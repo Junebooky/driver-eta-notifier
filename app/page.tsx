@@ -5,6 +5,7 @@ import { useDriverProfile } from '@/hooks/useDriverProfile';
 import { useLocation } from '@/hooks/useLocation';
 import { Header } from '@/components/Header';
 import { ProfileModal } from '@/components/ProfileModal';
+import { OriginDestinationSelector } from '@/components/OriginDestinationSelector';
 import { PresetButtons } from '@/components/PresetButtons';
 import { CustomPresetModal } from '@/components/CustomPresetModal';
 import { RouteInfoCard } from '@/components/RouteInfoCard';
@@ -30,6 +31,9 @@ export default function Home() {
     requestGpsLocation,
     saveRecentPreset,
   } = useLocation();
+
+  // Selection target mode: 'origin' or 'destination' (default: 'destination')
+  const [selectionTarget, setSelectionTarget] = useState<'origin' | 'destination'>('destination');
 
   // Custom Presets State
   const [customPresets, setCustomPresets] = useState<LocationPreset[]>([]);
@@ -60,7 +64,11 @@ export default function Home() {
   const handleAddCustomPreset = (newPreset: LocationPreset) => {
     const updated = [newPreset, ...customPresets];
     saveCustomPresetsToStorage(updated);
-    setDestination(newPreset);
+    if (selectionTarget === 'origin') {
+      setOrigin(newPreset);
+    } else {
+      setDestination(newPreset);
+    }
     setToastMessage(`커스텀 거점 [${newPreset.shortName}] 추가 완료`);
   };
 
@@ -69,6 +77,9 @@ export default function Home() {
     saveCustomPresetsToStorage(updated);
     if (destination.id === id) {
       setDestination(DEFAULT_PRESET_LOCATIONS[0]);
+    }
+    if (origin.id === id) {
+      setOrigin(DEFAULT_PRESET_LOCATIONS[2]);
     }
     setToastMessage('커스텀 거점이 삭제되었습니다.');
   };
@@ -129,11 +140,26 @@ export default function Home() {
     }
   }, [origin, destination, fetchRouteEstimate]);
 
-  // Handle Preset Destination Click
-  const handleSelectDestination = (preset: LocationPreset) => {
-    setDestination(preset);
-    saveRecentPreset(preset); // Update recent preset for underground GPS fallback
-    setToastMessage(`목적지 변경: [${preset.shortName}]`);
+  // Handle Preset Selection mapped to current target (origin or destination)
+  const handleSelectPreset = (preset: LocationPreset) => {
+    if (selectionTarget === 'origin') {
+      setOrigin(preset);
+      saveRecentPreset(preset);
+      setToastMessage(`출발지: [${preset.shortName}] 지정됨`);
+    } else {
+      setDestination(preset);
+      saveRecentPreset(preset);
+      setToastMessage(`목적지: [${preset.shortName}] 지정됨`);
+    }
+  };
+
+  // Bidirectional Swap UX (⇄)
+  const handleSwapOriginDestination = () => {
+    const prevOrigin = origin;
+    const prevDestination = destination;
+    setOrigin(prevDestination);
+    setDestination(prevOrigin);
+    setToastMessage(`출발지 ⇄ 목적지 맞교환: [${prevDestination.shortName}] ↔ [${prevOrigin.shortName}]`);
   };
 
   // Pre-calculated Report Text synchronously updated (Guarantees Safari User Gesture Compliance)
@@ -162,7 +188,7 @@ export default function Home() {
     <main className="min-h-screen pb-10 flex flex-col items-center bg-[#F8FAFC] text-slate-900">
       {/* 480px Mobile Viewport Container */}
       <div className="w-full max-w-[480px] min-h-screen flex flex-col justify-between border-x border-slate-200 shadow-sm bg-[#F8FAFC]">
-        {/* Top Header with Quick Navi Selector & Vehicle Info */}
+        {/* Top Header with Safe Area Inset & Minimal Navi Switcher */}
         <Header
           profile={profile}
           onOpenProfileModal={() => setIsProfileModalOpen(true)}
@@ -176,20 +202,28 @@ export default function Home() {
         <A2HSBanner />
 
         {/* Main Dashboard Content */}
-        <div className="flex-1 p-4 space-y-4">
-          {/* VIP Destination Presets Grid */}
+        <div className="flex-1 p-3.5 space-y-3">
+          {/* 1. Origin / Destination Separate Selection & Bidirectional Swap (⇄) UX */}
+          <OriginDestinationSelector
+            origin={origin}
+            destination={destination}
+            selectionTarget={selectionTarget}
+            onSelectTarget={(target) => setSelectionTarget(target)}
+            onSwap={handleSwapOriginDestination}
+          />
+
+          {/* 2. Simplified High-Density Preset Chips Grid */}
           <PresetButtons
             presets={allPresets}
-            selectedDestination={destination}
-            onSelectDestination={handleSelectDestination}
+            selectedOriginId={origin?.id}
+            selectedDestinationId={destination?.id}
+            onSelectPreset={handleSelectPreset}
             onOpenAddModal={() => setIsAddModalOpen(true)}
             onDeleteCustomPreset={handleDeleteCustomPreset}
           />
 
-          {/* Route Estimation & GPS Status */}
+          {/* 3. Route Estimation & ETA Status */}
           <RouteInfoCard
-            origin={origin}
-            destination={destination}
             routeEstimate={routeEstimate}
             isLoadingRoute={isLoadingRoute}
             isLocating={isLocating}
@@ -202,14 +236,14 @@ export default function Home() {
             }}
           />
 
-          {/* Report Template Selector & Live Preview */}
+          {/* 4. Report Template Selector */}
           <ReportTemplateSelector
             currentMode={reportMode}
             onSelectMode={(mode) => setReportMode(mode)}
             reportPreviewText={reportPreviewText}
           />
 
-          {/* 1-Sec Fast Pass & Kakao Share Action Panel */}
+          {/* 5. 1-Sec Fast Pass & Kakao Share Action Panel */}
           <ActionPanel
             defaultNavi={profile.defaultNavi}
             origin={origin}
@@ -222,7 +256,7 @@ export default function Home() {
 
         {/* Cockpit Footer */}
         <footer className="px-4 py-3 text-center text-[11px] font-semibold border-t border-slate-200 bg-white text-slate-500">
-          PROTOCOL COCKPIT v2.5 • VIP DRIVER SMART LAUNCHER
+          PROTOCOL COCKPIT v2.6 • VIP DRIVER SMART LAUNCHER
         </footer>
       </div>
 

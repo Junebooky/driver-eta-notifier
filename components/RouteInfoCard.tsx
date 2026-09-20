@@ -1,13 +1,11 @@
 'use client';
 
 import React from 'react';
-import { LocationPreset, RouteEstimate } from '@/types';
+import { RouteEstimate } from '@/types';
 import { Compass, AlertTriangle, RefreshCw, Clock, WifiOff, ShieldCheck } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface RouteInfoCardProps {
-  origin: LocationPreset;
-  destination: LocationPreset;
   routeEstimate: RouteEstimate | null;
   isLoadingRoute: boolean;
   isLocating: boolean;
@@ -18,8 +16,6 @@ interface RouteInfoCardProps {
 }
 
 export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
-  origin,
-  destination,
   routeEstimate,
   isLoadingRoute,
   isLocating,
@@ -29,28 +25,7 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
   onRefreshRoute,
 }) => {
   return (
-    <div className="w-full bg-white border border-slate-200 rounded-2xl p-4 shadow-xs space-y-3">
-      {/* Origin -> Destination Bar */}
-      <div className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-200">
-        <div className="flex items-center space-x-2 flex-1 min-w-0">
-          <div className="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0 animate-pulse" />
-          <div className="flex flex-col min-w-0">
-            <span className="text-[10px] font-bold text-slate-500 uppercase">출발지</span>
-            <span className="text-xs font-extrabold text-slate-900 truncate">{origin.shortName}</span>
-          </div>
-        </div>
-
-        <div className="px-2 text-slate-400 font-bold">→</div>
-
-        <div className="flex items-center space-x-2 flex-1 min-w-0 justify-end text-right">
-          <div className="flex flex-col min-w-0 items-end">
-            <span className="text-[10px] font-bold text-slate-500 uppercase">목적지</span>
-            <span className="text-xs font-extrabold text-blue-600 truncate">{destination.shortName}</span>
-          </div>
-          <div className="w-2.5 h-2.5 rounded-full bg-emerald-600 shrink-0" />
-        </div>
-      </div>
-
+    <div className="w-full bg-white border border-slate-200 rounded-2xl p-3.5 shadow-xs space-y-2 select-none">
       {/* Underground Parking / GPS Status Notice */}
       {isUndergroundFallback && (
         <div className="flex items-start space-x-2 bg-amber-50 border border-amber-200 p-2.5 rounded-xl text-amber-800 text-xs font-medium">
@@ -63,7 +38,7 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
       )}
 
       {/* Route & ETA Display Card */}
-      <div className="flex items-center justify-between bg-slate-50/80 border border-slate-200/80 p-3.5 rounded-xl">
+      <div className="flex items-center justify-between bg-slate-50/90 border border-slate-200/80 p-3.5 rounded-xl">
         <div>
           <div className="flex items-center space-x-1.5 text-xs text-slate-600 font-bold">
             <Clock className="w-3.5 h-3.5 text-blue-600" />
@@ -100,26 +75,28 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
           )}
         </div>
 
-        {/* Refresh & GPS Action Buttons with Haptic Feedback */}
+        {/* Refresh & GPS Action Buttons */}
         <div className="flex items-center space-x-2">
           <button
+            type="button"
             onClick={() => {
               haptics.lightTap();
               onRequestGps();
             }}
             disabled={isLocating}
-            className="p-2.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 hover:text-slate-900 shadow-xs transition-transform duration-100 active:scale-95 disabled:opacity-50"
-            title="GPS 현재 위치 조회"
+            className="p-2.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 hover:text-slate-900 shadow-xs transition-transform duration-100 active:scale-95 disabled:opacity-50 cursor-pointer"
+            title="GPS 현재 위치를 출발지로 설정"
           >
             <Compass className={`w-4 h-4 ${isLocating ? 'animate-spin text-blue-600' : ''}`} />
           </button>
           <button
+            type="button"
             onClick={() => {
               haptics.lightTap();
               onRefreshRoute();
             }}
             disabled={isLoadingRoute}
-            className="p-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white shadow-xs transition-transform duration-100 active:scale-95 disabled:opacity-50"
+            className="p-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white shadow-xs transition-transform duration-100 active:scale-95 disabled:opacity-50 cursor-pointer"
             title="ETA 재계산"
           >
             <RefreshCw className={`w-4 h-4 ${isLoadingRoute ? 'animate-spin' : ''}`} />

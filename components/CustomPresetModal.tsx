@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { LocationPreset } from '@/types';
-import { X, Plus, Search, MapPin, Loader2, Check } from 'lucide-react';
+import { X, Plus, Search, MapPin, Loader2 } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface CustomPresetModalProps {
@@ -85,7 +85,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
       return;
     }
     if (lat === null || lng === null) {
-      alert('검색 결과에서 거점을 선택하여 위도/경도를 등록해 주세요.');
+      alert('검색 결과에서 거점을 선택해 주세요.');
       return;
     }
 
@@ -125,6 +125,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
             <h2 className="text-sm font-black text-slate-900 tracking-tight">VIP 거점 실시간 검색 등록</h2>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 active:scale-95 transition-transform duration-100"
           >
@@ -153,7 +154,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
               <button
                 type="submit"
                 disabled={isSearching || !searchQuery.trim()}
-                className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-sm transition-transform duration-100 active:scale-95 flex items-center shrink-0"
+                className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-xs transition-transform duration-100 active:scale-95 flex items-center shrink-0"
               >
                 {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : '검색'}
               </button>
@@ -167,7 +168,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                     key={poi.id}
                     type="button"
                     onClick={() => handleSelectPoi(poi)}
-                    className="w-full p-2.5 text-left hover:bg-blue-50 active:bg-blue-100 transition-colors flex items-start space-x-2"
+                    className="w-full p-2.5 text-left hover:bg-blue-50 active:bg-blue-100 transition-colors flex items-start space-x-2 cursor-pointer"
                   >
                     <MapPin className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                     <div className="min-w-0 flex-1">
@@ -188,7 +189,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
           <form onSubmit={handleSubmit} className="space-y-3 pt-2 border-t border-slate-100">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                거점 전체 명칭 (자동 입력됨)
+                거점 전체 명칭 (자동 입력)
               </label>
               <input
                 type="text"
@@ -216,7 +217,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                상세 주소 (자동 매핑됨)
+                상세 주소 (자동 매핑)
               </label>
               <input
                 type="text"
@@ -226,13 +227,6 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                 className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 text-xs focus:outline-none"
               />
             </div>
-
-            {lat !== null && lng !== null && (
-              <div className="flex items-center space-x-1.5 text-[11px] text-emerald-600 font-bold bg-emerald-50 p-2 rounded-lg border border-emerald-200">
-                <Check className="w-3.5 h-3.5 text-emerald-600" />
-                <span>TMAP 좌표 매핑 완료 ({lat.toFixed(4)}, {lng.toFixed(4)})</span>
-              </div>
-            )}
 
             {/* Actions */}
             <div className="pt-2 flex items-center space-x-2">
@@ -248,7 +242,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                 disabled={lat === null || !name.trim()}
                 className="w-2/3 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-xs font-black shadow-md shadow-blue-500/20 active:scale-95 transition-transform duration-100"
               >
-                커스텀 거점 저장
+                저장
               </button>
             </div>
           </form>

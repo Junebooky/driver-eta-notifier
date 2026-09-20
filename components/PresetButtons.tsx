@@ -2,120 +2,104 @@
 
 import React from 'react';
 import { LocationPreset } from '@/types';
-import { Plane, Building2, Flag, RotateCcw, MapPin, Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface PresetButtonsProps {
   presets: LocationPreset[];
-  selectedDestination: LocationPreset;
-  onSelectDestination: (preset: LocationPreset) => void;
+  selectedOriginId?: string;
+  selectedDestinationId?: string;
+  onSelectPreset: (preset: LocationPreset) => void;
   onOpenAddModal: () => void;
   onDeleteCustomPreset?: (id: string) => void;
 }
 
-const CATEGORY_ICONS: Record<string, React.ReactNode> = {
-  AIRPORT: <Plane className="w-4 h-4 text-sky-600" />,
-  HOTEL: <Building2 className="w-4 h-4 text-amber-600" />,
-  CIRCUIT: <Flag className="w-4 h-4 text-rose-600" />,
-  RETURN: <RotateCcw className="w-4 h-4 text-emerald-600" />,
-  CUSTOM: <MapPin className="w-4 h-4 text-purple-600" />,
-};
-
 export const PresetButtons: React.FC<PresetButtonsProps> = ({
   presets,
-  selectedDestination,
-  onSelectDestination,
+  selectedOriginId,
+  selectedDestinationId,
+  onSelectPreset,
   onOpenAddModal,
   onDeleteCustomPreset,
 }) => {
   return (
-    <div className="w-full bg-white border border-slate-200 rounded-2xl p-4 shadow-xs">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center">
-          <MapPin className="w-3.5 h-3.5 mr-1.5 text-blue-600" /> VIP 거점 원터치 선택
-        </h3>
-
-        {/* Top Add Custom Preset Button */}
-        <button
-          onClick={() => {
-            haptics.lightTap();
-            onOpenAddModal();
-          }}
-          className="px-2.5 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 active:scale-95 transition-transform duration-100 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 shadow-xs"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span>거점 추가</span>
-        </button>
-      </div>
-
-      {/* Grid of presets - 2 columns for large touch targets on mobile */}
-      <div className="grid grid-cols-2 gap-2.5">
+    <div className="w-full bg-white border border-slate-200 rounded-2xl p-2.5 shadow-xs select-none">
+      {/* 3-Column High-Density Grid (No Section Title, No Emojis) */}
+      <div className="grid grid-cols-3 gap-1.5">
         {presets.map((preset) => {
-          const isSelected = selectedDestination.id === preset.id;
+          const isOrigin = selectedOriginId === preset.id;
+          const isDestination = selectedDestinationId === preset.id;
           const isCustom = preset.category === 'CUSTOM';
 
+          let stateClasses = 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 font-bold';
+          if (isDestination) {
+            stateClasses = 'bg-emerald-50 border-emerald-500 text-emerald-900 ring-2 ring-emerald-500/20 font-black shadow-2xs';
+          } else if (isOrigin) {
+            stateClasses = 'bg-blue-50 border-blue-500 text-blue-900 ring-2 ring-blue-500/20 font-black shadow-2xs';
+          }
+
           return (
-            <div key={preset.id} className="relative group select-none">
+            <div key={preset.id} className="relative group">
               <button
+                type="button"
                 onClick={() => {
                   haptics.lightTap();
-                  onSelectDestination(preset);
+                  onSelectPreset(preset);
                 }}
-                className={`w-full p-3.5 rounded-xl border text-left transition-transform duration-100 active:scale-95 flex flex-col justify-between min-h-[76px] cursor-pointer ${
-                  isSelected
-                    ? 'bg-blue-50/80 border-blue-500 text-blue-900 ring-2 ring-blue-500/20 shadow-xs'
-                    : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700'
-                }`}
+                className={`w-full py-2.5 px-2 rounded-xl border text-center transition-transform duration-100 active:scale-95 flex flex-col items-center justify-center min-h-[44px] cursor-pointer ${stateClasses}`}
+                title={preset.name}
               >
-                <div className="flex items-center justify-between w-full">
-                  <span className="p-1 rounded-lg bg-white border border-slate-200 shadow-2xs">
-                    {CATEGORY_ICONS[preset.category] || <MapPin className="w-4 h-4 text-blue-600" />}
-                  </span>
-                  <div className="flex items-center space-x-1">
-                    {isCustom && (
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 border border-purple-200">
-                        커스텀
-                      </span>
-                    )}
-                    {isSelected && (
-                      <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-blue-600 text-white shadow-2xs">
-                        선택됨
-                      </span>
-                    )}
-                  </div>
-                </div>
+                <span className="text-xs tracking-tight truncate w-full">
+                  {preset.shortName}
+                </span>
 
-                <div className="mt-2">
-                  <div className="font-extrabold text-sm tracking-tight text-slate-900 truncate">
-                    {preset.shortName}
-                  </div>
-                  {preset.address && (
-                    <div className="text-[10px] text-slate-500 font-medium truncate mt-0.5">
-                      {preset.address}
-                    </div>
-                  )}
-                </div>
+                {/* Status Indicator Tag */}
+                {isDestination && (
+                  <span className="text-[9px] font-black text-emerald-600 uppercase tracking-tighter leading-none mt-0.5">
+                    도착지
+                  </span>
+                )}
+                {isOrigin && !isDestination && (
+                  <span className="text-[9px] font-black text-blue-600 uppercase tracking-tighter leading-none mt-0.5">
+                    출발지
+                  </span>
+                )}
               </button>
 
-              {/* Delete button for user custom preset */}
+              {/* Delete button for custom presets */}
               {isCustom && onDeleteCustomPreset && (
                 <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     haptics.lightTap();
-                    if (confirm(`'${preset.shortName}' 커스텀 거점을 삭제하시겠습니까?`)) {
+                    if (confirm(`'${preset.shortName}' 거점을 삭제하시겠습니까?`)) {
                       onDeleteCustomPreset(preset.id);
                     }
                   }}
-                  className="absolute top-2 right-2 p-1 rounded-md bg-rose-100 hover:bg-rose-200 text-rose-600 border border-rose-200 opacity-80 hover:opacity-100 active:scale-90 transition-all"
-                  title="커스텀 거점 삭제"
+                  className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-100 hover:bg-rose-500 text-rose-600 hover:text-white border border-rose-300 flex items-center justify-center opacity-80 hover:opacity-100 active:scale-90 transition-all cursor-pointer z-10"
+                  title="거점 삭제"
                 >
-                  <Trash2 className="w-3 h-3" />
+                  <Trash2 className="w-2.5 h-2.5" />
                 </button>
               )}
             </div>
           );
         })}
+
+        {/* Integrated Compact '+ 거점 추가' Button */}
+        <button
+          type="button"
+          onClick={() => {
+            haptics.lightTap();
+            onOpenAddModal();
+          }}
+          className="w-full py-2.5 px-2 rounded-xl border border-dashed border-slate-300 hover:border-blue-500 bg-slate-50/60 hover:bg-blue-50/60 text-slate-500 hover:text-blue-600 text-xs font-bold flex items-center justify-center space-x-1 active:scale-95 transition-transform duration-100 cursor-pointer min-h-[44px]"
+          title="새 거점 검색 및 등록"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>추가</span>
+        </button>
       </div>
     </div>
   );
