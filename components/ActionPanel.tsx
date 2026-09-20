@@ -3,8 +3,8 @@
 import React from 'react';
 import { NaviProvider, LocationPreset, RouteEstimate } from '@/types';
 import { launchNavigationApp } from '@/utils/navigation';
-import { shareViaKakaoTalk } from '@/utils/kakao';
-import { Zap, Share2, Navigation } from 'lucide-react';
+import { generateVipReportText, copyAndLaunchKakaoTalk } from '@/utils/kakao';
+import { Zap, MessageSquare, Navigation } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface ActionPanelProps {
@@ -14,7 +14,6 @@ interface ActionPanelProps {
   routeEstimate: RouteEstimate | null;
   reportText: string;
   onShowToast: (message: string) => void;
-  isOledMode?: boolean;
 }
 
 const NAVI_DISPLAY_NAMES: Record<NaviProvider, string> = {
@@ -30,13 +29,12 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   routeEstimate,
   reportText,
   onShowToast,
-  isOledMode = false,
 }) => {
   /**
    * 1-Second Fast Pass Action (Synchronous Clipboard Copy on Safari User Activation + Navi Launch + Haptics)
    */
   const handleFastPassAction = () => {
-    // Confirmation pulse haptic feedback for primary fast pass action ([30ms, 40ms, 30ms])
+    // Confirmation pulse haptic feedback for primary fast pass action
     haptics.successPulse();
 
     // 1. TOP-LEVEL SYNCHRONOUS CLIPBOARD COPY (Mandatory for Safari User Gesture Security)
@@ -74,70 +72,48 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   };
 
   /**
-   * KakaoTalk Share Card Popup Action with 3-tier Fallback
+   * Pure Text Copy & KakaoTalk App Launch Pipeline
+   * Copies formatted text and immediately invokes kakaotalk:// URL scheme
    */
-  const handleKakaoShareAction = async () => {
-    // Light tap haptic feedback (15ms)
+  const handleKakaoReportAction = async () => {
     haptics.lightTap();
-    onShowToast('카카오톡 전송 창을 호출하는 중...');
 
-    const shared = await shareViaKakaoTalk({
+    const formattedVipText = generateVipReportText({
       destinationName: destination.shortName,
       originName: origin.shortName,
+      distanceKm: routeEstimate?.distanceKm || 62.4,
       durationMinutes: routeEstimate?.durationMinutes || 70,
       etaFormatted: routeEstimate?.etaFormatted || '약 70분 소요',
-      targetLat: destination.lat,
-      targetLng: destination.lng,
-      rawText: reportText,
     });
 
-    // Tertiary Fallback: If both Kakao SDK and Web Share API fail/unsupported, copy to clipboard
-    if (!shared) {
-      try {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          await navigator.clipboard.writeText(reportText);
-        } else {
-          const textArea = document.createElement('textarea');
-          textArea.value = reportText;
-          document.body.appendChild(textArea);
-          textArea.select();
-          document.execCommand('copy');
-          document.body.removeChild(textArea);
-        }
-        onShowToast('📋 클립보드 복사 완료! 카카오톡 단톡방에 붙여넣으세요.');
-      } catch (e) {
-        onShowToast('카카오톡 전송에 실패했습니다.');
-      }
+    const copied = await copyAndLaunchKakaoTalk(formattedVipText);
+
+    if (copied) {
+      onShowToast('📋 보고 문구 복사 완료! 카카오톡을 실행합니다.');
+    } else {
+      onShowToast('카카오톡을 실행합니다. (복사 실패 시 재시도)');
     }
   };
 
   return (
-    <div className="w-full space-y-3 pt-1">
+    <div className="w-full space-y-3 pt-1 select-none">
       {/* 1-Second Fast Pass Primary Button */}
       <button
         onClick={handleFastPassAction}
-        className={`w-full py-4 px-4 active:scale-[0.98] text-white rounded-2xl font-black text-base tracking-tight flex items-center justify-center space-x-2 transition-all group ${
-          isOledMode
-            ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 border-2 border-cyan-400 shadow-2xl shadow-cyan-950/80 text-white ring-1 ring-cyan-400/50'
-            : 'bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-600 shadow-xl shadow-blue-900/50 border border-blue-400/30'
-        }`}
+        className="w-full py-4 px-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-600 active:scale-95 transition-transform duration-100 text-white rounded-2xl font-black text-base tracking-tight shadow-md shadow-blue-500/20 flex items-center justify-center space-x-2 border border-blue-500/30 group"
       >
         <Zap className="w-5 h-5 text-yellow-300 fill-yellow-300 animate-bounce" />
         <span>1초 패스트패스 (보고복사 + {NAVI_DISPLAY_NAMES[defaultNavi]} 직행)</span>
         <Navigation className="w-4 h-4 ml-1 group-hover:translate-x-0.5 transition-transform" />
       </button>
 
-      {/* KakaoTalk Share Secondary Button */}
+      {/* KakaoTalk Pure Text Copy & App Launch Button */}
       <button
-        onClick={handleKakaoShareAction}
-        className={`w-full py-3.5 px-4 active:scale-[0.98] rounded-2xl font-extrabold text-sm tracking-tight flex items-center justify-center space-x-2 transition-all ${
-          isOledMode
-            ? 'bg-amber-400 hover:bg-amber-300 text-black border-2 border-amber-300 shadow-xl shadow-amber-950/60'
-            : 'bg-amber-400 hover:bg-amber-300 text-amber-950 border border-amber-300 shadow-lg shadow-amber-900/20'
-        }`}
+        onClick={handleKakaoReportAction}
+        className="w-full py-3.5 px-4 bg-[#FEE500] hover:bg-[#FDD835] active:scale-95 transition-transform duration-100 text-[#3C1E1E] rounded-2xl font-black text-sm tracking-tight shadow-xs flex items-center justify-center space-x-2 border border-[#E6CF00]"
       >
-        <Share2 className="w-4 h-4 text-black" />
-        <span>카카오톡 단톡방 보고 공유 (VIP 피드)</span>
+        <MessageSquare className="w-4 h-4 text-[#3C1E1E] fill-[#3C1E1E]" />
+        <span>카카오톡 단톡방 보고 (텍스트 복사 + 앱 실행)</span>
       </button>
     </div>
   );

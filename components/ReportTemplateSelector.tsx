@@ -9,39 +9,31 @@ interface ReportTemplateSelectorProps {
   currentMode: ReportMode;
   onSelectMode: (mode: ReportMode) => void;
   reportPreviewText: string;
-  isOledMode?: boolean;
 }
 
 const TEMPLATES: { mode: ReportMode; label: string; icon: React.ReactNode; color: string }[] = [
-  { mode: 'DEPARTURE', label: '[출발/이동]', icon: <Send className="w-3.5 h-3.5" />, color: 'border-blue-500 text-blue-400 bg-blue-500/10' },
-  { mode: 'ARRIVED', label: '[도착/하차]', icon: <CheckCircle2 className="w-3.5 h-3.5" />, color: 'border-emerald-500 text-emerald-400 bg-emerald-500/10' },
-  { mode: 'WAITING', label: '[현장 대기]', icon: <Clock className="w-3.5 h-3.5" />, color: 'border-amber-500 text-amber-400 bg-amber-500/10' },
-  { mode: 'RETURN', label: '[차량 반납]', icon: <Car className="w-3.5 h-3.5" />, color: 'border-purple-500 text-purple-400 bg-purple-500/10' },
+  { mode: 'DEPARTURE', label: '[출발/이동]', icon: <Send className="w-3.5 h-3.5" />, color: 'border-blue-500 text-blue-700 bg-blue-50/80 ring-2 ring-blue-500/20' },
+  { mode: 'ARRIVED', label: '[도착/하차]', icon: <CheckCircle2 className="w-3.5 h-3.5" />, color: 'border-emerald-500 text-emerald-700 bg-emerald-50/80 ring-2 ring-emerald-500/20' },
+  { mode: 'WAITING', label: '[현장 대기]', icon: <Clock className="w-3.5 h-3.5" />, color: 'border-amber-500 text-amber-700 bg-amber-50/80 ring-2 ring-amber-500/20' },
+  { mode: 'RETURN', label: '[차량 반납]', icon: <Car className="w-3.5 h-3.5" />, color: 'border-purple-500 text-purple-700 bg-purple-50/80 ring-2 ring-purple-500/20' },
 ];
 
 export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
   currentMode,
   onSelectMode,
   reportPreviewText,
-  isOledMode = false,
 }) => {
   return (
-    <div
-      className={`w-full rounded-2xl p-4 transition-colors space-y-3 ${
-        isOledMode
-          ? 'bg-black border-2 border-zinc-800 shadow-none'
-          : 'bg-zinc-900 border border-zinc-800 shadow-md'
-      }`}
-    >
+    <div className="w-full bg-white border border-slate-200 rounded-2xl p-4 shadow-xs space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center">
-          <FileText className={`w-3.5 h-3.5 mr-1.5 ${isOledMode ? 'text-cyan-400' : 'text-blue-400'}`} /> 단톡방 현장 보고 모드
+        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center">
+          <FileText className="w-3.5 h-3.5 mr-1.5 text-blue-600" /> 단톡방 현장 보고 모드
         </h3>
-        <span className="text-[11px] text-zinc-500 font-medium">원터치 템플릿</span>
+        <span className="text-[11px] text-slate-400 font-semibold">원터치 템플릿</span>
       </div>
 
       {/* Mode Selector Tabs */}
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2 select-none">
         {TEMPLATES.map((item) => {
           const isSelected = currentMode === item.mode;
           return (
@@ -51,12 +43,10 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
                 haptics.lightTap();
                 onSelectMode(item.mode);
               }}
-              className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center space-x-1.5 active:scale-95 ${
+              className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition-transform duration-100 flex items-center justify-center space-x-1.5 active:scale-95 cursor-pointer ${
                 isSelected
-                  ? `${item.color} ring-2 ring-blue-500/40 shadow-sm font-extrabold`
-                  : isOledMode
-                  ? 'bg-black border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
-                  : 'bg-zinc-950 border-zinc-850 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
+                  ? `${item.color} font-black shadow-2xs`
+                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'
               }`}
             >
               {item.icon}
@@ -67,12 +57,12 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
       </div>
 
       {/* Live Report Preview Box */}
-      <div className="bg-black border border-zinc-800 rounded-xl p-3">
-        <div className="text-[10px] font-bold text-zinc-500 uppercase mb-1 flex items-center justify-between">
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+        <div className="text-[10px] font-bold text-slate-500 uppercase mb-1 flex items-center justify-between">
           <span>보고 전송 텍스트 미리보기</span>
-          <span className={`${isOledMode ? 'text-cyan-400' : 'text-blue-400'} font-semibold`}>자동 갱신됨</span>
+          <span className="text-blue-600 font-semibold">실시간 갱신됨</span>
         </div>
-        <p className="text-xs font-mono font-medium text-zinc-100 leading-relaxed bg-zinc-950 p-2.5 rounded-lg border border-zinc-850 select-all">
+        <p className="text-xs font-mono font-medium text-slate-800 leading-relaxed bg-white p-2.5 rounded-lg border border-slate-200 shadow-2xs select-all">
           {reportPreviewText}
         </p>
       </div>

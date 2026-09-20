@@ -15,11 +15,9 @@ import { A2HSBanner } from '@/components/A2HSBanner';
 import { LocationPreset, ReportMode, RouteEstimate } from '@/types';
 import { DEFAULT_PRESET_LOCATIONS } from '@/utils/presets';
 import { generateReportText } from '@/utils/reportGenerator';
-import { initKakaoSDK } from '@/utils/kakao';
 import { calculateHaversineEstimate } from '@/utils/navigation';
 
 const CUSTOM_PRESETS_KEY = 'protocol_cockpit_custom_presets_v1';
-const OLED_MODE_KEY = 'protocol_cockpit_oled_mode_v1';
 
 export default function Home() {
   const { profile, isLoaded, updateProfile, setPreferredNavi } = useDriverProfile();
@@ -33,40 +31,21 @@ export default function Home() {
     saveRecentPreset,
   } = useLocation();
 
-  // OLED Pure Black Mode State (Default true for VIP night driving)
-  const [isOledMode, setIsOledMode] = useState(true);
-
   // Custom Presets State
   const [customPresets, setCustomPresets] = useState<LocationPreset[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-  // Load Custom Presets & OLED mode from LocalStorage on mount
+  // Load Custom Presets from LocalStorage on mount
   useEffect(() => {
     try {
       const savedPresets = localStorage.getItem(CUSTOM_PRESETS_KEY);
       if (savedPresets) {
         setCustomPresets(JSON.parse(savedPresets));
       }
-      const savedOled = localStorage.getItem(OLED_MODE_KEY);
-      if (savedOled !== null) {
-        setIsOledMode(savedOled === 'true');
-      }
     } catch (e) {
-      console.warn('Failed to load settings from storage:', e);
+      console.warn('Failed to load presets from storage:', e);
     }
   }, []);
-
-  const handleToggleOledMode = () => {
-    setIsOledMode((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem(OLED_MODE_KEY, String(next));
-      } catch (e) {
-        console.warn('Failed to save OLED mode:', e);
-      }
-      return next;
-    });
-  };
 
   // Save Custom Presets to LocalStorage
   const saveCustomPresetsToStorage = (updated: LocationPreset[]) => {
@@ -102,18 +81,13 @@ export default function Home() {
   const [destination, setDestination] = useState<LocationPreset>(DEFAULT_PRESET_LOCATIONS[0]);
   const [reportMode, setReportMode] = useState<ReportMode>('DEPARTURE');
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-  
+
   // Route estimation state
   const [routeEstimate, setRouteEstimate] = useState<RouteEstimate | null>(null);
   const [isLoadingRoute, setIsLoadingRoute] = useState(false);
 
   // Toast feedback state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  // Initialize Kakao SDK on mount
-  useEffect(() => {
-    initKakaoSDK();
-  }, []);
 
   // Fetch route duration & ETA from API
   const fetchRouteEstimate = useCallback(
@@ -175,9 +149,9 @@ export default function Home() {
 
   if (!isLoaded) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center text-zinc-400 font-bold text-sm">
+      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center text-slate-500 font-bold text-sm">
         <div className="flex flex-col items-center space-y-2">
-          <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
           <span>관제 런처 시스템 로딩 중...</span>
         </div>
       </div>
@@ -185,18 +159,10 @@ export default function Home() {
   }
 
   return (
-    <main
-      className={`min-h-screen pb-10 flex flex-col items-center transition-colors ${
-        isOledMode ? 'bg-black text-white' : 'bg-zinc-950 text-zinc-100'
-      }`}
-    >
+    <main className="min-h-screen pb-10 flex flex-col items-center bg-[#F8FAFC] text-slate-900">
       {/* 480px Mobile Viewport Container */}
-      <div
-        className={`w-full max-w-[480px] min-h-screen flex flex-col justify-between border-x shadow-2xl transition-colors ${
-          isOledMode ? 'bg-black border-zinc-800' : 'bg-zinc-950 border-zinc-850'
-        }`}
-      >
-        {/* Top Header with Quick Navi Selector, OLED Mode & Vehicle Info */}
+      <div className="w-full max-w-[480px] min-h-screen flex flex-col justify-between border-x border-slate-200 shadow-sm bg-[#F8FAFC]">
+        {/* Top Header with Quick Navi Selector & Vehicle Info */}
         <Header
           profile={profile}
           onOpenProfileModal={() => setIsProfileModalOpen(true)}
@@ -204,8 +170,6 @@ export default function Home() {
             setPreferredNavi(prov);
             setToastMessage(`주력 내비게이션 [${prov.toUpperCase()}] 변경됨`);
           }}
-          isOledMode={isOledMode}
-          onToggleOledMode={handleToggleOledMode}
         />
 
         {/* Add to Home Screen Guidance Banner */}
@@ -220,7 +184,6 @@ export default function Home() {
             onSelectDestination={handleSelectDestination}
             onOpenAddModal={() => setIsAddModalOpen(true)}
             onDeleteCustomPreset={handleDeleteCustomPreset}
-            isOledMode={isOledMode}
           />
 
           {/* Route Estimation & GPS Status */}
@@ -237,7 +200,6 @@ export default function Home() {
               fetchRouteEstimate(origin, destination);
               setToastMessage('ETA 및 실시간 경로를 재계산했습니다.');
             }}
-            isOledMode={isOledMode}
           />
 
           {/* Report Template Selector & Live Preview */}
@@ -245,7 +207,6 @@ export default function Home() {
             currentMode={reportMode}
             onSelectMode={(mode) => setReportMode(mode)}
             reportPreviewText={reportPreviewText}
-            isOledMode={isOledMode}
           />
 
           {/* 1-Sec Fast Pass & Kakao Share Action Panel */}
@@ -256,17 +217,12 @@ export default function Home() {
             routeEstimate={routeEstimate}
             reportText={reportPreviewText}
             onShowToast={(msg) => setToastMessage(msg)}
-            isOledMode={isOledMode}
           />
         </div>
 
         {/* Cockpit Footer */}
-        <footer
-          className={`px-4 py-3 text-center text-[11px] font-semibold border-t transition-colors ${
-            isOledMode ? 'bg-black border-zinc-850 text-zinc-500' : 'bg-zinc-950 border-zinc-900 text-zinc-600'
-          }`}
-        >
-          PROTOCOL COCKPIT v2.0 • VIP DRIVER SMART LAUNCHER
+        <footer className="px-4 py-3 text-center text-[11px] font-semibold border-t border-slate-200 bg-white text-slate-500">
+          PROTOCOL COCKPIT v2.5 • VIP DRIVER SMART LAUNCHER
         </footer>
       </div>
 

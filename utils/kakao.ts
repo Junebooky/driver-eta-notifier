@@ -1,139 +1,67 @@
-declare global {
-  interface Window {
-    Kakao?: any;
-  }
-}
+/**
+ * VIP Protocol Reporting and KakaoTalk App Launch Utility
+ */
 
-export interface KakaoFeedShareParams {
+export interface VipReportParams {
   destinationName: string;
   originName: string;
+  distanceKm: number;
   durationMinutes: number;
   etaFormatted: string;
-  targetLat?: number;
-  targetLng?: number;
-  rawText?: string;
-}
-
-export function initKakaoSDK(): boolean {
-  if (typeof window === 'undefined') return false;
-
-  const kakaoKey = process.env.NEXT_PUBLIC_KAKAO_JS_KEY || process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY;
-  if (!kakaoKey || kakaoKey === 'your_kakao_js_key') {
-    return false;
-  }
-
-  try {
-    if (window.Kakao) {
-      if (!window.Kakao.isInitialized()) {
-        window.Kakao.init(kakaoKey);
-      }
-      return window.Kakao.isInitialized();
-    }
-  } catch (e) {
-    console.warn('Kakao SDK hydration safe init failed:', e);
-  }
-
-  return false;
 }
 
 /**
- * VIP Protocol Feed Template KakaoTalk Share with Multi-tier Fallback Chain
- * 1. Kakao SDK Feed Template (Kakao.Share.sendDefault)
- * 2. Native Web Share API (navigator.share)
- * 3. Clipboard Text Copy (handled by caller if this returns false)
+ * Generates standardized plain text for VIP Protocol Reporting
+ * Specification:
+ * [VIP 의전 운행 보고]
+ * • 목적지: {목적지명}
+ * • 출발지: {출발지명}
+ * • 이동거리: {거리} km
+ * • 예상소요: 약 {소요분}분
+ * • 도착예정: {ETA시각} (실시간 교통 반영)
  */
-export async function shareViaKakaoTalk(
-  params: KakaoFeedShareParams | string
-): Promise<boolean> {
+export function generateVipReportText({
+  destinationName,
+  originName,
+  distanceKm,
+  durationMinutes,
+  etaFormatted,
+}: VipReportParams): string {
+  const cleanEta = etaFormatted.split(' ')[0] || etaFormatted;
+  return `[VIP 의전 운행 보고]\n• 목적지: ${destinationName}\n• 출발지: ${originName}\n• 이동거리: ${distanceKm} km\n• 예상소요: 약 ${durationMinutes}분\n• 도착예정: ${cleanEta} (실시간 교통 반영)`;
+}
+
+/**
+ * Copies formatted report text to clipboard and immediately launches KakaoTalk app
+ */
+export async function copyAndLaunchKakaoTalk(text: string): Promise<boolean> {
   if (typeof window === 'undefined') return false;
 
-  let title = 'VIP 의전 업무 보고';
-  let description = '';
-  let fullText = '';
-  let destinationName = '목적지';
-  let originName = '출발지';
-  let durationMinutes = 70;
-  let etaFormatted = '도착 예정';
-  let targetLat = 37.4495;
-  let targetLng = 126.4512;
-
-  if (typeof params === 'string') {
-    fullText = params;
-    description = params;
-  } else {
-    destinationName = params.destinationName || '목적지';
-    originName = params.originName || '출발지';
-    durationMinutes = params.durationMinutes || 70;
-    etaFormatted = params.etaFormatted || '도착 예정';
-    targetLat = params.targetLat ?? 37.4495;
-    targetLng = params.targetLng ?? 126.4512;
-
-    title = `[VIP 의전 운행 안내] ${destinationName}`;
-    description = `출발지: ${originName}\n예상 소요시간: 약 ${durationMinutes}분\n도착 예정시각: ${etaFormatted} (실시간 교통 반영)`;
-    fullText =
-      params.rawText ||
-      `${title}\n\n${description}\n\n티맵 경로: https://driver-eta-notifier.vercel.app/tmap?name=${encodeURIComponent(
-        destinationName
-      )}&lat=${targetLat}&lng=${targetLng}\n웹 관제: https://driver-eta-notifier.vercel.app`;
-  }
-
-  const cockpitUrl = 'https://driver-eta-notifier.vercel.app';
-  const tmapRedirectUrl = `${cockpitUrl}/tmap?name=${encodeURIComponent(
-    destinationName
-  )}&lat=${targetLat}&lng=${targetLng}`;
-
-  // 1. Primary: Kakao SDK Feed Template
-  const isInitialized = initKakaoSDK();
-  if (isInitialized && window.Kakao?.Share) {
-    try {
-      window.Kakao.Share.sendDefault({
-        objectType: 'feed',
-        content: {
-          title: title,
-          description: description,
-          imageUrl: `${cockpitUrl}/icon.png`,
-          link: {
-            mobileWebUrl: cockpitUrl,
-            webUrl: cockpitUrl,
-          },
-        },
-        buttons: [
-          {
-            title: '티맵 경로 확인',
-            link: {
-              mobileWebUrl: tmapRedirectUrl,
-              webUrl: tmapRedirectUrl,
-            },
-          },
-          {
-            title: '웹 관제 상황실',
-            link: {
-              mobileWebUrl: cockpitUrl,
-              webUrl: cockpitUrl,
-            },
-          },
-        ],
-      });
-      return true;
-    } catch (err) {
-      console.warn('Kakao Feed Share failed, falling back to Web Share API:', err);
+  // 1. Synchronous clipboard write for Safari user gesture compliance
+  let copySuccess = false;
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      copySuccess = true;
+    } else {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      copySuccess = true;
     }
+  } catch (err) {
+    console.warn('Clipboard write failed:', err);
   }
 
-  // 2. Secondary Fallback: Native Web Share API
-  if (typeof navigator !== 'undefined' && navigator.share) {
-    try {
-      await navigator.share({
-        title: title,
-        text: fullText,
-        url: cockpitUrl,
-      });
-      return true;
-    } catch (e) {
-      console.warn('Native Web Share cancelled or failed:', e);
-    }
+  // 2. Trigger kakaotalk:// URL scheme to immediately launch the app
+  try {
+    window.location.href = 'kakaotalk://';
+  } catch (err) {
+    console.warn('KakaoTalk scheme launch failed:', err);
   }
 
-  // 3. Returns false to trigger tertiary fallback (Clipboard copy in UI)
-  return false;
+  return copySuccess;
 }

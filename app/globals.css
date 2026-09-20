@@ -30,15 +30,15 @@
   }
 }
 
-/* Custom scrollbars for cockpit view */
+/* Custom clean scrollbars for cockpit view */
 ::-webkit-scrollbar {
   width: 4px;
   height: 4px;
 }
 ::-webkit-scrollbar-track {
-  background: #09090b;
+  background: #F1F5F9;
 }
 ::-webkit-scrollbar-thumb {
-  background: #27272a;
+  background: #CBD5E1;
   border-radius: 4px;
 }
