@@ -229,14 +229,14 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                 <div className="p-2 text-[10px] font-bold text-slate-400 bg-slate-50/80 uppercase">
                   터치하여 원터치 등록
                 </div>
-                {searchResults.map((poi) => (
+                {searchResults.map((poi, index) => (
                   <button
-                    key={poi.id}
+                    key={`${poi.id || 'poi'}-${index}`}
                     type="button"
                     onClick={() => handleSelectPoi(poi)}
-                    className="w-full p-2.5 text-left hover:bg-blue-50 active:bg-blue-100 transition-colors flex items-start space-x-2 cursor-pointer group"
+                    className="w-full p-2.5 text-left hover:bg-blue-50/80 active:bg-blue-100 transition-colors flex items-start space-x-2 cursor-pointer group"
                   >
-                    <MapPin className="w-4 h-4 text-blue-600 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
+                    <MapPin className="w-4 h-4 text-[#1E60F3] shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
                     <div className="min-w-0 flex-1">
                       <div className="text-xs font-bold text-slate-900 truncate">{poi.name}</div>
                       <div className="text-[10px] text-slate-500 truncate mt-0.5">{poi.address}</div>

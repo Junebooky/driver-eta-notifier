@@ -35,30 +35,39 @@ export default function Home() {
   // Selection target mode: 'origin' or 'destination' (default: 'destination')
   const [selectionTarget, setSelectionTarget] = useState<'origin' | 'destination'>('destination');
 
-  // Custom Presets State
-  const [customPresets, setCustomPresets] = useState<LocationPreset[]>([]);
+  // Ordered Presets State (combining defaults + customs with permanent order persistence)
+  const ORDERED_PRESETS_KEY = 'protocol_cockpit_ordered_presets_v2';
+  const [presets, setPresets] = useState<LocationPreset[]>(DEFAULT_PRESET_LOCATIONS);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingPreset, setEditingPreset] = useState<LocationPreset | null>(null);
 
-  // Load Custom Presets from LocalStorage on mount
+  // Load Presets from LocalStorage on mount
   useEffect(() => {
     try {
-      const savedPresets = localStorage.getItem(CUSTOM_PRESETS_KEY);
-      if (savedPresets) {
-        setCustomPresets(JSON.parse(savedPresets));
+      const savedOrdered = localStorage.getItem(ORDERED_PRESETS_KEY);
+      if (savedOrdered) {
+        setPresets(JSON.parse(savedOrdered));
+        return;
+      }
+      const savedCustom = localStorage.getItem(CUSTOM_PRESETS_KEY);
+      if (savedCustom) {
+        const parsedCustom = JSON.parse(savedCustom);
+        setPresets([...DEFAULT_PRESET_LOCATIONS, ...parsedCustom]);
+        return;
       }
     } catch (e) {
       console.warn('Failed to load presets from storage:', e);
     }
+    setPresets(DEFAULT_PRESET_LOCATIONS);
   }, []);
 
-  // Save Custom Presets to LocalStorage
-  const saveCustomPresetsToStorage = (updated: LocationPreset[]) => {
-    setCustomPresets(updated);
+  // Save Presets to LocalStorage
+  const savePresetsToStorage = (updated: LocationPreset[]) => {
+    setPresets(updated);
     try {
-      localStorage.setItem(CUSTOM_PRESETS_KEY, JSON.stringify(updated));
+      localStorage.setItem(ORDERED_PRESETS_KEY, JSON.stringify(updated));
     } catch (e) {
-      console.warn('Failed to save custom presets:', e);
+      console.warn('Failed to save ordered presets:', e);
     }
   };
 
@@ -73,25 +82,19 @@ export default function Home() {
   };
 
   const handleAddCustomPreset = (newPreset: LocationPreset) => {
-    const updated = [newPreset, ...customPresets];
-    saveCustomPresetsToStorage(updated);
+    const updated = [...presets, newPreset];
+    savePresetsToStorage(updated);
     if (selectionTarget === 'origin') {
       setOrigin(newPreset);
     } else {
       setDestination(newPreset);
     }
-    setToastMessage(`커스텀 거점 [${newPreset.shortName}] 추가 완료`);
+    setToastMessage(`거점 [${newPreset.shortName}] 추가 완료`);
   };
 
   const handleUpdatePreset = (updatedPreset: LocationPreset) => {
-    const isCustom = customPresets.some((p) => p.id === updatedPreset.id);
-    if (isCustom) {
-      const updated = customPresets.map((p) => (p.id === updatedPreset.id ? updatedPreset : p));
-      saveCustomPresetsToStorage(updated);
-    } else {
-      const updated = [updatedPreset, ...customPresets];
-      saveCustomPresetsToStorage(updated);
-    }
+    const updated = presets.map((p) => (p.id === updatedPreset.id ? updatedPreset : p));
+    savePresetsToStorage(updated);
     if (destination.id === updatedPreset.id) {
       setDestination(updatedPreset);
     }
@@ -102,8 +105,8 @@ export default function Home() {
   };
 
   const handleDeleteCustomPreset = (id: string) => {
-    const updated = customPresets.filter((p) => p.id !== id);
-    saveCustomPresetsToStorage(updated);
+    const updated = presets.filter((p) => p.id !== id);
+    savePresetsToStorage(updated);
     if (destination.id === id) {
       setDestination(DEFAULT_PRESET_LOCATIONS[0]);
     }
@@ -113,10 +116,10 @@ export default function Home() {
     setToastMessage('거점이 삭제되었습니다.');
   };
 
-  // Combine Default Presets + Custom Presets
-  const allPresets = useMemo(() => {
-    return [...DEFAULT_PRESET_LOCATIONS, ...customPresets];
-  }, [customPresets]);
+  const handleReorderPresets = (reordered: LocationPreset[]) => {
+    savePresetsToStorage(reordered);
+    setToastMessage('거점 순서가 변경되었습니다.');
+  };
 
   const [destination, setDestination] = useState<LocationPreset>(DEFAULT_PRESET_LOCATIONS[0]);
   const [reportMode, setReportMode] = useState<ReportMode>('DEPARTURE');
@@ -260,13 +263,14 @@ export default function Home() {
 
           {/* 2. Simplified High-Density Preset Chips Grid */}
           <PresetButtons
-            presets={allPresets}
+            presets={presets}
             selectedOriginId={origin?.id}
             selectedDestinationId={destination?.id}
             onSelectPreset={handleSelectPreset}
             onOpenAddModal={handleOpenAddModal}
             onEditPreset={handleOpenEditModal}
             onDeleteCustomPreset={handleDeleteCustomPreset}
+            onReorderPresets={handleReorderPresets}
           />
 
           {/* 3. Route Estimation & ETA Status */}

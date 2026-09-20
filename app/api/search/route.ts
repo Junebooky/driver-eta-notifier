@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
     const data = await response.json();
     const rawPois = data?.searchPoiInfo?.pois?.poi || [];
 
-    const pois: TmapPoiItem[] = rawPois.map((item: any) => {
+    const pois: TmapPoiItem[] = rawPois.map((item: any, originalIndex: number) => {
       const roadAddr = item?.newAddressList?.newAddress?.[0]?.fullAddressRoad;
       const jibunAddr = `${item.upperAddrName || ''} ${item.middleAddrName || ''} ${
         item.lowerAddrName || ''
@@ -62,15 +62,62 @@ export async function GET(req: NextRequest) {
       const lng = parseFloat(item.frontLon || item.noorLon || '126.9780');
 
       return {
-        id: item.id || `poi_${Date.now()}_${Math.random()}`,
+        id: item.id || `poi_${Date.now()}_${originalIndex}`,
         name: item.name || keyword,
         address,
         lat,
         lng,
+        originalIndex,
       };
     });
 
-    return NextResponse.json({ pois });
+    // Re-ranking based on user search relevance:
+    // 1st Priority: Exact match (name === keyword without spaces/case)
+    // 2nd Priority: Starts with keyword
+    // 3rd Priority: Contains keyword (sorted by length difference closest to keyword)
+    // 4th Priority: Other items in original TMAP order
+    const normKeyword = keyword.replace(/\s+/g, '').toLowerCase();
+
+    pois.sort((a: any, b: any) => {
+      const normA = a.name.replace(/\s+/g, '').toLowerCase();
+      const normB = b.name.replace(/\s+/g, '').toLowerCase();
+
+      const getTier = (normName: string) => {
+        if (normName === normKeyword) return 1;
+        if (normName.startsWith(normKeyword)) return 2;
+        if (normName.includes(normKeyword)) return 3;
+        return 4;
+      };
+
+      const tierA = getTier(normA);
+      const tierB = getTier(normB);
+
+      if (tierA !== tierB) {
+        return tierA - tierB;
+      }
+
+      // In Tier 2 and Tier 3, sort by length difference closest to keyword
+      if (tierA === 2 || tierA === 3) {
+        const diffA = Math.abs(normA.length - normKeyword.length);
+        const diffB = Math.abs(normB.length - normKeyword.length);
+        if (diffA !== diffB) {
+          return diffA - diffB;
+        }
+      }
+
+      return a.originalIndex - b.originalIndex;
+    });
+
+    // Clean up originalIndex before returning
+    const cleanedPois: TmapPoiItem[] = pois.map(({ id, name, address, lat, lng }) => ({
+      id,
+      name,
+      address,
+      lat,
+      lng,
+    }));
+
+    return NextResponse.json({ pois: cleanedPois });
   } catch (error: any) {
     console.warn('TMAP POI Search error:', error?.message);
     return NextResponse.json({ pois: [] });
