@@ -4,7 +4,7 @@ import React from 'react';
 import { NaviProvider, LocationPreset, RouteEstimate } from '@/types';
 import { launchNavigationApp, calculateHaversineEstimate } from '@/utils/navigation';
 import { generateVipReportText, copyAndLaunchKakaoTalk } from '@/utils/kakao';
-import { Zap, MessageSquare, Navigation } from 'lucide-react';
+import { Zap, MessageSquare, ArrowRight } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface ActionPanelProps {
@@ -91,24 +91,29 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   };
 
   return (
-    <div className="w-full space-y-3 pt-1 select-none">
+    <div className="w-full space-y-2.5 pt-1 select-none">
       {/* 1-Second Fast Pass Primary Button */}
       <button
         onClick={handleFastPassAction}
-        className="w-full py-4 px-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-600 active:scale-95 transition-transform duration-100 text-white rounded-2xl font-black text-base tracking-tight shadow-md shadow-blue-500/20 flex items-center justify-center space-x-2 border border-blue-500/30 group"
+        className="w-full py-4 px-4 bg-blue-600 hover:bg-blue-700 active:scale-95 transition-all duration-150 text-white rounded-2xl font-bold text-sm tracking-tight shadow-sm flex items-center justify-between cursor-pointer group"
       >
-        <Zap className="w-5 h-5 text-yellow-300 fill-yellow-300 animate-bounce" />
-        <span>1초 패스트패스 (보고복사 + {NAVI_DISPLAY_NAMES[defaultNavi]} 직행)</span>
-        <Navigation className="w-4 h-4 ml-1 group-hover:translate-x-0.5 transition-transform" />
+        <div className="flex items-center space-x-2">
+          <Zap className="w-5 h-5 text-yellow-300 fill-yellow-300 shrink-0" />
+          <span>1초 패스트패스 (보고복사 + {NAVI_DISPLAY_NAMES[defaultNavi]} 실행)</span>
+        </div>
+        <ArrowRight className="w-4.5 h-4.5 text-white/90 group-hover:translate-x-0.5 transition-transform shrink-0" />
       </button>
 
       {/* KakaoTalk Pure Text Copy & App Launch Button */}
       <button
         onClick={handleKakaoReportAction}
-        className="w-full py-3.5 px-4 bg-[#FEE500] hover:bg-[#FDD835] active:scale-95 transition-transform duration-100 text-[#3C1E1E] rounded-2xl font-black text-sm tracking-tight shadow-xs flex items-center justify-center space-x-2 border border-[#E6CF00]"
+        className="w-full py-4 px-4 bg-[#FEE500] hover:bg-[#FDD835] active:scale-95 transition-all duration-150 text-[#191919] rounded-2xl font-bold text-sm tracking-tight shadow-2xs flex items-center justify-between cursor-pointer group"
       >
-        <MessageSquare className="w-4 h-4 text-[#3C1E1E] fill-[#3C1E1E]" />
-        <span>카카오톡 단톡방 보고 (텍스트 복사 + 앱 실행)</span>
+        <div className="flex items-center space-x-2">
+          <MessageSquare className="w-5 h-5 text-[#3C1E1E] fill-[#3C1E1E] shrink-0" />
+          <span className="text-[#191919]">카카오톡 단톡방 보고 (텍스트 복사 + 앱 실행)</span>
+        </div>
+        <ArrowRight className="w-4.5 h-4.5 text-[#3C1E1E]/80 group-hover:translate-x-0.5 transition-transform shrink-0" />
       </button>
     </div>
   );

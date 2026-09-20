@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { DriverProfile, NaviProvider } from '@/types';
-import { Settings, Car } from 'lucide-react';
+import { Settings, Car, ChevronDown } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface HeaderProps {
@@ -17,35 +17,38 @@ export const Header: React.FC<HeaderProps> = ({
   onSelectNavi,
 }) => {
   return (
-    <header className="w-full bg-white/95 border-b border-slate-200 backdrop-blur pt-[max(env(safe-area-inset-top),1.25rem)] pb-2.5 px-4 sticky top-0 z-30 shadow-2xs">
+    <header className="w-full bg-white/95 border-b border-slate-200/80 backdrop-blur pt-[max(env(safe-area-inset-top),1.25rem)] pb-2.5 px-4 sticky top-0 z-30 shadow-2xs">
       <div className="max-w-md mx-auto flex items-center justify-between">
-        {/* Left: Minimal Driver / Vehicle Status Tag */}
-        <div className="flex items-center space-x-2">
-          <div className="flex items-center space-x-1.5 bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200 text-xs text-slate-700 font-bold">
-            <Car className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-            <span className="text-slate-900 font-black">{profile.vehicleNo || '4호차'}</span>
-            <span className="text-slate-400">•</span>
-            <span className="text-slate-600">{profile.driverName || '기사'}</span>
-          </div>
-        </div>
+        {/* Left: Driver / Vehicle Pill Tag */}
+        <button
+          onClick={() => {
+            haptics.lightTap();
+            onOpenProfileModal();
+          }}
+          className="flex items-center space-x-1.5 bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-2xs text-xs font-bold text-slate-800 cursor-pointer hover:bg-slate-50 active:scale-95 transition-all"
+        >
+          <Car className="w-3.5 h-3.5 text-blue-500 fill-blue-500 shrink-0" />
+          <span className="font-extrabold">{profile.vehicleNo || '4호차'} • {profile.driverName || '윤태준'}</span>
+          <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
+        </button>
 
-        {/* Right: Circular 40~44px Navi Switchers & Settings */}
+        {/* Right: Circular 36px Navi Switchers & Settings */}
         <div className="flex items-center space-x-2">
-          {/* TMAP Button (Renewed with Official White Background & Magenta-to-Cyan Gradient 'T' Logo) */}
+          {/* TMAP Button (White circular background + Gradient 'T' Logo) */}
           <button
             onClick={() => {
               haptics.lightTap();
               onSelectNavi('tmap');
             }}
-            className={`w-10 h-10 rounded-full bg-white border border-slate-200 shadow-xs flex items-center justify-center transition-all duration-100 active:scale-90 cursor-pointer ${
+            className={`w-9 h-9 rounded-full bg-white border border-slate-200 shadow-xs flex items-center justify-center transition-all duration-100 active:scale-90 cursor-pointer ${
               profile.defaultNavi === 'tmap'
-                ? 'ring-2 ring-offset-2 ring-blue-600 scale-105 shadow-md z-10'
-                : 'opacity-50 hover:opacity-90'
+                ? 'ring-2 ring-blue-500 scale-105 shadow-sm z-10'
+                : 'opacity-60 hover:opacity-100'
             }`}
             title="티맵 (TMAP) 선택"
             aria-label="티맵 선택"
           >
-            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg viewBox="0 0 24 24" className="w-4.5 h-4.5" fill="none" xmlns="http://www.w3.org/2000/svg">
               <defs>
                 <linearGradient id="tmapLogoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                   <stop offset="0%" stopColor="#E11D48" />
@@ -60,16 +63,16 @@ export const Header: React.FC<HeaderProps> = ({
             </svg>
           </button>
 
-          {/* KakaoNavi Button (Official Yellow + Dark Brown 'K') */}
+          {/* KakaoNavi Button */}
           <button
             onClick={() => {
               haptics.lightTap();
               onSelectNavi('kakao');
             }}
-            className={`w-10 h-10 rounded-full bg-[#FEE500] border border-amber-300 text-[#3C1E1E] font-black text-sm shadow-xs flex items-center justify-center transition-all duration-100 active:scale-90 cursor-pointer ${
+            className={`w-9 h-9 rounded-full bg-[#FEE500] border border-amber-300 text-[#3C1E1E] font-black text-xs shadow-xs flex items-center justify-center transition-all duration-100 active:scale-90 cursor-pointer ${
               profile.defaultNavi === 'kakao'
-                ? 'ring-2 ring-offset-2 ring-amber-400 scale-105 shadow-md z-10'
-                : 'opacity-50 hover:opacity-90'
+                ? 'ring-2 ring-amber-400 scale-105 shadow-sm z-10'
+                : 'opacity-60 hover:opacity-100'
             }`}
             title="카카오내비 선택"
             aria-label="카카오내비 선택"
@@ -77,16 +80,16 @@ export const Header: React.FC<HeaderProps> = ({
             <span>K</span>
           </button>
 
-          {/* NaverMap Button (Official Green + White 'N') */}
+          {/* NaverMap Button */}
           <button
             onClick={() => {
               haptics.lightTap();
               onSelectNavi('naver');
             }}
-            className={`w-10 h-10 rounded-full bg-[#03C75A] border border-emerald-400 text-white font-black text-sm shadow-xs flex items-center justify-center transition-all duration-100 active:scale-90 cursor-pointer ${
+            className={`w-9 h-9 rounded-full bg-[#A7F3D0] border border-emerald-300 text-emerald-800 font-black text-xs shadow-xs flex items-center justify-center transition-all duration-100 active:scale-90 cursor-pointer ${
               profile.defaultNavi === 'naver'
-                ? 'ring-2 ring-offset-2 ring-emerald-500 scale-105 shadow-md z-10'
-                : 'opacity-50 hover:opacity-90'
+                ? 'ring-2 ring-emerald-500 scale-105 shadow-sm z-10'
+                : 'opacity-60 hover:opacity-100'
             }`}
             title="네이버지도 선택"
             aria-label="네이버지도 선택"
@@ -100,7 +103,7 @@ export const Header: React.FC<HeaderProps> = ({
               haptics.lightTap();
               onOpenProfileModal();
             }}
-            className="w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 flex items-center justify-center text-slate-600 hover:text-slate-900 active:scale-90 transition-transform duration-100 cursor-pointer ml-1"
+            className="w-9 h-9 rounded-full bg-white hover:bg-slate-50 border border-slate-200 shadow-xs flex items-center justify-center text-slate-500 hover:text-slate-800 active:scale-90 transition-all duration-100 cursor-pointer"
             aria-label="기사 프로필 설정"
           >
             <Settings className="w-4 h-4" />

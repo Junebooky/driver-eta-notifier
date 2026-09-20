@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { LocationPreset } from '@/types';
-import { Plus, Trash2, Pencil, SlidersHorizontal } from 'lucide-react';
+import { Plus, Trash2, Pencil, SlidersHorizontal, MapPin } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface PresetButtonsProps {
@@ -28,10 +28,37 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
   const [managingPreset, setManagingPreset] = useState<LocationPreset | null>(null);
 
   return (
-    <div className="w-full bg-white border border-slate-200 rounded-2xl p-2.5 shadow-xs select-none">
+    <div className="w-full bg-white border border-slate-100/90 rounded-2xl p-4 shadow-2xs select-none space-y-3">
+      {/* Header: Title on Left, 거점 관리 on Right */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          <div className="w-5 h-5 rounded-full bg-blue-500/10 flex items-center justify-center">
+            <MapPin className="w-3.5 h-3.5 text-blue-500 fill-blue-500" />
+          </div>
+          <h2 className="text-sm font-bold text-slate-900 tracking-tight">자주 가는 목적지</h2>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            haptics.lightTap();
+            setIsManageMode(!isManageMode);
+          }}
+          className={`text-xs flex items-center space-x-1 py-1 px-2 rounded-lg transition-colors cursor-pointer ${
+            isManageMode
+              ? 'bg-blue-600 text-white font-bold shadow-xs'
+              : 'text-slate-400 hover:text-slate-600 font-medium'
+          }`}
+          title="거점 수정 및 삭제 관리"
+        >
+          <SlidersHorizontal className="w-3.5 h-3.5" />
+          <span>{isManageMode ? '관리 완료' : '거점 관리'}</span>
+        </button>
+      </div>
+
       {/* Management Mode Guidance Bar */}
       {isManageMode && (
-        <div className="mb-2 px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 text-[11px] font-bold flex items-center justify-between animate-fade-in">
+        <div className="px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 text-[11px] font-bold flex items-center justify-between animate-fade-in">
           <span>관리(수정/삭제)할 거점을 탭하세요.</span>
           <button
             type="button"
@@ -44,16 +71,19 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
       )}
 
       {/* 3-Column High-Density Grid (Clean Text-Only Chips) */}
-      <div className="grid grid-cols-3 gap-1.5">
+      <div className="grid grid-cols-3 gap-2">
         {presets.map((preset) => {
           const isOrigin = selectedOriginId === preset.id;
           const isDestination = selectedDestinationId === preset.id;
 
-          let stateClasses = 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 font-bold';
+          let stateClasses =
+            'bg-slate-50/70 hover:bg-slate-100/80 border-slate-200/80 text-slate-800 font-medium py-3.5';
           if (isDestination) {
-            stateClasses = 'bg-emerald-50 border-emerald-500 text-emerald-900 ring-2 ring-emerald-500/20 font-black shadow-2xs';
+            stateClasses =
+              'bg-white border-emerald-300 ring-2 ring-emerald-50 text-slate-900 font-bold shadow-2xs py-2.5';
           } else if (isOrigin) {
-            stateClasses = 'bg-blue-50 border-blue-500 text-blue-900 ring-2 ring-blue-500/20 font-black shadow-2xs';
+            stateClasses =
+              'bg-white border-blue-300 ring-2 ring-blue-50 text-slate-900 font-bold shadow-2xs py-2.5';
           }
 
           if (isManageMode) {
@@ -72,7 +102,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                     onSelectPreset(preset);
                   }
                 }}
-                className={`w-full py-2.5 px-2 rounded-xl border text-center transition-transform duration-100 active:scale-95 flex flex-col items-center justify-center min-h-[44px] cursor-pointer ${stateClasses}`}
+                className={`w-full px-2 rounded-xl border text-center transition-transform duration-100 active:scale-95 flex flex-col items-center justify-center min-h-[48px] cursor-pointer ${stateClasses}`}
                 title={preset.name}
               >
                 <span className="text-xs tracking-tight truncate w-full">
@@ -81,17 +111,19 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
 
                 {/* Status Indicator Tag */}
                 {isDestination && (
-                  <span className="text-[9px] font-black text-emerald-600 uppercase tracking-tighter leading-none mt-0.5">
+                  <span className="text-[10px] font-semibold text-emerald-600 flex items-center justify-center gap-1 mt-0.5 leading-none">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                     도착지
                   </span>
                 )}
                 {isOrigin && !isDestination && (
-                  <span className="text-[9px] font-black text-blue-600 uppercase tracking-tighter leading-none mt-0.5">
+                  <span className="text-[10px] font-semibold text-blue-600 flex items-center justify-center gap-1 mt-0.5 leading-none">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
                     출발지
                   </span>
                 )}
                 {isManageMode && (
-                  <span className="text-[8px] font-bold text-blue-600 leading-none mt-0.5">
+                  <span className="text-[9px] font-bold text-blue-600 leading-none mt-0.5">
                     관리
                   </span>
                 )}
@@ -100,38 +132,18 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
           );
         })}
 
-        {/* Integrated Compact '+ 추가' Button */}
+        {/* Integrated '+ 추가' Button */}
         <button
           type="button"
           onClick={() => {
             haptics.lightTap();
             onOpenAddModal();
           }}
-          className="w-full py-2.5 px-2 rounded-xl border border-dashed border-slate-300 hover:border-blue-500 bg-slate-50/60 hover:bg-blue-50/60 text-slate-500 hover:text-blue-600 text-xs font-bold flex items-center justify-center space-x-1 active:scale-95 transition-transform duration-100 cursor-pointer min-h-[44px]"
+          className="w-full py-3.5 px-2 rounded-xl border border-dashed border-slate-300 hover:border-blue-400 bg-white hover:bg-slate-50 text-slate-400 hover:text-blue-600 text-xs font-medium flex items-center justify-center space-x-1 active:scale-95 transition-transform duration-100 cursor-pointer min-h-[48px]"
           title="새 거점 검색 및 등록"
         >
           <Plus className="w-3.5 h-3.5" />
           <span>추가</span>
-        </button>
-      </div>
-
-      {/* Bottom Right: Discreet '거점 관리' Button */}
-      <div className="flex justify-end pt-2 pr-1">
-        <button
-          type="button"
-          onClick={() => {
-            haptics.lightTap();
-            setIsManageMode(!isManageMode);
-          }}
-          className={`text-[11px] font-bold flex items-center space-x-1 py-1 px-2 rounded-lg transition-colors cursor-pointer ${
-            isManageMode
-              ? 'bg-blue-600 text-white shadow-xs'
-              : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
-          }`}
-          title="거점 수정 및 삭제 관리"
-        >
-          <SlidersHorizontal className="w-3 h-3" />
-          <span>{isManageMode ? '관리 완료' : '거점 관리'}</span>
         </button>
       </div>
 

@@ -221,7 +221,7 @@ export default function Home() {
 
   if (!isLoaded) {
     return (
-      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center text-slate-500 font-bold text-sm">
+      <div className="min-h-screen bg-[#F6F8FB] flex items-center justify-center text-slate-500 font-bold text-sm">
         <div className="flex flex-col items-center space-y-2">
           <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
           <span>관제 런처 시스템 로딩 중...</span>
@@ -231,9 +231,9 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen pb-10 flex flex-col items-center bg-[#F8FAFC] text-slate-900">
+    <main className="min-h-screen pb-10 flex flex-col items-center bg-[#F6F8FB] text-slate-900">
       {/* 480px Mobile Viewport Container */}
-      <div className="w-full max-w-[480px] min-h-screen flex flex-col justify-between border-x border-slate-200 shadow-sm bg-[#F8FAFC]">
+      <div className="w-full max-w-[480px] min-h-screen flex flex-col justify-between border-x border-slate-200/80 shadow-sm bg-[#F6F8FB]">
         {/* Top Header with Safe Area Inset & Minimal Navi Switcher */}
         <Header
           profile={profile}
