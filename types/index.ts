@@ -5,6 +5,7 @@ export interface DriverProfile {
   driverName: string;      // e.g. '윤태준'
   passengerName: string;   // e.g. 'SOFYAN 외 1명'
   defaultNavi: NaviProvider; // 'tmap' | 'kakao' | 'naver'
+  targetChatRoom?: string; // e.g. 'VIP 의전 단톡방'
 }
 
 export interface LocationPreset {

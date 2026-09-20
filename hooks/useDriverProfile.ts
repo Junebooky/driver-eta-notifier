@@ -10,6 +10,7 @@ const DEFAULT_PROFILE: DriverProfile = {
   driverName: '윤태준',
   passengerName: 'SOFYAN 외 1명',
   defaultNavi: 'tmap',
+  targetChatRoom: 'VIP 의전 단톡방',
 };
 
 export function useDriverProfile() {

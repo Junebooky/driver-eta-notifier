@@ -5,6 +5,8 @@ export interface GenerateReportParams {
   origin?: LocationPreset | string;
   destination: LocationPreset | string;
   etaFormatted?: string;
+  distanceKm?: number;
+  durationMinutes?: number;
   mode: ReportMode;
 }
 
@@ -13,6 +15,8 @@ export function generateReportText({
   origin,
   destination,
   etaFormatted = '약 70분 후',
+  distanceKm,
+  durationMinutes,
   mode,
 }: GenerateReportParams): string {
   const vehicle = profile.vehicleNo || '4호차';
@@ -21,9 +25,12 @@ export function generateReportText({
   const destName = typeof destination === 'string' ? destination : destination.shortName;
   const originName = typeof origin === 'string' ? origin : origin ? origin.shortName : '현 위치';
 
+  const cleanEta = etaFormatted.split(' ')[0] || etaFormatted;
+  const metricsTag = distanceKm && durationMinutes ? ` / ${distanceKm}km(약 ${durationMinutes}분)` : '';
+
   switch (mode) {
     case 'DEPARTURE':
-      return `[출발/이동] ${vehicle} ${originName} to ${destName} 출발 / ${passenger} 승차 / ETA ${etaFormatted}`;
+      return `[출발/이동] ${vehicle} ${originName} to ${destName} 출발 / ${passenger} 승차${metricsTag} / ETA ${cleanEta}`;
     
     case 'ARRIVED':
       return `[도착/하차] ${vehicle} ${destName} 도착 / ${passenger} 하차 완료`;

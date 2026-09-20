@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { DriverProfile, NaviProvider } from '@/types';
-import { X, User, Car, Users, Navigation, Check } from 'lucide-react';
+import { X, User, Car, Users, Navigation, Check, MessageSquare } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface ProfileModalProps {
@@ -11,40 +11,6 @@ interface ProfileModalProps {
   profile: DriverProfile;
   onSave: (updated: Partial<DriverProfile>) => void;
 }
-
-const NAVI_OPTIONS: {
-  key: NaviProvider;
-  name: string;
-  symbol: string;
-  bgColor: string;
-  textColor: string;
-  activeRing: string;
-}[] = [
-  {
-    key: 'tmap',
-    name: '티맵 (TMAP)',
-    symbol: 'T',
-    bgColor: 'bg-[#EF4444]',
-    textColor: 'text-white',
-    activeRing: 'ring-2 ring-offset-2 ring-red-500 shadow-md shadow-red-500/20',
-  },
-  {
-    key: 'kakao',
-    name: '카카오내비',
-    symbol: 'K',
-    bgColor: 'bg-[#FEE500]',
-    textColor: 'text-[#3C1E1E]',
-    activeRing: 'ring-2 ring-offset-2 ring-amber-400 shadow-md shadow-amber-500/20',
-  },
-  {
-    key: 'naver',
-    name: '네이버지도',
-    symbol: 'N',
-    bgColor: 'bg-[#03C75A]',
-    textColor: 'text-white',
-    activeRing: 'ring-2 ring-offset-2 ring-emerald-500 shadow-md shadow-emerald-500/20',
-  },
-];
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({
   isOpen,
@@ -55,6 +21,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [vehicleNo, setVehicleNo] = useState(profile.vehicleNo);
   const [driverName, setDriverName] = useState(profile.driverName);
   const [passengerName, setPassengerName] = useState(profile.passengerName);
+  const [targetChatRoom, setTargetChatRoom] = useState(profile.targetChatRoom || 'VIP 의전 단톡방');
   const [defaultNavi, setDefaultNavi] = useState<NaviProvider>(profile.defaultNavi);
 
   useEffect(() => {
@@ -62,6 +29,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       setVehicleNo(profile.vehicleNo);
       setDriverName(profile.driverName);
       setPassengerName(profile.passengerName);
+      setTargetChatRoom(profile.targetChatRoom || 'VIP 의전 단톡방');
       setDefaultNavi(profile.defaultNavi);
     }
   }, [isOpen, profile]);
@@ -75,6 +43,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       vehicleNo: vehicleNo.trim() || '4호차',
       driverName: driverName.trim() || '윤태준',
       passengerName: passengerName.trim() || 'SOFYAN 외 1명',
+      targetChatRoom: targetChatRoom.trim() || 'VIP 의전 단톡방',
       defaultNavi,
     });
     onClose();
@@ -95,7 +64,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 active:scale-95 transition-transform duration-100"
+            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 active:scale-95 transition-transform duration-100 cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -143,36 +112,94 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           </div>
 
           <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center">
+              <MessageSquare className="w-3.5 h-3.5 mr-1 text-blue-600" /> 고정 보고 단톡방 / 수신자 메모
+            </label>
+            <input
+              type="text"
+              value={targetChatRoom}
+              onChange={(e) => setTargetChatRoom(e.target.value)}
+              placeholder="예: VIP 의전 단톡방"
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white font-bold"
+            />
+          </div>
+
+          <div>
             <label className="block text-xs font-bold text-slate-700 mb-2 flex items-center">
               <Navigation className="w-3.5 h-3.5 mr-1 text-blue-600" /> 주력 내비게이션 앱
             </label>
             <div className="grid grid-cols-3 gap-2">
-              {NAVI_OPTIONS.map((item) => {
-                const isSelected = defaultNavi === item.key;
-                return (
-                  <button
-                    key={item.key}
-                    type="button"
-                    onClick={() => {
-                      haptics.lightTap();
-                      setDefaultNavi(item.key);
-                    }}
-                    className={`py-3 px-2 rounded-2xl border transition-all duration-100 flex flex-col items-center justify-center space-y-1.5 active:scale-95 cursor-pointer ${
-                      isSelected
-                        ? 'bg-blue-50/80 border-blue-500 text-blue-900 ring-2 ring-blue-500/20 shadow-xs'
-                        : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'
-                    }`}
-                  >
-                    <div
-                      className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shadow-2xs ${item.bgColor} ${item.textColor}`}
-                    >
-                      {item.symbol}
-                    </div>
-                    <span className="text-[11px] font-extrabold">{item.name.split(' ')[0]}</span>
-                    {isSelected && <Check className="w-3.5 h-3.5 text-blue-600" />}
-                  </button>
-                );
-              })}
+              {/* TMAP Option */}
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.lightTap();
+                  setDefaultNavi('tmap');
+                }}
+                className={`py-3 px-2 rounded-2xl border transition-all duration-100 flex flex-col items-center justify-center space-y-1.5 active:scale-95 cursor-pointer ${
+                  defaultNavi === 'tmap'
+                    ? 'bg-blue-50/80 border-blue-500 text-blue-900 ring-2 ring-blue-500/20 shadow-xs'
+                    : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'
+                }`}
+              >
+                <div className="w-7 h-7 rounded-full bg-white border border-slate-200 shadow-xs flex items-center justify-center">
+                  <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                      <linearGradient id="tmapModalGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#E11D48" />
+                        <stop offset="45%" stopColor="#9333EA" />
+                        <stop offset="100%" stopColor="#06B6D4" />
+                      </linearGradient>
+                    </defs>
+                    <path
+                      d="M3.5 6.25C3.5 4.8 4.7 4 6 4H18C19.3 4 20.5 4.8 20.5 6.25C20.5 7.7 19.3 8.5 18 8.5H14.6V19.5C14.6 20.9 13.5 22 12 22C10.5 22 9.4 20.9 9.4 19.5V8.5H6C4.7 8.5 3.5 7.7 3.5 6.25Z"
+                      fill="url(#tmapModalGrad)"
+                    />
+                  </svg>
+                </div>
+                <span className="text-[11px] font-extrabold">티맵</span>
+                {defaultNavi === 'tmap' && <Check className="w-3.5 h-3.5 text-blue-600" />}
+              </button>
+
+              {/* KakaoNavi Option */}
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.lightTap();
+                  setDefaultNavi('kakao');
+                }}
+                className={`py-3 px-2 rounded-2xl border transition-all duration-100 flex flex-col items-center justify-center space-y-1.5 active:scale-95 cursor-pointer ${
+                  defaultNavi === 'kakao'
+                    ? 'bg-amber-50/80 border-amber-500 text-amber-900 ring-2 ring-amber-500/20 shadow-xs'
+                    : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'
+                }`}
+              >
+                <div className="w-7 h-7 rounded-full bg-[#FEE500] border border-amber-300 text-[#3C1E1E] flex items-center justify-center text-xs font-black shadow-2xs">
+                  K
+                </div>
+                <span className="text-[11px] font-extrabold">카카오</span>
+                {defaultNavi === 'kakao' && <Check className="w-3.5 h-3.5 text-amber-600" />}
+              </button>
+
+              {/* NaverMap Option */}
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.lightTap();
+                  setDefaultNavi('naver');
+                }}
+                className={`py-3 px-2 rounded-2xl border transition-all duration-100 flex flex-col items-center justify-center space-y-1.5 active:scale-95 cursor-pointer ${
+                  defaultNavi === 'naver'
+                    ? 'bg-emerald-50/80 border-emerald-500 text-emerald-900 ring-2 ring-emerald-500/20 shadow-xs'
+                    : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'
+                }`}
+              >
+                <div className="w-7 h-7 rounded-full bg-[#03C75A] border border-emerald-400 text-white flex items-center justify-center text-xs font-black shadow-2xs">
+                  N
+                </div>
+                <span className="text-[11px] font-extrabold">네이버</span>
+                {defaultNavi === 'naver' && <Check className="w-3.5 h-3.5 text-emerald-600" />}
+              </button>
             </div>
           </div>
 

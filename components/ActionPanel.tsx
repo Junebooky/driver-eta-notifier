@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { NaviProvider, LocationPreset, RouteEstimate } from '@/types';
-import { launchNavigationApp } from '@/utils/navigation';
+import { launchNavigationApp, calculateHaversineEstimate } from '@/utils/navigation';
 import { generateVipReportText, copyAndLaunchKakaoTalk } from '@/utils/kakao';
 import { Zap, MessageSquare, Navigation } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
@@ -13,6 +13,7 @@ interface ActionPanelProps {
   destination: LocationPreset;
   routeEstimate: RouteEstimate | null;
   reportText: string;
+  targetChatRoom?: string;
   onShowToast: (message: string) => void;
 }
 
@@ -28,6 +29,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   destination,
   routeEstimate,
   reportText,
+  targetChatRoom,
   onShowToast,
 }) => {
   /**
@@ -78,20 +80,26 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   const handleKakaoReportAction = async () => {
     haptics.lightTap();
 
+    // Dynamic Route Estimate Calculation fallback if routeEstimate is not yet loaded
+    const currentEstimate =
+      routeEstimate ||
+      calculateHaversineEstimate(origin.lat, origin.lng, destination.lat, destination.lng);
+
     const formattedVipText = generateVipReportText({
       destinationName: destination.shortName,
       originName: origin.shortName,
-      distanceKm: routeEstimate?.distanceKm || 62.4,
-      durationMinutes: routeEstimate?.durationMinutes || 70,
-      etaFormatted: routeEstimate?.etaFormatted || '약 70분 소요',
+      distanceKm: currentEstimate.distanceKm,
+      durationMinutes: currentEstimate.durationMinutes,
+      etaFormatted: currentEstimate.etaFormatted,
     });
 
     const copied = await copyAndLaunchKakaoTalk(formattedVipText);
 
+    const targetRoomLabel = targetChatRoom ? `[${targetChatRoom}]` : '[지정된 단톡방]';
     if (copied) {
-      onShowToast('📋 보고 문구 복사 완료! 카카오톡을 실행합니다.');
+      onShowToast(`📋 복사 완료! ${targetRoomLabel}에 바로 붙여넣기 하세요.`);
     } else {
-      onShowToast('카카오톡을 실행합니다. (복사 실패 시 재시도)');
+      onShowToast(`카카오톡을 실행합니다. (${targetRoomLabel}에 붙여넣기)`);
     }
   };
 

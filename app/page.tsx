@@ -93,14 +93,16 @@ export default function Home() {
   const [reportMode, setReportMode] = useState<ReportMode>('DEPARTURE');
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
-  // Route estimation state
-  const [routeEstimate, setRouteEstimate] = useState<RouteEstimate | null>(null);
+  // Route estimation state (initialized with immediate dynamic estimate)
+  const [routeEstimate, setRouteEstimate] = useState<RouteEstimate>(() =>
+    calculateHaversineEstimate(origin.lat, origin.lng, DEFAULT_PRESET_LOCATIONS[0].lat, DEFAULT_PRESET_LOCATIONS[0].lng)
+  );
   const [isLoadingRoute, setIsLoadingRoute] = useState(false);
 
   // Toast feedback state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Fetch route duration & ETA from API
+  // Fetch route duration & ETA from API with dynamic client clock calculation
   const fetchRouteEstimate = useCallback(
     async (start: LocationPreset, end: LocationPreset) => {
       setIsLoadingRoute(true);
@@ -118,7 +120,17 @@ export default function Home() {
 
         if (res.ok) {
           const data: RouteEstimate = await res.json();
-          setRouteEstimate(data);
+          // Dynamic client-side ETA calculation (resolves UTC server vs local driver timezone discrepancy)
+          const now = new Date();
+          const etaTime = new Date(now.getTime() + data.durationMinutes * 60 * 1000);
+          const hours = String(etaTime.getHours()).padStart(2, '0');
+          const minutes = String(etaTime.getMinutes()).padStart(2, '0');
+          const dynamicEta = `${hours}:${minutes} (${data.durationMinutes}분 소요)`;
+
+          setRouteEstimate({
+            ...data,
+            etaFormatted: dynamicEta,
+          });
         } else {
           throw new Error('Route API response not ok');
         }
@@ -145,21 +157,24 @@ export default function Home() {
     if (selectionTarget === 'origin') {
       setOrigin(preset);
       saveRecentPreset(preset);
+      fetchRouteEstimate(preset, destination);
       setToastMessage(`출발지: [${preset.shortName}] 지정됨`);
     } else {
       setDestination(preset);
       saveRecentPreset(preset);
+      fetchRouteEstimate(origin, preset);
       setToastMessage(`목적지: [${preset.shortName}] 지정됨`);
     }
   };
 
-  // Bidirectional Swap UX (⇄)
+  // Bidirectional Swap UX (⇄) with immediate route recalculation
   const handleSwapOriginDestination = () => {
-    const prevOrigin = origin;
-    const prevDestination = destination;
-    setOrigin(prevDestination);
-    setDestination(prevOrigin);
-    setToastMessage(`출발지 ⇄ 목적지 맞교환: [${prevDestination.shortName}] ↔ [${prevOrigin.shortName}]`);
+    const nextOrigin = destination;
+    const nextDestination = origin;
+    setOrigin(nextOrigin);
+    setDestination(nextDestination);
+    fetchRouteEstimate(nextOrigin, nextDestination);
+    setToastMessage(`출발지 ⇄ 목적지 맞교환: [${nextOrigin.shortName}] ↔ [${nextDestination.shortName}]`);
   };
 
   // Pre-calculated Report Text synchronously updated (Guarantees Safari User Gesture Compliance)
@@ -169,6 +184,8 @@ export default function Home() {
       origin,
       destination,
       etaFormatted: routeEstimate?.etaFormatted || '약 70분 후',
+      distanceKm: routeEstimate?.distanceKm,
+      durationMinutes: routeEstimate?.durationMinutes,
       mode: reportMode,
     });
   }, [profile, origin, destination, routeEstimate, reportMode]);
@@ -250,6 +267,7 @@ export default function Home() {
             destination={destination}
             routeEstimate={routeEstimate}
             reportText={reportPreviewText}
+            targetChatRoom={profile.targetChatRoom}
             onShowToast={(msg) => setToastMessage(msg)}
           />
         </div>
