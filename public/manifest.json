@@ -1,9 +1,10 @@
 {
   "name": "Protocol Cockpit",
-  "short_name": "ProtocolCockpit",
+  "short_name": "Cockpit",
   "description": "VIP 의전 드라이버 전용 스마트 관제 런처",
   "start_url": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#09090b",
   "theme_color": "#09090b",
   "icons": [

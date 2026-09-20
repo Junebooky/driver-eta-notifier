@@ -2,7 +2,8 @@
 
 import React from 'react';
 import { DriverProfile, NaviProvider } from '@/types';
-import { Settings, Navigation, Shield, Car } from 'lucide-react';
+import { Settings, Shield, Car } from 'lucide-react';
+import { haptics } from '@/utils/haptics';
 
 interface HeaderProps {
   profile: DriverProfile;
@@ -51,7 +52,10 @@ export const Header: React.FC<HeaderProps> = ({ profile, onOpenProfileModal, onS
               return (
                 <button
                   key={prov}
-                  onClick={() => onSelectNavi(prov)}
+                  onClick={() => {
+                    haptics.lightTap();
+                    onSelectNavi(prov);
+                  }}
                   className={`px-2 py-1 text-xs font-bold rounded-md transition-all ${
                     isSelected
                       ? NAVI_LABELS[prov].color + ' border shadow-sm scale-105'
@@ -67,7 +71,10 @@ export const Header: React.FC<HeaderProps> = ({ profile, onOpenProfileModal, onS
 
           {/* Profile Settings Button */}
           <button
-            onClick={onOpenProfileModal}
+            onClick={() => {
+              haptics.lightTap();
+              onOpenProfileModal();
+            }}
             className="w-9 h-9 rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 flex items-center justify-center text-zinc-300 hover:text-white transition-colors active:scale-95"
             aria-label="기사 프로필 설정"
           >

@@ -5,6 +5,7 @@ import { NaviProvider, LocationPreset } from '@/types';
 import { launchNavigationApp } from '@/utils/navigation';
 import { shareViaKakaoTalk } from '@/utils/kakao';
 import { Zap, Share2, Navigation } from 'lucide-react';
+import { haptics } from '@/utils/haptics';
 
 interface ActionPanelProps {
   defaultNavi: NaviProvider;
@@ -26,9 +27,12 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   onShowToast,
 }) => {
   /**
-   * 1-Second Fast Pass Action (Synchronous Clipboard Copy on Safari User Activation + Navi Launch)
+   * 1-Second Fast Pass Action (Synchronous Clipboard Copy on Safari User Activation + Navi Launch + Haptics)
    */
   const handleFastPassAction = () => {
+    // Dual pulse haptic feedback for success action
+    haptics.successPulse();
+
     // 1. TOP-LEVEL SYNCHRONOUS CLIPBOARD COPY (Mandatory for Safari User Gesture Security)
     let copySuccess = false;
     try {
@@ -36,7 +40,6 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
         navigator.clipboard.writeText(reportText);
         copySuccess = true;
       } else {
-        // Fallback for older WebViews
         const textArea = document.createElement('textarea');
         textArea.value = reportText;
         document.body.appendChild(textArea);
@@ -68,10 +71,10 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
    * KakaoTalk Share Card Popup Action
    */
   const handleKakaoShareAction = async () => {
+    haptics.lightTap();
     onShowToast('카카오톡 전송 창을 호출하는 중...');
     const shared = await shareViaKakaoTalk(reportText, 'VIP 의전 업무 보고');
     if (!shared) {
-      // If SDK or Web Share fails, copy to clipboard as fallback
       try {
         await navigator.clipboard.writeText(reportText);
         onShowToast('📋 클립보드 복사 완료! 카카오톡 단톡방에 붙여넣으세요.');

@@ -6,14 +6,18 @@ import { useLocation } from '@/hooks/useLocation';
 import { Header } from '@/components/Header';
 import { ProfileModal } from '@/components/ProfileModal';
 import { PresetButtons } from '@/components/PresetButtons';
+import { CustomPresetModal } from '@/components/CustomPresetModal';
 import { RouteInfoCard } from '@/components/RouteInfoCard';
 import { ReportTemplateSelector } from '@/components/ReportTemplateSelector';
 import { ActionPanel } from '@/components/ActionPanel';
 import { Toast } from '@/components/Toast';
+import { A2HSBanner } from '@/components/A2HSBanner';
 import { LocationPreset, ReportMode, RouteEstimate } from '@/types';
-import { PRESET_LOCATIONS } from '@/utils/presets';
+import { DEFAULT_PRESET_LOCATIONS } from '@/utils/presets';
 import { generateReportText } from '@/utils/reportGenerator';
 import { initKakaoSDK } from '@/utils/kakao';
+
+const CUSTOM_PRESETS_KEY = 'protocol_cockpit_custom_presets_v1';
 
 export default function Home() {
   const { profile, isLoaded, updateProfile, setPreferredNavi } = useDriverProfile();
@@ -27,7 +31,54 @@ export default function Home() {
     saveRecentPreset,
   } = useLocation();
 
-  const [destination, setDestination] = useState<LocationPreset>(PRESET_LOCATIONS[0]);
+  // Custom Presets State
+  const [customPresets, setCustomPresets] = useState<LocationPreset[]>([]);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+  // Load Custom Presets from LocalStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(CUSTOM_PRESETS_KEY);
+      if (saved) {
+        setCustomPresets(JSON.parse(saved));
+      }
+    } catch (e) {
+      console.warn('Failed to load custom presets:', e);
+    }
+  }, []);
+
+  // Save Custom Presets to LocalStorage
+  const saveCustomPresetsToStorage = (updated: LocationPreset[]) => {
+    setCustomPresets(updated);
+    try {
+      localStorage.setItem(CUSTOM_PRESETS_KEY, JSON.stringify(updated));
+    } catch (e) {
+      console.warn('Failed to save custom presets:', e);
+    }
+  };
+
+  const handleAddCustomPreset = (newPreset: LocationPreset) => {
+    const updated = [newPreset, ...customPresets];
+    saveCustomPresetsToStorage(updated);
+    setDestination(newPreset);
+    setToastMessage(`커스텀 거점 [${newPreset.shortName}] 추가 완료`);
+  };
+
+  const handleDeleteCustomPreset = (id: string) => {
+    const updated = customPresets.filter((p) => p.id !== id);
+    saveCustomPresetsToStorage(updated);
+    if (destination.id === id) {
+      setDestination(DEFAULT_PRESET_LOCATIONS[0]);
+    }
+    setToastMessage('커스텀 거점이 삭제되었습니다.');
+  };
+
+  // Combine Default Presets + Custom Presets
+  const allPresets = useMemo(() => {
+    return [...DEFAULT_PRESET_LOCATIONS, ...customPresets];
+  }, [customPresets]);
+
+  const [destination, setDestination] = useState<LocationPreset>(DEFAULT_PRESET_LOCATIONS[0]);
   const [reportMode, setReportMode] = useState<ReportMode>('DEPARTURE');
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   
@@ -138,13 +189,19 @@ export default function Home() {
           }}
         />
 
+        {/* Add to Home Screen Guidance Banner */}
+        <A2HSBanner />
+
         {/* Main Dashboard Content */}
         <div className="flex-1 p-4 space-y-4">
           
           {/* VIP Destination Presets Grid */}
           <PresetButtons
+            presets={allPresets}
             selectedDestination={destination}
             onSelectDestination={handleSelectDestination}
+            onOpenAddModal={() => setIsAddModalOpen(true)}
+            onDeleteCustomPreset={handleDeleteCustomPreset}
           />
 
           {/* Route Estimation & GPS Status */}
@@ -181,7 +238,7 @@ export default function Home() {
 
         {/* Cockpit Footer */}
         <footer className="px-4 py-3 text-center text-[11px] text-zinc-600 font-semibold border-t border-zinc-900 bg-zinc-950">
-          PROTOCOL COCKPIT v1.4 • VIP DRIVER SMART LAUNCHER
+          PROTOCOL COCKPIT v1.5 • VIP DRIVER SMART LAUNCHER
         </footer>
       </div>
 
@@ -194,6 +251,13 @@ export default function Home() {
           updateProfile(updated);
           setToastMessage('드라이버 프로필이 저장되었습니다.');
         }}
+      />
+
+      {/* Custom VIP Preset Add Modal */}
+      <CustomPresetModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onAddPreset={handleAddCustomPreset}
       />
 
       {/* Feedback Toast Notification */}

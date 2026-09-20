@@ -1,6 +1,6 @@
 import { LocationPreset } from '@/types';
 
-export const PRESET_LOCATIONS: LocationPreset[] = [
+export const DEFAULT_PRESET_LOCATIONS: LocationPreset[] = [
   {
     id: 'icn_t1',
     name: '인천국제공항 제1여객터미널',
@@ -38,13 +38,22 @@ export const PRESET_LOCATIONS: LocationPreset[] = [
     address: '서울 송파구 올림픽로 300 롯데월드타워',
   },
   {
-    id: 'inje_speedium',
+    id: 'inje_hotel',
     name: '인제스피디움 호텔',
     shortName: '인제스피디움 호텔',
     lat: 38.0051,
     lng: 128.2917,
     category: 'CIRCUIT',
     address: '강원 인제군 기린면 상하답로 130',
+  },
+  {
+    id: 'inje_paddock',
+    name: '인제스피디움 피트/패독',
+    shortName: '인제 패독',
+    lat: 38.0065,
+    lng: 128.2930,
+    category: 'CIRCUIT',
+    address: '강원 인제군 기린면 상하답로 130 패독',
   },
   {
     id: 'hanam_misa_return',
@@ -57,5 +66,6 @@ export const PRESET_LOCATIONS: LocationPreset[] = [
   },
 ];
 
-export const DEFAULT_ORIGIN: LocationPreset = PRESET_LOCATIONS[2]; // 조선팰리스 강남 default origin
-export const DEFAULT_DESTINATION: LocationPreset = PRESET_LOCATIONS[0]; // 인천공항 T1 default destination
+export const PRESET_LOCATIONS = DEFAULT_PRESET_LOCATIONS;
+export const DEFAULT_ORIGIN: LocationPreset = DEFAULT_PRESET_LOCATIONS[2]; // 조선팰리스 강남 default origin
+export const DEFAULT_DESTINATION: LocationPreset = DEFAULT_PRESET_LOCATIONS[0]; // 인천공항 T1 default destination

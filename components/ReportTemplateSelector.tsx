@@ -3,6 +3,7 @@
 import React from 'react';
 import { ReportMode } from '@/types';
 import { FileText, Send, CheckCircle2, Clock, Car } from 'lucide-react';
+import { haptics } from '@/utils/haptics';
 
 interface ReportTemplateSelectorProps {
   currentMode: ReportMode;
@@ -38,7 +39,10 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
           return (
             <button
               key={item.mode}
-              onClick={() => onSelectMode(item.mode)}
+              onClick={() => {
+                haptics.lightTap();
+                onSelectMode(item.mode);
+              }}
               className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center space-x-1.5 active:scale-95 ${
                 isSelected
                   ? `${item.color} ring-2 ring-blue-500/40 shadow-sm font-extrabold`
