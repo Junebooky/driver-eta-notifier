@@ -1,29 +1,30 @@
 /**
- * Touch Haptic Feedback Utility using Vibration API
+ * Touch Haptic Feedback Utility using Web Vibration API
+ * Designed with safe navigation to prevent runtime errors on iOS Safari / unsupported environments.
  */
 export const haptics = {
   /**
-   * Light tap feedback for preset selection, tab switching (15ms)
+   * Light tap feedback for preset selection, tab switching, and mode toggling (15ms)
    */
   lightTap: () => {
-    if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+    if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
       try {
-        navigator.vibrate(15);
+        navigator.vibrate?.(15);
       } catch (e) {
-        // Ignore if vibration fails or disabled by OS
+        // Safe navigation: ignore if unsupported or disabled by OS
       }
     }
   },
 
   /**
-   * Success / Fast Pass action dual pulse feedback ([30ms, 40ms, 30ms])
+   * Success / Fast Pass action confirmation pulse ([30ms, 40ms, 30ms])
    */
   successPulse: () => {
-    if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+    if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
       try {
-        navigator.vibrate([30, 40, 30]);
+        navigator.vibrate?.([30, 40, 30]);
       } catch (e) {
-        // Ignore
+        // Safe navigation: ignore
       }
     }
   },
@@ -32,11 +33,11 @@ export const haptics = {
    * Warning / GPS Fallback feedback ([60ms, 40ms, 60ms])
    */
   warningPulse: () => {
-    if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+    if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
       try {
-        navigator.vibrate([60, 40, 60]);
+        navigator.vibrate?.([60, 40, 60]);
       } catch (e) {
-        // Ignore
+        // Safe navigation: ignore
       }
     }
   },

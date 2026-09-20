@@ -14,6 +14,10 @@ export const metadata: Metadata = {
     statusBarStyle: 'black-translucent',
     title: 'Protocol Cockpit',
   },
+  other: {
+    'apple-mobile-web-app-capable': 'yes',
+    'mobile-web-app-capable': 'yes',
+  },
 };
 
 export const viewport: Viewport = {
@@ -22,7 +26,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: 'cover',
-  themeColor: '#09090b',
+  themeColor: '#000000',
 };
 
 export default function RootLayout({
@@ -31,8 +35,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ko" className="dark h-full bg-zinc-950 text-zinc-100">
-      <body className={`${inter.className} min-h-full flex flex-col bg-zinc-950 antialiased select-none`}>
+    <html lang="ko" className="dark h-full bg-black text-zinc-100">
+      <body className={`${inter.className} min-h-full flex flex-col bg-black antialiased select-none`}>
         {children}
         <Script
           src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js"

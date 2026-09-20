@@ -11,6 +11,7 @@ interface PresetButtonsProps {
   onSelectDestination: (preset: LocationPreset) => void;
   onOpenAddModal: () => void;
   onDeleteCustomPreset?: (id: string) => void;
+  isOledMode?: boolean;
 }
 
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
@@ -27,21 +28,32 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
   onSelectDestination,
   onOpenAddModal,
   onDeleteCustomPreset,
+  isOledMode = false,
 }) => {
   return (
-    <div className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-4 shadow-md">
+    <div
+      className={`w-full rounded-2xl p-4 transition-colors ${
+        isOledMode
+          ? 'bg-black border-2 border-zinc-800 shadow-none'
+          : 'bg-zinc-900 border border-zinc-800 shadow-md'
+      }`}
+    >
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center">
-          <MapPin className="w-3.5 h-3.5 mr-1.5 text-blue-400" /> VIP 거점 원터치 선택
+          <MapPin className={`w-3.5 h-3.5 mr-1.5 ${isOledMode ? 'text-cyan-400' : 'text-blue-400'}`} /> VIP 거점 원터치 선택
         </h3>
-        
+
         {/* Top Add Custom Preset Button */}
         <button
           onClick={() => {
             haptics.lightTap();
             onOpenAddModal();
           }}
-          className="px-2.5 py-1 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 text-blue-300 text-xs font-bold flex items-center space-x-1 active:scale-95 transition-all"
+          className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center space-x-1 active:scale-95 transition-all ${
+            isOledMode
+              ? 'bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/50 text-cyan-300'
+              : 'bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 text-blue-300'
+          }`}
         >
           <Plus className="w-3.5 h-3.5" />
           <span>거점 추가</span>
@@ -63,7 +75,11 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                 }}
                 className={`w-full p-3.5 rounded-xl border text-left transition-all active:scale-95 flex flex-col justify-between min-h-[76px] ${
                   isSelected
-                    ? 'bg-blue-600/20 border-blue-500 text-blue-200 ring-2 ring-blue-500/50 shadow-lg shadow-blue-950/50'
+                    ? isOledMode
+                      ? 'bg-cyan-950/40 border-cyan-400 text-cyan-200 ring-2 ring-cyan-400/60 shadow-lg shadow-cyan-950/50'
+                      : 'bg-blue-600/20 border-blue-500 text-blue-200 ring-2 ring-blue-500/50 shadow-lg shadow-blue-950/50'
+                    : isOledMode
+                    ? 'bg-black border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:bg-zinc-900'
                     : 'bg-zinc-950 border-zinc-850 text-zinc-300 hover:border-zinc-700 hover:bg-zinc-900'
                 }`}
               >
@@ -78,7 +94,11 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                       </span>
                     )}
                     {isSelected && (
-                      <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-blue-500 text-white shadow-sm">
+                      <span
+                        className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded text-white shadow-sm ${
+                          isOledMode ? 'bg-cyan-500' : 'bg-blue-500'
+                        }`}
+                      >
                         선택됨
                       </span>
                     )}
@@ -86,7 +106,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                 </div>
 
                 <div className="mt-2">
-                  <div className="font-extrabold text-sm tracking-tight text-zinc-100 truncate">
+                  <div className="font-extrabold text-sm tracking-tight text-white truncate">
                     {preset.shortName}
                   </div>
                   {preset.address && (

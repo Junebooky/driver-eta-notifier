@@ -2,7 +2,8 @@
 
 import React from 'react';
 import { LocationPreset, RouteEstimate } from '@/types';
-import { Navigation, Compass, AlertTriangle, RefreshCw, Clock, WifiOff, ShieldCheck } from 'lucide-react';
+import { Compass, AlertTriangle, RefreshCw, Clock, WifiOff, ShieldCheck } from 'lucide-react';
+import { haptics } from '@/utils/haptics';
 
 interface RouteInfoCardProps {
   origin: LocationPreset;
@@ -14,6 +15,7 @@ interface RouteInfoCardProps {
   gpsErrorMsg: string | null;
   onRequestGps: () => void;
   onRefreshRoute: () => void;
+  isOledMode?: boolean;
 }
 
 export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
@@ -26,13 +28,24 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
   gpsErrorMsg,
   onRequestGps,
   onRefreshRoute,
+  isOledMode = false,
 }) => {
   return (
-    <div className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-4 shadow-md space-y-3">
+    <div
+      className={`w-full rounded-2xl p-4 transition-colors space-y-3 ${
+        isOledMode
+          ? 'bg-black border-2 border-zinc-800 shadow-none'
+          : 'bg-zinc-900 border border-zinc-800 shadow-md'
+      }`}
+    >
       {/* Origin -> Destination Bar */}
-      <div className="flex items-center justify-between bg-zinc-950 p-3 rounded-xl border border-zinc-800">
+      <div className="flex items-center justify-between bg-black p-3 rounded-xl border border-zinc-800">
         <div className="flex items-center space-x-2 flex-1 min-w-0">
-          <div className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0 animate-pulse" />
+          <div
+            className={`w-2.5 h-2.5 rounded-full shrink-0 animate-pulse ${
+              isOledMode ? 'bg-cyan-400 shadow-[0_0_8px_#22d3ee]' : 'bg-blue-500'
+            }`}
+          />
           <div className="flex flex-col min-w-0">
             <span className="text-[10px] font-bold text-zinc-500 uppercase">출발지</span>
             <span className="text-xs font-bold text-zinc-200 truncate">{origin.shortName}</span>
@@ -44,9 +57,19 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
         <div className="flex items-center space-x-2 flex-1 min-w-0 justify-end text-right">
           <div className="flex flex-col min-w-0 items-end">
             <span className="text-[10px] font-bold text-zinc-500 uppercase">목적지</span>
-            <span className="text-xs font-bold text-blue-400 truncate">{destination.shortName}</span>
+            <span
+              className={`text-xs font-bold truncate ${
+                isOledMode ? 'text-cyan-300' : 'text-blue-400'
+              }`}
+            >
+              {destination.shortName}
+            </span>
           </div>
-          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+          <div
+            className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+              isOledMode ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]' : 'bg-emerald-500'
+            }`}
+          />
         </div>
       </div>
 
@@ -62,11 +85,17 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
       )}
 
       {/* Route & ETA Display Card */}
-      <div className="flex items-center justify-between bg-gradient-to-r from-blue-950/40 to-indigo-950/40 p-3.5 rounded-xl border border-blue-900/40">
+      <div
+        className={`flex items-center justify-between p-3.5 rounded-xl border ${
+          isOledMode
+            ? 'bg-black border-cyan-900/60 shadow-none'
+            : 'bg-gradient-to-r from-blue-950/40 to-indigo-950/40 border-blue-900/40'
+        }`}
+      >
         <div>
           <div className="flex items-center space-x-1.5 text-xs text-blue-300 font-medium">
-            <Clock className="w-3.5 h-3.5 text-blue-400" />
-            <span>예상 소요 시간 / ETA</span>
+            <Clock className={`w-3.5 h-3.5 ${isOledMode ? 'text-cyan-400' : 'text-blue-400'}`} />
+            <span className={isOledMode ? 'text-cyan-200 font-semibold' : ''}>예상 소요 시간 / ETA</span>
 
             {/* Network Fallback Badge */}
             {routeEstimate?.isFallback && (
@@ -99,20 +128,30 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
           )}
         </div>
 
-        {/* Refresh & GPS Action Buttons */}
+        {/* Refresh & GPS Action Buttons with Haptic Feedback */}
         <div className="flex items-center space-x-2">
           <button
-            onClick={onRequestGps}
+            onClick={() => {
+              haptics.lightTap();
+              onRequestGps();
+            }}
             disabled={isLocating}
-            className="p-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 hover:text-white transition-all active:scale-95 disabled:opacity-50"
+            className="p-2.5 rounded-xl bg-zinc-850 hover:bg-zinc-750 border border-zinc-700 text-zinc-300 hover:text-white transition-all active:scale-95 disabled:opacity-50"
             title="GPS 현재 위치 조회"
           >
-            <Compass className={`w-4 h-4 ${isLocating ? 'animate-spin text-blue-400' : ''}`} />
+            <Compass className={`w-4 h-4 ${isLocating ? 'animate-spin text-cyan-400' : ''}`} />
           </button>
           <button
-            onClick={onRefreshRoute}
+            onClick={() => {
+              haptics.lightTap();
+              onRefreshRoute();
+            }}
             disabled={isLoadingRoute}
-            className="p-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white shadow-md active:scale-95 disabled:opacity-50"
+            className={`p-2.5 rounded-xl text-white shadow-md active:scale-95 disabled:opacity-50 transition-all ${
+              isOledMode
+                ? 'bg-cyan-600 hover:bg-cyan-500 border border-cyan-400/50'
+                : 'bg-blue-600 hover:bg-blue-500'
+            }`}
             title="ETA 재계산"
           >
             <RefreshCw className={`w-4 h-4 ${isLoadingRoute ? 'animate-spin' : ''}`} />

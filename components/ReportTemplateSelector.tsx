@@ -9,6 +9,7 @@ interface ReportTemplateSelectorProps {
   currentMode: ReportMode;
   onSelectMode: (mode: ReportMode) => void;
   reportPreviewText: string;
+  isOledMode?: boolean;
 }
 
 const TEMPLATES: { mode: ReportMode; label: string; icon: React.ReactNode; color: string }[] = [
@@ -22,12 +23,19 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
   currentMode,
   onSelectMode,
   reportPreviewText,
+  isOledMode = false,
 }) => {
   return (
-    <div className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-4 shadow-md space-y-3">
+    <div
+      className={`w-full rounded-2xl p-4 transition-colors space-y-3 ${
+        isOledMode
+          ? 'bg-black border-2 border-zinc-800 shadow-none'
+          : 'bg-zinc-900 border border-zinc-800 shadow-md'
+      }`}
+    >
       <div className="flex items-center justify-between">
         <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider flex items-center">
-          <FileText className="w-3.5 h-3.5 mr-1.5 text-blue-400" /> 단톡방 현장 보고 모드
+          <FileText className={`w-3.5 h-3.5 mr-1.5 ${isOledMode ? 'text-cyan-400' : 'text-blue-400'}`} /> 단톡방 현장 보고 모드
         </h3>
         <span className="text-[11px] text-zinc-500 font-medium">원터치 템플릿</span>
       </div>
@@ -46,6 +54,8 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
               className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center space-x-1.5 active:scale-95 ${
                 isSelected
                   ? `${item.color} ring-2 ring-blue-500/40 shadow-sm font-extrabold`
+                  : isOledMode
+                  ? 'bg-black border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
                   : 'bg-zinc-950 border-zinc-850 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
               }`}
             >
@@ -57,12 +67,12 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
       </div>
 
       {/* Live Report Preview Box */}
-      <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3">
+      <div className="bg-black border border-zinc-800 rounded-xl p-3">
         <div className="text-[10px] font-bold text-zinc-500 uppercase mb-1 flex items-center justify-between">
           <span>보고 전송 텍스트 미리보기</span>
-          <span className="text-blue-400 font-semibold">자동 갱신됨</span>
+          <span className={`${isOledMode ? 'text-cyan-400' : 'text-blue-400'} font-semibold`}>자동 갱신됨</span>
         </div>
-        <p className="text-xs font-mono font-medium text-zinc-200 leading-relaxed bg-zinc-900/60 p-2.5 rounded-lg border border-zinc-800 select-all">
+        <p className="text-xs font-mono font-medium text-zinc-100 leading-relaxed bg-zinc-950 p-2.5 rounded-lg border border-zinc-850 select-all">
           {reportPreviewText}
         </p>
       </div>
