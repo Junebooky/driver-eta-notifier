@@ -7,7 +7,7 @@ declare global {
 export function initKakaoSDK(): boolean {
   if (typeof window === 'undefined') return false;
   
-  const kakaoKey = process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY;
+  const kakaoKey = process.env.NEXT_PUBLIC_KAKAO_JS_KEY || process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY;
   if (!kakaoKey || kakaoKey === 'your_kakao_js_key') {
     return false;
   }

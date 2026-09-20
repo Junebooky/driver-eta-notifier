@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { calculateHaversineEstimate } from '@/utils/navigation';
 
 interface CacheEntry {
   data: {
@@ -27,50 +28,25 @@ function getCacheKey(startLat: number, startLng: number, endLat: number, endLng:
   return `${sLat},${sLng}->${eLat},${eLng}`;
 }
 
-function calculateHaversineFallback(startLat: number, startLng: number, endLat: number, endLng: number) {
-  const R = 6371; // Earth radius in km
-  const dLat = ((endLat - startLat) * Math.PI) / 180;
-  const dLng = ((endLng - startLng) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((startLat * Math.PI) / 180) *
-      Math.cos((endLat * Math.PI) / 180) *
-      Math.sin(dLng / 2) *
-      Math.sin(dLng / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const straightKm = R * c;
-
-  // Detour factor 1.35x for urban road distance
-  const distanceKm = Math.max(1, Math.round(straightKm * 1.35 * 10) / 10);
-  const durationMinutes = Math.max(5, Math.round(distanceKm * 1.3));
-
-  const now = new Date();
-  const etaTime = new Date(now.getTime() + durationMinutes * 60 * 1000);
-  const hours = String(etaTime.getHours()).padStart(2, '0');
-  const minutes = String(etaTime.getMinutes()).padStart(2, '0');
-
-  return {
-    distanceKm,
-    durationMinutes,
-    etaFormatted: `${hours}:${minutes} (추정 ${durationMinutes}분 소요)`,
-    trafficSummary: '직선거리 기반 추정치',
-    isMock: false,
-    isFallback: true,
-    fallbackNotice: '네트워크 지연으로 추정 시간 표시 중',
-  };
-}
-
 export async function POST(req: NextRequest) {
+  let startLat = 37.5042;
+  let startLng = 127.0425;
+  let endLat = 37.4495;
+  let endLng = 126.4512;
+
   try {
     const body = await req.json();
-    const { startLat, startLng, endLat, endLng } = body;
+    if (typeof body.startLat === 'number') startLat = body.startLat;
+    if (typeof body.startLng === 'number') startLng = body.startLng;
+    if (typeof body.endLat === 'number') endLat = body.endLat;
+    if (typeof body.endLng === 'number') endLng = body.endLng;
+
+    if (!body.startLat || !body.startLng || !body.endLat || !body.endLng) {
+      return NextResponse.json({ error: 'Missing origin or destination coordinates' }, { status: 400 });
+    }
 
     const useMock = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
     const apiKey = process.env.TMAP_API_KEY;
-
-    if (!startLat || !startLng || !endLat || !endLng) {
-      return NextResponse.json({ error: 'Missing origin or destination coordinates' }, { status: 400 });
-    }
 
     const cacheKey = getCacheKey(startLat, startLng, endLat, endLng);
     const nowTimestamp = Date.now();
@@ -92,9 +68,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2. If Mock Mode explicitly enabled
+    // 2. If Mock Mode explicitly enabled or API key missing
     if (useMock || !apiKey || apiKey === 'your_tmap_api_key') {
-      const fallbackData = calculateHaversineFallback(startLat, startLng, endLat, endLng);
+      const fallbackData = calculateHaversineEstimate(startLat, startLng, endLat, endLng);
       return NextResponse.json({
         ...fallbackData,
         trafficSummary: '원활 (모의 데이터)',
@@ -131,7 +107,7 @@ export async function POST(req: NextRequest) {
 
     if (!response.ok) {
       console.warn(`TMAP API HTTP Error ${response.status}, triggering Haversine Fallback`);
-      const fallbackData = calculateHaversineFallback(startLat, startLng, endLat, endLng);
+      const fallbackData = calculateHaversineEstimate(startLat, startLng, endLat, endLng);
       return NextResponse.json({ ...fallbackData, isCached: false });
     }
 
@@ -163,9 +139,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(resultData);
   } catch (error: any) {
     console.warn('TMAP Route API call failed or timed out:', error?.message);
-    const body = await req.json().catch(() => ({}));
-    const { startLat = 37.5042, startLng = 127.0425, endLat = 37.4495, endLng = 126.4512 } = body;
-    const fallbackData = calculateHaversineFallback(startLat, startLng, endLat, endLng);
+    const fallbackData = calculateHaversineEstimate(startLat, startLng, endLat, endLng);
     return NextResponse.json({ ...fallbackData, isCached: false });
   }
 }

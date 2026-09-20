@@ -6,6 +6,44 @@ export interface LocationTarget {
   lng: number;
 }
 
+export function calculateHaversineEstimate(
+  startLat: number,
+  startLng: number,
+  endLat: number,
+  endLng: number
+) {
+  const R = 6371; // Earth radius in km
+  const dLat = ((endLat - startLat) * Math.PI) / 180;
+  const dLng = ((endLng - startLng) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((startLat * Math.PI) / 180) *
+      Math.cos((endLat * Math.PI) / 180) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const straightKm = R * c;
+
+  // Detour factor 1.35x for urban road distance
+  const distanceKm = Math.max(1, Math.round(straightKm * 1.35 * 10) / 10);
+  const durationMinutes = Math.max(5, Math.round(distanceKm * 1.3));
+
+  const now = new Date();
+  const etaTime = new Date(now.getTime() + durationMinutes * 60 * 1000);
+  const hours = String(etaTime.getHours()).padStart(2, '0');
+  const minutes = String(etaTime.getMinutes()).padStart(2, '0');
+
+  return {
+    distanceKm,
+    durationMinutes,
+    etaFormatted: `${hours}:${minutes} (추정 ${durationMinutes}분 소요)`,
+    trafficSummary: '직선거리 기반 추정치',
+    isMock: false,
+    isFallback: true,
+    fallbackNotice: '네트워크 지연으로 추정 소요시간 표시 중',
+  };
+}
+
 const STORE_URLS = {
   tmap: {
     ios: 'https://apps.apple.com/kr/app/id431204108',

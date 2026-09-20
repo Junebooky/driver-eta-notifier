@@ -72,7 +72,7 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
             {routeEstimate?.isFallback && (
               <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/40">
                 <WifiOff className="w-3 h-3 mr-1" />
-                {routeEstimate.fallbackNotice || '네트워크 지연 추정'}
+                {routeEstimate.fallbackNotice || '네트워크 지연으로 추정 소요시간 표시 중'}
               </span>
             )}
 

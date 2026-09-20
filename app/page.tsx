@@ -16,6 +16,7 @@ import { LocationPreset, ReportMode, RouteEstimate } from '@/types';
 import { DEFAULT_PRESET_LOCATIONS } from '@/utils/presets';
 import { generateReportText } from '@/utils/reportGenerator';
 import { initKakaoSDK } from '@/utils/kakao';
+import { calculateHaversineEstimate } from '@/utils/navigation';
 
 const CUSTOM_PRESETS_KEY = 'protocol_cockpit_custom_presets_v1';
 
@@ -117,20 +118,9 @@ export default function Home() {
           throw new Error('Route API response not ok');
         }
       } catch (err) {
-        console.warn('Route estimate fetch failed, fallback to mock data:', err);
-        const durationMinutes = 70;
-        const now = new Date();
-        const etaTime = new Date(now.getTime() + durationMinutes * 60 * 1000);
-        const hours = String(etaTime.getHours()).padStart(2, '0');
-        const minutes = String(etaTime.getMinutes()).padStart(2, '0');
-
-        setRouteEstimate({
-          distanceKm: 62.4,
-          durationMinutes,
-          etaFormatted: `${hours}:${minutes} (약 70분 소요)`,
-          trafficSummary: '모의 계산',
-          isMock: true,
-        });
+        console.warn('Route estimate fetch failed, fallback to haversine estimate:', err);
+        const fallbackEstimate = calculateHaversineEstimate(start.lat, start.lng, end.lat, end.lng);
+        setRouteEstimate(fallbackEstimate);
       } finally {
         setIsLoadingRoute(false);
       }
