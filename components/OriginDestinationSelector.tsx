@@ -20,7 +20,7 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
   onSwap,
 }) => {
   return (
-    <div className="w-full bg-white border border-slate-100/90 rounded-2xl p-3.5 shadow-2xs space-y-2.5 select-none">
+    <div className="w-full bg-white border border-slate-100/80 rounded-2xl p-4 shadow-[0_8px_25px_rgba(30,96,243,0.06)] space-y-2.5 select-none">
       <div className="flex items-center space-x-2.5 w-full">
         {/* Origin Card */}
         <div
@@ -30,12 +30,12 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
           }}
           className={`flex-1 min-w-0 w-full p-3 rounded-2xl border text-left cursor-pointer transition-all duration-150 active:scale-95 bg-white ${
             selectionTarget === 'origin'
-              ? 'border-blue-400 ring-2 ring-blue-100 shadow-xs'
+              ? 'border-[#1E60F3] ring-2 ring-[#1E60F3]/20 shadow-[0_2px_10px_rgba(30,96,243,0.1)]'
               : 'border-slate-200/80 hover:border-slate-300'
           }`}
         >
           <div className="flex items-center space-x-1.5 min-w-0">
-            <div className="w-2 h-2 rounded-full bg-blue-600 shrink-0" />
+            <div className="w-2 h-2 rounded-full bg-[#1E60F3] shrink-0" />
             <span className="text-xs font-semibold text-slate-500 shrink-0">출발지</span>
           </div>
           <div className="text-sm font-bold text-slate-900 truncate mt-1.5 w-full" title={origin.name}>
@@ -54,7 +54,7 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
             haptics.successPulse();
             onSwap();
           }}
-          className="w-8 h-8 rounded-full bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 shadow-2xs flex items-center justify-center shrink-0 active:scale-90 transition-transform duration-100 cursor-pointer"
+          className="w-8 h-8 rounded-full bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 shadow-[0_2px_8px_rgba(0,0,0,0.04)] flex items-center justify-center shrink-0 active:scale-90 transition-transform duration-100 cursor-pointer"
           title="출발지 ⇄ 목적지 맞교환"
           aria-label="출발지 목적지 맞교환"
         >
@@ -69,7 +69,7 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
           }}
           className={`flex-1 min-w-0 w-full p-3 rounded-2xl border text-left cursor-pointer transition-all duration-150 active:scale-95 bg-white ${
             selectionTarget === 'destination'
-              ? 'border-emerald-400 ring-2 ring-emerald-100 shadow-xs'
+              ? 'border-emerald-400 ring-2 ring-emerald-100 shadow-[0_2px_10px_rgba(16,185,129,0.1)]'
               : 'border-slate-200/80 hover:border-slate-300'
           }`}
         >
@@ -89,12 +89,12 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
       {/* Guide Caption */}
       <div className="text-[11px] text-slate-500 px-1 flex items-center justify-between">
         <div className="flex items-center space-x-1.5">
-          <div className="w-3.5 h-3.5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[9px] font-black shrink-0">
+          <div className="w-3.5 h-3.5 rounded-full bg-[#1E60F3] text-white flex items-center justify-center text-[9px] font-black shrink-0 shadow-[0_1px_4px_rgba(30,96,243,0.3)]">
             i
           </div>
           <span>
             아래 거점을 탭하면 현재{' '}
-            <strong className={selectionTarget === 'origin' ? 'text-blue-600' : 'text-emerald-600'}>
+            <strong className={selectionTarget === 'origin' ? 'text-[#1E60F3]' : 'text-emerald-600'}>
               [{selectionTarget === 'origin' ? '출발지' : '목적지'}]
             </strong>
             로 지정됩니다.

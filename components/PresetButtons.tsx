@@ -28,12 +28,12 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
   const [managingPreset, setManagingPreset] = useState<LocationPreset | null>(null);
 
   return (
-    <div className="w-full bg-white border border-slate-100/90 rounded-2xl p-4 shadow-2xs select-none space-y-3">
+    <div className="w-full bg-white border border-slate-100/80 rounded-2xl p-4 shadow-[0_8px_25px_rgba(30,96,243,0.06)] select-none space-y-3">
       {/* Header: Title on Left, 거점 관리 on Right */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          <div className="w-5 h-5 rounded-full bg-blue-500/10 flex items-center justify-center">
-            <MapPin className="w-3.5 h-3.5 text-blue-500 fill-blue-500" />
+          <div className="w-5 h-5 rounded-full bg-[#1E60F3]/10 flex items-center justify-center">
+            <MapPin className="w-3.5 h-3.5 text-[#1E60F3] fill-[#1E60F3]" />
           </div>
           <h2 className="text-sm font-bold text-slate-900 tracking-tight">자주 가는 목적지</h2>
         </div>
@@ -44,9 +44,9 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
             haptics.lightTap();
             setIsManageMode(!isManageMode);
           }}
-          className={`text-xs flex items-center space-x-1 py-1 px-2 rounded-lg transition-colors cursor-pointer ${
+          className={`text-xs flex items-center space-x-1 py-1 px-2.5 rounded-lg transition-colors cursor-pointer ${
             isManageMode
-              ? 'bg-blue-600 text-white font-bold shadow-xs'
+              ? 'bg-[#1E60F3] text-white font-bold shadow-[0_4px_12px_rgba(30,96,243,0.25)]'
               : 'text-slate-400 hover:text-slate-600 font-medium'
           }`}
           title="거점 수정 및 삭제 관리"
@@ -58,12 +58,12 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
 
       {/* Management Mode Guidance Bar */}
       {isManageMode && (
-        <div className="px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 text-[11px] font-bold flex items-center justify-between animate-fade-in">
+        <div className="px-3 py-1.5 rounded-xl bg-blue-50/90 border border-blue-200 text-[#1E60F3] text-[11px] font-bold flex items-center justify-between animate-fade-in">
           <span>관리(수정/삭제)할 거점을 탭하세요.</span>
           <button
             type="button"
             onClick={() => setIsManageMode(false)}
-            className="text-blue-600 font-extrabold hover:underline cursor-pointer"
+            className="text-[#1E60F3] font-extrabold hover:underline cursor-pointer"
           >
             완료
           </button>
@@ -80,14 +80,14 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
             'bg-slate-50/70 hover:bg-slate-100/80 border-slate-200/80 text-slate-800 font-medium py-3.5';
           if (isDestination) {
             stateClasses =
-              'bg-white border-emerald-300 ring-2 ring-emerald-50 text-slate-900 font-bold shadow-2xs py-2.5';
+              'bg-white border-emerald-300 ring-2 ring-emerald-50 text-slate-900 font-bold shadow-[0_2px_10px_rgba(16,185,129,0.08)] py-2.5';
           } else if (isOrigin) {
             stateClasses =
-              'bg-white border-blue-300 ring-2 ring-blue-50 text-slate-900 font-bold shadow-2xs py-2.5';
+              'bg-white border-[#1E60F3]/40 ring-2 ring-[#1E60F3]/10 text-slate-900 font-bold shadow-[0_2px_10px_rgba(30,96,243,0.08)] py-2.5';
           }
 
           if (isManageMode) {
-            stateClasses += ' border-dashed border-blue-400/80 hover:bg-blue-50/50';
+            stateClasses += ' border-dashed border-[#1E60F3]/60 hover:bg-blue-50/50';
           }
 
           return (
@@ -117,13 +117,13 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                   </span>
                 )}
                 {isOrigin && !isDestination && (
-                  <span className="text-[10px] font-semibold text-blue-600 flex items-center justify-center gap-1 mt-0.5 leading-none">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                  <span className="text-[10px] font-semibold text-[#1E60F3] flex items-center justify-center gap-1 mt-0.5 leading-none">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#1E60F3]" />
                     출발지
                   </span>
                 )}
                 {isManageMode && (
-                  <span className="text-[9px] font-bold text-blue-600 leading-none mt-0.5">
+                  <span className="text-[9px] font-bold text-[#1E60F3] leading-none mt-0.5">
                     관리
                   </span>
                 )}
@@ -139,7 +139,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
             haptics.lightTap();
             onOpenAddModal();
           }}
-          className="w-full py-3.5 px-2 rounded-xl border border-dashed border-slate-300 hover:border-blue-400 bg-white hover:bg-slate-50 text-slate-400 hover:text-blue-600 text-xs font-medium flex items-center justify-center space-x-1 active:scale-95 transition-transform duration-100 cursor-pointer min-h-[48px]"
+          className="w-full py-3.5 px-2 rounded-xl border border-dashed border-slate-300 hover:border-[#1E60F3] bg-white hover:bg-slate-50 text-slate-400 hover:text-[#1E60F3] text-xs font-medium flex items-center justify-center space-x-1 active:scale-95 transition-all duration-100 cursor-pointer min-h-[48px]"
           title="새 거점 검색 및 등록"
         >
           <Plus className="w-3.5 h-3.5" />
@@ -170,7 +170,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                   setManagingPreset(null);
                   setIsManageMode(false);
                 }}
-                className="py-2.5 px-3 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center space-x-1.5 border border-blue-200 active:scale-95 transition-transform cursor-pointer"
+                className="py-2.5 px-3 rounded-xl bg-[#1E60F3]/10 hover:bg-[#1E60F3]/20 text-[#1E60F3] text-xs font-bold flex items-center justify-center space-x-1.5 border border-[#1E60F3]/20 active:scale-95 transition-transform cursor-pointer"
               >
                 <Pencil className="w-3.5 h-3.5" />
                 <span>수정</span>

@@ -95,7 +95,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
       {/* 1-Second Fast Pass Primary Button */}
       <button
         onClick={handleFastPassAction}
-        className="w-full py-4 px-4 bg-blue-600 hover:bg-blue-700 active:scale-95 transition-all duration-150 text-white rounded-2xl font-bold text-sm tracking-tight shadow-sm flex items-center justify-between cursor-pointer group"
+        className="w-full py-4 px-4 bg-[#1E60F3] hover:bg-blue-600 active:scale-95 transition-all duration-150 text-white rounded-2xl font-bold text-sm tracking-tight shadow-[0_8px_25px_rgba(30,96,243,0.25)] flex items-center justify-between cursor-pointer group"
       >
         <div className="flex items-center space-x-2">
           <Zap className="w-5 h-5 text-yellow-300 fill-yellow-300 shrink-0" />
@@ -107,7 +107,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
       {/* KakaoTalk Pure Text Copy & App Launch Button */}
       <button
         onClick={handleKakaoReportAction}
-        className="w-full py-4 px-4 bg-[#FEE500] hover:bg-[#FDD835] active:scale-95 transition-all duration-150 text-[#191919] rounded-2xl font-bold text-sm tracking-tight shadow-2xs flex items-center justify-between cursor-pointer group"
+        className="w-full py-4 px-4 bg-[#FEE500] hover:bg-[#FDD835] active:scale-95 transition-all duration-150 text-[#191919] rounded-2xl font-bold text-sm tracking-tight shadow-[0_4px_14px_rgba(254,229,0,0.25)] flex items-center justify-between cursor-pointer group"
       >
         <div className="flex items-center space-x-2">
           <MessageSquare className="w-5 h-5 text-[#3C1E1E] fill-[#3C1E1E] shrink-0" />
