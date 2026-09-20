@@ -80,20 +80,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   const handleKakaoReportAction = async () => {
     haptics.lightTap();
 
-    // Dynamic Route Estimate Calculation fallback if routeEstimate is not yet loaded
-    const currentEstimate =
-      routeEstimate ||
-      calculateHaversineEstimate(origin.lat, origin.lng, destination.lat, destination.lng);
-
-    const formattedVipText = generateVipReportText({
-      destinationName: destination.shortName,
-      originName: origin.shortName,
-      distanceKm: currentEstimate.distanceKm,
-      durationMinutes: currentEstimate.durationMinutes,
-      etaFormatted: currentEstimate.etaFormatted,
-    });
-
-    const copied = await copyAndLaunchKakaoTalk(formattedVipText);
+    const copied = await copyAndLaunchKakaoTalk(reportText);
 
     const targetRoomLabel = targetChatRoom ? `[${targetChatRoom}]` : '[지정된 단톡방]';
     if (copied) {

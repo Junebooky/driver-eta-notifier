@@ -38,6 +38,7 @@ export default function Home() {
   // Custom Presets State
   const [customPresets, setCustomPresets] = useState<LocationPreset[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingPreset, setEditingPreset] = useState<LocationPreset | null>(null);
 
   // Load Custom Presets from LocalStorage on mount
   useEffect(() => {
@@ -61,6 +62,16 @@ export default function Home() {
     }
   };
 
+  const handleOpenAddModal = () => {
+    setEditingPreset(null);
+    setIsAddModalOpen(true);
+  };
+
+  const handleOpenEditModal = (preset: LocationPreset) => {
+    setEditingPreset(preset);
+    setIsAddModalOpen(true);
+  };
+
   const handleAddCustomPreset = (newPreset: LocationPreset) => {
     const updated = [newPreset, ...customPresets];
     saveCustomPresetsToStorage(updated);
@@ -72,6 +83,24 @@ export default function Home() {
     setToastMessage(`커스텀 거점 [${newPreset.shortName}] 추가 완료`);
   };
 
+  const handleUpdatePreset = (updatedPreset: LocationPreset) => {
+    const isCustom = customPresets.some((p) => p.id === updatedPreset.id);
+    if (isCustom) {
+      const updated = customPresets.map((p) => (p.id === updatedPreset.id ? updatedPreset : p));
+      saveCustomPresetsToStorage(updated);
+    } else {
+      const updated = [updatedPreset, ...customPresets];
+      saveCustomPresetsToStorage(updated);
+    }
+    if (destination.id === updatedPreset.id) {
+      setDestination(updatedPreset);
+    }
+    if (origin.id === updatedPreset.id) {
+      setOrigin(updatedPreset);
+    }
+    setToastMessage(`거점 [${updatedPreset.shortName}] 수정 완료`);
+  };
+
   const handleDeleteCustomPreset = (id: string) => {
     const updated = customPresets.filter((p) => p.id !== id);
     saveCustomPresetsToStorage(updated);
@@ -81,7 +110,7 @@ export default function Home() {
     if (origin.id === id) {
       setOrigin(DEFAULT_PRESET_LOCATIONS[2]);
     }
-    setToastMessage('커스텀 거점이 삭제되었습니다.');
+    setToastMessage('거점이 삭제되었습니다.');
   };
 
   // Combine Default Presets + Custom Presets
@@ -235,7 +264,8 @@ export default function Home() {
             selectedOriginId={origin?.id}
             selectedDestinationId={destination?.id}
             onSelectPreset={handleSelectPreset}
-            onOpenAddModal={() => setIsAddModalOpen(true)}
+            onOpenAddModal={handleOpenAddModal}
+            onEditPreset={handleOpenEditModal}
             onDeleteCustomPreset={handleDeleteCustomPreset}
           />
 
@@ -274,7 +304,7 @@ export default function Home() {
 
         {/* Cockpit Footer */}
         <footer className="px-4 py-3 text-center text-[11px] font-semibold border-t border-slate-200 bg-white text-slate-500">
-          PROTOCOL COCKPIT v2.6 • VIP DRIVER SMART LAUNCHER
+          PROTOCOL COCKPIT v2.7 • VIP DRIVER SMART LAUNCHER
         </footer>
       </div>
 
@@ -289,11 +319,16 @@ export default function Home() {
         }}
       />
 
-      {/* Custom VIP Preset Add Modal */}
+      {/* Custom VIP Preset Add / Edit Modal */}
       <CustomPresetModal
         isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
+        onClose={() => {
+          setIsAddModalOpen(false);
+          setEditingPreset(null);
+        }}
         onAddPreset={handleAddCustomPreset}
+        presetToEdit={editingPreset}
+        onUpdatePreset={handleUpdatePreset}
       />
 
       {/* Feedback Toast Notification */}

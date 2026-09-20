@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { LocationPreset } from '@/types';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Pencil } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface PresetButtonsProps {
@@ -11,6 +11,7 @@ interface PresetButtonsProps {
   selectedDestinationId?: string;
   onSelectPreset: (preset: LocationPreset) => void;
   onOpenAddModal: () => void;
+  onEditPreset?: (preset: LocationPreset) => void;
   onDeleteCustomPreset?: (id: string) => void;
 }
 
@@ -20,6 +21,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
   selectedDestinationId,
   onSelectPreset,
   onOpenAddModal,
+  onEditPreset,
   onDeleteCustomPreset,
 }) => {
   return (
@@ -29,7 +31,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
         {presets.map((preset) => {
           const isOrigin = selectedOriginId === preset.id;
           const isDestination = selectedDestinationId === preset.id;
-          const isCustom = preset.category === 'CUSTOM';
+          const isSelected = isOrigin || isDestination;
 
           let stateClasses = 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 font-bold';
           if (isDestination) {
@@ -66,22 +68,43 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                 )}
               </button>
 
-              {/* Delete button for custom presets */}
-              {isCustom && onDeleteCustomPreset && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    haptics.lightTap();
-                    if (confirm(`'${preset.shortName}' 거점을 삭제하시겠습니까?`)) {
-                      onDeleteCustomPreset(preset.id);
-                    }
-                  }}
-                  className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-100 hover:bg-rose-500 text-rose-600 hover:text-white border border-rose-300 flex items-center justify-center opacity-80 hover:opacity-100 active:scale-90 transition-all cursor-pointer z-10"
-                  title="거점 삭제"
+              {/* Action Buttons (Edit & Delete) visible when preset is selected */}
+              {isSelected && (
+                <div
+                  className="absolute top-1 right-1 flex items-center space-x-0.5 z-10"
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  <Trash2 className="w-2.5 h-2.5" />
-                </button>
+                  {onEditPreset && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        haptics.lightTap();
+                        onEditPreset(preset);
+                      }}
+                      className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1 transition-colors active:scale-90 cursor-pointer"
+                      title="거점 정보 수정"
+                    >
+                      <Pencil className="w-2.5 h-2.5" />
+                    </button>
+                  )}
+                  {onDeleteCustomPreset && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        haptics.lightTap();
+                        if (confirm(`'${preset.shortName}' 거점을 삭제하시겠습니까?`)) {
+                          onDeleteCustomPreset(preset.id);
+                        }
+                      }}
+                      className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1 transition-colors active:scale-90 cursor-pointer"
+                      title="거점 삭제"
+                    >
+                      <Trash2 className="w-2.5 h-2.5" />
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           );

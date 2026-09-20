@@ -1,14 +1,16 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LocationPreset } from '@/types';
-import { X, Plus, Search, MapPin, Loader2 } from 'lucide-react';
+import { X, Plus, Search, MapPin, Loader2, Pencil } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface CustomPresetModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAddPreset: (preset: LocationPreset) => void;
+  presetToEdit?: LocationPreset | null;
+  onUpdatePreset?: (preset: LocationPreset) => void;
 }
 
 interface PoiResult {
@@ -23,6 +25,8 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
   isOpen,
   onClose,
   onAddPreset,
+  presetToEdit,
+  onUpdatePreset,
 }) => {
   // Search State
   const [searchQuery, setSearchQuery] = useState('');
@@ -36,6 +40,31 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
   const [address, setAddress] = useState('');
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
+
+  // Populate form if presetToEdit is provided
+  useEffect(() => {
+    if (isOpen) {
+      if (presetToEdit) {
+        setName(presetToEdit.name);
+        setShortName(presetToEdit.shortName);
+        setAddress(presetToEdit.address || '');
+        setLat(presetToEdit.lat);
+        setLng(presetToEdit.lng);
+        setSearchQuery('');
+        setSearchResults([]);
+        setSearchError(null);
+      } else {
+        setName('');
+        setShortName('');
+        setAddress('');
+        setLat(null);
+        setLng(null);
+        setSearchQuery('');
+        setSearchResults([]);
+        setSearchError(null);
+      }
+    }
+  }, [isOpen, presetToEdit]);
 
   if (!isOpen) return null;
 
@@ -89,18 +118,29 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
       return;
     }
 
-    const newPreset: LocationPreset = {
-      id: `custom_${Date.now()}`,
-      name: name.trim(),
-      shortName: shortName.trim(),
-      lat,
-      lng,
-      category: 'CUSTOM',
-      address: address.trim() || '사용자 지정 거점',
-    };
-
     haptics.successPulse();
-    onAddPreset(newPreset);
+
+    if (presetToEdit && onUpdatePreset) {
+      onUpdatePreset({
+        ...presetToEdit,
+        name: name.trim(),
+        shortName: shortName.trim(),
+        address: address.trim() || '사용자 지정 거점',
+        lat,
+        lng,
+      });
+    } else {
+      const newPreset: LocationPreset = {
+        id: `custom_${Date.now()}`,
+        name: name.trim(),
+        shortName: shortName.trim(),
+        lat,
+        lng,
+        category: 'CUSTOM',
+        address: address.trim() || '사용자 지정 거점',
+      };
+      onAddPreset(newPreset);
+    }
 
     // Reset form
     setSearchQuery('');
@@ -120,14 +160,16 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50/80">
           <div className="flex items-center space-x-2">
             <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
-              <Plus className="w-4 h-4" />
+              {presetToEdit ? <Pencil className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
             </div>
-            <h2 className="text-sm font-black text-slate-900 tracking-tight">VIP 거점 실시간 검색 등록</h2>
+            <h2 className="text-sm font-black text-slate-900 tracking-tight">
+              {presetToEdit ? 'VIP 거점 정보 수정' : 'VIP 거점 실시간 검색 등록'}
+            </h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 active:scale-95 transition-transform duration-100"
+            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 active:scale-95 transition-transform duration-100 cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
