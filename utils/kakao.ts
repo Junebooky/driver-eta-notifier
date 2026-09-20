@@ -12,17 +12,18 @@ export function initKakaoSDK(): boolean {
     return false;
   }
 
-  if (window.Kakao && !window.Kakao.isInitialized()) {
-    try {
-      window.Kakao.init(kakaoKey);
+  try {
+    if (window.Kakao) {
+      if (!window.Kakao.isInitialized()) {
+        window.Kakao.init(kakaoKey);
+      }
       return window.Kakao.isInitialized();
-    } catch (e) {
-      console.warn('Kakao SDK init failed:', e);
-      return false;
     }
+  } catch (e) {
+    console.warn('Kakao SDK hydration safe init failed:', e);
   }
 
-  return window.Kakao ? window.Kakao.isInitialized() : false;
+  return false;
 }
 
 export async function shareViaKakaoTalk(text: string, title: string = 'Protocol Cockpit 업무 보고'): Promise<boolean> {

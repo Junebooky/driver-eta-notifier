@@ -25,4 +25,7 @@ export interface RouteEstimate {
   etaFormatted: string;
   trafficSummary?: string;
   isMock: boolean;
+  isFallback?: boolean;
+  fallbackNotice?: string;
+  isCached?: boolean;
 }

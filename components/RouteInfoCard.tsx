@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { LocationPreset, RouteEstimate } from '@/types';
-import { Navigation, Compass, AlertTriangle, RefreshCw, Clock, MapPin } from 'lucide-react';
+import { Navigation, Compass, AlertTriangle, RefreshCw, Clock, WifiOff, ShieldCheck } from 'lucide-react';
 
 interface RouteInfoCardProps {
   origin: LocationPreset;
@@ -67,7 +67,24 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
           <div className="flex items-center space-x-1.5 text-xs text-blue-300 font-medium">
             <Clock className="w-3.5 h-3.5 text-blue-400" />
             <span>예상 소요 시간 / ETA</span>
+
+            {/* Network Fallback Badge */}
+            {routeEstimate?.isFallback && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                <WifiOff className="w-3 h-3 mr-1" />
+                {routeEstimate.fallbackNotice || '네트워크 지연 추정'}
+              </span>
+            )}
+
+            {/* Quota Defense Cache Badge */}
+            {routeEstimate?.isCached && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                <ShieldCheck className="w-3 h-3 mr-1" />
+                쿼터 캐시(3분)
+              </span>
+            )}
           </div>
+
           <div className="text-xl font-black text-white mt-1 tracking-tight">
             {isLoadingRoute ? (
               <span className="text-zinc-500 text-sm animate-pulse">실시간 경로 계산 중...</span>
