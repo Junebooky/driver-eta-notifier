@@ -31,9 +31,9 @@ export function generateVipReportText({
 }: VipReportParams): string {
   const cleanEta = etaFormatted.split(' ')[0] || etaFormatted;
   if (mode === 'ARRIVED') {
-    return `[${carNumber} ${driverName}]\n• 목적지: ${destinationName}\n• 출발지: ${originName}\n• 상태: 도착 완료`;
+    return `[${carNumber} ${driverName}]\n• 출발지: ${originName}\n• 목적지: ${destinationName}\n• 상태: 도착 완료`;
   }
-  return `[${carNumber} ${driverName}]\n• 목적지: ${destinationName}\n• 출발지: ${originName}\n• ETA: ${cleanEta}`;
+  return `[${carNumber} ${driverName}]\n• 출발지: ${originName}\n• 목적지: ${destinationName}\n• ETA: ${cleanEta}`;
 }
 
 /**

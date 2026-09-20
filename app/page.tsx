@@ -301,11 +301,6 @@ export default function Home() {
             onShowToast={(msg) => setToastMessage(msg)}
           />
         </div>
-
-        {/* Cockpit Footer */}
-        <footer className="px-4 py-3 text-center text-[11px] font-semibold border-t border-slate-200 bg-white text-slate-500">
-          PROTOCOL COCKPIT v2.7 • VIP DRIVER SMART LAUNCHER
-        </footer>
       </div>
 
       {/* Driver Profile Edit Modal */}

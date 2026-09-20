@@ -26,8 +26,8 @@ export function generateReportText({
   const cleanEta = etaFormatted.split(' ')[0] || etaFormatted;
 
   if (mode === 'ARRIVED') {
-    return `[${vehicle} ${driver}]\n• 목적지: ${destName}\n• 출발지: ${originName}\n• 상태: 도착 완료`;
+    return `[${vehicle} ${driver}]\n• 출발지: ${originName}\n• 목적지: ${destName}\n• 상태: 도착 완료`;
   }
 
-  return `[${vehicle} ${driver}]\n• 목적지: ${destName}\n• 출발지: ${originName}\n• ETA: ${cleanEta}`;
+  return `[${vehicle} ${driver}]\n• 출발지: ${originName}\n• 목적지: ${destName}\n• ETA: ${cleanEta}`;
 }

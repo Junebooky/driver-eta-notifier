@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { ReportMode } from '@/types';
-import { MessageSquareShare, Send, CheckCircle2 } from 'lucide-react';
+import { MessageSquareShare } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface ReportTemplateSelectorProps {
@@ -14,17 +14,14 @@ interface ReportTemplateSelectorProps {
 const TEMPLATES: {
   mode: ReportMode;
   label: string;
-  icon: React.ReactNode;
 }[] = [
   {
     mode: 'DEPARTURE',
     label: '출발',
-    icon: <Send className="w-4 h-4 text-blue-600" />,
   },
   {
     mode: 'ARRIVED',
     label: '도착',
-    icon: <CheckCircle2 className="w-4 h-4 text-emerald-600" />,
   },
 ];
 
@@ -43,7 +40,7 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
         </div>
       </div>
 
-      {/* Mode Selector: 2-Column Unified Circular Badge Buttons */}
+      {/* Mode Selector: Circular Text Buttons */}
       <div className="grid grid-cols-2 gap-2">
         {TEMPLATES.map((item) => {
           const isSelected = currentMode === item.mode;
@@ -57,7 +54,7 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
                 haptics.lightTap();
                 onSelectMode(item.mode);
               }}
-              className={`py-2.5 px-3 rounded-xl border transition-all duration-100 flex items-center justify-center space-x-2.5 active:scale-95 cursor-pointer ${
+              className={`py-2 px-3 rounded-xl border transition-all duration-100 flex items-center justify-center space-x-2.5 active:scale-95 cursor-pointer ${
                 isSelected
                   ? isDeparture
                     ? 'bg-blue-50/90 border-blue-500 text-blue-950 ring-2 ring-blue-500/20 shadow-xs'
@@ -65,19 +62,21 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
                   : 'bg-slate-50/70 hover:bg-slate-100/80 border-slate-200 text-slate-600'
               }`}
             >
-              {/* Circular Badge matching top Navbar family look */}
+              {/* Circular Badge with centered text (no icons) */}
               <div
-                className={`w-8 h-8 rounded-full bg-white border border-slate-200 shadow-xs flex items-center justify-center shrink-0 transition-transform ${
+                className={`w-8 h-8 rounded-full bg-white border border-slate-200 shadow-xs flex items-center justify-center shrink-0 transition-transform text-xs font-semibold ${
                   isSelected
                     ? isDeparture
-                      ? 'ring-2 ring-offset-1 ring-blue-600 scale-105 shadow-xs'
-                      : 'ring-2 ring-offset-1 ring-emerald-500 scale-105 shadow-xs'
-                    : 'opacity-70'
+                      ? 'ring-2 ring-offset-1 ring-blue-600 text-blue-700 font-bold scale-105 shadow-xs'
+                      : 'ring-2 ring-offset-1 ring-emerald-500 text-emerald-700 font-bold scale-105 shadow-xs'
+                    : 'text-slate-500 opacity-80'
                 }`}
               >
-                {item.icon}
+                {item.label}
               </div>
-              <span className="text-xs font-black tracking-tight">{item.label}</span>
+              <span className={`text-xs ${isSelected ? 'font-black' : 'font-bold'}`}>
+                {item.label}
+              </span>
             </button>
           );
         })}
