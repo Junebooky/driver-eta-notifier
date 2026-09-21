@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Sparkles, ChevronRight, Info, Check, Clock } from 'lucide-react';
+import { X, Sparkles, Info, Check, Clock } from 'lucide-react';
 import { PredictionResult, PredictionTimelineItem } from '@/app/api/route/prediction/route';
 import { haptics } from '@/utils/haptics';
 import { formatEtaTime } from '@/utils/navigation';
@@ -16,6 +16,20 @@ interface PredictionResultSheetProps {
   selectedDate: Date;
 }
 
+const FULL_WEEKDAYS = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
+
+function formatDurationKorean(minutes: number): { timePart: string; unitPart: string } {
+  if (minutes >= 60) {
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    if (m === 0) {
+      return { timePart: `${h}시간`, unitPart: '걸려요' };
+    }
+    return { timePart: `${h}시간 ${m}분`, unitPart: '걸려요' };
+  }
+  return { timePart: `${minutes}분`, unitPart: '걸려요' };
+}
+
 export const PredictionResultSheet: React.FC<PredictionResultSheetProps> = ({
   isOpen,
   onClose,
@@ -25,12 +39,26 @@ export const PredictionResultSheet: React.FC<PredictionResultSheetProps> = ({
   onApplyPrediction,
   selectedDate,
 }) => {
-  const [activeSlotIdx, setActiveSlotIdx] = useState<number>(2); // Default to index 2 (offset 0)
+  const [activeSlotIdx, setActiveSlotIdx] = useState<number>(2); // Default to offset 0 index
   const [showInfoTooltip, setShowInfoTooltip] = useState(false);
 
-  // Sync active slot when prediction updates
+  // 1. Body Scroll Lock when sheet is open
   useEffect(() => {
-    if (prediction?.timeline) {
+    if (!isOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    const originalTouchAction = document.body.style.touchAction;
+    document.body.style.overflow = 'hidden';
+    document.body.style.touchAction = 'none';
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.touchAction = originalTouchAction;
+    };
+  }, [isOpen]);
+
+  // 2. Sync active slot when prediction updates
+  useEffect(() => {
+    if (prediction?.timeline && prediction.timeline.length > 0) {
       const zeroIdx = prediction.timeline.findIndex((t) => t.offsetMinutes === 0);
       setActiveSlotIdx(zeroIdx >= 0 ? zeroIdx : 0);
     }
@@ -38,7 +66,6 @@ export const PredictionResultSheet: React.FC<PredictionResultSheetProps> = ({
 
   if (!isOpen) return null;
 
-  // Active slot calculation
   const timeline = prediction?.timeline || [];
   const currentSlot: PredictionTimelineItem | undefined = timeline[activeSlotIdx];
 
@@ -52,24 +79,21 @@ export const PredictionResultSheet: React.FC<PredictionResultSheetProps> = ({
     effectiveDepartureDate.getTime() + currentDuration * 60 * 1000
   );
   const arrivalFormatted = formatEtaTime(effectiveArrivalDate);
-  const departureFormatted = formatEtaTime(effectiveDepartureDate);
 
-  // Format header text: "오늘 오후 3시 10분 출발하면 ⓘ"
+  // 1. Detailed Header Briefing: "9월 25일 금요일 오후 3시 30분 출발하면 ⓘ"
+  const month = effectiveDepartureDate.getMonth() + 1;
+  const day = effectiveDepartureDate.getDate();
+  const dayOfWeek = FULL_WEEKDAYS[effectiveDepartureDate.getDay()];
   const h24 = effectiveDepartureDate.getHours();
   const period = h24 >= 12 ? '오후' : '오전';
   let h12 = h24 % 12;
   if (h12 === 0) h12 = 12;
   const m = effectiveDepartureDate.getMinutes();
 
-  // Date relative label
-  const today = new Date();
-  const diffDays = effectiveDepartureDate.getDate() - today.getDate();
-  let dateText = '오늘';
-  if (diffDays === 1) dateText = '내일';
-  else if (diffDays === 2) dateText = '모레';
-  else if (diffDays > 2) dateText = `${effectiveDepartureDate.getMonth() + 1}월 ${effectiveDepartureDate.getDate()}일`;
+  const headerBriefing = `${month}월 ${day}일 ${dayOfWeek} ${period} ${h12}시 ${String(m).padStart(2, '0')}분 출발하면`;
 
-  const headerTitle = `${dateText} ${period} ${h12}시 ${String(m).padStart(2, '0')}분 출발하면`;
+  // 2. Large Typography Duration Text
+  const { timePart, unitPart } = formatDurationKorean(currentDuration);
 
   const handleApply = () => {
     haptics.successPulse();
@@ -77,31 +101,38 @@ export const PredictionResultSheet: React.FC<PredictionResultSheetProps> = ({
     onClose();
   };
 
+  // Safe percentage for slider track & handle knob
+  const safeTotalSlots = Math.max(1, timeline.length - 1);
+  const sliderPercentage = Math.min(100, Math.max(0, (activeSlotIdx / safeTotalSlots) * 100));
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center select-none animate-fade-in">
       {/* Dimmed backdrop */}
       <div
         className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
-        onClick={onClose}
+        onClick={() => {
+          haptics.lightTap();
+          onClose();
+        }}
       />
 
       {/* Bottom Sheet Container */}
-      <div className="relative w-full max-w-lg bg-white rounded-t-3xl shadow-2xl p-5 z-10 animate-in slide-in-from-bottom-5 duration-250 border border-slate-100 flex flex-col max-h-[92vh] overflow-y-auto">
+      <div className="relative w-full max-w-lg bg-white rounded-t-3xl shadow-2xl p-6 z-10 animate-in slide-in-from-bottom-5 duration-250 border border-slate-100 flex flex-col max-h-[92vh] overflow-y-auto">
         {/* Top Drag Indicator Pill */}
-        <div className="w-10 h-1 rounded-full bg-slate-300 mx-auto mb-3" />
+        <div className="w-10 h-1 rounded-full bg-slate-300 mx-auto mb-4" />
 
-        {/* 1. Header: Circular AI Gradient Badge + Title + Info Icon + Close Button */}
-        <div className="flex items-center justify-between">
+        {/* 1. Header: Circular AI Gradient Badge + Detailed Date/Weekday Briefing + Info + Close */}
+        <div className="flex items-center justify-between pb-1">
           <div className="flex items-center space-x-2">
             {/* Gradient Circular AI Badge */}
             <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-[#1E60F3] via-indigo-600 to-purple-500 text-white flex items-center justify-center shadow-xs shrink-0">
               <Sparkles className="w-3.5 h-3.5 fill-white" />
             </div>
 
-            {/* Briefing Text */}
+            {/* Detailed Briefing Text: e.g. "9월 25일 금요일 오후 3시 30분 출발하면" */}
             <div className="flex items-center space-x-1">
               <span className="text-xs font-bold text-slate-800 tracking-tight">
-                {headerTitle}
+                {headerBriefing}
               </span>
               <button
                 type="button"
@@ -132,67 +163,57 @@ export const PredictionResultSheet: React.FC<PredictionResultSheetProps> = ({
           <div className="mt-2.5 p-2.5 bg-blue-50/90 border border-blue-200/80 rounded-xl text-blue-900 text-[11px] leading-relaxed animate-fade-in flex items-start space-x-2">
             <Sparkles className="w-3.5 h-3.5 text-[#1E60F3] shrink-0 mt-0.5" />
             <div>
-              <span className="font-bold block">AI 미래 소요 시간 예측 안내</span>
-              <span>TMAP 타임머신 및 수도권 도로망 시간대별 교통 빅데이터를 분석하여 예상 이동 시간을 계산합니다.</span>
+              <span className="font-bold block">네이버지도 & TMAP 빅데이터 기반 소요 시간 예측</span>
+              <span>수도권 도로망의 시간대별 교통량 통계를 분석하여 출발 시각에 따른 정체 및 도착 예정 시각을 계산합니다.</span>
             </div>
           </div>
         )}
 
-        {/* 2. Large Typography Duration: "{소요시간}분 걸려요" */}
-        <div className="mt-4 mb-3">
+        {/* 2. Large Typography Duration: "1시간 33분 걸려요" / "40분 걸려요" */}
+        <div className="flex flex-col items-center justify-center my-5">
           {isLoading ? (
-            <div className="flex items-center space-x-2 py-3">
+            <div className="flex items-center space-x-2 py-4">
               <div className="w-5 h-5 border-2 border-[#1E60F3] border-t-transparent rounded-full animate-spin" />
               <span className="text-sm font-bold text-slate-500">AI 시간대별 소요 시간을 계산 중입니다...</span>
             </div>
           ) : (
             <>
-              <div className="flex items-baseline">
-                <span className="text-4xl sm:text-5xl font-black text-[#1E60F3] tracking-tight">
-                  {currentDuration}
-                </span>
-                <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 ml-1.5 tracking-tight">
-                  분 걸려요
-                </span>
-              </div>
+              <h3 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight flex items-baseline justify-center">
+                <span className="text-[#1E60F3] font-black">{timePart}</span>
+                <span className="ml-1.5 font-bold">{unitPart}</span>
+              </h3>
 
-              {/* Subtitle: Estimated arrival & distance */}
-              <div className="text-xs text-slate-500 mt-1 flex items-center gap-1.5 font-normal">
-                <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <span>
-                  도착 예정: <strong className="text-slate-800 font-bold">{arrivalFormatted}</strong>
-                </span>
-                <span>•</span>
-                <span>{prediction?.predictedDistanceKm || 50}km</span>
-                <span>•</span>
-                <span className="text-slate-600">{prediction?.trafficSummary || '교통 통계 반영'}</span>
-              </div>
-
-              {/* Compact Pill Button: [시간변경 >] */}
-              <div className="mt-2.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    haptics.lightTap();
-                    onOpenTimePicker();
-                  }}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 text-xs font-bold transition-all cursor-pointer shadow-2xs border border-slate-200/60"
-                  title="출발 시각 다시 선택"
-                >
-                  <span>시간변경</span>
-                  <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-                </button>
-              </div>
+              {/* Compact Pill Button: [시간변경] */}
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.lightTap();
+                  onOpenTimePicker();
+                }}
+                className="mt-3 px-4 py-1.5 rounded-full border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-50 active:scale-95 transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                title="출발 시각 다시 선택"
+              >
+                <span>시간변경</span>
+              </button>
             </>
           )}
         </div>
 
-        {/* 3. Congestion Timeline Slider & Comparative Bar Graph */}
+        {/* 3. Congestion Timeline Slider Track & Comparative Bar Graph */}
         {timeline.length > 0 && (
-          <div className="my-3 p-3.5 bg-slate-50/80 border border-slate-100 rounded-2xl">
-            <div className="flex items-center justify-between mb-3 text-xs">
-              <span className="font-bold text-slate-800">출발 시간대별 예상 소요 시간</span>
-              <span className="text-[11px] text-slate-400">막대를 눌러 시간 변경 가능</span>
+          <div className="my-2 p-4 bg-slate-50/80 border border-slate-100 rounded-2xl">
+            {/* Blue Slider Track with Circular Handle Knob */}
+            <div className="relative w-full h-1.5 bg-slate-200 rounded-full my-3">
+              {/* Active Blue Bar */}
+              <div
+                className="absolute left-0 top-0 bottom-0 bg-[#1E60F3] rounded-full transition-all duration-200"
+                style={{ width: `${sliderPercentage}%` }}
+              />
+              {/* Circular Knob: w-4 h-4 bg-white border-4 border-[#1E60F3] */}
+              <div
+                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 bg-white border-4 border-[#1E60F3] rounded-full shadow-sm transition-all duration-200 pointer-events-none"
+                style={{ left: `${sliderPercentage}%` }}
+              />
             </div>
 
             {/* Relative Diff Badges & Bars Container */}
@@ -202,26 +223,28 @@ export const PredictionResultSheet: React.FC<PredictionResultSheetProps> = ({
                 const isSelected = actualIdx === activeSlotIdx;
                 const diff = slot.diffMinutes;
 
-                // Color coding for relative time variation badges
+                // Color coding for relative time variation badges & bars:
+                // 단축 구간: 산뜻한 에메랄드 그린 컬러 막대 (bg-emerald-500) 및 -X분 텍스트
+                // 정체 구간: 주황 / 레드 컬러 막대 및 +X분 텍스트
                 let badgeClass = 'bg-slate-100 text-slate-600 border-slate-200';
                 let barColor = 'bg-slate-300';
                 let diffText = '동일';
 
                 if (diff < 0) {
-                  badgeClass = 'bg-amber-100/90 text-amber-800 border-amber-200 font-bold';
-                  barColor = 'bg-amber-400';
+                  badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-300 font-bold';
+                  barColor = 'bg-emerald-500';
                   diffText = `${diff}분`;
                 } else if (diff > 0 && diff <= 3) {
-                  badgeClass = 'bg-orange-100/90 text-orange-800 border-orange-200 font-bold';
+                  badgeClass = 'bg-orange-50 text-orange-700 border-orange-300 font-bold';
                   barColor = 'bg-orange-400';
                   diffText = `+${diff}분`;
                 } else if (diff > 3) {
-                  badgeClass = 'bg-rose-100 text-rose-800 border-rose-200 font-black';
+                  badgeClass = 'bg-rose-50 text-rose-700 border-rose-300 font-black';
                   barColor = 'bg-rose-500';
                   diffText = `+${diff}분`;
                 }
 
-                // Relative bar height (base 30px up to 60px)
+                // Proportional bar height (base 30px up to 64px)
                 const baseHeight = 32;
                 const dynamicHeight = Math.min(64, Math.max(22, baseHeight + diff * 3));
 
@@ -254,7 +277,7 @@ export const PredictionResultSheet: React.FC<PredictionResultSheetProps> = ({
                       }`}
                     />
 
-                    {/* Timeline Label or Time */}
+                    {/* Time Label */}
                     <span
                       className={`text-[10px] mt-1.5 tracking-tighter leading-none ${
                         isSelected ? 'text-[#1E60F3] font-bold' : 'text-slate-500 font-medium'
@@ -277,7 +300,7 @@ export const PredictionResultSheet: React.FC<PredictionResultSheetProps> = ({
         )}
 
         {/* 4. Bottom Action: Confirm and Sync to Protocol Report */}
-        <div className="pt-2 pb-[max(env(safe-area-inset-bottom),8px)]">
+        <div className="pt-3 pb-[max(env(safe-area-inset-bottom),8px)]">
           <button
             type="button"
             onClick={handleApply}

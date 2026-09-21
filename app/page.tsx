@@ -19,7 +19,7 @@ import { PredictionResult } from '@/app/api/route/prediction/route';
 import { LocationPreset, ReportMode, RouteEstimate, HomeLocation } from '@/types';
 import { DEFAULT_PRESET_LOCATIONS } from '@/utils/presets';
 import { generateReportText } from '@/utils/reportGenerator';
-import { calculateHaversineEstimate, formatEtaTime, getEtaString, launchRoutePreview } from '@/utils/navigation';
+import { calculateHaversineEstimate, formatEtaTime, getEtaString } from '@/utils/navigation';
 
 const CUSTOM_PRESETS_KEY = 'protocol_cockpit_custom_presets_v1';
 const ORDERED_PRESETS_KEY = 'protocol_cockpit_ordered_presets_v2';
@@ -400,16 +400,7 @@ export default function Home() {
     }));
   };
 
-  // Handle "정식 경로 보기" (Full Route Preview with origin + destination)
-  const handlePreviewRoute = () => {
-    launchRoutePreview(
-      profile.defaultNavi,
-      { name: origin.name, lat: origin.lat, lng: origin.lng },
-      { name: destination.name, lat: destination.lat, lng: destination.lng }
-    );
-  };
-
-  // Departure Time Capsule Button label
+  // Departure Time Button label
   const departureTimeCapsuleText = useMemo(() => {
     if (!selectedDepartureDate) return '지금 출발';
     const now = new Date();
@@ -577,9 +568,9 @@ export default function Home() {
                 fetchRouteEstimate(origin, destination);
               }
             }}
-            onPreviewRoute={handlePreviewRoute}
             onOpenTimePicker={() => setIsTimePickerOpen(true)}
             departureTimeText={departureTimeCapsuleText}
+            isFutureDeparture={Boolean(selectedDepartureDate)}
           />
 
           {/* 4. Report Template Selector */}
