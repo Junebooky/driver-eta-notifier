@@ -263,7 +263,7 @@ export default function Home() {
       if (!onboarded) {
         setIsOnboarding(true);
         setOnboardingStage('splash');
-        // Phase 1: Micro Splash (2.1s) -> Phase 2: Slide up Bottom Sheet
+        // Phase 1: Micro Splash (2.1s) -> Phase 2: Centered Onboarding Modal
         const timer = setTimeout(() => {
           setOnboardingStage('sheet');
           setIsProfileModalOpen(true);
@@ -498,7 +498,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* Driver Profile Edit / Onboarding Modal (Phase 2 Bottom Sheet) */}
+      {/* Driver Profile Edit / Onboarding Modal (Centered Modal) */}
       <ProfileModal
         isOpen={isProfileModalOpen}
         onClose={() => {

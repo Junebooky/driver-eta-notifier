@@ -35,10 +35,22 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       setTargetChatRoom(profile.targetChatRoom || '');
       setDefaultNavi(profile.defaultNavi || 'tmap');
 
+      // Body Scroll Lock: Prevent background page scrolling & rubber-banding
+      const originalOverflow = document.body.style.overflow;
+      const originalTouchAction = document.body.style.touchAction;
+
+      document.body.style.overflow = 'hidden';
+      document.body.style.touchAction = 'none';
+
       const timer = setTimeout(() => {
         setIsMounted(true);
-      }, 25);
-      return () => clearTimeout(timer);
+      }, 20);
+
+      return () => {
+        clearTimeout(timer);
+        document.body.style.overflow = originalOverflow;
+        document.body.style.touchAction = originalTouchAction;
+      };
     } else {
       setIsMounted(false);
     }
@@ -50,7 +62,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     setIsMounted(false);
     setTimeout(() => {
       onClose();
-    }, 300);
+    }, 250);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -68,7 +80,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 transition-opacity duration-400 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 touch-none transition-opacity duration-300 ease-out ${
         isMounted ? 'bg-slate-900/60 backdrop-blur-sm opacity-100' : 'bg-slate-900/0 opacity-0 pointer-events-none'
       }`}
       onClick={(e) => {
@@ -76,18 +88,18 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           handleClose();
         }
       }}
+      onTouchMove={(e) => {
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+        }
+      }}
     >
       <div
-        className={`w-full max-w-sm bg-white border-t sm:border border-slate-200 rounded-t-[28px] sm:rounded-3xl shadow-2xl overflow-hidden text-slate-900 transform transition-all duration-400 ease-[cubic-bezier(0.16,1,0.3,1)] max-h-[92vh] flex flex-col ${
-          isMounted ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-90'
+        className={`w-full max-w-sm bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-y-auto overscroll-contain text-slate-900 transform transition-all duration-300 ease-out max-h-[90vh] flex flex-col ${
+          isMounted ? 'scale-100 opacity-100' : 'scale-95 opacity-0 pointer-events-none'
         }`}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Drag Indicator Handle for Mobile Bottom Sheet */}
-        <div className="pt-2.5 pb-1 flex justify-center sm:hidden shrink-0">
-          <div className="w-10 h-1.5 rounded-full bg-slate-300/80" />
-        </div>
-
         {/* Modal Header with Master Brand App Icon */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50/80 shrink-0">
           <div className="flex items-center space-x-2.5">
@@ -111,7 +123,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
         </div>
 
         {/* Modal Body: Focus strictly on 4 inputs, navi switcher, and action buttons */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-3.5 overflow-y-auto flex-1">
+        <form onSubmit={handleSubmit} className="p-5 space-y-3.5 overflow-y-auto overscroll-contain flex-1">
           {/* Vehicle Identification Field */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center">
