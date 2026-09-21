@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { DriverProfile, NaviProvider } from '@/types';
-import { X, User, Car, Users, Navigation, Check, MessageSquare } from 'lucide-react';
+import { X, User, Car, Users, Navigation, Check } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface ProfileModalProps {
@@ -74,7 +74,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [plateBack, setPlateBack] = useState(parsed.plateBack);
   const [driverName, setDriverName] = useState(profile.driverName || '');
   const [passengerName, setPassengerName] = useState(profile.passengerName || '');
-  const [targetChatRoom, setTargetChatRoom] = useState(profile.targetChatRoom || '');
   const [defaultNavi, setDefaultNavi] = useState<NaviProvider>(profile.defaultNavi || 'tmap');
   const [isMounted, setIsMounted] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -88,7 +87,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       setPlateBack(initial.plateBack);
       setDriverName(profile.driverName || '');
       setPassengerName(profile.passengerName || '');
-      setTargetChatRoom(profile.targetChatRoom || '');
       setDefaultNavi(profile.defaultNavi || 'tmap');
 
       // Body Scroll Lock: Prevent background page scrolling & rubber-banding
@@ -181,11 +179,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       combinedVehicleNo = combinedPlate;
     }
 
-    const payload = {
+    const payload: Partial<DriverProfile> = {
       vehicleNo: combinedVehicleNo,
       driverName: driverName.trim(),
       passengerName: passengerName.trim(),
-      targetChatRoom: targetChatRoom.trim(),
       defaultNavi: defaultNavi || 'tmap',
     };
 
@@ -338,21 +335,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             />
           </div>
 
-          {/* 5. Target Chat Room Field */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center">
-              <MessageSquare className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 고정 보고 단톡방 / 수신자 메모
-            </label>
-            <input
-              type="text"
-              value={targetChatRoom}
-              onChange={(e) => setTargetChatRoom(e.target.value)}
-              placeholder="예: VIP 의전 단톡방"
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white font-bold transition-colors"
-            />
-          </div>
-
-          {/* 6. Primary Navigation Switcher */}
+          {/* 5. Primary Navigation Switcher */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-2 flex items-center">
               <Navigation className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 주력 내비게이션 앱

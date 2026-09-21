@@ -536,7 +536,7 @@ export default function Home() {
               vehicleNo: updated.vehicleNo,
               driverName: updated.driverName,
               passengerName: updated.passengerName,
-              targetChatRoom: updated.targetChatRoom,
+              targetChatRoom: updated.targetChatRoom ?? profile.targetChatRoom,
             }),
           }).catch((err) => console.warn('Supabase driver profile sync error:', err));
         }}
