@@ -1,7 +1,7 @@
-# Protocol Cockpit (driver-eta-notifier) - 주유소 선택 시 메인 홈 출발지 거점 보존 및 목적지 단독 갱신 완료 보고서
+# Protocol Cockpit (driver-eta-notifier) - 인천국제공항공사 실시간 운항 API 연동 및 입국 픽업 / 출국 샌딩 통합 관제 모듈 완료 보고서
 
 > **평가 일시**: 2026년 9월 21일  
-> **대상 애플리케이션**: Protocol Cockpit (의전 드라이버 전용 스마트 관제 런처 v4.33 - 주유소 선택 및 원스톱 내비 실행 시 메인 대시보드 출발지(Origin) 거점 100% 보존, 목적지 단독 갱신(`id: 'custom_gas_station'`), 자동 마운트 GPS 덮어쓰기 원천 차단 및 상태 격리)  
+> **대상 애플리케이션**: Protocol Cockpit (의전 드라이버 전용 스마트 관제 런처 v4.40 - 인천국제공항공사 실시간 여객 운항 현황 API 연동, 입국 픽업 및 출국 샌딩 2WAY 통합 관제, 3층 출국장 VIP 지능형 하차 도어 지식 베이스 매핑, 1층 입국장 출구 및 수하물 수취대 자동 감지, 단일 확정 운항 상태 산출, 담당승객 자동 바인딩 및 원터치 단톡방 표준 보고서 규격 탑재)  
 > **프로덕션 배포 URL**: [https://driver-eta-notifier.vercel.app](https://driver-eta-notifier.vercel.app)  
 > **GitHub Repository**: [https://github.com/Junebooky/driver-eta-notifier.git](https://github.com/Junebooky/driver-eta-notifier.git) (`main` 브랜치)  
 
@@ -11,61 +11,42 @@
 
 | 과업 항목 | 구현 상태 | 핵심 조치 및 엔지니어링 구현 세부 사항 |
 | :--- | :---: | :--- |
-| **1. 출발지(Origin) 상태 불변성 보장** | ✅ 완료 | • **출발지 덮어쓰기 원천 차단**: 페이지 마운트 시 무조건 `requestGpsLocation()`을 호출하여 기존 설정 출발지(자택, 본사 등)를 '현위치'로 강제 치환하던 백그라운드 효과를 완전 제거.<br>• 주유소 모달 선택 시 `origin` 및 `originId` 상태를 일체 변경하지 않고 기존 거점 값 100% 보존. |
-| **2. 목적지만 단독 치환 (Destination Only)** | ✅ 완료 | • **목적지 단독 갱신**: `handleSelectGasStation` 핸들러에서 오직 `destination`만 선택된 주유소의 정보(`id: 'custom_gas_station'`, 상호명, 정밀 위경도)로 단독 치환.<br>• `saveRecentPreset(gasPreset)`을 제거하여 목적지 주유소가 출발지 최근 거점 폴백으로 오염되는 현상 원천 방지.<br>• 선택 모드를 `'destination'`으로 확실히 복귀. |
-| **3. 내비게이션 실행 로직 무결성 유지** | ✅ 완료 | • 스마트폰 3사 내비게이션(티맵, 카카오내비, 네이버지도) 앱 실행 시 단말 자체 GPS가 출발점이 되므로, 메인 홈의 출발지 상태를 전혀 변경하지 않고도 안전하게 주유소 길안내 실행.<br>• 주유 보고서 클립보드 자동 복사 및 즉시 내비 실행(원스톱 런처) 파이프라인 무결성 100% 유지. |
-| **4. 빌드 무결성 및 No Regression** | ✅ 완료 | • `npm run build` TypeScript 정적 타입 검사 100% 통과 (에러 0건). |
+| **1. 인천공항공사 실시간 운항 백엔드 프록시 (`app/api/flight/route.ts`)** | ✅ 완료 | • **Open API 보안 프록시 구축**: 공공데이터포털 실시간 여객 운항 API(`getPassengerArrivalsDeOdp` / `getPassengerDeparturesDeOdp`) 프록시 라우트 신설.<br>• **2분 인메모리 캐싱**: 동일 편명 및 당일 쿼리 요청을 120초간 캐싱하여 500회/일 쿼터를 안전하게 보호하고 API 키 클라이언트 노출을 원천 차단.<br>• **스마트 날짜 매핑**: 당일 KST(`Asia/Seoul`) 기준 날짜 또는 현재 시각과 가장 인접한 운항 스케줄을 자동 선별. |
+| **2. 단일 확정 운항 상태 산출 로직** | ✅ 완료 | • 스케줄 예정 시각(`scheduleDateTime`)과 실시간 변경 시각(`estimatedDateTime`)의 분 단위 차이 계산:<br>  - **정시 운항**: `{HH:mm} (정상 착륙)` 또는 `{HH:mm} (정상 출발)`<br>  - **지연 운항 (+10분 이상)**: `{HH:mm} (지연 시간 +N분)`<br>  - **조기 운항 (-5분 이상 조기)**: `{HH:mm} (조기 도착 -N분)` 또는 `{HH:mm} (조기 출발 -N분)`<br>• 조건문 텍스트 남발 없이 단 하나의 확정 상태만 명확히 표출. |
+| **3. VIP 지능형 하차 도어 및 입국 게이트 지식 베이스 (`utils/flightMapping.ts`)** | ✅ 완료 | • **출국 샌딩 (3층 하차 도어 매핑)**:<br>  - `KE`/`DL`: 제2여객터미널 3층 **1번 도어** (프리미엄 체크인 카운터 A)<br>  - `OZ`: 제1여객터미널 3층 **1번 도어** (프리미엄 체크인 존 카운터 A)<br>  - 스카이팀(`AF`, `KL` 등): 제2여객터미널 3층 **4~5번 도어** 권장<br>  - 스타얼라이언스/외항사(`SQ`, `LH`, `UA` 등): 제1여객터미널 3층 **11~12번 도어** 권장<br>  - *API 카운터 확정 수신 시*: `{터미널} 3층 (카운터 {구역} / {도어}번 도어 앞)`으로 자동 오버라이드.<br>• **입국 픽업 (입국장 게이트 매핑)**:<br>  - 확정 수신 시: `{터미널} {출구}출구 (수하물 {수취대}번)` 표출.<br>  - 미배정 시: `{터미널} (입국 게이트 배정 중 / 현장 전광판 확인)` 안전 폴백. |
+| **4. 담당승객 자동 바인딩 및 단톡방 표준 보고서 규격** | ✅ 완료 | • **프로필 스토어 자동 연동**: `useDriverProfile`에 등록된 `passengerName`을 감지하여 `• 담당승객: {승객명}`을 자동으로 주입하며, 미등록 시 해당 라인을 자연스럽게 생략.<br>• **표준 보고서 규격 100% 준수**:<br>  - **입국 픽업**: `[{호차} {차량번호} {운전자명}]\n• 담당승객: {승객명}\n• 픽업대상: {편명} ({출발공항} ➔ ICN)\n• 예상착륙: {HH:mm} ({운항상태})\n• 입국게이트: {터미널} {출구}출구 (수하물 {수취대}번)`<br>  - **출국 샌딩**: `[{호차} {차량번호} {운전자명}]\n• 담당승객: {승객명}\n• 샌딩대상: {편명} (ICN ➔ {도착공항})\n• 예상출발: {HH:mm} ({운항상태})\n• 하차위치: {터미널} 3층 ({도어정보})` |
+| **5. 내비 거점 자동 연동 및 출발지 불변성 보장** | ✅ 완료 | • `[목적지 설정 및 보고서 복사]` 터치 시 출발지(`origin`) 거점은 100% 보존하며, 목적지만 판별된 터미널 3층 출국장 또는 1층 입국장 좌표로 단독 치환.<br>• 클립보드 즉시 복사 및 카카오톡 URL 스킴 연동 완결. |
+| **6. 메인 홈 퀵 액션 버튼 배치** | ✅ 완료 | • 메인 화면 주유소 아이콘 **바로 왼쪽**에 비행기 아이콘(`Plane`) 퀵 액션 버튼 배치 (`PresetButtons.tsx`). |
+| **7. 빌드 무결성** | ✅ 완료 | • `npm run build` TypeScript 타입 검사 100% 통과 (에러 0건). |
 
 ---
 
-## 2. 주요 변경 핵심 Diff 요약
+## 2. 주요 구현 코드 구조
 
-### [`app/page.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/page.tsx)
-```diff
-@@ -81,11 +81,6 @@ export default function Home() {
-     setPresets(DEFAULT_PRESET_LOCATIONS);
-   }, []);
- 
--  // Auto-acquire real GPS location on mount (기존 거점 덮어쓰기 결함 원인 제거)
--  useEffect(() => {
--    requestGpsLocation();
--  }, [requestGpsLocation]);
--
-   // Supabase Fleet Architecture Data Synchronization
-   useEffect(() => {
-     const driverId = profile.id || getOrCreateDeviceUuid();
-@@ -421,10 +416,10 @@ export default function Home() {
-     }
-   };
- 
--  // Select gas station as destination and trigger ETA calculation
-+  // Select gas station as destination (출발지 100% 보존 & 목적지 단독 갱신)
-   const handleSelectGasStation = (station: GasStation) => {
-     const gasPreset: LocationPreset = {
--      id: `gas_${station.id}`,
-+      id: 'custom_gas_station',
-       name: station.name,
-       shortName: station.name.replace(/주유소$/, '').trim().slice(0, 8),
-       lat: station.lat,
-@@ -433,7 +428,7 @@ export default function Home() {
-     };
- 
-     setDestination(gasPreset);
--    saveRecentPreset(gasPreset);
-+    setSelectionTarget('destination');
-     if (origin) {
-       fetchRouteEstimate(origin, gasPreset);
-     }
-```
+### 1) [`utils/flightMapping.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/utils/flightMapping.ts) - VIP 하차 도어 및 운항 상태 연산 엔진
+- IATA 항공사 접두사 및 체크인 카운터(`chkinrange`) 기반 3층 하차 도어 추천 알고리즘.
+- 실시간 운항 지연/조기 도착 산출 및 정형화 단톡방 보고서 빌더.
+
+### 2) [`app/api/flight/route.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/api/flight/route.ts) - 백엔드 프록시 및 캐시
+- `type=arrival` / `type=departure` 분기 처리.
+- 120초 인메모리 캐시 및 결항/지연/게이트 필드 정규화.
+
+### 3) [`components/FlightModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/FlightModal.tsx) - 통합 항공편 관제 모달
+- 상단 세그먼트 탭 `[입국 픽업]` | `[출국 샌딩]` 0.1초 즉시 전환.
+- 자동 대문자 변환 인풋 및 대표 항공편(KE012, OZ202, DL159, KE011) 1-탭 퀵 칩.
+- 항공편 요약 카드, VIP 도어/게이트 안내, 단톡방 보고서 실시간 프리뷰.
+- `[목적지 설정 및 보고서 복사]` 및 `[카톡]` 딥링크 액션.
 
 ---
 
-## 3. 검증 시나리오 결과
+## 3. 검증 결과
 
-1. **출발지 보존 및 목적지 갱신 검증**:
-   - 출발지를 임의의 거점(예: '자택', '조선팰리스 강남')으로 지정하고 목적지를 '본사'로 설정한 상태에서 주유소 모달 진입.
-   - 임의의 주유소에서 길안내(내비 실행) 터치 및 선택 완료.
-   - **출발지**: 기존 설정된 '자택'(또는 '조선팰리스 강남')이 그대로 100% 유지됨을 확인 (절대 '현위치'로 변경되지 않음).
-   - **목적지**: 선택한 주유소 명칭과 정밀 좌표(`id: 'custom_gas_station'`)로 정상 치환됨을 확인.
-2. **빌드 검증**:
-   - `npm run build` 결과 TypeScript 컴파일 에러 **0건**, Turbopack 최적화 빌드 완료.
+1. **실시간 API 쿼리 및 매핑 검증**:
+   - `KE012 (입국)`: 대한항공 / 로스앤젤레스(LAX) ➔ ICN / `05:15 (지연 시간 +35분)` / `제2여객터미널 B출구 (수하물 13번)` / T2 1층 입국장 좌표 자동 매핑.
+   - `OZ202 (출국)`: 아시아나항공 / ICN ➔ 로스앤젤레스(LAX) / `12:54 (지연 시간 +14분)` / `제2여객터미널 3층 (카운터 G17-J40 / 7번 도어 앞)` / T2 3층 출국장 좌표 자동 매핑.
+   - 2분 내 재조회 시 `cached: true` 즉시 응답 (캐싱 무결성 확인).
+2. **보고서 생성기 검증**:
+   - 담당승객 존재 시: `• 담당승객: SOYFAN 회장님` 정상 주입.
+   - 담당승객 미등록 시: 해당 라인 완벽 생략.
+3. **빌드 검증**:
+   - `npm run build` 결과 11/11 정적/동적 라우트 전체 컴파일 성공 (TypeScript 에러 0건).

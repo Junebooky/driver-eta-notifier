@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { LocationPreset, HomeLocation } from '@/types';
-import { Plus, Trash2, Pencil, SlidersHorizontal, Home as HomeIcon, ShieldAlert, Fuel } from 'lucide-react';
+import { Plus, Trash2, Pencil, SlidersHorizontal, Home as HomeIcon, ShieldAlert, Fuel, Plane } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface PresetButtonsProps {
@@ -15,6 +15,7 @@ interface PresetButtonsProps {
   onSelectPreset: (preset: LocationPreset) => void;
   onOpenAddModal: () => void;
   onOpenHomeModal: () => void;
+  onOpenFlightModal?: () => void;
   onOpenGasModal?: () => void;
   onEditPreset?: (preset: LocationPreset) => void;
   onDeleteCustomPreset?: (id: string) => void;
@@ -31,6 +32,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
   onSelectPreset,
   onOpenAddModal,
   onOpenHomeModal,
+  onOpenFlightModal,
   onOpenGasModal,
   onEditPreset,
   onDeleteCustomPreset,
@@ -302,6 +304,21 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
         </div>
 
         <div className="flex items-center space-x-2">
+          {onOpenFlightModal && (
+            <button
+              type="button"
+              onClick={() => {
+                haptics.lightTap();
+                onOpenFlightModal();
+              }}
+              className="w-8 h-8 rounded-full bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 active:scale-95 text-slate-700 hover:text-sky-600 flex items-center justify-center shadow-xs transition-all cursor-pointer"
+              title="인천공항 실시간 운항 관제"
+              aria-label="항공편 조회"
+            >
+              <Plane className="w-4 h-4" />
+            </button>
+          )}
+
           {onOpenGasModal && (
             <button
               type="button"

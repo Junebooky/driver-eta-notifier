@@ -68,3 +68,29 @@ export interface GasStation {
   address?: string;
 }
 
+export type FlightType = 'arrival' | 'departure';
+
+export interface FlightInfo {
+  flightId: string;              // e.g. 'KE012'
+  airline: string;               // e.g. '대한항공'
+  type: FlightType;              // 'arrival' | 'departure'
+  airport: string;               // e.g. '로스앤젤레스'
+  airportCode: string;           // e.g. 'LAX'
+  scheduleTimeFormatted: string; // e.g. '04:40'
+  estimatedTimeFormatted: string;// e.g. '04:25'
+  statusText: string;            // e.g. '04:25 (조기 도착 -15분)' or '12:40 (정상 출발)'
+  diffMinutes: number;           // difference in minutes
+  terminal: string;              // '제1여객터미널' | '제2여객터미널'
+  terminalId: string;            // 'P01' | 'P02' | 'P03'
+  // Arrival specific:
+  gateNumber?: string;           // e.g. '249'
+  carousel?: string;             // e.g. '5'
+  exitNumber?: string;           // e.g. 'A'
+  arrivalLocationText: string;   // e.g. '제2여객터미널 A출구 (수하물 5번)'
+  // Departure specific:
+  checkinRange?: string;         // e.g. 'A B C D'
+  suggestedDoor: string;         // e.g. '1번 도어'
+  departureLocationText: string; // e.g. '제2여객터미널 3층 (1번 도어 앞)'
+  // Target location preset for navigation:
+  targetPreset: LocationPreset;
+}

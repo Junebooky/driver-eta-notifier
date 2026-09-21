@@ -16,6 +16,7 @@ import { A2HSBanner } from '@/components/A2HSBanner';
 import { DepartureTimePickerModal } from '@/components/DepartureTimePickerModal';
 import { PredictionResultSheet } from '@/components/PredictionResultSheet';
 import { GasStationModal } from '@/components/GasStationModal';
+import { FlightModal } from '@/components/FlightModal';
 import { PredictionResult } from '@/app/api/route/prediction/route';
 import { LocationPreset, ReportMode, RouteEstimate, HomeLocation, GasStation } from '@/types';
 import { DEFAULT_PRESET_LOCATIONS } from '@/utils/presets';
@@ -55,6 +56,9 @@ export default function Home() {
 
   // Real-time Gas Station Modal State
   const [isGasModalOpen, setIsGasModalOpen] = useState(false);
+
+  // Real-time Flight Modal State (Incheon Airport)
+  const [isFlightModalOpen, setIsFlightModalOpen] = useState(false);
 
   // Load Presets & Admin State from LocalStorage on mount
   useEffect(() => {
@@ -436,6 +440,15 @@ export default function Home() {
     }
   };
 
+  // Select flight airport terminal as destination (Origin strictly preserved)
+  const handleSelectFlightDestination = (preset: LocationPreset) => {
+    setDestination(preset);
+    setSelectionTarget('destination');
+    if (origin) {
+      fetchRouteEstimate(origin, preset);
+    }
+  };
+
   // Bidirectional Swap UX (⇄)
   const handleSwapOriginDestination = () => {
     const currentOrigin = origin;
@@ -538,6 +551,7 @@ export default function Home() {
             onSelectPreset={handleSelectPreset}
             onOpenAddModal={handleOpenAddModal}
             onOpenHomeModal={() => setIsHomeModalOpen(true)}
+            onOpenFlightModal={() => setIsFlightModalOpen(true)}
             onOpenGasModal={() => setIsGasModalOpen(true)}
             onEditPreset={handleOpenEditModal}
             onDeleteCustomPreset={handleDeleteCustomPreset}
@@ -678,6 +692,14 @@ export default function Home() {
         defaultNavi={profile.defaultNavi}
         profile={profile}
         onSelectStation={handleSelectGasStation}
+      />
+
+      {/* Incheon Airport Real-time Flight Modal (Arrival/Departure) */}
+      <FlightModal
+        isOpen={isFlightModalOpen}
+        onClose={() => setIsFlightModalOpen(false)}
+        profile={profile}
+        onSelectDestination={handleSelectFlightDestination}
       />
 
     </main>
