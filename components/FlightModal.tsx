@@ -273,7 +273,7 @@ export const FlightModal: React.FC<FlightModalProps> = ({
                       <span className="text-sm font-semibold text-slate-500 block leading-tight mb-1">
                         {flight.airline}
                       </span>
-                      <h4 className="text-2xl font-black tracking-wider text-slate-900 leading-none">
+                      <h4 className="text-2xl font-black tracking-wider text-[#1E60F3] leading-none">
                         {flight.flightId}
                       </h4>
                     </div>
@@ -297,10 +297,12 @@ export const FlightModal: React.FC<FlightModalProps> = ({
                       </span>
                     </div>
 
-                    {/* Flight Path Icon */}
+                    {/* Flight Path Connector */}
                     <div className="flex flex-col items-center justify-center px-3 shrink-0">
-                      <Plane className="w-5 h-5 text-[#1E60F3] rotate-45" />
-                      <div className="w-16 border-b border-dashed border-slate-300 mt-1" />
+                      <span className="text-xs font-black tracking-widest text-slate-400">
+                        TO
+                      </span>
+                      <div className="w-14 border-b border-dashed border-slate-300 mt-1" />
                     </div>
 
                     {/* Destination */}
