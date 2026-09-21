@@ -85,7 +85,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   };
 
   return (
-    <div className="w-full space-y-2.5 pt-1 select-none">
+    <div className="w-full space-y-2.5 pt-1 pb-[max(env(safe-area-inset-bottom),16px)] select-none">
       {/* Navigation Primary Action Button (Centered) */}
       <button
         onClick={handleFastPassAction}

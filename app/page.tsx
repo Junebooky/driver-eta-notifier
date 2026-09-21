@@ -252,6 +252,20 @@ export default function Home() {
   const [destination, setDestination] = useState<LocationPreset>(DEFAULT_PRESET_LOCATIONS[0]);
   const [reportMode, setReportMode] = useState<ReportMode>('DEPARTURE');
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isOnboarding, setIsOnboarding] = useState(false);
+
+  // Check driver onboarding status on first launch (preventing default name misreporting)
+  useEffect(() => {
+    try {
+      const onboarded = localStorage.getItem('cockpit_driver_onboarded');
+      if (!onboarded) {
+        setIsOnboarding(true);
+        setIsProfileModalOpen(true);
+      }
+    } catch (e) {
+      console.warn('Failed to check driver onboarding status:', e);
+    }
+  }, []);
 
   // Route estimation state (initialized with immediate dynamic estimate)
   const [routeEstimate, setRouteEstimate] = useState<RouteEstimate>(() =>
@@ -363,8 +377,8 @@ export default function Home() {
   }, [reportMode, profile, origin, destination, routeEstimate]);
 
   return (
-    <main className="min-h-screen bg-[#F8FAFC] text-slate-800 flex flex-col items-center justify-start pb-24 selection:bg-[#1E60F3]/20">
-      <div className="w-full max-w-md mx-auto min-h-screen flex flex-col bg-white shadow-xl relative border-x border-slate-200/60">
+    <main className="min-h-dvh bg-[#F8FAFC] text-slate-800 flex flex-col items-center justify-between overflow-x-hidden selection:bg-[#1E60F3]/20">
+      <div className="w-full max-w-md mx-auto min-h-dvh flex flex-col justify-between bg-white shadow-xl relative border-x border-slate-200/60 overflow-x-hidden">
         {/* Top Header with Safe Area Inset & Navi Switcher */}
         <Header
           profile={profile}
@@ -454,13 +468,23 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Driver Profile Edit Modal */}
+      {/* Driver Profile Edit / Onboarding Modal */}
       <ProfileModal
         isOpen={isProfileModalOpen}
-        onClose={() => setIsProfileModalOpen(false)}
+        onClose={() => {
+          setIsProfileModalOpen(false);
+          setIsOnboarding(false);
+        }}
         profile={profile}
+        isOnboarding={isOnboarding}
         onSave={(updated) => {
           updateProfile(updated);
+          try {
+            localStorage.setItem('cockpit_driver_onboarded', 'true');
+            setIsOnboarding(false);
+          } catch (e) {
+            console.warn('Failed to save onboarding flag:', e);
+          }
           // Sync profile to Supabase
           fetch('/api/driver', {
             method: 'POST',

@@ -10,6 +10,22 @@ export interface GenerateReportParams {
   mode: ReportMode;
 }
 
+export function formatReportHeader(vehicleNo?: string, driverName?: string): string {
+  const v = vehicleNo?.trim() || '';
+  const d = driverName?.trim() || '';
+
+  if (v && d) {
+    return `[${v} ${d}]`;
+  }
+  if (v) {
+    return `[${v}]`;
+  }
+  if (d) {
+    return `[${d}]`;
+  }
+  return '[의전 드라이버]';
+}
+
 export function generateReportText({
   profile,
   origin,
@@ -17,8 +33,6 @@ export function generateReportText({
   etaFormatted = '03:08',
   mode,
 }: GenerateReportParams): string {
-  const carNumber = profile.vehicleNo || '4호차';
-  const driverName = profile.driverName || '윤태준';
   const passengerName = profile.passengerName?.trim();
   const hasPassenger = Boolean(passengerName);
   
@@ -34,7 +48,7 @@ export function generateReportText({
     cleanEta = etaFormatted.replace(/\s*\(.*?\)/, '').trim();
   }
 
-  const header = `[${carNumber} ${driverName}]`;
+  const header = formatReportHeader(profile.vehicleNo, profile.driverName);
 
   if (mode === 'ARRIVED') {
     const lines = [

@@ -10,6 +10,7 @@ interface ProfileModalProps {
   onClose: () => void;
   profile: DriverProfile;
   onSave: (updated: Partial<DriverProfile>) => void;
+  isOnboarding?: boolean;
 }
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({
@@ -17,6 +18,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   onClose,
   profile,
   onSave,
+  isOnboarding = false,
 }) => {
   const [vehicleNo, setVehicleNo] = useState(profile.vehicleNo);
   const [driverName, setDriverName] = useState(profile.driverName);
@@ -59,35 +61,50 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               <User className="w-4 h-4" />
             </div>
             <h2 className="text-sm font-black text-slate-900 tracking-tight">
-              드라이버 & 내비 프로필 설정
+              {isOnboarding ? '드라이버 정보 최초 등록' : '드라이버 & 내비 프로필 설정'}
             </h2>
           </div>
           <button
             onClick={onClose}
             className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 active:scale-95 transition-transform duration-100 cursor-pointer"
+            title="닫기"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
+        {/* Onboarding Welcome & Guidance Banner */}
+        {isOnboarding && (
+          <div className="mx-5 mt-4 p-3 bg-blue-50/90 border border-blue-200/80 rounded-2xl flex items-start space-x-2.5 shadow-2xs animate-fade-in">
+            <span className="text-base leading-none shrink-0 mt-0.5">👋</span>
+            <div className="text-xs text-blue-950 leading-snug">
+              <span className="font-extrabold block text-blue-900 mb-0.5">환영합니다!</span>
+              <span>원활한 관제 보고를 위해 차량 식별 정보와 기사 성명을 먼저 등록해 주세요.</span>
+            </div>
+          </div>
+        )}
+
         {/* Modal Body */}
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center">
-              <Car className="w-3.5 h-3.5 mr-1 text-blue-600" /> 호차 번호
+            <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center">
+              <Car className="w-3.5 h-3.5 mr-1 text-blue-600" /> 차량 식별 정보 (호차 / 차량번호)
             </label>
+            <p className="text-[11px] text-slate-400 font-normal mb-1.5">
+              호차를 아직 모를 경우 차량번호만 입력하셔도 무방합니다.
+            </p>
             <input
               type="text"
               value={vehicleNo}
               onChange={(e) => setVehicleNo(e.target.value)}
-              placeholder="예: 4호차"
+              placeholder="예: 142호 7811 또는 4호차 142호 7811"
               className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white font-bold"
             />
           </div>
 
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center">
-              <User className="w-3.5 h-3.5 mr-1 text-blue-600" /> 기사 성명
+              <User className="w-3.5 h-3.5 mr-1 text-blue-600" /> 드라이버 성명
             </label>
             <input
               type="text"

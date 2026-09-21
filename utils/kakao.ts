@@ -2,6 +2,8 @@
  * VIP Protocol Reporting and KakaoTalk App Launch Utility
  */
 
+import { formatReportHeader } from './reportGenerator';
+
 export interface VipReportParams {
   carNumber?: string;
   driverName?: string;
@@ -18,8 +20,8 @@ export interface VipReportParams {
  * Generates standardized plain text for VIP Protocol Reporting
  */
 export function generateVipReportText({
-  carNumber = '4호차',
-  driverName = '윤태준',
+  carNumber,
+  driverName,
   passengerName,
   destinationName,
   originName,
@@ -34,7 +36,7 @@ export function generateVipReportText({
     cleanEta = etaFormatted.replace(/\s*\(.*?\)/, '').trim();
   }
 
-  const header = `[${carNumber} ${driverName}]`;
+  const header = formatReportHeader(carNumber, driverName);
   const passenger = passengerName?.trim();
   const hasPassenger = Boolean(passenger);
 

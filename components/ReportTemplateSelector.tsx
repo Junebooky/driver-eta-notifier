@@ -88,15 +88,15 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
         </button>
       </div>
 
-      {/* Live Report Preview Box */}
+      {/* Live Report Preview Box (Stabilized Height to prevent Action Button Layout Shift) */}
       <div className="bg-slate-50/70 border border-slate-100 rounded-xl p-3 space-y-2">
         <div className="text-xs text-slate-400 font-normal px-0.5 flex items-center justify-between">
           <span>보고 텍스트 미리보기</span>
           <span className="text-[#1E60F3] font-medium">실시간 갱신됨</span>
         </div>
-        <p className="text-xs font-medium text-slate-800 leading-relaxed bg-white p-3 rounded-xl border border-slate-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.03)] select-all whitespace-pre-line font-sans">
+        <div className="text-xs font-medium text-slate-800 leading-relaxed bg-white p-3 rounded-xl border border-slate-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.03)] select-all whitespace-pre-line font-sans min-h-[130px] flex flex-col justify-start items-start text-left w-full">
           {reportPreviewText}
-        </p>
+        </div>
       </div>
     </div>
   );
