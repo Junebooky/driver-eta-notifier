@@ -316,7 +316,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
         {/* SLOT #1: Fixed '자택(Home)' Slot (Row 1, Col 1)                 */}
         {/* ============================================================== */}
         {isHomeConfigured ? (
-          <div className="relative select-none touch-none">
+          <div className="relative select-none touch-none h-full">
             <button
               type="button"
               onClick={() => {
@@ -327,12 +327,12 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                   onSelectPreset(homePreset);
                 }
               }}
-              className={`w-full px-2 rounded-xl border text-center flex flex-col items-center justify-center min-h-[48px] cursor-pointer transition-shadow ${
+              className={`w-full h-full min-h-[58px] px-2 py-2.5 rounded-xl border text-center flex flex-col justify-between items-center cursor-pointer transition-shadow ${
                 isHomeDestination
-                  ? 'bg-white border-emerald-300 ring-2 ring-emerald-50 text-slate-900 font-bold shadow-[0_2px_10px_rgba(16,185,129,0.08)] py-2.5'
+                  ? 'bg-white border-emerald-300 ring-2 ring-emerald-50 text-slate-900 font-bold shadow-[0_2px_10px_rgba(16,185,129,0.08)]'
                   : isHomeOrigin
-                  ? 'bg-white border-[#1E60F3]/40 ring-2 ring-[#1E60F3]/10 text-slate-900 font-bold shadow-[0_2px_10px_rgba(30,96,243,0.08)] py-2.5'
-                  : 'bg-blue-50/40 hover:bg-blue-50/80 border-blue-200/70 text-slate-900 font-semibold py-3.5'
+                  ? 'bg-white border-[#1E60F3]/40 ring-2 ring-[#1E60F3]/10 text-slate-900 font-bold shadow-[0_2px_10px_rgba(30,96,243,0.08)]'
+                  : 'bg-blue-50/40 hover:bg-blue-50/80 border-blue-200/70 text-slate-900 font-semibold'
               } ${isManageMode ? 'border-dashed border-[#1E60F3]/60' : ''}`}
               title={`${homePreset.name} (${homePreset.address})`}
             >
@@ -355,29 +355,39 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                   출발지
                 </span>
               )}
-              {isManageMode && (
-                <span className="text-[9px] font-bold text-[#1E60F3] leading-none mt-0.5">
-                  수정
+              {!isHomeDestination && !isHomeOrigin && (
+                <span className="text-[10px] text-slate-400 font-medium leading-none mt-0.5">
+                  {isManageMode ? '수정' : '거점'}
                 </span>
               )}
             </button>
           </div>
         ) : (
-          <div className="relative select-none">
+          <div className="relative select-none h-full">
             <button
               type="button"
               onClick={() => {
                 haptics.lightTap();
                 onOpenHomeModal();
               }}
-              className="w-full py-3 px-2 rounded-xl border border-dashed border-amber-300 hover:border-amber-400 bg-amber-50/40 hover:bg-amber-50 text-amber-700 text-xs font-bold flex flex-col items-center justify-center min-h-[48px] active:scale-95 transition-all cursor-pointer shadow-2xs"
+              className="w-full h-full min-h-[58px] py-2.5 px-2 rounded-xl border border-dashed border-slate-300 dark:border-slate-600 bg-slate-50/80 hover:bg-slate-100/90 text-slate-800 flex flex-col justify-between items-center active:scale-95 transition-all cursor-pointer group"
               title="자택 주소를 등록하세요"
             >
-              <div className="flex items-center gap-1">
-                <HomeIcon className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                <span className="tracking-tight">자택 미등록</span>
+              {/* 상단 1열: 단정한 집(Home) 아이콘과 차분한 '자택' 텍스트 */}
+              <div className="flex items-center justify-center gap-1 w-full">
+                <HomeIcon className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 shrink-0 transition-colors" />
+                <span className="text-xs font-bold text-slate-600 group-hover:text-slate-800 tracking-tight transition-colors">
+                  자택
+                </span>
               </div>
-              <span className="text-[9px] text-amber-600/80 font-normal mt-0.5">탭하여 등록</span>
+
+              {/* 하단 2열: 정갈한 플러스 아이콘과 코발트 블루 포인트 컬러의 + 주소 등록 */}
+              <div className="flex items-center justify-center gap-0.5 w-full mt-0.5">
+                <Plus className="w-3 h-3 text-[#1E60F3] stroke-[2.5] shrink-0" />
+                <span className="text-[11px] font-semibold text-[#1E60F3] leading-none">
+                  주소 등록
+                </span>
+              </div>
             </button>
           </div>
         )}
@@ -391,13 +401,13 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
           const isThisItemDragging = isDragging && dragIndex === index;
 
           let stateClasses =
-            'bg-slate-50/70 hover:bg-slate-100/80 border-slate-200/80 text-slate-800 font-medium py-3.5';
+            'bg-slate-50/70 hover:bg-slate-100/80 border-slate-200/80 text-slate-800 font-medium';
           if (isDestination) {
             stateClasses =
-              'bg-white border-emerald-300 ring-2 ring-emerald-50 text-slate-900 font-bold shadow-[0_2px_10px_rgba(16,185,129,0.08)] py-2.5';
+              'bg-white border-emerald-300 ring-2 ring-emerald-50 text-slate-900 font-bold shadow-[0_2px_10px_rgba(16,185,129,0.08)]';
           } else if (isOrigin) {
             stateClasses =
-              'bg-white border-[#1E60F3]/40 ring-2 ring-[#1E60F3]/10 text-slate-900 font-bold shadow-[0_2px_10px_rgba(30,96,243,0.08)] py-2.5';
+              'bg-white border-[#1E60F3]/40 ring-2 ring-[#1E60F3]/10 text-slate-900 font-bold shadow-[0_2px_10px_rgba(30,96,243,0.08)]';
           }
 
           if (isManageMode) {
@@ -410,7 +420,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
               ref={(el) => {
                 itemRefs.current[index] = el;
               }}
-              className="relative select-none touch-none will-change-transform"
+              className="relative select-none touch-none will-change-transform h-full"
             >
               {/* If this slot is currently being dragged, show subtle placeholder in grid */}
               <button
@@ -421,12 +431,12 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                 onMouseDown={(e) => handlePointerStart(index, e)}
                 onMouseMove={handlePointerMoveCheck}
                 onMouseUp={() => handlePointerEnd(preset)}
-                className={`w-full px-2 rounded-xl border text-center flex flex-col items-center justify-center min-h-[48px] cursor-pointer transition-shadow ${stateClasses} ${
+                className={`w-full h-full min-h-[58px] px-2 py-2.5 rounded-xl border text-center flex flex-col justify-between items-center cursor-pointer transition-shadow ${stateClasses} ${
                   isThisItemDragging ? 'opacity-20 border-dashed border-[#1E60F3]' : ''
                 }`}
                 title={`${preset.name} (길게 눌러 순서 변경)`}
               >
-                <span className="text-xs tracking-tight truncate w-full">
+                <span className="text-xs font-bold tracking-tight truncate w-full text-slate-900">
                   {preset.shortName}
                 </span>
 
@@ -443,9 +453,9 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                     출발지
                   </span>
                 )}
-                {isManageMode && (
-                  <span className="text-[9px] font-bold text-[#1E60F3] leading-none mt-0.5">
-                    {preset.isGlobal ? '공통' : '관리'}
+                {!isDestination && !isOrigin && (
+                  <span className="text-[10px] text-slate-400 font-medium leading-none mt-0.5">
+                    {isManageMode ? (preset.isGlobal ? '공통' : '관리') : '거점'}
                   </span>
                 )}
               </button>
@@ -462,11 +472,14 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
             haptics.lightTap();
             onOpenAddModal();
           }}
-          className="w-full py-3.5 px-2 rounded-xl border border-dashed border-slate-300 hover:border-[#1E60F3] bg-white hover:bg-slate-50 text-slate-400 hover:text-[#1E60F3] text-xs font-medium flex items-center justify-center space-x-1 active:scale-95 transition-all duration-100 cursor-pointer min-h-[48px]"
+          className="w-full h-full min-h-[58px] py-2.5 px-2 rounded-xl border border-dashed border-slate-300 hover:border-[#1E60F3] bg-white hover:bg-slate-50 text-slate-400 hover:text-[#1E60F3] text-xs font-medium flex flex-col justify-between items-center active:scale-95 transition-all duration-100 cursor-pointer"
           title="새 거점 검색 및 등록"
         >
-          <Plus className="w-3.5 h-3.5" />
-          <span>추가</span>
+          <div className="flex items-center justify-center gap-1 w-full">
+            <Plus className="w-3.5 h-3.5" />
+            <span className="font-bold">추가</span>
+          </div>
+          <span className="text-[10px] text-slate-400 leading-none mt-0.5">신규 거점</span>
         </button>
       </div>
 

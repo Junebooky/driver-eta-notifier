@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { RouteEstimate } from '@/types';
-import { AlertTriangle, RefreshCw, Clock, WifiOff } from 'lucide-react';
+import { AlertTriangle, RefreshCw, Clock } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface RouteInfoCardProps {
@@ -64,14 +64,6 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
               <Clock className="w-3 h-3 text-white stroke-[2.5]" />
             </div>
             <span className="text-xs font-bold text-slate-600 uppercase tracking-tight">ETA</span>
-
-            {/* Network Fallback Badge */}
-            {routeEstimate?.isFallback && (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-300 ml-1">
-                <WifiOff className="w-3 h-3 mr-1" />
-                {routeEstimate.fallbackNotice || '추정 소요시간'}
-              </span>
-            )}
           </div>
 
           {/* Large ETA & Duration display */}

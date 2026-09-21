@@ -40,7 +40,6 @@ export function calculateHaversineEstimate(
     trafficSummary: '직선거리 기반 추정치',
     isMock: false,
     isFallback: true,
-    fallbackNotice: '네트워크 지연으로 추정 소요시간 표시 중',
   };
 }
 
