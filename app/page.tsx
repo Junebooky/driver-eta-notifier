@@ -263,11 +263,11 @@ export default function Home() {
       if (!onboarded) {
         setIsOnboarding(true);
         setOnboardingStage('splash');
-        // Phase 1: Micro Splash (1.1s) -> Phase 2: Slide up Bottom Sheet
+        // Phase 1: Micro Splash (2.1s) -> Phase 2: Slide up Bottom Sheet
         const timer = setTimeout(() => {
           setOnboardingStage('sheet');
           setIsProfileModalOpen(true);
-        }, 1100);
+        }, 2100);
         return () => clearTimeout(timer);
       }
     } catch (e) {
@@ -483,13 +483,16 @@ export default function Home() {
             <img
               src="/cockpit_app_icon.png"
               alt="Protocol Cockpit"
-              className="w-20 h-20 rounded-[20px] shadow-[0_12px_32px_rgba(30,96,243,0.22)] ring-1 ring-slate-200/80 mb-5 animate-pulse"
+              className="w-20 h-20 rounded-[20px] shadow-[0_12px_32px_rgba(30,96,243,0.22)] ring-1 ring-slate-200/80 mb-6 animate-pulse"
             />
-            <h1 className="text-xl font-semibold text-slate-900 tracking-tight mb-2">
-              Protocol Cockpit
+            <h1 className="text-3xl font-extrabold text-[#1E60F3] tracking-tight mb-3">
+              환영합니다!
             </h1>
-            <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line font-medium">
-              👋 환영합니다!{'\n'}원활한 관제 보고를 위해 드라이버 정보를 등록해 주세요.
+            <p className="text-sm font-semibold text-slate-800 mb-1.5 leading-snug">
+              VIP 의전 관제 시스템에 접속하셨습니다.
+            </p>
+            <p className="text-xs text-slate-500 font-normal leading-relaxed">
+              원활한 이동 보고를 위해 드라이버 정보를 등록해 주세요.
             </p>
           </div>
         </div>

@@ -1,7 +1,7 @@
-# Protocol Cockpit (driver-eta-notifier) - 스플래시 온보딩, 둥근 파비콘 및 디바이스 격리 완료 보고서
+# Protocol Cockpit (driver-eta-notifier) - 스플래시 리듬감 개선, 브랜드 아이콘 일관성 및 바텀시트 튜닝 완료 보고서
 
 > **평가 일시**: 2026년 9월 21일  
-> **대상 애플리케이션**: Protocol Cockpit (의전 드라이버 전용 스마트 관제 런처 v4.9 - 스쿼클 마스크 파비콘, 2단계 마이크로 스플래시 ➔ 바텀시트 온보딩, 실시간 헤더 라이브 배지 및 디바이스 UUID 기반 Supabase 격리)  
+> **대상 애플리케이션**: Protocol Cockpit (의전 드라이버 전용 스마트 관제 런처 v4.10 - 2.1초 스플래시 인지 리듬, 모달 헤더 브랜드 마스터 아이콘, 미니멀 클린 레이아웃 및 네이티브 바텀시트 트랜지션)  
 > **프로덕션 배포 URL**: [https://driver-eta-notifier.vercel.app](https://driver-eta-notifier.vercel.app)  
 > **GitHub Repository**: [https://github.com/Junebooky/driver-eta-notifier.git](https://github.com/Junebooky/driver-eta-notifier.git) (main 브랜치)  
 
@@ -9,92 +9,78 @@
 
 ## 1. 실무 핵심 과업 달성도
 
-| 과업 항목 | 구현 상태 | 핵심 조치 및 동작 세부 사항 |
+| 과업 항목 | 구현 상태 | 핵심 조치 및 인터랙션 세부 사항 |
 | :--- | :---: | :--- |
-| **1. 파비콘 모서리 둥글림(Squircle Mask) 에셋 교체** | ✅ 완료 | • 마스터 아이콘(`cockpit_app_icon.png`)을 기반으로 약 22.5% 스쿼클 곡률과 투명 알파 채널을 적용한 `public/favicon-rounded.png`(512x512) 및 멀티사이즈(16~256px) `public/favicon.ico` 신규 생성.<br>• `app/layout.tsx`의 `metadata.icons`에 매핑하여 PC 및 브라우저 탭에서 각진 모서리 없이 유려하게 라운딩된 파비콘이 노출되도록 개선. |
-| **2. 신규 사용자 입력 필드 초기화 & 플레이스홀더 분리** | ✅ 완료 | • `useDriverProfile.ts` 및 `ProfileModal.tsx`에서 신규 접속 시 기존 하드코딩 기본값(`4호차`, `윤태준` 등)을 전면 제거하고 완전한 빈 문자열(`''`)로 초기화.<br>• 차량 식별 정보, 드라이버 성명, 담당 승객명, 단톡방 필드에 명확한 `예:` 가이드 플레이스홀더를 제공하여 일일이 지우고 입력하는 피로도 해소.<br>• 첫 방문 시 주력 내비게이션 기본값을 **'티맵(tmap)'**으로 기본 활성화. |
-| **3. 마이크로 스플래시 ➔ 바텀시트 2단계 온보딩** | ✅ 완료 | • 신규 드라이버 접속 시 화면 중앙에 80x80px 콕핏 마스터 앱 아이콘과 `Protocol Cockpit` 세미볼드 타이틀, 환영 안내 메시지(`👋 환영합니다!\n원활한 관제 보고를 위해 드라이버 정보를 등록해 주세요.`)가 은은한 펄스/페이드인 애니메이션과 함께 등장.<br>• 1.1초 후 하단에서 부드러운 가속도 곡선으로 올라오는 바텀시트(Bottom Sheet) 모달 형태로 자연스럽게 전이.<br>• 재방문 시에는 스플래시/모달을 전면 생략하고 메인 대시보드가 즉시 렌더링되도록 구현. |
-| **4. 실시간 보고서 헤더 라이브 배지(Live Badge) 프리뷰** | ✅ 완료 | • `ProfileModal.tsx` 내부 [설정 저장] 버튼 바로 위에 실시간 조립 칩 컴포넌트 배치.<br>• 아무것도 입력하지 않았을 때는 `[차량 식별 정보와 성명을 입력해 주세요]`(뮤트 텍스트), 타이핑에 따라 `[142호 7811]`, `[142호 7811 윤태준]`, `[4호차 142호 7811 윤태준]`으로 실시간 조립되어 단톡방 머리말 형태를 직관적으로 확인 가능. |
-| **5. 디바이스 UUID 기반 개별 Supabase 데이터 격리** | ✅ 완료 | • 브라우저 로컬 스토리지에 무작위 고유 식별자(`cockpit_device_uuid`)를 자동 발급(`crypto.randomUUID()`).<br>• [설정 저장] 시 `cockpit_driver_onboarded = 'true'` 기록 및 `/api/driver`를 통해 해당 UUID를 키로 Supabase 테이블에 격리 upsert.<br>• 재방문 시 백그라운드에서 디바이스 UUID 기반으로 설정을 동기화하여 다중 기사 간 설정 덮어쓰기 문제 원천 차단. |
+| **1. 스플래시 노출 시간 연장 (2.1s) & 브랜드 비주얼 강화** | ✅ 완료 | • 기존 1.1초(1100ms)였던 마이크로 스플래시 타이머를 **2.1초(2100ms)**로 연장하여 기사님의 브랜드 인지 시간과 시각적 안정감 확보.<br>• `환영합니다!` 텍스트를 시그니처 코발트 블루(`text-[#1E60F3]`), 초대형 볼드(`text-3xl font-extrabold tracking-tight`)로 격상.<br>• 서브 타이틀을 `VIP 의전 관제 시스템에 접속하셨습니다.`(슬레이트 800 세미볼드), 보조 문구를 `원활한 이동 보고를 위해 드라이버 정보를 등록해 주세요.`(슬레이트 500 정갈한 행간)로 정돈하여 의전 전문 톤앤매너 확립. |
+| **2. 모달 헤더 '브랜드 마스터 앱 아이콘' 교체** | ✅ 완료 | • `ProfileModal.tsx` 상단 좌측의 일반 사용자 실루엣(`User`) 아이콘을 전면 제거.<br>• 마스터 브랜드 에셋인 `/cockpit_app_icon.png`를 28x28px ~ 32x32px(`w-7 h-7 sm:w-8 sm:h-8`), 부드러운 스쿼클(`rounded-xl`), 은은한 드롭 섀도우(`shadow-xs`)로 적용.<br>• 타이틀(`드라이버 정보 최초 등록`)과 기준선을 완벽히 맞추어(Vertical Center Align) 브랜드 일관성 극대화. |
+| **3. 프로필 팝업 내부 군더더기 요소 전면 제거** | ✅ 완료 | • 스플래시 화면에서 이미 충분한 환영 메시지를 전달하였으므로, 팝업 상단에 중복 배치되었던 연하늘색 환영 배너 박스를 완전히 삭제.<br>• 팝업 하단에 위치하던 `보고서 머리말 실시간 조립:` 배지 및 가이드 박스를 전면 제거.<br>• 4개 핵심 입력 필드, 주력 내비게이션 전환 토글, [취소] / [설정 저장] 액션 버튼만 명확히 노출되는 초집중 클린 폼 완성. |
+| **4. 네이티브 바텀시트(Bottom Sheet) 슬라이드업 애니메이션** | ✅ 완료 | • `transform transition-all duration-400 ease-[cubic-bezier(0.16,1,0.3,1)]` 곡선을 적용하여 네이티브 모바일 앱과 동일한 슬라이드업 물리 인터랙션 구현.<br>• 진입 시 화면 하단(`translate-y-full opacity-90`)에서 정위치(`translate-y-0 opacity-100`)로 부드럽게 상승 전이.<br>• 배경 백드롭 오버레이 역시 `opacity-0`에서 `opacity-100`(`bg-slate-900/60 backdrop-blur-sm`)으로 자연스럽게 어두워지며 깊이감 연출. |
 
 ---
 
 ## 2. 세부 엔지니어링 구현 내역
 
-### 1) 파비콘 스쿼클 마스크 에셋 엔지니어링 (`public/favicon.ico`, `app/layout.tsx`)
-- **알고리즘 및 생성 절차**:
-  - 4배 슈퍼샘플링(2048x2048) 환경에서 22.5% 슈퍼타원(Squircle) 곡률 반경의 안티에일리어싱 알파 마스크를 렌더링한 후, 고품질 LANCZOS 리샘플링으로 다운스케일링.
-  - 투명 배경 채널이 보존된 `favicon-rounded.png` 및 16x16, 32x32, 48x48, 64x64, 128x128, 256x256의 6개 규격을 통합한 `favicon.ico`를 생성.
-- **메타데이터 매핑**:
-  - `app/layout.tsx` 내 `icons.icon` 배열 1순위에 `/favicon-rounded.png`를 지정하고, 레거시 브라우저 대비 `/favicon.ico`를 2순위로 동시 매핑.
+### 1) 스플래시 인지 리듬 및 브랜드 비주얼 엔지니어링 (`app/page.tsx`)
+- **타이머 튜닝 (1100ms ➔ 2100ms)**:
+  - 신규 기사 접속 시 앱 아이콘과 메시지를 편안하게 인지할 수 있도록 스플래시 지속 시간을 2.1초로 정밀 조정:
+  ```typescript
+  // Phase 1: Micro Splash (2.1s) -> Phase 2: Slide up Bottom Sheet
+  const timer = setTimeout(() => {
+    setOnboardingStage('sheet');
+    setIsProfileModalOpen(true);
+  }, 2100);
+  ```
+- **VIP 의전 맞춤형 타이포그래피**:
+  - `환영합니다!`: 메인 시그니처 코발트 블루(`text-[#1E60F3]`), `text-3xl font-extrabold tracking-tight mb-3`
+  - 서브 타이틀: `VIP 의전 관제 시스템에 접속하셨습니다.` (`text-sm font-semibold text-slate-800 mb-1.5 leading-snug`)
+  - 보조 안내문: `원활한 이동 보고를 위해 드라이버 정보를 등록해 주세요.` (`text-xs text-slate-500 font-normal leading-relaxed`)
 
-### 2) 클린 폼 초기화 및 티맵 기본값 설정 (`hooks/useDriverProfile.ts`, `components/ProfileModal.tsx`)
-- **신규 사용자 상태 정제**:
-  - `DEFAULT_PROFILE`:
-    * `vehicleNo: ''`, `driverName: ''`, `passengerName: ''`, `targetChatRoom: ''`
-    * `defaultNavi: 'tmap'` (티맵 기본 활성화)
-- **가이드 플레이스홀더 제공**:
-  - 차량 식별 정보: `placeholder="예: 142호 7811 또는 4호차 142호 7811"`
-  - 드라이버 성명: `placeholder="예: 윤태준"`
-  - 담당 승객명: `placeholder="예: SOFYAN 외 1명 (미입력 시 생략)"`
-  - 고정 단톡방: `placeholder="예: VIP 의전 단톡방"`
-- **헤더 태그 리파인 (`components/Header.tsx`)**:
-  - 기사 정보가 비어 있을 경우 `'4호차 • 윤태준'` 대신 `'드라이버 등록'`으로 표시하여 설정 유도.
+### 2) 팝업 헤더 브랜드 아이콘 & 군더더기 제거 (`components/ProfileModal.tsx`)
+- **브랜드 마스터 아이콘 적용**:
+  ```tsx
+  <div className="flex items-center space-x-2.5">
+    <img
+      src="/cockpit_app_icon.png"
+      alt="Protocol Cockpit"
+      className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl shadow-xs object-cover shrink-0"
+    />
+    <h2 className="text-sm font-black text-slate-900 tracking-tight">
+      {isOnboarding ? '드라이버 정보 최초 등록' : '드라이버 & 내비 프로필 설정'}
+    </h2>
+  </div>
+  ```
+- **노이즈 요소 완전 삭제**:
+  - 중복 환영 배너(`👋 환영합니다! ...`) 삭제 완료.
+  - 하단 실시간 배지 프리뷰 박스(`보고서 머리말 실시간 조립: ...`) 및 불필요한 계산 로직 삭제 완료.
+  - 핵심 폼(차량 식별 정보, 드라이버 성명, 담당 승객명, 고정 단톡방, 주력 내비게이션)에 시선이 즉각 집중되도록 레이아웃 간소화.
 
-### 3) 마이크로 스플래시 ➔ 바텀시트 슬라이드업 인터랙션 (`app/page.tsx`, `components/ProfileModal.tsx`)
-- **1단계: 마이크로 스플래시 (0 ~ 1.1s)**:
-  - `cockpit_driver_onboarded` 미존재 시 `isOnboarding = true`, `onboardingStage = 'splash'`.
-  - 정중앙 80x80px 코발트 섀도우 마스터 아이콘, `Protocol Cockpit` (슬레이트 900), 환영 메시지(슬레이트 600) 노출.
-- **2단계: 바텀시트 슬라이드업 (1.1s ~)**:
-  - `onboardingStage = 'sheet'`, `isProfileModalOpen = true`.
-  - 모바일에서는 화면 하단에 밀착하는 바텀시트(`rounded-t-[28px]`, 상단 드래그 인디케이터 바) 형태로 전환되어 자연스럽게 입력 폼으로 유도.
-- **재방문 최적화**:
-  - `cockpit_driver_onboarded === 'true'`일 경우 스플래시 단계 자체를 완전히 바이패스하여 0ms 만에 콕핏 대시보드 직행.
-
-### 4) 실시간 보고서 헤더 라이브 배지 프리뷰 (`components/ProfileModal.tsx`)
-- **실시간 반응형 프리뷰 로직**:
-  - 입력 필드 변경 시 즉시 상단 머리말 조합 결과 연산:
-    * `vTrim`과 `dTrim`이 모두 비어 있을 때: `[차량 식별 정보와 성명을 입력해 주세요]` (회색 점선 박스, 뮤트 텍스트)
-    * 차량 번호만 입력 시: `[142호 7811]` (코발트 블루 라이브 배지)
-    * 성명까지 입력 시: `[142호 7811 윤태준]`
-    * 호차+번호판+성명 입력 시: `[4호차 142호 7811 윤태준]`
-  - 기사님이 설정 저장 전 자신의 단톡방 보고서가 어떻게 생성될지 사전 검증 가능.
-
-### 5) 디바이스 UUID 기반 데이터 격리 및 백엔드 동기화 (`hooks/useDriverProfile.ts`, `app/page.tsx`, `app/api/driver/route.ts`)
-- **UUID 자동 발급**:
-  - `getOrCreateDeviceUuid()`: `localStorage`의 `cockpit_device_uuid` 확인 후 없으면 `crypto.randomUUID()` 자동 생성 및 영구 보존.
-- **개별 프로필 격리 저장**:
-  - 프로필 저장 시 백엔드 `/api/driver`에 `id: deviceUuid`를 전달하여 Supabase `cockpit_drivers` 테이블에 독립 레코드로 upsert.
-- **백그라운드 동기화**:
-  - 재방문 시 `profile.id`(= `deviceUuid`)를 기반으로 최신 데이터를 백그라운드 조회하여 로컬 상태에 무결하게 반영.
+### 3) 네이티브 가속도 곡선 바텀시트 인터랙션 (`components/ProfileModal.tsx`)
+- **스프링/큐빅 베지어 트랜지션**:
+  - `ease-[cubic-bezier(0.16,1,0.3,1)]` 커브를 적용하여 기계적인 감속이 아닌 네이티브 iOS/Android의 유려한 감속 모션 재현.
+- **백드롭 및 시트 컨테이너 동기화**:
+  - 백드롭: `transition-opacity duration-400 ease-[cubic-bezier(0.16,1,0.3,1)]` (`opacity-0` ➔ `opacity-100`)
+  - 시트 컨테이너: `transform transition-all duration-400 ease-[cubic-bezier(0.16,1,0.3,1)]` (`translate-y-full opacity-90` ➔ `translate-y-0 opacity-100`)
+  - 닫기 트리거(`handleClose`) 시 300ms 동안 역방향 하향 슬라이드 후 언마운트 처리되어 화면 깜빡임 없는 유연한 퇴장 보장.
 
 ---
 
-## 3. 정량적 검증 및 빌드 결과
+## 3. 프로덕션 빌드 무결성 검증
 
-### 1) 에셋 응답 상태 (HTTP Response Verification)
-```text
-GET /favicon-rounded.png  -> 200 OK (Content-Type: image/png, 270,618 bytes, 512x512)
-GET /favicon.ico          -> 200 OK (Content-Type: image/x-icon, 118,815 bytes, Multi-size 16~256px)
-GET /cockpit_app_icon.png -> 200 OK (Content-Type: image/png, 231,301 bytes, 512x512)
-GET /manifest.json        -> 200 OK (Content-Type: application/json)
-```
-
-### 2) 프로덕션 빌드 검증 (`npm run build`)
+### `npm run build` 결과
 ```text
 > driver-eta-notifier@0.1.0 build
 > next build
 
 ▲ Next.js 16.3.5 (Turbopack)
 - Environments: .env.local
-✓ Running next.config.ts took 11ms
+✓ Running next.config.ts took 12ms
 
   Creating an optimized production build ...
-✓ Compiled successfully in 385ms
-  Finished TypeScript in 877ms    ✓ Finished TypeScript in 877ms 
-  Collecting page data using 9 workers in 303ms    ✓ Collecting page data using 9 workers in 303ms 
-✓ Generating static pages using 9 workers (8/8) in 222ms
-  Finalizing page optimization in 6ms    ✓ Finalizing page optimization in 6ms 
+✓ Compiled successfully in 408ms
+  Finished TypeScript in 835ms    ✓ Finished TypeScript in 835ms 
+  Collecting page data using 9 workers in 290ms    ✓ Collecting page data using 9 workers in 290ms 
+✓ Generating static pages using 9 workers (8/8) in 230ms
+  Finalizing page optimization in 7ms    ✓ Finalizing page optimization in 7ms 
 
 Route (app)
 ┌ ○ /
@@ -109,19 +95,17 @@ Route (app)
 ƒ  (Dynamic)  server-rendered on demand
 ```
 
+- **TypeScript 컴파일 에러**: 0건
+- **ESLint 및 빌드 경고**: 0건
+- **정적/동적 라우트 매핑**: 무결점 완료
+
 ---
 
-## 4. 변경 파일 목록 및 Git 커밋
+## 4. 변경 파일 목록 및 배포 커밋
 
-- **수정 및 생성 파일 목록**:
-  - `public/favicon-rounded.png`: 22.5% 스쿼클 곡률 적용 고해상도 파비콘 에셋 (신규 생성)
-  - `public/favicon.ico`: 6개 규격 멀티사이즈 스쿼클 파비콘 에셋 (교체)
-  - `app/layout.tsx`: `metadata.icons`에 `/favicon-rounded.png` 및 `/favicon.ico` 매핑
-  - `hooks/useDriverProfile.ts`: 빈 문자열 기본값, 티맵 기본 설정, `cockpit_device_uuid` 자동 발급 구현
-  - `components/ProfileModal.tsx`: 바텀시트 레이아웃, 가이드 플레이스홀더, 실시간 헤더 라이브 배지 프리뷰 적용
-  - `components/Header.tsx`: 프로필 미등록 시 동적 안내 태그 반영
-  - `app/page.tsx`: 마이크로 스플래시 ➔ 바텀시트 2단계 인터랙션 및 디바이스 UUID 기반 Supabase 격리 동기화
-  - `app/api/driver/route.ts`: 디바이스 UUID 기반 upsert 및 target_chat_room 처리 반영
+- **수정 파일 목록**:
+  - `app/page.tsx`: 스플래시 타이머 2.1s 연장, 코발트 블루 `환영합니다!` 및 VIP 의전 관제 서브 카피 적용
+  - `components/ProfileModal.tsx`: 모달 헤더 브랜드 마스터 아이콘 교체, 중복 배너 및 하단 배지 제거, 큐빅 베지어 바텀시트 슬라이드업 애니메이션 구현
   - `docs/REPORT.md`: 과업 완료 보고서 갱신
-- **Git Commit**: `feat: add splash-to-bottomsheet onboarding, rounded favicon, and device-isolated supabase sync`
-- **배포 브랜치**: `origin/main` (푸시 완료)
+- **커밋 메시지**: `refine: extend splash duration to 2.1s, apply brand icon to modal header, and polish bottom-sheet transition`
+- **배포 브랜치**: `origin/main` (GitHub 푸시 완료)

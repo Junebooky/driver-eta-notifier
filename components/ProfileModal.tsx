@@ -25,6 +25,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [passengerName, setPassengerName] = useState(profile.passengerName || '');
   const [targetChatRoom, setTargetChatRoom] = useState(profile.targetChatRoom || '');
   const [defaultNavi, setDefaultNavi] = useState<NaviProvider>(profile.defaultNavi || 'tmap');
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -33,22 +34,24 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       setPassengerName(profile.passengerName || '');
       setTargetChatRoom(profile.targetChatRoom || '');
       setDefaultNavi(profile.defaultNavi || 'tmap');
+
+      const timer = setTimeout(() => {
+        setIsMounted(true);
+      }, 25);
+      return () => clearTimeout(timer);
+    } else {
+      setIsMounted(false);
     }
   }, [isOpen, profile]);
 
   if (!isOpen) return null;
 
-  // Realtime Live Report Header Assembly Preview
-  const vTrim = vehicleNo.trim();
-  const dTrim = driverName.trim();
-  const hasInput = Boolean(vTrim || dTrim);
-  const liveBadgeText = vTrim && dTrim
-    ? `[${vTrim} ${dTrim}]`
-    : vTrim
-    ? `[${vTrim}]`
-    : dTrim
-    ? `[${dTrim}]`
-    : '[차량 식별 정보와 성명을 입력해 주세요]';
+  const handleClose = () => {
+    setIsMounted(false);
+    setTimeout(() => {
+      onClose();
+    }, 300);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,29 +63,46 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       targetChatRoom: targetChatRoom.trim(),
       defaultNavi: defaultNavi || 'tmap',
     });
-    onClose();
+    handleClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/60 backdrop-blur-sm animate-fade-in p-0 sm:p-4">
-      <div className="w-full max-w-sm bg-white border-t sm:border border-slate-200 rounded-t-[28px] sm:rounded-3xl shadow-2xl overflow-hidden text-slate-900 transition-transform duration-400 ease-out max-h-[92vh] flex flex-col">
+    <div
+      className={`fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 transition-opacity duration-400 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+        isMounted ? 'bg-slate-900/60 backdrop-blur-sm opacity-100' : 'bg-slate-900/0 opacity-0 pointer-events-none'
+      }`}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          handleClose();
+        }
+      }}
+    >
+      <div
+        className={`w-full max-w-sm bg-white border-t sm:border border-slate-200 rounded-t-[28px] sm:rounded-3xl shadow-2xl overflow-hidden text-slate-900 transform transition-all duration-400 ease-[cubic-bezier(0.16,1,0.3,1)] max-h-[92vh] flex flex-col ${
+          isMounted ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-90'
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Drag Indicator Handle for Mobile Bottom Sheet */}
         <div className="pt-2.5 pb-1 flex justify-center sm:hidden shrink-0">
           <div className="w-10 h-1.5 rounded-full bg-slate-300/80" />
         </div>
 
-        {/* Modal Header */}
+        {/* Modal Header with Master Brand App Icon */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50/80 shrink-0">
-          <div className="flex items-center space-x-2">
-            <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
-              <User className="w-4 h-4" />
-            </div>
+          <div className="flex items-center space-x-2.5">
+            <img
+              src="/cockpit_app_icon.png"
+              alt="Protocol Cockpit"
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl shadow-xs object-cover shrink-0"
+            />
             <h2 className="text-sm font-black text-slate-900 tracking-tight">
               {isOnboarding ? '드라이버 정보 최초 등록' : '드라이버 & 내비 프로필 설정'}
             </h2>
           </div>
           <button
-            onClick={onClose}
+            type="button"
+            onClick={handleClose}
             className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 active:scale-95 transition-transform duration-100 cursor-pointer"
             title="닫기"
           >
@@ -90,18 +110,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           </button>
         </div>
 
-        {/* Onboarding Welcome & Guidance Banner */}
-        {isOnboarding && (
-          <div className="mx-5 mt-3.5 p-3 bg-blue-50/90 border border-blue-200/80 rounded-2xl flex items-start space-x-2.5 shadow-2xs animate-fade-in shrink-0">
-            <span className="text-base leading-none shrink-0 mt-0.5">👋</span>
-            <div className="text-xs text-blue-950 leading-snug">
-              <span className="font-extrabold block text-blue-900 mb-0.5">환영합니다!</span>
-              <span>원활한 관제 보고를 위해 차량 식별 정보와 기사 성명을 먼저 등록해 주세요.</span>
-            </div>
-          </div>
-        )}
-
-        {/* Modal Body (Scrollable if viewport is small) */}
+        {/* Modal Body: Focus strictly on 4 inputs, navi switcher, and action buttons */}
         <form onSubmit={handleSubmit} className="p-5 space-y-3.5 overflow-y-auto flex-1">
           {/* Vehicle Identification Field */}
           <div>
@@ -242,31 +251,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             </div>
           </div>
 
-          {/* Realtime Live Report Header Assembly Badge Preview */}
-          <div className="pt-1">
-            <div className={`rounded-xl px-3 py-2 transition-all duration-200 border ${
-              hasInput
-                ? 'bg-blue-50/80 border-blue-200/80 shadow-2xs'
-                : 'bg-slate-50/80 border-dashed border-slate-200'
-            }`}>
-              <div className="flex items-center justify-between gap-2 text-xs">
-                <span className="text-[11px] font-semibold text-slate-500 shrink-0">
-                  보고서 머리말 실시간 조립:
-                </span>
-                <span className={`text-xs font-black truncate tracking-tight text-right ${
-                  hasInput ? 'text-[#1E60F3]' : 'text-slate-400 font-normal'
-                }`}>
-                  {liveBadgeText}
-                </span>
-              </div>
-            </div>
-          </div>
-
           {/* Action Buttons */}
           <div className="pt-2 flex items-center space-x-2">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               className="w-1/3 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold active:scale-95 transition-transform duration-100 cursor-pointer"
             >
               취소
