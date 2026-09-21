@@ -28,11 +28,10 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
             haptics.lightTap();
             onSelectTarget('origin');
           }}
-          className={`flex-1 min-w-0 w-full p-3 rounded-2xl border text-left cursor-pointer transition-all duration-150 active:scale-95 bg-white ${
-            selectionTarget === 'origin'
+          className={`flex-1 min-w-0 w-full p-3 rounded-2xl border text-left cursor-pointer transition-all duration-150 active:scale-95 bg-white ${selectionTarget === 'origin'
               ? 'border-[#1E60F3] ring-2 ring-[#1E60F3]/20 shadow-[0_2px_10px_rgba(30,96,243,0.1)]'
               : 'border-slate-200/80 hover:border-slate-300'
-          }`}
+            }`}
         >
           <div className="flex items-center space-x-1.5 min-w-0">
             <div className="w-2 h-2 rounded-full bg-[#1E60F3] shrink-0" />
@@ -67,11 +66,10 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
             haptics.lightTap();
             onSelectTarget('destination');
           }}
-          className={`flex-1 min-w-0 w-full p-3 rounded-2xl border text-left cursor-pointer transition-all duration-150 active:scale-95 bg-white ${
-            selectionTarget === 'destination'
+          className={`flex-1 min-w-0 w-full p-3 rounded-2xl border text-left cursor-pointer transition-all duration-150 active:scale-95 bg-white ${selectionTarget === 'destination'
               ? 'border-emerald-400 ring-2 ring-emerald-100 shadow-[0_2px_10px_rgba(16,185,129,0.1)]'
               : 'border-slate-200/80 hover:border-slate-300'
-          }`}
+            }`}
         >
           <div className="flex items-center space-x-1.5 min-w-0">
             <div className="w-2 h-2 rounded-full bg-emerald-600 shrink-0" />

@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { X, Sparkles, Info, Check, Clock } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { X, Info, Check } from 'lucide-react';
 import { PredictionResult, PredictionTimelineItem } from '@/app/api/route/prediction/route';
 import { haptics } from '@/utils/haptics';
 import { formatEtaTime } from '@/utils/navigation';
@@ -39,7 +39,7 @@ export const PredictionResultSheet: React.FC<PredictionResultSheetProps> = ({
   onApplyPrediction,
   selectedDate,
 }) => {
-  const [activeSlotIdx, setActiveSlotIdx] = useState<number>(2); // Default to offset 0 index
+  const [activeSlotIdx, setActiveSlotIdx] = useState<number>(0);
   const [showInfoTooltip, setShowInfoTooltip] = useState(false);
 
   // 1. Body Scroll Lock when sheet is open
@@ -56,31 +56,80 @@ export const PredictionResultSheet: React.FC<PredictionResultSheetProps> = ({
     };
   }, [isOpen]);
 
-  // 2. Sync active slot when prediction updates
-  useEffect(() => {
-    if (prediction?.timeline && prediction.timeline.length > 0) {
-      const zeroIdx = prediction.timeline.findIndex((t) => t.offsetMinutes === 0);
-      setActiveSlotIdx(zeroIdx >= 0 ? zeroIdx : 0);
+  // 2. Filter / structure timeline slots for Screenshot 2 Horizontal Bar Rows
+  // Typically: Base Departure (0m), +30m, +60m (1시간 후), +90m, +120m (2시간 후)
+  const displayRows = useMemo(() => {
+    if (!prediction?.timeline || prediction.timeline.length === 0) {
+      return [];
     }
+
+    // Filter slots starting from offset >= 0 to show future progression
+    const futureSlots = prediction.timeline.filter((s) => s.offsetMinutes >= 0);
+    const sourceSlots = futureSlots.length > 0 ? futureSlots : prediction.timeline;
+
+    // Pick 5 representative intervals: 0m, 30m (or next), 60m (1시간 후), 90m, 120m (2시간 후)
+    const targetOffsets = [0, 30, 60, 90, 120];
+    const picked: { slot: PredictionTimelineItem; label: string; isBase: boolean }[] = [];
+
+    targetOffsets.forEach((targetOffset) => {
+      // Find closest slot
+      let closest = sourceSlots[0];
+      let minDiff = Math.abs(sourceSlots[0].offsetMinutes - targetOffset);
+      for (const s of sourceSlots) {
+        const diff = Math.abs(s.offsetMinutes - targetOffset);
+        if (diff < minDiff) {
+          minDiff = diff;
+          closest = s;
+        }
+      }
+
+      let label = '';
+      if (targetOffset === 0) {
+        // Label is the actual departure time (e.g., '오후 3:30')
+        const h24 = selectedDate.getHours();
+        const period = h24 >= 12 ? '오후' : '오전';
+        let h12 = h24 % 12;
+        if (h12 === 0) h12 = 12;
+        const m = selectedDate.getMinutes();
+        label = `${period} ${h12}:${String(m).padStart(2, '0')}`;
+      } else if (targetOffset === 60) {
+        label = '1시간 후';
+      } else if (targetOffset === 120) {
+        label = '2시간 후';
+      }
+
+      if (!picked.some((p) => p.slot.offsetMinutes === closest.offsetMinutes)) {
+        picked.push({
+          slot: closest,
+          label,
+          isBase: targetOffset === 0,
+        });
+      }
+    });
+
+    return picked;
+  }, [prediction, selectedDate]);
+
+  // Sync active slot on prediction update
+  useEffect(() => {
+    setActiveSlotIdx(0);
   }, [prediction]);
 
   if (!isOpen) return null;
 
-  const timeline = prediction?.timeline || [];
-  const currentSlot: PredictionTimelineItem | undefined = timeline[activeSlotIdx];
-
-  const currentDuration = currentSlot
-    ? currentSlot.durationMinutes
+  const currentItem = displayRows[activeSlotIdx]?.slot;
+  const currentDuration = currentItem
+    ? currentItem.durationMinutes
     : prediction?.predictedDurationMinutes || 45;
 
-  const currentOffsetMs = (currentSlot ? currentSlot.offsetMinutes : 0) * 60 * 1000;
+  const currentOffsetMs = (currentItem ? currentItem.offsetMinutes : 0) * 60 * 1000;
   const effectiveDepartureDate = new Date(selectedDate.getTime() + currentOffsetMs);
   const effectiveArrivalDate = new Date(
     effectiveDepartureDate.getTime() + currentDuration * 60 * 1000
   );
   const arrivalFormatted = formatEtaTime(effectiveArrivalDate);
 
-  // 1. Detailed Header Briefing: "9월 25일 금요일 오후 3시 30분 출발하면 ⓘ"
+  // 1. Header Briefing: "9월 25일 금요일 오후 3시 30분 출발하면 ⓘ"
   const month = effectiveDepartureDate.getMonth() + 1;
   const day = effectiveDepartureDate.getDate();
   const dayOfWeek = FULL_WEEKDAYS[effectiveDepartureDate.getDay()];
@@ -101,9 +150,11 @@ export const PredictionResultSheet: React.FC<PredictionResultSheetProps> = ({
     onClose();
   };
 
-  // Safe percentage for slider track & handle knob
-  const safeTotalSlots = Math.max(1, timeline.length - 1);
-  const sliderPercentage = Math.min(100, Math.max(0, (activeSlotIdx / safeTotalSlots) * 100));
+  // Base Duration for relative comparison (Row 0 is the baseline)
+  const baseDuration = displayRows[0]?.slot.durationMinutes || currentDuration;
+
+  // Knob baseline anchor position on horizontal bar (fixed at 80% to give room for shorter/longer bars)
+  const BASE_KNOB_PERCENT = 80;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center select-none animate-fade-in">
@@ -121,17 +172,21 @@ export const PredictionResultSheet: React.FC<PredictionResultSheetProps> = ({
         {/* Top Drag Indicator Pill */}
         <div className="w-10 h-1 rounded-full bg-slate-300 mx-auto mb-4" />
 
-        {/* 1. Header: Circular AI Gradient Badge + Detailed Date/Weekday Briefing + Info + Close */}
+        {/* 1. Header: Circular AI Multi-Color Gradient Ring Symbol + Briefing + Close */}
         <div className="flex items-center justify-between pb-1">
           <div className="flex items-center space-x-2">
-            {/* Gradient Circular AI Badge */}
-            <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-[#1E60F3] via-indigo-600 to-purple-500 text-white flex items-center justify-center shadow-xs shrink-0">
-              <Sparkles className="w-3.5 h-3.5 fill-white" />
+            {/* Native Ai Multi-Color Gradient Ring Symbol (Screenshot 2 Match) */}
+            <div className="w-6 h-6 rounded-full p-[1.5px] bg-gradient-to-tr from-cyan-400 via-purple-500 to-pink-500 flex items-center justify-center shadow-xs shrink-0">
+              <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
+                <span className="text-[10px] font-black text-slate-800 tracking-tighter leading-none">
+                  Ai
+                </span>
+              </div>
             </div>
 
             {/* Detailed Briefing Text: e.g. "9월 25일 금요일 오후 3시 30분 출발하면" */}
             <div className="flex items-center space-x-1">
-              <span className="text-xs font-bold text-slate-800 tracking-tight">
+              <span className="text-xs sm:text-sm font-bold text-slate-800 tracking-tight">
                 {headerBriefing}
               </span>
               <button
@@ -161,7 +216,7 @@ export const PredictionResultSheet: React.FC<PredictionResultSheetProps> = ({
         {/* Info Tooltip Banner */}
         {showInfoTooltip && (
           <div className="mt-2.5 p-2.5 bg-blue-50/90 border border-blue-200/80 rounded-xl text-blue-900 text-[11px] leading-relaxed animate-fade-in flex items-start space-x-2">
-            <Sparkles className="w-3.5 h-3.5 text-[#1E60F3] shrink-0 mt-0.5" />
+            <Info className="w-3.5 h-3.5 text-[#1E60F3] shrink-0 mt-0.5" />
             <div>
               <span className="font-bold block">네이버지도 & TMAP 빅데이터 기반 소요 시간 예측</span>
               <span>수도권 도로망의 시간대별 교통량 통계를 분석하여 출발 시각에 따른 정체 및 도착 예정 시각을 계산합니다.</span>
@@ -169,8 +224,8 @@ export const PredictionResultSheet: React.FC<PredictionResultSheetProps> = ({
           </div>
         )}
 
-        {/* 2. Large Typography Duration: "1시간 33분 걸려요" / "40분 걸려요" */}
-        <div className="flex flex-col items-center justify-center my-5">
+        {/* 2. Large Typography Duration: "1시간 33분 걸려요" (Bold Blue #1E60F3 + Charcoal #1E293B) */}
+        <div className="flex flex-col items-center justify-center my-4">
           {isLoading ? (
             <div className="flex items-center space-x-2 py-4">
               <div className="w-5 h-5 border-2 border-[#1E60F3] border-t-transparent rounded-full animate-spin" />
@@ -178,12 +233,12 @@ export const PredictionResultSheet: React.FC<PredictionResultSheetProps> = ({
             </div>
           ) : (
             <>
-              <h3 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight flex items-baseline justify-center">
+              <h3 className="text-3xl sm:text-4xl font-extrabold tracking-tight flex items-baseline justify-center">
                 <span className="text-[#1E60F3] font-black">{timePart}</span>
-                <span className="ml-1.5 font-bold">{unitPart}</span>
+                <span className="ml-2 font-bold text-[#1E293B]">{unitPart}</span>
               </h3>
 
-              {/* Compact Pill Button: [시간변경] */}
+              {/* Compact Pill Button: [시간변경] (Outline pill button) */}
               <button
                 type="button"
                 onClick={() => {
@@ -199,108 +254,129 @@ export const PredictionResultSheet: React.FC<PredictionResultSheetProps> = ({
           )}
         </div>
 
-        {/* 3. Congestion Timeline Slider Track & Comparative Bar Graph */}
-        {timeline.length > 0 && (
-          <div className="my-2 p-4 bg-slate-50/80 border border-slate-100 rounded-2xl">
-            {/* Blue Slider Track with Circular Handle Knob */}
-            <div className="relative w-full h-1.5 bg-slate-200 rounded-full my-3">
-              {/* Active Blue Bar */}
-              <div
-                className="absolute left-0 top-0 bottom-0 bg-[#1E60F3] rounded-full transition-all duration-200"
-                style={{ width: `${sliderPercentage}%` }}
-              />
-              {/* Circular Knob: w-4 h-4 bg-white border-4 border-[#1E60F3] */}
-              <div
-                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 bg-white border-4 border-[#1E60F3] rounded-full shadow-sm transition-all duration-200 pointer-events-none"
-                style={{ left: `${sliderPercentage}%` }}
-              />
-            </div>
+        {/* 3. Horizontal Progress Bar Rows (Screenshot 2 Match) */}
+        {displayRows.length > 0 && (
+          <div className="relative my-4 pt-2 pb-3 px-2">
+            {/* Timeline Rows Container */}
+            <div className="relative flex flex-col space-y-7">
+              {displayRows.map((rowItem, idx) => {
+                const isSelected = idx === activeSlotIdx;
+                const isBaseRow = rowItem.isBase;
+                const slotDuration = rowItem.slot.durationMinutes;
+                const diffMinutes = slotDuration - baseDuration;
 
-            {/* Relative Diff Badges & Bars Container */}
-            <div className="grid grid-cols-7 gap-1.5 items-end pt-3 pb-1">
-              {timeline.slice(1, 8).map((slot, idx) => {
-                const actualIdx = idx + 1;
-                const isSelected = actualIdx === activeSlotIdx;
-                const diff = slot.diffMinutes;
-
-                // Color coding for relative time variation badges & bars:
-                // 단축 구간: 산뜻한 에메랄드 그린 컬러 막대 (bg-emerald-500) 및 -X분 텍스트
-                // 정체 구간: 주황 / 레드 컬러 막대 및 +X분 텍스트
-                let badgeClass = 'bg-slate-100 text-slate-600 border-slate-200';
-                let barColor = 'bg-slate-300';
-                let diffText = '동일';
-
-                if (diff < 0) {
-                  badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-300 font-bold';
-                  barColor = 'bg-emerald-500';
-                  diffText = `${diff}분`;
-                } else if (diff > 0 && diff <= 3) {
-                  badgeClass = 'bg-orange-50 text-orange-700 border-orange-300 font-bold';
-                  barColor = 'bg-orange-400';
-                  diffText = `+${diff}분`;
-                } else if (diff > 3) {
-                  badgeClass = 'bg-rose-50 text-rose-700 border-rose-300 font-black';
-                  barColor = 'bg-rose-500';
-                  diffText = `+${diff}분`;
+                // Gauge width calculation relative to base knob position (80%)
+                // If diff is -7m, width = BASE_KNOB_PERCENT * (slotDuration / baseDuration)
+                let gaugePercent = BASE_KNOB_PERCENT;
+                if (baseDuration > 0) {
+                  gaugePercent = Math.min(
+                    95,
+                    Math.max(25, BASE_KNOB_PERCENT * (slotDuration / baseDuration))
+                  );
                 }
 
-                // Proportional bar height (base 30px up to 64px)
-                const baseHeight = 32;
-                const dynamicHeight = Math.min(64, Math.max(22, baseHeight + diff * 3));
+                // Color coding for gauge bar & diff text:
+                // Fast/saving: #00C853 (Native Vibrant Green)
+                // Equal: #1E60F3
+                // Slower/delay: Amber / Rose
+                let barColor = 'bg-[#00C853]';
+                let diffTextColor = 'text-[#00C853]';
+                let diffText = '';
+
+                if (diffMinutes < 0) {
+                  barColor = 'bg-[#00C853]';
+                  diffTextColor = 'text-[#00C853]';
+                  diffText = `${diffMinutes}분`;
+                } else if (diffMinutes > 0) {
+                  barColor = diffMinutes > 5 ? 'bg-rose-500' : 'bg-amber-500';
+                  diffTextColor = diffMinutes > 5 ? 'text-rose-600' : 'text-amber-600';
+                  diffText = `+${diffMinutes}분`;
+                }
 
                 return (
-                  <button
-                    key={slot.timeFormatted + idx}
-                    type="button"
+                  <div
+                    key={rowItem.slot.offsetMinutes}
                     onClick={() => {
                       haptics.lightTap();
-                      setActiveSlotIdx(actualIdx);
+                      setActiveSlotIdx(idx);
                     }}
-                    className={`flex flex-col items-center justify-end rounded-xl p-1 transition-all cursor-pointer ${
-                      isSelected
-                        ? 'bg-blue-50/90 ring-2 ring-[#1E60F3]/60 scale-105'
-                        : 'hover:bg-slate-100/80'
+                    className={`group relative flex items-center cursor-pointer transition-all ${
+                      isSelected ? 'opacity-100' : 'opacity-85 hover:opacity-100'
                     }`}
                   >
-                    {/* Relative Diff Badge */}
-                    <span
-                      className={`text-[10px] px-1 py-0.5 rounded-md border leading-none mb-1.5 whitespace-nowrap ${badgeClass}`}
-                    >
-                      {diffText}
-                    </span>
-
-                    {/* Proportional Bar */}
-                    <div
-                      style={{ height: `${dynamicHeight}px` }}
-                      className={`w-4.5 rounded-t-md transition-all ${
-                        isSelected ? 'bg-[#1E60F3] shadow-xs' : barColor
-                      }`}
-                    />
-
-                    {/* Time Label */}
-                    <span
-                      className={`text-[10px] mt-1.5 tracking-tighter leading-none ${
-                        isSelected ? 'text-[#1E60F3] font-bold' : 'text-slate-500 font-medium'
-                      }`}
-                    >
-                      {slot.timeFormatted}
-                    </span>
-
-                    {/* Secondary 1시간 후 / 2시간 후 Label */}
-                    {slot.label && (
-                      <span className="text-[9px] text-slate-400 font-bold mt-0.5 leading-none scale-90 truncate">
-                        {slot.label}
+                    {/* Left Column: Fixed-width Time Label (오후 3:30, 1시간 후, 2시간 후) */}
+                    <div className="w-20 sm:w-24 shrink-0 text-left">
+                      <span
+                        className={`text-xs sm:text-sm leading-none ${
+                          isBaseRow
+                            ? 'font-bold text-slate-800'
+                            : 'font-semibold text-slate-400'
+                        }`}
+                      >
+                        {rowItem.label}
                       </span>
-                    )}
-                  </button>
+                    </div>
+
+                    {/* Right Column: Base Rail + Horizontal Gauge Bar + Slider Knob & Diff Label */}
+                    <div className="relative flex-1 flex items-center h-5">
+                      {/* Subtle Blue Tint Area (Left of knob baseline) */}
+                      <div
+                        className="absolute left-0 top-[-14px] bottom-[-14px] bg-blue-50/25 pointer-events-none rounded-sm"
+                        style={{ width: `${BASE_KNOB_PERCENT}%` }}
+                      />
+
+                      {/* Vertical Dashed Guideline from Slider Knob down to bottom */}
+                      <div
+                        className="absolute top-[-14px] bottom-[-14px] border-l border-dashed border-blue-400/60 pointer-events-none z-10"
+                        style={{ left: `${BASE_KNOB_PERCENT}%` }}
+                      />
+
+                      {/* Gray Base Rail */}
+                      <div className="absolute left-0 right-0 h-1.5 bg-slate-100 rounded-full w-full" />
+
+                      {isBaseRow ? (
+                        /* First Row: Interactive Blue Slider Track with Circular Knob */
+                        <>
+                          <div
+                            className="absolute left-0 h-1.5 bg-[#1E60F3] rounded-full z-10 transition-all duration-300"
+                            style={{ width: `${BASE_KNOB_PERCENT}%` }}
+                          />
+                          {/* Circular Slider Knob */}
+                          <div
+                            className="absolute -translate-x-1/2 w-4 h-4 bg-[#1E60F3] rounded-full ring-4 ring-blue-100 shadow-sm z-20 transition-all duration-300 pointer-events-none"
+                            style={{ left: `${BASE_KNOB_PERCENT}%` }}
+                          />
+                        </>
+                      ) : (
+                        /* Following Rows: Horizontal Progress Bar + Delta Difference Badge */
+                        <>
+                          {/* Progress Gauge Bar */}
+                          <div
+                            className={`absolute left-0 h-1.5 rounded-full z-10 transition-all duration-300 ${barColor}`}
+                            style={{ width: `${gaugePercent}%` }}
+                          />
+
+                          {/* Relative Difference Text (e.g., -7분, -12분, -17분, -20분) right aligned above bar end */}
+                          {diffText && (
+                            <div
+                              className="absolute -top-4 font-bold text-xs leading-none z-20 pointer-events-none transition-all duration-300"
+                              style={{ left: `${Math.max(20, gaugePercent - 6)}%` }}
+                            >
+                              <span className={diffTextColor}>{diffText}</span>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
                 );
               })}
             </div>
           </div>
         )}
 
-        {/* 4. Bottom Action: Close Lookup Sheet */}
-        <div className="pt-3 pb-[max(env(safe-area-inset-bottom),8px)]">
+        {/* 4. Bottom Action: Confirm Button */}
+        <div className="pt-4 pb-[max(env(safe-area-inset-bottom),8px)]">
           <button
             type="button"
             onClick={handleApply}
@@ -314,3 +390,4 @@ export const PredictionResultSheet: React.FC<PredictionResultSheetProps> = ({
     </div>
   );
 };
+

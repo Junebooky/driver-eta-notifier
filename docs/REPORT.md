@@ -1,7 +1,7 @@
-# Protocol Cockpit (driver-eta-notifier) - 차량번호 텍스트 입력 복구, 휠 피커 탄성 스냅백 및 실시간 ETA 격리 완료 보고서
+# Protocol Cockpit (driver-eta-notifier) - AI 소요 시간 예측 바텀시트 리디자인 및 3D 실린더 휠 피커 구현 완료 보고서
 
 > **평가 일시**: 2026년 9월 21일  
-> **대상 애플리케이션**: Protocol Cockpit (의전 드라이버 전용 스마트 관제 런처 v4.22 - 차량번호 자유 텍스트 입력 복구, 휠 피커 수평 정렬 및 오전/오후 롤오버, 과거 시간대 진동/바운스 스냅백, 메인 대시보드 실시간 ETA 격리 보존)  
+> **대상 애플리케이션**: Protocol Cockpit (의전 드라이버 전용 스마트 관제 런처 v4.23 - AI 예측 바텀시트 수평 프로그레스 바 타임라인 리디자인, 휠 피커 배열 필터링 버그 수정 및 3D 실린더 드럼 볼록렌즈 인터랙션)  
 > **프로덕션 배포 URL**: [https://driver-eta-notifier.vercel.app](https://driver-eta-notifier.vercel.app)  
 > **GitHub Repository**: [https://github.com/Junebooky/driver-eta-notifier.git](https://github.com/Junebooky/driver-eta-notifier.git) (main 브랜치)  
 
@@ -11,210 +11,77 @@
 
 | 과업 항목 | 구현 상태 | 핵심 조치 및 엔지니어링 구현 세부 사항 |
 | :--- | :---: | :--- |
-| **1. 차량번호 입력 필드 한글/문자 제한 버그 즉시 해제 (`ProfileModal.tsx`)** | ✅ 완료 | • **숫자 전용 강제 필터링 제거**: 기존 차량번호 입력 필드에 적용되어 있던 `replace(/[^0-9]/g, '')`, `inputMode="numeric"`, `pattern="[0-9]*"` 속성을 완전히 제거.<br>• **자유 텍스트 입력 복구**: 차량 식별 속성을 표준 `type="text"`로 전환하여 한글/영문/숫자/공백/특수문자('142호 7811', '서울 32가 1234' 등)가 IME 자모 조합 끊김 없이 온전히 입력 및 영구 저장되도록 복구 완료. |
-| **2. 출발 시간 휠 피커 수평 일렬 정렬 & 오전/오후 연동 스크롤 (`DepartureTimePickerModal.tsx`)** | ✅ 완료 | • **수평 일렬 정밀 정렬**: 4개 열(날짜-오전/오후-시-분)의 모든 아이템 행 높이를 고정 `48px`(`h-[48px]`), 상·하단 패딩 `96px`(`pt-[96px] pb-[96px]`), 중앙 하이라이트 박스를 `top-[96px] h-[48px]`로 일치시켜 텍스트 베이스라인이 정확히 수평 일직선상에 정렬.<br>• **시간 휠 11 $\leftrightarrow$ 12 롤오버 동기화**: Hour 휠 스크롤 시 오전 11시 $\rightarrow$ 12시는 **오후 12시(정오)**로, 오후 11시 $\rightarrow$ 12시는 **오전 12시(자정 및 다음 날짜)**로 연동되고, 반대 방향 역스크롤 시에도 이전 시간대/날짜로 스마트 동기화 구현. |
-| **3. 과거 시간대 방어 및 탄성 바운스 스냅백 (`DepartureTimePickerModal.tsx`)** | ✅ 완료 | • **과거 시간대 비활성화**: '오늘' 날짜 선택 시 현재 시각 이전의 시간 및 분 슬롯을 `opacity-20 pointer-events-none`으로 흐리게 비활성화 처리.<br>• **탄성 바운스 스냅백 (Rubber-band Snapback)**: 사용자가 관성으로 과거 시간 영역으로 스크롤하거나 터치할 경우, 허용하지 않고 즉시 **현재 시각 기준 가장 가까운 유효 슬롯(현재 시각 + 10분 단위 올림)으로 부드럽게 튕겨 내려오는 탄성 애니메이션** 적용.<br>• **크로스 플랫폼 촉각 피드백**: 스냅백 순간 안드로이드 진동(`navigator?.vibrate?.([20, 30, 20])`) 및 오디오/햅틱(`warningPulse`)과 함께 화면 마이크로 흔들림(Shake/Bounce) 애니메이션 격발. |
-| **4. 메인 대시보드 실시간 ETA 보존 및 시뮬레이션 완전 격리 (`page.tsx`, `RouteInfoCard.tsx`)** | ✅ 완료 | • **메인 대시보드 실시간 ETA 원복**: 메인 홈 화면의 도착 시간(ETA), 소요 시간 및 카카오톡 보고 텍스트는 **무조건 '현재 시각' 기준 실시간 TMAP 데이터만 단독 표시**하도록 원천 분리.<br>• **조회 전용 시뮬레이션(Preview) 격리**: 시계 아이콘 터치 및 휠 피커 조작은 미래 소요 시간 단순 조회 전용 레이어로 동작하며, 결과는 오직 `PredictionResultSheet` 바텀시트 내부에서만 렌더링되고 시트를 닫으면 메인 대시보드는 실시간 상태를 그대로 유지. |
+| **1. AI 소요 시간 예측 바텀시트 전면 리디자인 (`PredictionResultSheet.tsx`)** | ✅ 완료 | • **세로 막대 그래프 폐기 및 수평 타임라인 행 전환**: 기존 가로축 세로 막대 그래프를 완전히 제거하고, 상용 내비 레퍼런스와 1:1 일치하는 **'세로 타임라인 행(Horizontal Progress Bar List)'** 구조로 전환.<br>• **네이티브 Ai 멀티컬러 링 심볼**: 상단 좌측에 시안-퍼플-핑크 그라데이션 원형 링과 볼드 "Ai" 타이포 결합 심볼 구현.<br>• **타이포그래피 및 액션**: 대형 소요 시간 타이포(`1시간 33분 걸려요` - 볼드 일렉트릭 블루 `#1E60F3` + 짙은 차콜 `#1E293B`) 및 아웃라인 알약형 `[시간변경]` 버튼 배치.<br>• **슬라이더 트랙 & 수직 점선 가이드라인**: 상단 기준 행에 파란 슬라이더 노브(`w-4 h-4 bg-[#1E60F3] ring-4 ring-blue-100`)와 시트 하단까지 관통하는 **수직 점선 가이드라인(`border-l border-dashed border-blue-400/60`)**, 좌측 틴트 배경(`bg-blue-50/25`) 구성.<br>• **시간대별 주행 상태 게이지 및 편차 배지**: 연회색 레일 위에 에메랄드 그린(`bg-[#00C853]`, 정체 시 오렌지/레드) 게이지 바 및 우측 상단 편차 수치(`-7분`, `-12분`, `-17분`, `-20분`) 볼드 텍스트 렌더링. |
+| **2. 출발 시간 휠 피커 데이터 배열 버그 수정 (`DepartureTimePickerModal.tsx`)** | ✅ 완료 | • **단순 CSS 숨김 금지 및 배열 소스 레벨 필터링**: '오늘' 날짜 선택 시 데이터 소스 배열(Array) 자체에서 지난 시간대 옵션을 원천 제외.<br>• **오전/오후 밀림 버그 원천 차단**: 현재 시각이 오후(12시 이후)인 경우 오전/오후 컬럼을 `['오후']` 단일 요소 배열로 동적 갱신하여 `selectedIndex`를 0으로 고정, 컨테이너 `scrollTop`을 0으로 초기화하여 하이라이트 박스(`top: 96px, h: 48px`) 정중앙에 정확히 안착.<br>• **아이템 높이 및 오프셋 정합성 보장**: 상하단 패딩(`96px`)과 `ITEM_HEIGHT`(48px) 계산 공식이 동적 배열 길이에 맞추어 완벽 동기화. |
+| **3. 티맵 스타일 3D 볼록렌즈(Cylinder Drum) 인터랙션 구현 (`DepartureTimePickerModal.tsx`)** | ✅ 완료 | • **3D 원근 뷰포트(Perspective) 구축**: 4개 컬럼 스크롤 컨테이너에 `perspective: 1000px; transform-style: preserve-3d;` 설정 및 상·하단 그라데이션 마스크(`from-white via-white/85 to-transparent`) 배치.<br>• **중앙 거리(Delta) 기반 동적 변위 계산**: 스크롤 오프셋과 아이템 중심 간의 수직 거리(`delta = (itemCenter - scrollTop) / ITEM_HEIGHT`)를 실시간 계산하여 인라인 3D 스타일 바인딩.<br>• **변환 매개변수 정밀 매핑**: X축 회전각(`rotateX: delta * -20deg`, 최대 ±50deg), Z축 깊이(`translateZ: 5px ~ -48px`), 스케일(`scale: 1.05 ~ 0.82`), 투명도(`opacity: 1.0 ~ 0.12`)를 적용하여 입체적인 원통 렌즈 롤링 효과 연출.<br>• **성능 최적화**: `will-change: transform, opacity` 및 `scroll-snap-type: y mandatory` 결합. |
+| **4. 메인 대시보드 실시간 ETA 격리 및 빌드 무결성** | ✅ 완료 | • **실시간 ETA 불변성 유지**: 메인 화면 소요 시간(ETA), 도착 예정 시각, 카카오톡 보고 텍스트는 오직 '현재 시각' 기준 실시간 TMAP 데이터만 단독 유지.<br>• **컴파일 에러 0건**: `npm run build`를 통해 TypeScript 정적 타입 검사 및 Turbopack 빌드 무결성 완벽 통과. |
 
 ---
 
 ## 2. 세부 엔지니어링 구현 내역
 
-### 1) 차량번호 필드 한글/문자 제한 완전 해제 (`components/ProfileModal.tsx`)
+### 1) AI 소요 시간 예측 바텀시트 (`components/PredictionResultSheet.tsx`) 전면 리디자인
 
-- **문제 원인**: 이전 커밋에서 번호판 입력을 2분할하면서 뒷자리 필드에 `replace(/[^0-9]/g, '')` 및 `inputMode="numeric"`이 강제되어 '서울 32가 1234'나 한글 번호판이 차단되는 문제 발생.
-- **조치 내용**:
-  - `plateNumber`를 단일 통합 `type="text"` 입력 필드로 전환하여 모든 문자열(공백, 한글, 숫자 등)을 자유롭게 입력 가능하도록 조치.
-  - 호차(`hocha`) 역시 `type="text"`로 영문/숫자 자유 입력 지원.
-
-```tsx
-{/* 1. Hocha (Optional) Field */}
-<div>
-  <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center">
-    <Car className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 호차 (선택)
-  </label>
-  <div className="relative flex items-center">
-    <input
-      type="text"
-      value={hocha}
-      onChange={handleHochaChange}
-      placeholder="예: 4 (호차 없으면 공란)"
-      className="w-full pl-3.5 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white font-bold transition-colors"
-    />
+- **기존 세로 막대형 차트 제거**: 가로축 기준의 막대 그래프를 완전히 폐기하고, 5개 대표 시간대(기준 출발 시각, +30분, +60분 `1시간 후`, +90분, +120분 `2시간 후`)의 수평 게이지 행 리스트로 전환.
+- **네이티브 Ai 심볼 및 헤더**:
+  ```tsx
+  {/* Native Ai Multi-Color Gradient Ring Symbol */}
+  <div className="w-6 h-6 rounded-full p-[1.5px] bg-gradient-to-tr from-cyan-400 via-purple-500 to-pink-500 flex items-center justify-center shadow-xs shrink-0">
+    <div className="w-full h-full rounded-full bg-white flex items-center justify-center">
+      <span className="text-[10px] font-black text-slate-800 tracking-tighter leading-none">
+        Ai
+      </span>
+    </div>
   </div>
-</div>
-
-{/* 2. License Plate Input Field */}
-<div>
-  <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center">
-    <Car className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 차량 번호판
-  </label>
-  <input
-    type="text"
-    value={plateNumber}
-    onChange={handlePlateChange}
-    placeholder="예: 142호 7811 또는 서울 32가 1234"
-    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white font-bold transition-colors"
-  />
-</div>
-```
+  ```
+- **수평 프로그레스 바 및 수직 점선 가이드라인**:
+  - 첫 번째 행(기준 출발 시각)의 슬라이더 위치(80%)를 기준으로 파란 조절 노브(`w-4 h-4 bg-[#1E60F3] ring-4 ring-blue-100`) 배치.
+  - 노브 중심에서 바닥까지 관통하는 `border-l border-dashed border-blue-400/60` 수직 점선 가이드라인 렌더링.
+  - 노브 좌측 전체에 `bg-blue-50/25` 은은한 틴트 배경을 깔아 기준 축 시각화.
+  - 각 하위 행에는 연회색 베이스 레일(`h-1.5 bg-slate-100`) 위에 초록 게이지 바(`h-1.5 bg-[#00C853]`)와 우측 상단 절약 편차 텍스트(`-7분`, `-12분`, `-17분`, `-20분`)를 배치.
+  - 행 터치 시 활성 슬롯이 동적으로 전환되어 상단 소요 시간 및 출발 시각 타이틀이 실시간 반응.
 
 ---
 
-### 2) 휠 피커 수평 일렬 정렬 및 오전/오후 스마트 롤오버 (`components/DepartureTimePickerModal.tsx`)
+### 2) 출발 시간 휠 피커 데이터 배열 필터링 (`components/DepartureTimePickerModal.tsx`)
 
-- **정밀 수평 일렬 정렬 (Sub-pixel Alignment)**:
-  - 컨테이너 높이 `h-[240px]`에 맞추어 상·하단 패딩을 각각 `96px`로 설정.
-  - 4개 열(날짜, 오전/오후, 시, 분)의 모든 아이템 높이를 `h-[48px]`(48px)로 통일하고 중앙 하이라이트 바를 `top-[96px] h-[48px]`에 고정하여 베이스라인이 정확히 일치하도록 교정.
-- **Hour 11 $\leftrightarrow$ 12 롤오버 연동**:
-  - `prevHourRef`를 통해 시간의 전진/후진 방향을 실시간 감지하여:
-    - 오전 11시 $\rightarrow$ 12시 전환 시: 자동으로 `오후`로 전환.
-    - 오후 11시 $\rightarrow$ 12시 전환 시: 자동으로 `오전`으로 전환 및 익일(다음 날짜)로 인덱스 동기화.
-    - 반대 방향 역스크롤 시에도 전일/오전/오후로 복원.
-
-```tsx
-// 3. Hour Selection / Rollover Sync Handler
-const handleSelectHour = (newHour: number) => {
-  const prevHour = prevHourRef.current;
-  let nextPeriod = selectedPeriod;
-  let nextDateIdx = selectedDateIdx;
-
-  // Rollover 11 -> 12 (Forward)
-  if (prevHour === 11 && newHour === 12) {
-    if (selectedPeriod === '오전') {
-      nextPeriod = '오후';
-      setSelectedPeriod('오후');
-      scrollColumnToIndex(periodColRef.current, 1, 'smooth');
-    } else {
-      nextPeriod = '오전';
-      nextDateIdx = Math.min(datesList.length - 1, selectedDateIdx + 1);
-      setSelectedPeriod('오전');
-      setSelectedDateIdx(nextDateIdx);
-      scrollColumnToIndex(periodColRef.current, 0, 'smooth');
-      scrollColumnToIndex(dateColRef.current, nextDateIdx, 'smooth');
+- **문제 원인**: 오늘 날짜에서 지난 시간(오전 등)을 단순 CSS 스타일 숨김 처리하여 빈 공간이 발생하고 '오후'가 선택 박스 하단으로 밀려나는 정렬 오류 발생.
+- **조치 내용**:
+  ```tsx
+  // Periods: If today & already afternoon, only ['오후'] is supplied
+  const availablePeriods: Array<'오전' | '오후'> = useMemo(() => {
+    if (isToday && isNowAfternoon) {
+      return ['오후'];
     }
-  }
-  // Rollover 12 -> 11 (Backward)
-  else if (prevHour === 12 && newHour === 11) {
-    if (selectedPeriod === '오후') {
-      nextPeriod = '오전';
-      setSelectedPeriod('오전');
-      scrollColumnToIndex(periodColRef.current, 0, 'smooth');
-    } else if (selectedDateIdx > 0) {
-      nextPeriod = '오후';
-      nextDateIdx = Math.max(0, selectedDateIdx - 1);
-      setSelectedPeriod('오후');
-      setSelectedDateIdx(nextDateIdx);
-      scrollColumnToIndex(periodColRef.current, 1, 'smooth');
-      scrollColumnToIndex(dateColRef.current, nextDateIdx, 'smooth');
-    }
-  }
-
-  prevHourRef.current = newHour;
-  setSelectedHour(newHour);
-  scrollColumnToIndex(hourColRef.current, HOURS.indexOf(newHour), 'smooth');
-};
-```
+    return ALL_PERIODS;
+  }, [isToday, isNowAfternoon]);
+  ```
+  - 배열 자체가 1개 요소(`['오후']`)로 축소되므로, `selectedIndex = 0` 및 `scrollTop = 0`에서 선택 하이라이트 박스(`top: 96px, h: 48px`) 중앙에 오차 없이 정확히 안착.
 
 ---
 
-### 3) 과거 시간 방어 및 탄성 스냅백 인터랙션 (`components/DepartureTimePickerModal.tsx`)
+### 3) 티맵 스타일 3D 볼록렌즈(Cylinder Drum) 인터랙션 (`components/DepartureTimePickerModal.tsx`)
 
-- **과거 시간 슬롯 비활성화**:
-  - `isToday`인 경우, `isPeriodDisabled`, `isHourDisabled`, `isMinuteDisabled` 검사를 통해 과거 항목에 `opacity-20 pointer-events-none cursor-not-allowed` 부여.
-- **탄성 스냅백 및 햅틱/진동 격발**:
-  - 과거 시간대로 휠이 올려지거나 관성 스크롤된 경우, 안드로이드 진동(`navigator.vibrate([20, 30, 20])`), 햅틱 경고, 마이크로 바운스 애니메이션(`isShaking`)과 함께 현재 시각 기준 가장 가까운 유효 슬롯(10분 단위 올림)으로 부드럽게 스냅백(Spring ease-out).
+- `CylinderColumn` 컴포넌트를 통해 4개 컬럼 전체에 3D 실린더 롤링 적용:
+  ```tsx
+  // Calculate relative distance from current scroll center
+  const itemCenter = idx * ITEM_HEIGHT;
+  const distance = itemCenter - scrollTop;
+  const delta = distance / ITEM_HEIGHT;
+  const clampedDelta = Math.max(-2.5, Math.min(2.5, delta));
 
-```tsx
-const triggerRubberBandSnapback = useCallback(() => {
-  try {
-    if (typeof navigator !== 'undefined' && navigator.vibrate) {
-      navigator.vibrate([20, 30, 20]);
-    }
-  } catch {}
-  haptics.warningPulse();
-
-  setIsShaking(true);
-  setTimeout(() => setIsShaking(false), 400);
-
-  const minValid = getMinAllowedDate();
-  const h24 = minValid.getHours();
-  const period = h24 >= 12 ? '오후' : '오전';
-  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
-  const minute = minValid.getMinutes();
-
-  setSelectedDateIdx(0);
-  setSelectedPeriod(period);
-  setSelectedHour(h12);
-  setSelectedMinute(minute);
-  prevHourRef.current = h12;
-
-  scrollColumnToIndex(dateColRef.current, 0, 'smooth');
-  scrollColumnToIndex(periodColRef.current, PERIODS.indexOf(period), 'smooth');
-  scrollColumnToIndex(hourColRef.current, HOURS.indexOf(h12), 'smooth');
-  scrollColumnToIndex(minuteColRef.current, MINUTES.indexOf(minute), 'smooth');
-}, [scrollColumnToIndex]);
-```
+  // 3D Parameters:
+  const rotateX = clampedDelta * -20;
+  const translateZ = Math.max(-48, 5 - Math.abs(clampedDelta) * 22);
+  const scale = Math.max(0.82, 1.05 - Math.abs(clampedDelta) * 0.12);
+  const opacity = Math.max(0.12, Math.min(1, 1 - Math.abs(clampedDelta) * 0.52));
+  ```
+- 원근감 뷰포트(`perspective: 1000px`, `transformStyle: preserve-3d`)와 상하단 그라데이션 마스크 결합으로 볼록렌즈 입체 깊이감 완성.
+- 과거 시간대 방어(스냅백, 진동 `[20, 30, 20]`, 햅틱, 흔들림) 정상 가동.
 
 ---
 
-### 4) 메인 대시보드 실시간 ETA 보존 및 시뮬레이션 완전 격리 (`app/page.tsx`, `components/RouteInfoCard.tsx`)
+## 3. 검증 결과
 
-- **실시간 ETA 오염 원천 차단**:
-  - `app/page.tsx`의 경로 계산 `useEffect`에서 `selectedDepartureDate` 의존성을 완전히 제거하고, 거점 변경 및 새로고침 시 **무조건 실시간 TMAP 데이터(`fetchRouteEstimate`)만 호출**하도록 원복.
-  - `handleApplyPrediction`에 의해 메인 화면의 `routeEstimate`가 덮어씌워지던 로직을 제거.
-  - `reportPreviewText` 역시 실시간 `routeEstimate`만을 기반으로 단톡방 메시지를 생성.
-- **조회 전용 시뮬레이션 레이어로 격리**:
-  - 출발 시간 선택 및 AI 예측 결과는 독립된 `simulationDepartureDate`와 `PredictionResultSheet` 바텀시트 내부에서만 렌더링.
-  - 바텀시트 하단 버튼은 `[확인 (조회 완료)]`로 동작하여 시트를 닫으면 메인 대시보드가 본래의 실시간 상태를 100% 온전히 유지.
-
----
-
-## 3. 프로덕션 빌드 무결성 검증
-
-### `npm run build` 결과
-```text
-> driver-eta-notifier@0.1.0 build
-> next build
-
-▲ Next.js 16.3.5 (Turbopack)
-- Environments: .env.local
-✓ Running next.config.ts took 10ms
-
-  Creating an optimized production build ...
-✓ Compiled successfully in 255ms
-  Finished TypeScript in 678ms    ✓ Finished TypeScript in 678ms 
-  Collecting page data using 10 workers in 287ms    ✓ Collecting page data using 10 workers in 287ms 
-✓ Generating static pages using 10 workers (9/9) in 226ms
-  Finalizing page optimization in 8ms    ✓ Finalizing page optimization in 8ms 
-
-Route (app)
-┌ ○ /
-├ ○ /_not-found
-├ ƒ /api/driver
-├ ƒ /api/presets
-├ ƒ /api/route
-├ ƒ /api/route/prediction
-├ ƒ /api/search
-└ ○ /tmap
-
-○  (Static)   prerendered as static content
-ƒ  (Dynamic)  server-rendered on demand
-```
-
-- **TypeScript 컴파일 에러**: 0건
-- **정적 최적화 및 빌드 무결성**: 100% 통과
-
----
-
-## 4. 변경 파일 목록 및 배포 커밋
-
-- **수정 파일**:
-  - `components/ProfileModal.tsx`: 차량 식별 입력 필드의 숫자 전용 필터링 제거 및 통합 `type="text"` 입력 필드 복구
-  - `components/DepartureTimePickerModal.tsx`: 4열 고정 48px 수평 일렬 정렬, 오전/오후 롤오버 동기화, 과거 시간대 비활성화 및 햅틱/진동 탄성 바운스 스냅백 구현
-  - `components/RouteInfoCard.tsx`: 미래 시뮬레이션 잔재 제거 및 100% 실시간 TMAP 데이터 표시 카드 원복
-  - `components/PredictionResultSheet.tsx`: `onApplyPrediction` 옵셔널 전환 및 하단 버튼 `[확인 (조회 완료)]` 격리 반영
-  - `app/page.tsx`: 실시간 경로 상태와 시뮬레이션 상태 원천 분리, 실시간 보고 텍스트 보존
-  - `docs/REPORT.md`: 과업 완료 보고서 갱신
-- **커밋 메시지**: `fix: restore vehicle text input, enforce past time rubber-band snapback with haptics, and isolate simulation from real-time ETA`
-- **배포 브랜치**: `origin/main` (GitHub 푸시 완료)
+- **빌드 검증**: `npm run build` 결과 TypeScript 정적 타입 검사 100% 통과, 9개 정적/동적 라우트 컴파일 완료.
+- **실시간 ETA 불변성**: 메인 대시보드 상태와 시뮬레이션 레이어 완벽 분리 유지.
