@@ -16,7 +16,9 @@ import { A2HSBanner } from '@/components/A2HSBanner';
 import { LocationPreset, ReportMode, RouteEstimate, HomeLocation } from '@/types';
 import { DEFAULT_PRESET_LOCATIONS } from '@/utils/presets';
 import { generateReportText } from '@/utils/reportGenerator';
-import { calculateHaversineEstimate } from '@/utils/navigation';
+import { calculateHaversineEstimate, formatEtaTime, getEtaString } from '@/utils/navigation';
+import { User } from 'lucide-react';
+import { haptics } from '@/utils/haptics';
 
 const CUSTOM_PRESETS_KEY = 'protocol_cockpit_custom_presets_v1';
 const ORDERED_PRESETS_KEY = 'protocol_cockpit_ordered_presets_v2';
@@ -277,14 +279,9 @@ export default function Home() {
         const data = await res.json();
         const durationMinutes = data.durationMinutes || 45;
 
-        // Dynamic ETA Calculation from Local Device Clock
+        // Dynamic ETA Calculation from Local Device Clock (Strict 24h format HH:mm)
         const now = new Date();
-        const etaDate = new Date(now.getTime() + durationMinutes * 60 * 1000);
-        const hours24 = etaDate.getHours();
-        const hours12 = hours24 % 12 || 12;
-        const minutes = String(etaDate.getMinutes()).padStart(2, '0');
-        const period = hours24 >= 12 ? '오후' : '오전';
-        const dynamicEtaFormatted = `${period} ${hours12}:${minutes}`;
+        const dynamicEtaFormatted = getEtaString(durationMinutes, now);
 
         setRouteEstimate({
           distanceKm: data.distanceKm || 50,
@@ -411,6 +408,28 @@ export default function Home() {
             onSwap={handleSwapOriginDestination}
           />
 
+          {/* Passenger Info Card: Positioned strictly above Origin Presets */}
+          <div className="bg-slate-100 dark:bg-slate-800/80 rounded-xl p-3 mb-2 flex items-center justify-between border border-slate-200 dark:border-slate-700 select-none">
+            <div className="flex items-center space-x-2.5 min-w-0">
+              <div className="w-6 h-6 rounded-lg bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 shrink-0">
+                <User className="w-3.5 h-3.5" />
+              </div>
+              <div className="text-xs font-semibold text-slate-600 dark:text-slate-400 truncate">
+                담당 승객: <span className="font-bold text-slate-900 dark:text-white">{profile.passengerName || 'SOFYAN 외 1명'}</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                haptics.lightTap();
+                setIsProfileModalOpen(true);
+              }}
+              className="text-[11px] font-semibold text-[#1E60F3] hover:underline cursor-pointer shrink-0 ml-2"
+            >
+              수정
+            </button>
+          </div>
+
           {/* 2. Simplified High-Density Preset Chips Grid (Slot #1 Home Fixed + 2D Hysteresis Drag) */}
           <PresetButtons
             presets={presets}
@@ -454,6 +473,7 @@ export default function Home() {
             routeEstimate={routeEstimate}
             reportText={reportPreviewText}
             targetChatRoom={profile.targetChatRoom}
+            profile={profile}
           />
         </div>
       </div>
@@ -473,6 +493,7 @@ export default function Home() {
               id: profile.id || 'driver_4',
               vehicleNo: updated.vehicleNo,
               driverName: updated.driverName,
+              passengerName: updated.passengerName,
             }),
           }).catch((err) => console.warn('Supabase driver profile sync error:', err));
         }}

@@ -5,6 +5,7 @@
 export interface VipReportParams {
   carNumber?: string;
   driverName?: string;
+  passengerName?: string;
   destinationName: string;
   originName: string;
   distanceKm?: number;
@@ -16,24 +17,35 @@ export interface VipReportParams {
 /**
  * Generates standardized plain text for VIP Protocol Reporting
  * Specification:
- * [{carNumber} {driverName}]
- * • 목적지: {destinationName}
- * • 출발지: {originName}
- * • ETA: {etaFormatted}
+ * [{carNumber}] {originName} to {destinationName} 출발 / {passengerName} 승차 / ETA {cleanEta}
  */
 export function generateVipReportText({
   carNumber = '4호차',
-  driverName = '윤태준',
+  passengerName = 'SOFYAN 외 1명',
   destinationName,
   originName,
   etaFormatted,
   mode = 'DEPARTURE',
 }: VipReportParams): string {
-  const cleanEta = etaFormatted.split(' ')[0] || etaFormatted;
-  if (mode === 'ARRIVED') {
-    return `[${carNumber} ${driverName}]\n• 출발지: ${originName}\n• 목적지: ${destinationName}\n• 상태: 도착 완료`;
+  let cleanEta = etaFormatted;
+  const timeMatch = etaFormatted.match(/(\d{1,2}:\d{2})/);
+  if (timeMatch) {
+    cleanEta = timeMatch[1].padStart(5, '0');
+  } else {
+    cleanEta = etaFormatted.replace(/\s*\(.*?\)/, '').trim();
   }
-  return `[${carNumber} ${driverName}]\n• 출발지: ${originName}\n• 목적지: ${destinationName}\n• ETA: ${cleanEta}`;
+
+  const passenger = passengerName?.trim();
+
+  if (mode === 'ARRIVED') {
+    return passenger
+      ? `[${carNumber}] ${destinationName} 도착 / ${passenger} 하차 완료`
+      : `[${carNumber}] ${destinationName} 도착 완료`;
+  }
+
+  return passenger
+    ? `[${carNumber}] ${originName} to ${destinationName} 출발 / ${passenger} 승차 / ETA ${cleanEta}`
+    : `[${carNumber}] ${originName} to ${destinationName} 출발 / ETA ${cleanEta}`;
 }
 
 /**

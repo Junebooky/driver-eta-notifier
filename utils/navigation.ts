@@ -6,6 +6,17 @@ export interface LocationTarget {
   lng: number;
 }
 
+export function formatEtaTime(date: Date): string {
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
+export function getEtaString(durationMinutes: number, fromDate: Date = new Date()): string {
+  const etaDate = new Date(fromDate.getTime() + durationMinutes * 60 * 1000);
+  return formatEtaTime(etaDate);
+}
+
 export function calculateHaversineEstimate(
   startLat: number,
   startLng: number,
@@ -29,14 +40,12 @@ export function calculateHaversineEstimate(
   const durationMinutes = Math.max(5, Math.round(distanceKm * 1.3));
 
   const now = new Date();
-  const etaTime = new Date(now.getTime() + durationMinutes * 60 * 1000);
-  const hours = String(etaTime.getHours()).padStart(2, '0');
-  const minutes = String(etaTime.getMinutes()).padStart(2, '0');
+  const etaFormatted = getEtaString(durationMinutes, now);
 
   return {
     distanceKm,
     durationMinutes,
-    etaFormatted: `${hours}:${minutes} (추정 ${durationMinutes}분 소요)`,
+    etaFormatted,
     trafficSummary: '직선거리 기반 추정치',
     isMock: false,
     isFallback: true,

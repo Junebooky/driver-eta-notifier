@@ -50,7 +50,7 @@ async function handleRouteCalculation(
 
       return NextResponse.json({
         ...cached.data,
-        etaFormatted: `${hours}:${minutes} (${cached.data.durationMinutes}분 소요)`,
+        etaFormatted: `${hours}:${minutes}`,
         isCached: true,
       });
     }
@@ -80,28 +80,29 @@ async function handleRouteCalculation(
         'Content-Type': 'application/json',
         appKey: apiKey,
       },
-      signal: controller.signal,
       body: JSON.stringify({
-        startX: String(startLng),
-        startY: String(startLat),
-        endX: String(endLng),
-        endY: String(endLat),
+        startX: startLng,
+        startY: startLat,
+        endX: endLng,
+        endY: endLat,
         reqCoordType: 'WGS84GEO',
         resCoordType: 'WGS84GEO',
-        searchOption: '0', // 0: 추천경로 (실시간 교통)
+        searchOption: 0, // 0: Recommended optimal traffic route
+        trafficInfo: 'Y', // Real-time traffic inclusion
       }),
+      signal: controller.signal,
     });
 
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      console.warn(`TMAP API HTTP Error ${response.status}, triggering Haversine Fallback`);
+      console.warn(`TMAP Route API error HTTP ${response.status}. Falling back to estimate.`);
       const fallbackData = calculateHaversineEstimate(startLat, startLng, endLat, endLng);
       return NextResponse.json({ ...fallbackData, isCached: false });
     }
 
     const data = await response.json();
-    const totalTimeSeconds = data?.features?.[0]?.properties?.totalTime || 4200;
+    const totalTimeSeconds = data?.features?.[0]?.properties?.totalTime || 3300;
     const totalDistanceMeters = data?.features?.[0]?.properties?.totalDistance || 62000;
 
     const durationMinutes = Math.round(totalTimeSeconds / 60);
@@ -110,7 +111,7 @@ async function handleRouteCalculation(
     const etaTime = new Date(nowTimestamp + durationMinutes * 60 * 1000);
     const hours = String(etaTime.getHours()).padStart(2, '0');
     const minutes = String(etaTime.getMinutes()).padStart(2, '0');
-    const etaFormatted = `${hours}:${minutes} (${durationMinutes}분 소요)`;
+    const etaFormatted = `${hours}:${minutes}`;
 
     const resultData = {
       distanceKm,

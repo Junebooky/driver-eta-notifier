@@ -24,19 +24,21 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
   onRequestGps,
   onRefreshRoute,
 }) => {
-  // Parse time and duration from etaFormatted (e.g. "02:52 (51분 소요)")
-  let timePart = '02:52';
-  let durationPart = '(51분 소요)';
+  // Parse strict 24h time (HH:mm) and duration from etaFormatted or durationMinutes
+  let timePart = '14:35';
+  let durationPart = '';
 
   if (routeEstimate?.etaFormatted) {
-    const match = routeEstimate.etaFormatted.match(/^(.*?)(\s*\(.*?\))$/);
-    if (match) {
-      timePart = match[1];
-      durationPart = match[2];
+    const timeMatch = routeEstimate.etaFormatted.match(/(\d{1,2}:\d{2})/);
+    if (timeMatch) {
+      timePart = timeMatch[1].padStart(5, '0');
     } else {
-      timePart = routeEstimate.etaFormatted;
-      durationPart = '';
+      timePart = routeEstimate.etaFormatted.replace(/\s*\(.*?\)/, '').trim();
     }
+  }
+
+  if (routeEstimate?.durationMinutes) {
+    durationPart = `(${routeEstimate.durationMinutes}분 소요)`;
   }
 
   return (

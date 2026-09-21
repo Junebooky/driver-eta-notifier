@@ -99,9 +99,9 @@ export const Header: React.FC<HeaderProps> = ({
               haptics.lightTap();
               onSelectNavi('naver');
             }}
-            className={`w-9 h-9 rounded-full bg-[#A7F3D0] border border-emerald-300 text-emerald-800 font-black text-xs shadow-xs flex items-center justify-center transition-all duration-100 active:scale-90 cursor-pointer ${
+            className={`w-9 h-9 rounded-full bg-[#03C75A] border border-emerald-400 text-white font-black text-xs shadow-xs flex items-center justify-center transition-all duration-100 active:scale-90 cursor-pointer ${
               profile.defaultNavi === 'naver'
-                ? 'ring-2 ring-emerald-500 scale-105 shadow-[0_4px_12px_rgba(16,185,129,0.25)] z-10'
+                ? 'ring-2 ring-emerald-500 scale-105 shadow-[0_4px_12px_rgba(3,199,90,0.35)] z-10'
                 : 'opacity-60 hover:opacity-100'
             }`}
             title="네이버지도 선택"

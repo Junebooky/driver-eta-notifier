@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { NaviProvider, LocationPreset, RouteEstimate } from '@/types';
+import { NaviProvider, LocationPreset, RouteEstimate, DriverProfile } from '@/types';
 import { launchNavigationApp, calculateHaversineEstimate } from '@/utils/navigation';
 import { generateVipReportText, copyAndLaunchKakaoTalk } from '@/utils/kakao';
 import { Zap, MessageSquare } from 'lucide-react';
@@ -14,6 +14,7 @@ interface ActionPanelProps {
   routeEstimate: RouteEstimate | null;
   reportText: string;
   targetChatRoom?: string;
+  profile?: DriverProfile;
 }
 
 const NAVI_DISPLAY_NAMES: Record<NaviProvider, string> = {
