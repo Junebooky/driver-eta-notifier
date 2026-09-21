@@ -71,9 +71,9 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           {isAdmin && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-[#1E60F3] text-[10px] font-black tracking-tight shrink-0 animate-fade-in">
-              <ShieldCheck className="w-3 h-3" />
-              관리자
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200/80 text-[#1E60F3] text-[11px] font-bold shadow-xs select-none shrink-0 animate-fade-in">
+              <ShieldCheck className="w-3.5 h-3.5 text-[#1E60F3]" />
+              <span>관리자</span>
             </span>
           )}
         </div>

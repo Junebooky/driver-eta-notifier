@@ -338,12 +338,12 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                   onSelectPreset(homePreset);
                 }
               }}
-              className={`w-full h-full min-h-[58px] px-2 py-2.5 rounded-xl border text-center flex flex-col justify-between items-center cursor-pointer transition-shadow ${
+              className={`w-full h-full min-h-[58px] px-2 py-2.5 rounded-xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-200 ${
                 isHomeDestination
                   ? 'bg-white border-emerald-300 ring-2 ring-emerald-50 text-slate-900 font-bold shadow-[0_2px_10px_rgba(16,185,129,0.08)]'
                   : isHomeOrigin
                   ? 'bg-white border-[#1E60F3]/40 ring-2 ring-[#1E60F3]/10 text-slate-900 font-bold shadow-[0_2px_10px_rgba(30,96,243,0.08)]'
-                  : 'bg-blue-50/40 hover:bg-blue-50/80 border-blue-200/70 text-slate-900 font-semibold'
+                  : 'bg-blue-50/40 hover:bg-blue-50/80 hover:border-blue-300/80 hover:shadow-xs hover:-translate-y-0.5 border-blue-200/70 text-slate-900 font-semibold'
               } ${isManageMode ? 'border-dashed border-[#1E60F3]/60' : ''}`}
               title={`${homePreset.name} (${homePreset.address})`}
             >
@@ -381,7 +381,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                 haptics.lightTap();
                 onOpenHomeModal();
               }}
-              className="w-full h-full min-h-[58px] py-2.5 px-2 rounded-xl border border-dashed border-slate-300 dark:border-slate-600 bg-slate-50/80 hover:bg-slate-100/90 text-slate-800 flex flex-col justify-between items-center active:scale-95 transition-all cursor-pointer group"
+              className="w-full h-full min-h-[58px] py-2.5 px-2 rounded-xl border border-dashed border-slate-300 dark:border-slate-600 bg-slate-50/80 hover:bg-blue-50/40 hover:border-blue-300/80 hover:shadow-xs hover:-translate-y-0.5 text-slate-800 flex flex-col justify-between items-center active:scale-95 transition-all duration-200 cursor-pointer group"
               title="자택 주소를 등록하세요"
             >
               {/* 상단 1열: 단정한 집(Home) 아이콘과 차분한 '자택' 텍스트 */}
@@ -412,7 +412,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
           const isThisItemDragging = isDragging && dragIndex === index;
 
           let stateClasses =
-            'bg-slate-50/70 hover:bg-slate-100/80 border-slate-200/80 text-slate-800 font-medium';
+            'bg-slate-50/70 hover:bg-blue-50/50 border-slate-200/80 hover:border-blue-300/80 hover:shadow-xs hover:-translate-y-0.5 text-slate-800 font-medium';
           if (isDestination) {
             stateClasses =
               'bg-white border-emerald-300 ring-2 ring-emerald-50 text-slate-900 font-bold shadow-[0_2px_10px_rgba(16,185,129,0.08)]';
@@ -442,7 +442,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                 onMouseDown={(e) => handlePointerStart(index, e)}
                 onMouseMove={handlePointerMoveCheck}
                 onMouseUp={() => handlePointerEnd(preset)}
-                className={`w-full h-full min-h-[58px] px-2 py-2.5 rounded-xl border text-center flex flex-col justify-between items-center cursor-pointer transition-shadow ${stateClasses} ${
+                className={`w-full h-full min-h-[58px] px-2 py-2.5 rounded-xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-200 ${stateClasses} ${
                   isThisItemDragging ? 'opacity-20 border-dashed border-[#1E60F3]' : ''
                 }`}
                 title={`${preset.name} (길게 눌러 순서 변경)`}
@@ -483,7 +483,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
             haptics.lightTap();
             onOpenAddModal();
           }}
-          className="w-full h-full min-h-[58px] py-2.5 px-2 rounded-xl border border-dashed border-slate-300 hover:border-[#1E60F3] bg-white hover:bg-slate-50 text-slate-400 hover:text-[#1E60F3] text-xs font-medium flex flex-col justify-between items-center active:scale-95 transition-all duration-100 cursor-pointer"
+          className="w-full h-full min-h-[58px] py-2.5 px-2 rounded-xl border border-dashed border-slate-300 hover:border-blue-300/80 bg-white hover:bg-blue-50/40 hover:shadow-xs hover:-translate-y-0.5 text-slate-400 hover:text-[#1E60F3] text-xs font-medium flex flex-col justify-between items-center active:scale-95 transition-all duration-200 cursor-pointer"
           title="새 거점 검색 및 등록"
         >
           <div className="flex items-center justify-center gap-1 w-full">
@@ -547,7 +547,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                     setManagingPreset(null);
                     onEditPreset(p);
                   }}
-                  className="w-full py-2.5 px-4 bg-[#1E60F3] hover:bg-blue-600 text-white font-bold rounded-xl text-xs flex items-center justify-center space-x-1.5 cursor-pointer active:scale-98 transition-all"
+                  className="w-full py-2.5 px-4 bg-[#1E60F3] hover:bg-blue-600 hover:shadow-md hover:shadow-blue-500/25 text-white font-bold rounded-xl text-xs flex items-center justify-center space-x-1.5 cursor-pointer active:scale-98 transition-all duration-150"
                 >
                   <Pencil className="w-3.5 h-3.5 text-white" />
                   <span>수정</span>
@@ -564,7 +564,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                     setManagingPreset(null);
                     onDeleteCustomPreset(idToDelete);
                   }}
-                  className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-red-600 font-semibold rounded-xl text-xs flex items-center justify-center space-x-1.5 cursor-pointer active:scale-98 transition-all"
+                  className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 font-semibold rounded-xl text-xs flex items-center justify-center space-x-1.5 cursor-pointer active:scale-98 transition-all duration-150"
                 >
                   <Trash2 className="w-3.5 h-3.5 text-slate-500" />
                   <span>
