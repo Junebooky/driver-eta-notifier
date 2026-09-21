@@ -26,12 +26,12 @@ const NAVI_DISPLAY_NAMES: Record<NaviProvider, string> = {
 const getNaviActionText = (provider: NaviProvider) => {
   switch (provider) {
     case 'kakao':
-      return '카카오내비 안내 시작 (ETA 자동복사)';
+      return '카카오내비 안내 시작';
     case 'naver':
-      return '네이버지도 안내 시작 (ETA 자동복사)';
+      return '네이버지도 안내 시작';
     case 'tmap':
     default:
-      return '티맵 안내 시작 (ETA 자동복사)';
+      return '티맵 안내 시작';
   }
 };
 
@@ -101,7 +101,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
         className="w-full py-4 px-4 bg-[#FEE500] hover:bg-[#FDD835] active:scale-95 transition-all duration-150 text-[#191919] rounded-2xl font-bold text-sm tracking-tight shadow-[0_4px_14px_rgba(254,229,0,0.25)] flex items-center justify-center gap-2 cursor-pointer"
       >
         <MessageSquare className="w-4.5 h-4.5 text-[#3C1E1E] fill-[#3C1E1E] shrink-0" />
-        <span>카카오톡 공유 (ETA 자동복사)</span>
+        <span>카카오톡 공유</span>
       </button>
     </div>
   );
