@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useDriverProfile } from '@/hooks/useDriverProfile';
+import { useDriverProfile, getOrCreateDeviceUuid } from '@/hooks/useDriverProfile';
 import { useLocation } from '@/hooks/useLocation';
 import { Header } from '@/components/Header';
 import { ProfileModal } from '@/components/ProfileModal';
@@ -76,7 +76,7 @@ export default function Home() {
 
   // Supabase Fleet Architecture Data Synchronization
   useEffect(() => {
-    const driverId = profile.id || 'driver_4';
+    const driverId = profile.id || getOrCreateDeviceUuid();
 
     async function syncSupabaseFleet() {
       try {
@@ -95,10 +95,11 @@ export default function Home() {
         if (dRes.ok) {
           const dData = await dRes.json();
           if (dData.driver) {
-            const { vehicle_no, driver_name, home_location } = dData.driver;
+            const { vehicle_no, driver_name, passenger_name, home_location } = dData.driver;
             updateProfile({
-              vehicleNo: vehicle_no || profile.vehicleNo,
-              driverName: driver_name || profile.driverName,
+              vehicleNo: vehicle_no ?? profile.vehicleNo,
+              driverName: driver_name ?? profile.driverName,
+              passengerName: passenger_name ?? profile.passengerName,
               homeLocation: home_location || profile.homeLocation,
             });
           }
@@ -144,7 +145,7 @@ export default function Home() {
     const presetWithGlobal: LocationPreset = {
       ...newPreset,
       isGlobal: isAdmin,
-      driverId: isAdmin ? null : (profile.id || 'driver_4'),
+      driverId: isAdmin ? null : (profile.id || getOrCreateDeviceUuid()),
     };
 
     const updated = [...presets, presetWithGlobal];
@@ -219,7 +220,7 @@ export default function Home() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: profile.id || 'driver_4',
+          id: profile.id || getOrCreateDeviceUuid(),
           presetOrder: reordered.map((p) => p.id),
         }),
       });
@@ -238,7 +239,7 @@ export default function Home() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: profile.id || 'driver_4',
+          id: profile.id || getOrCreateDeviceUuid(),
           vehicleNo: profile.vehicleNo,
           driverName: profile.driverName,
           homeLocation: homeData,
@@ -253,6 +254,7 @@ export default function Home() {
   const [reportMode, setReportMode] = useState<ReportMode>('DEPARTURE');
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isOnboarding, setIsOnboarding] = useState(false);
+  const [onboardingStage, setOnboardingStage] = useState<'splash' | 'sheet' | null>(null);
 
   // Check driver onboarding status on first launch (preventing default name misreporting)
   useEffect(() => {
@@ -260,7 +262,13 @@ export default function Home() {
       const onboarded = localStorage.getItem('cockpit_driver_onboarded');
       if (!onboarded) {
         setIsOnboarding(true);
-        setIsProfileModalOpen(true);
+        setOnboardingStage('splash');
+        // Phase 1: Micro Splash (1.1s) -> Phase 2: Slide up Bottom Sheet
+        const timer = setTimeout(() => {
+          setOnboardingStage('sheet');
+          setIsProfileModalOpen(true);
+        }, 1100);
+        return () => clearTimeout(timer);
       }
     } catch (e) {
       console.warn('Failed to check driver onboarding status:', e);
@@ -468,32 +476,55 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Driver Profile Edit / Onboarding Modal */}
+      {/* 2-Stage Onboarding: Phase 1 Micro Splash (Center App Icon + Welcome Text) */}
+      {isOnboarding && onboardingStage === 'splash' && (
+        <div className="fixed inset-0 z-50 bg-[#F8FAFC]/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-fade-in select-none">
+          <div className="flex flex-col items-center max-w-xs animate-in zoom-in-95 duration-500">
+            <img
+              src="/cockpit_app_icon.png"
+              alt="Protocol Cockpit"
+              className="w-20 h-20 rounded-[20px] shadow-[0_12px_32px_rgba(30,96,243,0.22)] ring-1 ring-slate-200/80 mb-5 animate-pulse"
+            />
+            <h1 className="text-xl font-semibold text-slate-900 tracking-tight mb-2">
+              Protocol Cockpit
+            </h1>
+            <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line font-medium">
+              👋 환영합니다!{'\n'}원활한 관제 보고를 위해 드라이버 정보를 등록해 주세요.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Driver Profile Edit / Onboarding Modal (Phase 2 Bottom Sheet) */}
       <ProfileModal
         isOpen={isProfileModalOpen}
         onClose={() => {
           setIsProfileModalOpen(false);
           setIsOnboarding(false);
+          setOnboardingStage(null);
         }}
         profile={profile}
         isOnboarding={isOnboarding}
         onSave={(updated) => {
           updateProfile(updated);
+          const deviceUuid = profile.id || getOrCreateDeviceUuid();
           try {
             localStorage.setItem('cockpit_driver_onboarded', 'true');
             setIsOnboarding(false);
+            setOnboardingStage(null);
           } catch (e) {
             console.warn('Failed to save onboarding flag:', e);
           }
-          // Sync profile to Supabase
+          // Sync profile to Supabase with device UUID
           fetch('/api/driver', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              id: profile.id || 'driver_4',
+              id: deviceUuid,
               vehicleNo: updated.vehicleNo,
               driverName: updated.driverName,
               passengerName: updated.passengerName,
+              targetChatRoom: updated.targetChatRoom,
             }),
           }).catch((err) => console.warn('Supabase driver profile sync error:', err));
         }}

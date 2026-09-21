@@ -33,7 +33,15 @@ export const Header: React.FC<HeaderProps> = ({
             className="flex items-center space-x-1.5 bg-white px-3 py-1.5 rounded-full border border-slate-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.04)] text-xs font-bold text-slate-800 cursor-pointer hover:bg-slate-50 active:scale-95 transition-all"
           >
             <Car className="w-3.5 h-3.5 text-[#1E60F3] fill-[#1E60F3] shrink-0" />
-            <span className="font-extrabold">{profile.vehicleNo || '4호차'} • {profile.driverName || '윤태준'}</span>
+            <span className="font-extrabold">
+              {profile.vehicleNo?.trim() && profile.driverName?.trim()
+                ? `${profile.vehicleNo.trim()} • ${profile.driverName.trim()}`
+                : profile.vehicleNo?.trim()
+                ? profile.vehicleNo.trim()
+                : profile.driverName?.trim()
+                ? profile.driverName.trim()
+                : '드라이버 등록'}
+            </span>
             <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
           </button>
 

@@ -20,42 +20,59 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   onSave,
   isOnboarding = false,
 }) => {
-  const [vehicleNo, setVehicleNo] = useState(profile.vehicleNo);
-  const [driverName, setDriverName] = useState(profile.driverName);
-  const [passengerName, setPassengerName] = useState(profile.passengerName ?? '');
-  const [targetChatRoom, setTargetChatRoom] = useState(profile.targetChatRoom || 'VIP 의전 단톡방');
-  const [defaultNavi, setDefaultNavi] = useState<NaviProvider>(profile.defaultNavi);
+  const [vehicleNo, setVehicleNo] = useState(profile.vehicleNo || '');
+  const [driverName, setDriverName] = useState(profile.driverName || '');
+  const [passengerName, setPassengerName] = useState(profile.passengerName || '');
+  const [targetChatRoom, setTargetChatRoom] = useState(profile.targetChatRoom || '');
+  const [defaultNavi, setDefaultNavi] = useState<NaviProvider>(profile.defaultNavi || 'tmap');
 
   useEffect(() => {
     if (isOpen) {
-      setVehicleNo(profile.vehicleNo);
-      setDriverName(profile.driverName);
-      setPassengerName(profile.passengerName ?? '');
-      setTargetChatRoom(profile.targetChatRoom || 'VIP 의전 단톡방');
-      setDefaultNavi(profile.defaultNavi);
+      setVehicleNo(profile.vehicleNo || '');
+      setDriverName(profile.driverName || '');
+      setPassengerName(profile.passengerName || '');
+      setTargetChatRoom(profile.targetChatRoom || '');
+      setDefaultNavi(profile.defaultNavi || 'tmap');
     }
   }, [isOpen, profile]);
 
   if (!isOpen) return null;
 
+  // Realtime Live Report Header Assembly Preview
+  const vTrim = vehicleNo.trim();
+  const dTrim = driverName.trim();
+  const hasInput = Boolean(vTrim || dTrim);
+  const liveBadgeText = vTrim && dTrim
+    ? `[${vTrim} ${dTrim}]`
+    : vTrim
+    ? `[${vTrim}]`
+    : dTrim
+    ? `[${dTrim}]`
+    : '[차량 식별 정보와 성명을 입력해 주세요]';
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     haptics.successPulse();
     onSave({
-      vehicleNo: vehicleNo.trim() || '4호차',
-      driverName: driverName.trim() || '윤태준',
-      passengerName: passengerName !== undefined ? passengerName.trim() : '',
-      targetChatRoom: targetChatRoom.trim() || 'VIP 의전 단톡방',
-      defaultNavi,
+      vehicleNo: vehicleNo.trim(),
+      driverName: driverName.trim(),
+      passengerName: passengerName.trim(),
+      targetChatRoom: targetChatRoom.trim(),
+      defaultNavi: defaultNavi || 'tmap',
     });
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-      <div className="w-full max-w-sm bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-hidden text-slate-900">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/60 backdrop-blur-sm animate-fade-in p-0 sm:p-4">
+      <div className="w-full max-w-sm bg-white border-t sm:border border-slate-200 rounded-t-[28px] sm:rounded-3xl shadow-2xl overflow-hidden text-slate-900 transition-transform duration-400 ease-out max-h-[92vh] flex flex-col">
+        {/* Drag Indicator Handle for Mobile Bottom Sheet */}
+        <div className="pt-2.5 pb-1 flex justify-center sm:hidden shrink-0">
+          <div className="w-10 h-1.5 rounded-full bg-slate-300/80" />
+        </div>
+
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50/80">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50/80 shrink-0">
           <div className="flex items-center space-x-2">
             <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
               <User className="w-4 h-4" />
@@ -75,7 +92,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
         {/* Onboarding Welcome & Guidance Banner */}
         {isOnboarding && (
-          <div className="mx-5 mt-4 p-3 bg-blue-50/90 border border-blue-200/80 rounded-2xl flex items-start space-x-2.5 shadow-2xs animate-fade-in">
+          <div className="mx-5 mt-3.5 p-3 bg-blue-50/90 border border-blue-200/80 rounded-2xl flex items-start space-x-2.5 shadow-2xs animate-fade-in shrink-0">
             <span className="text-base leading-none shrink-0 mt-0.5">👋</span>
             <div className="text-xs text-blue-950 leading-snug">
               <span className="font-extrabold block text-blue-900 mb-0.5">환영합니다!</span>
@@ -84,8 +101,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           </div>
         )}
 
-        {/* Modal Body */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        {/* Modal Body (Scrollable if viewport is small) */}
+        <form onSubmit={handleSubmit} className="p-5 space-y-3.5 overflow-y-auto flex-1">
+          {/* Vehicle Identification Field */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center">
               <Car className="w-3.5 h-3.5 mr-1 text-blue-600" /> 차량 식별 정보 (호차 / 차량번호)
@@ -98,10 +116,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               value={vehicleNo}
               onChange={(e) => setVehicleNo(e.target.value)}
               placeholder="예: 142호 7811 또는 4호차 142호 7811"
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white font-bold"
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white font-bold transition-colors"
             />
           </div>
 
+          {/* Driver Name Field */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center">
               <User className="w-3.5 h-3.5 mr-1 text-blue-600" /> 드라이버 성명
@@ -111,10 +130,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               value={driverName}
               onChange={(e) => setDriverName(e.target.value)}
               placeholder="예: 윤태준"
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white font-bold"
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white font-bold transition-colors"
             />
           </div>
 
+          {/* Passenger Name Field */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center">
               <Users className="w-3.5 h-3.5 mr-1 text-blue-600" /> 담당 승객명
@@ -124,10 +144,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               value={passengerName}
               onChange={(e) => setPassengerName(e.target.value)}
               placeholder="예: SOFYAN 외 1명 (미입력 시 생략)"
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white font-bold"
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white font-bold transition-colors"
             />
           </div>
 
+          {/* Target Chat Room Field */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center">
               <MessageSquare className="w-3.5 h-3.5 mr-1 text-blue-600" /> 고정 보고 단톡방 / 수신자 메모
@@ -137,30 +158,31 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               value={targetChatRoom}
               onChange={(e) => setTargetChatRoom(e.target.value)}
               placeholder="예: VIP 의전 단톡방"
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white font-bold"
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white font-bold transition-colors"
             />
           </div>
 
+          {/* Primary Navigation Switcher */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-2 flex items-center">
               <Navigation className="w-3.5 h-3.5 mr-1 text-blue-600" /> 주력 내비게이션 앱
             </label>
             <div className="grid grid-cols-3 gap-2">
-              {/* TMAP Option */}
+              {/* TMAP Option (Default) */}
               <button
                 type="button"
                 onClick={() => {
                   haptics.lightTap();
                   setDefaultNavi('tmap');
                 }}
-                className={`py-3 px-2 rounded-2xl border transition-all duration-100 flex flex-col items-center justify-center space-y-1.5 active:scale-95 cursor-pointer ${
+                className={`py-2.5 px-2 rounded-2xl border transition-all duration-100 flex flex-col items-center justify-center space-y-1 active:scale-95 cursor-pointer ${
                   defaultNavi === 'tmap'
                     ? 'bg-blue-50/80 border-blue-500 text-blue-900 ring-2 ring-blue-500/20 shadow-xs'
                     : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'
                 }`}
               >
-                <div className="w-7 h-7 rounded-full bg-white border border-slate-200 shadow-xs flex items-center justify-center">
-                  <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <div className="w-6 h-6 rounded-full bg-white border border-slate-200 shadow-xs flex items-center justify-center">
+                  <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <defs>
                       <linearGradient id="tmapModalGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                         <stop offset="0%" stopColor="#E11D48" />
@@ -175,7 +197,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   </svg>
                 </div>
                 <span className="text-[11px] font-extrabold">티맵</span>
-                {defaultNavi === 'tmap' && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                {defaultNavi === 'tmap' && <Check className="w-3 h-3 text-blue-600" />}
               </button>
 
               {/* KakaoNavi Option */}
@@ -185,17 +207,17 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   haptics.lightTap();
                   setDefaultNavi('kakao');
                 }}
-                className={`py-3 px-2 rounded-2xl border transition-all duration-100 flex flex-col items-center justify-center space-y-1.5 active:scale-95 cursor-pointer ${
+                className={`py-2.5 px-2 rounded-2xl border transition-all duration-100 flex flex-col items-center justify-center space-y-1 active:scale-95 cursor-pointer ${
                   defaultNavi === 'kakao'
                     ? 'bg-amber-50/80 border-amber-500 text-amber-900 ring-2 ring-amber-500/20 shadow-xs'
                     : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'
                 }`}
               >
-                <div className="w-7 h-7 rounded-full bg-[#FEE500] border border-amber-300 text-[#3C1E1E] flex items-center justify-center text-xs font-black shadow-2xs">
+                <div className="w-6 h-6 rounded-full bg-[#FEE500] border border-amber-300 text-[#3C1E1E] flex items-center justify-center text-xs font-black shadow-2xs">
                   K
                 </div>
                 <span className="text-[11px] font-extrabold">카카오</span>
-                {defaultNavi === 'kakao' && <Check className="w-3.5 h-3.5 text-amber-600" />}
+                {defaultNavi === 'kakao' && <Check className="w-3 h-3 text-amber-600" />}
               </button>
 
               {/* NaverMap Option */}
@@ -205,18 +227,38 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   haptics.lightTap();
                   setDefaultNavi('naver');
                 }}
-                className={`py-3 px-2 rounded-2xl border transition-all duration-100 flex flex-col items-center justify-center space-y-1.5 active:scale-95 cursor-pointer ${
+                className={`py-2.5 px-2 rounded-2xl border transition-all duration-100 flex flex-col items-center justify-center space-y-1 active:scale-95 cursor-pointer ${
                   defaultNavi === 'naver'
                     ? 'bg-emerald-50/80 border-emerald-500 text-emerald-900 ring-2 ring-emerald-500/20 shadow-xs'
                     : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'
                 }`}
               >
-                <div className="w-7 h-7 rounded-full bg-[#03C75A] border border-emerald-400 text-white flex items-center justify-center text-xs font-black shadow-2xs">
+                <div className="w-6 h-6 rounded-full bg-[#03C75A] border border-emerald-400 text-white flex items-center justify-center text-xs font-black shadow-2xs">
                   N
                 </div>
                 <span className="text-[11px] font-extrabold">네이버</span>
-                {defaultNavi === 'naver' && <Check className="w-3.5 h-3.5 text-emerald-600" />}
+                {defaultNavi === 'naver' && <Check className="w-3 h-3 text-emerald-600" />}
               </button>
+            </div>
+          </div>
+
+          {/* Realtime Live Report Header Assembly Badge Preview */}
+          <div className="pt-1">
+            <div className={`rounded-xl px-3 py-2 transition-all duration-200 border ${
+              hasInput
+                ? 'bg-blue-50/80 border-blue-200/80 shadow-2xs'
+                : 'bg-slate-50/80 border-dashed border-slate-200'
+            }`}>
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <span className="text-[11px] font-semibold text-slate-500 shrink-0">
+                  보고서 머리말 실시간 조립:
+                </span>
+                <span className={`text-xs font-black truncate tracking-tight text-right ${
+                  hasInput ? 'text-[#1E60F3]' : 'text-slate-400 font-normal'
+                }`}>
+                  {liveBadgeText}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -225,13 +267,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="w-1/3 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold active:scale-95 transition-transform duration-100"
+              className="w-1/3 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold active:scale-95 transition-transform duration-100 cursor-pointer"
             >
               취소
             </button>
             <button
               type="submit"
-              className="w-2/3 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-black shadow-md shadow-blue-500/20 active:scale-95 transition-transform duration-100"
+              className="w-2/3 py-3 rounded-xl bg-[#1E60F3] hover:bg-blue-600 text-white text-xs font-black shadow-md shadow-blue-500/20 active:scale-95 transition-transform duration-100 cursor-pointer"
             >
               설정 저장
             </button>

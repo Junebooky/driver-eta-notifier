@@ -10,9 +10,10 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
   icons: {
     icon: [
-      { url: '/cockpit_app_icon.png', type: 'image/png' },
+      { url: '/favicon-rounded.png', type: 'image/png' },
+      { url: '/favicon.ico', sizes: 'any' },
     ],
-    shortcut: ['/cockpit_app_icon.png'],
+    shortcut: ['/favicon-rounded.png'],
     apple: [
       { url: '/cockpit_app_icon.png' },
       { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
