@@ -14,49 +14,51 @@ interface ProfileModalProps {
 }
 
 /**
- * Auto-masks Korean vehicle license plate numbers.
- * E.g., '142호7811' -> '142호 7811', '110하1034' -> '110하 1034', '52가1234' -> '52가 1234'
- * Strips special characters and enforces a single space after [2~3 digits][1 Hangul].
+ * Parses existing vehicleNo string into hocha, plateFront, and plateBack.
+ * E.g., '4호차 142호 7811' -> hocha: '4', plateFront: '142호', plateBack: '7811'
+ *       '142호 7811'      -> hocha: '', plateFront: '142호', plateBack: '7811'
+ *       '4호차'           -> hocha: '4', plateFront: '', plateBack: ''
  */
-export function autoMaskPlate(raw: string): string {
-  const cleaned = raw.replace(/[^0-9가-힣]/g, '');
-  if (!cleaned) return '';
+export function parseVehicleDetails(raw?: string): {
+  hocha: string;
+  plateFront: string;
+  plateBack: string;
+} {
+  const v = raw?.trim() || '';
+  if (!v) return { hocha: '', plateFront: '', plateBack: '' };
 
-  // Case 1: [2~3 digits] + [1 Hangul] + [1~4 digits]
-  const fullMatch = cleaned.match(/^(\d{2,3})([가-힣])(\d{1,4})/);
-  if (fullMatch) {
-    return `${fullMatch[1]}${fullMatch[2]} ${fullMatch[3]}`;
-  }
-
-  // Case 2: [2~3 digits] + [1 Hangul] (immediately auto-insert space)
-  const prefixMatch = cleaned.match(/^(\d{2,3})([가-힣])$/);
-  if (prefixMatch) {
-    return `${prefixMatch[1]}${prefixMatch[2]} `;
-  }
-
-  // Case 3: Initial digits only (up to 3 digits)
-  const digitsMatch = cleaned.match(/^\d{1,3}/);
-  if (digitsMatch) {
-    return digitsMatch[0];
-  }
-
-  return '';
-}
-
-/**
- * Parses existing vehicleNo into separate hocha ('4') and plate ('142호 7811').
- */
-function parseVehicleNo(rawVehicleNo?: string): { hocha: string; plate: string } {
-  const v = rawVehicleNo?.trim() || '';
-  if (!v) return { hocha: '', plate: '' };
-
+  // 1. Extract hocha digits (e.g. '4호차' -> '4')
   const hochaMatch = v.match(/(\d+)호차/);
   const hocha = hochaMatch ? hochaMatch[1] : '';
 
+  // 2. Remove hocha portion from string
   const withoutHocha = v.replace(/\d+호차/, '').trim();
-  const plate = autoMaskPlate(withoutHocha) || withoutHocha;
 
-  return { hocha, plate };
+  // 3. Match 4 trailing digits: e.g. '142호 7811' or '142호7811'
+  const plateSplitMatch = withoutHocha.match(/^(.+?)\s*(\d{4})$/);
+  if (plateSplitMatch) {
+    return {
+      hocha,
+      plateFront: plateSplitMatch[1].trim(),
+      plateBack: plateSplitMatch[2].trim(),
+    };
+  }
+
+  // If only 4 digits exist
+  if (/^\d{4}$/.test(withoutHocha)) {
+    return {
+      hocha,
+      plateFront: '',
+      plateBack: withoutHocha,
+    };
+  }
+
+  // Otherwise, place remaining in plateFront
+  return {
+    hocha,
+    plateFront: withoutHocha,
+    plateBack: '',
+  };
 }
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({
@@ -66,9 +68,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   onSave,
   isOnboarding = false,
 }) => {
-  const parsed = parseVehicleNo(profile.vehicleNo);
+  const parsed = parseVehicleDetails(profile.vehicleNo);
   const [hocha, setHocha] = useState(parsed.hocha);
-  const [plateNumber, setPlateNumber] = useState(parsed.plate);
+  const [plateFront, setPlateFront] = useState(parsed.plateFront);
+  const [plateBack, setPlateBack] = useState(parsed.plateBack);
   const [driverName, setDriverName] = useState(profile.driverName || '');
   const [passengerName, setPassengerName] = useState(profile.passengerName || '');
   const [targetChatRoom, setTargetChatRoom] = useState(profile.targetChatRoom || '');
@@ -77,9 +80,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      const initial = parseVehicleNo(profile.vehicleNo);
+      const initial = parseVehicleDetails(profile.vehicleNo);
       setHocha(initial.hocha);
-      setPlateNumber(initial.plate);
+      setPlateFront(initial.plateFront);
+      setPlateBack(initial.plateBack);
       setDriverName(profile.driverName || '');
       setPassengerName(profile.passengerName || '');
       setTargetChatRoom(profile.targetChatRoom || '');
@@ -116,19 +120,23 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   };
 
   const handleHochaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Digits only for hocha
     const digits = e.target.value.replace(/[^0-9]/g, '').slice(0, 3);
     setHocha(digits);
   };
 
-  const handlePlateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const inputVal = e.target.value;
-    // Handle backspace when ending with a space cleanly (e.g. '142호 ' -> backspace -> '142호')
-    if (plateNumber.endsWith(' ') && inputVal === plateNumber.slice(0, -1)) {
-      setPlateNumber(inputVal.trim());
-      return;
-    }
-    const masked = autoMaskPlate(inputVal);
-    setPlateNumber(masked);
+  const handlePlateFrontChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Allow numbers, completed Hangul (가-힣), and in-progress jamo (ㄱ-ㅎ, ㅏ-ㅣ) to prevent IME freeze
+    const val = e.target.value
+      .replace(/[^0-9가-힣\u3131-\u314e\u314f-\u3163]/g, '')
+      .slice(0, 6);
+    setPlateFront(val);
+  };
+
+  const handlePlateBackChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Exact 4 numeric digits for back plate
+    const digits = e.target.value.replace(/[^0-9]/g, '').slice(0, 4);
+    setPlateBack(digits);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -136,14 +144,20 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     haptics.successPulse();
 
     const hTrim = hocha.trim();
-    const pTrim = plateNumber.trim();
+    const pFrontTrim = plateFront.trim();
+    const pBackTrim = plateBack.trim();
+
+    const combinedPlate = pFrontTrim && pBackTrim
+      ? `${pFrontTrim} ${pBackTrim}`
+      : pFrontTrim || pBackTrim;
+
     let combinedVehicleNo = '';
-    if (hTrim && pTrim) {
-      combinedVehicleNo = `${hTrim}호차 ${pTrim}`;
+    if (hTrim && combinedPlate) {
+      combinedVehicleNo = `${hTrim}호차 ${combinedPlate}`;
     } else if (hTrim) {
       combinedVehicleNo = `${hTrim}호차`;
-    } else if (pTrim) {
-      combinedVehicleNo = pTrim;
+    } else if (combinedPlate) {
+      combinedVehicleNo = combinedPlate;
     }
 
     onSave({
@@ -178,7 +192,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
         }`}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Modal Header with Master Brand App Icon */}
+        {/* Modal Header with Master Brand App Icon & Simplified Title */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50/80 shrink-0">
           <div className="flex items-center space-x-2.5">
             <img
@@ -187,7 +201,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl shadow-xs object-cover shrink-0"
             />
             <h2 className="text-sm font-black text-slate-900 tracking-tight">
-              {isOnboarding ? '드라이버 정보 최초 등록' : '드라이버 & 내비 프로필 설정'}
+              {isOnboarding ? '드라이버 정보 최초 등록' : '프로필 설정'}
             </h2>
           </div>
           <button
@@ -202,50 +216,68 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
         {/* Modal Body: Focus strictly on separated inputs, navi switcher, and action buttons */}
         <form onSubmit={handleSubmit} className="p-5 space-y-3.5 overflow-y-auto overscroll-contain flex-1">
-          {/* 1. Hocha & License Plate Split Inputs */}
-          <div className="grid grid-cols-5 gap-2.5">
-            {/* Hocha Field (Col-span 2) */}
-            <div className="col-span-2">
-              <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center">
-                <Car className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 호차
-              </label>
-              <div className="relative flex items-center">
+          {/* 1. Hocha (Optional) Field */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center">
+              <Car className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 호차 (선택)
+            </label>
+            <div className="relative flex items-center">
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={hocha}
+                onChange={handleHochaChange}
+                placeholder="예: 4 (호차 없으면 공란)"
+                className="w-full pl-3.5 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white font-bold transition-colors"
+              />
+              <span
+                className={`absolute right-3 text-xs font-black transition-colors pointer-events-none ${
+                  hocha ? 'text-[#1E60F3]' : 'text-slate-300'
+                }`}
+              >
+                호차
+              </span>
+            </div>
+          </div>
+
+          {/* 2. License Plate Dual Input (Flex Row: Front 53% + Back 47%) */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center">
+              <Car className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 차량 번호판
+            </label>
+            <div className="flex items-center gap-2">
+              {/* Front Plate: 2~3 digits + Hangul (e.g. 142호, 110하, 70가) */}
+              <div className="flex-1 basis-[53%] min-w-0">
+                <input
+                  type="text"
+                  value={plateFront}
+                  onChange={handlePlateFrontChange}
+                  placeholder="예: 142호"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white font-bold transition-colors"
+                />
+              </div>
+
+              {/* Separator */}
+              <span className="text-slate-400 font-bold shrink-0">-</span>
+
+              {/* Back Plate: 4 digits (e.g. 7811) */}
+              <div className="flex-1 basis-[47%] min-w-0">
                 <input
                   type="text"
                   inputMode="numeric"
                   pattern="[0-9]*"
-                  value={hocha}
-                  onChange={handleHochaChange}
-                  placeholder="예: 4"
-                  className="w-full pl-3 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white font-bold transition-colors"
+                  maxLength={4}
+                  value={plateBack}
+                  onChange={handlePlateBackChange}
+                  placeholder="예: 7811"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white font-bold transition-colors"
                 />
-                <span
-                  className={`absolute right-2.5 text-xs font-black transition-colors pointer-events-none ${
-                    hocha ? 'text-[#1E60F3]' : 'text-slate-400'
-                  }`}
-                >
-                  호차
-                </span>
               </div>
-            </div>
-
-            {/* License Plate Field (Col-span 3) */}
-            <div className="col-span-3">
-              <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center">
-                차량 번호판
-              </label>
-              <input
-                type="text"
-                value={plateNumber}
-                onChange={handlePlateChange}
-                placeholder="예: 142호 7811"
-                maxLength={10}
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white font-bold transition-colors"
-              />
             </div>
           </div>
 
-          {/* 2. Driver Name Field */}
+          {/* 3. Driver Name Field */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center">
               <User className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 드라이버 성명
@@ -259,7 +291,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             />
           </div>
 
-          {/* 3. Passenger Name Field */}
+          {/* 4. Passenger Name Field */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center">
               <Users className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 담당 승객명
@@ -273,7 +305,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             />
           </div>
 
-          {/* 4. Target Chat Room Field */}
+          {/* 5. Target Chat Room Field */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center">
               <MessageSquare className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 고정 보고 단톡방 / 수신자 메모
@@ -287,7 +319,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             />
           </div>
 
-          {/* 5. Primary Navigation Switcher */}
+          {/* 6. Primary Navigation Switcher */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-2 flex items-center">
               <Navigation className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 주력 내비게이션 앱

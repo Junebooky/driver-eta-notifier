@@ -19,7 +19,9 @@ interface HeaderProps {
  * compacts to '4호차 (7811) • 윤태준' to prevent header overflow.
  */
 function formatHeaderDriverLabel(vehicleNo?: string, driverName?: string): string {
-  const v = vehicleNo?.trim() || '';
+  let v = vehicleNo?.trim() || '';
+  v = v.replace(/^호차\s+/, '').trim();
+  if (v === '호차') v = '';
   const d = driverName?.trim() || '';
 
   if (!v && !d) return '드라이버 등록';
