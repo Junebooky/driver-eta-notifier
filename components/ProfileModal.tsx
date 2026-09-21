@@ -57,19 +57,24 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 }) => {
   const parsed = parseVehicleDetails(profile.vehicleNo);
   const [hocha, setHocha] = useState(parsed.hocha);
-  const [plateNumber, setPlateNumber] = useState(parsed.plateNumber);
+  const [plateFront, setPlateFront] = useState(parsed.plateFront);
+  const [plateBack, setPlateBack] = useState(parsed.plateBack);
   const [driverName, setDriverName] = useState(profile.driverName || '');
   const [passengerName, setPassengerName] = useState(profile.passengerName || '');
   const [defaultNavi, setDefaultNavi] = useState<NaviProvider>(profile.defaultNavi || 'tmap');
   const [isMounted, setIsMounted] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  const plateFrontRef = React.useRef<HTMLInputElement>(null);
+  const plateBackRef = React.useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (isOpen) {
       setIsSaving(false);
       const initial = parseVehicleDetails(profile.vehicleNo);
       setHocha(initial.hocha);
-      setPlateNumber(initial.plateNumber);
+      setPlateFront(initial.plateFront);
+      setPlateBack(initial.plateBack);
       setDriverName(profile.driverName || '');
       setPassengerName(profile.passengerName || '');
       setDefaultNavi(profile.defaultNavi || 'tmap');
@@ -114,8 +119,32 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     setHocha(e.target.value.slice(0, 10));
   };
 
-  const handlePlateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPlateNumber(e.target.value);
+  const handlePlateFrontChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    // Auto-advance to back input if trailing space is typed
+    if (val.endsWith(' ') && val.trim().length > 0) {
+      setPlateFront(val.trim());
+      plateBackRef.current?.focus();
+      return;
+    }
+    setPlateFront(val);
+  };
+
+  const handlePlateBackChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Only numeric digits, max 4
+    const numeric = e.target.value.replace(/[^0-9]/g, '').slice(0, 4);
+    setPlateBack(numeric);
+
+    // Auto-blur keyboard when 4 digits are completed
+    if (numeric.length === 4) {
+      plateBackRef.current?.blur();
+    }
+  };
+
+  const handlePlateBackKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && plateBack === '') {
+      plateFrontRef.current?.focus();
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -136,19 +165,21 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     haptics.successPulse();
 
     const hTrim = hocha.trim();
-    const pTrim = plateNumber.trim();
+    const pFront = plateFront.trim();
+    const pBack = plateBack.trim();
+    const combinedPlate = pFront && pBack ? `${pFront} ${pBack}` : pFront || pBack;
 
     let combinedVehicleNo = '';
-    if (hTrim && pTrim) {
-      if (pTrim.includes('호차')) {
-        combinedVehicleNo = pTrim;
+    if (hTrim && combinedPlate) {
+      if (combinedPlate.includes('호차')) {
+        combinedVehicleNo = combinedPlate;
       } else {
-        combinedVehicleNo = `${hTrim}호차 ${pTrim}`;
+        combinedVehicleNo = `${hTrim}호차 ${combinedPlate}`;
       }
     } else if (hTrim) {
       combinedVehicleNo = hTrim.includes('호차') ? hTrim : `${hTrim}호차`;
-    } else if (pTrim) {
-      combinedVehicleNo = pTrim;
+    } else if (combinedPlate) {
+      combinedVehicleNo = combinedPlate;
     }
 
     const payload: Partial<DriverProfile> = {
@@ -173,8 +204,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center p-4 touch-none transition-opacity duration-300 ease-out ${isMounted ? 'bg-slate-900/60 backdrop-blur-sm opacity-100' : 'bg-slate-900/0 opacity-0 pointer-events-none'
-        }`}
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 touch-none transition-opacity duration-300 ease-out ${
+        isMounted ? 'bg-slate-900/60 backdrop-blur-sm opacity-100' : 'bg-slate-900/0 opacity-0 pointer-events-none'
+      }`}
       onClick={(e) => {
         if (e.target === e.currentTarget && !isSaving) {
           handleClose();
@@ -187,8 +219,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       }}
     >
       <div
-        className={`w-full max-w-sm bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-y-auto overscroll-contain text-slate-900 transform transition-all duration-300 ease-out max-h-[90vh] flex flex-col ${isMounted ? 'scale-100 opacity-100' : 'scale-95 opacity-0 pointer-events-none'
-          }`}
+        className={`w-full max-w-sm bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-y-auto overscroll-contain text-slate-900 transform transition-all duration-300 ease-out max-h-[90vh] flex flex-col ${
+          isMounted ? 'scale-100 opacity-100' : 'scale-95 opacity-0 pointer-events-none'
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header with Master Brand App Icon & Simplified Title */}
@@ -229,29 +262,55 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 value={hocha}
                 onChange={handleHochaChange}
                 placeholder="예: 4 (호차 없으면 공란)"
-                className="w-full pl-3.5 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white font-bold transition-colors"
+                className="w-full pl-3.5 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-[#1E60F3] focus:bg-white font-bold transition-colors"
               />
               <span
-                className={`absolute right-3 text-xs font-black transition-colors pointer-events-none ${hocha ? 'text-[#1E60F3]' : 'text-slate-300'
-                  }`}
+                className={`absolute right-3 text-xs font-black transition-colors pointer-events-none ${
+                  hocha ? 'text-[#1E60F3]' : 'text-slate-300'
+                }`}
               >
                 호차
               </span>
             </div>
           </div>
 
-          {/* 2. License Plate Input Field */}
+          {/* 2. License Plate Separated Inputs (plateFront & plateBack) */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center">
-              <Car className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 차량 번호판
+            <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+              <span className="flex items-center">
+                <Car className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 차량 번호판
+              </span>
+              <span className="text-[10px] text-slate-400 font-medium">앞자리 + 뒷자리 4자리</span>
             </label>
-            <input
-              type="text"
-              value={plateNumber}
-              onChange={handlePlateChange}
-              placeholder="예: 142호 7811 또는 서울 32가 1234"
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white font-bold transition-colors"
-            />
+            <div className="grid grid-cols-[1.2fr_1fr] gap-2">
+              {/* Front Plate Input */}
+              <div className="relative">
+                <input
+                  ref={plateFrontRef}
+                  type="text"
+                  value={plateFront}
+                  onChange={handlePlateFrontChange}
+                  placeholder="예: 142호 / 서울32가"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-[#1E60F3] focus:bg-white font-bold transition-colors"
+                />
+              </div>
+
+              {/* Back Plate 4-digit Input */}
+              <div className="relative">
+                <input
+                  ref={plateBackRef}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={4}
+                  value={plateBack}
+                  onChange={handlePlateBackChange}
+                  onKeyDown={handlePlateBackKeyDown}
+                  placeholder="7811 (숫자)"
+                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-[#1E60F3] focus:bg-white font-bold transition-colors tracking-widest text-center"
+                />
+              </div>
+            </div>
           </div>
 
           {/* 3. Driver Name Field */}
@@ -365,19 +424,20 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               type="button"
               onClick={handleClose}
               disabled={isSaving}
-              className="w-1/3 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold active:scale-95 transition-transform duration-100 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
+              className="w-1/3 py-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold active:scale-95 transition-transform duration-100 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
             >
               취소
             </button>
             <button
               type="submit"
               disabled={isSaving}
-              className={`w-2/3 py-3 rounded-xl bg-[#1E60F3] hover:bg-[#1346D8] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/35 active:translate-y-0 active:scale-[0.97] active:bg-[#0f3bb8] text-white text-xs font-black shadow-xs transition-all duration-150 ease-out cursor-pointer flex items-center justify-center gap-1.5 ${isSaving ? 'opacity-85 pointer-events-none' : ''
-                }`}
+              className={`w-2/3 py-3.5 rounded-2xl bg-[#1E60F3] hover:bg-[#1650D6] active:bg-[#1244B8] active:scale-[0.98] text-white text-sm font-bold shadow-sm shadow-blue-500/20 transition-all duration-150 ease-out cursor-pointer flex items-center justify-center gap-1.5 ${
+                isSaving ? 'opacity-85 pointer-events-none' : ''
+              }`}
             >
               {isSaving ? (
                 <>
-                  <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0" />
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0" />
                   <span>저장 중...</span>
                 </>
               ) : (

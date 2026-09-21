@@ -300,18 +300,16 @@ export const PredictionResultSheet: React.FC<PredictionResultSheetProps> = ({
                       haptics.lightTap();
                       setActiveSlotIdx(idx);
                     }}
-                    className={`group relative flex items-center cursor-pointer transition-all ${
-                      isSelected ? 'opacity-100' : 'opacity-85 hover:opacity-100'
-                    }`}
+                    className={`group relative flex items-center cursor-pointer transition-all ${isSelected ? 'opacity-100' : 'opacity-85 hover:opacity-100'
+                      }`}
                   >
                     {/* Left Column: Fixed-width Time Label (오후 3:30, 1시간 후, 2시간 후) */}
                     <div className="w-20 sm:w-24 shrink-0 text-left">
                       <span
-                        className={`text-xs sm:text-sm leading-none ${
-                          isBaseRow
+                        className={`text-xs sm:text-sm leading-none ${isBaseRow
                             ? 'font-bold text-slate-800'
                             : 'font-semibold text-slate-400'
-                        }`}
+                          }`}
                       >
                         {rowItem.label}
                       </span>
@@ -380,10 +378,10 @@ export const PredictionResultSheet: React.FC<PredictionResultSheetProps> = ({
           <button
             type="button"
             onClick={handleApply}
-            className="w-full py-4 px-4 bg-[#1E60F3] hover:bg-[#1850D0] active:scale-[0.98] text-white rounded-2xl font-bold text-base shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-all duration-150 ease-out"
+            className="w-full py-4 px-4 bg-[#1E60F3] hover:bg-[#1650D6] active:bg-[#1244B8] active:scale-[0.98] text-white rounded-2xl font-bold text-base shadow-sm shadow-blue-500/20 flex items-center justify-center gap-2 cursor-pointer transition-all duration-150 ease-out"
           >
             <Check className="w-5 h-5" />
-            <span>확인 (조회 완료)</span>
+            <span>확인</span>
           </button>
         </div>
       </div>
