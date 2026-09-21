@@ -213,13 +213,13 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="2글자 이상 입력 (예: 조선, 신라, 공항)"
-                className="w-full pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white font-medium transition-colors"
+                placeholder="장소명 또는 주소 검색 (예: 인천공항, 신라호텔, 코엑스)"
+                className="w-full pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-[#1E60F3] focus:bg-white font-medium transition-colors"
                 autoFocus
               />
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
               {isSearching && (
-                <Loader2 className="w-4 h-4 text-blue-600 animate-spin absolute right-3 top-3" />
+                <Loader2 className="w-4 h-4 text-[#1E60F3] animate-spin absolute right-3 top-3" />
               )}
             </div>
 

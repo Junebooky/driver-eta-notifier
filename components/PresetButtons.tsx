@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { LocationPreset } from '@/types';
 import { Plus, Trash2, Pencil, SlidersHorizontal, MapPin } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
@@ -39,15 +39,47 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
   // Drag-and-Drop Gesture State
   const [isDragging, setIsDragging] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const isLongPressActiveRef = useRef(false);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const prevRectsRef = useRef<Map<string, DOMRect>>(new Map());
+
   const dragIndexRef = useRef<number | null>(null);
   dragIndexRef.current = dragIndex;
   const itemsRef = useRef<LocationPreset[]>(items);
   itemsRef.current = items;
+
+  // FLIP (First, Last, Invert, Play) Layout Animation for fluid app-icon displacement
+  useLayoutEffect(() => {
+    if (prevRectsRef.current.size === 0) return;
+
+    items.forEach((item, idx) => {
+      // The currently dragged card follows finger tracking; other cards animate smoothly
+      if (idx === dragIndexRef.current) return;
+
+      const prev = prevRectsRef.current.get(item.id);
+      const el = itemRefs.current[idx];
+      if (prev && el) {
+        const cur = el.getBoundingClientRect();
+        const dx = prev.left - cur.left;
+        const dy = prev.top - cur.top;
+        if (dx !== 0 || dy !== 0) {
+          el.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
+          el.style.transition = 'none';
+
+          requestAnimationFrame(() => {
+            el.style.transition = 'transform 300ms cubic-bezier(0.2, 0, 0, 1)';
+            el.style.transform = '';
+          });
+        }
+      }
+    });
+
+    prevRectsRef.current.clear();
+  }, [items]);
 
   // Window listeners for smooth, glitch-free dragging across viewport
   useEffect(() => {
@@ -68,12 +100,27 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
           clientY <= rect.bottom
         ) {
           if (i !== currentDrag) {
+            // 1. Capture previous bounding rects of all items for FLIP animation
+            prevRectsRef.current.clear();
+            itemsRef.current.forEach((item, idx) => {
+              const cardEl = itemRefs.current[idx];
+              if (cardEl) {
+                prevRectsRef.current.set(item.id, cardEl.getBoundingClientRect());
+              }
+            });
+
+            // 2. Reorder array
             const updated = [...itemsRef.current];
             const [movedItem] = updated.splice(currentDrag, 1);
             updated.splice(i, 0, movedItem);
+
+            // 3. Update local state
+            itemsRef.current = updated;
             setItems(updated);
             setDragIndex(i);
             dragIndexRef.current = i;
+
+            // Micro-haptic feedback on slot switch
             if (typeof navigator !== 'undefined' && navigator.vibrate) {
               navigator.vibrate(20);
             }
@@ -86,7 +133,11 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
     const handleTouchMove = (e: TouchEvent) => {
       if (e.cancelable) e.preventDefault();
       const touch = e.touches[0];
-      if (touch) {
+      if (touch && touchStartPosRef.current) {
+        setDragOffset({
+          x: touch.clientX - touchStartPosRef.current.x,
+          y: touch.clientY - touchStartPosRef.current.y,
+        });
         checkHover(touch.clientX, touch.clientY);
       }
     };
@@ -96,7 +147,13 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
     };
 
     const handleMouseMove = (e: MouseEvent) => {
-      checkHover(e.clientX, e.clientY);
+      if (touchStartPosRef.current) {
+        setDragOffset({
+          x: e.clientX - touchStartPosRef.current.x,
+          y: e.clientY - touchStartPosRef.current.y,
+        });
+        checkHover(e.clientX, e.clientY);
+      }
     };
 
     const handleMouseUp = () => {
@@ -108,6 +165,8 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
       setDragIndex(null);
       dragIndexRef.current = null;
       isLongPressActiveRef.current = false;
+      setDragOffset({ x: 0, y: 0 });
+      prevRectsRef.current.clear();
       onReorderPresets?.(itemsRef.current);
       haptics.lightTap();
     };
@@ -145,6 +204,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
       setIsDragging(true);
       setDragIndex(index);
       dragIndexRef.current = index;
+      setDragOffset({ x: 0, y: 0 });
 
       if (typeof navigator !== 'undefined' && navigator.vibrate) {
         navigator.vibrate(50);
@@ -179,7 +239,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
     }
 
     if (!isLongPressActiveRef.current) {
-      // Normal Immediate Tap
+      // Normal Immediate Tap without any delay
       haptics.lightTap();
       if (isManageMode) {
         setManagingPreset(preset);
@@ -192,11 +252,12 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
 
   return (
     <div className="w-full bg-white border border-slate-100/80 rounded-2xl p-4 shadow-[0_8px_25px_rgba(30,96,243,0.06)] select-none space-y-3">
-      {/* Header: Title on Left, 거점 관리 on Right */}
+      {/* Header: Upgraded White MapPin in Cobalt Badge on Left, 거점 관리 on Right */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          <div className="w-5 h-5 rounded-full bg-[#1E60F3]/10 flex items-center justify-center">
-            <MapPin className="w-3.5 h-3.5 text-[#1E60F3] fill-[#1E60F3]" />
+          {/* Modern Round Square Cobalt Badge with White MapPin */}
+          <div className="w-6 h-6 rounded-lg bg-[#1E60F3] flex items-center justify-center shadow-xs">
+            <MapPin className="w-3.5 h-3.5 text-white fill-white" />
           </div>
           <h2 className="text-sm font-bold text-slate-900 tracking-tight">자주 가는 목적지</h2>
         </div>
@@ -233,8 +294,8 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
         </div>
       )}
 
-      {/* 3-Column High-Density Grid (Clean Text-Only Chips with Long-Press Drag-to-Reorder) */}
-      <div className="grid grid-cols-3 gap-2">
+      {/* 3-Column High-Density Grid (Fluid Smartphone-like Drag Reordering) */}
+      <div className="grid grid-cols-3 gap-2 relative">
         {items.map((preset, index) => {
           const isOrigin = selectedOriginId === preset.id;
           const isDestination = selectedDestinationId === preset.id;
@@ -255,9 +316,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
           }
 
           if (isThisItemDragging) {
-            stateClasses += ' scale-105 shadow-xl ring-2 ring-[#1E60F3] z-30 opacity-95 bg-white';
-          } else {
-            stateClasses += ' transition-all duration-200 ease-out';
+            stateClasses += ' shadow-2xl ring-2 ring-[#1E60F3] z-40 opacity-95 bg-white cursor-grabbing pointer-events-none';
           }
 
           return (
@@ -266,7 +325,14 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
               ref={(el) => {
                 itemRefs.current[index] = el;
               }}
-              className="relative select-none touch-none"
+              className="relative select-none touch-none will-change-transform"
+              style={{
+                zIndex: isThisItemDragging ? 40 : 1,
+                transform: isThisItemDragging
+                  ? `translate3d(${dragOffset.x}px, ${dragOffset.y}px, 0) scale(1.06)`
+                  : undefined,
+                transition: isThisItemDragging ? 'none' : undefined,
+              }}
             >
               <button
                 type="button"
@@ -276,7 +342,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                 onMouseDown={(e) => handlePointerStart(index, e)}
                 onMouseMove={handlePointerMoveCheck}
                 onMouseUp={() => handlePointerEnd(preset)}
-                className={`w-full px-2 rounded-xl border text-center flex flex-col items-center justify-center min-h-[48px] cursor-pointer ${stateClasses}`}
+                className={`w-full px-2 rounded-xl border text-center flex flex-col items-center justify-center min-h-[48px] cursor-pointer transition-shadow ${stateClasses}`}
                 title={`${preset.name} (길게 눌러 순서 변경)`}
               >
                 <span className="text-xs tracking-tight truncate w-full">
