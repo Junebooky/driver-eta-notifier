@@ -1,7 +1,7 @@
-# Protocol Cockpit (driver-eta-notifier) - 항공편 모달 불필요 배지 제거, 모던 상태 칩 디자인 및 인라인 복사 인터랙션 구현 완료 보고서
+# Protocol Cockpit (driver-eta-notifier) - 보딩패스 타임 브릿지 전면 개편: 박스 제거, 비행 궤적 시각화 및 상태 컬러 일체화 완료 보고서
 
 > **평가 일시**: 2026년 9월 21일  
-> **대상 애플리케이션**: Protocol Cockpit (의전 드라이버 전용 스마트 관제 런처 v4.43 - 항공편 모달 중복 '내일 운항' 뱃지 제거, 모던 쿨그레이/소프트로즈/소프트민트 타임 브릿지 상태 칩 톤앤매너 리파인, 하단 돌출형 토스트 제거 및 원터치 인라인 '복사됨' 마이크로 인터랙션 구현)  
+> **대상 애플리케이션**: Protocol Cockpit (의전 드라이버 전용 스마트 관제 런처 v4.44 - 항공편 보딩패스 시간 비교 영역 플랫 3열 레이아웃 전환, 비행 궤적(그라데이션 실선 + 비행기 + 도착 점선) 시각화, 조기/지연/정시 3단계 상태 컬러 100% 동기화 시스템 탑재)  
 > **프로덕션 배포 URL**: [https://driver-eta-notifier.vercel.app](https://driver-eta-notifier.vercel.app)  
 > **GitHub Repository**: [https://github.com/Junebooky/driver-eta-notifier.git](https://github.com/Junebooky/driver-eta-notifier.git) (`main` 브랜치)  
 
@@ -11,83 +11,103 @@
 
 | 과업 항목 | 구현 상태 | 핵심 조치 및 엔지니어링 구현 세부 사항 |
 | :--- | :---: | :--- |
-| **1. 중복 안내 배지 제거 (`[내일 운항]` 삭제)** | ✅ 완료 | • 우측 상단에 운항 날짜(`YYYY-MM-DD`)가 명확히 상시 표기되므로, 편명 우측의 중복 배지 `[내일 운항]`을 완전히 삭제하여 시각적 노이즈 제거. |
-| **2. 모던 타임 브릿지 상태 칩(Status Chip) 디자인 동기화** | ✅ 완료 | • 코발트 블루 및 클린 화이트 배경에 맞춘 모던 파스텔/슬레이트 톤앤매너 적용:<br>  - **정시 운항**: 단정한 쿨그레이/슬레이트 (`bg-slate-100/90 text-slate-600 border border-slate-200/60 font-semibold text-[11px] px-2.5 py-0.5 rounded-full`)<br>  - **지연 운항**: 눈이 편안한 소프트 로즈 (`bg-rose-50 text-rose-600 border border-rose-200/60 font-semibold text-[11px] px-2.5 py-0.5 rounded-full`)<br>  - **조기 도착/출발**: 신뢰감을 주는 소프트 민트/에메랄드 (`bg-emerald-50 text-emerald-600 border border-emerald-200/60 font-semibold text-[11px] px-2.5 py-0.5 rounded-full`)<br>• 연결 화살표(`➔`)와 정렬선을 수평 일치시켜 안정적인 레이아웃 완성. |
-| **3. 하단 초록색 플로팅 토스트 팝업 제거** | ✅ 완료 | • '텍스트 복사' 클릭 시 모달 하단에 돌출되던 녹색 토스트 알림창(`단톡방 보고서가 클립보드에 복사되었습니다!`) UI 호출 및 렌더링 로직 완전 제거. |
-| **4. 원터치 인라인 체크(Check) 마이크로 인터랙션 구현** | ✅ 완료 | • 보고서 미리보기 상단 복사 버튼 내부에 `isCopied` 상태를 적용:<br>  - **기본 상태**: `<Copy className="w-3.5 h-3.5 text-slate-400" /> <span className="text-slate-500 font-medium">텍스트 복사</span>`<br>  - **복사 완료 상태 (2초간 유지)**: `<Check className="w-3.5 h-3.5 text-[#1E60F3]" /> <span className="text-[#1E60F3] font-bold">복사됨</span>`<br>• 복사 완료 시 가벼운 햅틱 피드백(`navigator.vibrate?.(20)` / `haptics.lightTap()`) 호출 후 2초 뒤 기본 아이콘으로 자동 복귀. |
-| **5. 빌드 무결성** | ✅ 완료 | • `npm run build` TypeScript 컴파일 에러 **0건**, Turbopack 최적화 빌드 완료. |
+| **1. 좌우 둔탁한 배경 박스 완전 제거 (플랫 레이아웃 전환)** | ✅ 완료 | • [스케줄 예정 시각]과 [예상 착륙(출발) 시각]을 감싸고 있던 회색/파란색 배경 카드(`bg-slate-50`, `border`, `rounded-2xl`)를 **완전히 삭제**.<br>• 화이트 캔버스 위에 텍스트와 궤적 그래픽이 시원하게 부각되도록 `flex items-center justify-between` 3열 가로 정렬 레이아웃 적용. |
+| **2. 중앙 비행 궤적(Flight Trajectory) 그래픽 구현** | ✅ 완료 | • **상단 상태 텍스트**: 은은한 글로우가 감도는 소프트 필 뱃지 (`text-[13px] font-bold py-0.5 px-3 rounded-full mb-2`).<br>• **비행기 좌측 궤적**: 투명에서 테마 컬러로 부드럽게 이어지는 그라데이션 실선(`h-[2px] w-10 sm:w-14`, `linear-gradient(to right, transparent, ${colorHex})`).<br>• **중앙 비행기 심볼**: 동쪽(우측)을 향해 비행하는 테마 컬러 솔리드 비행기 (`<Plane className="w-4 h-4 rotate-90" />`).<br>• **비행기 우측 도착선**: 착륙지를 향해 이어지는 연회색 점선 궤적 (`border-b-2 border-dotted border-slate-300 w-8 sm:w-10 opacity-80`). |
+| **3. 3단계 상태 컬러 시스템 완전 동기화 (Zero Discrepancy)** | ✅ 완료 | • **조기 도착/출발 (Early, 레퍼런스 규격)**: 비비드 에메랄드 그린(`text-[#00A86B]`) 통일 ➔ 중앙 `-N분 조기` 뱃지 + 그린 비행기 & 궤적선 + 우측 `예상 착륙 시각` 라벨 + `09:36` 대형 볼드 타이포(`text-2xl sm:text-3xl font-black`).<br>• **지연 운항 (Delayed)**: 모던 소프트 로즈/레드(`text-[#E11D48]`) 통일 ➔ 중앙 `+N분 지연` 뱃지 + 레드 비행기 & 궤적선 + 우측 라벨 + `10:30` 대형 볼드 타이포.<br>• **정시 운항 (On-time)**: 브랜드 솔리드 코발트 블루(`text-[#1E60F3]`) 통일 ➔ 중앙 `정시 운항` 뱃지 + 코발트 블루 비행기 & 궤적선 + 우측 라벨 + `09:55` 대형 볼드 타이포.<br>• **좌측 스케줄 예정 시각**: 차분한 그레이 라벨(`text-slate-400 font-medium text-xs`)과 다크 볼드 숫자(`text-slate-900 font-black text-2xl sm:text-3xl`)로 기준점 유지. |
+| **4. 빌드 무결성** | ✅ 완료 | • `npm run build` TypeScript 컴파일 에러 **0건**, Turbopack 최적화 빌드 완료. |
 
 ---
 
 ## 2. 주요 코드 변경 요약 ([`components/FlightModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/FlightModal.tsx))
 
-### 1) '내일 운항' 뱃지 제거 및 헤더 정제
 ```tsx
-{/* Airline Subheader + Flight ID */}
-<div className="flex items-center justify-between">
-  <div>
-    <span className="text-sm font-semibold text-slate-500 block leading-tight mb-1">
-      {flight.airline}
-    </span>
-    <h4 className="text-2xl font-black tracking-wider text-slate-900 leading-none">
-      {flight.flightId}
-    </h4>
-  </div>
+{/* Time Comparison & Trajectory (Flat Layout - Reference Image 1:1) */}
+{(() => {
+  const theme =
+    flight.diffMinutes >= 10
+      ? {
+          colorHex: '#E11D48',
+          textColor: 'text-[#E11D48]',
+          bgBadge: 'bg-rose-50/80 shadow-[0_0_12px_rgba(225,29,72,0.25)]',
+          statusText: `+${flight.diffMinutes}분 지연`,
+        }
+      : flight.diffMinutes <= -5
+      ? {
+          colorHex: '#00A86B',
+          textColor: 'text-[#00A86B]',
+          bgBadge: 'bg-emerald-50/80 shadow-[0_0_12px_rgba(0,168,107,0.25)]',
+          statusText: `${flight.diffMinutes}분 조기`,
+        }
+      : {
+          colorHex: '#1E60F3',
+          textColor: 'text-[#1E60F3]',
+          bgBadge: 'bg-blue-50/80 shadow-[0_0_12px_rgba(30,96,243,0.25)]',
+          statusText: '정시 운항',
+        };
 
-  {flight.flightDate && (
-    <span className="text-xs font-bold text-slate-400">
-      {flight.flightDate}
-    </span>
-  )}
-</div>
-```
+  return (
+    <div className="pt-3 pb-1 border-t border-slate-100 flex items-center justify-between">
+      {/* Left: Scheduled Time */}
+      <div className="text-left flex-1">
+        <span className="block text-xs font-medium text-slate-400 mb-1">
+          스케줄 예정 시각
+        </span>
+        <span className="block text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-none">
+          {flight.scheduleTimeFormatted}
+        </span>
+      </div>
 
-### 2) 모던 타임 브릿지 상태 칩 톤앤매너
-```tsx
-{flight.diffMinutes >= 10 ? (
-  <span className="bg-rose-50 text-rose-600 border border-rose-200/60 font-semibold text-[11px] px-2.5 py-0.5 rounded-full whitespace-nowrap">
-    +{flight.diffMinutes}분 지연
-  </span>
-) : flight.diffMinutes <= -5 ? (
-  <span className="bg-emerald-50 text-emerald-600 border border-emerald-200/60 font-semibold text-[11px] px-2.5 py-0.5 rounded-full whitespace-nowrap">
-    {flight.diffMinutes}분 조기
-  </span>
-) : (
-  <span className="bg-slate-100/90 text-slate-600 border border-slate-200/60 font-semibold text-[11px] px-2.5 py-0.5 rounded-full whitespace-nowrap">
-    정시 운항
-  </span>
-)}
-```
+      {/* Center: Status Badge & Trajectory Graphic */}
+      <div className="flex flex-col items-center justify-center px-1 shrink-0">
+        <span
+          className={`text-[13px] font-bold py-0.5 px-3 rounded-full mb-2 tracking-tight ${theme.bgBadge} ${theme.textColor}`}
+        >
+          {theme.statusText}
+        </span>
 
-### 3) 인라인 복사 체크 마이크로 인터랙션
-```tsx
-<button
-  type="button"
-  onClick={() => copyReport(flight)}
-  className="text-[11px] flex items-center gap-1.5 px-2 py-0.5 rounded-lg hover:bg-slate-100 active:scale-95 transition-all cursor-pointer"
->
-  {isCopied ? (
-    <>
-      <Check className="w-3.5 h-3.5 text-[#1E60F3]" />
-      <span className="text-[#1E60F3] font-bold">복사됨</span>
-    </>
-  ) : (
-    <>
-      <Copy className="w-3.5 h-3.5 text-slate-400" />
-      <span className="text-slate-500 font-medium">텍스트 복사</span>
-    </>
-  )}
-</button>
+        {/* Flight Trajectory Graphic */}
+        <div className="flex items-center justify-center">
+          {/* Flight Trail Solid Line (Left) */}
+          <div
+            className="h-[2px] w-10 sm:w-14 shrink-0"
+            style={{
+              backgroundImage: `linear-gradient(to right, transparent, ${theme.colorHex})`,
+            }}
+          />
+          {/* Plane Icon (Eastbound/Right) */}
+          <Plane
+            className="w-4 h-4 rotate-90 shrink-0 mx-0.5"
+            style={{ color: theme.colorHex, fill: theme.colorHex }}
+          />
+          {/* Dotted Trail to Destination (Right) */}
+          <div className="w-8 sm:w-10 border-b-2 border-dotted border-slate-300 opacity-80 shrink-0 ml-0.5" />
+        </div>
+      </div>
+
+      {/* Right: Estimated Time */}
+      <div className="text-right flex-1">
+        <span
+          className={`block text-xs font-semibold mb-1 ${theme.textColor}`}
+        >
+          {flight.type === 'arrival' ? '예상 착륙 시각' : '예상 출발 시각'}
+        </span>
+        <span
+          className={`block text-2xl sm:text-3xl font-black tracking-tight leading-none ${theme.textColor}`}
+        >
+          {flight.estimatedTimeFormatted}
+        </span>
+      </div>
+    </div>
+  );
+})()}
 ```
 
 ---
 
 ## 3. 검증 결과
 
-1. **시각적 일체감**:
-   - 상단 헤더의 불필요한 배지가 제거되어 편명과 날짜가 깔끔하게 노출됨.
-   - 타임 브릿지 상태 칩의 채도가 정돈되어 코발트 블루 강조 타이포와 조화를 이룸.
-2. **인라인 피드백**:
-   - '텍스트 복사' 터치 시 하단에 초록색 팝업이 뜨지 않고, 버튼 자체가 파란색 체크(`Check`)와 함께 `복사됨`으로 부드럽게 전환된 뒤 2초 후 자동 복귀됨.
-3. **빌드 검증**:
+1. **시각적 완성도 (레퍼런스 1:1 일치)**:
+   - 둔탁하던 좌우 배경 카드가 사라지고 클린 화이트 캔버스 위에 양쪽 시각과 중앙 비행기 궤적이 일직선으로 완벽하게 배치됨.
+   - 조기 도착 시 비비드 에메랄드 그린(`#00A86B`) 테마로 중앙 뱃지, 궤적 실선, 비행기 아이콘, 우측 라벨, 그리고 우측 대형 시각 숫자까지 100% 동일한 톤으로 연동됨.
+2. **빌드 검증**:
    - `npm run build` 결과 11/11 정적/동적 라우트 전체 컴파일 성공 (TypeScript 에러 0건).

@@ -316,51 +316,85 @@ export const FlightModal: React.FC<FlightModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Time Bridge: Schedule -> Status Pill -> Estimated */}
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-1.5">
-                    {/* Schedule Time Box */}
-                    <div className="flex-1 bg-slate-50 rounded-2xl py-2.5 px-2 text-center border border-slate-100">
-                      <span className="block text-[10px] text-slate-400 font-semibold mb-0.5">
-                        스케줄 예정 시각
-                      </span>
-                      <span className="text-sm font-black text-slate-700">
-                        {flight.scheduleTimeFormatted}
-                      </span>
-                    </div>
+                  {/* Time Comparison & Trajectory (Flat Layout - Reference Image 1:1) */}
+                  {(() => {
+                    const theme =
+                      flight.diffMinutes >= 10
+                        ? {
+                            colorHex: '#E11D48',
+                            textColor: 'text-[#E11D48]',
+                            bgBadge: 'bg-rose-50/80 shadow-[0_0_12px_rgba(225,29,72,0.25)]',
+                            statusText: `+${flight.diffMinutes}분 지연`,
+                          }
+                        : flight.diffMinutes <= -5
+                        ? {
+                            colorHex: '#00A86B',
+                            textColor: 'text-[#00A86B]',
+                            bgBadge: 'bg-emerald-50/80 shadow-[0_0_12px_rgba(0,168,107,0.25)]',
+                            statusText: `${flight.diffMinutes}분 조기`,
+                          }
+                        : {
+                            colorHex: '#1E60F3',
+                            textColor: 'text-[#1E60F3]',
+                            bgBadge: 'bg-blue-50/80 shadow-[0_0_12px_rgba(30,96,243,0.25)]',
+                            statusText: '정시 운항',
+                          };
 
-                    {/* Time Bridge: Deviation Badge & Connecting Arrow */}
-                    <div className="flex flex-col items-center justify-center px-1 shrink-0 relative min-w-[88px]">
-                      <div className="mb-1 flex items-center justify-center">
-                        {flight.diffMinutes >= 10 ? (
-                          <span className="bg-rose-50 text-rose-600 border border-rose-200/60 font-semibold text-[11px] px-2.5 py-0.5 rounded-full whitespace-nowrap">
-                            +{flight.diffMinutes}분 지연
+                    return (
+                      <div className="pt-3 pb-1 border-t border-slate-100 flex items-center justify-between">
+                        {/* Left: Scheduled Time */}
+                        <div className="text-left flex-1">
+                          <span className="block text-xs font-medium text-slate-400 mb-1">
+                            스케줄 예정 시각
                           </span>
-                        ) : flight.diffMinutes <= -5 ? (
-                          <span className="bg-emerald-50 text-emerald-600 border border-emerald-200/60 font-semibold text-[11px] px-2.5 py-0.5 rounded-full whitespace-nowrap">
-                            {flight.diffMinutes}분 조기
+                          <span className="block text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-none">
+                            {flight.scheduleTimeFormatted}
                           </span>
-                        ) : (
-                          <span className="bg-slate-100/90 text-slate-600 border border-slate-200/60 font-semibold text-[11px] px-2.5 py-0.5 rounded-full whitespace-nowrap">
-                            정시 운항
-                          </span>
-                        )}
-                      </div>
-                      <div className="w-full flex items-center justify-center text-slate-300">
-                        <div className="flex-1 border-b border-slate-200" />
-                        <ArrowRight className="w-3.5 h-3.5 text-[#1E60F3] -ml-0.5 shrink-0" />
-                      </div>
-                    </div>
+                        </div>
 
-                    {/* Estimated Time Box */}
-                    <div className="flex-1 bg-blue-50/50 rounded-2xl py-2.5 px-2 text-center border border-blue-100">
-                      <span className="block text-[10px] text-[#1E60F3] font-bold mb-0.5">
-                        {flight.type === 'arrival' ? '예상 착륙 시각' : '예상 출발 시각'}
-                      </span>
-                      <span className="text-lg font-black text-[#1E60F3]">
-                        {flight.estimatedTimeFormatted}
-                      </span>
-                    </div>
-                  </div>
+                        {/* Center: Status Badge & Trajectory Graphic */}
+                        <div className="flex flex-col items-center justify-center px-1 shrink-0">
+                          <span
+                            className={`text-[13px] font-bold py-0.5 px-3 rounded-full mb-2 tracking-tight ${theme.bgBadge} ${theme.textColor}`}
+                          >
+                            {theme.statusText}
+                          </span>
+
+                          {/* Flight Trajectory Graphic */}
+                          <div className="flex items-center justify-center">
+                            {/* Flight Trail Solid Line (Left) */}
+                            <div
+                              className="h-[2px] w-10 sm:w-14 shrink-0"
+                              style={{
+                                backgroundImage: `linear-gradient(to right, transparent, ${theme.colorHex})`,
+                              }}
+                            />
+                            {/* Plane Icon (Eastbound/Right) */}
+                            <Plane
+                              className="w-4 h-4 rotate-90 shrink-0 mx-0.5"
+                              style={{ color: theme.colorHex, fill: theme.colorHex }}
+                            />
+                            {/* Dotted Trail to Destination (Right) */}
+                            <div className="w-8 sm:w-10 border-b-2 border-dotted border-slate-300 opacity-80 shrink-0 ml-0.5" />
+                          </div>
+                        </div>
+
+                        {/* Right: Estimated Time */}
+                        <div className="text-right flex-1">
+                          <span
+                            className={`block text-xs font-semibold mb-1 ${theme.textColor}`}
+                          >
+                            {flight.type === 'arrival' ? '예상 착륙 시각' : '예상 출발 시각'}
+                          </span>
+                          <span
+                            className={`block text-2xl sm:text-3xl font-black tracking-tight leading-none ${theme.textColor}`}
+                          >
+                            {flight.estimatedTimeFormatted}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* 2. Ticket Center Perforation & Notches (반원형 홈 & 점선 절취선) */}
