@@ -81,11 +81,6 @@ export default function Home() {
     setPresets(DEFAULT_PRESET_LOCATIONS);
   }, []);
 
-  // Auto-acquire real GPS location on mount
-  useEffect(() => {
-    requestGpsLocation();
-  }, [requestGpsLocation]);
-
   // Supabase Fleet Architecture Data Synchronization
   useEffect(() => {
     const driverId = profile.id || getOrCreateDeviceUuid();
@@ -422,10 +417,10 @@ export default function Home() {
     }
   };
 
-  // Select gas station as destination and trigger ETA calculation
+  // Select gas station as destination and trigger ETA calculation (Origin strictly preserved)
   const handleSelectGasStation = (station: GasStation) => {
     const gasPreset: LocationPreset = {
-      id: `gas_${station.id}`,
+      id: 'custom_gas_station',
       name: station.name,
       shortName: station.name.replace(/주유소$/, '').trim().slice(0, 8),
       lat: station.lat,
@@ -435,7 +430,7 @@ export default function Home() {
     };
 
     setDestination(gasPreset);
-    saveRecentPreset(gasPreset);
+    setSelectionTarget('destination');
     if (origin) {
       fetchRouteEstimate(origin, gasPreset);
     }
