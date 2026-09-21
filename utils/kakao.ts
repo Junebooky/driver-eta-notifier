@@ -20,7 +20,7 @@ export interface VipReportParams {
 export function generateVipReportText({
   carNumber = '4호차',
   driverName = '윤태준',
-  passengerName = 'SOFYAN 외 1명',
+  passengerName,
   destinationName,
   originName,
   etaFormatted,
@@ -36,11 +36,12 @@ export function generateVipReportText({
 
   const header = `[${carNumber} ${driverName}]`;
   const passenger = passengerName?.trim();
+  const hasPassenger = Boolean(passenger);
 
   if (mode === 'ARRIVED') {
     const lines = [
       header,
-      passenger ? `• 담당승객: ${passenger}` : null,
+      hasPassenger ? `• 담당승객: ${passenger}` : null,
       `• 도착지: ${destinationName}`,
       `• 상태: 도착 완료`,
     ].filter(Boolean);
@@ -49,7 +50,7 @@ export function generateVipReportText({
 
   const lines = [
     header,
-    passenger ? `• 담당승객: ${passenger}` : null,
+    hasPassenger ? `• 담당승객: ${passenger}` : null,
     `• 출발지: ${originName}`,
     `• 목적지: ${destinationName}`,
     `• ETA: ${cleanEta}`,

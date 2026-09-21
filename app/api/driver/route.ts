@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { id = 'driver_4', vehicleNo, driverName, homeLocation, presetOrder } = body;
+    const { id = 'driver_4', vehicleNo, driverName, passengerName, homeLocation, presetOrder } = body;
 
     const payload: any = {
       id,
@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
 
     if (vehicleNo !== undefined) payload.vehicle_no = vehicleNo;
     if (driverName !== undefined) payload.driver_name = driverName;
+    if (passengerName !== undefined) payload.passenger_name = passengerName;
     if (homeLocation !== undefined) payload.home_location = homeLocation;
     if (presetOrder !== undefined) payload.preset_order = presetOrder;
 

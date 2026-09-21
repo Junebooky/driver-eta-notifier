@@ -19,7 +19,8 @@ export function generateReportText({
 }: GenerateReportParams): string {
   const carNumber = profile.vehicleNo || '4호차';
   const driverName = profile.driverName || '윤태준';
-  const passengerName = profile.passengerName?.trim() || 'SOFYAN 외 1명';
+  const passengerName = profile.passengerName?.trim();
+  const hasPassenger = Boolean(passengerName);
   
   const destName = typeof destination === 'string' ? destination : destination.shortName;
   const originName = typeof origin === 'string' ? origin : origin ? origin.shortName : '현 위치';
@@ -38,7 +39,7 @@ export function generateReportText({
   if (mode === 'ARRIVED') {
     const lines = [
       header,
-      passengerName ? `• 담당승객: ${passengerName}` : null,
+      hasPassenger ? `• 담당승객: ${passengerName}` : null,
       `• 도착지: ${destName}`,
       `• 상태: 도착 완료`,
     ].filter(Boolean);
@@ -47,7 +48,7 @@ export function generateReportText({
 
   const lines = [
     header,
-    passengerName ? `• 담당승객: ${passengerName}` : null,
+    hasPassenger ? `• 담당승객: ${passengerName}` : null,
     `• 출발지: ${originName}`,
     `• 목적지: ${destName}`,
     `• ETA: ${cleanEta}`,

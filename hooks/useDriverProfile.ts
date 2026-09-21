@@ -22,7 +22,11 @@ export function useDriverProfile() {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        setProfile((prev) => ({ ...prev, ...parsed }));
+        setProfile((prev) => ({
+          ...prev,
+          ...parsed,
+          passengerName: parsed.passengerName !== undefined ? parsed.passengerName : prev.passengerName,
+        }));
       }
     } catch (e) {
       console.warn('Failed to load profile from localStorage:', e);
@@ -33,7 +37,14 @@ export function useDriverProfile() {
 
   const updateProfile = (newProfile: Partial<DriverProfile>) => {
     setProfile((prev) => {
-      const updated = { ...prev, ...newProfile };
+      const updated = {
+        ...prev,
+        ...newProfile,
+        passengerName:
+          newProfile.passengerName !== undefined
+            ? newProfile.passengerName
+            : prev.passengerName,
+      };
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       } catch (e) {

@@ -20,7 +20,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 }) => {
   const [vehicleNo, setVehicleNo] = useState(profile.vehicleNo);
   const [driverName, setDriverName] = useState(profile.driverName);
-  const [passengerName, setPassengerName] = useState(profile.passengerName);
+  const [passengerName, setPassengerName] = useState(profile.passengerName ?? '');
   const [targetChatRoom, setTargetChatRoom] = useState(profile.targetChatRoom || 'VIP 의전 단톡방');
   const [defaultNavi, setDefaultNavi] = useState<NaviProvider>(profile.defaultNavi);
 
@@ -28,7 +28,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     if (isOpen) {
       setVehicleNo(profile.vehicleNo);
       setDriverName(profile.driverName);
-      setPassengerName(profile.passengerName);
+      setPassengerName(profile.passengerName ?? '');
       setTargetChatRoom(profile.targetChatRoom || 'VIP 의전 단톡방');
       setDefaultNavi(profile.defaultNavi);
     }
@@ -42,7 +42,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     onSave({
       vehicleNo: vehicleNo.trim() || '4호차',
       driverName: driverName.trim() || '윤태준',
-      passengerName: passengerName.trim() || 'SOFYAN 외 1명',
+      passengerName: passengerName !== undefined ? passengerName.trim() : '',
       targetChatRoom: targetChatRoom.trim() || 'VIP 의전 단톡방',
       defaultNavi,
     });
@@ -106,7 +106,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               type="text"
               value={passengerName}
               onChange={(e) => setPassengerName(e.target.value)}
-              placeholder="예: SOFYAN 외 1명"
+              placeholder="예: SOFYAN 외 1명 (미입력 시 생략)"
               className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white font-bold"
             />
           </div>
