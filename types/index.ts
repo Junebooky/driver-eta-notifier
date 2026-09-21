@@ -23,7 +23,7 @@ export interface LocationPreset {
   shortName: string;
   lat: number;
   lng: number;
-  category: 'AIRPORT' | 'HOTEL' | 'CIRCUIT' | 'RETURN' | 'CUSTOM' | 'HOME';
+  category: 'AIRPORT' | 'HOTEL' | 'CIRCUIT' | 'RETURN' | 'CUSTOM' | 'HOME' | 'GAS';
   address?: string;
   isGlobal?: boolean;
   driverId?: string | null;
@@ -41,3 +41,23 @@ export interface RouteEstimate {
   fallbackNotice?: string;
   isCached?: boolean;
 }
+
+export type FuelCode = 'D047' | 'B027' | 'B034';
+
+export interface GasStation {
+  id: string;
+  name: string;
+  brandCode: string;
+  brandName: string;
+  price: number;
+  fuelCode: FuelCode;
+  fuelName: string;
+  lat: number;
+  lng: number;
+  distanceMeters: number;
+  distanceKm: number;
+  durationMinutes: number;
+  tmapEtaFormatted: string;
+  address?: string;
+}
+

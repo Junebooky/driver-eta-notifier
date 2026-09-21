@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { LocationPreset, HomeLocation } from '@/types';
-import { Plus, Trash2, Pencil, SlidersHorizontal, Home as HomeIcon, ShieldAlert } from 'lucide-react';
+import { Plus, Trash2, Pencil, SlidersHorizontal, Home as HomeIcon, ShieldAlert, Fuel } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface PresetButtonsProps {
@@ -15,6 +15,7 @@ interface PresetButtonsProps {
   onSelectPreset: (preset: LocationPreset) => void;
   onOpenAddModal: () => void;
   onOpenHomeModal: () => void;
+  onOpenGasModal?: () => void;
   onEditPreset?: (preset: LocationPreset) => void;
   onDeleteCustomPreset?: (id: string) => void;
   onReorderPresets?: (reordered: LocationPreset[]) => void;
@@ -30,6 +31,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
   onSelectPreset,
   onOpenAddModal,
   onOpenHomeModal,
+  onOpenGasModal,
   onEditPreset,
   onDeleteCustomPreset,
   onReorderPresets,
@@ -299,22 +301,39 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
           <h2 className="text-sm font-bold text-slate-900 tracking-tight">자주 가는 목적지</h2>
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            haptics.lightTap();
-            setIsManageMode(!isManageMode);
-          }}
-          className={`text-xs flex items-center space-x-1 py-1 px-2.5 rounded-lg transition-colors cursor-pointer ${
-            isManageMode
-              ? 'bg-[#1E60F3] text-white font-bold shadow-[0_4px_12px_rgba(30,96,243,0.25)]'
-              : 'text-slate-400 hover:text-slate-600 font-medium'
-          }`}
-          title="거점 수정 및 삭제 관리"
-        >
-          <SlidersHorizontal className="w-3.5 h-3.5" />
-          <span>{isManageMode ? '관리 완료' : '거점 관리'}</span>
-        </button>
+        <div className="flex items-center space-x-1.5">
+          {onOpenGasModal && (
+            <button
+              type="button"
+              onClick={() => {
+                haptics.lightTap();
+                onOpenGasModal();
+              }}
+              className="text-xs flex items-center space-x-1 py-1 px-2.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 hover:text-amber-800 font-bold border border-amber-200/80 transition-all cursor-pointer shadow-2xs active:scale-95"
+              title="실시간 최저가·최단거리 주유소 추천"
+            >
+              <Fuel className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <span>주유소</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => {
+              haptics.lightTap();
+              setIsManageMode(!isManageMode);
+            }}
+            className={`text-xs flex items-center space-x-1 py-1 px-2.5 rounded-lg transition-colors cursor-pointer ${
+              isManageMode
+                ? 'bg-[#1E60F3] text-white font-bold shadow-[0_4px_12px_rgba(30,96,243,0.25)]'
+                : 'text-slate-400 hover:text-slate-600 font-medium'
+            }`}
+            title="거점 수정 및 삭제 관리"
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            <span>{isManageMode ? '관리 완료' : '거점 관리'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Management Mode Guidance Bar */}

@@ -15,8 +15,9 @@ import { ActionPanel } from '@/components/ActionPanel';
 import { A2HSBanner } from '@/components/A2HSBanner';
 import { DepartureTimePickerModal } from '@/components/DepartureTimePickerModal';
 import { PredictionResultSheet } from '@/components/PredictionResultSheet';
+import { GasStationModal } from '@/components/GasStationModal';
 import { PredictionResult } from '@/app/api/route/prediction/route';
-import { LocationPreset, ReportMode, RouteEstimate, HomeLocation } from '@/types';
+import { LocationPreset, ReportMode, RouteEstimate, HomeLocation, GasStation } from '@/types';
 import { DEFAULT_PRESET_LOCATIONS } from '@/utils/presets';
 import { generateReportText } from '@/utils/reportGenerator';
 import { calculateHaversineEstimate, getEtaString } from '@/utils/navigation';
@@ -51,6 +52,9 @@ export default function Home() {
 
   // Home Registration Modal State
   const [isHomeModalOpen, setIsHomeModalOpen] = useState(false);
+
+  // Real-time Gas Station Modal State
+  const [isGasModalOpen, setIsGasModalOpen] = useState(false);
 
   // Load Presets & Admin State from LocalStorage on mount
   useEffect(() => {
@@ -413,6 +417,25 @@ export default function Home() {
     }
   };
 
+  // Select gas station as destination and trigger ETA calculation
+  const handleSelectGasStation = (station: GasStation) => {
+    const gasPreset: LocationPreset = {
+      id: `gas_${station.id}`,
+      name: station.name,
+      shortName: station.name.replace(/주유소$/, '').trim().slice(0, 8),
+      lat: station.lat,
+      lng: station.lng,
+      category: 'GAS',
+      address: station.address || `${station.name} (${station.brandName})`,
+    };
+
+    setDestination(gasPreset);
+    saveRecentPreset(gasPreset);
+    if (origin) {
+      fetchRouteEstimate(origin, gasPreset);
+    }
+  };
+
   // Bidirectional Swap UX (⇄)
   const handleSwapOriginDestination = () => {
     const currentOrigin = origin;
@@ -515,6 +538,7 @@ export default function Home() {
             onSelectPreset={handleSelectPreset}
             onOpenAddModal={handleOpenAddModal}
             onOpenHomeModal={() => setIsHomeModalOpen(true)}
+            onOpenGasModal={() => setIsGasModalOpen(true)}
             onEditPreset={handleOpenEditModal}
             onDeleteCustomPreset={handleDeleteCustomPreset}
             onReorderPresets={handleReorderPresets}
@@ -642,6 +666,17 @@ export default function Home() {
           setIsTimePickerOpen(true);
         }}
         selectedDate={simulationDepartureDate}
+      />
+
+      {/* Real-time Gas Station Recommendation Modal (Opinet x TMAP) */}
+      <GasStationModal
+        isOpen={isGasModalOpen}
+        onClose={() => setIsGasModalOpen(false)}
+        currentLat={origin.lat}
+        currentLng={origin.lng}
+        defaultNavi={profile.defaultNavi}
+        profile={profile}
+        onSelectStation={handleSelectGasStation}
       />
 
     </main>
