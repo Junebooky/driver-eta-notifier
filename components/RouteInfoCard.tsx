@@ -97,8 +97,8 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
           )}
         </div>
 
-        {/* Right Actions: Clock/Schedule Icon Button + Refresh Button */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Right Actions: Vertical Stack (Clock/Schedule Button Top + Refresh Button Bottom) */}
+        <div className="flex flex-col items-center gap-2 shrink-0">
           {onOpenTimePicker && (
             <button
               type="button"
@@ -106,11 +106,11 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
                 haptics.lightTap();
                 onOpenTimePicker();
               }}
-              className="w-11 h-11 rounded-xl bg-slate-100/80 border border-slate-200/80 text-slate-700 hover:bg-slate-200 flex items-center justify-center transition-all duration-150 active:scale-95 cursor-pointer shadow-xs"
+              className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/90 hover:bg-white border border-slate-200/70 text-slate-700 hover:text-slate-900 flex items-center justify-center transition-all duration-150 active:scale-95 cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.04)] backdrop-blur-xs"
               title="출발 시간별 소요 시간 예측 (미래 조회)"
               aria-label="출발 시간 선택"
             >
-              <CalendarClock className="w-5 h-5 text-slate-600" />
+              <CalendarClock className="w-5 h-5 text-slate-700" />
             </button>
           )}
 
@@ -122,7 +122,7 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
               onRefreshRoute();
             }}
             disabled={isLoadingRoute}
-            className="w-11 h-11 rounded-xl bg-[#1E60F3] hover:bg-[#1346D8] hover:scale-105 hover:shadow-lg hover:shadow-blue-500/35 active:translate-y-0 active:scale-[0.97] active:bg-[#0f3bb8] text-white shadow-xs flex items-center justify-center transition-all duration-150 ease-out disabled:opacity-50 cursor-pointer shrink-0 group"
+            className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-[#1E60F3] hover:bg-[#1346D8] hover:scale-105 active:scale-[0.97] text-white shadow-[0_4px_12px_rgba(30,96,243,0.3)] flex items-center justify-center transition-all duration-150 ease-out disabled:opacity-50 cursor-pointer shrink-0 group"
             title="ETA 재계산"
             aria-label="경로 새로고침"
           >
