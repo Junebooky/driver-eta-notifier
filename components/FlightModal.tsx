@@ -14,7 +14,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
-import { formatFlightReport } from '@/utils/flightMapping';
+import { formatFlightReport, getCurbsideGate } from '@/utils/flightMapping';
 
 interface FlightModalProps {
   isOpen: boolean;
@@ -425,6 +425,23 @@ export const FlightModal: React.FC<FlightModalProps> = ({
                         ? flight.departureLocationText
                         : flight.arrivalLocationText}
                     </p>
+
+                    {/* 입국 시 1층 도로변 외부 영접 게이트 뱃지 노출 */}
+                    {flight.type === 'arrival' &&
+                      (() => {
+                        const curbside =
+                          flight.curbsideGate ||
+                          (flight.exitNumber ? getCurbsideGate(flight.terminal, flight.exitNumber) : undefined);
+                        if (!curbside || curbside === '외부 게이트 확인 필요') return null;
+                        return (
+                          <div className="flex items-center gap-1.5 mt-2 text-xs text-slate-500 font-medium">
+                            <span>영접 위치:</span>
+                            <span className="font-bold text-[#1E60F3] bg-blue-50/80 px-2 py-0.5 rounded-md text-[11px] border border-blue-500/10">
+                              {curbside}
+                            </span>
+                          </div>
+                        );
+                      })()}
 
                     {/* 출국 시에만 체크인 카운터 노출 (입국 시 탑승구 문구 완전 삭제) */}
                     {flight.type === 'departure' && flight.checkinRange && (

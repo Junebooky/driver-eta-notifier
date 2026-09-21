@@ -4,6 +4,7 @@ import {
   resolveTerminal,
   resolveDepartureDoor,
   resolveArrivalGate,
+  getCurbsideGate,
   computeFlightStatusText,
   getFlightLocationPreset,
   parseFlightDateTime,
@@ -253,6 +254,7 @@ export async function GET(req: NextRequest) {
     const carousel = bestItem.carousel || '';
     const exitNumber = bestItem.exitnumber || '';
     const arrivalLocationText = resolveArrivalGate(terminal, exitNumber, carousel);
+    const curbsideGate = exitNumber ? getCurbsideGate(terminal, exitNumber) : undefined;
 
     const targetPreset = getFlightLocationPreset(terminal, type);
 
@@ -273,6 +275,7 @@ export async function GET(req: NextRequest) {
       gateNumber,
       carousel,
       exitNumber,
+      curbsideGate,
       arrivalLocationText,
       checkinRange,
       suggestedDoor,

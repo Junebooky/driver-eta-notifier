@@ -88,6 +88,7 @@ export interface FlightInfo {
   gateNumber?: string;           // e.g. '249'
   carousel?: string;             // e.g. '5'
   exitNumber?: string;           // e.g. 'A'
+  curbsideGate?: string;         // e.g. '외부 11~14번 게이트'
   arrivalLocationText: string;   // e.g. '제2여객터미널 A출구 (수하물 5번)'
   // Departure specific:
   checkinRange?: string;         // e.g. 'A B C D'

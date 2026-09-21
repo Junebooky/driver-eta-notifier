@@ -211,6 +211,31 @@ export function resolveArrivalGate(
 }
 
 /**
+ * Maps arrival exit (A~F) to 1st floor curbside pickup gate
+ */
+export function getCurbsideGate(terminal: string, exit: string): string {
+  const cleanTerminal = terminal.replace(/\s+/g, '');
+  const cleanExit = exit.trim().replace(/출구$/, '').trim().toUpperCase();
+
+  // 제2여객터미널 (T2)
+  if (cleanTerminal.includes('제2') || cleanTerminal.includes('T2')) {
+    if (cleanExit === 'A') return '외부 1~3번 게이트';
+    if (cleanExit === 'B') return '외부 4~5번 게이트';
+    return '외부 게이트 확인 필요';
+  }
+
+  // 제1여객터미널 (T1)
+  if (cleanTerminal.includes('제1') || cleanTerminal.includes('T1')) {
+    if (['A', 'B'].includes(cleanExit)) return '외부 1~4번 게이트';
+    if (['C', 'D'].includes(cleanExit)) return '외부 5~10번 게이트';
+    if (['E', 'F'].includes(cleanExit)) return '외부 11~14번 게이트';
+    return '외부 게이트 확인 필요';
+  }
+
+  return '외부 게이트 확인 필요';
+}
+
+/**
  * Constructs precision LocationPreset for navigation destination
  */
 export function getFlightLocationPreset(terminal: string, type: FlightType): LocationPreset {
@@ -286,6 +311,10 @@ export function formatFlightReport(profile: DriverProfile, flight: FlightInfo): 
     lines.push(`• 항공편명: ${flight.flightId} (${flight.airport} ➔ ICN)`);
     lines.push(`• 예상착륙: ${flight.statusText}`);
     lines.push(`• 입국게이트: ${flight.arrivalLocationText}`);
+    const curbside = flight.curbsideGate || (flight.exitNumber ? getCurbsideGate(flight.terminal, flight.exitNumber) : '');
+    if (curbside && curbside !== '외부 게이트 확인 필요') {
+      lines.push(`• 영접위치: ${curbside}`);
+    }
   } else {
     lines.push(`• 샌딩대상: ${flight.flightId} (ICN ➔ ${flight.airport})`);
     lines.push(`• 예상출발: ${flight.statusText}`);
