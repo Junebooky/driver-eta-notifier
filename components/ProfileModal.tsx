@@ -201,9 +201,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center p-4 touch-none transition-opacity duration-300 ease-out ${
-        isMounted ? 'bg-slate-900/60 backdrop-blur-sm opacity-100' : 'bg-slate-900/0 opacity-0 pointer-events-none'
-      }`}
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 touch-none transition-opacity duration-300 ease-out ${isMounted ? 'bg-slate-900/60 backdrop-blur-sm opacity-100' : 'bg-slate-900/0 opacity-0 pointer-events-none'
+        }`}
       onClick={(e) => {
         if (e.target === e.currentTarget && !isSaving) {
           handleClose();
@@ -216,9 +215,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       }}
     >
       <div
-        className={`w-full max-w-sm bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-y-auto overscroll-contain text-slate-900 transform transition-all duration-300 ease-out max-h-[90vh] flex flex-col ${
-          isMounted ? 'scale-100 opacity-100' : 'scale-95 opacity-0 pointer-events-none'
-        }`}
+        className={`w-full max-w-sm bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-y-auto overscroll-contain text-slate-900 transform transition-all duration-300 ease-out max-h-[90vh] flex flex-col ${isMounted ? 'scale-100 opacity-100' : 'scale-95 opacity-0 pointer-events-none'
+          }`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header with Master Brand App Icon & Simplified Title */}
@@ -262,9 +260,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 className="w-full pl-3.5 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white font-bold transition-colors"
               />
               <span
-                className={`absolute right-3 text-xs font-black transition-colors pointer-events-none ${
-                  hocha ? 'text-[#1E60F3]' : 'text-slate-300'
-                }`}
+                className={`absolute right-3 text-xs font-black transition-colors pointer-events-none ${hocha ? 'text-[#1E60F3]' : 'text-slate-300'
+                  }`}
               >
                 호차
               </span>
@@ -330,7 +327,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               type="text"
               value={passengerName}
               onChange={(e) => setPassengerName(e.target.value)}
-              placeholder="예: SOFYAN 외 1명 (미입력 시 생략)"
+              placeholder="예: SOYFAN 외 1명 (미입력 시 생략)"
               className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white font-bold transition-colors"
             />
           </div>
@@ -348,11 +345,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   haptics.lightTap();
                   setDefaultNavi('tmap');
                 }}
-                className={`py-2.5 px-2 rounded-2xl border transition-all duration-100 flex flex-col items-center justify-center space-y-1 active:scale-95 cursor-pointer ${
-                  defaultNavi === 'tmap'
+                className={`py-2.5 px-2 rounded-2xl border transition-all duration-100 flex flex-col items-center justify-center space-y-1 active:scale-95 cursor-pointer ${defaultNavi === 'tmap'
                     ? 'bg-blue-50/80 border-blue-500 text-blue-900 ring-2 ring-blue-500/20 shadow-xs'
                     : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'
-                }`}
+                  }`}
               >
                 <div className="w-6 h-6 rounded-full bg-white border border-slate-200 shadow-xs flex items-center justify-center">
                   <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -380,11 +376,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   haptics.lightTap();
                   setDefaultNavi('kakao');
                 }}
-                className={`py-2.5 px-2 rounded-2xl border transition-all duration-100 flex flex-col items-center justify-center space-y-1 active:scale-95 cursor-pointer ${
-                  defaultNavi === 'kakao'
+                className={`py-2.5 px-2 rounded-2xl border transition-all duration-100 flex flex-col items-center justify-center space-y-1 active:scale-95 cursor-pointer ${defaultNavi === 'kakao'
                     ? 'bg-amber-50/80 border-amber-500 text-amber-900 ring-2 ring-amber-500/20 shadow-xs'
                     : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'
-                }`}
+                  }`}
               >
                 <div className="w-6 h-6 rounded-full bg-[#FEE500] border border-amber-300 text-[#3C1E1E] flex items-center justify-center text-xs font-black shadow-2xs">
                   K
@@ -400,11 +395,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   haptics.lightTap();
                   setDefaultNavi('naver');
                 }}
-                className={`py-2.5 px-2 rounded-2xl border transition-all duration-100 flex flex-col items-center justify-center space-y-1 active:scale-95 cursor-pointer ${
-                  defaultNavi === 'naver'
+                className={`py-2.5 px-2 rounded-2xl border transition-all duration-100 flex flex-col items-center justify-center space-y-1 active:scale-95 cursor-pointer ${defaultNavi === 'naver'
                     ? 'bg-emerald-50/80 border-emerald-500 text-emerald-900 ring-2 ring-emerald-500/20 shadow-xs'
                     : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'
-                }`}
+                  }`}
               >
                 <div className="w-6 h-6 rounded-full bg-[#03C75A] border border-emerald-400 text-white flex items-center justify-center text-xs font-black shadow-2xs">
                   N
@@ -428,9 +422,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             <button
               type="submit"
               disabled={isSaving}
-              className={`w-2/3 py-3 rounded-xl bg-[#1E60F3] hover:bg-blue-600 text-white text-xs font-black shadow-md shadow-blue-500/20 active:scale-95 transition-all duration-150 cursor-pointer flex items-center justify-center gap-1.5 ${
-                isSaving ? 'opacity-85 pointer-events-none' : ''
-              }`}
+              className={`w-2/3 py-3 rounded-xl bg-[#1E60F3] hover:bg-blue-600 text-white text-xs font-black shadow-md shadow-blue-500/20 active:scale-95 transition-all duration-150 cursor-pointer flex items-center justify-center gap-1.5 ${isSaving ? 'opacity-85 pointer-events-none' : ''
+                }`}
             >
               {isSaving ? (
                 <>

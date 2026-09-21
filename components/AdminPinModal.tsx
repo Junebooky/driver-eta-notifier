@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, ShieldCheck, KeyRound, Check, LogOut } from 'lucide-react';
+import { X, ShieldCheck, KeyRound, LogOut } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface AdminPinModalProps {
@@ -51,8 +51,8 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-xl bg-[#1E60F3]/10 text-[#1E60F3] flex items-center justify-center">
-              <ShieldCheck className="w-4.5 h-4.5" />
+            <div className="w-7 h-7 rounded-xl bg-[#1E60F3] text-white flex items-center justify-center shadow-xs">
+              <ShieldCheck className="w-4 h-4 text-white" />
             </div>
             <div>
               <h3 className="text-sm font-black text-slate-900">관리자 모드</h3>
@@ -70,12 +70,13 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
 
         {isAdmin ? (
           <div className="space-y-3 pt-1">
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-center space-y-1">
-              <span className="inline-flex items-center gap-1 text-xs font-black text-[#1E60F3]">
-                <Check className="w-3.5 h-3.5" /> 관리자 권한 활성화됨
-              </span>
-              <p className="text-[11px] text-slate-600 font-medium leading-relaxed">
-                현재 추가 또는 삭제하는 거점은 전사 공통 거점(is_global = true)으로 모든 기사에게 반영됩니다.
+            <div className="bg-blue-50/50 border border-blue-100/80 rounded-xl p-3.5 space-y-1.5">
+              <div className="text-[#1E60F3] font-bold text-xs flex items-center gap-1.5">
+                <span>✓</span>
+                <span>전사 공통 거점 편집 권한</span>
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                추가 또는 삭제하는 거점은 모든 의전 드라이버 앱에 실시간 공통 거점으로 일괄 반영됩니다.
               </p>
             </div>
 
@@ -86,10 +87,10 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
                 onToggleAdmin(false);
                 onClose();
               }}
-              className="w-full py-2.5 bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              className="w-full py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors flex items-center justify-center gap-2 cursor-pointer active:scale-98"
             >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>관리자 모드 종료 (일반 기사 모드로 전환)</span>
+              <LogOut className="w-4 h-4 text-slate-500" />
+              <span>관리자 모드 종료</span>
             </button>
           </div>
         ) : (

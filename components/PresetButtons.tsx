@@ -547,10 +547,10 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                     setManagingPreset(null);
                     onEditPreset(p);
                   }}
-                  className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs flex items-center justify-center space-x-1.5 cursor-pointer active:scale-98 transition-all"
+                  className="w-full py-2.5 px-4 bg-[#1E60F3] hover:bg-blue-600 text-white font-bold rounded-xl text-xs flex items-center justify-center space-x-1.5 cursor-pointer active:scale-98 transition-all"
                 >
-                  <Pencil className="w-3.5 h-3.5" />
-                  <span>거점 명칭 수정</span>
+                  <Pencil className="w-3.5 h-3.5 text-white" />
+                  <span>수정</span>
                 </button>
               )}
 
@@ -564,11 +564,11 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                     setManagingPreset(null);
                     onDeleteCustomPreset(idToDelete);
                   }}
-                  className="w-full py-2.5 px-4 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold rounded-xl text-xs flex items-center justify-center space-x-1.5 cursor-pointer active:scale-98 transition-all"
+                  className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-red-600 font-semibold rounded-xl text-xs flex items-center justify-center space-x-1.5 cursor-pointer active:scale-98 transition-all"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
+                  <Trash2 className="w-3.5 h-3.5 text-slate-500" />
                   <span>
-                    {managingPreset.isGlobal ? '공통 거점 삭제 (관리자)' : '거점 삭제'}
+                    {managingPreset.isGlobal ? '공통 거점 삭제' : '삭제'}
                   </span>
                 </button>
               )}

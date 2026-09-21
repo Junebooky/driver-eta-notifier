@@ -10,7 +10,7 @@
 
 - **핵심 목표**: VIP 의전 드라이버 전용 스마트 관제 런처 (Protocol Cockpit) 모바일 웹 구축, 3대 내비게이션(TMAP, 카카오내비, 네이버지도) 딥링크 통합 및 원터치 단톡방 보고 시스템 완성.
 - **주요 해결 과제 및 구현 내역**:
-  - **드라이버 프로필 영속화**: LocalStorage 기반 4호차 / 윤태준 기사 / SOFYAN 외 1명 승객 / 주력 내비게이션 설정 및 상단 퀵 스위처 제공.
+  - **드라이버 프로필 영속화**: LocalStorage 기반 4호차 / 윤태준 기사 / SOYFAN 외 1명 승객 / 주력 내비게이션 설정 및 상단 퀵 스위처 제공.
   - **Safari User Activation 대응**: 버튼 클릭 이벤트 핸들러 최상단에서 동기적으로 `navigator.clipboard.writeText()`를 실행하여 사파리 클립보드 차단 방지.
   - **Safari 딥링크 팝업 안전장치**: `pagehide` 및 `visibilitychange` 이벤트 수신기로 앱 스킴 호출 후 백그라운드 전환 시 스토어 자동 이동 타이머(`clearTimeout`)를 해제.
   - **지하 주차장 GPS Fallback**: GPS 타임아웃/오류 시 최근 거점(조선팰리스 강남 등)으로 출발지를 우회 설정.
@@ -253,7 +253,7 @@ export function generateReportText({
   mode,
 }: GenerateReportParams): string {
   const vehicle = profile.vehicleNo || '4호차';
-  const passenger = profile.passengerName || 'SOFYAN 외 1명';
+  const passenger = profile.passengerName || 'SOYFAN 외 1명';
   
   const destName = typeof destination === 'string' ? destination : destination.shortName;
   const originName = typeof origin === 'string' ? origin : origin ? origin.shortName : '현 위치';
