@@ -83,8 +83,16 @@ export const FlightModal: React.FC<FlightModalProps> = ({
         document.body.removeChild(ta);
       }
       setIsCopied(true);
-      haptics.successPulse();
-      setTimeout(() => setIsCopied(false), 2500);
+      if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+        try {
+          navigator.vibrate?.(20);
+        } catch {
+          // ignore vibration error
+        }
+      } else {
+        haptics.lightTap();
+      }
+      setTimeout(() => setIsCopied(false), 2000);
     } catch (err) {
       console.warn('Clipboard copy error:', err);
     }
@@ -261,22 +269,15 @@ export const FlightModal: React.FC<FlightModalProps> = ({
               <div className="rounded-3xl border border-slate-200 bg-white shadow-sm relative overflow-hidden">
                 {/* 1. Ticket Top (비행 정보부) */}
                 <div className="p-4 space-y-3">
-                  {/* Airline Subheader + Flight ID + Tomorrow Badge */}
+                  {/* Airline Subheader + Flight ID */}
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="text-sm font-semibold text-slate-500 block leading-tight mb-1">
                         {flight.airline}
                       </span>
-                      <div className="flex items-center gap-2">
-                        <h4 className="text-2xl font-black tracking-wider text-slate-900 leading-none">
-                          {flight.flightId}
-                        </h4>
-                        {flight.isTomorrow && (
-                          <span className="bg-blue-50 text-[#1E60F3] border border-blue-200 font-bold px-2 py-0.5 rounded-md text-[11px]">
-                            내일 운항
-                          </span>
-                        )}
-                      </div>
+                      <h4 className="text-2xl font-black tracking-wider text-slate-900 leading-none">
+                        {flight.flightId}
+                      </h4>
                     </div>
 
                     {flight.flightDate && (
@@ -328,18 +329,18 @@ export const FlightModal: React.FC<FlightModalProps> = ({
                     </div>
 
                     {/* Time Bridge: Deviation Badge & Connecting Arrow */}
-                    <div className="flex flex-col items-center justify-center px-1 shrink-0 relative min-w-[84px]">
-                      <div className="mb-1">
+                    <div className="flex flex-col items-center justify-center px-1 shrink-0 relative min-w-[88px]">
+                      <div className="mb-1 flex items-center justify-center">
                         {flight.diffMinutes >= 10 ? (
-                          <span className="text-rose-600 bg-rose-50 border border-rose-100 font-bold text-[11px] px-2 py-0.5 rounded-full whitespace-nowrap">
+                          <span className="bg-rose-50 text-rose-600 border border-rose-200/60 font-semibold text-[11px] px-2.5 py-0.5 rounded-full whitespace-nowrap">
                             +{flight.diffMinutes}분 지연
                           </span>
                         ) : flight.diffMinutes <= -5 ? (
-                          <span className="text-emerald-600 bg-emerald-50 border border-emerald-100 font-bold text-[11px] px-2 py-0.5 rounded-full whitespace-nowrap">
+                          <span className="bg-emerald-50 text-emerald-600 border border-emerald-200/60 font-semibold text-[11px] px-2.5 py-0.5 rounded-full whitespace-nowrap">
                             {flight.diffMinutes}분 조기
                           </span>
                         ) : (
-                          <span className="text-slate-500 bg-slate-100 font-medium text-[11px] px-2 py-0.5 rounded-full whitespace-nowrap">
+                          <span className="bg-slate-100/90 text-slate-600 border border-slate-200/60 font-semibold text-[11px] px-2.5 py-0.5 rounded-full whitespace-nowrap">
                             정시 운항
                           </span>
                         )}
@@ -418,10 +419,19 @@ export const FlightModal: React.FC<FlightModalProps> = ({
                   <button
                     type="button"
                     onClick={() => copyReport(flight)}
-                    className="text-[10px] text-[#1E60F3] font-bold flex items-center gap-0.5 hover:underline cursor-pointer"
+                    className="text-[11px] flex items-center gap-1.5 px-2 py-0.5 rounded-lg hover:bg-slate-100 active:scale-95 transition-all cursor-pointer"
                   >
-                    <Copy className="w-3 h-3" />
-                    <span>텍스트 복사</span>
+                    {isCopied ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-[#1E60F3]" />
+                        <span className="text-[#1E60F3] font-bold">복사됨</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5 text-slate-400" />
+                        <span className="text-slate-500 font-medium">텍스트 복사</span>
+                      </>
+                    )}
                   </button>
                 </div>
                 <pre className="text-[11px] font-mono leading-relaxed bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-slate-800 whitespace-pre-wrap select-all">
@@ -440,7 +450,7 @@ export const FlightModal: React.FC<FlightModalProps> = ({
 
         {/* Footer Actions: [확인] & [카톡] */}
         {flight && (
-          <div className="p-3.5 bg-white border-t border-slate-100 shrink-0 space-y-2">
+          <div className="p-3.5 bg-white border-t border-slate-100 shrink-0">
             <div className="flex gap-2">
               {/* Main Action: Confirm (Close Modal) */}
               <button
@@ -462,13 +472,6 @@ export const FlightModal: React.FC<FlightModalProps> = ({
                 <ExternalLink className="w-3.5 h-3.5 text-[#191919]" />
               </button>
             </div>
-
-            {isCopied && (
-              <p className="text-center text-[11px] font-bold text-emerald-600 animate-fade-in flex items-center justify-center gap-1">
-                <Check className="w-3.5 h-3.5" />
-                <span>단톡방 보고서가 클립보드에 복사되었습니다!</span>
-              </p>
-            )}
           </div>
         )}
       </div>
