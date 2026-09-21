@@ -299,7 +299,7 @@ export const FlightModal: React.FC<FlightModalProps> = ({
 
                     {/* Flight Path Icon */}
                     <div className="flex flex-col items-center justify-center px-3 shrink-0">
-                      <Plane className="w-5 h-5 text-[#1E60F3] rotate-90" />
+                      <Plane className="w-5 h-5 text-[#1E60F3] rotate-45" />
                       <div className="w-16 border-b border-dashed border-slate-300 mt-1" />
                     </div>
 
@@ -370,9 +370,9 @@ export const FlightModal: React.FC<FlightModalProps> = ({
                                 backgroundImage: `linear-gradient(to right, transparent, ${theme.colorHex})`,
                               }}
                             />
-                            {/* Plane Icon (Northeast 45° Up-Right) */}
+                            {/* Plane Icon (Direct Right / Horizontal →) */}
                             <Plane
-                              className="w-4 h-4 shrink-0 mx-0.5"
+                              className="w-4 h-4 rotate-45 shrink-0 mx-0.5"
                               style={{ color: theme.colorHex, fill: theme.colorHex }}
                             />
                             {/* Dotted Trail to Destination (Right) */}
