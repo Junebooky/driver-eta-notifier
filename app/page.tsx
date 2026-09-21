@@ -12,7 +12,6 @@ import { CustomPresetModal } from '@/components/CustomPresetModal';
 import { RouteInfoCard } from '@/components/RouteInfoCard';
 import { ReportTemplateSelector } from '@/components/ReportTemplateSelector';
 import { ActionPanel } from '@/components/ActionPanel';
-import { Toast } from '@/components/Toast';
 import { A2HSBanner } from '@/components/A2HSBanner';
 import { LocationPreset, ReportMode, RouteEstimate, HomeLocation } from '@/types';
 import { DEFAULT_PRESET_LOCATIONS } from '@/utils/presets';
@@ -129,7 +128,6 @@ export default function Home() {
     try {
       localStorage.setItem(ADMIN_MODE_KEY, String(status));
     } catch (e) {}
-    setToastMessage(status ? '관리자 모드 활성화 (전사 공통 거점 관리)' : '일반 기사 모드로 전환');
   };
 
   const handleOpenAddModal = () => {
@@ -168,12 +166,6 @@ export default function Home() {
     } catch (e) {
       console.warn('Failed to sync new preset to Supabase:', e);
     }
-
-    setToastMessage(
-      isAdmin
-        ? `전사 공통 거점 [${presetWithGlobal.shortName}] 추가 완료`
-        : `개인 거점 [${presetWithGlobal.shortName}] 추가 완료`
-    );
   };
 
   const handleUpdatePreset = async (updatedPreset: LocationPreset) => {
@@ -196,8 +188,6 @@ export default function Home() {
     } catch (e) {
       console.warn('Failed to sync updated preset to Supabase:', e);
     }
-
-    setToastMessage(`거점 [${updatedPreset.shortName}] 수정 완료`);
   };
 
   const handleDeleteCustomPreset = async (id: string) => {
@@ -218,8 +208,6 @@ export default function Home() {
     } catch (e) {
       console.warn('Failed to delete preset from Supabase:', e);
     }
-
-    setToastMessage('거점이 삭제되었습니다.');
   };
 
   const handleReorderPresets = async (reordered: LocationPreset[]) => {
@@ -238,8 +226,6 @@ export default function Home() {
     } catch (e) {
       console.warn('Failed to sync preset order to Supabase:', e);
     }
-
-    setToastMessage('거점 순서가 실시간 동기화되었습니다.');
   };
 
   // Register or update Home Location
@@ -261,8 +247,6 @@ export default function Home() {
     } catch (e) {
       console.warn('Failed to sync home location to Supabase:', e);
     }
-
-    setToastMessage('자택 주소가 등록·동기화되었습니다.');
   };
 
   const [destination, setDestination] = useState<LocationPreset>(DEFAULT_PRESET_LOCATIONS[0]);
@@ -275,8 +259,6 @@ export default function Home() {
   );
   const [isLoadingRoute, setIsLoadingRoute] = useState(false);
 
-  // Toast feedback state
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Fetch route duration & ETA from API with dynamic client clock calculation
   const fetchRouteEstimate = useCallback(
@@ -356,11 +338,9 @@ export default function Home() {
     if (selectionTarget === 'origin') {
       setOrigin(resolvedPreset);
       saveRecentPreset(resolvedPreset);
-      setToastMessage(`출발지: [${resolvedPreset.shortName}] 선택됨`);
       setSelectionTarget('destination');
     } else {
       setDestination(resolvedPreset);
-      setToastMessage(`도착지: [${resolvedPreset.shortName}] 선택됨`);
     }
   };
 
@@ -372,7 +352,6 @@ export default function Home() {
     setOrigin(currentDestination);
     setDestination(currentOrigin);
     saveRecentPreset(currentDestination);
-    setToastMessage(`출발지와 도착지를 맞바꿨습니다 (⇄)`);
   };
 
   // Real-time dynamic report text generated from current state
@@ -397,7 +376,6 @@ export default function Home() {
           onOpenProfileModal={() => setIsProfileModalOpen(true)}
           onSelectNavi={(prov) => {
             setPreferredNavi(prov);
-            setToastMessage(`주력 내비게이션 [${prov.toUpperCase()}] 변경됨`);
           }}
           onOpenAdminModal={() => setIsAdminModalOpen(true)}
           isAdmin={isAdmin}
@@ -458,7 +436,6 @@ export default function Home() {
             onRequestGps={requestGpsLocation}
             onRefreshRoute={() => {
               fetchRouteEstimate(origin, destination);
-              setToastMessage('ETA 및 실시간 경로를 재계산했습니다.');
             }}
           />
 
@@ -477,7 +454,6 @@ export default function Home() {
             routeEstimate={routeEstimate}
             reportText={reportPreviewText}
             targetChatRoom={profile.targetChatRoom}
-            onShowToast={(msg) => setToastMessage(msg)}
           />
         </div>
       </div>
@@ -499,7 +475,6 @@ export default function Home() {
               driverName: updated.driverName,
             }),
           }).catch((err) => console.warn('Supabase driver profile sync error:', err));
-          setToastMessage('드라이버 프로필이 저장되었습니다.');
         }}
       />
 
@@ -533,11 +508,6 @@ export default function Home() {
         onSaveHome={handleSaveHomeLocation}
       />
 
-      {/* Feedback Toast Notification */}
-      <Toast
-        message={toastMessage}
-        onClose={() => setToastMessage(null)}
-      />
     </main>
   );
 }

@@ -14,7 +14,6 @@ interface ActionPanelProps {
   routeEstimate: RouteEstimate | null;
   reportText: string;
   targetChatRoom?: string;
-  onShowToast: (message: string) => void;
 }
 
 const NAVI_DISPLAY_NAMES: Record<NaviProvider, string> = {
@@ -42,7 +41,6 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   routeEstimate,
   reportText,
   targetChatRoom,
-  onShowToast,
 }) => {
   /**
    * 1-Second Fast Pass Action (Synchronous Clipboard Copy on Safari User Activation + Navi Launch + Haptics)
@@ -52,11 +50,9 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
     haptics.successPulse();
 
     // 1. TOP-LEVEL SYNCHRONOUS CLIPBOARD COPY (Mandatory for Safari User Gesture Security)
-    let copySuccess = false;
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(reportText);
-        copySuccess = true;
       } else {
         const textArea = document.createElement('textarea');
         textArea.value = reportText;
@@ -64,20 +60,12 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
         textArea.select();
         document.execCommand('copy');
         document.body.removeChild(textArea);
-        copySuccess = true;
       }
     } catch (err) {
       console.warn('Clipboard write failed:', err);
     }
 
-    // 2. Immediate Toast Feedback
-    if (copySuccess) {
-      onShowToast(`📋 ETA 복사 완료! [${NAVI_DISPLAY_NAMES[defaultNavi]}] 실행 중...`);
-    } else {
-      onShowToast(`[${NAVI_DISPLAY_NAMES[defaultNavi]}] 앱 실행 중...`);
-    }
-
-    // 3. Launch Selected Navigation Deep Link sequentially
+    // 2. Launch Selected Navigation Deep Link sequentially
     launchNavigationApp(defaultNavi, {
       name: destination.name,
       lat: destination.lat,
@@ -92,14 +80,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   const handleKakaoReportAction = async () => {
     haptics.lightTap();
 
-    const copied = await copyAndLaunchKakaoTalk(reportText);
-
-    const targetRoomLabel = targetChatRoom ? `[${targetChatRoom}]` : '[VIP 단톡방]';
-    if (copied) {
-      onShowToast(`📋 ETA 복사 완료! ${targetRoomLabel}에 바로 붙여넣기 하세요.`);
-    } else {
-      onShowToast(`카카오톡을 실행합니다. (${targetRoomLabel}에 붙여넣기)`);
-    }
+    await copyAndLaunchKakaoTalk(reportText);
   };
 
   return (
