@@ -11,6 +11,9 @@ interface CustomPresetModalProps {
   onAddPreset: (preset: LocationPreset) => void;
   presetToEdit?: LocationPreset | null;
   onUpdatePreset?: (preset: LocationPreset) => void;
+  isHomeMode?: boolean;
+  onSaveHome?: (home: { name: string; address: string; lat: number; lng: number }) => void;
+  isAdmin?: boolean;
 }
 
 interface PoiResult {
@@ -27,6 +30,9 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
   onAddPreset,
   presetToEdit,
   onUpdatePreset,
+  isHomeMode = false,
+  onSaveHome,
+  isAdmin = false,
 }) => {
   // Search & Autocomplete State
   const [searchQuery, setSearchQuery] = useState('');
@@ -108,6 +114,20 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
   // One-touch Selection and Registration
   const handleSelectPoi = (poi: PoiResult) => {
     haptics.successPulse();
+
+    if (isHomeMode && onSaveHome) {
+      onSaveHome({
+        name: poi.name,
+        address: poi.address,
+        lat: poi.lat,
+        lng: poi.lng,
+      });
+      setSearchQuery('');
+      setSearchResults([]);
+      onClose();
+      return;
+    }
+
     const cleanShort = poi.name.length > 8 ? poi.name.slice(0, 8) : poi.name;
 
     if (presetToEdit && onUpdatePreset) {
@@ -126,8 +146,9 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
         shortName: cleanShort,
         lat: poi.lat,
         lng: poi.lng,
-        category: 'CUSTOM',
+        category: isAdmin ? 'HOTEL' : 'CUSTOM',
         address: poi.address,
+        isGlobal: isAdmin,
       };
       onAddPreset(newPreset);
     }
@@ -140,16 +161,34 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !shortName.trim()) {
-      alert('거점 명칭과 표기용 짧은 이름을 입력해 주세요.');
+    if (!name.trim() || (!isHomeMode && !shortName.trim())) {
+      alert('거점 명칭을 입력해 주세요.');
       return;
     }
     if (lat === null || lng === null) {
-      alert('검색 결과에서 거점을 선택해 주세요.');
+      alert('검색 결과에서 위치를 선택해 주세요.');
       return;
     }
 
     haptics.successPulse();
+
+    if (isHomeMode && onSaveHome) {
+      onSaveHome({
+        name: name.trim() || '자택',
+        address: address.trim() || '자택 주소',
+        lat,
+        lng,
+      });
+      setSearchQuery('');
+      setSearchResults([]);
+      setName('');
+      setShortName('');
+      setAddress('');
+      setLat(null);
+      setLng(null);
+      onClose();
+      return;
+    }
 
     if (presetToEdit && onUpdatePreset) {
       onUpdatePreset({
@@ -167,8 +206,9 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
         shortName: shortName.trim(),
         lat,
         lng,
-        category: 'CUSTOM',
+        category: isAdmin ? 'HOTEL' : 'CUSTOM',
         address: address.trim() || '사용자 지정 거점',
+        isGlobal: isAdmin,
       };
       onAddPreset(newPreset);
     }
@@ -187,11 +227,24 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
       <div className="w-full max-w-sm bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-hidden text-slate-900">
-        {/* Header: Simplified Title (no '+' icon) */}
+        {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50/80">
-          <h2 className="text-sm font-black text-slate-900 tracking-tight">
-            {presetToEdit ? '장소 수정' : '장소 등록'}
-          </h2>
+          <div className="flex items-center gap-1.5">
+            <h2 className="text-sm font-black text-slate-900 tracking-tight">
+              {isHomeMode
+                ? '자택 주소 등록'
+                : presetToEdit
+                ? '장소 수정'
+                : isAdmin
+                ? '공통 거점 등록'
+                : '장소 등록'}
+            </h2>
+            {isAdmin && !isHomeMode && (
+              <span className="text-[10px] bg-[#1E60F3] text-white font-bold px-1.5 py-0.5 rounded">
+                전사 공통
+              </span>
+            )}
+          </div>
           <button
             type="button"
             onClick={onClose}

@@ -2,38 +2,51 @@
 
 import React from 'react';
 import { DriverProfile, NaviProvider } from '@/types';
-import { Car, ChevronDown } from 'lucide-react';
+import { Car, ChevronDown, Settings, ShieldCheck } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface HeaderProps {
   profile: DriverProfile;
   onOpenProfileModal: () => void;
   onSelectNavi: (provider: NaviProvider) => void;
+  onOpenAdminModal?: () => void;
+  isAdmin?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   profile,
   onOpenProfileModal,
   onSelectNavi,
+  onOpenAdminModal,
+  isAdmin = false,
 }) => {
   return (
     <header className="w-full bg-white/95 border-b border-slate-100/90 backdrop-blur pt-[max(env(safe-area-inset-top),1.25rem)] pb-2.5 px-4 sticky top-0 z-30 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
       <div className="max-w-md mx-auto flex items-center justify-between">
         {/* Left: Driver / Vehicle Pill Tag */}
-        <button
-          onClick={() => {
-            haptics.lightTap();
-            onOpenProfileModal();
-          }}
-          className="flex items-center space-x-1.5 bg-white px-3 py-1.5 rounded-full border border-slate-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.04)] text-xs font-bold text-slate-800 cursor-pointer hover:bg-slate-50 active:scale-95 transition-all"
-        >
-          <Car className="w-3.5 h-3.5 text-[#1E60F3] fill-[#1E60F3] shrink-0" />
-          <span className="font-extrabold">{profile.vehicleNo || '4호차'} • {profile.driverName || '윤태준'}</span>
-          <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => {
+              haptics.lightTap();
+              onOpenProfileModal();
+            }}
+            className="flex items-center space-x-1.5 bg-white px-3 py-1.5 rounded-full border border-slate-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.04)] text-xs font-bold text-slate-800 cursor-pointer hover:bg-slate-50 active:scale-95 transition-all"
+          >
+            <Car className="w-3.5 h-3.5 text-[#1E60F3] fill-[#1E60F3] shrink-0" />
+            <span className="font-extrabold">{profile.vehicleNo || '4호차'} • {profile.driverName || '윤태준'}</span>
+            <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
+          </button>
 
-        {/* Right: Circular 36px Navi Switchers (Right Aligned) */}
-        <div className="ml-auto flex items-center gap-2">
+          {isAdmin && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-[#1E60F3] text-[10px] font-black tracking-tight animate-fade-in">
+              <ShieldCheck className="w-3 h-3" />
+              관리자
+            </span>
+          )}
+        </div>
+
+        {/* Right: Circular 36px Navi Switchers + Settings Gear Icon */}
+        <div className="ml-auto flex items-center gap-1.5">
           {/* TMAP Button (White circular background + Gradient 'T' Logo) */}
           <button
             onClick={() => {
@@ -96,6 +109,25 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <span>N</span>
           </button>
+
+          {/* Admin / Settings Gear Button */}
+          {onOpenAdminModal && (
+            <button
+              onClick={() => {
+                haptics.lightTap();
+                onOpenAdminModal();
+              }}
+              className={`w-9 h-9 rounded-full border shadow-xs flex items-center justify-center transition-all duration-100 active:scale-90 cursor-pointer ${
+                isAdmin
+                  ? 'bg-blue-50 border-blue-300 text-[#1E60F3] ring-2 ring-blue-400'
+                  : 'bg-white border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50'
+              }`}
+              title={isAdmin ? '관리자 모드 활성화됨 (설정)' : '관리자 모드 진입 (설정)'}
+              aria-label="관리자 모드 설정"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
     </header>

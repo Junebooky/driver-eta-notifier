@@ -41,4 +41,17 @@ export const haptics = {
       }
     }
   },
+
+  /**
+   * Error / Denial alert feedback ([80ms, 50ms, 80ms])
+   */
+  errorAlert: () => {
+    if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate?.([80, 50, 80]);
+      } catch (e) {
+        // Safe navigation: ignore
+      }
+    }
+  },
 };
