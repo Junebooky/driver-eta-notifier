@@ -99,11 +99,11 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
             onRefreshRoute();
           }}
           disabled={isLoadingRoute}
-          className="w-11 h-11 rounded-xl bg-[#1E60F3] hover:bg-blue-600 text-white shadow-[0_4px_14px_rgba(30,96,243,0.3)] flex items-center justify-center active:scale-95 transition-transform duration-100 disabled:opacity-50 cursor-pointer shrink-0"
+          className="w-11 h-11 rounded-xl bg-[#1E60F3] hover:bg-[#1346D8] hover:scale-105 hover:shadow-lg hover:shadow-blue-500/35 active:translate-y-0 active:scale-[0.97] active:bg-[#0f3bb8] text-white shadow-xs flex items-center justify-center transition-all duration-150 ease-out disabled:opacity-50 cursor-pointer shrink-0 group"
           title="ETA 재계산"
           aria-label="ETA 재계산"
         >
-          <RefreshCw className={`w-5 h-5 ${isLoadingRoute ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`w-5 h-5 group-hover:rotate-45 transition-transform duration-200 ${isLoadingRoute ? 'animate-spin' : ''}`} />
         </button>
       </div>
     </div>

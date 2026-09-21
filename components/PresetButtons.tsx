@@ -10,6 +10,7 @@ interface PresetButtonsProps {
   homeLocation?: HomeLocation | null;
   selectedOriginId?: string;
   selectedDestinationId?: string;
+  selectionTarget?: 'origin' | 'destination';
   isAdmin?: boolean;
   onSelectPreset: (preset: LocationPreset) => void;
   onOpenAddModal: () => void;
@@ -24,6 +25,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
   homeLocation,
   selectedOriginId,
   selectedDestinationId,
+  selectionTarget = 'destination',
   isAdmin = false,
   onSelectPreset,
   onOpenAddModal,
@@ -267,6 +269,14 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
 
   const draggedPreset = dragIndex !== null ? items[dragIndex] : null;
 
+  const isTargetDestination = selectionTarget === 'destination';
+  const dynamicHoverClasses = isTargetDestination
+    ? 'hover:bg-emerald-50/70 hover:border-emerald-400 hover:shadow-xs hover:-translate-y-0.5'
+    : 'hover:bg-blue-50/70 hover:border-blue-400 hover:shadow-xs hover:-translate-y-0.5';
+  const dynamicTextHoverClass = isTargetDestination
+    ? 'group-hover:text-emerald-900'
+    : 'group-hover:text-[#1E60F3]';
+
   return (
     <div className="w-full bg-white border border-slate-100/80 rounded-2xl p-4 shadow-[0_8px_25px_rgba(30,96,243,0.06)] select-none space-y-3">
       {/* Header: Classic Teardrop MapPin with Center Circular Cutout in Cobalt Badge on Left, 거점 관리 on Right */}
@@ -275,15 +285,15 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
           <div className="w-6 h-6 rounded-lg bg-[#1E60F3] flex items-center justify-center shadow-xs shrink-0">
             <svg
               viewBox="0 0 24 24"
-              fill="currentColor"
-              className="w-4 h-4 text-white"
-              aria-hidden="true"
+              className="w-3.5 h-3.5 text-white"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
-              <path
-                fillRule="evenodd"
-                clipRule="evenodd"
-                d="M12 2C7.58 2 4 5.58 4 10c0 5.25 8 12 8 12s8-6.75 8-12c0-4.42-3.58-8-8-8zm0 5a3 3 0 1 1 0 6 3 3 0 0 1 0-6z"
-              />
+              <path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" />
+              <circle cx="12" cy="10" r="3" />
             </svg>
           </div>
           <h2 className="text-sm font-bold text-slate-900 tracking-tight">자주 가는 목적지</h2>
@@ -338,18 +348,26 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                   onSelectPreset(homePreset);
                 }
               }}
-              className={`w-full h-full min-h-[58px] px-2 py-2.5 rounded-xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-200 ${
+              className={`w-full h-full min-h-[58px] px-2 py-2.5 rounded-xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-200 group ${
                 isHomeDestination
-                  ? 'bg-white border-emerald-300 ring-2 ring-emerald-50 text-slate-900 font-bold shadow-[0_2px_10px_rgba(16,185,129,0.08)]'
+                  ? 'border-emerald-500 bg-emerald-50/40 text-emerald-800 ring-1 ring-emerald-500/30 font-bold shadow-[0_2px_10px_rgba(16,185,129,0.1)]'
                   : isHomeOrigin
                   ? 'bg-white border-[#1E60F3]/40 ring-2 ring-[#1E60F3]/10 text-slate-900 font-bold shadow-[0_2px_10px_rgba(30,96,243,0.08)]'
-                  : 'bg-blue-50/40 hover:bg-blue-50/80 hover:border-blue-300/80 hover:shadow-xs hover:-translate-y-0.5 border-blue-200/70 text-slate-900 font-semibold'
+                  : `bg-slate-50/70 border-slate-200/80 text-slate-800 font-semibold ${dynamicHoverClasses}`
               } ${isManageMode ? 'border-dashed border-[#1E60F3]/60' : ''}`}
               title={`${homePreset.name} (${homePreset.address})`}
             >
               <div className="flex items-center justify-center gap-1 w-full">
                 <HomeIcon className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />
-                <span className="text-xs tracking-tight truncate font-bold text-slate-900">
+                <span
+                  className={`text-xs tracking-tight truncate font-bold ${
+                    isHomeDestination
+                      ? 'text-emerald-900'
+                      : isHomeOrigin
+                      ? 'text-blue-900'
+                      : `text-slate-900 ${dynamicTextHoverClass}`
+                  } transition-colors`}
+                >
                   자택
                 </span>
               </div>
@@ -381,7 +399,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                 haptics.lightTap();
                 onOpenHomeModal();
               }}
-              className="w-full h-full min-h-[58px] py-2.5 px-2 rounded-xl border border-dashed border-slate-300 dark:border-slate-600 bg-slate-50/80 hover:bg-blue-50/40 hover:border-blue-300/80 hover:shadow-xs hover:-translate-y-0.5 text-slate-800 flex flex-col justify-between items-center active:scale-95 transition-all duration-200 cursor-pointer group"
+              className={`w-full h-full min-h-[58px] py-2.5 px-2 rounded-xl border border-dashed border-slate-300 dark:border-slate-600 bg-slate-50/80 ${dynamicHoverClasses} text-slate-800 flex flex-col justify-between items-center active:scale-95 transition-all duration-200 cursor-pointer group`}
               title="자택 주소를 등록하세요"
             >
               {/* 상단 1열: 단정한 집(Home) 아이콘과 차분한 '자택' 텍스트 */}
@@ -411,11 +429,10 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
           const isDestination = selectedDestinationId === preset.id;
           const isThisItemDragging = isDragging && dragIndex === index;
 
-          let stateClasses =
-            'bg-slate-50/70 hover:bg-blue-50/50 border-slate-200/80 hover:border-blue-300/80 hover:shadow-xs hover:-translate-y-0.5 text-slate-800 font-medium';
+          let stateClasses = `bg-slate-50/70 border-slate-200/80 text-slate-800 font-medium ${dynamicHoverClasses}`;
           if (isDestination) {
             stateClasses =
-              'bg-white border-emerald-300 ring-2 ring-emerald-50 text-slate-900 font-bold shadow-[0_2px_10px_rgba(16,185,129,0.08)]';
+              'border-emerald-500 bg-emerald-50/40 text-emerald-800 ring-1 ring-emerald-500/30 font-bold shadow-[0_2px_10px_rgba(16,185,129,0.1)]';
           } else if (isOrigin) {
             stateClasses =
               'bg-white border-[#1E60F3]/40 ring-2 ring-[#1E60F3]/10 text-slate-900 font-bold shadow-[0_2px_10px_rgba(30,96,243,0.08)]';
@@ -442,12 +459,20 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                 onMouseDown={(e) => handlePointerStart(index, e)}
                 onMouseMove={handlePointerMoveCheck}
                 onMouseUp={() => handlePointerEnd(preset)}
-                className={`w-full h-full min-h-[58px] px-2 py-2.5 rounded-xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-200 ${stateClasses} ${
+                className={`w-full h-full min-h-[58px] px-2 py-2.5 rounded-xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-200 group ${stateClasses} ${
                   isThisItemDragging ? 'opacity-20 border-dashed border-[#1E60F3]' : ''
                 }`}
                 title={`${preset.name} (길게 눌러 순서 변경)`}
               >
-                <span className="text-xs font-bold tracking-tight truncate w-full text-slate-900">
+                <span
+                  className={`text-xs font-bold tracking-tight truncate w-full ${
+                    isDestination
+                      ? 'text-emerald-900'
+                      : isOrigin
+                      ? 'text-blue-900'
+                      : `text-slate-900 ${dynamicTextHoverClass}`
+                  } transition-colors`}
+                >
                   {preset.shortName}
                 </span>
 
@@ -547,7 +572,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                     setManagingPreset(null);
                     onEditPreset(p);
                   }}
-                  className="w-full py-2.5 px-4 bg-[#1E60F3] hover:bg-blue-600 hover:shadow-md hover:shadow-blue-500/25 text-white font-bold rounded-xl text-xs flex items-center justify-center space-x-1.5 cursor-pointer active:scale-98 transition-all duration-150"
+                  className="w-full py-2.5 px-4 bg-[#1E60F3] hover:bg-[#1346D8] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/35 active:translate-y-0 active:scale-[0.97] active:bg-[#0f3bb8] text-white font-bold rounded-xl text-xs flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs transition-all duration-150 ease-out"
                 >
                   <Pencil className="w-3.5 h-3.5 text-white" />
                   <span>수정</span>
@@ -564,7 +589,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                     setManagingPreset(null);
                     onDeleteCustomPreset(idToDelete);
                   }}
-                  className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 font-semibold rounded-xl text-xs flex items-center justify-center space-x-1.5 cursor-pointer active:scale-98 transition-all duration-150"
+                  className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 font-semibold rounded-xl text-xs flex items-center justify-center space-x-1.5 cursor-pointer active:translate-y-0 active:scale-[0.97] transition-all duration-150 ease-out"
                 >
                   <Trash2 className="w-3.5 h-3.5 text-slate-500" />
                   <span>

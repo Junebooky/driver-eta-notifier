@@ -124,7 +124,7 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
             <button
               type="submit"
               disabled={!pin}
-              className="w-full py-3 bg-[#1E60F3] hover:bg-[#1850db] disabled:opacity-50 text-white rounded-xl text-xs font-extrabold shadow-sm active:scale-98 transition-all cursor-pointer"
+              className="w-full py-3 bg-[#1E60F3] hover:bg-[#1346D8] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/35 active:translate-y-0 active:scale-[0.97] active:bg-[#0f3bb8] disabled:opacity-50 text-white rounded-xl text-xs font-extrabold shadow-xs transition-all duration-150 ease-out cursor-pointer"
             >
               관리자 모드 활성화
             </button>

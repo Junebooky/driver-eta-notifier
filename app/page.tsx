@@ -463,6 +463,7 @@ export default function Home() {
             homeLocation={profile.homeLocation}
             selectedOriginId={origin?.id}
             selectedDestinationId={destination?.id}
+            selectionTarget={selectionTarget}
             isAdmin={isAdmin}
             onSelectPreset={handleSelectPreset}
             onOpenAddModal={handleOpenAddModal}

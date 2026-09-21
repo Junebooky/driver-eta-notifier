@@ -359,7 +359,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
               <button
                 type="submit"
                 disabled={lat === null || !name.trim()}
-                className="w-2/3 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-xs font-black shadow-md shadow-blue-500/20 active:scale-95 transition-transform duration-100 cursor-pointer"
+                className="w-2/3 py-3 rounded-xl bg-[#1E60F3] hover:bg-[#1346D8] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/35 active:translate-y-0 active:scale-[0.97] active:bg-[#0f3bb8] disabled:opacity-40 text-white text-xs font-black shadow-xs transition-all duration-150 ease-out cursor-pointer"
               >
                 저장
               </button>
