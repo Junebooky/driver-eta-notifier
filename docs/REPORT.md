@@ -1,7 +1,7 @@
-# Protocol Cockpit (driver-eta-notifier) - 항공편 모달 리얼 보딩패스 티켓 리디자인 및 아시아나 터미널 매핑 긴급 교정 완료 보고서
+# Protocol Cockpit (driver-eta-notifier) - 인천공항 항공편 관제 고도화: 백엔드 익일 룩어헤드 및 브랜드 일체화·보딩패스 UI 정제 완료 보고서
 
 > **평가 일시**: 2026년 9월 21일  
-> **대상 애플리케이션**: Protocol Cockpit (의전 드라이버 전용 스마트 관제 런처 v4.41 - 인천국제공항공사 실시간 항공편 모달 실물 보딩패스 티켓 일체화, 아시아나항공 T1 터미널 오매핑 긴급 버그 교정, 코발트 스쿼클 헤더 및 슬라이딩 필 탭 탑재, 홈 주유소/항공편 쌍둥이 퀵 액션 버튼 동기화)  
+> **대상 애플리케이션**: Protocol Cockpit (의전 드라이버 전용 스마트 관제 런처 v4.42 - 과거 만료 항공편 자동 필터링 및 익일(+1일) 자동 룩어헤드 파이프라인, 보딩패스 스케줄-예상 시각 '타임 브릿지(Time Bridge)' 연결 인터랙션, 잡색 전면 제거 및 브랜드 코발트 블루 일체화, [내일 운항] 배지, 입국장 탑승구 문구 삭제 및 의전 거점 단독 강조, 직관적 Empty State 카피)  
 > **프로덕션 배포 URL**: [https://driver-eta-notifier.vercel.app](https://driver-eta-notifier.vercel.app)  
 > **GitHub Repository**: [https://github.com/Junebooky/driver-eta-notifier.git](https://github.com/Junebooky/driver-eta-notifier.git) (`main` 브랜치)  
 
@@ -11,60 +11,60 @@
 
 | 과업 항목 | 구현 상태 | 핵심 조치 및 엔지니어링 구현 세부 사항 |
 | :--- | :---: | :--- |
-| **1. 아시아나항공(OZ) 터미널 매핑 긴급 교정 (`utils/flightMapping.ts`, `app/api/flight/route.ts`)** | ✅ 완료 | • **API 오응답 원천 차단**: 공항공사 API에서 아시아나항공(`OZ`) 운항 정보 조회 시 `terminalid: P03`이 비정상 반환되던 문제를 해결.<br>• IATA 코드가 `OZ`이거나 `P01/P02`인 경우 무조건 **'제1여객터미널' (`isT2: false`)**로 강제 바인딩.<br>• `OZ741` 실시간 쿼리 검증: `제1여객터미널 3층 (카운터 G17-J40 / 7~8번 도어 앞)` 및 T1 출국장 좌표(`custom_flight_icn_t1_dep`, lat 37.4495) 정상 매핑 완료. |
-| **2. 모달 헤더 및 슬라이딩 세그먼트 탭 UI 정제 (`components/FlightModal.tsx`)** | ✅ 완료 | • **헤더 간결화**: 연하늘색 아이콘 대신 브랜드 솔리드 코발트 블루 스쿼클(`w-10 h-10 rounded-2xl bg-[#1E60F3] text-white`) 탑재, 부제목을 걷어내고 메인 타이틀 `인천공항 실시간 운항 관제`만 볼드 표출.<br>• **2글자 세그먼트 탭 (`[입국]` / `[출국]`)**: 단톡방 보고 섹션과 동일한 부드러운 좌우 슬라이딩 필 애니메이션(`transition-transform duration-300 ease-out`, `translate-x-0` ↔ `translate-x-full`) 적용. |
-| **3. 리얼 보딩패스(Boarding Pass) 티켓 일체화** | ✅ 완료 | • **군더더기 요소 제거**: 복잡도를 유발하던 빠른 조회 칩 및 담당승객 프로필 표출 행 화면 제거 (백그라운드 단톡방 보고서 복사 로직은 100% 보존).<br>• **실물 항공권 컴포넌트 통합**: 상단 비행정보 카드와 하단 하차도어 카드를 단 하나의 보딩패스로 통합.<br>  - **티켓 상단**: 항공사 뱃지 + 편명 + 운항 상태 캡슐, 출발 ➔ 도착 노선 및 비행기 패스, 스케줄 vs 예상 시각 비교 그리드.<br>  - **티켓 중앙 절취선**: 양 끝 반원형 티켓 홈(Notches, `-ml-3 w-6 h-6 rounded-r-full bg-slate-50` / `-mr-3 w-6 h-6 rounded-l-full bg-slate-50`) 및 점선 절취선(`border-b-2 border-dashed border-slate-200`) 완벽 구현.<br>  - **티켓 하단 스텁**: 출국 시 `{터미널} 3층 ({카운터} / {도어}번 도어 앞)`, 입국 시 `{터미널} 1층 ({출구} / 수하물 {수취대}번)` 선명한 볼드 타이포그래피 강조. |
-| **4. 하단 액션 버튼 재정의** | ✅ 완료 | • 기존 버튼 대신 **`[확인]` 버튼(`bg-[#1E60F3] text-white font-bold rounded-2xl h-12 flex-1`)**을 배치하여 터치 시 즉시 모달 닫힘 바인딩.<br>• 우측 노란색 **`[카톡]` 버튼**은 단톡방 표준 보고서 클립보드 자동 복사 + `kakaotalk://` 딥링크 호출을 즉각 실행하도록 유지. |
-| **5. 메인 홈 주유소 버튼 비주얼 동기화 (`components/PresetButtons.tsx`)** | ✅ 완료 | • '거점 관리' 좌측의 **주유소(`Fuel`) 버튼**을 항공편 버튼과 완벽히 동일한 화이트 카드 규격(`w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-slate-700 hover:bg-[#1E60F3] hover:text-white hover:border-[#1E60F3] active:scale-95`)으로 통일하여 완벽한 쌍둥이 인터랙션 구축. |
-| **6. 빌드 무결성** | ✅ 완료 | • `npm run build` TypeScript 컴파일 에러 **0건**, Next.js 16.3.5 Turbopack 최적화 빌드 완료. |
+| **1. 백엔드 스마트 타임 윈도우 & 익일(+1일) 자동 룩어헤드 (`app/api/flight/route.ts`, `utils/flightMapping.ts`)** | ✅ 완료 | • **만료 운항(Stale Flight) 판정**: 현재 시각 기준 **2시간 이상 과거**에 도착/출발이 완료된 당일 비행편은 '종료된 과거 운항'으로 판정하여 바인딩 제외.<br>• **익일(+1일) 자동 룩어헤드 파이프라인**: 당일 잔여 운항이 없는 야간 시간대 조회 시, 내일(`YYYYMMDD + 1일`) 스케줄을 자동으로 탐색하여 `isTomorrow: true`, `flightDate: "YYYY-MM-DD"` 메타데이터와 함께 즉시 반환.<br>• **KST-UTC 무손실 파싱**: Vercel 서버리스 환경(UTC+0)에서도 KST(UTC+9) 시각 왜곡이 발생하지 않도록 `Date.UTC(y, m, d, h - 9, min)` 정밀 변환 적용. |
+| **2. 브랜드 컬러 일체화 & 지연 시간 '타임 브릿지' 구현 (`components/FlightModal.tsx`)** | ✅ 완료 | • **오프브랜드 잡색 제거**: 연하늘색(`bg-blue-50`) 및 황갈색 지연 배지(`bg-amber-100`) 완전 삭제. 항공사명은 단정한 서브헤더(`text-sm font-semibold text-slate-500`)로 편명 상단에 배치.<br>• **스케줄-예상 시각 '타임 브릿지'**: [스케줄 예정 시각] ➔ [예상 착륙(출발) 시각] 사이를 가로지르는 가이드 라인과 우측 화살표(`➔`) 구축. 중앙에 지연(`+N분 지연`, rose), 조기(`-N분 조기`, emerald), 정시(`정시 운항`, slate) 모던 필 배지 탑재.<br>• 예상 시각 숫자는 브랜드 코발트 블루(`text-[#1E60F3] font-black text-lg`)로 강조.<br>• 내일 비행편의 경우 보딩패스 상단에 **`[내일 운항]` (`bg-blue-50 text-[#1E60F3] border border-blue-200`)** 배지 표출. |
+| **3. '탑승구(Gate)' 용어 오류 제거 및 입국 거점 표기 단순화** | ✅ 완료 | • 입국 픽업 화면에서 일반구역 대기 의전 기사에게 불필요한 `탑승구(Gate): 268번 게이트` 라인을 완전히 제거.<br>• 입국 시 영접 거점인 **`제1(2)여객터미널 1층 ({출구}출구 / 수하물 {수취대}번)`** 위치 정보만 여백을 주어 볼드하게 단독 강조. |
+| **4. 조회 결과 없음(Empty State) 화면 카피 간결화** | ✅ 완료 | • 장황한 안내 텍스트를 제거하고 직관적인 카피로 대체:<br>  - 메인 타이틀: `운항 정보를 찾을 수 없습니다` (`text-base font-bold text-slate-800 mt-3`)<br>  - 서브 가이드: `편명 또는 [입국/출국] 탭 설정을 확인해 주세요.` (`text-xs text-slate-400 mt-1`) |
+| **5. 빌드 무결성** | ✅ 완료 | • `npm run build` TypeScript 컴파일 에러 **0건**, Turbopack 최적화 빌드 완료. |
 
 ---
 
-## 2. 주요 구현 코드 변경 요약
+## 2. 주요 코드 변경 요약
 
-### 1) [`utils/flightMapping.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/utils/flightMapping.ts) - 터미널 판별 우선순위 강제
+### 1) [`app/api/flight/route.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/api/flight/route.ts) - 만료 비행편 판정 및 익일 룩어헤드
 ```ts
-export function resolveTerminal(terminalId?: string | null, flightId?: string): { terminal: string; isT2: boolean } {
-  const prefix = (flightId || '').slice(0, 2).toUpperCase();
-  const tId = (terminalId || '').toUpperCase();
+const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 
-  // Rule 1: Asiana Airlines (OZ) or P01/P02 is strictly Terminal 1
-  if (prefix === 'OZ' || tId === 'P01' || tId === 'P02') {
-    return { terminal: '제1여객터미널', isT2: false };
-  }
+function isStaleFlight(item: any, nowMs: number): boolean {
+  const dtStr = item.estimatedDateTime || item.scheduleDateTime;
+  const itemDate = parseFlightDateTime(dtStr);
+  if (!itemDate) return false;
 
-  // Rule 2: T2 airlines or explicitly P03
-  const t2Airlines = ['KE', 'DL', 'AF', 'KL', 'AM', 'GA', 'ME', 'RO', 'SV', 'UX', 'VN', 'MF', 'LJ'];
-  if (t2Airlines.includes(prefix) || tId === 'P03') {
-    return { terminal: '제2여객터미널', isT2: true };
-  }
+  const diffFromNow = nowMs - itemDate.getTime();
+  const remark = (item.remark || '').trim();
+  const isCompletedRemark = ['도착', '출발', '결항', '탑승마감'].some((r) => remark.includes(r));
 
-  return { terminal: '제1여객터미널', isT2: false };
+  return diffFromNow >= TWO_HOURS_MS && (isCompletedRemark || diffFromNow >= 3.5 * 60 * 60 * 1000);
 }
 ```
 
-### 2) [`components/FlightModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/FlightModal.tsx) - 보딩패스 티켓 일체화 & 슬라이딩 탭
-- 상단 헤더: `Plane` 코발트 스쿼클 아이콘 + 간결한 타이틀.
-- 슬라이딩 필: `w-[calc(50%-4px)] h-[calc(100%-8px)] transition-transform duration-300 ease-out`.
-- 실물 보딩패스: 상단 비행정보 + 중앙 반원형 노치 및 대시 절취선 + 하단 VIP 의전 하차 도어/게이트 스텁.
-- 액션 바: `[확인]` (모달 닫힘) + `[카톡]` (클립보드 복사 + 카카오톡 실행).
-
-### 3) [`components/PresetButtons.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/PresetButtons.tsx) - 항공편/주유소 쌍둥이 버튼 규격
-- 항공편(`Plane`) 버튼 & 주유소(`Fuel`) 버튼 모두 `w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-slate-700 hover:bg-[#1E60F3] hover:text-white hover:border-[#1E60F3] active:scale-95` 적용.
+### 2) [`components/FlightModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/FlightModal.tsx) - 타임 브릿지 및 UI 정제
+- **항공사명 서브헤더 + `[내일 운항]` 뱃지**:
+  - `isTomorrow && <span className="bg-blue-50 text-[#1E60F3] border border-blue-200 font-bold px-2 py-0.5 rounded-md text-[11px]">내일 운항</span>`
+- **타임 브릿지(Time Bridge)**:
+  - 좌측 [스케줄 예정 시각] ➔ 중앙 [편차 뱃지 + 연결 화살표] ➔ 우측 [예상 시각(코발트 블루 텍스트)]
+- **입국 거점 단독 표출**:
+  - 탑승구 문구 삭제, `{flight.arrivalLocationText}` 단독 카드 강조.
 
 ---
 
-## 3. 엔드투엔드(E2E) 검증 결과
+## 3. 엔드투엔드(E2E) 실시간 쿼리 검증 결과
 
-1. **OZ741 (아시아나항공 방콕행 출국) 실제 조회 검증**:
-   - `terminal`: **`제1여객터미널`** (기존 제2여객터미널 오표기 결함 완벽 해결)
-   - `terminalId`: **`P01`**
-   - `departureLocationText`: **`제1여객터미널 3층 (카운터 G17-J40 / 7~8번 도어 앞)`**
-   - `targetPreset`: **`custom_flight_icn_t1_dep`** (위도 37.4495, 경도 126.4512)
-   - `statusText`: **`20:01 (지연 시간 +26분)`**
-2. **KE012 (대한항공 로스앤젤레스발 입국) 실제 조회 검증**:
-   - `terminal`: **`제2여객터미널`**
-   - `arrivalLocationText`: **`제2여객터미널 1층 (B출구 / 수하물 13번)`**
-   - `targetPreset`: **`custom_flight_icn_t2_arr`** (위도 37.4691, 경도 126.4344)
-3. **빌드 검증**:
-   - `npm run build` 결과 11/11 정적/동적 라우트 전체 컴파일 성공 (TypeScript 에러 0건).
+1. **KE012 (입국 / 주간 도착편 야간 조회 시뮬레이션)**:
+   - 당일 05:15 도착 완료편(17시간 전) 자동 만료 처리.
+   - 내일(`2026-09-22`) 스케줄로 자동 룩어헤드 연계 성공:
+     - `isTomorrow`: **`true`**
+     - `flightDate`: **`"2026-09-22"`**
+     - `scheduleTimeFormatted`: **`"04:40"`**
+     - `estimatedTimeFormatted`: **`"04:41"`**
+     - `arrivalLocationText`: **`"제2여객터미널 1층 (B출구 / 수하물 11번)"`**
+2. **OZ741 (출국 / 아시아나항공 방콕행)**:
+   - 당일 20:01 출발 완료편(2.4시간 전) 만료 판정 후 내일 19:35 스케줄로 룩어헤드 성공:
+     - `isTomorrow`: **`true`**
+     - `flightDate`: **`"2026-09-22"`**
+     - `terminal`: **`"제1여객터미널"`**
+     - `departureLocationText`: **`"제1여객터미널 3층 (카운터 G17-J34 / 7~8번 도어 앞)"`**
+3. **Empty State 검증 (`XX999`)**:
+   - `운항 정보를 찾을 수 없습니다` 및 `편명 또는 [입국/출국] 탭 설정을 확인해 주세요.` 표출 확인.
+4. **빌드 검증**:
+   - `npm run build` 결과 11/11 정적/동적 라우트 컴파일 100% 성공.

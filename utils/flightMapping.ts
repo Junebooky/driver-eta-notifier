@@ -12,17 +12,20 @@ export function parseFlightDateTime(dtStr?: string | null): Date | null {
   const d = parseInt(clean.slice(6, 8), 10);
   const h = parseInt(clean.slice(8, 10), 10);
   const min = parseInt(clean.slice(10, 12), 10);
-  return new Date(y, m, d, h, min);
+  // Incheon Airport API provides timestamps in KST (UTC+9)
+  // Use Date.UTC with h - 9 to get timezone-independent UTC epoch
+  return new Date(Date.UTC(y, m, d, h - 9, min));
 }
 
 /**
  * Format Date or YYYYMMDDHHmm to HH:mm
  */
 export function formatFlightTime(dtStr?: string | null): string {
-  const d = parseFlightDateTime(dtStr);
-  if (!d) return '--:--';
-  const hours = String(d.getHours()).padStart(2, '0');
-  const minutes = String(d.getMinutes()).padStart(2, '0');
+  if (!dtStr || typeof dtStr !== 'string') return '--:--';
+  const clean = dtStr.replace(/[^0-9]/g, '');
+  if (clean.length < 12) return '--:--';
+  const hours = clean.slice(8, 10);
+  const minutes = clean.slice(10, 12);
   return `${hours}:${minutes}`;
 }
 
@@ -280,7 +283,7 @@ export function formatFlightReport(profile: DriverProfile, flight: FlightInfo): 
   }
 
   if (flight.type === 'arrival') {
-    lines.push(`• 픽업대상: ${flight.flightId} (${flight.airport} ➔ ICN)`);
+    lines.push(`• 항공편명: ${flight.flightId} (${flight.airport} ➔ ICN)`);
     lines.push(`• 예상착륙: ${flight.statusText}`);
     lines.push(`• 입국게이트: ${flight.arrivalLocationText}`);
   } else {

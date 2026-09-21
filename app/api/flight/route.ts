@@ -19,16 +19,40 @@ interface FlightCacheEntry {
 const flightCache = new Map<string, FlightCacheEntry>();
 const CACHE_TTL_MS = 2 * 60 * 1000; // 120 seconds
 
-// Get current date in KST (Asia/Seoul) as YYYYMMDD
-function getKstDateString(): string {
-  const now = new Date();
+function getKstDate(offsetDays = 0): { yyyymmdd: string; formatted: string } {
+  const now = new Date(Date.now() + offsetDays * 24 * 60 * 60 * 1000);
   const formatter = new Intl.DateTimeFormat('ko-KR', {
     timeZone: 'Asia/Seoul',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
   });
-  return formatter.format(now).replace(/[^0-9]/g, '');
+  const parts = formatter.formatToParts(now);
+  const y = parts.find((p) => p.type === 'year')?.value || '';
+  const m = parts.find((p) => p.type === 'month')?.value || '';
+  const d = parts.find((p) => p.type === 'day')?.value || '';
+  return {
+    yyyymmdd: `${y}${m}${d}`,
+    formatted: `${y}-${m}-${d}`,
+  };
+}
+
+const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+
+function isStaleFlight(item: any, nowMs: number): boolean {
+  const dtStr = item.estimatedDateTime || item.scheduleDateTime;
+  const itemDate = parseFlightDateTime(dtStr);
+  if (!itemDate) return false;
+
+  const diffFromNow = nowMs - itemDate.getTime(); // positive if past
+  const remark = (item.remark || '').trim();
+  const isCompletedRemark = ['도착', '출발', '결항', '탑승마감'].some((r) => remark.includes(r));
+
+  // If arrival/departure is 2 hours or more in the past AND status is completed (or > 3.5 hours in past)
+  if (diffFromNow >= TWO_HOURS_MS && (isCompletedRemark || diffFromNow >= 3.5 * 60 * 60 * 1000)) {
+    return true;
+  }
+  return false;
 }
 
 export async function GET(req: NextRequest) {
@@ -47,14 +71,16 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const searchDate = searchParams.get('searchdate') || getKstDateString();
+  const today = getKstDate(0);
+  const tomorrow = getKstDate(1);
+  const searchDate = searchParams.get('searchdate') || today.yyyymmdd;
   const cacheKey = `${type}:${flightId}:${searchDate}`;
-  const now = Date.now();
+  const nowMs = Date.now();
 
   // 1. Check in-memory 2-minute cache
   if (flightCache.has(cacheKey)) {
     const cached = flightCache.get(cacheKey)!;
-    if (now - cached.timestamp < CACHE_TTL_MS) {
+    if (nowMs - cached.timestamp < CACHE_TTL_MS) {
       return NextResponse.json({
         success: true,
         flight: cached.flight,
@@ -95,7 +121,7 @@ export async function GET(req: NextRequest) {
     }
 
     const data = await res.json();
-    const items = data?.response?.body?.items;
+    let items = data?.response?.body?.items;
 
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
@@ -107,30 +133,94 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Pick the most relevant item:
-    // 1) Match searchDate (e.g. 20260921)
-    // 2) Otherwise, closest upcoming or closest to current time
-    const nowDate = new Date();
-    let bestItem = items.find(
+    // 2. Smart Time Window & Tomorrow (+1 day) Lookahead Pipeline
+    // Filter items for today
+    const todayItems = items.filter(
       (it: any) =>
-        (it.scheduleDateTime && it.scheduleDateTime.startsWith(searchDate)) ||
-        (it.estimatedDateTime && it.estimatedDateTime.startsWith(searchDate))
+        (it.scheduleDateTime && it.scheduleDateTime.startsWith(today.yyyymmdd)) ||
+        (it.estimatedDateTime && it.estimatedDateTime.startsWith(today.yyyymmdd))
     );
 
-    if (!bestItem) {
-      // Find item with minimum time delta to now
+    // Active (non-stale) flights today
+    const activeTodayItems = todayItems.filter((it: any) => !isStaleFlight(it, nowMs));
+
+    let bestItem: any = null;
+    let isTomorrow = false;
+    let flightDate = today.formatted;
+
+    if (activeTodayItems.length > 0) {
+      // Pick active flight today closest to now
       let minDiff = Infinity;
-      items.forEach((it: any) => {
+      activeTodayItems.forEach((it: any) => {
         const itemDate = parseFlightDateTime(it.estimatedDateTime || it.scheduleDateTime);
         if (itemDate) {
-          const diff = Math.abs(itemDate.getTime() - nowDate.getTime());
+          const diff = Math.abs(itemDate.getTime() - nowMs);
           if (diff < minDiff) {
             minDiff = diff;
             bestItem = it;
           }
         }
       });
-      if (!bestItem) bestItem = items[0];
+      if (!bestItem) bestItem = activeTodayItems[0];
+      isTomorrow = false;
+      flightDate = today.formatted;
+    } else {
+      // Lookahead to tomorrow (+1 day)!
+      let tomorrowItems = items.filter(
+        (it: any) =>
+          (it.scheduleDateTime && it.scheduleDateTime.startsWith(tomorrow.yyyymmdd)) ||
+          (it.estimatedDateTime && it.estimatedDateTime.startsWith(tomorrow.yyyymmdd))
+      );
+
+      // If tomorrow items not in current batch, fetch tomorrow explicitly from airport API
+      if (tomorrowItems.length === 0) {
+        try {
+          const tomorrowQueryUrl = `${endpoint}?serviceKey=${encodeURIComponent(
+            apiKey
+          )}&type=json&flight_id=${encodeURIComponent(flightId)}&searchdate=${tomorrow.yyyymmdd}&numOfRows=10`;
+          const tomorrowRes = await fetch(tomorrowQueryUrl, {
+            method: 'GET',
+            headers: { Accept: 'application/json' },
+          });
+          if (tomorrowRes.ok) {
+            const tomorrowData = await tomorrowRes.json();
+            const tomorrowBatch = tomorrowData?.response?.body?.items;
+            if (Array.isArray(tomorrowBatch) && tomorrowBatch.length > 0) {
+              tomorrowItems = tomorrowBatch;
+            }
+          }
+        } catch (e) {
+          console.warn('Tomorrow lookahead fetch failed:', e);
+        }
+      }
+
+      if (tomorrowItems.length > 0) {
+        bestItem = tomorrowItems[0];
+        isTomorrow = true;
+        flightDate = tomorrow.formatted;
+      } else {
+        // Fallback: closest future item among all items
+        const futureItems = items.filter((it: any) => {
+          const d = parseFlightDateTime(it.estimatedDateTime || it.scheduleDateTime);
+          return d && d.getTime() > nowMs;
+        });
+        if (futureItems.length > 0) {
+          bestItem = futureItems[0];
+          const itemDtStr = bestItem.estimatedDateTime || bestItem.scheduleDateTime || '';
+          if (itemDtStr.startsWith(tomorrow.yyyymmdd)) {
+            isTomorrow = true;
+            flightDate = tomorrow.formatted;
+          } else {
+            isTomorrow = false;
+            flightDate = itemDtStr.slice(0, 4) + '-' + itemDtStr.slice(4, 6) + '-' + itemDtStr.slice(6, 8);
+          }
+        } else {
+          // Last fallback to most recent item
+          bestItem = items[items.length - 1] || items[0];
+          isTomorrow = false;
+          flightDate = today.formatted;
+        }
+      }
     }
 
     // Mappings
@@ -178,6 +268,8 @@ export async function GET(req: NextRequest) {
       diffMinutes,
       terminal,
       terminalId: isT2 ? 'P03' : 'P01',
+      isTomorrow,
+      flightDate,
       gateNumber,
       carousel,
       exitNumber,

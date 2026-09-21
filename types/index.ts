@@ -82,6 +82,8 @@ export interface FlightInfo {
   diffMinutes: number;           // difference in minutes
   terminal: string;              // '제1여객터미널' | '제2여객터미널'
   terminalId: string;            // 'P01' | 'P02' | 'P03'
+  isTomorrow?: boolean;          // true if flight is tomorrow (+1 day lookahead)
+  flightDate?: string;           // 'YYYY-MM-DD'
   // Arrival specific:
   gateNumber?: string;           // e.g. '249'
   carousel?: string;             // e.g. '5'
