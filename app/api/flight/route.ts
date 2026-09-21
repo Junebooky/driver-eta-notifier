@@ -177,7 +177,7 @@ export async function GET(req: NextRequest) {
       statusText,
       diffMinutes,
       terminal,
-      terminalId,
+      terminalId: isT2 ? 'P03' : 'P01',
       gateNumber,
       carousel,
       exitNumber,

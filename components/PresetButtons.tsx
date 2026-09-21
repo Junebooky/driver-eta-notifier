@@ -311,7 +311,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                 haptics.lightTap();
                 onOpenFlightModal();
               }}
-              className="w-8 h-8 rounded-full bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 active:scale-95 text-slate-700 hover:text-sky-600 flex items-center justify-center shadow-xs transition-all cursor-pointer"
+              className="w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-slate-700 hover:bg-[#1E60F3] hover:text-white hover:border-[#1E60F3] active:scale-95 flex items-center justify-center transition-all cursor-pointer"
               title="인천공항 실시간 운항 관제"
               aria-label="항공편 조회"
             >
@@ -326,11 +326,11 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                 haptics.lightTap();
                 onOpenGasModal();
               }}
-              className="w-8 h-8 rounded-full bg-[#1E60F3] hover:bg-[#1650D6] active:scale-95 text-white flex items-center justify-center shadow-sm shadow-blue-500/25 transition-all cursor-pointer"
+              className="w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-slate-700 hover:bg-[#1E60F3] hover:text-white hover:border-[#1E60F3] active:scale-95 flex items-center justify-center transition-all cursor-pointer"
               title="실시간 주유소 추천"
               aria-label="주유소 추천"
             >
-              <Fuel className="w-4 h-4 text-white" />
+              <Fuel className="w-4 h-4" />
             </button>
           )}
 

@@ -30,20 +30,21 @@ export function formatFlightTime(dtStr?: string | null): string {
  * Resolves Terminal name from Incheon Airport terminal ID or flight prefix
  */
 export function resolveTerminal(terminalId?: string | null, flightId?: string): { terminal: string; isT2: boolean } {
+  const prefix = (flightId || '').slice(0, 2).toUpperCase();
   const tId = (terminalId || '').toUpperCase();
-  if (tId === 'P03') {
-    return { terminal: '제2여객터미널', isT2: true };
-  }
-  if (tId === 'P01' || tId === 'P02') {
+
+  // Rule 1: Asiana Airlines (OZ) or P01/P02 is strictly Terminal 1
+  // (Incheon Airport API mistakenly returns P03 for Asiana flights like OZ741)
+  if (prefix === 'OZ' || tId === 'P01' || tId === 'P02') {
     return { terminal: '제1여객터미널', isT2: false };
   }
 
-  // Fallback by airline IATA prefix
-  const prefix = (flightId || '').slice(0, 2).toUpperCase();
+  // Rule 2: T2 airlines or explicitly P03
   const t2Airlines = ['KE', 'DL', 'AF', 'KL', 'AM', 'GA', 'ME', 'RO', 'SV', 'UX', 'VN', 'MF', 'LJ'];
-  if (t2Airlines.includes(prefix)) {
+  if (t2Airlines.includes(prefix) || tId === 'P03') {
     return { terminal: '제2여객터미널', isT2: true };
   }
+
   return { terminal: '제1여객터미널', isT2: false };
 }
 
@@ -195,14 +196,15 @@ export function resolveArrivalGate(
 ): string {
   const cleanExit = (exitNumber || '').trim();
   const cleanCarousel = (carousel || '').trim();
+  const exitFormatted = cleanExit ? (cleanExit.endsWith('출구') ? cleanExit : `${cleanExit}출구`) : '';
 
-  if (cleanExit && cleanCarousel) {
-    return `${terminal} ${cleanExit}출구 (수하물 ${cleanCarousel}번)`;
+  if (exitFormatted && cleanCarousel) {
+    return `${terminal} 1층 (${exitFormatted} / 수하물 ${cleanCarousel}번)`;
   }
-  if (cleanExit) {
-    return `${terminal} ${cleanExit}출구 (수하물 수취대 배정 중)`;
+  if (exitFormatted) {
+    return `${terminal} 1층 (${exitFormatted} / 수하물 수취대 배정 중)`;
   }
-  return `${terminal} (입국 게이트 배정 중 / 현장 전광판 확인)`;
+  return `${terminal} 1층 (입국 게이트 배정 중 / 현장 전광판 확인)`;
 }
 
 /**

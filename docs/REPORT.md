@@ -1,7 +1,7 @@
-# Protocol Cockpit (driver-eta-notifier) - 인천국제공항공사 실시간 운항 API 연동 및 입국 픽업 / 출국 샌딩 통합 관제 모듈 완료 보고서
+# Protocol Cockpit (driver-eta-notifier) - 항공편 모달 리얼 보딩패스 티켓 리디자인 및 아시아나 터미널 매핑 긴급 교정 완료 보고서
 
 > **평가 일시**: 2026년 9월 21일  
-> **대상 애플리케이션**: Protocol Cockpit (의전 드라이버 전용 스마트 관제 런처 v4.40 - 인천국제공항공사 실시간 여객 운항 현황 API 연동, 입국 픽업 및 출국 샌딩 2WAY 통합 관제, 3층 출국장 VIP 지능형 하차 도어 지식 베이스 매핑, 1층 입국장 출구 및 수하물 수취대 자동 감지, 단일 확정 운항 상태 산출, 담당승객 자동 바인딩 및 원터치 단톡방 표준 보고서 규격 탑재)  
+> **대상 애플리케이션**: Protocol Cockpit (의전 드라이버 전용 스마트 관제 런처 v4.41 - 인천국제공항공사 실시간 항공편 모달 실물 보딩패스 티켓 일체화, 아시아나항공 T1 터미널 오매핑 긴급 버그 교정, 코발트 스쿼클 헤더 및 슬라이딩 필 탭 탑재, 홈 주유소/항공편 쌍둥이 퀵 액션 버튼 동기화)  
 > **프로덕션 배포 URL**: [https://driver-eta-notifier.vercel.app](https://driver-eta-notifier.vercel.app)  
 > **GitHub Repository**: [https://github.com/Junebooky/driver-eta-notifier.git](https://github.com/Junebooky/driver-eta-notifier.git) (`main` 브랜치)  
 
@@ -11,42 +11,60 @@
 
 | 과업 항목 | 구현 상태 | 핵심 조치 및 엔지니어링 구현 세부 사항 |
 | :--- | :---: | :--- |
-| **1. 인천공항공사 실시간 운항 백엔드 프록시 (`app/api/flight/route.ts`)** | ✅ 완료 | • **Open API 보안 프록시 구축**: 공공데이터포털 실시간 여객 운항 API(`getPassengerArrivalsDeOdp` / `getPassengerDeparturesDeOdp`) 프록시 라우트 신설.<br>• **2분 인메모리 캐싱**: 동일 편명 및 당일 쿼리 요청을 120초간 캐싱하여 500회/일 쿼터를 안전하게 보호하고 API 키 클라이언트 노출을 원천 차단.<br>• **스마트 날짜 매핑**: 당일 KST(`Asia/Seoul`) 기준 날짜 또는 현재 시각과 가장 인접한 운항 스케줄을 자동 선별. |
-| **2. 단일 확정 운항 상태 산출 로직** | ✅ 완료 | • 스케줄 예정 시각(`scheduleDateTime`)과 실시간 변경 시각(`estimatedDateTime`)의 분 단위 차이 계산:<br>  - **정시 운항**: `{HH:mm} (정상 착륙)` 또는 `{HH:mm} (정상 출발)`<br>  - **지연 운항 (+10분 이상)**: `{HH:mm} (지연 시간 +N분)`<br>  - **조기 운항 (-5분 이상 조기)**: `{HH:mm} (조기 도착 -N분)` 또는 `{HH:mm} (조기 출발 -N분)`<br>• 조건문 텍스트 남발 없이 단 하나의 확정 상태만 명확히 표출. |
-| **3. VIP 지능형 하차 도어 및 입국 게이트 지식 베이스 (`utils/flightMapping.ts`)** | ✅ 완료 | • **출국 샌딩 (3층 하차 도어 매핑)**:<br>  - `KE`/`DL`: 제2여객터미널 3층 **1번 도어** (프리미엄 체크인 카운터 A)<br>  - `OZ`: 제1여객터미널 3층 **1번 도어** (프리미엄 체크인 존 카운터 A)<br>  - 스카이팀(`AF`, `KL` 등): 제2여객터미널 3층 **4~5번 도어** 권장<br>  - 스타얼라이언스/외항사(`SQ`, `LH`, `UA` 등): 제1여객터미널 3층 **11~12번 도어** 권장<br>  - *API 카운터 확정 수신 시*: `{터미널} 3층 (카운터 {구역} / {도어}번 도어 앞)`으로 자동 오버라이드.<br>• **입국 픽업 (입국장 게이트 매핑)**:<br>  - 확정 수신 시: `{터미널} {출구}출구 (수하물 {수취대}번)` 표출.<br>  - 미배정 시: `{터미널} (입국 게이트 배정 중 / 현장 전광판 확인)` 안전 폴백. |
-| **4. 담당승객 자동 바인딩 및 단톡방 표준 보고서 규격** | ✅ 완료 | • **프로필 스토어 자동 연동**: `useDriverProfile`에 등록된 `passengerName`을 감지하여 `• 담당승객: {승객명}`을 자동으로 주입하며, 미등록 시 해당 라인을 자연스럽게 생략.<br>• **표준 보고서 규격 100% 준수**:<br>  - **입국 픽업**: `[{호차} {차량번호} {운전자명}]\n• 담당승객: {승객명}\n• 픽업대상: {편명} ({출발공항} ➔ ICN)\n• 예상착륙: {HH:mm} ({운항상태})\n• 입국게이트: {터미널} {출구}출구 (수하물 {수취대}번)`<br>  - **출국 샌딩**: `[{호차} {차량번호} {운전자명}]\n• 담당승객: {승객명}\n• 샌딩대상: {편명} (ICN ➔ {도착공항})\n• 예상출발: {HH:mm} ({운항상태})\n• 하차위치: {터미널} 3층 ({도어정보})` |
-| **5. 내비 거점 자동 연동 및 출발지 불변성 보장** | ✅ 완료 | • `[목적지 설정 및 보고서 복사]` 터치 시 출발지(`origin`) 거점은 100% 보존하며, 목적지만 판별된 터미널 3층 출국장 또는 1층 입국장 좌표로 단독 치환.<br>• 클립보드 즉시 복사 및 카카오톡 URL 스킴 연동 완결. |
-| **6. 메인 홈 퀵 액션 버튼 배치** | ✅ 완료 | • 메인 화면 주유소 아이콘 **바로 왼쪽**에 비행기 아이콘(`Plane`) 퀵 액션 버튼 배치 (`PresetButtons.tsx`). |
-| **7. 빌드 무결성** | ✅ 완료 | • `npm run build` TypeScript 타입 검사 100% 통과 (에러 0건). |
+| **1. 아시아나항공(OZ) 터미널 매핑 긴급 교정 (`utils/flightMapping.ts`, `app/api/flight/route.ts`)** | ✅ 완료 | • **API 오응답 원천 차단**: 공항공사 API에서 아시아나항공(`OZ`) 운항 정보 조회 시 `terminalid: P03`이 비정상 반환되던 문제를 해결.<br>• IATA 코드가 `OZ`이거나 `P01/P02`인 경우 무조건 **'제1여객터미널' (`isT2: false`)**로 강제 바인딩.<br>• `OZ741` 실시간 쿼리 검증: `제1여객터미널 3층 (카운터 G17-J40 / 7~8번 도어 앞)` 및 T1 출국장 좌표(`custom_flight_icn_t1_dep`, lat 37.4495) 정상 매핑 완료. |
+| **2. 모달 헤더 및 슬라이딩 세그먼트 탭 UI 정제 (`components/FlightModal.tsx`)** | ✅ 완료 | • **헤더 간결화**: 연하늘색 아이콘 대신 브랜드 솔리드 코발트 블루 스쿼클(`w-10 h-10 rounded-2xl bg-[#1E60F3] text-white`) 탑재, 부제목을 걷어내고 메인 타이틀 `인천공항 실시간 운항 관제`만 볼드 표출.<br>• **2글자 세그먼트 탭 (`[입국]` / `[출국]`)**: 단톡방 보고 섹션과 동일한 부드러운 좌우 슬라이딩 필 애니메이션(`transition-transform duration-300 ease-out`, `translate-x-0` ↔ `translate-x-full`) 적용. |
+| **3. 리얼 보딩패스(Boarding Pass) 티켓 일체화** | ✅ 완료 | • **군더더기 요소 제거**: 복잡도를 유발하던 빠른 조회 칩 및 담당승객 프로필 표출 행 화면 제거 (백그라운드 단톡방 보고서 복사 로직은 100% 보존).<br>• **실물 항공권 컴포넌트 통합**: 상단 비행정보 카드와 하단 하차도어 카드를 단 하나의 보딩패스로 통합.<br>  - **티켓 상단**: 항공사 뱃지 + 편명 + 운항 상태 캡슐, 출발 ➔ 도착 노선 및 비행기 패스, 스케줄 vs 예상 시각 비교 그리드.<br>  - **티켓 중앙 절취선**: 양 끝 반원형 티켓 홈(Notches, `-ml-3 w-6 h-6 rounded-r-full bg-slate-50` / `-mr-3 w-6 h-6 rounded-l-full bg-slate-50`) 및 점선 절취선(`border-b-2 border-dashed border-slate-200`) 완벽 구현.<br>  - **티켓 하단 스텁**: 출국 시 `{터미널} 3층 ({카운터} / {도어}번 도어 앞)`, 입국 시 `{터미널} 1층 ({출구} / 수하물 {수취대}번)` 선명한 볼드 타이포그래피 강조. |
+| **4. 하단 액션 버튼 재정의** | ✅ 완료 | • 기존 버튼 대신 **`[확인]` 버튼(`bg-[#1E60F3] text-white font-bold rounded-2xl h-12 flex-1`)**을 배치하여 터치 시 즉시 모달 닫힘 바인딩.<br>• 우측 노란색 **`[카톡]` 버튼**은 단톡방 표준 보고서 클립보드 자동 복사 + `kakaotalk://` 딥링크 호출을 즉각 실행하도록 유지. |
+| **5. 메인 홈 주유소 버튼 비주얼 동기화 (`components/PresetButtons.tsx`)** | ✅ 완료 | • '거점 관리' 좌측의 **주유소(`Fuel`) 버튼**을 항공편 버튼과 완벽히 동일한 화이트 카드 규격(`w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-slate-700 hover:bg-[#1E60F3] hover:text-white hover:border-[#1E60F3] active:scale-95`)으로 통일하여 완벽한 쌍둥이 인터랙션 구축. |
+| **6. 빌드 무결성** | ✅ 완료 | • `npm run build` TypeScript 컴파일 에러 **0건**, Next.js 16.3.5 Turbopack 최적화 빌드 완료. |
 
 ---
 
-## 2. 주요 구현 코드 구조
+## 2. 주요 구현 코드 변경 요약
 
-### 1) [`utils/flightMapping.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/utils/flightMapping.ts) - VIP 하차 도어 및 운항 상태 연산 엔진
-- IATA 항공사 접두사 및 체크인 카운터(`chkinrange`) 기반 3층 하차 도어 추천 알고리즘.
-- 실시간 운항 지연/조기 도착 산출 및 정형화 단톡방 보고서 빌더.
+### 1) [`utils/flightMapping.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/utils/flightMapping.ts) - 터미널 판별 우선순위 강제
+```ts
+export function resolveTerminal(terminalId?: string | null, flightId?: string): { terminal: string; isT2: boolean } {
+  const prefix = (flightId || '').slice(0, 2).toUpperCase();
+  const tId = (terminalId || '').toUpperCase();
 
-### 2) [`app/api/flight/route.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/api/flight/route.ts) - 백엔드 프록시 및 캐시
-- `type=arrival` / `type=departure` 분기 처리.
-- 120초 인메모리 캐시 및 결항/지연/게이트 필드 정규화.
+  // Rule 1: Asiana Airlines (OZ) or P01/P02 is strictly Terminal 1
+  if (prefix === 'OZ' || tId === 'P01' || tId === 'P02') {
+    return { terminal: '제1여객터미널', isT2: false };
+  }
 
-### 3) [`components/FlightModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/FlightModal.tsx) - 통합 항공편 관제 모달
-- 상단 세그먼트 탭 `[입국 픽업]` | `[출국 샌딩]` 0.1초 즉시 전환.
-- 자동 대문자 변환 인풋 및 대표 항공편(KE012, OZ202, DL159, KE011) 1-탭 퀵 칩.
-- 항공편 요약 카드, VIP 도어/게이트 안내, 단톡방 보고서 실시간 프리뷰.
-- `[목적지 설정 및 보고서 복사]` 및 `[카톡]` 딥링크 액션.
+  // Rule 2: T2 airlines or explicitly P03
+  const t2Airlines = ['KE', 'DL', 'AF', 'KL', 'AM', 'GA', 'ME', 'RO', 'SV', 'UX', 'VN', 'MF', 'LJ'];
+  if (t2Airlines.includes(prefix) || tId === 'P03') {
+    return { terminal: '제2여객터미널', isT2: true };
+  }
+
+  return { terminal: '제1여객터미널', isT2: false };
+}
+```
+
+### 2) [`components/FlightModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/FlightModal.tsx) - 보딩패스 티켓 일체화 & 슬라이딩 탭
+- 상단 헤더: `Plane` 코발트 스쿼클 아이콘 + 간결한 타이틀.
+- 슬라이딩 필: `w-[calc(50%-4px)] h-[calc(100%-8px)] transition-transform duration-300 ease-out`.
+- 실물 보딩패스: 상단 비행정보 + 중앙 반원형 노치 및 대시 절취선 + 하단 VIP 의전 하차 도어/게이트 스텁.
+- 액션 바: `[확인]` (모달 닫힘) + `[카톡]` (클립보드 복사 + 카카오톡 실행).
+
+### 3) [`components/PresetButtons.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/PresetButtons.tsx) - 항공편/주유소 쌍둥이 버튼 규격
+- 항공편(`Plane`) 버튼 & 주유소(`Fuel`) 버튼 모두 `w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-slate-700 hover:bg-[#1E60F3] hover:text-white hover:border-[#1E60F3] active:scale-95` 적용.
 
 ---
 
-## 3. 검증 결과
+## 3. 엔드투엔드(E2E) 검증 결과
 
-1. **실시간 API 쿼리 및 매핑 검증**:
-   - `KE012 (입국)`: 대한항공 / 로스앤젤레스(LAX) ➔ ICN / `05:15 (지연 시간 +35분)` / `제2여객터미널 B출구 (수하물 13번)` / T2 1층 입국장 좌표 자동 매핑.
-   - `OZ202 (출국)`: 아시아나항공 / ICN ➔ 로스앤젤레스(LAX) / `12:54 (지연 시간 +14분)` / `제2여객터미널 3층 (카운터 G17-J40 / 7번 도어 앞)` / T2 3층 출국장 좌표 자동 매핑.
-   - 2분 내 재조회 시 `cached: true` 즉시 응답 (캐싱 무결성 확인).
-2. **보고서 생성기 검증**:
-   - 담당승객 존재 시: `• 담당승객: SOYFAN 회장님` 정상 주입.
-   - 담당승객 미등록 시: 해당 라인 완벽 생략.
+1. **OZ741 (아시아나항공 방콕행 출국) 실제 조회 검증**:
+   - `terminal`: **`제1여객터미널`** (기존 제2여객터미널 오표기 결함 완벽 해결)
+   - `terminalId`: **`P01`**
+   - `departureLocationText`: **`제1여객터미널 3층 (카운터 G17-J40 / 7~8번 도어 앞)`**
+   - `targetPreset`: **`custom_flight_icn_t1_dep`** (위도 37.4495, 경도 126.4512)
+   - `statusText`: **`20:01 (지연 시간 +26분)`**
+2. **KE012 (대한항공 로스앤젤레스발 입국) 실제 조회 검증**:
+   - `terminal`: **`제2여객터미널`**
+   - `arrivalLocationText`: **`제2여객터미널 1층 (B출구 / 수하물 13번)`**
+   - `targetPreset`: **`custom_flight_icn_t2_arr`** (위도 37.4691, 경도 126.4344)
 3. **빌드 검증**:
    - `npm run build` 결과 11/11 정적/동적 라우트 전체 컴파일 성공 (TypeScript 에러 0건).
