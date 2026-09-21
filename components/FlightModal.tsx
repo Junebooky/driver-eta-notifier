@@ -12,8 +12,6 @@ import {
   RefreshCw,
   ArrowRight,
   ExternalLink,
-  MapPin,
-  Luggage,
 } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 import { formatFlightReport } from '@/utils/flightMapping';
@@ -322,21 +320,24 @@ export const FlightModal: React.FC<FlightModalProps> = ({
                       flight.diffMinutes >= 10
                         ? {
                             colorHex: '#E11D48',
-                            textColor: 'text-[#E11D48]',
-                            bgBadge: 'bg-rose-50/80 shadow-[0_0_12px_rgba(225,29,72,0.25)]',
+                            textColor: 'text-rose-600',
+                            bgBadge:
+                              'bg-gradient-to-r from-rose-50/20 via-rose-100/40 to-rose-50/10 text-rose-600 border border-current/10',
                             statusText: `+${flight.diffMinutes}분 지연`,
                           }
                         : flight.diffMinutes <= -5
                         ? {
-                            colorHex: '#00A86B',
-                            textColor: 'text-[#00A86B]',
-                            bgBadge: 'bg-emerald-50/80 shadow-[0_0_12px_rgba(0,168,107,0.25)]',
+                            colorHex: '#059669',
+                            textColor: 'text-emerald-600',
+                            bgBadge:
+                              'bg-gradient-to-r from-emerald-50/20 via-emerald-100/40 to-emerald-50/10 text-emerald-600 border border-current/10',
                             statusText: `${flight.diffMinutes}분 조기`,
                           }
                         : {
                             colorHex: '#1E60F3',
                             textColor: 'text-[#1E60F3]',
-                            bgBadge: 'bg-blue-50/80 shadow-[0_0_12px_rgba(30,96,243,0.25)]',
+                            bgBadge:
+                              'bg-gradient-to-r from-blue-50/20 via-blue-100/40 to-blue-50/10 text-[#1E60F3] border border-current/10',
                             statusText: '정시 운항',
                           };
 
@@ -355,7 +356,7 @@ export const FlightModal: React.FC<FlightModalProps> = ({
                         {/* Center: Status Badge & Trajectory Graphic */}
                         <div className="flex flex-col items-center justify-center px-1 shrink-0">
                           <span
-                            className={`text-[13px] font-bold py-0.5 px-3 rounded-full mb-2 tracking-tight ${theme.bgBadge} ${theme.textColor}`}
+                            className={`text-[13px] font-bold py-0.5 px-3 rounded-full mb-2 tracking-tight ${theme.bgBadge}`}
                           >
                             {theme.statusText}
                           </span>
@@ -369,9 +370,9 @@ export const FlightModal: React.FC<FlightModalProps> = ({
                                 backgroundImage: `linear-gradient(to right, transparent, ${theme.colorHex})`,
                               }}
                             />
-                            {/* Plane Icon (Eastbound/Right) */}
+                            {/* Plane Icon (Northeast 45° Up-Right) */}
                             <Plane
-                              className="w-4 h-4 rotate-90 shrink-0 mx-0.5"
+                              className="w-4 h-4 shrink-0 mx-0.5"
                               style={{ color: theme.colorHex, fill: theme.colorHex }}
                             />
                             {/* Dotted Trail to Destination (Right) */}
@@ -408,21 +409,9 @@ export const FlightModal: React.FC<FlightModalProps> = ({
                 </div>
 
                 {/* 3. Ticket Bottom (하차 도어 / 입국 거점 스텁) */}
-                <div className="p-4 bg-gradient-to-b from-white to-slate-50/50 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 text-[#1E60F3]">
-                      {flight.type === 'departure' ? (
-                        <MapPin className="w-4 h-4 text-[#1E60F3]" />
-                      ) : (
-                        <Luggage className="w-4 h-4 text-[#1E60F3]" />
-                      )}
-                      <span className="text-xs font-black">
-                        {flight.type === 'departure'
-                          ? '3층 출국장 VIP 하차 도어'
-                          : '1층 입국장 출구 & 수하물 수취대'}
-                      </span>
-                    </div>
-                    <span className="text-[11px] font-black bg-[#1E60F3] text-white px-2 py-0.5 rounded-lg shadow-2xs">
+                <div className="p-4 bg-gradient-to-b from-white to-slate-50/50">
+                  <div className="flex items-center justify-start mb-2">
+                    <span className="text-[11px] font-black bg-[#1E60F3] text-white px-2.5 py-0.5 rounded-lg shadow-2xs">
                       {flight.terminal}
                     </span>
                   </div>
