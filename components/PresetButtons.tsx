@@ -301,7 +301,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
           <h2 className="text-sm font-bold text-slate-900 tracking-tight">자주 가는 목적지</h2>
         </div>
 
-        <div className="flex items-center space-x-1.5">
+        <div className="flex items-center space-x-2">
           {onOpenGasModal && (
             <button
               type="button"
@@ -309,11 +309,11 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                 haptics.lightTap();
                 onOpenGasModal();
               }}
-              className="text-xs flex items-center space-x-1 py-1 px-2.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 hover:text-amber-800 font-bold border border-amber-200/80 transition-all cursor-pointer shadow-2xs active:scale-95"
-              title="실시간 최저가·최단거리 주유소 추천"
+              className="w-8 h-8 rounded-full bg-[#1E60F3] hover:bg-[#1650D6] active:scale-95 text-white flex items-center justify-center shadow-sm shadow-blue-500/25 transition-all cursor-pointer"
+              title="실시간 주유소 추천"
+              aria-label="주유소 추천"
             >
-              <Fuel className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-              <span>주유소</span>
+              <Fuel className="w-4 h-4 text-white" />
             </button>
           )}
 

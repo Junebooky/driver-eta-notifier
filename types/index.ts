@@ -44,14 +44,21 @@ export interface RouteEstimate {
 
 export type FuelCode = 'D047' | 'B027' | 'B034';
 
+export interface GasPrices {
+  diesel?: number;           // 경유 (D047)
+  gasoline?: number;         // 휘발유 (B027)
+  premiumGasoline?: number;  // 고급휘발유 (B034)
+}
+
 export interface GasStation {
   id: string;
   name: string;
   brandCode: string;
   brandName: string;
-  price: number;
-  fuelCode: FuelCode;
-  fuelName: string;
+  price?: number;            // Primary/lowest display price
+  prices: GasPrices;         // All-in-one 3-fuel prices
+  fuelCode?: FuelCode;
+  fuelName?: string;
   lat: number;
   lng: number;
   distanceMeters: number;

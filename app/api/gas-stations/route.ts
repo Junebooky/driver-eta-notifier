@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { toKatec, toWgs84 } from '@/utils/coordinate';
-import { FuelCode, GasStation } from '@/types';
+import { GasStation, GasPrices } from '@/types';
 import { calculateHaversineEstimate } from '@/utils/navigation';
 
 interface GasCacheEntry {
@@ -22,17 +22,11 @@ const BRAND_NAME_MAP: Record<string, string> = {
   ETC: '자가/기타',
 };
 
-const FUEL_NAME_MAP: Record<FuelCode, string> = {
-  D047: '경유',
-  B027: '휘발유',
-  B034: '고급휘발유',
-};
-
 // Generates rounded cache key (~500m resolution) to prevent repeated calls
-function getCacheKey(lat: number, lng: number, prodcd: string): string {
+function getCacheKey(lat: number, lng: number): string {
   const roundedLat = (Math.round(lat * 200) / 200).toFixed(3);
   const roundedLng = (Math.round(lng * 200) / 200).toFixed(3);
-  return `${roundedLat},${roundedLng}_${prodcd}`;
+  return `${roundedLat},${roundedLng}`;
 }
 
 // Real-time TMAP Route Calculation for actual drive duration and distance
@@ -93,17 +87,14 @@ async function calculateTmapDriveInfo(
 }
 
 // Fallback Mock Stations near Gangnam/Teheran-ro if Opinet network fails or quota exceeded
-function getFallbackStations(lat: number, lng: number, fuelCode: FuelCode): GasStation[] {
-  const fuelName = FUEL_NAME_MAP[fuelCode] || '경유';
-  const basePrice = fuelCode === 'D047' ? 1540 : fuelCode === 'B027' ? 1690 : 1940;
-
+function getFallbackStations(lat: number, lng: number): GasStation[] {
   const mockList = [
     {
       id: 'fallback_1',
       name: 'GS칼텍스 역삼주유소',
       brandCode: 'GSC',
       brandName: 'GS칼텍스',
-      price: basePrice - 20,
+      prices: { diesel: 1520, gasoline: 1670, premiumGasoline: 1920 },
       dLat: 0.005,
       dLng: 0.004,
       address: '서울 강남구 테헤란로 152',
@@ -113,7 +104,7 @@ function getFallbackStations(lat: number, lng: number, fuelCode: FuelCode): GasS
       name: '현대오일뱅크 직영 삼일주유소',
       brandCode: 'HDO',
       brandName: 'HD현대오일뱅크',
-      price: basePrice,
+      prices: { diesel: 1540, gasoline: 1690, premiumGasoline: 1940 },
       dLat: -0.006,
       dLng: 0.003,
       address: '서울 강남구 역삼로 204',
@@ -123,7 +114,7 @@ function getFallbackStations(lat: number, lng: number, fuelCode: FuelCode): GasS
       name: 'SK에너지 테헤란로주유소',
       brandCode: 'SKE',
       brandName: 'SK에너지',
-      price: basePrice + 15,
+      prices: { diesel: 1555, gasoline: 1710, premiumGasoline: 1980 },
       dLat: 0.007,
       dLng: -0.005,
       address: '서울 강남구 테헤란로 218',
@@ -133,7 +124,7 @@ function getFallbackStations(lat: number, lng: number, fuelCode: FuelCode): GasS
       name: 'S-OIL 대치제일주유소',
       brandCode: 'SOL',
       brandName: 'S-OIL',
-      price: basePrice - 10,
+      prices: { diesel: 1530, gasoline: 1680, premiumGasoline: 1930 },
       dLat: -0.008,
       dLng: 0.007,
       address: '서울 강남구 삼성로 312',
@@ -156,9 +147,10 @@ function getFallbackStations(lat: number, lng: number, fuelCode: FuelCode): GasS
       name: m.name,
       brandCode: m.brandCode,
       brandName: m.brandName,
-      price: m.price,
-      fuelCode,
-      fuelName,
+      price: m.prices.diesel,
+      prices: m.prices,
+      fuelCode: 'D047',
+      fuelName: '경유',
       lat: sLat,
       lng: sLng,
       distanceMeters: Math.round(est.distanceKm * 1000),
@@ -176,14 +168,9 @@ export async function GET(req: NextRequest) {
   // Parse query parameters
   const lat = parseFloat(searchParams.get('lat') || '37.5000');
   const lng = parseFloat(searchParams.get('lng') || '127.0350');
-  const fuelCode = (searchParams.get('prodcd') || 'D047') as FuelCode;
   const radius = parseInt(searchParams.get('radius') || '3000', 10);
 
-  // Validate fuelCode
-  const validFuelCodes: FuelCode[] = ['D047', 'B027', 'B034'];
-  const sanitizedFuelCode = validFuelCodes.includes(fuelCode) ? fuelCode : 'D047';
-
-  const cacheKey = getCacheKey(lat, lng, sanitizedFuelCode);
+  const cacheKey = getCacheKey(lat, lng);
   const now = Date.now();
 
   // 1. Quota Safeguard: Check in-memory 15-min cache
@@ -205,7 +192,6 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({
         gasStations: updatedStations,
         cached: true,
-        fuelCode: sanitizedFuelCode,
       });
     }
   }
@@ -214,73 +200,123 @@ export async function GET(req: NextRequest) {
   const [katecX, katecY] = toKatec(lng, lat);
   const opinetKey = process.env.OPINET_API_KEY || 'F260921054';
 
-  const opinetUrl = `http://www.opinet.co.kr/api/aroundAll.do?code=${opinetKey}&x=${Math.round(
-    katecX
-  )}&y=${Math.round(katecY)}&radius=${radius}&prodcd=${sanitizedFuelCode}&sort=1&out=json`;
+  const fuels = [
+    { code: 'D047', field: 'diesel' as const },
+    { code: 'B027', field: 'gasoline' as const },
+    { code: 'B034', field: 'premiumGasoline' as const },
+  ];
 
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4500);
+    // 3. Parallel fetch of all 3 fuel types from Opinet API
+    const results = await Promise.all(
+      fuels.map(async ({ code, field }) => {
+        const url = `http://www.opinet.co.kr/api/aroundAll.do?code=${opinetKey}&x=${Math.round(
+          katecX
+        )}&y=${Math.round(katecY)}&radius=${radius}&prodcd=${code}&sort=1&out=json`;
 
-    const response = await fetch(opinetUrl, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-      },
-      signal: controller.signal,
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 4500);
+
+          const res = await fetch(url, {
+            method: 'GET',
+            headers: { Accept: 'application/json' },
+            signal: controller.signal,
+          });
+
+          clearTimeout(timeoutId);
+
+          if (!res.ok) return { field, list: [] };
+          const data = await res.json();
+          return { field, list: Array.isArray(data?.RESULT?.OIL) ? data.RESULT.OIL : [] };
+        } catch {
+          return { field, list: [] };
+        }
+      })
+    );
+
+    // 4. Merge 3-fuel prices into unified station map
+    const stationMap = new Map<
+      string,
+      {
+        id: string;
+        name: string;
+        brandCode: string;
+        brandName: string;
+        prices: GasPrices;
+        x: number;
+        y: number;
+        distanceMeters: number;
+      }
+    >();
+
+    results.forEach(({ field, list }) => {
+      list.forEach((oil: any) => {
+        const id = oil.UNI_ID || `oil_${Math.random()}`;
+        const price = Number(oil.PRICE) || 0;
+
+        if (!stationMap.has(id)) {
+          const brandCode = (oil.POLL_DIV_CD || 'ETC').trim().toUpperCase();
+          const brandName = BRAND_NAME_MAP[brandCode] || '주유소';
+          const x = Number(oil.GIS_X_COOR ?? oil.GIS_X_COORD);
+          const y = Number(oil.GIS_Y_COOR ?? oil.GIS_Y_COORD);
+          const distanceMeters = Number(oil.DISTANCE) || 0;
+
+          stationMap.set(id, {
+            id,
+            name: oil.OS_NM || '알 수 없는 주유소',
+            brandCode,
+            brandName,
+            prices: {},
+            x,
+            y,
+            distanceMeters,
+          });
+        }
+
+        const entry = stationMap.get(id)!;
+        if (price > 0) {
+          entry.prices[field] = price;
+        }
+      });
     });
 
-    clearTimeout(timeoutId);
+    const mergedList = Array.from(stationMap.values());
 
-    if (!response.ok) {
-      throw new Error(`Opinet API responded with HTTP ${response.status}`);
-    }
-
-    const data = await response.json();
-    const rawOilList = data?.RESULT?.OIL;
-
-    if (!Array.isArray(rawOilList) || rawOilList.length === 0) {
-      console.warn('Opinet returned empty or non-array OIL list, using fallback.');
-      const fallback = getFallbackStations(lat, lng, sanitizedFuelCode);
+    if (mergedList.length === 0) {
+      console.warn('Opinet returned 0 stations, using fallback.');
+      const fallback = getFallbackStations(lat, lng);
       return NextResponse.json({
         gasStations: fallback,
         cached: false,
         isFallback: true,
-        fuelCode: sanitizedFuelCode,
       });
     }
 
-    // 3. Parse Opinet raw data and convert KATEC -> WGS84
-    const validStations = rawOilList.slice(0, 8).map((oil: any) => {
-      const x = Number(oil.GIS_X_COOR ?? oil.GIS_X_COORD);
-      const y = Number(oil.GIS_Y_COOR ?? oil.GIS_Y_COORD);
-      const [wgsLng, wgsLat] = toWgs84(x, y);
-
-      const brandCode = (oil.POLL_DIV_CD || 'ETC').trim().toUpperCase();
-      const brandName = BRAND_NAME_MAP[brandCode] || '주유소';
-      const price = Number(oil.PRICE) || 0;
-      const distanceMeters = Number(oil.DISTANCE) || 0;
-
+    // Convert KATEC -> WGS84
+    const validStations: GasStation[] = mergedList.slice(0, 10).map((st) => {
+      const [wgsLng, wgsLat] = toWgs84(st.x, st.y);
       return {
-        id: oil.UNI_ID || `oil_${Math.random()}`,
-        name: oil.OS_NM || '알 수 없는 주유소',
-        brandCode,
-        brandName,
-        price,
-        fuelCode: sanitizedFuelCode,
-        fuelName: FUEL_NAME_MAP[sanitizedFuelCode] || '경유',
+        id: st.id,
+        name: st.name,
+        brandCode: st.brandCode,
+        brandName: st.brandName,
+        price: st.prices.diesel || st.prices.gasoline || 0,
+        prices: st.prices,
+        fuelCode: 'D047',
+        fuelName: '경유',
         lat: wgsLat,
         lng: wgsLng,
-        distanceMeters,
-        distanceKm: Math.round((distanceMeters / 1000) * 10) / 10,
+        distanceMeters: st.distanceMeters,
+        distanceKm: Math.round((st.distanceMeters / 1000) * 10) / 10,
         durationMinutes: 5,
         tmapEtaFormatted: '',
         address: '',
       };
     });
 
-    // 4. Merge TMAP real-time route calculations for top 5 stations
-    const topStations = validStations.slice(0, 5);
+    // 5. Merge TMAP real-time route calculations for top 6 stations
+    const topStations = validStations.slice(0, 6);
     const dateNow = new Date();
 
     const enrichedStations: GasStation[] = await Promise.all(
@@ -309,13 +345,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       gasStations: enrichedStations,
       cached: false,
-      fuelCode: sanitizedFuelCode,
     });
   } catch (error) {
     console.error('Failed to fetch from Opinet API, returning fallback:', error);
-    const fallback = getFallbackStations(lat, lng, sanitizedFuelCode);
+    const fallback = getFallbackStations(lat, lng);
 
-    // Also cache fallback briefly (3 minutes) to shield quota
     gasCache.set(cacheKey, {
       stations: fallback,
       timestamp: Date.now() - (CACHE_TTL_MS - 3 * 60 * 1000),
@@ -325,7 +359,6 @@ export async function GET(req: NextRequest) {
       gasStations: fallback,
       cached: false,
       isFallback: true,
-      fuelCode: sanitizedFuelCode,
     });
   }
 }
