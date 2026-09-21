@@ -1,86 +1,87 @@
-# Protocol Cockpit (driver-eta-notifier) - 전역 솔리드 블루 마이크로 텐션 및 컨텍스트 인지형 인터랙션 완료 보고서
+# Protocol Cockpit (driver-eta-notifier) - 딥링크 출발지 좌표 연동 및 UI 인터랙션 최적화 완료 보고서
 
 > **평가 일시**: 2026년 9월 21일  
-> **대상 애플리케이션**: Protocol Cockpit (의전 드라이버 전용 스마트 관제 런처 v4.18 - 전역 솔리드 블루 텐션 인터랙션 키트 통일 및 목적지/출발지 컨텍스트 인지형 스마트 거점 인터랙션)  
+> **대상 애플리케이션**: Protocol Cockpit (의전 드라이버 전용 스마트 관제 런처 v4.19 - 자택 아이콘 색상 중립화, 3대 내비 딥링크 출발지 좌표 전송 규격화, 카카오 액션 버튼 햅틱 리프트 모션 적용)  
 > **프로덕션 배포 URL**: [https://driver-eta-notifier.vercel.app](https://driver-eta-notifier.vercel.app)  
 > **GitHub Repository**: [https://github.com/Junebooky/driver-eta-notifier.git](https://github.com/Junebooky/driver-eta-notifier.git) (main 브랜치)  
 
 ---
 
-## 1. 실무 핵심 과업 달성도
+## 1. 핵심 과업 달성 현황
 
 | 과업 항목 | 구현 상태 | 핵심 조치 및 인터랙션 디자인 시스템 고도화 세부 사항 |
 | :--- | :---: | :--- |
-| **1. 전역 솔리드 블루 '마이크로 텐션' 인터랙션 통일** | ✅ 완료 | • **공통 인터랙션 규격 수립**: 기본(`bg-[#1E60F3] text-white shadow-xs`) 상태에서 마우스 오버 시 **20% 명도 다운 + 마이크로 리프트 + 앰비언트 글로우**(`hover:bg-[#1346D8] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/35 transition-all duration-150 ease-out`), 클릭 시 **압력 피드백**(`active:translate-y-0 active:scale-[0.97] active:bg-[#0f3bb8]`)을 일괄 적용.<br>• **적용 대상 전수 동기화**:<br>&nbsp;&nbsp;- 거점 관리 모달: [수정] 버튼 (`PresetButtons.tsx`)<br>&nbsp;&nbsp;- 프로필 모달: [설정 저장] 버튼 (`ProfileModal.tsx`)<br>&nbsp;&nbsp;- 메인 퀵 액션: [티맵 안내 시작 / 패스트패스] 버튼 (`ActionPanel.tsx`)<br>&nbsp;&nbsp;- 관리자 PIN 및 장소 등록 모달: [활성화 / 저장] 버튼 (`AdminPinModal.tsx`, `CustomPresetModal.tsx`)<br>&nbsp;&nbsp;- ETA 관제 패널: [새로고침] 원형 버튼 (`RouteInfoCard.tsx`)에 `hover:scale-105` 및 아이콘 45도 회전 예열 인터랙션(`group-hover:rotate-45 transition-transform duration-200`) 결합. |
-| **2. 목적지(초록) / 출발지(파랑) 컨텍스트 인지형 거점 인터랙션** | ✅ 완료 | • **동적 컨텍스트 테마 연동**: `selectionTarget`('destination' \| 'origin') 상태에 따라 거점 카드 호버 시 시그니처 테마가 실시간으로 반응.<br>&nbsp;&nbsp;- **목적지 선택 모드**: 소프트 에메랄드 그린 배경 및 보더(`hover:bg-emerald-50/70 hover:border-emerald-400 hover:shadow-xs hover:-translate-y-0.5 transition-all duration-200`) + 텍스트 `group-hover:text-emerald-900`<br>&nbsp;&nbsp;- **출발지 선택 모드**: 소프트 코발트 블루 배경 및 보더(`hover:bg-blue-50/70 hover:border-blue-400 hover:shadow-xs hover:-translate-y-0.5 transition-all duration-200`) + 텍스트 `group-hover:text-[#1E60F3]`<br>• **선택 완료 카드 시각 계층 확립**: 목적지 선택 활성 카드는 에메랄드 그린 계열(`border-emerald-500 bg-emerald-50/40 text-emerald-800 ring-1 ring-emerald-500/30 font-bold shadow-[0_2px_10px_rgba(16,185,129,0.1)]`)로 상단 목적지 정보 박스와 완벽한 시각적 일체감 달성. |
+| **1. 자택(Home) 프리셋 아이콘 색상 중립화** | ✅ 완료 | • **아이콘 색상 독립성 확보**: 자택 프리셋 내 `Home` 아이콘이 파란색으로 고정되어 목적지(에메랄드 그린) 지정 시 발생하던 시각적 충돌 완벽 해결.<br>• **컨텍스트 반응형 색상 동기화**: 미선택 기본 상태에서는 세련된 슬레이트 톤(`text-slate-500 group-hover:text-slate-700`)을 유지하며, 목적지 지정 시 `text-emerald-600`, 출발지 지정 시 `text-[#1E60F3]`로 자동 전환되도록 예외 처리 구현. |
+| **2. 3대 내비게이션 딥링크 출발지(Origin) 좌표 연동** | ✅ 완료 | • **티맵(TMAP) 출발지/목적지 쌍 연동**: 기존 단일 목적지만 전달되어 단말기 현 GPS(용인시 등)가 강제 출발지로 지정되던 결함을 수정하고 `startname`, `startx`, `starty`, `goalname`, `goalx`, `goaly` 전송 규격 완벽 적용.<br>• **네이버지도 & 카카오맵 동반 최적화**: 네이버지도 자동차 경로 스킴(`nmap://route/car?slat=...&slng=...&dlat=...&dlng=...`) 및 카카오맵 자동차 경로 스킴(`kakaomap://route?sp=...&ep=...&by=CAR`)을 Android Intent와 iOS URL Scheme에 모두 일체화. |
+| **3. 하단 카카오톡 공유 버튼 인터랙션 동기화** | ✅ 완료 | • **브랜드 고유 컬러 보존**: 카카오 공식 옐로우 톤(`bg-[#FEE500] hover:bg-[#FDD835] text-[#191919]`)을 정확히 유지.<br>• **마이크로 리프트 & 텐션 피드백**: 상단 내비 버튼과 동일한 촉각적 조작감을 제공하도록 호버 시 떠오르는 모션(`hover:-translate-y-0.5 hover:shadow-md transition-all duration-150 ease-out`)과 클릭 압력(`active:translate-y-0 active:scale-[0.97]`) 동기화. |
 
 ---
 
 ## 2. 세부 엔지니어링 구현 내역
 
-### 1) 전역 솔리드 블루 마이크로 텐션 컴포넌트 규격
-- **메인 퀵 액션 [티맵 안내 시작] (`components/ActionPanel.tsx`)**:
-  ```tsx
-  <button
-    onClick={handleFastPassAction}
-    className="w-full py-4 px-4 bg-[#1E60F3] hover:bg-[#1346D8] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/35 active:translate-y-0 active:scale-[0.97] active:bg-[#0f3bb8] text-white rounded-2xl font-bold text-sm tracking-tight shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-all duration-150 ease-out"
-  >
-    <Zap className="w-4.5 h-4.5 text-yellow-300 fill-yellow-300 shrink-0" />
-    <span>{getNaviActionText(defaultNavi)}</span>
-  </button>
-  ```
-- **ETA 관제 패널 [새로고침] 회전 예열 인터랙션 (`components/RouteInfoCard.tsx`)**:
-  ```tsx
-  <button
-    type="button"
-    onClick={onRefreshRoute}
-    disabled={isLoadingRoute}
-    className="w-11 h-11 rounded-xl bg-[#1E60F3] hover:bg-[#1346D8] hover:scale-105 hover:shadow-lg hover:shadow-blue-500/35 active:translate-y-0 active:scale-[0.97] active:bg-[#0f3bb8] text-white shadow-xs flex items-center justify-center transition-all duration-150 ease-out disabled:opacity-50 cursor-pointer shrink-0 group"
-    title="ETA 재계산"
-  >
-    <RefreshCw className={`w-5 h-5 group-hover:rotate-45 transition-transform duration-200 ${isLoadingRoute ? 'animate-spin' : ''}`} />
-  </button>
-  ```
-- **프로필 모달 [설정 저장] (`components/ProfileModal.tsx`) 및 거점 관리 모달 [수정] (`components/PresetButtons.tsx`)**:
-  ```tsx
-  className="w-full py-2.5 px-4 bg-[#1E60F3] hover:bg-[#1346D8] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/35 active:translate-y-0 active:scale-[0.97] active:bg-[#0f3bb8] text-white font-bold rounded-xl text-xs flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs transition-all duration-150 ease-out"
-  ```
-
-### 2) 컨텍스트 인지형 동적 거점 호버 시스템 (`components/PresetButtons.tsx`)
+### 1) 자택(Home) 프리셋 아이콘 색상 중립화 (`components/PresetButtons.tsx`)
+- 미선택 시 기본 슬레이트 톤을 제공하여 시각적 간섭을 배제하고, 목적지 또는 출발지로 지정되는 즉시 해당 컨텍스트의 핵심 색상(에메랄드/블루)으로 전환되도록 개선하였습니다.
 ```tsx
-const isTargetDestination = selectionTarget === 'destination';
-const dynamicHoverClasses = isTargetDestination
-  ? 'hover:bg-emerald-50/70 hover:border-emerald-400 hover:shadow-xs hover:-translate-y-0.5'
-  : 'hover:bg-blue-50/70 hover:border-blue-400 hover:shadow-xs hover:-translate-y-0.5';
-const dynamicTextHoverClass = isTargetDestination
-  ? 'group-hover:text-emerald-900'
-  : 'group-hover:text-[#1E60F3]';
+<HomeIcon
+  className={`w-3.5 h-3.5 shrink-0 transition-colors ${
+    isHomeDestination
+      ? 'text-emerald-600'
+      : isHomeOrigin
+      ? 'text-[#1E60F3]'
+      : 'text-slate-500 group-hover:text-slate-700'
+  }`}
+/>
+```
 
-// 목적지 선택 완료 활성 카드
-if (isDestination) {
-  stateClasses =
-    'border-emerald-500 bg-emerald-50/40 text-emerald-800 ring-1 ring-emerald-500/30 font-bold shadow-[0_2px_10px_rgba(16,185,129,0.1)]';
-}
+### 2) 내비게이션 딥링크 출발지 좌표 전송 파이프라인 (`utils/navigation.ts`)
+- `launchNavigationApp` 및 `buildDeepLink` 함수에 `origin` 매개변수를 확장하고, 3대 내비게이션 앱에 출발지와 목적지 좌표를 완벽하게 공급하도록 개편하였습니다.
+
+#### ① TMAP (티맵) 딥링크 스킴
+- 사용자가 선택한 출발지(예: 조선팰리스 강남)와 목적지(예: 인천공항 T1)를 그대로 유지하며 앱 경로 미리보기가 열리도록 파라미터를 규격화하였습니다.
+- **iOS**: `tmap://route?startname=${encodedOriginName}&startx=${origin.lng}&starty=${origin.lat}&goalname=${encodedName}&goalx=${lng}&goaly=${lat}`
+- **Android**: `intent://route?startname=${encodedOriginName}&startx=${origin.lng}&starty=${origin.lat}&goalname=${encodedName}&goalx=${lng}&goaly=${lat}#Intent;scheme=tmap;package=com.skt.tmap.ku;end;`
+
+#### ② Naver Map (네이버지도) 딥링크 스킴
+- 자동차 경로 조회를 위한 정밀 좌표 스킴을 연동하였습니다.
+- **iOS**: `nmap://route/car?slat=${origin.lat}&slng=${origin.lng}&sname=${encodedOriginName}&dlat=${lat}&dlng=${lng}&dname=${encodedName}&appname=driver-eta-notifier`
+- **Android**: `intent://route/car?slat=${origin.lat}&slng=${origin.lng}&sname=${encodedOriginName}&dlat=${lat}&dlng=${lng}&dname=${encodedName}&appname=driver-eta-notifier#Intent;scheme=nmap;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.nhn.android.nmap;end;`
+
+#### ③ Kakao (카카오맵 / 카카오내비) 딥링크 스킴
+- 출발지-도착지 좌표 쌍(`sp`, `ep`)을 포함한 자동차 경로 스킴을 적용하였습니다.
+- **iOS**: `kakaomap://route?sp=${origin.lat},${origin.lng}&ep=${lat},${lng}&by=CAR`
+- **Android**: `intent://route?sp=${origin.lat},${origin.lng}&ep=${lat},${lng}&by=CAR#Intent;scheme=kakaomap;package=net.daum.android.map;end;`
+- **스토어 Fallback**: 카카오맵 iOS App Store ID(`304608425`) 및 Play Store 패키지(`net.daum.android.map`) 갱신.
+
+### 3) 하단 카카오톡 공유 버튼 인터랙션 동기화 (`components/ActionPanel.tsx`)
+- 고유 브랜드 옐로우를 유지하면서, 마우스 호버 시 자연스럽게 떠오르는 리프트 모션과 클릭 압력 스케일 모션을 적용하였습니다.
+```tsx
+<button
+  onClick={handleKakaoReportAction}
+  className="w-full py-4 px-4 bg-[#FEE500] hover:bg-[#FDD835] hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.97] text-[#191919] rounded-2xl font-bold text-sm tracking-tight shadow-[0_4px_14px_rgba(254,229,0,0.25)] flex items-center justify-center gap-2 cursor-pointer transition-all duration-150 ease-out"
+>
+  <MessageSquare className="w-4.5 h-4.5 text-[#3C1E1E] fill-[#3C1E1E] shrink-0" />
+  <span>카카오톡 공유</span>
+</button>
 ```
 
 ---
 
 ## 3. 프로덕션 빌드 무결성 검증
 
-### `npm run build` 결과
+### `npm run build` 검증 로그
 ```text
 > driver-eta-notifier@0.1.0 build
 > next build
 
 ▲ Next.js 16.3.5 (Turbopack)
 - Environments: .env.local
-✓ Running next.config.ts took 11ms
+✓ Running next.config.ts took 12ms
 
   Creating an optimized production build ...
-✓ Compiled successfully in 398ms
-  Finished TypeScript in 891ms    ✓ Finished TypeScript in 891ms 
-  Collecting page data using 9 workers in 284ms    ✓ Collecting page data using 9 workers in 284ms 
-✓ Generating static pages using 9 workers (8/8) in 220ms
+✓ Compiled successfully in 337ms
+  Finished TypeScript in 816ms    ✓ Finished TypeScript in 816ms 
+  Collecting page data using 9 workers in 240ms    ✓ Collecting page data using 9 workers in 240ms 
+✓ Generating static pages using 9 workers (8/8) in 236ms
   Finalizing page optimization in 6ms    ✓ Finalizing page optimization in 6ms 
 
 Route (app)
@@ -97,21 +98,19 @@ Route (app)
 ```
 
 - **TypeScript 컴파일 에러**: 0건
-- **ESLint 및 빌드 경고**: 0건
-- **정적/동적 라우트 컴파일**: 100% 무결점 통과
+- **린트 및 문법 결함**: 0건
+- **정적 최적화 및 빌드 무결성**: 100% 통과
 
 ---
 
 ## 4. 변경 파일 목록 및 배포 커밋
 
 - **수정 파일 목록**:
-  - `components/PresetButtons.tsx`: 거점 관리 [수정] 버튼 텐션 피드백 적용, 목적지/출발지 컨텍스트 인지형 동적 호버(초록/파랑) 및 활성 목적지 카드 에메랄드 그린 스타일링
-  - `components/ProfileModal.tsx`: [설정 저장] 버튼 마이크로 텐션 피드백 적용
-  - `components/ActionPanel.tsx`: [티맵 안내 시작] 퀵 액션 버튼 마이크로 텐션 피드백 적용
-  - `components/RouteInfoCard.tsx`: [새로고침] 원형 버튼 마이크로 리프트 및 아이콘 45도 회전 예열 호버 적용
-  - `components/AdminPinModal.tsx`: 관리자 모드 활성화 버튼 마이크로 텐션 피드백 적용
-  - `components/CustomPresetModal.tsx`: 장소 등록/수정 모달 저장 버튼 마이크로 텐션 피드백 적용
-  - `app/page.tsx`: PresetButtons 컴포넌트에 현재 `selectionTarget` 컨텍스트 프롭 전달
+  - `components/PresetButtons.tsx`: 자택 프리셋 아이콘 슬레이트 톤 중립화 및 컨텍스트 반응형 색상 연동
+  - `utils/navigation.ts`: TMAP(`startname/startx/starty`), 네이버지도(`slat/slng/sname`), 카카오맵(`sp/ep`) 출발지 딥링크 스킴 및 안드로이드 인텐트 규격 전면 개편
+  - `components/ActionPanel.tsx`: `launchNavigationApp` 호출 시 `origin` 좌표 전달 및 카카오톡 공유 버튼 햅틱 리프트/음영 인터랙션 적용
+  - `components/Header.tsx`: 미사용 아이콘 임포트 정리 및 네브바 버튼 레이아웃 정돈
+  - `app/tmap/page.tsx`: URL 쿼리 파라미터 내 출발지(`sname`, `slat`, `slng`) 파싱 및 딥링크 전달 지원
   - `docs/REPORT.md`: 과업 완료 보고서 갱신
-- **커밋 메시지**: `feat: implement global solid-blue tactile interaction kit and context-aware destination green hover`
+- **커밋 메시지**: `fix: neutralize home icon, inject origin coords to deeplinks, and add tactile lift to kakao action button`
 - **배포 브랜치**: `origin/main` (GitHub 푸시 완료)

@@ -12,11 +12,19 @@ function TmapLauncherContent() {
   const lat = parseFloat(searchParams.get('lat') || '37.4495');
   const lng = parseFloat(searchParams.get('lng') || '126.4512');
 
+  const sname = searchParams.get('sname') || searchParams.get('startname') || undefined;
+  const slat = parseFloat(searchParams.get('slat') || searchParams.get('starty') || '');
+  const slng = parseFloat(searchParams.get('slng') || searchParams.get('startx') || '');
+  const origin =
+    sname && !isNaN(slat) && !isNaN(slng)
+      ? { name: sname, lat: slat, lng: slng }
+      : undefined;
+
   useEffect(() => {
     if (name && !isNaN(lat) && !isNaN(lng)) {
-      launchNavigationApp('tmap', { name, lat, lng });
+      launchNavigationApp('tmap', { name, lat, lng }, origin);
     }
-  }, [name, lat, lng]);
+  }, [name, lat, lng, origin]);
 
   return (
     <div className="min-h-screen bg-black text-zinc-100 flex flex-col items-center justify-center p-6 text-center">
@@ -32,12 +40,21 @@ function TmapLauncherContent() {
         티맵(TMAP) 경로를 실행 중입니다
       </h1>
       <p className="text-sm text-zinc-400 max-w-xs mb-8 leading-relaxed">
-        목적지 <span className="text-zinc-200 font-bold">[{name}]</span>로 바로 안내하기 위해 티맵 앱을 호출하고 있습니다.
+        {origin ? (
+          <>
+            출발지 <span className="text-zinc-200 font-bold">[{origin.name}]</span>에서 목적지{' '}
+            <span className="text-zinc-200 font-bold">[{name}]</span>로 바로 안내하기 위해 티맵 앱을 호출하고 있습니다.
+          </>
+        ) : (
+          <>
+            목적지 <span className="text-zinc-200 font-bold">[{name}]</span>로 바로 안내하기 위해 티맵 앱을 호출하고 있습니다.
+          </>
+        )}
       </p>
 
       <div className="space-y-3 w-full max-w-xs">
         <button
-          onClick={() => launchNavigationApp('tmap', { name, lat, lng })}
+          onClick={() => launchNavigationApp('tmap', { name, lat, lng }, origin)}
           className="w-full py-4 px-4 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-black text-sm rounded-2xl shadow-xl shadow-emerald-950/60 flex items-center justify-center space-x-2 transition-all border border-emerald-400/40"
         >
           <ExternalLink className="w-4 h-4" />

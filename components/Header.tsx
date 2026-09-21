@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { DriverProfile, NaviProvider } from '@/types';
-import { Car, ChevronDown, Settings, ShieldCheck } from 'lucide-react';
+import { Car, ChevronDown, Settings } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface HeaderProps {
@@ -70,12 +70,6 @@ export const Header: React.FC<HeaderProps> = ({
             <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
           </button>
 
-          {isAdmin && (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 border border-blue-200/80 text-[#1E60F3] text-[11px] font-bold shadow-xs select-none shrink-0 animate-fade-in">
-              <ShieldCheck className="w-3.5 h-3.5 text-[#1E60F3]" />
-              <span>관리자</span>
-            </span>
-          )}
         </div>
 
         {/* Right: Circular 36px Navi Switchers + Settings Gear Icon (Guaranteed shrink-0 protection) */}
@@ -86,11 +80,10 @@ export const Header: React.FC<HeaderProps> = ({
               haptics.lightTap();
               onSelectNavi('tmap');
             }}
-            className={`w-9 h-9 rounded-full bg-white border border-slate-200 shadow-xs flex items-center justify-center transition-all duration-100 active:scale-90 cursor-pointer ${
-              profile.defaultNavi === 'tmap'
+            className={`w-9 h-9 rounded-full bg-white border border-slate-200 shadow-xs flex items-center justify-center transition-all duration-100 active:scale-90 cursor-pointer ${profile.defaultNavi === 'tmap'
                 ? 'ring-2 ring-[#1E60F3] scale-105 shadow-[0_4px_12px_rgba(30,96,243,0.25)] z-10'
                 : 'opacity-60 hover:opacity-100'
-            }`}
+              }`}
             title="티맵 (TMAP) 선택"
             aria-label="티맵 선택"
           >
@@ -115,11 +108,10 @@ export const Header: React.FC<HeaderProps> = ({
               haptics.lightTap();
               onSelectNavi('kakao');
             }}
-            className={`w-9 h-9 rounded-full bg-[#FEE500] border border-amber-300 text-[#3C1E1E] font-black text-xs shadow-xs flex items-center justify-center transition-all duration-100 active:scale-90 cursor-pointer ${
-              profile.defaultNavi === 'kakao'
+            className={`w-9 h-9 rounded-full bg-[#FEE500] border border-amber-300 text-[#3C1E1E] font-black text-xs shadow-xs flex items-center justify-center transition-all duration-100 active:scale-90 cursor-pointer ${profile.defaultNavi === 'kakao'
                 ? 'ring-2 ring-amber-400 scale-105 shadow-[0_4px_12px_rgba(254,229,0,0.35)] z-10'
                 : 'opacity-60 hover:opacity-100'
-            }`}
+              }`}
             title="카카오내비 선택"
             aria-label="카카오내비 선택"
           >
@@ -132,11 +124,10 @@ export const Header: React.FC<HeaderProps> = ({
               haptics.lightTap();
               onSelectNavi('naver');
             }}
-            className={`w-9 h-9 rounded-full bg-[#03C75A] border border-emerald-400 text-white font-black text-xs shadow-xs flex items-center justify-center transition-all duration-100 active:scale-90 cursor-pointer ${
-              profile.defaultNavi === 'naver'
+            className={`w-9 h-9 rounded-full bg-[#03C75A] border border-emerald-400 text-white font-black text-xs shadow-xs flex items-center justify-center transition-all duration-100 active:scale-90 cursor-pointer ${profile.defaultNavi === 'naver'
                 ? 'ring-2 ring-emerald-500 scale-105 shadow-[0_4px_12px_rgba(3,199,90,0.35)] z-10'
                 : 'opacity-60 hover:opacity-100'
-            }`}
+              }`}
             title="네이버지도 선택"
             aria-label="네이버지도 선택"
           >
@@ -150,11 +141,10 @@ export const Header: React.FC<HeaderProps> = ({
                 haptics.lightTap();
                 onOpenAdminModal();
               }}
-              className={`w-9 h-9 rounded-full border shadow-xs flex items-center justify-center transition-all duration-100 active:scale-90 cursor-pointer ${
-                isAdmin
+              className={`w-9 h-9 rounded-full border shadow-xs flex items-center justify-center transition-all duration-100 active:scale-90 cursor-pointer ${isAdmin
                   ? 'bg-blue-50 border-blue-300 text-[#1E60F3] ring-2 ring-blue-400'
                   : 'bg-white border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50'
-              }`}
+                }`}
               title={isAdmin ? '관리자 모드 활성화됨 (설정)' : '관리자 모드 진입 (설정)'}
               aria-label="관리자 모드 설정"
             >

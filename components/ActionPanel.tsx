@@ -66,12 +66,22 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
       console.warn('Clipboard write failed:', err);
     }
 
-    // 2. Launch Selected Navigation Deep Link sequentially
-    launchNavigationApp(defaultNavi, {
-      name: destination.name,
-      lat: destination.lat,
-      lng: destination.lng,
-    });
+    // 2. Launch Selected Navigation Deep Link sequentially with origin coordinates
+    launchNavigationApp(
+      defaultNavi,
+      {
+        name: destination.name,
+        lat: destination.lat,
+        lng: destination.lng,
+      },
+      origin
+        ? {
+            name: origin.name,
+            lat: origin.lat,
+            lng: origin.lng,
+          }
+        : undefined
+    );
   };
 
   /**
@@ -98,7 +108,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
       {/* KakaoTalk Pure Text Copy & App Launch Button (Centered) */}
       <button
         onClick={handleKakaoReportAction}
-        className="w-full py-4 px-4 bg-[#FEE500] hover:bg-[#FDD835] active:scale-95 transition-all duration-150 text-[#191919] rounded-2xl font-bold text-sm tracking-tight shadow-[0_4px_14px_rgba(254,229,0,0.25)] flex items-center justify-center gap-2 cursor-pointer"
+        className="w-full py-4 px-4 bg-[#FEE500] hover:bg-[#FDD835] hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.97] text-[#191919] rounded-2xl font-bold text-sm tracking-tight shadow-[0_4px_14px_rgba(254,229,0,0.25)] flex items-center justify-center gap-2 cursor-pointer transition-all duration-150 ease-out"
       >
         <MessageSquare className="w-4.5 h-4.5 text-[#3C1E1E] fill-[#3C1E1E] shrink-0" />
         <span>카카오톡 공유</span>

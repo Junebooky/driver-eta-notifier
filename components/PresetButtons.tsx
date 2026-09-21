@@ -358,7 +358,15 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
               title={`${homePreset.name} (${homePreset.address})`}
             >
               <div className="flex items-center justify-center gap-1 w-full">
-                <HomeIcon className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />
+                <HomeIcon
+                  className={`w-3.5 h-3.5 shrink-0 transition-colors ${
+                    isHomeDestination
+                      ? 'text-emerald-600'
+                      : isHomeOrigin
+                      ? 'text-[#1E60F3]'
+                      : 'text-slate-500 group-hover:text-slate-700'
+                  }`}
+                />
                 <span
                   className={`text-xs tracking-tight truncate font-bold ${
                     isHomeDestination

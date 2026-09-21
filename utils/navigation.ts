@@ -59,9 +59,9 @@ const STORE_URLS = {
     web: 'https://play.google.com/store/apps/details?id=com.skt.tmap.ku',
   },
   kakao: {
-    ios: 'https://apps.apple.com/kr/app/id1057796673',
-    android: 'market://details?id=com.locnall.KimGiSa',
-    web: 'https://play.google.com/store/apps/details?id=com.locnall.KimGiSa',
+    ios: 'https://apps.apple.com/kr/app/id304608425',
+    android: 'market://details?id=net.daum.android.map',
+    web: 'https://play.google.com/store/apps/details?id=net.daum.android.map',
   },
   naver: {
     ios: 'https://apps.apple.com/kr/app/id311867728',
@@ -70,11 +70,30 @@ const STORE_URLS = {
   },
 };
 
-export function buildDeepLink(provider: NaviProvider, target: LocationTarget, isAndroid: boolean): { scheme: string; fallbackUrl: string } {
+export function buildDeepLink(
+  provider: NaviProvider,
+  target: LocationTarget,
+  isAndroid: boolean,
+  origin?: LocationTarget
+): { scheme: string; fallbackUrl: string } {
   const { name, lat, lng } = target;
   const encodedName = encodeURIComponent(name);
 
   if (provider === 'tmap') {
+    if (origin) {
+      const encodedOriginName = encodeURIComponent(origin.name);
+      if (isAndroid) {
+        return {
+          scheme: `intent://route?startname=${encodedOriginName}&startx=${origin.lng}&starty=${origin.lat}&goalname=${encodedName}&goalx=${lng}&goaly=${lat}#Intent;scheme=tmap;package=com.skt.tmap.ku;end;`,
+          fallbackUrl: STORE_URLS.tmap.android,
+        };
+      }
+      return {
+        scheme: `tmap://route?startname=${encodedOriginName}&startx=${origin.lng}&starty=${origin.lat}&goalname=${encodedName}&goalx=${lng}&goaly=${lat}`,
+        fallbackUrl: STORE_URLS.tmap.ios,
+      };
+    }
+
     if (isAndroid) {
       return {
         scheme: `intent://route?goalname=${encodedName}&goalx=${lng}&goaly=${lat}&coordType=WGS84GEO#Intent;scheme=tmap;package=com.skt.tmap.ku;end;`,
@@ -88,6 +107,19 @@ export function buildDeepLink(provider: NaviProvider, target: LocationTarget, is
   }
 
   if (provider === 'kakao') {
+    if (origin) {
+      if (isAndroid) {
+        return {
+          scheme: `intent://route?sp=${origin.lat},${origin.lng}&ep=${lat},${lng}&by=CAR#Intent;scheme=kakaomap;package=net.daum.android.map;end;`,
+          fallbackUrl: STORE_URLS.kakao.android,
+        };
+      }
+      return {
+        scheme: `kakaomap://route?sp=${origin.lat},${origin.lng}&ep=${lat},${lng}&by=CAR`,
+        fallbackUrl: STORE_URLS.kakao.ios,
+      };
+    }
+
     if (isAndroid) {
       return {
         scheme: `intent://navigate?name=${encodedName}&x=${lng}&y=${lat}&coord_type=wgs84#Intent;scheme=kakaonavi;package=com.locnall.KimGiSa;end;`,
@@ -96,19 +128,33 @@ export function buildDeepLink(provider: NaviProvider, target: LocationTarget, is
     }
     return {
       scheme: `kakaonavi://navigate?name=${encodedName}&x=${lng}&y=${lat}&coord_type=wgs84`,
-      fallbackUrl: `kakaomap://route?ep=${lat},${lng}&by=CAR`, // Secondary scheme fallback before App Store
+      fallbackUrl: `kakaomap://route?ep=${lat},${lng}&by=CAR`,
     };
   }
 
   // Naver
+  if (origin) {
+    const encodedOriginName = encodeURIComponent(origin.name);
+    if (isAndroid) {
+      return {
+        scheme: `intent://route/car?slat=${origin.lat}&slng=${origin.lng}&sname=${encodedOriginName}&dlat=${lat}&dlng=${lng}&dname=${encodedName}&appname=driver-eta-notifier#Intent;scheme=nmap;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.nhn.android.nmap;end;`,
+        fallbackUrl: STORE_URLS.naver.android,
+      };
+    }
+    return {
+      scheme: `nmap://route/car?slat=${origin.lat}&slng=${origin.lng}&sname=${encodedOriginName}&dlat=${lat}&dlng=${lng}&dname=${encodedName}&appname=driver-eta-notifier`,
+      fallbackUrl: STORE_URLS.naver.ios,
+    };
+  }
+
   if (isAndroid) {
     return {
-      scheme: `intent://navigation?dlat=${lat}&dlng=${lng}&dname=${encodedName}&appname=protocol-launcher#Intent;scheme=nmap;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.nhn.android.nmap;end;`,
+      scheme: `intent://navigation?dlat=${lat}&dlng=${lng}&dname=${encodedName}&appname=driver-eta-notifier#Intent;scheme=nmap;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.nhn.android.nmap;end;`,
       fallbackUrl: STORE_URLS.naver.android,
     };
   }
   return {
-    scheme: `nmap://navigation?dlat=${lat}&dlng=${lng}&dname=${encodedName}&appname=protocol-launcher`,
+    scheme: `nmap://navigation?dlat=${lat}&dlng=${lng}&dname=${encodedName}&appname=driver-eta-notifier`,
     fallbackUrl: STORE_URLS.naver.ios,
   };
 }
@@ -116,12 +162,16 @@ export function buildDeepLink(provider: NaviProvider, target: LocationTarget, is
 /**
   Safari / Mobile Chrome Deep Link Trigger with Pagehide / Visibilitychange Safeguard
  */
-export function launchNavigationApp(provider: NaviProvider, target: LocationTarget): void {
+export function launchNavigationApp(
+  provider: NaviProvider,
+  target: LocationTarget,
+  origin?: LocationTarget
+): void {
   if (typeof window === 'undefined') return;
 
   const userAgent = navigator.userAgent || '';
   const isAndroid = /Android/i.test(userAgent);
-  const { scheme, fallbackUrl } = buildDeepLink(provider, target, isAndroid);
+  const { scheme, fallbackUrl } = buildDeepLink(provider, target, isAndroid, origin);
 
   let timer: NodeJS.Timeout | null = null;
 
