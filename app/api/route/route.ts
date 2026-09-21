@@ -9,7 +9,6 @@ interface CacheEntry {
     trafficSummary: string;
     isMock: boolean;
     isFallback?: boolean;
-    fallbackNotice?: string;
     isCached: boolean;
   };
   timestamp: number;
@@ -28,63 +27,53 @@ function getCacheKey(startLat: number, startLng: number, endLat: number, endLng:
   return `${sLat},${sLng}->${eLat},${eLng}`;
 }
 
-export async function POST(req: NextRequest) {
-  let startLat = 37.5042;
-  let startLng = 127.0425;
-  let endLat = 37.4495;
-  let endLng = 126.4512;
+async function handleRouteCalculation(
+  startLat: number,
+  startLng: number,
+  endLat: number,
+  endLng: number
+) {
+  const useMock = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
+  const apiKey = process.env.TMAP_API_KEY;
 
-  try {
-    const body = await req.json();
-    if (typeof body.startLat === 'number') startLat = body.startLat;
-    if (typeof body.startLng === 'number') startLng = body.startLng;
-    if (typeof body.endLat === 'number') endLat = body.endLat;
-    if (typeof body.endLng === 'number') endLng = body.endLng;
+  const cacheKey = getCacheKey(startLat, startLng, endLat, endLng);
+  const nowTimestamp = Date.now();
 
-    if (!body.startLat || !body.startLng || !body.endLat || !body.endLng) {
-      return NextResponse.json({ error: 'Missing origin or destination coordinates' }, { status: 400 });
-    }
+  // 1. Quota Defense: Check 3-minute Cache first
+  if (routeCache.has(cacheKey)) {
+    const cached = routeCache.get(cacheKey)!;
+    if (nowTimestamp - cached.timestamp < CACHE_TTL_MS) {
+      // Re-calculate fresh ETA clock string for cached duration
+      const etaTime = new Date(nowTimestamp + cached.data.durationMinutes * 60 * 1000);
+      const hours = String(etaTime.getHours()).padStart(2, '0');
+      const minutes = String(etaTime.getMinutes()).padStart(2, '0');
 
-    const useMock = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
-    const apiKey = process.env.TMAP_API_KEY;
-
-    const cacheKey = getCacheKey(startLat, startLng, endLat, endLng);
-    const nowTimestamp = Date.now();
-
-    // 1. Quota Defense: Check 3-minute Cache first
-    if (routeCache.has(cacheKey)) {
-      const cached = routeCache.get(cacheKey)!;
-      if (nowTimestamp - cached.timestamp < CACHE_TTL_MS) {
-        // Re-calculate fresh ETA clock string for cached duration
-        const etaTime = new Date(nowTimestamp + cached.data.durationMinutes * 60 * 1000);
-        const hours = String(etaTime.getHours()).padStart(2, '0');
-        const minutes = String(etaTime.getMinutes()).padStart(2, '0');
-
-        return NextResponse.json({
-          ...cached.data,
-          etaFormatted: `${hours}:${minutes} (${cached.data.durationMinutes}분 소요)`,
-          isCached: true,
-        });
-      }
-    }
-
-    // 2. If Mock Mode explicitly enabled or API key missing
-    if (useMock || !apiKey || apiKey === 'your_tmap_api_key') {
-      const fallbackData = calculateHaversineEstimate(startLat, startLng, endLat, endLng);
       return NextResponse.json({
-        ...fallbackData,
-        trafficSummary: '원활 (모의 데이터)',
-        isMock: true,
-        isFallback: false,
-        isCached: false,
+        ...cached.data,
+        etaFormatted: `${hours}:${minutes} (${cached.data.durationMinutes}분 소요)`,
+        isCached: true,
       });
     }
+  }
 
-    // 3. Server-Side TMAP API Call (Key strictly hidden from client)
-    const tmapUrl = `https://apis.openapi.sk.com/tmap/routes?version=1&format=json`;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4500); // 4.5s timeout threshold
+  // 2. If Mock Mode explicitly enabled or API key missing
+  if (useMock || !apiKey || apiKey === 'your_tmap_api_key') {
+    const fallbackData = calculateHaversineEstimate(startLat, startLng, endLat, endLng);
+    return NextResponse.json({
+      ...fallbackData,
+      trafficSummary: '원활 (모의 데이터)',
+      isMock: true,
+      isFallback: false,
+      isCached: false,
+    });
+  }
 
+  // 3. Server-Side TMAP API Call (Key strictly hidden from client)
+  const tmapUrl = `https://apis.openapi.sk.com/tmap/routes?version=1&format=json`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 4500); // 4.5s timeout threshold
+
+  try {
     const response = await fetch(tmapUrl, {
       method: 'POST',
       headers: {
@@ -138,8 +127,41 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(resultData);
   } catch (error: any) {
+    clearTimeout(timeoutId);
     console.warn('TMAP Route API call failed or timed out:', error?.message);
     const fallbackData = calculateHaversineEstimate(startLat, startLng, endLat, endLng);
     return NextResponse.json({ ...fallbackData, isCached: false });
+  }
+}
+
+// Support GET requests (query params: startX, startY, endX, endY or startLat, startLng, endLat, endLng)
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+
+    const startLng = parseFloat(searchParams.get('startX') || searchParams.get('startLng') || '127.0425');
+    const startLat = parseFloat(searchParams.get('startY') || searchParams.get('startLat') || '37.5042');
+    const endLng = parseFloat(searchParams.get('endX') || searchParams.get('endLng') || '126.4512');
+    const endLat = parseFloat(searchParams.get('endY') || searchParams.get('endLat') || '37.4495');
+
+    return await handleRouteCalculation(startLat, startLng, endLat, endLng);
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message }, { status: 500 });
+  }
+}
+
+// Support POST requests (body: { startLat, startLng, endLat, endLng } or { startX, startY, endX, endY })
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json().catch(() => ({}));
+
+    const startLng = parseFloat(String(body.startLng ?? body.startX ?? '127.0425'));
+    const startLat = parseFloat(String(body.startLat ?? body.startY ?? '37.5042'));
+    const endLng = parseFloat(String(body.endLng ?? body.endX ?? '126.4512'));
+    const endLat = parseFloat(String(body.endLat ?? body.endY ?? '37.4495'));
+
+    return await handleRouteCalculation(startLat, startLng, endLat, endLng);
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message }, { status: 500 });
   }
 }
