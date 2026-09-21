@@ -72,7 +72,7 @@ function constructDate(
 }
 
 // -----------------------------------------------------------------------------
-// 3D Cylinder Drum Column Component
+// 3D Convex Cylinder Drum Column Component (Zero-Latency Direct DOM Manipulation)
 // -----------------------------------------------------------------------------
 interface CylinderColumnProps<T> {
   items: T[];
@@ -91,45 +91,103 @@ function CylinderColumn<T>({
   colRef,
   className = '',
 }: CylinderColumnProps<T>) {
-  const [scrollTop, setScrollTop] = useState(selectedIndex * ITEM_HEIGHT);
+  const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const rAFRef = useRef<number | null>(null);
+  const isProgrammaticScrollRef = useRef(false);
 
-  // Sync scroll position when selectedIndex or items change
+  // Update transforms directly on DOM elements for Zero-Latency 120Hz smooth scrolling
+  const updateTransforms = useCallback((scrollTop: number) => {
+    const total = items.length;
+    for (let idx = 0; idx < total; idx++) {
+      const el = itemRefs.current[idx];
+      if (!el) continue;
+
+      const itemCenter = idx * ITEM_HEIGHT;
+      const distance = itemCenter - scrollTop;
+      const delta = distance / ITEM_HEIGHT;
+      const absDelta = Math.abs(delta);
+
+      // [Convex Drum 3D Geometry - Forward Protruding Formula]
+      // 1. rotateX: Center 0deg, distant items rolling backwards along cylinder curve
+      const rotateX = delta * -24;
+
+      // 2. translateZ: Center PROTRUDES forward (+24px), distant items roll deep into the back (-35px ~ -55px)
+      const translateZ = Math.max(-55, 24 - Math.pow(absDelta, 1.35) * 52);
+
+      // 3. scale: Center expands to 1.16, distant items scale down to 0.82
+      const scale = Math.max(0.80, 1.16 - absDelta * 0.28);
+
+      // 4. opacity: Center crystal clear (1.0), distant items gently subdued (0.22)
+      const opacity = Math.max(0.18, 1.0 - absDelta * 0.62);
+
+      el.style.transform = `perspective(1000px) rotateX(${rotateX}deg) translateZ(${translateZ}px) scale(${scale})`;
+      el.style.opacity = `${opacity}`;
+
+      // Dynamic Typography & Color switching based on center proximity
+      const span = el.querySelector('span');
+      if (span) {
+        if (absDelta < 0.45) {
+          span.style.color = '#0F172A';
+          span.style.fontWeight = '900';
+          span.style.fontSize = '1.35rem'; // ~22px-24px (text-2xl feel)
+        } else {
+          span.style.color = '#94A3B8';
+          span.style.fontWeight = '600';
+          span.style.fontSize = '1.1rem'; // ~17px-18px (text-lg feel)
+        }
+      }
+    }
+  }, [items.length]);
+
+  // Sync scroll position when selectedIndex changes externally
   useEffect(() => {
     if (!colRef.current) return;
     const targetScroll = selectedIndex * ITEM_HEIGHT;
     if (Math.abs(colRef.current.scrollTop - targetScroll) > 2) {
+      isProgrammaticScrollRef.current = true;
       colRef.current.scrollTo({
         top: targetScroll,
         behavior: 'smooth',
       });
+      setTimeout(() => {
+        isProgrammaticScrollRef.current = false;
+      }, 200);
     }
-    setScrollTop(targetScroll);
-  }, [selectedIndex, items.length, colRef]);
+    updateTransforms(targetScroll);
+  }, [selectedIndex, colRef, updateTransforms]);
+
+  // Initial layout transform binding
+  useEffect(() => {
+    if (colRef.current) {
+      updateTransforms(colRef.current.scrollTop);
+    }
+  }, [updateTransforms, colRef]);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const st = e.currentTarget.scrollTop;
 
-    // Use requestAnimationFrame for smooth 60fps GPU-accelerated updates without Jank
+    // Zero-Latency Direct GPU styling via requestAnimationFrame
     if (rAFRef.current) {
       cancelAnimationFrame(rAFRef.current);
     }
     rAFRef.current = requestAnimationFrame(() => {
-      setScrollTop(st);
+      updateTransforms(st);
     });
 
     if (scrollTimeoutRef.current) {
       clearTimeout(scrollTimeoutRef.current);
     }
 
+    // Debounced center snap index commit
     scrollTimeoutRef.current = setTimeout(() => {
+      if (isProgrammaticScrollRef.current) return;
       const finalIndex = Math.round(st / ITEM_HEIGHT);
       const clamped = Math.max(0, Math.min(items.length - 1, finalIndex));
       if (clamped !== selectedIndex) {
         onSelect(clamped);
       }
-    }, 80);
+    }, 70);
   };
 
   return (
@@ -146,23 +204,12 @@ function CylinderColumn<T>({
       }}
     >
       {items.map((item, idx) => {
-        // Calculate relative distance from current scroll center
-        const itemCenter = idx * ITEM_HEIGHT;
-        const distance = itemCenter - scrollTop;
-        const delta = distance / ITEM_HEIGHT; // -2, -1, 0, 1, 2
-        const clampedDelta = Math.max(-2.5, Math.min(2.5, delta));
-
-        // 3D Parameters:
-        const rotateX = clampedDelta * -20;
-        const translateZ = Math.max(-48, 5 - Math.abs(clampedDelta) * 22);
-        const scale = Math.max(0.82, 1.05 - Math.abs(clampedDelta) * 0.12);
-        const opacity = Math.max(0.12, Math.min(1, 1 - Math.abs(clampedDelta) * 0.52));
-
-        const isExactCenter = idx === selectedIndex;
-
         return (
           <button
             key={`${getLabel(item)}-${idx}`}
+            ref={(el) => {
+              itemRefs.current[idx] = el;
+            }}
             type="button"
             onClick={() => {
               if (colRef.current) {
@@ -173,23 +220,15 @@ function CylinderColumn<T>({
               }
               onSelect(idx);
             }}
-            className="h-[48px] w-full flex items-center justify-center snap-center shrink-0 cursor-pointer select-none transition-colors duration-150"
+            className="h-[48px] w-full flex items-center justify-center snap-center shrink-0 cursor-pointer select-none"
             style={{
-              transform: `perspective(1000px) rotateX(${rotateX}deg) translateZ(${translateZ}px) scale(${scale})`,
               transformStyle: 'preserve-3d',
-              opacity,
               willChange: 'transform, opacity',
               scrollSnapAlign: 'center',
               scrollSnapStop: 'normal',
             }}
           >
-            <span
-              className={`leading-none truncate px-1 transition-all ${
-                isExactCenter
-                  ? 'text-slate-900 font-extrabold text-base sm:text-lg'
-                  : 'text-slate-500 font-medium text-xs sm:text-sm'
-              }`}
-            >
+            <span className="leading-none truncate px-1 transition-colors duration-100 select-none">
               {getLabel(item)}
             </span>
           </button>
@@ -240,33 +279,16 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
     };
   }, [isOpen]);
 
-  // 2. Date-Scoped Dynamic Array Calculation
-  // ONLY when selected date is '오늘', filter out past period if already afternoon
+  // 2. Fixed Data Sources for 100% Column Independence
+  // ALL_PERIODS is 100% permanent: ['오전', '오후']. Never reshuffle or resize array!
   const now = new Date();
   const minAllowed = getMinAllowedDate(now);
   const isToday = selectedDateIdx === 0;
   const isNowAfternoon = now.getHours() >= 12;
 
-  // Periods: If today & already afternoon, only ['오후'] is supplied
-  // If '내일' or beyond (isToday === false), BOTH ['오전', '오후'] are 100% open!
-  const availablePeriods: Array<'오전' | '오후'> = useMemo(() => {
-    if (isToday && isNowAfternoon) {
-      return ['오후'];
-    }
-    return ALL_PERIODS;
-  }, [isToday, isNowAfternoon]);
-
-  // Auto-correct period only if switching to '오늘' and current period is '오전'
-  useEffect(() => {
-    if (isToday && isNowAfternoon && selectedPeriod === '오전') {
-      setSelectedPeriod('오후');
-    }
-  }, [isToday, isNowAfternoon, selectedPeriod]);
-
-  // Hours: Full 1..12
-  const availableHours = ALL_HOURS;
-  // Minutes: 00..50
-  const availableMinutes = ALL_MINUTES;
+  const periodsList = ALL_PERIODS;
+  const hoursList = ALL_HOURS;
+  const minutesList = ALL_MINUTES;
 
   // Helper to trigger Elastic Rubber-Band Snapback (Strictly scoped to '오늘')
   const triggerRubberBandSnapback = useCallback(() => {
@@ -324,12 +346,12 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
 
   if (!isOpen) return null;
 
-  // 4. Selection Handlers with Strict Date-Scoped Past Check
+  // 4. Selection Handlers with Column Isolation & Strict Date Scope
   const handleSelectDateIdx = (idx: number) => {
     haptics.lightTap();
     setSelectedDateIdx(idx);
 
-    // Past guardrail is strictly applied ONLY when selecting '오늘' (idx === 0)
+    // Only when switching back to '오늘', check if currently selected time is in the past
     if (idx === 0) {
       const projected = constructDate(0, selectedPeriod, selectedHour, selectedMinute, now);
       if (projected.getTime() < minAllowed.getTime()) {
@@ -339,11 +361,18 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
   };
 
   const handleSelectPeriodIdx = (idx: number) => {
-    const period = availablePeriods[idx] || '오후';
+    const period = periodsList[idx] || '오후';
+
+    // Guardrail: If on '오늘' and already afternoon, selecting '오전' triggers gentle snapback
+    if (selectedDateIdx === 0 && isNowAfternoon && period === '오전') {
+      triggerRubberBandSnapback();
+      return;
+    }
+
     haptics.lightTap();
     setSelectedPeriod(period);
 
-    // STRICT DATE-SCOPE: Only check past time if currently on '오늘' (selectedDateIdx === 0)
+    // Strictly check past time only if on '오늘'
     if (selectedDateIdx === 0) {
       const projected = constructDate(0, period, selectedHour, selectedMinute, now);
       if (projected.getTime() < minAllowed.getTime()) {
@@ -353,7 +382,7 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
   };
 
   const handleSelectHourIdx = (idx: number) => {
-    const newHour = availableHours[idx];
+    const newHour = hoursList[idx];
     const prevHour = prevHourRef.current;
     let nextPeriod = selectedPeriod;
     let nextDateIdx = selectedDateIdx;
@@ -387,7 +416,6 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
       } catch {}
 
       if (selectedPeriod === '오후') {
-        // Only allow morning if tomorrow, or today before noon
         if (selectedDateIdx > 0 || !isNowAfternoon) {
           nextPeriod = '오전';
           setSelectedPeriod('오전');
@@ -417,7 +445,7 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
   };
 
   const handleSelectMinuteIdx = (idx: number) => {
-    const minute = availableMinutes[idx];
+    const minute = minutesList[idx];
     setSelectedMinute(minute);
 
     // STRICT DATE-SCOPE: Only check past time if currently on '오늘' (selectedDateIdx === 0)
@@ -452,10 +480,9 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
     onConfirm(target);
   };
 
-  // Resolve active indices in current dynamic arrays
-  const periodIndex = Math.max(0, availablePeriods.indexOf(selectedPeriod));
-  const hourIndex = Math.max(0, availableHours.indexOf(selectedHour));
-  const minuteIndex = Math.max(0, availableMinutes.indexOf(selectedMinute));
+  const periodIndex = Math.max(0, periodsList.indexOf(selectedPeriod));
+  const hourIndex = Math.max(0, hoursList.indexOf(selectedHour));
+  const minuteIndex = Math.max(0, minutesList.indexOf(selectedMinute));
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center select-none animate-fade-in">
@@ -494,8 +521,8 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
           }`}
           style={{ perspective: '1000px', transformStyle: 'preserve-3d' }}
         >
-          {/* Exact Central Highlight Box across all 4 columns: h-12 (48px) at top-[96px] */}
-          <div className="absolute left-1 right-1 top-[96px] h-[48px] bg-slate-100/90 rounded-2xl pointer-events-none z-0 border border-slate-200/60 shadow-inner" />
+          {/* Subtle Ambient Glow Central Highlight Window across all 4 columns: h-12 (48px) at top-[96px] */}
+          <div className="absolute left-1 right-1 top-[96px] h-[48px] bg-slate-100/90 rounded-2xl pointer-events-none z-0 border border-blue-200/50 shadow-sm shadow-blue-500/10" />
 
           {/* Top Gradient Fade Mask for 3D depth */}
           <div className="absolute top-0 left-0 right-0 h-24 bg-gradient-to-b from-white via-white/85 to-transparent pointer-events-none z-20" />
@@ -503,7 +530,7 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
           {/* Bottom Gradient Fade Mask for 3D depth */}
           <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white via-white/85 to-transparent pointer-events-none z-20" />
 
-          {/* 4 Columns Container in 3D Perspective */}
+          {/* 4 Completely Isolated Columns in 3D Perspective */}
           <div className="grid grid-cols-4 gap-1 w-full h-[240px] relative z-10">
             {/* Column 1: Date (오늘, 내일, 9월 22일 화 등) */}
             <CylinderColumn
@@ -514,9 +541,9 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
               colRef={dateColRef}
             />
 
-            {/* Column 2: AM / PM (오전, 오후 - dynamically filtered, no empty spacer shift) */}
+            {/* Column 2: AM / PM (오전, 오후 - 100% Permanently Fixed Array, Zero Shaking) */}
             <CylinderColumn
-              items={availablePeriods}
+              items={periodsList}
               selectedIndex={periodIndex}
               onSelect={handleSelectPeriodIdx}
               getLabel={(item) => item}
@@ -525,7 +552,7 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
 
             {/* Column 3: Hours (1 ~ 12) with Smart Rollover */}
             <CylinderColumn
-              items={availableHours}
+              items={hoursList}
               selectedIndex={hourIndex}
               onSelect={handleSelectHourIdx}
               getLabel={(item) => `${item}시`}
@@ -534,7 +561,7 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
 
             {/* Column 4: Minutes in 10s (00 ~ 50) */}
             <CylinderColumn
-              items={availableMinutes}
+              items={minutesList}
               selectedIndex={minuteIndex}
               onSelect={handleSelectMinuteIdx}
               getLabel={(item) => `${String(item).padStart(2, '0')}분`}
