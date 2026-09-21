@@ -84,11 +84,15 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
             )}
           </div>
 
-          {/* Subtitle: Real-time Distance & Traffic provider ONLY */}
+          {/* Subtitle: Real-time Distance & Traffic provider in separated vertical hierarchy */}
           {routeEstimate && (
-            <div className="text-xs text-slate-500 mt-1 font-normal">
-              이동 거리: <span className="text-slate-900 font-bold">{routeEstimate.distanceKm} km</span>{' '}
-              <span className="text-slate-600">({routeEstimate.trafficSummary || '실시간 교통 반영 (TMAP)'})</span>
+            <div className="mt-1.5 space-y-0.5">
+              <div className="text-xs text-slate-500 font-normal">
+                이동 거리: <span className="text-slate-900 font-bold">{routeEstimate.distanceKm} km</span>
+              </div>
+              <div className="text-[11px] font-medium text-slate-400 whitespace-nowrap tracking-tight">
+                ({routeEstimate.trafficSummary || '실시간 교통 반영(TMAP)'})
+              </div>
             </div>
           )}
         </div>

@@ -549,8 +549,18 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
 
       {/* Management Action Dialog Modal */}
       {managingPreset && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-xs bg-white border border-slate-200 rounded-3xl shadow-2xl p-5 text-center space-y-4">
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center pt-[12vh] sm:items-center sm:pt-0 p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setManagingPreset(null);
+            }
+          }}
+        >
+          <div
+            className="w-full max-w-xs bg-white border border-slate-200 rounded-3xl shadow-2xl p-5 text-center space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div>
               <div className="flex items-center justify-center gap-1">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
