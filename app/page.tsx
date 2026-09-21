@@ -674,6 +674,7 @@ export default function Home() {
         onClose={() => setIsGasModalOpen(false)}
         currentLat={origin.lat}
         currentLng={origin.lng}
+        originId={origin?.id}
         defaultNavi={profile.defaultNavi}
         profile={profile}
         onSelectStation={handleSelectGasStation}

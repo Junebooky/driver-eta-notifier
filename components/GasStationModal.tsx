@@ -11,6 +11,7 @@ interface GasStationModalProps {
   onClose: () => void;
   currentLat: number;
   currentLng: number;
+  originId?: string;
   defaultNavi: NaviProvider;
   profile: DriverProfile;
   onSelectStation: (station: GasStation, autoLaunch?: boolean) => void;
@@ -133,6 +134,7 @@ export const GasStationModal: React.FC<GasStationModalProps> = ({
   onClose,
   currentLat,
   currentLng,
+  originId,
   defaultNavi,
   profile,
   onSelectStation,
@@ -141,13 +143,14 @@ export const GasStationModal: React.FC<GasStationModalProps> = ({
   const [stations, setStations] = useState<GasStation[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
 
-  // Fetch gas stations with all-in-one 3-fuel prices
-  const fetchGasStations = async () => {
+  // [태스크 1] Fetch gas stations using real-time dynamic GPS coordinates
+  const fetchGasStations = async (targetLat: number, targetLng: number) => {
     setIsLoading(true);
     setErrorMsg(null);
     try {
-      const url = `/api/gas-stations?lat=${currentLat}&lng=${currentLng}&radius=3000`;
+      const url = `/api/gas-stations?lat=${targetLat}&lng=${targetLng}&fuelType=all`;
       const res = await fetch(url);
       if (!res.ok) {
         throw new Error(`API Error ${res.status}`);
@@ -166,11 +169,47 @@ export const GasStationModal: React.FC<GasStationModalProps> = ({
     }
   };
 
+  // Acquire on-device GPS location on mount/refresh, fallback to currentLat/currentLng
+  const acquireLocationAndFetch = (forceGeolocation = false) => {
+    setIsLoading(true);
+    setErrorMsg(null);
+
+    const isLiveGpsOrigin = originId === 'gps_current';
+    if (!forceGeolocation && isLiveGpsOrigin && currentLat && currentLng) {
+      setUserCoords({ lat: currentLat, lng: currentLng });
+      fetchGasStations(currentLat, currentLng);
+      return;
+    }
+
+    if (typeof window !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          setUserCoords({ lat: latitude, lng: longitude });
+          fetchGasStations(latitude, longitude);
+        },
+        (err) => {
+          console.warn('Geolocation failed or denied, using dashboard coords:', err);
+          setUserCoords({ lat: currentLat, lng: currentLng });
+          fetchGasStations(currentLat, currentLng);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 4500,
+          maximumAge: 10000,
+        }
+      );
+    } else {
+      setUserCoords({ lat: currentLat, lng: currentLng });
+      fetchGasStations(currentLat, currentLng);
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
-      fetchGasStations();
+      acquireLocationAndFetch();
     }
-  }, [isOpen, currentLat, currentLng]);
+  }, [isOpen]);
 
   // Client-side sort by Fastest (TMAP duration) or Cheapest (Diesel / lowest price)
   const sortedStations = useMemo(() => {
@@ -311,7 +350,7 @@ export const GasStationModal: React.FC<GasStationModalProps> = ({
 
           <button
             type="button"
-            onClick={fetchGasStations}
+            onClick={() => acquireLocationAndFetch(true)}
             disabled={isLoading}
             className="p-2 text-slate-400 hover:text-slate-700 rounded-xl hover:bg-slate-100 cursor-pointer disabled:opacity-50 transition-colors"
             title="새로고침"
@@ -334,7 +373,7 @@ export const GasStationModal: React.FC<GasStationModalProps> = ({
               <p className="text-xs font-bold text-slate-700">{errorMsg}</p>
               <button
                 type="button"
-                onClick={fetchGasStations}
+                onClick={() => acquireLocationAndFetch(true)}
                 className="text-xs text-[#1E60F3] font-bold underline cursor-pointer"
               >
                 다시 시도
@@ -342,7 +381,7 @@ export const GasStationModal: React.FC<GasStationModalProps> = ({
             </div>
           ) : sortedStations.length === 0 ? (
             <div className="py-14 text-center text-slate-400 space-y-1">
-              <p className="text-xs font-bold text-slate-600">반경 3km 내 검색된 주유소가 없습니다.</p>
+              <p className="text-xs font-bold text-slate-600">인근에 검색된 주유소가 없습니다.</p>
               <p className="text-[11px]">잠시 후 다시 새로고침해 주세요.</p>
             </div>
           ) : (
@@ -422,7 +461,7 @@ export const GasStationModal: React.FC<GasStationModalProps> = ({
                       title="단톡방 보고 복사 & 길안내 즉시 시작"
                       aria-label="길안내 시작"
                     >
-                      <Navigation className="w-4 h-4 fill-white rotate-45" />
+                      <Navigation className="w-4 h-4 fill-white" />
                     </button>
                   </div>
                 </div>
