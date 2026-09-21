@@ -94,8 +94,17 @@ const BrandEmblem: React.FC<{ brandCode: string; brandName: string }> = ({ brand
   );
 };
 
+// [태스크 1] 단일 진실 공급원(SSOT): 사용자 단말 실제 시각에 기반한 정확한 24시간제 ETA 산출
+export const getAccurateEta = (durationMinutes: number): string => {
+  const now = new Date();
+  const arrivalTime = new Date(now.getTime() + Math.max(1, durationMinutes) * 60 * 1000);
+  const hours = String(arrivalTime.getHours()).padStart(2, '0');
+  const minutes = String(arrivalTime.getMinutes()).padStart(2, '0');
+  return `${hours}:${minutes}`;
+};
+
 // [태스크 4] '안 1(표준 의전 관제형)' 멀티라인 단톡방 보고 템플릿
-function formatGasStationReport(profile: DriverProfile, stationName: string, etaFormatted: string): string {
+function formatGasStationReport(profile: DriverProfile, stationName: string, durationMinutes: number): string {
   let v = (profile.vehicleNo || '').trim();
   // Strip trailing '호차' from full plate (e.g. "4호차 142호 7811호차" -> "4호차 142호 7811")
   v = v.replace(/호차\s*$/, '').trim();
@@ -117,9 +126,7 @@ function formatGasStationReport(profile: DriverProfile, stationName: string, eta
     headerTag = `${vehicleDisplay} ${dName}`;
   }
 
-  // Strict HH:mm ETA
-  const timeMatch = etaFormatted.match(/(\d{1,2}:\d{2})/);
-  const cleanEta = timeMatch ? timeMatch[1].padStart(5, '0') : etaFormatted || '19:36';
+  const cleanEta = getAccurateEta(durationMinutes);
 
   return [
     `[${headerTag}]`,
@@ -195,8 +202,8 @@ export const GasStationModal: React.FC<GasStationModalProps> = ({
         },
         {
           enableHighAccuracy: true,
-          timeout: 4500,
-          maximumAge: 10000,
+          timeout: 8000,
+          maximumAge: 0,
         }
       );
     } else {
@@ -234,7 +241,7 @@ export const GasStationModal: React.FC<GasStationModalProps> = ({
 
   // Helper to copy report text to clipboard safely
   const copyReportToClipboard = (station: GasStation) => {
-    const reportMessage = formatGasStationReport(profile, station.name, station.tmapEtaFormatted);
+    const reportMessage = formatGasStationReport(profile, station.name, station.durationMinutes);
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(reportMessage);
@@ -445,12 +452,10 @@ export const GasStationModal: React.FC<GasStationModalProps> = ({
                       </span>
                       <span className="text-slate-300">•</span>
                       <span className="font-semibold text-slate-600">{station.distanceKm} km</span>
-                      {station.tmapEtaFormatted && (
-                        <>
-                          <span className="text-slate-300">•</span>
-                          <span className="text-[#1E60F3] font-bold">{station.tmapEtaFormatted} 도착</span>
-                        </>
-                      )}
+                      <span className="text-slate-300">•</span>
+                      <span className="text-[#1E60F3] font-bold">
+                        {getAccurateEta(station.durationMinutes)} 도착
+                      </span>
                     </div>
 
                     {/* 원형 내비 런처: 45도 우상향(북동쪽) 날렵한 화살표 */}

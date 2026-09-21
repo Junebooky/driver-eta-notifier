@@ -8,9 +8,9 @@ interface GasCacheEntry {
   timestamp: number;
 }
 
-// 1. Quota Safeguard: In-Memory Cache (15 minutes = 900,000ms TTL)
+// 1. Quota Safeguard: In-Memory Cache (5 minutes TTL)
 const gasCache = new Map<string, GasCacheEntry>();
-const CACHE_TTL_MS = 15 * 60 * 1000; // 900 seconds
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 const BRAND_NAME_MAP: Record<string, string> = {
   SKE: 'SK에너지',
@@ -22,10 +22,23 @@ const BRAND_NAME_MAP: Record<string, string> = {
   ETC: '자가/기타',
 };
 
-// Generates rounded cache key (~500m resolution) to prevent repeated calls
+// Explicit KST (Asia/Seoul) ETA formatter to prevent server UTC offset skew
+function formatKstEta(durationMinutes: number): string {
+  const now = new Date();
+  const arrival = new Date(now.getTime() + Math.max(1, durationMinutes) * 60 * 1000);
+  const kstFormatter = new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+  return kstFormatter.format(arrival);
+}
+
+// Generates rounded cache key (~100m resolution) to prevent repeated calls while preserving micro-location
 function getCacheKey(lat: number, lng: number): string {
-  const roundedLat = (Math.round(lat * 200) / 200).toFixed(3);
-  const roundedLng = (Math.round(lng * 200) / 200).toFixed(3);
+  const roundedLat = (Math.round(lat * 1000) / 1000).toFixed(3);
+  const roundedLng = (Math.round(lng * 1000) / 1000).toFixed(3);
   return `${roundedLat},${roundedLng}`;
 }
 
@@ -144,10 +157,7 @@ async function fetchTmapAroundGasStations(lat: number, lng: number): Promise<Gas
         }
 
         const driveInfo = await calculateTmapDriveInfo(lat, lng, sLat, sLng);
-        const etaDate = new Date(now.getTime() + driveInfo.durationMinutes * 60 * 1000);
-        const tmapEtaFormatted = `${String(etaDate.getHours()).padStart(2, '0')}:${String(
-          etaDate.getMinutes()
-        ).padStart(2, '0')}`;
+        const tmapEtaFormatted = formatKstEta(driveInfo.durationMinutes);
 
         return {
           id: poi.id || `tmap_poi_${Math.random()}`,
@@ -188,10 +198,7 @@ function getFallbackStations(lat: number, lng: number): GasStation[] {
     const sLat = lat + m.dLat;
     const sLng = lng + m.dLng;
     const est = calculateHaversineEstimate(lat, lng, sLat, sLng);
-    const etaDate = new Date(now.getTime() + est.durationMinutes * 60 * 1000);
-    const etaFormatted = `${String(etaDate.getHours()).padStart(2, '0')}:${String(
-      etaDate.getMinutes()
-    ).padStart(2, '0')}`;
+    const etaFormatted = formatKstEta(est.durationMinutes + idx);
 
     return {
       id: `fallback_${idx}`,
@@ -234,15 +241,11 @@ export async function GET(req: NextRequest) {
   if (gasCache.has(cacheKey)) {
     const cached = gasCache.get(cacheKey)!;
     if (now - cached.timestamp < CACHE_TTL_MS) {
-      // Re-calculate updated ETA clock strings
-      const freshNow = new Date();
+      // Re-calculate updated ETA clock strings using KST
       const updatedStations = cached.stations.map((st) => {
-        const etaDate = new Date(freshNow.getTime() + st.durationMinutes * 60 * 1000);
         return {
           ...st,
-          tmapEtaFormatted: `${String(etaDate.getHours()).padStart(2, '0')}:${String(
-            etaDate.getMinutes()
-          ).padStart(2, '0')}`,
+          tmapEtaFormatted: formatKstEta(st.durationMinutes),
         };
       });
 
@@ -285,7 +288,7 @@ export async function GET(req: NextRequest) {
         fuels.map(async ({ code, field }) => {
           const url = `http://www.opinet.co.kr/api/aroundAll.do?code=${opinetKey}&x=${Math.round(
             katecX
-          )}&y=${Math.round(katecY)}&radius=${radiusM}&prodcd=${code}&sort=1&out=json`;
+          )}&y=${Math.round(katecY)}&radius=${radiusM}&prodcd=${code}&sort=2&out=json`;
 
           try {
             const controller = new AbortController();
@@ -345,7 +348,10 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const mergedList = Array.from(stationMap.values());
+    // Sort strictly by distance to prioritize the closest stations right near user's location
+    const mergedList = Array.from(stationMap.values()).sort(
+      (a, b) => a.distanceMeters - b.distanceMeters
+    );
 
     // [태스크 2] 최후의 안전장치: 오피넷 10km 검색에도 0건일 경우 TMAP 카테고리 POI 폴백 격발
     if (mergedList.length === 0) {
@@ -372,8 +378,8 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Convert KATEC -> WGS84
-    const validStations: GasStation[] = mergedList.slice(0, 10).map((st) => {
+    // Convert KATEC -> WGS84 for the closest 8 candidate stations
+    const validStations: GasStation[] = mergedList.slice(0, 8).map((st) => {
       const [wgsLng, wgsLat] = toWgs84(st.x, st.y);
       return {
         id: st.id,
@@ -392,17 +398,11 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    // 5. Merge TMAP real-time route calculations for top 6 stations
-    const topStations = validStations.slice(0, 6);
-    const dateNow = new Date();
-
+    // Merge TMAP real-time route calculations for all candidate stations
     const enrichedStations: GasStation[] = await Promise.all(
-      topStations.map(async (st) => {
+      validStations.map(async (st) => {
         const driveInfo = await calculateTmapDriveInfo(lat, lng, st.lat, st.lng);
-        const etaDate = new Date(dateNow.getTime() + driveInfo.durationMinutes * 60 * 1000);
-        const tmapEtaFormatted = `${String(etaDate.getHours()).padStart(2, '0')}:${String(
-          etaDate.getMinutes()
-        ).padStart(2, '0')}`;
+        const tmapEtaFormatted = formatKstEta(driveInfo.durationMinutes);
 
         return {
           ...st,

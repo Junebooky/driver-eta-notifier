@@ -81,6 +81,11 @@ export default function Home() {
     setPresets(DEFAULT_PRESET_LOCATIONS);
   }, []);
 
+  // Auto-acquire real GPS location on mount
+  useEffect(() => {
+    requestGpsLocation();
+  }, [requestGpsLocation]);
+
   // Supabase Fleet Architecture Data Synchronization
   useEffect(() => {
     const driverId = profile.id || getOrCreateDeviceUuid();
