@@ -14,6 +14,7 @@ export interface VipReportParams {
   durationMinutes?: number;
   etaFormatted: string;
   mode?: string;
+  departureTimeText?: string;
 }
 
 /**
@@ -27,6 +28,7 @@ export function generateVipReportText({
   originName,
   etaFormatted,
   mode = 'DEPARTURE',
+  departureTimeText,
 }: VipReportParams): string {
   let cleanEta = etaFormatted;
   const timeMatch = etaFormatted.match(/(\d{1,2}:\d{2})/);
@@ -53,9 +55,13 @@ export function generateVipReportText({
   const lines = [
     header,
     hasPassenger ? `• 담당승객: ${passenger}` : null,
-    `• 출발지: ${originName}`,
+    departureTimeText
+      ? `• 출발 예정: ${originName} (${departureTimeText})`
+      : `• 출발지: ${originName}`,
     `• 목적지: ${destinationName}`,
-    `• ETA: ${cleanEta}`,
+    departureTimeText
+      ? `• 예상 도착(ETA): ${cleanEta}`
+      : `• ETA: ${cleanEta}`,
   ].filter(Boolean);
   return lines.join('\n');
 }

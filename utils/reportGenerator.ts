@@ -8,6 +8,7 @@ export interface GenerateReportParams {
   distanceKm?: number;
   durationMinutes?: number;
   mode: ReportMode;
+  departureTimeText?: string;
 }
 
 export function formatReportHeader(vehicleNo?: string, driverName?: string): string {
@@ -34,6 +35,7 @@ export function generateReportText({
   destination,
   etaFormatted = '03:08',
   mode,
+  departureTimeText,
 }: GenerateReportParams): string {
   const passengerName = profile.passengerName?.trim();
   const hasPassenger = Boolean(passengerName);
@@ -65,9 +67,13 @@ export function generateReportText({
   const lines = [
     header,
     hasPassenger ? `• 담당승객: ${passengerName}` : null,
-    `• 출발지: ${originName}`,
+    departureTimeText
+      ? `• 출발 예정: ${originName} (${departureTimeText})`
+      : `• 출발지: ${originName}`,
     `• 목적지: ${destName}`,
-    `• ETA: ${cleanEta}`,
+    departureTimeText
+      ? `• 예상 도착(ETA): ${cleanEta}`
+      : `• ETA: ${cleanEta}`,
   ].filter(Boolean);
   return lines.join('\n');
 }

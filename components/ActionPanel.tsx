@@ -66,22 +66,12 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
       console.warn('Clipboard write failed:', err);
     }
 
-    // 2. Launch Selected Navigation Deep Link sequentially with origin coordinates
-    launchNavigationApp(
-      defaultNavi,
-      {
-        name: destination.name,
-        lat: destination.lat,
-        lng: destination.lng,
-      },
-      origin
-        ? {
-            name: origin.name,
-            lat: origin.lat,
-            lng: origin.lng,
-          }
-        : undefined
-    );
+    // 2. Launch Selected Navigation Deep Link (Alt A: Immediate GPS Turn-by-Turn, Destination only)
+    launchNavigationApp(defaultNavi, {
+      name: destination.name,
+      lat: destination.lat,
+      lng: destination.lng,
+    });
   };
 
   /**

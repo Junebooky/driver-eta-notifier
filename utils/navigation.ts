@@ -207,3 +207,16 @@ export function launchNavigationApp(
   // Launch scheme
   window.location.href = scheme;
 }
+
+/**
+ * 정식 경로 보기 (Route Preview):
+ * 지정된 출발지와 목적지 좌표를 모두 전달하여 내비 앱에서 전체 경로와 교통 흐름을 브리핑받을 수 있도록 호출합니다.
+ */
+export function launchRoutePreview(
+  provider: NaviProvider,
+  origin: LocationTarget,
+  destination: LocationTarget
+): void {
+  launchNavigationApp(provider, destination, origin);
+}
+
