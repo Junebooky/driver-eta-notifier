@@ -80,6 +80,7 @@ interface CylinderColumnProps<T> {
   onSelect: (index: number) => void;
   getLabel: (item: T) => string;
   colRef: React.RefObject<HTMLDivElement | null>;
+  isItemDisabled?: (item: T, index: number) => boolean;
   className?: string;
 }
 
@@ -89,6 +90,7 @@ function CylinderColumn<T>({
   onSelect,
   getLabel,
   colRef,
+  isItemDisabled,
   className = '',
 }: CylinderColumnProps<T>) {
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -109,36 +111,44 @@ function CylinderColumn<T>({
       const absDelta = Math.abs(delta);
 
       // [Convex Drum 3D Geometry - Forward Protruding Formula]
-      // 1. rotateX: Center 0deg, distant items rolling backwards along cylinder curve
-      const rotateX = delta * -24;
+      let rotateX = delta * -24;
+      let translateZ = Math.max(-55, 24 - Math.pow(absDelta, 1.35) * 52);
+      let scale = Math.max(0.80, 1.16 - absDelta * 0.28);
+      let opacity = Math.max(0.18, 1.0 - absDelta * 0.62);
 
-      // 2. translateZ: Center PROTRUDES forward (+24px), distant items roll deep into the back (-35px ~ -55px)
-      const translateZ = Math.max(-55, 24 - Math.pow(absDelta, 1.35) * 52);
+      // [태스크 1] Snap-to-Zero Deadzone (absDelta <= 0.15)
+      // When item is within center window (±7px), force mathematical zero to prevent horizontal baseline tilting
+      if (absDelta <= 0.15) {
+        rotateX = 0;
+        translateZ = 24; // 전면 돌출 기준 높이
+        scale = 1.16;
+        opacity = 1.0;
+      }
 
-      // 3. scale: Center expands to 1.16, distant items scale down to 0.82
-      const scale = Math.max(0.80, 1.16 - absDelta * 0.28);
-
-      // 4. opacity: Center crystal clear (1.0), distant items gently subdued (0.22)
-      const opacity = Math.max(0.18, 1.0 - absDelta * 0.62);
+      const disabled = isItemDisabled ? isItemDisabled(items[idx], idx) : false;
 
       el.style.transform = `perspective(1000px) rotateX(${rotateX}deg) translateZ(${translateZ}px) scale(${scale})`;
-      el.style.opacity = `${opacity}`;
+      el.style.opacity = disabled ? (absDelta <= 0.15 ? '0.35' : '0.15') : `${opacity}`;
 
-      // Dynamic Typography & Color switching based on center proximity
+      // Dynamic Typography & Color switching based on center proximity & disabled state
       const span = el.querySelector('span');
       if (span) {
-        if (absDelta < 0.45) {
+        if (disabled) {
+          span.style.color = '#CBD5E1'; // slate-300
+          span.style.fontWeight = '500';
+          span.style.fontSize = absDelta < 0.45 ? '1.25rem' : '1.05rem';
+        } else if (absDelta < 0.45) {
           span.style.color = '#0F172A';
           span.style.fontWeight = '900';
-          span.style.fontSize = '1.35rem'; // ~22px-24px (text-2xl feel)
+          span.style.fontSize = '1.35rem'; // ~22px-24px (text-2xl)
         } else {
           span.style.color = '#94A3B8';
           span.style.fontWeight = '600';
-          span.style.fontSize = '1.1rem'; // ~17px-18px (text-lg feel)
+          span.style.fontSize = '1.1rem'; // ~17px-18px (text-lg)
         }
       }
     }
-  }, [items.length]);
+  }, [items, isItemDisabled]);
 
   // Sync scroll position when selectedIndex changes externally
   useEffect(() => {
@@ -179,11 +189,22 @@ function CylinderColumn<T>({
       clearTimeout(scrollTimeoutRef.current);
     }
 
-    // Debounced center snap index commit
+    // [태스크 1] Debounced center snap index commit + Integer Pixel Magnetic Clamping
     scrollTimeoutRef.current = setTimeout(() => {
       if (isProgrammaticScrollRef.current) return;
       const finalIndex = Math.round(st / ITEM_HEIGHT);
       const clamped = Math.max(0, Math.min(items.length - 1, finalIndex));
+      const targetScroll = clamped * ITEM_HEIGHT;
+
+      // Magnetic snap to exact integer pixel offset (zero subpixel tilting)
+      if (colRef.current && Math.abs(colRef.current.scrollTop - targetScroll) > 0.5) {
+        colRef.current.scrollTo({
+          top: targetScroll,
+          behavior: 'smooth',
+        });
+      }
+      updateTransforms(targetScroll);
+
       if (clamped !== selectedIndex) {
         onSelect(clamped);
       }
@@ -204,6 +225,7 @@ function CylinderColumn<T>({
       }}
     >
       {items.map((item, idx) => {
+        const disabled = isItemDisabled ? isItemDisabled(item, idx) : false;
         return (
           <button
             key={`${getLabel(item)}-${idx}`}
@@ -211,7 +233,9 @@ function CylinderColumn<T>({
               itemRefs.current[idx] = el;
             }}
             type="button"
+            disabled={disabled}
             onClick={() => {
+              if (disabled) return;
               if (colRef.current) {
                 colRef.current.scrollTo({
                   top: idx * ITEM_HEIGHT,
@@ -220,7 +244,9 @@ function CylinderColumn<T>({
               }
               onSelect(idx);
             }}
-            className="h-[48px] w-full flex items-center justify-center snap-center shrink-0 cursor-pointer select-none"
+            className={`h-[48px] w-full flex items-center justify-center snap-center shrink-0 select-none ${
+              disabled ? 'cursor-not-allowed pointer-events-none' : 'cursor-pointer'
+            }`}
             style={{
               transformStyle: 'preserve-3d',
               willChange: 'transform, opacity',
@@ -280,7 +306,6 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
   }, [isOpen]);
 
   // 2. Fixed Data Sources for 100% Column Independence
-  // ALL_PERIODS is 100% permanent: ['오전', '오후']. Never reshuffle or resize array!
   const now = new Date();
   const minAllowed = getMinAllowedDate(now);
   const isToday = selectedDateIdx === 0;
@@ -294,7 +319,7 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
   const triggerRubberBandSnapback = useCallback(() => {
     try {
       if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        navigator.vibrate([20, 30, 20]);
+        navigator.vibrate([30, 40, 30]);
       }
     } catch {
       // Ignore vibration error
@@ -318,7 +343,21 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
     setSelectedHour(h12);
     setSelectedMinute(minute);
     prevHourRef.current = h12;
-  }, []);
+
+    // Immediately animate columns to valid positions
+    if (periodColRef.current) {
+      const pIdx = periodsList.indexOf(period);
+      periodColRef.current.scrollTo({ top: pIdx * ITEM_HEIGHT, behavior: 'smooth' });
+    }
+    if (hourColRef.current) {
+      const hIdx = hoursList.indexOf(h12);
+      hourColRef.current.scrollTo({ top: hIdx * ITEM_HEIGHT, behavior: 'smooth' });
+    }
+    if (minuteColRef.current) {
+      const mIdx = minutesList.indexOf(minute);
+      minuteColRef.current.scrollTo({ top: mIdx * ITEM_HEIGHT, behavior: 'smooth' });
+    }
+  }, [periodsList, hoursList, minutesList]);
 
   // 3. Initialize from initialDate or minAllowedDate on open
   useEffect(() => {
@@ -346,12 +385,30 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
 
   if (!isOpen) return null;
 
-  // 4. Selection Handlers with Column Isolation & Strict Date Scope
+  // Pre-disabled Visual Cue functions for past slots
+  const isPeriodDisabled = (p: '오전' | '오후') => {
+    return isToday && isNowAfternoon && p === '오전';
+  };
+
+  const isHourDisabled = (h: number) => {
+    if (!isToday) return false;
+    // Check if the latest minute of this hour is in the past
+    const maxHourTime = constructDate(0, selectedPeriod, h, 50, now);
+    return maxHourTime.getTime() < minAllowed.getTime();
+  };
+
+  const isMinuteDisabled = (m: number) => {
+    if (!isToday) return false;
+    const itemTime = constructDate(0, selectedPeriod, selectedHour, m, now);
+    return itemTime.getTime() < minAllowed.getTime();
+  };
+
+  // 4. Selection Handlers with Real-time Elastic Rebound
   const handleSelectDateIdx = (idx: number) => {
     haptics.lightTap();
     setSelectedDateIdx(idx);
 
-    // Only when switching back to '오늘', check if currently selected time is in the past
+    // When switching back to '오늘', check if current time creates an invalid past time
     if (idx === 0) {
       const projected = constructDate(0, selectedPeriod, selectedHour, selectedMinute, now);
       if (projected.getTime() < minAllowed.getTime()) {
@@ -363,8 +420,16 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
   const handleSelectPeriodIdx = (idx: number) => {
     const period = periodsList[idx] || '오후';
 
-    // Guardrail: If on '오늘' and already afternoon, selecting '오전' triggers gentle snapback
+    // [태스크 2] Real-time Elastic Rebound when selecting '오전' during today's afternoon
     if (selectedDateIdx === 0 && isNowAfternoon && period === '오전') {
+      // Forcibly rebound back to '오후' (index = 1) immediately with warning haptics
+      if (periodColRef.current) {
+        periodColRef.current.scrollTo({
+          top: 1 * ITEM_HEIGHT,
+          behavior: 'smooth',
+        });
+      }
+      setSelectedPeriod('오후');
       triggerRubberBandSnapback();
       return;
     }
@@ -372,7 +437,6 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
     haptics.lightTap();
     setSelectedPeriod(period);
 
-    // Strictly check past time only if on '오늘'
     if (selectedDateIdx === 0) {
       const projected = constructDate(0, period, selectedHour, selectedMinute, now);
       if (projected.getTime() < minAllowed.getTime()) {
@@ -399,12 +463,17 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
       if (selectedPeriod === '오전') {
         nextPeriod = '오후';
         setSelectedPeriod('오후');
+        if (periodColRef.current) {
+          periodColRef.current.scrollTo({ top: 1 * ITEM_HEIGHT, behavior: 'smooth' });
+        }
       } else {
         // 오후 11시 -> 12시는 자정(다음날 오전 12시)
         nextPeriod = '오전';
         nextDateIdx = Math.min(datesList.length - 1, selectedDateIdx + 1);
         setSelectedPeriod('오전');
         setSelectedDateIdx(nextDateIdx);
+        if (periodColRef.current) periodColRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+        if (dateColRef.current) dateColRef.current.scrollTo({ top: nextDateIdx * ITEM_HEIGHT, behavior: 'smooth' });
       }
     }
     // Rollover 12 -> 11 (Backward)
@@ -419,6 +488,7 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
         if (selectedDateIdx > 0 || !isNowAfternoon) {
           nextPeriod = '오전';
           setSelectedPeriod('오전');
+          if (periodColRef.current) periodColRef.current.scrollTo({ top: 0, behavior: 'smooth' });
         }
       } else if (selectedDateIdx > 0) {
         // 오전 12시 -> 11시 뒤로는 전날 오후 11시
@@ -426,6 +496,8 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
         nextDateIdx = Math.max(0, selectedDateIdx - 1);
         setSelectedPeriod('오후');
         setSelectedDateIdx(nextDateIdx);
+        if (periodColRef.current) periodColRef.current.scrollTo({ top: 1 * ITEM_HEIGHT, behavior: 'smooth' });
+        if (dateColRef.current) dateColRef.current.scrollTo({ top: nextDateIdx * ITEM_HEIGHT, behavior: 'smooth' });
       }
     }
 
@@ -460,7 +532,7 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
     haptics.lightTap();
   };
 
-  // Bottom action: Confirm button
+  // Bottom action: Confirm button (Strict Zero Silent Mutation - SSOT Principle)
   const handleConfirm = () => {
     const target = constructDate(
       datesList[selectedDateIdx].offsetDays,
@@ -470,12 +542,13 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
       new Date()
     );
 
-    // STRICT DATE-SCOPE: Only trigger snapback if on '오늘'
+    // If an invalid past time is reached on '오늘', do NOT mutate silently; rebound visibly first!
     if (selectedDateIdx === 0 && target.getTime() < minAllowed.getTime()) {
       triggerRubberBandSnapback();
       return;
     }
 
+    // Submit EXACT value currently shown on the screen (Single Source of Truth)
     haptics.successPulse();
     onConfirm(target);
   };
@@ -521,7 +594,7 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
           }`}
           style={{ perspective: '1000px', transformStyle: 'preserve-3d' }}
         >
-          {/* Subtle Ambient Glow Central Highlight Window across all 4 columns: h-12 (48px) at top-[96px] */}
+          {/* Subtle Ambient Glow Central Highlight Window across all 4 columns: exactly h-[48px] at top-[96px] */}
           <div className="absolute left-1 right-1 top-[96px] h-[48px] bg-slate-100/90 rounded-2xl pointer-events-none z-0 border border-blue-200/50 shadow-sm shadow-blue-500/10" />
 
           {/* Top Gradient Fade Mask for 3D depth */}
@@ -548,6 +621,7 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
               onSelect={handleSelectPeriodIdx}
               getLabel={(item) => item}
               colRef={periodColRef}
+              isItemDisabled={(_, idx) => isPeriodDisabled(periodsList[idx])}
             />
 
             {/* Column 3: Hours (1 ~ 12) with Smart Rollover */}
@@ -557,6 +631,7 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
               onSelect={handleSelectHourIdx}
               getLabel={(item) => `${item}시`}
               colRef={hourColRef}
+              isItemDisabled={(_, idx) => isHourDisabled(hoursList[idx])}
             />
 
             {/* Column 4: Minutes in 10s (00 ~ 50) */}
@@ -566,6 +641,7 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
               onSelect={handleSelectMinuteIdx}
               getLabel={(item) => `${String(item).padStart(2, '0')}분`}
               colRef={minuteColRef}
+              isItemDisabled={(_, idx) => isMinuteDisabled(minutesList[idx])}
             />
           </div>
         </div>
