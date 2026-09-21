@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { LocationPreset, HomeLocation } from '@/types';
-import { Plus, Trash2, Pencil, SlidersHorizontal, MapPin, Home as HomeIcon, ShieldAlert } from 'lucide-react';
+import { Plus, Trash2, Pencil, SlidersHorizontal, Home as HomeIcon, ShieldAlert } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface PresetButtonsProps {
@@ -269,11 +269,22 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
 
   return (
     <div className="w-full bg-white border border-slate-100/80 rounded-2xl p-4 shadow-[0_8px_25px_rgba(30,96,243,0.06)] select-none space-y-3">
-      {/* Header: Upgraded White MapPin in Cobalt Badge on Left, 거점 관리 on Right */}
+      {/* Header: Classic Teardrop MapPin with Center Circular Cutout in Cobalt Badge on Left, 거점 관리 on Right */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          <div className="w-6 h-6 rounded-lg bg-[#1E60F3] flex items-center justify-center shadow-xs">
-            <MapPin className="w-3.5 h-3.5 text-white fill-white" />
+          <div className="w-6 h-6 rounded-lg bg-[#1E60F3] flex items-center justify-center shadow-xs shrink-0">
+            <svg
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              className="w-4 h-4 text-white"
+              aria-hidden="true"
+            >
+              <path
+                fillRule="evenodd"
+                clipRule="evenodd"
+                d="M12 2C7.58 2 4 5.58 4 10c0 5.25 8 12 8 12s8-6.75 8-12c0-4.42-3.58-8-8-8zm0 5a3 3 0 1 1 0 6 3 3 0 0 1 0-6z"
+              />
+            </svg>
           </div>
           <h2 className="text-sm font-bold text-slate-900 tracking-tight">자주 가는 목적지</h2>
         </div>
