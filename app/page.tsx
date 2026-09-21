@@ -250,28 +250,33 @@ export default function Home() {
     }
   };
 
+  const [isInitialized, setIsInitialized] = useState(false);
   const [destination, setDestination] = useState<LocationPreset>(DEFAULT_PRESET_LOCATIONS[0]);
   const [reportMode, setReportMode] = useState<ReportMode>('DEPARTURE');
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isOnboarding, setIsOnboarding] = useState(false);
   const [onboardingStage, setOnboardingStage] = useState<'splash' | 'sheet' | null>(null);
 
-  // Check driver onboarding status on first launch (preventing default name misreporting)
+  // Initialization Gate: check driver onboarding status on first launch before revealing dashboard
   useEffect(() => {
     try {
       const onboarded = localStorage.getItem('cockpit_driver_onboarded');
       if (!onboarded) {
         setIsOnboarding(true);
         setOnboardingStage('splash');
+        setIsInitialized(true);
         // Phase 1: Micro Splash (2.1s) -> Phase 2: Centered Onboarding Modal
         const timer = setTimeout(() => {
           setOnboardingStage('sheet');
           setIsProfileModalOpen(true);
         }, 2100);
         return () => clearTimeout(timer);
+      } else {
+        setIsInitialized(true);
       }
     } catch (e) {
       console.warn('Failed to check driver onboarding status:', e);
+      setIsInitialized(true);
     }
   }, []);
 
@@ -384,6 +389,30 @@ export default function Home() {
     });
   }, [reportMode, profile, origin, destination, routeEstimate]);
 
+  // Pre-initialization & Onboarding Splash Gate: completely blocks dashboard FOUC on initial mount
+  if (!isInitialized || (isOnboarding && onboardingStage === 'splash')) {
+    return (
+      <div className="fixed inset-0 z-50 bg-[#F8FAFC] flex flex-col items-center justify-center p-6 text-center select-none">
+        <div className="flex flex-col items-center max-w-xs animate-in zoom-in-95 duration-300">
+          <img
+            src="/cockpit_app_icon.png"
+            alt="Protocol Cockpit"
+            className="w-20 h-20 rounded-[20px] shadow-[0_12px_32px_rgba(30,96,243,0.22)] ring-1 ring-slate-200/80 mb-6 animate-pulse"
+          />
+          <h1 className="text-3xl font-extrabold text-[#1E60F3] tracking-tight mb-3">
+            환영합니다!
+          </h1>
+          <p className="text-sm font-semibold text-slate-800 mb-1.5 leading-snug">
+            VIP 의전 관제 시스템에 접속하셨습니다.
+          </p>
+          <p className="text-xs text-slate-500 font-normal leading-relaxed">
+            원활한 이동 보고를 위해 드라이버 정보를 등록해 주세요.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <main className="min-h-dvh bg-[#F8FAFC] text-slate-800 flex flex-col items-center justify-between overflow-x-hidden selection:bg-[#1E60F3]/20">
       <div className="w-full max-w-md mx-auto min-h-dvh flex flex-col justify-between bg-white shadow-xl relative border-x border-slate-200/60 overflow-x-hidden">
@@ -476,27 +505,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* 2-Stage Onboarding: Phase 1 Micro Splash (Center App Icon + Welcome Text) */}
-      {isOnboarding && onboardingStage === 'splash' && (
-        <div className="fixed inset-0 z-50 bg-[#F8FAFC]/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-fade-in select-none">
-          <div className="flex flex-col items-center max-w-xs animate-in zoom-in-95 duration-500">
-            <img
-              src="/cockpit_app_icon.png"
-              alt="Protocol Cockpit"
-              className="w-20 h-20 rounded-[20px] shadow-[0_12px_32px_rgba(30,96,243,0.22)] ring-1 ring-slate-200/80 mb-6 animate-pulse"
-            />
-            <h1 className="text-3xl font-extrabold text-[#1E60F3] tracking-tight mb-3">
-              환영합니다!
-            </h1>
-            <p className="text-sm font-semibold text-slate-800 mb-1.5 leading-snug">
-              VIP 의전 관제 시스템에 접속하셨습니다.
-            </p>
-            <p className="text-xs text-slate-500 font-normal leading-relaxed">
-              원활한 이동 보고를 위해 드라이버 정보를 등록해 주세요.
-            </p>
-          </div>
-        </div>
-      )}
+
 
       {/* Driver Profile Edit / Onboarding Modal (Centered Modal) */}
       <ProfileModal

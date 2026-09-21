@@ -77,9 +77,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [targetChatRoom, setTargetChatRoom] = useState(profile.targetChatRoom || '');
   const [defaultNavi, setDefaultNavi] = useState<NaviProvider>(profile.defaultNavi || 'tmap');
   const [isMounted, setIsMounted] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
+      setIsSaving(false);
       const initial = parseVehicleDetails(profile.vehicleNo);
       setHocha(initial.hocha);
       setPlateFront(initial.plateFront);
@@ -107,16 +109,22 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       };
     } else {
       setIsMounted(false);
+      setIsSaving(false);
     }
   }, [isOpen, profile]);
 
   if (!isOpen) return null;
 
-  const handleClose = () => {
+  const handleClose = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (isSaving) return;
     setIsMounted(false);
     setTimeout(() => {
       onClose();
-    }, 250);
+    }, 200);
   };
 
   const handleHochaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -141,6 +149,19 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+
+    if (isSaving) return;
+    setIsSaving(true);
+
+    // 1. Instant visual/haptic feedback
+    try {
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate(20);
+      }
+    } catch {
+      // Ignore
+    }
     haptics.successPulse();
 
     const hTrim = hocha.trim();
@@ -160,14 +181,25 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       combinedVehicleNo = combinedPlate;
     }
 
-    onSave({
+    const payload = {
       vehicleNo: combinedVehicleNo,
       driverName: driverName.trim(),
       passengerName: passengerName.trim(),
       targetChatRoom: targetChatRoom.trim(),
       defaultNavi: defaultNavi || 'tmap',
-    });
-    handleClose();
+    };
+
+    // 2. Trigger modal exit animation FIRST (60fps scale-down & fade-out without Jank)
+    setIsMounted(false);
+
+    // 3. Decouple heavy parent updates and database calls from the animation frame
+    setTimeout(() => {
+      React.startTransition(() => {
+        onSave(payload);
+        onClose();
+        setIsSaving(false);
+      });
+    }, 180);
   };
 
   return (
@@ -176,7 +208,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
         isMounted ? 'bg-slate-900/60 backdrop-blur-sm opacity-100' : 'bg-slate-900/0 opacity-0 pointer-events-none'
       }`}
       onClick={(e) => {
-        if (e.target === e.currentTarget) {
+        if (e.target === e.currentTarget && !isSaving) {
           handleClose();
         }
       }}
@@ -207,7 +239,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           <button
             type="button"
             onClick={handleClose}
-            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 active:scale-95 transition-transform duration-100 cursor-pointer"
+            disabled={isSaving}
+            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 active:scale-95 transition-transform duration-100 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
             title="닫기"
           >
             <X className="w-4 h-4" />
@@ -404,15 +437,26 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             <button
               type="button"
               onClick={handleClose}
-              className="w-1/3 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold active:scale-95 transition-transform duration-100 cursor-pointer"
+              disabled={isSaving}
+              className="w-1/3 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold active:scale-95 transition-transform duration-100 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
             >
               취소
             </button>
             <button
               type="submit"
-              className="w-2/3 py-3 rounded-xl bg-[#1E60F3] hover:bg-blue-600 text-white text-xs font-black shadow-md shadow-blue-500/20 active:scale-95 transition-transform duration-100 cursor-pointer"
+              disabled={isSaving}
+              className={`w-2/3 py-3 rounded-xl bg-[#1E60F3] hover:bg-blue-600 text-white text-xs font-black shadow-md shadow-blue-500/20 active:scale-95 transition-all duration-150 cursor-pointer flex items-center justify-center gap-1.5 ${
+                isSaving ? 'opacity-85 pointer-events-none' : ''
+              }`}
             >
-              설정 저장
+              {isSaving ? (
+                <>
+                  <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0" />
+                  <span>저장 중...</span>
+                </>
+              ) : (
+                '설정 저장'
+              )}
             </button>
           </div>
         </form>
