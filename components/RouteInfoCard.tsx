@@ -14,8 +14,6 @@ interface RouteInfoCardProps {
   onRequestGps: () => void;
   onRefreshRoute: () => void;
   onOpenTimePicker?: () => void;
-  departureTimeText?: string | null;
-  isFutureDeparture?: boolean;
 }
 
 export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
@@ -27,8 +25,6 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
   onRequestGps,
   onRefreshRoute,
   onOpenTimePicker,
-  departureTimeText,
-  isFutureDeparture = false,
 }) => {
   // Parse strict 24h time (HH:mm) and duration from etaFormatted or durationMinutes
   let timePart = '14:35';
@@ -47,8 +43,6 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
     durationPart = `(${routeEstimate.durationMinutes}분 소요)`;
   }
 
-  const hasFuture = isFutureDeparture || Boolean(departureTimeText && departureTimeText !== '지금 출발');
-
   return (
     <div className="w-full bg-[url('/eta_bg.jpg')] bg-cover bg-center border border-slate-100/80 rounded-2xl p-4 shadow-[0_8px_25px_rgba(30,96,243,0.06)] relative overflow-hidden select-none">
       {/* Soft gradient overlay for optimal text contrast & ambient depth */}
@@ -65,7 +59,7 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
         </div>
       )}
 
-      {/* Main ETA Card Content */}
+      {/* Main ETA Card Content: Strictly Real-time TMAP Data */}
       <div className="flex items-center justify-between relative z-10">
         <div>
           {/* Top Label: Clock Icon + ETA */}
@@ -90,14 +84,9 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
             )}
           </div>
 
-          {/* Subtitle: Distance & Traffic provider */}
+          {/* Subtitle: Real-time Distance & Traffic provider ONLY */}
           {routeEstimate && (
             <div className="text-xs text-slate-500 mt-1 font-normal">
-              {hasFuture && departureTimeText && (
-                <span className="inline-block mr-1.5 text-[#1E60F3] font-bold">
-                  [{departureTimeText}]
-                </span>
-              )}
               이동 거리: <span className="text-slate-900 font-bold">{routeEstimate.distanceKm} km</span>{' '}
               <span className="text-slate-600">({routeEstimate.trafficSummary || '실시간 교통 반영 (TMAP)'})</span>
             </div>
@@ -113,18 +102,11 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
                 haptics.lightTap();
                 onOpenTimePicker();
               }}
-              className={`relative w-11 h-11 rounded-xl border flex items-center justify-center transition-all duration-150 active:scale-95 cursor-pointer shadow-xs ${
-                hasFuture
-                  ? 'bg-blue-50 border-blue-300 text-[#1E60F3] hover:bg-blue-100 shadow-[0_2px_8px_rgba(30,96,243,0.15)]'
-                  : 'bg-slate-100/80 border-slate-200/80 text-slate-700 hover:bg-slate-200'
-              }`}
-              title={hasFuture ? `미래 출발 설정됨: ${departureTimeText || ''}` : '출발 시간 선택 (AI 미래 소요시간 예측)'}
+              className="w-11 h-11 rounded-xl bg-slate-100/80 border border-slate-200/80 text-slate-700 hover:bg-slate-200 flex items-center justify-center transition-all duration-150 active:scale-95 cursor-pointer shadow-xs"
+              title="출발 시간별 소요 시간 예측 (미래 조회)"
               aria-label="출발 시간 선택"
             >
-              <CalendarClock className={`w-5 h-5 ${hasFuture ? 'text-[#1E60F3]' : 'text-slate-600'}`} />
-              {hasFuture && (
-                <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#1E60F3] ring-2 ring-white animate-pulse" />
-              )}
+              <CalendarClock className="w-5 h-5 text-slate-600" />
             </button>
           )}
 
@@ -138,9 +120,13 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
             disabled={isLoadingRoute}
             className="w-11 h-11 rounded-xl bg-[#1E60F3] hover:bg-[#1346D8] hover:scale-105 hover:shadow-lg hover:shadow-blue-500/35 active:translate-y-0 active:scale-[0.97] active:bg-[#0f3bb8] text-white shadow-xs flex items-center justify-center transition-all duration-150 ease-out disabled:opacity-50 cursor-pointer shrink-0 group"
             title="ETA 재계산"
-            aria-label="ETA 재계산"
+            aria-label="경로 새로고침"
           >
-            <RefreshCw className={`w-5 h-5 group-hover:rotate-45 transition-transform duration-200 ${isLoadingRoute ? 'animate-spin' : ''}`} />
+            <RefreshCw
+              className={`w-5 h-5 text-white transition-transform duration-500 ${
+                isLoadingRoute ? 'animate-spin' : 'group-hover:rotate-180'
+              }`}
+            />
           </button>
         </div>
       </div>

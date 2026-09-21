@@ -19,7 +19,7 @@ import { PredictionResult } from '@/app/api/route/prediction/route';
 import { LocationPreset, ReportMode, RouteEstimate, HomeLocation } from '@/types';
 import { DEFAULT_PRESET_LOCATIONS } from '@/utils/presets';
 import { generateReportText } from '@/utils/reportGenerator';
-import { calculateHaversineEstimate, formatEtaTime, getEtaString } from '@/utils/navigation';
+import { calculateHaversineEstimate, getEtaString } from '@/utils/navigation';
 
 const CUSTOM_PRESETS_KEY = 'protocol_cockpit_custom_presets_v1';
 const ORDERED_PRESETS_KEY = 'protocol_cockpit_ordered_presets_v2';
@@ -289,10 +289,10 @@ export default function Home() {
   );
   const [isLoadingRoute, setIsLoadingRoute] = useState(false);
 
-  // Departure Time & AI Prediction State
+  // Departure Time & AI Prediction State (Isolated Simulation Layer)
   const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
   const [isPredictionSheetOpen, setIsPredictionSheetOpen] = useState(false);
-  const [selectedDepartureDate, setSelectedDepartureDate] = useState<Date | null>(null);
+  const [simulationDepartureDate, setSimulationDepartureDate] = useState<Date>(() => new Date());
   const [predictionResult, setPredictionResult] = useState<PredictionResult | null>(null);
   const [isLoadingPrediction, setIsLoadingPrediction] = useState(false);
 
@@ -338,7 +338,7 @@ export default function Home() {
     []
   );
 
-  // Fetch AI Prediction for future departure time
+  // Fetch AI Prediction for future departure time (Isolated simulation only)
   const fetchPrediction = useCallback(
     async (targetDate: Date, start: LocationPreset, end: LocationPreset) => {
       setIsLoadingPrediction(true);
@@ -366,50 +366,22 @@ export default function Home() {
     []
   );
 
-  // Recalculate route whenever origin or destination coordinates change
+  // Recalculate route whenever origin or destination coordinates change (Strictly Real-time TMAP)
   useEffect(() => {
     if (origin && destination) {
-      if (selectedDepartureDate) {
-        fetchPrediction(selectedDepartureDate, origin, destination);
-      } else {
-        fetchRouteEstimate(origin, destination);
-      }
+      fetchRouteEstimate(origin, destination);
     }
-  }, [origin?.lat, origin?.lng, destination?.lat, destination?.lng, fetchRouteEstimate, selectedDepartureDate, fetchPrediction]);
+  }, [origin?.lat, origin?.lng, destination?.lat, destination?.lng, fetchRouteEstimate]);
 
-  // Handle Departure Time selection from Wheel Picker
+  // Handle Departure Time selection from Wheel Picker (Simulation Preview Only)
   const handleConfirmDepartureTime = (date: Date) => {
-    setSelectedDepartureDate(date);
+    setSimulationDepartureDate(date);
     setIsTimePickerOpen(false);
     setIsPredictionSheetOpen(true);
-    fetchPrediction(date, origin, destination);
+    if (origin && destination) {
+      fetchPrediction(date, origin, destination);
+    }
   };
-
-  // Handle apply prediction from Bottom Sheet
-  const handleApplyPrediction = (
-    effectiveDate: Date,
-    durationMinutes: number,
-    arrivalFormatted: string
-  ) => {
-    setSelectedDepartureDate(effectiveDate);
-    setRouteEstimate((prev) => ({
-      ...prev,
-      durationMinutes,
-      etaFormatted: arrivalFormatted,
-      trafficSummary: predictionResult?.trafficSummary || 'AI 미래 교통 통계 예측 (TMAP)',
-    }));
-  };
-
-  // Departure Time Button label
-  const departureTimeCapsuleText = useMemo(() => {
-    if (!selectedDepartureDate) return '지금 출발';
-    const now = new Date();
-    const isToday =
-      selectedDepartureDate.getDate() === now.getDate() &&
-      selectedDepartureDate.getMonth() === now.getMonth();
-    const prefix = isToday ? '오늘' : '내일';
-    return `${prefix} ${formatEtaTime(selectedDepartureDate)} 출발`;
-  }, [selectedDepartureDate]);
 
   // Handle Preset Button Click
   const handleSelectPreset = (preset: LocationPreset) => {
@@ -453,10 +425,6 @@ export default function Home() {
 
   // Real-time dynamic report text generated from current state
   const reportPreviewText = useMemo(() => {
-    const departureTimeText = selectedDepartureDate
-      ? `${formatEtaTime(selectedDepartureDate)} 출발 예정`
-      : undefined;
-
     return generateReportText({
       mode: reportMode,
       profile,
@@ -465,9 +433,8 @@ export default function Home() {
       etaFormatted: routeEstimate?.etaFormatted,
       distanceKm: routeEstimate?.distanceKm,
       durationMinutes: routeEstimate?.durationMinutes,
-      departureTimeText,
     });
-  }, [reportMode, profile, origin, destination, routeEstimate, selectedDepartureDate]);
+  }, [reportMode, profile, origin, destination, routeEstimate]);
 
   // Pre-initialization & Onboarding Splash Gate: completely blocks dashboard FOUC on initial mount
   if (!isInitialized || (isOnboarding && onboardingStage === 'splash')) {
@@ -553,24 +520,20 @@ export default function Home() {
             onReorderPresets={handleReorderPresets}
           />
 
-          {/* 3. Route Estimation & ETA Status */}
+          {/* 3. Route Estimation & ETA Status (Strictly Real-time TMAP) */}
           <RouteInfoCard
             routeEstimate={routeEstimate}
-            isLoadingRoute={isLoadingRoute || isLoadingPrediction}
+            isLoadingRoute={isLoadingRoute}
             isLocating={isLocating}
             isUndergroundFallback={isUndergroundFallback}
             gpsErrorMsg={gpsErrorMsg}
             onRequestGps={requestGpsLocation}
             onRefreshRoute={() => {
-              if (selectedDepartureDate) {
-                fetchPrediction(selectedDepartureDate, origin, destination);
-              } else {
+              if (origin && destination) {
                 fetchRouteEstimate(origin, destination);
               }
             }}
             onOpenTimePicker={() => setIsTimePickerOpen(true)}
-            departureTimeText={departureTimeCapsuleText}
-            isFutureDeparture={Boolean(selectedDepartureDate)}
           />
 
           {/* 4. Report Template Selector */}
@@ -665,10 +628,10 @@ export default function Home() {
         isOpen={isTimePickerOpen}
         onClose={() => setIsTimePickerOpen(false)}
         onConfirm={handleConfirmDepartureTime}
-        initialDate={selectedDepartureDate || new Date()}
+        initialDate={simulationDepartureDate}
       />
 
-      {/* AI Duration Prediction Result Bottom Sheet */}
+      {/* AI Duration Prediction Result Bottom Sheet (Isolated Simulation Layer) */}
       <PredictionResultSheet
         isOpen={isPredictionSheetOpen}
         onClose={() => setIsPredictionSheetOpen(false)}
@@ -678,8 +641,7 @@ export default function Home() {
           setIsPredictionSheetOpen(false);
           setIsTimePickerOpen(true);
         }}
-        onApplyPrediction={handleApplyPrediction}
-        selectedDate={selectedDepartureDate || new Date()}
+        selectedDate={simulationDepartureDate}
       />
 
     </main>

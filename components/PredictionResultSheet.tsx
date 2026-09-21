@@ -12,7 +12,7 @@ interface PredictionResultSheetProps {
   prediction: PredictionResult | null;
   isLoading: boolean;
   onOpenTimePicker: () => void;
-  onApplyPrediction: (selectedDate: Date, durationMinutes: number, arrivalFormatted: string) => void;
+  onApplyPrediction?: (selectedDate: Date, durationMinutes: number, arrivalFormatted: string) => void;
   selectedDate: Date;
 }
 
@@ -96,8 +96,8 @@ export const PredictionResultSheet: React.FC<PredictionResultSheetProps> = ({
   const { timePart, unitPart } = formatDurationKorean(currentDuration);
 
   const handleApply = () => {
-    haptics.successPulse();
-    onApplyPrediction(effectiveDepartureDate, currentDuration, arrivalFormatted);
+    haptics.lightTap();
+    onApplyPrediction?.(effectiveDepartureDate, currentDuration, arrivalFormatted);
     onClose();
   };
 
@@ -299,15 +299,15 @@ export const PredictionResultSheet: React.FC<PredictionResultSheetProps> = ({
           </div>
         )}
 
-        {/* 4. Bottom Action: Confirm and Sync to Protocol Report */}
+        {/* 4. Bottom Action: Close Lookup Sheet */}
         <div className="pt-3 pb-[max(env(safe-area-inset-bottom),8px)]">
           <button
             type="button"
             onClick={handleApply}
-            className="w-full py-4 px-4 bg-[#1E60F3] hover:bg-[#1346D8] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/35 active:translate-y-0 active:scale-[0.98] active:bg-[#0f3bb8] text-white rounded-2xl font-bold text-sm tracking-tight shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-all duration-150 ease-out"
+            className="w-full py-4 px-4 bg-[#1E60F3] hover:bg-[#1850D0] active:scale-[0.98] text-white rounded-2xl font-bold text-base shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-all duration-150 ease-out"
           >
-            <Check className="w-4.5 h-4.5" />
-            <span>이 시간으로 설정 및 단톡방 보고 반영</span>
+            <Check className="w-5 h-5" />
+            <span>확인 (조회 완료)</span>
           </button>
         </div>
       </div>

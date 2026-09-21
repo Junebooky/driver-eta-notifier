@@ -21,43 +21,30 @@ interface ProfileModalProps {
  */
 export function parseVehicleDetails(raw?: string): {
   hocha: string;
+  plateNumber: string;
   plateFront: string;
   plateBack: string;
 } {
   const v = raw?.trim() || '';
-  if (!v) return { hocha: '', plateFront: '', plateBack: '' };
+  if (!v) return { hocha: '', plateNumber: '', plateFront: '', plateBack: '' };
 
-  // 1. Extract hocha digits (e.g. '4호차' -> '4')
+  // 1. Extract hocha digits/text (e.g. '4호차' -> '4')
   const hochaMatch = v.match(/(\d+)호차/);
   const hocha = hochaMatch ? hochaMatch[1] : '';
 
   // 2. Remove hocha portion from string
   const withoutHocha = v.replace(/\d+호차/, '').trim();
 
-  // 3. Match 4 trailing digits: e.g. '142호 7811' or '142호7811'
+  // Backward-compat for plateFront / plateBack if referenced
   const plateSplitMatch = withoutHocha.match(/^(.+?)\s*(\d{4})$/);
-  if (plateSplitMatch) {
-    return {
-      hocha,
-      plateFront: plateSplitMatch[1].trim(),
-      plateBack: plateSplitMatch[2].trim(),
-    };
-  }
+  const plateFront = plateSplitMatch ? plateSplitMatch[1].trim() : withoutHocha;
+  const plateBack = plateSplitMatch ? plateSplitMatch[2].trim() : '';
 
-  // If only 4 digits exist
-  if (/^\d{4}$/.test(withoutHocha)) {
-    return {
-      hocha,
-      plateFront: '',
-      plateBack: withoutHocha,
-    };
-  }
-
-  // Otherwise, place remaining in plateFront
   return {
     hocha,
-    plateFront: withoutHocha,
-    plateBack: '',
+    plateNumber: withoutHocha,
+    plateFront,
+    plateBack,
   };
 }
 
@@ -70,8 +57,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 }) => {
   const parsed = parseVehicleDetails(profile.vehicleNo);
   const [hocha, setHocha] = useState(parsed.hocha);
-  const [plateFront, setPlateFront] = useState(parsed.plateFront);
-  const [plateBack, setPlateBack] = useState(parsed.plateBack);
+  const [plateNumber, setPlateNumber] = useState(parsed.plateNumber);
   const [driverName, setDriverName] = useState(profile.driverName || '');
   const [passengerName, setPassengerName] = useState(profile.passengerName || '');
   const [defaultNavi, setDefaultNavi] = useState<NaviProvider>(profile.defaultNavi || 'tmap');
@@ -83,8 +69,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       setIsSaving(false);
       const initial = parseVehicleDetails(profile.vehicleNo);
       setHocha(initial.hocha);
-      setPlateFront(initial.plateFront);
-      setPlateBack(initial.plateBack);
+      setPlateNumber(initial.plateNumber);
       setDriverName(profile.driverName || '');
       setPassengerName(profile.passengerName || '');
       setDefaultNavi(profile.defaultNavi || 'tmap');
@@ -126,23 +111,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   };
 
   const handleHochaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Digits only for hocha
-    const digits = e.target.value.replace(/[^0-9]/g, '').slice(0, 3);
-    setHocha(digits);
+    setHocha(e.target.value.slice(0, 10));
   };
 
-  const handlePlateFrontChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Allow numbers, completed Hangul (가-힣), and in-progress jamo (ㄱ-ㅎ, ㅏ-ㅣ) to prevent IME freeze
-    const val = e.target.value
-      .replace(/[^0-9가-힣\u3131-\u314e\u314f-\u3163]/g, '')
-      .slice(0, 6);
-    setPlateFront(val);
-  };
-
-  const handlePlateBackChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Exact 4 numeric digits for back plate
-    const digits = e.target.value.replace(/[^0-9]/g, '').slice(0, 4);
-    setPlateBack(digits);
+  const handlePlateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPlateNumber(e.target.value);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -163,20 +136,19 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     haptics.successPulse();
 
     const hTrim = hocha.trim();
-    const pFrontTrim = plateFront.trim();
-    const pBackTrim = plateBack.trim();
-
-    const combinedPlate = pFrontTrim && pBackTrim
-      ? `${pFrontTrim} ${pBackTrim}`
-      : pFrontTrim || pBackTrim;
+    const pTrim = plateNumber.trim();
 
     let combinedVehicleNo = '';
-    if (hTrim && combinedPlate) {
-      combinedVehicleNo = `${hTrim}호차 ${combinedPlate}`;
+    if (hTrim && pTrim) {
+      if (pTrim.includes('호차')) {
+        combinedVehicleNo = pTrim;
+      } else {
+        combinedVehicleNo = `${hTrim}호차 ${pTrim}`;
+      }
     } else if (hTrim) {
-      combinedVehicleNo = `${hTrim}호차`;
-    } else if (combinedPlate) {
-      combinedVehicleNo = combinedPlate;
+      combinedVehicleNo = hTrim.includes('호차') ? hTrim : `${hTrim}호차`;
+    } else if (pTrim) {
+      combinedVehicleNo = pTrim;
     }
 
     const payload: Partial<DriverProfile> = {
@@ -268,40 +240,18 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             </div>
           </div>
 
-          {/* 2. License Plate Dual Input (Flex Row: Front 53% + Back 47%) */}
+          {/* 2. License Plate Input Field */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center">
               <Car className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 차량 번호판
             </label>
-            <div className="flex items-center gap-2">
-              {/* Front Plate: 2~3 digits + Hangul (e.g. 142호, 110하, 70가) */}
-              <div className="flex-1 basis-[53%] min-w-0">
-                <input
-                  type="text"
-                  value={plateFront}
-                  onChange={handlePlateFrontChange}
-                  placeholder="예: 142호"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white font-bold transition-colors"
-                />
-              </div>
-
-              {/* Separator */}
-              <span className="text-slate-400 font-bold shrink-0">-</span>
-
-              {/* Back Plate: 4 digits (e.g. 7811) */}
-              <div className="flex-1 basis-[47%] min-w-0">
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  maxLength={4}
-                  value={plateBack}
-                  onChange={handlePlateBackChange}
-                  placeholder="예: 7811"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white font-bold transition-colors"
-                />
-              </div>
-            </div>
+            <input
+              type="text"
+              value={plateNumber}
+              onChange={handlePlateChange}
+              placeholder="예: 142호 7811 또는 서울 32가 1234"
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white font-bold transition-colors"
+            />
           </div>
 
           {/* 3. Driver Name Field */}
