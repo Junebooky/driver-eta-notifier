@@ -13,6 +13,52 @@ interface ProfileModalProps {
   isOnboarding?: boolean;
 }
 
+/**
+ * Auto-masks Korean vehicle license plate numbers.
+ * E.g., '142호7811' -> '142호 7811', '110하1034' -> '110하 1034', '52가1234' -> '52가 1234'
+ * Strips special characters and enforces a single space after [2~3 digits][1 Hangul].
+ */
+export function autoMaskPlate(raw: string): string {
+  const cleaned = raw.replace(/[^0-9가-힣]/g, '');
+  if (!cleaned) return '';
+
+  // Case 1: [2~3 digits] + [1 Hangul] + [1~4 digits]
+  const fullMatch = cleaned.match(/^(\d{2,3})([가-힣])(\d{1,4})/);
+  if (fullMatch) {
+    return `${fullMatch[1]}${fullMatch[2]} ${fullMatch[3]}`;
+  }
+
+  // Case 2: [2~3 digits] + [1 Hangul] (immediately auto-insert space)
+  const prefixMatch = cleaned.match(/^(\d{2,3})([가-힣])$/);
+  if (prefixMatch) {
+    return `${prefixMatch[1]}${prefixMatch[2]} `;
+  }
+
+  // Case 3: Initial digits only (up to 3 digits)
+  const digitsMatch = cleaned.match(/^\d{1,3}/);
+  if (digitsMatch) {
+    return digitsMatch[0];
+  }
+
+  return '';
+}
+
+/**
+ * Parses existing vehicleNo into separate hocha ('4') and plate ('142호 7811').
+ */
+function parseVehicleNo(rawVehicleNo?: string): { hocha: string; plate: string } {
+  const v = rawVehicleNo?.trim() || '';
+  if (!v) return { hocha: '', plate: '' };
+
+  const hochaMatch = v.match(/(\d+)호차/);
+  const hocha = hochaMatch ? hochaMatch[1] : '';
+
+  const withoutHocha = v.replace(/\d+호차/, '').trim();
+  const plate = autoMaskPlate(withoutHocha) || withoutHocha;
+
+  return { hocha, plate };
+}
+
 export const ProfileModal: React.FC<ProfileModalProps> = ({
   isOpen,
   onClose,
@@ -20,7 +66,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   onSave,
   isOnboarding = false,
 }) => {
-  const [vehicleNo, setVehicleNo] = useState(profile.vehicleNo || '');
+  const parsed = parseVehicleNo(profile.vehicleNo);
+  const [hocha, setHocha] = useState(parsed.hocha);
+  const [plateNumber, setPlateNumber] = useState(parsed.plate);
   const [driverName, setDriverName] = useState(profile.driverName || '');
   const [passengerName, setPassengerName] = useState(profile.passengerName || '');
   const [targetChatRoom, setTargetChatRoom] = useState(profile.targetChatRoom || '');
@@ -29,7 +77,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      setVehicleNo(profile.vehicleNo || '');
+      const initial = parseVehicleNo(profile.vehicleNo);
+      setHocha(initial.hocha);
+      setPlateNumber(initial.plate);
       setDriverName(profile.driverName || '');
       setPassengerName(profile.passengerName || '');
       setTargetChatRoom(profile.targetChatRoom || '');
@@ -65,11 +115,39 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     }, 250);
   };
 
+  const handleHochaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const digits = e.target.value.replace(/[^0-9]/g, '').slice(0, 3);
+    setHocha(digits);
+  };
+
+  const handlePlateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const inputVal = e.target.value;
+    // Handle backspace when ending with a space cleanly (e.g. '142호 ' -> backspace -> '142호')
+    if (plateNumber.endsWith(' ') && inputVal === plateNumber.slice(0, -1)) {
+      setPlateNumber(inputVal.trim());
+      return;
+    }
+    const masked = autoMaskPlate(inputVal);
+    setPlateNumber(masked);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     haptics.successPulse();
+
+    const hTrim = hocha.trim();
+    const pTrim = plateNumber.trim();
+    let combinedVehicleNo = '';
+    if (hTrim && pTrim) {
+      combinedVehicleNo = `${hTrim}호차 ${pTrim}`;
+    } else if (hTrim) {
+      combinedVehicleNo = `${hTrim}호차`;
+    } else if (pTrim) {
+      combinedVehicleNo = pTrim;
+    }
+
     onSave({
-      vehicleNo: vehicleNo.trim(),
+      vehicleNo: combinedVehicleNo,
       driverName: driverName.trim(),
       passengerName: passengerName.trim(),
       targetChatRoom: targetChatRoom.trim(),
@@ -122,29 +200,55 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           </button>
         </div>
 
-        {/* Modal Body: Focus strictly on 4 inputs, navi switcher, and action buttons */}
+        {/* Modal Body: Focus strictly on separated inputs, navi switcher, and action buttons */}
         <form onSubmit={handleSubmit} className="p-5 space-y-3.5 overflow-y-auto overscroll-contain flex-1">
-          {/* Vehicle Identification Field */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center">
-              <Car className="w-3.5 h-3.5 mr-1 text-blue-600" /> 차량 식별 정보 (호차 / 차량번호)
-            </label>
-            <p className="text-[11px] text-slate-400 font-normal mb-1.5">
-              호차를 아직 모를 경우 차량번호만 입력하셔도 무방합니다.
-            </p>
-            <input
-              type="text"
-              value={vehicleNo}
-              onChange={(e) => setVehicleNo(e.target.value)}
-              placeholder="예: 142호 7811 또는 4호차 142호 7811"
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white font-bold transition-colors"
-            />
+          {/* 1. Hocha & License Plate Split Inputs */}
+          <div className="grid grid-cols-5 gap-2.5">
+            {/* Hocha Field (Col-span 2) */}
+            <div className="col-span-2">
+              <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center">
+                <Car className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 호차
+              </label>
+              <div className="relative flex items-center">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={hocha}
+                  onChange={handleHochaChange}
+                  placeholder="예: 4"
+                  className="w-full pl-3 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white font-bold transition-colors"
+                />
+                <span
+                  className={`absolute right-2.5 text-xs font-black transition-colors pointer-events-none ${
+                    hocha ? 'text-[#1E60F3]' : 'text-slate-400'
+                  }`}
+                >
+                  호차
+                </span>
+              </div>
+            </div>
+
+            {/* License Plate Field (Col-span 3) */}
+            <div className="col-span-3">
+              <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center">
+                차량 번호판
+              </label>
+              <input
+                type="text"
+                value={plateNumber}
+                onChange={handlePlateChange}
+                placeholder="예: 142호 7811"
+                maxLength={10}
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white font-bold transition-colors"
+              />
+            </div>
           </div>
 
-          {/* Driver Name Field */}
+          {/* 2. Driver Name Field */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center">
-              <User className="w-3.5 h-3.5 mr-1 text-blue-600" /> 드라이버 성명
+              <User className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 드라이버 성명
             </label>
             <input
               type="text"
@@ -155,10 +259,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             />
           </div>
 
-          {/* Passenger Name Field */}
+          {/* 3. Passenger Name Field */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center">
-              <Users className="w-3.5 h-3.5 mr-1 text-blue-600" /> 담당 승객명
+              <Users className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 담당 승객명
             </label>
             <input
               type="text"
@@ -169,10 +273,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             />
           </div>
 
-          {/* Target Chat Room Field */}
+          {/* 4. Target Chat Room Field */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center">
-              <MessageSquare className="w-3.5 h-3.5 mr-1 text-blue-600" /> 고정 보고 단톡방 / 수신자 메모
+              <MessageSquare className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 고정 보고 단톡방 / 수신자 메모
             </label>
             <input
               type="text"
@@ -183,10 +287,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             />
           </div>
 
-          {/* Primary Navigation Switcher */}
+          {/* 5. Primary Navigation Switcher */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-2 flex items-center">
-              <Navigation className="w-3.5 h-3.5 mr-1 text-blue-600" /> 주력 내비게이션 앱
+              <Navigation className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 주력 내비게이션 앱
             </label>
             <div className="grid grid-cols-3 gap-2">
               {/* TMAP Option (Default) */}
