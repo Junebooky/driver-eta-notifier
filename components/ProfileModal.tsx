@@ -49,6 +49,30 @@ export function parseVehicleDetails(raw?: string): {
   };
 }
 
+/**
+ * Parses existing phone string into 3 segments (e.g. '010', '6348', '8726').
+ */
+export function parsePhoneDetails(raw?: string): {
+  p1: string;
+  p2: string;
+  p3: string;
+} {
+  const digits = (raw || '').replace(/[^0-9]/g, '');
+  if (!digits) return { p1: '010', p2: '', p3: '' };
+
+  if (digits.length === 11) {
+    return { p1: digits.slice(0, 3), p2: digits.slice(3, 7), p3: digits.slice(7, 11) };
+  } else if (digits.length === 10) {
+    return { p1: digits.slice(0, 3), p2: digits.slice(3, 6), p3: digits.slice(6, 10) };
+  } else if (digits.length <= 3) {
+    return { p1: digits, p2: '', p3: '' };
+  } else if (digits.length <= 7) {
+    return { p1: digits.slice(0, 3), p2: digits.slice(3), p3: '' };
+  } else {
+    return { p1: digits.slice(0, 3), p2: digits.slice(3, 7), p3: digits.slice(7, 11) };
+  }
+}
+
 export const ProfileModal: React.FC<ProfileModalProps> = ({
   isOpen,
   onClose,
@@ -57,10 +81,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   isOnboarding = false,
 }) => {
   const parsed = parseVehicleDetails(profile.vehicleNo);
+  const parsedPhone = parsePhoneDetails(profile.phone || profile.mobile);
   const [hocha, setHocha] = useState(parsed.hocha);
   const [plateFront, setPlateFront] = useState(parsed.plateFront);
   const [plateBack, setPlateBack] = useState(parsed.plateBack);
-  const [phone, setPhone] = useState(profile.phone || profile.mobile || '');
+  const [phone1, setPhone1] = useState(parsedPhone.p1);
+  const [phone2, setPhone2] = useState(parsedPhone.p2);
+  const [phone3, setPhone3] = useState(parsedPhone.p3);
   const [driverName, setDriverName] = useState(profile.driverName || '');
   const [passengerName, setPassengerName] = useState(profile.passengerName || '');
   const [defaultNavi, setDefaultNavi] = useState<NaviProvider>(profile.defaultNavi || 'tmap');
@@ -69,26 +96,70 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
   const plateFrontRef = React.useRef<HTMLInputElement>(null);
   const plateBackRef = React.useRef<HTMLInputElement>(null);
+  const phone1Ref = React.useRef<HTMLInputElement>(null);
+  const phone2Ref = React.useRef<HTMLInputElement>(null);
+  const phone3Ref = React.useRef<HTMLInputElement>(null);
 
-  const formatPhoneNumber = (val: string): string => {
-    const digits = val.replace(/[^0-9]/g, '').slice(0, 11);
-    if (digits.length <= 3) return digits;
-    if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
-    return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+  const handlePhone1Change = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 3);
+    setPhone1(val);
+    if (val.length === 3) {
+      phone2Ref.current?.focus();
+    }
   };
 
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPhone(formatPhoneNumber(e.target.value));
+  const handlePhone2Change = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 4);
+    setPhone2(val);
+    if (val.length === 4) {
+      phone3Ref.current?.focus();
+    }
+  };
+
+  const handlePhone3Change = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 4);
+    setPhone3(val);
+    if (val.length === 4) {
+      phone3Ref.current?.blur();
+    }
+  };
+
+  const handlePhone2KeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && phone2 === '') {
+      phone1Ref.current?.focus();
+    }
+  };
+
+  const handlePhone3KeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && phone3 === '') {
+      phone2Ref.current?.focus();
+    }
+  };
+
+  const handlePhonePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const pasted = e.clipboardData.getData('text');
+    const digits = pasted.replace(/[^0-9]/g, '');
+    if (digits.length >= 10) {
+      e.preventDefault();
+      const p = parsePhoneDetails(digits);
+      setPhone1(p.p1);
+      setPhone2(p.p2);
+      setPhone3(p.p3);
+      phone3Ref.current?.focus();
+    }
   };
 
   useEffect(() => {
     if (isOpen) {
       setIsSaving(false);
       const initial = parseVehicleDetails(profile.vehicleNo);
+      const initPhone = parsePhoneDetails(profile.phone || profile.mobile);
       setHocha(initial.hocha);
       setPlateFront(initial.plateFront);
       setPlateBack(initial.plateBack);
-      setPhone(profile.phone || profile.mobile || '');
+      setPhone1(initPhone.p1);
+      setPhone2(initPhone.p2);
+      setPhone3(initPhone.p3);
       setDriverName(profile.driverName || '');
       setPassengerName(profile.passengerName || '');
       setDefaultNavi(profile.defaultNavi || 'tmap');
@@ -196,9 +267,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       combinedVehicleNo = combinedPlate;
     }
 
+    const combinedPhone =
+      phone1.trim() && phone2.trim() && phone3.trim()
+        ? `${phone1.trim()}-${phone2.trim()}-${phone3.trim()}`
+        : [phone1.trim(), phone2.trim(), phone3.trim()].filter(Boolean).join('-');
+
     if (isOnboarding) {
-      const cleanPhone = phone.replace(/[^0-9]/g, '');
-      if (!cleanPhone || cleanPhone.length < 10) {
+      const cleanPhone = `${phone1}${phone2}${phone3}`.replace(/[^0-9]/g, '');
+      if (cleanPhone.length < 10) {
         alert('휴대폰 번호(연락처)를 올바르게 입력해 주십시오. (예: 010-0000-0000)');
         setIsSaving(false);
         return;
@@ -219,8 +295,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       vehicleNo: combinedVehicleNo,
       carNumber: combinedPlate || undefined,
       driverName: driverName.trim(),
-      phone: phone.trim(),
-      mobile: phone.trim(),
+      phone: combinedPhone,
+      mobile: combinedPhone,
       passengerName: passengerName.trim(),
       defaultNavi: defaultNavi || 'tmap',
     };
@@ -304,11 +380,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                       type="button"
                       onClick={() => {
                         haptics.lightTap();
+                        const pObj = parsePhoneDetails(d.phone);
                         setHocha(d.hocha);
                         setPlateFront(d.plateFront);
                         setPlateBack(d.plateBack);
                         setDriverName(d.driverName);
-                        setPhone(d.phone);
+                        setPhone1(pObj.p1);
+                        setPhone2(pObj.p2);
+                        setPhone3(pObj.p3);
                         setDefaultNavi(d.defaultNavi);
                       }}
                       className={`p-2 rounded-xl text-left border transition-all cursor-pointer ${
@@ -394,7 +473,26 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             </div>
           </div>
 
-          {/* 3. Mobile Phone Number Field (Between License Plate and Driver Name) */}
+          {/* 3. Driver Name Field (드라이버 성명: 연락처 상단 배치) */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+              <span className="flex items-center">
+                <User className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 드라이버 성명
+              </span>
+              {isOnboarding && (
+                <span className="text-[10px] text-red-500 font-bold">* 필수 입력</span>
+              )}
+            </label>
+            <input
+              type="text"
+              value={driverName}
+              onChange={(e) => setDriverName(e.target.value)}
+              placeholder="예: 윤태준"
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-[#1E60F3] focus:bg-white font-bold transition-colors"
+            />
+          </div>
+
+          {/* 4. Mobile Phone Number Field (가로 1줄 3칸 분할 입력) */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
               <span className="flex items-center">
@@ -403,35 +501,60 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               {isOnboarding ? (
                 <span className="text-[10px] text-red-500 font-bold">* 필수 입력</span>
               ) : (
-                <span className="text-[10px] text-slate-400 font-medium">자동 하이픈</span>
+                <span className="text-[10px] text-slate-400 font-medium">3칸 분할 입력</span>
               )}
             </label>
-            <input
-              type="tel"
-              inputMode="numeric"
-              value={phone}
-              onChange={handlePhoneChange}
-              placeholder="010-0000-0000"
-              maxLength={13}
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-[#1E60F3] focus:bg-white font-bold transition-colors tracking-wide"
-            />
+            <div className="grid grid-cols-[1fr_auto_1.2fr_auto_1.2fr] items-center gap-1.5">
+              <div className="relative">
+                <input
+                  ref={phone1Ref}
+                  type="tel"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={3}
+                  value={phone1}
+                  onChange={handlePhone1Change}
+                  onPaste={handlePhonePaste}
+                  placeholder="010"
+                  className="w-full px-2 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-[#1E60F3] focus:bg-white font-bold transition-colors text-center tracking-wider"
+                />
+              </div>
+              <span className="text-slate-300 font-bold text-xs select-none">-</span>
+              <div className="relative">
+                <input
+                  ref={phone2Ref}
+                  type="tel"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={4}
+                  value={phone2}
+                  onChange={handlePhone2Change}
+                  onKeyDown={handlePhone2KeyDown}
+                  onPaste={handlePhonePaste}
+                  placeholder="0000"
+                  className="w-full px-2 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-[#1E60F3] focus:bg-white font-bold transition-colors text-center tracking-wider"
+                />
+              </div>
+              <span className="text-slate-300 font-bold text-xs select-none">-</span>
+              <div className="relative">
+                <input
+                  ref={phone3Ref}
+                  type="tel"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={4}
+                  value={phone3}
+                  onChange={handlePhone3Change}
+                  onKeyDown={handlePhone3KeyDown}
+                  onPaste={handlePhonePaste}
+                  placeholder="0000"
+                  className="w-full px-2 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-[#1E60F3] focus:bg-white font-bold transition-colors text-center tracking-wider"
+                />
+              </div>
+            </div>
           </div>
 
-          {/* 4. Driver Name Field */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center">
-              <User className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 드라이버 성명
-            </label>
-            <input
-              type="text"
-              value={driverName}
-              onChange={(e) => setDriverName(e.target.value)}
-              placeholder="예: 윤태준"
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white font-bold transition-colors"
-            />
-          </div>
-
-          {/* 4. Passenger Name Field */}
+          {/* 5. Passenger Name Field */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center">
               <Users className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 담당 승객명
@@ -445,7 +568,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             />
           </div>
 
-          {/* 5. Primary Navigation Switcher */}
+          {/* 6. Primary Navigation Switcher */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-2 flex items-center">
               <Navigation className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 주력 내비게이션 앱
