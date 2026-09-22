@@ -5,6 +5,9 @@ import { DEFAULT_PRESET_LOCATIONS } from '@/utils/presets';
 
 interface CopilotRequestBody {
   query: string;
+  image?: string;
+  mode?: 'image_analysis' | 'text_chat';
+  model?: string;
   profile?: {
     vehicleNo?: string;
     driverName?: string;
@@ -191,7 +194,7 @@ function processDeterministicFallback(
 export async function POST(req: NextRequest) {
   try {
     const body: CopilotRequestBody = await req.json();
-    const { query, profile = {}, schedules = CONFIRMED_FERRARI_SCHEDULES } = body;
+    const { query, image, mode, model, profile = {}, schedules = CONFIRMED_FERRARI_SCHEDULES } = body;
 
     if (!query || typeof query !== 'string' || !query.trim()) {
       return NextResponse.json({ error: 'Query is required' }, { status: 400 });
@@ -228,7 +231,8 @@ export async function POST(req: NextRequest) {
       normalized.includes('9/') ||
       normalized.includes('9월') ||
       normalized.includes('내일') ||
-      normalized.includes('오늘');
+      normalized.includes('오늘') ||
+      Boolean(image);
 
     if (isOutOfDomain && !hasDomainKeyword) {
       return NextResponse.json({
@@ -237,13 +241,19 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Dynamic Model Selection:
+    // - Image Upload / Multimodal Analysis -> gemini-3.8-flash (High-tier visual reasoning)
+    // - General Text Chat -> gemini-3.5-flash-lite (Ultra-fast, cost-efficient)
+    const isImageMode = mode === 'image_analysis' || Boolean(image);
+    const selectedModel = model || (isImageMode ? 'gemini-3.8-flash' : 'gemini-3.5-flash-lite');
+
     // Check for GEMINI_API_KEY
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      console.log('[Gemini Live API: Fallback Triggered] No GEMINI_API_KEY detected. Executing deterministic protocol engine.');
+      console.log(`[Gemini Live API: Fallback Triggered] No GEMINI_API_KEY detected. Executing deterministic protocol engine (model: ${selectedModel}).`);
       // Execute intelligent deterministic engine
       const result = processDeterministicFallback(query, { vehicleNo: driverVehicle, driverName, passengerName }, activeSchedules);
-      return NextResponse.json(result);
+      return NextResponse.json({ ...result, model: selectedModel });
     }
 
     // Prepare System Prompt with Context Injection
@@ -287,14 +297,38 @@ ${presetSummary}
 2. 항공편 조회 질의("SQ612 상태 어때?", "9/17 항공편 알려줘" 등):
 항공편명, 예정 착륙/출발 시각, 정시 여부, 터미널 위치(T1/T2), 영접/샌딩 동선을 명확하고 간결하게 4줄 이내로 브리핑하라.
 
-3. 답변 어조:
+3. 배차표 이미지 분석 요청 시:
+이미지 속 일자, 시간(착륙/픽업), 동선(출발지/도착지), 담당 승객, 항공편명을 정밀 판독하여 단정하게 불릿 포인트로 요약 보고하라.
+
+4. 답변 어조:
 신속하고 정중하며 신뢰감 있는 VIP 모빌리티 관제 전문 톤(하십시오체, 단정한 불릿 포인트). 군더더기 서론이나 잡담 금지.`;
+
+    // Construct multimodal contents if image provided
+    let contents: any = query;
+    if (image) {
+      let mimeType = 'image/jpeg';
+      let base64Data = image;
+      const match = image.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
+      if (match) {
+        mimeType = match[1];
+        base64Data = match[2];
+      }
+      contents = [
+        {
+          inlineData: {
+            mimeType,
+            data: base64Data,
+          },
+        },
+        query,
+      ];
+    }
 
     try {
       const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: query,
+        model: selectedModel,
+        contents,
         config: {
           systemInstruction: systemPrompt,
           temperature: 0.1,
@@ -306,20 +340,21 @@ ${presetSummary}
         throw new Error('Empty response from Gemini model');
       }
 
-      console.log(`[Gemini Live API: Success] Response generated via gemini-3.8-flash for query: "${query.slice(0, 35)}"`);
+      console.log(`[Gemini Live API: Success] [${selectedModel}] Response generated for query: "${query.slice(0, 35)}" (mode: ${isImageMode ? 'image_analysis' : 'text_chat'})`);
 
       return NextResponse.json({
         reply,
         type: 'gemini',
+        model: selectedModel,
       });
     } catch (geminiError) {
-      console.warn('[Gemini Live API: Fallback Triggered] Google GenAI call failed or error thrown. Activating deterministic fallback:', geminiError);
+      console.warn(`[Gemini Live API: Fallback Triggered] Google GenAI [${selectedModel}] call failed. Activating deterministic fallback:`, geminiError);
       const fallbackResult = processDeterministicFallback(
         query,
         { vehicleNo: driverVehicle, driverName, passengerName },
         activeSchedules
       );
-      return NextResponse.json(fallbackResult);
+      return NextResponse.json({ ...fallbackResult, model: selectedModel });
     }
   } catch (err: any) {
     console.error('Copilot API Route Error:', err);

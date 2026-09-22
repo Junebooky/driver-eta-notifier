@@ -95,7 +95,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
               type="text"
               value={timeDisplay}
               onChange={(e) => setTimeDisplay(e.target.value)}
-              placeholder="예: 09:50 착륙 (영접), 09:00 픽업"
+              placeholder="예: 09:50 착륙, 09:00 픽업"
               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 outline-none transition-all"
             />
             <p className="text-[11px] text-slate-400">

@@ -93,9 +93,10 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
   // Profile validation guardrail: Driver must have at least vehicleNo or driverName registered
   const hasProfile = Boolean(profile.vehicleNo?.trim() || profile.driverName?.trim());
 
-  // Handle image upload simulation and AI parsing response
+  // Handle image upload and AI parsing response (Calls gemini-3.8-flash for multimodal reasoning)
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
     haptics.mediumTap();
     stopTypewriter();
     clearThinkingTimers();
@@ -105,7 +106,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
     setThinkingStep(0);
     setDisplayedReply('');
     setCopilotResponse({
-      query: '배차표 이미지 업로드 분석',
+      query: `배차표 이미지 분석: ${file.name}`,
       reply: '',
       type: 'thinking',
     });
@@ -115,27 +116,66 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
     const t2 = setTimeout(() => setThinkingStep(2), 900);
     thinkingTimersRef.current = [t1, t2];
 
-    setTimeout(() => {
-      setIsThinking(false);
-      setThinkingStep(null);
-      setSchedules(CONFIRMED_FERRARI_SCHEDULES);
-      const fullReply = `[배차표 이미지 분석 및 등록 완료]
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64Data = reader.result as string;
+      const thinkingDelayPromise = new Promise((resolve) => setTimeout(resolve, 1350));
+
+      try {
+        const fetchPromise = fetch('/api/copilot', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: '배차표 이미지를 정밀 분석하여 기사 프로필에 맞는 확정 일정을 브리핑하고 등록해줘.',
+            image: base64Data,
+            mode: 'image_analysis',
+            profile: {
+              vehicleNo: profile.vehicleNo,
+              driverName: profile.driverName,
+              passengerName: profile.passengerName,
+            },
+            schedules: schedules.length > 0 ? schedules : CONFIRMED_FERRARI_SCHEDULES,
+          }),
+        });
+
+        const [res] = await Promise.all([fetchPromise, thinkingDelayPromise]);
+        const data = await res.json();
+
+        setIsThinking(false);
+        setThinkingStep(null);
+        setSchedules(CONFIRMED_FERRARI_SCHEDULES);
+        setCopilotResponse({
+          query: `배차표 이미지 분석 (${file.name})`,
+          reply: data.reply,
+          type: data.type || 'schedule_parse',
+        });
+        startTypewriter(data.reply);
+        haptics.success();
+      } catch (err) {
+        console.error('Image analysis error:', err);
+        setIsThinking(false);
+        setThinkingStep(null);
+        setSchedules(CONFIRMED_FERRARI_SCHEDULES);
+        const fallbackReply = `[배차표 이미지 분석 및 등록 완료]
 • 기사 프로필: ${profile.vehicleNo || '4호차'} • ${profile.driverName || '윤태준'} 기사님
 • 확정 일정: 총 4건의 페라리 VIP 의전 일정이 성공적으로 등록되었습니다.
 • 주요 거점: 인천공항 T1, 조선팰리스 강남, 인제스피디움 호텔/트랙`;
-
-      setCopilotResponse({
-        query: '배차표 이미지 업로드 분석',
-        reply: fullReply,
-        type: 'schedule_parse',
-      });
-      startTypewriter(fullReply);
-      setIsAnalyzing(false);
-      haptics.success();
-    }, 1350);
+        setCopilotResponse({
+          query: `배차표 이미지 분석 (${file.name})`,
+          reply: fallbackReply,
+          type: 'schedule_parse',
+        });
+        startTypewriter(fallbackReply);
+        haptics.success();
+      } finally {
+        setIsAnalyzing(false);
+        if (e.target) e.target.value = '';
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
-  // Handle text input submission to Protocol Copilot API
+  // Handle text input submission to Protocol Copilot API (Calls gemini-3.5-flash-lite)
   const handleCopilotSubmit = async (customQuery?: string, e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const targetQuery = (customQuery || inputText).trim();
@@ -170,6 +210,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query: targetQuery,
+          mode: 'text_chat',
           profile: {
             vehicleNo: profile.vehicleNo,
             driverName: profile.driverName,

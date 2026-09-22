@@ -42,7 +42,7 @@ export const CONFIRMED_FERRARI_SCHEDULES: ScheduleItem[] = [
     dateLabel: "9월 17일 (목)",
     pickup_time: "09:50",
     dropoff_time: null,                       // 배차표 원본에 종료시각이 없으므로 null
-    time_display: "09:50 착륙 (영접)",          // 원본 LANDING TIME 기준 단일 표기
+    time_display: "09:50 착륙",          // 원본 LANDING TIME 기준 단일 표기
     origin_name: "인천공항 T1",
     origin_address: "인천 중구 공항로 272",
     origin_preset_id: "3c7e416a-1111-4111-a111-111111111111",
