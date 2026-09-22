@@ -22,25 +22,46 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
   return (
     <div className="w-full bg-white border border-slate-100/80 rounded-2xl p-4 shadow-[0_8px_25px_rgba(30,96,243,0.06)] space-y-2.5 select-none">
       <div className="flex items-center space-x-2.5 w-full">
-        {/* Origin Card */}
+        {/* Origin Card (Neutral Gray 기준점) */}
         <div
           onClick={() => {
             haptics.lightTap();
             onSelectTarget('origin');
           }}
-          className={`flex-1 min-w-0 w-full p-3 rounded-2xl border text-left cursor-pointer transition-all duration-150 active:scale-95 bg-white ${selectionTarget === 'origin'
-              ? 'border-[#1E60F3] ring-2 ring-[#1E60F3]/20 shadow-[0_2px_10px_rgba(30,96,243,0.1)]'
-              : 'border-slate-200/80 hover:border-slate-300'
-            }`}
+          className={`flex-1 min-w-0 w-full p-3 rounded-2xl border text-left cursor-pointer transition-all duration-150 active:scale-95 ${
+            selectionTarget === 'origin'
+              ? 'bg-slate-100 text-slate-700 border-slate-300 ring-2 ring-slate-300/60 shadow-xs'
+              : 'bg-white border-slate-200/80 hover:border-slate-300'
+          }`}
         >
           <div className="flex items-center space-x-1.5 min-w-0">
-            <div className="w-2 h-2 rounded-full bg-[#1E60F3] shrink-0" />
-            <span className="text-xs font-semibold text-slate-500 shrink-0">출발지</span>
+            <div
+              className={`w-2 h-2 rounded-full shrink-0 ${
+                selectionTarget === 'origin' ? 'bg-slate-500' : 'bg-slate-300'
+              }`}
+            />
+            <span
+              className={`text-xs font-semibold shrink-0 ${
+                selectionTarget === 'origin' ? 'text-slate-700 font-bold' : 'text-slate-500'
+              }`}
+            >
+              출발지
+            </span>
           </div>
-          <div className="text-sm font-bold text-slate-900 truncate mt-1.5 w-full" title={origin.name}>
+          <div
+            className={`text-sm font-bold truncate mt-1.5 w-full ${
+              selectionTarget === 'origin' ? 'text-slate-900' : 'text-slate-700'
+            }`}
+            title={origin.name}
+          >
             {origin.shortName}
           </div>
-          <div className="text-[11px] text-slate-400 truncate mt-0.5 font-normal w-full" title={origin.address || origin.name}>
+          <div
+            className={`text-[11px] truncate mt-0.5 font-normal w-full ${
+              selectionTarget === 'origin' ? 'text-slate-500' : 'text-slate-400'
+            }`}
+            title={origin.address || origin.name}
+          >
             {origin.address || origin.name}
           </div>
         </div>
@@ -60,25 +81,46 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
           <ArrowLeftRight className="w-3.5 h-3.5" />
         </button>
 
-        {/* Destination Card */}
+        {/* Destination Card (Solid Cobalt Blue 핵심 타깃) */}
         <div
           onClick={() => {
             haptics.lightTap();
             onSelectTarget('destination');
           }}
-          className={`flex-1 min-w-0 w-full p-3 rounded-2xl border text-left cursor-pointer transition-all duration-150 active:scale-95 bg-white ${selectionTarget === 'destination'
-              ? 'border-emerald-400 ring-2 ring-emerald-100 shadow-[0_2px_10px_rgba(16,185,129,0.1)]'
-              : 'border-slate-200/80 hover:border-slate-300'
-            }`}
+          className={`flex-1 min-w-0 w-full p-3 rounded-2xl border text-left cursor-pointer transition-all duration-150 active:scale-95 ${
+            selectionTarget === 'destination'
+              ? 'bg-[#1E60F3] text-white border-[#1E60F3] font-bold shadow-sm shadow-blue-500/20 ring-2 ring-blue-300/40'
+              : 'bg-white border-slate-200/80 hover:border-slate-300'
+          }`}
         >
           <div className="flex items-center space-x-1.5 min-w-0">
-            <div className="w-2 h-2 rounded-full bg-emerald-600 shrink-0" />
-            <span className="text-xs font-semibold text-slate-500 shrink-0">목적지</span>
+            <div
+              className={`w-2 h-2 rounded-full shrink-0 ${
+                selectionTarget === 'destination' ? 'bg-white' : 'bg-[#1E60F3]'
+              }`}
+            />
+            <span
+              className={`text-xs font-semibold shrink-0 ${
+                selectionTarget === 'destination' ? 'text-blue-100 font-bold' : 'text-slate-500'
+              }`}
+            >
+              목적지
+            </span>
           </div>
-          <div className="text-sm font-bold text-slate-900 truncate mt-1.5 w-full" title={destination.name}>
+          <div
+            className={`text-sm font-bold truncate mt-1.5 w-full ${
+              selectionTarget === 'destination' ? 'text-white' : 'text-slate-900'
+            }`}
+            title={destination.name}
+          >
             {destination.shortName}
           </div>
-          <div className="text-[11px] text-slate-400 truncate mt-0.5 font-normal w-full" title={destination.address || destination.name}>
+          <div
+            className={`text-[11px] truncate mt-0.5 font-normal w-full ${
+              selectionTarget === 'destination' ? 'text-blue-100/90' : 'text-slate-400'
+            }`}
+            title={destination.address || destination.name}
+          >
             {destination.address || destination.name}
           </div>
         </div>
@@ -92,7 +134,7 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
           </div>
           <span>
             아래 거점을 탭하면 현재{' '}
-            <strong className={selectionTarget === 'origin' ? 'text-[#1E60F3]' : 'text-emerald-600'}>
+            <strong className={selectionTarget === 'origin' ? 'text-slate-800' : 'text-[#1E60F3]'}>
               [{selectionTarget === 'origin' ? '출발지' : '목적지'}]
             </strong>
             로 지정됩니다.

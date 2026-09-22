@@ -5,7 +5,7 @@ import { DriverProfile, LocationPreset } from '@/types';
 import { ScheduleItem, CONFIRMED_FERRARI_SCHEDULES, scheduleToPresets } from '@/data/ferrariSchedules';
 import { ScheduleCard } from '@/components/ScheduleCard';
 import { EditScheduleModal } from '@/components/EditScheduleModal';
-import { Camera, Send, AlertCircle, Sparkles, RefreshCw } from 'lucide-react';
+import { Camera, Send, AlertCircle, Sparkles, RefreshCw, Bot, Copy, Check, X } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface ScheduleTabProps {
@@ -33,35 +33,94 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<ScheduleItem | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [copilotResponse, setCopilotResponse] = useState<{
+    query: string;
+    reply: string;
+    type?: string;
+  } | null>(null);
+  const [isCopilotOpen, setIsCopilotOpen] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Profile validation guardrail: Driver must have at least vehicleNo or driverName registered
   const hasProfile = Boolean(profile.vehicleNo?.trim() || profile.driverName?.trim());
 
-  // Handle image upload simulation
+  // Handle image upload simulation and AI parsing response
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     haptics.mediumTap();
     setIsAnalyzing(true);
     setTimeout(() => {
       setSchedules(CONFIRMED_FERRARI_SCHEDULES);
+      setCopilotResponse({
+        query: '배차표 이미지 업로드 분석',
+        reply: `[배차표 이미지 분석 및 등록 완료]
+• 기사 프로필: ${profile.vehicleNo || '4호차'} • ${profile.driverName || '윤태준'} 기사님
+• 확정 일정: 총 4건의 페라리 VIP 의전 일정이 성공적으로 등록되었습니다.
+• 주요 거점: 인천공항 T1, 조선팰리스 강남, 인제스피디움 호텔/트랙`,
+        type: 'schedule_parse',
+      });
+      setIsCopilotOpen(true);
       setIsAnalyzing(false);
       haptics.success();
-    }, 900);
+    }, 850);
   };
 
-  // Handle text input submission
-  const handleTextSubmit = (e?: React.FormEvent) => {
+  // Handle text input submission to Protocol Copilot API
+  const handleCopilotSubmit = async (customQuery?: string, e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!inputText.trim()) return;
+    const targetQuery = (customQuery || inputText).trim();
+    if (!targetQuery) return;
+
     haptics.mediumTap();
     setIsAnalyzing(true);
-    setTimeout(() => {
-      setSchedules(CONFIRMED_FERRARI_SCHEDULES);
+    try {
+      const res = await fetch('/api/copilot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: targetQuery,
+          profile: {
+            vehicleNo: profile.vehicleNo,
+            driverName: profile.driverName,
+            passengerName: profile.passengerName,
+          },
+          schedules: schedules.length > 0 ? schedules : CONFIRMED_FERRARI_SCHEDULES,
+        }),
+      });
+
+      const data = await res.json();
+      setCopilotResponse({
+        query: targetQuery,
+        reply: data.reply,
+        type: data.type,
+      });
+      setIsCopilotOpen(true);
       setInputText('');
-      setIsAnalyzing(false);
+
+      // Auto-load schedules if user requested schedules or confirmed load
+      if (
+        schedules.length === 0 &&
+        (targetQuery.includes('배차') ||
+          targetQuery.includes('등록') ||
+          targetQuery.includes('샘플') ||
+          targetQuery.includes('전체'))
+      ) {
+        setSchedules(CONFIRMED_FERRARI_SCHEDULES);
+      }
       haptics.success();
-    }, 700);
+    } catch (err) {
+      console.error('Copilot query error:', err);
+      setCopilotResponse({
+        query: targetQuery,
+        reply: '기사님, 관제 서버 통신 중 일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주십시오.',
+        type: 'error',
+      });
+      setIsCopilotOpen(true);
+      haptics.errorAlert();
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   // One-click Ferrari 4-day sample loader
@@ -303,15 +362,122 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
         </div>
       )}
 
-      {/* 3. SLIM FLOATING ACTION DOCK (Messenger-style Single Unified Input Bar) */}
+      {/* 3. COPILOT RESPONSE CARD & QUICK PROMPT PILLS */}
       <div
-        className={`w-full max-w-md mx-auto pt-3 transition-all ${
+        className={`w-full max-w-md mx-auto pt-3 space-y-2.5 transition-all ${
           !hasProfile ? 'opacity-50 pointer-events-none' : ''
         }`}
       >
+        {/* Copilot Response Card (Protocol Copilot Intelligence Layer) */}
+        {isCopilotOpen && copilotResponse && (
+          <div className="w-full bg-white border border-blue-200/90 rounded-2xl p-3.5 shadow-[0_8px_25px_rgba(30,96,243,0.12)] animate-fade-in relative space-y-2.5">
+            {/* Header: Title + Bot Badge + Copy & Close */}
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-[#1E60F3] flex items-center justify-center text-white shadow-xs">
+                  <Bot className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-black text-slate-900 leading-tight">
+                    의전 AI 관제 코파일럿
+                  </h4>
+                  <p className="text-[10px] text-blue-600 font-bold">Protocol Copilot Intelligence</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (copilotResponse?.reply) {
+                      navigator.clipboard.writeText(copilotResponse.reply);
+                      setCopySuccess(true);
+                      haptics.successPulse();
+                      setTimeout(() => setCopySuccess(false), 1500);
+                    }
+                  }}
+                  className="px-2 py-1 rounded-md text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-1 cursor-pointer transition-colors"
+                  title="답변 복사"
+                >
+                  {copySuccess ? (
+                    <>
+                      <Check className="w-3 h-3 text-[#1E60F3]" />
+                      <span className="text-[#1E60F3]">복사됨</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3 h-3 text-slate-500" />
+                      <span>복사</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    haptics.lightTap();
+                    setIsCopilotOpen(false);
+                  }}
+                  className="w-6 h-6 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center cursor-pointer transition-colors"
+                  title="닫기"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Query Echo Banner */}
+            <div className="text-[11px] text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg truncate">
+              💬 <span className="font-bold text-slate-700">질문:</span> {copilotResponse.query}
+            </div>
+
+            {/* Formatted Reply Body */}
+            <div className="text-xs text-slate-800 font-normal leading-relaxed whitespace-pre-wrap bg-blue-50/50 p-3 rounded-xl border border-blue-100/70 select-text">
+              {copilotResponse.reply}
+            </div>
+          </div>
+        )}
+
+        {/* Quick Suggestion Prompt Chips */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+          <button
+            type="button"
+            onClick={() => handleCopilotSubmit('9.18일 일정 브리핑해줘')}
+            disabled={isAnalyzing}
+            className="shrink-0 px-2.5 py-1 bg-white hover:bg-blue-50/70 border border-slate-200/80 hover:border-blue-300 text-[11px] font-medium text-slate-600 hover:text-[#1E60F3] rounded-full transition-all active:scale-95 shadow-2xs cursor-pointer"
+          >
+            💡 9/18 일정 브리핑
+          </button>
+          <button
+            type="button"
+            onClick={() => handleCopilotSubmit('SQ612 상태 어때?')}
+            disabled={isAnalyzing}
+            className="shrink-0 px-2.5 py-1 bg-white hover:bg-blue-50/70 border border-slate-200/80 hover:border-blue-300 text-[11px] font-medium text-slate-600 hover:text-[#1E60F3] rounded-full transition-all active:scale-95 shadow-2xs cursor-pointer"
+          >
+            ✈️ SQ612 항공편 조회
+          </button>
+          <button
+            type="button"
+            onClick={() => handleCopilotSubmit('전체 일정 브리핑해줘')}
+            disabled={isAnalyzing}
+            className="shrink-0 px-2.5 py-1 bg-white hover:bg-blue-50/70 border border-slate-200/80 hover:border-blue-300 text-[11px] font-medium text-slate-600 hover:text-[#1E60F3] rounded-full transition-all active:scale-95 shadow-2xs cursor-pointer"
+          >
+            📋 전체 일정 브리핑
+          </button>
+          <button
+            type="button"
+            onClick={() => handleCopilotSubmit('여기 맛집 추천해줘')}
+            disabled={isAnalyzing}
+            className="shrink-0 px-2.5 py-1 bg-white hover:bg-slate-50 border border-slate-200/80 text-[11px] font-medium text-slate-400 hover:text-slate-600 rounded-full transition-all active:scale-95 shadow-2xs cursor-pointer"
+            title="가드레일 방어 테스트"
+          >
+            🛡️ 가드레일 테스트
+          </button>
+        </div>
+
+        {/* Floating Action Dock Input Field */}
         <form
-          onSubmit={handleTextSubmit}
-          className="w-full bg-white border border-slate-200 rounded-full pl-1.5 pr-1.5 py-1.5 flex items-center shadow-sm focus-within:border-blue-500 transition-all"
+          onSubmit={(e) => handleCopilotSubmit(undefined, e)}
+          className="w-full bg-white border border-slate-200 rounded-full pl-1.5 pr-1.5 py-1.5 flex items-center shadow-sm focus-within:border-[#1E60F3] transition-all"
         >
           {/* Left: Inlined Camera Icon Button */}
           <button
@@ -334,16 +500,16 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             disabled={isAnalyzing}
-            placeholder="카카오톡 공지나 배차표 내용을 붙여넣어 주세요"
+            placeholder="AI 코파일럿에게 일정 브리핑/항공편 문의 또는 배차표 입력"
             className="flex-1 bg-transparent text-xs text-slate-700 placeholder-slate-400 outline-none px-2 min-w-0"
           />
 
           {/* Right: Solid Cobalt Blue Send Button */}
           <button
             type="submit"
-            disabled={isAnalyzing || (!inputText.trim() && schedules.length > 0)}
+            disabled={isAnalyzing || !inputText.trim()}
             className="w-9 h-9 bg-[#1E60F3] hover:bg-[#1650D6] active:scale-95 disabled:opacity-40 text-white rounded-full flex items-center justify-center shrink-0 shadow-md shadow-blue-500/20 transition-all cursor-pointer"
-            title="배차표 등록 및 분석"
+            title="AI 코파일럿 질문 및 배차표 분석 전송"
             aria-label="배차표 전송"
           >
             {isAnalyzing ? (
