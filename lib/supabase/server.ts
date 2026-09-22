@@ -8,6 +8,9 @@ if (!supabaseServiceRoleKey) {
 }
 
 export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
+  db: {
+    schema: 'cockpit',
+  },
   auth: {
     persistSession: false,
     autoRefreshToken: false,

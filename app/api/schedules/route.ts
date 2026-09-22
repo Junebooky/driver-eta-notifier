@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
     const vehicleNo = searchParams.get('vehicle_no') || '4호차';
 
     const { data, error } = await supabaseAdmin
-      .from('cockpit_schedules')
+      .from('schedules')
       .select('*')
       .eq('vehicle_no', vehicleNo)
       .order('date', { ascending: true })
@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
     };
 
     const { data, error } = await supabaseAdmin
-      .from('cockpit_schedules')
+      .from('schedules')
       .insert(payload)
       .select()
       .single();
@@ -204,7 +204,7 @@ export async function PUT(req: NextRequest) {
     if (status !== undefined) updates.status = status;
 
     const { data, error } = await supabaseAdmin
-      .from('cockpit_schedules')
+      .from('schedules')
       .update(updates)
       .eq('id', id)
       .select()
@@ -233,7 +233,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     const { error } = await supabaseAdmin
-      .from('cockpit_schedules')
+      .from('schedules')
       .delete()
       .eq('id', id);
 

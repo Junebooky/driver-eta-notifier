@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
   try {
     // Query common master presets (cockpit_presets SSOT)
     const { data: rawPresets, error: presetsError } = await supabaseAdmin
-      .from('cockpit_presets')
+      .from('presets')
       .select('*')
       .order('order_index', { ascending: true });
 
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { data, error } = await supabaseAdmin
-      .from('cockpit_presets')
+      .from('presets')
       .upsert(payload, { onConflict: 'name' })
       .select()
       .single();
@@ -98,7 +98,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     const { error } = await supabaseAdmin
-      .from('cockpit_presets')
+      .from('presets')
       .delete()
       .eq('id', id);
 

@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
       ? '2호차'
       : '4호차';
 
-    let query = supabaseAdmin.from('cockpit_drivers').select('*');
+    let query = supabaseAdmin.from('drivers').select('*');
     if (searchParams.get('vehicle_no')) {
       query = query.eq('vehicle_no', searchParams.get('vehicle_no')!);
     } else {
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
     if (default_navi !== undefined) payload.default_navi = default_navi;
 
     const { data, error } = await supabaseAdmin
-      .from('cockpit_drivers')
+      .from('drivers')
       .upsert(payload, { onConflict: 'vehicle_no' })
       .select()
       .single();
