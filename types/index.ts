@@ -27,6 +27,8 @@ export interface LocationPreset {
   address?: string;
   isGlobal?: boolean;
   driverId?: string | null;
+  vehicle_no?: string | null;
+  vehicleNo?: string | null;
 }
 
 export type ReportMode = 'DEPARTURE' | 'ARRIVED' | 'WAITING' | 'RETURN';

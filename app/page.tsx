@@ -27,8 +27,10 @@ import { generateReportText } from '@/utils/reportGenerator';
 import { calculateHaversineEstimate, getEtaString, launchNavigationApp } from '@/utils/navigation';
 import { haptics } from '@/utils/haptics';
 
-const CUSTOM_PRESETS_KEY = 'protocol_cockpit_custom_presets_v1';
-const ORDERED_PRESETS_KEY = 'protocol_cockpit_ordered_presets_v2';
+export const getPresetsStorageKey = (vehicleNo?: string) => {
+  const v = vehicleNo?.match(/(\d+호차)/)?.[1] || (vehicleNo ? vehicleNo.trim() : '4호차');
+  return `cockpit_presets_${v}`;
+};
 const ADMIN_MODE_KEY = 'protocol_cockpit_admin_mode_v1';
 
 export default function Home() {
@@ -66,46 +68,65 @@ export default function Home() {
   const [flightModalInitialFlightId, setFlightModalInitialFlightId] = useState<string | undefined>(undefined);
   const [flightModalInitialType, setFlightModalInitialType] = useState<FlightType | undefined>(undefined);
 
-  // Load Presets & Admin State from LocalStorage on mount
+  // Active vehicle identifier (e.g. '4호차', '1호차')
+  const currentVehicleNo = useMemo(() => {
+    return profile.vehicleNo?.match(/(\d+호차)/)?.[1] || '4호차';
+  }, [profile.vehicleNo]);
+
+  // Fetch Presets with Vehicle Isolation (Common Master + Vehicle's Custom Presets)
+  const fetchPresetsForVehicle = useCallback(async (vNo: string) => {
+    const cleanV = vNo.match(/(\d+호차)/)?.[1] || vNo || '4호차';
+    const storageKey = getPresetsStorageKey(cleanV);
+
+    // 1. Load from vehicle-isolated localStorage first for instant UI response
+    try {
+      const cached = localStorage.getItem(storageKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setPresets(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load presets from vehicle storage:', e);
+    }
+
+    // 2. Fetch from API with vehicle_no parameter (Supabase cockpit.presets SSOT)
+    try {
+      const res = await fetch(`/api/presets?vehicle_no=${encodeURIComponent(cleanV)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.presets && Array.isArray(data.presets)) {
+          setPresets(data.presets);
+          localStorage.setItem(storageKey, JSON.stringify(data.presets));
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to fetch presets for vehicle from API:', err);
+    }
+  }, []);
+
+  // Sync isolated presets whenever vehicle changes or profile loads
+  useEffect(() => {
+    if (isLoaded) {
+      fetchPresetsForVehicle(currentVehicleNo);
+    }
+  }, [isLoaded, currentVehicleNo, fetchPresetsForVehicle]);
+
+  // Load Admin State from LocalStorage on mount
   useEffect(() => {
     try {
       const savedAdmin = localStorage.getItem(ADMIN_MODE_KEY);
       if (savedAdmin === 'true') {
         setIsAdmin(true);
       }
-
-      const savedOrdered = localStorage.getItem(ORDERED_PRESETS_KEY);
-      if (savedOrdered) {
-        setPresets(JSON.parse(savedOrdered));
-        return;
-      }
-      const savedCustom = localStorage.getItem(CUSTOM_PRESETS_KEY);
-      if (savedCustom) {
-        const parsedCustom = JSON.parse(savedCustom);
-        setPresets([...DEFAULT_PRESET_LOCATIONS, ...parsedCustom]);
-        return;
-      }
-    } catch (e) {
-      console.warn('Failed to load presets from storage:', e);
-    }
-    setPresets(DEFAULT_PRESET_LOCATIONS);
+    } catch (e) {}
   }, []);
 
-  // Supabase Fleet Architecture Data Synchronization
+  // Supabase Fleet Architecture Driver Profile Sync
   useEffect(() => {
-    async function syncSupabaseFleet() {
+    async function syncDriverProfile() {
       try {
-        // 1. Fetch Common Master Presets from Supabase (cockpit_presets SSOT)
-        const pRes = await fetch('/api/presets');
-        if (pRes.ok) {
-          const data = await pRes.json();
-          if (data.presets && data.presets.length > 0) {
-            setPresets(data.presets);
-            localStorage.setItem(ORDERED_PRESETS_KEY, JSON.stringify(data.presets));
-          }
-        }
-
-        // 2. Fetch Driver Profile by Vehicle from Supabase (STRICT RULE 1: Vehicle Isolation)
         if (!profile.driverName || !profile.vehicleNo) {
           const dRes = await fetch(`/api/driver?vehicle_no=${encodeURIComponent(profile.vehicleNo || '4호차')}`);
           if (dRes.ok) {
@@ -122,20 +143,20 @@ export default function Home() {
           }
         }
       } catch (err) {
-        console.warn('Supabase remote sync skipped/unavailable:', err);
+        console.warn('Supabase remote driver sync skipped/unavailable:', err);
       }
     }
 
     if (isLoaded) {
-      syncSupabaseFleet();
+      syncDriverProfile();
     }
   }, [isLoaded]);
 
-  // Save Presets to LocalStorage
+  // Save Presets to LocalStorage (Isolated by current vehicle)
   const savePresetsToStorage = (updated: LocationPreset[]) => {
     setPresets(updated);
     try {
-      localStorage.setItem(ORDERED_PRESETS_KEY, JSON.stringify(updated));
+      localStorage.setItem(getPresetsStorageKey(currentVehicleNo), JSON.stringify(updated));
     } catch (e) {
       console.warn('Failed to save ordered presets:', e);
     }
@@ -159,28 +180,40 @@ export default function Home() {
   };
 
   const handleAddCustomPreset = async (newPreset: LocationPreset) => {
-    const presetWithGlobal: LocationPreset = {
+    const presetWithVehicle: LocationPreset = {
       ...newPreset,
       isGlobal: isAdmin,
       driverId: isAdmin ? null : (profile.id || getOrCreateDeviceUuid()),
+      vehicle_no: currentVehicleNo,
+      vehicleNo: currentVehicleNo,
     };
 
-    const updated = [...presets, presetWithGlobal];
+    const updated = [...presets, presetWithVehicle];
     savePresetsToStorage(updated);
 
     if (selectionTarget === 'origin') {
-      setOrigin(presetWithGlobal);
+      setOrigin(presetWithVehicle);
     } else {
-      setDestination(presetWithGlobal);
+      setDestination(presetWithVehicle);
     }
 
-    // Supabase Sync
+    // Supabase Sync with vehicle_no
     try {
-      await fetch('/api/presets', {
+      const res = await fetch('/api/presets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(presetWithGlobal),
+        body: JSON.stringify({
+          ...presetWithVehicle,
+          vehicle_no: currentVehicleNo,
+        }),
       });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.preset) {
+          const synced = updated.map((p) => (p.id === presetWithVehicle.id ? data.preset : p));
+          savePresetsToStorage(synced);
+        }
+      }
     } catch (e) {
       console.warn('Failed to sync new preset to Supabase:', e);
     }
@@ -196,12 +229,15 @@ export default function Home() {
       setOrigin(updatedPreset);
     }
 
-    // Supabase Sync
+    // Supabase Sync with vehicle_no
     try {
       await fetch('/api/presets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedPreset),
+        body: JSON.stringify({
+          ...updatedPreset,
+          vehicle_no: updatedPreset.vehicle_no || currentVehicleNo,
+        }),
       });
     } catch (e) {
       console.warn('Failed to sync updated preset to Supabase:', e);
@@ -218,9 +254,9 @@ export default function Home() {
       setOrigin(DEFAULT_PRESET_LOCATIONS[2]);
     }
 
-    // Supabase Sync
+    // Supabase Sync with vehicle_no for security check
     try {
-      await fetch(`/api/presets?id=${id}`, {
+      await fetch(`/api/presets?id=${encodeURIComponent(id)}&vehicle_no=${encodeURIComponent(currentVehicleNo)}`, {
         method: 'DELETE',
       });
     } catch (e) {
@@ -721,6 +757,10 @@ export default function Home() {
               onOpenPredictionForSchedule={handleOpenPredictionForSchedule}
               onNavigateForSchedule={handleNavigateForSchedule}
               onOpenFlightModal={handleOpenFlightModalFromSchedule}
+              onSwitchVehicle={(vNo) => {
+                updateProfile({ vehicleNo: vNo });
+                fetchPresetsForVehicle(vNo);
+              }}
             />
           </div>
         )}
@@ -751,6 +791,7 @@ export default function Home() {
           // Sync profile to Supabase with vehicle_no & car_number
           const { hocha: h, plateNumber: pNum } = parseVehicleDetails(updated.vehicleNo);
           const cleanVehicleNo = h ? `${h}호차` : (updated.vehicleNo || '4호차');
+          fetchPresetsForVehicle(cleanVehicleNo);
           fetch('/api/driver', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

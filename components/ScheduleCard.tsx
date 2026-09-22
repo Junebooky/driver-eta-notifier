@@ -108,7 +108,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
       >
         {/* Passenger */}
         <div className="flex items-center gap-1.5 font-medium">
-          <User className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />
+          <User className="w-3.5 h-3.5 text-slate-500 shrink-0" />
           <span className="text-slate-500 font-normal">승객:</span>
           <span className="font-bold text-slate-900 truncate">{item.passenger}</span>
         </div>

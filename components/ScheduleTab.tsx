@@ -22,6 +22,7 @@ interface ScheduleTabProps {
   onOpenPredictionForSchedule: (schedule: ScheduleItem) => void;
   onNavigateForSchedule: (schedule: ScheduleItem) => void;
   onOpenFlightModal?: (flightId: string, type: 'arrival' | 'departure') => void;
+  onSwitchVehicle?: (vehicleNo: string) => void;
 }
 
 export const ScheduleTab: React.FC<ScheduleTabProps> = ({
@@ -31,6 +32,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
   onOpenPredictionForSchedule,
   onNavigateForSchedule,
   onOpenFlightModal,
+  onSwitchVehicle,
 }) => {
   // Schedules state (starts with empty state by default, populated dynamically per vehicle)
   const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
@@ -407,6 +409,9 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
                   haptics.lightTap();
                   setSelectedVehicleFilter(v.id);
                   setSelectedDateFilter('all');
+                  if (onSwitchVehicle && v.id !== 'all') {
+                    onSwitchVehicle(v.id);
+                  }
                 }}
                 className={`flex-1 py-1.5 px-1 rounded-xl text-xs font-black flex items-center justify-center gap-1 transition-all cursor-pointer ${
                   isSelected

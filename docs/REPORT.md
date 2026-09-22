@@ -207,3 +207,75 @@ export function formatFlightReport(profile: DriverProfile, flight: FlightInfo): 
 
 ### 10.2 빌드 검증
 * `npm run build` 결과: Next.js 16.3.5 Turbopack 기준 13/13 라우트 100% 정상 컴파일 (TypeScript 에러 0건).
+
+---
+
+## 11. [v4.77] 스케줄 이미지 업로드 현황 팩트체크, 승객 아이콘 교정 및 호차별 커스텀 거점 격리 구축
+
+### 11.1 승객 아이콘 뉴트럴 통일 (`components/ScheduleCard.tsx`)
+* 스케줄 카드 내 '승객' 라벨 좌측의 `User` 아이콘에 적용되어 있던 단독 파란색(`text-[#1E60F3]`)을 뉴트럴 슬레이트(`text-slate-500`)로 교정하여 항공편(`Plane`), 메모(`FileText`) 아이콘과 시각적 톤앤매너를 일체화하였습니다.
+
+### 11.2 [Part 1] 배차표 이미지 업로드 & AI 파싱 구현 현황 팩트체크 (Fact Check)
+1. **배차표 이미지 업로드 & 파싱의 실제 구현 범위**:
+   * **현재 동작**: 스케줄 탭의 카메라 버튼(`📷`)으로 배차표 이미지를 업로드하면 Base64로 인코딩되어 `/api/copilot`으로 전송되며, **Gemini 3.8 Flash가 이미지를 보고 텍스트 채팅창에 자연어 브리핑 요약문(답변 텍스트)을 출력하는 단계까지 구현**되어 있습니다.
+   * **미구현 사항**: 이미지에서 추출된 일정 데이터(일자, 시간, 출발지, 도착지, 위경도, 승객명, 항공편명 등)를 정형 JSON 레코드로 구조화하여 데이터베이스(`cockpit_schedules` 테이블)에 **INSERT/UPDATE하는 자동 레코드 적재 파이프라인은 현재 존재하지 않습니다.**
+   * 이미지 업로드 완료 콜백 시 로컬 상태를 기존 정적 상수(`CONFIRMED_FERRARI_SCHEDULES`)로 초기화하도록 임시 연결되어 있는 상태입니다.
+2. **현재 화면에 표출되는 4호차 4건 일정의 출처**:
+   * 현재 화면의 4건(9/17~9/20)은 마이그레이션 SQL 스크립트([`20260922_init_cockpit.sql`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/supabase/migrations/20260922_init_cockpit.sql)) 실행 시 데이터베이스에 직접 INSERT된 **공식 시드(Seed) 데이터**입니다.
+
+---
+
+### 11.3 [Part 2] 거점(프리셋) 호차별 격리 아키텍처 구축
+
+#### 1. 데이터베이스 스키마 및 마이그레이션 ([`20260922_isolate_presets_by_vehicle.sql`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/supabase/migrations/20260922_isolate_presets_by_vehicle.sql))
+* `cockpit.presets` 테이블에 `vehicle_no TEXT NULL` 컬럼 추가 및 인덱스(`idx_cockpit_presets_vehicle`) 생성.
+* 기존 `name UNIQUE` 단일 제약을 해제하고, `(vehicle_no, name)` 복합 유니크 인덱스 및 `(name) WHERE vehicle_no IS NULL` 부분 유니크 인덱스를 구축하여 호차 간 동일 명칭 거점 등록 지원.
+* **비즈니스 격리 룰**:
+  * `vehicle_no IS NULL`: **전사 공통 마스터 거점** (인천공항 T1/T2, 조선팰리스, 시그니엘, 인제스피디움 등) - 전 호차 공통 노출, 기사 삭제 불가.
+  * `vehicle_no = '{호차명}'`: **해당 호차 전용 커스텀 거점** - 해당 호차에만 노출되며 타 호차에는 완전히 은닉.
+
+```sql
+-- 1. cockpit.presets 테이블에 vehicle_no 컬럼 추가
+ALTER TABLE IF EXISTS cockpit.presets 
+ADD COLUMN IF NOT EXISTS vehicle_no TEXT NULL;
+
+-- 2. vehicle_no 인덱스 생성
+CREATE INDEX IF NOT EXISTS idx_cockpit_presets_vehicle 
+ON cockpit.presets (vehicle_no);
+
+-- 3. 기존 name 단일 UNIQUE 제약조건 해제
+ALTER TABLE IF EXISTS cockpit.presets 
+DROP CONSTRAINT IF EXISTS presets_name_key;
+
+-- 4. 공통 거점 및 호차별 거점 유니크 인덱스 생성
+CREATE UNIQUE INDEX IF NOT EXISTS idx_presets_global_name 
+ON cockpit.presets (name) 
+WHERE vehicle_no IS NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_presets_vehicle_name 
+ON cockpit.presets (vehicle_no, name) 
+WHERE vehicle_no IS NOT NULL;
+
+-- 5. 호환성 뷰 갱신
+CREATE OR REPLACE VIEW cockpit.cockpit_presets AS 
+SELECT * FROM cockpit.presets;
+```
+
+#### 2. API 엔드포인트 격리 ([`app/api/presets/route.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/api/presets/route.ts))
+* **GET `/api/presets?vehicle_no={호차명}`**:
+  * `WHERE vehicle_no IS NULL OR vehicle_no = :vehicle_no` 조건 적용.
+  * 공통 마스터 거점이 상단(우선순위), 개별 커스텀 거점이 후순위로 정렬.
+* **POST `/api/presets`**:
+  * 요청 바디의 `vehicle_no`를 바인딩하여 공통 거점 오염 방지.
+* **DELETE `/api/presets?id={id}&vehicle_no={호차명}`**:
+  * `vehicle_no IS NULL`인 공통 마스터 거점 삭제 요청 시 `403 Forbidden` 차단.
+  * 타 호차의 커스텀 거점 삭제 시도 시 `403 Forbidden` 차단.
+
+#### 3. 프론트엔드 상태 및 로컬 스토리지 격리 ([`app/page.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/page.tsx), [`components/ScheduleTab.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ScheduleTab.tsx))
+* 로컬 스토리지 캐시 키를 `cockpit_presets_${vehicleNo}`로 분리하여 호차 변경 시 캐시 오염 원천 차단.
+* 상단 호차 스위처 또는 프로필 모달에서 호차 변경 시 `fetchPresetsForVehicle(newVehicleNo)`가 즉각 호출되어 거점 목록을 해당 호차 전용 데이터로 리프레시.
+
+### 11.4 빌드 및 무결성 검증
+* `npm run build`: Next.js 16.3.5 Turbopack 기준 13/13 라우트 컴파일 에러 0건 성공.
+* 4호차 커스텀 거점 등록 후 1호차 조회 시 100% 완전 격리 검증 완료.
+* 공통 마스터 거점 삭제 차단 및 타 호차 거점 삭제 차단 검증 완료.
