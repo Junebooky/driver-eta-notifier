@@ -124,12 +124,18 @@ export default function Home() {
     } catch (e) {}
   }, []);
 
-  // Supabase Fleet Architecture Driver Profile Sync
+  // Supabase Fleet Architecture Driver Profile Sync (Only for onboarded profiles)
   useEffect(() => {
     async function syncDriverProfile() {
       try {
-        if (!profile.driverName || !profile.vehicleNo || !profile.phone) {
-          const dRes = await fetch(`/api/driver?vehicle_no=${encodeURIComponent(profile.vehicleNo || '4호차')}`);
+        const onboarded = typeof window !== 'undefined' ? localStorage.getItem('cockpit_driver_onboarded') : null;
+        // Do not auto-fetch or auto-inject 4호차 fallback if onboarding is pending or vehicleNo is not chosen yet
+        if (!onboarded || !profile.vehicleNo) {
+          return;
+        }
+
+        if (!profile.driverName || !profile.phone) {
+          const dRes = await fetch(`/api/driver?vehicle_no=${encodeURIComponent(profile.vehicleNo)}`);
           if (dRes.ok) {
             const dData = await dRes.json();
             if (dData.driver) {
@@ -154,7 +160,7 @@ export default function Home() {
     if (isLoaded) {
       syncDriverProfile();
     }
-  }, [isLoaded]);
+  }, [isLoaded, profile.vehicleNo, profile.driverName, profile.phone]);
 
   // Save Presets to LocalStorage (Isolated by current vehicle)
   const savePresetsToStorage = (updated: LocationPreset[]) => {

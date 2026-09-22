@@ -634,9 +634,58 @@ SELECT * FROM cockpit.presets;
 * **빌드 무결성**:
   * `npm run build`: Next.js 16.3.5 Turbopack 기준 14/14 라우트 컴파일 에러 **0건** 완료.
 
+---
 
+## 20. [v4.89] 최초 방문 시 프로필 등록 폼 완전 빈칸 초기화 및 DEV 프리셋 선택형 전환
 
+> **평가 일시**: 2026년 9월 22일  
+> **상태**: 신규 사용자 최초 방문(온보딩) 시 4호차 기본값 자동 주입 방지, 폼 완전 빈칸 초기화, DEV 프리셋 선택형 전환 및 필수값 유효성 검증 강화 완료  
 
+### 20.1 최초 진입 시 프로필 State 빈값 처리 ([`hooks/useDriverProfile.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/hooks/useDriverProfile.ts), [`app/page.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/page.tsx), [`components/ProfileModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ProfileModal.tsx))
+1. **EMPTY_PROFILE 객체 정의 및 신규 진입 시 기본 주입**:
+   * `localStorage`에 저장된 프로필이 없을 경우(`!saved`), 4호차 기본값이 아닌 모든 필드가 빈 문자열인 `EMPTY_PROFILE`을 주입:
+     ```typescript
+     export const EMPTY_PROFILE: DriverProfile = {
+       id: '',
+       vehicleNo: '',
+       carNumberFront: '',
+       carNumberBack: '',
+       carNumber: '',
+       driverName: '',
+       phonePart1: '010',
+       phonePart2: '',
+       phonePart3: '',
+       phone: '',
+       passengerName: '',
+       defaultNavi: 'tmap', // 기본 내비 유지
+     };
+     ```
+2. **원격 Supabase 4호차 자동 주입 결함 방어 (`app/page.tsx`)**:
+   * `syncDriverProfile`에서 `!onboarded || !profile.vehicleNo`일 경우 원격 4호차 fallback 조회를 즉시 차단하여, 최초 방문자가 모달을 열기 전에 4호차 프로필로 자동 덮어씌워지던 결함을 원천 차단.
+3. **입력 필드 초기 렌더링 상태**:
+   * **호차 (선택)**: `""` (플레이스홀더: `"예: 4"`)
+   * **차량 번호판**: 앞자리 `""` / 뒷자리 `""` (플레이스홀더: `"142호"` / `"7811"`)
+   * **드라이버 성명 (* 필수)**: `""` (플레이스홀더: `"성함 입력"`, 라벨: `* 필수 입력`)
+   * **연락처 (* 필수)**: `010` - `""` - `""` (플레이스홀더: `"010"`, `"0000"`, `"0000"`, 라벨: `* 필수 입력`)
+   * **담당 승객명**: `""` (플레이스홀더: `"예: SOYFAN 외 1명 (미입력 시 생략)"`)
 
+### 20.2 DEV 1초 기사 전환 버튼 활성 상태 초기화 ([`components/ProfileModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ProfileModal.tsx))
+1. **최초 진입 시 프리셋 선택 해제**:
+   * 모달 진입 시 `selectedPresetVehicle`을 `null`로 초기화.
+   * 모든 DEV 프리셋 카드(1호차, 2호차, 4호차, 8호차)가 초기에는 동일한 비활성 화이트 카드 스타일(`bg-white text-slate-700 border-slate-200`)로 렌더링.
+2. **명시적 클릭 시에만 주입 및 활성화**:
+   * 기사 또는 개발자가 상단 호차 카드(예: 4호차, 8호차 등)를 **직접 클릭했을 때만** 해당 기사 정보가 폼에 즉시 바인딩되고 해당 버튼이 파란색(`bg-[#1E60F3] text-white`)으로 활성화됨.
+   * 사용자가 입력 필드를 직접 수정하면 `selectedPresetVehicle`이 `null`로 복귀하여 프리셋 활성 상태가 해제됨.
 
+### 20.3 필수 입력값 유효성 검증(Validation) 보호 ([`components/ProfileModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ProfileModal.tsx))
+1. **누락 필드별 안내 경고 및 인풋 자동 포커싱**:
+   * 성명과 연락처가 모두 비어 있는 상태에서 [설정 저장] 터치 시:
+     * 경고 알림: `"드라이버 성명과 연락처를 입력해 주세요."`
+     * `driverNameRef.current?.focus()` 호출로 성명 인풋 자동 포커스.
+   * 성명만 누락 시: `"드라이버 성명을 입력해 주세요."` 경고 및 포커스.
+   * 연락처만 누락/불완전 시: `"연락처(휴대폰 번호)를 정확히 입력해 주세요. (예: 010-0000-0000)"` 경고 및 `phone2Ref`/`phone3Ref` 포커스.
+   * 번호판 뒷자리 불완전 시: `"차량 번호판 뒷자리는 4자리 숫자로 입력해 주세요."` 경고 및 포커스.
+
+### 20.4 빌드 무결성 검증
+* `npm run build`: Next.js 16.3.5 Turbopack 기준 14/14 라우트 컴파일 에러 **0건** 통과.
 

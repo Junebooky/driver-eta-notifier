@@ -82,15 +82,18 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 }) => {
   const parsed = parseVehicleDetails(profile.vehicleNo);
   const parsedPhone = parsePhoneDetails(profile.phone || profile.mobile);
-  const [hocha, setHocha] = useState(parsed.hocha);
-  const [plateFront, setPlateFront] = useState(parsed.plateFront);
-  const [plateBack, setPlateBack] = useState(parsed.plateBack);
-  const [phone1, setPhone1] = useState(parsedPhone.p1);
-  const [phone2, setPhone2] = useState(parsedPhone.p2);
-  const [phone3, setPhone3] = useState(parsedPhone.p3);
-  const [driverName, setDriverName] = useState(profile.driverName || '');
-  const [passengerName, setPassengerName] = useState(profile.passengerName || '');
+  const isInitialEmpty = isOnboarding || (!profile.driverName && !profile.vehicleNo);
+
+  const [hocha, setHocha] = useState(isInitialEmpty ? '' : parsed.hocha);
+  const [plateFront, setPlateFront] = useState(isInitialEmpty ? '' : (profile.carNumberFront || parsed.plateFront));
+  const [plateBack, setPlateBack] = useState(isInitialEmpty ? '' : (profile.carNumberBack || parsed.plateBack));
+  const [phone1, setPhone1] = useState(isInitialEmpty ? '010' : (profile.phonePart1 || parsedPhone.p1 || '010'));
+  const [phone2, setPhone2] = useState(isInitialEmpty ? '' : (profile.phonePart2 || parsedPhone.p2));
+  const [phone3, setPhone3] = useState(isInitialEmpty ? '' : (profile.phonePart3 || parsedPhone.p3));
+  const [driverName, setDriverName] = useState(isInitialEmpty ? '' : (profile.driverName || ''));
+  const [passengerName, setPassengerName] = useState(isInitialEmpty ? '' : (profile.passengerName || ''));
   const [defaultNavi, setDefaultNavi] = useState<NaviProvider>(profile.defaultNavi || 'tmap');
+  const [selectedPresetVehicle, setSelectedPresetVehicle] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [fleetPresets, setFleetPresets] = useState<FleetPresetDriver[]>(FLEET_PRESET_DRIVERS);
@@ -139,6 +142,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     loadDynamicDrivers();
   }, [isOpen]);
 
+  const driverNameRef = React.useRef<HTMLInputElement>(null);
   const plateFrontRef = React.useRef<HTMLInputElement>(null);
   const plateBackRef = React.useRef<HTMLInputElement>(null);
   const phone1Ref = React.useRef<HTMLInputElement>(null);
@@ -146,6 +150,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const phone3Ref = React.useRef<HTMLInputElement>(null);
 
   const handlePhone1Change = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSelectedPresetVehicle(null);
     const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 3);
     setPhone1(val);
     if (val.length === 3) {
@@ -154,6 +159,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   };
 
   const handlePhone2Change = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSelectedPresetVehicle(null);
     const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 4);
     setPhone2(val);
     if (val.length === 4) {
@@ -162,6 +168,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   };
 
   const handlePhone3Change = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSelectedPresetVehicle(null);
     const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 4);
     setPhone3(val);
     if (val.length === 4) {
@@ -182,6 +189,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   };
 
   const handlePhonePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    setSelectedPresetVehicle(null);
     const pasted = e.clipboardData.getData('text');
     const digits = pasted.replace(/[^0-9]/g, '');
     if (digits.length >= 10) {
@@ -197,17 +205,32 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setIsSaving(false);
-      const initial = parseVehicleDetails(profile.vehicleNo);
-      const initPhone = parsePhoneDetails(profile.phone || profile.mobile);
-      setHocha(initial.hocha);
-      setPlateFront(initial.plateFront);
-      setPlateBack(initial.plateBack);
-      setPhone1(initPhone.p1);
-      setPhone2(initPhone.p2);
-      setPhone3(initPhone.p3);
-      setDriverName(profile.driverName || '');
-      setPassengerName(profile.passengerName || '');
-      setDefaultNavi(profile.defaultNavi || 'tmap');
+      setSelectedPresetVehicle(null);
+
+      const isInitialOrOnboarding = isOnboarding || (!profile.driverName && !profile.vehicleNo);
+      if (isInitialOrOnboarding) {
+        setHocha('');
+        setPlateFront('');
+        setPlateBack('');
+        setPhone1('010');
+        setPhone2('');
+        setPhone3('');
+        setDriverName('');
+        setPassengerName('');
+        setDefaultNavi('tmap');
+      } else {
+        const initial = parseVehicleDetails(profile.vehicleNo);
+        const initPhone = parsePhoneDetails(profile.phone || profile.mobile);
+        setHocha(initial.hocha);
+        setPlateFront(profile.carNumberFront || initial.plateFront);
+        setPlateBack(profile.carNumberBack || initial.plateBack);
+        setPhone1(profile.phonePart1 || initPhone.p1 || '010');
+        setPhone2(profile.phonePart2 || initPhone.p2 || '');
+        setPhone3(profile.phonePart3 || initPhone.p3 || '');
+        setDriverName(profile.driverName || '');
+        setPassengerName(profile.passengerName || '');
+        setDefaultNavi(profile.defaultNavi || 'tmap');
+      }
 
       // Body Scroll Lock: Prevent background page scrolling & rubber-banding
       const originalOverflow = document.body.style.overflow;
@@ -228,8 +251,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     } else {
       setIsMounted(false);
       setIsSaving(false);
+      setSelectedPresetVehicle(null);
     }
-  }, [isOpen, profile]);
+  }, [isOpen, profile, isOnboarding]);
 
   if (!isOpen) return null;
 
@@ -246,10 +270,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   };
 
   const handleHochaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSelectedPresetVehicle(null);
     setHocha(e.target.value.slice(0, 10));
   };
 
   const handlePlateFrontChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSelectedPresetVehicle(null);
     const val = e.target.value;
     // Auto-advance to back input if trailing space is typed
     if (val.endsWith(' ') && val.trim().length > 0) {
@@ -261,6 +287,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   };
 
   const handlePlateBackChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSelectedPresetVehicle(null);
     // Only numeric digits, max 4
     const numeric = e.target.value.replace(/[^0-9]/g, '').slice(0, 4);
     setPlateBack(numeric);
@@ -317,31 +344,58 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
         ? `${phone1.trim()}-${phone2.trim()}-${phone3.trim()}`
         : [phone1.trim(), phone2.trim(), phone3.trim()].filter(Boolean).join('-');
 
-    if (isOnboarding) {
-      const cleanPhone = `${phone1}${phone2}${phone3}`.replace(/[^0-9]/g, '');
-      if (cleanPhone.length < 10) {
-        alert('휴대폰 번호(연락처)를 올바르게 입력해 주십시오. (예: 010-0000-0000)');
-        setIsSaving(false);
-        return;
+    const cleanPhone = `${phone1}${phone2}${phone3}`.replace(/[^0-9]/g, '');
+    const isNameEmpty = !driverName.trim();
+    const isPhoneEmpty = !phone2.trim() && !phone3.trim();
+    const isPhoneIncomplete = !phone2.trim() || !phone3.trim() || cleanPhone.length < 10;
+
+    // 1. Both name and phone are empty/missing
+    if (isNameEmpty && (isPhoneEmpty || isPhoneIncomplete)) {
+      alert('드라이버 성명과 연락처를 입력해 주세요.');
+      driverNameRef.current?.focus();
+      setIsSaving(false);
+      return;
+    }
+
+    // 2. Only name is missing
+    if (isNameEmpty) {
+      alert('드라이버 성명을 입력해 주세요.');
+      driverNameRef.current?.focus();
+      setIsSaving(false);
+      return;
+    }
+
+    // 3. Phone is incomplete
+    if (isPhoneIncomplete) {
+      alert('연락처(휴대폰 번호)를 정확히 입력해 주세요. (예: 010-0000-0000)');
+      if (!phone2.trim()) {
+        phone2Ref.current?.focus();
+      } else {
+        phone3Ref.current?.focus();
       }
-      if (!pBack || pBack.length < 4) {
-        alert('차량 번호판 뒷자리 4자리를 입력해 주십시오.');
-        setIsSaving(false);
-        return;
-      }
-      if (!driverName.trim()) {
-        alert('드라이버 성명을 입력해 주십시오.');
-        setIsSaving(false);
-        return;
-      }
+      setIsSaving(false);
+      return;
+    }
+
+    // 4. Plate back digit validation if provided
+    if (pBack && pBack.length < 4) {
+      alert('차량 번호판 뒷자리는 4자리 숫자로 입력해 주세요.');
+      plateBackRef.current?.focus();
+      setIsSaving(false);
+      return;
     }
 
     const payload: Partial<DriverProfile> = {
       vehicleNo: combinedVehicleNo,
       carNumber: combinedPlate || undefined,
+      carNumberFront: pFront,
+      carNumberBack: pBack,
       driverName: driverName.trim(),
       phone: combinedPhone,
       mobile: combinedPhone,
+      phonePart1: phone1.trim(),
+      phonePart2: phone2.trim(),
+      phonePart3: phone3.trim(),
       passengerName: passengerName.trim(),
       defaultNavi: defaultNavi || 'tmap',
     };
@@ -418,13 +472,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                 {fleetPresets.map((d) => {
-                  const isCurrent = hocha === d.hocha;
+                  const isCurrent = selectedPresetVehicle === d.vehicleNo;
                   return (
                     <button
                       key={d.vehicleNo}
                       type="button"
                       onClick={() => {
                         haptics.lightTap();
+                        setSelectedPresetVehicle(d.vehicleNo);
                         const pObj = parsePhoneDetails(d.phone);
                         setHocha(d.hocha);
                         setPlateFront(d.plateFront);
@@ -466,7 +521,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 pattern="[0-9]*"
                 value={hocha}
                 onChange={handleHochaChange}
-                placeholder="예: 4 (호차 없으면 공란)"
+                placeholder="예: 4"
                 className="w-full pl-3.5 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-[#1E60F3] focus:bg-white font-bold transition-colors"
               />
               <span
@@ -494,7 +549,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   type="text"
                   value={plateFront}
                   onChange={handlePlateFrontChange}
-                  placeholder="예: 142호"
+                  placeholder="142호"
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-[#1E60F3] focus:bg-white font-bold transition-colors"
                 />
               </div>
@@ -510,7 +565,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   value={plateBack}
                   onChange={handlePlateBackChange}
                   onKeyDown={handlePlateBackKeyDown}
-                  placeholder="예: 7811"
+                  placeholder="7811"
                   className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-[#1E60F3] focus:bg-white font-bold transition-colors tracking-widest text-center"
                 />
               </div>
@@ -523,15 +578,17 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               <span className="flex items-center">
                 <User className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 드라이버 성명
               </span>
-              {isOnboarding && (
-                <span className="text-[10px] text-red-500 font-bold">* 필수 입력</span>
-              )}
+              <span className="text-[10px] text-red-500 font-bold">* 필수 입력</span>
             </label>
             <input
+              ref={driverNameRef}
               type="text"
               value={driverName}
-              onChange={(e) => setDriverName(e.target.value)}
-              placeholder="예: 윤태준"
+              onChange={(e) => {
+                setSelectedPresetVehicle(null);
+                setDriverName(e.target.value);
+              }}
+              placeholder="성함 입력"
               className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-[#1E60F3] focus:bg-white font-bold transition-colors"
             />
           </div>
@@ -542,11 +599,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               <span className="flex items-center">
                 <Phone className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 연락처
               </span>
-              {isOnboarding ? (
-                <span className="text-[10px] text-red-500 font-bold">* 필수 입력</span>
-              ) : (
-                <span className="text-[10px] text-slate-400 font-medium">3칸 분할 입력</span>
-              )}
+              <span className="text-[10px] text-red-500 font-bold">* 필수 입력</span>
             </label>
             <div className="grid grid-cols-[1fr_auto_1.2fr_auto_1.2fr] items-center gap-1.5">
               <div className="relative">

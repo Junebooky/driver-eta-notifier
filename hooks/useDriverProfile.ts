@@ -23,20 +23,42 @@ export function getOrCreateDeviceUuid(): string {
   }
 }
 
-const DEFAULT_PROFILE: DriverProfile = {
+export const EMPTY_PROFILE: DriverProfile = {
   id: '',
   vehicleNo: '',
+  carNumberFront: '',
+  carNumberBack: '',
   carNumber: '',
   driverName: '',
+  phonePart1: '010',
+  phonePart2: '',
+  phonePart3: '',
   phone: '',
   mobile: '',
+  passengerName: '',
+  defaultNavi: 'tmap', // 기본 내비는 유지
+  targetChatRoom: '',
+};
+
+export const DEFAULT_DRIVER_PROFILE: DriverProfile = {
+  id: '',
+  vehicleNo: '4호차',
+  carNumberFront: '142호',
+  carNumberBack: '7811',
+  carNumber: '142호 7811',
+  driverName: '윤태준',
+  phonePart1: '010',
+  phonePart2: '6348',
+  phonePart3: '8726',
+  phone: '010-6348-8726',
+  mobile: '010-6348-8726',
   passengerName: '',
   defaultNavi: 'tmap',
   targetChatRoom: '',
 };
 
 export function useDriverProfile() {
-  const [profile, setProfile] = useState<DriverProfile>(DEFAULT_PROFILE);
+  const [profile, setProfile] = useState<DriverProfile>(EMPTY_PROFILE);
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
@@ -56,10 +78,10 @@ export function useDriverProfile() {
           passengerName: parsed.passengerName !== undefined ? parsed.passengerName : prev.passengerName,
         }));
       } else {
-        setProfile((prev) => ({
-          ...prev,
+        setProfile({
+          ...EMPTY_PROFILE,
           id: deviceUuid,
-        }));
+        });
       }
     } catch (e) {
       console.warn('Failed to load profile from localStorage:', e);

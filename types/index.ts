@@ -11,14 +11,20 @@ export interface DriverProfile {
   id?: string;             // e.g. 'driver_4'
   vehicleNo: string;       // e.g. '4호차'
   carNumber?: string;      // e.g. '142호 7811'
+  carNumberFront?: string; // e.g. '142호'
+  carNumberBack?: string;  // e.g. '7811'
   driverName: string;      // e.g. '윤태준'
   phone?: string;          // e.g. '010-6348-8726'
   mobile?: string;         // alias for phone
+  phonePart1?: string;     // e.g. '010'
+  phonePart2?: string;     // e.g. '6348'
+  phonePart3?: string;     // e.g. '8726'
   passengerName: string;   // e.g. 'SOYFAN 외 1명'
   defaultNavi: NaviProvider; // 'tmap' | 'kakao' | 'naver'
   targetChatRoom?: string; // e.g. 'VIP 의전 단톡방'
   homeLocation?: HomeLocation | null;
 }
+
 
 export interface LocationPreset {
   id: string;
