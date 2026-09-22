@@ -98,3 +98,5 @@ export interface FlightInfo {
   // Target location preset for navigation:
   targetPreset: LocationPreset;
 }
+
+export type { ScheduleItem } from '@/data/ferrariSchedules';

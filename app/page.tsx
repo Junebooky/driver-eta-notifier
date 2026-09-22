@@ -17,11 +17,15 @@ import { DepartureTimePickerModal } from '@/components/DepartureTimePickerModal'
 import { PredictionResultSheet } from '@/components/PredictionResultSheet';
 import { GasStationModal } from '@/components/GasStationModal';
 import { FlightModal } from '@/components/FlightModal';
+import { ScheduleTab } from '@/components/ScheduleTab';
+import { Navigation, Calendar } from 'lucide-react';
+import { ScheduleItem, scheduleToPresets } from '@/data/ferrariSchedules';
 import { PredictionResult } from '@/app/api/route/prediction/route';
 import { LocationPreset, ReportMode, RouteEstimate, HomeLocation, GasStation } from '@/types';
 import { DEFAULT_PRESET_LOCATIONS } from '@/utils/presets';
 import { generateReportText } from '@/utils/reportGenerator';
-import { calculateHaversineEstimate, getEtaString } from '@/utils/navigation';
+import { calculateHaversineEstimate, getEtaString, launchNavigationApp } from '@/utils/navigation';
+import { haptics } from '@/utils/haptics';
 
 const CUSTOM_PRESETS_KEY = 'protocol_cockpit_custom_presets_v1';
 const ORDERED_PRESETS_KEY = 'protocol_cockpit_ordered_presets_v2';
@@ -263,6 +267,7 @@ export default function Home() {
 
   const [isInitialized, setIsInitialized] = useState(false);
   const [destination, setDestination] = useState<LocationPreset>(DEFAULT_PRESET_LOCATIONS[0]);
+  const [activeTab, setActiveTab] = useState<'drive' | 'schedule'>('drive');
   const [reportMode, setReportMode] = useState<ReportMode>('DEPARTURE');
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isOnboarding, setIsOnboarding] = useState(false);
@@ -459,6 +464,55 @@ export default function Home() {
     saveRecentPreset(currentDestination);
   };
 
+  // Schedule Tab Action Handlers
+  const handleSelectRouteFromSchedule = useCallback(
+    (originPreset: LocationPreset, destinationPreset: LocationPreset) => {
+      setOrigin(originPreset);
+      setDestination(destinationPreset);
+      fetchRouteEstimate(originPreset, destinationPreset);
+      setActiveTab('drive');
+      haptics.success();
+    },
+    [setOrigin, setDestination, fetchRouteEstimate]
+  );
+
+  const handleNavigateForSchedule = useCallback(
+    (schedule: ScheduleItem) => {
+      const { originPreset, destinationPreset } = scheduleToPresets(schedule);
+      setOrigin(originPreset);
+      setDestination(destinationPreset);
+      fetchRouteEstimate(originPreset, destinationPreset);
+      launchNavigationApp(
+        profile.defaultNavi,
+        { name: destinationPreset.name, lat: destinationPreset.lat, lng: destinationPreset.lng },
+        { name: originPreset.name, lat: originPreset.lat, lng: originPreset.lng }
+      );
+      haptics.heavyTap();
+    },
+    [profile.defaultNavi, setOrigin, setDestination, fetchRouteEstimate]
+  );
+
+  const handleOpenPredictionForSchedule = useCallback(
+    (schedule: ScheduleItem) => {
+      const { originPreset, destinationPreset } = scheduleToPresets(schedule);
+      setOrigin(originPreset);
+      setDestination(destinationPreset);
+      fetchRouteEstimate(originPreset, destinationPreset);
+
+      const [year, month, day] = schedule.date.split('-').map(Number);
+      const [hour, minute] = schedule.pickup_time.split(':').map(Number);
+      if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+        const schedDate = new Date();
+        schedDate.setFullYear(year, month - 1, day);
+        schedDate.setHours(hour || 9, minute || 0, 0, 0);
+        setSimulationDepartureDate(schedDate);
+      }
+      setIsTimePickerOpen(true);
+      haptics.mediumTap();
+    },
+    [setOrigin, setDestination, fetchRouteEstimate]
+  );
+
   // Real-time dynamic report text generated from current state
   const reportPreviewText = useMemo(() => {
     return generateReportText({
@@ -529,69 +583,134 @@ export default function Home() {
           </div>
         )}
 
-        {/* Main Dashboard Content */}
-        <div className="flex-1 p-3.5 space-y-3">
-          {/* 1. Origin / Destination Separate Selection & Bidirectional Swap (⇄) UX */}
-          <OriginDestinationSelector
-            origin={origin}
-            destination={destination}
-            selectionTarget={selectionTarget}
-            onSelectTarget={(target) => setSelectionTarget(target)}
-            onSwap={handleSwapOriginDestination}
-          />
+        {/* Top Segmented Navigation: [ 운행 ] | [ 스케줄 ] (Flawless w-[calc(50%-4px)] sliding bar) */}
+        <div className="px-3.5 pt-2.5 pb-1 bg-white shrink-0">
+          <div className="w-full bg-slate-100 p-1 rounded-full relative flex items-center select-none shadow-inner">
+            {/* Sliding Indicator Pill */}
+            <div
+              className={`w-[calc(50%-4px)] h-[calc(100%-8px)] absolute top-1 left-1 rounded-full bg-[#1E60F3] shadow-[0_4px_14px_rgba(30,96,243,0.35)] transition-transform duration-300 ease-out pointer-events-none transform ${
+                activeTab === 'drive' ? 'translate-x-0' : 'translate-x-full'
+              }`}
+            />
 
-          {/* 2. Simplified High-Density Preset Chips Grid (Slot #1 Home Fixed + 2D Hysteresis Drag) */}
-          <PresetButtons
-            presets={presets}
-            homeLocation={profile.homeLocation}
-            selectedOriginId={origin?.id}
-            selectedDestinationId={destination?.id}
-            selectionTarget={selectionTarget}
-            isAdmin={isAdmin}
-            onSelectPreset={handleSelectPreset}
-            onOpenAddModal={handleOpenAddModal}
-            onOpenHomeModal={() => setIsHomeModalOpen(true)}
-            onOpenFlightModal={() => setIsFlightModalOpen(true)}
-            onOpenGasModal={() => setIsGasModalOpen(true)}
-            onEditPreset={handleOpenEditModal}
-            onDeleteCustomPreset={handleDeleteCustomPreset}
-            onReorderPresets={handleReorderPresets}
-          />
+            {/* Drive Tab Button */}
+            <button
+              type="button"
+              onClick={() => {
+                haptics.lightTap();
+                setActiveTab('drive');
+              }}
+              className="flex-1 py-2 rounded-full z-10 flex items-center justify-center gap-1.5 cursor-pointer transition-colors duration-300"
+            >
+              <Navigation className={`w-3.5 h-3.5 ${activeTab === 'drive' ? 'text-white fill-white' : 'text-slate-400'}`} />
+              <span
+                className={`text-xs tracking-tight transition-colors duration-300 ${
+                  activeTab === 'drive' ? 'text-white font-black' : 'text-slate-500 font-bold hover:text-slate-800'
+                }`}
+              >
+                운행
+              </span>
+            </button>
 
-          {/* 3. Route Estimation & ETA Status (Strictly Real-time TMAP) */}
-          <RouteInfoCard
-            routeEstimate={routeEstimate}
-            isLoadingRoute={isLoadingRoute}
-            isLocating={isLocating}
-            isUndergroundFallback={isUndergroundFallback}
-            gpsErrorMsg={gpsErrorMsg}
-            onRequestGps={requestGpsLocation}
-            onRefreshRoute={() => {
-              if (origin && destination) {
-                fetchRouteEstimate(origin, destination);
-              }
-            }}
-            onOpenTimePicker={() => setIsTimePickerOpen(true)}
-          />
-
-          {/* 4. Report Template Selector */}
-          <ReportTemplateSelector
-            currentMode={reportMode}
-            onSelectMode={(mode) => setReportMode(mode)}
-            reportPreviewText={reportPreviewText}
-          />
-
-          {/* 5. 1-Sec Fast Pass & Kakao Share Action Panel */}
-          <ActionPanel
-            defaultNavi={profile.defaultNavi}
-            origin={origin}
-            destination={destination}
-            routeEstimate={routeEstimate}
-            reportText={reportPreviewText}
-            targetChatRoom={profile.targetChatRoom}
-            profile={profile}
-          />
+            {/* Schedule Tab Button */}
+            <button
+              type="button"
+              onClick={() => {
+                haptics.lightTap();
+                setActiveTab('schedule');
+              }}
+              className="flex-1 py-2 rounded-full z-10 flex items-center justify-center gap-1.5 cursor-pointer transition-colors duration-300 relative"
+            >
+              <Calendar className={`w-3.5 h-3.5 ${activeTab === 'schedule' ? 'text-white' : 'text-slate-400'}`} />
+              <span
+                className={`text-xs tracking-tight transition-colors duration-300 ${
+                  activeTab === 'schedule' ? 'text-white font-black' : 'text-slate-500 font-bold hover:text-slate-800'
+                }`}
+              >
+                스케줄
+              </span>
+              {activeTab !== 'schedule' && (
+                <span className="w-1.5 h-1.5 rounded-full bg-[#1E60F3]" />
+              )}
+            </button>
+          </div>
         </div>
+
+        {/* Tab View Switch: [운행 대시보드] vs [배차 스케줄] */}
+        {activeTab === 'drive' ? (
+          <div className="flex-1 p-3.5 space-y-3 animate-fade-in">
+            {/* 1. Origin / Destination Separate Selection & Bidirectional Swap (⇄) UX */}
+            <OriginDestinationSelector
+              origin={origin}
+              destination={destination}
+              selectionTarget={selectionTarget}
+              onSelectTarget={(target) => setSelectionTarget(target)}
+              onSwap={handleSwapOriginDestination}
+            />
+
+            {/* 2. Simplified High-Density Preset Chips Grid (Slot #1 Home Fixed + 2D Hysteresis Drag) */}
+            <PresetButtons
+              presets={presets}
+              homeLocation={profile.homeLocation}
+              selectedOriginId={origin?.id}
+              selectedDestinationId={destination?.id}
+              selectionTarget={selectionTarget}
+              isAdmin={isAdmin}
+              onSelectPreset={handleSelectPreset}
+              onOpenAddModal={handleOpenAddModal}
+              onOpenHomeModal={() => setIsHomeModalOpen(true)}
+              onOpenFlightModal={() => setIsFlightModalOpen(true)}
+              onOpenGasModal={() => setIsGasModalOpen(true)}
+              onEditPreset={handleOpenEditModal}
+              onDeleteCustomPreset={handleDeleteCustomPreset}
+              onReorderPresets={handleReorderPresets}
+            />
+
+            {/* 3. Route Estimation & ETA Status (Strictly Real-time TMAP) */}
+            <RouteInfoCard
+              routeEstimate={routeEstimate}
+              isLoadingRoute={isLoadingRoute}
+              isLocating={isLocating}
+              isUndergroundFallback={isUndergroundFallback}
+              gpsErrorMsg={gpsErrorMsg}
+              onRequestGps={requestGpsLocation}
+              onRefreshRoute={() => {
+                if (origin && destination) {
+                  fetchRouteEstimate(origin, destination);
+                }
+              }}
+              onOpenTimePicker={() => setIsTimePickerOpen(true)}
+            />
+
+            {/* 4. Report Template Selector */}
+            <ReportTemplateSelector
+              currentMode={reportMode}
+              onSelectMode={(mode) => setReportMode(mode)}
+              reportPreviewText={reportPreviewText}
+            />
+
+            {/* 5. 1-Sec Fast Pass & Kakao Share Action Panel */}
+            <ActionPanel
+              defaultNavi={profile.defaultNavi}
+              origin={origin}
+              destination={destination}
+              routeEstimate={routeEstimate}
+              reportText={reportPreviewText}
+              targetChatRoom={profile.targetChatRoom}
+              profile={profile}
+            />
+          </div>
+        ) : (
+          <div className="flex-1 p-3.5 animate-fade-in">
+            <ScheduleTab
+              profile={profile}
+              onOpenProfileModal={() => setIsProfileModalOpen(true)}
+              onSelectRouteForCockpit={handleSelectRouteFromSchedule}
+              onOpenPredictionForSchedule={handleOpenPredictionForSchedule}
+              onNavigateForSchedule={handleNavigateForSchedule}
+            />
+          </div>
+        )}
       </div>
 
 

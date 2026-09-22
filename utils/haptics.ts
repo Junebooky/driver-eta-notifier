@@ -17,6 +17,45 @@ export const haptics = {
   },
 
   /**
+   * Medium tap feedback for secondary button presses (25ms)
+   */
+  mediumTap: () => {
+    if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate?.(25);
+      } catch (e) {
+        // Safe navigation: ignore
+      }
+    }
+  },
+
+  /**
+   * Heavy tap feedback for primary navigation launches and action executions (40ms)
+   */
+  heavyTap: () => {
+    if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate?.(40);
+      } catch (e) {
+        // Safe navigation: ignore
+      }
+    }
+  },
+
+  /**
+   * Success action confirmation
+   */
+  success: () => {
+    if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate?.([30, 40, 30]);
+      } catch (e) {
+        // Safe navigation: ignore
+      }
+    }
+  },
+
+  /**
    * Success / Fast Pass action confirmation pulse ([30ms, 40ms, 30ms])
    */
   successPulse: () => {
