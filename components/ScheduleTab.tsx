@@ -18,11 +18,11 @@ const THINKING_STEPS = [
 ];
 
 const COCKPIT_ANALYSIS_STAGES = [
-  { step: 1, text: '1단계 · 운항 지시서 이미지 분석 중...', percent: 45 },
-  { step: 2, text: '2단계 · 기사 및 차량 정보 식별 중...', percent: 60 },
-  { step: 3, text: '3단계 · VIP 및 항공편 정보 추출 중...', percent: 72 },
-  { step: 4, text: '4단계 · 기사님의 개인 스케줄 구성 중...', percent: 85 },
-  { step: 5, text: '5단계 · 일정과 이동 정보 교차 검증 중...', percent: 92 },
+  { step: 1, text: '1단계 · 운항 지시서 이미지 분석 중...', percent: 36 },
+  { step: 2, text: '2단계 · 기사 및 차량 정보 식별 중...', percent: 52 },
+  { step: 3, text: '3단계 · VIP 및 항공편 정보 추출 중...', percent: 68 },
+  { step: 4, text: '4단계 · 기사님의 개인 스케줄 구성 중...', percent: 84 },
+  { step: 5, text: '5단계 · 일정과 이동 정보 교차 검증 중...', percent: 94 },
   { step: 6, text: '6단계 · 최종 스케줄 정확도 확인', percent: 97 },
 ];
 
@@ -259,7 +259,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
     setIsAnalyzingSchedule(true);
     setScheduleAnalysisCompleted(false);
     setScheduleAnalysisStage(0);
-    setScheduleAnalysisProgress(30);
+    setScheduleAnalysisProgress(20);
     setIsThinking(false);
     setDisplayedReply('');
     setCopilotResponse({
@@ -269,36 +269,42 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
     });
     setIsCopilotOpen(true);
 
-    // Progressive real-time timing synchronization based on network lifecycle
+    // Balanced equal timing per stage (모든 1~5단계 균등 2.0초 배분)
+    const STAGE_DURATION_MS = 2000;
     const startTime = Date.now();
     const stageInterval = setInterval(() => {
       const elapsed = Date.now() - startTime;
-      if (elapsed < 1500) {
-        // 0s ~ 1.5s (요청 초기): 1단계 · 운항 지시서 이미지 분석 중... (30~45%)
-        const ratio = elapsed / 1500;
-        setScheduleAnalysisStage(0);
-        setScheduleAnalysisProgress(Math.round(30 + ratio * 15));
-      } else if (elapsed < 2500) {
-        // 1.5s ~ 2.5s: 2단계 · 기사 및 차량 정보 식별 중... (50~60%)
-        const ratio = (elapsed - 1500) / 1000;
-        setScheduleAnalysisStage(1);
-        setScheduleAnalysisProgress(Math.round(50 + ratio * 10));
-      } else if (elapsed < 3500) {
-        // 2.5s ~ 3.5s: 3단계 · VIP 및 항공편 정보 추출 중... (60~72%)
-        const ratio = (elapsed - 2500) / 1000;
-        setScheduleAnalysisStage(2);
-        setScheduleAnalysisProgress(Math.round(60 + ratio * 12));
-      } else if (elapsed < 5000) {
-        // 3.5s ~ 5.0s: 4단계 · 기사님의 개인 스케줄 구성 중... (75~85%)
-        const ratio = (elapsed - 3500) / 1500;
-        setScheduleAnalysisStage(3);
-        setScheduleAnalysisProgress(Math.round(75 + ratio * 10));
+      const stageIndex = Math.min(Math.floor(elapsed / STAGE_DURATION_MS), 4);
+      setScheduleAnalysisStage(stageIndex);
+
+      if (stageIndex === 0) {
+        // 0s ~ 2.0s: 1단계 · 운항 지시서 이미지 분석 중... (20% ~ 36%)
+        const ratio = Math.min(elapsed / STAGE_DURATION_MS, 1);
+        setScheduleAnalysisProgress(Math.round(20 + ratio * 16));
+      } else if (stageIndex === 1) {
+        // 2.0s ~ 4.0s: 2단계 · 기사 및 차량 정보 식별 중... (36% ~ 52%)
+        const ratio = Math.min((elapsed - STAGE_DURATION_MS) / STAGE_DURATION_MS, 1);
+        setScheduleAnalysisProgress(Math.round(36 + ratio * 16));
+      } else if (stageIndex === 2) {
+        // 4.0s ~ 6.0s: 3단계 · VIP 및 항공편 정보 추출 중... (52% ~ 68%)
+        const ratio = Math.min((elapsed - STAGE_DURATION_MS * 2) / STAGE_DURATION_MS, 1);
+        setScheduleAnalysisProgress(Math.round(52 + ratio * 16));
+      } else if (stageIndex === 3) {
+        // 6.0s ~ 8.0s: 4단계 · 기사님의 개인 스케줄 구성 중... (68% ~ 84%)
+        const ratio = Math.min((elapsed - STAGE_DURATION_MS * 3) / STAGE_DURATION_MS, 1);
+        setScheduleAnalysisProgress(Math.round(68 + ratio * 16));
       } else {
-        // 5.0s ~ 응답 직전 (대기 구간): 5단계 · 일정과 이동 정보 교차 검증 중... (86~92% Damping 대기)
-        setScheduleAnalysisStage(4);
-        const extraSec = (elapsed - 5000) / 1000;
-        const damped = 86 + 6 * (1 - Math.exp(-extraSec / 4));
-        setScheduleAnalysisProgress(Math.min(Math.round(damped), 92));
+        // 8.0s ~ 10.0s: 5단계 · 일정과 이동 정보 교차 검증 중... (84% ~ 94%)
+        const extraElapsed = elapsed - STAGE_DURATION_MS * 4;
+        if (extraElapsed < STAGE_DURATION_MS) {
+          const ratio = extraElapsed / STAGE_DURATION_MS;
+          setScheduleAnalysisProgress(Math.round(84 + ratio * 10));
+        } else {
+          // 10.0s 이상 네트워크 응답 대기 시 94% ~ 96% 소프트 댐핑
+          const waitSec = (extraElapsed - STAGE_DURATION_MS) / 1000;
+          const damped = 94 + 2 * (1 - Math.exp(-waitSec / 3));
+          setScheduleAnalysisProgress(Math.min(Math.round(damped), 96));
+        }
       }
     }, 100);
     scheduleAnalysisTimerRef.current = stageInterval;
@@ -357,6 +363,13 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
             });
           }
         }
+      }
+
+      // 1~5단계가 고르게 표출되도록 최소 균등 보장 시간(5단계 * 2.0초 = 10초) 유지
+      const totalElapsed = Date.now() - startTime;
+      const minRequiredDuration = STAGE_DURATION_MS * 5;
+      if (totalElapsed < minRequiredDuration) {
+        await new Promise((resolve) => setTimeout(resolve, minRequiredDuration - totalElapsed));
       }
 
       if (scheduleAnalysisTimerRef.current) {
