@@ -32,7 +32,7 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
       <div className="w-full bg-slate-100/90 p-1 rounded-full relative flex items-center select-none shadow-inner">
         {/* Sliding Indicator Pill */}
         <div
-          className={`w-1/2 h-[calc(100%-8px)] absolute top-1 left-1 rounded-full bg-[#1E60F3] shadow-[0_4px_14px_rgba(30,96,243,0.35)] transition-all duration-300 ease-out pointer-events-none transform ${
+          className={`w-[calc(50%-4px)] h-[calc(100%-8px)] absolute top-1 left-1 rounded-full bg-[#1E60F3] shadow-[0_4px_14px_rgba(30,96,243,0.35)] transition-transform duration-300 ease-out pointer-events-none transform ${
             isDeparture ? 'translate-x-0' : 'translate-x-full'
           }`}
         />

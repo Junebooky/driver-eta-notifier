@@ -1,7 +1,7 @@
-# Protocol Cockpit (driver-eta-notifier) - 항공편 출구 미배정 시 접미사 중복('출구 배정 중출구') 버그 수정 완료 보고서
+# Protocol Cockpit (driver-eta-notifier) - 단톡방 보고 모드 셀렉터 슬라이딩 바 오버플로우 버그 수정 완료 보고서
 
 > **평가 일시**: 2026년 9월 22일  
-> **대상 애플리케이션**: Protocol Cockpit (의전 드라이버 전용 스마트 관제 런처 v4.53 - 항공편 출구 미배정 시 '출구 배정 중' 텍스트에 접미사 '출구'가 중복 부착되는 '출구 배정 중출구' 버그 완전 해소 및 출구 정제 유틸 표준화)  
+> **대상 애플리케이션**: Protocol Cockpit (의전 드라이버 전용 스마트 관제 런처 v4.54 - 메인 '단톡방 보고' 세그먼트 컨트롤에서 '도착' 선택 시 인디케이터 바가 우측 패딩을 뚫고 오버플로우되던 기하학 계산 버그 완전 수정)  
 > **프로덕션 배포 URL**: [https://driver-eta-notifier.vercel.app](https://driver-eta-notifier.vercel.app)  
 > **GitHub Repository**: [https://github.com/Junebooky/driver-eta-notifier.git](https://github.com/Junebooky/driver-eta-notifier.git) (`main` 브랜치)  
 
@@ -11,10 +11,8 @@
 
 | 과업 항목 | 구현 상태 | 핵심 조치 및 엔지니어링 구현 세부 사항 |
 | :--- | :---: | :--- |
-| **1. 출구 접미사 중복 방지 포맷터 (`formatExitText`)** | ✅ 완료 | • `utils/flightMapping.ts`에 `formatExitText` 구현.<br>• 입력값에 이미 `'배정'` 키워드가 포함되어 있거나 끝자리가 `'출구'`인 경우 중복 접미사를 붙이지 않으며, 값이 없을 때 `'출구 배정 중'` 반환.<br>• 기존에 오염된 `'출구 배정 중출구'`가 인입되더라도 자체 치유하여 `'출구 배정 중'`으로 정상 환원. |
-| **2. 순수 출구 코드 추출 유틸 (`cleanExitCode`)** | ✅ 완료 | • 입국 데이터 정제 시 `'배정'` 포함 텍스트는 빈 문자열(`''`)로 정규화하여 미배정 상태를 안전하게 식별.<br>• `app/api/flight/route.ts`의 `exitNumber` 매핑 시 `cleanExitCode`를 적용하여 잘못된 문자열 전파 차단. |
-| **3. 입국 게이트 교차 검증 및 UI 안전화 (`FlightModal.tsx` & `route.ts`)** | ✅ 완료 | • `resolveArrivalCrossValidation` 및 `resolveArrivalGate` 전반에 `formatExitText` 및 `cleanExitCode`를 일관되게 적용.<br>• 입국장 안내 문구가 `제N여객터미널 1층 (입국 게이트 배정 중 / 현장 전광판 확인)` 등으로 깨끗하게 렌더링되도록 수정. |
-| **4. 빌드 무결성** | ✅ 완료 | • `npm run build` TypeScript 컴파일 에러 **0건**, Turbopack 최적화 빌드 완료. |
+| **1. 단톡방 보고 모드 셀렉터 바 규격 수정 (`ReportTemplateSelector.tsx`)** | ✅ 완료 | • 기존 `w-1/2` 너비 지정으로 인해 컨테이너 패딩(`p-1`=4px)을 고려하지 못해 `translate-x-full` 적용 시 우측으로 8px 초과 돌출되던 버그 발견.<br>• 인디케이터 바 너비를 `w-[calc(50%-4px)]`로 정밀 수정하여 '출발'과 '도착' 모두 좌우 4px 패딩 영역 내에 1:1 완벽하게 핏되도록 보정.<br>• `transition-transform duration-300 ease-out`을 적용하여 GPU 가속 기반의 부드러운 전환 구현. |
+| **2. 빌드 무결성** | ✅ 완료 | • `npm run build` TypeScript 컴파일 에러 **0건**, Turbopack 최적화 빌드 완료. |
 
 ---
 
