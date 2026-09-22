@@ -422,16 +422,6 @@ export function formatFlightReport(profile: DriverProfile, flight: FlightInfo): 
     lines.push(`• 항공편명: ${flight.flightId} (${flight.airport} ➔ ICN)`);
     lines.push(`• 예상착륙: ${flight.statusText}`);
     lines.push(`• 입국게이트: ${flight.arrivalLocationText}`);
-    const resolution = resolveArrivalCrossValidation(flight.terminal, flight.exitNumber, flight.carousel);
-    const curbside = flight.curbsideGate || resolution.curbsideGate;
-    const parking = flight.recommendedParking || resolution.recommendedParking;
-
-    if (curbside && curbside !== '외부 게이트 확인 필요') {
-      lines.push(`• 영접위치: ${curbside}`);
-    }
-    if (parking && !parking.includes('확인 필요')) {
-      lines.push(`• 추천주차: ${parking}`);
-    }
   } else {
     lines.push(`• 샌딩대상: ${flight.flightId} (ICN ➔ ${flight.airport})`);
     lines.push(`• 예상출발: ${flight.statusText}`);
