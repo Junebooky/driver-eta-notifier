@@ -778,7 +778,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
             {isAnalyzing ? (
               <RefreshCw className="w-4 h-4 text-white animate-spin" />
             ) : (
-              <Send className="w-4 h-4 text-white translate-x-px" />
+              <Send className="w-4 h-4 text-white transform rotate-45" />
             )}
           </button>
         </form>

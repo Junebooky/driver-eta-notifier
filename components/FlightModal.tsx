@@ -47,11 +47,19 @@ export const FlightModal: React.FC<FlightModalProps> = ({
 
   // Auto-trigger search when launched with an initial flight ID (e.g., from ScheduleCard)
   useEffect(() => {
-    if (isOpen && initialFlightId) {
-      const type = initialType || 'arrival';
-      setActiveType(type);
-      setFlightQuery(initialFlightId);
-      handleSearch(initialFlightId, type);
+    if (isOpen) {
+      setIsCopied(false);
+      setErrorMsg(null);
+      if (initialFlightId) {
+        const cleanQuery = initialFlightId.split('(')[0].trim().toUpperCase();
+        const type = initialType || 'arrival';
+        setActiveType(type);
+        setFlightQuery(cleanQuery);
+        handleSearch(cleanQuery, type);
+      } else {
+        setFlightQuery('');
+        setFlight(null);
+      }
     }
   }, [isOpen, initialFlightId, initialType]);
 
@@ -122,17 +130,6 @@ export const FlightModal: React.FC<FlightModalProps> = ({
     window.location.href = 'kakaotalk://';
   };
 
-  // Reset when modal opens with KE012 default preview if empty
-  useEffect(() => {
-    if (isOpen) {
-      setIsCopied(false);
-      setErrorMsg(null);
-      if (!flight && !flightQuery) {
-        setFlightQuery('KE012');
-        handleSearch('KE012', 'arrival');
-      }
-    }
-  }, [isOpen]);
 
   if (!isOpen) return null;
 
