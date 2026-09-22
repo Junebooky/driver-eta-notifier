@@ -81,44 +81,40 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
           <ArrowLeftRight className="w-3.5 h-3.5" />
         </button>
 
-        {/* Destination Card (Solid Cobalt Blue 핵심 타깃) */}
+        {/* Destination Card (2px Cobalt Outline 핵심 타깃) */}
         <div
           onClick={() => {
             haptics.lightTap();
             onSelectTarget('destination');
           }}
-          className={`flex-1 min-w-0 w-full p-3 rounded-2xl border text-left cursor-pointer transition-all duration-150 active:scale-95 ${
+          className={`flex-1 min-w-0 w-full p-3 rounded-2xl text-left cursor-pointer transition-all duration-150 active:scale-95 ${
             selectionTarget === 'destination'
-              ? 'bg-[#1E60F3] text-white border-[#1E60F3] font-bold shadow-sm shadow-blue-500/20 ring-2 ring-blue-300/40'
-              : 'bg-white border-slate-200/80 hover:border-slate-300'
+              ? 'bg-blue-50/20 border-2 border-[#1E60F3] shadow-sm shadow-blue-500/10'
+              : 'bg-white border border-slate-200/80 hover:border-slate-300'
           }`}
         >
           <div className="flex items-center space-x-1.5 min-w-0">
             <div
               className={`w-2 h-2 rounded-full shrink-0 ${
-                selectionTarget === 'destination' ? 'bg-white' : 'bg-[#1E60F3]'
+                selectionTarget === 'destination' ? 'bg-[#1E60F3]' : 'bg-slate-300'
               }`}
             />
             <span
               className={`text-xs font-semibold shrink-0 ${
-                selectionTarget === 'destination' ? 'text-blue-100 font-bold' : 'text-slate-500'
+                selectionTarget === 'destination' ? 'text-[#1E60F3] font-bold' : 'text-slate-500'
               }`}
             >
               목적지
             </span>
           </div>
           <div
-            className={`text-sm font-bold truncate mt-1.5 w-full ${
-              selectionTarget === 'destination' ? 'text-white' : 'text-slate-900'
-            }`}
+            className="text-sm font-bold truncate mt-1.5 w-full text-slate-900"
             title={destination.name}
           >
             {destination.shortName}
           </div>
           <div
-            className={`text-[11px] truncate mt-0.5 font-normal w-full ${
-              selectionTarget === 'destination' ? 'text-blue-100/90' : 'text-slate-400'
-            }`}
+            className="text-[11px] truncate mt-0.5 font-normal w-full text-slate-500"
             title={destination.address || destination.name}
           >
             {destination.address || destination.name}

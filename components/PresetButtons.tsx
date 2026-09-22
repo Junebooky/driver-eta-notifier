@@ -274,7 +274,8 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
   const draggedPreset = dragIndex !== null ? items[dragIndex] : null;
 
   const isTargetDestination = selectionTarget === 'destination';
-  const dynamicHoverClasses = 'hover:border-blue-300 hover:bg-blue-50/50 hover:shadow-xs hover:-translate-y-0.5';
+  const dynamicHoverClasses =
+    'hover:border-[#1E60F3] hover:text-[#1E60F3] hover:bg-blue-50/40 hover:shadow-xs hover:-translate-y-0.5';
   const dynamicTextHoverClass = 'group-hover:text-[#1E60F3]';
 
   return (
@@ -382,7 +383,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
               }}
               className={`w-full h-full min-h-[58px] px-2 py-2.5 rounded-xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-200 group ${
                 isHomeDestination
-                  ? 'bg-[#1E60F3] text-white border-[#1E60F3] font-bold shadow-sm shadow-blue-500/25'
+                  ? 'border-2 border-[#1E60F3] text-[#1E60F3] bg-blue-50/40 font-bold shadow-sm shadow-blue-500/10'
                   : isHomeOrigin
                   ? 'bg-slate-100 text-slate-700 border-slate-300 ring-1 ring-slate-300/60 font-bold shadow-xs'
                   : `bg-white border-slate-200 text-slate-700 font-semibold ${dynamicHoverClasses}`
@@ -393,7 +394,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                 <HomeIcon
                   className={`w-3.5 h-3.5 shrink-0 transition-colors ${
                     isHomeDestination
-                      ? 'text-white'
+                      ? 'text-[#1E60F3]'
                       : isHomeOrigin
                       ? 'text-slate-600'
                       : 'text-slate-500 group-hover:text-[#1E60F3]'
@@ -402,7 +403,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                 <span
                   className={`text-xs tracking-tight truncate font-bold ${
                     isHomeDestination
-                      ? 'text-white'
+                      ? 'text-[#1E60F3]'
                       : isHomeOrigin
                       ? 'text-slate-900'
                       : `text-slate-700 ${dynamicTextHoverClass}`
@@ -413,8 +414,8 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
               </div>
 
               {isHomeDestination && (
-                <span className="text-[10px] font-semibold text-blue-100 flex items-center justify-center gap-1 mt-0.5 leading-none">
-                  <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                <span className="text-[10px] font-bold text-[#1E60F3] flex items-center justify-center gap-1 mt-0.5 leading-none">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#1E60F3]" />
                   도착지
                 </span>
               )}
@@ -472,7 +473,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
           let stateClasses = `bg-white border-slate-200 text-slate-700 font-medium ${dynamicHoverClasses}`;
           if (isDestination) {
             stateClasses =
-              'bg-[#1E60F3] text-white border-[#1E60F3] font-bold shadow-sm shadow-blue-500/25';
+              'border-2 border-[#1E60F3] text-[#1E60F3] bg-blue-50/40 font-bold shadow-sm shadow-blue-500/10';
           } else if (isOrigin) {
             stateClasses =
               'bg-slate-100 text-slate-700 border-slate-300 ring-1 ring-slate-300/60 font-bold shadow-xs';
@@ -507,7 +508,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                 <span
                   className={`text-xs font-bold tracking-tight truncate w-full ${
                     isDestination
-                      ? 'text-white'
+                      ? 'text-[#1E60F3]'
                       : isOrigin
                       ? 'text-slate-900'
                       : `text-slate-700 ${dynamicTextHoverClass}`
@@ -518,8 +519,8 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
 
                 {/* Status Indicator Tag */}
                 {isDestination && (
-                  <span className="text-[10px] font-semibold text-blue-100 flex items-center justify-center gap-1 mt-0.5 leading-none">
-                    <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                  <span className="text-[10px] font-bold text-[#1E60F3] flex items-center justify-center gap-1 mt-0.5 leading-none">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#1E60F3]" />
                     도착지
                   </span>
                 )}

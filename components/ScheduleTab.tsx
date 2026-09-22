@@ -1,12 +1,18 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { DriverProfile, LocationPreset } from '@/types';
 import { ScheduleItem, CONFIRMED_FERRARI_SCHEDULES, scheduleToPresets } from '@/data/ferrariSchedules';
 import { ScheduleCard } from '@/components/ScheduleCard';
 import { EditScheduleModal } from '@/components/EditScheduleModal';
 import { Camera, Send, AlertCircle, Sparkles, RefreshCw, Bot, Copy, Check, X } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
+
+const THINKING_STEPS = [
+  '🔍 배차 데이터베이스 동선 대조 중...',
+  '⚡ 실시간 스케줄 및 VIP 승객 분석 중...',
+  '📋 맞춤 브리핑 작성 중...',
+];
 
 interface ScheduleTabProps {
   profile: DriverProfile;
@@ -40,7 +46,49 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
   } | null>(null);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
+
+  // Copilot Thinking & Typewriter States
+  const [thinkingStep, setThinkingStep] = useState<number | null>(null);
+  const [isThinking, setIsThinking] = useState(false);
+  const [displayedReply, setDisplayedReply] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const typewriterTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const thinkingTimersRef = useRef<NodeJS.Timeout[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const stopTypewriter = () => {
+    if (typewriterTimerRef.current) {
+      clearInterval(typewriterTimerRef.current);
+      typewriterTimerRef.current = null;
+    }
+  };
+
+  const clearThinkingTimers = () => {
+    thinkingTimersRef.current.forEach((t) => clearTimeout(t));
+    thinkingTimersRef.current = [];
+  };
+
+  useEffect(() => {
+    return () => {
+      stopTypewriter();
+      clearThinkingTimers();
+    };
+  }, []);
+
+  const startTypewriter = (fullText: string) => {
+    stopTypewriter();
+    setIsTyping(true);
+    setDisplayedReply('');
+    let idx = 0;
+    typewriterTimerRef.current = setInterval(() => {
+      idx += 1;
+      setDisplayedReply(fullText.slice(0, idx));
+      if (idx >= fullText.length) {
+        stopTypewriter();
+        setIsTyping(false);
+      }
+    }, 18);
+  };
 
   // Profile validation guardrail: Driver must have at least vehicleNo or driverName registered
   const hasProfile = Boolean(profile.vehicleNo?.trim() || profile.driverName?.trim());
@@ -49,21 +97,42 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     haptics.mediumTap();
+    stopTypewriter();
+    clearThinkingTimers();
+
     setIsAnalyzing(true);
+    setIsThinking(true);
+    setThinkingStep(0);
+    setDisplayedReply('');
+    setCopilotResponse({
+      query: '배차표 이미지 업로드 분석',
+      reply: '',
+      type: 'thinking',
+    });
+    setIsCopilotOpen(true);
+
+    const t1 = setTimeout(() => setThinkingStep(1), 450);
+    const t2 = setTimeout(() => setThinkingStep(2), 900);
+    thinkingTimersRef.current = [t1, t2];
+
     setTimeout(() => {
+      setIsThinking(false);
+      setThinkingStep(null);
       setSchedules(CONFIRMED_FERRARI_SCHEDULES);
-      setCopilotResponse({
-        query: '배차표 이미지 업로드 분석',
-        reply: `[배차표 이미지 분석 및 등록 완료]
+      const fullReply = `[배차표 이미지 분석 및 등록 완료]
 • 기사 프로필: ${profile.vehicleNo || '4호차'} • ${profile.driverName || '윤태준'} 기사님
 • 확정 일정: 총 4건의 페라리 VIP 의전 일정이 성공적으로 등록되었습니다.
-• 주요 거점: 인천공항 T1, 조선팰리스 강남, 인제스피디움 호텔/트랙`,
+• 주요 거점: 인천공항 T1, 조선팰리스 강남, 인제스피디움 호텔/트랙`;
+
+      setCopilotResponse({
+        query: '배차표 이미지 업로드 분석',
+        reply: fullReply,
         type: 'schedule_parse',
       });
-      setIsCopilotOpen(true);
+      startTypewriter(fullReply);
       setIsAnalyzing(false);
       haptics.success();
-    }, 850);
+    }, 1350);
   };
 
   // Handle text input submission to Protocol Copilot API
@@ -73,9 +142,30 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
     if (!targetQuery) return;
 
     haptics.mediumTap();
+    stopTypewriter();
+    clearThinkingTimers();
+
     setIsAnalyzing(true);
+    setIsThinking(true);
+    setThinkingStep(0);
+    setDisplayedReply('');
+    setCopilotResponse({
+      query: targetQuery,
+      reply: '',
+      type: 'thinking',
+    });
+    setIsCopilotOpen(true);
+    setInputText('');
+
+    // Progressive Thinking steps timer (approx 1.35s total duration)
+    const t1 = setTimeout(() => setThinkingStep(1), 450);
+    const t2 = setTimeout(() => setThinkingStep(2), 900);
+    thinkingTimersRef.current = [t1, t2];
+
+    const thinkingDelayPromise = new Promise((resolve) => setTimeout(resolve, 1350));
+
     try {
-      const res = await fetch('/api/copilot', {
+      const fetchPromise = fetch('/api/copilot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -89,14 +179,19 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
         }),
       });
 
+      const [res] = await Promise.all([fetchPromise, thinkingDelayPromise]);
       const data = await res.json();
+
+      setIsThinking(false);
+      setThinkingStep(null);
       setCopilotResponse({
         query: targetQuery,
         reply: data.reply,
         type: data.type,
       });
-      setIsCopilotOpen(true);
-      setInputText('');
+
+      // Start Typewriter effect
+      startTypewriter(data.reply);
 
       // Auto-load schedules if user requested schedules or confirmed load
       if (
@@ -111,12 +206,15 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
       haptics.success();
     } catch (err) {
       console.error('Copilot query error:', err);
+      setIsThinking(false);
+      setThinkingStep(null);
+      const errMsg = '기사님, 관제 서버 통신 중 일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주십시오.';
       setCopilotResponse({
         query: targetQuery,
-        reply: '기사님, 관제 서버 통신 중 일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주십시오.',
+        reply: errMsg,
         type: 'error',
       });
-      setIsCopilotOpen(true);
+      startTypewriter(errMsg);
       haptics.errorAlert();
     } finally {
       setIsAnalyzing(false);
@@ -389,8 +487,9 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    if (copilotResponse?.reply) {
-                      navigator.clipboard.writeText(copilotResponse.reply);
+                    const textToCopy = copilotResponse?.reply || displayedReply;
+                    if (textToCopy) {
+                      navigator.clipboard.writeText(textToCopy);
                       setCopySuccess(true);
                       haptics.successPulse();
                       setTimeout(() => setCopySuccess(false), 1500);
@@ -415,6 +514,8 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
                   type="button"
                   onClick={() => {
                     haptics.lightTap();
+                    stopTypewriter();
+                    clearThinkingTimers();
                     setIsCopilotOpen(false);
                   }}
                   className="w-6 h-6 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center cursor-pointer transition-colors"
@@ -430,10 +531,23 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
               💬 <span className="font-bold text-slate-700">질문:</span> {copilotResponse.query}
             </div>
 
-            {/* Formatted Reply Body */}
-            <div className="text-xs text-slate-800 font-normal leading-relaxed whitespace-pre-wrap bg-blue-50/50 p-3 rounded-xl border border-blue-100/70 select-text">
-              {copilotResponse.reply}
-            </div>
+            {/* Thinking Step Indicator (1.2~1.5s Sequential Reasoning Progression) */}
+            {isThinking && (
+              <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-blue-50/80 border border-blue-200/90 text-xs font-bold text-[#1E60F3] animate-pulse">
+                <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0 text-[#1E60F3]" />
+                <span className="truncate">{THINKING_STEPS[thinkingStep ?? 0]}</span>
+              </div>
+            )}
+
+            {/* Formatted Reply Body with Typewriter Streaming Effect */}
+            {!isThinking && displayedReply && (
+              <div className="text-xs text-slate-800 font-normal leading-relaxed whitespace-pre-wrap bg-blue-50/50 p-3 rounded-xl border border-blue-100/70 select-text font-mono">
+                {displayedReply}
+                {isTyping && (
+                  <span className="inline-block w-1.5 h-3.5 bg-[#1E60F3] animate-pulse ml-0.5 align-middle" />
+                )}
+              </div>
+            )}
           </div>
         )}
 

@@ -240,6 +240,7 @@ export async function POST(req: NextRequest) {
     // Check for GEMINI_API_KEY
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
+      console.log('[Gemini Live API: Fallback Triggered] No GEMINI_API_KEY detected. Executing deterministic protocol engine.');
       // Execute intelligent deterministic engine
       const result = processDeterministicFallback(query, { vehicleNo: driverVehicle, driverName, passengerName }, activeSchedules);
       return NextResponse.json(result);
@@ -305,12 +306,14 @@ ${presetSummary}
         throw new Error('Empty response from Gemini model');
       }
 
+      console.log(`[Gemini Live API: Success] Response generated via gemini-1.5-flash for query: "${query.slice(0, 35)}"`);
+
       return NextResponse.json({
         reply,
         type: 'gemini',
       });
     } catch (geminiError) {
-      console.warn('Gemini API call failed, falling back to deterministic engine:', geminiError);
+      console.warn('[Gemini Live API: Fallback Triggered] Google GenAI call failed or error thrown. Activating deterministic fallback:', geminiError);
       const fallbackResult = processDeterministicFallback(
         query,
         { vehicleNo: driverVehicle, driverName, passengerName },
