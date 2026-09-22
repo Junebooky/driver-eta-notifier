@@ -429,8 +429,8 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                 </span>
               )}
               {!isHomeDestination && !isHomeOrigin && (
-                <span className="text-[10px] text-slate-400 font-medium leading-none mt-0.5">
-                  {isManageMode ? '수정' : '거점'}
+                <span className="text-[11px] font-medium tracking-wide text-slate-400 group-hover:text-slate-600 leading-none mt-0.5">
+                  {isManageMode ? '수정' : 'MY'}
                 </span>
               )}
             </button>
@@ -472,6 +472,8 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
           const isOrigin = selectedOriginId === preset.id;
           const isDestination = selectedDestinationId === preset.id;
           const isThisItemDragging = isDragging && dragIndex === index;
+          const isHQ = !preset.vehicle_no && !preset.vehicleNo;
+          const badgeLabel = isHQ ? 'HQ' : 'MY';
 
           let stateClasses = `bg-white border-slate-200 text-slate-700 font-medium ${dynamicHoverClasses}`;
           if (isDestination) {
@@ -534,8 +536,8 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                   </span>
                 )}
                 {!isDestination && !isOrigin && (
-                  <span className="text-[10px] text-slate-400 font-medium leading-none mt-0.5">
-                    {isManageMode ? (preset.isGlobal ? '공통' : '관리') : '거점'}
+                  <span className="text-[11px] font-medium tracking-wide text-slate-400 group-hover:text-slate-600 leading-none mt-0.5">
+                    {isManageMode ? (isHQ ? '공통' : '관리') : badgeLabel}
                   </span>
                 )}
               </button>

@@ -279,3 +279,24 @@ SELECT * FROM cockpit.presets;
 * `npm run build`: Next.js 16.3.5 Turbopack 기준 13/13 라우트 컴파일 에러 0건 성공.
 * 4호차 커스텀 거점 등록 후 1호차 조회 시 100% 완전 격리 검증 완료.
 * 공통 마스터 거점 삭제 차단 및 타 호차 거점 삭제 차단 검증 완료.
+
+---
+
+## 12. [v4.78] 자주 가는 목적지 서브텍스트 교체 (일괄 '거점' ➔ 'HQ' / 'MY' 분기)
+
+### 12.1 구현 내역 ([`components/PresetButtons.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/PresetButtons.tsx))
+1. **소유권 판별 및 라벨 분기 로직 적용**:
+   * 각 거점(`preset`) 렌더링 시 `vehicle_no` 소유권을 기준으로 라벨을 분기:
+     ```typescript
+     const isHQ = !preset.vehicle_no && !preset.vehicleNo; // vehicle_no가 null/undefined이면 본사 공통 마스터
+     const badgeLabel = isHQ ? 'HQ' : 'MY';
+     ```
+2. **서브텍스트 UI 교체**:
+   * 거점 카드 하단에 일괄 고정 출력되던 `거점` 텍스트를 제거하고 `{badgeLabel}`(`HQ` 또는 `MY`)로 대체.
+   * 스타일 규격 적용: `text-[11px] font-medium tracking-wide text-slate-400 group-hover:text-slate-600 leading-none mt-0.5`
+   * 자택 슬롯(`HomePreset`)의 경우 기사 개인 소유 거점이므로 기본 라벨을 `MY`로 표시.
+   * **보존 규칙**: 최하단 `+ 추가` 버튼의 서브텍스트 `신규 거점`은 원형 그대로 보존.
+
+### 12.2 빌드 검증
+* `npm run build`: Next.js 16.3.5 Turbopack 기준 13/13 라우트 컴파일 에러 0건 성공.
+* 본사 공통 마스터 거점(인천공항, 조선팰리스 등) 하단에는 `HQ`, 기사 등록 커스텀 거점 하단에는 `MY` 노출 검증 완료.
