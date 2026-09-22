@@ -18,6 +18,7 @@ import {
   formatFlightReport,
   getCurbsideGate,
   resolveArrivalCrossValidation,
+  formatExitText,
 } from '@/utils/flightMapping';
 
 interface FlightModalProps {

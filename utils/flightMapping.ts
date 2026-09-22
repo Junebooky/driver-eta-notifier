@@ -196,6 +196,31 @@ export interface ArrivalGateResolution {
 }
 
 /**
+ * Safely formats exit text without duplicate '출구' suffix or '출구 배정 중출구'
+ */
+export function formatExitText(exit?: string | null): string {
+  if (!exit) return '출구 배정 중';
+  const trimmed = exit.trim();
+  if (trimmed.includes('배정') || trimmed === '출구') {
+    return '출구 배정 중';
+  }
+  if (trimmed.endsWith('출구')) {
+    return trimmed;
+  }
+  return `${trimmed}출구`;
+}
+
+/**
+ * Extracts pure exit code (e.g. 'A', 'B', '') without '출구' suffix or assignment keywords
+ */
+export function cleanExitCode(rawExit?: string | null): string {
+  if (!rawExit) return '';
+  const trimmed = rawExit.trim();
+  if (trimmed.includes('배정')) return '';
+  return trimmed.replace(/출구$/, '').trim().toUpperCase();
+}
+
+/**
  * Cross-validates arrival exit, curbside gate, and recommended short-term ground parking
  * based on the physical layout of Incheon Airport T1 and T2 baggage carousels.
  */
@@ -205,7 +230,7 @@ export function resolveArrivalCrossValidation(
   rawBaggage?: string | null
 ): ArrivalGateResolution {
   const cleanTerminal = (terminal || '').replace(/\s+/g, '');
-  const cleanExit = (rawExit || '').trim().replace(/출구$/, '').trim().toUpperCase();
+  const cleanExit = cleanExitCode(rawExit);
   const digits = (rawBaggage || '').replace(/[^0-9]/g, '');
   const beltNum = digits ? parseInt(digits, 10) : NaN;
   const hasBelt = !isNaN(beltNum) && beltNum > 0;
@@ -248,7 +273,7 @@ export function resolveArrivalCrossValidation(
     }
 
     return {
-      exit: cleanExit ? `${cleanExit}출구` : '출구 배정 중',
+      exit: '출구 배정 중',
       curbsideGate: '외부 게이트 확인 필요',
       recommendedParking: 'T2 단기 지상주차장',
     };
@@ -288,28 +313,28 @@ export function resolveArrivalCrossValidation(
   // Fallback based on exit for T1
   if (['A', 'B'].includes(cleanExit)) {
     return {
-      exit: `${cleanExit}출구`,
+      exit: formatExitText(cleanExit),
       curbsideGate: '외부 1~4번 게이트',
       recommendedParking: 'P1 단기 지상 (A·B구역)',
     };
   }
   if (['C', 'D'].includes(cleanExit)) {
     return {
-      exit: `${cleanExit}출구`,
+      exit: formatExitText(cleanExit),
       curbsideGate: '외부 5~10번 게이트',
       recommendedParking: 'P1·P2 단기 지상 (C·D구역)',
     };
   }
   if (['E', 'F'].includes(cleanExit)) {
     return {
-      exit: `${cleanExit}출구`,
+      exit: formatExitText(cleanExit),
       curbsideGate: '외부 11~14번 게이트',
       recommendedParking: 'P2 단기 지상 (F·G구역)',
     };
   }
 
   return {
-    exit: cleanExit ? `${cleanExit}출구` : '출구 배정 중',
+    exit: cleanExit ? formatExitText(cleanExit) : '출구 배정 중',
     curbsideGate: '외부 게이트 확인 필요',
     recommendedParking: 'P1·P2 단기 지상주차장',
   };
@@ -324,13 +349,14 @@ export function resolveArrivalGate(
   carousel?: string | null
 ): string {
   const resolution = resolveArrivalCrossValidation(terminal, exitNumber, carousel);
-  const cleanCarousel = (carousel || '').trim();
-  const exitFormatted = resolution.exit;
+  const cleanCarousel = (carousel || '').replace(/[^0-9]/g, '').trim();
+  const exitFormatted = formatExitText(resolution.exit);
+  const isAssigned = exitFormatted !== '출구 배정 중';
 
-  if (exitFormatted && exitFormatted !== '출구 배정 중' && cleanCarousel) {
+  if (isAssigned && cleanCarousel) {
     return `${terminal} 1층 (${exitFormatted} / 수하물 ${cleanCarousel}번)`;
   }
-  if (exitFormatted && exitFormatted !== '출구 배정 중') {
+  if (isAssigned) {
     return `${terminal} 1층 (${exitFormatted} / 수하물 수취대 배정 중)`;
   }
   if (cleanCarousel) {

@@ -1,7 +1,7 @@
-# Protocol Cockpit (driver-eta-notifier) - 단톡방 보고서 경량화(영접위치·추천주차 제외) 및 티켓 UI 최적화 완료 보고서
+# Protocol Cockpit (driver-eta-notifier) - 항공편 출구 미배정 시 접미사 중복('출구 배정 중출구') 버그 수정 완료 보고서
 
 > **평가 일시**: 2026년 9월 22일  
-> **대상 애플리케이션**: Protocol Cockpit (의전 드라이버 전용 스마트 관제 런처 v4.52 - 단톡방 표준 보고서에서 '영접위치' 및 '추천주차'를 제외하여 필수 승객/운항 정보 중심으로 경량화, 티켓 카드 내부에는 기사 전용 영접 게이트 및 단기 주차장 안내 유지)  
+> **대상 애플리케이션**: Protocol Cockpit (의전 드라이버 전용 스마트 관제 런처 v4.53 - 항공편 출구 미배정 시 '출구 배정 중' 텍스트에 접미사 '출구'가 중복 부착되는 '출구 배정 중출구' 버그 완전 해소 및 출구 정제 유틸 표준화)  
 > **프로덕션 배포 URL**: [https://driver-eta-notifier.vercel.app](https://driver-eta-notifier.vercel.app)  
 > **GitHub Repository**: [https://github.com/Junebooky/driver-eta-notifier.git](https://github.com/Junebooky/driver-eta-notifier.git) (`main` 브랜치)  
 
@@ -11,9 +11,10 @@
 
 | 과업 항목 | 구현 상태 | 핵심 조치 및 엔지니어링 구현 세부 사항 |
 | :--- | :---: | :--- |
-| **1. 단톡방 표준 보고서 경량화 (`formatFlightReport`)** | ✅ 완료 | • 단톡방 보고서 복사 텍스트에서 불필요한 노이즈가 될 수 있는 **`• 영접위치` 및 `• 추천주차` 항목을 전면 제외**.<br>• 호차, 운전원, 담당승객, 편명(노선), 예상착륙, 입국게이트(터미널/출구/수하물) 등 공유 대상자에게 필수적인 핵심 운항 지표만 간결하게 출력하도록 정제. |
-| **2. 티켓 카드 내 운전원 전용 안내 유지 (`FlightModal.tsx`)** | ✅ 완료 | • 모달 상단의 보딩패스 티켓 상세 카드에는 기사가 현장에서 참조할 수 있는 **`영접 위치: 외부 N번 게이트`** 및 **`추천 주차: P1/P2 단기 지상 (구역)`**을 그대로 유지하여 기사 단독 편의성 보장. |
-| **3. 빌드 무결성** | ✅ 완료 | • `npm run build` TypeScript 컴파일 에러 **0건**, Turbopack 최적화 빌드 완료. |
+| **1. 출구 접미사 중복 방지 포맷터 (`formatExitText`)** | ✅ 완료 | • `utils/flightMapping.ts`에 `formatExitText` 구현.<br>• 입력값에 이미 `'배정'` 키워드가 포함되어 있거나 끝자리가 `'출구'`인 경우 중복 접미사를 붙이지 않으며, 값이 없을 때 `'출구 배정 중'` 반환.<br>• 기존에 오염된 `'출구 배정 중출구'`가 인입되더라도 자체 치유하여 `'출구 배정 중'`으로 정상 환원. |
+| **2. 순수 출구 코드 추출 유틸 (`cleanExitCode`)** | ✅ 완료 | • 입국 데이터 정제 시 `'배정'` 포함 텍스트는 빈 문자열(`''`)로 정규화하여 미배정 상태를 안전하게 식별.<br>• `app/api/flight/route.ts`의 `exitNumber` 매핑 시 `cleanExitCode`를 적용하여 잘못된 문자열 전파 차단. |
+| **3. 입국 게이트 교차 검증 및 UI 안전화 (`FlightModal.tsx` & `route.ts`)** | ✅ 완료 | • `resolveArrivalCrossValidation` 및 `resolveArrivalGate` 전반에 `formatExitText` 및 `cleanExitCode`를 일관되게 적용.<br>• 입국장 안내 문구가 `제N여객터미널 1층 (입국 게이트 배정 중 / 현장 전광판 확인)` 등으로 깨끗하게 렌더링되도록 수정. |
+| **4. 빌드 무결성** | ✅ 완료 | • `npm run build` TypeScript 컴파일 에러 **0건**, Turbopack 최적화 빌드 완료. |
 
 ---
 
