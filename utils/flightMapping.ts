@@ -239,24 +239,6 @@ export function resolveArrivalCrossValidation(
 
   // 제2여객터미널 (T2)
   if (isT2) {
-    if (hasBelt) {
-      if (beltNum >= 1 && beltNum <= 10) {
-        return {
-          exit: 'A출구',
-          curbsideGate: '외부 1~3번 게이트',
-          recommendedParking: 'T2 서편 단기 지상',
-        };
-      }
-      if (beltNum >= 11 && beltNum <= 20) {
-        return {
-          exit: 'B출구',
-          curbsideGate: '외부 4~5번 게이트',
-          recommendedParking: 'T2 동편 단기 지상',
-        };
-      }
-    }
-
-    // Fallback based on exit for T2
     if (cleanExit === 'A') {
       return {
         exit: 'A출구',
@@ -274,43 +256,14 @@ export function resolveArrivalCrossValidation(
 
     return {
       exit: '출구 배정 중',
-      curbsideGate: '외부 게이트 확인 필요',
-      recommendedParking: 'T2 단기 지상주차장',
+      curbsideGate: '',
+      recommendedParking: hasBelt
+        ? (beltNum <= 10 ? 'T2 서편 단기 지상' : 'T2 동편 단기 지상')
+        : 'T2 단기 지상주차장',
     };
   }
 
   // 제1여객터미널 (T1)
-  if (hasBelt) {
-    // 수하물 1~10번: 동편 구역 -> A·B출구 / 외부 1~4번 게이트 / 추천 주차: P1 단기 지상 (A·B구역)
-    if (beltNum >= 1 && beltNum <= 10) {
-      const exit = cleanExit === 'A' ? 'A출구' : cleanExit === 'B' ? 'B출구' : (beltNum <= 5 ? 'A출구' : 'B출구');
-      return {
-        exit,
-        curbsideGate: '외부 1~4번 게이트',
-        recommendedParking: 'P1 단기 지상 (A·B구역)',
-      };
-    }
-    // 수하물 11~15번: 중앙 구역 -> C·D출구 / 외부 5~10번 게이트 / 추천 주차: P1·P2 단기 지상 (C·D구역)
-    if (beltNum >= 11 && beltNum <= 15) {
-      const exit = cleanExit === 'D' ? 'D출구' : 'C출구';
-      return {
-        exit,
-        curbsideGate: '외부 5~10번 게이트',
-        recommendedParking: 'P1·P2 단기 지상 (C·D구역)',
-      };
-    }
-    // 수하물 16~23번: 서편 구역 -> E·F출구 / 외부 11~14번 게이트 / 추천 주차: P2 단기 지상 (F·G구역)
-    if (beltNum >= 16 && beltNum <= 23) {
-      const exit = cleanExit === 'F' ? 'F출구' : 'E출구';
-      return {
-        exit,
-        curbsideGate: '외부 11~14번 게이트',
-        recommendedParking: 'P2 단기 지상 (F·G구역)',
-      };
-    }
-  }
-
-  // Fallback based on exit for T1
   if (['A', 'B'].includes(cleanExit)) {
     return {
       exit: formatExitText(cleanExit),
@@ -334,9 +287,15 @@ export function resolveArrivalCrossValidation(
   }
 
   return {
-    exit: cleanExit ? formatExitText(cleanExit) : '출구 배정 중',
-    curbsideGate: '외부 게이트 확인 필요',
-    recommendedParking: 'P1·P2 단기 지상주차장',
+    exit: '출구 배정 중',
+    curbsideGate: '',
+    recommendedParking: hasBelt
+      ? (beltNum <= 10
+        ? 'P1 단기 지상 (A·B구역)'
+        : beltNum <= 15
+        ? 'P1·P2 단기 지상 (C·D구역)'
+        : 'P2 단기 지상 (F·G구역)')
+      : 'P1·P2 단기 지상주차장',
   };
 }
 
@@ -348,28 +307,31 @@ export function resolveArrivalGate(
   exitNumber?: string | null,
   carousel?: string | null
 ): string {
-  const resolution = resolveArrivalCrossValidation(terminal, exitNumber, carousel);
+  const cleanExit = cleanExitCode(exitNumber);
   const cleanCarousel = (carousel || '').replace(/[^0-9]/g, '').trim();
-  const exitFormatted = formatExitText(resolution.exit);
-  const isAssigned = exitFormatted !== '출구 배정 중';
+  const hasExit = Boolean(cleanExit);
+  const hasCarousel = Boolean(cleanCarousel);
 
-  if (isAssigned && cleanCarousel) {
-    return `${terminal} 1층 (${exitFormatted} / 수하물 ${cleanCarousel}번)`;
+  if (hasExit && hasCarousel) {
+    return `${terminal} 1층 (${cleanExit}출구 / 수하물 ${cleanCarousel}번)`;
   }
-  if (isAssigned) {
-    return `${terminal} 1층 (${exitFormatted} / 수하물 수취대 배정 중)`;
+  if (hasExit) {
+    return `${terminal} 1층 (${cleanExit}출구 / 수하물 배정 중)`;
   }
-  if (cleanCarousel) {
-    return `${terminal} 1층 (수하물 ${cleanCarousel}번 / 출구 배정 중)`;
+  if (hasCarousel) {
+    return `${terminal} 1층 (출구 배정 중 / 수하물 ${cleanCarousel}번)`;
   }
-  return `${terminal} 1층 (입국 게이트 배정 중 / 현장 전광판 확인)`;
+  return `${terminal} 1층 (출구 배정 중 / 수하물 배정 중)`;
 }
 
 /**
  * Maps arrival exit (A~F) to 1st floor curbside pickup gate
  */
-export function getCurbsideGate(terminal: string, exit: string): string {
-  return resolveArrivalCrossValidation(terminal, exit).curbsideGate;
+export function getCurbsideGate(terminal: string, exit?: string | null): string {
+  if (!exit) return '';
+  const cleanExit = cleanExitCode(exit);
+  if (!cleanExit) return '';
+  return resolveArrivalCrossValidation(terminal, cleanExit).curbsideGate;
 }
 
 /**

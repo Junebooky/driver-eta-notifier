@@ -433,29 +433,40 @@ export const FlightModal: React.FC<FlightModalProps> = ({
 
                   {/* Bold Location Highlight */}
                   <div className="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-2xs">
-                    <p className="text-base font-black text-slate-900 tracking-tight leading-snug">
-                      {flight.type === 'departure'
-                        ? flight.departureLocationText
-                        : flight.arrivalLocationText}
-                    </p>
+                    {flight.type === 'departure' ? (
+                      <p className="text-base font-black text-slate-900 tracking-tight leading-snug">
+                        {flight.departureLocationText}
+                      </p>
+                    ) : (
+                      <p
+                        className={`text-base tracking-tight leading-snug ${
+                          !flight.exitNumber && !flight.exit
+                            ? 'font-medium text-slate-500'
+                            : 'font-black text-slate-900'
+                        }`}
+                      >
+                        {flight.arrivalLocationText}
+                      </p>
+                    )}
 
                     {/* 입국 시 1층 도로변 외부 영접 게이트 및 추천 단기 주차 구역 노출 */}
                     {flight.type === 'arrival' &&
                       (() => {
-                        const resolution = resolveArrivalCrossValidation(
-                          flight.terminal,
-                          flight.exitNumber,
-                          flight.carousel
-                        );
-                        const curbside = flight.curbsideGate || resolution.curbsideGate;
-                        const parking = flight.recommendedParking || resolution.recommendedParking;
+                        const exitCode = flight.exitNumber || flight.exit;
+                        const hasExit = Boolean(exitCode);
+                        const curbside = hasExit ? (flight.curbsideGate || getCurbsideGate(flight.terminal, exitCode!)) : null;
+                        const parking = flight.recommendedParking;
 
                         return (
                           <div className="space-y-1 mt-1.5">
-                            {curbside && curbside !== '외부 게이트 확인 필요' && (
+                            {hasExit && curbside ? (
                               <p className="text-xs text-slate-500 font-medium">
                                 영접 위치:{' '}
                                 <span className="font-bold text-[#1E60F3]">{curbside}</span>
+                              </p>
+                            ) : (
+                              <p className="text-xs text-slate-500 font-medium">
+                                영접 위치: 착륙 1~2시간 전 자동 확정
                               </p>
                             )}
                             {parking && !parking.includes('확인 필요') && (

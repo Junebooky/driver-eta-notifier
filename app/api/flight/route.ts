@@ -252,15 +252,25 @@ export async function GET(req: NextRequest) {
     );
 
     // Arrival specific mapping
-    const gateNumber = bestItem.gatenumber || '';
-    const carousel = bestItem.carousel || '';
-    const rawExitNumber = bestItem.exitnumber || '';
+    const rawGate = bestItem.gatenumber ? String(bestItem.gatenumber).trim() : '';
+    const rawCarousel = bestItem.carousel ? String(bestItem.carousel).trim() : '';
+    const rawExitNumber = bestItem.exitnumber ? String(bestItem.exitnumber).trim() : '';
 
-    const arrivalResolution = resolveArrivalCrossValidation(terminal, rawExitNumber, carousel);
-    const correctedExit = arrivalResolution.exit;
-    const curbsideGate = arrivalResolution.curbsideGate;
+    // Flight arrival timing check:
+    // Real Incheon Airport baggage carousel and exit gate allocations occur 1-2 hours before landing.
+    // For tomorrow's lookahead (+1 day) or distant future flights where remark/gate is unassigned,
+    // any leftover/static API carousel/exit values are strictly suppressed to null.
+    const isUnassignedTiming = isTomorrow || (!bestItem.remark && !rawGate);
+
+    const carousel = (isUnassignedTiming || !rawCarousel || rawCarousel === 'null') ? null : rawCarousel;
+    const cleanExit = (isUnassignedTiming || !rawExitNumber || rawExitNumber === 'null') ? null : (cleanExitCode(rawExitNumber) || null);
+    const exitNumber = cleanExit;
+    const exit = cleanExit;
+
+    const arrivalResolution = resolveArrivalCrossValidation(terminal, cleanExit, carousel);
+    const curbsideGate = cleanExit ? (getCurbsideGate(terminal, cleanExit) || null) : null;
     const recommendedParking = arrivalResolution.recommendedParking;
-    const arrivalLocationText = resolveArrivalGate(terminal, correctedExit, carousel);
+    const arrivalLocationText = resolveArrivalGate(terminal, cleanExit, carousel);
 
     const targetPreset = getFlightLocationPreset(terminal, type);
 
@@ -278,9 +288,10 @@ export async function GET(req: NextRequest) {
       terminalId: isT2 ? 'P03' : 'P01',
       isTomorrow,
       flightDate,
-      gateNumber,
+      gateNumber: rawGate || null,
       carousel,
-      exitNumber: cleanExitCode(correctedExit) || undefined,
+      exit,
+      exitNumber,
       curbsideGate,
       recommendedParking,
       arrivalLocationText,

@@ -90,11 +90,12 @@ export interface FlightInfo {
   isTomorrow?: boolean;          // true if flight is tomorrow (+1 day lookahead)
   flightDate?: string;           // 'YYYY-MM-DD'
   // Arrival specific:
-  gateNumber?: string;           // e.g. '249'
-  carousel?: string;             // e.g. '5'
-  exitNumber?: string;           // e.g. 'A'
-  curbsideGate?: string;         // e.g. '외부 11~14번 게이트'
-  recommendedParking?: string;   // e.g. 'P2 단기 지상 (F·G구역)'
+  gateNumber?: string | null;           // e.g. '249'
+  carousel?: string | null;             // e.g. '5'
+  exit?: string | null;                 // e.g. 'A'
+  exitNumber?: string | null;           // e.g. 'A'
+  curbsideGate?: string | null;         // e.g. '외부 11~14번 게이트'
+  recommendedParking?: string | null;   // e.g. 'P2 단기 지상 (F·G구역)'
   arrivalLocationText: string;   // e.g. '제2여객터미널 A출구 (수하물 5번)'
   // Departure specific:
   checkinRange?: string;         // e.g. 'A B C D'

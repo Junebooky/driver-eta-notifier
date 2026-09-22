@@ -605,6 +605,36 @@ SELECT * FROM cockpit.presets;
 ### 18.5 빌드 검증
 * `npm run build`: Next.js 16.3.5 Turbopack 기준 14/14 라우트 컴파일 에러 **0건** 완료.
 
+---
+
+## 19. [v4.88] 항공편 실시간 수하물/출구 미배정 상태 처리 및 가짜 Fallback 제거
+
+> **평가 일시**: 2026년 9월 22일  
+> **상태**: 착륙 전 수하물/출구 가짜 Fallback 데이터(7번, A출구 등) 완전 제거, 미배정 시 차분한 슬레이트 그레이 안내 카피 및 실제 배정 시에만 게이트 매핑 활성화 완료  
+
+### 19.1 API 라우트 가짜 Fallback 제거 ([`app/api/flight/route.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/api/flight/route.ts))
+1. **미배정 데이터 null 명시화**:
+   * 공항공사 API의 `carousel` 또는 `exitnumber`가 없거나 빈 값(`null`, `""`, `undefined`), 또는 익일 운항(+1 day lookahead / 착륙 수 시간 전)으로 미배정 상태일 때:
+     * 임의의 숫자('7번', '18번')나 알파벳('A', 'E')을 강제로 주입하던 로직을 전면 제거.
+     * 클라이언트에 반드시 `carousel: null`, `exit: null`, `exitNumber: null`, `curbsideGate: null`로 정직하게 전달.
+
+### 19.2 FlightModal 미배정 상태 UI 렌더링 ([`components/FlightModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/FlightModal.tsx), [`utils/flightMapping.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/utils/flightMapping.ts))
+1. **수하물 및 출구 배정 대기 안내 표기**:
+   * 출구 및 수하물 정보 미배정 시:
+     * 메인 카드 헤더: **`제N여객터미널 1층 (출구 배정 중 / 수하물 배정 중)`**
+     * 메인 카드 서브: **`영접 위치: 착륙 1~2시간 전 자동 확정`**
+     * 스타일: 미확정 상태를 기사가 명확히 인지할 수 있도록 은은하고 품격 있는 슬레이트 그레이 톤(`text-slate-500 font-medium`)으로 렌더링.
+2. **실제 데이터 수신 시에만 게이트 매핑 활성화**:
+   * 공항공사 API로부터 `exit` 정보가 실제로 수신되었을 때만 `getCurbsideGate`를 호출하여 `외부 N~M번 게이트`(`font-bold text-[#1E60F3]`) 파란색 강조 배지를 노출.
+
+### 19.3 실시간 API 통신 및 빌드 검증
+* **KE722(내일 도착편) 조회 검증**:
+  * API 응답: `carousel: null`, `exit: null`, `exitNumber: null`, `curbsideGate: null`.
+  * UI 표출: `제2여객터미널 1층 (출구 배정 중 / 수하물 배정 중)` 및 `영접 위치: 착륙 1~2시간 전 자동 확정` 정상 표출 확인.
+* **빌드 무결성**:
+  * `npm run build`: Next.js 16.3.5 Turbopack 기준 14/14 라우트 컴파일 에러 **0건** 완료.
+
+
 
 
 
