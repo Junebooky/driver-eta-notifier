@@ -4,6 +4,7 @@ import {
   resolveTerminal,
   resolveDepartureDoor,
   resolveArrivalGate,
+  resolveArrivalCrossValidation,
   getCurbsideGate,
   computeFlightStatusText,
   getFlightLocationPreset,
@@ -252,9 +253,13 @@ export async function GET(req: NextRequest) {
     // Arrival specific mapping
     const gateNumber = bestItem.gatenumber || '';
     const carousel = bestItem.carousel || '';
-    const exitNumber = bestItem.exitnumber || '';
-    const arrivalLocationText = resolveArrivalGate(terminal, exitNumber, carousel);
-    const curbsideGate = exitNumber ? getCurbsideGate(terminal, exitNumber) : undefined;
+    const rawExitNumber = bestItem.exitnumber || '';
+
+    const arrivalResolution = resolveArrivalCrossValidation(terminal, rawExitNumber, carousel);
+    const correctedExit = arrivalResolution.exit;
+    const curbsideGate = arrivalResolution.curbsideGate;
+    const recommendedParking = arrivalResolution.recommendedParking;
+    const arrivalLocationText = resolveArrivalGate(terminal, correctedExit, carousel);
 
     const targetPreset = getFlightLocationPreset(terminal, type);
 
@@ -274,8 +279,9 @@ export async function GET(req: NextRequest) {
       flightDate,
       gateNumber,
       carousel,
-      exitNumber,
+      exitNumber: correctedExit.replace(/출구$/, ''),
       curbsideGate,
+      recommendedParking,
       arrivalLocationText,
       checkinRange,
       suggestedDoor,

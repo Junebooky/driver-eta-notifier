@@ -14,7 +14,11 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
-import { formatFlightReport, getCurbsideGate } from '@/utils/flightMapping';
+import {
+  formatFlightReport,
+  getCurbsideGate,
+  resolveArrivalCrossValidation,
+} from '@/utils/flightMapping';
 
 interface FlightModalProps {
   isOpen: boolean;
@@ -152,9 +156,8 @@ export const FlightModal: React.FC<FlightModalProps> = ({
           <div className="w-full bg-slate-100 p-1 rounded-2xl relative flex items-center select-none shadow-inner">
             {/* Sliding Indicator Pill */}
             <div
-              className={`w-[calc(50%-4px)] h-[calc(100%-8px)] absolute top-1 left-1 rounded-xl bg-[#1E60F3] shadow-[0_4px_14px_rgba(30,96,243,0.35)] transition-transform duration-300 ease-out pointer-events-none transform ${
-                isArrival ? 'translate-x-0' : 'translate-x-full'
-              }`}
+              className={`w-[calc(50%-4px)] h-[calc(100%-8px)] absolute top-1 left-1 rounded-xl bg-[#1E60F3] shadow-[0_4px_14px_rgba(30,96,243,0.35)] transition-transform duration-300 ease-out pointer-events-none transform ${isArrival ? 'translate-x-0' : 'translate-x-full'
+                }`}
             />
 
             {/* Arrival Tab Button */}
@@ -168,9 +171,8 @@ export const FlightModal: React.FC<FlightModalProps> = ({
               className="flex-1 py-2 rounded-xl z-10 flex items-center justify-center cursor-pointer transition-colors duration-300"
             >
               <span
-                className={`text-xs tracking-tight transition-colors duration-300 ${
-                  isArrival ? 'text-white font-black' : 'text-slate-500 font-bold hover:text-slate-800'
-                }`}
+                className={`text-xs tracking-tight transition-colors duration-300 ${isArrival ? 'text-white font-black' : 'text-slate-500 font-bold hover:text-slate-800'
+                  }`}
               >
                 입국
               </span>
@@ -187,9 +189,8 @@ export const FlightModal: React.FC<FlightModalProps> = ({
               className="flex-1 py-2 rounded-xl z-10 flex items-center justify-center cursor-pointer transition-colors duration-300"
             >
               <span
-                className={`text-xs tracking-tight transition-colors duration-300 ${
-                  !isArrival ? 'text-white font-black' : 'text-slate-500 font-bold hover:text-slate-800'
-                }`}
+                className={`text-xs tracking-tight transition-colors duration-300 ${!isArrival ? 'text-white font-black' : 'text-slate-500 font-bold hover:text-slate-800'
+                  }`}
               >
                 출국
               </span>
@@ -321,21 +322,21 @@ export const FlightModal: React.FC<FlightModalProps> = ({
                     const theme =
                       flight.diffMinutes >= 10
                         ? {
-                            colorHex: '#E11D48',
-                            textColor: 'text-rose-600',
-                            bgBadge:
-                              'bg-gradient-to-r from-rose-50/20 via-rose-100/40 to-rose-50/10 text-rose-600 border border-current/10',
-                            statusText: `+${flight.diffMinutes}분 지연`,
-                          }
+                          colorHex: '#E11D48',
+                          textColor: 'text-rose-600',
+                          bgBadge:
+                            'bg-gradient-to-r from-rose-50/20 via-rose-100/40 to-rose-50/10 text-rose-600 border border-current/10',
+                          statusText: `+${flight.diffMinutes}분 지연`,
+                        }
                         : flight.diffMinutes <= -5
-                        ? {
+                          ? {
                             colorHex: '#059669',
                             textColor: 'text-emerald-600',
                             bgBadge:
                               'bg-gradient-to-r from-emerald-50/20 via-emerald-100/40 to-emerald-50/10 text-emerald-600 border border-current/10',
                             statusText: `${flight.diffMinutes}분 조기`,
                           }
-                        : {
+                          : {
                             colorHex: '#1E60F3',
                             textColor: 'text-[#1E60F3]',
                             bgBadge:
@@ -426,18 +427,32 @@ export const FlightModal: React.FC<FlightModalProps> = ({
                         : flight.arrivalLocationText}
                     </p>
 
-                    {/* 입국 시 1층 도로변 외부 영접 게이트 노출 */}
+                    {/* 입국 시 1층 도로변 외부 영접 게이트 및 추천 단기 주차 구역 노출 */}
                     {flight.type === 'arrival' &&
                       (() => {
-                        const curbside =
-                          flight.curbsideGate ||
-                          (flight.exitNumber ? getCurbsideGate(flight.terminal, flight.exitNumber) : undefined);
-                        if (!curbside || curbside === '외부 게이트 확인 필요') return null;
+                        const resolution = resolveArrivalCrossValidation(
+                          flight.terminal,
+                          flight.exitNumber,
+                          flight.carousel
+                        );
+                        const curbside = flight.curbsideGate || resolution.curbsideGate;
+                        const parking = flight.recommendedParking || resolution.recommendedParking;
+
                         return (
-                          <p className="text-xs text-slate-500 font-medium mt-1.5">
-                            영접 위치:{' '}
-                            <span className="font-bold text-[#1E60F3]">{curbside}</span>
-                          </p>
+                          <div className="space-y-1 mt-1.5">
+                            {curbside && curbside !== '외부 게이트 확인 필요' && (
+                              <p className="text-xs text-slate-500 font-medium">
+                                영접 위치:{' '}
+                                <span className="font-bold text-[#1E60F3]">{curbside}</span>
+                              </p>
+                            )}
+                            {parking && !parking.includes('확인 필요') && (
+                              <p className="text-xs text-slate-500 font-medium">
+                                추천 주차:{' '}
+                                <span className="font-bold text-slate-800">{parking}</span>
+                              </p>
+                            )}
+                          </div>
                         );
                       })()}
 

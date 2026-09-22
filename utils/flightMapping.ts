@@ -189,6 +189,132 @@ export function resolveDepartureDoor(
   };
 }
 
+export interface ArrivalGateResolution {
+  exit: string;              // 예: "E출구"
+  curbsideGate: string;      // 예: "외부 11~14번 게이트"
+  recommendedParking: string; // 예: "P2 단기 지상 (F·G구역)"
+}
+
+/**
+ * Cross-validates arrival exit, curbside gate, and recommended short-term ground parking
+ * based on the physical layout of Incheon Airport T1 and T2 baggage carousels.
+ */
+export function resolveArrivalCrossValidation(
+  terminal: string,
+  rawExit?: string | null,
+  rawBaggage?: string | null
+): ArrivalGateResolution {
+  const cleanTerminal = (terminal || '').replace(/\s+/g, '');
+  const cleanExit = (rawExit || '').trim().replace(/출구$/, '').trim().toUpperCase();
+  const digits = (rawBaggage || '').replace(/[^0-9]/g, '');
+  const beltNum = digits ? parseInt(digits, 10) : NaN;
+  const hasBelt = !isNaN(beltNum) && beltNum > 0;
+
+  const isT2 = cleanTerminal.includes('제2') || cleanTerminal.includes('T2');
+
+  // 제2여객터미널 (T2)
+  if (isT2) {
+    if (hasBelt) {
+      if (beltNum >= 1 && beltNum <= 10) {
+        return {
+          exit: 'A출구',
+          curbsideGate: '외부 1~3번 게이트',
+          recommendedParking: 'T2 서편 단기 지상',
+        };
+      }
+      if (beltNum >= 11 && beltNum <= 20) {
+        return {
+          exit: 'B출구',
+          curbsideGate: '외부 4~5번 게이트',
+          recommendedParking: 'T2 동편 단기 지상',
+        };
+      }
+    }
+
+    // Fallback based on exit for T2
+    if (cleanExit === 'A') {
+      return {
+        exit: 'A출구',
+        curbsideGate: '외부 1~3번 게이트',
+        recommendedParking: 'T2 서편 단기 지상',
+      };
+    }
+    if (cleanExit === 'B') {
+      return {
+        exit: 'B출구',
+        curbsideGate: '외부 4~5번 게이트',
+        recommendedParking: 'T2 동편 단기 지상',
+      };
+    }
+
+    return {
+      exit: cleanExit ? `${cleanExit}출구` : '출구 배정 중',
+      curbsideGate: '외부 게이트 확인 필요',
+      recommendedParking: 'T2 단기 지상주차장',
+    };
+  }
+
+  // 제1여객터미널 (T1)
+  if (hasBelt) {
+    // 수하물 1~10번: 동편 구역 -> A·B출구 / 외부 1~4번 게이트 / 추천 주차: P1 단기 지상 (A·B구역)
+    if (beltNum >= 1 && beltNum <= 10) {
+      const exit = cleanExit === 'A' ? 'A출구' : cleanExit === 'B' ? 'B출구' : (beltNum <= 5 ? 'A출구' : 'B출구');
+      return {
+        exit,
+        curbsideGate: '외부 1~4번 게이트',
+        recommendedParking: 'P1 단기 지상 (A·B구역)',
+      };
+    }
+    // 수하물 11~15번: 중앙 구역 -> C·D출구 / 외부 5~10번 게이트 / 추천 주차: P1·P2 단기 지상 (C·D구역)
+    if (beltNum >= 11 && beltNum <= 15) {
+      const exit = cleanExit === 'D' ? 'D출구' : 'C출구';
+      return {
+        exit,
+        curbsideGate: '외부 5~10번 게이트',
+        recommendedParking: 'P1·P2 단기 지상 (C·D구역)',
+      };
+    }
+    // 수하물 16~23번: 서편 구역 -> E·F출구 / 외부 11~14번 게이트 / 추천 주차: P2 단기 지상 (F·G구역)
+    if (beltNum >= 16 && beltNum <= 23) {
+      const exit = cleanExit === 'F' ? 'F출구' : 'E출구';
+      return {
+        exit,
+        curbsideGate: '외부 11~14번 게이트',
+        recommendedParking: 'P2 단기 지상 (F·G구역)',
+      };
+    }
+  }
+
+  // Fallback based on exit for T1
+  if (['A', 'B'].includes(cleanExit)) {
+    return {
+      exit: `${cleanExit}출구`,
+      curbsideGate: '외부 1~4번 게이트',
+      recommendedParking: 'P1 단기 지상 (A·B구역)',
+    };
+  }
+  if (['C', 'D'].includes(cleanExit)) {
+    return {
+      exit: `${cleanExit}출구`,
+      curbsideGate: '외부 5~10번 게이트',
+      recommendedParking: 'P1·P2 단기 지상 (C·D구역)',
+    };
+  }
+  if (['E', 'F'].includes(cleanExit)) {
+    return {
+      exit: `${cleanExit}출구`,
+      curbsideGate: '외부 11~14번 게이트',
+      recommendedParking: 'P2 단기 지상 (F·G구역)',
+    };
+  }
+
+  return {
+    exit: cleanExit ? `${cleanExit}출구` : '출구 배정 중',
+    curbsideGate: '외부 게이트 확인 필요',
+    recommendedParking: 'P1·P2 단기 지상주차장',
+  };
+}
+
 /**
  * Intelligent Arrival Gate Mapping (입국장 게이트 매핑)
  */
@@ -197,15 +323,18 @@ export function resolveArrivalGate(
   exitNumber?: string | null,
   carousel?: string | null
 ): string {
-  const cleanExit = (exitNumber || '').trim();
+  const resolution = resolveArrivalCrossValidation(terminal, exitNumber, carousel);
   const cleanCarousel = (carousel || '').trim();
-  const exitFormatted = cleanExit ? (cleanExit.endsWith('출구') ? cleanExit : `${cleanExit}출구`) : '';
+  const exitFormatted = resolution.exit;
 
-  if (exitFormatted && cleanCarousel) {
+  if (exitFormatted && exitFormatted !== '출구 배정 중' && cleanCarousel) {
     return `${terminal} 1층 (${exitFormatted} / 수하물 ${cleanCarousel}번)`;
   }
-  if (exitFormatted) {
+  if (exitFormatted && exitFormatted !== '출구 배정 중') {
     return `${terminal} 1층 (${exitFormatted} / 수하물 수취대 배정 중)`;
+  }
+  if (cleanCarousel) {
+    return `${terminal} 1층 (수하물 ${cleanCarousel}번 / 출구 배정 중)`;
   }
   return `${terminal} 1층 (입국 게이트 배정 중 / 현장 전광판 확인)`;
 }
@@ -214,25 +343,7 @@ export function resolveArrivalGate(
  * Maps arrival exit (A~F) to 1st floor curbside pickup gate
  */
 export function getCurbsideGate(terminal: string, exit: string): string {
-  const cleanTerminal = terminal.replace(/\s+/g, '');
-  const cleanExit = exit.trim().replace(/출구$/, '').trim().toUpperCase();
-
-  // 제2여객터미널 (T2)
-  if (cleanTerminal.includes('제2') || cleanTerminal.includes('T2')) {
-    if (cleanExit === 'A') return '외부 1~3번 게이트';
-    if (cleanExit === 'B') return '외부 4~5번 게이트';
-    return '외부 게이트 확인 필요';
-  }
-
-  // 제1여객터미널 (T1)
-  if (cleanTerminal.includes('제1') || cleanTerminal.includes('T1')) {
-    if (['A', 'B'].includes(cleanExit)) return '외부 1~4번 게이트';
-    if (['C', 'D'].includes(cleanExit)) return '외부 5~10번 게이트';
-    if (['E', 'F'].includes(cleanExit)) return '외부 11~14번 게이트';
-    return '외부 게이트 확인 필요';
-  }
-
-  return '외부 게이트 확인 필요';
+  return resolveArrivalCrossValidation(terminal, exit).curbsideGate;
 }
 
 /**
@@ -311,9 +422,15 @@ export function formatFlightReport(profile: DriverProfile, flight: FlightInfo): 
     lines.push(`• 항공편명: ${flight.flightId} (${flight.airport} ➔ ICN)`);
     lines.push(`• 예상착륙: ${flight.statusText}`);
     lines.push(`• 입국게이트: ${flight.arrivalLocationText}`);
-    const curbside = flight.curbsideGate || (flight.exitNumber ? getCurbsideGate(flight.terminal, flight.exitNumber) : '');
+    const resolution = resolveArrivalCrossValidation(flight.terminal, flight.exitNumber, flight.carousel);
+    const curbside = flight.curbsideGate || resolution.curbsideGate;
+    const parking = flight.recommendedParking || resolution.recommendedParking;
+
     if (curbside && curbside !== '외부 게이트 확인 필요') {
       lines.push(`• 영접위치: ${curbside}`);
+    }
+    if (parking && !parking.includes('확인 필요')) {
+      lines.push(`• 추천주차: ${parking}`);
     }
   } else {
     lines.push(`• 샌딩대상: ${flight.flightId} (ICN ➔ ${flight.airport})`);
