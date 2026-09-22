@@ -16,13 +16,6 @@ const DRIVER_DEFAULTS: Record<string, any> = {
     phone: '010-7231-8340',
     default_navi: 'tmap',
   },
-  '1호차': {
-    vehicle_no: '1호차',
-    car_number: '110하 1035',
-    driver_name: '김의전',
-    phone: '010-1111-2222',
-    default_navi: 'tmap',
-  },
   '2호차': {
     vehicle_no: '2호차',
     car_number: '112하 3456',

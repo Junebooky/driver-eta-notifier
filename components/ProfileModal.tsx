@@ -371,7 +371,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   DEV
                 </span>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+              <div className="grid grid-cols-3 gap-1.5">
                 {FLEET_PRESET_DRIVERS.map((d) => {
                   const isCurrent = hocha === d.hocha;
                   return (
@@ -391,8 +391,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                         setDefaultNavi(d.defaultNavi);
                       }}
                       className={`p-2 rounded-xl text-left border transition-all cursor-pointer ${isCurrent
-                          ? 'bg-[#1E60F3] text-white border-[#1E60F3] shadow-xs'
-                          : 'bg-white text-slate-700 border-slate-200 hover:border-[#1E60F3]/50 hover:bg-slate-50'
+                        ? 'bg-[#1E60F3] text-white border-[#1E60F3] shadow-xs'
+                        : 'bg-white text-slate-700 border-slate-200 hover:border-[#1E60F3]/50 hover:bg-slate-50'
                         }`}
                     >
                       <div className="text-xs font-black truncate">{d.vehicleNo}</div>

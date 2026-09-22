@@ -531,6 +531,37 @@ SELECT * FROM cockpit.presets;
 * KE 623 출국 조회 API 통신 검증 완료 (`scheduleTimeFormatted: 18:50`, `airport: 마닐라`).
 * 8호차 9월 20일 스케줄 `15:30 픽업` 및 `flightType: departure` 데이터 정합성 검증 완료.
 
+---
+
+## 17. [v4.86] 1호차 '김의전' 테스트 데이터 및 프리셋 전면 삭제
+
+> **평가 일시**: 2026년 9월 22일  
+> **상태**: 1호차(김의전) 테스트용 DB 레코드 영구 삭제 및 프리셋/스위처 코드 전면 정리 완료  
+
+### 17.1 Supabase DB 영구 삭제 (`cockpit` 스키마)
+1. **스케줄 테이블 (`cockpit.schedules`)**:
+   * `DELETE FROM cockpit.schedules WHERE vehicle_no = '1호차';` 실행 완료. (잔여 0건)
+2. **드라이버 테이블 (`cockpit.drivers`)**:
+   * `DELETE FROM cockpit.drivers WHERE vehicle_no = '1호차' OR driver_name = '김의전';` 실행 완료.
+   * 현재 활성 기사는 `4호차 (윤태준)`, `8호차 (민성호)`, `2호차 (박의전)` 3대로 완전 정돈.
+
+### 17.2 코드베이스 및 UI 정리
+1. **프리셋 상수 및 백엔드 라우트**:
+   * [`utils/constants.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/utils/constants.ts): `FLEET_PRESET_DRIVERS`에서 1호차(김의전 / 110하 1035 / 010-1111-2222) 객체 삭제.
+   * [`app/api/driver/route.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/api/driver/route.ts): `DRIVER_DEFAULTS`에서 1호차 항목 삭제.
+   * [`app/api/schedules/route.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/api/schedules/route.ts): `VEHICLE_1_FALLBACK` 및 1호차 fallback 분기 완전 삭제.
+2. **프론트엔드 UI 컴포넌트**:
+   * [`components/ScheduleTab.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ScheduleTab.tsx):
+     * 상단 호차 스위처 탭 목록에서 1호차 제거 ➔ `[4호차 | 8호차 | 2호차 | 전체]`로 재편.
+     * `vehicleCounts` 상태 및 실시간 집계 로직에서 1호차 항목 정리.
+   * [`components/ProfileModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ProfileModal.tsx):
+     * 1초 기사 전환 프리셋 그리드를 `grid-cols-3`으로 변경하여 남은 3대(4, 8, 2호차)가 균형 있게 노출되도록 최적화.
+
+### 17.3 빌드 및 정합성 검증
+* `npm run build`: Next.js 16.3.5 Turbopack 기준 14/14 라우트 컴파일 에러 **0건** 통과.
+* Supabase `cockpit.drivers` 및 `cockpit.schedules` 조회 쿼리로 1호차 데이터 부재 검증 완료.
+
+
 
 
 

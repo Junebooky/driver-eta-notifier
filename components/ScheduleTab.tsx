@@ -67,7 +67,6 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
   const [vehicleCounts, setVehicleCounts] = useState<Record<string, number>>({
     '4호차': 0,
     '8호차': 0,
-    '1호차': 0,
     '2호차': 0,
     'all': 0,
   });
@@ -81,7 +80,6 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
           const counts: Record<string, number> = {
             '4호차': 0,
             '8호차': 0,
-            '1호차': 0,
             '2호차': 0,
             'all': data.schedules.length,
           };
@@ -549,7 +547,6 @@ ${scheduleItemsFormatted}
           {[
             { id: '4호차', label: '4호차' },
             { id: '8호차', label: '8호차' },
-            { id: '1호차', label: '1호차' },
             { id: '2호차', label: '2호차' },
             { id: 'all', label: '전체' },
           ].map((v) => {

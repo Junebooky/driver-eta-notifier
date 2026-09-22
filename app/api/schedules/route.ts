@@ -59,33 +59,6 @@ function mapDbRowToScheduleItem(row: DbScheduleRow): ScheduleItem {
   };
 }
 
-// Fallback seed schedules for 1호차 to guarantee vehicle isolation even before DB migration
-const VEHICLE_1_FALLBACK: ScheduleItem[] = [
-  {
-    id: '11111111-0001-4000-a000-000000000001',
-    vehicle_no: '1호차',
-    date: '2026-09-17',
-    dateLabel: '9월 17일 (목)',
-    pickup_time: '11:00',
-    dropoff_time: null,
-    time_display: '11:00 착륙',
-    origin_name: '인천공항 T2',
-    origin_address: '인천 중구 제2소화물통로 255',
-    origin_preset_id: '3c7e416a-2222-4222-a222-222222222222',
-    origin_lat: 37.4691,
-    origin_lng: 126.4344,
-    destination_name: '시그니엘 서울',
-    destination_address: '서울 송파구 올림픽로 300 롯데월드타워',
-    destination_preset_id: '3c7e416a-4444-4444-a444-444444444444',
-    destination_lat: 37.5126,
-    destination_lng: 127.1025,
-    status: 'confirmed',
-    passenger: 'FERRARI GLOBAL VIP (2명)',
-    flight: 'KE 012',
-    notes: '1호차 전담 VIP 영접 의전 • T2 입국장 피켓 대기',
-  },
-];
-
 // GET: Fetch schedules isolated by vehicle_no (STRICT RULE 1: Vehicle Isolation, or 'all' for dispatcher view)
 export async function GET(req: NextRequest) {
   try {
@@ -104,18 +77,8 @@ export async function GET(req: NextRequest) {
     if (error) {
       // Graceful fallback when table is not yet created or migration pending
       console.warn(`[Supabase Schedules: Fallback] Table query failed (${error.message}). Using vehicle-isolated fallback for ${vehicleNo}.`);
-      if (vehicleNo === '4호차') {
+      if (vehicleNo === '4호차' || vehicleNo === 'all') {
         return NextResponse.json({ schedules: CONFIRMED_FERRARI_SCHEDULES, fallback: true });
-      }
-      if (vehicleNo === '1호차') {
-        return NextResponse.json({ schedules: VEHICLE_1_FALLBACK, fallback: true });
-      }
-      if (vehicleNo === 'all') {
-        const allFallback = [
-          ...CONFIRMED_FERRARI_SCHEDULES.map((s) => ({ ...s, vehicle_no: '4호차' })),
-          ...VEHICLE_1_FALLBACK,
-        ].sort((a, b) => a.date.localeCompare(b.date) || a.pickup_time.localeCompare(b.pickup_time));
-        return NextResponse.json({ schedules: allFallback, fallback: true });
       }
       return NextResponse.json({ schedules: [], fallback: true });
     }
@@ -123,9 +86,6 @@ export async function GET(req: NextRequest) {
     if (!data || data.length === 0) {
       if (vehicleNo === '4호차') {
         return NextResponse.json({ schedules: CONFIRMED_FERRARI_SCHEDULES, fallback: true });
-      }
-      if (vehicleNo === '1호차') {
-        return NextResponse.json({ schedules: VEHICLE_1_FALLBACK, fallback: true });
       }
       return NextResponse.json({ schedules: [], fallback: false });
     }
