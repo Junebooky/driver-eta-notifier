@@ -106,16 +106,19 @@ export default function Home() {
         }
 
         // 2. Fetch Driver Profile by Vehicle from Supabase (STRICT RULE 1: Vehicle Isolation)
-        const dRes = await fetch(`/api/driver?vehicle_no=${encodeURIComponent(profile.vehicleNo || '4호차')}`);
-        if (dRes.ok) {
-          const dData = await dRes.json();
-          if (dData.driver) {
-            const { vehicle_no, driver_name, default_navi } = dData.driver;
-            updateProfile({
-              vehicleNo: vehicle_no ?? profile.vehicleNo,
-              driverName: driver_name ?? profile.driverName,
-              defaultNavi: default_navi ?? profile.defaultNavi,
-            });
+        if (!profile.driverName || !profile.vehicleNo) {
+          const dRes = await fetch(`/api/driver?vehicle_no=${encodeURIComponent(profile.vehicleNo || '4호차')}`);
+          if (dRes.ok) {
+            const dData = await dRes.json();
+            if (dData.driver) {
+              const { vehicle_no, car_number, driver_name, default_navi } = dData.driver;
+              const fullVehicleNo = car_number ? `${vehicle_no} ${car_number}` : vehicle_no;
+              updateProfile({
+                vehicleNo: fullVehicleNo,
+                driverName: driver_name || profile.driverName,
+                defaultNavi: default_navi || profile.defaultNavi || 'tmap',
+              });
+            }
           }
         }
       } catch (err) {
@@ -126,7 +129,7 @@ export default function Home() {
     if (isLoaded) {
       syncSupabaseFleet();
     }
-  }, [isLoaded, profile.vehicleNo]);
+  }, [isLoaded]);
 
   // Save Presets to LocalStorage
   const savePresetsToStorage = (updated: LocationPreset[]) => {

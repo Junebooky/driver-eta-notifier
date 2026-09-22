@@ -28,26 +28,29 @@ const DRIVER_DEFAULTS: Record<string, any> = {
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const vehicleNo = searchParams.get('vehicle_no') || searchParams.get('id') || '4호차';
+    const rawVehicleNo = searchParams.get('vehicle_no') || searchParams.get('id') || '4호차';
 
-    // Normalize vehicle query (e.g. 'driver_4' -> '4호차')
-    const normalizedVehicle = vehicleNo.includes('1')
-      ? '1호차'
-      : vehicleNo.includes('2')
-      ? '2호차'
-      : '4호차';
-
-    let query = supabaseAdmin.from('drivers').select('*');
-    if (searchParams.get('vehicle_no')) {
-      query = query.eq('vehicle_no', searchParams.get('vehicle_no')!);
+    // Accurately extract hocha (e.g. '4호차 142호 7811' -> '4호차')
+    let targetVehicleNo = '4호차';
+    const hochaMatch = rawVehicleNo.match(/(\d+호차)/);
+    if (hochaMatch) {
+      targetVehicleNo = hochaMatch[1];
+    } else if (rawVehicleNo.includes('1호차') || rawVehicleNo.startsWith('1')) {
+      targetVehicleNo = '1호차';
+    } else if (rawVehicleNo.includes('2호차') || rawVehicleNo.startsWith('2')) {
+      targetVehicleNo = '2호차';
     } else {
-      query = query.eq('vehicle_no', normalizedVehicle);
+      targetVehicleNo = '4호차';
     }
 
-    const { data, error } = await query.maybeSingle();
+    const { data, error } = await supabaseAdmin
+      .from('drivers')
+      .select('*')
+      .eq('vehicle_no', targetVehicleNo)
+      .maybeSingle();
 
     if (error || !data) {
-      const fallbackDriver = DRIVER_DEFAULTS[normalizedVehicle] || DRIVER_DEFAULTS['4호차'];
+      const fallbackDriver = DRIVER_DEFAULTS[targetVehicleNo] || DRIVER_DEFAULTS['4호차'];
       return NextResponse.json({ driver: fallbackDriver, fallback: true });
     }
 
