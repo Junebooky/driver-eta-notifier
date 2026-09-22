@@ -274,9 +274,10 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
   const draggedPreset = dragIndex !== null ? items[dragIndex] : null;
 
   const isTargetDestination = selectionTarget === 'destination';
-  const dynamicHoverClasses =
-    'hover:border-[#1E60F3] hover:text-[#1E60F3] hover:bg-blue-50/40 hover:shadow-xs hover:-translate-y-0.5';
-  const dynamicTextHoverClass = 'group-hover:text-[#1E60F3]';
+  const dynamicHoverClasses = isTargetDestination
+    ? 'hover:border-[#1E60F3] hover:text-[#1E60F3] hover:bg-blue-50/30 hover:shadow-xs hover:-translate-y-0.5'
+    : 'hover:border-slate-400 hover:text-slate-800 hover:bg-slate-50/80 hover:shadow-xs hover:-translate-y-0.5';
+  const dynamicTextHoverClass = isTargetDestination ? 'group-hover:text-[#1E60F3]' : 'group-hover:text-slate-800';
 
   return (
     <div className="w-full bg-white border border-slate-100/80 rounded-2xl p-4 shadow-[0_8px_25px_rgba(30,96,243,0.06)] select-none space-y-3">
@@ -383,9 +384,9 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
               }}
               className={`w-full h-full min-h-[58px] px-2 py-2.5 rounded-xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-200 group ${
                 isHomeDestination
-                  ? 'border-2 border-[#1E60F3] text-[#1E60F3] bg-blue-50/40 font-bold shadow-sm shadow-blue-500/10'
+                  ? 'border-2 border-[#1E60F3] text-[#1E60F3] bg-white font-bold shadow-sm shadow-blue-500/10'
                   : isHomeOrigin
-                  ? 'bg-slate-100 text-slate-700 border-slate-300 ring-1 ring-slate-300/60 font-bold shadow-xs'
+                  ? 'bg-slate-50/80 text-slate-800 border-slate-300/90 ring-1 ring-slate-200/60 font-bold shadow-2xs'
                   : `bg-white border-slate-200 text-slate-700 font-semibold ${dynamicHoverClasses}`
               } ${isManageMode ? 'border-dashed border-[#1E60F3]/60' : ''}`}
               title={`${homePreset.name} (${homePreset.address})`}
@@ -397,7 +398,9 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                       ? 'text-[#1E60F3]'
                       : isHomeOrigin
                       ? 'text-slate-600'
-                      : 'text-slate-500 group-hover:text-[#1E60F3]'
+                      : isTargetDestination
+                      ? 'text-slate-500 group-hover:text-[#1E60F3]'
+                      : 'text-slate-500 group-hover:text-slate-700'
                   }`}
                 />
                 <span
@@ -473,10 +476,10 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
           let stateClasses = `bg-white border-slate-200 text-slate-700 font-medium ${dynamicHoverClasses}`;
           if (isDestination) {
             stateClasses =
-              'border-2 border-[#1E60F3] text-[#1E60F3] bg-blue-50/40 font-bold shadow-sm shadow-blue-500/10';
+              'border-2 border-[#1E60F3] text-[#1E60F3] bg-white font-bold shadow-sm shadow-blue-500/10';
           } else if (isOrigin) {
             stateClasses =
-              'bg-slate-100 text-slate-700 border-slate-300 ring-1 ring-slate-300/60 font-bold shadow-xs';
+              'bg-slate-50/80 text-slate-800 border-slate-300/90 ring-1 ring-slate-200/60 font-bold shadow-2xs';
           }
 
           if (isManageMode) {
@@ -549,7 +552,11 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
             haptics.lightTap();
             onOpenAddModal();
           }}
-          className="w-full h-full min-h-[58px] py-2.5 px-2 rounded-xl border border-dashed border-slate-300 hover:border-blue-300/80 bg-white hover:bg-blue-50/40 hover:shadow-xs hover:-translate-y-0.5 text-slate-400 hover:text-[#1E60F3] text-xs font-medium flex flex-col justify-between items-center active:scale-95 transition-all duration-200 cursor-pointer"
+          className={`w-full h-full min-h-[58px] py-2.5 px-2 rounded-xl border border-dashed border-slate-300 ${
+            isTargetDestination
+              ? 'hover:border-blue-300/80 hover:bg-blue-50/40 hover:text-[#1E60F3]'
+              : 'hover:border-slate-400 hover:bg-slate-50/80 hover:text-slate-800'
+          } bg-white hover:shadow-xs hover:-translate-y-0.5 text-slate-400 text-xs font-medium flex flex-col justify-between items-center active:scale-95 transition-all duration-200 cursor-pointer`}
           title="새 거점 검색 및 등록"
         >
           <div className="flex items-center justify-center gap-1 w-full">

@@ -425,11 +425,10 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
                     haptics.lightTap();
                     setSelectedDateFilter(tab.key);
                   }}
-                  className={`px-3 py-1.5 rounded-full text-xs font-bold shrink-0 transition-all cursor-pointer ${
-                    isSelected
-                      ? 'bg-[#1E60F3] text-white shadow-xs'
-                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                  }`}
+                  className={`px-3 py-1.5 rounded-full text-xs font-bold shrink-0 transition-all cursor-pointer ${isSelected
+                    ? 'bg-[#1E60F3] text-white shadow-xs'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                    }`}
                 >
                   {tab.label}
                 </button>
@@ -462,24 +461,23 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
 
       {/* 3. COPILOT RESPONSE CARD & QUICK PROMPT PILLS */}
       <div
-        className={`w-full max-w-md mx-auto pt-3 space-y-2.5 transition-all ${
-          !hasProfile ? 'opacity-50 pointer-events-none' : ''
-        }`}
+        className={`w-full max-w-md mx-auto pt-3 space-y-2.5 transition-all ${!hasProfile ? 'opacity-50 pointer-events-none' : ''
+          }`}
       >
         {/* Copilot Response Card (Protocol Copilot Intelligence Layer) */}
         {isCopilotOpen && copilotResponse && (
-          <div className="w-full bg-white border border-blue-200/90 rounded-2xl p-3.5 shadow-[0_8px_25px_rgba(30,96,243,0.12)] animate-fade-in relative space-y-2.5">
+          <div className="w-full bg-white border border-slate-200/90 rounded-2xl p-3.5 shadow-md animate-fade-in relative space-y-2.5">
             {/* Header: Title + Bot Badge + Copy & Close */}
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-lg bg-[#1E60F3] flex items-center justify-center text-white shadow-xs">
+                <div className="w-6 h-6 rounded-lg bg-slate-900 flex items-center justify-center text-white shadow-xs">
                   <Bot className="w-3.5 h-3.5" />
                 </div>
                 <div>
                   <h4 className="text-xs font-black text-slate-900 leading-tight">
-                    의전 AI 관제 코파일럿
+                    Cockpit AI
                   </h4>
-                  <p className="text-[10px] text-blue-600 font-bold">Protocol Copilot Intelligence</p>
+
                 </div>
               </div>
 
@@ -500,8 +498,8 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
                 >
                   {copySuccess ? (
                     <>
-                      <Check className="w-3 h-3 text-[#1E60F3]" />
-                      <span className="text-[#1E60F3]">복사됨</span>
+                      <Check className="w-3 h-3 text-slate-900" />
+                      <span className="text-slate-900">복사됨</span>
                     </>
                   ) : (
                     <>
@@ -531,20 +529,20 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
               💬 <span className="font-bold text-slate-700">질문:</span> {copilotResponse.query}
             </div>
 
-            {/* Thinking Step Indicator (1.2~1.5s Sequential Reasoning Progression) */}
+            {/* Thinking Step Indicator (1.2~1.5s Sequential Reasoning Progression - 동일한 흑색 텍스트 테마) */}
             {isThinking && (
-              <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-blue-50/80 border border-blue-200/90 text-xs font-bold text-[#1E60F3] animate-pulse">
-                <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0 text-[#1E60F3]" />
-                <span className="truncate">{THINKING_STEPS[thinkingStep ?? 0]}</span>
+              <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-100 border border-slate-200/90 text-xs font-bold text-slate-800 animate-pulse">
+                <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0 text-slate-700" />
+                <span className="truncate text-slate-800">{THINKING_STEPS[thinkingStep ?? 0]}</span>
               </div>
             )}
 
             {/* Formatted Reply Body with Typewriter Streaming Effect */}
             {!isThinking && displayedReply && (
-              <div className="text-xs text-slate-800 font-normal leading-relaxed whitespace-pre-wrap bg-blue-50/50 p-3 rounded-xl border border-blue-100/70 select-text font-mono">
+              <div className="text-xs text-slate-800 font-normal leading-relaxed whitespace-pre-wrap bg-slate-50/90 p-3 rounded-xl border border-slate-200/90 select-text font-mono">
                 {displayedReply}
                 {isTyping && (
-                  <span className="inline-block w-1.5 h-3.5 bg-[#1E60F3] animate-pulse ml-0.5 align-middle" />
+                  <span className="inline-block w-1.5 h-3.5 bg-slate-800 animate-pulse ml-0.5 align-middle" />
                 )}
               </div>
             )}
@@ -557,7 +555,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
             type="button"
             onClick={() => handleCopilotSubmit('9.18일 일정 브리핑해줘')}
             disabled={isAnalyzing}
-            className="shrink-0 px-2.5 py-1 bg-white hover:bg-blue-50/70 border border-slate-200/80 hover:border-blue-300 text-[11px] font-medium text-slate-600 hover:text-[#1E60F3] rounded-full transition-all active:scale-95 shadow-2xs cursor-pointer"
+            className="shrink-0 px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-200/80 hover:border-slate-300 text-[11px] font-medium text-slate-700 hover:text-slate-900 rounded-full transition-all active:scale-95 shadow-2xs cursor-pointer"
           >
             💡 9/18 일정 브리핑
           </button>
@@ -565,7 +563,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
             type="button"
             onClick={() => handleCopilotSubmit('SQ612 상태 어때?')}
             disabled={isAnalyzing}
-            className="shrink-0 px-2.5 py-1 bg-white hover:bg-blue-50/70 border border-slate-200/80 hover:border-blue-300 text-[11px] font-medium text-slate-600 hover:text-[#1E60F3] rounded-full transition-all active:scale-95 shadow-2xs cursor-pointer"
+            className="shrink-0 px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-200/80 hover:border-slate-300 text-[11px] font-medium text-slate-700 hover:text-slate-900 rounded-full transition-all active:scale-95 shadow-2xs cursor-pointer"
           >
             ✈️ SQ612 항공편 조회
           </button>
@@ -573,7 +571,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
             type="button"
             onClick={() => handleCopilotSubmit('전체 일정 브리핑해줘')}
             disabled={isAnalyzing}
-            className="shrink-0 px-2.5 py-1 bg-white hover:bg-blue-50/70 border border-slate-200/80 hover:border-blue-300 text-[11px] font-medium text-slate-600 hover:text-[#1E60F3] rounded-full transition-all active:scale-95 shadow-2xs cursor-pointer"
+            className="shrink-0 px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-200/80 hover:border-slate-300 text-[11px] font-medium text-slate-700 hover:text-slate-900 rounded-full transition-all active:scale-95 shadow-2xs cursor-pointer"
           >
             📋 전체 일정 브리핑
           </button>
@@ -581,7 +579,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
             type="button"
             onClick={() => handleCopilotSubmit('여기 맛집 추천해줘')}
             disabled={isAnalyzing}
-            className="shrink-0 px-2.5 py-1 bg-white hover:bg-slate-50 border border-slate-200/80 text-[11px] font-medium text-slate-400 hover:text-slate-600 rounded-full transition-all active:scale-95 shadow-2xs cursor-pointer"
+            className="shrink-0 px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-200/80 hover:border-slate-300 text-[11px] font-medium text-slate-400 hover:text-slate-600 rounded-full transition-all active:scale-95 shadow-2xs cursor-pointer"
             title="가드레일 방어 테스트"
           >
             🛡️ 가드레일 테스트

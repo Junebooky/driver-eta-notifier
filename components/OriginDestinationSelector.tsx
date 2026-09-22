@@ -30,7 +30,7 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
           }}
           className={`flex-1 min-w-0 w-full p-3 rounded-2xl border text-left cursor-pointer transition-all duration-150 active:scale-95 ${
             selectionTarget === 'origin'
-              ? 'bg-slate-100 text-slate-700 border-slate-300 ring-2 ring-slate-300/60 shadow-xs'
+              ? 'bg-slate-50/80 text-slate-800 border-slate-300/90 ring-2 ring-slate-200/60 shadow-xs'
               : 'bg-white border-slate-200/80 hover:border-slate-300'
           }`}
         >
@@ -81,7 +81,7 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
           <ArrowLeftRight className="w-3.5 h-3.5" />
         </button>
 
-        {/* Destination Card (2px Cobalt Outline 핵심 타깃) */}
+        {/* Destination Card (2px Cobalt Outline 핵심 타깃 - 순수 화이트 배경) */}
         <div
           onClick={() => {
             haptics.lightTap();
@@ -89,7 +89,7 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
           }}
           className={`flex-1 min-w-0 w-full p-3 rounded-2xl text-left cursor-pointer transition-all duration-150 active:scale-95 ${
             selectionTarget === 'destination'
-              ? 'bg-blue-50/20 border-2 border-[#1E60F3] shadow-sm shadow-blue-500/10'
+              ? 'bg-white border-2 border-[#1E60F3] shadow-sm shadow-blue-500/10'
               : 'bg-white border border-slate-200/80 hover:border-slate-300'
           }`}
         >

@@ -164,26 +164,26 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
                   item.time_display.includes('영접');
                 onOpenFlight(cleanId, isArrival ? 'arrival' : 'departure');
               }}
-              className="w-11 h-11 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center border border-slate-200/80 transition-colors active:scale-90 cursor-pointer shrink-0"
+              className="w-11 h-11 rounded-full bg-white hover:bg-slate-50 text-slate-700 flex items-center justify-center border border-slate-200/90 shadow-2xs transition-colors active:scale-90 cursor-pointer shrink-0"
               title={`항공편(${item.flight}) 실시간 운항 정보 조회`}
               aria-label="항공편 조회"
             >
-              <Plane className="w-5 h-5 text-slate-600" />
+              <Plane className="w-5 h-5 text-slate-700" />
             </button>
           )}
 
-          {/* Action 2: Departure Time Picker Wheel Button (Dark Neutral Spec) */}
+          {/* Action 2: Departure Time Picker Wheel Button (White Background & Dark Slate Icon) */}
           <button
             type="button"
             onClick={() => {
               haptics.mediumTap();
               onPredict(item);
             }}
-            className="w-11 h-11 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center border border-slate-200/80 transition-colors active:scale-90 cursor-pointer shrink-0"
+            className="w-11 h-11 rounded-full bg-white hover:bg-slate-50 text-slate-700 flex items-center justify-center border border-slate-200/90 shadow-2xs transition-colors active:scale-90 cursor-pointer shrink-0"
             title="출발 시간 예측 (휠 피커)"
             aria-label="출발 시간 예측"
           >
-            <Clock className="w-5 h-5 text-slate-600" />
+            <Clock className="w-5 h-5 text-slate-700" />
           </button>
 
           {/* Action 3: Solid Blue Circular Navigation Launch Button (w-11 h-11) */}
