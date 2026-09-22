@@ -22,6 +22,7 @@ function formatDateLabel(dateStr: string): string {
 function mapDbRowToScheduleItem(row: DbScheduleRow): ScheduleItem {
   return {
     id: row.id,
+    vehicle_no: row.vehicle_no,
     date: row.date,
     dateLabel: formatDateLabel(row.date),
     pickup_time: row.pickup_time ? row.pickup_time.slice(0, 5) : '09:00',
@@ -48,6 +49,7 @@ function mapDbRowToScheduleItem(row: DbScheduleRow): ScheduleItem {
 const VEHICLE_1_FALLBACK: ScheduleItem[] = [
   {
     id: '11111111-0001-4000-a000-000000000001',
+    vehicle_no: '1호차',
     date: '2026-09-17',
     dateLabel: '9월 17일 (목)',
     pickup_time: '11:00',
@@ -70,16 +72,18 @@ const VEHICLE_1_FALLBACK: ScheduleItem[] = [
   },
 ];
 
-// GET: Fetch schedules isolated by vehicle_no (STRICT RULE 1: Vehicle Isolation)
+// GET: Fetch schedules isolated by vehicle_no (STRICT RULE 1: Vehicle Isolation, or 'all' for dispatcher view)
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const vehicleNo = searchParams.get('vehicle_no') || '4호차';
 
-    const { data, error } = await supabaseAdmin
-      .from('schedules')
-      .select('*')
-      .eq('vehicle_no', vehicleNo)
+    let query = supabaseAdmin.from('schedules').select('*');
+    if (vehicleNo !== 'all') {
+      query = query.eq('vehicle_no', vehicleNo);
+    }
+
+    const { data, error } = await query
       .order('date', { ascending: true })
       .order('pickup_time', { ascending: true });
 
@@ -92,11 +96,17 @@ export async function GET(req: NextRequest) {
       if (vehicleNo === '1호차') {
         return NextResponse.json({ schedules: VEHICLE_1_FALLBACK, fallback: true });
       }
+      if (vehicleNo === 'all') {
+        const allFallback = [
+          ...CONFIRMED_FERRARI_SCHEDULES.map((s) => ({ ...s, vehicle_no: '4호차' })),
+          ...VEHICLE_1_FALLBACK,
+        ].sort((a, b) => a.date.localeCompare(b.date) || a.pickup_time.localeCompare(b.pickup_time));
+        return NextResponse.json({ schedules: allFallback, fallback: true });
+      }
       return NextResponse.json({ schedules: [], fallback: true });
     }
 
     if (!data || data.length === 0) {
-      // If table exists but empty for this vehicle, return default fallback if 4호차
       if (vehicleNo === '4호차') {
         return NextResponse.json({ schedules: CONFIRMED_FERRARI_SCHEDULES, fallback: true });
       }

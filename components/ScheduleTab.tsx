@@ -7,6 +7,7 @@ import { ScheduleCard } from '@/components/ScheduleCard';
 import { EditScheduleModal } from '@/components/EditScheduleModal';
 import { Camera, Send, AlertCircle, Sparkles, RefreshCw, Bot, Copy, Check, X } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
+import { ENABLE_DEV_FLEET_SWITCHER } from '@/utils/constants';
 
 const THINKING_STEPS = [
   '🔍 배차 데이터베이스 동선 대조 중...',
@@ -47,8 +48,34 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
 
-  // Vehicle Isolation: Fetch schedules for current vehicle from Supabase (STRICT RULE 1)
-  const currentVehicleNo = profile.vehicleNo?.trim() || '4호차';
+  // Vehicle Isolation & Fleet Switcher State (Dev Mode enables switching between 1, 2, 4호차 & All)
+  const initialVehicle = profile.vehicleNo?.match(/(\d+호차)/)?.[1] || '4호차';
+  const [selectedVehicleFilter, setSelectedVehicleFilter] = useState<string>(initialVehicle);
+  const [vehicleCounts, setVehicleCounts] = useState<Record<string, number>>({
+    '4호차': 0,
+    '1호차': 0,
+    '2호차': 0,
+    'all': 0,
+  });
+
+  const fetchCounts = useCallback(async () => {
+    try {
+      const res = await fetch('/api/schedules?vehicle_no=all');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.schedules) {
+          const counts: Record<string, number> = { '4호차': 0, '1호차': 0, '2호차': 0, 'all': data.schedules.length };
+          data.schedules.forEach((s: ScheduleItem) => {
+            const v = s.vehicle_no || '4호차';
+            counts[v] = (counts[v] || 0) + 1;
+          });
+          setVehicleCounts(counts);
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to fetch schedule counts:', err);
+    }
+  }, []);
 
   const fetchSchedulesForVehicle = useCallback(async (vNo: string) => {
     try {
@@ -57,8 +84,10 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
         const data = await res.json();
         if (data.schedules) {
           setSchedules(data.schedules);
-          if (vNo.includes('4')) {
-            setScheduleTitle('페라리 VIP 의전 배차표');
+          if (vNo === 'all') {
+            setScheduleTitle('전체 호차 통합 관제 배차표');
+          } else if (vNo.includes('4')) {
+            setScheduleTitle('4호차 페라리 VIP 의전 배차표');
           } else {
             setScheduleTitle(`${vNo} VIP 의전 배차표`);
           }
@@ -70,8 +99,19 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
   }, []);
 
   useEffect(() => {
-    fetchSchedulesForVehicle(currentVehicleNo);
-  }, [currentVehicleNo, fetchSchedulesForVehicle]);
+    fetchCounts();
+  }, [fetchCounts]);
+
+  useEffect(() => {
+    if (!ENABLE_DEV_FLEET_SWITCHER) {
+      // Production Rule: Strictly locked to driver's own vehicle
+      const lockV = profile.vehicleNo?.match(/(\d+호차)/)?.[1] || '4호차';
+      setSelectedVehicleFilter(lockV);
+      fetchSchedulesForVehicle(lockV);
+    } else {
+      fetchSchedulesForVehicle(selectedVehicleFilter);
+    }
+  }, [selectedVehicleFilter, profile.vehicleNo, fetchSchedulesForVehicle]);
 
   // Copilot Thinking & Typewriter States
   const [thinkingStep, setThinkingStep] = useState<number | null>(null);
@@ -348,6 +388,48 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
         </div>
       )}
 
+      {/* Fleet Vehicle Switcher (Development / Dispatcher Control Mode) */}
+      {ENABLE_DEV_FLEET_SWITCHER && (
+        <div className="mb-3 bg-slate-100/90 p-1 rounded-2xl flex items-center gap-1 border border-slate-200/80 shadow-xs">
+          {[
+            { id: '4호차', label: '4호차' },
+            { id: '1호차', label: '1호차' },
+            { id: '2호차', label: '2호차' },
+            { id: 'all', label: '전체 호차' },
+          ].map((v) => {
+            const isSelected = selectedVehicleFilter === v.id;
+            const count = vehicleCounts[v.id] ?? 0;
+            return (
+              <button
+                key={v.id}
+                type="button"
+                onClick={() => {
+                  haptics.lightTap();
+                  setSelectedVehicleFilter(v.id);
+                  setSelectedDateFilter('all');
+                }}
+                className={`flex-1 py-1.5 px-1 rounded-xl text-xs font-black flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                  isSelected
+                    ? 'bg-white text-slate-900 shadow-sm border border-slate-200/90 scale-100'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <span>{v.label}</span>
+                <span
+                  className={`text-[10px] font-black px-1.5 py-0.2 rounded-full ${
+                    isSelected
+                      ? 'bg-blue-50 text-[#1E60F3]'
+                      : 'bg-slate-200 text-slate-600'
+                  }`}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* 2. MAIN CONTENT AREA: Empty State VS Confirmed Schedule List */}
       {schedules.length === 0 ? (
         /* ================= EMPTY STATE (TASK 1) ================= */
@@ -465,7 +547,9 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
                 {scheduleTitle}
               </h3>
               <p className="text-[11px] text-slate-500 font-medium">
-                {profile.vehicleNo || '4호차'} • {profile.driverName || '윤태준'}
+                {selectedVehicleFilter === 'all'
+                  ? `전체 호차 통합 관제 뷰 (총 ${schedules.length}건)`
+                  : `${selectedVehicleFilter} 전담 의전 일정 (총 ${schedules.length}건)`}
               </p>
             </div>
 

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { DriverProfile, NaviProvider } from '@/types';
 import { X, User, Car, Users, Navigation, Check } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
+import { ENABLE_DEV_FLEET_SWITCHER, FLEET_PRESET_DRIVERS } from '@/utils/constants';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -247,6 +248,53 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
         {/* Modal Body: Focus strictly on separated inputs, navi switcher, and action buttons */}
         <form onSubmit={handleSubmit} className="p-5 space-y-3.5 overflow-y-auto overscroll-contain flex-1">
+          {/* Quick Preset Drivers for Development/Dispatcher */}
+          {ENABLE_DEV_FLEET_SWITCHER && (
+            <div className="p-3 bg-blue-50/60 border border-blue-200/80 rounded-2xl space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-black text-slate-700 flex items-center gap-1.5">
+                  <Car className="w-3.5 h-3.5 text-[#1E60F3]" />
+                  개발·관제용 1초 기사 전환
+                </span>
+                <span className="text-[9px] font-bold text-[#1E60F3] bg-white px-1.5 py-0.5 rounded-md border border-blue-200">
+                  DEV
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {FLEET_PRESET_DRIVERS.map((d) => {
+                  const isCurrent = hocha === d.hocha;
+                  return (
+                    <button
+                      key={d.vehicleNo}
+                      type="button"
+                      onClick={() => {
+                        haptics.lightTap();
+                        setHocha(d.hocha);
+                        setPlateFront(d.plateFront);
+                        setPlateBack(d.plateBack);
+                        setDriverName(d.driverName);
+                        setDefaultNavi(d.defaultNavi);
+                      }}
+                      className={`p-2 rounded-xl text-left border transition-all cursor-pointer ${
+                        isCurrent
+                          ? 'bg-[#1E60F3] text-white border-[#1E60F3] shadow-xs'
+                          : 'bg-white text-slate-700 border-slate-200 hover:border-[#1E60F3]/50 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="text-xs font-black truncate">{d.vehicleNo}</div>
+                      <div className={`text-[10px] font-bold truncate ${isCurrent ? 'text-blue-100' : 'text-slate-600'}`}>
+                        {d.driverName}
+                      </div>
+                      <div className={`text-[9px] truncate ${isCurrent ? 'text-blue-200' : 'text-slate-400'}`}>
+                        {d.plateBack}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* 1. Hocha (Optional) Field */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center">

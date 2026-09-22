@@ -2,6 +2,7 @@ import { LocationPreset } from '@/types';
 
 export interface ScheduleItem {
   id: string;
+  vehicle_no?: string;
   date: string;
   dateLabel: string;
   pickup_time: string;

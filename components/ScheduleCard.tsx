@@ -26,7 +26,12 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
     <div className="w-full bg-white rounded-2xl p-4 border border-slate-200/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-md transition-all space-y-3.5 relative overflow-hidden">
       {/* Top Header: Date and Single Landing/Pickup Time Badge + Edit Button */}
       <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
+          {item.vehicle_no && (
+            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-blue-50 text-[#1E60F3] border border-blue-200/80 shrink-0">
+              {item.vehicle_no}
+            </span>
+          )}
           <span className="text-xs font-bold text-slate-700 tracking-tight truncate">
             {item.dateLabel}
           </span>
