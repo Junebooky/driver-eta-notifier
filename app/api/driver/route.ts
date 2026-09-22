@@ -9,6 +9,20 @@ const DRIVER_DEFAULTS: Record<string, any> = {
     phone: '010-6348-8726',
     default_navi: 'tmap',
   },
+  '8호차': {
+    vehicle_no: '8호차',
+    car_number: '142호 7815',
+    driver_name: '민성호',
+    phone: '010-7231-8340',
+    default_navi: 'tmap',
+  },
+  '7호차': {
+    vehicle_no: '7호차',
+    car_number: '142호 7814',
+    driver_name: '배선만',
+    phone: '010-8806-9758',
+    default_navi: 'tmap',
+  },
   '1호차': {
     vehicle_no: '1호차',
     car_number: '110하 1035',
@@ -30,17 +44,18 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const rawVehicleNo = searchParams.get('vehicle_no') || searchParams.get('id') || '4호차';
 
-    // Accurately extract hocha (e.g. '4호차 142호 7811' -> '4호차')
+    // Accurately extract hocha (e.g. '8호차 142호 7815' -> '8호차', '8' -> '8호차')
     let targetVehicleNo = '4호차';
-    const hochaMatch = rawVehicleNo.match(/(\d+호차)/);
+    const hochaMatch = rawVehicleNo.match(/(\d+)호차/);
     if (hochaMatch) {
-      targetVehicleNo = hochaMatch[1];
-    } else if (rawVehicleNo.includes('1호차') || rawVehicleNo.startsWith('1')) {
-      targetVehicleNo = '1호차';
-    } else if (rawVehicleNo.includes('2호차') || rawVehicleNo.startsWith('2')) {
-      targetVehicleNo = '2호차';
+      targetVehicleNo = `${hochaMatch[1]}호차`;
     } else {
-      targetVehicleNo = '4호차';
+      const digitMatch = rawVehicleNo.match(/^(\d+)$/);
+      if (digitMatch) {
+        targetVehicleNo = `${digitMatch[1]}호차`;
+      } else {
+        targetVehicleNo = rawVehicleNo.trim() || '4호차';
+      }
     }
 
     const { data, error } = await supabaseAdmin

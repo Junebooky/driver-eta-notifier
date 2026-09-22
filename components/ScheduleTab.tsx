@@ -52,11 +52,13 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
 
-  // Vehicle Isolation & Fleet Switcher State (Dev Mode enables switching between 1, 2, 4호차 & All)
+  // Vehicle Isolation & Fleet Switcher State (Dev Mode enables switching between vehicles & All)
   const initialVehicle = profile.vehicleNo?.match(/(\d+호차)/)?.[1] || '4호차';
   const [selectedVehicleFilter, setSelectedVehicleFilter] = useState<string>(initialVehicle);
   const [vehicleCounts, setVehicleCounts] = useState<Record<string, number>>({
     '4호차': 0,
+    '8호차': 0,
+    '7호차': 0,
     '1호차': 0,
     '2호차': 0,
     'all': 0,
@@ -68,7 +70,14 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
       if (res.ok) {
         const data = await res.json();
         if (data.schedules) {
-          const counts: Record<string, number> = { '4호차': 0, '1호차': 0, '2호차': 0, 'all': data.schedules.length };
+          const counts: Record<string, number> = {
+            '4호차': 0,
+            '8호차': 0,
+            '7호차': 0,
+            '1호차': 0,
+            '2호차': 0,
+            'all': data.schedules.length,
+          };
           data.schedules.forEach((s: ScheduleItem) => {
             const v = s.vehicle_no || '4호차';
             counts[v] = (counts[v] || 0) + 1;
@@ -163,10 +172,35 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
   // Profile validation guardrail: Driver must have at least vehicleNo or driverName registered
   const hasProfile = Boolean(profile.vehicleNo?.trim() || profile.driverName?.trim());
 
-  // Handle image upload and AI parsing response (Calls Gemini 3.8 Flash Vision with 3-anchor guardrail)
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return;
-    const file = e.target.files[0];
+  // Helper to format date string 'YYYY-MM-DD' into 'M월 D일(요일)'
+  const formatBriefingDate = (dateStr: string): string => {
+    try {
+      const d = new Date(dateStr + 'T00:00:00+09:00');
+      if (isNaN(d.getTime())) return dateStr;
+      const m = d.getMonth() + 1;
+      const day = d.getDate();
+      const days = ['일', '월', '화', '수', '목', '금', '토'];
+      return `${m}월 ${day}일(${days[d.getDay()]})`;
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const readFileAsDataUrl = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  // Handle batch image upload and sequential AI parsing (Calls Gemini 3.8 Flash Vision with 3-anchor guardrail)
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files;
+    if (!fileList || fileList.length === 0) return;
+    const files = Array.from(fileList);
+    const totalFiles = files.length;
+
     haptics.mediumTap();
     stopTypewriter();
     clearThinkingTimers();
@@ -176,31 +210,44 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
     setThinkingStep(0);
     setDisplayedReply('');
     setCopilotResponse({
-      query: `배차표 이미지 분석: ${file.name}`,
+      query: totalFiles > 1 ? `배차표 분석 중... (1/${totalFiles})` : `배차표 이미지 분석: ${files[0].name}`,
       reply: '',
       type: 'thinking',
     });
     setIsCopilotOpen(true);
 
-    const t1 = setTimeout(() => setThinkingStep(1), 450);
-    const t2 = setTimeout(() => setThinkingStep(2), 900);
-    thinkingTimersRef.current = [t1, t2];
+    const vehicleDetails = parseVehicleDetails(profile.vehicleNo);
+    const hochaStr = vehicleDetails.hocha ? `${vehicleDetails.hocha}호차` : (profile.vehicleNo || '4호차');
+    const plateNo = vehicleDetails.plateNumber || profile.carNumber || '142호 7811';
+    const plateLast4 = vehicleDetails.plateBack || (plateNo ? plateNo.replace(/\D/g, '').slice(-4) : '7811');
+    const driverName = profile.driverName || '윤태준';
+    const mobile = profile.phone || profile.mobile || '010-6348-8726';
+    const nameCandidates = generateNameCandidates(driverName);
 
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const base64Data = reader.result as string;
-      const thinkingDelayPromise = new Promise((resolve) => setTimeout(resolve, 1000));
+    const allParsedSchedules: Array<{
+      date: string;
+      pickup_time: string;
+      dropoff_time?: string | null;
+      origin_name: string;
+      destination_name: string;
+      passenger_name?: string | null;
+      flight_no?: string | null;
+      notes?: string | null;
+    }> = [];
 
-      try {
-        const vehicleDetails = parseVehicleDetails(profile.vehicleNo);
-        const hochaStr = vehicleDetails.hocha ? `${vehicleDetails.hocha}호차` : (profile.vehicleNo || '4호차');
-        const plateNo = vehicleDetails.plateNumber || profile.carNumber || '142호 7811';
-        const plateLast4 = vehicleDetails.plateBack || (plateNo ? plateNo.replace(/\D/g, '').slice(-4) : '7811');
-        const driverName = profile.driverName || '윤태준';
-        const mobile = profile.phone || profile.mobile || '010-6348-8726';
-        const nameCandidates = generateNameCandidates(driverName);
+    try {
+      for (let i = 0; i < totalFiles; i++) {
+        const file = files[i];
+        setCopilotResponse({
+          query: `배차표 분석 중... (${i + 1}/${totalFiles})`,
+          reply: '',
+          type: 'thinking',
+        });
+        setThinkingStep(i % 3);
 
-        const fetchPromise = fetch('/api/schedule/parse', {
+        const base64Data = await readFileAsDataUrl(file);
+
+        const res = await fetch('/api/schedule/parse', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -217,58 +264,78 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
           }),
         });
 
-        const [res] = await Promise.all([fetchPromise, thinkingDelayPromise]);
-        const data = await res.json();
-
-        setIsThinking(false);
-        setThinkingStep(null);
-
-        if (data.success) {
-          // Immediately reload from Supabase SSOT
-          await fetchSchedulesForVehicle(selectedVehicleFilter);
-          await fetchCounts();
-
-          const replyText =
-            data.summary || `[배차표 분석 완료] 총 ${data.count || 0}건의 의전 일정이 성공적으로 등록되었습니다.`;
-          setCopilotResponse({
-            query: `배차표 이미지 분석 (${file.name})`,
-            reply: replyText,
-            type: 'schedule_parse',
-          });
-          startTypewriter(replyText);
-          haptics.success();
-        } else {
-          const failMsg = `[배차표 분석 안내]
-• 오류: ${data.error || '배차표 파싱에 실패했습니다.'}
-• 기사 프로필 3중 앵커(${driverName}, ${plateLast4}, ${mobile})를 확인해 주십시오.`;
-          setCopilotResponse({
-            query: `배차표 이미지 분석 (${file.name})`,
-            reply: failMsg,
-            type: 'schedule_parse',
-          });
-          startTypewriter(failMsg);
-          haptics.warningPulse();
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.schedules)) {
+            data.schedules.forEach((s: any) => {
+              const exists = allParsedSchedules.some(
+                (ex) => ex.date === s.date && ex.pickup_time.slice(0, 5) === s.pickup_time.slice(0, 5)
+              );
+              if (!exists) {
+                allParsedSchedules.push(s);
+              }
+            });
+          }
         }
-      } catch (err: any) {
-        console.error('Image analysis error:', err);
-        setIsThinking(false);
-        setThinkingStep(null);
-        const errMsg = `[배차표 이미지 분석 오류]
-• 서버 통신 중 오류가 발생했습니다: ${err?.message || '네트워크 연결을 확인해 주십시오.'}
-• 잠시 후 다시 시도해 주십시오.`;
+      }
+
+      setIsThinking(false);
+      setThinkingStep(null);
+
+      // Refresh SSOT from Supabase
+      await fetchSchedulesForVehicle(selectedVehicleFilter);
+      await fetchCounts();
+
+      if (allParsedSchedules.length > 0) {
+        const scheduleItemsFormatted = allParsedSchedules
+          .sort((a, b) => a.date.localeCompare(b.date) || a.pickup_time.localeCompare(b.pickup_time))
+          .map((s) => {
+            const dateLabel = formatBriefingDate(s.date);
+            const flightPart = s.flight_no ? ` (항공편: ${s.flight_no})` : '';
+            return `• ${dateLabel} ${s.pickup_time}\n  출발: ${s.origin_name}\n  도착: ${s.destination_name}\n  승객: ${s.passenger_name || profile.passengerName || 'VIP 승객'}${flightPart}`;
+          })
+          .join('\n\n');
+
+        const replyText = `📋 배차 일정 동기화 완료
+${driverName} 기사님(${hochaStr} · ${plateNo})의 의전 일정 총 ${allParsedSchedules.length}건이 정리되었습니다.
+
+${scheduleItemsFormatted}
+
+스케줄 캘린더에서 상세 동선과 원터치 티맵·카카오 내비 안내를 바로 이용하실 수 있습니다.`;
+
         setCopilotResponse({
-          query: `배차표 이미지 분석 (${file.name})`,
-          reply: errMsg,
+          query: totalFiles > 1 ? `배차표 ${totalFiles}장 일괄 동기화 완료` : `배차표 이미지 분석 완료`,
+          reply: replyText,
           type: 'schedule_parse',
         });
-        startTypewriter(errMsg);
+        startTypewriter(replyText);
+        haptics.success();
+      } else {
+        const noMatchText = `기사님, 배차표에서 ${driverName} 기사님(${hochaStr} · ${plateNo})의 배차 일정이 발견되지 않았습니다. 프로필 정보나 배차표 이미지를 다시 한번 확인해 주시기 바랍니다.`;
+        setCopilotResponse({
+          query: totalFiles > 1 ? `배차표 ${totalFiles}장 일괄 분석 결과` : `배차표 이미지 분석 결과`,
+          reply: noMatchText,
+          type: 'schedule_parse',
+        });
+        startTypewriter(noMatchText);
         haptics.warningPulse();
-      } finally {
-        setIsAnalyzing(false);
-        if (e.target) e.target.value = '';
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err: any) {
+      console.error('Image analysis error:', err);
+      setIsThinking(false);
+      setThinkingStep(null);
+      const errMsg = `기사님, 배차표 이미지 분석 중 네트워크 연결에 문제가 발생했습니다. 잠시 후 다시 시도해 주시기 바랍니다.`;
+      setCopilotResponse({
+        query: `배차표 분석 안내`,
+        reply: errMsg,
+        type: 'schedule_parse',
+      });
+      startTypewriter(errMsg);
+      haptics.warningPulse();
+    } finally {
+      setIsAnalyzing(false);
+      if (e.target) e.target.value = '';
+    }
   };
 
   // Handle text input submission to Protocol Copilot API (Calls gemini-3.5-flash-lite)
@@ -387,12 +454,13 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
 
   return (
     <div className="w-full min-h-[calc(100dvh-130px)] flex flex-col justify-between relative pb-6 select-none">
-      {/* Hidden File Input for Image Upload */}
+      {/* Hidden File Input for Image Upload (multiple enabled) */}
       <input
         type="file"
         ref={fileInputRef}
         onChange={handleImageUpload}
         accept="image/*"
+        multiple
         className="hidden"
       />
 
@@ -420,12 +488,14 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
 
       {/* Fleet Vehicle Switcher (Development / Dispatcher Control Mode) */}
       {ENABLE_DEV_FLEET_SWITCHER && (
-        <div className="mb-3 bg-slate-100/90 p-1 rounded-2xl flex items-center gap-1 border border-slate-200/80 shadow-xs">
+        <div className="mb-3 bg-slate-100/90 p-1 rounded-2xl flex items-center gap-1 border border-slate-200/80 shadow-xs overflow-x-auto">
           {[
             { id: '4호차', label: '4호차' },
+            { id: '8호차', label: '8호차' },
+            { id: '7호차', label: '7호차' },
             { id: '1호차', label: '1호차' },
             { id: '2호차', label: '2호차' },
-            { id: 'all', label: '전체 호차' },
+            { id: 'all', label: '전체' },
           ].map((v) => {
             const isSelected = selectedVehicleFilter === v.id;
             const count = vehicleCounts[v.id] ?? 0;

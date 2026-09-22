@@ -45,6 +45,7 @@ const SURNAME_MAP: Record<string, string[]> = {
   '주': ['Joo', 'Ju'],
   '우': ['Woo', 'Wu'],
   '구': ['Koo', 'Ku', 'Gu'],
+  '민': ['Min'],
 };
 
 // 이름 음절 주요 로마자 표기 매핑
@@ -54,6 +55,8 @@ const SYLLABLE_MAP: Record<string, string[]> = {
   '의': ['Eui', 'Ui'],
   '전': ['Jeon', 'Jun'],
   '민': ['Min'],
+  '선': ['Sun', 'Seon'],
+  '만': ['Man'],
   '수': ['Soo', 'Su'],
   '진': ['Jin'],
   '영': ['Young', 'Yeong'],

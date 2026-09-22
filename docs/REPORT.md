@@ -353,7 +353,78 @@ SELECT * FROM cockpit.presets;
 * 기존의 Mock 배차표(`CONFIRMED_FERRARI_SCHEDULES`) 덮어쓰기 로직을 전면 제거하고 실제 DB 데이터 중심 실시간 렌더링으로 전환.
 * AI 코파일럿 브리핑 창에 발췌 건수, 기사 3중 앵커 검증 정보, 상세 일정 브리핑 타이프라이터 효과 제공.
 
-### 13.5 빌드 검증 결과
-* `npm run build`: Next.js 16.3.5 Turbopack 기준 14/14 라우트 컴파일 에러 **0건** 성공.
-  - `/api/schedule/parse` 라우트 신규 생성 및 빌드 확인.
+
+---
+
+## 14. [v4.82] 배차표 다중 이미지(N장) 일괄 파싱 지원, 코파일럿 의전 비서 톤앤매너 리라이팅 및 테스트 호차 프리셋 확장
+
+> **평가 일시**: 2026년 9월 22일  
+> **엔진**: Google Gemini 3.8 Flash Multimodal Vision (`gemini-3.8-flash`)  
+> **DB 스키마**: Supabase `cockpit` 전용 격리 스키마 (`cockpit.drivers`, `cockpit.schedules`, `cockpit.presets`)  
+
+### 14.1 다중 이미지 일괄 업로드 및 순차 파싱 파이프라인 ([`components/ScheduleTab.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ScheduleTab.tsx))
+
+1. **다중 파일 선택 지원**:
+   * 숨김 파일 인풋에 `multiple` 속성을 활성화하여 기사 또는 관제자가 여러 장의 배차표 이미지(예: 4일치 일정표 4장)를 한 번에 선택하거나 드래그 앤 드롭할 수 있도록 개선.
+2. **순차 파싱 및 배치 업로드(Batch Upload) 처리**:
+   * 업로드된 모든 이미지 파일 목록(`Array.from(files)`)을 대상으로 순차 비동기 루프를 실행.
+   * 각 이미지를 Base64로 인코딩한 후 `/api/schedule/parse`에 현재 활성 프로필 앵커(기사명/차량번호/휴대폰 번호)와 함께 전송.
+   * **실시간 프로그레스 인디케이터**:
+     * 상단 사고 과정 표출 영역에 실시간 인덱스를 반영: `배차표 분석 중... (1/4)` ➔ `배차표 분석 중... (2/4)` ➔ `배차표 분석 중... (3/4)` ➔ `배차표 분석 중... (4/4)` ➔ `분석 완료`.
+3. **일정 병합 및 SSOT 재동기화**:
+   * 각 이미지에서 파싱된 일정들을 메모리 상에서 날짜(`date`)와 픽업 시각(`pickup_time`) 기준으로 중복을 자동 제거하며 단일 배열로 병합(`allParsedSchedules`).
+   * 서버 측 Supabase `cockpit.schedules`에 Upsert된 최신 상태를 `fetchSchedulesForVehicle` 및 `fetchCounts`를 호출하여 클라이언트 캘린더 UI에 즉각 반영.
+
+---
+
+### 14.2 코파일럿 의전 비서 톤앤매너 전면 개편 ([`app/api/schedule/parse/route.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/api/schedule/parse/route.ts), [`components/ScheduleTab.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ScheduleTab.tsx))
+
+1. **개발자 전문 용어 전면 삭제**:
+   * 사용자 화면에서 `Supabase DB`, `DB 적재 완료`, `3중 앵커 매칭 결과`, `FK 제약조건` 등 엔지니어링 기술 용어를 완전히 제거.
+2. **최고급 Protocol Chauffeur AI 비서 포맷 적용**:
+   * 배차표 분석 완료 시 기사님이 한눈에 일정을 파악할 수 있도록 정갈하고 지능적인 서식으로 브리핑 텍스트 렌더링:
+     ```text
+     📋 배차 일정 동기화 완료
+     {기사명} 기사님({호차} · {차량번호})의 의전 일정 총 {N}건이 정리되었습니다.
+
+     • {날짜(요일)} {시간}
+       출발: {출발지}
+       도착: {목적지}
+       승객: {승객명} (항공편: {편명})
+
+     스케줄 캘린더에서 상세 동선과 원터치 티맵·카카오 내비 안내를 바로 이용하실 수 있습니다.
+     ```
+   * 날짜 포맷터(`formatBriefingDate`)를 통해 `2026-09-17` 형태의 raw date를 `9월 17일(목)` 등 한국어 요일 표기로 자동 변환.
+   * 일치하는 일정이 없거나 네트워크 오류 발생 시에도 정중하고 친절한 의전 비서 톤으로 안내 제공.
+
+---
+
+### 14.3 테스트 편의를 위한 기사 프로필 프리셋 및 호차 스위처 확장
+
+1. **확장된 기사 프리셋 등록 ([`utils/constants.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/utils/constants.ts), [`app/api/driver/route.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/api/driver/route.ts), Supabase `cockpit.drivers`)**:
+   * `4호차`: 윤태준 / 142호 7811 / `010-6348-8726`
+   * `8호차`: 민성호 / 142호 7815 / `010-7231-8340`
+   * `7호차`: 배선만 / 142호 7814 / `010-8806-9758`
+   * `1호차`: 김의전 / 110하 1035 / `010-1111-2222`
+   * `2호차`: 박의전 / 112하 3456 / `010-3333-4444`
+   * Supabase `cockpit.drivers` 테이블에 8호차 및 7호차 레코드를 안전하게 Upsert 등록하여 외래키 참조 무결성 보장.
+2. **스케줄 탭 상단 호차 필터 바 동기화 ([`components/ScheduleTab.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ScheduleTab.tsx))**:
+   * 상단 스위처에 `[4호차 | 8호차 | 7호차 | 1호차 | 2호차 | 전체]`를 모두 배치하고, 각 호차별 일정 등록 건수 배지를 동적으로 계산하여 표출.
+   * 모바일 화면 폭을 고려하여 `overflow-x-auto` 가로 스크롤 적용.
+3. **프로필 설정 모달 UI 고도화 ([`components/ProfileModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ProfileModal.tsx))**:
+   * **필드 순서 교정**: 드라이버 성명 입력란을 연락처보다 상단에 배치.
+   * **3칸 분할 연락처 입력창**: `010` - `0000` - `0000` 가로 1열 3분할 입력 필드를 도입하고, 자동 포커스 이동, 백스페이스 역이동, 11자리 일괄 붙여넣기(Paste) 지원.
+4. **한글/영문 성명 매칭 엔진 보강 ([`utils/nameMatcher.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/utils/nameMatcher.ts))**:
+   * 신규 기사 성명에 대응하여 성씨 `'민' ➔ ['Min']`, 음절 `'선' ➔ ['Sun', 'Seon']`, `'만' ➔ ['Man']` 음절 매핑을 추가하여 `Min Sung Ho`, `Bae Sun Man` 등의 영문 표기 자동 매칭 보장.
+
+---
+
+### 14.4 빌드 및 무결성 검증
+
+1. **TypeScript 컴파일 및 프로덕션 빌드**:
+   * `npm run build`: Next.js 16.3.5 Turbopack 기준 14/14 라우트 컴파일 에러 **0건** 완료.
+2. **다중 배차표 일괄 파싱 및 SSOT 갱신 검증**:
+   * 다중 이미지 업로드 시 인덱스별 순차 통신 및 데이터 병합 완료.
+   * 챗봇 브리핑 안내 문구 내 개발자 전문 용어 0건 검증 완료.
+
 

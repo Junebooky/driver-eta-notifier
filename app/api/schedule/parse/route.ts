@@ -317,23 +317,37 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 8. Generate Clear Protocol Briefing Summary for Copilot Typewriter
+    // 8. Generate Protocol Chauffeur AI Assistant Briefing (Zero Developer Jargon)
+    const formatBriefingDate = (dateStr: string): string => {
+      try {
+        const d = new Date(dateStr + 'T00:00:00+09:00');
+        if (isNaN(d.getTime())) return dateStr;
+        const m = d.getMonth() + 1;
+        const day = d.getDate();
+        const days = ['일', '월', '화', '수', '목', '금', '토'];
+        return `${m}월 ${day}일(${days[d.getDay()]})`;
+      } catch {
+        return dateStr;
+      }
+    };
+
+    const scheduleItemsFormatted = rawSchedules
+      .slice(0, 6)
+      .map((s) => {
+        const dateLabel = formatBriefingDate(s.date);
+        const flightPart = s.flight_no ? ` (항공편: ${s.flight_no})` : '';
+        return `• ${dateLabel} ${s.pickup_time}\n  출발: ${s.origin_name}\n  도착: ${s.destination_name}\n  승객: ${s.passenger_name || profile?.passengerName || 'VIP 승객'}${flightPart}`;
+      })
+      .join('\n\n');
+
     const summary = rawSchedules.length > 0
-      ? `[배차표 이미지 분석 및 DB 적재 완료]
-• 기사 프로필: ${targetVehicleNo} • ${driverName} 기사님 (${rawMobile})
-• 차량번호: ${plateNo} (뒷4자리: ${plateLast4})
-• 3중 앵커 매칭 결과: 총 ${rawSchedules.length}건의 의전 일정이 발췌되어 Supabase DB에 자동 적재되었습니다.
-${rawSchedules
-  .slice(0, 4)
-  .map(
-    (s, idx) =>
-      `  ${idx + 1}. [${s.date}] ${s.pickup_time} | ${s.origin_name} ➔ ${s.destination_name} | ${s.passenger_name || 'VIP 승객'}${s.flight_no ? ` (${s.flight_no})` : ''}`
-  )
-  .join('\n')}`
-      : `[배차표 이미지 분석 결과]
-• 기사 프로필: ${targetVehicleNo} • ${driverName} 기사님 (${rawMobile})
-• 차량번호: ${plateNo} (뒷4자리: ${plateLast4})
-• 3중 앵커 가드레일 판별 결과, 해당 배차표 이미지 내에 기사님 본인 일치 일정(2개 이상 일치)이 발견되지 않았습니다. 타 기사 일정을 100% 배제하였습니다.`;
+      ? `📋 배차 일정 동기화 완료
+${driverName} 기사님(${targetVehicleNo} · ${plateNo})의 의전 일정 총 ${rawSchedules.length}건이 정리되었습니다.
+
+${scheduleItemsFormatted}
+
+스케줄 캘린더에서 상세 동선과 원터치 티맵·카카오 내비 안내를 바로 이용하실 수 있습니다.`
+      : `기사님, 배차표에서 ${driverName} 기사님(${targetVehicleNo} · ${plateNo})의 배차 일정이 발견되지 않았습니다. 프로필 정보나 배차표 이미지를 다시 한번 확인해 주시기 바랍니다.`;
 
     return NextResponse.json({
       success: true,

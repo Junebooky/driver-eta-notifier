@@ -390,11 +390,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                         setPhone3(pObj.p3);
                         setDefaultNavi(d.defaultNavi);
                       }}
-                      className={`p-2 rounded-xl text-left border transition-all cursor-pointer ${
-                        isCurrent
+                      className={`p-2 rounded-xl text-left border transition-all cursor-pointer ${isCurrent
                           ? 'bg-[#1E60F3] text-white border-[#1E60F3] shadow-xs'
                           : 'bg-white text-slate-700 border-slate-200 hover:border-[#1E60F3]/50 hover:bg-slate-50'
-                      }`}
+                        }`}
                     >
                       <div className="text-xs font-black truncate">{d.vehicleNo}</div>
                       <div className={`text-[10px] font-bold truncate ${isCurrent ? 'text-blue-100' : 'text-slate-600'}`}>
@@ -496,7 +495,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
               <span className="flex items-center">
-                <Phone className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 연락처 (휴대폰 번호)
+                <Phone className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 연락처
               </span>
               {isOnboarding ? (
                 <span className="text-[10px] text-red-500 font-bold">* 필수 입력</span>
