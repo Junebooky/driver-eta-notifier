@@ -4,7 +4,8 @@ import React, { useState, useRef } from 'react';
 import { DriverProfile, LocationPreset } from '@/types';
 import { ScheduleItem, CONFIRMED_FERRARI_SCHEDULES, scheduleToPresets } from '@/data/ferrariSchedules';
 import { ScheduleCard } from '@/components/ScheduleCard';
-import { Camera, Send, AlertCircle, Sparkles, RefreshCw, Calendar, Check, ArrowRight } from 'lucide-react';
+import { EditScheduleModal } from '@/components/EditScheduleModal';
+import { Camera, Send, AlertCircle, Sparkles, RefreshCw } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface ScheduleTabProps {
@@ -13,6 +14,7 @@ interface ScheduleTabProps {
   onSelectRouteForCockpit: (origin: LocationPreset, destination: LocationPreset) => void;
   onOpenPredictionForSchedule: (schedule: ScheduleItem) => void;
   onNavigateForSchedule: (schedule: ScheduleItem) => void;
+  onOpenFlightModal?: (flightId: string, type: 'arrival' | 'departure') => void;
 }
 
 export const ScheduleTab: React.FC<ScheduleTabProps> = ({
@@ -21,12 +23,16 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
   onSelectRouteForCockpit,
   onOpenPredictionForSchedule,
   onNavigateForSchedule,
+  onOpenFlightModal,
 }) => {
   // Schedules state (starts with empty state by default, with one-touch toggle/load)
   const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
+  const [scheduleTitle, setScheduleTitle] = useState<string>('페라리 VIP 의전 배차표');
   const [inputText, setInputText] = useState('');
   const [selectedDateFilter, setSelectedDateFilter] = useState<string>('all');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [editingSchedule, setEditingSchedule] = useState<ScheduleItem | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Profile validation guardrail: Driver must have at least vehicleNo or driverName registered
@@ -228,12 +234,11 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
       ) : (
         /* ================= CONFIRMED SCHEDULES VIEW (TASK 2) ================= */
         <div className="flex-1 space-y-3.5 pt-1">
-          {/* Subheader & Date Filter Pills */}
+          {/* Subheader & Date Filter Pills (Calendar icon removed, dynamic title bound) */}
           <div className="flex items-center justify-between pb-1 px-0.5">
             <div>
-              <h3 className="text-sm font-black text-slate-900 tracking-tight flex items-center gap-1.5">
-                <Calendar className="w-4 h-4 text-[#1E60F3]" />
-                페라리 VIP 의전 배차표
+              <h3 className="text-sm font-black text-slate-900 tracking-tight">
+                {scheduleTitle}
               </h3>
               <p className="text-[11px] text-slate-500 font-medium">
                 {profile.vehicleNo || '4호차'} • {profile.driverName || '윤태준'}
@@ -287,51 +292,57 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
                   const { originPreset, destinationPreset } = scheduleToPresets(sch);
                   onSelectRouteForCockpit(originPreset, destinationPreset);
                 }}
+                onOpenFlight={onOpenFlightModal}
+                onEdit={(sch) => {
+                  setEditingSchedule(sch);
+                  setIsEditModalOpen(true);
+                }}
               />
             ))}
           </div>
         </div>
       )}
 
-      {/* 3. FLOATING ACTION DOCK (2-Tier Container at Bottom) */}
+      {/* 3. SLIM FLOATING ACTION DOCK (Messenger-style Single Unified Input Bar) */}
       <div
-        className={`w-full max-w-md mx-auto pt-4 transition-all ${
+        className={`w-full max-w-md mx-auto pt-3 transition-all ${
           !hasProfile ? 'opacity-50 pointer-events-none' : ''
         }`}
       >
-        {/* Top Tier: Capsule Upload Button */}
-        <button
-          type="button"
-          onClick={() => {
-            haptics.lightTap();
-            fileInputRef.current?.click();
-          }}
-          disabled={isAnalyzing}
-          className="w-fit px-4 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200/80 rounded-full text-xs font-semibold text-slate-700 flex items-center gap-1.5 shadow-sm mb-2.5 transition-all cursor-pointer active:scale-95"
-        >
-          <Camera className="w-3.5 h-3.5 text-slate-600" />
-          <span>[📷 이미지 업로드]</span>
-        </button>
-
-        {/* Bottom Tier: Round Input Bar & Solid Cobalt Blue Send Button */}
         <form
           onSubmit={handleTextSubmit}
-          className="w-full bg-white border border-slate-200 rounded-full pl-5 pr-1.5 py-1.5 flex items-center shadow-sm focus-within:border-blue-500 transition-all"
+          className="w-full bg-white border border-slate-200 rounded-full pl-1.5 pr-1.5 py-1.5 flex items-center shadow-sm focus-within:border-blue-500 transition-all"
         >
+          {/* Left: Inlined Camera Icon Button */}
+          <button
+            type="button"
+            onClick={() => {
+              haptics.lightTap();
+              fileInputRef.current?.click();
+            }}
+            disabled={isAnalyzing}
+            className="w-9 h-9 text-slate-400 hover:text-slate-600 active:scale-95 flex items-center justify-center shrink-0 transition-colors cursor-pointer rounded-full hover:bg-slate-50"
+            title="배차표 엑셀/이미지 업로드"
+            aria-label="이미지 업로드"
+          >
+            <Camera className="w-4 h-4" />
+          </button>
+
+          {/* Center: Input Field */}
           <input
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             disabled={isAnalyzing}
             placeholder="카카오톡 공지나 배차표 내용을 붙여넣어 주세요"
-            className="text-xs text-slate-800 placeholder:text-slate-400 font-normal outline-none flex-1 bg-transparent min-w-0 pr-2"
+            className="flex-1 bg-transparent text-xs text-slate-700 placeholder-slate-400 outline-none px-2 min-w-0"
           />
 
-          {/* Right Solid Cobalt Blue Send Button */}
+          {/* Right: Solid Cobalt Blue Send Button */}
           <button
             type="submit"
             disabled={isAnalyzing || (!inputText.trim() && schedules.length > 0)}
-            className="w-9 h-9 bg-[#1E60F3] hover:bg-[#1650D6] active:scale-95 disabled:opacity-40 rounded-full flex items-center justify-center text-white shadow-md shadow-blue-500/20 transition-all shrink-0 cursor-pointer"
+            className="w-9 h-9 bg-[#1E60F3] hover:bg-[#1650D6] active:scale-95 disabled:opacity-40 text-white rounded-full flex items-center justify-center shrink-0 shadow-md shadow-blue-500/20 transition-all cursor-pointer"
             title="배차표 등록 및 분석"
             aria-label="배차표 전송"
           >
@@ -343,6 +354,19 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
           </button>
         </form>
       </div>
+
+      {/* 4. Edit Schedule Modal */}
+      <EditScheduleModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingSchedule(null);
+        }}
+        schedule={editingSchedule}
+        onSave={(updated) => {
+          setSchedules((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+        }}
+      />
     </div>
   );
 };

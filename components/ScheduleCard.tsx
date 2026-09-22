@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { ScheduleItem } from '@/data/ferrariSchedules';
-import { Navigation, Clock, User, Plane, FileText, CheckCircle2, ChevronRight } from 'lucide-react';
+import { Navigation, Clock, User, Plane, FileText, ChevronRight, Pencil } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface ScheduleCardProps {
@@ -10,6 +10,8 @@ interface ScheduleCardProps {
   onNavigate: (item: ScheduleItem) => void;
   onPredict: (item: ScheduleItem) => void;
   onSelectForCockpit?: (item: ScheduleItem) => void;
+  onOpenFlight?: (flightId: string, type: 'arrival' | 'departure') => void;
+  onEdit?: (item: ScheduleItem) => void;
 }
 
 export const ScheduleCard: React.FC<ScheduleCardProps> = ({
@@ -17,24 +19,41 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
   onNavigate,
   onPredict,
   onSelectForCockpit,
+  onOpenFlight,
+  onEdit,
 }) => {
   return (
     <div className="w-full bg-white rounded-2xl p-4 border border-slate-200/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-md transition-all space-y-3.5 relative overflow-hidden">
-      {/* Top Header: Date, Status, and Single Landing/Pickup Time Badge */}
+      {/* Top Header: Date and Single Landing/Pickup Time Badge + Edit Button */}
       <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-slate-600 tracking-tight">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-xs font-bold text-slate-700 tracking-tight truncate">
             {item.dateLabel}
-          </span>
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200/80">
-            <CheckCircle2 className="w-3 h-3" />
-            확정
           </span>
         </div>
 
-        {/* Pure Single Time Badge (No simulation end time) */}
-        <div className="px-2.5 py-1 rounded-full text-xs font-black bg-slate-900 text-white tracking-tight shadow-xs">
-          {item.time_display}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* Pure Single Time Badge (No simulation end time) */}
+          <div className="px-2.5 py-1 rounded-full text-xs font-black bg-slate-900 text-white tracking-tight shadow-xs">
+            {item.time_display}
+          </div>
+
+          {/* Edit Button */}
+          {onEdit && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                haptics.lightTap();
+                onEdit(item);
+              }}
+              className="w-7 h-7 rounded-lg text-slate-400 hover:text-[#1E60F3] hover:bg-blue-50 active:scale-90 flex items-center justify-center transition-all cursor-pointer"
+              title="스케줄 정보 수정"
+              aria-label="스케줄 수정"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -74,8 +93,19 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
         </div>
       </div>
 
-      {/* Details Box: Passenger, Flight, Notes */}
-      <div className="bg-slate-50/80 rounded-xl p-3 space-y-1.5 text-xs text-slate-700 border border-slate-100">
+      {/* Details Box: Passenger, Flight, Notes (Clickable to trigger Edit) */}
+      <div
+        onClick={() => {
+          if (onEdit) {
+            haptics.lightTap();
+            onEdit(item);
+          }
+        }}
+        className={`bg-slate-50/80 rounded-xl p-3 space-y-1.5 text-xs text-slate-700 border border-slate-100 transition-colors ${
+          onEdit ? 'hover:bg-slate-100/90 cursor-pointer' : ''
+        }`}
+        title={onEdit ? '클릭하여 정보 수정' : undefined}
+      >
         {/* Passenger */}
         <div className="flex items-center gap-1.5 font-medium">
           <User className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />
@@ -101,8 +131,8 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
         )}
       </div>
 
-      {/* Card Footer: Left Route Set & Right Dual Action Floating Buttons */}
-      <div className="flex items-center justify-between pt-1">
+      {/* Card Footer: Left Route Set & Right Multi-Action Floating Buttons */}
+      <div className="flex items-center justify-between pt-1 gap-1">
         {/* Left: One-touch Cockpit Bind */}
         {onSelectForCockpit && (
           <button
@@ -111,31 +141,52 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
               haptics.lightTap();
               onSelectForCockpit(item);
             }}
-            className="text-xs font-bold text-slate-600 hover:text-[#1E60F3] flex items-center gap-1 cursor-pointer transition-colors py-1.5 px-2 -ml-2 rounded-lg hover:bg-slate-100"
+            className="text-xs font-bold text-slate-600 hover:text-[#1E60F3] flex items-center gap-0.5 cursor-pointer transition-colors py-1.5 px-2 -ml-2 rounded-lg hover:bg-slate-100 min-w-0"
+            title="관제 대시보드에 출발/도착지 설정"
           >
-            <span>관제 대시보드 연동</span>
-            <ChevronRight className="w-3.5 h-3.5" />
+            <span className="truncate">관제 연동</span>
+            <ChevronRight className="w-3.5 h-3.5 shrink-0" />
           </button>
         )}
 
-        {/* Right: Dual Action Buttons (Preserved exactly per user directive) */}
-        <div className="flex items-center gap-2.5 ml-auto">
-          {/* Action 1: White Circular Departure Time Picker Wheel Button (w-11 h-11) */}
+        {/* Right: Multi-Action Buttons (Conditional Flight + White Clock + Solid Blue Navigation) */}
+        <div className="flex items-center gap-2 ml-auto shrink-0">
+          {/* Action 1 (Conditional): Flight Modal Launcher Button (Only when item.flight exists) */}
+          {item.flight && onOpenFlight && (
+            <button
+              type="button"
+              onClick={() => {
+                haptics.mediumTap();
+                const cleanId = item.flight!.split('(')[0].replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+                const isArrival =
+                  item.origin_name.includes('공항') ||
+                  item.time_display.includes('착륙') ||
+                  item.time_display.includes('영접');
+                onOpenFlight(cleanId, isArrival ? 'arrival' : 'departure');
+              }}
+              className="w-11 h-11 rounded-full bg-white hover:bg-slate-50 active:scale-95 text-slate-600 border border-slate-200/90 shadow-sm flex items-center justify-center transition-all cursor-pointer"
+              title={`항공편(${item.flight}) 실시간 운항 정보 조회`}
+              aria-label="항공편 조회"
+            >
+              <Plane className="w-5 h-5 text-indigo-600" />
+            </button>
+          )}
+
+          {/* Action 2: White Circular Departure Time Picker Wheel Button (w-11 h-11, clean no blue dot) */}
           <button
             type="button"
             onClick={() => {
               haptics.mediumTap();
               onPredict(item);
             }}
-            className="w-11 h-11 rounded-full bg-white hover:bg-slate-50 active:scale-90 text-slate-700 border border-slate-200/90 shadow-md flex items-center justify-center transition-all cursor-pointer relative"
+            className="w-11 h-11 rounded-full bg-white hover:bg-slate-50 active:scale-90 text-slate-700 border border-slate-200/90 shadow-sm flex items-center justify-center transition-all cursor-pointer"
             title="출발 시간 예측 (휠 피커)"
             aria-label="출발 시간 예측"
           >
             <Clock className="w-5 h-5 text-slate-700" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#1E60F3]" />
           </button>
 
-          {/* Action 2: Solid Blue Circular Navigation Launch Button (w-11 h-11) */}
+          {/* Action 3: Solid Blue Circular Navigation Launch Button (w-11 h-11) */}
           <button
             type="button"
             onClick={() => {

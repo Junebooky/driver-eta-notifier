@@ -21,7 +21,7 @@ import { ScheduleTab } from '@/components/ScheduleTab';
 import { Navigation, Calendar } from 'lucide-react';
 import { ScheduleItem, scheduleToPresets } from '@/data/ferrariSchedules';
 import { PredictionResult } from '@/app/api/route/prediction/route';
-import { LocationPreset, ReportMode, RouteEstimate, HomeLocation, GasStation } from '@/types';
+import { LocationPreset, ReportMode, RouteEstimate, HomeLocation, GasStation, FlightType } from '@/types';
 import { DEFAULT_PRESET_LOCATIONS } from '@/utils/presets';
 import { generateReportText } from '@/utils/reportGenerator';
 import { calculateHaversineEstimate, getEtaString, launchNavigationApp } from '@/utils/navigation';
@@ -63,6 +63,8 @@ export default function Home() {
 
   // Real-time Flight Modal State (Incheon Airport)
   const [isFlightModalOpen, setIsFlightModalOpen] = useState(false);
+  const [flightModalInitialFlightId, setFlightModalInitialFlightId] = useState<string | undefined>(undefined);
+  const [flightModalInitialType, setFlightModalInitialType] = useState<FlightType | undefined>(undefined);
 
   // Load Presets & Admin State from LocalStorage on mount
   useEffect(() => {
@@ -513,6 +515,16 @@ export default function Home() {
     [setOrigin, setDestination, fetchRouteEstimate]
   );
 
+  const handleOpenFlightModalFromSchedule = useCallback(
+    (flightId: string, type: 'arrival' | 'departure') => {
+      setFlightModalInitialFlightId(flightId);
+      setFlightModalInitialType(type);
+      setIsFlightModalOpen(true);
+      haptics.mediumTap();
+    },
+    []
+  );
+
   // Real-time dynamic report text generated from current state
   const reportPreviewText = useMemo(() => {
     return generateReportText({
@@ -708,6 +720,7 @@ export default function Home() {
               onSelectRouteForCockpit={handleSelectRouteFromSchedule}
               onOpenPredictionForSchedule={handleOpenPredictionForSchedule}
               onNavigateForSchedule={handleNavigateForSchedule}
+              onOpenFlightModal={handleOpenFlightModalFromSchedule}
             />
           </div>
         )}
@@ -816,9 +829,15 @@ export default function Home() {
       {/* Incheon Airport Real-time Flight Modal (Arrival/Departure) */}
       <FlightModal
         isOpen={isFlightModalOpen}
-        onClose={() => setIsFlightModalOpen(false)}
+        onClose={() => {
+          setIsFlightModalOpen(false);
+          setFlightModalInitialFlightId(undefined);
+          setFlightModalInitialType(undefined);
+        }}
         profile={profile}
         onSelectDestination={handleSelectFlightDestination}
+        initialFlightId={flightModalInitialFlightId}
+        initialType={flightModalInitialType}
       />
 
     </main>

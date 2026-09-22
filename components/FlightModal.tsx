@@ -26,6 +26,8 @@ interface FlightModalProps {
   onClose: () => void;
   profile: DriverProfile;
   onSelectDestination: (preset: LocationPreset) => void;
+  initialFlightId?: string;
+  initialType?: FlightType;
 }
 
 export const FlightModal: React.FC<FlightModalProps> = ({
@@ -33,6 +35,8 @@ export const FlightModal: React.FC<FlightModalProps> = ({
   onClose,
   profile,
   onSelectDestination,
+  initialFlightId,
+  initialType,
 }) => {
   const [activeType, setActiveType] = useState<FlightType>('arrival');
   const [flightQuery, setFlightQuery] = useState('');
@@ -40,6 +44,16 @@ export const FlightModal: React.FC<FlightModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
+
+  // Auto-trigger search when launched with an initial flight ID (e.g., from ScheduleCard)
+  useEffect(() => {
+    if (isOpen && initialFlightId) {
+      const type = initialType || 'arrival';
+      setActiveType(type);
+      setFlightQuery(initialFlightId);
+      handleSearch(initialFlightId, type);
+    }
+  }, [isOpen, initialFlightId, initialType]);
 
   const handleSearch = async (targetId?: string, targetType?: FlightType) => {
     const query = (targetId || flightQuery).trim().toUpperCase();
