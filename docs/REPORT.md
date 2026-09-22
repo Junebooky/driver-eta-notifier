@@ -689,3 +689,33 @@ SELECT * FROM cockpit.presets;
 ### 20.4 빌드 무결성 검증
 * `npm run build`: Next.js 16.3.5 Turbopack 기준 14/14 라우트 컴파일 에러 **0건** 통과.
 
+---
+
+## 21. 프로필 설정 모달 UI 정제 및 온서브밋 인라인 검증 시스템 (2026-09-22)
+
+### 21.1 개요
+* '프로필 설정' 모달 오픈 시 상시 노출되던 원색 빨간색 `* 필수 입력` 텍스트를 전면 삭제하여 칵핏의 미니멀 블루/슬레이트 톤앤매너를 유지하도록 개선.
+* 필수 입력값(드라이버 성명, 연락처) 미기입 상태로 [설정 저장] 버튼을 누를 때만 동적으로 세련된 인라인 뱃지(`● 필수 입력`), 소프트 로즈 테두리 링 발광, 하단 안내 배너가 표출되도록 온서브밋 인터랙션 리파인.
+
+### 21.2 주요 변경 내역 ([`components/ProfileModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ProfileModal.tsx))
+1. **평상시 정적 텍스트 완전 제거**:
+   * '드라이버 성명' 및 '연락처' 라벨 우측의 기존 고정 붉은색 `* 필수 입력` 텍스트 삭제. 평상시에는 군더더기 없는 미려한 라벨만 노출.
+2. **온서브밋 동적 인라인 뱃지 디자인 격상**:
+   * 필수값 누락 시에만 라벨 우측에 세련된 소프트 로즈 칩 뱃지 표출:
+     ```tsx
+     <span className="text-[10.5px] font-bold text-rose-500 bg-rose-50 border border-rose-200/80 px-2 py-0.5 rounded-md flex items-center gap-1.5 animate-fade-in shadow-2xs">
+       <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+       필수 입력
+     </span>
+     ```
+3. **인풋 시각 피드백 및 하단 액션 배너**:
+   * 미입력 인풋창 테두리에 은은한 로즈 링 하이라이트(`border-rose-400 ring-2 ring-rose-100 bg-rose-50/20`) 적용 및 자동 포커싱.
+   * 액션 버튼([취소]/[설정 저장]) 상단에 `validationMsg` 안내 배너 렌더링.
+   * 햅틱 경고 펄스(`haptics.warningPulse()`) 연동.
+4. **실시간 에러 자동 클리어**:
+   * 드라이버가 인풋에 입력을 시작하거나(`onChange`), 붙여넣기(`onPaste`), DEV 프리셋을 클릭하면 에러 상태가 즉각 소멸.
+
+### 21.3 빌드 무결성 검증
+* `npm run build`: Turbopack 기준 14/14 라우트 정상 빌드 완료 (컴파일 에러 0건).
+
+

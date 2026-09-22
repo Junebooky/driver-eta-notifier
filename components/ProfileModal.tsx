@@ -94,6 +94,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [passengerName, setPassengerName] = useState(isInitialEmpty ? '' : (profile.passengerName || ''));
   const [defaultNavi, setDefaultNavi] = useState<NaviProvider>(profile.defaultNavi || 'tmap');
   const [selectedPresetVehicle, setSelectedPresetVehicle] = useState<string | null>(null);
+  const [nameError, setNameError] = useState(false);
+  const [phoneError, setPhoneError] = useState(false);
+  const [plateError, setPlateError] = useState(false);
+  const [validationMsg, setValidationMsg] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [fleetPresets, setFleetPresets] = useState<FleetPresetDriver[]>(FLEET_PRESET_DRIVERS);
@@ -151,6 +155,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
   const handlePhone1Change = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSelectedPresetVehicle(null);
+    if (phoneError) {
+      setPhoneError(false);
+      setValidationMsg(null);
+    }
     const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 3);
     setPhone1(val);
     if (val.length === 3) {
@@ -160,6 +168,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
   const handlePhone2Change = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSelectedPresetVehicle(null);
+    if (phoneError) {
+      setPhoneError(false);
+      setValidationMsg(null);
+    }
     const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 4);
     setPhone2(val);
     if (val.length === 4) {
@@ -169,6 +181,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
   const handlePhone3Change = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSelectedPresetVehicle(null);
+    if (phoneError) {
+      setPhoneError(false);
+      setValidationMsg(null);
+    }
     const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 4);
     setPhone3(val);
     if (val.length === 4) {
@@ -190,6 +206,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
   const handlePhonePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     setSelectedPresetVehicle(null);
+    if (phoneError) {
+      setPhoneError(false);
+      setValidationMsg(null);
+    }
     const pasted = e.clipboardData.getData('text');
     const digits = pasted.replace(/[^0-9]/g, '');
     if (digits.length >= 10) {
@@ -206,6 +226,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     if (isOpen) {
       setIsSaving(false);
       setSelectedPresetVehicle(null);
+      setNameError(false);
+      setPhoneError(false);
+      setPlateError(false);
+      setValidationMsg(null);
 
       const isInitialOrOnboarding = isOnboarding || (!profile.driverName && !profile.vehicleNo);
       if (isInitialOrOnboarding) {
@@ -288,6 +312,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
   const handlePlateBackChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSelectedPresetVehicle(null);
+    if (plateError) {
+      setPlateError(false);
+      setValidationMsg(null);
+    }
     // Only numeric digits, max 4
     const numeric = e.target.value.replace(/[^0-9]/g, '').slice(0, 4);
     setPlateBack(numeric);
@@ -349,39 +377,50 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     const isPhoneEmpty = !phone2.trim() && !phone3.trim();
     const isPhoneIncomplete = !phone2.trim() || !phone3.trim() || cleanPhone.length < 10;
 
-    // 1. Both name and phone are empty/missing
-    if (isNameEmpty && (isPhoneEmpty || isPhoneIncomplete)) {
-      alert('드라이버 성명과 연락처를 입력해 주세요.');
-      driverNameRef.current?.focus();
-      setIsSaving(false);
-      return;
-    }
+    let hasValidationError = false;
 
-    // 2. Only name is missing
     if (isNameEmpty) {
-      alert('드라이버 성명을 입력해 주세요.');
-      driverNameRef.current?.focus();
-      setIsSaving(false);
-      return;
+      setNameError(true);
+      hasValidationError = true;
+    } else {
+      setNameError(false);
     }
 
-    // 3. Phone is incomplete
     if (isPhoneIncomplete) {
-      alert('연락처(휴대폰 번호)를 정확히 입력해 주세요. (예: 010-0000-0000)');
-      if (!phone2.trim()) {
-        phone2Ref.current?.focus();
-      } else {
-        phone3Ref.current?.focus();
-      }
-      setIsSaving(false);
-      return;
+      setPhoneError(true);
+      hasValidationError = true;
+    } else {
+      setPhoneError(false);
     }
 
-    // 4. Plate back digit validation if provided
     if (pBack && pBack.length < 4) {
-      alert('차량 번호판 뒷자리는 4자리 숫자로 입력해 주세요.');
-      plateBackRef.current?.focus();
+      setPlateError(true);
+      hasValidationError = true;
+    } else {
+      setPlateError(false);
+    }
+
+    if (hasValidationError) {
+      haptics.warningPulse();
       setIsSaving(false);
+
+      if (isNameEmpty && isPhoneIncomplete) {
+        setValidationMsg('드라이버 성명과 연락처를 입력해 주세요.');
+        driverNameRef.current?.focus();
+      } else if (isNameEmpty) {
+        setValidationMsg('드라이버 성명을 입력해 주세요.');
+        driverNameRef.current?.focus();
+      } else if (isPhoneIncomplete) {
+        setValidationMsg('연락처(휴대폰 번호)를 정확히 입력해 주세요.');
+        if (!phone2.trim()) {
+          phone2Ref.current?.focus();
+        } else {
+          phone3Ref.current?.focus();
+        }
+      } else if (pBack && pBack.length < 4) {
+        setValidationMsg('차량 번호판 뒷자리 4자리를 입력해 주세요.');
+        plateBackRef.current?.focus();
+      }
       return;
     }
 
@@ -480,6 +519,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                       onClick={() => {
                         haptics.lightTap();
                         setSelectedPresetVehicle(d.vehicleNo);
+                        setNameError(false);
+                        setPhoneError(false);
+                        setPlateError(false);
+                        setValidationMsg(null);
                         const pObj = parsePhoneDetails(d.phone);
                         setHocha(d.hocha);
                         setPlateFront(d.plateFront);
@@ -539,7 +582,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               <span className="flex items-center">
                 <Car className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 차량 번호판
               </span>
-              <span className="text-[10px] text-slate-400 font-medium">앞자리 + 뒷자리 4자리</span>
+              {plateError ? (
+                <span className="text-[10px] font-bold text-rose-500 bg-rose-50 border border-rose-200/80 px-2 py-0.5 rounded-md flex items-center gap-1 animate-fade-in shadow-2xs">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                  4자리 입력 필요
+                </span>
+              ) : (
+                <span className="text-[10px] text-slate-400 font-medium">앞자리 + 뒷자리 4자리</span>
+              )}
             </label>
             <div className="grid grid-cols-[1.2fr_1fr] gap-2">
               {/* Front Plate Input */}
@@ -566,7 +616,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   onChange={handlePlateBackChange}
                   onKeyDown={handlePlateBackKeyDown}
                   placeholder="7811"
-                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-[#1E60F3] focus:bg-white font-bold transition-colors tracking-widest text-center"
+                  className={`w-full px-3 py-2.5 rounded-xl text-slate-900 text-sm font-bold transition-all tracking-widest text-center ${
+                    plateError
+                      ? 'bg-rose-50/20 border-rose-400 ring-2 ring-rose-100 focus:outline-none focus:border-rose-500 focus:bg-white'
+                      : 'bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#1E60F3] focus:bg-white'
+                  }`}
                 />
               </div>
             </div>
@@ -578,7 +632,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               <span className="flex items-center">
                 <User className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 드라이버 성명
               </span>
-              <span className="text-[10px] text-red-500 font-bold">* 필수 입력</span>
+              {nameError && (
+                <span className="text-[10.5px] font-bold text-rose-500 bg-rose-50 border border-rose-200/80 px-2 py-0.5 rounded-md flex items-center gap-1.5 animate-fade-in shadow-2xs">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                  필수 입력
+                </span>
+              )}
             </label>
             <input
               ref={driverNameRef}
@@ -587,9 +646,17 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               onChange={(e) => {
                 setSelectedPresetVehicle(null);
                 setDriverName(e.target.value);
+                if (nameError) {
+                  setNameError(false);
+                  setValidationMsg(null);
+                }
               }}
               placeholder="성함 입력"
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-[#1E60F3] focus:bg-white font-bold transition-colors"
+              className={`w-full px-3.5 py-2.5 rounded-xl text-slate-900 text-sm font-bold transition-all ${
+                nameError
+                  ? 'bg-rose-50/20 border-rose-400 ring-2 ring-rose-100 focus:outline-none focus:border-rose-500 focus:bg-white'
+                  : 'bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#1E60F3] focus:bg-white'
+              }`}
             />
           </div>
 
@@ -599,7 +666,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               <span className="flex items-center">
                 <Phone className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 연락처
               </span>
-              <span className="text-[10px] text-red-500 font-bold">* 필수 입력</span>
+              {phoneError && (
+                <span className="text-[10.5px] font-bold text-rose-500 bg-rose-50 border border-rose-200/80 px-2 py-0.5 rounded-md flex items-center gap-1.5 animate-fade-in shadow-2xs">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                  필수 입력
+                </span>
+              )}
             </label>
             <div className="grid grid-cols-[1fr_auto_1.2fr_auto_1.2fr] items-center gap-1.5">
               <div className="relative">
@@ -613,7 +685,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   onChange={handlePhone1Change}
                   onPaste={handlePhonePaste}
                   placeholder="010"
-                  className="w-full px-2 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-[#1E60F3] focus:bg-white font-bold transition-colors text-center tracking-wider"
+                  className={`w-full px-2 py-2.5 rounded-xl text-slate-900 text-sm font-bold transition-all text-center tracking-wider ${
+                    phoneError
+                      ? 'bg-rose-50/20 border-rose-400 ring-2 ring-rose-100 focus:outline-none focus:border-rose-500 focus:bg-white'
+                      : 'bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#1E60F3] focus:bg-white'
+                  }`}
                 />
               </div>
               <span className="text-slate-300 font-bold text-xs select-none">-</span>
@@ -629,7 +705,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   onKeyDown={handlePhone2KeyDown}
                   onPaste={handlePhonePaste}
                   placeholder="0000"
-                  className="w-full px-2 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-[#1E60F3] focus:bg-white font-bold transition-colors text-center tracking-wider"
+                  className={`w-full px-2 py-2.5 rounded-xl text-slate-900 text-sm font-bold transition-all text-center tracking-wider ${
+                    phoneError
+                      ? 'bg-rose-50/20 border-rose-400 ring-2 ring-rose-100 focus:outline-none focus:border-rose-500 focus:bg-white'
+                      : 'bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#1E60F3] focus:bg-white'
+                  }`}
                 />
               </div>
               <span className="text-slate-300 font-bold text-xs select-none">-</span>
@@ -645,7 +725,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   onKeyDown={handlePhone3KeyDown}
                   onPaste={handlePhonePaste}
                   placeholder="0000"
-                  className="w-full px-2 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-[#1E60F3] focus:bg-white font-bold transition-colors text-center tracking-wider"
+                  className={`w-full px-2 py-2.5 rounded-xl text-slate-900 text-sm font-bold transition-all text-center tracking-wider ${
+                    phoneError
+                      ? 'bg-rose-50/20 border-rose-400 ring-2 ring-rose-100 focus:outline-none focus:border-rose-500 focus:bg-white'
+                      : 'bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#1E60F3] focus:bg-white'
+                  }`}
                 />
               </div>
             </div>
@@ -741,6 +825,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               </button>
             </div>
           </div>
+
+          {/* Validation Notice Banner */}
+          {validationMsg && (
+            <div className="p-2.5 rounded-xl bg-rose-50/90 border border-rose-200/90 flex items-center gap-2 text-xs font-bold text-rose-600 animate-fade-in shadow-2xs">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0 animate-ping" />
+              <span>{validationMsg}</span>
+            </div>
+          )}
 
           {/* Action Buttons */}
           <div className="pt-2 flex items-center space-x-2">
