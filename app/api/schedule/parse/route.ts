@@ -271,8 +271,37 @@ export async function POST(req: NextRequest) {
       const originMatch = resolvePresetCoordinates(s.origin_name, activePresets);
       const destMatch = resolvePresetCoordinates(s.destination_name, activePresets);
 
+      // Detect airport departure sending vs airport arrival pickup
+      const isAirportDest =
+        (destMatch.name && (destMatch.name.includes('공항') || destMatch.name.toLowerCase().includes('airport'))) ||
+        (destMatch.address && (destMatch.address.includes('공항') || destMatch.address.toLowerCase().includes('airport'))) ||
+        (s.destination_name && (s.destination_name.includes('공항') || s.destination_name.toLowerCase().includes('airport')));
+
+      const hasDepartureNotes = Boolean(s.notes && /DEPARTURE|출국|샌딩|센딩/i.test(s.notes));
+      const isDeparture = isAirportDest || hasDepartureNotes;
+
+      const isAirportOrigin =
+        (originMatch.name && (originMatch.name.includes('공항') || originMatch.name.toLowerCase().includes('airport'))) ||
+        (originMatch.address && (originMatch.address.includes('공항') || originMatch.address.toLowerCase().includes('airport'))) ||
+        (s.origin_name && (s.origin_name.includes('공항') || s.origin_name.toLowerCase().includes('airport')));
+
+      const hasArrivalNotes = Boolean(s.notes && /ARRIVAL|입국|영접/i.test(s.notes));
+      const isArrival = isAirportOrigin || hasArrivalNotes;
+
+      // Departure is always "픽업", Arrival with flight is "착륙"
+      let timeSuffix = '픽업';
+      if (isArrival && s.flight_no) {
+        timeSuffix = '착륙';
+      } else if (isDeparture) {
+        timeSuffix = '픽업';
+      } else if (s.flight_no && !isDeparture) {
+        timeSuffix = '착륙';
+      } else {
+        timeSuffix = '픽업';
+      }
+
       const pickupTimeFormatted = s.pickup_time.length === 5 ? `${s.pickup_time}:00` : s.pickup_time;
-      const timeDisplay = `${s.pickup_time} ${s.flight_no ? '착륙' : '픽업'}`;
+      const timeDisplay = `${s.pickup_time} ${timeSuffix}`;
       const timeKey = s.pickup_time.slice(0, 5);
       const existingId = existingMap.get(`${s.date}_${timeKey}`);
 
@@ -281,6 +310,7 @@ export async function POST(req: NextRequest) {
         date: s.date,
         pickup_time: pickupTimeFormatted,
         time_display: timeDisplay,
+        flight_type: isDeparture ? 'departure' : 'arrival',
         origin: originMatch.name,
         origin_address: originMatch.address || null,
         origin_lat: originMatch.lat,

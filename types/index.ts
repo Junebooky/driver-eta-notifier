@@ -148,6 +148,7 @@ export interface DbScheduleRow {
   passenger_count?: number;
   passenger_note?: string | null;
   flight_number?: string | null;
+  flight_type?: string | null;
   protocol_notes?: string | null;
   status: string;
   created_at?: string;

@@ -20,6 +20,19 @@ function formatDateLabel(dateStr: string): string {
 
 // Convert DbScheduleRow to ScheduleItem
 function mapDbRowToScheduleItem(row: DbScheduleRow): ScheduleItem {
+  const isAirportDest =
+    (row.destination && (row.destination.includes('공항') || row.destination.toLowerCase().includes('airport'))) ||
+    (row.destination_address && (row.destination_address.includes('공항') || row.destination_address.toLowerCase().includes('airport')));
+
+  const hasDepartureNotes = Boolean(row.protocol_notes && /DEPARTURE|출국|샌딩|센딩/i.test(row.protocol_notes));
+  const isDeparture = row.flight_type === 'departure' || isAirportDest || hasDepartureNotes;
+
+  // Ensure departure time_display uses 픽업 instead of 착륙
+  let resolvedTimeDisplay = row.time_display;
+  if (isDeparture && resolvedTimeDisplay && resolvedTimeDisplay.includes('착륙')) {
+    resolvedTimeDisplay = resolvedTimeDisplay.replace('착륙', '픽업');
+  }
+
   return {
     id: row.id,
     vehicle_no: row.vehicle_no,
@@ -27,7 +40,8 @@ function mapDbRowToScheduleItem(row: DbScheduleRow): ScheduleItem {
     dateLabel: formatDateLabel(row.date),
     pickup_time: row.pickup_time ? row.pickup_time.slice(0, 5) : '09:00',
     dropoff_time: null, // STRICT RULE 3: 공식 고시 시간 보존 (TMAP 임의 연산 절대 금지)
-    time_display: row.time_display,
+    time_display: resolvedTimeDisplay,
+    flightType: isDeparture ? 'departure' : 'arrival',
     origin_name: row.origin,
     origin_address: row.origin_address || '',
     origin_lat: row.origin_lat || 37.5042,

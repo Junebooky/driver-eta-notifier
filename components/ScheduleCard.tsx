@@ -22,6 +22,17 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
   onOpenFlight,
   onEdit,
 }) => {
+  const isDeparture =
+    item.flightType === 'departure' ||
+    (item.destination_name && (item.destination_name.includes('공항') || item.destination_name.toLowerCase().includes('airport'))) ||
+    (item.destination_address && (item.destination_address.includes('공항') || item.destination_address.toLowerCase().includes('airport'))) ||
+    (item.notes && /DEPARTURE|출국|샌딩|센딩/i.test(item.notes));
+
+  const effectiveFlightType: 'arrival' | 'departure' = isDeparture ? 'departure' : 'arrival';
+  const effectiveTimeBadge = isDeparture
+    ? item.time_display.replace('착륙', '픽업')
+    : item.time_display;
+
   return (
     <div className="w-full bg-white rounded-2xl p-4 border border-slate-200/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-md transition-all space-y-3.5 relative overflow-hidden">
       {/* Top Header: Date and Single Landing/Pickup Time Badge + Edit Button */}
@@ -35,7 +46,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
         <div className="flex items-center gap-1.5 shrink-0">
           {/* Pure Single Time Badge (No simulation end time) */}
           <div className="px-2.5 py-1 rounded-full text-xs font-black bg-slate-900 text-white tracking-tight shadow-xs">
-            {item.time_display}
+            {effectiveTimeBadge}
           </div>
 
           {/* Edit Button */}
@@ -158,14 +169,10 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
               onClick={() => {
                 haptics.mediumTap();
                 const cleanId = item.flight!.split('(')[0].trim().toUpperCase();
-                const isArrival =
-                  item.origin_name.includes('공항') ||
-                  item.time_display.includes('착륙') ||
-                  item.time_display.includes('영접');
-                onOpenFlight(cleanId, isArrival ? 'arrival' : 'departure');
+                onOpenFlight(cleanId, effectiveFlightType);
               }}
               className="w-11 h-11 rounded-full bg-white hover:bg-slate-50 text-slate-700 flex items-center justify-center border border-slate-200/90 shadow-2xs transition-colors active:scale-90 cursor-pointer shrink-0"
-              title={`항공편(${item.flight}) 실시간 운항 정보 조회`}
+              title={`항공편(${item.flight}) 실시간 운항 정보 조회 (${effectiveFlightType === 'departure' ? '출국' : '입국'})`}
               aria-label="항공편 조회"
             >
               <Plane className="w-5 h-5 text-slate-700" />

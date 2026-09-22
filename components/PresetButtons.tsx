@@ -496,51 +496,56 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
               }}
               className="relative select-none touch-none will-change-transform h-full"
             >
-              {/* If this slot is currently being dragged, show subtle placeholder in grid */}
-              <button
-                type="button"
-                onTouchStart={(e) => handlePointerStart(index, e)}
-                onTouchMove={handlePointerMoveCheck}
-                onTouchEnd={() => handlePointerEnd(preset)}
-                onMouseDown={(e) => handlePointerStart(index, e)}
-                onMouseMove={handlePointerMoveCheck}
-                onMouseUp={() => handlePointerEnd(preset)}
-                className={`w-full h-full min-h-[58px] px-2 py-2.5 rounded-xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-200 group ${stateClasses} ${
-                  isThisItemDragging ? 'opacity-20 border-dashed border-[#1E60F3]' : ''
-                }`}
-                title={`${preset.name} (길게 눌러 순서 변경)`}
-              >
-                <span
-                  className={`text-xs font-bold tracking-tight truncate w-full ${
-                    isDestination
-                      ? 'text-[#1E60F3]'
-                      : isOrigin
-                      ? 'text-slate-900'
-                      : `text-slate-700 ${dynamicTextHoverClass}`
-                  } transition-colors`}
+              {/* If this slot is currently being dragged, show exact-sized dashed placeholder to prevent jitter */}
+              {isThisItemDragging ? (
+                <div
+                  className="w-full h-full min-h-[58px] border-2 border-dashed border-blue-200 rounded-2xl bg-blue-50/20 flex items-center justify-center transition-all duration-200"
+                  aria-hidden="true"
+                />
+              ) : (
+                <button
+                  type="button"
+                  onTouchStart={(e) => handlePointerStart(index, e)}
+                  onTouchMove={handlePointerMoveCheck}
+                  onTouchEnd={() => handlePointerEnd(preset)}
+                  onMouseDown={(e) => handlePointerStart(index, e)}
+                  onMouseMove={handlePointerMoveCheck}
+                  onMouseUp={() => handlePointerEnd(preset)}
+                  className={`w-full h-full min-h-[58px] px-2 py-2.5 rounded-xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-200 group ${stateClasses}`}
+                  title={`${preset.name} (길게 눌러 순서 변경)`}
                 >
-                  {preset.shortName}
-                </span>
+                  <span
+                    className={`text-xs font-bold tracking-tight truncate w-full ${
+                      isDestination
+                        ? 'text-[#1E60F3]'
+                        : isOrigin
+                        ? 'text-slate-900'
+                        : `text-slate-700 ${dynamicTextHoverClass}`
+                    } transition-colors`}
+                  >
+                    {preset.shortName}
+                  </span>
 
-                {/* Status Indicator Tag */}
-                {isDestination && (
-                  <span className="text-[10px] font-bold text-[#1E60F3] flex items-center justify-center gap-1 mt-0.5 leading-none">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#1E60F3]" />
-                    도착지
-                  </span>
-                )}
-                {isOrigin && !isDestination && (
-                  <span className="text-[10px] font-semibold text-slate-600 flex items-center justify-center gap-1 mt-0.5 leading-none">
-                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                    출발지
-                  </span>
-                )}
-                {!isDestination && !isOrigin && (
-                  <span className="text-[11px] font-medium tracking-wide text-slate-400 group-hover:text-slate-600 leading-none mt-0.5">
-                    {isManageMode ? (isHQ ? '공통' : '관리') : badgeLabel}
-                  </span>
-                )}
-              </button>
+                  {/* Status Indicator Tag */}
+                  {isDestination && (
+                    <span className="text-[10px] font-bold text-[#1E60F3] flex items-center justify-center gap-1 mt-0.5 leading-none">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#1E60F3]" />
+                      도착지
+                    </span>
+                  )}
+                  {isOrigin && !isDestination && (
+                    <span className="text-[10px] font-semibold text-slate-600 flex items-center justify-center gap-1 mt-0.5 leading-none">
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                      출발지
+                    </span>
+                  )}
+                  {!isDestination && !isOrigin && (
+                    <span className="text-[11px] font-medium tracking-wide text-slate-400 group-hover:text-slate-600 leading-none mt-0.5">
+                      {isManageMode ? (isHQ ? '공통' : '관리') : badgeLabel}
+                    </span>
+                  )}
+                </button>
+              )}
             </div>
           );
         })}
@@ -570,21 +575,18 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
       </div>
 
       {/* ============================================================== */}
-      {/* FLOATING DRAG LAYER (z-50 pointer-events-none 1:1 Tracking)     */}
+      {/* FLOATING DRAG LAYER (z-50 pointer-events-none Compact Mini Chip) */}
       {/* ============================================================== */}
       {isDragging && draggedPreset && (
         <div
-          className="fixed z-50 pointer-events-none -translate-x-1/2 -translate-y-1/2 will-change-transform shadow-2xl rounded-2xl bg-white border-2 border-[#1E60F3] px-4 py-3 flex flex-col items-center justify-center min-w-[100px] scale-110"
+          className="fixed z-50 pointer-events-none -translate-x-1/2 -translate-y-1/2 will-change-transform shadow-2xl rounded-2xl bg-white border-2 border-[#1E60F3] ring-2 ring-[#1E60F3] px-3.5 py-2 flex items-center justify-center scale-75 opacity-90 transition-transform duration-200 ease-out"
           style={{
             left: `${pointerPos.x}px`,
             top: `${pointerPos.y}px`,
           }}
         >
-          <span className="text-xs font-bold text-slate-900 tracking-tight">
+          <span className="text-xs font-bold text-slate-900 tracking-tight whitespace-nowrap">
             {draggedPreset.shortName}
-          </span>
-          <span className="text-[10px] text-[#1E60F3] font-semibold mt-0.5">
-            이동 중...
           </span>
         </div>
       )}

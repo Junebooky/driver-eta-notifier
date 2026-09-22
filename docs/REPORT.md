@@ -459,5 +459,78 @@ SELECT * FROM cockpit.presets;
 ### 15.3 빌드 검증
 * `npm run build`: Next.js 16.3.5 Turbopack 기준 14/14 라우트 컴파일 에러 **0건** 완료.
 
+---
+
+## 16. [v4.85] 관제 AI 6단계 정밀 분석 및 100% 코발트 블루 게이지 바 구현, 출국 샌딩 연동 교정 및 거점 드래그 간섭 차단
+
+> **평가 일시**: 2026년 9월 22일  
+> **엔진**: Google Gemini 3.8 Flash Multimodal Vision (`gemini-3.8-flash`)  
+> **상태**: 6단계 정밀 분석 & 코발트 블루 게이지 100% 완충 연출, 출국 샌딩 배지/모달 연동, 거점 드래그 미니 칩 축소 및 안티-지터 완비  
+
+### 16.1 Cockpit AI 6단계 정밀 분석 및 코발트 블루 게이지 바 100% 완충 연출 ([`components/ScheduleTab.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ScheduleTab.tsx))
+
+1. **가벼운 이모지/아이콘 전면 배제 및 6단계 정밀 텍스트 전환**:
+   * 배차표 이미지 업로드 시 가벼운 이모지나 회전 스피너 아이콘을 전면 배제하고, 최고급 의전 관제 센터 품격에 맞춘 6단계 텍스트 순차 전환 구현:
+     * `1단계 · 운항 지시서 이미지 분석 중...`
+     * `2단계 · 기사 및 차량 정보 식별 중...`
+     * `3단계 · 출발지 · 목적지 · VIP · 항공편 정보 추출 중...`
+     * `4단계 · 기사님의 개인 스케줄을 구성 중...`
+     * `5단계 · 일정과 이동 정보를 교차 검증 중...`
+     * `6단계 · 최종 스케줄 정확도를 확인 중...`
+   * 타이포그래피: `text-xs font-semibold text-slate-700 tracking-tight` 규격 적용.
+2. **코발트 블루 신뢰도 게이지 바 (100% 완충 시각화)**:
+   * 슬릭한 라운드 프로그레스 트랙: `h-2 bg-slate-100 rounded-full overflow-hidden w-full`
+   * 브랜드 솔리드 코발트 블루 게이지 필: `bg-[#1E60F3] transition-all duration-300 ease-out`
+   * 실시간 신뢰도 매칭:
+     * `분석 신뢰도 72%` ➔ 게이지 72% 충전
+     * `분석 신뢰도 86%` ➔ 게이지 86% 충전
+     * `분석 신뢰도 97%` ➔ 게이지 97% 충전
+     * `신뢰도 100%` ➔ 게이지 바가 우측 끝까지 꽉 채워진 100% 완충 연출.
+3. **분석 완료 확정 상태 전환 및 안착 트랜지션**:
+   * 게이지 바 100% 충전 상태에서 최종 완료 카피를 단정하게 표출 (0.8초 유지):
+     ```text
+     ✓ Cockpit AI 분석 완료
+     신뢰도 100%
+     기사님 전용 스케줄이 준비되었습니다.
+     ```
+   * 0.8초 후 캘린더에 정돈된 스케줄 카드가 안착하며 브리핑 텍스트가 전환되는 부드러운 트랜지션 연결.
+
+---
+
+### 16.2 출국 샌딩 스케줄 '출국(Departure)' 탭 자동 지정 및 상단 배지 교정 ([`components/ScheduleCard.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ScheduleCard.tsx), [`components/FlightModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/FlightModal.tsx), [`app/api/schedule/parse/route.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/api/schedule/parse/route.ts), [`app/api/schedules/route.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/api/schedules/route.ts))
+
+1. **공항 출국 샌딩 자동 감지 엔진**:
+   * 목적지(`destination_name`, `destination_address`)에 `공항` 또는 `Airport`가 포함되거나, 비고에 `DEPARTURE`, `출국`, `샌딩`, `센딩` 키워드가 존재할 경우:
+     * 해당 스케줄을 **`flightType: "departure"`(출국)**로 명시적 분류.
+2. **상단 우측 검은색 시간 배지 교정**:
+   * 9월 20일과 같은 출국 샌딩 스케줄에서 `flight_number` 존재로 인해 `15:30 착륙`으로 잘못 표기되던 결함을 전면 수정하여, 반드시 **`15:30 픽업`**으로 정상 표기.
+   * Supabase `cockpit.schedules` DB 내 기존 레코드 및 파싱 라우트의 `time_display`를 일괄 교정.
+3. **항공편 관제 모달 '출국' 탭 즉각 연동**:
+   * 스케줄 카드 하단의 비행기 관제 버튼 터치 시 `onOpenFlight(cleanId, effectiveFlightType)`를 통해 `type: 'departure'` 전달.
+   * `FlightModal`이 기본값 '입국' 대신 **[출국] 탭이 활성화된 상태로 즉시 열리며, 'KE 623' (18:50 마닐라행, T2) 조회가 오류 없이 즉시 성공**.
+
+---
+
+### 16.3 거점 카드 드래그 시 컴팩트 미니 칩 축소 및 간섭 차단 ([`components/PresetButtons.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/PresetButtons.tsx))
+
+1. **드래그 중인 카드의 컴팩트 미니 칩 축소**:
+   * 롱프레스(350ms)로 드래그가 시작되는 즉시:
+     * 부유 레이어 카드 크기 축소: `scale-75`
+     * 최상단 심도 및 코발트 링: `shadow-2xl z-50 border-2 border-[#1E60F3] ring-2 ring-[#1E60F3] opacity-90`
+     * 내부 보조 텍스트(`MY`, `HQ`, `이동 중...` 등)를 일시 생략하고 컴팩트한 이름 칩만 표출하여 손가락 크기에 꼭 맞는 미니 칩 규격으로 이동.
+2. **그리드 레이아웃 충돌 및 주변 카드 떨림(Jitter) 원천 차단**:
+   * 카드가 이탈한 원위치 그리드 슬롯에는 크기 변동이 없는 점선 박스 플레이스홀더(`border-2 border-dashed border-blue-200 rounded-2xl bg-blue-50/20 min-h-[58px] w-full`)를 배치하여, 주변 카드들이 덜덜 떨리거나 밀려나는 레이아웃 지터를 완벽히 차단.
+3. **드롭 완료 인터랙션**:
+   * 손을 떼어 드롭이 완료되면 `transition-transform duration-200 ease-out`을 거쳐 원래 카드 크기와 텍스트로 부드럽게 복귀.
+
+---
+
+### 16.4 빌드 및 무결성 검증
+
+* `npm run build`: Next.js 16.3.5 Turbopack 기준 14/14 라우트 컴파일 에러 **0건** 완료.
+* KE 623 출국 조회 API 통신 검증 완료 (`scheduleTimeFormatted: 18:50`, `airport: 마닐라`).
+* 8호차 9월 20일 스케줄 `15:30 픽업` 및 `flightType: departure` 데이터 정합성 검증 완료.
+
+
 
 

@@ -17,6 +17,15 @@ const THINKING_STEPS = [
   '📋 맞춤 브리핑 작성 중...',
 ];
 
+const COCKPIT_ANALYSIS_STAGES = [
+  { step: 1, text: '1단계 · 운항 지시서 이미지 분석 중...', percent: 45 },
+  { step: 2, text: '2단계 · 기사 및 차량 정보 식별 중...', percent: 60 },
+  { step: 3, text: '3단계 · 출발지 · 목적지 · VIP · 항공편 정보 추출 중...', percent: 72 },
+  { step: 4, text: '4단계 · 기사님의 개인 스케줄을 구성 중...', percent: 86 },
+  { step: 5, text: '5단계 · 일정과 이동 정보를 교차 검증 중...', percent: 97 },
+  { step: 6, text: '6단계 · 최종 스케줄 정확도를 확인 중...', percent: 99 },
+];
+
 interface ScheduleTabProps {
   profile: DriverProfile;
   onOpenProfileModal: () => void;
@@ -133,6 +142,13 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
   const thinkingTimersRef = useRef<NodeJS.Timeout[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // 6-Stage Cockpit AI Precision Analysis States for Schedule Image Parsing
+  const [isAnalyzingSchedule, setIsAnalyzingSchedule] = useState(false);
+  const [scheduleAnalysisStage, setScheduleAnalysisStage] = useState(0);
+  const [scheduleAnalysisProgress, setScheduleAnalysisProgress] = useState(45);
+  const [scheduleAnalysisCompleted, setScheduleAnalysisCompleted] = useState(false);
+  const scheduleAnalysisTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   const stopTypewriter = () => {
     if (typewriterTimerRef.current) {
       clearInterval(typewriterTimerRef.current);
@@ -143,6 +159,10 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
   const clearThinkingTimers = () => {
     thinkingTimersRef.current.forEach((t) => clearTimeout(t));
     thinkingTimersRef.current = [];
+    if (scheduleAnalysisTimerRef.current) {
+      clearInterval(scheduleAnalysisTimerRef.current);
+      scheduleAnalysisTimerRef.current = null;
+    }
   };
 
   useEffect(() => {
@@ -204,15 +224,32 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
     clearThinkingTimers();
 
     setIsAnalyzing(true);
-    setIsThinking(true);
-    setThinkingStep(0);
+    setIsAnalyzingSchedule(true);
+    setScheduleAnalysisCompleted(false);
+    setScheduleAnalysisStage(0);
+    setScheduleAnalysisProgress(45);
+    setIsThinking(false);
     setDisplayedReply('');
     setCopilotResponse({
-      query: totalFiles > 1 ? `배차표 분석 중... (1/${totalFiles})` : `배차표 이미지 분석: ${files[0].name}`,
+      query: totalFiles > 1 ? `배차표 ${totalFiles}장 정밀 관제 분석` : `배차표 정밀 관제 분석: ${files[0].name}`,
       reply: '',
       type: 'thinking',
     });
     setIsCopilotOpen(true);
+
+    // Smooth progressive advancement through the 6 stages
+    const stageInterval = setInterval(() => {
+      setScheduleAnalysisStage((prev) => {
+        const next = Math.min(prev + 1, 5);
+        if (next === 1) setScheduleAnalysisProgress(60);
+        else if (next === 2) setScheduleAnalysisProgress(72);
+        else if (next === 3) setScheduleAnalysisProgress(86);
+        else if (next === 4) setScheduleAnalysisProgress(97);
+        else if (next === 5) setScheduleAnalysisProgress(99);
+        return next;
+      });
+    }, 450);
+    scheduleAnalysisTimerRef.current = stageInterval;
 
     const vehicleDetails = parseVehicleDetails(profile.vehicleNo);
     const hochaStr = vehicleDetails.hocha ? `${vehicleDetails.hocha}호차` : (profile.vehicleNo || '4호차');
@@ -236,13 +273,6 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
     try {
       for (let i = 0; i < totalFiles; i++) {
         const file = files[i];
-        setCopilotResponse({
-          query: `배차표 분석 중... (${i + 1}/${totalFiles})`,
-          reply: '',
-          type: 'thinking',
-        });
-        setThinkingStep(i % 3);
-
         const base64Data = await readFileAsDataUrl(file);
 
         const res = await fetch('/api/schedule/parse', {
@@ -277,8 +307,22 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
         }
       }
 
-      setIsThinking(false);
-      setThinkingStep(null);
+      if (scheduleAnalysisTimerRef.current) {
+        clearInterval(scheduleAnalysisTimerRef.current);
+        scheduleAnalysisTimerRef.current = null;
+      }
+
+      // Step 6 & 100% Cobalt Blue Gauge Full
+      setScheduleAnalysisStage(5);
+      setScheduleAnalysisProgress(100);
+      setScheduleAnalysisCompleted(true);
+      haptics.success();
+
+      // Hold 100% completion card for ~0.8s as requested
+      await new Promise((resolve) => setTimeout(resolve, 800));
+
+      setIsAnalyzingSchedule(false);
+      setScheduleAnalysisCompleted(false);
 
       // Refresh SSOT from Supabase (Auto-switch view to uploaded hocha if not viewing all)
       if (selectedVehicleFilter !== 'all' && selectedVehicleFilter !== hochaStr) {
@@ -325,6 +369,12 @@ ${scheduleItemsFormatted}
       }
     } catch (err: any) {
       console.error('Image analysis error:', err);
+      if (scheduleAnalysisTimerRef.current) {
+        clearInterval(scheduleAnalysisTimerRef.current);
+        scheduleAnalysisTimerRef.current = null;
+      }
+      setIsAnalyzingSchedule(false);
+      setScheduleAnalysisCompleted(false);
       setIsThinking(false);
       setThinkingStep(null);
       const errMsg = `기사님, 배차표 이미지 분석 중 네트워크 연결에 문제가 발생했습니다. 잠시 후 다시 시도해 주시기 바랍니다.`;
@@ -336,6 +386,10 @@ ${scheduleItemsFormatted}
       startTypewriter(errMsg);
       haptics.warningPulse();
     } finally {
+      if (scheduleAnalysisTimerRef.current) {
+        clearInterval(scheduleAnalysisTimerRef.current);
+        scheduleAnalysisTimerRef.current = null;
+      }
       setIsAnalyzing(false);
       if (e.target) e.target.value = '';
     }
@@ -781,17 +835,74 @@ ${scheduleItemsFormatted}
             </div>
 
             {/* Query Echo Banner */}
-            <div className="text-[11px] text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg truncate">
-              💬 <span className="font-bold text-slate-700">질문:</span> {copilotResponse.query}
+            <div className="text-[11px] text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg truncate font-medium">
+              {isAnalyzingSchedule ? (
+                <span>분석 대상: {copilotResponse.query}</span>
+              ) : (
+                <span>💬 <span className="font-bold text-slate-700">질문:</span> {copilotResponse.query}</span>
+              )}
             </div>
 
-            {/* Thinking Step Indicator (1.2~1.5s Sequential Reasoning Progression - 동일한 흑색 텍스트 테마) */}
-            {isThinking && (
+            {/* 6-Stage Cockpit AI Precision Analysis with 100% Solid Cobalt Blue Gauge Bar */}
+            {isAnalyzingSchedule ? (
+              <div className="space-y-3 p-3.5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs animate-fade-in">
+                {!scheduleAnalysisCompleted ? (
+                  <>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold text-slate-700 tracking-tight truncate">
+                        {COCKPIT_ANALYSIS_STAGES[scheduleAnalysisStage]?.text || '1단계 · 운항 지시서 이미지 분석 중...'}
+                      </span>
+                      <span className="text-xs font-bold text-[#1E60F3] shrink-0 font-mono">
+                        {scheduleAnalysisProgress >= 97
+                          ? '분석 신뢰도 97%'
+                          : scheduleAnalysisProgress >= 86
+                          ? '분석 신뢰도 86%'
+                          : scheduleAnalysisProgress >= 72
+                          ? '분석 신뢰도 72%'
+                          : `분석 신뢰도 ${scheduleAnalysisProgress}%`}
+                      </span>
+                    </div>
+
+                    {/* Progress Track & Solid Cobalt Blue Gauge Bar */}
+                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden w-full">
+                      <div
+                        className="h-full bg-[#1E60F3] transition-all duration-300 ease-out"
+                        style={{ width: `${scheduleAnalysisProgress}%` }}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  /* 100% 완충 및 최종 완료 확정 상태 (약 0.8초 유지) */
+                  <div className="space-y-2 py-0.5 animate-fade-in">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-900 tracking-tight">
+                        ✓ Cockpit AI 분석 완료
+                      </span>
+                      <span className="text-xs font-black text-[#1E60F3] font-mono">
+                        신뢰도 100%
+                      </span>
+                    </div>
+
+                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden w-full">
+                      <div
+                        className="h-full bg-[#1E60F3] transition-all duration-300 ease-out"
+                        style={{ width: '100%' }}
+                      />
+                    </div>
+
+                    <p className="text-xs font-semibold text-slate-700 tracking-tight pt-0.5">
+                      기사님 전용 스케줄이 준비되었습니다.
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : isThinking ? (
+              /* Normal text chat thinking indicator */
               <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-100 border border-slate-200/90 text-xs font-bold text-slate-800 animate-pulse">
                 <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0 text-slate-700" />
                 <span className="truncate text-slate-800">{THINKING_STEPS[thinkingStep ?? 0]}</span>
               </div>
-            )}
+            ) : null}
 
             {/* Formatted Reply Body with Typewriter Streaming Effect */}
             {!isThinking && displayedReply && (

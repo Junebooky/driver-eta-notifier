@@ -15,6 +15,7 @@ export interface ScheduleItem {
   status: 'confirmed' | 'pending' | 'completed';
   passenger: string;
   flight?: string;
+  flightType?: 'arrival' | 'departure';
   notes?: string;
   // SSOT preset mapping for zero-cost geocoding and instant navigation
   origin_preset_id: string;
@@ -127,6 +128,7 @@ export const CONFIRMED_FERRARI_SCHEDULES: ScheduleItem[] = [
     status: "confirmed",
     passenger: "KAI THIO (1명)",
     flight: "SQ 601 (16:45 출국)",
+    flightType: "departure",
     notes: "CLUB CHALLENGE C/D 출국 샌딩"
   }
 ];
