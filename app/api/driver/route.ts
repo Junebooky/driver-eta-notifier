@@ -61,20 +61,52 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { vehicle_no, car_number, driver_name, phone, default_navi } = body;
+    const rawVehicleNo = body.vehicle_no || body.vehicleNo || '';
+    const rawDriverName = body.driver_name || body.driverName || '';
+    let rawCarNumber = body.car_number || body.carNumber || '';
+    const rawPhone = body.phone || '';
+    const rawDefaultNavi = body.default_navi || body.defaultNavi || 'tmap';
 
-    if (!vehicle_no) {
+    // If client only sent metadata without vehicle identifier, handle gracefully
+    if (!rawVehicleNo && (body.presetOrder || body.homeLocation)) {
+      return NextResponse.json({ success: true, message: 'Metadata updated' });
+    }
+
+    if (!rawVehicleNo) {
       return NextResponse.json({ error: 'vehicle_no is required' }, { status: 400 });
     }
 
+    // Normalize vehicle_no: e.g. "4호차 142호 7811" -> "4호차"
+    let normalizedVehicleNo = rawVehicleNo.trim();
+    const hochaMatch = normalizedVehicleNo.match(/(\d+호차)/);
+    if (hochaMatch) {
+      const hocha = hochaMatch[1];
+      const remainder = normalizedVehicleNo.replace(hocha, '').trim();
+      normalizedVehicleNo = hocha;
+      if (!rawCarNumber && remainder) {
+        rawCarNumber = remainder;
+      }
+    }
+
+    // Ensure car_number is never null to satisfy NOT NULL constraint
+    if (!rawCarNumber) {
+      const { data: existing } = await supabaseAdmin
+        .from('drivers')
+        .select('car_number')
+        .eq('vehicle_no', normalizedVehicleNo)
+        .maybeSingle();
+
+      rawCarNumber = existing?.car_number || (DRIVER_DEFAULTS[normalizedVehicleNo]?.car_number || '142호 7811');
+    }
+
     const payload: any = {
-      vehicle_no,
+      vehicle_no: normalizedVehicleNo,
+      car_number: rawCarNumber,
     };
 
-    if (car_number !== undefined) payload.car_number = car_number;
-    if (driver_name !== undefined) payload.driver_name = driver_name;
-    if (phone !== undefined) payload.phone = phone;
-    if (default_navi !== undefined) payload.default_navi = default_navi;
+    if (rawDriverName) payload.driver_name = rawDriverName;
+    if (rawPhone) payload.phone = rawPhone;
+    if (rawDefaultNavi) payload.default_navi = rawDefaultNavi;
 
     const { data, error } = await supabaseAdmin
       .from('drivers')

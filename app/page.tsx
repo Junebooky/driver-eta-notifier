@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useDriverProfile, getOrCreateDeviceUuid } from '@/hooks/useDriverProfile';
 import { useLocation } from '@/hooks/useLocation';
 import { Header } from '@/components/Header';
-import { ProfileModal } from '@/components/ProfileModal';
+import { ProfileModal, parseVehicleDetails } from '@/components/ProfileModal';
 import { AdminPinModal } from '@/components/AdminPinModal';
 import { OriginDestinationSelector } from '@/components/OriginDestinationSelector';
 import { PresetButtons } from '@/components/PresetButtons';
@@ -745,12 +745,15 @@ export default function Home() {
           } catch (e) {
             console.warn('Failed to save onboarding flag:', e);
           }
-          // Sync profile to Supabase with vehicle_no
+          // Sync profile to Supabase with vehicle_no & car_number
+          const { hocha: h, plateNumber: pNum } = parseVehicleDetails(updated.vehicleNo);
+          const cleanVehicleNo = h ? `${h}호차` : (updated.vehicleNo || '4호차');
           fetch('/api/driver', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              vehicle_no: updated.vehicleNo,
+              vehicle_no: cleanVehicleNo,
+              car_number: pNum || undefined,
               driver_name: updated.driverName,
               default_navi: updated.defaultNavi ?? profile.defaultNavi,
             }),
