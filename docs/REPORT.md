@@ -718,4 +718,38 @@ SELECT * FROM cockpit.presets;
 ### 21.3 빌드 무결성 검증
 * `npm run build`: Turbopack 기준 14/14 라우트 정상 빌드 완료 (컴파일 에러 0건).
 
+---
+
+## 22. 호차별 전담 기사 SSOT 데이터 정합성 원상복구 및 가짜 더미 데이터 영구 척결 (2026-09-23)
+
+### 22.1 문제 원인 정밀 규명
+1. **임의의 테스트 가짜 이름('박의전') 잔존**:
+   * 초기 개발 단계에서 2호차에 임의로 부여되었던 더미 이름(`박의전`)이 `FLEET_PRESET_DRIVERS`, `DRIVER_DEFAULTS`, Supabase `cockpit.drivers`에 방치되어 있었음.
+   * 실제 2호차의 공식 전담 기사님은 **홍승범** 기사님임에도 가짜 이름이 노출되는 결함 발생.
+2. **1호차(배선만) 프리셋 누락에 따른 프로필 상태 불일치**:
+   * 과거 '김의전(1호차)' 테스트 데이터를 삭제하는 과정에서 `FLEET_PRESET_DRIVERS`에서 1호차 객체 자체가 제거되어 있었음.
+   * 스케줄 탭에서 '1호차(배선만)' 탭을 클릭했을 때 `FLEET_PRESET_DRIVERS.find()`가 `undefined`를 반환하여 직전에 선택되었던 2호차의 기사명(`박의전`)이 1호차 화면에 그대로 잔존·노출되는 상태 누수(State Leak) 발생.
+
+### 22.2 조치 내역
+1. **공식 기사 정보 완전 확정 및 복구**:
+   * **1호차**: `배선만` / `142호 7814` / `010-8806-9758`
+   * **2호차**: `홍승범` / `112하 3456` / `010-3333-4444` (가짜 이름 '박의전' 완전 영구 제명)
+   * **4호차**: `윤태준` / `142호 7811` / `010-6348-8726`
+   * **8호차**: `민성호` / `142호 7815` / `010-7231-8340`
+2. **Supabase `cockpit.drivers` DB 영구 반영**:
+   * 2호차 `driver_name = '홍승범'` 갱신 완료.
+   * 1호차 `배선만` 데이터 무결성 보장.
+3. **코드베이스 및 상수 동기화**:
+   * [`utils/constants.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/utils/constants.ts): `FLEET_PRESET_DRIVERS`에 1호차(배선만), 2호차(홍승범) 정규 등록.
+   * [`app/api/driver/route.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/api/driver/route.ts): `DRIVER_DEFAULTS`에 1호차(배선만), 2호차(홍승범) 동기화.
+   * [`utils/nameMatcher.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/utils/nameMatcher.ts): `'범': ['Beom', 'Bum']` 음절 매핑 추가하여 `홍승범` 기사님의 영문 다형성 후보군 100% 매칭 보장.
+4. **상태 누수 방지 및 로컬스토리지 자동 마이그레이션**:
+   * [`app/page.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/page.tsx): `onSwitchVehicle` 시 정적 프리셋에 없는 경우에도 `/api/driver?vehicle_no=...`를 즉시 호출하여 타 호차 기사명이 잔존하는 현상 차단.
+   * [`hooks/useDriverProfile.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/hooks/useDriverProfile.ts): 클라이언트 로컬스토리지에 기존 '박의전' 값이 캐시되어 있는 경우 1호차는 '배선만', 2호차는 '홍승범'으로 즉시 자동 치환되도록 정화 로직 적용.
+   * [`components/ScheduleTab.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ScheduleTab.tsx): `availableVehicles` 및 `vehicleCounts` 기본값에 `1호차` 기본 포함.
+
+### 22.3 빌드 무결성 검증
+* `npm run build`: Turbopack 기준 14/14 라우트 정상 빌드 완료 (에러 0건).
+
+
 

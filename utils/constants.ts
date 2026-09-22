@@ -22,6 +22,26 @@ export interface FleetPresetDriver {
 
 export const FLEET_PRESET_DRIVERS: FleetPresetDriver[] = [
   {
+    vehicleNo: '1호차',
+    hocha: '1',
+    plateFront: '142호',
+    plateBack: '7814',
+    carNumber: '142호 7814',
+    driverName: '배선만',
+    phone: '010-8806-9758',
+    defaultNavi: 'tmap',
+  },
+  {
+    vehicleNo: '2호차',
+    hocha: '2',
+    plateFront: '112하',
+    plateBack: '3456',
+    carNumber: '112하 3456',
+    driverName: '홍승범',
+    phone: '010-3333-4444',
+    defaultNavi: 'tmap',
+  },
+  {
     vehicleNo: '4호차',
     hocha: '4',
     plateFront: '142호',
@@ -39,16 +59,6 @@ export const FLEET_PRESET_DRIVERS: FleetPresetDriver[] = [
     carNumber: '142호 7815',
     driverName: '민성호',
     phone: '010-7231-8340',
-    defaultNavi: 'tmap',
-  },
-  {
-    vehicleNo: '2호차',
-    hocha: '2',
-    plateFront: '112하',
-    plateBack: '3456',
-    carNumber: '112하 3456',
-    driverName: '박의전',
-    phone: '010-3333-4444',
     defaultNavi: 'tmap',
   },
 ];

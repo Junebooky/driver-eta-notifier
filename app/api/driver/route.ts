@@ -2,6 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 
 const DRIVER_DEFAULTS: Record<string, any> = {
+  '1호차': {
+    vehicle_no: '1호차',
+    car_number: '142호 7814',
+    driver_name: '배선만',
+    phone: '010-8806-9758',
+    default_navi: 'tmap',
+  },
+  '2호차': {
+    vehicle_no: '2호차',
+    car_number: '112하 3456',
+    driver_name: '홍승범',
+    phone: '010-3333-4444',
+    default_navi: 'tmap',
+  },
   '4호차': {
     vehicle_no: '4호차',
     car_number: '142호 7811',
@@ -14,13 +28,6 @@ const DRIVER_DEFAULTS: Record<string, any> = {
     car_number: '142호 7815',
     driver_name: '민성호',
     phone: '010-7231-8340',
-    default_navi: 'tmap',
-  },
-  '2호차': {
-    vehicle_no: '2호차',
-    car_number: '112하 3456',
-    driver_name: '박의전',
-    phone: '010-3333-4444',
     default_navi: 'tmap',
   },
 };

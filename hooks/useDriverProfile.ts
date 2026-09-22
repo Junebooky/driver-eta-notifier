@@ -67,6 +67,27 @@ export function useDriverProfile() {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
+
+        // Sanitize stale dummy data ('박의전' -> real driver profile)
+        if (parsed.driverName === '박의전') {
+          if (parsed.vehicleNo?.includes('1')) {
+            parsed.driverName = '배선만';
+            parsed.carNumber = '142호 7814';
+            parsed.carNumberFront = '142호';
+            parsed.carNumberBack = '7814';
+            parsed.phone = '010-8806-9758';
+            parsed.mobile = '010-8806-9758';
+            parsed.phonePart1 = '010';
+            parsed.phonePart2 = '8806';
+            parsed.phonePart3 = '9758';
+          } else {
+            parsed.driverName = '홍승범';
+          }
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+          } catch {}
+        }
+
         const resolvedPhone = parsed.phone || parsed.mobile || '';
         setProfile((prev) => ({
           ...prev,

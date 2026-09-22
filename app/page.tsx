@@ -796,7 +796,26 @@ export default function Home() {
                     }),
                   }).catch((err) => console.warn('Supabase driver background sync failed:', err));
                 } else {
-                  updateProfile({ vehicleNo: vNo });
+                  // Fallback: fetch dynamically from API so different vehicle never retains old driver name
+                  fetch(`/api/driver?vehicle_no=${encodeURIComponent(vNo)}`)
+                    .then((res) => res.json())
+                    .then((data) => {
+                      if (data?.driver) {
+                        const d = data.driver;
+                        const fullVehicle = d.car_number ? `${d.vehicle_no} ${d.car_number}` : d.vehicle_no;
+                        updateProfile({
+                          vehicleNo: fullVehicle,
+                          carNumber: d.car_number || undefined,
+                          driverName: d.driver_name || '',
+                          phone: d.phone || '',
+                          mobile: d.phone || '',
+                          defaultNavi: d.default_navi || 'tmap',
+                        });
+                      } else {
+                        updateProfile({ vehicleNo: vNo });
+                      }
+                    })
+                    .catch(() => updateProfile({ vehicleNo: vNo }));
                 }
                 fetchPresetsForVehicle(vNo);
               }}

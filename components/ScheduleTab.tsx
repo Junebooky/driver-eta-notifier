@@ -64,11 +64,12 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
   // Vehicle Isolation & Fleet Switcher State (Dev Mode enables switching between vehicles & All)
   const initialVehicle = profile.vehicleNo?.match(/(\d+호차)/)?.[1] || '4호차';
   const [selectedVehicleFilter, setSelectedVehicleFilter] = useState<string>(initialVehicle);
-  const [availableVehicles, setAvailableVehicles] = useState<string[]>(['4호차', '8호차', '2호차']);
+  const [availableVehicles, setAvailableVehicles] = useState<string[]>(['1호차', '2호차', '4호차', '8호차']);
   const [vehicleCounts, setVehicleCounts] = useState<Record<string, number>>({
+    '1호차': 0,
+    '2호차': 0,
     '4호차': 0,
     '8호차': 0,
-    '2호차': 0,
     'all': 0,
   });
 
@@ -79,14 +80,15 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
         fetch('/api/driver?all=true'),
       ]);
 
-      const vehicleSet = new Set<string>(['4호차', '8호차', '2호차']);
+      const vehicleSet = new Set<string>(['1호차', '2호차', '4호차', '8호차']);
       const currentHocha = profile.vehicleNo?.match(/(\d+호차)/)?.[1];
       if (currentHocha) vehicleSet.add(currentHocha);
 
       const counts: Record<string, number> = {
+        '1호차': 0,
+        '2호차': 0,
         '4호차': 0,
         '8호차': 0,
-        '2호차': 0,
         all: 0,
       };
 
