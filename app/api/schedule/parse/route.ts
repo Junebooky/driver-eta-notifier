@@ -374,9 +374,7 @@ export async function POST(req: NextRequest) {
       ? `📋 배차 일정 동기화 완료
 ${driverName} 기사님(${targetVehicleNo} · ${plateNo})의 의전 일정 총 ${rawSchedules.length}건이 정리되었습니다.
 
-${scheduleItemsFormatted}
-
-스케줄 캘린더에서 상세 동선과 원터치 티맵·카카오 내비 안내를 바로 이용하실 수 있습니다.`
+${scheduleItemsFormatted}`.trim()
       : `기사님, 배차표에서 ${driverName} 기사님(${targetVehicleNo} · ${plateNo})의 배차 일정이 발견되지 않았습니다. 프로필 정보나 배차표 이미지를 다시 한번 확인해 주시기 바랍니다.`;
 
     return NextResponse.json({

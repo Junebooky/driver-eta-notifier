@@ -402,9 +402,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
         const replyText = `📋 배차 일정 동기화 완료
 ${driverName} 기사님(${hochaStr} · ${plateNo})의 의전 일정 총 ${allParsedSchedules.length}건이 정리되었습니다.
 
-${scheduleItemsFormatted}
-
-스케줄 캘린더에서 상세 동선과 원터치 티맵·카카오 내비 안내를 바로 이용하실 수 있습니다.`;
+${scheduleItemsFormatted}`.trim();
 
         setCopilotResponse({
           query: totalFiles > 1 ? `배차표 ${totalFiles}장 일괄 동기화 완료` : `배차표 이미지 분석 완료`,
