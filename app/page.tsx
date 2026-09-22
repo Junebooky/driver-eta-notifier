@@ -127,16 +127,19 @@ export default function Home() {
   useEffect(() => {
     async function syncDriverProfile() {
       try {
-        if (!profile.driverName || !profile.vehicleNo) {
+        if (!profile.driverName || !profile.vehicleNo || !profile.phone) {
           const dRes = await fetch(`/api/driver?vehicle_no=${encodeURIComponent(profile.vehicleNo || '4호차')}`);
           if (dRes.ok) {
             const dData = await dRes.json();
             if (dData.driver) {
-              const { vehicle_no, car_number, driver_name, default_navi } = dData.driver;
+              const { vehicle_no, car_number, driver_name, phone, default_navi } = dData.driver;
               const fullVehicleNo = car_number ? `${vehicle_no} ${car_number}` : vehicle_no;
               updateProfile({
                 vehicleNo: fullVehicleNo,
+                carNumber: car_number || undefined,
                 driverName: driver_name || profile.driverName,
+                phone: phone || profile.phone,
+                mobile: phone || profile.mobile,
                 defaultNavi: default_navi || profile.defaultNavi || 'tmap',
               });
             }
@@ -799,6 +802,7 @@ export default function Home() {
               vehicle_no: cleanVehicleNo,
               car_number: pNum || undefined,
               driver_name: updated.driverName,
+              phone: updated.phone || updated.mobile || undefined,
               default_navi: updated.defaultNavi ?? profile.defaultNavi,
             }),
           }).catch((err) => console.warn('Supabase driver profile sync error:', err));

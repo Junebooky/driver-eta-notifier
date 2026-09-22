@@ -26,7 +26,10 @@ export function getOrCreateDeviceUuid(): string {
 const DEFAULT_PROFILE: DriverProfile = {
   id: '',
   vehicleNo: '',
+  carNumber: '',
   driverName: '',
+  phone: '',
+  mobile: '',
   passengerName: '',
   defaultNavi: 'tmap',
   targetChatRoom: '',
@@ -42,10 +45,13 @@ export function useDriverProfile() {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
+        const resolvedPhone = parsed.phone || parsed.mobile || '';
         setProfile((prev) => ({
           ...prev,
           id: deviceUuid,
           ...parsed,
+          phone: resolvedPhone || prev.phone || '',
+          mobile: resolvedPhone || prev.mobile || '',
           defaultNavi: parsed.defaultNavi || 'tmap',
           passengerName: parsed.passengerName !== undefined ? parsed.passengerName : prev.passengerName,
         }));
@@ -64,10 +70,19 @@ export function useDriverProfile() {
 
   const updateProfile = (newProfile: Partial<DriverProfile>) => {
     setProfile((prev) => {
+      const resolvedPhone =
+        newProfile.phone !== undefined
+          ? newProfile.phone
+          : newProfile.mobile !== undefined
+          ? newProfile.mobile
+          : prev.phone;
+
       const updated = {
         ...prev,
         ...newProfile,
         id: prev.id || getOrCreateDeviceUuid(),
+        phone: resolvedPhone,
+        mobile: resolvedPhone,
         defaultNavi: newProfile.defaultNavi || prev.defaultNavi || 'tmap',
         passengerName:
           newProfile.passengerName !== undefined

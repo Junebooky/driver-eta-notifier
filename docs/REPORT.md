@@ -300,3 +300,60 @@ SELECT * FROM cockpit.presets;
 ### 12.2 빌드 검증
 * `npm run build`: Next.js 16.3.5 Turbopack 기준 13/13 라우트 컴파일 에러 0건 성공.
 * 본사 공통 마스터 거점(인천공항, 조선팰리스 등) 하단에는 `HQ`, 기사 등록 커스텀 거점 하단에는 `MY` 노출 검증 완료.
+
+---
+
+## 13. [v4.80] 기사 프로필 연락처 필드 신설 및 영문명·차량번호·모바일 3중 앵커 기반 배차표 이미지 AI 자동 파싱 및 Supabase 적재 파이프라인
+
+> **평가 일시**: 2026년 9월 22일  
+> **엔진**: Google Gemini 3.8 Flash Multimodal Vision (`gemini-3.8-flash`)  
+> **DB 스키마**: Supabase `cockpit` 전용 격리 스키마 (`cockpit.drivers`, `cockpit.schedules`, `cockpit.presets`)  
+
+### 13.1 기사 프로필 연락처(휴대폰 번호) 필드 신설 및 온보딩/프리셋 연동
+
+1. **타입 정의 및 스토어 갱신 ([`types/index.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/types/index.ts), [`hooks/useDriverProfile.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/hooks/useDriverProfile.ts))**:
+   * `DriverProfile` 인터페이스에 `phone?: string; mobile?: string; carNumber?: string;` 추가.
+   * `useDriverProfile` 훅에서 로컬스토리지 및 Supabase `cockpit.drivers` 간의 양방향 상태 동기화 구현.
+
+2. **프로필 설정 모달 UI 확장 ([`components/ProfileModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ProfileModal.tsx))**:
+   * 차량 번호판과 드라이버 성명 입력란 사이에 **'연락처 (휴대폰 번호)'** 입력 필드 신설.
+   * `formatPhoneNumber` 유틸을 내장하여 숫자 입력 시 자동으로 `010-0000-0000` 규격으로 하이픈 포맷팅.
+   * 상단 빠른 기사 전환 프리셋(FLEET_PRESET_DRIVERS)에도 공식 연락처 데이터 바인딩:
+     * `4호차`: 윤태준 / 142호 7811 / `010-6348-8726`
+     * `1호차`: 김의전 / 110하 1035 / `010-1111-2222`
+     * `2호차`: 박의전 / 112하 3456 / `010-3333-4444`
+
+3. **온보딩 가드레일 강화**:
+   * 기사 최초 등록 온보딩(`isOnboarding = true`) 시 호차, 차량번호, 기사명과 함께 **휴대폰 번호(10자리 이상)가 필수 입력**되도록 가드레일 적용.
+
+### 13.2 한글/영문 기사명 다형성 생성 엔진 ([`utils/nameMatcher.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/utils/nameMatcher.ts))
+
+* 글로벌 VIP 의전 배차표의 영문 기사명 표기(`DRIVER NAME`)에 대응하여, 한글 성명으로부터 가능한 모든 영문 후보군을 자동 조합 생성:
+  * 예: '윤태준' ➔ `Yoon Tae Jun`, `Yoon Taejun`, `Yoon, Tae Jun`, `Yoon Tae-Jun`, `Tae Jun Yoon`, `Taejun Yoon`, `Tae-Jun Yoon`, `YOONTAEJUN`, `TAEJUNYOON` 등.
+* 배차표 파싱 API 호출 시 클라이언트가 `generateNameCandidates(driverName)`를 통해 후보군을 자동 패키징하여 전송.
+
+### 13.3 백엔드 멀티모달 배차표 파싱 API ([`app/api/schedule/parse/route.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/api/schedule/parse/route.ts))
+
+1. **Gemini 3.8 Flash Vision 3중 앵커 매칭 가드레일**:
+   * **1) 기사명 매칭**: 표의 `DRIVER NAME` 열이 `nameCandidates` 중 하나와 일치하는가?
+   * **2) 차량번호 매칭**: 표의 `CAR REG NO` 열에 `plateLast4`("7811") 또는 `plateNo`가 포함되어 있는가?
+   * **3) 연락처 매칭**: 표의 `DRIVER MOBILE` 열에 기사 휴대폰 번호(`010-6348-8726`, `01063488726`)가 일치하는가?
+   * **판별 기준**: 3개 조건 중 **2개 이상 일치하거나, 차량번호 뒷 4자리 또는 영문/한글 기사명이 명확히 일치하는 행만 정밀 발췌**.
+   * **엄격한 세션 격리**: 타 호차/타 기사의 일정은 100% 배제하며, 불일치 시 빈 배열(`[]`) 반환.
+
+2. **Supabase DB 적재 파이프라인 (`cockpit.schedules`)**:
+   * `cockpit.presets` 마스터 거점 테이블과 좌표/도로명 주소를 매핑하여 정밀 좌표 자동 보정.
+   * `(vehicle_no, date, pickup_time)` 기반 중복 방지 Upsert 로직 구현.
+   * `cockpit.drivers` 외래키 참조 무결성을 보장하기 위한 선제적 프로필 Upsert 연동.
+
+### 13.4 스케줄 탭 실시간 연동 및 무결성 검증 ([`components/ScheduleTab.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ScheduleTab.tsx))
+
+* 카메라/배차표 이미지 업로드 시 base64 인코딩 및 프로필 3중 앵커 페이로드를 조립하여 `/api/schedule/parse` 호출.
+* 파싱 및 DB 적재 완료 시 Supabase SSOT로부터 즉시 `fetchSchedulesForVehicle` 및 `fetchCounts`를 호출하여 최신 DB 데이터를 UI에 즉시 반영.
+* 기존의 Mock 배차표(`CONFIRMED_FERRARI_SCHEDULES`) 덮어쓰기 로직을 전면 제거하고 실제 DB 데이터 중심 실시간 렌더링으로 전환.
+* AI 코파일럿 브리핑 창에 발췌 건수, 기사 3중 앵커 검증 정보, 상세 일정 브리핑 타이프라이터 효과 제공.
+
+### 13.5 빌드 검증 결과
+* `npm run build`: Next.js 16.3.5 Turbopack 기준 14/14 라우트 컴파일 에러 **0건** 성공.
+  - `/api/schedule/parse` 라우트 신규 생성 및 빌드 확인.
+

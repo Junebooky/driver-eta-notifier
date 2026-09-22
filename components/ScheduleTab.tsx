@@ -8,6 +8,8 @@ import { EditScheduleModal } from '@/components/EditScheduleModal';
 import { Camera, Send, AlertCircle, Sparkles, RefreshCw, Bot, Copy, Check, X } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 import { ENABLE_DEV_FLEET_SWITCHER } from '@/utils/constants';
+import { generateNameCandidates } from '@/utils/nameMatcher';
+import { parseVehicleDetails } from '@/components/ProfileModal';
 
 const THINKING_STEPS = [
   '🔍 배차 데이터베이스 동선 대조 중...',
@@ -161,7 +163,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
   // Profile validation guardrail: Driver must have at least vehicleNo or driverName registered
   const hasProfile = Boolean(profile.vehicleNo?.trim() || profile.driverName?.trim());
 
-  // Handle image upload and AI parsing response (Calls gemini-3.8-flash for multimodal reasoning)
+  // Handle image upload and AI parsing response (Calls Gemini 3.8 Flash Vision with 3-anchor guardrail)
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     const file = e.target.files[0];
@@ -187,22 +189,31 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
     const reader = new FileReader();
     reader.onload = async () => {
       const base64Data = reader.result as string;
-      const thinkingDelayPromise = new Promise((resolve) => setTimeout(resolve, 1350));
+      const thinkingDelayPromise = new Promise((resolve) => setTimeout(resolve, 1000));
 
       try {
-        const fetchPromise = fetch('/api/copilot', {
+        const vehicleDetails = parseVehicleDetails(profile.vehicleNo);
+        const hochaStr = vehicleDetails.hocha ? `${vehicleDetails.hocha}호차` : (profile.vehicleNo || '4호차');
+        const plateNo = vehicleDetails.plateNumber || profile.carNumber || '142호 7811';
+        const plateLast4 = vehicleDetails.plateBack || (plateNo ? plateNo.replace(/\D/g, '').slice(-4) : '7811');
+        const driverName = profile.driverName || '윤태준';
+        const mobile = profile.phone || profile.mobile || '010-6348-8726';
+        const nameCandidates = generateNameCandidates(driverName);
+
+        const fetchPromise = fetch('/api/schedule/parse', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            query: '배차표 이미지를 정밀 분석하여 기사 프로필에 맞는 확정 일정을 브리핑하고 등록해줘.',
-            image: base64Data,
-            mode: 'image_analysis',
+            imageBase64: base64Data,
             profile: {
-              vehicleNo: profile.vehicleNo,
-              driverName: profile.driverName,
+              vehicleNo: hochaStr,
+              driverName,
+              nameCandidates,
+              plateNo,
+              plateLast4,
+              mobile,
               passengerName: profile.passengerName,
             },
-            schedules: schedules.length > 0 ? schedules : CONFIRMED_FERRARI_SCHEDULES,
           }),
         });
 
@@ -211,30 +222,47 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
 
         setIsThinking(false);
         setThinkingStep(null);
-        setSchedules(CONFIRMED_FERRARI_SCHEDULES);
-        setCopilotResponse({
-          query: `배차표 이미지 분석 (${file.name})`,
-          reply: data.reply,
-          type: data.type || 'schedule_parse',
-        });
-        startTypewriter(data.reply);
-        haptics.success();
-      } catch (err) {
+
+        if (data.success) {
+          // Immediately reload from Supabase SSOT
+          await fetchSchedulesForVehicle(selectedVehicleFilter);
+          await fetchCounts();
+
+          const replyText =
+            data.summary || `[배차표 분석 완료] 총 ${data.count || 0}건의 의전 일정이 성공적으로 등록되었습니다.`;
+          setCopilotResponse({
+            query: `배차표 이미지 분석 (${file.name})`,
+            reply: replyText,
+            type: 'schedule_parse',
+          });
+          startTypewriter(replyText);
+          haptics.success();
+        } else {
+          const failMsg = `[배차표 분석 안내]
+• 오류: ${data.error || '배차표 파싱에 실패했습니다.'}
+• 기사 프로필 3중 앵커(${driverName}, ${plateLast4}, ${mobile})를 확인해 주십시오.`;
+          setCopilotResponse({
+            query: `배차표 이미지 분석 (${file.name})`,
+            reply: failMsg,
+            type: 'schedule_parse',
+          });
+          startTypewriter(failMsg);
+          haptics.warningPulse();
+        }
+      } catch (err: any) {
         console.error('Image analysis error:', err);
         setIsThinking(false);
         setThinkingStep(null);
-        setSchedules(CONFIRMED_FERRARI_SCHEDULES);
-        const fallbackReply = `[배차표 이미지 분석 및 등록 완료]
-• 기사 프로필: ${profile.vehicleNo || '4호차'} • ${profile.driverName || '윤태준'} 기사님
-• 확정 일정: 총 4건의 페라리 VIP 의전 일정이 성공적으로 등록되었습니다.
-• 주요 거점: 인천공항 T1, 조선팰리스 강남, 인제스피디움 호텔/트랙`;
+        const errMsg = `[배차표 이미지 분석 오류]
+• 서버 통신 중 오류가 발생했습니다: ${err?.message || '네트워크 연결을 확인해 주십시오.'}
+• 잠시 후 다시 시도해 주십시오.`;
         setCopilotResponse({
           query: `배차표 이미지 분석 (${file.name})`,
-          reply: fallbackReply,
+          reply: errMsg,
           type: 'schedule_parse',
         });
-        startTypewriter(fallbackReply);
-        haptics.success();
+        startTypewriter(errMsg);
+        haptics.warningPulse();
       } finally {
         setIsAnalyzing(false);
         if (e.target) e.target.value = '';

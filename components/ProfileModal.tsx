@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { DriverProfile, NaviProvider } from '@/types';
-import { X, User, Car, Users, Navigation, Check } from 'lucide-react';
+import { X, User, Car, Users, Navigation, Check, Phone } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 import { ENABLE_DEV_FLEET_SWITCHER, FLEET_PRESET_DRIVERS } from '@/utils/constants';
 
@@ -60,6 +60,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [hocha, setHocha] = useState(parsed.hocha);
   const [plateFront, setPlateFront] = useState(parsed.plateFront);
   const [plateBack, setPlateBack] = useState(parsed.plateBack);
+  const [phone, setPhone] = useState(profile.phone || profile.mobile || '');
   const [driverName, setDriverName] = useState(profile.driverName || '');
   const [passengerName, setPassengerName] = useState(profile.passengerName || '');
   const [defaultNavi, setDefaultNavi] = useState<NaviProvider>(profile.defaultNavi || 'tmap');
@@ -69,6 +70,17 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const plateFrontRef = React.useRef<HTMLInputElement>(null);
   const plateBackRef = React.useRef<HTMLInputElement>(null);
 
+  const formatPhoneNumber = (val: string): string => {
+    const digits = val.replace(/[^0-9]/g, '').slice(0, 11);
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+    return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPhone(formatPhoneNumber(e.target.value));
+  };
+
   useEffect(() => {
     if (isOpen) {
       setIsSaving(false);
@@ -76,6 +88,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       setHocha(initial.hocha);
       setPlateFront(initial.plateFront);
       setPlateBack(initial.plateBack);
+      setPhone(profile.phone || profile.mobile || '');
       setDriverName(profile.driverName || '');
       setPassengerName(profile.passengerName || '');
       setDefaultNavi(profile.defaultNavi || 'tmap');
@@ -183,9 +196,31 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       combinedVehicleNo = combinedPlate;
     }
 
+    if (isOnboarding) {
+      const cleanPhone = phone.replace(/[^0-9]/g, '');
+      if (!cleanPhone || cleanPhone.length < 10) {
+        alert('휴대폰 번호(연락처)를 올바르게 입력해 주십시오. (예: 010-0000-0000)');
+        setIsSaving(false);
+        return;
+      }
+      if (!pBack || pBack.length < 4) {
+        alert('차량 번호판 뒷자리 4자리를 입력해 주십시오.');
+        setIsSaving(false);
+        return;
+      }
+      if (!driverName.trim()) {
+        alert('드라이버 성명을 입력해 주십시오.');
+        setIsSaving(false);
+        return;
+      }
+    }
+
     const payload: Partial<DriverProfile> = {
       vehicleNo: combinedVehicleNo,
+      carNumber: combinedPlate || undefined,
       driverName: driverName.trim(),
+      phone: phone.trim(),
+      mobile: phone.trim(),
       passengerName: passengerName.trim(),
       defaultNavi: defaultNavi || 'tmap',
     };
@@ -273,6 +308,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                         setPlateFront(d.plateFront);
                         setPlateBack(d.plateBack);
                         setDriverName(d.driverName);
+                        setPhone(d.phone);
                         setDefaultNavi(d.defaultNavi);
                       }}
                       className={`p-2 rounded-xl text-left border transition-all cursor-pointer ${
@@ -286,7 +322,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                         {d.driverName}
                       </div>
                       <div className={`text-[9px] truncate ${isCurrent ? 'text-blue-200' : 'text-slate-400'}`}>
-                        {d.plateBack}
+                        {d.phone}
                       </div>
                     </button>
                   );
@@ -358,7 +394,30 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             </div>
           </div>
 
-          {/* 3. Driver Name Field */}
+          {/* 3. Mobile Phone Number Field (Between License Plate and Driver Name) */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+              <span className="flex items-center">
+                <Phone className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 연락처 (휴대폰 번호)
+              </span>
+              {isOnboarding ? (
+                <span className="text-[10px] text-red-500 font-bold">* 필수 입력</span>
+              ) : (
+                <span className="text-[10px] text-slate-400 font-medium">자동 하이픈</span>
+              )}
+            </label>
+            <input
+              type="tel"
+              inputMode="numeric"
+              value={phone}
+              onChange={handlePhoneChange}
+              placeholder="010-0000-0000"
+              maxLength={13}
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-[#1E60F3] focus:bg-white font-bold transition-colors tracking-wide"
+            />
+          </div>
+
+          {/* 4. Driver Name Field */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center">
               <User className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 드라이버 성명
