@@ -293,7 +293,7 @@ ${presetSummary}
     try {
       const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
-        model: 'gemini-3.5-flash-lite',
+        model: 'gemini-3.8-flash',
         contents: query,
         config: {
           systemInstruction: systemPrompt,
@@ -306,7 +306,7 @@ ${presetSummary}
         throw new Error('Empty response from Gemini model');
       }
 
-      console.log(`[Gemini Live API: Success] Response generated via gemini-1.5-flash for query: "${query.slice(0, 35)}"`);
+      console.log(`[Gemini Live API: Success] Response generated via gemini-3.8-flash for query: "${query.slice(0, 35)}"`);
 
       return NextResponse.json({
         reply,
