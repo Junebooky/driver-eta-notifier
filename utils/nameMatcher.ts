@@ -84,6 +84,8 @@ const SYLLABLE_MAP: Record<string, string[]> = {
   '승': ['Seung'],
   '종': ['Jong'],
   '찬': ['Chan'],
+  '선': ['Seon', 'Sun'],
+  '만': ['Man'],
 };
 
 // 한글 음절 분해를 위한 자음/모음 기본 로마자 (Fallback)

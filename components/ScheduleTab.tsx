@@ -20,10 +20,10 @@ const THINKING_STEPS = [
 const COCKPIT_ANALYSIS_STAGES = [
   { step: 1, text: '1단계 · 운항 지시서 이미지 분석 중...', percent: 45 },
   { step: 2, text: '2단계 · 기사 및 차량 정보 식별 중...', percent: 60 },
-  { step: 3, text: '3단계 · 출발지 · 목적지 · VIP · 항공편 정보 추출 중...', percent: 72 },
-  { step: 4, text: '4단계 · 기사님의 개인 스케줄을 구성 중...', percent: 86 },
-  { step: 5, text: '5단계 · 일정과 이동 정보를 교차 검증 중...', percent: 97 },
-  { step: 6, text: '6단계 · 최종 스케줄 정확도를 확인 중...', percent: 99 },
+  { step: 3, text: '3단계 · VIP 및 항공편 정보 추출 중...', percent: 72 },
+  { step: 4, text: '4단계 · 기사님의 개인 스케줄 구성 중...', percent: 85 },
+  { step: 5, text: '5단계 · 일정과 이동 정보 교차 검증 중...', percent: 92 },
+  { step: 6, text: '6단계 · 최종 스케줄 정확도 확인', percent: 97 },
 ];
 
 interface ScheduleTabProps {
@@ -64,6 +64,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
   // Vehicle Isolation & Fleet Switcher State (Dev Mode enables switching between vehicles & All)
   const initialVehicle = profile.vehicleNo?.match(/(\d+호차)/)?.[1] || '4호차';
   const [selectedVehicleFilter, setSelectedVehicleFilter] = useState<string>(initialVehicle);
+  const [availableVehicles, setAvailableVehicles] = useState<string[]>(['4호차', '8호차', '2호차']);
   const [vehicleCounts, setVehicleCounts] = useState<Record<string, number>>({
     '4호차': 0,
     '8호차': 0,
@@ -73,27 +74,60 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
 
   const fetchCounts = useCallback(async () => {
     try {
-      const res = await fetch('/api/schedules?vehicle_no=all');
-      if (res.ok) {
-        const data = await res.json();
+      const [schedRes, driverRes] = await Promise.all([
+        fetch('/api/schedules?vehicle_no=all'),
+        fetch('/api/driver?all=true'),
+      ]);
+
+      const vehicleSet = new Set<string>(['4호차', '8호차', '2호차']);
+      const currentHocha = profile.vehicleNo?.match(/(\d+호차)/)?.[1];
+      if (currentHocha) vehicleSet.add(currentHocha);
+
+      const counts: Record<string, number> = {
+        '4호차': 0,
+        '8호차': 0,
+        '2호차': 0,
+        all: 0,
+      };
+
+      if (schedRes.ok) {
+        const data = await schedRes.json();
         if (data.schedules) {
-          const counts: Record<string, number> = {
-            '4호차': 0,
-            '8호차': 0,
-            '2호차': 0,
-            'all': data.schedules.length,
-          };
+          counts.all = data.schedules.length;
           data.schedules.forEach((s: ScheduleItem) => {
             const v = s.vehicle_no || '4호차';
+            vehicleSet.add(v);
             counts[v] = (counts[v] || 0) + 1;
           });
-          setVehicleCounts(counts);
         }
       }
+
+      if (driverRes.ok) {
+        const dData = await driverRes.json();
+        if (Array.isArray(dData.drivers)) {
+          dData.drivers.forEach((d: any) => {
+            if (d.vehicle_no) {
+              vehicleSet.add(d.vehicle_no);
+              if (counts[d.vehicle_no] === undefined) {
+                counts[d.vehicle_no] = 0;
+              }
+            }
+          });
+        }
+      }
+
+      const sortedVehicles = Array.from(vehicleSet).sort((a, b) => {
+        const numA = parseInt(a.replace(/\D/g, ''), 10) || 999;
+        const numB = parseInt(b.replace(/\D/g, ''), 10) || 999;
+        return numA - numB;
+      });
+
+      setAvailableVehicles(sortedVehicles);
+      setVehicleCounts(counts);
     } catch (err) {
       console.warn('Failed to fetch schedule counts:', err);
     }
-  }, []);
+  }, [profile.vehicleNo]);
 
   const fetchSchedulesForVehicle = useCallback(async (vNo: string) => {
     try {
@@ -225,7 +259,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
     setIsAnalyzingSchedule(true);
     setScheduleAnalysisCompleted(false);
     setScheduleAnalysisStage(0);
-    setScheduleAnalysisProgress(45);
+    setScheduleAnalysisProgress(30);
     setIsThinking(false);
     setDisplayedReply('');
     setCopilotResponse({
@@ -235,18 +269,38 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
     });
     setIsCopilotOpen(true);
 
-    // Smooth progressive advancement through the 6 stages
+    // Progressive real-time timing synchronization based on network lifecycle
+    const startTime = Date.now();
     const stageInterval = setInterval(() => {
-      setScheduleAnalysisStage((prev) => {
-        const next = Math.min(prev + 1, 5);
-        if (next === 1) setScheduleAnalysisProgress(60);
-        else if (next === 2) setScheduleAnalysisProgress(72);
-        else if (next === 3) setScheduleAnalysisProgress(86);
-        else if (next === 4) setScheduleAnalysisProgress(97);
-        else if (next === 5) setScheduleAnalysisProgress(99);
-        return next;
-      });
-    }, 450);
+      const elapsed = Date.now() - startTime;
+      if (elapsed < 1500) {
+        // 0s ~ 1.5s (요청 초기): 1단계 · 운항 지시서 이미지 분석 중... (30~45%)
+        const ratio = elapsed / 1500;
+        setScheduleAnalysisStage(0);
+        setScheduleAnalysisProgress(Math.round(30 + ratio * 15));
+      } else if (elapsed < 2500) {
+        // 1.5s ~ 2.5s: 2단계 · 기사 및 차량 정보 식별 중... (50~60%)
+        const ratio = (elapsed - 1500) / 1000;
+        setScheduleAnalysisStage(1);
+        setScheduleAnalysisProgress(Math.round(50 + ratio * 10));
+      } else if (elapsed < 3500) {
+        // 2.5s ~ 3.5s: 3단계 · VIP 및 항공편 정보 추출 중... (60~72%)
+        const ratio = (elapsed - 2500) / 1000;
+        setScheduleAnalysisStage(2);
+        setScheduleAnalysisProgress(Math.round(60 + ratio * 12));
+      } else if (elapsed < 5000) {
+        // 3.5s ~ 5.0s: 4단계 · 기사님의 개인 스케줄 구성 중... (75~85%)
+        const ratio = (elapsed - 3500) / 1500;
+        setScheduleAnalysisStage(3);
+        setScheduleAnalysisProgress(Math.round(75 + ratio * 10));
+      } else {
+        // 5.0s ~ 응답 직전 (대기 구간): 5단계 · 일정과 이동 정보 교차 검증 중... (86~92% Damping 대기)
+        setScheduleAnalysisStage(4);
+        const extraSec = (elapsed - 5000) / 1000;
+        const damped = 86 + 6 * (1 - Math.exp(-extraSec / 4));
+        setScheduleAnalysisProgress(Math.min(Math.round(damped), 92));
+      }
+    }, 100);
     scheduleAnalysisTimerRef.current = stageInterval;
 
     const vehicleDetails = parseVehicleDetails(profile.vehicleNo);
@@ -310,8 +364,12 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
         scheduleAnalysisTimerRef.current = null;
       }
 
-      // Step 6 & 100% Cobalt Blue Gauge Full
+      // Step 6: 97% confidence check upon receiving response
       setScheduleAnalysisStage(5);
+      setScheduleAnalysisProgress(97);
+
+      // 0.4s transition to 100% full confidence
+      await new Promise((resolve) => setTimeout(resolve, 400));
       setScheduleAnalysisProgress(100);
       setScheduleAnalysisCompleted(true);
       haptics.success();
@@ -545,9 +603,7 @@ ${scheduleItemsFormatted}
       {ENABLE_DEV_FLEET_SWITCHER && (
         <div className="mb-3 bg-slate-100/90 p-1 rounded-2xl flex items-center gap-1 border border-slate-200/80 shadow-xs overflow-x-auto">
           {[
-            { id: '4호차', label: '4호차' },
-            { id: '8호차', label: '8호차' },
-            { id: '2호차', label: '2호차' },
+            ...availableVehicles.map((v) => ({ id: v, label: v })),
             { id: 'all', label: '전체' },
           ].map((v) => {
             const isSelected = selectedVehicleFilter === v.id;
@@ -840,30 +896,29 @@ ${scheduleItemsFormatted}
               )}
             </div>
 
-            {/* 6-Stage Cockpit AI Precision Analysis with 100% Solid Cobalt Blue Gauge Bar */}
+            {/* 6-Stage Cockpit AI Precision Analysis with Soft Tech Blue Gauge Bar */}
             {isAnalyzingSchedule ? (
               <div className="space-y-3 p-3.5 rounded-2xl bg-white border border-slate-200/90 shadow-2xs animate-fade-in">
                 {!scheduleAnalysisCompleted ? (
                   <>
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-semibold text-slate-700 tracking-tight truncate">
+                      <span
+                        key={scheduleAnalysisStage}
+                        className="text-xs font-semibold text-slate-700 tracking-tight truncate transition-all duration-300 ease-out animate-fade-in"
+                      >
                         {COCKPIT_ANALYSIS_STAGES[scheduleAnalysisStage]?.text || '1단계 · 운항 지시서 이미지 분석 중...'}
                       </span>
-                      <span className="text-xs font-bold text-[#1E60F3] shrink-0 font-mono">
+                      <span className="text-xs font-bold text-sky-600 shrink-0 font-mono transition-opacity duration-300">
                         {scheduleAnalysisProgress >= 97
                           ? '분석 신뢰도 97%'
-                          : scheduleAnalysisProgress >= 86
-                          ? '분석 신뢰도 86%'
-                          : scheduleAnalysisProgress >= 72
-                          ? '분석 신뢰도 72%'
                           : `분석 신뢰도 ${scheduleAnalysisProgress}%`}
                       </span>
                     </div>
 
-                    {/* Progress Track & Solid Cobalt Blue Gauge Bar */}
+                    {/* Progress Track & Soft Tech Blue Gauge Bar */}
                     <div className="h-2 bg-slate-100 rounded-full overflow-hidden w-full">
                       <div
-                        className="h-full bg-[#1E60F3] transition-all duration-300 ease-out"
+                        className="h-full bg-gradient-to-r from-blue-300 via-sky-400 to-blue-400 transition-all duration-300 ease-out shadow-xs"
                         style={{ width: `${scheduleAnalysisProgress}%` }}
                       />
                     </div>
@@ -875,14 +930,14 @@ ${scheduleItemsFormatted}
                       <span className="text-xs font-bold text-slate-900 tracking-tight">
                         ✓ Cockpit AI 분석 완료
                       </span>
-                      <span className="text-xs font-black text-[#1E60F3] font-mono">
+                      <span className="text-xs font-black text-sky-600 font-mono">
                         신뢰도 100%
                       </span>
                     </div>
 
                     <div className="h-2 bg-slate-100 rounded-full overflow-hidden w-full">
                       <div
-                        className="h-full bg-[#1E60F3] transition-all duration-300 ease-out"
+                        className="h-full bg-gradient-to-r from-blue-400 via-sky-400 to-blue-500 transition-all duration-300 ease-out shadow-xs"
                         style={{ width: '100%' }}
                       />
                     </div>

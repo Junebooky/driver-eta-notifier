@@ -28,6 +28,20 @@ const DRIVER_DEFAULTS: Record<string, any> = {
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
+    const isAll = searchParams.get('all') === 'true' || searchParams.get('vehicle_no') === 'all';
+
+    if (isAll) {
+      const { data, error } = await supabaseAdmin
+        .from('drivers')
+        .select('*')
+        .order('vehicle_no', { ascending: true });
+
+      if (error || !data || data.length === 0) {
+        return NextResponse.json({ drivers: Object.values(DRIVER_DEFAULTS), fallback: true });
+      }
+      return NextResponse.json({ drivers: data, fallback: false });
+    }
+
     const rawVehicleNo = searchParams.get('vehicle_no') || searchParams.get('id') || '4호차';
 
     // Accurately extract hocha (e.g. '8호차 142호 7815' -> '8호차', '8' -> '8호차')
@@ -51,7 +65,13 @@ export async function GET(req: NextRequest) {
       .maybeSingle();
 
     if (error || !data) {
-      const fallbackDriver = DRIVER_DEFAULTS[targetVehicleNo] || DRIVER_DEFAULTS['4호차'];
+      const fallbackDriver = DRIVER_DEFAULTS[targetVehicleNo] || {
+        vehicle_no: targetVehicleNo,
+        car_number: '',
+        driver_name: '',
+        phone: '',
+        default_navi: 'tmap',
+      };
       return NextResponse.json({ driver: fallbackDriver, fallback: true });
     }
 

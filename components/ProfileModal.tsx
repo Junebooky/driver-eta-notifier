@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { DriverProfile, NaviProvider } from '@/types';
 import { X, User, Car, Users, Navigation, Check, Phone } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
-import { ENABLE_DEV_FLEET_SWITCHER, FLEET_PRESET_DRIVERS } from '@/utils/constants';
+import { ENABLE_DEV_FLEET_SWITCHER, FLEET_PRESET_DRIVERS, FleetPresetDriver } from '@/utils/constants';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -93,6 +93,51 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [defaultNavi, setDefaultNavi] = useState<NaviProvider>(profile.defaultNavi || 'tmap');
   const [isMounted, setIsMounted] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [fleetPresets, setFleetPresets] = useState<FleetPresetDriver[]>(FLEET_PRESET_DRIVERS);
+
+  // Dynamic fetch of all registered drivers from Supabase SSOT
+  useEffect(() => {
+    if (!isOpen) return;
+    async function loadDynamicDrivers() {
+      try {
+        const res = await fetch('/api/driver?all=true');
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.drivers) && data.drivers.length > 0) {
+            const presetMap = new Map<string, FleetPresetDriver>();
+            FLEET_PRESET_DRIVERS.forEach((d) => presetMap.set(d.vehicleNo, d));
+
+            data.drivers.forEach((d: any) => {
+              if (!d.vehicle_no) return;
+              const hochaOnly = d.vehicle_no.match(/(\d+)호차/)?.[1] || d.vehicle_no.replace(/\D/g, '') || '';
+              const carDetails = parseVehicleDetails(d.car_number);
+              const presetObj: FleetPresetDriver = {
+                vehicleNo: d.vehicle_no,
+                hocha: hochaOnly,
+                plateFront: carDetails.plateFront || '',
+                plateBack: carDetails.plateBack || '',
+                carNumber: d.car_number || '',
+                driverName: d.driver_name || '',
+                phone: d.phone || '',
+                defaultNavi: (d.default_navi as NaviProvider) || 'tmap',
+              };
+              presetMap.set(d.vehicle_no, presetObj);
+            });
+
+            const sorted = Array.from(presetMap.values()).sort((a, b) => {
+              const numA = parseInt(a.hocha || '999', 10);
+              const numB = parseInt(b.hocha || '999', 10);
+              return numA - numB;
+            });
+            setFleetPresets(sorted);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to load dynamic drivers in ProfileModal:', err);
+      }
+    }
+    loadDynamicDrivers();
+  }, [isOpen]);
 
   const plateFrontRef = React.useRef<HTMLInputElement>(null);
   const plateBackRef = React.useRef<HTMLInputElement>(null);
@@ -371,8 +416,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   DEV
                 </span>
               </div>
-              <div className="grid grid-cols-3 gap-1.5">
-                {FLEET_PRESET_DRIVERS.map((d) => {
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                {fleetPresets.map((d) => {
                   const isCurrent = hocha === d.hocha;
                   return (
                     <button

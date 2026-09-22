@@ -4,6 +4,7 @@ import React from 'react';
 import { ScheduleItem } from '@/data/ferrariSchedules';
 import { Navigation, Clock, User, Plane, FileText, ChevronRight, Pencil } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
+import { sanitizePlaceName } from '@/utils/formatters';
 
 interface ScheduleCardProps {
   item: ScheduleItem;
@@ -80,10 +81,16 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
           <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
             출발
           </span>
-          <span className="text-sm font-bold text-slate-900 tracking-tight shrink-0">
-            {item.origin_name}
+          <span
+            className="text-sm font-bold text-slate-900 tracking-tight min-w-0 max-w-[55%] truncate"
+            title={item.origin_name}
+          >
+            {sanitizePlaceName(item.origin_name)}
           </span>
-          <span className="text-xs text-slate-400 font-normal truncate">
+          <span
+            className="text-xs text-slate-400 font-normal min-w-0 flex-1 truncate"
+            title={item.origin_address}
+          >
             {item.origin_address}
           </span>
         </div>
@@ -95,10 +102,16 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
           <span className="px-1.5 py-0.5 rounded text-[10px] bg-[#1E60F3] text-white font-bold shrink-0 shadow-xs">
             도착
           </span>
-          <span className="text-sm font-bold text-slate-900 tracking-tight shrink-0">
-            {item.destination_name}
+          <span
+            className="text-sm font-bold text-slate-900 tracking-tight min-w-0 max-w-[55%] truncate"
+            title={item.destination_name}
+          >
+            {sanitizePlaceName(item.destination_name)}
           </span>
-          <span className="text-xs text-slate-400 font-normal truncate">
+          <span
+            className="text-xs text-slate-400 font-normal min-w-0 flex-1 truncate"
+            title={item.destination_address}
+          >
             {item.destination_address}
           </span>
         </div>
@@ -118,10 +131,17 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
         title={onEdit ? '클릭하여 정보 수정' : undefined}
       >
         {/* Passenger */}
-        <div className="flex items-center gap-1.5 font-medium">
-          <User className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-          <span className="text-slate-500 font-normal">승객:</span>
-          <span className="font-bold text-slate-900 truncate">{item.passenger}</span>
+        <div className="flex items-center gap-1.5 font-medium min-w-0">
+          <div className="flex items-center gap-1 shrink-0 whitespace-nowrap">
+            <User className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+            <span className="text-slate-500 font-normal">승객:</span>
+          </div>
+          <span
+            className="font-bold text-slate-900 min-w-0 flex-1 truncate"
+            title={item.passenger}
+          >
+            {item.passenger}
+          </span>
         </div>
 
         {/* Flight (Optional) */}
