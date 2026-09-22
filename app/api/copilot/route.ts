@@ -293,7 +293,7 @@ ${presetSummary}
     try {
       const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
-        model: 'gemini-1.5-flash',
+        model: 'gemini-3.5-flash-lite',
         contents: query,
         config: {
           systemInstruction: systemPrompt,
