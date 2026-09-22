@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { DriverProfile, LocationPreset } from '@/types';
 import { ScheduleItem, CONFIRMED_FERRARI_SCHEDULES, scheduleToPresets } from '@/data/ferrariSchedules';
 import { ScheduleCard } from '@/components/ScheduleCard';
@@ -31,7 +31,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
   onNavigateForSchedule,
   onOpenFlightModal,
 }) => {
-  // Schedules state (starts with empty state by default, with one-touch toggle/load)
+  // Schedules state (starts with empty state by default, populated dynamically per vehicle)
   const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
   const [scheduleTitle, setScheduleTitle] = useState<string>('페라리 VIP 의전 배차표');
   const [inputText, setInputText] = useState('');
@@ -46,6 +46,32 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
   } | null>(null);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
+
+  // Vehicle Isolation: Fetch schedules for current vehicle from Supabase (STRICT RULE 1)
+  const currentVehicleNo = profile.vehicleNo?.trim() || '4호차';
+
+  const fetchSchedulesForVehicle = useCallback(async (vNo: string) => {
+    try {
+      const res = await fetch(`/api/schedules?vehicle_no=${encodeURIComponent(vNo)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.schedules) {
+          setSchedules(data.schedules);
+          if (vNo.includes('4')) {
+            setScheduleTitle('페라리 VIP 의전 배차표');
+          } else {
+            setScheduleTitle(`${vNo} VIP 의전 배차표`);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to fetch schedules from API:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSchedulesForVehicle(currentVehicleNo);
+  }, [currentVehicleNo, fetchSchedulesForVehicle]);
 
   // Copilot Thinking & Typewriter States
   const [thinkingStep, setThinkingStep] = useState<number | null>(null);
@@ -682,8 +708,24 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
           setEditingSchedule(null);
         }}
         schedule={editingSchedule}
-        onSave={(updated) => {
+        onSave={async (updated) => {
           setSchedules((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+          try {
+            await fetch('/api/schedules', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                id: updated.id,
+                time_display: updated.time_display,
+                passenger_name: updated.passenger,
+                flight_number: updated.flight,
+                protocol_notes: updated.notes,
+                status: updated.status,
+              }),
+            });
+          } catch (err) {
+            console.warn('Failed to persist schedule update to Supabase:', err);
+          }
         }}
       />
     </div>

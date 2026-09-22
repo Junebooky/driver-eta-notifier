@@ -93,12 +93,10 @@ export default function Home() {
 
   // Supabase Fleet Architecture Data Synchronization
   useEffect(() => {
-    const driverId = profile.id || getOrCreateDeviceUuid();
-
     async function syncSupabaseFleet() {
       try {
-        // 1. Fetch Presets from Supabase
-        const pRes = await fetch(`/api/presets?driverId=${driverId}`);
+        // 1. Fetch Common Master Presets from Supabase (cockpit_presets SSOT)
+        const pRes = await fetch('/api/presets');
         if (pRes.ok) {
           const data = await pRes.json();
           if (data.presets && data.presets.length > 0) {
@@ -107,17 +105,16 @@ export default function Home() {
           }
         }
 
-        // 2. Fetch Driver Profile & Home Location from Supabase
-        const dRes = await fetch(`/api/driver?id=${driverId}`);
+        // 2. Fetch Driver Profile by Vehicle from Supabase (STRICT RULE 1: Vehicle Isolation)
+        const dRes = await fetch(`/api/driver?vehicle_no=${encodeURIComponent(profile.vehicleNo || '4호차')}`);
         if (dRes.ok) {
           const dData = await dRes.json();
           if (dData.driver) {
-            const { vehicle_no, driver_name, passenger_name, home_location } = dData.driver;
+            const { vehicle_no, driver_name, default_navi } = dData.driver;
             updateProfile({
               vehicleNo: vehicle_no ?? profile.vehicleNo,
               driverName: driver_name ?? profile.driverName,
-              passengerName: passenger_name ?? profile.passengerName,
-              homeLocation: home_location || profile.homeLocation,
+              defaultNavi: default_navi ?? profile.defaultNavi,
             });
           }
         }
@@ -129,7 +126,7 @@ export default function Home() {
     if (isLoaded) {
       syncSupabaseFleet();
     }
-  }, [isLoaded, profile.id]);
+  }, [isLoaded, profile.vehicleNo]);
 
   // Save Presets to LocalStorage
   const savePresetsToStorage = (updated: LocationPreset[]) => {
@@ -748,16 +745,14 @@ export default function Home() {
           } catch (e) {
             console.warn('Failed to save onboarding flag:', e);
           }
-          // Sync profile to Supabase with device UUID
+          // Sync profile to Supabase with vehicle_no
           fetch('/api/driver', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              id: deviceUuid,
-              vehicleNo: updated.vehicleNo,
-              driverName: updated.driverName,
-              passengerName: updated.passengerName,
-              targetChatRoom: updated.targetChatRoom ?? profile.targetChatRoom,
+              vehicle_no: updated.vehicleNo,
+              driver_name: updated.driverName,
+              default_navi: updated.defaultNavi ?? profile.defaultNavi,
             }),
           }).catch((err) => console.warn('Supabase driver profile sync error:', err));
         }}

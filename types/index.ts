@@ -100,3 +100,51 @@ export interface FlightInfo {
 }
 
 export type { ScheduleItem } from '@/data/ferrariSchedules';
+
+// ==============================================================================
+// Supabase Database Row Types (Enterprise Architecture)
+// ==============================================================================
+export interface DbPresetRow {
+  id: string;
+  category: string;
+  name: string;
+  address: string;
+  lat: number;
+  lng: number;
+  order_index: number;
+  created_at?: string;
+}
+
+export interface DbDriverRow {
+  id: string;
+  vehicle_no: string;
+  car_number: string;
+  driver_name: string;
+  phone?: string | null;
+  default_navi: NaviProvider;
+  created_at?: string;
+}
+
+export interface DbScheduleRow {
+  id: string;
+  vehicle_no: string;
+  date: string;
+  pickup_time: string;
+  time_display: string;
+  origin: string;
+  origin_address?: string | null;
+  origin_lat?: number | null;
+  origin_lng?: number | null;
+  destination: string;
+  destination_address?: string | null;
+  destination_lat?: number | null;
+  destination_lng?: number | null;
+  passenger_name?: string | null;
+  passenger_count?: number;
+  passenger_note?: string | null;
+  flight_number?: string | null;
+  protocol_notes?: string | null;
+  status: string;
+  created_at?: string;
+  updated_at?: string;
+}

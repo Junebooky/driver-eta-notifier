@@ -1,48 +1,84 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 
+const DRIVER_DEFAULTS: Record<string, any> = {
+  '4호차': {
+    vehicle_no: '4호차',
+    car_number: '142호 7811',
+    driver_name: '윤태준',
+    phone: '010-1234-5678',
+    default_navi: 'tmap',
+  },
+  '1호차': {
+    vehicle_no: '1호차',
+    car_number: '111호 1111',
+    driver_name: '김의전',
+    phone: '010-9876-5432',
+    default_navi: 'tmap',
+  },
+  '2호차': {
+    vehicle_no: '2호차',
+    car_number: '222호 2222',
+    driver_name: '박의전',
+    phone: '010-5555-5555',
+    default_navi: 'tmap',
+  },
+};
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const id = searchParams.get('id') || 'driver_4';
+    const vehicleNo = searchParams.get('vehicle_no') || searchParams.get('id') || '4호차';
 
-    const { data, error } = await supabaseAdmin
-      .from('cockpit_drivers')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle();
+    // Normalize vehicle query (e.g. 'driver_4' -> '4호차')
+    const normalizedVehicle = vehicleNo.includes('1')
+      ? '1호차'
+      : vehicleNo.includes('2')
+      ? '2호차'
+      : '4호차';
 
-    if (error) {
-      return NextResponse.json({ driver: null, fallback: true, message: error.message });
+    let query = supabaseAdmin.from('cockpit_drivers').select('*');
+    if (searchParams.get('vehicle_no')) {
+      query = query.eq('vehicle_no', searchParams.get('vehicle_no')!);
+    } else {
+      query = query.eq('vehicle_no', normalizedVehicle);
+    }
+
+    const { data, error } = await query.maybeSingle();
+
+    if (error || !data) {
+      const fallbackDriver = DRIVER_DEFAULTS[normalizedVehicle] || DRIVER_DEFAULTS['4호차'];
+      return NextResponse.json({ driver: fallbackDriver, fallback: true });
     }
 
     return NextResponse.json({ driver: data, fallback: false });
   } catch (err: any) {
     console.error('Error fetching driver from Supabase:', err);
-    return NextResponse.json({ driver: null, fallback: true, error: err?.message }, { status: 500 });
+    return NextResponse.json({ driver: DRIVER_DEFAULTS['4호차'], fallback: true, error: err?.message });
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { id = 'driver_default', vehicleNo, driverName, passengerName, targetChatRoom, homeLocation, presetOrder } = body;
+    const { vehicle_no, car_number, driver_name, phone, default_navi } = body;
+
+    if (!vehicle_no) {
+      return NextResponse.json({ error: 'vehicle_no is required' }, { status: 400 });
+    }
 
     const payload: any = {
-      id,
-      updated_at: new Date().toISOString(),
+      vehicle_no,
     };
 
-    if (vehicleNo !== undefined) payload.vehicle_no = vehicleNo;
-    if (driverName !== undefined) payload.driver_name = driverName;
-    if (passengerName !== undefined) payload.passenger_name = passengerName;
-    if (targetChatRoom !== undefined) payload.target_chat_room = targetChatRoom;
-    if (homeLocation !== undefined) payload.home_location = homeLocation;
-    if (presetOrder !== undefined) payload.preset_order = presetOrder;
+    if (car_number !== undefined) payload.car_number = car_number;
+    if (driver_name !== undefined) payload.driver_name = driver_name;
+    if (phone !== undefined) payload.phone = phone;
+    if (default_navi !== undefined) payload.default_navi = default_navi;
 
     const { data, error } = await supabaseAdmin
       .from('cockpit_drivers')
-      .upsert(payload)
+      .upsert(payload, { onConflict: 'vehicle_no' })
       .select()
       .single();
 
