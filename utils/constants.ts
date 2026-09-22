@@ -42,16 +42,6 @@ export const FLEET_PRESET_DRIVERS: FleetPresetDriver[] = [
     defaultNavi: 'tmap',
   },
   {
-    vehicleNo: '7호차',
-    hocha: '7',
-    plateFront: '142호',
-    plateBack: '7814',
-    carNumber: '142호 7814',
-    driverName: '배선만',
-    phone: '010-8806-9758',
-    defaultNavi: 'tmap',
-  },
-  {
     vehicleNo: '1호차',
     hocha: '1',
     plateFront: '110하',

@@ -58,7 +58,6 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
   const [vehicleCounts, setVehicleCounts] = useState<Record<string, number>>({
     '4호차': 0,
     '8호차': 0,
-    '7호차': 0,
     '1호차': 0,
     '2호차': 0,
     'all': 0,
@@ -73,7 +72,6 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
           const counts: Record<string, number> = {
             '4호차': 0,
             '8호차': 0,
-            '7호차': 0,
             '1호차': 0,
             '2호차': 0,
             'all': data.schedules.length,
@@ -282,8 +280,13 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
       setIsThinking(false);
       setThinkingStep(null);
 
-      // Refresh SSOT from Supabase
-      await fetchSchedulesForVehicle(selectedVehicleFilter);
+      // Refresh SSOT from Supabase (Auto-switch view to uploaded hocha if not viewing all)
+      if (selectedVehicleFilter !== 'all' && selectedVehicleFilter !== hochaStr) {
+        setSelectedVehicleFilter(hochaStr);
+        await fetchSchedulesForVehicle(hochaStr);
+      } else {
+        await fetchSchedulesForVehicle(selectedVehicleFilter);
+      }
       await fetchCounts();
 
       if (allParsedSchedules.length > 0) {
@@ -492,7 +495,6 @@ ${scheduleItemsFormatted}
           {[
             { id: '4호차', label: '4호차' },
             { id: '8호차', label: '8호차' },
-            { id: '7호차', label: '7호차' },
             { id: '1호차', label: '1호차' },
             { id: '2호차', label: '2호차' },
             { id: 'all', label: '전체' },

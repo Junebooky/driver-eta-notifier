@@ -421,10 +421,43 @@ SELECT * FROM cockpit.presets;
 
 ### 14.4 빌드 및 무결성 검증
 
-1. **TypeScript 컴파일 및 프로덕션 빌드**:
-   * `npm run build`: Next.js 16.3.5 Turbopack 기준 14/14 라우트 컴파일 에러 **0건** 완료.
-2. **다중 배차표 일괄 파싱 및 SSOT 갱신 검증**:
-   * 다중 이미지 업로드 시 인덱스별 순차 통신 및 데이터 병합 완료.
-   * 챗봇 브리핑 안내 문구 내 개발자 전문 용어 0건 검증 완료.
+* `npm run build`: Next.js 16.3.5 Turbopack 기준 14/14 라우트 컴파일 에러 **0건** 완료.
+* 다중 배차표 일괄 파싱 및 SSOT 갱신 검증 완료.
+
+## 15. [v4.83] 7호차 불필요 데이터 전면 롤백 및 8호차(민성호) 4장 이미지 일괄 파싱 대기준비 완료
+
+> **평가 일시**: 2026년 9월 22일  
+> **대상 차량**: 8호차 (민성호 기사님 / 142호 7815 / 010-7231-8340)  
+> **상태**: 7호차 잔여 데이터 100% 롤백 완료, 8호차 4장 일괄 업로드 파이프라인 무결성 검증 완료  
+
+### 15.1 7호차(배선만) 코드, 프리셋, DB 전면 롤백
+1. **프리셋 및 API 롤백**:
+   * [`utils/constants.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/utils/constants.ts): `FLEET_PRESET_DRIVERS`에서 7호차(`배선만`, `142호 7814`, `010-8806-9758`) 삭제 완료.
+   * [`app/api/driver/route.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/api/driver/route.ts): `DRIVER_DEFAULTS`에서 7호차 정의 삭제 완료.
+   * Supabase DB: `cockpit.drivers` 테이블에서 7호차 레코드 영구 삭제(`DELETE`) 완료.
+2. **UI 스위처 및 모달 정리**:
+   * [`components/ScheduleTab.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ScheduleTab.tsx): 상단 호차 스위처 및 카운트 상태에서 7호차 탭 제거 ➔ `[4호차 | 8호차 | 1호차 | 2호차 | 전체]`로 정갈하게 재배치.
+   * [`components/ProfileModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ProfileModal.tsx): 기사 전환 그리드를 `grid-cols-2 sm:grid-cols-4`로 최적화하여 4대 호차 버튼이 여유롭게 노출되도록 조정.
+3. **매칭 음절 정리 ([`utils/nameMatcher.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/utils/nameMatcher.ts))**:
+   * 7호차용으로 추가되었던 음절 `'선'`, `'만'`을 제거하고, 8호차용 성씨 `'민' ➔ ['Min']` 및 음절 `'민'`, `'성'`, `'호'`만 엄격히 유지.
+
+---
+
+### 15.2 8호차 배차표 4장 일괄 업로드 파이프라인 무결성 검증
+1. **프로필 3중 앵커 주입 가드레일**:
+   * 성명: `민성호` (영문 후보군: `Min Sung Ho`, `Min Sung-Ho`, `Min Seong Ho`, `MINSUNGHO` 등 36개 조합 자동 생성)
+   * 차량번호: `142호 7815` (뒷 4자리: `7815`)
+   * 연락처: `010-7231-8340` (숫자만: `01072318340`)
+   * 스케줄 탭 상단 스위처에서 '8호차'를 클릭하거나 프로필 모달에서 8호차 프리셋을 선택할 시, 활성 프로필과 Supabase SSOT가 즉시 8호차 민성호 기사님으로 자동 동기화.
+2. **다중 이미지(4장) 일괄 파싱 및 병합 파이프라인**:
+   * `input multiple`을 통해 4장 동시 선택 시 비동기 순차 루프 가동: `(1/4)` ➔ `(2/4)` ➔ `(3/4)` ➔ `(4/4)` ➔ `동기화 완료`.
+   * 중복 일정 자동 배제(`date + pickup_time`) 및 Supabase `cockpit.schedules` 일괄 Upsert 후 UI 캘린더 SSOT 리프레시.
+   * 업로드 후 현재 필터가 8호차가 아니더라도 업로드된 호차로 시야를 자동 전환하여 새로 파싱된 일정을 즉각 확인 가능.
+
+---
+
+### 15.3 빌드 검증
+* `npm run build`: Next.js 16.3.5 Turbopack 기준 14/14 라우트 컴파일 에러 **0건** 완료.
+
 
 

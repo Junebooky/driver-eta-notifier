@@ -55,8 +55,6 @@ const SYLLABLE_MAP: Record<string, string[]> = {
   '의': ['Eui', 'Ui'],
   '전': ['Jeon', 'Jun'],
   '민': ['Min'],
-  '선': ['Sun', 'Seon'],
-  '만': ['Man'],
   '수': ['Soo', 'Su'],
   '진': ['Jin'],
   '영': ['Young', 'Yeong'],

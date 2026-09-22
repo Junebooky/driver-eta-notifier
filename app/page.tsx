@@ -23,6 +23,7 @@ import { ScheduleItem, scheduleToPresets } from '@/data/ferrariSchedules';
 import { PredictionResult } from '@/app/api/route/prediction/route';
 import { LocationPreset, ReportMode, RouteEstimate, HomeLocation, GasStation, FlightType } from '@/types';
 import { DEFAULT_PRESET_LOCATIONS } from '@/utils/presets';
+import { FLEET_PRESET_DRIVERS } from '@/utils/constants';
 import { generateReportText } from '@/utils/reportGenerator';
 import { calculateHaversineEstimate, getEtaString, launchNavigationApp } from '@/utils/navigation';
 import { haptics } from '@/utils/haptics';
@@ -761,7 +762,36 @@ export default function Home() {
               onNavigateForSchedule={handleNavigateForSchedule}
               onOpenFlightModal={handleOpenFlightModalFromSchedule}
               onSwitchVehicle={(vNo) => {
-                updateProfile({ vehicleNo: vNo });
+                const matchedPreset = FLEET_PRESET_DRIVERS.find(
+                  (p) => p.vehicleNo === vNo || p.hocha === vNo.replace(/[^0-9]/g, '')
+                );
+                if (matchedPreset) {
+                  const fullVehicle = `${matchedPreset.vehicleNo} ${matchedPreset.carNumber}`;
+                  updateProfile({
+                    vehicleNo: fullVehicle,
+                    carNumber: matchedPreset.carNumber,
+                    driverName: matchedPreset.driverName,
+                    phone: matchedPreset.phone,
+                    mobile: matchedPreset.phone,
+                    defaultNavi: matchedPreset.defaultNavi,
+                  });
+                  // Background sync with Supabase
+                  const deviceUuid = profile.id || getOrCreateDeviceUuid();
+                  fetch('/api/driver', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      id: deviceUuid,
+                      vehicleNo: fullVehicle,
+                      driverName: matchedPreset.driverName,
+                      carNumber: matchedPreset.carNumber,
+                      phone: matchedPreset.phone,
+                      defaultNavi: matchedPreset.defaultNavi,
+                    }),
+                  }).catch((err) => console.warn('Supabase driver background sync failed:', err));
+                } else {
+                  updateProfile({ vehicleNo: vNo });
+                }
                 fetchPresetsForVehicle(vNo);
               }}
             />
