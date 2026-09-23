@@ -7,6 +7,7 @@ const DRIVER_DEFAULTS: Record<string, any> = {
     car_number: '142호 7814',
     driver_name: '배선만',
     phone: '010-8806-9758',
+    passenger_name: 'VIP 게스트 A',
     default_navi: 'tmap',
   },
   '2호차': {
@@ -14,6 +15,7 @@ const DRIVER_DEFAULTS: Record<string, any> = {
     car_number: '112하 3456',
     driver_name: '홍승범',
     phone: '010-3333-4444',
+    passenger_name: 'VIP 게스트 B',
     default_navi: 'tmap',
   },
   '4호차': {
@@ -21,6 +23,7 @@ const DRIVER_DEFAULTS: Record<string, any> = {
     car_number: '142호 7811',
     driver_name: '윤태준',
     phone: '010-6348-8726',
+    passenger_name: 'SOYFAN 외 1명',
     default_navi: 'tmap',
   },
   '8호차': {
@@ -28,6 +31,7 @@ const DRIVER_DEFAULTS: Record<string, any> = {
     car_number: '142호 7815',
     driver_name: '민성호',
     phone: '010-7231-8340',
+    passenger_name: 'VIP 게스트 C',
     default_navi: 'tmap',
   },
 };
@@ -46,7 +50,11 @@ export async function GET(req: NextRequest) {
       if (error || !data || data.length === 0) {
         return NextResponse.json({ drivers: Object.values(DRIVER_DEFAULTS), fallback: true });
       }
-      return NextResponse.json({ drivers: data, fallback: false });
+      const enriched = data.map((d: any) => ({
+        ...d,
+        passenger_name: d.passenger_name || DRIVER_DEFAULTS[d.vehicle_no]?.passenger_name || '',
+      }));
+      return NextResponse.json({ drivers: enriched, fallback: false });
     }
 
     const rawVehicleNo = searchParams.get('vehicle_no') || searchParams.get('id') || '4호차';
@@ -77,12 +85,17 @@ export async function GET(req: NextRequest) {
         car_number: '',
         driver_name: '',
         phone: '',
+        passenger_name: '',
         default_navi: 'tmap',
       };
       return NextResponse.json({ driver: fallbackDriver, fallback: true });
     }
 
-    return NextResponse.json({ driver: data, fallback: false });
+    const driverWithPassenger = {
+      ...data,
+      passenger_name: data.passenger_name || DRIVER_DEFAULTS[targetVehicleNo]?.passenger_name || '',
+    };
+    return NextResponse.json({ driver: driverWithPassenger, fallback: false });
   } catch (err: any) {
     console.error('Error fetching driver from Supabase:', err);
     return NextResponse.json({ driver: DRIVER_DEFAULTS['4호차'], fallback: true, error: err?.message });
@@ -96,6 +109,7 @@ export async function POST(req: NextRequest) {
     const rawDriverName = body.driver_name || body.driverName || '';
     let rawCarNumber = body.car_number || body.carNumber || '';
     const rawPhone = body.phone || '';
+    const rawPassengerName = body.passenger_name !== undefined ? body.passenger_name : body.passengerName;
     const rawDefaultNavi = body.default_navi || body.defaultNavi || 'tmap';
 
     // If client only sent metadata without vehicle identifier, handle gracefully
@@ -137,6 +151,7 @@ export async function POST(req: NextRequest) {
 
     if (rawDriverName) payload.driver_name = rawDriverName;
     if (rawPhone) payload.phone = rawPhone;
+    if (rawPassengerName !== undefined) payload.passenger_name = rawPassengerName;
     if (rawDefaultNavi) payload.default_navi = rawDefaultNavi;
 
     const { data, error } = await supabaseAdmin

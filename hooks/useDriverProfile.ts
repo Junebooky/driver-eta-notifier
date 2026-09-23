@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { DriverProfile, NaviProvider } from '@/types';
+import { getPresetPassengerName } from '@/utils/constants';
 
 const STORAGE_KEY = 'protocol_cockpit_driver_profile_v1';
+export const VEHICLE_PROFILES_KEY = 'protocol_cockpit_vehicle_profiles_v1';
 export const DEVICE_UUID_KEY = 'cockpit_device_uuid';
 export const ONBOARDED_KEY = 'cockpit_driver_onboarded';
 
@@ -23,6 +25,37 @@ export function getOrCreateDeviceUuid(): string {
   }
 }
 
+export function getStoredVehicleProfile(vehicleNo: string): Partial<DriverProfile> | null {
+  if (typeof window === 'undefined' || !vehicleNo) return null;
+  try {
+    const raw = localStorage.getItem(VEHICLE_PROFILES_KEY);
+    if (!raw) return null;
+    const map = JSON.parse(raw);
+    const hochaMatch = vehicleNo.match(/(\d+)호차/);
+    const cleanKey = hochaMatch ? `${hochaMatch[1]}호차` : vehicleNo.trim();
+    return map[cleanKey] || null;
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredVehicleProfile(vehicleNo: string, data: Partial<DriverProfile>): void {
+  if (typeof window === 'undefined' || !vehicleNo) return;
+  try {
+    const raw = localStorage.getItem(VEHICLE_PROFILES_KEY);
+    const map = raw ? JSON.parse(raw) : {};
+    const hochaMatch = vehicleNo.match(/(\d+)호차/);
+    const cleanKey = hochaMatch ? `${hochaMatch[1]}호차` : vehicleNo.trim();
+    map[cleanKey] = {
+      ...(map[cleanKey] || {}),
+      ...data,
+    };
+    localStorage.setItem(VEHICLE_PROFILES_KEY, JSON.stringify(map));
+  } catch (err) {
+    console.warn('Failed to store vehicle profile in localStorage:', err);
+  }
+}
+
 export const EMPTY_PROFILE: DriverProfile = {
   id: '',
   vehicleNo: '',
@@ -36,7 +69,7 @@ export const EMPTY_PROFILE: DriverProfile = {
   phone: '',
   mobile: '',
   passengerName: '',
-  defaultNavi: 'tmap', // 기본 내비는 유지
+  defaultNavi: 'tmap',
   targetChatRoom: '',
 };
 
@@ -52,7 +85,7 @@ export const DEFAULT_DRIVER_PROFILE: DriverProfile = {
   phonePart3: '8726',
   phone: '010-6348-8726',
   mobile: '010-6348-8726',
-  passengerName: '',
+  passengerName: 'SOYFAN 외 1명',
   defaultNavi: 'tmap',
   targetChatRoom: '',
 };
@@ -89,6 +122,15 @@ export function useDriverProfile() {
         }
 
         const resolvedPhone = parsed.phone || parsed.mobile || '';
+        const initialVehicle = parsed.vehicleNo || '4호차';
+        const hochaMatch = initialVehicle.match(/(\d+)호차/);
+        const cleanHocha = hochaMatch ? `${hochaMatch[1]}호차` : initialVehicle;
+        const storedForVehicle = getStoredVehicleProfile(cleanHocha);
+        const resolvedPassenger =
+          parsed.passengerName !== undefined && parsed.passengerName !== ''
+            ? parsed.passengerName
+            : storedForVehicle?.passengerName || getPresetPassengerName(cleanHocha) || '';
+
         setProfile((prev) => ({
           ...prev,
           id: deviceUuid,
@@ -96,7 +138,7 @@ export function useDriverProfile() {
           phone: resolvedPhone || prev.phone || '',
           mobile: resolvedPhone || prev.mobile || '',
           defaultNavi: parsed.defaultNavi || 'tmap',
-          passengerName: parsed.passengerName !== undefined ? parsed.passengerName : prev.passengerName,
+          passengerName: resolvedPassenger,
         }));
       } else {
         setProfile({
@@ -120,20 +162,46 @@ export function useDriverProfile() {
           ? newProfile.mobile
           : prev.phone;
 
-      const updated = {
+      const currentVehicle = prev.vehicleNo || '4호차';
+      const targetVehicle = newProfile.vehicleNo || currentVehicle;
+      const targetHochaMatch = targetVehicle.match(/(\d+)호차/);
+      const cleanTargetVehicle = targetHochaMatch ? `${targetHochaMatch[1]}호차` : targetVehicle.trim();
+      const isSwitchingVehicle = newProfile.vehicleNo !== undefined && newProfile.vehicleNo !== prev.vehicleNo;
+
+      let resolvedPassenger = prev.passengerName;
+      if (newProfile.passengerName !== undefined) {
+        resolvedPassenger = newProfile.passengerName;
+      } else if (isSwitchingVehicle) {
+        // When vehicle is switched without explicit passenger name, load target vehicle's isolated passenger!
+        const vehicleCache = getStoredVehicleProfile(cleanTargetVehicle);
+        resolvedPassenger =
+          vehicleCache?.passengerName !== undefined
+            ? vehicleCache.passengerName
+            : getPresetPassengerName(cleanTargetVehicle) || '';
+      }
+
+      const updated: DriverProfile = {
         ...prev,
         ...newProfile,
         id: prev.id || getOrCreateDeviceUuid(),
         phone: resolvedPhone,
         mobile: resolvedPhone,
         defaultNavi: newProfile.defaultNavi || prev.defaultNavi || 'tmap',
-        passengerName:
-          newProfile.passengerName !== undefined
-            ? newProfile.passengerName
-            : prev.passengerName,
+        passengerName: resolvedPassenger,
       };
+
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        if (cleanTargetVehicle) {
+          setStoredVehicleProfile(cleanTargetVehicle, {
+            vehicleNo: updated.vehicleNo,
+            carNumber: updated.carNumber,
+            driverName: updated.driverName,
+            phone: updated.phone,
+            passengerName: resolvedPassenger,
+            defaultNavi: updated.defaultNavi,
+          });
+        }
       } catch (e) {
         console.warn('Failed to save profile to localStorage:', e);
       }

@@ -61,7 +61,7 @@ export const Header: React.FC<HeaderProps> = ({
               onOpenProfileModal();
             }}
             className="flex items-center space-x-1.5 bg-white px-3 py-1.5 rounded-full border border-slate-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.04)] text-xs font-bold text-slate-800 cursor-pointer hover:bg-slate-50 active:scale-95 transition-all min-w-0 max-w-full"
-            title={`${profile.vehicleNo || ''} ${profile.driverName || ''}`.trim() || '드라이버 정보 설정'}
+            title={`${profile.vehicleNo || ''} ${profile.driverName || ''} • 담당승객: ${profile.passengerName || '미지정'}`.trim()}
           >
             <Car className="w-3.5 h-3.5 text-[#1E60F3] fill-[#1E60F3] shrink-0" />
             <span className="font-extrabold truncate whitespace-nowrap">

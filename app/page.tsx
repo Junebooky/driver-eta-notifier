@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useDriverProfile, getOrCreateDeviceUuid } from '@/hooks/useDriverProfile';
+import { useDriverProfile, getOrCreateDeviceUuid, getStoredVehicleProfile } from '@/hooks/useDriverProfile';
 import { useLocation } from '@/hooks/useLocation';
 import { Header } from '@/components/Header';
 import { ProfileModal, parseVehicleDetails } from '@/components/ProfileModal';
@@ -23,7 +23,7 @@ import { ScheduleItem, scheduleToPresets } from '@/data/ferrariSchedules';
 import { PredictionResult } from '@/app/api/route/prediction/route';
 import { LocationPreset, ReportMode, RouteEstimate, HomeLocation, GasStation, FlightType } from '@/types';
 import { DEFAULT_PRESET_LOCATIONS } from '@/utils/presets';
-import { FLEET_PRESET_DRIVERS } from '@/utils/constants';
+import { FLEET_PRESET_DRIVERS, getPresetPassengerName } from '@/utils/constants';
 import { generateReportText } from '@/utils/reportGenerator';
 import { calculateHaversineEstimate, getEtaString, launchNavigationApp } from '@/utils/navigation';
 import { haptics } from '@/utils/haptics';
@@ -765,9 +765,18 @@ export default function Home() {
               onNavigateForSchedule={handleNavigateForSchedule}
               onOpenFlightModal={handleOpenFlightModalFromSchedule}
               onSwitchVehicle={(vNo) => {
+                const hochaMatch = vNo.match(/(\d+)호차/);
+                const cleanVNo = hochaMatch ? `${hochaMatch[1]}호차` : (vNo.includes('호차') ? vNo.trim() : `${vNo.trim()}호차`);
                 const matchedPreset = FLEET_PRESET_DRIVERS.find(
-                  (p) => p.vehicleNo === vNo || p.hocha === vNo.replace(/[^0-9]/g, '')
+                  (p) => p.vehicleNo === cleanVNo || p.hocha === cleanVNo.replace(/[^0-9]/g, '')
                 );
+                const storedPassenger = getStoredVehicleProfile(cleanVNo)?.passengerName;
+                const defaultPassenger = matchedPreset?.passengerName || getPresetPassengerName(cleanVNo);
+                const effectivePassenger =
+                  storedPassenger !== undefined && storedPassenger !== ''
+                    ? storedPassenger
+                    : defaultPassenger;
+
                 if (matchedPreset) {
                   const fullVehicle = `${matchedPreset.vehicleNo} ${matchedPreset.carNumber}`;
                   updateProfile({
@@ -776,6 +785,7 @@ export default function Home() {
                     driverName: matchedPreset.driverName,
                     phone: matchedPreset.phone,
                     mobile: matchedPreset.phone,
+                    passengerName: effectivePassenger,
                     defaultNavi: matchedPreset.defaultNavi,
                   });
                   // Background sync with Supabase
@@ -785,36 +795,40 @@ export default function Home() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                       id: deviceUuid,
+                      vehicle_no: matchedPreset.vehicleNo,
                       vehicleNo: fullVehicle,
-                      driverName: matchedPreset.driverName,
-                      carNumber: matchedPreset.carNumber,
+                      driver_name: matchedPreset.driverName,
+                      car_number: matchedPreset.carNumber,
                       phone: matchedPreset.phone,
-                      defaultNavi: matchedPreset.defaultNavi,
+                      passenger_name: effectivePassenger,
+                      default_navi: matchedPreset.defaultNavi,
                     }),
                   }).catch((err) => console.warn('Supabase driver background sync failed:', err));
                 } else {
                   // Fallback: fetch dynamically from API so different vehicle never retains old driver name
-                  fetch(`/api/driver?vehicle_no=${encodeURIComponent(vNo)}`)
+                  fetch(`/api/driver?vehicle_no=${encodeURIComponent(cleanVNo)}`)
                     .then((res) => res.json())
                     .then((data) => {
                       if (data?.driver) {
                         const d = data.driver;
                         const fullVehicle = d.car_number ? `${d.vehicle_no} ${d.car_number}` : d.vehicle_no;
+                        const apiPassenger = d.passenger_name || storedPassenger || getPresetPassengerName(cleanVNo);
                         updateProfile({
                           vehicleNo: fullVehicle,
                           carNumber: d.car_number || undefined,
                           driverName: d.driver_name || '',
                           phone: d.phone || '',
                           mobile: d.phone || '',
+                          passengerName: apiPassenger,
                           defaultNavi: d.default_navi || 'tmap',
                         });
                       } else {
-                        updateProfile({ vehicleNo: vNo });
+                        updateProfile({ vehicleNo: cleanVNo, passengerName: effectivePassenger });
                       }
                     })
-                    .catch(() => updateProfile({ vehicleNo: vNo }));
+                    .catch(() => updateProfile({ vehicleNo: cleanVNo, passengerName: effectivePassenger }));
                 }
-                fetchPresetsForVehicle(vNo);
+                fetchPresetsForVehicle(cleanVNo);
               }}
             />
           </div>
@@ -843,7 +857,7 @@ export default function Home() {
           } catch (e) {
             console.warn('Failed to save onboarding flag:', e);
           }
-          // Sync profile to Supabase with vehicle_no & car_number
+          // Sync profile to Supabase with vehicle_no & car_number & passenger_name
           const { hocha: h, plateNumber: pNum } = parseVehicleDetails(updated.vehicleNo);
           const cleanVehicleNo = h ? `${h}호차` : (updated.vehicleNo || '4호차');
           fetchPresetsForVehicle(cleanVehicleNo);
@@ -855,6 +869,7 @@ export default function Home() {
               car_number: pNum || undefined,
               driver_name: updated.driverName,
               phone: updated.phone || updated.mobile || undefined,
+              passenger_name: updated.passengerName !== undefined ? updated.passengerName : profile.passengerName,
               default_navi: updated.defaultNavi ?? profile.defaultNavi,
             }),
           }).catch((err) => console.warn('Supabase driver profile sync error:', err));

@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { DriverProfile, NaviProvider } from '@/types';
 import { X, User, Car, Users, Navigation, Check, Phone } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
-import { ENABLE_DEV_FLEET_SWITCHER, FLEET_PRESET_DRIVERS, FleetPresetDriver } from '@/utils/constants';
+import { ENABLE_DEV_FLEET_SWITCHER, FLEET_PRESET_DRIVERS, FleetPresetDriver, getPresetPassengerName } from '@/utils/constants';
+import { getStoredVehicleProfile } from '@/hooks/useDriverProfile';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -126,6 +127,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 carNumber: d.car_number || '',
                 driverName: d.driver_name || '',
                 phone: d.phone || '',
+                passengerName: d.passenger_name || getPresetPassengerName(d.vehicle_no) || '',
                 defaultNavi: (d.default_navi as NaviProvider) || 'tmap',
               };
               presetMap.set(d.vehicle_no, presetObj);
@@ -245,6 +247,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       } else {
         const initial = parseVehicleDetails(profile.vehicleNo);
         const initPhone = parsePhoneDetails(profile.phone || profile.mobile);
+        const cleanVehicleKey = initial.hocha ? `${initial.hocha}호차` : profile.vehicleNo;
+        const storedPassenger = getStoredVehicleProfile(cleanVehicleKey)?.passengerName;
+        const initialPassenger =
+          profile.passengerName !== undefined && profile.passengerName !== ''
+            ? profile.passengerName
+            : storedPassenger || getPresetPassengerName(cleanVehicleKey) || '';
+
         setHocha(initial.hocha);
         setPlateFront(profile.carNumberFront || initial.plateFront);
         setPlateBack(profile.carNumberBack || initial.plateBack);
@@ -252,7 +261,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
         setPhone2(profile.phonePart2 || initPhone.p2 || '');
         setPhone3(profile.phonePart3 || initPhone.p3 || '');
         setDriverName(profile.driverName || '');
-        setPassengerName(profile.passengerName || '');
+        setPassengerName(initialPassenger);
         setDefaultNavi(profile.defaultNavi || 'tmap');
       }
 
@@ -532,6 +541,15 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                         setPhone2(pObj.p2);
                         setPhone3(pObj.p3);
                         setDefaultNavi(d.defaultNavi);
+
+                        // Auto-inject vehicle-isolated passenger name
+                        const storedPassenger = getStoredVehicleProfile(d.vehicleNo)?.passengerName;
+                        const targetPassenger =
+                          d.passengerName ||
+                          storedPassenger ||
+                          getPresetPassengerName(d.vehicleNo) ||
+                          '';
+                        setPassengerName(targetPassenger);
                       }}
                       className={`p-2 rounded-xl text-left border transition-all cursor-pointer ${isCurrent
                         ? 'bg-[#1E60F3] text-white border-[#1E60F3] shadow-xs'

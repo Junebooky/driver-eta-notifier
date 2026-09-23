@@ -334,18 +334,20 @@ export async function POST(req: NextRequest) {
     const activePresets = dbPresets || [];
 
     // 6. Ensure Driver Exists in cockpit.drivers (satisfies foreign key constraint)
+    const driverPayload: any = {
+      vehicle_no: targetVehicleNo,
+      car_number: plateNo,
+      driver_name: driverName,
+      phone: rawMobile,
+      default_navi: 'tmap',
+    };
+    if (profile?.passengerName) {
+      driverPayload.passenger_name = profile.passengerName;
+    }
+
     await supabaseAdmin
       .from('drivers')
-      .upsert(
-        {
-          vehicle_no: targetVehicleNo,
-          car_number: plateNo,
-          driver_name: driverName,
-          phone: rawMobile,
-          default_navi: 'tmap',
-        },
-        { onConflict: 'vehicle_no' }
-      );
+      .upsert(driverPayload, { onConflict: 'vehicle_no' });
 
     // 7. Supabase DB Upsert Pipeline
     // Check existing schedules for this vehicle to update without causing duplicates

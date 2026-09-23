@@ -133,6 +133,7 @@ export interface DbDriverRow {
   car_number: string;
   driver_name: string;
   phone?: string | null;
+  passenger_name?: string | null;
   default_navi: NaviProvider;
   created_at?: string;
 }

@@ -37,8 +37,7 @@ export function generateReportText({
   mode,
   departureTimeText,
 }: GenerateReportParams): string {
-  const passengerName = profile.passengerName?.trim();
-  const hasPassenger = Boolean(passengerName);
+  const passengerName = profile.passengerName?.trim() || '미지정';
   
   const destName = typeof destination === 'string' ? destination : destination.shortName;
   const originName = typeof origin === 'string' ? origin : origin ? origin.shortName : '현 위치';
@@ -57,7 +56,7 @@ export function generateReportText({
   if (mode === 'ARRIVED') {
     const lines = [
       header,
-      hasPassenger ? `• 담당승객: ${passengerName}` : null,
+      `• 담당승객: ${passengerName}`,
       `• 도착지: ${destName}`,
       `• 상태: 도착 완료`,
     ].filter(Boolean);
@@ -66,7 +65,7 @@ export function generateReportText({
 
   const lines = [
     header,
-    hasPassenger ? `• 담당승객: ${passengerName}` : null,
+    `• 담당승객: ${passengerName}`,
     departureTimeText
       ? `• 출발 예정: ${originName} (${departureTimeText})`
       : `• 출발지: ${originName}`,

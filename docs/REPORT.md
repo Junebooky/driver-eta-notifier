@@ -875,6 +875,64 @@ SELECT * FROM cockpit.presets;
      - 정밀 진입 좌표: `lat: 37.52587649`, `lng: 127.0289898` 정상 추출
      - 3단계 파이프라인을 거쳐 출발지/도착지 주소 및 내비 좌표에 100% 무결 바인딩 완료.
 
+---
+
+## 25. 호차별 담당 승객명(passengerName) 데이터 격리 및 프로필 독립 영속화 (2026-09-23)
+
+### 25.1 문제 배경 및 목적
+* 기존 시스템에서는 프로필의 `passengerName` 필드가 전체 호차 간 공유되는 상태 누수(State Leak)가 존재하여, 4호차의 승객명('SOYFAN 외 1명')이 1호차나 2호차로 전환해도 그대로 잔존하거나, 한 호차에서 승객명을 변경하면 타 호차의 승객명까지 연쇄 덮어쓰기되는 결함이 있었음.
+* 이를 해결하기 위해 Supabase DB(`cockpit.drivers` 및 `cockpit.driver_profiles`), 클라이언트 로컬 스토리지(`VEHICLE_PROFILES_KEY`), 프로필 모달, 메인 화면 보고 텍스트 전반에서 **호차(`vehicle_no`)별 승객명 완전 독립 격리 및 영속화 파이프라인**을 구축함.
+
+### 25.2 주요 구현 내역
+
+#### 1. DB 스키마 확장 및 호차별 기본 승객명 프리셋 확정 ([`types/index.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/types/index.ts), [`utils/constants.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/utils/constants.ts))
+* **Supabase `cockpit.drivers` 테이블 컬럼 추가**:
+  - `passenger_name text` 컬럼 추가 및 `vehicle_no` 기준 고유 업데이트 적용.
+  - `cockpit.cockpit_drivers` 및 `cockpit.driver_profiles` 뷰에 `passenger_name` 투영 반영.
+* **호차별 기본 승객명 프리셋 정의**:
+  - **4호차 (윤태준 기사님)**: `'SOYFAN 외 1명'` (고정 지정)
+  - **1호차 (배선만 기사님)**: `'VIP 게스트 A'` (임시 명칭)
+  - **2호차 (홍승범 기사님)**: `'VIP 게스트 B'` (임시 명칭)
+  - **8호차 (민성호 기사님)**: `'VIP 게스트 C'` (임시 명칭)
+  - 신규 등록 호차: 빈 문자열(`""`) 또는 `'미지정'`
+* [`utils/constants.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/utils/constants.ts)에 `getPresetPassengerName(vehicleNo)` 헬퍼 함수 구현.
+
+#### 2. 백엔드 API 격리 업서트 ([`app/api/driver/route.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/api/driver/route.ts))
+* `DRIVER_DEFAULTS`에 호차별 기본 `passenger_name` 등록.
+* `GET /api/driver`:
+  - `all=true` 및 개별 호차 조회 시 DB에 저장된 `passenger_name`을 최우선 반환하되, 부재 시 기본 프리셋 값으로 자동 보강.
+* `POST /api/driver`:
+  - `passenger_name` 필드를 수신하여 오직 대상 `vehicle_no` 레코드만 단독 갱신(`onConflict: 'vehicle_no'`). 타 호차 레코드에 일체 영향 없음.
+
+#### 3. 클라이언트 로컬 스토리지 호차별 격리 저장 ([`hooks/useDriverProfile.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/hooks/useDriverProfile.ts))
+* `VEHICLE_PROFILES_KEY`(`protocol_cockpit_vehicle_profiles_v1`) 도입:
+  - `getStoredVehicleProfile(vehicleNo)` 및 `setStoredVehicleProfile(vehicleNo, data)` 함수 구현.
+  - 활성 프로필 변경 시 해당 호차 전용 데이터 세트로 즉각 전환되고, 프로필 저장 시 해당 호차 전용 캐시와 Supabase에 동시 기록.
+  - 호차 전환 시 이전 호차의 승객명을 상속받지 않고 대상 호차의 전용 승객명으로 완전 교체.
+
+#### 4. 프로필 모달 DEV 1초 전환 시 자동 주입 ([`components/ProfileModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ProfileModal.tsx))
+* 모달 오픈 시 Supabase에서 조회된 드라이버 목록의 `passenger_name`을 `fleetPresets`에 바인딩.
+* DEV 1초 전환 버튼(1호차, 2호차, 4호차, 8호차) 클릭 시 이전 호차 승객명이 잔존하지 않고, 해당 호차의 저장된 `passengerName` 또는 기본 프리셋('SOYFAN 외 1명', 'VIP 게스트 A' 등)이 폼에 즉시 채워지도록 구현.
+* 저장 시 현재 선택된 `vehicleNo`와 `passengerName`만 단독 전달.
+
+#### 5. 메인 화면 및 단톡방 보고 텍스트 실시간 1:1 연동 ([`utils/reportGenerator.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/utils/reportGenerator.ts), [`app/page.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/page.tsx), [`components/Header.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/Header.tsx))
+* `generateReportText`:
+  - `const passengerName = profile.passengerName?.trim() || '미지정'`
+  - 출발(`DEPARTURE`) 및 도착(`ARRIVED`) 보고 텍스트 모두에 `• 담당승객: ${passengerName}`이 누락 없이 실시간 렌더링.
+  - 4호차 활성 시 `'SOYFAN 외 1명'`, 1호차 활성 시 `'VIP 게스트 A'`(또는 수정한 커스텀 승객명)로 1:1 즉각 동기화.
+* 상단 헤더 프로필 툴팁에도 현재 담당 승객명 실시간 반영.
+
+### 25.3 빌드 및 시나리오 검증 결과
+1. **빌드 무결성**:
+   * `npm run build`: Turbopack 기준 14개 전 라우트 컴파일 0 에러 통과.
+2. **시나리오 검증**:
+   * **4호차 선택**: DB 및 폼에서 담당 승객명 `'SOYFAN 외 1명'` 정상 로드.
+   * **DEV 1호차 전환**: 담당 승객명이 `'VIP 게스트 A'`로 즉시 교체.
+   * **1호차 수정 및 저장**: 승객명을 `'Mr. Anderson'`으로 수정한 후 저장 시 1호차만 `'Mr. Anderson'`으로 단독 갱신.
+   * **4호차 복귀**: 4호차의 승객명이 영향을 받지 않고 `'SOYFAN 외 1명'`으로 온전히 유지됨 확인.
+   * **보고 텍스트 연동**: 단톡방 보고 텍스트 미리보기에 `• 담당승객: SOYFAN 외 1명` 및 `• 담당승객: VIP 게스트 A`가 실시간으로 완벽 표출됨 확인.
+
+
 
 
 
