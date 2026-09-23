@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { LocationPreset, HomeLocation } from '@/types';
-import { Plus, Trash2, Pencil, SlidersHorizontal, Home as HomeIcon, ShieldAlert, Fuel, Plane, ClipboardCheck } from 'lucide-react';
+import { Plus, Trash2, Pencil, SlidersHorizontal, Home as HomeIcon, ShieldAlert, Fuel, Plane, ClipboardCheck, X } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface PresetButtonsProps {
@@ -42,6 +43,11 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
 }) => {
   const [isManageMode, setIsManageMode] = useState(false);
   const [managingPreset, setManagingPreset] = useState<LocationPreset | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Local preset list for dynamic position swapping during drag (excluding Home slot)
   const [items, setItems] = useState<LocationPreset[]>(presets);
@@ -615,92 +621,96 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
         </div>
       )}
 
-      {/* Management Action Dialog Modal */}
-      {managingPreset && (
-        <div
-          className="fixed inset-0 z-50 flex items-start justify-center pt-[12vh] sm:items-center sm:pt-0 p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setManagingPreset(null);
-            }
-          }}
-        >
-          <div
-            className="w-full max-w-xs bg-white border border-slate-200 rounded-3xl shadow-2xl p-5 text-center space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div>
-              <div className="flex items-center justify-center gap-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  {managingPreset.isGlobal ? '전사 공통 거점 관리' : '개인 거점 관리'}
-                </span>
-                {managingPreset.isGlobal && (
-                  <span className="text-[9px] bg-blue-50 text-[#1E60F3] font-bold px-1.5 py-0.5 rounded">
-                    공통
-                  </span>
-                )}
-              </div>
-              <h3 className="text-sm font-black text-slate-900 truncate mt-0.5">
-                [{managingPreset.shortName}]
-              </h3>
-              <p className="text-[11px] text-slate-500 truncate mt-0.5">
-                {managingPreset.address || managingPreset.name}
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              {onEditPreset && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    haptics.lightTap();
-                    const p = managingPreset;
-                    setManagingPreset(null);
-                    onEditPreset(p);
-                  }}
-                  className="w-full py-2.5 px-4 bg-[#1E60F3] hover:bg-[#1346D8] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/35 active:translate-y-0 active:scale-[0.97] active:bg-[#0f3bb8] text-white font-bold rounded-xl text-xs flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs transition-all duration-150 ease-out"
-                >
-                  <Pencil className="w-3.5 h-3.5 text-white" />
-                  <span>수정</span>
-                </button>
-              )}
-
-              {/* Delete button: permitted for personal presets, or for global presets IF admin */}
-              {onDeleteCustomPreset && (!managingPreset.isGlobal || isAdmin) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    haptics.errorAlert();
-                    const idToDelete = managingPreset.id;
-                    setManagingPreset(null);
-                    onDeleteCustomPreset(idToDelete);
-                  }}
-                  className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 font-semibold rounded-xl text-xs flex items-center justify-center space-x-1.5 cursor-pointer active:translate-y-0 active:scale-[0.97] transition-all duration-150 ease-out"
-                >
-                  <Trash2 className="w-3.5 h-3.5 text-slate-500" />
-                  <span>
-                    {managingPreset.isGlobal ? '공통 거점 삭제' : '삭제'}
-                  </span>
-                </button>
-              )}
-
-              {managingPreset.isGlobal && !isAdmin && (
-                <p className="text-[10px] text-slate-400">
-                  전사 공통 거점은 관리자 모드(PIN: 1010)에서만 삭제할 수 있습니다.
-                </p>
-              )}
-
-              <button
-                type="button"
-                onClick={() => setManagingPreset(null)}
-                className="w-full py-2 text-slate-400 hover:text-slate-600 font-medium text-xs cursor-pointer"
+      {/* Managing Single Preset Action Modal (Portaled directly to document.body to prevent stacking context overlap) */}
+      {isMounted && managingPreset && typeof document !== 'undefined'
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) {
+                  setManagingPreset(null);
+                }
+              }}
+            >
+              <div
+                className="w-full max-w-xs bg-white border border-slate-200 rounded-3xl shadow-2xl p-5 text-center space-y-4"
+                onClick={(e) => e.stopPropagation()}
               >
-                닫기
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+                <div>
+                  <div className="flex items-center justify-center gap-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      {managingPreset.isGlobal ? '전사 공통 거점 관리' : '개인 거점 관리'}
+                    </span>
+                    {managingPreset.isGlobal && (
+                      <span className="text-[9px] bg-blue-50 text-[#1E60F3] font-bold px-1.5 py-0.5 rounded">
+                        공통
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="text-sm font-black text-slate-900 truncate mt-0.5">
+                    [{managingPreset.shortName}]
+                  </h3>
+                  <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                    {managingPreset.address || managingPreset.name}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  {onEditPreset && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        haptics.lightTap();
+                        const p = managingPreset;
+                        setManagingPreset(null);
+                        onEditPreset(p);
+                      }}
+                      className="w-full py-2.5 px-4 bg-[#1E60F3] hover:bg-[#1346D8] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/35 active:translate-y-0 active:scale-[0.97] active:bg-[#0f3bb8] text-white font-bold rounded-xl text-xs flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs transition-all duration-150 ease-out"
+                    >
+                      <Pencil className="w-3.5 h-3.5 text-white" />
+                      <span>수정</span>
+                    </button>
+                  )}
+
+                  {/* Delete button: permitted for personal presets, or for global presets IF admin */}
+                  {onDeleteCustomPreset && (!managingPreset.isGlobal || isAdmin) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        haptics.errorAlert();
+                        const idToDelete = managingPreset.id;
+                        setManagingPreset(null);
+                        onDeleteCustomPreset(idToDelete);
+                      }}
+                      className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 font-semibold rounded-xl text-xs flex items-center justify-center space-x-1.5 cursor-pointer active:translate-y-0 active:scale-[0.97] transition-all duration-150 ease-out"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-slate-500" />
+                      <span>
+                        {managingPreset.isGlobal ? '공통 거점 삭제' : '삭제'}
+                      </span>
+                    </button>
+                  )}
+
+                  {managingPreset.isGlobal && !isAdmin && (
+                    <p className="text-[10px] text-slate-400">
+                      전사 공통 거점은 관리자 모드(PIN: 1010)에서만 삭제할 수 있습니다.
+                    </p>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setManagingPreset(null)}
+                    className="w-full py-2.5 px-4 text-slate-400 hover:text-slate-600 font-medium text-xs flex items-center justify-center space-x-1.5 cursor-pointer transition-colors active:scale-95"
+                  >
+                    <X className="w-3.5 h-3.5 text-slate-400" />
+                    <span>닫기</span>
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
     </div>
   );
 };
