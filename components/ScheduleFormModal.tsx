@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ScheduleItem } from '@/data/ferrariSchedules';
 import { LocationPreset } from '@/types';
 import { DEFAULT_PRESET_LOCATIONS } from '@/utils/presets';
@@ -91,6 +91,9 @@ function parseAndValidate8DigitDate(raw: string) {
   return { year, month, day, dayOfWeek, formattedDate, isoDate, dateLabel };
 }
 
+// Client-side in-memory search cache for 0ms instant retrieval
+const scheduleSearchCache = new Map<string, PoiResult[]>();
+
 export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
   isOpen,
   onClose,
@@ -113,6 +116,7 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<PoiResult[]>([]);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // 3. Time & Details
   const [pickupTime, setPickupTime] = useState('09:00');
@@ -167,13 +171,30 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
     }
   }, [isOpen, initialDate, presets, passengerName]);
 
-  // Real-time TMAP POI search with 250ms debounce
+  // Real-time TMAP POI search with in-memory caching and AbortController
   useEffect(() => {
     const q = searchQuery.trim();
     if (q.length < 2) {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
       setSearchResults([]);
       setIsSearching(false);
       setSearchError(null);
+      return;
+    }
+
+    // 0ms In-memory cache hit
+    if (scheduleSearchCache.has(q)) {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      const cached = scheduleSearchCache.get(q)!;
+      setSearchResults(cached);
+      setIsSearching(false);
+      setSearchError(cached.length === 0 ? '추천 검색 결과가 없습니다.' : null);
       return;
     }
 
@@ -181,11 +202,21 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
     setSearchError(null);
 
     const timer = setTimeout(async () => {
+      // Abort any prior in-flight request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
       try {
-        const res = await fetch(`/api/search?keyword=${encodeURIComponent(q)}`);
+        const res = await fetch(`/api/search?keyword=${encodeURIComponent(q)}`, {
+          signal: controller.signal,
+        });
         if (res.ok) {
           const data = await res.json();
           const pois: PoiResult[] = data.pois || [];
+          scheduleSearchCache.set(q, pois);
           setSearchResults(pois);
           if (pois.length === 0) {
             setSearchError('추천 검색 결과가 없습니다.');
@@ -193,15 +224,27 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
         } else {
           setSearchError('TMAP 검색 서버 응답에 실패했습니다.');
         }
-      } catch (err) {
+      } catch (err: any) {
+        if (err?.name === 'AbortError') {
+          // Aborted intentionally due to newer user typing
+          return;
+        }
         console.warn('TMAP search error:', err);
         setSearchError('검색 중 오류가 발생했습니다.');
       } finally {
-        setIsSearching(false);
+        if (abortControllerRef.current === controller) {
+          setIsSearching(false);
+        }
       }
     }, 250);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+    };
   }, [searchQuery]);
 
   if (!isOpen) return null;

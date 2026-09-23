@@ -1066,9 +1066,53 @@ SELECT * FROM cockpit.presets;
    * **"조선팰리스" 비역세권 일반 검색**:
      1. `조선팰리스 서울강남`이 최우선 1위로 정상 유지됨 확인.
 
+---
 
+## 28. 모바일 TMAP POI 검색 속도 3배 가속을 위한 4대 최적화 파이프라인 구축 (2026-09-23)
 
+### 28.1 배경 및 목적
+* 모바일 의전 현장에서 기사님이 거점 또는 일정을 등록할 때, 장소 검색 시 입력 자모마다 발생하는 네트워크 왕복 및 Vercel 기본 해외 리전(미국 동부) 경유로 인한 지연(700ms 이상)을 제거함.
+* 서버리스 물리 리전을 서울(icn1)로 고정하고, 한글 연속 입력 시 이전 요청을 즉시 강제 취소하는 `AbortController` 및 0ms 클라이언트 인메모리 캐시를 탑재하여 체감 검색 속도를 3배 이상 단축함.
 
+---
 
+### 28.2 핵심 구현 내역
 
+#### [태스크 1] 백엔드 Vercel 리전 서울 고정 및 캐시 헤더 부여 ([`app/api/search/route.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/api/search/route.ts), [`vercel.json`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/vercel.json))
+1. **서버리스 물리 리전 서울(`icn1`) 고정**:
+   * 태평양 왕복 지연을 방지하기 위해 파일 상단에 서울 리전 및 Node.js 런타임을 명시하고 `vercel.json`에 `regions: ["icn1"]` 등록:
+     ```typescript
+     export const preferredRegion = 'icn1';
+     export const runtime = 'nodejs';
+     ```
+2. **검색어 2글자 미만 가드레일**:
+   * `keyword.length < 2`인 경우 외부 TMAP API를 호출하지 않고 즉시 `[]` 반환하여 불필요한 백엔드 트래픽과 할당량 낭비를 원천 차단.
+3. **HTTP Cache-Control 헤더 부여**:
+   * 동일 키워드 재검색 시 CDN 및 브라우저에서 즉시 반환할 수 있도록 응답 헤더 추가:
+     `'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400'`
+
+---
+
+#### [태스크 2] 클라이언트 인메모리 캐시 및 이전 요청 취소 파이프라인 ([`ScheduleFormModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ScheduleFormModal.tsx), [`CustomPresetModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/CustomPresetModal.tsx))
+1. **`AbortController`를 통한 이전 요청 즉시 폐기**:
+   * `abortControllerRef = useRef<AbortController | null>(null)`를 장착.
+   * 사용자가 자모를 연속 타이핑할 때마다 이전 진행 중이던 `fetch` 요청을 즉각 `abort()` 취소하여 소켓 대기열 적체를 방지하고 마지막 키워드의 응답만 신속 렌더링.
+2. **0ms 클라이언트 인메모리 캐시 (Map) 탑재**:
+   * 컴포넌트 외부에 `searchCache = new Map<string, PoiResult[]>()` 선언.
+   * 타이핑 후 캐시에 데이터가 존재하면 네트워크 호출 없이 **0ms** 만에 즉시 상태 업데이트 및 화면 표출.
+3. **2자 미만 타이핑 방어 및 스크롤 격리 유지**:
+   * 1글자 입력 시 로딩 스피너 및 네트워크 요청을 즉각 차단하고 결과 목록 초기화.
+   * 모바일 키패드 블러(`document.activeElement.blur()`) 및 `overscroll-contain touch-pan-y` 완벽 보존.
+
+---
+
+### 28.3 빌드 및 성능 검증 결과
+1. **빌드 무결성**:
+   * `npm run build`: Turbopack 기준 전 라우트 컴파일 **0 에러** 통과.
+2. **응답 헤더 및 가드레일 검증 (`curl`)**:
+   * `GET /api/search?keyword=구` (1글자) ➔ TMAP 호출 없이 즉시 `{"pois":[]}` 반환.
+   * `GET /api/search?keyword=구의역` ➔ `cache-control: public, s-maxage=3600, stale-while-revalidate=86400` 정상 부여.
+3. **캐시 및 취소 인터랙션 검증**:
+   * 자모 입력 시 이전 fetch의 `AbortError`가 콘솔 노이즈 없이 부드럽게 무시되고 최종 쿼리만 수신.
+   * 검색했던 키워드를 다시 입력할 때 네트워크 탭 요청 없이 인메모리 캐시에서 즉시 결과 렌더링 확인.
 

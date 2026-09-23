@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { LocationPreset } from '@/types';
 import { X, Search, MapPin, Loader2 } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
@@ -24,6 +24,9 @@ interface PoiResult {
   lng: number;
 }
 
+// Client-side in-memory search cache for 0ms instant retrieval
+const customPresetSearchCache = new Map<string, PoiResult[]>();
+
 export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
   isOpen,
   onClose,
@@ -39,6 +42,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<PoiResult[]>([]);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Selected Preset Form State
   const [name, setName] = useState('');
@@ -72,13 +76,30 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
     }
   }, [isOpen, presetToEdit]);
 
-  // Real-time TMAP POI Autocomplete with 250ms Debounce
+  // Real-time TMAP POI Autocomplete with in-memory caching and AbortController
   useEffect(() => {
     const query = searchQuery.trim();
     if (query.length < 2) {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
       setSearchResults([]);
       setIsSearching(false);
       setSearchError(null);
+      return;
+    }
+
+    // 0ms In-memory cache hit
+    if (customPresetSearchCache.has(query)) {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      const cached = customPresetSearchCache.get(query)!;
+      setSearchResults(cached);
+      setIsSearching(false);
+      setSearchError(cached.length === 0 ? '추천 검색 결과가 없습니다.' : null);
       return;
     }
 
@@ -86,11 +107,21 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
     setSearchError(null);
 
     const debounceTimer = setTimeout(async () => {
+      // Abort any prior in-flight request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
       try {
-        const res = await fetch(`/api/search?keyword=${encodeURIComponent(query)}`);
+        const res = await fetch(`/api/search?keyword=${encodeURIComponent(query)}`, {
+          signal: controller.signal,
+        });
         if (res.ok) {
           const data = await res.json();
           const pois: PoiResult[] = data.pois || [];
+          customPresetSearchCache.set(query, pois);
           setSearchResults(pois);
           if (pois.length === 0) {
             setSearchError('추천 검색 결과가 없습니다.');
@@ -98,15 +129,27 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
         } else {
           setSearchError('TMAP 검색 서버 응답에 실패했습니다.');
         }
-      } catch (err) {
+      } catch (err: any) {
+        if (err?.name === 'AbortError') {
+          // Aborted intentionally due to newer user typing
+          return;
+        }
         console.warn('POI autocomplete error:', err);
         setSearchError('검색 중 오류가 발생했습니다.');
       } finally {
-        setIsSearching(false);
+        if (abortControllerRef.current === controller) {
+          setIsSearching(false);
+        }
       }
     }, 250);
 
-    return () => clearTimeout(debounceTimer);
+    return () => {
+      clearTimeout(debounceTimer);
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+    };
   }, [searchQuery]);
 
   if (!isOpen) return null;

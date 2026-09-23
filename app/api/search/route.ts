@@ -10,12 +10,15 @@ export interface TmapPoiItem {
   lowerBizName?: string;
 }
 
+export const preferredRegion = 'icn1';
+export const runtime = 'nodejs';
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const keyword = searchParams.get('keyword')?.trim();
 
-    if (!keyword || keyword.length < 1) {
+    if (!keyword || keyword.length < 2) {
       return NextResponse.json({ pois: [] });
     }
 
@@ -238,7 +241,14 @@ export async function GET(req: NextRequest) {
       lng,
     }));
 
-    return NextResponse.json({ pois: cleanedPois });
+    return NextResponse.json(
+      { pois: cleanedPois },
+      {
+        headers: {
+          'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
+        },
+      }
+    );
   } catch (error: any) {
     console.warn('TMAP POI Search error:', error?.message);
     return NextResponse.json({ pois: [] });
