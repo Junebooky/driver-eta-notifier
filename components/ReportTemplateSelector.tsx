@@ -1,8 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { ReportMode } from '@/types';
-import { FileText, Play, Square } from 'lucide-react';
+import { FileText, Play, Square, Copy, Check } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface ReportTemplateSelectorProps {
@@ -16,7 +16,18 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
   onSelectMode,
   reportPreviewText,
 }) => {
+  const [copySuccess, setCopySuccess] = useState(false);
   const isDeparture = currentMode === 'DEPARTURE';
+
+  // Minimal Header Copy Action (Icon feedback only, identical to VehicleInspectionModal)
+  const handleCopyMinimal = () => {
+    haptics.success();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(reportPreviewText);
+    }
+    setCopySuccess(true);
+    setTimeout(() => setCopySuccess(false), 1500);
+  };
 
   return (
     <div className="w-full bg-white border border-slate-100/80 rounded-2xl p-4 shadow-[0_8px_25px_rgba(30,96,243,0.06)] space-y-3 select-none">
@@ -92,7 +103,19 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
       <div className="bg-slate-50/70 border border-slate-100 rounded-xl p-3 space-y-2">
         <div className="text-xs text-slate-400 font-normal px-0.5 flex items-center justify-between">
           <span>보고 텍스트 미리보기</span>
-          <span className="text-[#1E60F3] font-medium">실시간 갱신됨</span>
+          <button
+            type="button"
+            onClick={handleCopyMinimal}
+            className="w-8 h-8 rounded-lg flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all active:scale-90 cursor-pointer"
+            title="양식 복사"
+            aria-label="양식 복사"
+          >
+            {copySuccess ? (
+              <Check className="w-4 h-4 text-[#1E60F3]" />
+            ) : (
+              <Copy className="w-4 h-4 text-slate-600" />
+            )}
+          </button>
         </div>
         <div className="text-xs font-medium text-slate-800 leading-relaxed bg-white p-3 rounded-xl border border-slate-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.03)] select-all whitespace-pre-line font-sans min-h-[130px] flex flex-col justify-start items-start text-left w-full">
           {reportPreviewText}
