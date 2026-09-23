@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { LocationPreset, HomeLocation } from '@/types';
-import { Plus, Trash2, Pencil, SlidersHorizontal, Home as HomeIcon, ShieldAlert, Fuel, Plane } from 'lucide-react';
+import { Plus, Trash2, Pencil, SlidersHorizontal, Home as HomeIcon, ShieldAlert, Fuel, Plane, ClipboardCheck } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface PresetButtonsProps {
@@ -17,6 +17,7 @@ interface PresetButtonsProps {
   onOpenHomeModal: () => void;
   onOpenFlightModal?: () => void;
   onOpenGasModal?: () => void;
+  onOpenInspectionModal?: () => void;
   onEditPreset?: (preset: LocationPreset) => void;
   onDeleteCustomPreset?: (id: string) => void;
   onReorderPresets?: (reordered: LocationPreset[]) => void;
@@ -34,6 +35,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
   onOpenHomeModal,
   onOpenFlightModal,
   onOpenGasModal,
+  onOpenInspectionModal,
   onEditPreset,
   onDeleteCustomPreset,
   onReorderPresets,
@@ -302,6 +304,21 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
         </div>
 
         <div className="flex items-center space-x-2">
+          {onOpenInspectionModal && (
+            <button
+              type="button"
+              onClick={() => {
+                haptics.lightTap();
+                onOpenInspectionModal();
+              }}
+              className="w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-slate-700 hover:bg-[#1E60F3] hover:text-white hover:border-[#1E60F3] active:scale-95 flex items-center justify-center transition-all cursor-pointer"
+              title="차량 수령·반납 점검표"
+              aria-label="차량 점검"
+            >
+              <ClipboardCheck className="w-4 h-4" />
+            </button>
+          )}
+
           {onOpenFlightModal && (
             <button
               type="button"
@@ -384,10 +401,10 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
               }}
               className={`w-full h-full min-h-[58px] px-2 py-2.5 rounded-xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-200 group ${
                 isHomeDestination
-                  ? 'border-[#1E60F3] bg-blue-50/70 text-[#1E60F3] font-bold shadow-sm shadow-blue-500/10'
+                  ? 'border-2 border-[#1E60F3] text-[#1E60F3] bg-white font-bold shadow-sm shadow-blue-500/10'
                   : isHomeOrigin
-                  ? 'bg-slate-100 text-slate-800 border-slate-300 ring-1 ring-slate-200 font-bold shadow-2xs'
-                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300 font-semibold'
+                  ? 'bg-slate-50/80 text-slate-800 border-slate-300/90 ring-1 ring-slate-200/60 font-bold shadow-2xs'
+                  : `bg-white border-slate-200 text-slate-700 font-semibold ${dynamicHoverClasses}`
               } ${isManageMode ? 'border-dashed border-[#1E60F3]/60' : ''}`}
               title={`${homePreset.name} (${homePreset.address})`}
             >
@@ -475,13 +492,13 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
           const isHQ = !preset.vehicle_no && !preset.vehicleNo;
           const badgeLabel = isHQ ? 'HQ' : 'MY';
 
-          let stateClasses = 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300 font-medium';
+          let stateClasses = `bg-white border-slate-200 text-slate-700 font-medium ${dynamicHoverClasses}`;
           if (isDestination) {
             stateClasses =
-              'border-[#1E60F3] bg-blue-50/70 text-[#1E60F3] font-bold shadow-sm shadow-blue-500/10';
+              'border-2 border-[#1E60F3] text-[#1E60F3] bg-white font-bold shadow-sm shadow-blue-500/10';
           } else if (isOrigin) {
             stateClasses =
-              'bg-slate-100 text-slate-800 border-slate-300 ring-1 ring-slate-200 font-bold shadow-2xs';
+              'bg-slate-50/80 text-slate-800 border-slate-300/90 ring-1 ring-slate-200/60 font-bold shadow-2xs';
           }
 
           if (isManageMode) {

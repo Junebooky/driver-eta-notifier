@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { DriverProfile, NaviProvider } from '@/types';
-import { Car, ChevronDown, Settings, ClipboardCheck } from 'lucide-react';
+import { Car, ChevronDown, Settings } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface HeaderProps {
@@ -10,7 +10,6 @@ interface HeaderProps {
   onOpenProfileModal: () => void;
   onSelectNavi: (provider: NaviProvider) => void;
   onOpenAdminModal?: () => void;
-  onOpenInspectionModal?: () => void;
   isAdmin?: boolean;
 }
 
@@ -47,7 +46,6 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenProfileModal,
   onSelectNavi,
   onOpenAdminModal,
-  onOpenInspectionModal,
   isAdmin = false,
 }) => {
   const headerLabel = formatHeaderDriverLabel(profile.vehicleNo, profile.driverName);
@@ -55,7 +53,7 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="w-full bg-white/95 border-b border-slate-100/90 backdrop-blur pt-[max(env(safe-area-inset-top),1.25rem)] pb-2.5 px-4 sticky top-0 z-30 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
       <div className="max-w-md mx-auto flex items-center justify-between gap-2">
-        {/* Left: Driver / Vehicle Pill Tag & Inspection Button */}
+        {/* Left: Driver / Vehicle Pill Tag (Flexible with truncate, won't wrap to 2 lines) */}
         <div className="flex items-center gap-1.5 min-w-0 flex-1 shrink mr-2">
           <button
             onClick={() => {
@@ -72,21 +70,6 @@ export const Header: React.FC<HeaderProps> = ({
             <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
           </button>
 
-          {onOpenInspectionModal && (
-            <button
-              type="button"
-              onClick={() => {
-                haptics.lightTap();
-                onOpenInspectionModal();
-              }}
-              className="flex items-center space-x-1 bg-white hover:bg-slate-50 px-2.5 py-1.5 rounded-full border border-slate-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.04)] text-xs font-bold text-slate-700 cursor-pointer active:scale-95 transition-all shrink-0"
-              title="차량 수령·반납 점검표"
-              aria-label="차량 점검"
-            >
-              <ClipboardCheck className="w-3.5 h-3.5 text-[#1E60F3]" />
-              <span className="text-[11px] font-bold text-slate-800">점검</span>
-            </button>
-          )}
         </div>
 
         {/* Right: Circular 36px Navi Switchers + Settings Gear Icon (Guaranteed shrink-0 protection) */}

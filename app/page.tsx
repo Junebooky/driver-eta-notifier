@@ -624,10 +624,6 @@ export default function Home() {
             setPreferredNavi(prov);
           }}
           onOpenAdminModal={() => setIsAdminModalOpen(true)}
-          onOpenInspectionModal={() => {
-            setInspectionInitialMode('receipt');
-            setIsInspectionModalOpen(true);
-          }}
           isAdmin={isAdmin}
         />
 
@@ -725,6 +721,7 @@ export default function Home() {
               onOpenHomeModal={() => setIsHomeModalOpen(true)}
               onOpenFlightModal={() => setIsFlightModalOpen(true)}
               onOpenGasModal={() => setIsGasModalOpen(true)}
+              onOpenInspectionModal={() => setIsInspectionModalOpen(true)}
               onEditPreset={handleOpenEditModal}
               onDeleteCustomPreset={handleDeleteCustomPreset}
               onReorderPresets={handleReorderPresets}
@@ -762,10 +759,6 @@ export default function Home() {
               reportText={reportPreviewText}
               targetChatRoom={profile.targetChatRoom}
               profile={profile}
-              onOpenInspectionModal={() => {
-                setInspectionInitialMode('return');
-                setIsInspectionModalOpen(true);
-              }}
             />
           </div>
         ) : (
