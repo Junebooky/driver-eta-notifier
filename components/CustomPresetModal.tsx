@@ -159,6 +159,13 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
     onClose();
   };
 
+  // Dismiss mobile virtual keyboard on touching/scrolling result list
+  const handleListTouch = () => {
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || (!isHomeMode && !shortName.trim())) {
@@ -255,7 +262,10 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
         </div>
 
         {/* Modal Content */}
-        <div className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+        <div
+          className="p-5 space-y-4 max-h-[80vh] overflow-y-auto overscroll-contain touch-pan-y"
+          style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
+        >
           {/* TMAP Real-time POI Autocomplete Search */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5">
@@ -278,7 +288,12 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
 
             {/* Real-time Autocomplete Results Dropdown */}
             {searchResults.length > 0 && (
-              <div className="mt-2 border border-slate-200 rounded-xl bg-white shadow-lg max-h-52 overflow-y-auto divide-y divide-slate-100 animate-fade-in">
+              <div
+                onTouchStart={handleListTouch}
+                onScrollCapture={handleListTouch}
+                style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
+                className="mt-2 border border-slate-200 rounded-xl bg-white shadow-lg max-h-52 overflow-y-auto divide-y divide-slate-100 animate-fade-in overscroll-contain touch-pan-y"
+              >
                 <div className="p-2 text-[10px] font-bold text-slate-400 bg-slate-50/80 uppercase">
                   터치하여 원터치 등록
                 </div>

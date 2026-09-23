@@ -218,6 +218,13 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
     }
   };
 
+  // Dismiss mobile virtual keyboard on touching/scrolling result list
+  const handleListTouch = () => {
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+  };
+
   // Quick Location Selection
   const handleSelectLocation = (loc: SelectedLocation) => {
     haptics.lightTap();
@@ -313,7 +320,10 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
         </div>
 
         {/* Modal Scrollable Body */}
-        <div className="p-5 space-y-4 overflow-y-auto flex-1 text-slate-800">
+        <div
+          className="p-5 space-y-4 overflow-y-auto flex-1 text-slate-800 overscroll-contain touch-pan-y"
+          style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
+        >
           {/* ========================================================= */}
           {/* [태스크 2] 날짜 입력 필드 (숫자 8자리 + 요일 자동 연산 뱃지)  */}
           {/* ========================================================= */}
@@ -494,7 +504,12 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
 
                 {/* TMAP Autocomplete Results List */}
                 {searchResults.length > 0 && (
-                  <div className="max-h-40 overflow-y-auto space-y-1 divide-y divide-slate-50 border border-slate-100 rounded-xl p-1 bg-slate-50/50">
+                  <div
+                    onTouchStart={handleListTouch}
+                    onScrollCapture={handleListTouch}
+                    style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
+                    className="max-h-40 overflow-y-auto space-y-1 divide-y divide-slate-50 border border-slate-100 rounded-xl p-1 bg-slate-50/50 overscroll-contain touch-pan-y"
+                  >
                     {searchResults.map((poi) => (
                       <button
                         key={poi.id}

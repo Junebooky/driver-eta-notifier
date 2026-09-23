@@ -1006,6 +1006,67 @@ SELECT * FROM cockpit.presets;
    * `parseAndValidate8DigitDate('20260231')` ➔ 비정상 날짜 `null` 반환 및 에러 문구 노출 정상 작동.
    * `extractDateFromQuery` 자연어 추출("9월 25일 일정 등록", "9.25 스케줄 추가") 정상 통과.
 
+---
+
+## 27. TMAP 지하철 대표역 우선순위 재정렬(Re-ranking) 및 모바일 키패드 스크롤 격리 인터랙션 고도화 (2026-09-23)
+
+### 27.1 배경 및 목적
+* 기존 TMAP 장소 검색 시 "구의역", "강남역", "혜화역" 등 지하철역 키워드 입력 시 장소명 글자 수 차이(`diff`) 계산으로 인해 대표 지하철역보다 출구 번호나 주변 상호명(`구의역숯불집` 등)이 먼저 노출되는 문제가 발생함.
+* 또한 모바일 가상 키패드가 뜬 상태에서 검색 결과 리스트를 터치하거나 스크롤할 때, 키패드가 닫히지 않고 모달 전체 화면이 위아래로 끌려 내려가는 스크롤 체이닝(Scroll Chaining) 및 바운스 현상으로 인해 사용성이 저하되는 문제를 해결하고자 함.
+
+---
+
+### 27.2 핵심 구현 내역
+
+#### [태스크 1] TMAP 검색 결과 가중치 재정렬 엔진 (3-Tier Re-ranking Engine) ([`app/api/search/route.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/api/search/route.ts))
+1. **표기 기호 정돈**:
+   * TMAP 원본 데이터의 대괄호 표기(`구의역[2호선]`, `강남역[신분당선]`)를 가독성 높은 소괄호(`구의역 (2호선)`, `강남역 (신분당선)`)로 자동 치환.
+2. **3단계 우선순위 재정렬 (3-Tier Sorting)**:
+   * **1순위 (지하철 대표역)**:
+     - `isSubwayStationMain`: 검색어가 역 이름일 때 출구가 아닌 대표 역사(`lowerBizName: '지하철역'` 또는 `(O호선)`, `[O호선]`, `[O선]`)를 **배열 최상단(Index 0)**에 무조건 우선 배치.
+     - 노선이 여러 개인 환승역(예: `강남역 (2호선)`, `강남역 (신분당선)`)은 대표역 그룹 내에서 1, 2순위로 동시 상단 승격.
+   * **2순위 (지하철역 출구)**:
+     - `isSubwayExit`: 출구 번호 정규식(`\d+번출구`)을 통해 순수 지하철 출구만 추출하고, `getExitNumber` 함수로 출구 번호를 파싱하여 **오름차순(1번, 2번, 3번, 4번...)** 정렬.
+     - 출구 뒤에 상호명이나 대여소가 붙은 경우(`혜화역4번출구포차`, `대여소`) 2순위에서 제외하여 일반 POI로 정확히 분기.
+   * **3순위 (일반 POI)**:
+     - 주변 상권 및 시설물(`구의역숯불집`, `구의역더튼튼의원` 등)은 대표역과 출구 목록 뒤에 안전하게 배치하며, 기존의 정밀 4단계 문자열 매칭 정합성 순위를 유지.
+
+---
+
+#### [태스크 2] 모바일 키패드 자동 숨김 및 스크롤 격리 ([`components/ScheduleFormModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ScheduleFormModal.tsx), [`components/CustomPresetModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/CustomPresetModal.tsx))
+1. **결과 리스트 터치/스크롤 시 가상 키패드 즉시 블러(Blur)**:
+   * 검색 결과 컨테이너에 `onTouchStart={handleListTouch}` 및 `onScrollCapture={handleListTouch}` 이벤트 바인딩.
+   * 사용자가 검색 결과를 스와이프하거나 탭하는 순간 `document.activeElement.blur()`를 실행하여 가상 키패드를 즉시 수납.
+2. **CSS 스크롤 체이닝 차단**:
+   * 검색 결과 목록 드롭다운: `overscroll-contain touch-pan-y` 및 `style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}` 적용.
+   * 모달 본체 스크롤 컨테이너: 동일하게 `overscroll-contain touch-pan-y` 적용으로, 키패드가 열리거나 닫히는 과정에서 모달 창 전체가 화면 밖으로 밀려 올라가거나 튕기는 현상 원천 방지.
+
+---
+
+### 27.3 빌드 및 검증 결과
+1. **빌드 무결성**:
+   * `npm run build`: Turbopack 기준 전 14개 라우트 컴파일 **0 에러, 0 경고** 통과.
+2. **실서버 API 정합성 검증 (`curl http://localhost:3000/api/search`)**:
+   * **"구의역" 검색**:
+     1. `구의역 (2호선)` ➔ **1위 (대표역)**
+     2. `구의역 1번출구` ➔ **2위 (출구)**
+     3. `구의역 2번출구` ➔ **3위 (출구)**
+     4. `구의역 3번출구` ➔ **4위 (출구)**
+     5. `구의역 4번출구` ➔ **5위 (출구)**
+     6. `구의역숯불집` ➔ **6위 (일반 POI)**
+     7. `구의역더튼튼의원` ➔ **7위 (일반 POI)**
+   * **"강남역" 검색**:
+     1. `강남역 (2호선)`
+     2. `강남역 (신분당선)`
+     3. `강남역 1번출구` ~ `11번출구` 순차 정렬 완벽 확인.
+   * **"혜화역" 검색**:
+     1. `혜화역 (4호선)`
+     2. `혜화역 1번출구` ~ `4번출구`
+     3. `혜화역4번출구포차`, `대여소` (일반 POI로 정상 후순위 배치).
+   * **"조선팰리스" 비역세권 일반 검색**:
+     1. `조선팰리스 서울강남`이 최우선 1위로 정상 유지됨 확인.
+
+
 
 
 

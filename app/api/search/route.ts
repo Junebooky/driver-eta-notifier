@@ -7,6 +7,7 @@ export interface TmapPoiItem {
   lat: number;
   lng: number;
   originalIndex?: number;
+  lowerBizName?: string;
 }
 
 export async function GET(req: NextRequest) {
@@ -96,20 +97,85 @@ export async function GET(req: NextRequest) {
           lat,
           lng,
           originalIndex,
+          lowerBizName: item.lowerBizName || '',
         });
       }
     });
 
-    // 4-Stage Normalized Ranking Algorithm:
-    // Rank 1 (최우선): 공백 제거 후 검색어로 시작하는 장소명 (name.replace(/\s+/g, '').startsWith(query))
-    //                 예: '대원베스트' 검색 시 '대원베스트빌'이 최상위(Rank 1)에 즉시 승격
-    // Rank 2: 검색어를 내부에 포함하는 장소명 (name.includes(query))
-    // Rank 3: 검색어 토큰 또는 주소에 검색어가 포함된 경우
-    // Rank 4: TMAP 기본 원본 가중치 순서
+    // Clean up symbol notation: e.g. '구의역[2호선]' ➔ '구의역 (2호선)'
+    pois.forEach((p) => {
+      p.name = p.name.replace(/\[(.*?)\]/g, ' ($1)').trim();
+    });
+
+    // TMAP POI Re-ranking Engine:
+    // 1순위 (지하철 대표역): 검색어 역 대표 역사(예: '구의역 (2호선)', '강남역 (신분당선)') 최상단 배치
+    // 2순위 (지하철역 출구): '구의역 1번출구', '구의역 2번출구' 등 출구 번호 오름차순 배치
+    // 3순위 (일반 POI): 식당, 병원, 상점 등 부속 시설물 (기존 4-Stage 정합성 랭킹 유지)
     const normKeyword = keyword.replace(/\s+/g, '').toLowerCase();
+    const baseKeyword = normKeyword.endsWith('역') ? normKeyword.slice(0, -1) : normKeyword;
+    const stationKeyword = normKeyword.endsWith('역') ? normKeyword : `${normKeyword}역`;
     const tokens = keyword.split(/\s+/).filter(Boolean).map((t) => t.toLowerCase());
 
+    const isSubwayStationMain = (p: TmapPoiItem) => {
+      const norm = p.name.replace(/\s+/g, '').toLowerCase();
+      // 출구 및 출구 부속시설 제외
+      if (norm.includes('출구') || p.lowerBizName === '지하철출구번호') return false;
+
+      const isStationPrefix =
+        norm.startsWith(stationKeyword) ||
+        (normKeyword.length >= 2 && norm.startsWith(baseKeyword + '역'));
+      if (!isStationPrefix) return false;
+
+      const hasLinePattern =
+        /\[.*?선\]/.test(p.name) ||
+        /\(.*선\)/.test(p.name) ||
+        /\[.*?호선\]/.test(p.name) ||
+        /\(.*호선\)/.test(p.name);
+      const isExactStation = norm === stationKeyword || norm === normKeyword;
+      const isBizSubway = p.lowerBizName === '지하철역';
+
+      return hasLinePattern || isExactStation || isBizSubway;
+    };
+
+    const isSubwayExit = (p: TmapPoiItem) => {
+      if (p.lowerBizName === '지하철출구번호') return true;
+      const norm = p.name.replace(/\s+/g, '').toLowerCase();
+      const isStationPrefix =
+        norm.startsWith(stationKeyword) ||
+        (normKeyword.length >= 2 && norm.startsWith(baseKeyword + '역'));
+      return isStationPrefix && /(?:역)?\d+번출구$/.test(norm);
+    };
+
+    const getExitNumber = (name: string): number => {
+      const m = name.match(/(\d+)번\s*출구/);
+      return m ? parseInt(m[1], 10) : 9999;
+    };
+
     pois.sort((a, b) => {
+      // 1순위: 대표 지하철역
+      const isStationA = isSubwayStationMain(a);
+      const isStationB = isSubwayStationMain(b);
+
+      if (isStationA && !isStationB) return -1;
+      if (!isStationA && isStationB) return 1;
+      if (isStationA && isStationB) {
+        return (a.originalIndex ?? 0) - (b.originalIndex ?? 0);
+      }
+
+      // 2순위: 지하철역 출구 (출구 번호 오름차순)
+      const isExitA = isSubwayExit(a);
+      const isExitB = isSubwayExit(b);
+
+      if (isExitA && !isExitB) return -1;
+      if (!isExitA && isExitB) return 1;
+      if (isExitA && isExitB) {
+        const exitNumA = getExitNumber(a.name);
+        const exitNumB = getExitNumber(b.name);
+        if (exitNumA !== exitNumB) return exitNumA - exitNumB;
+        return (a.originalIndex ?? 0) - (b.originalIndex ?? 0);
+      }
+
+      // 3순위: 일반 POI (기존 정렬 가중치 유지)
       const normA = a.name.replace(/\s+/g, '').toLowerCase();
       const normB = b.name.replace(/\s+/g, '').toLowerCase();
       const addrA = a.address.replace(/\s+/g, '').toLowerCase();
