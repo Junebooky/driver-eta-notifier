@@ -22,6 +22,7 @@ import {
   Gauge,
   Camera,
 } from 'lucide-react';
+import { VehicleTopDownViewer } from '@/components/VehicleTopDownViewer';
 
 interface VehicleInspectionModalProps {
   isOpen: boolean;
@@ -425,7 +426,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
               {/* Task 4: Dashboard Photo Slot (Pure local in-memory preview, No-DB) */}
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                  계기판 사진 (선택)
+                  계기판 AI 자동 입력 ✨
                 </label>
                 {receiptMeterPhoto ? (
                   <div className="relative w-full h-28 rounded-xl overflow-hidden border border-slate-200 bg-slate-100 group">
@@ -461,10 +462,26 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                       className="w-full py-2.5 px-3 rounded-xl border border-dashed border-slate-300 hover:border-[#1E60F3] bg-slate-50 hover:bg-blue-50/20 text-slate-500 hover:text-[#1E60F3] flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                     >
                       <Camera className="w-4 h-4 text-slate-400 shrink-0" />
-                      <span className="text-xs font-semibold">계기판 사진 등록 (선택)</span>
+                      <span className="text-xs font-semibold">계기판 사진 등록</span>
                     </button>
                   </div>
                 )}
+              </div>
+
+              {/* 2D Top-Down Interactive Vehicle Inspection Viewer */}
+              <div className="space-y-1.5 pt-1">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-semibold text-slate-600">
+                    차량 외관 2D 탑뷰 점검
+                  </label>
+                  <span className="text-[10px] text-slate-400 font-medium">
+                    사각지대 없는 수직 평면도
+                  </span>
+                </div>
+                <VehicleTopDownViewer
+                  selectedParts={receiptSelectedParts}
+                  onTogglePart={(part) => handleToggleDamageChip(part, 'receipt')}
+                />
               </div>
 
               {/* Task 3: Outer Damage Quick Chip Selector & Input */}
@@ -554,7 +571,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
               {/* Task 4: Dashboard Photo Slot for Return */}
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                  계기판 사진 (선택)
+                  계기판 AI 자동 입력 ✨
                 </label>
                 {returnMeterPhoto ? (
                   <div className="relative w-full h-28 rounded-xl overflow-hidden border border-slate-200 bg-slate-100 group">
@@ -590,10 +607,26 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                       className="w-full py-2.5 px-3 rounded-xl border border-dashed border-slate-300 hover:border-[#1E60F3] bg-slate-50 hover:bg-blue-50/20 text-slate-500 hover:text-[#1E60F3] flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                     >
                       <Camera className="w-4 h-4 text-slate-400 shrink-0" />
-                      <span className="text-xs font-semibold">계기판 사진 등록 (선택)</span>
+                      <span className="text-xs font-semibold">계기판 사진 등록</span>
                     </button>
                   </div>
                 )}
+              </div>
+
+              {/* 2D Top-Down Interactive Vehicle Inspection Viewer */}
+              <div className="space-y-1.5 pt-1">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-semibold text-slate-600">
+                    차량 외관 2D 탑뷰 점검
+                  </label>
+                  <span className="text-[10px] text-slate-400 font-medium">
+                    사각지대 없는 수직 평면도
+                  </span>
+                </div>
+                <VehicleTopDownViewer
+                  selectedParts={returnSelectedParts}
+                  onTogglePart={(part) => handleToggleDamageChip(part, 'return')}
+                />
               </div>
 
               {/* Task 3: Outer Damage Quick Chip Selector & Input */}
