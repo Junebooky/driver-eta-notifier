@@ -687,9 +687,6 @@ export default function Home() {
               >
                 스케줄
               </span>
-              {activeTab !== 'schedule' && (
-                <span className="w-1.5 h-1.5 rounded-full bg-[#1E60F3]" />
-              )}
             </button>
           </div>
         </div>
