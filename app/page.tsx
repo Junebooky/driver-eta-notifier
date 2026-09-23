@@ -646,9 +646,9 @@ export default function Home() {
           </div>
         )}
 
-        {/* Top Segmented Navigation: [ 운행 ] | [ 스케줄 ] (Flawless w-[calc(50%-4px)] sliding bar) */}
+        {/* Top Segmented Navigation: [ 운행 ] | [ 스케줄 ] (Matches ReportTemplateSelector tab size) */}
         <div className="px-3.5 pt-2.5 pb-1 bg-white shrink-0">
-          <div className="w-full bg-slate-100 p-1 rounded-full relative flex items-center select-none shadow-inner">
+          <div className="w-full bg-slate-100/90 p-1 rounded-full relative flex items-center select-none shadow-inner">
             {/* Sliding Indicator Pill */}
             <div
               className={`w-[calc(50%-4px)] h-[calc(100%-8px)] absolute top-1 left-1 rounded-full bg-[#1E60F3] shadow-[0_4px_14px_rgba(30,96,243,0.35)] transition-transform duration-300 ease-out pointer-events-none transform ${
@@ -663,12 +663,18 @@ export default function Home() {
                 haptics.lightTap();
                 setActiveTab('drive');
               }}
-              className="flex-1 py-2 rounded-full z-10 flex items-center justify-center gap-1.5 cursor-pointer transition-colors duration-300"
+              className="flex-1 py-2.5 rounded-full z-10 flex items-center justify-center space-x-2 cursor-pointer transition-colors duration-300"
             >
-              <Navigation className={`w-3.5 h-3.5 ${activeTab === 'drive' ? 'text-white fill-white' : 'text-slate-400'}`} />
+              <div
+                className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors duration-300 ${
+                  activeTab === 'drive' ? 'bg-white/20 text-white' : 'text-slate-400'
+                }`}
+              >
+                <Navigation className={`w-3 h-3 ${activeTab === 'drive' ? 'text-white fill-white' : 'text-slate-400'}`} />
+              </div>
               <span
-                className={`text-xs tracking-tight transition-colors duration-300 ${
-                  activeTab === 'drive' ? 'text-white font-black' : 'text-slate-500 font-bold hover:text-slate-800'
+                className={`text-sm tracking-tight transition-colors duration-300 ${
+                  activeTab === 'drive' ? 'text-white font-black' : 'text-slate-500 font-semibold'
                 }`}
               >
                 운행
@@ -682,12 +688,18 @@ export default function Home() {
                 haptics.lightTap();
                 setActiveTab('schedule');
               }}
-              className="flex-1 py-2 rounded-full z-10 flex items-center justify-center gap-1.5 cursor-pointer transition-colors duration-300 relative"
+              className="flex-1 py-2.5 rounded-full z-10 flex items-center justify-center space-x-2 cursor-pointer transition-colors duration-300 relative"
             >
-              <Calendar className={`w-3.5 h-3.5 ${activeTab === 'schedule' ? 'text-white' : 'text-slate-400'}`} />
+              <div
+                className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors duration-300 ${
+                  activeTab === 'schedule' ? 'bg-white/20 text-white' : 'text-slate-400'
+                }`}
+              >
+                <Calendar className={`w-3 h-3 ${activeTab === 'schedule' ? 'text-white' : 'text-slate-400'}`} />
+              </div>
               <span
-                className={`text-xs tracking-tight transition-colors duration-300 ${
-                  activeTab === 'schedule' ? 'text-white font-black' : 'text-slate-500 font-bold hover:text-slate-800'
+                className={`text-sm tracking-tight transition-colors duration-300 ${
+                  activeTab === 'schedule' ? 'text-white font-black' : 'text-slate-500 font-semibold'
                 }`}
               >
                 스케줄

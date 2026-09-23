@@ -287,6 +287,274 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
     : 'hover:border-slate-400 hover:text-slate-800 hover:bg-slate-50/80 hover:shadow-xs hover:-translate-y-0.5';
   const dynamicTextHoverClass = isTargetDestination ? 'group-hover:text-[#1E60F3]' : 'group-hover:text-slate-800';
 
+  // ==============================================================
+  // 4-ROW THRESHOLD HORIZONTAL PAGINATION (CAROUSEL)
+  // 3 columns x 4 rows = 12 slots maximum per page
+  // ==============================================================
+  const PAGE_SIZE = 12;
+  const [currentPage, setCurrentPage] = useState(0);
+
+  type SlotItem =
+    | { type: 'home' }
+    | { type: 'preset'; preset: LocationPreset; index: number }
+    | { type: 'add' };
+
+  const allSlots: SlotItem[] = [
+    { type: 'home' },
+    ...items.map((preset, index) => ({ type: 'preset' as const, preset, index })),
+    { type: 'add' },
+  ];
+
+  const totalPages = Math.ceil(allSlots.length / PAGE_SIZE);
+
+  // Clamp current page when total pages shrink
+  useEffect(() => {
+    if (currentPage >= totalPages && totalPages > 0) {
+      setCurrentPage(Math.max(0, totalPages - 1));
+    }
+  }, [totalPages, currentPage]);
+
+  const pages: SlotItem[][] = [];
+  for (let i = 0; i < allSlots.length; i += PAGE_SIZE) {
+    pages.push(allSlots.slice(i, i + PAGE_SIZE));
+  }
+
+  // Horizontal swipe gesture for carousel
+  const carouselTouchStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  const handleCarouselTouchStart = (e: React.TouchEvent) => {
+    if (isDragging || isLongPressActiveRef.current) return;
+    carouselTouchStartRef.current = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY,
+    };
+  };
+
+  const handleCarouselTouchEnd = (e: React.TouchEvent) => {
+    if (!carouselTouchStartRef.current || isDragging || isLongPressActiveRef.current) {
+      carouselTouchStartRef.current = null;
+      return;
+    }
+    const touchEndX = e.changedTouches[0].clientX;
+    const touchEndY = e.changedTouches[0].clientY;
+    const dx = touchEndX - carouselTouchStartRef.current.x;
+    const dy = touchEndY - carouselTouchStartRef.current.y;
+    carouselTouchStartRef.current = null;
+
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      if (dx < 0 && currentPage < totalPages - 1) {
+        haptics.lightTap();
+        setCurrentPage((prev) => Math.min(prev + 1, totalPages - 1));
+      } else if (dx > 0 && currentPage > 0) {
+        haptics.lightTap();
+        setCurrentPage((prev) => Math.max(prev - 1, 0));
+      }
+    }
+  };
+
+  // Slot Render Helpers
+  const renderHomeSlot = () => {
+    if (isHomeConfigured) {
+      return (
+        <div key="slot_home" className="relative select-none touch-none h-full">
+          <button
+            type="button"
+            onClick={() => {
+              haptics.lightTap();
+              if (isManageMode) {
+                onOpenHomeModal();
+              } else {
+                onSelectPreset(homePreset);
+              }
+            }}
+            className={`w-full h-full min-h-[58px] px-2 py-2.5 rounded-xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-200 group ${
+              isHomeDestination
+                ? 'border-2 border-[#1E60F3] text-[#1E60F3] bg-white font-bold shadow-sm shadow-blue-500/10'
+                : isHomeOrigin
+                  ? 'bg-slate-50/80 text-slate-800 border-slate-300/90 ring-1 ring-slate-200/60 font-bold shadow-2xs'
+                  : `bg-white border-slate-200 text-slate-700 font-semibold ${dynamicHoverClasses}`
+            } ${isManageMode ? 'border-dashed border-[#1E60F3]/60' : ''}`}
+            title={`${homePreset.name} (${homePreset.address})`}
+          >
+            <div className="flex items-center justify-center gap-1 w-full">
+              <HomeIcon
+                className={`w-3.5 h-3.5 shrink-0 transition-colors ${
+                  isHomeDestination
+                    ? 'text-[#1E60F3]'
+                    : isHomeOrigin
+                      ? 'text-slate-600'
+                      : isTargetDestination
+                        ? 'text-slate-500 group-hover:text-[#1E60F3]'
+                        : 'text-slate-500 group-hover:text-slate-700'
+                }`}
+              />
+              <span
+                className={`text-xs tracking-tight truncate font-bold ${
+                  isHomeDestination
+                    ? 'text-[#1E60F3]'
+                    : isHomeOrigin
+                      ? 'text-slate-900'
+                      : `text-slate-700 ${dynamicTextHoverClass}`
+                } transition-colors`}
+              >
+                자택
+              </span>
+            </div>
+
+            {isHomeDestination && (
+              <span className="text-[10px] font-bold text-[#1E60F3] flex items-center justify-center gap-1 mt-0.5 leading-none">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#1E60F3]" />
+                도착지
+              </span>
+            )}
+            {isHomeOrigin && !isHomeDestination && (
+              <span className="text-[10px] font-semibold text-slate-600 flex items-center justify-center gap-1 mt-0.5 leading-none">
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                출발지
+              </span>
+            )}
+            {!isHomeDestination && !isHomeOrigin && (
+              <span className="text-[11px] font-medium tracking-wide text-slate-400 group-hover:text-slate-600 leading-none mt-0.5">
+                {isManageMode ? '수정' : 'MY'}
+              </span>
+            )}
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div key="slot_home" className="relative select-none h-full">
+        <button
+          type="button"
+          onClick={() => {
+            haptics.lightTap();
+            onOpenHomeModal();
+          }}
+          className={`w-full h-full min-h-[58px] py-2.5 px-2 rounded-xl border border-dashed border-slate-300 dark:border-slate-600 bg-slate-50/80 ${dynamicHoverClasses} text-slate-800 flex flex-col justify-between items-center active:scale-95 transition-all duration-200 cursor-pointer group`}
+          title="자택 주소를 등록하세요"
+        >
+          <div className="flex items-center justify-center gap-1 w-full">
+            <HomeIcon className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 shrink-0 transition-colors" />
+            <span className="text-xs font-bold text-slate-600 group-hover:text-slate-800 tracking-tight transition-colors">
+              자택
+            </span>
+          </div>
+
+          <div className="flex items-center justify-center gap-0.5 w-full mt-0.5">
+            <Plus className="w-3 h-3 text-[#1E60F3] stroke-[2.5] shrink-0" />
+            <span className="text-[11px] font-semibold text-[#1E60F3] leading-none">
+              주소 등록
+            </span>
+          </div>
+        </button>
+      </div>
+    );
+  };
+
+  const renderPresetSlot = (preset: LocationPreset, index: number) => {
+    const isOrigin = selectedOriginId === preset.id;
+    const isDestination = selectedDestinationId === preset.id;
+    const isThisItemDragging = isDragging && dragIndex === index;
+    const isHQ = !preset.vehicle_no && !preset.vehicleNo;
+    const badgeLabel = isHQ ? 'HQ' : 'MY';
+
+    let stateClasses = `bg-white border-slate-200 text-slate-700 font-medium ${dynamicHoverClasses}`;
+    if (isDestination) {
+      stateClasses =
+        'border-2 border-[#1E60F3] text-[#1E60F3] bg-white font-bold shadow-sm shadow-blue-500/10';
+    } else if (isOrigin) {
+      stateClasses =
+        'bg-slate-50/80 text-slate-800 border-slate-300/90 ring-1 ring-slate-200/60 font-bold shadow-2xs';
+    }
+
+    if (isManageMode) {
+      stateClasses += ' border-dashed border-[#1E60F3]/60 hover:bg-blue-50/50';
+    }
+
+    return (
+      <div
+        key={preset.id}
+        ref={(el) => {
+          itemRefs.current[index] = el;
+        }}
+        className="relative select-none touch-none will-change-transform h-full"
+      >
+        {isThisItemDragging ? (
+          <div
+            className="w-full h-full min-h-[58px] border-2 border-dashed border-blue-200 rounded-2xl bg-blue-50/20 flex items-center justify-center transition-all duration-200"
+            aria-hidden="true"
+          />
+        ) : (
+          <button
+            type="button"
+            onTouchStart={(e) => handlePointerStart(index, e)}
+            onTouchMove={handlePointerMoveCheck}
+            onTouchEnd={() => handlePointerEnd(preset)}
+            onMouseDown={(e) => handlePointerStart(index, e)}
+            onMouseMove={handlePointerMoveCheck}
+            onMouseUp={() => handlePointerEnd(preset)}
+            className={`w-full h-full min-h-[58px] px-2 py-2.5 rounded-xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-200 group ${stateClasses}`}
+            title={`${preset.name} (길게 눌러 순서 변경)`}
+          >
+            <span
+              className={`text-xs font-bold tracking-tight truncate w-full ${
+                isDestination
+                  ? 'text-[#1E60F3]'
+                  : isOrigin
+                    ? 'text-slate-900'
+                    : `text-slate-700 ${dynamicTextHoverClass}`
+              } transition-colors`}
+            >
+              {preset.shortName}
+            </span>
+
+            {isDestination && (
+              <span className="text-[10px] font-bold text-[#1E60F3] flex items-center justify-center gap-1 mt-0.5 leading-none">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#1E60F3]" />
+                도착지
+              </span>
+            )}
+            {isOrigin && !isDestination && (
+              <span className="text-[10px] font-semibold text-slate-600 flex items-center justify-center gap-1 mt-0.5 leading-none">
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                출발지
+              </span>
+            )}
+            {!isDestination && !isOrigin && (
+              <span className="text-[11px] font-medium tracking-wide text-slate-400 group-hover:text-slate-600 leading-none mt-0.5">
+                {isManageMode ? (isHQ ? '공통' : '관리') : badgeLabel}
+              </span>
+            )}
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  const renderAddSlot = () => (
+    <button
+      key="slot_add"
+      type="button"
+      onClick={() => {
+        haptics.lightTap();
+        onOpenAddModal();
+      }}
+      className={`w-full h-full min-h-[58px] py-2.5 px-2 rounded-xl border border-dashed border-slate-300 ${
+        isTargetDestination
+          ? 'hover:border-blue-300/80 hover:bg-blue-50/40 hover:text-[#1E60F3]'
+          : 'hover:border-slate-400 hover:bg-slate-50/80 hover:text-slate-800'
+      } bg-white hover:shadow-xs hover:-translate-y-0.5 text-slate-400 text-xs font-medium flex flex-col justify-between items-center active:scale-95 transition-all duration-200 cursor-pointer`}
+      title="새 거점 검색 및 등록"
+    >
+      <div className="flex items-center justify-center gap-1 w-full">
+        <Plus className="w-3.5 h-3.5" />
+        <span className="font-bold">추가</span>
+      </div>
+      <span className="text-[10px] text-slate-400 leading-none mt-0.5">신규 거점</span>
+    </button>
+  );
+
   return (
     <div className="w-full bg-white border border-slate-100/80 rounded-2xl p-4 shadow-[0_8px_25px_rgba(30,96,243,0.06)] select-none space-y-3">
       {/* Header: Classic Teardrop MapPin with Center Circular Cutout in Cobalt Badge on Left, Utility Buttons on Right */}
@@ -368,11 +636,10 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
               haptics.lightTap();
               setIsManageMode(!isManageMode);
             }}
-            className={`p-1.5 sm:p-2 rounded-lg transition-all active:scale-90 flex items-center justify-center cursor-pointer ${
-              isManageMode
+            className={`p-1.5 sm:p-2 rounded-lg transition-all active:scale-90 flex items-center justify-center cursor-pointer ${isManageMode
                 ? 'bg-[#1E60F3] text-white shadow-xs'
                 : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
-            }`}
+              }`}
             title={isManageMode ? '거점 관리 완료' : '거점 수정 및 삭제 관리'}
             aria-label="거점 관리"
           >
@@ -395,214 +662,59 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
         </div>
       )}
 
-      {/* 3-Column High-Density Grid */}
-      <div className="grid grid-cols-3 gap-2 relative">
-        {/* ============================================================== */}
-        {/* SLOT #1: Fixed '자택(Home)' Slot (Row 1, Col 1)                 */}
-        {/* ============================================================== */}
-        {isHomeConfigured ? (
-          <div className="relative select-none touch-none h-full">
-            <button
-              type="button"
-              onClick={() => {
-                haptics.lightTap();
-                if (isManageMode) {
-                  onOpenHomeModal();
-                } else {
-                  onSelectPreset(homePreset);
-                }
-              }}
-              className={`w-full h-full min-h-[58px] px-2 py-2.5 rounded-xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-200 group ${
-                isHomeDestination
-                  ? 'border-2 border-[#1E60F3] text-[#1E60F3] bg-white font-bold shadow-sm shadow-blue-500/10'
-                  : isHomeOrigin
-                  ? 'bg-slate-50/80 text-slate-800 border-slate-300/90 ring-1 ring-slate-200/60 font-bold shadow-2xs'
-                  : `bg-white border-slate-200 text-slate-700 font-semibold ${dynamicHoverClasses}`
-              } ${isManageMode ? 'border-dashed border-[#1E60F3]/60' : ''}`}
-              title={`${homePreset.name} (${homePreset.address})`}
-            >
-              <div className="flex items-center justify-center gap-1 w-full">
-                <HomeIcon
-                  className={`w-3.5 h-3.5 shrink-0 transition-colors ${
-                    isHomeDestination
-                      ? 'text-[#1E60F3]'
-                      : isHomeOrigin
-                      ? 'text-slate-600'
-                      : isTargetDestination
-                      ? 'text-slate-500 group-hover:text-[#1E60F3]'
-                      : 'text-slate-500 group-hover:text-slate-700'
-                  }`}
-                />
-                <span
-                  className={`text-xs tracking-tight truncate font-bold ${
-                    isHomeDestination
-                      ? 'text-[#1E60F3]'
-                      : isHomeOrigin
-                      ? 'text-slate-900'
-                      : `text-slate-700 ${dynamicTextHoverClass}`
-                  } transition-colors`}
-                >
-                  자택
-                </span>
-              </div>
-
-              {isHomeDestination && (
-                <span className="text-[10px] font-bold text-[#1E60F3] flex items-center justify-center gap-1 mt-0.5 leading-none">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#1E60F3]" />
-                  도착지
-                </span>
-              )}
-              {isHomeOrigin && !isHomeDestination && (
-                <span className="text-[10px] font-semibold text-slate-600 flex items-center justify-center gap-1 mt-0.5 leading-none">
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                  출발지
-                </span>
-              )}
-              {!isHomeDestination && !isHomeOrigin && (
-                <span className="text-[11px] font-medium tracking-wide text-slate-400 group-hover:text-slate-600 leading-none mt-0.5">
-                  {isManageMode ? '수정' : 'MY'}
-                </span>
-              )}
-            </button>
-          </div>
-        ) : (
-          <div className="relative select-none h-full">
-            <button
-              type="button"
-              onClick={() => {
-                haptics.lightTap();
-                onOpenHomeModal();
-              }}
-              className={`w-full h-full min-h-[58px] py-2.5 px-2 rounded-xl border border-dashed border-slate-300 dark:border-slate-600 bg-slate-50/80 ${dynamicHoverClasses} text-slate-800 flex flex-col justify-between items-center active:scale-95 transition-all duration-200 cursor-pointer group`}
-              title="자택 주소를 등록하세요"
-            >
-              {/* 상단 1열: 단정한 집(Home) 아이콘과 차분한 '자택' 텍스트 */}
-              <div className="flex items-center justify-center gap-1 w-full">
-                <HomeIcon className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 shrink-0 transition-colors" />
-                <span className="text-xs font-bold text-slate-600 group-hover:text-slate-800 tracking-tight transition-colors">
-                  자택
-                </span>
-              </div>
-
-              {/* 하단 2열: 정갈한 플러스 아이콘과 코발트 블루 포인트 컬러의 + 주소 등록 */}
-              <div className="flex items-center justify-center gap-0.5 w-full mt-0.5">
-                <Plus className="w-3 h-3 text-[#1E60F3] stroke-[2.5] shrink-0" />
-                <span className="text-[11px] font-semibold text-[#1E60F3] leading-none">
-                  주소 등록
-                </span>
-              </div>
-            </button>
-          </div>
-        )}
-
-        {/* ============================================================== */}
-        {/* DRAGGABLE PRESET SLOTS (Slots 2..N)                            */}
-        {/* ============================================================== */}
-        {items.map((preset, index) => {
-          const isOrigin = selectedOriginId === preset.id;
-          const isDestination = selectedDestinationId === preset.id;
-          const isThisItemDragging = isDragging && dragIndex === index;
-          const isHQ = !preset.vehicle_no && !preset.vehicleNo;
-          const badgeLabel = isHQ ? 'HQ' : 'MY';
-
-          let stateClasses = `bg-white border-slate-200 text-slate-700 font-medium ${dynamicHoverClasses}`;
-          if (isDestination) {
-            stateClasses =
-              'border-2 border-[#1E60F3] text-[#1E60F3] bg-white font-bold shadow-sm shadow-blue-500/10';
-          } else if (isOrigin) {
-            stateClasses =
-              'bg-slate-50/80 text-slate-800 border-slate-300/90 ring-1 ring-slate-200/60 font-bold shadow-2xs';
-          }
-
-          if (isManageMode) {
-            stateClasses += ' border-dashed border-[#1E60F3]/60 hover:bg-blue-50/50';
-          }
-
-          return (
-            <div
-              key={preset.id}
-              ref={(el) => {
-                itemRefs.current[index] = el;
-              }}
-              className="relative select-none touch-none will-change-transform h-full"
-            >
-              {/* If this slot is currently being dragged, show exact-sized dashed placeholder to prevent jitter */}
-              {isThisItemDragging ? (
-                <div
-                  className="w-full h-full min-h-[58px] border-2 border-dashed border-blue-200 rounded-2xl bg-blue-50/20 flex items-center justify-center transition-all duration-200"
-                  aria-hidden="true"
-                />
-              ) : (
-                <button
-                  type="button"
-                  onTouchStart={(e) => handlePointerStart(index, e)}
-                  onTouchMove={handlePointerMoveCheck}
-                  onTouchEnd={() => handlePointerEnd(preset)}
-                  onMouseDown={(e) => handlePointerStart(index, e)}
-                  onMouseMove={handlePointerMoveCheck}
-                  onMouseUp={() => handlePointerEnd(preset)}
-                  className={`w-full h-full min-h-[58px] px-2 py-2.5 rounded-xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-200 group ${stateClasses}`}
-                  title={`${preset.name} (길게 눌러 순서 변경)`}
-                >
-                  <span
-                    className={`text-xs font-bold tracking-tight truncate w-full ${
-                      isDestination
-                        ? 'text-[#1E60F3]'
-                        : isOrigin
-                        ? 'text-slate-900'
-                        : `text-slate-700 ${dynamicTextHoverClass}`
-                    } transition-colors`}
-                  >
-                    {preset.shortName}
-                  </span>
-
-                  {/* Status Indicator Tag */}
-                  {isDestination && (
-                    <span className="text-[10px] font-bold text-[#1E60F3] flex items-center justify-center gap-1 mt-0.5 leading-none">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#1E60F3]" />
-                      도착지
-                    </span>
-                  )}
-                  {isOrigin && !isDestination && (
-                    <span className="text-[10px] font-semibold text-slate-600 flex items-center justify-center gap-1 mt-0.5 leading-none">
-                      <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                      출발지
-                    </span>
-                  )}
-                  {!isDestination && !isOrigin && (
-                    <span className="text-[11px] font-medium tracking-wide text-slate-400 group-hover:text-slate-600 leading-none mt-0.5">
-                      {isManageMode ? (isHQ ? '공통' : '관리') : badgeLabel}
-                    </span>
-                  )}
-                </button>
-              )}
-            </div>
-          );
-        })}
-
-        {/* ============================================================== */}
-        {/* FIXED '+ 추가' BUTTON (Always at the end, not draggable)        */}
-        {/* ============================================================== */}
-        <button
-          type="button"
-          onClick={() => {
-            haptics.lightTap();
-            onOpenAddModal();
-          }}
-          className={`w-full h-full min-h-[58px] py-2.5 px-2 rounded-xl border border-dashed border-slate-300 ${
-            isTargetDestination
-              ? 'hover:border-blue-300/80 hover:bg-blue-50/40 hover:text-[#1E60F3]'
-              : 'hover:border-slate-400 hover:bg-slate-50/80 hover:text-slate-800'
-          } bg-white hover:shadow-xs hover:-translate-y-0.5 text-slate-400 text-xs font-medium flex flex-col justify-between items-center active:scale-95 transition-all duration-200 cursor-pointer`}
-          title="새 거점 검색 및 등록"
+      {/* 3-Column High-Density Grid with Horizontal Carousel Pagination (Max 4 rows per page) */}
+      <div
+        className="w-full overflow-hidden select-none"
+        onTouchStart={handleCarouselTouchStart}
+        onTouchEnd={handleCarouselTouchEnd}
+      >
+        <div
+          className="flex transition-transform duration-300 ease-out will-change-transform"
+          style={{ transform: `translateX(-${currentPage * 100}%)` }}
         >
-          <div className="flex items-center justify-center gap-1 w-full">
-            <Plus className="w-3.5 h-3.5" />
-            <span className="font-bold">추가</span>
-          </div>
-          <span className="text-[10px] text-slate-400 leading-none mt-0.5">신규 거점</span>
-        </button>
+          {pages.map((pageSlots, pageIdx) => (
+            <div key={pageIdx} className="w-full shrink-0">
+              <div
+                className={`grid grid-cols-3 gap-2 content-start ${
+                  totalPages > 1 ? 'min-h-[256px]' : ''
+                }`}
+              >
+                {pageSlots.map((slot) => {
+                  if (slot.type === 'home') return renderHomeSlot();
+                  if (slot.type === 'preset') return renderPresetSlot(slot.preset, slot.index);
+                  if (slot.type === 'add') return renderAddSlot();
+                  return null;
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
+
+      {/* Interactive Dots Pagination (Only visible when totalPages > 1 / next page exists) */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-1.5 pt-1 pb-0.5">
+          {Array.from({ length: totalPages }).map((_, idx) => {
+            const isActive = idx === currentPage;
+            return (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => {
+                  haptics.lightTap();
+                  setCurrentPage(idx);
+                }}
+                aria-label={`페이지 ${idx + 1}`}
+                className={`h-2 rounded-full transition-all duration-300 cursor-pointer focus:outline-none ${
+                  isActive
+                    ? 'w-6 bg-[#1E60F3] shadow-[0_2px_8px_rgba(30,96,243,0.35)]'
+                    : 'w-2 bg-slate-300 hover:bg-slate-400'
+                }`}
+              />
+            );
+          })}
+        </div>
+      )}
 
       {/* ============================================================== */}
       {/* FLOATING DRAG LAYER (z-50 pointer-events-none Compact Mini Chip) */}
@@ -624,92 +736,92 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
       {/* Managing Single Preset Action Modal (Portaled directly to document.body to prevent stacking context overlap) */}
       {isMounted && managingPreset && typeof document !== 'undefined'
         ? createPortal(
+          <div
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setManagingPreset(null);
+              }
+            }}
+          >
             <div
-              className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in"
-              onClick={(e) => {
-                if (e.target === e.currentTarget) {
-                  setManagingPreset(null);
-                }
-              }}
+              className="w-full max-w-xs bg-white border border-slate-200 rounded-3xl shadow-2xl p-5 text-center space-y-4"
+              onClick={(e) => e.stopPropagation()}
             >
-              <div
-                className="w-full max-w-xs bg-white border border-slate-200 rounded-3xl shadow-2xl p-5 text-center space-y-4"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div>
-                  <div className="flex items-center justify-center gap-1">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                      {managingPreset.isGlobal ? '전사 공통 거점 관리' : '개인 거점 관리'}
+              <div>
+                <div className="flex items-center justify-center gap-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    {managingPreset.isGlobal ? '전사 공통 거점 관리' : '개인 거점 관리'}
+                  </span>
+                  {managingPreset.isGlobal && (
+                    <span className="text-[9px] bg-blue-50 text-[#1E60F3] font-bold px-1.5 py-0.5 rounded">
+                      공통
                     </span>
-                    {managingPreset.isGlobal && (
-                      <span className="text-[9px] bg-blue-50 text-[#1E60F3] font-bold px-1.5 py-0.5 rounded">
-                        공통
-                      </span>
-                    )}
-                  </div>
-                  <h3 className="text-sm font-black text-slate-900 truncate mt-0.5">
-                    [{managingPreset.shortName}]
-                  </h3>
-                  <p className="text-[11px] text-slate-500 truncate mt-0.5">
-                    {managingPreset.address || managingPreset.name}
-                  </p>
+                  )}
                 </div>
+                <h3 className="text-sm font-black text-slate-900 truncate mt-0.5">
+                  [{managingPreset.shortName}]
+                </h3>
+                <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                  {managingPreset.address || managingPreset.name}
+                </p>
+              </div>
 
-                <div className="space-y-2">
-                  {onEditPreset && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        haptics.lightTap();
-                        const p = managingPreset;
-                        setManagingPreset(null);
-                        onEditPreset(p);
-                      }}
-                      className="w-full py-2.5 px-4 bg-[#1E60F3] hover:bg-[#1346D8] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/35 active:translate-y-0 active:scale-[0.97] active:bg-[#0f3bb8] text-white font-bold rounded-xl text-xs flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs transition-all duration-150 ease-out"
-                    >
-                      <Pencil className="w-3.5 h-3.5 text-white" />
-                      <span>수정</span>
-                    </button>
-                  )}
-
-                  {/* Delete button: permitted for personal presets, or for global presets IF admin */}
-                  {onDeleteCustomPreset && (!managingPreset.isGlobal || isAdmin) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        haptics.errorAlert();
-                        const idToDelete = managingPreset.id;
-                        setManagingPreset(null);
-                        onDeleteCustomPreset(idToDelete);
-                      }}
-                      className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 font-semibold rounded-xl text-xs flex items-center justify-center space-x-1.5 cursor-pointer active:translate-y-0 active:scale-[0.97] transition-all duration-150 ease-out"
-                    >
-                      <Trash2 className="w-3.5 h-3.5 text-slate-500" />
-                      <span>
-                        {managingPreset.isGlobal ? '공통 거점 삭제' : '삭제'}
-                      </span>
-                    </button>
-                  )}
-
-                  {managingPreset.isGlobal && !isAdmin && (
-                    <p className="text-[10px] text-slate-400">
-                      전사 공통 거점은 관리자 모드(PIN: 1010)에서만 삭제할 수 있습니다.
-                    </p>
-                  )}
-
+              <div className="space-y-2">
+                {onEditPreset && (
                   <button
                     type="button"
-                    onClick={() => setManagingPreset(null)}
-                    className="w-full py-2.5 px-4 text-slate-400 hover:text-slate-600 font-medium text-xs flex items-center justify-center space-x-1.5 cursor-pointer transition-colors active:scale-95"
+                    onClick={() => {
+                      haptics.lightTap();
+                      const p = managingPreset;
+                      setManagingPreset(null);
+                      onEditPreset(p);
+                    }}
+                    className="w-full py-2.5 px-4 bg-[#1E60F3] hover:bg-[#1346D8] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/35 active:translate-y-0 active:scale-[0.97] active:bg-[#0f3bb8] text-white font-bold rounded-xl text-xs flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs transition-all duration-150 ease-out"
                   >
-                    <X className="w-3.5 h-3.5 text-slate-400" />
-                    <span>닫기</span>
+                    <Pencil className="w-3.5 h-3.5 text-white" />
+                    <span>수정</span>
                   </button>
-                </div>
+                )}
+
+                {/* Delete button: permitted for personal presets, or for global presets IF admin */}
+                {onDeleteCustomPreset && (!managingPreset.isGlobal || isAdmin) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      haptics.errorAlert();
+                      const idToDelete = managingPreset.id;
+                      setManagingPreset(null);
+                      onDeleteCustomPreset(idToDelete);
+                    }}
+                    className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 font-semibold rounded-xl text-xs flex items-center justify-center space-x-1.5 cursor-pointer active:translate-y-0 active:scale-[0.97] transition-all duration-150 ease-out"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-slate-500" />
+                    <span>
+                      {managingPreset.isGlobal ? '공통 거점 삭제' : '삭제'}
+                    </span>
+                  </button>
+                )}
+
+                {managingPreset.isGlobal && !isAdmin && (
+                  <p className="text-[10px] text-slate-400">
+                    전사 공통 거점은 관리자 모드(PIN: 1010)에서만 삭제할 수 있습니다.
+                  </p>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setManagingPreset(null)}
+                  className="w-full py-2.5 px-4 text-slate-400 hover:text-slate-600 font-medium text-xs flex items-center justify-center space-x-1.5 cursor-pointer transition-colors active:scale-95"
+                >
+                  <X className="w-3.5 h-3.5 text-slate-400" />
+                  <span>닫기</span>
+                </button>
               </div>
-            </div>,
-            document.body
-          )
+            </div>
+          </div>,
+          document.body
+        )
         : null}
     </div>
   );
