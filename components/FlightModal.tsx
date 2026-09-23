@@ -11,7 +11,6 @@ import {
   AlertCircle,
   RefreshCw,
   ArrowRight,
-  ExternalLink,
 } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 import {
@@ -546,8 +545,11 @@ export const FlightModal: React.FC<FlightModalProps> = ({
                 className="w-16 h-12 bg-[#FEE500] hover:bg-[#FDD835] active:scale-95 text-[#191919] rounded-2xl font-black text-xs flex items-center justify-center gap-1 cursor-pointer transition-all shadow-2xs shrink-0"
                 title="단톡방 보고서 복사 및 카카오톡 실행"
               >
+                {/* Authentic Kakao Speech Bubble Icon */}
+                <svg className="w-3.5 h-3.5 fill-[#191919] shrink-0" viewBox="0 0 24 24">
+                  <path d="M12 3c-5.523 0-10 3.582-10 8 0 2.853 1.879 5.364 4.707 6.744l-.961 3.541c-.085.312.246.577.525.418l4.24-2.42c.484.06 1.002.097 1.489.097 5.523 0 10-3.582 10-8s-4.477-8-10-8z" />
+                </svg>
                 <span>카톡</span>
-                <ExternalLink className="w-3.5 h-3.5 text-[#191919]" />
               </button>
             </div>
           </div>

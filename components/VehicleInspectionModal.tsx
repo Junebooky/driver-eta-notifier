@@ -755,30 +755,26 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
 
         {/* Task 5: 2-Split Action Buttons Footer (FlightModal Kakao Standard) */}
         <div className="p-4 border-t border-slate-100 bg-white flex items-center gap-2.5 shrink-0">
-          {/* Left: '확인' Button */}
+          {/* Left: '확인' Button (Cobalt Blue, larger width) */}
           <button
             type="button"
             onClick={handleConfirmSave}
-            className="flex-1 py-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm transition-all active:scale-[0.98] cursor-pointer text-center"
+            className="flex-[2] py-3.5 rounded-xl bg-[#1E60F3] hover:bg-[#1650D6] text-white font-bold text-sm transition-all shadow-md shadow-blue-500/20 active:scale-[0.98] cursor-pointer text-center flex items-center justify-center"
           >
             확인
           </button>
 
-          {/* Right: '카카오톡 전송' Button (FlightModal Spec 100% Match) */}
+          {/* Right: '카톡' Button (Compact Brand Button) */}
           <button
             type="button"
             onClick={handleKakaoLaunch}
-            className="flex-[1.5] py-3.5 rounded-xl bg-[#FEE500] hover:bg-[#FDD800] text-[#191919] font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-sm active:scale-[0.98] cursor-pointer"
+            className="flex-1 py-3.5 rounded-xl bg-[#FEE500] hover:bg-[#FDD800] text-[#191919] font-bold text-sm flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-[0.98] cursor-pointer"
           >
             {/* Authentic Kakao Speech Bubble Icon */}
             <svg className="w-4 h-4 fill-[#191919] shrink-0" viewBox="0 0 24 24">
               <path d="M12 3c-5.523 0-10 3.582-10 8 0 2.853 1.879 5.364 4.707 6.744l-.961 3.541c-.085.312.246.577.525.418l4.24-2.42c.484.06 1.002.097 1.489.097 5.523 0 10-3.582 10-8s-4.477-8-10-8z" />
             </svg>
-            <span>
-              {activeTab === 'receipt'
-                ? '수령 보고 카톡 전송'
-                : '반납 보고 카톡 전송'}
-            </span>
+            <span>카톡</span>
           </button>
         </div>
       </div>
