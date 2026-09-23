@@ -36,9 +36,10 @@ const DAMAGE_PART_CHIPS = [
   '뒷 범퍼',
   '앞 휠 (운전석)',
   '앞 휠 (조수석)',
+  '도어 (운전석)',
+  '도어 (조수석)',
   '뒷 휠 (운전석)',
   '뒷 휠 (조수석)',
-  '도어/측면',
   '유리/윈드실드',
 ];
 
@@ -469,15 +470,10 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
               </div>
 
               {/* 2D Top-Down Interactive Vehicle Inspection Viewer */}
-              <div className="space-y-1.5 pt-1">
-                <div className="flex items-center justify-between">
-                  <label className="block text-[11px] font-semibold text-slate-600">
-                    차량 외관 2D 탑뷰 점검
-                  </label>
-                  <span className="text-[10px] text-slate-400 font-medium">
-                    사각지대 없는 수직 평면도
-                  </span>
-                </div>
+              <div className="space-y-1 pt-0.5">
+                <label className="block text-[11px] font-semibold text-slate-600">
+                  차량 외관 2D 탑뷰 점검
+                </label>
                 <VehicleTopDownViewer
                   selectedParts={receiptSelectedParts}
                   onTogglePart={(part) => handleToggleDamageChip(part, 'receipt')}
@@ -485,7 +481,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
               </div>
 
               {/* Task 3: Outer Damage Quick Chip Selector & Input */}
-              <div className="space-y-1.5 pt-1">
+              <div className="space-y-1 pt-1">
                 <label className="block text-[11px] font-semibold text-slate-600">
                   외관 부위별 빠른 선택
                 </label>
@@ -511,7 +507,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                         type="button"
                         onClick={() => handleToggleDamageChip(part, 'receipt')}
                         className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer ${isSelected
-                          ? 'border-[#1E60F3] bg-blue-50 text-[#1E60F3] font-bold shadow-xs'
+                          ? 'border-rose-400 bg-rose-50 text-rose-600 font-bold shadow-xs'
                           : 'border-slate-200 bg-slate-50 text-slate-600 font-medium hover:bg-slate-100'
                           }`}
                       >
@@ -614,15 +610,10 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
               </div>
 
               {/* 2D Top-Down Interactive Vehicle Inspection Viewer */}
-              <div className="space-y-1.5 pt-1">
-                <div className="flex items-center justify-between">
-                  <label className="block text-[11px] font-semibold text-slate-600">
-                    차량 외관 2D 탑뷰 점검
-                  </label>
-                  <span className="text-[10px] text-slate-400 font-medium">
-                    사각지대 없는 수직 평면도
-                  </span>
-                </div>
+              <div className="space-y-1 pt-0.5">
+                <label className="block text-[11px] font-semibold text-slate-600">
+                  차량 외관 2D 탑뷰 점검
+                </label>
                 <VehicleTopDownViewer
                   selectedParts={returnSelectedParts}
                   onTogglePart={(part) => handleToggleDamageChip(part, 'return')}
@@ -630,7 +621,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
               </div>
 
               {/* Task 3: Outer Damage Quick Chip Selector & Input */}
-              <div className="space-y-1.5 pt-1">
+              <div className="space-y-1 pt-1">
                 <label className="block text-[11px] font-semibold text-slate-600">
                   외관 부위별 빠른 선택
                 </label>
@@ -656,7 +647,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                         type="button"
                         onClick={() => handleToggleDamageChip(part, 'return')}
                         className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer ${isSelected
-                          ? 'border-[#1E60F3] bg-blue-50 text-[#1E60F3] font-bold shadow-xs'
+                          ? 'border-rose-400 bg-rose-50 text-rose-600 font-bold shadow-xs'
                           : 'border-slate-200 bg-slate-50 text-slate-600 font-medium hover:bg-slate-100'
                           }`}
                       >
