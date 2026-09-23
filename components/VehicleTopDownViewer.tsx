@@ -37,21 +37,21 @@ export const VehicleTopDownViewer: React.FC<VehicleTopDownViewerProps> = ({
 
   return (
     <div className="relative w-full h-[168px] bg-slate-50/70 border border-slate-200/90 rounded-2xl p-2 select-none overflow-hidden touch-manipulation flex items-center justify-center shadow-2xs">
-      {/* Unified Synchronized Pulse Keyframes for Misty Rose Glow */}
+      {/* Unified Synchronized Pulse Keyframes for Cobalt Blue Glow (15% softer opacity) */}
       <style>{`
-        @keyframes misty-rose-pulse {
+        @keyframes cobalt-blue-pulse {
           0%, 100% {
             transform: scale(1);
             opacity: 0.95;
-            box-shadow: 0 0 5px rgba(244, 63, 94, 0.35);
+            box-shadow: 0 0 5px rgba(30, 96, 243, 0.4);
           }
           50% {
             transform: scale(1.14);
             opacity: 1;
-            box-shadow: 0 0 10px rgba(244, 63, 94, 0.55), 0 0 16px rgba(244, 63, 94, 0.2);
+            box-shadow: 0 0 10px rgba(30, 96, 243, 0.6), 0 0 16px rgba(30, 96, 243, 0.25);
           }
         }
-        @keyframes misty-rose-ring {
+        @keyframes cobalt-blue-ring {
           0%, 100% {
             transform: scale(0.9);
             opacity: 0.25;
@@ -61,11 +61,11 @@ export const VehicleTopDownViewer: React.FC<VehicleTopDownViewerProps> = ({
             opacity: 0.65;
           }
         }
-        .sync-rose-pin {
-          animation: misty-rose-pulse 2.2s ease-in-out infinite;
+        .sync-cobalt-pin {
+          animation: cobalt-blue-pulse 2.2s ease-in-out infinite;
         }
-        .sync-rose-ring {
-          animation: misty-rose-ring 2.2s ease-in-out infinite;
+        .sync-cobalt-ring {
+          animation: cobalt-blue-ring 2.2s ease-in-out infinite;
         }
       `}</style>
 
@@ -83,20 +83,15 @@ export const VehicleTopDownViewer: React.FC<VehicleTopDownViewerProps> = ({
         R 조수석
       </span>
 
-      {/* Status Pill Badge (Top-Right) */}
-      <div className="absolute top-1.5 right-2.5 pointer-events-none">
-        {isClean ? (
-          <span className="text-[10px] text-emerald-600 font-medium px-1.5 py-0.5 rounded-md bg-emerald-50 border border-emerald-200/60 flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-            이상 없음
-          </span>
-        ) : (
-          <span className="text-[10px] text-rose-600 font-bold px-1.5 py-0.5 rounded-md bg-rose-50 border border-rose-200/60 flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
+      {/* Status Badge (Top-Right): Only displayed when there are damages, hidden when clean */}
+      {!isClean && (
+        <div className="absolute top-1.5 right-2.5 pointer-events-none animate-fade-in">
+          <span className="text-[10px] text-white font-bold px-2 py-0.5 rounded-full bg-[#1E60F3]/85 shadow-2xs flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0 animate-pulse" />
             {selectedParts.length}개 흠집
           </span>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* 2D Top-down Silhouette Container (Compact aspect ratio) */}
       <div className="relative w-[86px] h-[148px] shrink-0">
@@ -178,12 +173,12 @@ export const VehicleTopDownViewer: React.FC<VehicleTopDownViewerProps> = ({
           {/* Rear Bumper & Trunk Line */}
           <path d="M 53 194 Q 80 198 107 194" stroke="#CBD5E1" strokeWidth="1" />
 
-          {/* Taillights (Soft Rose Accent) */}
+          {/* Taillights (Soft Red/Rose Accent) */}
           <path d="M 45 244 Q 58 250 70 251" stroke="#FB7185" strokeWidth="2.2" strokeLinecap="round" opacity="0.85" />
           <path d="M 115 244 Q 102 250 90 251" stroke="#FB7185" strokeWidth="2.2" strokeLinecap="round" opacity="0.85" />
         </svg>
 
-        {/* Hotspots & Synchronized Misty Rose Glow Marker Layer */}
+        {/* Hotspots & Synchronized Cobalt Blue Glow Marker Layer (15% Softer Opacity) */}
         {HOTSPOTS.map((spot) => {
           const isSelected = selectedParts.includes(spot.part);
 
@@ -204,15 +199,15 @@ export const VehicleTopDownViewer: React.FC<VehicleTopDownViewerProps> = ({
               aria-label={`${spot.part} 점검`}
             >
               {isSelected ? (
-                /* Selected State: Misty Rose Glow with Synchronized Pulse */
+                /* Selected State: Cobalt Blue Glow with Synchronized Pulse (15% Softer) */
                 <span className="relative flex items-center justify-center">
-                  <span className="absolute w-5 h-5 rounded-full bg-rose-400/40 sync-rose-ring pointer-events-none" />
-                  <span className="relative w-3 h-3 rounded-full bg-rose-500 border-2 border-white sync-rose-pin" />
+                  <span className="absolute w-5 h-5 rounded-full bg-[#1E60F3]/30 sync-cobalt-ring pointer-events-none" />
+                  <span className="relative w-3.5 h-3.5 rounded-full bg-[#1E60F3]/85 border-2 border-white sync-cobalt-pin shadow-xs" />
                 </span>
               ) : (
                 /* Inactive State: Clean Subtle Dot */
                 <span className="flex items-center justify-center w-5 h-5 rounded-full group-hover:bg-slate-200/50 transition-colors">
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-rose-400 group-hover:scale-125 transition-all shadow-2xs" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-[#1E60F3]/60 group-hover:scale-125 transition-all shadow-2xs" />
                 </span>
               )}
             </button>

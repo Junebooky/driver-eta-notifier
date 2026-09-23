@@ -490,12 +490,15 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                   <button
                     type="button"
                     onClick={() => handleResetDamageToClean('receipt')}
-                    className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer ${isReceiptClean
-                      ? 'border-[#1E60F3] bg-blue-50 text-[#1E60F3] font-bold shadow-xs'
-                      : 'border-slate-200 bg-slate-50 text-slate-600 font-medium hover:bg-slate-100'
+                    className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer flex items-center ${isReceiptClean
+                      ? 'border-[#1E60F3]/40 bg-blue-50/70 text-slate-800 font-bold shadow-xs'
+                      : 'border-slate-200 bg-white text-slate-400 font-medium hover:bg-slate-50'
                       }`}
                   >
-                    ✓ 이상 없음 (무)
+                    <span className={isReceiptClean ? 'text-[#1E60F3] font-black text-xs mr-1' : 'text-slate-300 text-xs mr-1'}>
+                      ✓
+                    </span>
+                    <span>이상 없음 (무)</span>
                   </button>
 
                   {/* Body part chips */}
@@ -507,7 +510,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                         type="button"
                         onClick={() => handleToggleDamageChip(part, 'receipt')}
                         className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer ${isSelected
-                          ? 'border-rose-400 bg-rose-50 text-rose-600 font-bold shadow-xs'
+                          ? 'border-[#1E60F3]/40 bg-[#1E60F3]/85 hover:bg-[#1E60F3]/90 text-white font-bold shadow-xs'
                           : 'border-slate-200 bg-slate-50 text-slate-600 font-medium hover:bg-slate-100'
                           }`}
                       >
@@ -630,12 +633,15 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                   <button
                     type="button"
                     onClick={() => handleResetDamageToClean('return')}
-                    className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer ${isReturnClean
-                      ? 'border-[#1E60F3] bg-blue-50 text-[#1E60F3] font-bold shadow-xs'
-                      : 'border-slate-200 bg-slate-50 text-slate-600 font-medium hover:bg-slate-100'
+                    className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer flex items-center ${isReturnClean
+                      ? 'border-[#1E60F3]/40 bg-blue-50/70 text-slate-800 font-bold shadow-xs'
+                      : 'border-slate-200 bg-white text-slate-400 font-medium hover:bg-slate-50'
                       }`}
                   >
-                    ✓ 이상 없음 (무)
+                    <span className={isReturnClean ? 'text-[#1E60F3] font-black text-xs mr-1' : 'text-slate-300 text-xs mr-1'}>
+                      ✓
+                    </span>
+                    <span>이상 없음 (무)</span>
                   </button>
 
                   {/* Body part chips */}
@@ -647,7 +653,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                         type="button"
                         onClick={() => handleToggleDamageChip(part, 'return')}
                         className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer ${isSelected
-                          ? 'border-rose-400 bg-rose-50 text-rose-600 font-bold shadow-xs'
+                          ? 'border-[#1E60F3]/40 bg-[#1E60F3]/85 hover:bg-[#1E60F3]/90 text-white font-bold shadow-xs'
                           : 'border-slate-200 bg-slate-50 text-slate-600 font-medium hover:bg-slate-100'
                           }`}
                       >
