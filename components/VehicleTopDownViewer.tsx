@@ -36,149 +36,303 @@ export const VehicleTopDownViewer: React.FC<VehicleTopDownViewerProps> = ({
   const isClean = selectedParts.length === 0;
 
   return (
-    <div className="relative w-full h-[168px] bg-slate-50/70 border border-slate-200/90 rounded-2xl p-2 select-none overflow-hidden touch-manipulation flex items-center justify-center shadow-2xs">
-      {/* Unified Synchronized Pulse Keyframes for Cobalt Blue Glow (15% softer opacity) */}
+    <div className="relative w-full h-[182px] bg-slate-50/70 border border-slate-200/90 rounded-2xl p-2 select-none overflow-hidden touch-manipulation flex items-center justify-center shadow-xs">
+      {/* Synchronized Ethereal Cobalt Halo & Core Glow */}
       <style>{`
-        @keyframes cobalt-blue-pulse {
+        @keyframes cobalt-halo-breathe {
+          0%, 100% {
+            transform: scale(0.92);
+            opacity: 0.5;
+          }
+          50% {
+            transform: scale(1.38);
+            opacity: 0.85;
+          }
+        }
+        @keyframes cobalt-core-pulse {
           0%, 100% {
             transform: scale(1);
-            opacity: 0.95;
-            box-shadow: 0 0 5px rgba(30, 96, 243, 0.4);
+            box-shadow: 0 0 8px 1px rgba(30, 96, 243, 0.45);
           }
           50% {
-            transform: scale(1.14);
-            opacity: 1;
-            box-shadow: 0 0 10px rgba(30, 96, 243, 0.6), 0 0 16px rgba(30, 96, 243, 0.25);
+            transform: scale(1.12);
+            box-shadow: 0 0 14px 3px rgba(30, 96, 243, 0.75), 0 0 22px 6px rgba(30, 96, 243, 0.25);
           }
         }
-        @keyframes cobalt-blue-ring {
-          0%, 100% {
-            transform: scale(0.9);
-            opacity: 0.25;
-          }
-          50% {
-            transform: scale(1.48);
-            opacity: 0.65;
-          }
+        .sync-cobalt-halo {
+          animation: cobalt-halo-breathe 2.4s ease-in-out infinite;
         }
-        .sync-cobalt-pin {
-          animation: cobalt-blue-pulse 2.2s ease-in-out infinite;
-        }
-        .sync-cobalt-ring {
-          animation: cobalt-blue-ring 2.2s ease-in-out infinite;
+        .sync-cobalt-core {
+          animation: cobalt-core-pulse 2.4s ease-in-out infinite;
         }
       `}</style>
 
       {/* Direction & Orientation Labels (Subtle Monotone) */}
-      <span className="absolute top-1.5 left-1/2 -translate-x-1/2 text-[10px] font-medium tracking-wider text-slate-400 uppercase pointer-events-none">
+      <span className="absolute top-2 left-1/2 -translate-x-1/2 text-[10px] font-semibold tracking-wider text-slate-400 uppercase pointer-events-none">
         FRONT
       </span>
-      <span className="absolute bottom-1.5 left-1/2 -translate-x-1/2 text-[10px] font-medium tracking-wider text-slate-400 uppercase pointer-events-none">
+      <span className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[10px] font-semibold tracking-wider text-slate-400 uppercase pointer-events-none">
         REAR
       </span>
-      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] font-medium text-slate-400 pointer-events-none">
+      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[11px] font-medium text-slate-400 pointer-events-none">
         L 운전석
       </span>
-      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-medium text-slate-400 pointer-events-none">
+      <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[11px] font-medium text-slate-400 pointer-events-none">
         R 조수석
       </span>
 
-      {/* Status Badge (Top-Right): Only displayed when there are damages, hidden when clean */}
+      {/* Status Badge (Top-Right): Displayed only when damages exist */}
       {!isClean && (
-        <div className="absolute top-1.5 right-2.5 pointer-events-none animate-fade-in">
-          <span className="text-[10px] text-white font-bold px-2 py-0.5 rounded-full bg-[#1E60F3]/85 shadow-2xs flex items-center gap-1">
+        <div className="absolute top-2 right-3 pointer-events-none animate-fade-in">
+          <span className="text-[11px] text-white font-bold px-3 py-1 rounded-full bg-[#1E60F3]/90 shadow-sm flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0 animate-pulse" />
             {selectedParts.length}개 흠집
           </span>
         </div>
       )}
 
-      {/* 2D Top-down Silhouette Container (Compact aspect ratio) */}
-      <div className="relative w-[86px] h-[148px] shrink-0">
-        {/* Crisp Pure Inline SVG Sedan Silhouette in Light Mode */}
+      {/* 2D Top-down Silhouette Container with 3D Depth */}
+      <div className="relative w-[92px] h-[158px] shrink-0">
+        {/* Photorealistic 3D Metallic Sedan Silhouette SVG */}
         <svg
           viewBox="0 0 160 280"
-          className="w-full h-full drop-shadow-2xs pointer-events-none"
+          className="w-full h-full pointer-events-none"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
         >
-          {/* Subtle blueprint grid lines */}
-          <line x1="80" y1="12" x2="80" y2="268" stroke="#E2E8F0" strokeWidth="0.8" strokeDasharray="3 3" />
-          <line x1="20" y1="140" x2="140" y2="140" stroke="#E2E8F0" strokeWidth="0.8" strokeDasharray="3 3" />
+          <defs>
+            {/* Soft Ambient Ground Occlusion Shadow */}
+            <filter id="car-ambient-shadow" x="-25%" y="-20%" width="150%" height="150%">
+              <feDropShadow dx="0" dy="5" stdDeviation="7" floodColor="#0F172A" floodOpacity="0.22" />
+            </filter>
 
-          {/* 4 Wheels (Tires & Rims in Light Mode) */}
-          {/* Front-Left Wheel */}
-          <rect x="20" y="52" width="12" height="30" rx="3" fill="#E2E8F0" stroke="#94A3B8" strokeWidth="1" />
-          <line x1="26" y1="56" x2="26" y2="78" stroke="#CBD5E1" strokeWidth="1" />
-          {/* Front-Right Wheel */}
-          <rect x="128" y="52" width="12" height="30" rx="3" fill="#E2E8F0" stroke="#94A3B8" strokeWidth="1" />
-          <line x1="134" y1="56" x2="134" y2="78" stroke="#CBD5E1" strokeWidth="1" />
-          {/* Rear-Left Wheel */}
-          <rect x="20" y="192" width="12" height="30" rx="3" fill="#E2E8F0" stroke="#94A3B8" strokeWidth="1" />
-          <line x1="26" y1="196" x2="26" y2="218" stroke="#CBD5E1" strokeWidth="1" />
-          {/* Rear-Right Wheel */}
-          <rect x="128" y="192" width="12" height="30" rx="3" fill="#E2E8F0" stroke="#94A3B8" strokeWidth="1" />
-          <line x1="134" y1="196" x2="134" y2="218" stroke="#CBD5E1" strokeWidth="1" />
+            {/* Subtle Wheel Drop Shadow */}
+            <filter id="wheel-shadow" x="-30%" y="-30%" width="160%" height="160%">
+              <feDropShadow dx="0" dy="2" stdDeviation="2.5" floodColor="#0F172A" floodOpacity="0.3" />
+            </filter>
 
-          {/* Side Mirrors */}
-          <path d="M 42 76 C 34 74, 32 80, 40 84 Z" fill="#F1F5F9" stroke="#94A3B8" strokeWidth="1" />
-          <path d="M 118 76 C 126 74, 128 80, 120 84 Z" fill="#F1F5F9" stroke="#94A3B8" strokeWidth="1" />
+            {/* 3D Metallic Paint - Transverse Curvature (Left-to-Right Shading) */}
+            <linearGradient id="body-paint-transverse" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#CBD5E1" />
+              <stop offset="7%" stopColor="#E2E8F0" />
+              <stop offset="18%" stopColor="#F8FAFC" />
+              <stop offset="32%" stopColor="#FFFFFF" />
+              <stop offset="50%" stopColor="#F1F5F9" />
+              <stop offset="68%" stopColor="#FFFFFF" />
+              <stop offset="82%" stopColor="#F8FAFC" />
+              <stop offset="93%" stopColor="#E2E8F0" />
+              <stop offset="100%" stopColor="#CBD5E1" />
+            </linearGradient>
 
-          {/* Main Car Body Shell */}
+            {/* 3D Longitudinal Highlights (Front-to-Rear Shading) */}
+            <linearGradient id="body-paint-longitudinal" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#CBD5E1" />
+              <stop offset="6%" stopColor="#F8FAFC" />
+              <stop offset="16%" stopColor="#FFFFFF" />
+              <stop offset="35%" stopColor="#E2E8F0" />
+              <stop offset="55%" stopColor="#F1F5F9" />
+              <stop offset="82%" stopColor="#FFFFFF" />
+              <stop offset="95%" stopColor="#E2E8F0" />
+              <stop offset="100%" stopColor="#94A3B8" />
+            </linearGradient>
+
+            {/* Dark Glossy Tinted Glass Gradient */}
+            <linearGradient id="cabin-glass" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#1E293B" />
+              <stop offset="25%" stopColor="#0F172A" />
+              <stop offset="75%" stopColor="#0F172A" />
+              <stop offset="100%" stopColor="#1E293B" />
+            </linearGradient>
+
+            {/* Windshield Diagonal Light Glare Reflection */}
+            <linearGradient id="windshield-glare" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.45" />
+              <stop offset="35%" stopColor="#BAE6FD" stopOpacity="0.22" />
+              <stop offset="70%" stopColor="#38BDF8" stopOpacity="0.08" />
+              <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
+            </linearGradient>
+
+            {/* Rear Glass Defroster Glare */}
+            <linearGradient id="rear-glass-glare" x1="100%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.3" />
+              <stop offset="50%" stopColor="#94A3B8" stopOpacity="0.1" />
+              <stop offset="100%" stopColor="#0F172A" stopOpacity="0" />
+            </linearGradient>
+
+            {/* High-End LED Taillight Bar Gradient */}
+            <linearGradient id="led-taillight" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#B91C1C" />
+              <stop offset="20%" stopColor="#EF4444" />
+              <stop offset="50%" stopColor="#FCA5A5" />
+              <stop offset="80%" stopColor="#EF4444" />
+              <stop offset="100%" stopColor="#B91C1C" />
+            </linearGradient>
+
+            {/* Jewel LED Headlight Gradient */}
+            <linearGradient id="jewel-headlight" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#38BDF8" />
+              <stop offset="50%" stopColor="#E0F2FE" />
+              <stop offset="100%" stopColor="#0284C7" />
+            </linearGradient>
+          </defs>
+
+          {/* 1. Underlying Wheels (Tires & Rims tucked under body) */}
+          <g filter="url(#wheel-shadow)">
+            {/* Front-Left Wheel */}
+            <rect x="22" y="52" width="13" height="30" rx="3.5" fill="#0F172A" stroke="#334155" strokeWidth="0.8" />
+            <line x1="28.5" y1="56" x2="28.5" y2="78" stroke="#64748B" strokeWidth="1.2" strokeLinecap="round" />
+            {/* Front-Right Wheel */}
+            <rect x="125" y="52" width="13" height="30" rx="3.5" fill="#0F172A" stroke="#334155" strokeWidth="0.8" />
+            <line x1="131.5" y1="56" x2="131.5" y2="78" stroke="#64748B" strokeWidth="1.2" strokeLinecap="round" />
+            {/* Rear-Left Wheel */}
+            <rect x="21" y="190" width="13" height="32" rx="3.5" fill="#0F172A" stroke="#334155" strokeWidth="0.8" />
+            <line x1="27.5" y1="194" x2="27.5" y2="218" stroke="#64748B" strokeWidth="1.2" strokeLinecap="round" />
+            {/* Rear-Right Wheel */}
+            <rect x="126" y="190" width="13" height="32" rx="3.5" fill="#0F172A" stroke="#334155" strokeWidth="0.8" />
+            <line x1="132.5" y1="194" x2="132.5" y2="218" stroke="#64748B" strokeWidth="1.2" strokeLinecap="round" />
+          </g>
+
+          {/* 2. Main Aerodynamic Car Body with Realistic Ambient Shadow */}
           <path
-            d="M 80 18 C 58 18, 48 30, 44 48 C 42 60, 40 85, 38 105 C 36 125, 36 155, 38 175 C 40 195, 42 220, 44 235 C 47 252, 58 262, 80 262 C 102 262, 113 252, 116 235 C 118 220, 120 195, 122 175 C 124 155, 124 125, 122 105 C 120 85, 118 60, 116 48 C 112 30, 102 18, 80 18 Z"
-            fill="#FFFFFF"
-            stroke="#94A3B8"
-            strokeWidth="1.4"
+            d="M 80 16 
+               C 56 16, 46 27, 43 45 
+               C 40 58, 38 85, 36 106 
+               C 35 125, 35 155, 36 175 
+               C 38 198, 40 222, 43 236 
+               C 46 253, 56 264, 80 264 
+               C 104 264, 114 253, 117 236 
+               C 120 222, 122 198, 124 175 
+               C 125 155, 125 125, 124 106 
+               C 122 85, 120 58, 117 45 
+               C 114 27, 104 16, 80 16 Z"
+            fill="url(#body-paint-transverse)"
+            filter="url(#car-ambient-shadow)"
           />
 
-          {/* Front Bumper & Hood Feature Lines */}
-          <path d="M 64 24 Q 80 22 96 24" stroke="#94A3B8" strokeWidth="1.2" />
-          <line x1="52" y1="46" x2="56" y2="74" stroke="#CBD5E1" strokeWidth="1" />
-          <line x1="108" y1="46" x2="104" y2="74" stroke="#CBD5E1" strokeWidth="1" />
-
-          {/* Headlights (Cyan/Sky Accent) */}
-          <path d="M 45 36 Q 56 31 68 30" stroke="#38BDF8" strokeWidth="2.2" strokeLinecap="round" opacity="0.85" />
-          <path d="M 115 36 Q 104 31 92 30" stroke="#38BDF8" strokeWidth="2.2" strokeLinecap="round" opacity="0.85" />
-
-          {/* Front Windshield (Soft Sky Tint) */}
+          {/* Longitudinal Light Overlay for 3D Surface Curvature */}
           <path
-            d="M 47 78 Q 80 71 113 78 L 109 106 Q 80 101 51 106 Z"
-            fill="#E0F2FE"
+            d="M 80 16 
+               C 56 16, 46 27, 43 45 
+               C 40 58, 38 85, 36 106 
+               C 35 125, 35 155, 36 175 
+               C 38 198, 40 222, 43 236 
+               C 46 253, 56 264, 80 264 
+               C 104 264, 114 253, 117 236 
+               C 120 222, 122 198, 124 175 
+               C 125 155, 125 125, 124 106 
+               C 122 85, 120 58, 117 45 
+               C 114 27, 104 16, 80 16 Z"
+            fill="url(#body-paint-longitudinal)"
+            opacity="0.65"
             stroke="#94A3B8"
             strokeWidth="1.2"
           />
 
-          {/* Door Separation Seams (Driver and Passenger Door Cut Lines) */}
-          <line x1="39" y1="140" x2="52" y2="140" stroke="#CBD5E1" strokeWidth="1" />
-          <line x1="108" y1="140" x2="121" y2="140" stroke="#CBD5E1" strokeWidth="1" />
+          {/* 3. Sculpted Hood Creases & Front Fender Flairs */}
+          {/* Front Bumper Sculpted Contour */}
+          <path d="M 60 21 Q 80 18 100 21" stroke="#94A3B8" strokeWidth="1.2" opacity="0.85" />
+          {/* Hood Power Bulges (Left & Right Character Lines) */}
+          <path d="M 64 22 C 60 42, 54 62, 52 74" stroke="#CBD5E1" strokeWidth="1.4" strokeLinecap="round" />
+          <path d="M 63 22 C 59 42, 53 62, 51 74" stroke="#FFFFFF" strokeWidth="0.8" strokeLinecap="round" opacity="0.9" />
+          <path d="M 96 22 C 100 42, 106 62, 108 74" stroke="#CBD5E1" strokeWidth="1.4" strokeLinecap="round" />
+          <path d="M 97 22 C 101 42, 107 62, 109 74" stroke="#FFFFFF" strokeWidth="0.8" strokeLinecap="round" opacity="0.9" />
 
-          {/* Sunroof / Panoramic Roof */}
+          {/* Jewel LED Headlights with Subtle Blue Glare */}
+          <path d="M 44 32 Q 54 27 66 26" stroke="url(#jewel-headlight)" strokeWidth="2.8" strokeLinecap="round" />
+          <path d="M 116 32 Q 106 27 94 26" stroke="url(#jewel-headlight)" strokeWidth="2.8" strokeLinecap="round" />
+
+          {/* 4. Streamlined Side Mirrors */}
+          {/* Left Mirror */}
+          <path d="M 39 76 C 30 73 28 82 38 86 Z" fill="url(#body-paint-transverse)" stroke="#64748B" strokeWidth="1" />
+          <line x1="33" y1="78" x2="38" y2="84" stroke="#0F172A" strokeWidth="1.2" />
+          {/* Right Mirror */}
+          <path d="M 121 76 C 130 73 132 82 122 86 Z" fill="url(#body-paint-transverse)" stroke="#64748B" strokeWidth="1" />
+          <line x1="127" y1="78" x2="122" y2="84" stroke="#0F172A" strokeWidth="1.2" />
+
+          {/* 5. Passenger Greenhouse (A/B/C Pillars & Dark Tinted Cabin Glass) */}
+          {/* Windshield Cowl & Roof Pillar Surround */}
           <path
-            d="M 52 110 Q 80 106 108 110 L 106 158 Q 80 155 54 158 Z"
-            fill="#F8FAFC"
-            stroke="#CBD5E1"
+            d="M 48 76 Q 80 69 112 76 
+               L 108 202 Q 80 206 52 202 Z"
+            fill="#0F172A"
+          />
+
+          {/* Front Curved Windshield */}
+          <path
+            d="M 48 76 Q 80 69 112 76 
+               L 106 112 Q 80 107 54 112 Z"
+            fill="url(#cabin-glass)"
+            stroke="#475569"
+            strokeWidth="0.8"
+          />
+          {/* Windshield Reflection Sheen */}
+          <path
+            d="M 50 78 Q 72 73 88 75 L 76 110 Q 60 108 55 111 Z"
+            fill="url(#windshield-glare)"
+          />
+          {/* Rearview Mirror Sensor Mount */}
+          <rect x="76" y="75" width="8" height="6" rx="2" fill="#0F172A" stroke="#334155" strokeWidth="0.6" />
+
+          {/* Panoramic Sunroof / Glass Roof Panel */}
+          <path
+            d="M 54 115 Q 80 110 106 115 
+               L 104 165 Q 80 160 56 165 Z"
+            fill="#0F172A"
+            stroke="#334155"
+            strokeWidth="0.8"
+          />
+          {/* Roof Crossbar Divider */}
+          <line x1="55" y1="138" x2="105" y2="138" stroke="#1E293B" strokeWidth="1.2" />
+
+          {/* Rear Windshield with Curved Glass Reflections */}
+          <path
+            d="M 56 168 Q 80 163 104 168 
+               L 108 200 Q 80 204 52 200 Z"
+            fill="url(#cabin-glass)"
+            stroke="#475569"
+            strokeWidth="0.8"
+          />
+          {/* Rear Glass Highlight Reflection */}
+          <path
+            d="M 103 169 Q 88 165 78 167 L 86 199 Q 98 201 106 198 Z"
+            fill="url(#rear-glass-glare)"
+          />
+
+          {/* Chrome / Metal Window Surrounds (Left & Right Window Frames) */}
+          <path d="M 44 78 Q 38 135 48 201" stroke="#94A3B8" strokeWidth="1.4" opacity="0.85" />
+          <path d="M 116 78 Q 122 135 112 201" stroke="#94A3B8" strokeWidth="1.4" opacity="0.85" />
+
+          {/* Door Separation Cut Lines (Driver / Passenger Seams) */}
+          <line x1="36" y1="138" x2="45" y2="138" stroke="#94A3B8" strokeWidth="1.2" />
+          <line x1="115" y1="138" x2="124" y2="138" stroke="#94A3B8" strokeWidth="1.2" />
+
+          {/* 6. Sculpted Trunk Lid & Rear Spoiler Feature Line */}
+          <path d="M 52 204 Q 80 208 108 204" stroke="#94A3B8" strokeWidth="1.2" />
+          <path d="M 54 228 Q 80 233 106 228" stroke="#E2E8F0" strokeWidth="1.4" />
+          <path d="M 54 229 Q 80 234 106 229" stroke="#CBD5E1" strokeWidth="0.8" />
+
+          {/* Continuous Red LED Taillight Bar with Soft Glow */}
+          <path
+            d="M 44 246 Q 80 252 116 246"
+            stroke="url(#led-taillight)"
+            strokeWidth="3.2"
+            strokeLinecap="round"
+          />
+          {/* Inner Lightbar Core Highlight */}
+          <path
+            d="M 46 246 Q 80 251.5 114 246"
+            stroke="#FCA5A5"
             strokeWidth="1"
-            strokeDasharray="3 2"
+            strokeLinecap="round"
+            opacity="0.9"
           />
 
-          {/* Rear Windshield */}
-          <path
-            d="M 54 162 Q 80 159 106 162 L 110 188 Q 80 192 50 188 Z"
-            fill="#E0F2FE"
-            stroke="#94A3B8"
-            strokeWidth="1.2"
-          />
-
-          {/* Rear Bumper & Trunk Line */}
-          <path d="M 53 194 Q 80 198 107 194" stroke="#CBD5E1" strokeWidth="1" />
-
-          {/* Taillights (Soft Red/Rose Accent) */}
-          <path d="M 45 244 Q 58 250 70 251" stroke="#FB7185" strokeWidth="2.2" strokeLinecap="round" opacity="0.85" />
-          <path d="M 115 244 Q 102 250 90 251" stroke="#FB7185" strokeWidth="2.2" strokeLinecap="round" opacity="0.85" />
+          {/* Rear Lower Diffuser Accents */}
+          <path d="M 56 257 L 66 257" stroke="#64748B" strokeWidth="1.4" strokeLinecap="round" />
+          <path d="M 94 257 L 104 257" stroke="#64748B" strokeWidth="1.4" strokeLinecap="round" />
         </svg>
 
-        {/* Hotspots & Synchronized Cobalt Blue Glow Marker Layer (15% Softer Opacity) */}
+        {/* Hotspots & Ethereal Cobalt Halo Marker Layer */}
         {HOTSPOTS.map((spot) => {
           const isSelected = selectedParts.includes(spot.part);
 
@@ -194,20 +348,22 @@ export const VehicleTopDownViewer: React.FC<VehicleTopDownViewerProps> = ({
                 top: spot.top,
                 left: spot.left,
               }}
-              className="absolute -translate-x-1/2 -translate-y-1/2 w-7 h-7 rounded-full flex items-center justify-center cursor-pointer group active:scale-90 transition-transform touch-manipulation z-10"
+              className="absolute -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center cursor-pointer group active:scale-90 transition-transform touch-manipulation z-10"
               title={`${spot.part} 선택/해제`}
               aria-label={`${spot.part} 점검`}
             >
               {isSelected ? (
-                /* Selected State: Cobalt Blue Glow with Synchronized Pulse (15% Softer) */
+                /* Selected State: Ethereal Cobalt Halo Ring + Glowing Pin Core */
                 <span className="relative flex items-center justify-center">
-                  <span className="absolute w-5 h-5 rounded-full bg-[#1E60F3]/30 sync-cobalt-ring pointer-events-none" />
-                  <span className="relative w-3.5 h-3.5 rounded-full bg-[#1E60F3]/85 border-2 border-white sync-cobalt-pin shadow-xs" />
+                  {/* Soft Wide Luminous Halo */}
+                  <span className="absolute w-7 h-7 rounded-full bg-[#1E60F3]/30 sync-cobalt-halo pointer-events-none blur-[0.5px]" />
+                  {/* Crisp Cobalt Blue Pin with White Border */}
+                  <span className="relative w-3.5 h-3.5 rounded-full bg-[#1E60F3] border-2 border-white sync-cobalt-core shadow-sm" />
                 </span>
               ) : (
-                /* Inactive State: Clean Subtle Dot */
+                /* Inactive State: Subtle Dot */
                 <span className="flex items-center justify-center w-5 h-5 rounded-full group-hover:bg-slate-200/50 transition-colors">
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-[#1E60F3]/60 group-hover:scale-125 transition-all shadow-2xs" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400/60 group-hover:bg-[#1E60F3]/70 group-hover:scale-125 transition-all shadow-2xs" />
                 </span>
               )}
             </button>
