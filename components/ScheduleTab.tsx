@@ -18,12 +18,12 @@ const THINKING_STEPS = [
 ];
 
 const COCKPIT_ANALYSIS_STAGES = [
-  { step: 1, text: '1단계 · 운항 지시서 이미지 분석 중...', percent: 36 },
-  { step: 2, text: '2단계 · 기사 및 차량 정보 식별 중...', percent: 52 },
+  { step: 1, text: '1단계 · 운항 지시서 이미지 분석 중...', percent: 32 },
+  { step: 2, text: '2단계 · 기사 및 차량 정보 식별 중...', percent: 50 },
   { step: 3, text: '3단계 · VIP 및 항공편 정보 추출 중...', percent: 68 },
   { step: 4, text: '4단계 · 기사님의 개인 스케줄 구성 중...', percent: 84 },
-  { step: 5, text: '5단계 · 일정과 이동 정보 교차 검증 중...', percent: 94 },
-  { step: 6, text: '6단계 · 최종 스케줄 정확도 확인', percent: 97 },
+  { step: 5, text: '5단계 · 일정과 이동 정보 교차 검증 중...', percent: 96 },
+  { step: 6, text: '6단계 · 최종 스케줄 정확도 확인', percent: 100 },
 ];
 
 interface ScheduleTabProps {
@@ -261,7 +261,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
     setIsAnalyzingSchedule(true);
     setScheduleAnalysisCompleted(false);
     setScheduleAnalysisStage(0);
-    setScheduleAnalysisProgress(20);
+    setScheduleAnalysisProgress(15);
     setIsThinking(false);
     setDisplayedReply('');
     setCopilotResponse({
@@ -271,44 +271,49 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
     });
     setIsCopilotOpen(true);
 
-    // Balanced equal timing per stage (모든 1~5단계 균등 2.0초 배분)
-    const STAGE_DURATION_MS = 2000;
+    // Adaptive multi-stage timing:
+    // Earlier stages (1~4): calm, measured pace (속도를 조금 더 줄임)
+    // Final stages (5~6): swift, brisk acceleration into 100% (속도를 올림)
     const startTime = Date.now();
     const stageInterval = setInterval(() => {
       const elapsed = Date.now() - startTime;
-      const stageIndex = Math.min(Math.floor(elapsed / STAGE_DURATION_MS), 4);
-      setScheduleAnalysisStage(stageIndex);
 
-      if (stageIndex === 0) {
-        // 0s ~ 2.0s: 1단계 · 운항 지시서 이미지 분석 중... (20% ~ 36%)
-        const ratio = Math.min(elapsed / STAGE_DURATION_MS, 1);
-        setScheduleAnalysisProgress(Math.round(20 + ratio * 16));
-      } else if (stageIndex === 1) {
-        // 2.0s ~ 4.0s: 2단계 · 기사 및 차량 정보 식별 중... (36% ~ 52%)
-        const ratio = Math.min((elapsed - STAGE_DURATION_MS) / STAGE_DURATION_MS, 1);
-        setScheduleAnalysisProgress(Math.round(36 + ratio * 16));
-      } else if (stageIndex === 2) {
-        // 4.0s ~ 6.0s: 3단계 · VIP 및 항공편 정보 추출 중... (52% ~ 68%)
-        const ratio = Math.min((elapsed - STAGE_DURATION_MS * 2) / STAGE_DURATION_MS, 1);
-        setScheduleAnalysisProgress(Math.round(52 + ratio * 16));
-      } else if (stageIndex === 3) {
-        // 6.0s ~ 8.0s: 4단계 · 기사님의 개인 스케줄 구성 중... (68% ~ 84%)
-        const ratio = Math.min((elapsed - STAGE_DURATION_MS * 3) / STAGE_DURATION_MS, 1);
+      if (elapsed < 2400) {
+        // 0.0s ~ 2.4s: 1단계 · 운항 지시서 이미지 분석 중... (15% ~ 32%)
+        const ratio = elapsed / 2400;
+        setScheduleAnalysisStage(0);
+        setScheduleAnalysisProgress(Math.round(15 + ratio * 17));
+      } else if (elapsed < 4800) {
+        // 2.4s ~ 4.8s: 2단계 · 기사 및 차량 정보 식별 중... (32% ~ 50%)
+        const ratio = (elapsed - 2400) / 2400;
+        setScheduleAnalysisStage(1);
+        setScheduleAnalysisProgress(Math.round(32 + ratio * 18));
+      } else if (elapsed < 7000) {
+        // 4.8s ~ 7.0s: 3단계 · VIP 및 항공편 정보 추출 중... (50% ~ 68%)
+        const ratio = (elapsed - 4800) / 2200;
+        setScheduleAnalysisStage(2);
+        setScheduleAnalysisProgress(Math.round(50 + ratio * 18));
+      } else if (elapsed < 9000) {
+        // 7.0s ~ 9.0s: 4단계 · 기사님의 개인 스케줄 구성 중... (68% ~ 84%)
+        const ratio = (elapsed - 7000) / 2000;
+        setScheduleAnalysisStage(3);
         setScheduleAnalysisProgress(Math.round(68 + ratio * 16));
       } else {
-        // 8.0s ~ 10.0s: 5단계 · 일정과 이동 정보 교차 검증 중... (84% ~ 94%)
-        const extraElapsed = elapsed - STAGE_DURATION_MS * 4;
-        if (extraElapsed < STAGE_DURATION_MS) {
-          const ratio = extraElapsed / STAGE_DURATION_MS;
-          setScheduleAnalysisProgress(Math.round(84 + ratio * 10));
+        // 9.0s 이상: 5단계 · 일정과 이동 정보 교차 검증 중... (84% ~ 96% 빠른 가속)
+        setScheduleAnalysisStage(4);
+        const stage5Elapsed = elapsed - 9000;
+        if (stage5Elapsed <= 1200) {
+          // 1.2초 만에 84% -> 96%로 빠르게 치고 올라감 (속도를 올림)
+          const ratio = stage5Elapsed / 1200;
+          setScheduleAnalysisProgress(Math.round(84 + ratio * 12));
         } else {
-          // 10.0s 이상 네트워크 응답 대기 시 94% ~ 96% 소프트 댐핑
-          const waitSec = (extraElapsed - STAGE_DURATION_MS) / 1000;
-          const damped = 94 + 2 * (1 - Math.exp(-waitSec / 3));
-          setScheduleAnalysisProgress(Math.min(Math.round(damped), 96));
+          // 네트워크 응답 추가 대기 시에도 멈추지 않고 96% -> 98%로 부드럽게 유지
+          const waitSec = (stage5Elapsed - 1200) / 1000;
+          const damped = 96 + 2 * (1 - Math.exp(-waitSec / 2));
+          setScheduleAnalysisProgress(Math.min(Math.round(damped), 98));
         }
       }
-    }, 100);
+    }, 50);
     scheduleAnalysisTimerRef.current = stageInterval;
 
     const vehicleDetails = parseVehicleDetails(profile.vehicleNo);
@@ -367,30 +372,34 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
         }
       }
 
-      // 1~5단계가 고르게 표출되도록 최소 균등 보장 시간(5단계 * 2.0초 = 10초) 유지
-      const totalElapsed = Date.now() - startTime;
-      const minRequiredDuration = STAGE_DURATION_MS * 5;
-      if (totalElapsed < minRequiredDuration) {
-        await new Promise((resolve) => setTimeout(resolve, minRequiredDuration - totalElapsed));
-      }
-
+      // 타이머 정리 및 최종 5~6단계 신속 가속 완충 처리
       if (scheduleAnalysisTimerRef.current) {
         clearInterval(scheduleAnalysisTimerRef.current);
         scheduleAnalysisTimerRef.current = null;
       }
 
-      // Step 6: 97% confidence check upon receiving response
-      setScheduleAnalysisStage(5);
-      setScheduleAnalysisProgress(97);
+      // API가 초기에 너무 일찍 끝났을 경우에만 자연스러운 전개를 위한 최소 보장 (5.0s)
+      const totalElapsed = Date.now() - startTime;
+      if (totalElapsed < 5000) {
+        await new Promise((resolve) => setTimeout(resolve, 5000 - totalElapsed));
+      }
 
-      // 0.4s transition to 100% full confidence
-      await new Promise((resolve) => setTimeout(resolve, 400));
+      // 5단계 확실한 도달 및 가속
+      setScheduleAnalysisStage(4);
+      setScheduleAnalysisProgress(96);
+      await new Promise((resolve) => setTimeout(resolve, 180));
+
+      // 6단계 · 최종 스케줄 정확도 확인 (속도 가속 98% -> 100%)
+      setScheduleAnalysisStage(5);
+      setScheduleAnalysisProgress(98);
+      await new Promise((resolve) => setTimeout(resolve, 180));
+
       setScheduleAnalysisProgress(100);
       setScheduleAnalysisCompleted(true);
       haptics.success();
 
-      // Hold 100% completion card for ~0.8s as requested
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      // 완료 카드 0.5초 산뜻하게 유지
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       setIsAnalyzingSchedule(false);
       setScheduleAnalysisCompleted(false);
@@ -915,15 +924,14 @@ ${scheduleItemsFormatted}`.trim();
                 {!scheduleAnalysisCompleted ? (
                   <>
                     <div className="flex items-center justify-between gap-2">
-                      <span
-                        key={scheduleAnalysisStage}
-                        className="text-xs font-semibold text-slate-700 tracking-tight truncate transition-all duration-300 ease-out animate-fade-in"
-                      >
-                        {COCKPIT_ANALYSIS_STAGES[scheduleAnalysisStage]?.text || '1단계 · 운항 지시서 이미지 분석 중...'}
-                      </span>
+                      <div key={scheduleAnalysisStage} className="animate-fade-in min-w-0 flex-1 truncate">
+                        <span className="animate-reasoning-shimmer text-xs font-semibold tracking-tight truncate block">
+                          {COCKPIT_ANALYSIS_STAGES[scheduleAnalysisStage]?.text || '1단계 · 운항 지시서 이미지 분석 중...'}
+                        </span>
+                      </div>
                       <span className="text-xs font-bold text-sky-600 shrink-0 font-mono transition-opacity duration-300">
-                        {scheduleAnalysisProgress >= 97
-                          ? '분석 신뢰도 97%'
+                        {scheduleAnalysisProgress >= 100
+                          ? '분석 신뢰도 100%'
                           : `분석 신뢰도 ${scheduleAnalysisProgress}%`}
                       </span>
                     </div>
@@ -931,7 +939,7 @@ ${scheduleItemsFormatted}`.trim();
                     {/* Progress Track & Soft Tech Blue Gauge Bar */}
                     <div className="h-2 bg-slate-100 rounded-full overflow-hidden w-full">
                       <div
-                        className="h-full bg-gradient-to-r from-blue-300 via-sky-400 to-blue-400 transition-all duration-300 ease-out shadow-xs"
+                        className="h-full bg-gradient-to-r from-blue-300 via-sky-400 to-blue-400 transition-all duration-200 ease-out shadow-xs"
                         style={{ width: `${scheduleAnalysisProgress}%` }}
                       />
                     </div>

@@ -28,6 +28,43 @@
   .animate-fade-in {
     animation: fadeIn 0.2s ease-out forwards;
   }
+
+  @keyframes reasoningShimmer {
+    0% {
+      background-position: 150% 0;
+    }
+    100% {
+      background-position: -150% 0;
+    }
+  }
+
+  @keyframes reasoningPulse {
+    0%, 100% {
+      opacity: 0.88;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+
+  .animate-reasoning-shimmer {
+    background: linear-gradient(
+      90deg,
+      rgba(71, 85, 105, 0.38) 0%,
+      rgba(30, 41, 59, 0.72) 28%,
+      rgba(15, 23, 42, 1) 48%,
+      rgba(30, 96, 243, 1) 52%,
+      rgba(30, 41, 59, 0.72) 72%,
+      rgba(71, 85, 105, 0.38) 100%
+    );
+    background-size: 250% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: #334155;
+    animation: reasoningShimmer 2.2s infinite ease-in-out, reasoningPulse 2.6s infinite ease-in-out;
+    display: inline-block;
+  }
 }
 
 /* Custom clean scrollbars for cockpit view */

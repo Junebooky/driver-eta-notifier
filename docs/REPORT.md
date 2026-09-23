@@ -751,5 +751,60 @@ SELECT * FROM cockpit.presets;
 ### 22.3 빌드 무결성 검증
 * `npm run build`: Turbopack 기준 14/14 라우트 정상 빌드 완료 (에러 0건).
 
+---
+
+## 23. Cockpit AI 추론 텍스트 투명도 쉬머(Shimmer) 이펙트 및 게이지바 템포 재조율 (2026-09-23)
+
+### 23.1 개요
+* ChatGPT 및 Gemini의 LLM 추론(Reasoning) 시 나타나는 텍스트 투명도 변조 및 쉬머(Shimmering) 반짝임 인터랙션을 6단계 관제 텍스트에 적용.
+* 게이지바의 앞 단계(1~4단계)는 차분하게 내용을 음미할 수 있도록 속도를 안정화하고, 정체되던 후반 5~6단계는 지연 없이 신속하게 100%로 가속 완충되도록 템포 전면 재조율.
+
+### 23.2 주요 변경 내역
+1. **LLM 추론 투명도 쉬머 애니메이션 구현 ([`app/globals.css`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/globals.css))**:
+   * `-webkit-background-clip: text` 및 멀티 스톱 선형 그래디언트(`background-size: 250% 100%`)를 활용하여 글자 투명도가 `0.38`에서 `1.0`으로 파동치듯 은은하게 반짝이는 쉬머 효과 구현:
+     ```css
+     @keyframes reasoningShimmer {
+       0% { background-position: 150% 0; }
+       100% { background-position: -150% 0; }
+     }
+     @keyframes reasoningPulse {
+       0%, 100% { opacity: 0.88; }
+       50% { opacity: 1; }
+     }
+     .animate-reasoning-shimmer {
+       background: linear-gradient(
+         90deg,
+         rgba(71, 85, 105, 0.38) 0%,
+         rgba(30, 41, 59, 0.72) 28%,
+         rgba(15, 23, 42, 1) 48%,
+         rgba(30, 96, 243, 1) 52%,
+         rgba(30, 41, 59, 0.72) 72%,
+         rgba(71, 85, 105, 0.38) 100%
+       );
+       background-size: 250% 100%;
+       -webkit-background-clip: text;
+       background-clip: text;
+       -webkit-text-fill-color: transparent;
+       animation: reasoningShimmer 2.2s infinite ease-in-out, reasoningPulse 2.6s infinite ease-in-out;
+     }
+     ```
+2. **게이지바 템포 및 단계별 진행률 재조율 ([`components/ScheduleTab.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ScheduleTab.tsx))**:
+   * **앞 단계 (1~4단계: 0.0s ~ 9.0s)**:
+     - 1단계 (0.0s ~ 2.4s): 15% ➔ 32% (차분하게 기사님이 분석 단계를 인지할 수 있는 안정적 템포)
+     - 2단계 (2.4s ~ 4.8s): 32% ➔ 50%
+     - 3단계 (4.8s ~ 7.0s): 50% ➔ 68%
+     - 4단계 (7.0s ~ 9.0s): 68% ➔ 84%
+   * **마지막 단계 (5~6단계 신속 가속)**:
+     - 5단계 (9.0s ~ 10.2s): 84% ➔ 96%로 1.2초 만에 시원하게 치고 올라감 (기존의 느린 지연 크롤링 완전 제거)
+     - 6단계 (최종 확인): 96% ➔ 98% ➔ 100%로 360ms 만에 신속 완충 후 0.5초간 완료 카드 표시.
+   * **초기 타이머 주기 50ms**:
+     - 게이지바 업데이트 주기를 100ms ➔ 50ms로 격상하여 60fps에 준하는 극도로 매끄러운 바 모션 확보.
+3. **단계 전환 시 이중 레이어 모션**:
+   * 단계 변경 시 텍스트 래퍼의 부드러운 페이드인(`animate-fade-in`)과 텍스트 자체의 쉬머 파동이 충돌 없이 유기적으로 블렌딩되도록 컴포넌트 구조 고도화.
+
+### 23.3 빌드 무결성 검증
+* `npm run build`: Turbopack 기준 14/14 라우트 정상 빌드 완료 (컴파일 에러 0건).
+
+
 
 
