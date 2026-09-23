@@ -283,9 +283,9 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
 
   return (
     <div className="w-full bg-white border border-slate-100/80 rounded-2xl p-4 shadow-[0_8px_25px_rgba(30,96,243,0.06)] select-none space-y-3">
-      {/* Header: Classic Teardrop MapPin with Center Circular Cutout in Cobalt Badge on Left, 거점 관리 on Right */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
+      {/* Header: Classic Teardrop MapPin with Center Circular Cutout in Cobalt Badge on Left, Utility Buttons on Right */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center space-x-2 shrink-0">
           <div className="w-6 h-6 rounded-lg bg-[#1E60F3] flex items-center justify-center shadow-xs shrink-0">
             <svg
               viewBox="0 0 24 24"
@@ -300,10 +300,10 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
               <circle cx="12" cy="10" r="3" />
             </svg>
           </div>
-          <h2 className="text-sm font-bold text-slate-900 tracking-tight">자주 가는 목적지</h2>
+          <h2 className="text-sm font-bold text-slate-900 tracking-tight whitespace-nowrap">자주 가는 목적지</h2>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {onOpenInspectionModal && (
             <button
               type="button"
@@ -311,7 +311,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                 haptics.lightTap();
                 onOpenInspectionModal();
               }}
-              className="w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-slate-700 hover:bg-[#1E60F3] hover:text-white hover:border-[#1E60F3] active:scale-95 flex items-center justify-center transition-all cursor-pointer"
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-slate-700 hover:bg-[#1E60F3] hover:text-white hover:border-[#1E60F3] active:scale-95 flex items-center justify-center transition-all cursor-pointer"
               title="차량 수령·반납 점검표"
               aria-label="차량 점검"
             >
@@ -326,7 +326,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                 haptics.lightTap();
                 onOpenFlightModal();
               }}
-              className="w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-slate-700 hover:bg-[#1E60F3] hover:text-white hover:border-[#1E60F3] active:scale-95 flex items-center justify-center transition-all cursor-pointer"
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-slate-700 hover:bg-[#1E60F3] hover:text-white hover:border-[#1E60F3] active:scale-95 flex items-center justify-center transition-all cursor-pointer"
               title="인천공항 실시간 운항 관제"
               aria-label="항공편 조회"
             >
@@ -341,7 +341,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                 haptics.lightTap();
                 onOpenGasModal();
               }}
-              className="w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-slate-700 hover:bg-[#1E60F3] hover:text-white hover:border-[#1E60F3] active:scale-95 flex items-center justify-center transition-all cursor-pointer"
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-slate-700 hover:bg-[#1E60F3] hover:text-white hover:border-[#1E60F3] active:scale-95 flex items-center justify-center transition-all cursor-pointer"
               title="실시간 주유소 추천"
               aria-label="주유소 추천"
             >
@@ -355,15 +355,15 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
               haptics.lightTap();
               setIsManageMode(!isManageMode);
             }}
-            className={`text-xs flex items-center space-x-1 py-1 px-2.5 rounded-lg transition-colors cursor-pointer ${
+            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl border transition-all active:scale-95 flex items-center justify-center cursor-pointer shadow-2xs ${
               isManageMode
-                ? 'bg-[#1E60F3] text-white font-bold shadow-[0_4px_12px_rgba(30,96,243,0.25)]'
-                : 'text-slate-400 hover:text-slate-600 font-medium'
+                ? 'bg-[#1E60F3] border-[#1E60F3] text-white shadow-[0_4px_12px_rgba(30,96,243,0.25)]'
+                : 'bg-white border-slate-200/80 text-slate-700 hover:bg-[#1E60F3] hover:text-white hover:border-[#1E60F3]'
             }`}
-            title="거점 수정 및 삭제 관리"
+            title={isManageMode ? '거점 관리 완료' : '거점 수정 및 삭제 관리'}
+            aria-label="거점 관리"
           >
-            <SlidersHorizontal className="w-3.5 h-3.5" />
-            <span>{isManageMode ? '관리 완료' : '거점 관리'}</span>
+            <SlidersHorizontal className="w-4 h-4" />
           </button>
         </div>
       </div>
