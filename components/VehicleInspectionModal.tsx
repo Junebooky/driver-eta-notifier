@@ -91,6 +91,18 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
   const receiptPhotoInputRef = useRef<HTMLInputElement>(null);
   const returnPhotoInputRef = useRef<HTMLInputElement>(null);
 
+  // Existing damage parts inherited from initial receipt inspection or current receipt state
+  const existingDamageParts = useMemo(() => {
+    if (initialData?.selectedParts && initialData.selectedParts.length > 0) {
+      return initialData.selectedParts;
+    }
+    if (initialData?.outerDamage && initialData.outerDamage !== '무') {
+      const matched = DAMAGE_PART_CHIPS.filter((part) => initialData.outerDamage!.includes(part));
+      if (matched.length > 0) return matched;
+    }
+    return receiptSelectedParts;
+  }, [initialData, receiptSelectedParts]);
+
   // Sync profile defaults when modal opens or profile updates
   useEffect(() => {
     if (isOpen) {
@@ -98,12 +110,39 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
       setCarNumber(detectedCarNumber);
       const stored = getInitialInspection();
       setInitialData(stored);
+
+      // Auto restore receipt damage parts if stored
+      if (stored?.selectedParts && stored.selectedParts.length > 0) {
+        if (receiptSelectedParts.length === 0) {
+          setReceiptSelectedParts(stored.selectedParts);
+        }
+        if (receiptDamage === '무' && stored.outerDamage) {
+          setReceiptDamage(stored.outerDamage);
+        }
+      } else if (stored?.outerDamage && stored.outerDamage !== '무') {
+        const matched = DAMAGE_PART_CHIPS.filter((part) => stored.outerDamage!.includes(part));
+        if (matched.length > 0 && receiptSelectedParts.length === 0) {
+          setReceiptSelectedParts(matched);
+          setReceiptDamage(stored.outerDamage);
+        }
+      }
     }
   }, [isOpen, detectedHocha, detectedCarNumber]);
 
   useEffect(() => {
     setActiveTab(initialMode);
   }, [initialMode]);
+
+  // Carry over receipt damages to return tab when switching to return
+  useEffect(() => {
+    if (activeTab === 'return') {
+      const hasNewParts = returnSelectedParts.some((p) => !existingDamageParts.includes(p));
+      if (!hasNewParts && existingDamageParts.length > 0 && returnSelectedParts.length === 0) {
+        setReturnSelectedParts([...existingDamageParts]);
+        setReturnDamage(`${existingDamageParts.join(', ')} (수령 시와 동일)`);
+      }
+    }
+  }, [activeTab, existingDamageParts]);
 
   // Clean up object URLs on unmount to avoid memory leaks
   useEffect(() => {
@@ -135,10 +174,18 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
         : [...returnSelectedParts, part];
 
       setReturnSelectedParts(newParts);
+
+      const existing = newParts.filter((p) => existingDamageParts.includes(p));
+      const newlyAdded = newParts.filter((p) => !existingDamageParts.includes(p));
+
       if (newParts.length === 0) {
         setReturnDamage('무');
+      } else if (existing.length > 0 && newlyAdded.length > 0) {
+        setReturnDamage(`기존: ${existing.join(', ')} / 신규: ${newlyAdded.join(', ')}`);
+      } else if (newlyAdded.length > 0) {
+        setReturnDamage(`신규 스크래치: ${newlyAdded.join(', ')}`);
       } else {
-        setReturnDamage(`${newParts.join(', ')} 미세 기스`);
+        setReturnDamage(`${existing.join(', ')} (수령 시와 동일)`);
       }
     }
   };
@@ -239,6 +286,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
         vehicleHocha,
         carNumber,
         outerDamage: receiptDamage,
+        selectedParts: receiptSelectedParts,
       });
     }
 
@@ -257,6 +305,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
         vehicleHocha,
         carNumber,
         outerDamage: receiptDamage,
+        selectedParts: receiptSelectedParts,
       });
       const updated = getInitialInspection();
       setInitialData(updated);
@@ -477,6 +526,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                 <VehicleTopDownViewer
                   selectedParts={receiptSelectedParts}
                   onTogglePart={(part) => handleToggleDamageChip(part, 'receipt')}
+                  mode="receipt"
                 />
               </div>
 
@@ -612,22 +662,45 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                 )}
               </div>
 
-              {/* 2D Top-Down Interactive Vehicle Inspection Viewer */}
+              {/* 2D Top-Down Interactive Vehicle Inspection Viewer with Receipt Data Inheritance */}
               <div className="space-y-1 pt-0.5">
-                <label className="block text-[11px] font-semibold text-slate-600">
-                  차량 외관 2D 탑뷰 점검
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-semibold text-slate-600">
+                    차량 외관 2D 탑뷰 점검
+                  </label>
+                  {existingDamageParts.length > 0 && (
+                    <div className="flex items-center gap-2 text-[10px] font-medium text-slate-500">
+                      <span className="flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#1E60F3]" />
+                        수령 기존
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                        반납 신규
+                      </span>
+                    </div>
+                  )}
+                </div>
                 <VehicleTopDownViewer
                   selectedParts={returnSelectedParts}
                   onTogglePart={(part) => handleToggleDamageChip(part, 'return')}
+                  existingParts={existingDamageParts}
+                  mode="return"
                 />
               </div>
 
               {/* Task 3: Outer Damage Quick Chip Selector & Input */}
               <div className="space-y-1 pt-1">
-                <label className="block text-[11px] font-semibold text-slate-600">
-                  외관 부위별 빠른 선택
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-semibold text-slate-600">
+                    외관 부위별 빠른 선택
+                  </label>
+                  {existingDamageParts.length > 0 && (
+                    <span className="text-[10px] text-slate-400">
+                      (신규 흠집은 빨간색으로 표시)
+                    </span>
+                  )}
+                </div>
                 <div className="flex flex-wrap gap-1.5">
                   {/* Clean reset chip */}
                   <button
@@ -644,20 +717,36 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                     <span>이상 없음 (무)</span>
                   </button>
 
-                  {/* Body part chips */}
+                  {/* Body part chips with Receipt vs New damage color differentiation */}
                   {DAMAGE_PART_CHIPS.map((part) => {
                     const isSelected = returnSelectedParts.includes(part);
+                    const isExisting = existingDamageParts.includes(part);
+                    const isNew = isSelected && !isExisting;
+
                     return (
                       <button
                         key={part}
                         type="button"
                         onClick={() => handleToggleDamageChip(part, 'return')}
-                        className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer ${isSelected
-                          ? 'border-[#1E60F3]/40 bg-[#1E60F3]/85 hover:bg-[#1E60F3]/90 text-white font-bold shadow-xs'
-                          : 'border-slate-200 bg-slate-50 text-slate-600 font-medium hover:bg-slate-100'
-                          }`}
+                        className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer flex items-center gap-1 ${
+                          isNew
+                            ? 'border-red-400 bg-red-500 hover:bg-red-600 text-white font-bold shadow-xs ring-1 ring-red-400/50'
+                            : isSelected
+                            ? 'border-[#1E60F3]/40 bg-[#1E60F3]/85 hover:bg-[#1E60F3]/90 text-white font-bold shadow-xs'
+                            : 'border-slate-200 bg-slate-50 text-slate-600 font-medium hover:bg-slate-100'
+                        }`}
                       >
-                        {part}
+                        <span>{part}</span>
+                        {isNew && (
+                          <span className="text-[9px] bg-white text-red-600 font-black px-1 rounded-xs leading-none py-0.5">
+                            신규
+                          </span>
+                        )}
+                        {isExisting && isSelected && (
+                          <span className="text-[9px] text-blue-100 font-normal">
+                            기존
+                          </span>
+                        )}
                       </button>
                     );
                   })}

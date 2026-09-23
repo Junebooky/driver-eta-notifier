@@ -12,6 +12,7 @@ export interface InitialInspectionData {
   vehicleHocha?: string;
   carNumber?: string;
   outerDamage?: string;
+  selectedParts?: string[];
   savedAt: string;
 }
 

@@ -6,6 +6,8 @@ import { haptics } from '@/utils/haptics';
 interface VehicleTopDownViewerProps {
   selectedParts: string[];
   onTogglePart: (part: string) => void;
+  existingParts?: string[];
+  mode?: 'receipt' | 'return';
 }
 
 interface HotspotDef {
@@ -32,12 +34,22 @@ const HOTSPOTS: HotspotDef[] = [
 export const VehicleTopDownViewer: React.FC<VehicleTopDownViewerProps> = ({
   selectedParts,
   onTogglePart,
+  existingParts = [],
+  mode = 'receipt',
 }) => {
   const isClean = selectedParts.length === 0;
 
+  const existingCount = mode === 'return'
+    ? selectedParts.filter((p) => existingParts.includes(p)).length
+    : selectedParts.length;
+
+  const newCount = mode === 'return'
+    ? selectedParts.filter((p) => !existingParts.includes(p)).length
+    : 0;
+
   return (
     <div className="relative w-full h-[182px] bg-slate-50/70 border border-slate-200/90 rounded-2xl p-2 select-none overflow-hidden touch-manipulation flex items-center justify-center shadow-xs">
-      {/* Synchronized Ethereal Cobalt Halo & Core Glow */}
+      {/* Synchronized Ethereal Cobalt & Red Halo Keyframes */}
       <style>{`
         @keyframes cobalt-halo-breathe {
           0%, 100% {
@@ -59,11 +71,37 @@ export const VehicleTopDownViewer: React.FC<VehicleTopDownViewerProps> = ({
             box-shadow: 0 0 14px 3px rgba(30, 96, 243, 0.75), 0 0 22px 6px rgba(30, 96, 243, 0.25);
           }
         }
+        @keyframes red-halo-breathe {
+          0%, 100% {
+            transform: scale(0.92);
+            opacity: 0.55;
+          }
+          50% {
+            transform: scale(1.38);
+            opacity: 0.9;
+          }
+        }
+        @keyframes red-core-pulse {
+          0%, 100% {
+            transform: scale(1);
+            box-shadow: 0 0 8px 1px rgba(239, 68, 68, 0.5);
+          }
+          50% {
+            transform: scale(1.12);
+            box-shadow: 0 0 14px 3px rgba(239, 68, 68, 0.8), 0 0 22px 6px rgba(239, 68, 68, 0.3);
+          }
+        }
         .sync-cobalt-halo {
           animation: cobalt-halo-breathe 2.4s ease-in-out infinite;
         }
         .sync-cobalt-core {
           animation: cobalt-core-pulse 2.4s ease-in-out infinite;
+        }
+        .sync-red-halo {
+          animation: red-halo-breathe 2.4s ease-in-out infinite;
+        }
+        .sync-red-core {
+          animation: red-core-pulse 2.4s ease-in-out infinite;
         }
       `}</style>
 
@@ -83,11 +121,28 @@ export const VehicleTopDownViewer: React.FC<VehicleTopDownViewerProps> = ({
 
       {/* Status Badge (Top-Right): Displayed only when damages exist */}
       {!isClean && (
-        <div className="absolute top-2 right-3 pointer-events-none animate-fade-in">
-          <span className="text-[11px] text-white font-bold px-3 py-1 rounded-full bg-[#1E60F3]/90 shadow-sm flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0 animate-pulse" />
-            {selectedParts.length}개 흠집
-          </span>
+        <div className="absolute top-2 right-3 pointer-events-none animate-fade-in flex items-center gap-1.5">
+          {mode === 'return' ? (
+            <>
+              {existingCount > 0 && (
+                <span className="text-[10px] text-white font-bold px-2 py-0.5 rounded-full bg-[#1E60F3]/90 shadow-2xs flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                  기존 {existingCount}
+                </span>
+              )}
+              {newCount > 0 && (
+                <span className="text-[10px] text-white font-bold px-2 py-0.5 rounded-full bg-red-500 shadow-2xs flex items-center gap-1 animate-pulse">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0" />
+                  신규 {newCount}
+                </span>
+              )}
+            </>
+          ) : (
+            <span className="text-[11px] text-white font-bold px-3 py-1 rounded-full bg-[#1E60F3]/90 shadow-sm flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-white shrink-0 animate-pulse" />
+              {selectedParts.length}개 흠집
+            </span>
+          )}
         </div>
       )}
 
@@ -332,9 +387,11 @@ export const VehicleTopDownViewer: React.FC<VehicleTopDownViewerProps> = ({
           <path d="M 94 257 L 104 257" stroke="#64748B" strokeWidth="1.4" strokeLinecap="round" />
         </svg>
 
-        {/* Hotspots & Ethereal Cobalt Halo Marker Layer */}
+        {/* Hotspots & Ethereal Halo Marker Layer (Cobalt for Existing / Red for New) */}
         {HOTSPOTS.map((spot) => {
           const isSelected = selectedParts.includes(spot.part);
+          const isExisting = mode === 'return' ? existingParts.includes(spot.part) : true;
+          const isNew = mode === 'return' && isSelected && !isExisting;
 
           return (
             <button
@@ -353,13 +410,19 @@ export const VehicleTopDownViewer: React.FC<VehicleTopDownViewerProps> = ({
               aria-label={`${spot.part} 점검`}
             >
               {isSelected ? (
-                /* Selected State: Ethereal Cobalt Halo Ring + Glowing Pin Core */
-                <span className="relative flex items-center justify-center">
-                  {/* Soft Wide Luminous Halo */}
-                  <span className="absolute w-7 h-7 rounded-full bg-[#1E60F3]/30 sync-cobalt-halo pointer-events-none blur-[0.5px]" />
-                  {/* Crisp Cobalt Blue Pin with White Border */}
-                  <span className="relative w-3.5 h-3.5 rounded-full bg-[#1E60F3] border-2 border-white sync-cobalt-core shadow-sm" />
-                </span>
+                isNew ? (
+                  /* Return Mode - New Scratch: Red Halo & Red Core Pin */
+                  <span className="relative flex items-center justify-center">
+                    <span className="absolute w-7 h-7 rounded-full bg-red-500/35 sync-red-halo pointer-events-none blur-[0.5px]" />
+                    <span className="relative w-3.5 h-3.5 rounded-full bg-red-500 border-2 border-white sync-red-core shadow-sm" />
+                  </span>
+                ) : (
+                  /* Receipt / Existing Damage: Cobalt Blue Halo & Blue Core Pin */
+                  <span className="relative flex items-center justify-center">
+                    <span className="absolute w-7 h-7 rounded-full bg-[#1E60F3]/30 sync-cobalt-halo pointer-events-none blur-[0.5px]" />
+                    <span className="relative w-3.5 h-3.5 rounded-full bg-[#1E60F3] border-2 border-white sync-cobalt-core shadow-sm" />
+                  </span>
+                )
               ) : (
                 /* Inactive State: Subtle Dot */
                 <span className="flex items-center justify-center w-5 h-5 rounded-full group-hover:bg-slate-200/50 transition-colors">
