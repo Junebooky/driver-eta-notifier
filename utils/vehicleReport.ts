@@ -150,7 +150,29 @@ export function generateReturnReport(params: ReturnReportParams): string {
     lines.push(`  - 주행가능거리 : ${hasReturnDte ? `${returnDteNum.toLocaleString()} km` : ''}`);
   }
 
-  lines.push(`• 외관 데미지 : ${damage}`);
+  // Outer damage format: multi-line indentation if both existing and new damages exist
+  if (damage.includes('기존:') && damage.includes('신규:')) {
+    lines.push('• 외관 데미지 :');
+    const parts = damage.split(/\n|\//);
+    const existingPart = parts.find((p) => p.includes('기존:'))?.trim();
+    const newPart = parts.find((p) => p.includes('신규:'))?.trim();
+    if (existingPart) {
+      lines.push(`  - ${existingPart}`);
+    }
+    if (newPart) {
+      lines.push(`  - ${newPart}`);
+    }
+  } else if (damage.includes('\n')) {
+    lines.push('• 외관 데미지 :');
+    damage.split('\n').forEach((line) => {
+      const trimmed = line.trim();
+      if (trimmed) {
+        lines.push(trimmed.startsWith('-') ? `  ${trimmed}` : `  - ${trimmed}`);
+      }
+    });
+  } else {
+    lines.push(`• 외관 데미지 : ${damage}`);
+  }
 
   const parking = params.parkingLocation?.trim();
   const key = params.keyLocation?.trim();
