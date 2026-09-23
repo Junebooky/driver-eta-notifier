@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { DriverProfile } from '@/types';
 import {
   generateReceiptReport,
@@ -20,11 +20,8 @@ import {
   RotateCcw,
   Check,
   Copy,
-  MessageSquare,
   Gauge,
-  MapPin,
-  Key,
-  ShieldAlert,
+  Camera,
 } from 'lucide-react';
 
 interface VehicleInspectionModalProps {
@@ -33,6 +30,17 @@ interface VehicleInspectionModalProps {
   profile: DriverProfile;
   initialMode?: 'receipt' | 'return';
 }
+
+const DAMAGE_PART_CHIPS = [
+  '앞 범퍼',
+  '뒷 범퍼',
+  '앞 휠 (운전석)',
+  '앞 휠 (조수석)',
+  '뒷 휠 (운전석)',
+  '뒷 휠 (조수석)',
+  '도어/측면',
+  '유리/윈드실드',
+];
 
 export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
   isOpen,
@@ -62,17 +70,25 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
   const [receiptTotalKm, setReceiptTotalKm] = useState<string>('14698');
   const [receiptDte, setReceiptDte] = useState<string>('476');
   const [receiptDamage, setReceiptDamage] = useState<string>('무');
+  const [receiptSelectedParts, setReceiptSelectedParts] = useState<string[]>([]);
+  const [receiptMeterPhoto, setReceiptMeterPhoto] = useState<string | null>(null);
 
   // Return Inputs
   const [returnTotalKm, setReturnTotalKm] = useState<string>('15048');
   const [returnDte, setReturnDte] = useState<string>('180');
   const [returnDamage, setReturnDamage] = useState<string>('무');
+  const [returnSelectedParts, setReturnSelectedParts] = useState<string[]>([]);
+  const [returnMeterPhoto, setReturnMeterPhoto] = useState<string | null>(null);
   const [parkingLocation, setParkingLocation] = useState<string>('');
   const [keyLocation, setKeyLocation] = useState<string>('');
 
   // Stored Initial Inspection Data
   const [initialData, setInitialData] = useState<InitialInspectionData | null>(null);
   const [copySuccess, setCopySuccess] = useState(false);
+
+  // File input refs for local photo viewer
+  const receiptPhotoInputRef = useRef<HTMLInputElement>(null);
+  const returnPhotoInputRef = useRef<HTMLInputElement>(null);
 
   // Sync profile defaults when modal opens or profile updates
   useEffect(() => {
@@ -85,7 +101,15 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
       if (stored) {
         setReceiptTotalKm(String(stored.initialTotalKm));
         setReceiptDte(String(stored.initialDte));
-        if (stored.outerDamage) setReceiptDamage(stored.outerDamage);
+        if (stored.outerDamage) {
+          setReceiptDamage(stored.outerDamage);
+          if (stored.outerDamage !== '무') {
+            const matchedParts = DAMAGE_PART_CHIPS.filter((part) =>
+              stored.outerDamage?.includes(part)
+            );
+            setReceiptSelectedParts(matchedParts);
+          }
+        }
       }
     }
   }, [isOpen, detectedHocha, detectedCarNumber]);
@@ -93,6 +117,89 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
   useEffect(() => {
     setActiveTab(initialMode);
   }, [initialMode]);
+
+  // Clean up object URLs on unmount to avoid memory leaks
+  useEffect(() => {
+    return () => {
+      if (receiptMeterPhoto) URL.revokeObjectURL(receiptMeterPhoto);
+      if (returnMeterPhoto) URL.revokeObjectURL(returnMeterPhoto);
+    };
+  }, [receiptMeterPhoto, returnMeterPhoto]);
+
+  // Damage chip toggle handler
+  const handleToggleDamageChip = (part: string, mode: 'receipt' | 'return') => {
+    haptics.lightTap();
+    if (mode === 'receipt') {
+      const isSelected = receiptSelectedParts.includes(part);
+      const newParts = isSelected
+        ? receiptSelectedParts.filter((p) => p !== part)
+        : [...receiptSelectedParts, part];
+
+      setReceiptSelectedParts(newParts);
+      if (newParts.length === 0) {
+        setReceiptDamage('무');
+      } else {
+        setReceiptDamage(`${newParts.join(', ')} 미세 기스`);
+      }
+    } else {
+      const isSelected = returnSelectedParts.includes(part);
+      const newParts = isSelected
+        ? returnSelectedParts.filter((p) => p !== part)
+        : [...returnSelectedParts, part];
+
+      setReturnSelectedParts(newParts);
+      if (newParts.length === 0) {
+        setReturnDamage('무');
+      } else {
+        setReturnDamage(`${newParts.join(', ')} 미세 기스`);
+      }
+    }
+  };
+
+  // Reset to clean damage chip ("무")
+  const handleResetDamageToClean = (mode: 'receipt' | 'return') => {
+    haptics.lightTap();
+    if (mode === 'receipt') {
+      setReceiptSelectedParts([]);
+      setReceiptDamage('무');
+    } else {
+      setReturnSelectedParts([]);
+      setReturnDamage('무');
+    }
+  };
+
+  // Local meter photo upload handler (Pure in-memory Object URL, No-DB)
+  const handleMeterPhotoUpload = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    mode: 'receipt' | 'return'
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    haptics.lightTap();
+    const objectUrl = URL.createObjectURL(file);
+    if (mode === 'receipt') {
+      if (receiptMeterPhoto) URL.revokeObjectURL(receiptMeterPhoto);
+      setReceiptMeterPhoto(objectUrl);
+    } else {
+      if (returnMeterPhoto) URL.revokeObjectURL(returnMeterPhoto);
+      setReturnMeterPhoto(objectUrl);
+    }
+    // Reset file input value so same file can be reselected
+    e.target.value = '';
+  };
+
+  // Remove meter photo
+  const handleRemoveMeterPhoto = (mode: 'receipt' | 'return') => {
+    haptics.lightTap();
+    if (mode === 'receipt') {
+      if (receiptMeterPhoto) URL.revokeObjectURL(receiptMeterPhoto);
+      setReceiptMeterPhoto(null);
+    } else {
+      if (returnMeterPhoto) URL.revokeObjectURL(returnMeterPhoto);
+      setReturnMeterPhoto(null);
+    }
+  };
 
   // Real-time Preview Text Generation
   const previewText = useMemo(() => {
@@ -133,8 +240,26 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
 
   if (!isOpen) return null;
 
+  // Handle Save (Confirm button) - saves to localStorage and closes
+  const handleConfirmSave = () => {
+    haptics.lightTap();
+
+    if (activeTab === 'receipt') {
+      saveInitialInspection({
+        initialTotalKm: parseFloat(receiptTotalKm) || 0,
+        initialDte: parseFloat(receiptDte) || 0,
+        inspectionDate: formatInspectionDate(),
+        vehicleHocha,
+        carNumber,
+        outerDamage: receiptDamage,
+      });
+    }
+
+    onClose();
+  };
+
   // Handle Save & Launch KakaoTalk
-  const handleSaveAndLaunch = async () => {
+  const handleKakaoLaunch = async () => {
     haptics.successPulse();
 
     if (activeTab === 'receipt') {
@@ -151,13 +276,11 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
     }
 
     await copyAndLaunchKakaoTalk(previewText);
-    setCopySuccess(true);
-    setTimeout(() => setCopySuccess(false), 2000);
   };
 
-  // Pure Clipboard Copy
-  const handleCopyOnly = () => {
-    haptics.lightTap();
+  // Minimal Header Copy Action (Icon feedback only)
+  const handleCopyMinimal = () => {
+    haptics.success();
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(previewText);
     }
@@ -171,6 +294,9 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
     clearInitialInspection();
     setInitialData(null);
   };
+
+  const isReceiptClean = receiptSelectedParts.length === 0 && (receiptDamage === '무' || !receiptDamage);
+  const isReturnClean = returnSelectedParts.length === 0 && (returnDamage === '무' || !returnDamage);
 
   return (
     <div
@@ -292,10 +418,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
           {/* TAB 1: RECEIPT MODE */}
           {activeTab === 'receipt' && (
             <div className="space-y-3 animate-fade-in">
-              <div className="p-2.5 bg-blue-50/70 border border-blue-200/80 rounded-xl text-[11px] text-blue-900 leading-relaxed">
-                💡 수령 시 입력한 계기판 수치는 <strong className="text-[#1E60F3]">로컬 브라우저</strong>에 안전하게 보관되어, 운행 후 반납 시 <strong>총 주행거리 및 DTE 증감치</strong>가 자동 연산됩니다.
-              </div>
-
+              {/* Meter Inputs */}
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-600 mb-1">
@@ -323,17 +446,102 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                 </div>
               </div>
 
+              {/* Task 4: Dashboard Photo Slot (Pure local in-memory preview, No-DB) */}
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                  외관 데미지
+                  계기판 사진 (선택)
                 </label>
-                <input
-                  type="text"
-                  value={receiptDamage}
-                  onChange={(e) => setReceiptDamage(e.target.value)}
-                  placeholder="무 (미입력 시 '무' 표기)"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors"
-                />
+                {receiptMeterPhoto ? (
+                  <div className="relative w-full h-28 rounded-xl overflow-hidden border border-slate-200 bg-slate-100 group">
+                    <img
+                      src={receiptMeterPhoto}
+                      alt="수령 계기판 사진"
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveMeterPhoto('receipt')}
+                      className="absolute top-2 right-2 w-7 h-7 rounded-full bg-slate-900/70 hover:bg-slate-900 text-white flex items-center justify-center transition-all shadow-md active:scale-90 cursor-pointer"
+                      title="사진 삭제"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                    <div className="absolute bottom-1.5 left-2 px-2 py-0.5 rounded bg-slate-900/60 backdrop-blur-xs text-[10px] text-white font-medium">
+                      로컬 미리보기 (DB 업로드 없음)
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <input
+                      ref={receiptPhotoInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handleMeterPhotoUpload(e, 'receipt')}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => receiptPhotoInputRef.current?.click()}
+                      className="w-full py-2.5 px-3 rounded-xl border border-dashed border-slate-300 hover:border-[#1E60F3] bg-slate-50 hover:bg-blue-50/20 text-slate-500 hover:text-[#1E60F3] flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <Camera className="w-4 h-4 text-slate-400 shrink-0" />
+                      <span className="text-xs font-semibold">계기판 사진 등록 (선택)</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Task 3: Outer Damage Quick Chip Selector & Input */}
+              <div className="space-y-1.5 pt-1">
+                <label className="block text-[11px] font-semibold text-slate-600">
+                  외관 부위별 빠른 선택
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {/* Clean reset chip */}
+                  <button
+                    type="button"
+                    onClick={() => handleResetDamageToClean('receipt')}
+                    className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer ${
+                      isReceiptClean
+                        ? 'border-[#1E60F3] bg-blue-50 text-[#1E60F3] font-bold shadow-xs'
+                        : 'border-slate-200 bg-slate-50 text-slate-600 font-medium hover:bg-slate-100'
+                    }`}
+                  >
+                    ✓ 이상 없음 (무)
+                  </button>
+
+                  {/* Body part chips */}
+                  {DAMAGE_PART_CHIPS.map((part) => {
+                    const isSelected = receiptSelectedParts.includes(part);
+                    return (
+                      <button
+                        key={part}
+                        type="button"
+                        onClick={() => handleToggleDamageChip(part, 'receipt')}
+                        className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer ${
+                          isSelected
+                            ? 'border-[#1E60F3] bg-blue-50 text-[#1E60F3] font-bold shadow-xs'
+                            : 'border-slate-200 bg-slate-50 text-slate-600 font-medium hover:bg-slate-100'
+                        }`}
+                      >
+                        {part}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="pt-1">
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                    외관 데미지 상세 (직접 수정 가능)
+                  </label>
+                  <input
+                    type="text"
+                    value={receiptDamage}
+                    onChange={(e) => setReceiptDamage(e.target.value)}
+                    placeholder="무 (미입력 시 '무' 표기)"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors"
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -365,6 +573,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                 </div>
               )}
 
+              {/* Meter Inputs */}
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-600 mb-1">
@@ -392,20 +601,106 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                 </div>
               </div>
 
+              {/* Task 4: Dashboard Photo Slot for Return */}
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                  외관 데미지
+                  계기판 사진 (선택)
                 </label>
-                <input
-                  type="text"
-                  value={returnDamage}
-                  onChange={(e) => setReturnDamage(e.target.value)}
-                  placeholder="예: 조수석 뒷 휠 미세 기스 (수령 시와 동일)"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors"
-                />
+                {returnMeterPhoto ? (
+                  <div className="relative w-full h-28 rounded-xl overflow-hidden border border-slate-200 bg-slate-100 group">
+                    <img
+                      src={returnMeterPhoto}
+                      alt="반납 계기판 사진"
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveMeterPhoto('return')}
+                      className="absolute top-2 right-2 w-7 h-7 rounded-full bg-slate-900/70 hover:bg-slate-900 text-white flex items-center justify-center transition-all shadow-md active:scale-90 cursor-pointer"
+                      title="사진 삭제"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                    <div className="absolute bottom-1.5 left-2 px-2 py-0.5 rounded bg-slate-900/60 backdrop-blur-xs text-[10px] text-white font-medium">
+                      로컬 미리보기 (DB 업로드 없음)
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <input
+                      ref={returnPhotoInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handleMeterPhotoUpload(e, 'return')}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => returnPhotoInputRef.current?.click()}
+                      className="w-full py-2.5 px-3 rounded-xl border border-dashed border-slate-300 hover:border-[#1E60F3] bg-slate-50 hover:bg-blue-50/20 text-slate-500 hover:text-[#1E60F3] flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <Camera className="w-4 h-4 text-slate-400 shrink-0" />
+                      <span className="text-xs font-semibold">계기판 사진 등록 (선택)</span>
+                    </button>
+                  </div>
+                )}
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5">
+              {/* Task 3: Outer Damage Quick Chip Selector & Input */}
+              <div className="space-y-1.5 pt-1">
+                <label className="block text-[11px] font-semibold text-slate-600">
+                  외관 부위별 빠른 선택
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {/* Clean reset chip */}
+                  <button
+                    type="button"
+                    onClick={() => handleResetDamageToClean('return')}
+                    className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer ${
+                      isReturnClean
+                        ? 'border-[#1E60F3] bg-blue-50 text-[#1E60F3] font-bold shadow-xs'
+                        : 'border-slate-200 bg-slate-50 text-slate-600 font-medium hover:bg-slate-100'
+                    }`}
+                  >
+                    ✓ 이상 없음 (무)
+                  </button>
+
+                  {/* Body part chips */}
+                  {DAMAGE_PART_CHIPS.map((part) => {
+                    const isSelected = returnSelectedParts.includes(part);
+                    return (
+                      <button
+                        key={part}
+                        type="button"
+                        onClick={() => handleToggleDamageChip(part, 'return')}
+                        className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer ${
+                          isSelected
+                            ? 'border-[#1E60F3] bg-blue-50 text-[#1E60F3] font-bold shadow-xs'
+                            : 'border-slate-200 bg-slate-50 text-slate-600 font-medium hover:bg-slate-100'
+                        }`}
+                      >
+                        {part}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="pt-1">
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                    외관 데미지 상세 (직접 수정 가능)
+                  </label>
+                  <input
+                    type="text"
+                    value={returnDamage}
+                    onChange={(e) => setReturnDamage(e.target.value)}
+                    placeholder="예: 조수석 뒷 휠 미세 기스 (수령 시와 동일)"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Parking & Key Location */}
+              <div className="grid grid-cols-2 gap-2.5 pt-1">
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-600 mb-1">
                     주차위치 (선택)
@@ -434,11 +729,23 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
             </div>
           )}
 
-          {/* Live Standard Report Preview Box */}
+          {/* Task 2: Live Standard Report Preview Box with Minimal Icon Copy Button */}
           <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-3 space-y-1.5">
             <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500">
               <span>카카오톡 전송 양식 미리보기</span>
-              <span className="text-[#1E60F3] font-bold">수치 실시간 연산됨</span>
+              <button
+                type="button"
+                onClick={handleCopyMinimal}
+                className="w-8 h-8 rounded-lg flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all active:scale-90 cursor-pointer"
+                title="양식 복사"
+                aria-label="양식 복사"
+              >
+                {copySuccess ? (
+                  <Check className="w-4 h-4 text-[#1E60F3]" />
+                ) : (
+                  <Copy className="w-4 h-4 text-slate-600" />
+                )}
+              </button>
             </div>
             <pre className="p-3 bg-white border border-slate-200 rounded-xl text-xs font-mono text-slate-800 whitespace-pre-wrap leading-relaxed select-all shadow-inner">
               {previewText}
@@ -446,37 +753,31 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
           </div>
         </div>
 
-        {/* Modal Action Buttons Footer */}
-        <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex items-center gap-2 shrink-0">
+        {/* Task 5: 2-Split Action Buttons Footer (FlightModal Kakao Standard) */}
+        <div className="p-4 border-t border-slate-100 bg-white flex items-center gap-2.5 shrink-0">
+          {/* Left: '확인' Button */}
           <button
             type="button"
-            onClick={handleCopyOnly}
-            className="py-3 px-3 rounded-2xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors active:scale-95 cursor-pointer"
-            title="텍스트만 복사"
+            onClick={handleConfirmSave}
+            className="flex-1 py-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm transition-all active:scale-[0.98] cursor-pointer text-center"
           >
-            {copySuccess ? (
-              <>
-                <Check className="w-3.5 h-3.5 text-emerald-600" />
-                <span className="text-emerald-700">복사됨</span>
-              </>
-            ) : (
-              <>
-                <Copy className="w-3.5 h-3.5 text-slate-500" />
-                <span>복사</span>
-              </>
-            )}
+            확인
           </button>
 
+          {/* Right: '카카오톡 전송' Button (FlightModal Spec 100% Match) */}
           <button
             type="button"
-            onClick={handleSaveAndLaunch}
-            className="flex-1 py-3 px-4 rounded-2xl bg-[#1E60F3] hover:bg-[#1346D8] active:scale-[0.98] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-blue-500/25 transition-all cursor-pointer"
+            onClick={handleKakaoLaunch}
+            className="flex-[1.5] py-3.5 rounded-xl bg-[#FEE500] hover:bg-[#FDD800] text-[#191919] font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-sm active:scale-[0.98] cursor-pointer"
           >
-            <MessageSquare className="w-4 h-4 fill-white" />
+            {/* Authentic Kakao Speech Bubble Icon */}
+            <svg className="w-4 h-4 fill-[#191919] shrink-0" viewBox="0 0 24 24">
+              <path d="M12 3c-5.523 0-10 3.582-10 8 0 2.853 1.879 5.364 4.707 6.744l-.961 3.541c-.085.312.246.577.525.418l4.24-2.42c.484.06 1.002.097 1.489.097 5.523 0 10-3.582 10-8s-4.477-8-10-8z" />
+            </svg>
             <span>
               {activeTab === 'receipt'
-                ? '수령 저장 및 카톡 보고'
-                : '반납 보고서 카톡 전송'}
+                ? '수령 보고 카톡 전송'
+                : '반납 보고 카톡 전송'}
             </span>
           </button>
         </div>
