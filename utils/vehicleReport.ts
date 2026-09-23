@@ -81,6 +81,8 @@ export function generateReceiptReport(params: ReceiptReportParams): string {
   const carNo = params.carNumber?.trim();
   const totalKmNum = parseKmNumber(params.totalKm);
   const dteNum = parseKmNumber(params.dte);
+  const hasTotalKm = params.totalKm !== '' && params.totalKm !== undefined && params.totalKm !== null;
+  const hasDte = params.dte !== '' && params.dte !== undefined && params.dte !== null;
   const damage = params.outerDamage?.trim() || '무';
 
   const lines: string[] = ['[차량 수령]', ''];
@@ -95,8 +97,8 @@ export function generateReceiptReport(params: ReceiptReportParams): string {
   }
 
   lines.push('• 계기판 현황 :');
-  lines.push(`  - 총 주행거리 : ${totalKmNum.toLocaleString()} km`);
-  lines.push(`  - 주행가능거리 : ${dteNum.toLocaleString()} km`);
+  lines.push(`  - 총 주행거리 : ${hasTotalKm ? `${totalKmNum.toLocaleString()} km` : ''}`);
+  lines.push(`  - 주행가능거리 : ${hasDte ? `${dteNum.toLocaleString()} km` : ''}`);
   lines.push(`• 외관 데미지 : ${damage}`);
 
   return lines.join('\n');
@@ -111,6 +113,8 @@ export function generateReturnReport(params: ReturnReportParams): string {
   const carNo = params.carNumber?.trim();
   const returnTotalKmNum = parseKmNumber(params.returnTotalKm);
   const returnDteNum = parseKmNumber(params.returnDte);
+  const hasReturnTotalKm = params.returnTotalKm !== '' && params.returnTotalKm !== undefined && params.returnTotalKm !== null;
+  const hasReturnDte = params.returnDte !== '' && params.returnDte !== undefined && params.returnDte !== null;
   const damage = params.outerDamage?.trim() || '무';
 
   const lines: string[] = ['[차량 반납]', ''];
@@ -126,7 +130,7 @@ export function generateReturnReport(params: ReturnReportParams): string {
 
   lines.push('• 계기판 현황 :');
 
-  if (params.initialData && params.initialData.initialTotalKm > 0) {
+  if (params.initialData && params.initialData.initialTotalKm > 0 && hasReturnTotalKm) {
     const initialKm = params.initialData.initialTotalKm;
     const initialDte = params.initialData.initialDte;
     const totalDriven = returnTotalKmNum - initialKm;
@@ -138,11 +142,11 @@ export function generateReturnReport(params: ReturnReportParams): string {
       `  - 총 주행거리 : ${returnTotalKmNum.toLocaleString()} km (최초: ${initialKm.toLocaleString()} km / 총 운행: ${totalDriven.toLocaleString()} km)`
     );
     lines.push(
-      `  - 주행가능거리 : ${returnDteNum.toLocaleString()} km (최초: ${initialDte.toLocaleString()} km / 차이: ${diffDteFormatted})`
+      `  - 주행가능거리 : ${hasReturnDte ? `${returnDteNum.toLocaleString()} km (최초: ${initialDte.toLocaleString()} km / 차이: ${diffDteFormatted})` : ''}`
     );
   } else {
-    lines.push(`  - 총 주행거리 : ${returnTotalKmNum.toLocaleString()} km`);
-    lines.push(`  - 주행가능거리 : ${returnDteNum.toLocaleString()} km`);
+    lines.push(`  - 총 주행거리 : ${hasReturnTotalKm ? `${returnTotalKmNum.toLocaleString()} km` : ''}`);
+    lines.push(`  - 주행가능거리 : ${hasReturnDte ? `${returnDteNum.toLocaleString()} km` : ''}`);
   }
 
   lines.push(`• 외관 데미지 : ${damage}`);

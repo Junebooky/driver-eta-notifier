@@ -7,7 +7,6 @@ import {
   generateReturnReport,
   saveInitialInspection,
   getInitialInspection,
-  clearInitialInspection,
   formatInspectionDate,
   extractHocha,
   InitialInspectionData,
@@ -67,15 +66,15 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
   const [carNumber, setCarNumber] = useState(detectedCarNumber);
 
   // Receipt Inputs
-  const [receiptTotalKm, setReceiptTotalKm] = useState<string>('14698');
-  const [receiptDte, setReceiptDte] = useState<string>('476');
+  const [receiptTotalKm, setReceiptTotalKm] = useState<string>('');
+  const [receiptDte, setReceiptDte] = useState<string>('');
   const [receiptDamage, setReceiptDamage] = useState<string>('무');
   const [receiptSelectedParts, setReceiptSelectedParts] = useState<string[]>([]);
   const [receiptMeterPhoto, setReceiptMeterPhoto] = useState<string | null>(null);
 
   // Return Inputs
-  const [returnTotalKm, setReturnTotalKm] = useState<string>('15048');
-  const [returnDte, setReturnDte] = useState<string>('180');
+  const [returnTotalKm, setReturnTotalKm] = useState<string>('');
+  const [returnDte, setReturnDte] = useState<string>('');
   const [returnDamage, setReturnDamage] = useState<string>('무');
   const [returnSelectedParts, setReturnSelectedParts] = useState<string[]>([]);
   const [returnMeterPhoto, setReturnMeterPhoto] = useState<string | null>(null);
@@ -97,20 +96,6 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
       setCarNumber(detectedCarNumber);
       const stored = getInitialInspection();
       setInitialData(stored);
-
-      if (stored) {
-        setReceiptTotalKm(String(stored.initialTotalKm));
-        setReceiptDte(String(stored.initialDte));
-        if (stored.outerDamage) {
-          setReceiptDamage(stored.outerDamage);
-          if (stored.outerDamage !== '무') {
-            const matchedParts = DAMAGE_PART_CHIPS.filter((part) =>
-              stored.outerDamage?.includes(part)
-            );
-            setReceiptSelectedParts(matchedParts);
-          }
-        }
-      }
     }
   }, [isOpen, detectedHocha, detectedCarNumber]);
 
@@ -288,12 +273,6 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
     setTimeout(() => setCopySuccess(false), 1500);
   };
 
-  // Clear stored receipt data
-  const handleClearStored = () => {
-    haptics.lightTap();
-    clearInitialInspection();
-    setInitialData(null);
-  };
 
   const isReceiptClean = receiptSelectedParts.length === 0 && (receiptDamage === '무' || !receiptDamage);
   const isReturnClean = returnSelectedParts.length === 0 && (returnDamage === '무' || !returnDamage);
@@ -425,7 +404,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                     type="number"
                     value={receiptTotalKm}
                     onChange={(e) => setReceiptTotalKm(e.target.value)}
-                    placeholder="14698"
+                    placeholder="예: 14698"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors"
                   />
                 </div>
@@ -437,7 +416,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                     type="number"
                     value={receiptDte}
                     onChange={(e) => setReceiptDte(e.target.value)}
-                    placeholder="476"
+                    placeholder="예: 276"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors"
                   />
                 </div>
@@ -544,30 +523,6 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
           {/* TAB 2: RETURN MODE */}
           {activeTab === 'return' && (
             <div className="space-y-3 animate-fade-in">
-              {/* Linked Initial Inspection Notice */}
-              {initialData ? (
-                <div className="p-2.5 bg-blue-50/80 border border-blue-200 rounded-xl flex items-center justify-between text-[11px] text-blue-900">
-                  <div>
-                    <span className="font-bold text-[#1E60F3]">✓ 최초 수령 기록 연동됨</span>
-                    <div className="text-[10px] text-blue-700 mt-0.5">
-                      최초 {initialData.initialTotalKm.toLocaleString()} km / DTE {initialData.initialDte.toLocaleString()} km
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleClearStored}
-                    className="text-[10px] font-medium text-slate-400 hover:text-red-500 underline ml-2 cursor-pointer"
-                    title="수령 기록 초기화"
-                  >
-                    초기화
-                  </button>
-                </div>
-              ) : (
-                <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-800 leading-tight">
-                  ⚠️ 보관된 수령 기록이 없습니다. 반납 수치 단독으로 보고서가 작성됩니다.
-                </div>
-              )}
-
               {/* Meter Inputs */}
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
@@ -578,7 +533,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                     type="number"
                     value={returnTotalKm}
                     onChange={(e) => setReturnTotalKm(e.target.value)}
-                    placeholder="15048"
+                    placeholder="예: 15048"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors"
                   />
                 </div>
@@ -590,7 +545,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                     type="number"
                     value={returnDte}
                     onChange={(e) => setReturnDte(e.target.value)}
-                    placeholder="180"
+                    placeholder="예: 180"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors"
                   />
                 </div>
@@ -686,7 +641,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                     type="text"
                     value={returnDamage}
                     onChange={(e) => setReturnDamage(e.target.value)}
-                    placeholder="예: 조수석 뒷 휠 미세 기스 (수령 시와 동일)"
+                    placeholder="예: 조수석 뒷 휠 기스 (수령 시와 동일)"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors"
                   />
                 </div>
@@ -702,7 +657,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                     type="text"
                     value={parkingLocation}
                     onChange={(e) => setParkingLocation(e.target.value)}
-                    placeholder="예: 지하 5층 B5구역"
+                    placeholder="예: B5 기둥 F"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors"
                   />
                 </div>
