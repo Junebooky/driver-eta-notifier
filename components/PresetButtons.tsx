@@ -304,66 +304,73 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {onOpenInspectionModal && (
-            <button
-              type="button"
-              onClick={() => {
-                haptics.lightTap();
-                onOpenInspectionModal();
-              }}
-              className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-slate-700 hover:bg-[#1E60F3] hover:text-white hover:border-[#1E60F3] active:scale-95 flex items-center justify-center transition-all cursor-pointer"
-              title="차량 수령·반납 점검표"
-              aria-label="차량 점검"
-            >
-              <ClipboardCheck className="w-4 h-4" />
-            </button>
-          )}
+          {/* Modal Action Buttons (Vehicle Inspection, Flight, Gas Station) */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {onOpenInspectionModal && (
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.lightTap();
+                  onOpenInspectionModal();
+                }}
+                className="w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-slate-700 hover:bg-[#1E60F3] hover:text-white hover:border-[#1E60F3] active:scale-95 flex items-center justify-center transition-all cursor-pointer"
+                title="차량 수령·반납 점검표"
+                aria-label="차량 점검"
+              >
+                <ClipboardCheck className="w-4 h-4" />
+              </button>
+            )}
 
-          {onOpenFlightModal && (
-            <button
-              type="button"
-              onClick={() => {
-                haptics.lightTap();
-                onOpenFlightModal();
-              }}
-              className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-slate-700 hover:bg-[#1E60F3] hover:text-white hover:border-[#1E60F3] active:scale-95 flex items-center justify-center transition-all cursor-pointer"
-              title="인천공항 실시간 운항 관제"
-              aria-label="항공편 조회"
-            >
-              <Plane className="w-4 h-4" />
-            </button>
-          )}
+            {onOpenFlightModal && (
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.lightTap();
+                  onOpenFlightModal();
+                }}
+                className="w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-slate-700 hover:bg-[#1E60F3] hover:text-white hover:border-[#1E60F3] active:scale-95 flex items-center justify-center transition-all cursor-pointer"
+                title="인천공항 실시간 운항 관제"
+                aria-label="항공편 조회"
+              >
+                <Plane className="w-4 h-4" />
+              </button>
+            )}
 
-          {onOpenGasModal && (
-            <button
-              type="button"
-              onClick={() => {
-                haptics.lightTap();
-                onOpenGasModal();
-              }}
-              className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-slate-700 hover:bg-[#1E60F3] hover:text-white hover:border-[#1E60F3] active:scale-95 flex items-center justify-center transition-all cursor-pointer"
-              title="실시간 주유소 추천"
-              aria-label="주유소 추천"
-            >
-              <Fuel className="w-4 h-4" />
-            </button>
-          )}
+            {onOpenGasModal && (
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.lightTap();
+                  onOpenGasModal();
+                }}
+                className="w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-slate-700 hover:bg-[#1E60F3] hover:text-white hover:border-[#1E60F3] active:scale-95 flex items-center justify-center transition-all cursor-pointer"
+                title="실시간 주유소 추천"
+                aria-label="주유소 추천"
+              >
+                <Fuel className="w-4 h-4" />
+              </button>
+            )}
+          </div>
 
+          {/* Proper separation distance & vertical divider between modal triggers and preset editor */}
+          <div className="h-4 w-px bg-slate-200/80 ml-1.5 sm:ml-2 mr-0.5 sm:mr-1 shrink-0" />
+
+          {/* Preset Destination Management Toggle (Small & flat icon, clearly differentiated for grid editing) */}
           <button
             type="button"
             onClick={() => {
               haptics.lightTap();
               setIsManageMode(!isManageMode);
             }}
-            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl border transition-all active:scale-95 flex items-center justify-center cursor-pointer shadow-2xs ${
+            className={`p-1.5 sm:p-2 rounded-lg transition-all active:scale-90 flex items-center justify-center cursor-pointer ${
               isManageMode
-                ? 'bg-[#1E60F3] border-[#1E60F3] text-white shadow-[0_4px_12px_rgba(30,96,243,0.25)]'
-                : 'bg-white border-slate-200/80 text-slate-700 hover:bg-[#1E60F3] hover:text-white hover:border-[#1E60F3]'
+                ? 'bg-[#1E60F3] text-white shadow-xs'
+                : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
             }`}
             title={isManageMode ? '거점 관리 완료' : '거점 수정 및 삭제 관리'}
             aria-label="거점 관리"
           >
-            <SlidersHorizontal className="w-4 h-4" />
+            <SlidersHorizontal className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
