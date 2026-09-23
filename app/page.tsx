@@ -87,9 +87,9 @@ export default function Home() {
   const [flightModalInitialFlightId, setFlightModalInitialFlightId] = useState<string | undefined>(undefined);
   const [flightModalInitialType, setFlightModalInitialType] = useState<FlightType | undefined>(undefined);
 
-  // Vehicle Inspection (Receipt / Return) Modal State (No-DB / Pure LocalStorage)
+  // Vehicle Inspection (Receipt / Daily / Return) Modal State (No-DB / Pure LocalStorage)
   const [isInspectionModalOpen, setIsInspectionModalOpen] = useState(false);
-  const [inspectionInitialMode, setInspectionInitialMode] = useState<'receipt' | 'return'>('receipt');
+  const [inspectionInitialMode, setInspectionInitialMode] = useState<'pickup' | 'daily' | 'return' | 'receipt'>('pickup');
 
   // Active vehicle identifier (e.g. '4호차', '1호차')
   const currentVehicleNo = useMemo(() => {

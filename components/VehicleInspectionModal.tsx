@@ -5,8 +5,11 @@ import { DriverProfile } from '@/types';
 import {
   generateReceiptReport,
   generateReturnReport,
+  generateDailyReport,
   saveInitialInspection,
   getInitialInspection,
+  saveDailyInspection,
+  getDailyInspection,
   formatInspectionDate,
   extractHocha,
   InitialInspectionData,
@@ -21,6 +24,7 @@ import {
   Copy,
   Gauge,
   Camera,
+  CalendarCheck,
 } from 'lucide-react';
 import { VehicleTopDownViewer } from '@/components/VehicleTopDownViewer';
 
@@ -28,7 +32,7 @@ interface VehicleInspectionModalProps {
   isOpen: boolean;
   onClose: () => void;
   profile: DriverProfile;
-  initialMode?: 'receipt' | 'return';
+  initialMode?: 'pickup' | 'daily' | 'return' | 'receipt';
 }
 
 const DAMAGE_PART_CHIPS = [
@@ -47,9 +51,10 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
   isOpen,
   onClose,
   profile,
-  initialMode = 'receipt',
+  initialMode = 'pickup',
 }) => {
-  const [activeTab, setActiveTab] = useState<'receipt' | 'return'>(initialMode);
+  const normalizedInitialMode = initialMode === 'receipt' ? 'pickup' : (initialMode || 'pickup');
+  const [activeTab, setActiveTab] = useState<'pickup' | 'daily' | 'return'>(normalizedInitialMode);
 
   // Profile hocha and car number defaults
   const detectedHocha = useMemo(() => {
@@ -67,12 +72,17 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
   const [vehicleHocha, setVehicleHocha] = useState(detectedHocha);
   const [carNumber, setCarNumber] = useState(detectedCarNumber);
 
-  // Receipt Inputs
+  // Pickup Inputs (Formerly Receipt)
   const [receiptTotalKm, setReceiptTotalKm] = useState<string>('');
   const [receiptDte, setReceiptDte] = useState<string>('');
   const [receiptDamage, setReceiptDamage] = useState<string>('무');
   const [receiptSelectedParts, setReceiptSelectedParts] = useState<string[]>([]);
   const [receiptMeterPhoto, setReceiptMeterPhoto] = useState<string | null>(null);
+
+  // Daily Inputs
+  const [dailyDte, setDailyDte] = useState<string>('');
+  const [dailyNewParts, setDailyNewParts] = useState<string[]>([]);
+  const [dailyMeterPhoto, setDailyMeterPhoto] = useState<string | null>(null);
 
   // Return Inputs
   const [returnTotalKm, setReturnTotalKm] = useState<string>('');
@@ -89,6 +99,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
 
   // File input refs for local photo viewer
   const receiptPhotoInputRef = useRef<HTMLInputElement>(null);
+  const dailyPhotoInputRef = useRef<HTMLInputElement>(null);
   const returnPhotoInputRef = useRef<HTMLInputElement>(null);
 
   // Existing damage parts inherited from initial receipt inspection or current receipt state
@@ -126,36 +137,55 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
           setReceiptDamage(stored.outerDamage);
         }
       }
+
+      // Check stored daily inspection
+      const storedDaily = getDailyInspection();
+      if (storedDaily) {
+        if (!dailyDte && storedDaily.range > 0) {
+          setDailyDte(String(storedDaily.range));
+        }
+        if (dailyNewParts.length === 0 && storedDaily.newDamages?.length > 0) {
+          setDailyNewParts(storedDaily.newDamages);
+        }
+      }
     }
   }, [isOpen, detectedHocha, detectedCarNumber]);
 
   useEffect(() => {
-    setActiveTab(initialMode);
+    setActiveTab(initialMode === 'receipt' ? 'pickup' : (initialMode || 'pickup'));
   }, [initialMode]);
 
-  // Carry over receipt damages to return tab when switching to return
+  // Carry over receipt and daily damages to return tab when switching to return
   useEffect(() => {
     if (activeTab === 'return') {
-      const hasNewParts = returnSelectedParts.some((p) => !existingDamageParts.includes(p));
-      if (!hasNewParts && existingDamageParts.length > 0 && returnSelectedParts.length === 0) {
-        setReturnSelectedParts([...existingDamageParts]);
-        setReturnDamage(`${existingDamageParts.join(', ')} (수령 시와 동일)`);
+      const combined = Array.from(new Set([...existingDamageParts, ...dailyNewParts]));
+      if (combined.length > 0 && returnSelectedParts.length === 0) {
+        setReturnSelectedParts(combined);
+        const newlyAdded = combined.filter((p) => !existingDamageParts.includes(p));
+        if (existingDamageParts.length > 0 && newlyAdded.length > 0) {
+          setReturnDamage(`기존: ${existingDamageParts.join(', ')} / 신규: ${newlyAdded.join(', ')}`);
+        } else if (newlyAdded.length > 0) {
+          setReturnDamage(`신규 스크래치: ${newlyAdded.join(', ')}`);
+        } else {
+          setReturnDamage(`${existingDamageParts.join(', ')} (수령 시와 동일)`);
+        }
       }
     }
-  }, [activeTab, existingDamageParts]);
+  }, [activeTab, existingDamageParts, dailyNewParts]);
 
   // Clean up object URLs on unmount to avoid memory leaks
   useEffect(() => {
     return () => {
       if (receiptMeterPhoto) URL.revokeObjectURL(receiptMeterPhoto);
+      if (dailyMeterPhoto) URL.revokeObjectURL(dailyMeterPhoto);
       if (returnMeterPhoto) URL.revokeObjectURL(returnMeterPhoto);
     };
-  }, [receiptMeterPhoto, returnMeterPhoto]);
+  }, [receiptMeterPhoto, dailyMeterPhoto, returnMeterPhoto]);
 
-  // Damage chip toggle handler
-  const handleToggleDamageChip = (part: string, mode: 'receipt' | 'return') => {
+  // Damage chip toggle handler (pickup & return)
+  const handleToggleDamageChip = (part: string, mode: 'pickup' | 'return') => {
     haptics.lightTap();
-    if (mode === 'receipt') {
+    if (mode === 'pickup') {
       const isSelected = receiptSelectedParts.includes(part);
       const newParts = isSelected
         ? receiptSelectedParts.filter((p) => p !== part)
@@ -190,10 +220,26 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
     }
   };
 
-  // Reset to clean damage chip ("무")
-  const handleResetDamageToClean = (mode: 'receipt' | 'return') => {
+  // Daily Damage Toggle (Only allows toggling new scratches)
+  const handleToggleDailyDamage = (part: string) => {
     haptics.lightTap();
-    if (mode === 'receipt') {
+    if (existingDamageParts.includes(part)) {
+      return;
+    }
+    const isSelected = dailyNewParts.includes(part);
+    setDailyNewParts(isSelected ? dailyNewParts.filter((p) => p !== part) : [...dailyNewParts, part]);
+  };
+
+  // Reset daily damage to clean
+  const handleResetDailyDamage = () => {
+    haptics.lightTap();
+    setDailyNewParts([]);
+  };
+
+  // Reset to clean damage chip ("무")
+  const handleResetDamageToClean = (mode: 'pickup' | 'return') => {
+    haptics.lightTap();
+    if (mode === 'pickup') {
       setReceiptSelectedParts([]);
       setReceiptDamage('무');
     } else {
@@ -205,16 +251,19 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
   // Local meter photo upload handler (Pure in-memory Object URL, No-DB)
   const handleMeterPhotoUpload = (
     e: React.ChangeEvent<HTMLInputElement>,
-    mode: 'receipt' | 'return'
+    mode: 'pickup' | 'daily' | 'return'
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     haptics.lightTap();
     const objectUrl = URL.createObjectURL(file);
-    if (mode === 'receipt') {
+    if (mode === 'pickup') {
       if (receiptMeterPhoto) URL.revokeObjectURL(receiptMeterPhoto);
       setReceiptMeterPhoto(objectUrl);
+    } else if (mode === 'daily') {
+      if (dailyMeterPhoto) URL.revokeObjectURL(dailyMeterPhoto);
+      setDailyMeterPhoto(objectUrl);
     } else {
       if (returnMeterPhoto) URL.revokeObjectURL(returnMeterPhoto);
       setReturnMeterPhoto(objectUrl);
@@ -224,11 +273,14 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
   };
 
   // Remove meter photo
-  const handleRemoveMeterPhoto = (mode: 'receipt' | 'return') => {
+  const handleRemoveMeterPhoto = (mode: 'pickup' | 'daily' | 'return') => {
     haptics.lightTap();
-    if (mode === 'receipt') {
+    if (mode === 'pickup') {
       if (receiptMeterPhoto) URL.revokeObjectURL(receiptMeterPhoto);
       setReceiptMeterPhoto(null);
+    } else if (mode === 'daily') {
+      if (dailyMeterPhoto) URL.revokeObjectURL(dailyMeterPhoto);
+      setDailyMeterPhoto(null);
     } else {
       if (returnMeterPhoto) URL.revokeObjectURL(returnMeterPhoto);
       setReturnMeterPhoto(null);
@@ -237,13 +289,22 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
 
   // Real-time Preview Text Generation
   const previewText = useMemo(() => {
-    if (activeTab === 'receipt') {
+    if (activeTab === 'pickup') {
       return generateReceiptReport({
         vehicleHocha,
         carNumber,
         totalKm: receiptTotalKm,
         dte: receiptDte,
         outerDamage: receiptDamage,
+      });
+    } else if (activeTab === 'daily') {
+      return generateDailyReport({
+        date: formatInspectionDate(),
+        vehicleNo: vehicleHocha,
+        plateNumber: carNumber,
+        range: parseFloat(dailyDte) || 0,
+        existingDamages: existingDamageParts,
+        newDamages: dailyNewParts,
       });
     } else {
       return generateReturnReport({
@@ -264,6 +325,9 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
     receiptTotalKm,
     receiptDte,
     receiptDamage,
+    dailyDte,
+    existingDamageParts,
+    dailyNewParts,
     returnTotalKm,
     returnDte,
     returnDamage,
@@ -278,7 +342,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
   const handleConfirmSave = () => {
     haptics.lightTap();
 
-    if (activeTab === 'receipt') {
+    if (activeTab === 'pickup') {
       saveInitialInspection({
         initialTotalKm: parseFloat(receiptTotalKm) || 0,
         initialDte: parseFloat(receiptDte) || 0,
@@ -287,6 +351,14 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
         carNumber,
         outerDamage: receiptDamage,
         selectedParts: receiptSelectedParts,
+      });
+    } else if (activeTab === 'daily') {
+      saveDailyInspection({
+        inspectionDate: formatInspectionDate(),
+        vehicleHocha,
+        carNumber,
+        range: parseFloat(dailyDte) || 0,
+        newDamages: dailyNewParts,
       });
     }
 
@@ -297,7 +369,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
   const handleKakaoLaunch = async () => {
     haptics.successPulse();
 
-    if (activeTab === 'receipt') {
+    if (activeTab === 'pickup') {
       saveInitialInspection({
         initialTotalKm: parseFloat(receiptTotalKm) || 0,
         initialDte: parseFloat(receiptDte) || 0,
@@ -309,6 +381,14 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
       });
       const updated = getInitialInspection();
       setInitialData(updated);
+    } else if (activeTab === 'daily') {
+      saveDailyInspection({
+        inspectionDate: formatInspectionDate(),
+        vehicleHocha,
+        carNumber,
+        range: parseFloat(dailyDte) || 0,
+        newDamages: dailyNewParts,
+      });
     }
 
     await copyAndLaunchKakaoTalk(previewText);
@@ -323,7 +403,6 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
     setCopySuccess(true);
     setTimeout(() => setCopySuccess(false), 1500);
   };
-
 
   const isReceiptClean = receiptSelectedParts.length === 0 && (receiptDamage === '무' || !receiptDamage);
   const isReturnClean = returnSelectedParts.length === 0 && (returnDamage === '무' || !returnDamage);
@@ -367,27 +446,33 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
           </button>
         </div>
 
-        {/* Tab Segmented Control */}
+        {/* Tab Segmented Control (3단 전환: 수령 | 일일 | 반납) */}
         <div className="px-5 pt-3.5 pb-2 shrink-0">
           <div className="w-full bg-slate-100/90 p-1 rounded-full relative flex items-center select-none shadow-inner">
             {/* Sliding Pill Indicator */}
             <div
-              className={`w-[calc(50%-4px)] h-[calc(100%-8px)] absolute top-1 left-1 rounded-full bg-[#1E60F3] shadow-[0_4px_14px_rgba(30,96,243,0.35)] transition-transform duration-300 ease-out pointer-events-none transform ${activeTab === 'receipt' ? 'translate-x-0' : 'translate-x-full'
-                }`}
+              className={`w-[calc((100%-8px)/3)] h-[calc(100%-8px)] absolute top-1 left-1 rounded-full bg-[#1E60F3] shadow-[0_4px_14px_rgba(30,96,243,0.35)] transition-transform duration-300 ease-out pointer-events-none transform ${
+                activeTab === 'pickup'
+                  ? 'translate-x-0'
+                  : activeTab === 'daily'
+                  ? 'translate-x-full'
+                  : 'translate-x-[200%]'
+              }`}
             />
 
             <button
               type="button"
               onClick={() => {
                 haptics.lightTap();
-                setActiveTab('receipt');
+                setActiveTab('pickup');
               }}
-              className="flex-1 py-2 rounded-full z-10 flex items-center justify-center space-x-1.5 cursor-pointer transition-colors duration-300"
+              className="flex-1 py-2 rounded-full z-10 flex items-center justify-center space-x-1 sm:space-x-1.5 cursor-pointer transition-colors duration-300"
             >
-              <Gauge className={`w-3.5 h-3.5 ${activeTab === 'receipt' ? 'text-white' : 'text-slate-400'}`} />
+              <Gauge className={`w-3.5 h-3.5 ${activeTab === 'pickup' ? 'text-white' : 'text-slate-400'}`} />
               <span
-                className={`text-xs tracking-tight transition-colors duration-300 ${activeTab === 'receipt' ? 'text-white font-extrabold' : 'text-slate-500 font-semibold'
-                  }`}
+                className={`text-xs tracking-tight transition-colors duration-300 ${
+                  activeTab === 'pickup' ? 'text-white font-extrabold' : 'text-slate-500 font-semibold'
+                }`}
               >
                 차량 수령
               </span>
@@ -397,14 +482,33 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
               type="button"
               onClick={() => {
                 haptics.lightTap();
+                setActiveTab('daily');
+              }}
+              className="flex-1 py-2 rounded-full z-10 flex items-center justify-center space-x-1 sm:space-x-1.5 cursor-pointer transition-colors duration-300"
+            >
+              <CalendarCheck className={`w-3.5 h-3.5 ${activeTab === 'daily' ? 'text-white' : 'text-slate-400'}`} />
+              <span
+                className={`text-xs tracking-tight transition-colors duration-300 ${
+                  activeTab === 'daily' ? 'text-white font-extrabold' : 'text-slate-500 font-semibold'
+                }`}
+              >
+                일일 점검
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                haptics.lightTap();
                 setActiveTab('return');
               }}
-              className="flex-1 py-2 rounded-full z-10 flex items-center justify-center space-x-1.5 cursor-pointer transition-colors duration-300"
+              className="flex-1 py-2 rounded-full z-10 flex items-center justify-center space-x-1 sm:space-x-1.5 cursor-pointer transition-colors duration-300"
             >
               <RotateCcw className={`w-3.5 h-3.5 ${activeTab === 'return' ? 'text-white' : 'text-slate-400'}`} />
               <span
-                className={`text-xs tracking-tight transition-colors duration-300 ${activeTab === 'return' ? 'text-white font-extrabold' : 'text-slate-500 font-semibold'
-                  }`}
+                className={`text-xs tracking-tight transition-colors duration-300 ${
+                  activeTab === 'return' ? 'text-white font-extrabold' : 'text-slate-500 font-semibold'
+                }`}
               >
                 차량 반납
               </span>
@@ -442,8 +546,8 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
             </div>
           </div>
 
-          {/* TAB 1: RECEIPT MODE */}
-          {activeTab === 'receipt' && (
+          {/* TAB 1: PICKUP MODE */}
+          {activeTab === 'pickup' && (
             <div className="space-y-3 animate-fade-in">
               {/* Meter Inputs */}
               <div className="grid grid-cols-2 gap-2.5">
@@ -473,7 +577,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                 </div>
               </div>
 
-              {/* Task 4: Dashboard Photo Slot (Pure local in-memory preview, No-DB) */}
+              {/* Dashboard Photo Slot */}
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1">
                   계기판 AI 자동 입력 ✨
@@ -487,7 +591,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                     />
                     <button
                       type="button"
-                      onClick={() => handleRemoveMeterPhoto('receipt')}
+                      onClick={() => handleRemoveMeterPhoto('pickup')}
                       className="absolute top-2 right-2 w-7 h-7 rounded-full bg-slate-900/70 hover:bg-slate-900 text-white flex items-center justify-center transition-all shadow-md active:scale-90 cursor-pointer"
                       title="사진 삭제"
                     >
@@ -504,7 +608,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                       type="file"
                       accept="image/*"
                       className="hidden"
-                      onChange={(e) => handleMeterPhotoUpload(e, 'receipt')}
+                      onChange={(e) => handleMeterPhotoUpload(e, 'pickup')}
                     />
                     <button
                       type="button"
@@ -525,12 +629,12 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                 </label>
                 <VehicleTopDownViewer
                   selectedParts={receiptSelectedParts}
-                  onTogglePart={(part) => handleToggleDamageChip(part, 'receipt')}
-                  mode="receipt"
+                  onTogglePart={(part) => handleToggleDamageChip(part, 'pickup')}
+                  mode="pickup"
                 />
               </div>
 
-              {/* Task 3: Outer Damage Quick Chip Selector & Input */}
+              {/* Outer Damage Quick Chip Selector & Input */}
               <div className="space-y-1 pt-1">
                 <label className="block text-[11px] font-semibold text-slate-600">
                   외관 부위별 빠른 선택
@@ -539,7 +643,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                   {/* Clean reset chip */}
                   <button
                     type="button"
-                    onClick={() => handleResetDamageToClean('receipt')}
+                    onClick={() => handleResetDamageToClean('pickup')}
                     className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer flex items-center ${isReceiptClean
                       ? 'border-[#1E60F3]/40 bg-blue-50/70 text-slate-800 font-bold shadow-xs'
                       : 'border-slate-200 bg-white text-slate-400 font-medium hover:bg-slate-50'
@@ -558,7 +662,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                       <button
                         key={part}
                         type="button"
-                        onClick={() => handleToggleDamageChip(part, 'receipt')}
+                        onClick={() => handleToggleDamageChip(part, 'pickup')}
                         className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer ${isSelected
                           ? 'border-[#1E60F3]/40 bg-[#1E60F3]/85 hover:bg-[#1E60F3]/90 text-white font-bold shadow-xs'
                           : 'border-slate-200 bg-slate-50 text-slate-600 font-medium hover:bg-slate-100'
@@ -581,6 +685,158 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                     placeholder="무 (미입력 시 '무' 표기)"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors"
                   />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: DAILY INSPECTION MODE */}
+          {activeTab === 'daily' && (
+            <div className="space-y-3 animate-fade-in">
+              {/* Range Input Only (Odometer Hidden) */}
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                  주행가능거리 (km)
+                </label>
+                <input
+                  type="number"
+                  value={dailyDte}
+                  onChange={(e) => setDailyDte(e.target.value)}
+                  placeholder="예: 280"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors"
+                />
+              </div>
+
+              {/* Dashboard Photo Slot for Daily */}
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                  계기판 사진 (선택)
+                </label>
+                {dailyMeterPhoto ? (
+                  <div className="relative w-full h-28 rounded-xl overflow-hidden border border-slate-200 bg-slate-100 group">
+                    <img
+                      src={dailyMeterPhoto}
+                      alt="일일 점검 계기판 사진"
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveMeterPhoto('daily')}
+                      className="absolute top-2 right-2 w-7 h-7 rounded-full bg-slate-900/70 hover:bg-slate-900 text-white flex items-center justify-center transition-all shadow-md active:scale-90 cursor-pointer"
+                      title="사진 삭제"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                    <div className="absolute bottom-1.5 left-2 px-2 py-0.5 rounded bg-slate-900/60 backdrop-blur-xs text-[10px] text-white font-medium">
+                      로컬 미리보기 (DB 업로드 없음)
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <input
+                      ref={dailyPhotoInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handleMeterPhotoUpload(e, 'daily')}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => dailyPhotoInputRef.current?.click()}
+                      className="w-full py-2.5 px-3 rounded-xl border border-dashed border-slate-300 hover:border-[#1E60F3] bg-slate-50 hover:bg-blue-50/20 text-slate-500 hover:text-[#1E60F3] flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <Camera className="w-4 h-4 text-slate-400 shrink-0" />
+                      <span className="text-xs font-semibold">계기판 사진 등록</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* 2D Top-Down Interactive Vehicle Inspection Viewer */}
+              <div className="space-y-1 pt-0.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-semibold text-slate-600">
+                    차량 외관 2D 탑뷰 점검
+                  </label>
+                  <div className="flex items-center gap-2 text-[10px] font-medium text-slate-500">
+                    {existingDamageParts.length > 0 && (
+                      <span className="flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#1E60F3]" />
+                        기존 누적 {existingDamageParts.length}
+                      </span>
+                    )}
+                    {dailyNewParts.length > 0 && (
+                      <span className="flex items-center gap-1 text-red-600 font-bold">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                        금일 신규 {dailyNewParts.length}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <VehicleTopDownViewer
+                  selectedParts={[...existingDamageParts, ...dailyNewParts]}
+                  onTogglePart={handleToggleDailyDamage}
+                  existingParts={existingDamageParts}
+                  mode="daily"
+                />
+              </div>
+
+              {/* Outer Damage Quick Chip Selector & One-Touch Clean */}
+              <div className="space-y-1 pt-1">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-semibold text-slate-600">
+                    외관 부위별 빠른 선택
+                  </label>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {/* One-touch clean check button */}
+                  <button
+                    type="button"
+                    onClick={handleResetDailyDamage}
+                    className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer flex items-center gap-1 ${
+                      dailyNewParts.length === 0
+                        ? 'border-[#1E60F3]/40 bg-blue-50/70 text-[#1E60F3] font-bold shadow-xs'
+                        : 'border-slate-200 bg-white text-slate-400 font-medium hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className={dailyNewParts.length === 0 ? 'text-[#1E60F3] font-black text-xs mr-0.5' : 'text-slate-300 text-xs mr-0.5'}>
+                      ✓
+                    </span>
+                    <span>금일 특이사항 없음 (신규 데미지 0건)</span>
+                  </button>
+
+                  {/* Body part chips with Existing vs New differentiation */}
+                  {DAMAGE_PART_CHIPS.map((part) => {
+                    const isExisting = existingDamageParts.includes(part);
+                    const isNew = dailyNewParts.includes(part);
+
+                    return (
+                      <button
+                        key={part}
+                        type="button"
+                        onClick={() => handleToggleDailyDamage(part)}
+                        className={`px-2.5 py-1 text-xs rounded-lg border transition-all flex items-center gap-1 ${
+                          isExisting
+                            ? 'border-slate-200 bg-slate-100 text-slate-500 font-medium cursor-default opacity-85'
+                            : isNew
+                            ? 'border-red-400 bg-red-500 hover:bg-red-600 text-white font-bold shadow-xs ring-1 ring-red-400/50 cursor-pointer'
+                            : 'border-slate-200 bg-slate-50 text-slate-600 font-medium hover:bg-slate-100 cursor-pointer'
+                        }`}
+                      >
+                        <span>{part}</span>
+                        {isExisting && (
+                          <span className="text-[9px] bg-slate-300 text-slate-600 font-semibold px-1 rounded-xs leading-none py-0.5">
+                            기존
+                          </span>
+                        )}
+                        {isNew && (
+                          <span className="text-[9px] bg-white text-red-600 font-black px-1 rounded-xs leading-none py-0.5">
+                            신규
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>

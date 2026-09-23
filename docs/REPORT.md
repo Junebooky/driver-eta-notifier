@@ -1235,3 +1235,60 @@ SELECT * FROM cockpit.presets;
 3. **카카오톡 2단 포맷 출력 검증**:
    * `generateReturnReport` 실행 결과 2단 계층형 계기판 수치 개행 정상 출력 확인.
 
+---
+
+## 31. 차량 점검 모달 내 '일일 점검' 모드 신설 및 맞춤형 카카오톡 보고 템플릿 연동
+
+### 31.1 개요
+다일간 행사 운용 시 기사들이 렌터카 정산용 총 주행거리나 차량 인계용 보관 위치 입력 없이, 당일 스케줄 수행을 위한 핵심 지표(주행가능거리 및 신규 외관 데미지)만 간편하게 점검·보고할 수 있도록 [차량 수령], [일일 점검], [차량 반납] 3단 세그먼트 체계를 구축하고 전용 카카오톡 보고서 생성기를 연동하였습니다.
+
+---
+
+### 31.2 상세 구현 내역
+
+#### [태스크 1] 점검 모달 상단 3단 세그먼트 전환 UI 구축 ([`components/VehicleInspectionModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/VehicleInspectionModal.tsx), [`components/VehicleTopDownViewer.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/VehicleTopDownViewer.tsx))
+1. **모드 상태 3단계 확장**:
+   * 점검 모드를 `'pickup' | 'daily' | 'return'` 3단계로 확장 (`initialMode?: 'pickup' | 'daily' | 'return' | 'receipt'`).
+   * 상단 세그먼트 탭: **[차량 수령] | [일일 점검] | [차량 반납]** 3분할 슬라이딩 필 인디케이터(`w-[calc((100%-8px)/3)]`, `translate-x-0` ➔ `translate-x-full` ➔ `translate-x-[200%]`) 구현.
+2. **모드별 입력 폼 노출 제어**:
+   * **일일 점검(`activeTab === 'daily'`) 선택 시**:
+     * **총 주행거리(Odometer) 입력창 숨김**: 불필요한 입력 피로를 제거하여 총 주행거리 필드를 배제.
+     * **주행가능거리(Range) 입력창 유지**: 당일 운행 가능 여부 확인을 위한 주행가능거리 입력창만 단독 렌더링.
+     * **보관 위치(주차/차키) 섹션 숨김**: 차량 인계 상황이 아니므로 보관 위치 입력 섹션을 완전히 숨김.
+     * **외관 데미지 체크 섹션 유지 및 2중 차별화**:
+       - 기존 수령 시 누적된 흠집은 회색(`bg-slate-100`, `기존` 뱃지)으로 표시하여 불필요한 재체크 방지.
+       - 당일 발생한 신규 흠집만 선명한 레드 컬러로 토글 등록.
+       - **[✓ 금일 특이사항 없음 (신규 데미지 0건)]** 원터치 확인 버튼 제공으로 이상 없을 시 1-터치 즉시 완료.
+3. **2D 탑뷰 인터랙티브 뷰어 다층 모드 지원 (`VehicleTopDownViewer.tsx`)**:
+   * `mode="daily"` 지원을 추가하여 기존 누적 부위(코발트)와 금일 신규 부위(레드 핀)를 시각적으로 명확히 분리 표출.
+
+---
+
+#### [태스크 2] 일일 점검 전용 카카오톡 보고서 포맷터 추가 ([`utils/vehicleReport.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/utils/vehicleReport.ts))
+1. **`generateDailyReport` 함수 구현**:
+   * 시점(출근/퇴근)에 구애받지 않는 중립적인 일일 보고 템플릿 포맷 적용:
+     ```text
+     [일일 차량 점검 보고]
+
+     • 점검일자 : 2026년 9월 24일 (목)
+     • 차량호차 : 4호차
+     • 차량번호 : 142호 7811
+     • 계기판 현황 :
+       - 주행가능거리 : 520 km
+     • 외관 데미지 :
+       - 기존 누적: 뒷 범퍼, 앞 휠 (운전석)
+       - 금일 특이사항: 이상 없음 (신규 데미지 없음)
+     ```
+   * 총 주행거리 및 보관 위치 항목을 완전히 배제하고, 신규 데미지 발생 시 `- 금일 신규: [부위]`로 명확히 개행 표기.
+2. **클립보드 및 로컬 영속화 연동**:
+   * `mode === 'daily'`일 때 카카오톡 복사 버튼 클릭 시 `generateDailyReport` 결과물이 클립보드에 정확히 복사되고 카카오톡 공유 링크가 실행되도록 연결.
+   * `saveDailyInspection` / `getDailyInspection` 탑재로 브라우저 새로고침 시에도 당일 입력한 DTE 및 점검 내역 안전하게 보존.
+
+---
+
+### 31.3 빌드 및 검증 결과
+1. **프로덕션 빌드 무결성**:
+   * `npm run build`: Next.js 16.3.5 Turbopack 기준 전 14개 라우트 컴파일 에러 **0건** 통과.
+2. **보고서 서식 단위 테스트 검증 (`scratch/verify_daily_inspection.ts`)**:
+   * 전원 이상 없음(Clean), 기존 누적 데미지만 존재, 신규 데미지 발생 등 모든 분기 조건에서 총 주행거리/보관위치 배제 및 정갈한 2단 포맷 출력 검증 통과.
+

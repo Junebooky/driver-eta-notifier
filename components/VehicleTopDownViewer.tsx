@@ -7,7 +7,7 @@ interface VehicleTopDownViewerProps {
   selectedParts: string[];
   onTogglePart: (part: string) => void;
   existingParts?: string[];
-  mode?: 'receipt' | 'return';
+  mode?: 'receipt' | 'pickup' | 'daily' | 'return';
 }
 
 interface HotspotDef {
@@ -38,12 +38,13 @@ export const VehicleTopDownViewer: React.FC<VehicleTopDownViewerProps> = ({
   mode = 'receipt',
 }) => {
   const isClean = selectedParts.length === 0;
+  const isMultiLayer = mode === 'return' || mode === 'daily';
 
-  const existingCount = mode === 'return'
+  const existingCount = isMultiLayer
     ? selectedParts.filter((p) => existingParts.includes(p)).length
     : selectedParts.length;
 
-  const newCount = mode === 'return'
+  const newCount = isMultiLayer
     ? selectedParts.filter((p) => !existingParts.includes(p)).length
     : 0;
 
@@ -122,7 +123,7 @@ export const VehicleTopDownViewer: React.FC<VehicleTopDownViewerProps> = ({
       {/* Status Badge (Top-Right): Displayed only when damages exist */}
       {!isClean && (
         <div className="absolute top-2 right-3 pointer-events-none animate-fade-in flex items-center gap-1.5">
-          {mode === 'return' ? (
+          {isMultiLayer ? (
             <>
               {existingCount > 0 && (
                 <span className="text-[10px] text-white font-bold px-2 py-0.5 rounded-full bg-[#1E60F3]/90 shadow-2xs flex items-center gap-1">
@@ -390,8 +391,8 @@ export const VehicleTopDownViewer: React.FC<VehicleTopDownViewerProps> = ({
         {/* Hotspots & Ethereal Halo Marker Layer (Cobalt for Existing / Red for New) */}
         {HOTSPOTS.map((spot) => {
           const isSelected = selectedParts.includes(spot.part);
-          const isExisting = mode === 'return' ? existingParts.includes(spot.part) : true;
-          const isNew = mode === 'return' && isSelected && !isExisting;
+          const isExisting = isMultiLayer ? existingParts.includes(spot.part) : true;
+          const isNew = isMultiLayer && isSelected && !isExisting;
 
           return (
             <button

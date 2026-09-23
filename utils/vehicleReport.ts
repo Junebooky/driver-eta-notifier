@@ -4,6 +4,7 @@
  */
 
 export const STORAGE_KEY_INITIAL_INSPECTION = 'cockpit_initial_inspection';
+export const STORAGE_KEY_DAILY_INSPECTION = 'cockpit_daily_inspection';
 
 export interface InitialInspectionData {
   initialTotalKm: number;
@@ -14,6 +15,15 @@ export interface InitialInspectionData {
   outerDamage?: string;
   selectedParts?: string[];
   savedAt: string;
+}
+
+export interface DailyReportParams {
+  date: string;              // 예: "2026년 9월 24일 (목)"
+  vehicleNo: string;         // 예: "4호차"
+  plateNumber: string;       // 예: "142호 7811"
+  range: number;             // 주행가능거리
+  existingDamages: string[]; // 기존 누적 부위 목록
+  newDamages: string[];      // 금일 신규 발생 부위 목록
 }
 
 export interface ReceiptReportParams {
@@ -197,6 +207,41 @@ export function generateReturnReport(params: ReturnReportParams): string {
 }
 
 /**
+ * Generate daily vehicle inspection report text (Pure client-side, zero ODO / zero storage)
+ */
+export function generateDailyReport(params: {
+  date: string;              // 예: "2026년 9월 24일 (목)"
+  vehicleNo: string;         // 예: "4호차"
+  plateNumber: string;       // 예: "142호 7811"
+  range: number;             // 주행가능거리
+  existingDamages: string[]; // 기존 누적 부위 목록
+  newDamages: string[];      // 금일 신규 발생 부위 목록
+}): string {
+  const damageDetail = params.newDamages.length > 0
+    ? `- 금일 신규: ${params.newDamages.join(', ')}`
+    : `- 금일 특이사항: 이상 없음 (신규 데미지 없음)`;
+
+  const existingDetail = params.existingDamages.length > 0
+    ? `- 기존 누적: ${params.existingDamages.join(', ')}`
+    : `- 기존 누적: 없음`;
+
+  const vehicleStr = params.vehicleNo?.trim() || '';
+  const plateStr = params.plateNumber?.trim() || '';
+  const rangeNum = typeof params.range === 'number' ? params.range : parseKmNumber(params.range);
+
+  return `[일일 차량 점검 보고]
+
+• 점검일자 : ${params.date}
+• 차량호차 : ${vehicleStr}
+• 차량번호 : ${plateStr}
+• 계기판 현황 :
+  - 주행가능거리 : ${rangeNum.toLocaleString()} km
+• 외관 데미지 :
+  ${existingDetail}
+  ${damageDetail}`;
+}
+
+/**
  * Save initial inspection data to localStorage
  */
 export function saveInitialInspection(data: Omit<InitialInspectionData, 'savedAt'>): void {
@@ -239,5 +284,60 @@ export function clearInitialInspection(): void {
     localStorage.removeItem(STORAGE_KEY_INITIAL_INSPECTION);
   } catch (err) {
     console.warn('Failed to clear initial vehicle inspection from localStorage:', err);
+  }
+}
+
+export interface DailyInspectionData {
+  inspectionDate: string;
+  vehicleHocha?: string;
+  carNumber?: string;
+  range: number;
+  newDamages: string[];
+  savedAt: string;
+}
+
+/**
+ * Save daily inspection data to localStorage
+ */
+export function saveDailyInspection(data: Omit<DailyInspectionData, 'savedAt'>): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const payload: DailyInspectionData = {
+      ...data,
+      savedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(STORAGE_KEY_DAILY_INSPECTION, JSON.stringify(payload));
+  } catch (err) {
+    console.warn('Failed to save daily vehicle inspection to localStorage:', err);
+  }
+}
+
+/**
+ * Retrieve daily inspection data from localStorage
+ */
+export function getDailyInspection(): DailyInspectionData | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_DAILY_INSPECTION);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.range === 'number') {
+      return parsed as DailyInspectionData;
+    }
+  } catch (err) {
+    console.warn('Failed to parse daily vehicle inspection from localStorage:', err);
+  }
+  return null;
+}
+
+/**
+ * Clear daily inspection data from localStorage
+ */
+export function clearDailyInspection(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(STORAGE_KEY_DAILY_INSPECTION);
+  } catch (err) {
+    console.warn('Failed to clear daily vehicle inspection from localStorage:', err);
   }
 }
