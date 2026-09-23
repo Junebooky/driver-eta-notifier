@@ -33,6 +33,23 @@ export const getPresetsStorageKey = (vehicleNo?: string) => {
   const v = vehicleNo?.match(/(\d+호차)/)?.[1] || (vehicleNo ? vehicleNo.trim() : '4호차');
   return `cockpit_presets_${v}`;
 };
+
+export function deduplicatePresets(list: LocationPreset[]): LocationPreset[] {
+  const seenIds = new Set<string>();
+  const seenNames = new Set<string>();
+  return list.filter((p) => {
+    if (!p || !p.id) return false;
+    if (seenIds.has(p.id)) return false;
+    seenIds.add(p.id);
+
+    const vKey = `${p.name}___${p.vehicle_no || p.vehicleNo || 'common'}`;
+    if (seenNames.has(vKey)) return false;
+    seenNames.add(vKey);
+
+    return true;
+  });
+}
+
 const ADMIN_MODE_KEY = 'protocol_cockpit_admin_mode_v1';
 
 export default function Home() {
@@ -90,7 +107,11 @@ export default function Home() {
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setPresets(parsed);
+          const deduped = deduplicatePresets(parsed);
+          setPresets(deduped);
+          if (deduped.length !== parsed.length) {
+            localStorage.setItem(storageKey, JSON.stringify(deduped));
+          }
         }
       }
     } catch (e) {
@@ -103,8 +124,9 @@ export default function Home() {
       if (res.ok) {
         const data = await res.json();
         if (data.presets && Array.isArray(data.presets)) {
-          setPresets(data.presets);
-          localStorage.setItem(storageKey, JSON.stringify(data.presets));
+          const deduped = deduplicatePresets(data.presets);
+          setPresets(deduped);
+          localStorage.setItem(storageKey, JSON.stringify(deduped));
         }
       }
     } catch (err) {
@@ -169,9 +191,10 @@ export default function Home() {
 
   // Save Presets to LocalStorage (Isolated by current vehicle)
   const savePresetsToStorage = (updated: LocationPreset[]) => {
-    setPresets(updated);
+    const deduped = deduplicatePresets(updated);
+    setPresets(deduped);
     try {
-      localStorage.setItem(getPresetsStorageKey(currentVehicleNo), JSON.stringify(updated));
+      localStorage.setItem(getPresetsStorageKey(currentVehicleNo), JSON.stringify(deduped));
     } catch (e) {
       console.warn('Failed to save ordered presets:', e);
     }
@@ -203,7 +226,23 @@ export default function Home() {
       vehicleNo: currentVehicleNo,
     };
 
-    const updated = [...presets, presetWithVehicle];
+    const existingIndex = presets.findIndex(
+      (p) =>
+        (p.id && p.id === newPreset.id) ||
+        (p.name === newPreset.name && (p.vehicle_no === currentVehicleNo || (!p.vehicle_no && isAdmin)))
+    );
+
+    let updated: LocationPreset[];
+    if (existingIndex >= 0) {
+      updated = [...presets];
+      updated[existingIndex] = {
+        ...updated[existingIndex],
+        ...presetWithVehicle,
+        id: updated[existingIndex].id,
+      };
+    } else {
+      updated = deduplicatePresets([...presets, presetWithVehicle]);
+    }
     savePresetsToStorage(updated);
 
     if (selectionTarget === 'origin') {
@@ -225,8 +264,18 @@ export default function Home() {
       if (res.ok) {
         const data = await res.json();
         if (data.preset) {
-          const synced = updated.map((p) => (p.id === presetWithVehicle.id ? data.preset : p));
-          savePresetsToStorage(synced);
+          setPresets((prev) => {
+            const synced = prev.map((p) =>
+              p.id === presetWithVehicle.id || (p.name === data.preset.name && p.vehicle_no === data.preset.vehicle_no)
+                ? data.preset
+                : p
+            );
+            const deduped = deduplicatePresets(synced);
+            try {
+              localStorage.setItem(getPresetsStorageKey(currentVehicleNo), JSON.stringify(deduped));
+            } catch (e) {}
+            return deduped;
+          });
         }
       }
     } catch (e) {

@@ -16,11 +16,20 @@ export const runtime = 'nodejs';
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const keyword = searchParams.get('keyword')?.trim();
+    const rawKeyword = searchParams.get('keyword')?.trim();
 
-    if (!keyword || keyword.length < 2) {
+    if (!rawKeyword || rawKeyword.length < 2) {
       return NextResponse.json({ pois: [] });
     }
+
+    // Sanitize query: strip dong/ho/floor/building patterns for robust building-level retrieval
+    const detailPattern = /([0-9A-Za-z가-힣]+(?:동|호|층|관))/g;
+    const cleanKeyword = rawKeyword
+      .replace(detailPattern, '')
+      .replace(/[,]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const keyword = cleanKeyword.length >= 2 ? cleanKeyword : rawKeyword;
 
     const apiKey = process.env.TMAP_API_KEY;
     if (!apiKey || apiKey === 'your_tmap_api_key') {

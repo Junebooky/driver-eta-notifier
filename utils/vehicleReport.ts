@@ -139,12 +139,18 @@ export function generateReturnReport(params: ReturnReportParams): string {
     const diffDteSign = diffDte > 0 ? '+' : '';
     const diffDteFormatted = `${diffDteSign}${diffDte.toLocaleString()} km`;
 
+    lines.push(`  - 총 주행거리 : ${returnTotalKmNum.toLocaleString()} km`);
     lines.push(
-      `  - 총 주행거리 : ${returnTotalKmNum.toLocaleString()} km (최초: ${initialKm.toLocaleString()} km / 총 운행: ${totalDriven.toLocaleString()} km)`
+      `    (최초 ${initialKm.toLocaleString()} km | 총 운행 ${totalDriven.toLocaleString()} km)`
     );
     lines.push(
-      `  - 주행가능거리 : ${hasReturnDte ? `${returnDteNum.toLocaleString()} km (최초: ${initialDte.toLocaleString()} km / 차이: ${diffDteFormatted})` : ''}`
+      `  - 주행가능거리 : ${hasReturnDte ? `${returnDteNum.toLocaleString()} km` : ''}`
     );
+    if (hasReturnDte) {
+      lines.push(
+        `    (최초 ${initialDte.toLocaleString()} km | 차이 ${diffDteFormatted})`
+      );
+    }
   } else {
     lines.push(`  - 총 주행거리 : ${hasReturnTotalKm ? `${returnTotalKmNum.toLocaleString()} km` : ''}`);
     lines.push(`  - 주행가능거리 : ${hasReturnDte ? `${returnDteNum.toLocaleString()} km` : ''}`);

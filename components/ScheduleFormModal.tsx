@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ScheduleItem } from '@/data/ferrariSchedules';
 import { LocationPreset } from '@/types';
 import { DEFAULT_PRESET_LOCATIONS } from '@/utils/presets';
+import { sanitizeSearchQuery } from './CustomPresetModal';
 import {
   X,
   Calendar,
@@ -173,7 +174,8 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
 
   // Real-time TMAP POI search with in-memory caching and AbortController
   useEffect(() => {
-    const q = searchQuery.trim();
+    const rawQ = searchQuery.trim();
+    const q = sanitizeSearchQuery(rawQ);
     if (q.length < 2) {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -553,9 +555,9 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
                     style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
                     className="max-h-40 overflow-y-auto space-y-1 divide-y divide-slate-50 border border-slate-100 rounded-xl p-1 bg-slate-50/50 overscroll-contain touch-pan-y"
                   >
-                    {searchResults.map((poi) => (
+                    {searchResults.map((poi, idx) => (
                       <button
-                        key={poi.id}
+                        key={`${poi.id || 'poi'}-${idx}`}
                         type="button"
                         onClick={() =>
                           handleSelectLocation({
@@ -595,11 +597,11 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
                   </div>
 
                   <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-                    {presets.map((p) => {
+                    {presets.map((p, pIdx) => {
                       const isHQ = !p.vehicle_no && !p.vehicleNo;
                       return (
                         <button
-                          key={p.id}
+                          key={`${p.id}-${pIdx}`}
                           type="button"
                           onClick={() =>
                             handleSelectLocation({

@@ -24,6 +24,20 @@ interface PoiResult {
   lng: number;
 }
 
+/**
+ * Sanitize search query by stripping commas and dong/ho/floor/building patterns
+ * (e.g., '4108동', '101호', 'B1층', '3층', etc.) to ensure building-level TMAP retrieval.
+ */
+export function sanitizeSearchQuery(query: string): string {
+  const detailPattern = /([0-9A-Za-z가-힣]+(?:동|호|층|관))/g;
+  const cleanQuery = query
+    .replace(detailPattern, '')
+    .replace(/[,]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return cleanQuery || query;
+}
+
 // Client-side in-memory search cache for 0ms instant retrieval
 const customPresetSearchCache = new Map<string, PoiResult[]>();
 
@@ -78,7 +92,8 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
 
   // Real-time TMAP POI Autocomplete with in-memory caching and AbortController
   useEffect(() => {
-    const query = searchQuery.trim();
+    const rawQuery = searchQuery.trim();
+    const query = sanitizeSearchQuery(rawQuery);
     if (query.length < 2) {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -154,52 +169,20 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
 
   if (!isOpen) return null;
 
-  // One-touch Selection and Registration
+  // Select POI from autocomplete results: populate fields without auto-closing modal
   const handleSelectPoi = (poi: PoiResult) => {
-    haptics.successPulse();
-
-    if (isHomeMode && onSaveHome) {
-      onSaveHome({
-        name: poi.name,
-        address: poi.address,
-        lat: poi.lat,
-        lng: poi.lng,
-      });
-      setSearchQuery('');
-      setSearchResults([]);
-      onClose();
-      return;
-    }
+    haptics.lightTap();
 
     const cleanShort = poi.name.length > 8 ? poi.name.slice(0, 8) : poi.name;
+    setName(poi.name);
+    setShortName(cleanShort);
+    setAddress(poi.address || poi.name);
+    setLat(poi.lat);
+    setLng(poi.lng);
 
-    if (presetToEdit && onUpdatePreset) {
-      onUpdatePreset({
-        ...presetToEdit,
-        name: poi.name,
-        shortName: cleanShort,
-        address: poi.address,
-        lat: poi.lat,
-        lng: poi.lng,
-      });
-    } else {
-      const newPreset: LocationPreset = {
-        id: `custom_${Date.now()}`,
-        name: poi.name,
-        shortName: cleanShort,
-        lat: poi.lat,
-        lng: poi.lng,
-        category: isAdmin ? 'HOTEL' : 'CUSTOM',
-        address: poi.address,
-        isGlobal: isAdmin,
-      };
-      onAddPreset(newPreset);
-    }
-
-    // Reset and Close
-    setSearchQuery('');
+    // Dismiss search dropdown so user can review and edit fields
     setSearchResults([]);
-    onClose();
+    setSearchQuery(poi.name);
   };
 
   // Dismiss mobile virtual keyboard on touching/scrolling result list
@@ -338,7 +321,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                 className="mt-2 border border-slate-200 rounded-xl bg-white shadow-lg max-h-52 overflow-y-auto divide-y divide-slate-100 animate-fade-in overscroll-contain touch-pan-y"
               >
                 <div className="p-2 text-[10px] font-bold text-slate-400 bg-slate-50/80 uppercase">
-                  터치하여 원터치 등록
+                  터치하여 거점 정보 입력
                 </div>
                 {searchResults.map((poi, index) => (
                   <button
@@ -378,32 +361,21 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                버튼 표기 명칭 (최대 8자 권장)
-              </label>
-              <input
-                type="text"
-                required
-                value={shortName}
-                onChange={(e) => setShortName(e.target.value)}
-                placeholder="예: 소노펠리체"
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-bold focus:outline-none focus:border-blue-600 focus:bg-white"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                상세 주소
-              </label>
-              <input
-                type="text"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder="주소 정보"
-                className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 text-xs focus:outline-none"
-              />
-            </div>
+            {!isHomeMode && (
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  버튼 표기 명칭 (최대 8자 권장)
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={shortName}
+                  onChange={(e) => setShortName(e.target.value)}
+                  placeholder="예: 소노펠리체"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-bold focus:outline-none focus:border-blue-600 focus:bg-white"
+                />
+              </div>
+            )}
 
             {/* Actions */}
             <div className="pt-2 flex items-center space-x-2">

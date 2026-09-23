@@ -987,9 +987,9 @@ ${scheduleItemsFormatted}`.trim();
 
           {/* Schedule Cards List */}
           <div className="space-y-3">
-            {filteredSchedules.map((item) => (
+            {filteredSchedules.map((item, itemIdx) => (
               <ScheduleCard
-                key={item.id}
+                key={`${item.id}-${itemIdx}`}
                 item={item}
                 onNavigate={(sch) => onNavigateForSchedule(sch)}
                 onPredict={(sch) => onOpenPredictionForSchedule(sch)}

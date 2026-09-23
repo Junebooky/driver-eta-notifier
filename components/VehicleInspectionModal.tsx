@@ -165,7 +165,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
       if (newParts.length === 0) {
         setReceiptDamage('무');
       } else {
-        setReceiptDamage(`${newParts.join(', ')} 미세 기스`);
+        setReceiptDamage(`${newParts.join(', ')} 기스`);
       }
     } else {
       const isSelected = returnSelectedParts.includes(part);
@@ -695,11 +695,6 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                   <label className="block text-[11px] font-semibold text-slate-600">
                     외관 부위별 빠른 선택
                   </label>
-                  {existingDamageParts.length > 0 && (
-                    <span className="text-[10px] text-slate-400">
-                      (신규 흠집은 빨간색으로 표시)
-                    </span>
-                  )}
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {/* Clean reset chip */}
@@ -728,13 +723,12 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                         key={part}
                         type="button"
                         onClick={() => handleToggleDamageChip(part, 'return')}
-                        className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer flex items-center gap-1 ${
-                          isNew
-                            ? 'border-red-400 bg-red-500 hover:bg-red-600 text-white font-bold shadow-xs ring-1 ring-red-400/50'
-                            : isSelected
+                        className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer flex items-center gap-1 ${isNew
+                          ? 'border-red-400 bg-red-500 hover:bg-red-600 text-white font-bold shadow-xs ring-1 ring-red-400/50'
+                          : isSelected
                             ? 'border-[#1E60F3]/40 bg-[#1E60F3]/85 hover:bg-[#1E60F3]/90 text-white font-bold shadow-xs'
                             : 'border-slate-200 bg-slate-50 text-slate-600 font-medium hover:bg-slate-100'
-                        }`}
+                          }`}
                       >
                         <span>{part}</span>
                         {isNew && (

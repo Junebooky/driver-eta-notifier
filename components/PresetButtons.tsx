@@ -266,14 +266,15 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
     }, 350);
   };
 
-  // Pointer move to detect scrolling (Touch Slop >= 8px threshold)
+  // Pointer move to detect scrolling (Vertical gesture |deltaY| > 6px or Touch Slop >= 8px)
   const handlePointerMoveCheck = (e: React.TouchEvent | React.MouseEvent) => {
     if (!touchStartPosRef.current || isLongPressActiveRef.current) return;
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    const deltaY = Math.abs(clientY - touchStartPosRef.current.y);
     const dist = Math.hypot(clientX - touchStartPosRef.current.x, clientY - touchStartPosRef.current.y);
 
-    if (dist >= 8) {
+    if (deltaY > 6 || dist >= 8) {
       isScrollingRef.current = true;
       if (longPressTimerRef.current) {
         clearTimeout(longPressTimerRef.current);
@@ -637,7 +638,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
   const renderHomeSlot = () => {
     if (isHomeConfigured) {
       return (
-        <div key="slot_home" className="relative select-none touch-none h-full">
+        <div key="slot_home" className="relative select-none touch-pan-y h-full">
           <button
             type="button"
             onTouchStart={handleHomePointerStart}
@@ -712,7 +713,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
     }
 
     return (
-      <div key="slot_home" className="relative select-none h-full">
+      <div key="slot_home" className="relative select-none touch-pan-y h-full">
         <button
           type="button"
           onTouchStart={handleHomePointerStart}
@@ -773,11 +774,11 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
 
     return (
       <div
-        key={preset.id}
+        key={`${preset.id}-${index}`}
         ref={(el) => {
           itemRefs.current[index] = el;
         }}
-        className="relative select-none touch-none will-change-transform h-full"
+        className="relative select-none touch-pan-y will-change-transform h-full"
       >
         {isThisItemDragging ? (
           <div
@@ -862,7 +863,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
         isTargetDestination
           ? 'hover:border-blue-300/80 hover:bg-blue-50/40 hover:text-[#1E60F3]'
           : 'hover:border-slate-400 hover:bg-slate-50/80 hover:text-slate-800'
-      } bg-white hover:shadow-xs hover:-translate-y-0.5 text-slate-400 text-xs font-medium flex flex-col justify-between items-center transition-all duration-200 cursor-pointer select-none [-webkit-tap-highlight-color:transparent] ${
+      } bg-white hover:shadow-xs hover:-translate-y-0.5 text-slate-400 text-xs font-medium flex flex-col justify-between items-center transition-all duration-200 cursor-pointer select-none touch-pan-y [-webkit-tap-highlight-color:transparent] ${
         activePressedIndex === 'add' ? 'scale-[0.97] bg-slate-100/90' : ''
       }`}
       title="새 거점 검색 및 등록"
@@ -984,7 +985,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
 
       {/* 3-Column High-Density Grid with Horizontal Carousel Pagination (Max 4 rows per page) */}
       <div
-        className="w-full overflow-hidden select-none"
+        className="w-full overflow-hidden select-none touch-pan-y"
         onClickCapture={(e) => {
           if (isScrollingRef.current) {
             e.stopPropagation();

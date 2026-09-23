@@ -1168,3 +1168,70 @@ SELECT * FROM cockpit.presets;
    * 의도적으로 임의의 거점을 '톡' 쳤을 때 지연 없이 즉각 상단 목적지/출발지에 100% 정상 반영됨 확인.
    * 350ms 롱프레스 시 햅틱 진동과 함께 거점 카드 축소 및 순서 변경 드래그 앤 드롭 기능이 오작동 없이 온전히 작동함을 확인.
 
+---
+
+## 30. 거점 섹션 상하 스크롤 복원, 카카오톡 계기판 줄바꿈 정돈 및 장소 등록 모달/건물단위 검색 UX 개선 (2026-09-24)
+
+### 30.1 배경 및 목적
+* `components/PresetButtons.tsx`에 남아있던 `touch-none` 속성으로 인해 모바일에서 '자주 가는 목적지' 영역을 쓸어내릴 때 페이지 상하 스크롤이 먹통이 되던 현상을 해결.
+* 차량 반납 시 카카오톡으로 전송되는 계기판 현황 메시지가 좁은 모바일 화면에서 지저분하게 꺾이는 문제를 2단 계층형 포맷으로 개선.
+* 장소 등록 모달(`CustomPresetModal.tsx`, `PlaceRegisterModal.tsx`)에서 검색 결과 클릭 시 창이 즉시 닫히지 않고 명칭을 다듬어 저장할 수 있도록 개선하고, `광교마을로 90, 4108동`처럼 동·호수가 포함된 입력에도 TMAP 검색 누락이 없도록 건물 단위 자동 정제 파이프라인 구축.
+* React 렌더링 시 발생하던 중복 키 경고(`Encountered two children with the same key, e2f30315-797d-482b-bae0-058a80323978`)를 근본적으로 차단하기 위해 프리셋 중복 제거 및 안전 키 구조 확립.
+
+---
+
+### 30.2 핵심 구현 내역
+
+#### [태스크 1] '자주 가는 목적지' 네이티브 상하 스크롤 즉각 복원 ([`components/PresetButtons.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/PresetButtons.tsx))
+1. **CSS 터치 액션 전면 교정 (`touch-pan-y`)**:
+   * 거점 버튼 및 그리드 컨테이너의 `touch-none`을 완전히 제거하고 **`touch-pan-y`**를 적용하여 모바일 상하 스와이프 제스처를 브라우저 네이티브 스크롤 엔진에 온전히 양도.
+2. **수직 제스처 감지 시 롱프레스 즉각 취소 가드**:
+   * `touchmove` / `pointermove` 시 수직 이동 거리($|\Delta y|$)가 **6px**을 초과하거나 전체 거리($\text{dist}$)가 **8px** 이상이면 대기 중인 롱프레스 타이머(`longPressTimerRef`)와 시각 피드백 타이머(`activeTouchTimeoutRef`)를 즉각 `clearTimeout` 취소.
+   * 롱프레스가 발화하기 전에는 어떠한 `preventDefault()`나 `setPointerCapture()`도 호출하지 않아 상하 스크롤 끊김이 100% 제거됨.
+
+---
+
+#### [태스크 2] 차량 반납 카카오톡 보고서 계기판 현황 줄바꿈 개선 ([`utils/vehicleReport.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/utils/vehicleReport.ts))
+1. **2단 계층형 개행 포맷 적용**:
+   * 주요 수치와 괄호 세부 내역을 2단으로 명확히 개행 분리:
+     ```text
+     • 계기판 현황 :
+       - 총 주행거리 : 15,048 km
+         (최초 14,698 km | 총 운행 350 km)
+       - 주행가능거리 : 180 km
+         (최초 476 km | 차이 -296 km)
+     ```
+   * 좁은 모바일 카카오톡 말풍선 안에서도 괄호 내용이 임의의 위치에서 지저분하게 꺾이지 않고 높은 가독성 확보.
+
+---
+
+#### [태스크 3] 거점 등록 모달 즉시 닫힘 방지 및 건물 단위 주소 정제 ([`components/CustomPresetModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/CustomPresetModal.tsx), [`components/PlaceRegisterModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/PlaceRegisterModal.tsx), [`app/api/search/route.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/api/search/route.ts))
+1. **검색 결과 선택 시 자동 닫힘 차단 및 폼 유지**:
+   * 검색 결과 POI 클릭 시 모달이 즉시 닫히지 않고, `거점 전체 명칭`과 `버튼 표기 명칭`(8자 이내 자동 제안)에 값이 세팅되며 드롭다운만 닫히도록 흐름 개선.
+   * 모달 하단의 **[저장]** 버튼을 눌러야만 유효성 검사 후 최종 등록되고 닫히도록 보장.
+   * 상세 주소(동·호수 등) 입력창을 제거하여 폼을 직관적으로 단순화.
+2. **동·호수 입력 대응 토지/건물 단위 정제 검색 (`sanitizeSearchQuery`)**:
+   * 사용자가 `광교마을로 90, 4108동`이나 `테헤란로 152 12층`처럼 세부 동·호수를 입력하더라도 정규식(`/([0-9A-Za-z가-힣]+(?:동|호|층|관))/g`)을 통해 건물/도로명 단위(`광교마을로 90`)로 자동 정제하여 TMAP 검색 누락 방지.
+   * `CustomPresetModal.tsx`, `ScheduleFormModal.tsx`, 백엔드 `/api/search/route.ts` 3중 탑재.
+3. **`PlaceRegisterModal.tsx` 호환 컴포넌트 신설**:
+   * 기존 `CustomPresetModal`을 래핑하는 명시적 `PlaceRegisterModal.tsx` 에일리어스 제공.
+
+---
+
+#### [부가 과제] React 중복 키 에러 완전 차단 및 프리셋 상태 정합성 보장 ([`app/page.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/page.tsx), [`components/PresetButtons.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/PresetButtons.tsx))
+1. **`deduplicatePresets` 유틸 탑재**:
+   * 로컬 스토리지 로드, API 동기화, 신규 거점 추가 시 `id` 및 `name + vehicle_no` 기준 중복 객체를 사전에 정제.
+2. **렌더링 키 복합화**:
+   * `PresetButtons.tsx`, `ScheduleTab.tsx`, `ScheduleFormModal.tsx`의 맵 렌더링 키를 `${id}-${index}`로 안전하게 복합 구성하여 브라우저 중복 키 콘솔 경고 완전 제거.
+
+---
+
+### 30.3 빌드 및 검증 결과
+1. **빌드 무결성**:
+   * `npm run build`: Next.js 16.3.5 Turbopack 기준 전 14개 라우트 컴파일 에러 **0건** 통과.
+2. **검색 API 정제 검증**:
+   * `GET /api/search?keyword=광교마을로 90, 4108동` ➔ `경기 용인시 수지구 광교마을로 90` 건물 단위 검색 결과 즉시 반환 확인.
+   * `GET /api/search?keyword=테헤란로 152 12층` ➔ `서울 강남구 테헤란로 152` 즉시 반환 확인.
+3. **카카오톡 2단 포맷 출력 검증**:
+   * `generateReturnReport` 실행 결과 2단 계층형 계기판 수치 개행 정상 출력 확인.
+
