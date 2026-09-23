@@ -5,7 +5,8 @@ import { DriverProfile, LocationPreset } from '@/types';
 import { ScheduleItem, CONFIRMED_FERRARI_SCHEDULES, scheduleToPresets } from '@/data/ferrariSchedules';
 import { ScheduleCard } from '@/components/ScheduleCard';
 import { EditScheduleModal } from '@/components/EditScheduleModal';
-import { Camera, Send, AlertCircle, Sparkles, RefreshCw, Bot, Copy, Check, X } from 'lucide-react';
+import { ScheduleFormModal } from '@/components/ScheduleFormModal';
+import { Camera, Send, AlertCircle, Sparkles, RefreshCw, Bot, Copy, Check, X, Plus, CalendarPlus } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 import { ENABLE_DEV_FLEET_SWITCHER } from '@/utils/constants';
 import { generateNameCandidates } from '@/utils/nameMatcher';
@@ -25,6 +26,68 @@ const COCKPIT_ANALYSIS_STAGES = [
   { step: 5, text: '5단계 · 일정과 이동 정보 교차 검증 중...', percent: 96 },
   { step: 6, text: '6단계 · 최종 스케줄 정확도 확인', percent: 100 },
 ];
+
+// Helper: Extract 8-digit date string from user query
+function extractDateFromQuery(q: string): string | null {
+  // 1. YYYYMMDD (e.g. 20260925)
+  const yyyymmdd = q.match(/(\d{4})(\d{2})(\d{2})/);
+  if (yyyymmdd) return yyyymmdd[0];
+
+  // 2. YYYY-MM-DD or YYYY.MM.DD
+  const ymdWithDelim = q.match(/(\d{4})[.-/](\d{1,2})[.-/](\d{1,2})/);
+  if (ymdWithDelim) {
+    return `${ymdWithDelim[1]}${ymdWithDelim[2].padStart(2, '0')}${ymdWithDelim[3].padStart(2, '0')}`;
+  }
+
+  // 3. M월 D일 or M.D or M/D
+  const mdMatch = q.match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/) || q.match(/(\d{1,2})[./](\d{1,2})/);
+  if (mdMatch) {
+    const curYear = new Date().getFullYear();
+    return `${curYear}${mdMatch[1].padStart(2, '0')}${mdMatch[2].padStart(2, '0')}`;
+  }
+
+  // 4. '내일'
+  if (q.includes('내일')) {
+    const tmr = new Date();
+    tmr.setDate(tmr.getDate() + 1);
+    const y = tmr.getFullYear();
+    const m = String(tmr.getMonth() + 1).padStart(2, '0');
+    const d = String(tmr.getDate()).padStart(2, '0');
+    return `${y}${m}${d}`;
+  }
+
+  // 5. '오늘'
+  if (q.includes('오늘')) {
+    const td = new Date();
+    const y = td.getFullYear();
+    const m = String(td.getMonth() + 1).padStart(2, '0');
+    const d = String(td.getDate()).padStart(2, '0');
+    return `${y}${m}${d}`;
+  }
+
+  return null;
+}
+
+// Helper: Validate and format 8-digit date for response
+function parseAndValidate8DigitDate(raw: string) {
+  if (raw.length !== 8) return null;
+  const year = parseInt(raw.slice(0, 4), 10);
+  const month = parseInt(raw.slice(4, 6), 10);
+  const day = parseInt(raw.slice(6, 8), 10);
+
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const targetDate = new Date(year, month - 1, day);
+  if (
+    targetDate.getFullYear() !== year ||
+    targetDate.getMonth() !== month - 1 ||
+    targetDate.getDate() !== day
+  ) {
+    return null;
+  }
+  const dayOfWeek = ['일', '월', '화', '수', '목', '금', '토'][targetDate.getDay()];
+  const formattedDate = `${year}.${String(month).padStart(2, '0')}.${String(day).padStart(2, '0')}`;
+  return { year, month, day, dayOfWeek, formattedDate };
+}
 
 interface ScheduleTabProps {
   profile: DriverProfile;
@@ -60,6 +123,55 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
   } | null>(null);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
+
+  // Schedule Form Modal State
+  const [isScheduleFormModalOpen, setIsScheduleFormModalOpen] = useState(false);
+  const [scheduleFormInitialDate, setScheduleFormInitialDate] = useState<string | undefined>(undefined);
+
+  const handleOpenScheduleFormModal = (dateStr?: string) => {
+    haptics.lightTap();
+    setScheduleFormInitialDate(dateStr);
+    setIsScheduleFormModalOpen(true);
+  };
+
+  const handleSaveNewSchedule = async (newSchedule: ScheduleItem) => {
+    setSchedules((prev) => {
+      const updated = [newSchedule, ...prev];
+      try {
+        localStorage.setItem('cockpit_schedules', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Failed to cache new schedule to storage:', e);
+      }
+      return updated;
+    });
+
+    try {
+      await fetch('/api/schedules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vehicle_no: newSchedule.vehicle_no,
+          date: newSchedule.date,
+          pickup_time: newSchedule.pickup_time,
+          time_display: newSchedule.time_display,
+          origin: newSchedule.origin_name,
+          origin_address: newSchedule.origin_address,
+          origin_lat: newSchedule.origin_lat,
+          origin_lng: newSchedule.origin_lng,
+          destination: newSchedule.destination_name,
+          destination_address: newSchedule.destination_address,
+          destination_lat: newSchedule.destination_lat,
+          destination_lng: newSchedule.destination_lng,
+          passenger_name: newSchedule.passenger,
+          flight_number: newSchedule.flight,
+          protocol_notes: newSchedule.notes,
+          status: newSchedule.status,
+        }),
+      });
+    } catch (err) {
+      console.warn('Failed to persist new schedule to Supabase:', err);
+    }
+  };
 
   // Vehicle Isolation & Fleet Switcher State (Dev Mode enables switching between vehicles & All)
   const initialVehicle = profile.vehicleNo?.match(/(\d+호차)/)?.[1] || '4호차';
@@ -483,6 +595,40 @@ ${scheduleItemsFormatted}`.trim();
     stopTypewriter();
     clearThinkingTimers();
 
+    // Check if user wants to register / add a new schedule
+    const isRegisterIntent =
+      targetQuery.includes('일정 등록') ||
+      targetQuery.includes('스케줄 등록') ||
+      targetQuery.includes('일정 추가') ||
+      targetQuery.includes('스케줄 추가') ||
+      targetQuery.includes('새 스케줄') ||
+      (extractDateFromQuery(targetQuery) !== null &&
+        (targetQuery.includes('등록') || targetQuery.includes('추가') || targetQuery.includes('작성')));
+
+    if (isRegisterIntent) {
+      const extractedDate = extractDateFromQuery(targetQuery);
+      const dateInfo = extractedDate ? parseAndValidate8DigitDate(extractedDate) : null;
+
+      const reply = dateInfo
+        ? `📝 **${dateInfo.formattedDate} (${dateInfo.dayOfWeek})** 신규 스케줄 등록 팝업을 열었습니다.\n픽업 시간 및 장소를 확인 후 저장해 주세요.`
+        : '📝 신규 스케줄 등록 팝업을 열었습니다.\n운행 일자(8자리 숫자) 및 상세 일정을 입력해 주세요.';
+
+      setIsAnalyzing(false);
+      setIsThinking(false);
+      setThinkingStep(null);
+      setCopilotResponse({
+        query: targetQuery,
+        reply,
+        type: 'schedule_form',
+      });
+      setIsCopilotOpen(true);
+      setInputText('');
+      startTypewriter(reply);
+      handleOpenScheduleFormModal(extractedDate || undefined);
+      haptics.success();
+      return;
+    }
+
     setIsAnalyzing(true);
     setIsThinking(true);
     setThinkingStep(0);
@@ -642,19 +788,17 @@ ${scheduleItemsFormatted}`.trim();
                     onSwitchVehicle(v.id);
                   }
                 }}
-                className={`flex-1 py-1.5 px-1 rounded-xl text-xs font-black flex items-center justify-center gap-1 transition-all cursor-pointer ${
-                  isSelected
-                    ? 'bg-white text-slate-900 shadow-sm border border-slate-200/90 scale-100'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
+                className={`flex-1 py-1.5 px-1 rounded-xl text-xs font-black flex items-center justify-center gap-1 transition-all cursor-pointer ${isSelected
+                  ? 'bg-white text-slate-900 shadow-sm border border-slate-200/90 scale-100'
+                  : 'text-slate-500 hover:text-slate-800'
+                  }`}
               >
                 <span>{v.label}</span>
                 <span
-                  className={`text-[10px] font-black px-1.5 py-0.2 rounded-full ${
-                    isSelected
-                      ? 'bg-blue-50 text-[#1E60F3]'
-                      : 'bg-slate-200 text-slate-600'
-                  }`}
+                  className={`text-[10px] font-black px-1.5 py-0.2 rounded-full ${isSelected
+                    ? 'bg-blue-50 text-[#1E60F3]'
+                    : 'bg-slate-200 text-slate-600'
+                    }`}
                 >
                   {count}
                 </span>
@@ -755,21 +899,30 @@ ${scheduleItemsFormatted}`.trim();
 
           {/* Typography */}
           <h2 className="text-xl font-bold text-slate-900 tracking-tight mt-6">
-            배차표를 등록해 주세요
+            내 스케줄, AI가 바로 만들어드려요 ✨
           </h2>
           <p className="text-xs text-slate-500 mt-2 text-center max-w-xs leading-relaxed">
-            엑셀 캡쳐 이미지 업로드 또는 카카오톡 공지 텍스트 붙여넣기
+            배차표 이미지나 텍스트만 등록해 주세요
           </p>
 
-          {/* Convenience Helper: 1-Click Ferrari Confirmed Schedule Loader */}
-          <button
-            type="button"
-            onClick={handleLoadDemoSchedules}
-            className="mt-6 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-blue-50/80 hover:bg-blue-100 text-[#1E60F3] border border-blue-200/60 text-xs font-bold transition-all active:scale-95 shadow-2xs"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>💡 페라리 4일치 원본 배차표 불러오기 (샘플)</span>
-          </button>
+          {/* Convenience Helper: 1-Click Ferrari Confirmed Schedule Loader & Manual Register */}
+          <div className="flex items-center gap-2 mt-6">
+            <button
+              type="button"
+              onClick={() => handleOpenScheduleFormModal()}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#1E60F3] hover:bg-[#1650D6] text-white text-xs font-bold transition-all active:scale-95 shadow-xs cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>새 스케줄 직접 등록</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleLoadDemoSchedules}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-blue-50/80 hover:bg-blue-100 text-[#1E60F3] border border-blue-200/60 text-xs font-bold transition-all active:scale-95 shadow-2xs cursor-pointer"
+            >
+              <span> ✨ 샘플로 먼저 확인하기</span>
+            </button>
+          </div>
         </div>
       ) : (
         /* ================= CONFIRMED SCHEDULES VIEW (TASK 2) ================= */
@@ -787,15 +940,26 @@ ${scheduleItemsFormatted}`.trim();
               </p>
             </div>
 
-            {/* Reset to Empty State button */}
-            <button
-              type="button"
-              onClick={handleResetSchedules}
-              className="text-xs text-slate-400 hover:text-slate-700 flex items-center gap-1 py-1 px-2 rounded-lg hover:bg-slate-100 transition-all font-medium"
-            >
-              <RefreshCw className="w-3 h-3" />
-              <span>배차표 재등록</span>
-            </button>
+            {/* Header Action Buttons: Add Schedule & Reset */}
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => handleOpenScheduleFormModal()}
+                className="text-xs text-[#1E60F3] hover:text-[#1650D6] bg-blue-50 hover:bg-blue-100 border border-blue-200 flex items-center gap-1 py-1 px-2.5 rounded-lg transition-all font-bold cursor-pointer"
+                title="새 스케줄 직접 등록"
+              >
+                <Plus className="w-3 h-3" />
+                <span>일정 추가</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleResetSchedules}
+                className="text-xs text-slate-400 hover:text-slate-700 flex items-center gap-1 py-1 px-2 rounded-lg hover:bg-slate-100 transition-all font-medium cursor-pointer"
+              >
+                <RefreshCw className="w-3 h-3" />
+                <span>배차표 재등록</span>
+              </button>
+            </div>
           </div>
 
           {/* Date Filter Tabs */}
@@ -984,6 +1148,18 @@ ${scheduleItemsFormatted}`.trim();
                 {isTyping && (
                   <span className="inline-block w-1.5 h-3.5 bg-slate-800 animate-pulse ml-0.5 align-middle" />
                 )}
+                {copilotResponse.type === 'schedule_form' && !isTyping && (
+                  <div className="mt-2.5 pt-2 border-t border-slate-200/80 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenScheduleFormModal(scheduleFormInitialDate)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1E60F3] text-white text-xs font-bold shadow-xs hover:bg-[#1650D6] active:scale-95 transition-all cursor-pointer"
+                    >
+                      <CalendarPlus className="w-3.5 h-3.5" />
+                      <span>스케줄 등록 팝업 열기</span>
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -991,6 +1167,14 @@ ${scheduleItemsFormatted}`.trim();
 
         {/* Quick Suggestion Prompt Chips */}
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+          <button
+            type="button"
+            onClick={() => handleCopilotSubmit('9월 25일 일정 등록')}
+            disabled={isAnalyzing}
+            className="shrink-0 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 border border-blue-200/90 text-[11px] font-bold text-[#1E60F3] rounded-full transition-all active:scale-95 shadow-2xs cursor-pointer"
+          >
+            ➕ 9/25 스케줄 등록
+          </button>
           <button
             type="button"
             onClick={() => handleCopilotSubmit('9.18일 일정 브리핑해줘')}
@@ -1100,6 +1284,16 @@ ${scheduleItemsFormatted}`.trim();
             console.warn('Failed to persist schedule update to Supabase:', err);
           }
         }}
+      />
+
+      {/* 5. Schedule Form Modal (New Manual / Voice Schedule Addition) */}
+      <ScheduleFormModal
+        isOpen={isScheduleFormModalOpen}
+        onClose={() => setIsScheduleFormModalOpen(false)}
+        onSave={handleSaveNewSchedule}
+        initialDate={scheduleFormInitialDate}
+        vehicleNo={profile.vehicleNo}
+        passengerName={profile.passengerName}
       />
     </div>
   );

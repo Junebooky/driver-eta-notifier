@@ -932,6 +932,80 @@ SELECT * FROM cockpit.presets;
    * **4호차 복귀**: 4호차의 승객명이 영향을 받지 않고 `'SOYFAN 외 1명'`으로 온전히 유지됨 확인.
    * **보고 텍스트 연동**: 단톡방 보고 텍스트 미리보기에 `• 담당승객: SOYFAN 외 1명` 및 `• 담당승객: VIP 게스트 A`가 실시간으로 완벽 표출됨 확인.
 
+---
+
+## 26. 거점 소유 라벨 한글화(공통/개인) 및 숫자 전용 날짜 입력·요일 자동 완성 스케줄 등록 모달 구현 (2026-09-23)
+
+### 26.1 배경 및 목적
+* Protocol Cockpit의 기존 거점 식별 배지(`HQ` / `MY`)는 영문 약어로 표기되어 있어 현장 의전 기사님들의 직관적인 인지성이 다소 떨어지는 문제가 있었음. 이를 친숙한 한글(`공통` / `개인`)로 전면 개편함.
+* 스케줄 등록 시 날짜 선택기(캘린더 팝업)의 터치 오류와 번거로움을 해결하기 위해, 숫자 8자리(`inputMode="numeric"`, `maxLength={8}`) 전용 입력 필드와 입력 즉시 `YYYY.MM.DD (요일)`을 자동 연산하여 표출하는 동적 뱃지 시스템을 도입함.
+* 아울러 출발지/도착지 장소 입력 가드레일(TMAP 실시간 POI 자동완성 검색 + 자주 가는 목적지 원터치 퀵 선택) 및 AI 코파일럿 텍스트 연동을 지원하는 모달(`ScheduleFormModal.tsx`)을 구축함.
+
+---
+
+### 26.2 핵심 구현 내역
+
+#### [태스크 1] 거점 식별 텍스트 전면 한글화 ([`components/PresetButtons.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/PresetButtons.tsx))
+1. **라벨 분기 수정**:
+   * 전사 공통 거점 식별자(`!preset.vehicle_no && !preset.vehicleNo`)를 기준으로 기존 `HQ`를 **`공통`**으로 변경.
+   * 기사 개인 거점 및 자택 거점을 기존 `MY`에서 **`개인`**으로 변경.
+   ```typescript
+   const isHQ = !preset.vehicle_no && !preset.vehicleNo;
+   const badgeLabel = isHQ ? '공통' : '개인';
+   ```
+2. **스타일 유지**:
+   * `text-[11px] font-medium tracking-wide text-slate-400` 스타일을 유지하여 디자인 시스템 통일성과 가독성을 동시 확보.
+
+---
+
+#### [태스크 2] 스케줄 등록 모달 숫자 전용 날짜 입력 및 요일 자동 연산 ([`components/ScheduleFormModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ScheduleFormModal.tsx))
+1. **숫자 8자리 전용 마스킹 입력 필드**:
+   * `inputMode="numeric"`, `maxLength={8}`, `placeholder="예: 20260925 (8자리 숫자)"` 적용.
+   * 사용자 키 입력 시 비숫자 문자를 실시간 제거(`replace(/\D/g, '')`)하고 최대 8자리까지만 수용.
+2. **실시간 유효성 검증 및 요일 자동 연산 뱃지**:
+   * `parseAndValidate8DigitDate` 함수로 연/월/일 파싱 및 `new Date(year, month - 1, day)` 유효성 정합성 검증.
+   * 유효한 8자리 숫자 입력 완료 시 우측 상단에 코발트 블루 볼드 뱃지로 포맷팅 및 요일 자동 표출:
+     `const dayOfWeek = ['일', '월', '화', '수', '목', '금', '토'][targetDate.getDay()];`
+     예: `2026.09.25 (금)`
+3. **AI 코파일럿 대화창 프리필 연동**:
+   * 코파일럿 입력창에서 `"9월 25일 일정 등록"`, `"9.25 스케줄 추가"`, `"내일 일정 등록"` 등 날짜 및 등록 의도가 담긴 텍스트 입력 시 날짜를 8자리로 자동 추출(`extractDateFromQuery`)하여 `initialDate`로 모달에 즉시 주입.
+
+---
+
+#### [태스크 3] 장소 입력 필드 가드레일 (TMAP 검색 + '자주 가는 목적지' 퀵 선택)
+1. **장소 선택 2단 드로어 구조**:
+   * 출발지 및 도착지 카드 터치 시 해당 위치 선택 섹션이 토글 오픈.
+2. **상단: TMAP 실시간 POI 자동완성 검색**:
+   * `/api/search?keyword=...` API 연동, 250ms 디바운스 적용.
+   * 검색 결과 목록(장소명, 주소) 제공 및 터치 시 좌표(`lat`, `lng`) 자동 동기화.
+3. **하단: '자주 가는 목적지' 퀵 선택 칩**:
+   * 가로 스크롤 칩 리스트 제공.
+   * 각 거점별 `공통` 및 `개인` 배지 표기.
+   * 원터치로 출발지 또는 도착지에 즉각 반영.
+
+---
+
+#### [태스크 4] 스케줄 탭 통합 및 버튼 배치 ([`components/ScheduleTab.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ScheduleTab.tsx), [`app/api/copilot/route.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/api/copilot/route.ts))
+1. **엠프티 뷰(Empty State)**:
+   * `[ ＋ 새 스케줄 직접 등록 ]` 버튼을 `[ ✨ 샘플로 먼저 확인하기 ]` 좌측에 배치.
+2. **확정 스케줄 뷰(Confirmed View)**:
+   * 서브헤더 `배차표 재등록` 좌측에 `[ 일정 추가 ]` 파란색 버튼 배치.
+3. **코파일럿 카드 피드백**:
+   * 사용자가 등록 요청 시 등록 확인 안내와 함께 `[ 스케줄 등록 팝업 열기 ]` 재오픈 액션 버튼 제공.
+4. **저장 및 영속화**:
+   * 신규 등록 스케줄을 로컬 State에 즉시 반영(`cockpit_schedules` 캐싱)하고 `/api/schedules` 백그라운드 POST 호출.
+
+---
+
+### 26.3 빌드 및 검증 결과
+1. **빌드 무결성**:
+   * `npm run build`: Turbopack 기준 전 라우트 컴파일 **0 에러, 0 경고** 완벽 통과.
+2. **단위 테스트 검증 (`test_schedule_dates.ts`)**:
+   * `parseAndValidate8DigitDate('20260925')` ➔ `2026.09.25 (금)` 정합성 일치.
+   * `parseAndValidate8DigitDate('20260923')` ➔ `2026.09.23 (수)` 정합성 일치.
+   * `parseAndValidate8DigitDate('20260231')` ➔ 비정상 날짜 `null` 반환 및 에러 문구 노출 정상 작동.
+   * `extractDateFromQuery` 자연어 추출("9월 25일 일정 등록", "9.25 스케줄 추가") 정상 통과.
+
 
 
 

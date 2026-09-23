@@ -160,7 +160,20 @@ function processDeterministicFallback(
     };
   }
 
-  // 4. Full Schedule Briefing
+  // 4. Schedule Registration Intent
+  if (
+    normalized.includes('등록') ||
+    normalized.includes('추가') ||
+    normalized.includes('작성') ||
+    normalized.includes('새 스케줄')
+  ) {
+    return {
+      reply: `📝 신규 스케줄 등록 팝업을 열었습니다.\n운행 일자(8자리 숫자) 및 상세 일정을 입력해 주세요.`,
+      type: 'schedule_form',
+    };
+  }
+
+  // 5. Full Schedule Briefing
   if (
     normalized.includes('전체') ||
     normalized.includes('모든') ||
@@ -230,6 +243,9 @@ export async function POST(req: NextRequest) {
       normalized.includes('9.') ||
       normalized.includes('9/') ||
       normalized.includes('9월') ||
+      normalized.includes('등록') ||
+      normalized.includes('추가') ||
+      normalized.includes('작성') ||
       normalized.includes('내일') ||
       normalized.includes('오늘') ||
       Boolean(image);
