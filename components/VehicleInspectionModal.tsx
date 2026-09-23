@@ -342,9 +342,8 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
           <div className="w-full bg-slate-100/90 p-1 rounded-full relative flex items-center select-none shadow-inner">
             {/* Sliding Pill Indicator */}
             <div
-              className={`w-[calc(50%-4px)] h-[calc(100%-8px)] absolute top-1 left-1 rounded-full bg-[#1E60F3] shadow-[0_4px_14px_rgba(30,96,243,0.35)] transition-transform duration-300 ease-out pointer-events-none transform ${
-                activeTab === 'receipt' ? 'translate-x-0' : 'translate-x-full'
-              }`}
+              className={`w-[calc(50%-4px)] h-[calc(100%-8px)] absolute top-1 left-1 rounded-full bg-[#1E60F3] shadow-[0_4px_14px_rgba(30,96,243,0.35)] transition-transform duration-300 ease-out pointer-events-none transform ${activeTab === 'receipt' ? 'translate-x-0' : 'translate-x-full'
+                }`}
             />
 
             <button
@@ -357,9 +356,8 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
             >
               <Gauge className={`w-3.5 h-3.5 ${activeTab === 'receipt' ? 'text-white' : 'text-slate-400'}`} />
               <span
-                className={`text-xs tracking-tight transition-colors duration-300 ${
-                  activeTab === 'receipt' ? 'text-white font-extrabold' : 'text-slate-500 font-semibold'
-                }`}
+                className={`text-xs tracking-tight transition-colors duration-300 ${activeTab === 'receipt' ? 'text-white font-extrabold' : 'text-slate-500 font-semibold'
+                  }`}
               >
                 차량 수령
               </span>
@@ -375,9 +373,8 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
             >
               <RotateCcw className={`w-3.5 h-3.5 ${activeTab === 'return' ? 'text-white' : 'text-slate-400'}`} />
               <span
-                className={`text-xs tracking-tight transition-colors duration-300 ${
-                  activeTab === 'return' ? 'text-white font-extrabold' : 'text-slate-500 font-semibold'
-                }`}
+                className={`text-xs tracking-tight transition-colors duration-300 ${activeTab === 'return' ? 'text-white font-extrabold' : 'text-slate-500 font-semibold'
+                  }`}
               >
                 차량 반납
               </span>
@@ -434,7 +431,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                 </div>
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                    주행가능거리 DTE (km)
+                    주행가능거리 (km)
                   </label>
                   <input
                     type="number"
@@ -501,11 +498,10 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                   <button
                     type="button"
                     onClick={() => handleResetDamageToClean('receipt')}
-                    className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer ${
-                      isReceiptClean
-                        ? 'border-[#1E60F3] bg-blue-50 text-[#1E60F3] font-bold shadow-xs'
-                        : 'border-slate-200 bg-slate-50 text-slate-600 font-medium hover:bg-slate-100'
-                    }`}
+                    className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer ${isReceiptClean
+                      ? 'border-[#1E60F3] bg-blue-50 text-[#1E60F3] font-bold shadow-xs'
+                      : 'border-slate-200 bg-slate-50 text-slate-600 font-medium hover:bg-slate-100'
+                      }`}
                   >
                     ✓ 이상 없음 (무)
                   </button>
@@ -518,11 +514,10 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                         key={part}
                         type="button"
                         onClick={() => handleToggleDamageChip(part, 'receipt')}
-                        className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer ${
-                          isSelected
-                            ? 'border-[#1E60F3] bg-blue-50 text-[#1E60F3] font-bold shadow-xs'
-                            : 'border-slate-200 bg-slate-50 text-slate-600 font-medium hover:bg-slate-100'
-                        }`}
+                        className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer ${isSelected
+                          ? 'border-[#1E60F3] bg-blue-50 text-[#1E60F3] font-bold shadow-xs'
+                          : 'border-slate-200 bg-slate-50 text-slate-600 font-medium hover:bg-slate-100'
+                          }`}
                       >
                         {part}
                       </button>
@@ -589,7 +584,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                 </div>
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                    반납 주행가능거리 DTE (km)
+                    반납 주행가능거리 (km)
                   </label>
                   <input
                     type="number"
@@ -656,11 +651,10 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                   <button
                     type="button"
                     onClick={() => handleResetDamageToClean('return')}
-                    className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer ${
-                      isReturnClean
-                        ? 'border-[#1E60F3] bg-blue-50 text-[#1E60F3] font-bold shadow-xs'
-                        : 'border-slate-200 bg-slate-50 text-slate-600 font-medium hover:bg-slate-100'
-                    }`}
+                    className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer ${isReturnClean
+                      ? 'border-[#1E60F3] bg-blue-50 text-[#1E60F3] font-bold shadow-xs'
+                      : 'border-slate-200 bg-slate-50 text-slate-600 font-medium hover:bg-slate-100'
+                      }`}
                   >
                     ✓ 이상 없음 (무)
                   </button>
@@ -673,11 +667,10 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                         key={part}
                         type="button"
                         onClick={() => handleToggleDamageChip(part, 'return')}
-                        className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer ${
-                          isSelected
-                            ? 'border-[#1E60F3] bg-blue-50 text-[#1E60F3] font-bold shadow-xs'
-                            : 'border-slate-200 bg-slate-50 text-slate-600 font-medium hover:bg-slate-100'
-                        }`}
+                        className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer ${isSelected
+                          ? 'border-[#1E60F3] bg-blue-50 text-[#1E60F3] font-bold shadow-xs'
+                          : 'border-slate-200 bg-slate-50 text-slate-600 font-medium hover:bg-slate-100'
+                          }`}
                       >
                         {part}
                       </button>
