@@ -87,12 +87,14 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
           >
             {sanitizePlaceName(item.origin_name)}
           </span>
-          <span
-            className="text-xs text-slate-400 font-normal min-w-0 flex-1 truncate"
-            title={item.origin_address}
-          >
-            {item.origin_address}
-          </span>
+          {item.origin_address && (
+            <span
+              className="text-xs text-slate-400 font-normal min-w-0 flex-1 truncate max-w-[180px]"
+              title={item.origin_address}
+            >
+              {item.origin_address}
+            </span>
+          )}
         </div>
 
         {/* Row 2: Arrival Destination Spot Name + Road Address Inline */}
@@ -108,12 +110,14 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
           >
             {sanitizePlaceName(item.destination_name)}
           </span>
-          <span
-            className="text-xs text-slate-400 font-normal min-w-0 flex-1 truncate"
-            title={item.destination_address}
-          >
-            {item.destination_address}
-          </span>
+          {item.destination_address && (
+            <span
+              className="text-xs text-slate-400 font-normal min-w-0 flex-1 truncate max-w-[180px]"
+              title={item.destination_address}
+            >
+              {item.destination_address}
+            </span>
+          )}
         </div>
       </div>
 

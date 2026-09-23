@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { supabaseAdmin } from '@/lib/supabase/server';
+import { searchTmapPoi, ResolvedPlaceLocation } from '@/services/tmapService';
 
 interface ParseScheduleRequestBody {
   imageBase64: string;
@@ -24,14 +25,27 @@ interface ParsedScheduleRaw {
   passenger_name?: string | null;
   flight_no?: string | null;
   notes?: string | null;
+  origin_address?: string | null;
+  origin_lat?: number;
+  origin_lng?: number;
+  destination_address?: string | null;
+  destination_lat?: number;
+  destination_lng?: number;
 }
 
-// Preset matching helper
+interface ResolvedLocation {
+  name: string;
+  address: string | null;
+  lat: number;
+  lng: number;
+}
+
+// 1. Preset matching helper
 function resolvePresetCoordinates(
   name: string,
   presets: Array<{ name: string; address: string; lat: number; lng: number }>
-) {
-  if (!name) return { name: '', address: '', lat: 37.5042, lng: 127.0425 };
+): { name: string; address: string; lat: number; lng: number } | null {
+  if (!name) return null;
 
   const norm = name.replace(/\s+/g, '').toLowerCase();
 
@@ -78,12 +92,94 @@ function resolvePresetCoordinates(
     if (match) return { name: match.name, address: match.address, lat: match.lat, lng: match.lng };
   }
 
-  // Fallback defaults to Gangnam Tehran-ro
+  return null;
+}
+
+/**
+ * 3단계 정밀 주소 확정 파이프라인
+ * 1순위: DB/로컬 마스터 프리셋 대조
+ * 2순위: 비고란(notes / remark) 도로명/영문 주소 정규식 추출
+ * 3순위: TMAP 통합 POI 검색 API 자동 호출 및 좌표 취득
+ */
+async function resolveScheduleLocation(
+  placeName: string,
+  notes: string | null | undefined,
+  presets: Array<{ name: string; address: string; lat: number; lng: number }>,
+  cache: Map<string, ResolvedPlaceLocation | null>
+): Promise<ResolvedLocation> {
+  const cleanName = (placeName || '').trim();
+  if (!cleanName) {
+    return { name: '', address: null, lat: 37.5042, lng: 127.0425 };
+  }
+
+  // [1순위] 로컬/DB 마스터 프리셋(cockpit_presets) 명칭 대조
+  const presetMatch = resolvePresetCoordinates(cleanName, presets);
+  if (presetMatch && presetMatch.address && presetMatch.address.trim().length > 0) {
+    return {
+      name: presetMatch.name || cleanName,
+      address: presetMatch.address,
+      lat: presetMatch.lat,
+      lng: presetMatch.lng,
+    };
+  }
+
+  // [2순위] 비고란(notes / remark)에 기재된 영문/한글 주소 확인
+  let remarkAddress: string | null = null;
+  if (notes) {
+    // 한글 주소 패턴 매칭 (시/도 + 구/군 + 로/길 + 번지)
+    const krMatch = notes.match(
+      /(?:서울(?:특별시)?|인천(?:광역시)?|경기(?:도)?|강원(?:특별자치도|도)?|충(?:청)?(?:북|남)(?:도)?|전(?:라)?(?:북|남)(?:도)?|경(?:상)?(?:북|남)(?:도)?|제주(?:특별자치도)?|세종(?:특별자치시)?|부산(?:광역시)?|대구(?:광역시)?|광주(?:광역시)?|대전(?:광역시)?|울산(?:광역시)?)[가-힣0-9\s,.-]+(?:로|길|동|읍|면|가)\s*[\d-]+(?:번지)?/i
+    );
+    // 영문 도로명 주소 패턴 매칭 (예: 854 Nonhyeon-ro, Gangnam-gu, Seoul)
+    const enMatch = notes.match(
+      /\b\d+[\w\s,.-]+(?:ro|gil|daero|street|road|st|ave|avenue|blvd)[\w\s,.-]*/i
+    );
+
+    if (krMatch) {
+      remarkAddress = krMatch[0].trim();
+    } else if (enMatch) {
+      remarkAddress = enMatch[0].trim();
+    }
+  }
+
+  // [3순위] 여전히 정규 도로명 주소가 없다면 searchTmapPoi(placeName) 호출하여 도로명 주소와 위경도 좌표 취득
+  let poiResult: ResolvedPlaceLocation | null = null;
+  if (cache.has(cleanName)) {
+    poiResult = cache.get(cleanName)!;
+  } else {
+    poiResult = await searchTmapPoi(cleanName);
+    // 만약 거점명으로 검색되지 않고 2순위 비고란 주소가 존재한다면 비고 주소로도 POI 재검색 시도
+    if (!poiResult && remarkAddress) {
+      poiResult = await searchTmapPoi(remarkAddress);
+    }
+    cache.set(cleanName, poiResult);
+  }
+
+  if (poiResult) {
+    return {
+      name: cleanName,
+      address: poiResult.roadAddress || remarkAddress || null,
+      lat: poiResult.lat,
+      lng: poiResult.lng,
+    };
+  }
+
+  // 2순위에서 주소를 추출했으나 TMAP 검색이 불가했던 경우
+  if (remarkAddress) {
+    return {
+      name: cleanName,
+      address: remarkAddress,
+      lat: presetMatch?.lat || 37.5042,
+      lng: presetMatch?.lng || 127.0425,
+    };
+  }
+
+  // 최종 폴백: 프리셋 기본 좌표 (강남 테헤란로 등)
   return {
-    name,
-    address: '',
-    lat: 37.5042,
-    lng: 127.0425,
+    name: presetMatch?.name || cleanName,
+    address: presetMatch?.address || null,
+    lat: presetMatch?.lat || 37.5042,
+    lng: presetMatch?.lng || 127.0425,
   };
 }
 
@@ -267,23 +363,53 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const upsertRows = rawSchedules.map((s) => {
-      const originMatch = resolvePresetCoordinates(s.origin_name, activePresets);
-      const destMatch = resolvePresetCoordinates(s.destination_name, activePresets);
+    // 7. 3단계 주소 확정 파이프라인 (Promise.all 병렬 처리 & 캐싱)
+    const poiCache = new Map<string, ResolvedPlaceLocation | null>();
 
+    const enrichedSchedules = await Promise.all(
+      rawSchedules.map(async (s) => {
+        // 출발지(origin) 3단계 주소/좌표 확정
+        const originLoc = await resolveScheduleLocation(
+          s.origin_name,
+          s.notes,
+          activePresets,
+          poiCache
+        );
+
+        // 도착지(destination) 3단계 주소/좌표 확정
+        const destLoc = await resolveScheduleLocation(
+          s.destination_name,
+          s.notes,
+          activePresets,
+          poiCache
+        );
+
+        return {
+          ...s,
+          origin_name: originLoc.name || s.origin_name,
+          origin_address: originLoc.address,
+          origin_lat: originLoc.lat,
+          origin_lng: originLoc.lng,
+          destination_name: destLoc.name || s.destination_name,
+          destination_address: destLoc.address,
+          destination_lat: destLoc.lat,
+          destination_lng: destLoc.lng,
+        };
+      })
+    );
+
+    const upsertRows = enrichedSchedules.map((s) => {
       // Detect airport departure sending vs airport arrival pickup
       const isAirportDest =
-        (destMatch.name && (destMatch.name.includes('공항') || destMatch.name.toLowerCase().includes('airport'))) ||
-        (destMatch.address && (destMatch.address.includes('공항') || destMatch.address.toLowerCase().includes('airport'))) ||
-        (s.destination_name && (s.destination_name.includes('공항') || s.destination_name.toLowerCase().includes('airport')));
+        (s.destination_name && (s.destination_name.includes('공항') || s.destination_name.toLowerCase().includes('airport'))) ||
+        (s.destination_address && (s.destination_address.includes('공항') || s.destination_address.toLowerCase().includes('airport')));
 
       const hasDepartureNotes = Boolean(s.notes && /DEPARTURE|출국|샌딩|센딩/i.test(s.notes));
       const isDeparture = isAirportDest || hasDepartureNotes;
 
       const isAirportOrigin =
-        (originMatch.name && (originMatch.name.includes('공항') || originMatch.name.toLowerCase().includes('airport'))) ||
-        (originMatch.address && (originMatch.address.includes('공항') || originMatch.address.toLowerCase().includes('airport'))) ||
-        (s.origin_name && (s.origin_name.includes('공항') || s.origin_name.toLowerCase().includes('airport')));
+        (s.origin_name && (s.origin_name.includes('공항') || s.origin_name.toLowerCase().includes('airport'))) ||
+        (s.origin_address && (s.origin_address.includes('공항') || s.origin_address.toLowerCase().includes('airport')));
 
       const hasArrivalNotes = Boolean(s.notes && /ARRIVAL|입국|영접/i.test(s.notes));
       const isArrival = isAirportOrigin || hasArrivalNotes;
@@ -311,14 +437,14 @@ export async function POST(req: NextRequest) {
         pickup_time: pickupTimeFormatted,
         time_display: timeDisplay,
         flight_type: isDeparture ? 'departure' : 'arrival',
-        origin: originMatch.name,
-        origin_address: originMatch.address || null,
-        origin_lat: originMatch.lat,
-        origin_lng: originMatch.lng,
-        destination: destMatch.name,
-        destination_address: destMatch.address || null,
-        destination_lat: destMatch.lat,
-        destination_lng: destMatch.lng,
+        origin: s.origin_name,
+        origin_address: s.origin_address || null,
+        origin_lat: s.origin_lat,
+        origin_lng: s.origin_lng,
+        destination: s.destination_name,
+        destination_address: s.destination_address || null,
+        destination_lat: s.destination_lat,
+        destination_lng: s.destination_lng,
         passenger_name: s.passenger_name || profile?.passengerName || 'VIP 고객님',
         flight_number: s.flight_no || null,
         protocol_notes: s.notes || null,
@@ -361,7 +487,7 @@ export async function POST(req: NextRequest) {
       }
     };
 
-    const scheduleItemsFormatted = rawSchedules
+    const scheduleItemsFormatted = enrichedSchedules
       .slice(0, 6)
       .map((s) => {
         const dateLabel = formatBriefingDate(s.date);
@@ -370,9 +496,9 @@ export async function POST(req: NextRequest) {
       })
       .join('\n\n');
 
-    const summary = rawSchedules.length > 0
+    const summary = enrichedSchedules.length > 0
       ? `📋 배차 일정 동기화 완료
-${driverName} 기사님(${targetVehicleNo} · ${plateNo})의 의전 일정 총 ${rawSchedules.length}건이 정리되었습니다.
+${driverName} 기사님(${targetVehicleNo} · ${plateNo})의 의전 일정 총 ${enrichedSchedules.length}건이 정리되었습니다.
 
 ${scheduleItemsFormatted}`.trim()
       : `기사님, 배차표에서 ${driverName} 기사님(${targetVehicleNo} · ${plateNo})의 배차 일정이 발견되지 않았습니다. 프로필 정보나 배차표 이미지를 다시 한번 확인해 주시기 바랍니다.`;
@@ -381,7 +507,7 @@ ${scheduleItemsFormatted}`.trim()
       success: true,
       matchedDriver: parsedResult.matchedDriver || `${driverName} (${targetVehicleNo})`,
       count: insertedCount,
-      schedules: rawSchedules,
+      schedules: enrichedSchedules,
       summary,
     });
   } catch (err: any) {

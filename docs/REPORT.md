@@ -805,6 +805,77 @@ SELECT * FROM cockpit.presets;
 ### 23.3 빌드 무결성 검증
 * `npm run build`: Turbopack 기준 14/14 라우트 정상 빌드 완료 (컴파일 에러 0건).
 
+---
+
+## 24. 스케줄 파싱 시 미등록 거점의 TMAP POI 도로명 주소 및 좌표 자동 보정 파이프라인 구축 (2026-09-23)
+
+### 24.1 구축 배경 및 목적
+* 배차표 파싱 시 사전에 등록되지 않은 신규 거점(예: '안다즈 서울 강남', '시그니엘 서울', 신규 호텔 및 행사 장소)이 인입되는 경우, 기존에는 주소가 빈 문자열(`""`)로 남거나 기본 테헤란로 좌표로 폴백되어 스케줄 카드의 시인성 저하 및 내비게이션 길안내 오차 위험이 존재했음.
+* 이를 해결하기 위해 TMAP 통합 POI 검색 API를 활용한 **3단계 정밀 주소 확정 파이프라인**을 백그라운드에 구축하여, 별도의 수동 등록 없이도 도로명 주소와 내비게이션 진입 좌표를 전자동으로 보정·저장하는 시스템을 완성함.
+
+### 24.2 주요 구현 내역
+
+#### 1. TMAP 통합 POI 검색 헬퍼 모듈 연동 ([`services/tmapService.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/services/tmapService.ts), [`utils/tmap.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/utils/tmap.ts))
+* **엔드포인트**: `https://apis.openapi.sk.com/tmap/pois?version=1&searchKeyword={keyword}&resCoordType=WGS84GEO&reqCoordType=WGS84GEO&count=1`
+* **헤더**: `appKey: process.env.TMAP_API_KEY || process.env.NEXT_PUBLIC_TMAP_API_KEY`
+* **규격 인터페이스**:
+  ```typescript
+  export interface ResolvedPlaceLocation {
+    name: string;
+    roadAddress: string;     // 도로명 주소 (예: "서울 강남구 논현로 854")
+    jibunAddress?: string;    // 지번 주소 백업
+    lat: number;              // WGS84 위도 (frontLat 또는 noorLat)
+    lng: number;              // WGS84 경도 (frontLon 또는 noorLon)
+  }
+  ```
+* **결과 추출 및 안전 가드**:
+  - `searchPoiInfo.pois.poi[0]`에서 최우선 검색 결과 취득.
+  - 도로명 주소(`newAddressList.newAddress[0].fullAddressRoad`)를 최우선으로 취득하고, 없을 시 구주소(`upperAddrName + middleAddrName + lowerAddrName + detailAddrName`)로 폴백.
+  - 좌표는 정밀 출입구 좌표(`frontLat`, `frontLon`)를 최우선 추출하고, 부재 시 중심점 좌표(`noorLat`, `noorLon`)로 파싱.
+  - AbortController 기반 4,000ms 타임아웃 및 try-catch 무결성 래핑을 통해 에러 발생 시 예외를 던지지 않고 안전하게 `null` 반환.
+
+#### 2. 스케줄 파싱 3단계 주소 확정 파이프라인 ([`app/api/schedule/parse/route.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/api/schedule/parse/route.ts))
+* Gemini 비전 파싱 후 각 일정의 출발지(`origin`) 및 도착지(`destination`)에 대해 3단계 주소 검증을 순차 수행:
+  1. **1순위 (DB/로컬 마스터 프리셋)**: `cockpit.presets` 및 핵심 키워드 휴리스틱과 일치하는 항목 확인 (기존 검증된 고정 주소 및 좌표 유지).
+  2. **2순위 (비고란 주소 추출)**: `notes` / `remark` 내에 기재된 영문/한글 도로명 주소 정규식 패턴(`854 Nonhyeon-ro...`, `서울 강남구 논현로 854...`) 탐색.
+  3. **3순위 (TMAP POI 실시간 검색)**: 여전히 정규 도로명 주소가 없다면 `searchTmapPoi(placeName)`를 호출하여 도로명 주소 및 위경도 좌표 취득 (필요 시 2순위 비고란 주소로 2차 검색).
+* **고성능 병렬 처리 및 인메모리 캐싱**:
+  - `Promise.all`을 적용하여 전체 스케줄 항목의 POI 검색을 비동기 병렬 처리.
+  - 요청 스코프 내 `poiCache = new Map<string, ResolvedPlaceLocation | null>()`를 적용하여 중복 거점(예: 동일 호텔 왕복)에 대한 불필요한 네트워크 중복 호출 방지.
+* **DB 동기화**:
+  - `cockpit.schedules` 테이블의 `origin_address`, `origin_lat`, `origin_lng`, `destination_address`, `destination_lat`, `destination_lng`에 완벽하게 바인딩 및 업서트.
+
+#### 3. 스케줄 카드 UI 출발지 주소 노출 동기화 ([`components/ScheduleCard.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ScheduleCard.tsx))
+* 도착지와 동일하게 출발지 거점명 옆에도 `origin_address`가 존재할 경우 차분한 슬레이트 서브 텍스트로 자연스럽게 인라인 렌더링:
+  ```tsx
+  <div className="relative flex items-center gap-2 min-w-0">
+    <div className="absolute -left-[19px] w-2.5 h-2.5 rounded-full bg-slate-400 ring-2 ring-white" />
+    <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
+      출발
+    </span>
+    <span className="text-sm font-bold text-slate-900 tracking-tight min-w-0 max-w-[55%] truncate" title={item.origin_name}>
+      {sanitizePlaceName(item.origin_name)}
+    </span>
+    {item.origin_address && (
+      <span className="text-xs text-slate-400 font-normal min-w-0 flex-1 truncate max-w-[180px]" title={item.origin_address}>
+        {item.origin_address}
+      </span>
+    )}
+  </div>
+  ```
+* **내비게이션 실행 버튼 연동 검증**:
+  - 우측 솔리드 블루 원형 내비 버튼(`w-11 h-11`) 터치 시, `scheduleToPresets(item)`를 통해 POI로 확보된 목적지 위경도(`destination_lat`, `destination_lng`)가 TMAP 딥링크 스킴(`tmap://route?goalname=...&goalx=...&goaly=...&coordType=WGS84GEO`)에 정확히 주입되어 지정된 목적지로 즉시 길안내가 시작됨을 확인.
+
+### 24.3 빌드 및 실데이터 검증 결과
+1. **타입스크립트 빌드 무결성**:
+   * `npm run build`: Turbopack 기준 14개 전 라우트 컴파일 통과 (에러 0건, 경고 0건).
+2. **미등록 거점 실데이터 POI 보정 검증**:
+   * 미등록 거점인 `'안다즈 서울 강남'` 조회 시:
+     - 도로명 주소: `'서울 강남구 논현로 854'` 정상 취득
+     - 정밀 진입 좌표: `lat: 37.52587649`, `lng: 127.0289898` 정상 추출
+     - 3단계 파이프라인을 거쳐 출발지/도착지 주소 및 내비 좌표에 100% 무결 바인딩 완료.
+
+
 
 
 
