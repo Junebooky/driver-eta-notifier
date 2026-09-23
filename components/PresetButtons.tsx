@@ -384,10 +384,10 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
               }}
               className={`w-full h-full min-h-[58px] px-2 py-2.5 rounded-xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-200 group ${
                 isHomeDestination
-                  ? 'border-2 border-[#1E60F3] text-[#1E60F3] bg-white font-bold shadow-sm shadow-blue-500/10'
+                  ? 'border-[#1E60F3] bg-blue-50/70 text-[#1E60F3] font-bold shadow-sm shadow-blue-500/10'
                   : isHomeOrigin
-                  ? 'bg-slate-50/80 text-slate-800 border-slate-300/90 ring-1 ring-slate-200/60 font-bold shadow-2xs'
-                  : `bg-white border-slate-200 text-slate-700 font-semibold ${dynamicHoverClasses}`
+                  ? 'bg-slate-100 text-slate-800 border-slate-300 ring-1 ring-slate-200 font-bold shadow-2xs'
+                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300 font-semibold'
               } ${isManageMode ? 'border-dashed border-[#1E60F3]/60' : ''}`}
               title={`${homePreset.name} (${homePreset.address})`}
             >
@@ -475,13 +475,13 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
           const isHQ = !preset.vehicle_no && !preset.vehicleNo;
           const badgeLabel = isHQ ? 'HQ' : 'MY';
 
-          let stateClasses = `bg-white border-slate-200 text-slate-700 font-medium ${dynamicHoverClasses}`;
+          let stateClasses = 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300 font-medium';
           if (isDestination) {
             stateClasses =
-              'border-2 border-[#1E60F3] text-[#1E60F3] bg-white font-bold shadow-sm shadow-blue-500/10';
+              'border-[#1E60F3] bg-blue-50/70 text-[#1E60F3] font-bold shadow-sm shadow-blue-500/10';
           } else if (isOrigin) {
             stateClasses =
-              'bg-slate-50/80 text-slate-800 border-slate-300/90 ring-1 ring-slate-200/60 font-bold shadow-2xs';
+              'bg-slate-100 text-slate-800 border-slate-300 ring-1 ring-slate-200 font-bold shadow-2xs';
           }
 
           if (isManageMode) {

@@ -4,7 +4,7 @@ import React from 'react';
 import { NaviProvider, LocationPreset, RouteEstimate, DriverProfile } from '@/types';
 import { launchNavigationApp, calculateHaversineEstimate } from '@/utils/navigation';
 import { generateVipReportText, copyAndLaunchKakaoTalk } from '@/utils/kakao';
-import { Zap, MessageSquare } from 'lucide-react';
+import { Zap, MessageSquare, ClipboardCheck } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface ActionPanelProps {
@@ -15,6 +15,7 @@ interface ActionPanelProps {
   reportText: string;
   targetChatRoom?: string;
   profile?: DriverProfile;
+  onOpenInspectionModal?: () => void;
 }
 
 const NAVI_DISPLAY_NAMES: Record<NaviProvider, string> = {
@@ -42,6 +43,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   routeEstimate,
   reportText,
   targetChatRoom,
+  onOpenInspectionModal,
 }) => {
   /**
    * 1-Second Fast Pass Action (Synchronous Clipboard Copy on Safari User Activation + Navi Launch + Haptics)
@@ -103,6 +105,21 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
         <MessageSquare className="w-4.5 h-4.5 text-[#3C1E1E] fill-[#3C1E1E] shrink-0" />
         <span>카카오톡 공유</span>
       </button>
+
+      {/* Vehicle Inspection Report Button (Receipt/Return Math Engine) */}
+      {onOpenInspectionModal && (
+        <button
+          type="button"
+          onClick={() => {
+            haptics.lightTap();
+            onOpenInspectionModal();
+          }}
+          className="w-full py-3 px-4 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 border border-slate-200/90 rounded-2xl font-bold text-xs tracking-tight shadow-2xs flex items-center justify-center gap-2 cursor-pointer transition-all duration-150 active:scale-[0.98]"
+        >
+          <ClipboardCheck className="w-4 h-4 text-[#1E60F3]" />
+          <span>차량 수령·반납 점검표 (계기판 연산)</span>
+        </button>
+      )}
     </div>
   );
 };

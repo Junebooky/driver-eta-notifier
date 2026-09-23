@@ -22,44 +22,31 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
   return (
     <div className="w-full bg-white border border-slate-100/80 rounded-2xl p-4 shadow-[0_8px_25px_rgba(30,96,243,0.06)] space-y-2.5 select-none">
       <div className="flex items-center space-x-2.5 w-full">
-        {/* Origin Card (Neutral Gray 기준점) */}
+        {/* Origin Card (Calm Slate Gray 기준점) */}
         <div
           onClick={() => {
             haptics.lightTap();
             onSelectTarget('origin');
           }}
-          className={`flex-1 min-w-0 w-full p-3 rounded-2xl border text-left cursor-pointer transition-all duration-150 active:scale-95 ${
+          className={`flex-1 min-w-0 w-full p-3 rounded-2xl border text-left cursor-pointer transition-all duration-150 active:scale-95 bg-slate-100 text-slate-700 border-slate-200 ${
             selectionTarget === 'origin'
-              ? 'bg-slate-50/80 text-slate-800 border-slate-300/90 ring-2 ring-slate-200/60 shadow-xs'
-              : 'bg-white border-slate-200/80 hover:border-slate-300'
+              ? 'ring-2 ring-slate-400/60 border-slate-300 shadow-xs'
+              : 'hover:border-slate-300'
           }`}
         >
           <div className="flex items-center space-x-1.5 min-w-0">
-            <div
-              className={`w-2 h-2 rounded-full shrink-0 ${
-                selectionTarget === 'origin' ? 'bg-slate-500' : 'bg-slate-300'
-              }`}
-            />
-            <span
-              className={`text-xs font-semibold shrink-0 ${
-                selectionTarget === 'origin' ? 'text-slate-700 font-bold' : 'text-slate-500'
-              }`}
-            >
+            <span className="px-1.5 py-0.5 rounded-md bg-slate-200/70 text-slate-600 font-semibold text-[10px] shrink-0">
               출발지
             </span>
           </div>
           <div
-            className={`text-sm font-bold truncate mt-1.5 w-full ${
-              selectionTarget === 'origin' ? 'text-slate-900' : 'text-slate-700'
-            }`}
+            className="text-sm font-bold truncate mt-1.5 w-full text-slate-800"
             title={origin.name}
           >
             {origin.shortName}
           </div>
           <div
-            className={`text-[11px] truncate mt-0.5 font-normal w-full ${
-              selectionTarget === 'origin' ? 'text-slate-500' : 'text-slate-400'
-            }`}
+            className="text-[11px] truncate mt-0.5 font-normal w-full text-slate-500"
             title={origin.address || origin.name}
           >
             {origin.address || origin.name}
@@ -81,40 +68,31 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
           <ArrowLeftRight className="w-3.5 h-3.5" />
         </button>
 
-        {/* Destination Card (2px Cobalt Outline 핵심 타깃 - 순수 화이트 배경) */}
+        {/* Destination Card (Solid Cobalt Blue 메인 타깃) */}
         <div
           onClick={() => {
             haptics.lightTap();
             onSelectTarget('destination');
           }}
-          className={`flex-1 min-w-0 w-full p-3 rounded-2xl text-left cursor-pointer transition-all duration-150 active:scale-95 ${
+          className={`flex-1 min-w-0 w-full p-3 rounded-2xl border-transparent text-left cursor-pointer transition-all duration-150 active:scale-95 bg-[#1E60F3] text-white shadow-[0_4px_16px_rgba(30,96,243,0.25)] ${
             selectionTarget === 'destination'
-              ? 'bg-white border-2 border-[#1E60F3] shadow-sm shadow-blue-500/10'
-              : 'bg-white border border-slate-200/80 hover:border-slate-300'
+              ? 'ring-2 ring-blue-300 shadow-md shadow-blue-500/35'
+              : 'hover:brightness-105'
           }`}
         >
           <div className="flex items-center space-x-1.5 min-w-0">
-            <div
-              className={`w-2 h-2 rounded-full shrink-0 ${
-                selectionTarget === 'destination' ? 'bg-[#1E60F3]' : 'bg-slate-300'
-              }`}
-            />
-            <span
-              className={`text-xs font-semibold shrink-0 ${
-                selectionTarget === 'destination' ? 'text-[#1E60F3] font-bold' : 'text-slate-500'
-              }`}
-            >
+            <span className="px-1.5 py-0.5 rounded-md bg-white/20 text-white font-bold text-[10px] shrink-0">
               목적지
             </span>
           </div>
           <div
-            className="text-sm font-bold truncate mt-1.5 w-full text-slate-900"
+            className="text-sm font-bold truncate mt-1.5 w-full text-white"
             title={destination.name}
           >
             {destination.shortName}
           </div>
           <div
-            className="text-[11px] truncate mt-0.5 font-normal w-full text-slate-500"
+            className="text-[11px] truncate mt-0.5 font-normal w-full text-blue-100"
             title={destination.address || destination.name}
           >
             {destination.address || destination.name}

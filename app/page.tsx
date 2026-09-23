@@ -17,6 +17,7 @@ import { DepartureTimePickerModal } from '@/components/DepartureTimePickerModal'
 import { PredictionResultSheet } from '@/components/PredictionResultSheet';
 import { GasStationModal } from '@/components/GasStationModal';
 import { FlightModal } from '@/components/FlightModal';
+import { VehicleInspectionModal } from '@/components/VehicleInspectionModal';
 import { ScheduleTab } from '@/components/ScheduleTab';
 import { Navigation, Calendar } from 'lucide-react';
 import { ScheduleItem, scheduleToPresets } from '@/data/ferrariSchedules';
@@ -68,6 +69,10 @@ export default function Home() {
   const [isFlightModalOpen, setIsFlightModalOpen] = useState(false);
   const [flightModalInitialFlightId, setFlightModalInitialFlightId] = useState<string | undefined>(undefined);
   const [flightModalInitialType, setFlightModalInitialType] = useState<FlightType | undefined>(undefined);
+
+  // Vehicle Inspection (Receipt / Return) Modal State (No-DB / Pure LocalStorage)
+  const [isInspectionModalOpen, setIsInspectionModalOpen] = useState(false);
+  const [inspectionInitialMode, setInspectionInitialMode] = useState<'receipt' | 'return'>('receipt');
 
   // Active vehicle identifier (e.g. '4호차', '1호차')
   const currentVehicleNo = useMemo(() => {
@@ -619,6 +624,10 @@ export default function Home() {
             setPreferredNavi(prov);
           }}
           onOpenAdminModal={() => setIsAdminModalOpen(true)}
+          onOpenInspectionModal={() => {
+            setInspectionInitialMode('receipt');
+            setIsInspectionModalOpen(true);
+          }}
           isAdmin={isAdmin}
         />
 
@@ -753,6 +762,10 @@ export default function Home() {
               reportText={reportPreviewText}
               targetChatRoom={profile.targetChatRoom}
               profile={profile}
+              onOpenInspectionModal={() => {
+                setInspectionInitialMode('return');
+                setIsInspectionModalOpen(true);
+              }}
             />
           </div>
         ) : (
@@ -951,6 +964,14 @@ export default function Home() {
         onSelectDestination={handleSelectFlightDestination}
         initialFlightId={flightModalInitialFlightId}
         initialType={flightModalInitialType}
+      />
+
+      {/* Vehicle Inspection (Receipt & Return) Modal (Pure Client-Side / localStorage Math) */}
+      <VehicleInspectionModal
+        isOpen={isInspectionModalOpen}
+        onClose={() => setIsInspectionModalOpen(false)}
+        profile={profile}
+        initialMode={inspectionInitialMode}
       />
 
     </main>
