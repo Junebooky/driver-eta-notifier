@@ -73,8 +73,12 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
   const [pointerPos, setPointerPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const touchStartPosRef = useRef<{ x: number; y: number; time: number } | null>(null);
   const isLongPressActiveRef = useRef(false);
+  const isScrollingRef = useRef(false);
+  const scrollResetTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const activeTouchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [activePressedIndex, setActivePressedIndex] = useState<number | 'home' | 'add' | null>(null);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
   const prevRectsRef = useRef<Map<string, DOMRect>>(new Map());
 
@@ -214,19 +218,40 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
     };
   }, [isDragging, onReorderPresets]);
 
-  // Pointer start (350ms long press timer)
+  const scheduleScrollReset = () => {
+    if (scrollResetTimerRef.current) {
+      clearTimeout(scrollResetTimerRef.current);
+    }
+    scrollResetTimerRef.current = setTimeout(() => {
+      isScrollingRef.current = false;
+    }, 100);
+  };
+
+  // Pointer start (350ms long press timer + 65ms active pressed feedback delay)
   const handlePointerStart = (index: number, e: React.TouchEvent | React.MouseEvent) => {
     if (isManageMode) return;
 
     isLongPressActiveRef.current = false;
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    touchStartPosRef.current = { x: clientX, y: clientY };
+    touchStartPosRef.current = { x: clientX, y: clientY, time: Date.now() };
     setPointerPos({ x: clientX, y: clientY });
 
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
     }
+    if (activeTouchTimeoutRef.current) {
+      clearTimeout(activeTouchTimeoutRef.current);
+      activeTouchTimeoutRef.current = null;
+    }
+
+    // Delay active pressed visual feedback by 65ms so scroll/flick doesn't flash buttons
+    activeTouchTimeoutRef.current = setTimeout(() => {
+      if (!isScrollingRef.current) {
+        setActivePressedIndex(index);
+      }
+    }, 65);
 
     longPressTimerRef.current = setTimeout(() => {
       isLongPressActiveRef.current = true;
@@ -241,38 +266,272 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
     }, 350);
   };
 
-  // Pointer move before 350ms to detect normal scrolling cancel
+  // Pointer move to detect scrolling (Touch Slop >= 8px threshold)
   const handlePointerMoveCheck = (e: React.TouchEvent | React.MouseEvent) => {
     if (!touchStartPosRef.current || isLongPressActiveRef.current) return;
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     const dist = Math.hypot(clientX - touchStartPosRef.current.x, clientY - touchStartPosRef.current.y);
-    if (dist > 10) {
+
+    if (dist >= 8) {
+      isScrollingRef.current = true;
       if (longPressTimerRef.current) {
         clearTimeout(longPressTimerRef.current);
         longPressTimerRef.current = null;
       }
+      if (activeTouchTimeoutRef.current) {
+        clearTimeout(activeTouchTimeoutRef.current);
+        activeTouchTimeoutRef.current = null;
+      }
+      setActivePressedIndex(null);
     }
   };
 
-  // Pointer end for normal tap
-  const handlePointerEnd = (preset: LocationPreset) => {
+  // Pointer cancel (Touch Cancel)
+  const handlePointerCancel = () => {
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
+    if (activeTouchTimeoutRef.current) {
+      clearTimeout(activeTouchTimeoutRef.current);
+      activeTouchTimeoutRef.current = null;
+    }
+    setActivePressedIndex(null);
+    isScrollingRef.current = true;
+    scheduleScrollReset();
+  };
+
+  // Pointer end for normal tap with 3-Guard Verification (Touch Slop < 8px, Duration <= 300ms, Hit Test)
+  const handlePointerEnd = (preset: LocationPreset, e: React.TouchEvent | React.MouseEvent) => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    if (activeTouchTimeoutRef.current) {
+      clearTimeout(activeTouchTimeoutRef.current);
+      activeTouchTimeoutRef.current = null;
+    }
+    setActivePressedIndex(null);
 
     if (isDragging) return;
 
-    if (!isLongPressActiveRef.current) {
-      haptics.lightTap();
-      if (isManageMode) {
-        setManagingPreset(preset);
-      } else {
-        onSelectPreset(preset);
+    if (isLongPressActiveRef.current) {
+      isLongPressActiveRef.current = false;
+      return;
+    }
+
+    if (isScrollingRef.current || !touchStartPosRef.current) {
+      scheduleScrollReset();
+      return;
+    }
+
+    let releaseX = 0;
+    let releaseY = 0;
+    if ('changedTouches' in e && e.changedTouches.length > 0) {
+      releaseX = e.changedTouches[0].clientX;
+      releaseY = e.changedTouches[0].clientY;
+    } else if ('clientX' in e) {
+      releaseX = e.clientX;
+      releaseY = e.clientY;
+    } else {
+      releaseX = touchStartPosRef.current.x;
+      releaseY = touchStartPosRef.current.y;
+    }
+
+    const duration = Date.now() - touchStartPosRef.current.time;
+    const dist = Math.hypot(
+      releaseX - touchStartPosRef.current.x,
+      releaseY - touchStartPosRef.current.y
+    );
+
+    // 1. Touch Slop Guard: movement must be < 8px
+    if (dist >= 8) {
+      isScrollingRef.current = true;
+      scheduleScrollReset();
+      return;
+    }
+
+    // 2. Duration Guard: touch duration must be <= 300ms
+    if (duration > 300) {
+      scheduleScrollReset();
+      return;
+    }
+
+    // 3. Bounding Rect Hit Test Guard: must release inside button boundaries
+    if (e.currentTarget instanceof HTMLElement) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const isInside =
+        releaseX >= rect.left &&
+        releaseX <= rect.right &&
+        releaseY >= rect.top &&
+        releaseY <= rect.bottom;
+      if (!isInside) {
+        scheduleScrollReset();
+        return;
       }
     }
-    isLongPressActiveRef.current = false;
+
+    // Deliberate tap validated!
+    haptics.lightTap();
+    if (isManageMode) {
+      setManagingPreset(preset);
+    } else {
+      onSelectPreset(preset);
+    }
+
+    scheduleScrollReset();
+  };
+
+  // Home Slot Touch Handlers with same 3-Guard Verification
+  const handleHomePointerStart = (e: React.TouchEvent | React.MouseEvent) => {
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    touchStartPosRef.current = { x: clientX, y: clientY, time: Date.now() };
+
+    if (activeTouchTimeoutRef.current) {
+      clearTimeout(activeTouchTimeoutRef.current);
+    }
+    activeTouchTimeoutRef.current = setTimeout(() => {
+      if (!isScrollingRef.current) {
+        setActivePressedIndex('home');
+      }
+    }, 65);
+  };
+
+  const handleHomePointerEnd = (e: React.TouchEvent | React.MouseEvent) => {
+    if (activeTouchTimeoutRef.current) {
+      clearTimeout(activeTouchTimeoutRef.current);
+      activeTouchTimeoutRef.current = null;
+    }
+    setActivePressedIndex(null);
+
+    if (isScrollingRef.current || !touchStartPosRef.current) {
+      scheduleScrollReset();
+      return;
+    }
+
+    let releaseX = 0;
+    let releaseY = 0;
+    if ('changedTouches' in e && e.changedTouches.length > 0) {
+      releaseX = e.changedTouches[0].clientX;
+      releaseY = e.changedTouches[0].clientY;
+    } else if ('clientX' in e) {
+      releaseX = e.clientX;
+      releaseY = e.clientY;
+    } else {
+      releaseX = touchStartPosRef.current.x;
+      releaseY = touchStartPosRef.current.y;
+    }
+
+    const duration = Date.now() - touchStartPosRef.current.time;
+    const dist = Math.hypot(
+      releaseX - touchStartPosRef.current.x,
+      releaseY - touchStartPosRef.current.y
+    );
+
+    if (dist >= 8 || duration > 300) {
+      isScrollingRef.current = true;
+      scheduleScrollReset();
+      return;
+    }
+
+    if (e.currentTarget instanceof HTMLElement) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const isInside =
+        releaseX >= rect.left &&
+        releaseX <= rect.right &&
+        releaseY >= rect.top &&
+        releaseY <= rect.bottom;
+      if (!isInside) {
+        scheduleScrollReset();
+        return;
+      }
+    }
+
+    haptics.lightTap();
+    if (isHomeConfigured) {
+      if (isManageMode) {
+        onOpenHomeModal();
+      } else {
+        onSelectPreset(homePreset);
+      }
+    } else {
+      onOpenHomeModal();
+    }
+
+    scheduleScrollReset();
+  };
+
+  // Add Slot Touch Handlers with 3-Guard Verification
+  const handleAddPointerStart = (e: React.TouchEvent | React.MouseEvent) => {
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    touchStartPosRef.current = { x: clientX, y: clientY, time: Date.now() };
+
+    if (activeTouchTimeoutRef.current) {
+      clearTimeout(activeTouchTimeoutRef.current);
+    }
+    activeTouchTimeoutRef.current = setTimeout(() => {
+      if (!isScrollingRef.current) {
+        setActivePressedIndex('add');
+      }
+    }, 65);
+  };
+
+  const handleAddPointerEnd = (e: React.TouchEvent | React.MouseEvent) => {
+    if (activeTouchTimeoutRef.current) {
+      clearTimeout(activeTouchTimeoutRef.current);
+      activeTouchTimeoutRef.current = null;
+    }
+    setActivePressedIndex(null);
+
+    if (isScrollingRef.current || !touchStartPosRef.current) {
+      scheduleScrollReset();
+      return;
+    }
+
+    let releaseX = 0;
+    let releaseY = 0;
+    if ('changedTouches' in e && e.changedTouches.length > 0) {
+      releaseX = e.changedTouches[0].clientX;
+      releaseY = e.changedTouches[0].clientY;
+    } else if ('clientX' in e) {
+      releaseX = e.clientX;
+      releaseY = e.clientY;
+    } else {
+      releaseX = touchStartPosRef.current.x;
+      releaseY = touchStartPosRef.current.y;
+    }
+
+    const duration = Date.now() - touchStartPosRef.current.time;
+    const dist = Math.hypot(
+      releaseX - touchStartPosRef.current.x,
+      releaseY - touchStartPosRef.current.y
+    );
+
+    if (dist >= 8 || duration > 300) {
+      isScrollingRef.current = true;
+      scheduleScrollReset();
+      return;
+    }
+
+    if (e.currentTarget instanceof HTMLElement) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const isInside =
+        releaseX >= rect.left &&
+        releaseX <= rect.right &&
+        releaseY >= rect.top &&
+        releaseY <= rect.bottom;
+      if (!isInside) {
+        scheduleScrollReset();
+        return;
+      }
+    }
+
+    haptics.lightTap();
+    onOpenAddModal();
+    scheduleScrollReset();
   };
 
   const isHomeConfigured = !!homeLocation?.address;
@@ -341,6 +600,11 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
     const dy = touchEndY - carouselTouchStartRef.current.y;
     carouselTouchStartRef.current = null;
 
+    if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+      isScrollingRef.current = true;
+      scheduleScrollReset();
+    }
+
     if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) {
       if (dx < 0 && currentPage < totalPages - 1) {
         haptics.lightTap();
@@ -352,6 +616,23 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
     }
   };
 
+  const handleCarouselTouchMove = (e: React.TouchEvent) => {
+    if (!carouselTouchStartRef.current || isDragging || isLongPressActiveRef.current) return;
+    const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
+    const dx = currentX - carouselTouchStartRef.current.x;
+    const dy = currentY - carouselTouchStartRef.current.y;
+    if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+      isScrollingRef.current = true;
+    }
+  };
+
+  const handleCarouselTouchCancel = () => {
+    carouselTouchStartRef.current = null;
+    isScrollingRef.current = true;
+    scheduleScrollReset();
+  };
+
   // Slot Render Helpers
   const renderHomeSlot = () => {
     if (isHomeConfigured) {
@@ -359,15 +640,22 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
         <div key="slot_home" className="relative select-none touch-none h-full">
           <button
             type="button"
-            onClick={() => {
-              haptics.lightTap();
-              if (isManageMode) {
-                onOpenHomeModal();
-              } else {
-                onSelectPreset(homePreset);
+            onTouchStart={handleHomePointerStart}
+            onTouchMove={handlePointerMoveCheck}
+            onTouchEnd={handleHomePointerEnd}
+            onTouchCancel={handlePointerCancel}
+            onMouseDown={handleHomePointerStart}
+            onMouseMove={handlePointerMoveCheck}
+            onMouseUp={handleHomePointerEnd}
+            onClick={(e) => {
+              if (isScrollingRef.current) {
+                e.preventDefault();
+                e.stopPropagation();
               }
             }}
-            className={`w-full h-full min-h-[58px] px-2 py-2.5 rounded-xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-200 group ${
+            className={`w-full h-full min-h-[58px] px-2 py-2.5 rounded-xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-200 group select-none [-webkit-tap-highlight-color:transparent] ${
+              activePressedIndex === 'home' ? 'scale-[0.97] bg-slate-100/90' : ''
+            } ${
               isHomeDestination
                 ? 'border-2 border-[#1E60F3] text-[#1E60F3] bg-white font-bold shadow-sm shadow-blue-500/10'
                 : isHomeOrigin
@@ -427,11 +715,22 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
       <div key="slot_home" className="relative select-none h-full">
         <button
           type="button"
-          onClick={() => {
-            haptics.lightTap();
-            onOpenHomeModal();
+          onTouchStart={handleHomePointerStart}
+          onTouchMove={handlePointerMoveCheck}
+          onTouchEnd={handleHomePointerEnd}
+          onTouchCancel={handlePointerCancel}
+          onMouseDown={handleHomePointerStart}
+          onMouseMove={handlePointerMoveCheck}
+          onMouseUp={handleHomePointerEnd}
+          onClick={(e) => {
+            if (isScrollingRef.current) {
+              e.preventDefault();
+              e.stopPropagation();
+            }
           }}
-          className={`w-full h-full min-h-[58px] py-2.5 px-2 rounded-xl border border-dashed border-slate-300 dark:border-slate-600 bg-slate-50/80 ${dynamicHoverClasses} text-slate-800 flex flex-col justify-between items-center active:scale-95 transition-all duration-200 cursor-pointer group`}
+          className={`w-full h-full min-h-[58px] py-2.5 px-2 rounded-xl border border-dashed border-slate-300 dark:border-slate-600 bg-slate-50/80 ${dynamicHoverClasses} text-slate-800 flex flex-col justify-between items-center transition-all duration-200 cursor-pointer group select-none [-webkit-tap-highlight-color:transparent] ${
+            activePressedIndex === 'home' ? 'scale-[0.97] bg-slate-100/90' : ''
+          }`}
           title="자택 주소를 등록하세요"
         >
           <div className="flex items-center justify-center gap-1 w-full">
@@ -490,11 +789,20 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
             type="button"
             onTouchStart={(e) => handlePointerStart(index, e)}
             onTouchMove={handlePointerMoveCheck}
-            onTouchEnd={() => handlePointerEnd(preset)}
+            onTouchEnd={(e) => handlePointerEnd(preset, e)}
+            onTouchCancel={handlePointerCancel}
             onMouseDown={(e) => handlePointerStart(index, e)}
             onMouseMove={handlePointerMoveCheck}
-            onMouseUp={() => handlePointerEnd(preset)}
-            className={`w-full h-full min-h-[58px] px-2 py-2.5 rounded-xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-200 group ${stateClasses}`}
+            onMouseUp={(e) => handlePointerEnd(preset, e)}
+            onClick={(e) => {
+              if (isScrollingRef.current) {
+                e.preventDefault();
+                e.stopPropagation();
+              }
+            }}
+            className={`w-full h-full min-h-[58px] px-2 py-2.5 rounded-xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-200 group select-none [-webkit-tap-highlight-color:transparent] ${
+              activePressedIndex === index ? 'scale-[0.97] bg-slate-100/90' : ''
+            } ${stateClasses}`}
             title={`${preset.name} (길게 눌러 순서 변경)`}
           >
             <span
@@ -536,15 +844,27 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
     <button
       key="slot_add"
       type="button"
-      onClick={() => {
-        haptics.lightTap();
-        onOpenAddModal();
+      onTouchStart={handleAddPointerStart}
+      onTouchMove={handlePointerMoveCheck}
+      onTouchEnd={handleAddPointerEnd}
+      onTouchCancel={handlePointerCancel}
+      onMouseDown={handleAddPointerStart}
+      onMouseMove={handlePointerMoveCheck}
+      onMouseUp={handleAddPointerEnd}
+      onClick={(e) => {
+        if (isScrollingRef.current) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
       }}
       className={`w-full h-full min-h-[58px] py-2.5 px-2 rounded-xl border border-dashed border-slate-300 ${
         isTargetDestination
           ? 'hover:border-blue-300/80 hover:bg-blue-50/40 hover:text-[#1E60F3]'
           : 'hover:border-slate-400 hover:bg-slate-50/80 hover:text-slate-800'
-      } bg-white hover:shadow-xs hover:-translate-y-0.5 text-slate-400 text-xs font-medium flex flex-col justify-between items-center active:scale-95 transition-all duration-200 cursor-pointer`}
+      } bg-white hover:shadow-xs hover:-translate-y-0.5 text-slate-400 text-xs font-medium flex flex-col justify-between items-center transition-all duration-200 cursor-pointer select-none [-webkit-tap-highlight-color:transparent] ${
+        activePressedIndex === 'add' ? 'scale-[0.97] bg-slate-100/90' : ''
+      }`}
       title="새 거점 검색 및 등록"
     >
       <div className="flex items-center justify-center gap-1 w-full">
@@ -665,8 +985,16 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
       {/* 3-Column High-Density Grid with Horizontal Carousel Pagination (Max 4 rows per page) */}
       <div
         className="w-full overflow-hidden select-none"
+        onClickCapture={(e) => {
+          if (isScrollingRef.current) {
+            e.stopPropagation();
+            e.preventDefault();
+          }
+        }}
         onTouchStart={handleCarouselTouchStart}
+        onTouchMove={handleCarouselTouchMove}
         onTouchEnd={handleCarouselTouchEnd}
+        onTouchCancel={handleCarouselTouchCancel}
       >
         <div
           className="flex transition-transform duration-300 ease-out will-change-transform"
