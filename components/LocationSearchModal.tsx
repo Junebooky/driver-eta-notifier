@@ -234,7 +234,7 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 select-none overscroll-contain"
+      className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 select-none overscroll-contain"
       style={{ overscrollBehavior: 'contain', touchAction: 'pan-y' }}
       onClick={onClose}
     >

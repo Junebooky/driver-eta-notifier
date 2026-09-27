@@ -27,6 +27,25 @@ export interface ScheduleItem {
 }
 
 /**
+ * 스케줄 목록의 실제 운행 날짜 및 시간순(Chronological) 강제 오름차순 정렬 유틸리티
+ */
+export function sortSchedulesChronologically<T extends { date?: string; pickup_date?: string; pickup_time?: string; time_display?: string }>(schedules: T[]): T[] {
+  return [...schedules].sort((a, b) => {
+    const dateA = a.pickup_date || a.date || '';
+    const dateB = b.pickup_date || b.date || '';
+    if (dateA !== dateB) return dateA.localeCompare(dateB);
+
+    const getTime = (item: T) => {
+      const match = (item.pickup_time || item.time_display || '').match(/(\d{1,2}):(\d{2})/);
+      if (!match) return '99:99';
+      return `${match[1].padStart(2, '0')}:${match[2]}`;
+    };
+
+    return getTime(a).localeCompare(getTime(b));
+  });
+}
+
+/**
  * 윤태준 드라이버 (4호차, 142호 7811) 실제 4일치 페라리 VIP 의전 배차 데이터
  * (시뮬레이션 배제, 원본 기재 착륙/픽업 시각 기준)
  * 

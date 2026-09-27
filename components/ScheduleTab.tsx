@@ -2,7 +2,8 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { DriverProfile, LocationPreset } from '@/types';
-import { ScheduleItem, CONFIRMED_FERRARI_SCHEDULES, scheduleToPresets } from '@/data/ferrariSchedules';
+import { ScheduleItem, CONFIRMED_FERRARI_SCHEDULES, scheduleToPresets, sortSchedulesChronologically } from '@/data/ferrariSchedules';
+export { sortSchedulesChronologically };
 import { ScheduleCard } from '@/components/ScheduleCard';
 import { EditScheduleModal } from '@/components/EditScheduleModal';
 import { ScheduleFormModal } from '@/components/ScheduleFormModal';
@@ -136,7 +137,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
 
   const handleSaveNewSchedule = async (newSchedule: ScheduleItem) => {
     setSchedules((prev) => {
-      const updated = [newSchedule, ...prev];
+      const updated = sortSchedulesChronologically([newSchedule, ...prev.filter((s) => s.id !== newSchedule.id)]);
       try {
         localStorage.setItem('cockpit_schedules', JSON.stringify(updated));
       } catch (e) {
@@ -249,7 +250,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
       if (res.ok) {
         const data = await res.json();
         if (data.schedules) {
-          setSchedules(data.schedules);
+          setSchedules(sortSchedulesChronologically(data.schedules));
           if (vNo === 'all') {
             setScheduleTitle('전체 호차 통합 관제 배차표');
           } else if (vNo.includes('4')) {
@@ -686,7 +687,7 @@ ${scheduleItemsFormatted}`.trim();
           targetQuery.includes('샘플') ||
           targetQuery.includes('전체'))
       ) {
-        setSchedules(CONFIRMED_FERRARI_SCHEDULES);
+        setSchedules(sortSchedulesChronologically(CONFIRMED_FERRARI_SCHEDULES));
       }
       haptics.success();
     } catch (err) {
@@ -709,7 +710,7 @@ ${scheduleItemsFormatted}`.trim();
   // One-click Ferrari 4-day sample loader
   const handleLoadDemoSchedules = () => {
     haptics.heavyTap();
-    setSchedules(CONFIRMED_FERRARI_SCHEDULES);
+    setSchedules(sortSchedulesChronologically(CONFIRMED_FERRARI_SCHEDULES));
   };
 
   // Reset to empty state
@@ -719,15 +720,18 @@ ${scheduleItemsFormatted}`.trim();
     setSelectedDateFilter('all');
   };
 
-  // Filtered schedules
-  const filteredSchedules = selectedDateFilter === 'all'
-    ? schedules
-    : schedules.filter((s) => s.date === selectedDateFilter);
+  // Filtered schedules (Chronological order guaranteed)
+  const filteredSchedules = sortSchedulesChronologically(
+    selectedDateFilter === 'all'
+      ? schedules
+      : schedules.filter((s) => s.date === selectedDateFilter)
+  );
 
-  // Extract unique dates for filter chips
+  // Extract unique dates for filter chips (sorted chronologically)
+  const uniqueDates = Array.from(new Set(schedules.map((s) => s.date))).sort();
   const dateFilters = [
     { key: 'all', label: `전체 (${schedules.length})` },
-    ...Array.from(new Set(schedules.map((s) => s.date))).map((d) => {
+    ...uniqueDates.map((d) => {
       const match = schedules.find((s) => s.date === d);
       return { key: d, label: match ? match.dateLabel.replace('2026-', '') : d };
     }),
@@ -1266,7 +1270,7 @@ ${scheduleItemsFormatted}`.trim();
         }}
         schedule={editingSchedule}
         onSave={async (updated) => {
-          setSchedules((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+          setSchedules((prev) => sortSchedulesChronologically(prev.map((s) => (s.id === updated.id ? updated : s))));
           try {
             await fetch('/api/schedules', {
               method: 'PUT',

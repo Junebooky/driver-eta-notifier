@@ -1515,6 +1515,105 @@ SELECT * FROM cockpit.presets;
 3. **스케줄 등록 모달 단일 시간 박스 검증**:
    - 퀵 칩과 중복 인풋 없이 단일 네이티브 터치 박스가 렌더링되며, `formatKoreanTime`을 통해 `오전 09:00`, `오후 02:30` 등의 표준 시간 서식이 완벽하게 적용됨을 확인.
 
+---
+
+## 36. 모달 Z-Index 최상위 격리, 픽업일자 네이티브 피커 전환, 스케줄 시간순 정렬 및 모달 폰트 1.4배 확대 (2026-09-28)
+
+### 36.1 추진 배경 및 목적
+1. **모달 뒷배경 탭 레이어 비침 현상 원천 차단**:
+   - `app/page.tsx` 내 `animate-fade-in` 애니메이션 컨테이너로 인해 CSS Stacking Context가 형성되어, `ScheduleFormModal`이 메인 화면 상단 네비게이션 탭('운행'/'스케줄') 뒤로 밀리거나 비치던 현상 해결.
+   - React Portal(`createPortal(..., document.body)`)을 적용하여 모달을 `document.body` 최상단으로 승격하고, `z-[100]` 및 딤드 오버레이(`fixed inset-0 bg-black/60 backdrop-blur-sm -z-10`)로 뷰포트 전체를 완전 격리.
+2. **픽업 일자 입력 UX 혁신**:
+   - 8자리 숫자(`20260928`)를 키패드로 번거롭게 타이핑하던 기존 방식을 완전히 걷어내고, 단일 네이티브 날짜 피커 터치 박스(`w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl`)로 전면 개편.
+   - 한국어 표준 날짜 표기(예: `2026년 09월 28일 (월)`) 및 원터치 OS 네이티브 달력 호출 연동.
+3. **스케줄 목록 실제 날짜 및 시간순(Chronological) 강제 정렬**:
+   - 스케줄 추가, 수정, 조회 및 필터링 시 등록 순서와 무관하게 실제 운행 일자와 픽업 시간(HH:mm) 기준 오름차순으로 일관되게 정렬되어 이른 아침 일정부터 밤 일정까지 정갈하게 나열되도록 보장.
+4. **모달 전체 폰트 및 터치 타깃 1.4배 스케일업**:
+   - 차량 운전 및 거치대 환경에서 기사님의 한눈 가독성과 조작 편의성을 극대화하기 위해 헤더 제목, 입력 라벨, 경로/시간 텍스트, 버튼 패딩을 약 1.4배 수준으로 확대.
+
+---
+
+### 36.2 핵심 구현 내역
+
+#### [태스크 1] 모달 최상위 레이어 Z-Index 승격 및 백드롭 누수 차단 ([`components/ScheduleFormModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ScheduleFormModal.tsx), [`components/EditScheduleModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/EditScheduleModal.tsx), [`components/LocationSearchModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/LocationSearchModal.tsx))
+1. **React Portal 기반 DOM 루트 승격**:
+   - `ScheduleFormModal` 및 `EditScheduleModal`을 `createPortal(..., document.body)`로 감싸 상위 CSS 애니메이션 Stacking Context로부터 완전 격리.
+2. **최상위 Z-Index 및 백드롭 딤드 오버레이 (`z-[100]`, `-z-10`)**:
+   - 최외곽 컨테이너: `fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 select-none overscroll-contain animate-in fade-in duration-200`.
+   - 백드롭 딤드 레이어: `fixed inset-0 bg-black/60 backdrop-blur-sm -z-10`을 배치하여 상태바, 헤더, 상단 네비게이션 탭(`스케줄` 텍스트 등) 전체를 빈틈없이 암전 차단.
+3. **자식 모달 레이어 위계 정립**:
+   - 장소 검색 모달(`LocationSearchModal`)의 Z-Index를 `z-[110]`으로 승격하여 스케줄 등록 모달(`z-[100]`) 위에서 충돌 없이 렌더링되도록 계층화.
+
+---
+
+#### [태스크 2] 픽업 일자 8자리 숫자 입력 ➔ '네이티브 날짜 피커 터치 박스' 전환 ([`components/ScheduleFormModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ScheduleFormModal.tsx))
+1. **기존 8자리 텍스트 인풋 제거**:
+   - `20260928` 숫자 텍스트 인풋, 유효성 검사 경고 및 "숫자만 입력 시 요일이 자동 연산됩니다" 안내 문구를 완전히 삭제.
+2. **단일 네이티브 날짜 터치 박스 (Single Native Date Picker)**:
+   - 가로 전체 폭의 라운드 박스(`w-full px-5 py-4 bg-slate-50 border rounded-2xl`) 배치.
+   - `formatKoreanDate(pickupDate)`를 통해 선택된 일자를 한국어 포맷(예: `2026년 09월 28일 (월)`)으로 큼직하고 단정하게 표기(`text-xl font-bold text-slate-900`)하고 우측에 달력 아이콘 배치.
+   - 박스 전체에 투명 네이티브 `<input type="date" value={pickupDate} onChange={...} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />`를 오버레이하여 클릭 즉시 모바일 OS 달력 피커 호출.
+
+---
+
+#### [태스크 3] 스케줄 목록의 실제 날짜 및 시간순(Chronological) 강제 정렬 ([`data/ferrariSchedules.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/data/ferrariSchedules.ts), [`components/ScheduleTab.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ScheduleTab.tsx))
+1. **정렬 알고리즘 표준화 (`sortSchedulesChronologically`)**:
+   ```typescript
+   export function sortSchedulesChronologically<T extends { date?: string; pickup_date?: string; pickup_time?: string; time_display?: string }>(schedules: T[]): T[] {
+     return [...schedules].sort((a, b) => {
+       const dateA = a.pickup_date || a.date || '';
+       const dateB = b.pickup_date || b.date || '';
+       if (dateA !== dateB) return dateA.localeCompare(dateB);
+
+       const getTime = (item: T) => {
+         const match = (item.pickup_time || item.time_display || '').match(/(\d{1,2}):(\d{2})/);
+         if (!match) return '99:99';
+         return `${match[1].padStart(2, '0')}:${match[2]}`;
+       };
+
+       return getTime(a).localeCompare(getTime(b));
+     });
+   }
+   ```
+2. **전체 뷰 및 파이프라인 동기화**:
+   - `handleSaveNewSchedule` (신규 등록 시 즉시 정렬 삽입)
+   - `fetchSchedulesForVehicle` (API 응답 데이터 정렬)
+   - `filteredSchedules` (전체보기 및 일자별 필터 뷰 정렬)
+   - `EditScheduleModal` `onSave` (일정 수정 시 자동 재배열)
+   - `handleLoadDemoSchedules` 및 Fallback 스케줄 동기화
+
+---
+
+#### [태스크 4] 스케줄 등록 모달 전체 폰트 및 터치 타깃 1.4배 확대 ([`components/ScheduleFormModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ScheduleFormModal.tsx))
+1. **모달 헤더**:
+   - 제목: `text-base` ➔ `text-xl sm:text-2xl font-black`
+   - 배정 안내: `text-xs` ➔ `text-sm font-semibold text-slate-500`
+   - 아이콘 박스: `w-7 h-7` ➔ `w-9 h-9 sm:w-10 sm:h-10`, 닫기 버튼: `w-8 h-8` ➔ `w-10 h-10`
+2. **섹션 입력 라벨** (픽업 일자, 픽업 경로, 픽업 시간, 승객명, 항공편명, 의전 메모):
+   - `text-xs / text-sm` ➔ `text-base sm:text-lg font-extrabold text-slate-700`
+3. **입력 필드 및 결과 텍스트**:
+   - 출발지/도착지 명칭: `text-sm font-bold` ➔ `text-lg font-black`
+   - 상세 주소: `text-[11px]` ➔ `text-sm text-slate-500`
+   - 뱃지 ('출발' / '도착'): `text-[10px]` ➔ `text-xs font-black px-2.5 py-1`
+   - 픽업 일자 / 픽업 시간 표시 텍스트: `text-base` ➔ `text-xl font-bold`
+   - 승객명, 항공편명, 의전 메모 인풋 텍스트 및 플레이스홀더: `text-xs` ➔ `text-base sm:text-lg font-semibold`, 패딩: `px-4 py-3 sm:py-3.5`
+4. **하단 액션 버튼** (`취소`, `스케줄 등록 완료`):
+   - 패딩: `py-3` ➔ `py-4`
+   - 텍스트: `text-xs font-bold` ➔ `text-base sm:text-lg font-black`
+
+---
+
+### 36.3 검증 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 14개 라우트 컴파일 에러 **0건** 통과.
+2. **시간순 정렬 알고리즘 검증**:
+   - `test_modal_features.ts` 독립 실행 결과, 다양한 일자(2026-09-27, 2026-09-28) 및 시간 포맷(`HH:mm:ss`, `픽업 HH:mm`, `HH:mm`)에 대해 이른 아침부터 밤 순서로 100% 완벽하게 오름차순 정렬됨을 검증 완료.
+3. **모달 Z-Index & 백드롭 차단 검증**:
+   - `createPortal(..., document.body)`와 `z-[100]`, `bg-black/60 backdrop-blur-sm -z-10` 적용으로 메인 화면 탭 바 및 상단 헤더가 전혀 투과되지 않고 안정적으로 차단됨을 확인.
+4. **네이티브 날짜 피커 및 1.4배 폰트 UI 검증**:
+   - 8자리 숫자 인풋이 단일 터치 박스로 대체되고, 한국어 포맷(`2026년 09월 28일 (월)`)과 1.4배 확대된 타이포그래피로 현장 가독성이 극대화됨을 확인.
+
+
 
 
 

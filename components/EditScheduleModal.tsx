@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ScheduleItem } from '@/data/ferrariSchedules';
-import { X, Check, Clock, User, Plane, FileText, Calendar } from 'lucide-react';
+import { X, Check, Clock, User, Plane, FileText } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface EditScheduleModalProps {
@@ -18,10 +19,15 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
   schedule,
   onSave,
 }) => {
+  const [mounted, setMounted] = useState(false);
   const [passenger, setPassenger] = useState('');
   const [flight, setFlight] = useState('');
   const [timeDisplay, setTimeDisplay] = useState('');
   const [notes, setNotes] = useState('');
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (schedule) {
@@ -42,7 +48,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
     };
   }, [isOpen]);
 
-  if (!isOpen || !schedule) return null;
+  if (!isOpen || !mounted || !schedule) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,14 +71,17 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
     onClose();
   };
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 select-none overscroll-contain"
+      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 select-none overscroll-contain animate-in fade-in duration-200"
       style={{ overscrollBehavior: 'contain', touchAction: 'pan-y' }}
       onClick={onClose}
     >
+      {/* Background Dimmed Overlay */}
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm -z-10" />
+
       <div
-        className="w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[85dvh] animate-in slide-in-from-bottom-6 duration-300"
+        className="w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[85dvh] relative z-10 animate-in slide-in-from-bottom-6 duration-300"
         style={{ overscrollBehavior: 'contain', touchAction: 'pan-y' }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -192,6 +201,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
