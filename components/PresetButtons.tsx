@@ -985,7 +985,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
 
       {/* 3-Column High-Density Grid with Horizontal Carousel Pagination (Max 4 rows per page) */}
       <div
-        className="w-full overflow-hidden select-none touch-pan-y"
+        className="w-full overflow-hidden select-none touch-pan-y px-1 pt-1 pb-7 sm:pb-8"
         onClickCapture={(e) => {
           if (isScrollingRef.current) {
             e.stopPropagation();
@@ -1005,7 +1005,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
             <div key={pageIdx} className="w-full shrink-0">
               <div
                 className={`grid grid-cols-3 gap-2 content-start ${
-                  totalPages > 1 ? 'min-h-[256px]' : ''
+                  totalPages > 1 ? 'min-h-[268px]' : ''
                 }`}
               >
                 {pageSlots.map((slot) => {
@@ -1022,7 +1022,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
 
       {/* Interactive Dots Pagination (Only visible when totalPages > 1 / next page exists) */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-1.5 pt-1 pb-0.5">
+        <div className="flex items-center justify-center gap-1.5 pt-2 pb-1 mt-2.5 sm:mt-3">
           {Array.from({ length: totalPages }).map((_, idx) => {
             const isActive = idx === currentPage;
             return (

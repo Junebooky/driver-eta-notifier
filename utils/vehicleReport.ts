@@ -98,11 +98,11 @@ export function generateReceiptReport(params: ReceiptReportParams): string {
 
   const lines: string[] = ['[차량 수령]', ''];
   lines.push(`• 수령일자 : ${dateStr}`);
-  
+
   if (hocha) {
     lines.push(`• 차량호차 : ${hocha}`);
   }
-  
+
   if (carNo) {
     lines.push(`• 차량번호 : ${carNo}`);
   }
@@ -219,7 +219,7 @@ export function generateDailyReport(params: {
 }): string {
   const damageDetail = params.newDamages.length > 0
     ? `- 금일 신규: ${params.newDamages.join(', ')}`
-    : `- 금일 특이사항: 이상 없음 (신규 데미지 없음)`;
+    : `- 금일 특이사항: X`;
 
   const existingDetail = params.existingDamages.length > 0
     ? `- 기존 누적: ${params.existingDamages.join(', ')}`

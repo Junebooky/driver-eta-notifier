@@ -47,6 +47,26 @@ const DAMAGE_PART_CHIPS = [
   '유리/윈드실드',
 ];
 
+/**
+ * Format raw numeric string into 3-digit comma separated format
+ * e.g. "55555" -> "55,555", "" -> ""
+ */
+const formatNumberWithComma = (val: string | number | undefined | null): string => {
+  if (val === undefined || val === null || val === '') return '';
+  const clean = String(val).replace(/[^0-9]/g, '');
+  if (!clean) return '';
+  const num = Number(clean);
+  return isNaN(num) ? '' : num.toLocaleString();
+};
+
+/**
+ * Extract clean digit string from input
+ * e.g. "55,555" -> "55555"
+ */
+const sanitizeNumericInput = (val: string): string => {
+  return val.replace(/[^0-9]/g, '');
+};
+
 export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
   isOpen,
   onClose,
@@ -451,13 +471,12 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
           <div className="w-full bg-slate-100/90 p-1 rounded-full relative flex items-center select-none shadow-inner">
             {/* Sliding Pill Indicator */}
             <div
-              className={`w-[calc((100%-8px)/3)] h-[calc(100%-8px)] absolute top-1 left-1 rounded-full bg-[#1E60F3] shadow-[0_4px_14px_rgba(30,96,243,0.35)] transition-transform duration-300 ease-out pointer-events-none transform ${
-                activeTab === 'pickup'
-                  ? 'translate-x-0'
-                  : activeTab === 'daily'
+              className={`w-[calc((100%-8px)/3)] h-[calc(100%-8px)] absolute top-1 left-1 rounded-full bg-[#1E60F3] shadow-[0_4px_14px_rgba(30,96,243,0.35)] transition-transform duration-300 ease-out pointer-events-none transform ${activeTab === 'pickup'
+                ? 'translate-x-0'
+                : activeTab === 'daily'
                   ? 'translate-x-full'
                   : 'translate-x-[200%]'
-              }`}
+                }`}
             />
 
             <button
@@ -470,9 +489,8 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
             >
               <Gauge className={`w-3.5 h-3.5 ${activeTab === 'pickup' ? 'text-white' : 'text-slate-400'}`} />
               <span
-                className={`text-xs tracking-tight transition-colors duration-300 ${
-                  activeTab === 'pickup' ? 'text-white font-extrabold' : 'text-slate-500 font-semibold'
-                }`}
+                className={`text-xs tracking-tight transition-colors duration-300 ${activeTab === 'pickup' ? 'text-white font-extrabold' : 'text-slate-500 font-semibold'
+                  }`}
               >
                 차량 수령
               </span>
@@ -488,9 +506,8 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
             >
               <CalendarCheck className={`w-3.5 h-3.5 ${activeTab === 'daily' ? 'text-white' : 'text-slate-400'}`} />
               <span
-                className={`text-xs tracking-tight transition-colors duration-300 ${
-                  activeTab === 'daily' ? 'text-white font-extrabold' : 'text-slate-500 font-semibold'
-                }`}
+                className={`text-xs tracking-tight transition-colors duration-300 ${activeTab === 'daily' ? 'text-white font-extrabold' : 'text-slate-500 font-semibold'
+                  }`}
               >
                 일일 점검
               </span>
@@ -506,9 +523,8 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
             >
               <RotateCcw className={`w-3.5 h-3.5 ${activeTab === 'return' ? 'text-white' : 'text-slate-400'}`} />
               <span
-                className={`text-xs tracking-tight transition-colors duration-300 ${
-                  activeTab === 'return' ? 'text-white font-extrabold' : 'text-slate-500 font-semibold'
-                }`}
+                className={`text-xs tracking-tight transition-colors duration-300 ${activeTab === 'return' ? 'text-white font-extrabold' : 'text-slate-500 font-semibold'
+                  }`}
               >
                 차량 반납
               </span>
@@ -556,10 +572,11 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                     총 주행거리 (km)
                   </label>
                   <input
-                    type="number"
-                    value={receiptTotalKm}
-                    onChange={(e) => setReceiptTotalKm(e.target.value)}
-                    placeholder="예: 14698"
+                    type="text"
+                    inputMode="numeric"
+                    value={formatNumberWithComma(receiptTotalKm)}
+                    onChange={(e) => setReceiptTotalKm(sanitizeNumericInput(e.target.value))}
+                    placeholder="예: 14,698"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors"
                   />
                 </div>
@@ -568,9 +585,10 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                     주행가능거리 (km)
                   </label>
                   <input
-                    type="number"
-                    value={receiptDte}
-                    onChange={(e) => setReceiptDte(e.target.value)}
+                    type="text"
+                    inputMode="numeric"
+                    value={formatNumberWithComma(receiptDte)}
+                    onChange={(e) => setReceiptDte(sanitizeNumericInput(e.target.value))}
                     placeholder="예: 276"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors"
                   />
@@ -699,9 +717,10 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                   주행가능거리 (km)
                 </label>
                 <input
-                  type="number"
-                  value={dailyDte}
-                  onChange={(e) => setDailyDte(e.target.value)}
+                  type="text"
+                  inputMode="numeric"
+                  value={formatNumberWithComma(dailyDte)}
+                  onChange={(e) => setDailyDte(sanitizeNumericInput(e.target.value))}
                   placeholder="예: 280"
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors"
                 />
@@ -793,16 +812,15 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                   <button
                     type="button"
                     onClick={handleResetDailyDamage}
-                    className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer flex items-center gap-1 ${
-                      dailyNewParts.length === 0
-                        ? 'border-[#1E60F3]/40 bg-blue-50/70 text-[#1E60F3] font-bold shadow-xs'
-                        : 'border-slate-200 bg-white text-slate-400 font-medium hover:bg-slate-50'
-                    }`}
+                    className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer flex items-center gap-1 ${dailyNewParts.length === 0
+                      ? 'border-[#1E60F3]/40 bg-blue-50/70 text-[#1E60F3] font-bold shadow-xs'
+                      : 'border-slate-200 bg-white text-slate-400 font-medium hover:bg-slate-50'
+                      }`}
                   >
                     <span className={dailyNewParts.length === 0 ? 'text-[#1E60F3] font-black text-xs mr-0.5' : 'text-slate-300 text-xs mr-0.5'}>
                       ✓
                     </span>
-                    <span>금일 특이사항 없음 (신규 데미지 0건)</span>
+                    <span>이상없음 (무) </span>
                   </button>
 
                   {/* Body part chips with Existing vs New differentiation */}
@@ -815,13 +833,12 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                         key={part}
                         type="button"
                         onClick={() => handleToggleDailyDamage(part)}
-                        className={`px-2.5 py-1 text-xs rounded-lg border transition-all flex items-center gap-1 ${
-                          isExisting
-                            ? 'border-slate-200 bg-slate-100 text-slate-500 font-medium cursor-default opacity-85'
-                            : isNew
+                        className={`px-2.5 py-1 text-xs rounded-lg border transition-all flex items-center gap-1 ${isExisting
+                          ? 'border-slate-200 bg-slate-100 text-slate-500 font-medium cursor-default opacity-85'
+                          : isNew
                             ? 'border-red-400 bg-red-500 hover:bg-red-600 text-white font-bold shadow-xs ring-1 ring-red-400/50 cursor-pointer'
                             : 'border-slate-200 bg-slate-50 text-slate-600 font-medium hover:bg-slate-100 cursor-pointer'
-                        }`}
+                          }`}
                       >
                         <span>{part}</span>
                         {isExisting && (
@@ -852,10 +869,11 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                     반납 총 주행거리 (km)
                   </label>
                   <input
-                    type="number"
-                    value={returnTotalKm}
-                    onChange={(e) => setReturnTotalKm(e.target.value)}
-                    placeholder="예: 15048"
+                    type="text"
+                    inputMode="numeric"
+                    value={formatNumberWithComma(returnTotalKm)}
+                    onChange={(e) => setReturnTotalKm(sanitizeNumericInput(e.target.value))}
+                    placeholder="예: 15,048"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors"
                   />
                 </div>
@@ -864,9 +882,10 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                     반납 주행가능거리 (km)
                   </label>
                   <input
-                    type="number"
-                    value={returnDte}
-                    onChange={(e) => setReturnDte(e.target.value)}
+                    type="text"
+                    inputMode="numeric"
+                    value={formatNumberWithComma(returnDte)}
+                    onChange={(e) => setReturnDte(sanitizeNumericInput(e.target.value))}
                     placeholder="예: 180"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors"
                   />

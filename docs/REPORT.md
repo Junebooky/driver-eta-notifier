@@ -1292,3 +1292,49 @@ SELECT * FROM cockpit.presets;
 2. **보고서 서식 단위 테스트 검증 (`scratch/verify_daily_inspection.ts`)**:
    * 전원 이상 없음(Clean), 기존 누적 데미지만 존재, 신규 데미지 발생 등 모든 분기 조건에서 총 주행거리/보관위치 배제 및 정갈한 2단 포맷 출력 검증 통과.
 
+---
+
+## 32. 계기판 입력 필드 세 자리 단위 콤마(,) 서식 적용 및 거점 그리드 하단 잘림 UI 교정 (2026-09-28)
+
+### 32.1 문제 정의 및 해결 방향
+1. **계기판 주행거리 입력 편의성 부족**:
+   - 기존 `<input type="number">`에서는 14698, 55555 등의 큰 숫자를 입력할 때 자릿수 콤마가 없어 시각적으로 자릿수를 오독하기 쉬움.
+   - HTML `number` 인풋의 제약을 극복하고 `inputMode="numeric"`과 `type="text"`를 조합하여 모바일 숫자 키패드를 띄우면서도 실시간 1,000단위 콤마 서식을 지원해야 함.
+2. **거점 캐러셀 하단 행 잘림 및 인디케이터 도트 겹침 현상**:
+   - 거점 슬롯이 4행(최대 12개)에 달할 때, 스와이프 컨테이너의 `overflow-hidden` 바닥 패딩 부족으로 4행 카드의 둥근 하단 모서리와 그림자가 잘리고, 페이지네이션 인디케이터가 최하단 카드와 겹쳐 렌더링되던 문제 발생.
+
+---
+
+### 32.2 핵심 구현 내역
+
+#### [태스크 1] 계기판 거리 입력 시 세 자리 단위 콤마(,) 실시간 포맷팅 ([`components/VehicleInspectionModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/VehicleInspectionModal.tsx))
+1. **실시간 콤마 입력 UX & 모바일 숫자 키패드 유지**:
+   - 차량 수령, 일일 점검, 차량 반납의 총 주행거리(`receiptTotalKm`, `returnTotalKm`) 및 주행가능거리(`receiptDte`, `dailyDte`, `returnDte`) 인풋에 `type="text" inputMode="numeric"` 적용.
+   - 헬퍼 유틸리티 `formatNumberWithComma` 및 `sanitizeNumericInput` 구현:
+     - State에는 순수 숫자 문자열(`val.replace(/[^0-9]/g, '')`)을 보관하여 계산 왜곡 방지.
+     - 화면 렌더링 시에는 `Number(raw).toLocaleString()`으로 실시간 1,000 단위 콤마 자동 바인딩.
+     - 빈 값일 경우 `""`로 깨끗하게 처리하여 `NaN`이나 `0` 노출 방지.
+2. **계산 및 카카오톡 보고서 생성 정합성 보장**:
+   - `saveInitialInspection`, `saveDailyInspection`, `generateReturnReport` 등으로 전달될 때 온전한 숫자형으로 파싱되어 총 운행거리 및 DTE 차이 계산 오차 0건 보장.
+
+---
+
+#### [태스크 2] '자주 가는 목적지' 4x4 그리드 하단 잘림 및 인디케이터 겹침 해결 ([`components/PresetButtons.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/PresetButtons.tsx))
+1. **스와이프 캐러셀 컨테이너 여백 확보**:
+   - 캐러셀 래퍼 컨테이너에 `px-1 pt-1 pb-7 sm:pb-8`을 적용하여 4번째 행 카드가 `overflow-hidden` 경계면에 잘리지 않고 둥근 모서리와 그림자(`box-shadow`)가 온전히 노출되도록 개선.
+2. **페이지네이션 인디케이터 도트 여백 분리**:
+   - 페이지네이션 인디케이터 컨테이너에 `pt-2 pb-1 mt-2.5 sm:mt-3`을 적용하여 상단 거점 카드들과 명확한 시각적 간격을 두고 분리.
+3. **유동 높이 및 min-h 조정**:
+   - 4행 슬롯 높이에 맞춰 내부 그리드에 `totalPages > 1 ? 'min-h-[268px]' : ''`를 적용하여 카드 내용에 따른 자연스러운 가변 높이 수용.
+
+---
+
+### 32.3 빌드 및 검증 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 14개 라우트 컴파일 에러 **0건** 완료.
+2. **실시간 콤마 및 보고서 출력 검증**:
+   - `55555` 입력 시 화면상 `55,555`로 즉시 포맷팅되며, 카카오톡 일일/반납 보고서 생성 시 정산 계산식 및 텍스트에 오차 없이 반영됨을 검증 완료.
+3. **모바일 거점 카드 하단 노출 검증**:
+   - 최하단 4행 거점 카드가 잘림 없이 온전한 라운딩과 텍스트를 유지하며, 인디케이터 도트와의 겹침이 완전히 해소됨을 확인.
+
+
