@@ -1471,6 +1471,51 @@ SELECT * FROM cockpit.presets;
    - 의전 메모 필드가 초기 빈 값으로 로드되며 실용적인 플레이스홀더 노출 확인.
    - 티맵 시간 모달이 모바일 표준 네이티브 피커로 매끄럽게 작동 확인.
 
+---
+
+## 35. 장소 검색 모달 상단 검색창 Sticky 고정/뷰포트 안정화 및 스케줄 등록 픽업 시간 단일 네이티브 인풋 개편 (2026-09-28)
+
+### 35.1 추진 배경 및 목적
+1. **장소 검색 모달 키보드 및 스크롤 시 검색창 이탈 방지**:
+   - 모바일 환경에서 가상 키보드가 올라오거나 검색 결과 목록이 길어질 때, 상단 검색창이 화면 위로 밀려 올라가거나 사라져 검색어를 수정하기 번거로웠던 현상 개선.
+   - 검색 결과 개수에 따라 모달 높이가 출렁이는 현상(Layout Shift)을 방지하고 `90dvh`로 든든하게 고정.
+2. **스케줄 등록 픽업 시간 컨트롤러 단일화**:
+   - 좌우로 나뉘어 있던 분할 인풋 박스와 하단 퀵 선택 칩을 전면 정리하고, 가로 전체를 활용하는 단 하나의 네이티브 터치 박스로 통합하여 한국어 12시간제(`오전 09:00`, `오후 02:30`) 표기 및 원터치 OS 네이티브 시간 피커 호출 구현.
+
+---
+
+### 35.2 핵심 구현 내역
+
+#### [태스크 1] 장소 검색 모달 상단 검색창 완전 고정 및 뷰포트 높이 안정화 ([`components/LocationSearchModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/LocationSearchModal.tsx))
+1. **모달 뷰포트 고정 (`h-[90dvh] max-h-[90dvh] overflow-hidden`)**:
+   - 검색 결과 수에 상관없이 모달 컨테이너의 기본 높이를 `90dvh`로 고정하여 화면 출렁임(Layout Shift) 제로 달성.
+2. **상단 헤더 & 검색창 Sticky 고정 (Pinned Header & Search Bar)**:
+   - `[출발지/목적지 설정 헤더]`와 `[TMAP 장소 검색 인풋창]`을 묶어 `flex-shrink-0 sticky top-0 z-20 bg-white border-b border-slate-100`으로 래핑.
+   - 모바일 키보드가 활성화되거나 수십 개의 POI 검색 결과를 스크롤하더라도 검색창이 상단에 항상 고정되어 언제든 검색어 재입력/클리어 가능.
+3. **결과 리스트 내부 스크롤 격리**:
+   - 검색창 하단의 '자주 가는 거점 그리드' 및 'TMAP 검색 결과 리스트'에 `flex-1 overflow-y-auto min-h-0 overscroll-contain touch-pan-y`를 부여하여 하단 영역에서만 부드럽게 스크롤되도록 격리.
+
+---
+
+#### [태스크 2] 스케줄 등록 모달 픽업 시간 단일 네이티브 터치 박스 통합 ([`components/ScheduleFormModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ScheduleFormModal.tsx))
+1. **중복 입력 필드 및 하단 퀵 칩 전면 제거**:
+   - 기존 좌우 분할 인풋 필드 중 우측 보조 인풋 박스 및 하단 시간 퀵 칩(`['09:00', '10:00', ...]`)을 완전히 삭제하여 시각적 군더더기 제거.
+2. **단일 네이티브 시간 선택 박스 구축 (Single Native Picker Input)**:
+   - 가로 폭 전체(`w-full px-4 py-3.5`)를 차지하는 단 하나의 둥근 터치 박스(`rounded-2xl`) 배치.
+   - 내부 텍스트로 한국어 12시간제(`formatKoreanTime`, 예: `오전 09:00`, `오후 02:30`)를 큼직하고 단정하게 표기.
+   - 박스 전 영역에 투명 네이티브 `<input type="time" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />`를 오버레이하여 박스 어디를 터치하더라도 iOS는 햅틱 드럼롤 휠, Android는 시계 다이얼 피커가 즉각 호출되도록 연동.
+
+---
+
+### 35.3 검증 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 14개 라우트 컴파일 에러 **0건** 완료.
+2. **장소 검색 모달 고정 구조 검증**:
+   - 헤더 및 검색창의 `sticky top-0 z-20` 고정 및 결과 목록 영역의 `flex-1 min-h-0 overflow-y-auto` 독립 스크롤 동작 확인.
+3. **스케줄 등록 모달 단일 시간 박스 검증**:
+   - 퀵 칩과 중복 인풋 없이 단일 네이티브 터치 박스가 렌더링되며, `formatKoreanTime`을 통해 `오전 09:00`, `오후 02:30` 등의 표준 시간 서식이 완벽하게 적용됨을 확인.
+
+
 
 
 

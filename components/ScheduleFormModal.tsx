@@ -81,6 +81,19 @@ function parseAndValidate8DigitDate(raw: string) {
   return { year, month, day, dayOfWeek, formattedDate, isoDate, dateLabel };
 }
 
+// Helper: Format HH:mm into Korean 12-hour format e.g. "오전 09:00", "오후 02:30"
+function formatKoreanTime(timeStr: string): string {
+  if (!timeStr) return '';
+  const match = timeStr.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return timeStr;
+  const h = parseInt(match[1], 10);
+  const m = match[2];
+  const period = h < 12 ? '오전' : '오후';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  const hStr = String(h12).padStart(2, '0');
+  return `${period} ${hStr}:${m}`;
+}
+
 export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
   isOpen,
   onClose,
@@ -211,9 +224,8 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
       flightType = 'arrival';
     }
 
-    // Ensure clean pickup time format e.g. "픽업 09:00" without duplicate '픽업'
-    const cleanTime = (timeDisplay || pickupTime).replace(/픽업/g, '').trim();
-    const resolvedTimeDisplay = cleanTime ? `픽업 ${cleanTime}` : `픽업 ${pickupTime}`;
+    // Ensure clean pickup time format e.g. "픽업 09:00"
+    const resolvedTimeDisplay = `픽업 ${pickupTime}`;
 
     const newSchedule: ScheduleItem = {
       id: `manual_${Date.now()}`,
@@ -420,7 +432,7 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
           </div>
 
           {/* ========================================================= */}
-          {/* [태스크 3] 시간 표기 & 픽업 시각 ('픽업' 용어 통일)         */}
+          {/* 픽업 시간 (단일 네이티브 터치 박스)                         */}
           {/* ========================================================= */}
           <div className="space-y-1.5 pt-1">
             <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
@@ -428,42 +440,22 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
               <span>픽업 시간</span>
             </label>
 
-            <div className="grid grid-cols-[100px_1fr] gap-2">
+            <div className="relative flex items-center justify-between w-full px-4 py-3.5 bg-slate-50 border border-slate-200 hover:border-[#1E60F3] rounded-2xl transition-all shadow-xs group cursor-pointer">
+              <span className="text-base font-bold text-slate-800 tracking-tight">
+                {formatKoreanTime(pickupTime) || '시간 선택'}
+              </span>
+              <Clock className="w-5 h-5 text-slate-400 group-hover:text-[#1E60F3] transition-colors" />
               <input
                 type="time"
                 value={pickupTime}
                 onChange={(e) => {
+                  haptics.lightTap();
                   setPickupTime(e.target.value);
                   setTimeDisplay(e.target.value);
                 }}
-                className="px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-900 outline-none focus:border-[#1E60F3]"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                aria-label="픽업 시간 선택"
               />
-              <input
-                type="text"
-                value={timeDisplay}
-                onChange={(e) => setTimeDisplay(e.target.value)}
-                placeholder="예: 09:00, 16:45"
-                className="px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 outline-none focus:border-[#1E60F3]"
-              />
-            </div>
-
-            {/* Quick Time Chips */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pt-0.5 no-scrollbar">
-              {['09:00', '10:00', '13:00', '14:30', '16:45'].map((tag) => (
-                <button
-                  key={tag}
-                  type="button"
-                  onClick={() => {
-                    haptics.lightTap();
-                    setTimeDisplay(tag);
-                    const match = tag.match(/(\d{2}:\d{2})/);
-                    if (match) setPickupTime(match[1]);
-                  }}
-                  className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-[11px] font-semibold text-slate-600 shrink-0 transition-colors cursor-pointer"
-                >
-                  {tag}
-                </button>
-              ))}
             </div>
           </div>
 
