@@ -1,7 +1,7 @@
 'use client';
 
 import { LocationPreset } from '@/types';
-import { ArrowLeftRight } from 'lucide-react';
+import { ArrowLeftRight, Search } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface OriginDestinationSelectorProps {
@@ -10,6 +10,7 @@ interface OriginDestinationSelectorProps {
   selectionTarget: 'origin' | 'destination';
   onSelectTarget: (target: 'origin' | 'destination') => void;
   onSwap: () => void;
+  onOpenSearchModal?: (target: 'origin' | 'destination') => void;
 }
 
 export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps> = ({
@@ -18,6 +19,7 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
   selectionTarget,
   onSelectTarget,
   onSwap,
+  onOpenSearchModal,
 }) => {
   return (
     <div className="w-full bg-white border border-slate-100/80 rounded-2xl p-4 shadow-[0_8px_25px_rgba(30,96,243,0.06)] space-y-2.5 select-none">
@@ -27,16 +29,24 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
           onClick={() => {
             haptics.lightTap();
             onSelectTarget('origin');
+            if (onOpenSearchModal) {
+              onOpenSearchModal('origin');
+            }
           }}
           className={`flex-1 min-w-0 w-full p-3 rounded-2xl border text-left cursor-pointer transition-all duration-150 active:scale-95 ${
             selectionTarget === 'origin'
               ? 'bg-slate-50/80 text-slate-800 border-slate-300/90 ring-2 ring-slate-200/60 shadow-xs'
               : 'bg-white border-slate-200/80 hover:border-slate-300'
           }`}
+          title="출발지 검색 및 변경"
         >
-          <div className="flex items-center space-x-1.5 min-w-0">
+          <div className="flex items-center justify-between w-full">
             <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
               출발지
+            </span>
+            <span className="text-[10px] text-slate-400 font-medium flex items-center gap-0.5 group-hover:text-slate-600">
+              <Search className="w-3 h-3 text-slate-400" />
+              <span>검색</span>
             </span>
           </div>
           <div
@@ -77,16 +87,24 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
           onClick={() => {
             haptics.lightTap();
             onSelectTarget('destination');
+            if (onOpenSearchModal) {
+              onOpenSearchModal('destination');
+            }
           }}
           className={`flex-1 min-w-0 w-full p-3 rounded-2xl text-left cursor-pointer transition-all duration-150 active:scale-95 ${
             selectionTarget === 'destination'
               ? 'bg-white border-2 border-[#1E60F3] shadow-sm shadow-blue-500/10'
               : 'bg-white border border-slate-200/80 hover:border-slate-300'
           }`}
+          title="목적지 검색 및 변경"
         >
-          <div className="flex items-center space-x-1.5 min-w-0">
+          <div className="flex items-center justify-between w-full">
             <span className="px-1.5 py-0.5 rounded text-[10px] bg-[#1E60F3] text-white font-bold shrink-0 shadow-xs">
               목적지
+            </span>
+            <span className="text-[10px] text-blue-500 font-medium flex items-center gap-0.5">
+              <Search className="w-3 h-3 text-[#1E60F3]" />
+              <span>검색</span>
             </span>
           </div>
           <div
@@ -110,15 +128,9 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
           <div className="w-3.5 h-3.5 rounded-full bg-[#1E60F3] text-white flex items-center justify-center text-[9px] font-black shrink-0 shadow-[0_1px_4px_rgba(30,96,243,0.3)]">
             i
           </div>
-          <span>
-            아래 거점을 탭하면 현재{' '}
-            <strong className={selectionTarget === 'origin' ? 'text-slate-800' : 'text-[#1E60F3]'}>
-              [{selectionTarget === 'origin' ? '출발지' : '목적지'}]
-            </strong>
-            로 지정됩니다.
-          </span>
+          <span>카드를 탭하면 전용 팝업에서 장소 검색 및 거점 선택이 가능합니다.</span>
         </div>
-        <span className="text-slate-400 text-[11px]">⇄ 맞교환 가능</span>
+        <span className="text-slate-400 text-[11px]">⇄ 맞교환</span>
       </div>
     </div>
   );

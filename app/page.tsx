@@ -18,6 +18,7 @@ import { PredictionResultSheet } from '@/components/PredictionResultSheet';
 import { GasStationModal } from '@/components/GasStationModal';
 import { FlightModal } from '@/components/FlightModal';
 import { VehicleInspectionModal } from '@/components/VehicleInspectionModal';
+import { LocationSearchModal, SelectedLocationData } from '@/components/LocationSearchModal';
 import { ScheduleTab } from '@/components/ScheduleTab';
 import { Navigation, Calendar } from 'lucide-react';
 import { ScheduleItem, scheduleToPresets } from '@/data/ferrariSchedules';
@@ -90,6 +91,9 @@ export default function Home() {
   // Vehicle Inspection (Receipt / Daily / Return) Modal State (No-DB / Pure LocalStorage)
   const [isInspectionModalOpen, setIsInspectionModalOpen] = useState(false);
   const [inspectionInitialMode, setInspectionInitialMode] = useState<'pickup' | 'daily' | 'return' | 'receipt'>('pickup');
+
+  // Standalone Location Search & Preset Modal State
+  const [isLocationSearchOpen, setIsLocationSearchOpen] = useState(false);
 
   // Active vehicle identifier (e.g. '4호차', '1호차')
   const currentVehicleNo = useMemo(() => {
@@ -556,6 +560,27 @@ export default function Home() {
     }
   };
 
+  // Handler for selecting location from standalone LocationSearchModal
+  const handleSelectLocationFromSearch = (loc: SelectedLocationData) => {
+    const resolvedPreset: LocationPreset = {
+      id: loc.id || `loc_${Date.now()}`,
+      name: loc.name,
+      shortName: loc.shortName || loc.name.slice(0, 8),
+      lat: loc.lat,
+      lng: loc.lng,
+      category: loc.category || 'CUSTOM',
+      address: loc.address,
+    };
+
+    if (selectionTarget === 'origin') {
+      setOrigin(resolvedPreset);
+      saveRecentPreset(resolvedPreset);
+      setSelectionTarget('destination');
+    } else {
+      setDestination(resolvedPreset);
+    }
+  };
+
   // Bidirectional Swap UX (⇄)
   const handleSwapOriginDestination = () => {
     const currentOrigin = origin;
@@ -767,6 +792,10 @@ export default function Home() {
               selectionTarget={selectionTarget}
               onSelectTarget={(target) => setSelectionTarget(target)}
               onSwap={handleSwapOriginDestination}
+              onOpenSearchModal={(target) => {
+                setSelectionTarget(target);
+                setIsLocationSearchOpen(true);
+              }}
             />
 
             {/* 2. Simplified High-Density Preset Chips Grid (Slot #1 Home Fixed + 2D Hysteresis Drag) */}
@@ -1026,6 +1055,18 @@ export default function Home() {
         onClose={() => setIsInspectionModalOpen(false)}
         profile={profile}
         initialMode={inspectionInitialMode}
+      />
+
+      {/* Standalone Location Search & Preset Modal */}
+      <LocationSearchModal
+        isOpen={isLocationSearchOpen}
+        onClose={() => setIsLocationSearchOpen(false)}
+        target={selectionTarget}
+        presets={presets}
+        homeLocation={profile.homeLocation}
+        currentSelectedId={selectionTarget === 'origin' ? origin?.id : destination?.id}
+        onSelectLocation={handleSelectLocationFromSearch}
+        onOpenHomeModal={() => setIsHomeModalOpen(true)}
       />
 
     </main>

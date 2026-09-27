@@ -611,7 +611,7 @@ ${scheduleItemsFormatted}`.trim();
 
       const reply = dateInfo
         ? `📝 **${dateInfo.formattedDate} (${dateInfo.dayOfWeek})** 신규 스케줄 등록 팝업을 열었습니다.\n픽업 시간 및 장소를 확인 후 저장해 주세요.`
-        : '📝 신규 스케줄 등록 팝업을 열었습니다.\n운행 일자(8자리 숫자) 및 상세 일정을 입력해 주세요.';
+        : '📝 신규 스케줄 등록 팝업을 열었습니다.\n픽업 일자(8자리 숫자) 및 상세 일정을 입력해 주세요.';
 
       setIsAnalyzing(false);
       setIsThinking(false);

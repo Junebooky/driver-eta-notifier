@@ -32,6 +32,16 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
     }
   }, [schedule]);
 
+  // Body Scroll Lock
+  useEffect(() => {
+    if (!isOpen) return;
+    const orig = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = orig;
+    };
+  }, [isOpen]);
+
   if (!isOpen || !schedule) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -56,9 +66,14 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 select-none overscroll-contain"
+      style={{ overscrollBehavior: 'contain', touchAction: 'pan-y' }}
+      onClick={onClose}
+    >
       <div
-        className="w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[90dvh] animate-in slide-in-from-bottom-6 duration-300"
+        className="w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[85dvh] animate-in slide-in-from-bottom-6 duration-300"
+        style={{ overscrollBehavior: 'contain', touchAction: 'pan-y' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -84,22 +99,26 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto flex-1">
+        <form
+          onSubmit={handleSubmit}
+          className="p-5 space-y-4 overflow-y-auto max-h-[85dvh] flex-1 overscroll-contain touch-pan-y"
+          style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
+        >
           {/* Field 1: Time Display */}
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
               <Clock className="w-3.5 h-3.5 text-[#1E60F3]" />
-              <span>픽업/착륙 시간 표기</span>
+              <span>픽업 시간</span>
             </label>
             <input
               type="text"
               value={timeDisplay}
               onChange={(e) => setTimeDisplay(e.target.value)}
-              placeholder="예: 09:50 착륙, 09:00 픽업"
+              placeholder="예: 픽업 09:50, 픽업 09:00"
               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 outline-none transition-all"
             />
             <p className="text-[11px] text-slate-400">
-              배차표 카드 상단에 노출되는 시간과 운행 성격을 지정합니다.
+              배차표 카드 상단에 노출되는 픽업 시간을 지정합니다.
             </p>
           </div>
 

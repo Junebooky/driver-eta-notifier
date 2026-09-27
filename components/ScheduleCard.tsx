@@ -30,13 +30,27 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
     (item.notes && /DEPARTURE|출국|샌딩|센딩/i.test(item.notes));
 
   const effectiveFlightType: 'arrival' | 'departure' = isDeparture ? 'departure' : 'arrival';
-  const effectiveTimeBadge = isDeparture
-    ? item.time_display.replace('착륙', '픽업')
-    : item.time_display;
+
+  // [태스크 3] 시간 표기 '픽업 HH:mm' 포맷으로 전면 일원화
+  const formatPickupTimeBadge = (schedule: ScheduleItem): string => {
+    const displayStr = schedule.time_display || '';
+    const match = displayStr.match(/(\d{1,2}:\d{2})/);
+    if (match) {
+      return `픽업 ${match[1]}`;
+    }
+    if (schedule.pickup_time) {
+      const timeMatch = schedule.pickup_time.match(/(\d{1,2}:\d{2})/);
+      if (timeMatch) {
+        return `픽업 ${timeMatch[1]}`;
+      }
+    }
+    const sanitized = displayStr.replace(/착륙\s*영접|착륙|운행\s*시작|운행/g, '').trim();
+    return sanitized ? `픽업 ${sanitized}` : '픽업';
+  };
 
   return (
     <div className="w-full bg-white rounded-2xl p-4 border border-slate-200/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-md transition-all space-y-3.5 relative overflow-hidden">
-      {/* Top Header: Date and Single Landing/Pickup Time Badge + Edit Button */}
+      {/* Top Header: Date and Unified Pickup Time Badge + Edit Button */}
       <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
         <div className="flex items-center min-w-0">
           <span className="text-xs font-bold text-slate-900 tracking-tight truncate">
@@ -45,9 +59,9 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
-          {/* Pure Single Time Badge (No simulation end time) */}
+          {/* Pure Single Pickup Time Badge */}
           <div className="px-2.5 py-1 rounded-full text-xs font-black bg-slate-900 text-white tracking-tight shadow-xs">
-            {effectiveTimeBadge}
+            {formatPickupTimeBadge(item)}
           </div>
 
           {/* Edit Button */}

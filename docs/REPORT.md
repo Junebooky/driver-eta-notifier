@@ -1337,4 +1337,63 @@ SELECT * FROM cockpit.presets;
 3. **모바일 거점 카드 하단 노출 검증**:
    - 최하단 4행 거점 카드가 잘림 없이 온전한 라운딩과 텍스트를 유지하며, 인디케이터 도트와의 겹침이 완전히 해소됨을 확인.
 
+---
+
+## 33. 스케줄 등록 모달 바디 스크롤 락, 독립형 장소 검색 모달 신설 및 '픽업' 용어 전면 통일 (2026-09-28)
+
+### 33.1 문제 정의 및 해결 방향
+1. **모달 오픈 시 뒷배경 스크롤 간섭 및 폼 내부 체이닝 현상**:
+   - 모달이 열린 상태에서 스크롤 시 바깥 페이지가 함께 끌려 올라가거나, 모바일 가상 키패드 및 제스처 간섭으로 조작성이 저하되는 문제 발생.
+   - Body scroll lock과 컨테이너 레벨의 `overscroll-behavior: contain`, `touch-action: pan-y`, `max-h-[85dvh]` 적용 필요.
+2. **협소했던 인라인 검색창 개선 및 독립형 장소 검색 모달 요구**:
+   - 기존의 인라인 검색 드로어 방식은 폼 내부를 지나치게 길게 늘어뜨려 사용성이 떨어졌음.
+   - 메인 대시보드(`OriginDestinationSelector`) 및 스케줄 등록 폼에서 출발지/목적지 터치 시 쾌적한 전용 모달(`LocationSearchModal`)이 호출되고, 자주 가는 목적지(프리셋)가 최상단에 큼직한 3열 그리드로 즉시 노출되도록 개편 필요.
+3. **용어 혼선 해소 ('픽업' 전면 일원화)**:
+   - '운행시간', '착륙 영접', '운행 시작', '출발 시간' 등으로 혼재되어 있던 명칭을 현장 VIP 의전 맥락에 맞추어 **'픽업' / '픽업 HH:mm'**으로 완전 통일.
+
+---
+
+### 33.2 핵심 구현 내역
+
+#### [태스크 1] 새 스케줄 등록/수정 모달 스크롤 격리 및 뒷배경 스크롤 락 ([`components/ScheduleFormModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ScheduleFormModal.tsx), [`components/EditScheduleModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/EditScheduleModal.tsx))
+1. **바디 스크롤 락 (Body Scroll Lock)**:
+   - `isOpen` 시 `document.body.style.overflow = 'hidden'`을 적용하고, 모달 언마운트/닫힘 시 원래 스타일로 안전하게 복구.
+2. **모달 내부 스크롤 체이닝 차단**:
+   - 모달 래퍼 및 스크롤 바디에 `overscroll-behavior: contain`, `touch-action: pan-y`, `-webkit-overflow-scrolling: touch` 속성 및 `max-h-[85dvh] overflow-y-auto` 적용으로 모달 내부에서만 부드럽게 스크롤되도록 격리.
+
+---
+
+#### [태스크 2] 독립형 장소 검색 전용 모달 신설 및 프리셋 강조 ([`components/LocationSearchModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/LocationSearchModal.tsx), [`components/OriginDestinationSelector.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/OriginDestinationSelector.tsx), [`app/page.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/page.tsx))
+1. **`LocationSearchModal.tsx` 신설**:
+   - **상단 헤더**: 선택 타깃에 따른 직관적 뱃지 (`[출발지 설정]` 또는 `[목적지 설정]`) 및 닫기(`✕`) 버튼.
+   - **실시간 검색창**: TMAP 실시간 POI 자동완성 인풋 (자동 포커스, 원터치 클리어 `✕` 버튼, 로딩 스피너, 0ms 인메모리 캐시 및 AbortController 연동).
+   - **자주 가는 목적지 3열 그리드 최우선 노출**: 검색창 바로 아래에 자택 및 전체 프리셋 카드를 큼직한 3열 그리드로 배치하여, 타이핑 없이도 원터치로 즉시 거점 확정 후 자동 닫힘.
+   - **검색 결과 리스트**: 2자 이상 입력 시 건물 단위로 정제된 TMAP 검색 결과가 스크롤 영역으로 표출되며, 터치 즉시 해당 장소 확정.
+2. **기존 인라인 확장 방식 완전 제거**:
+   - `ScheduleFormModal.tsx` 내부에 존재하던 번잡한 인라인 검색 드로어를 전면 삭제하고, 출발/도착 카드 탭 시 독립형 `LocationSearchModal`을 띄우도록 리팩토링.
+3. **메인 운행 대시보드 연동**:
+   - `OriginDestinationSelector.tsx`에 검색 뱃지 및 `onOpenSearchModal` 트리거를 장착하여, 출발지/목적지 카드 터치 시 바로 전용 검색 모달이 열리도록 연계.
+
+---
+
+#### [태스크 3] 시간 및 운행 섹션 표기 '픽업'으로 전면 일원화 ([`components/ScheduleCard.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ScheduleCard.tsx), [`components/ScheduleFormModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ScheduleFormModal.tsx), [`components/EditScheduleModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/EditScheduleModal.tsx), [`components/ScheduleTab.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ScheduleTab.tsx))
+1. **스케줄 카드 메인 시간 뱃지 포맷 통일**:
+   - `formatPickupTimeBadge` 유틸리티를 구현하여 기존 '착륙', '운행', '출국' 등 혼재된 표기를 무조건 **`픽업 HH:mm`** (예: `픽업 09:50`, `픽업 09:00`, `픽업 14:30`) 형태로 일관되게 렌더링.
+2. **입력 폼 라벨 및 칩 통일**:
+   - 폼 입력 라벨: `운행 일자` ➔ `픽업 일자`, `운행 경로` ➔ `픽업 경로`, `운행 시각` ➔ `픽업 시간`.
+   - 퀵 선택 칩: `['픽업 09:00', '픽업 10:00', '픽업 13:00', '픽업 14:30', '픽업 16:45']` 적용.
+
+---
+
+### 33.3 빌드 및 검증 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 14개 라우트 컴파일 에러 **0건** 완료.
+2. **스크롤 락 및 격리 검증**:
+   - 모달 활성화 시 `body { overflow: hidden }`이 정상 동작하여 뒷배경 스크롤이 원천 차단되고, 모달 내부에서만 부드럽게 스크롤됨을 확인.
+3. **독립형 검색 모달 및 프리셋 퀵 선택 검증**:
+   - 출발지/목적지 탭 시 시원한 전용 팝업이 노출되고, 최상단 프리셋 카드를 1-터치하여 즉시 위치를 지정할 수 있음을 검증.
+4. **시간 표기 일원화 검증**:
+   - 모든 스케줄 카드의 상단 메인 시간 뱃지가 `픽업 HH:mm`으로 단정하게 통일됨을 확인.
+
+
 

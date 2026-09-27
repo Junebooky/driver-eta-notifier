@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ScheduleItem } from '@/data/ferrariSchedules';
 import { LocationPreset } from '@/types';
 import { DEFAULT_PRESET_LOCATIONS } from '@/utils/presets';
-import { sanitizeSearchQuery } from './CustomPresetModal';
+import { LocationSearchModal, SelectedLocationData } from './LocationSearchModal';
 import {
   X,
   Calendar,
@@ -13,11 +13,9 @@ import {
   Plane,
   FileText,
   MapPin,
-  Search,
   Check,
-  Sparkles,
-  Loader2,
   Navigation,
+  Search,
 } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
@@ -40,14 +38,6 @@ interface SelectedLocation {
   presetId?: string;
 }
 
-interface PoiResult {
-  id: string;
-  name: string;
-  address: string;
-  lat: number;
-  lng: number;
-}
-
 // Helper: Normalize any incoming date string to an 8-digit string 'YYYYMMDD'
 function normalizeTo8Digits(dateStr?: string): string {
   if (!dateStr) return '';
@@ -55,7 +45,6 @@ function normalizeTo8Digits(dateStr?: string): string {
   if (digits.length === 8) {
     return digits;
   }
-  // If e.g. '0925' or '925'
   const currentYear = new Date().getFullYear();
   if (digits.length === 4) {
     return `${currentYear}${digits}`;
@@ -92,9 +81,6 @@ function parseAndValidate8DigitDate(raw: string) {
   return { year, month, day, dayOfWeek, formattedDate, isoDate, dateLabel };
 }
 
-// Client-side in-memory search cache for 0ms instant retrieval
-const scheduleSearchCache = new Map<string, PoiResult[]>();
-
 export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
   isOpen,
   onClose,
@@ -111,23 +97,28 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
   const [origin, setOrigin] = useState<SelectedLocation | null>(null);
   const [destination, setDestination] = useState<SelectedLocation | null>(null);
 
-  // Active location selection drawer: 'origin' | 'destination' | null
-  const [activeLocationTarget, setActiveLocationTarget] = useState<'origin' | 'destination' | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchResults, setSearchResults] = useState<PoiResult[]>([]);
-  const [searchError, setSearchError] = useState<string | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
+  // Standalone Location Search Modal Target: 'origin' | 'destination' | null
+  const [searchModalTarget, setSearchModalTarget] = useState<'origin' | 'destination' | null>(null);
 
-  // 3. Time & Details
+  // 3. Time & Details (Unified to '픽업')
   const [pickupTime, setPickupTime] = useState('09:00');
-  const [timeDisplay, setTimeDisplay] = useState('09:00 픽업');
+  const [timeDisplay, setTimeDisplay] = useState('픽업 09:00');
   const [passenger, setPassenger] = useState('');
   const [flight, setFlight] = useState('');
   const [notes, setNotes] = useState('');
 
   // Validation error highlights
   const [formErrors, setFormErrors] = useState<{ [key: string]: boolean }>({});
+
+  // [태스크 1] 바디 스크롤 락 (Body Scroll Lock)
+  useEffect(() => {
+    if (!isOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isOpen]);
 
   // Reset or pre-fill on modal open
   useEffect(() => {
@@ -136,7 +127,6 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
       if (normalized && normalized.length === 8) {
         setRawDate(normalized);
       } else {
-        // Default to today if not provided
         const today = new Date();
         const y = today.getFullYear();
         const m = String(today.getMonth() + 1).padStart(2, '0');
@@ -161,93 +151,14 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
       });
 
       setPickupTime('09:00');
-      setTimeDisplay('09:00 픽업');
+      setTimeDisplay('픽업 09:00');
       setPassenger(passengerName || 'DENZEL SOFYAN');
       setFlight('');
       setNotes('VIP 전담 의전 영접');
-      setActiveLocationTarget(null);
-      setSearchQuery('');
-      setSearchResults([]);
+      setSearchModalTarget(null);
       setFormErrors({});
     }
   }, [isOpen, initialDate, presets, passengerName]);
-
-  // Real-time TMAP POI search with in-memory caching and AbortController
-  useEffect(() => {
-    const rawQ = searchQuery.trim();
-    const q = sanitizeSearchQuery(rawQ);
-    if (q.length < 2) {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-        abortControllerRef.current = null;
-      }
-      setSearchResults([]);
-      setIsSearching(false);
-      setSearchError(null);
-      return;
-    }
-
-    // 0ms In-memory cache hit
-    if (scheduleSearchCache.has(q)) {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-        abortControllerRef.current = null;
-      }
-      const cached = scheduleSearchCache.get(q)!;
-      setSearchResults(cached);
-      setIsSearching(false);
-      setSearchError(cached.length === 0 ? '추천 검색 결과가 없습니다.' : null);
-      return;
-    }
-
-    setIsSearching(true);
-    setSearchError(null);
-
-    const timer = setTimeout(async () => {
-      // Abort any prior in-flight request
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-      const controller = new AbortController();
-      abortControllerRef.current = controller;
-
-      try {
-        const res = await fetch(`/api/search?keyword=${encodeURIComponent(q)}`, {
-          signal: controller.signal,
-        });
-        if (res.ok) {
-          const data = await res.json();
-          const pois: PoiResult[] = data.pois || [];
-          scheduleSearchCache.set(q, pois);
-          setSearchResults(pois);
-          if (pois.length === 0) {
-            setSearchError('추천 검색 결과가 없습니다.');
-          }
-        } else {
-          setSearchError('TMAP 검색 서버 응답에 실패했습니다.');
-        }
-      } catch (err: any) {
-        if (err?.name === 'AbortError') {
-          // Aborted intentionally due to newer user typing
-          return;
-        }
-        console.warn('TMAP search error:', err);
-        setSearchError('검색 중 오류가 발생했습니다.');
-      } finally {
-        if (abortControllerRef.current === controller) {
-          setIsSearching(false);
-        }
-      }
-    }, 250);
-
-    return () => {
-      clearTimeout(timer);
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-        abortControllerRef.current = null;
-      }
-    };
-  }, [searchQuery]);
 
   if (!isOpen) return null;
 
@@ -261,28 +172,6 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
     if (formErrors.date) {
       setFormErrors((prev) => ({ ...prev, date: false }));
     }
-  };
-
-  // Dismiss mobile virtual keyboard on touching/scrolling result list
-  const handleListTouch = () => {
-    if (document.activeElement instanceof HTMLElement) {
-      document.activeElement.blur();
-    }
-  };
-
-  // Quick Location Selection
-  const handleSelectLocation = (loc: SelectedLocation) => {
-    haptics.lightTap();
-    if (activeLocationTarget === 'origin') {
-      setOrigin(loc);
-      if (formErrors.origin) setFormErrors((prev) => ({ ...prev, origin: false }));
-    } else if (activeLocationTarget === 'destination') {
-      setDestination(loc);
-      if (formErrors.destination) setFormErrors((prev) => ({ ...prev, destination: false }));
-    }
-    setActiveLocationTarget(null);
-    setSearchQuery('');
-    setSearchResults([]);
   };
 
   // Form Submit Handler
@@ -300,41 +189,71 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
       return;
     }
 
-    if (!dateInfo || !origin || !destination) return;
+    haptics.successPulse();
+
+    // Flight Type detection
+    const isAirportDest =
+      destination!.name.includes('공항') ||
+      destination!.address.includes('공항') ||
+      destination!.name.toLowerCase().includes('airport');
+
+    const isAirportOrigin =
+      origin!.name.includes('공항') ||
+      origin!.address.includes('공항') ||
+      origin!.name.toLowerCase().includes('airport');
+
+    let flightType: 'arrival' | 'departure' | 'none' = 'none';
+    if (flight) {
+      flightType = isAirportDest ? 'departure' : 'arrival';
+    } else if (isAirportDest) {
+      flightType = 'departure';
+    } else if (isAirportOrigin) {
+      flightType = 'arrival';
+    }
+
+    // Ensure clean pickup time format e.g. "픽업 09:00"
+    const resolvedTimeDisplay = timeDisplay.startsWith('픽업')
+      ? timeDisplay
+      : `픽업 ${pickupTime}`;
 
     const newSchedule: ScheduleItem = {
-      id: `sch-manual-${Date.now()}`,
-      vehicle_no: vehicleNo,
-      date: dateInfo.isoDate,
-      dateLabel: dateInfo.dateLabel,
-      pickup_time: pickupTime || '09:00',
+      id: `manual_${Date.now()}`,
+      date: dateInfo!.isoDate,
+      dateLabel: dateInfo!.dateLabel,
+      pickup_time: `${pickupTime}:00`,
       dropoff_time: null,
-      time_display: timeDisplay.trim() || `${pickupTime} 픽업`,
-      origin_name: origin.name,
-      origin_address: origin.address,
-      origin_lat: origin.lat,
-      origin_lng: origin.lng,
-      origin_preset_id: origin.presetId || 'custom_origin',
-      destination_name: destination.name,
-      destination_address: destination.address,
-      destination_lat: destination.lat,
-      destination_lng: destination.lng,
-      destination_preset_id: destination.presetId || 'custom_dest',
-      passenger: passenger.trim() || 'VIP 승객',
-      flight: flight.trim() ? flight.trim().toUpperCase() : undefined,
-      notes: notes.trim() || undefined,
+      time_display: resolvedTimeDisplay,
+      vehicle_no: vehicleNo,
+      origin_name: origin!.name,
+      origin_address: origin!.address,
+      origin_preset_id: origin!.presetId || 'custom_origin',
+      origin_lat: origin!.lat,
+      origin_lng: origin!.lng,
+      destination_name: destination!.name,
+      destination_address: destination!.address,
+      destination_preset_id: destination!.presetId || 'custom_destination',
+      destination_lat: destination!.lat,
+      destination_lng: destination!.lng,
       status: 'confirmed',
+      passenger: passenger.trim() || 'VIP 승객',
+      flight: flight.trim() || undefined,
+      flightType: flightType !== 'none' ? flightType : undefined,
+      notes: notes.trim() || undefined,
     };
 
-    haptics.success();
     onSave(newSchedule);
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 select-none">
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 select-none overscroll-contain"
+      style={{ overscrollBehavior: 'contain', touchAction: 'pan-y' }}
+      onClick={onClose}
+    >
       <div
-        className="w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[92dvh] animate-in slide-in-from-bottom-6 duration-300"
+        className="w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[85dvh] animate-in slide-in-from-bottom-6 duration-300"
+        style={{ overscrollBehavior: 'contain', touchAction: 'pan-y' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
@@ -364,19 +283,19 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
           </button>
         </div>
 
-        {/* Modal Scrollable Body */}
+        {/* Modal Scrollable Body: Max 85dvh and isolated overscroll */}
         <div
-          className="p-5 space-y-4 overflow-y-auto flex-1 text-slate-800 overscroll-contain touch-pan-y"
+          className="p-5 space-y-4 overflow-y-auto max-h-[85dvh] flex-1 text-slate-800 overscroll-contain touch-pan-y"
           style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
         >
           {/* ========================================================= */}
-          {/* [태스크 2] 날짜 입력 필드 (숫자 8자리 + 요일 자동 연산 뱃지)  */}
+          {/* [태스크 3] 날짜 입력 필드 (숫자 8자리 + 요일 자동 연산 뱃지)  */}
           {/* ========================================================= */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                 <Calendar className="w-3.5 h-3.5 text-[#1E60F3]" />
-                <span>운행 일자 (8자리 숫자)</span>
+                <span>픽업 일자 (8자리 숫자)</span>
               </label>
 
               {/* 실시간 요일 계산 완료 뱃지 (파란색 볼드) */}
@@ -421,12 +340,12 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
           </div>
 
           {/* ========================================================= */}
-          {/* [태스크 3] 출발지 & 도착지 장소 가드레일 (TMAP 검색 + 퀵 선택)  */}
+          {/* [태스크 2] 독립형 장소 검색 모달 연동 출발지 & 도착지 카드 */}
           {/* ========================================================= */}
           <div className="space-y-2.5 pt-1">
             <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
               <Navigation className="w-3.5 h-3.5 text-[#1E60F3]" />
-              <span>운행 경로 (출발지 ➔ 도착지)</span>
+              <span>픽업 경로 (출발지 ➔ 도착지)</span>
             </label>
 
             {/* 출발지 / 도착지 선택 카드 2단 */}
@@ -435,15 +354,14 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
               <div
                 onClick={() => {
                   haptics.lightTap();
-                  setActiveLocationTarget(activeLocationTarget === 'origin' ? null : 'origin');
-                  setSearchQuery('');
-                  setSearchResults([]);
+                  setSearchModalTarget('origin');
                 }}
                 className={`p-3 rounded-2xl border transition-all cursor-pointer ${
-                  activeLocationTarget === 'origin'
-                    ? 'border-2 border-[#1E60F3] bg-blue-50/30 shadow-xs'
+                  formErrors.origin
+                    ? 'border-rose-400 bg-rose-50/40 ring-1 ring-rose-200'
                     : 'border-slate-200 bg-slate-50/80 hover:bg-slate-100/80 hover:border-slate-300'
                 }`}
+                title="출발지 검색 및 선택"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 min-w-0">
@@ -454,9 +372,10 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
                       {origin ? origin.name : '출발지를 선택해 주세요'}
                     </span>
                   </div>
-                  <span className="text-[11px] font-bold text-[#1E60F3] shrink-0 ml-2">
-                    {activeLocationTarget === 'origin' ? '선택 중' : '변경'}
-                  </span>
+                  <div className="flex items-center gap-1 text-[11px] font-bold text-[#1E60F3] shrink-0 ml-2">
+                    <Search className="w-3 h-3 text-[#1E60F3]" />
+                    <span>변경</span>
+                  </div>
                 </div>
                 {origin && (
                   <p className="text-[11px] text-slate-500 truncate mt-1 pl-8">
@@ -469,15 +388,14 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
               <div
                 onClick={() => {
                   haptics.lightTap();
-                  setActiveLocationTarget(activeLocationTarget === 'destination' ? null : 'destination');
-                  setSearchQuery('');
-                  setSearchResults([]);
+                  setSearchModalTarget('destination');
                 }}
                 className={`p-3 rounded-2xl border transition-all cursor-pointer ${
-                  activeLocationTarget === 'destination'
-                    ? 'border-2 border-[#1E60F3] bg-blue-50/30 shadow-xs'
+                  formErrors.destination
+                    ? 'border-rose-400 bg-rose-50/40 ring-1 ring-rose-200'
                     : 'border-slate-200 bg-slate-50/80 hover:bg-slate-100/80 hover:border-slate-300'
                 }`}
+                title="도착지 검색 및 선택"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 min-w-0">
@@ -488,9 +406,10 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
                       {destination ? destination.name : '도착지를 선택해 주세요'}
                     </span>
                   </div>
-                  <span className="text-[11px] font-bold text-[#1E60F3] shrink-0 ml-2">
-                    {activeLocationTarget === 'destination' ? '선택 중' : '변경'}
-                  </span>
+                  <div className="flex items-center gap-1 text-[11px] font-bold text-[#1E60F3] shrink-0 ml-2">
+                    <Search className="w-3 h-3 text-[#1E60F3]" />
+                    <span>변경</span>
+                  </div>
                 </div>
                 {destination && (
                   <p className="text-[11px] text-slate-500 truncate mt-1 pl-8">
@@ -499,145 +418,15 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
                 )}
               </div>
             </div>
-
-            {/* Location Selector Drawer (Opens when activeLocationTarget is set) */}
-            {activeLocationTarget && (
-              <div className="p-3.5 rounded-2xl bg-white border border-[#1E60F3]/40 shadow-lg space-y-3 animate-fade-in">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                  <div className="flex items-center gap-1.5">
-                    <span
-                      className={`w-2 h-2 rounded-full ${
-                        activeLocationTarget === 'origin' ? 'bg-slate-600' : 'bg-[#1E60F3]'
-                      }`}
-                    />
-                    <span className="text-xs font-bold text-slate-900">
-                      {activeLocationTarget === 'origin' ? '출발지 검색 및 선택' : '도착지 검색 및 선택'}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setActiveLocationTarget(null)}
-                    className="text-[11px] font-medium text-slate-400 hover:text-slate-600 cursor-pointer"
-                  >
-                    닫기
-                  </button>
-                </div>
-
-                {/* 1. TMAP Real-time Search Input */}
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="장소명 또는 주소 검색 (TMAP 실시간)"
-                    className="w-full pl-9 pr-8 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 outline-none transition-all"
-                  />
-                  <Search className="w-4 h-4 text-[#1E60F3] absolute left-3 top-2.5" />
-                  {isSearching && (
-                    <Loader2 className="w-3.5 h-3.5 text-blue-500 animate-spin absolute right-3 top-3" />
-                  )}
-                  {searchQuery && !isSearching && (
-                    <button
-                      type="button"
-                      onClick={() => setSearchQuery('')}
-                      className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-
-                {/* TMAP Autocomplete Results List */}
-                {searchResults.length > 0 && (
-                  <div
-                    onTouchStart={handleListTouch}
-                    onScrollCapture={handleListTouch}
-                    style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
-                    className="max-h-40 overflow-y-auto space-y-1 divide-y divide-slate-50 border border-slate-100 rounded-xl p-1 bg-slate-50/50 overscroll-contain touch-pan-y"
-                  >
-                    {searchResults.map((poi, idx) => (
-                      <button
-                        key={`${poi.id || 'poi'}-${idx}`}
-                        type="button"
-                        onClick={() =>
-                          handleSelectLocation({
-                            name: poi.name,
-                            address: poi.address,
-                            lat: poi.lat,
-                            lng: poi.lng,
-                          })
-                        }
-                        className="w-full text-left p-2 rounded-lg hover:bg-blue-50 transition-colors flex items-start gap-2 cursor-pointer group"
-                      >
-                        <MapPin className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#1E60F3] shrink-0 mt-0.5" />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-bold text-slate-900 truncate group-hover:text-[#1E60F3]">
-                            {poi.name}
-                          </p>
-                          <p className="text-[10px] text-slate-400 truncate">{poi.address}</p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {searchError && (
-                  <p className="text-[11px] text-slate-400 text-center py-1">{searchError}</p>
-                )}
-
-                {/* 2. Frequently Visited Presets Quick-Select Chips (공통 / 개인) */}
-                <div className="space-y-1.5 pt-1">
-                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-600">
-                    <span className="flex items-center gap-1">
-                      <Sparkles className="w-3 h-3 text-[#1E60F3]" />
-                      <span>자주 가는 목적지 퀵 선택</span>
-                    </span>
-                    <span className="text-[10px] text-slate-400 font-normal">
-                      터치 시 즉시 지정
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-                    {presets.map((p, pIdx) => {
-                      const isHQ = !p.vehicle_no && !p.vehicleNo;
-                      return (
-                        <button
-                          key={`${p.id}-${pIdx}`}
-                          type="button"
-                          onClick={() =>
-                            handleSelectLocation({
-                              name: p.shortName,
-                              address: p.address || p.name,
-                              lat: p.lat,
-                              lng: p.lng,
-                              presetId: p.id,
-                            })
-                          }
-                          className="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:border-[#1E60F3] hover:bg-blue-50/50 text-slate-800 shrink-0 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-2xs"
-                        >
-                          <span
-                            className={`text-[9px] font-extrabold px-1 py-0.2 rounded ${
-                              isHQ ? 'bg-slate-100 text-slate-600' : 'bg-blue-50 text-[#1E60F3]'
-                            }`}
-                          >
-                            {isHQ ? '공통' : '개인'}
-                          </span>
-                          <span className="text-xs font-bold">{p.shortName}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* ========================================================= */}
-          {/* 시간 표기 & 픽업 시각                                      */}
+          {/* [태스크 3] 시간 표기 & 픽업 시각 ('픽업' 용어 통일)         */}
           {/* ========================================================= */}
           <div className="space-y-1.5 pt-1">
             <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
               <Clock className="w-3.5 h-3.5 text-[#1E60F3]" />
-              <span>픽업 및 운행 시각</span>
+              <span>픽업 시간</span>
             </label>
 
             <div className="grid grid-cols-[100px_1fr] gap-2">
@@ -646,7 +435,7 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
                 value={pickupTime}
                 onChange={(e) => {
                   setPickupTime(e.target.value);
-                  setTimeDisplay(`${e.target.value} 픽업`);
+                  setTimeDisplay(`픽업 ${e.target.value}`);
                 }}
                 className="px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-900 outline-none focus:border-[#1E60F3]"
               />
@@ -654,14 +443,14 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
                 type="text"
                 value={timeDisplay}
                 onChange={(e) => setTimeDisplay(e.target.value)}
-                placeholder="예: 09:00 픽업, 16:45 출국"
+                placeholder="예: 픽업 09:00, 픽업 16:45"
                 className="px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 outline-none focus:border-[#1E60F3]"
               />
             </div>
 
             {/* Quick Time Chips */}
             <div className="flex items-center gap-1.5 overflow-x-auto pt-0.5 no-scrollbar">
-              {['09:00 픽업', '10:00 픽업', '13:00 픽업', '14:30 픽업', '착륙 영접'].map((tag) => (
+              {['픽업 09:00', '픽업 10:00', '픽업 13:00', '픽업 14:30', '픽업 16:45'].map((tag) => (
                 <button
                   key={tag}
                   type="button"
@@ -749,6 +538,39 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Standalone Location Search Modal (Child Layer) */}
+      {searchModalTarget && (
+        <LocationSearchModal
+          isOpen={!!searchModalTarget}
+          onClose={() => setSearchModalTarget(null)}
+          target={searchModalTarget}
+          presets={presets}
+          currentSelectedId={searchModalTarget === 'origin' ? origin?.presetId : destination?.presetId}
+          onSelectLocation={(loc: SelectedLocationData) => {
+            if (searchModalTarget === 'origin') {
+              setOrigin({
+                name: loc.shortName || loc.name,
+                address: loc.address || loc.name,
+                lat: loc.lat,
+                lng: loc.lng,
+                presetId: loc.id,
+              });
+              if (formErrors.origin) setFormErrors((prev) => ({ ...prev, origin: false }));
+            } else if (searchModalTarget === 'destination') {
+              setDestination({
+                name: loc.shortName || loc.name,
+                address: loc.address || loc.name,
+                lat: loc.lat,
+                lng: loc.lng,
+                presetId: loc.id,
+              });
+              if (formErrors.destination) setFormErrors((prev) => ({ ...prev, destination: false }));
+            }
+            setSearchModalTarget(null);
+          }}
+        />
+      )}
     </div>
   );
 };
