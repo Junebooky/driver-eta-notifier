@@ -14,11 +14,29 @@ export interface ResolvedPlaceLocation {
 }
 
 /**
+ * 검색어 띄어쓰기 전처리 정규화 (Query Normalization)
+ * 사용자가 '포시즌스호텔', '신라호텔', '그랜드하얏트', '인천공항터미널'처럼 띄어쓰기 없이 입력할 경우,
+ * TMAP 형태소 엔진이 인식할 수 있도록 주요 시설 접미사 앞에 자동으로 공백을 삽입합니다.
+ */
+export function normalizeSearchKeyword(keyword: string): string {
+  return keyword
+    .replace(/([가-힣a-zA-Z0-9]+)(호텔|리조트|타워|빌딩|공항|역|터미널|컨벤션|스피디움)/g, '$1 $2')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
  * TMAP 통합 POI 검색을 수행하여 장소명으로부터 도로명 주소 및 좌표를 반환합니다.
- * @param keyword 검색 장소명 (예: '안다즈 서울 강남', '시그니엘 서울')
+ * @param keyword 검색 장소명 (예: '안다즈 서울 강남', '시그니엘 서울', '포시즌스호텔')
+ * @param centerLat 기준 중심 위도 (기본값: 서울 시청 37.5665)
+ * @param centerLon 기준 중심 경도 (기본값: 서울 시청 126.9780)
  * @returns ResolvedPlaceLocation 또는 검색 실패 시 null
  */
-export async function searchTmapPoi(keyword: string): Promise<ResolvedPlaceLocation | null> {
+export async function searchTmapPoi(
+  keyword: string,
+  centerLat: number = 37.5665,
+  centerLon: number = 126.9780
+): Promise<ResolvedPlaceLocation | null> {
   const cleanKeyword = (keyword || '').trim();
   if (!cleanKeyword) return null;
 
@@ -28,32 +46,60 @@ export async function searchTmapPoi(keyword: string): Promise<ResolvedPlaceLocat
     return null;
   }
 
-  try {
-    const url = `https://apis.openapi.sk.com/tmap/pois?version=1&searchKeyword=${encodeURIComponent(
-      cleanKeyword
-    )}&resCoordType=WGS84GEO&reqCoordType=WGS84GEO&count=1`;
+  // 1단계: 검색어 띄어쓰기 형태소 정규화
+  const normalizedKeyword = normalizeSearchKeyword(cleanKeyword);
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
+  const fetchSinglePoi = async (searchKw: string): Promise<any | null> => {
+    try {
+      const url = `https://apis.openapi.sk.com/tmap/pois?version=1&searchKeyword=${encodeURIComponent(
+        searchKw
+      )}&resCoordType=WGS84GEO&reqCoordType=WGS84GEO&count=1&centerLat=${centerLat}&centerLon=${centerLon}`;
 
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        appKey: apiKey,
-        Accept: 'application/json',
-      },
-      signal: controller.signal,
-    });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
 
-    clearTimeout(timeoutId);
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          appKey: apiKey,
+          Accept: 'application/json',
+        },
+        signal: controller.signal,
+      });
 
-    if (!response.ok) {
-      console.warn(`[TMAP POI] Request failed for "${cleanKeyword}" with status ${response.status}`);
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const data = await response.json();
+      return data?.searchPoiInfo?.pois?.poi?.[0] || null;
+    } catch (err) {
       return null;
     }
+  };
 
-    const data = await response.json();
-    const poi = data?.searchPoiInfo?.pois?.poi?.[0];
+  try {
+    let poi = await fetchSinglePoi(normalizedKeyword);
+
+    // 2단계 다중 질의 폴백: 결과 부재 시 원본 검색어 및 핵심 키워드(앞 1~2단어)로 백그라운드 재질의
+    if (!poi && normalizedKeyword !== cleanKeyword) {
+      poi = await fetchSinglePoi(cleanKeyword);
+    }
+
+    if (!poi) {
+      const words = normalizedKeyword.split(/\s+/).filter(Boolean);
+      if (words.length >= 2) {
+        const fallbackTarget = words.slice(0, 2).join(' ');
+        if (fallbackTarget && fallbackTarget !== normalizedKeyword) {
+          poi = await fetchSinglePoi(fallbackTarget);
+        }
+      }
+      if (!poi && words.length >= 1 && words[0].length >= 2 && words[0] !== normalizedKeyword) {
+        poi = await fetchSinglePoi(words[0]);
+      }
+    }
 
     if (!poi) {
       return null;
@@ -83,14 +129,13 @@ export async function searchTmapPoi(keyword: string): Promise<ResolvedPlaceLocat
     }
 
     return {
-      name: poi.name || cleanKeyword,
+      name: poi.name || normalizedKeyword,
       roadAddress: finalAddress,
       jibunAddress: jibun || undefined,
       lat,
       lng,
     };
   } catch (error: any) {
-    // 안전한 에러 핸들링: 예외를 던지지 않고 null 반환
     console.warn(`[TMAP POI] Error searching POI for "${cleanKeyword}":`, error?.message || error);
     return null;
   }

@@ -131,9 +131,14 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
       abortControllerRef.current = controller;
 
       try {
-        const res = await fetch(`/api/search?keyword=${encodeURIComponent(query)}`, {
-          signal: controller.signal,
-        });
+        const centerLat = homeLocation?.lat || 37.5665;
+        const centerLng = homeLocation?.lng || 126.9780;
+        const res = await fetch(
+          `/api/search?keyword=${encodeURIComponent(query)}&lat=${centerLat}&lng=${centerLng}`,
+          {
+            signal: controller.signal,
+          }
+        );
 
         if (res.ok) {
           const data = await res.json();

@@ -25,11 +25,11 @@ interface PoiResult {
 }
 
 /**
- * Sanitize search query by stripping commas and dong/ho/floor/building patterns
+ * Sanitize search query by stripping commas and dong/ho/floor patterns
  * (e.g., '4108동', '101호', 'B1층', '3층', etc.) to ensure building-level TMAP retrieval.
  */
 export function sanitizeSearchQuery(query: string): string {
-  const detailPattern = /([0-9A-Za-z가-힣]+(?:동|호|층|관))/g;
+  const detailPattern = /(?<=\s|^)(?:[0-9]+동|[0-9]+호|[0-9B]+층|[A-Za-z]동)(?=\s|$)/g;
   const cleanQuery = query
     .replace(detailPattern, '')
     .replace(/[,]/g, ' ')
@@ -130,7 +130,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
       abortControllerRef.current = controller;
 
       try {
-        const res = await fetch(`/api/search?keyword=${encodeURIComponent(query)}`, {
+        const res = await fetch(`/api/search?keyword=${encodeURIComponent(query)}&lat=37.5665&lng=126.9780`, {
           signal: controller.signal,
         });
         if (res.ok) {

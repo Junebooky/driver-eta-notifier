@@ -1395,5 +1395,82 @@ SELECT * FROM cockpit.presets;
 4. **시간 표기 일원화 검증**:
    - 모든 스케줄 카드의 상단 메인 시간 뱃지가 `픽업 HH:mm`으로 단정하게 통일됨을 확인.
 
+---
+
+## 34. 픽업 시간 UI 정돈, 네이티브 피커 적용, 메모 플레이스홀더화 및 TMAP POI 검색 형태소 정규화 개편 (2026-09-28)
+
+### 34.1 추진 배경 및 목적
+1. **스케줄 등록 폼 내 '픽업' 중복 수식어 제거**:
+   - 상단 섹션 소제목이 이미 '픽업 시간'임에도 하위 인풋과 퀵 칩에 '픽업' 접두어가 중복 적용되어 "픽업 픽업 09:00" 등의 어색한 표기가 발생하는 문제 해소.
+2. **티맵 예상 출발/도착 시간 모달 네이티브 피커 전환**:
+   - 기존의 복잡한 3D 실린더 휠 드럼롤 코드를 제거하고, iOS Safari의 햅틱 드럼롤 휠과 Android의 시계 롤러가 자연스럽게 호출되는 모바일 표준 네이티브 `<input type="date">` / `<input type="time">` 래퍼 UI로 개편.
+3. **의전 메모/특이사항 기본값 플레이스홀더 전환**:
+   - 하드코딩된 'VIP 전담 의전 영접' 문자열을 제거하고 투명 플레이스홀더로 변경하여, 기사가 기존 텍스트를 지우는 번거로움 없이 즉시 메모를 작성할 수 있도록 UX 개선.
+4. **TMAP POI 검색 형태소 정규화 및 서울 중심 좌표 주입**:
+   - '포시즌스호텔', '신라호텔', '인천공항터미널'처럼 사용자가 띄어쓰기 없이 입력하거나 '포시즌스'만 입력했을 때, 정규식 버그로 '호'가 누락되어 '텔'로 검색되거나 지방 펜션/모텔이 1순위로 오노출되는 문제를 근본적으로 해결.
+
+---
+
+### 34.2 핵심 구현 내역
+
+#### [태스크 1] 스케줄 등록 모달 픽업 시간 중복 표기 정돈 ([`components/ScheduleFormModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ScheduleFormModal.tsx))
+1. **중복 '픽업' 접두어 제거**:
+   - 시간 인풋 및 퀵 선택 칩에서 '픽업' 접두어를 완전히 제거하여 `['09:00', '10:00', '13:00', '14:30', '16:45']`의 깔끔한 시간 표기 적용.
+   - 내부 상태 저장 시 `(timeDisplay || pickupTime).replace(/픽업/g, '').trim()` 처리를 통해 중복 접두어("픽업 픽업") 발생을 원천 차단.
+
+---
+
+#### [태스크 2] 티맵 예상 출발/도착 시간 모달 네이티브 피커 전환 ([`components/DepartureTimePickerModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/DepartureTimePickerModal.tsx))
+1. **네이티브 모바일 피커 래퍼 UI 구축**:
+   - 번잡한 3D 실린더 휠 드럼 코드를 제거하고, 모바일 OS 표준 네이티브 `<input type="date">` 및 `<input type="time">` 래퍼로 전면 전환.
+   - iOS Safari에서는 탭틱 엔진 기반 네이티브 휠 피커, Android Chrome에서는 다이얼/롤러 피커가 자동 연동되어 극대화된 조작 편의성 및 햅틱 피드백 확보.
+2. **원터치 퀵 칩 및 실시간 프리뷰**:
+   - 날짜 퀵 칩: `[오늘, 내일, 모레]`.
+   - 시간 퀵 칩: `[지금, +10분, +30분, +1시간]`.
+   - 선택된 일시의 실시간 요일/오전·오후 카드형 프리뷰 및 바디 스크롤 락 탑재.
+
+---
+
+#### [태스크 3] 의전 메모 / 특이사항 필드 투명 플레이스홀더화 ([`components/ScheduleFormModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ScheduleFormModal.tsx))
+1. **기본값 공백화**:
+   - `notes` 상태의 초기값을 하드코딩된 `'VIP 전담 의전 영접'`에서 빈 문자열(`""`)로 변경.
+2. **투명 플레이스홀더 부여**:
+   - `placeholder="예: VIP 전담 의전 영접, 수하물 3개 등 특이사항 입력"` 적용으로 기사가 메모 작성 시 즉시 타이핑 가능.
+
+---
+
+#### [태스크 4] TMAP POI 검색 형태소 정규화 및 기준 좌표 주입 ([`services/tmapService.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/services/tmapService.ts), [`app/api/search/route.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/api/search/route.ts), [`components/LocationSearchModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/LocationSearchModal.tsx), [`components/CustomPresetModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/CustomPresetModal.tsx))
+1. **형태소 자동 공백 삽입 정규화 (`normalizeSearchKeyword`)**:
+   - '호텔', '리조트', '타워', '빌딩', '공항', '역', '터미널', '컨벤션', '스피디움' 등 주요 시설 접미사 앞에 자동으로 띄어쓰기를 삽입:
+     - `'포시즌스호텔'` ➔ `'포시즌스 호텔'`
+     - `'포시즌스호텔 서울'` ➔ `'포시즌스 호텔 서울'`
+     - `'신라호텔'` ➔ `'신라 호텔'`
+     - `'인천공항터미널'` ➔ `'인천공항 터미널'`
+2. **정규식 버그 교정 (`sanitizeSearchQuery`)**:
+   - 기존의 `detailPattern = /([0-9A-Za-z가-힣]+(?:동|호|층|관))/g`가 '포시즌스호텔'의 '포시즌스호'를 매칭하여 '텔'로 축소해버리던 치명적 결함을 발견하여, 숫자/영문 토큰 전용 패턴 `/(?<=\s|^)(?:[0-9]+동|[0-9]+호|[0-9B]+층|[A-Za-z]동)(?=\s|$)/g`으로 전면 교정.
+3. **서울 기준 좌표 주입 (`centerLat=37.5665, centerLon=126.9780`)**:
+   - TMAP API 호출 시 WGS84GEO 서울 중심 좌표 파라미터를 강제 주입하여, 거리 및 인기도 가중치 기반으로 '포시즌스' 검색 시 지방 펜션이 아닌 서울 종로구 새문안로의 '포시즌스호텔 서울'이 1순위로 조회되도록 랭킹 보정.
+4. **2단계 다중 질의 폴백 (Multi-Query Fallback)**:
+   - 정규화된 키워드로 결과가 없을 경우, 검색어의 핵심 키워드(앞 1~2단어) 또는 원본 검색어로 백그라운드 재질의를 자동 수행하여 검색 누락 원천 차단.
+5. **Tier 1 랭킹 엔진 정밀화**:
+   - 부속 시설(주차장, 전기차충전소, 정문, 후문) 감점 처리 및 TMAP 대표 POI(candidate #0) 최우선 보존으로 '포시즌스', '포시즌스호텔', '포시즌스호텔 서울' 모두 '포시즌스호텔 서울 (서울 종로구 새문안로 97)'이 최상단 노출.
+
+---
+
+### 34.3 검증 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 14개 라우트 컴파일 에러 **0건** 통과.
+2. **장소 검색 검증**:
+   - `'포시즌스호텔'` ➔ `[1] 포시즌스호텔 서울 | 서울 종로구 새문안로 97` (최상단 노출 확인)
+   - `'포시즌스호텔 서울'` ➔ `[1] 포시즌스호텔 서울 | 서울 종로구 새문안로 97` (최상단 노출 확인)
+   - `'포시즌스'` ➔ `[1] 포시즌스호텔 서울 | 서울 종로구 새문안로 97` (최상단 노출 확인)
+   - `'신라호텔'` ➔ `[1] 신라호텔 서울 | 서울 중구 동호로 249` (최상단 노출 확인)
+   - `'구의역'` ➔ `[1] 구의역 (2호선)` (최상단 노출 확인)
+3. **UI 및 인터랙션 검증**:
+   - 스케줄 모달에서 픽업 시간 라벨 및 칩이 중복 없이 '09:00', '10:00' 등으로 깔끔하게 렌더링됨.
+   - 의전 메모 필드가 초기 빈 값으로 로드되며 실용적인 플레이스홀더 노출 확인.
+   - 티맵 시간 모달이 모바일 표준 네이티브 피커로 매끄럽게 작동 확인.
+
+
 
 

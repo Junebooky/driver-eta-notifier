@@ -102,7 +102,7 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
 
   // 3. Time & Details (Unified to '픽업')
   const [pickupTime, setPickupTime] = useState('09:00');
-  const [timeDisplay, setTimeDisplay] = useState('픽업 09:00');
+  const [timeDisplay, setTimeDisplay] = useState('09:00');
   const [passenger, setPassenger] = useState('');
   const [flight, setFlight] = useState('');
   const [notes, setNotes] = useState('');
@@ -151,10 +151,10 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
       });
 
       setPickupTime('09:00');
-      setTimeDisplay('픽업 09:00');
+      setTimeDisplay('09:00');
       setPassenger(passengerName || 'DENZEL SOFYAN');
       setFlight('');
-      setNotes('VIP 전담 의전 영접');
+      setNotes('');
       setSearchModalTarget(null);
       setFormErrors({});
     }
@@ -211,10 +211,9 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
       flightType = 'arrival';
     }
 
-    // Ensure clean pickup time format e.g. "픽업 09:00"
-    const resolvedTimeDisplay = timeDisplay.startsWith('픽업')
-      ? timeDisplay
-      : `픽업 ${pickupTime}`;
+    // Ensure clean pickup time format e.g. "픽업 09:00" without duplicate '픽업'
+    const cleanTime = (timeDisplay || pickupTime).replace(/픽업/g, '').trim();
+    const resolvedTimeDisplay = cleanTime ? `픽업 ${cleanTime}` : `픽업 ${pickupTime}`;
 
     const newSchedule: ScheduleItem = {
       id: `manual_${Date.now()}`,
@@ -435,7 +434,7 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
                 value={pickupTime}
                 onChange={(e) => {
                   setPickupTime(e.target.value);
-                  setTimeDisplay(`픽업 ${e.target.value}`);
+                  setTimeDisplay(e.target.value);
                 }}
                 className="px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-900 outline-none focus:border-[#1E60F3]"
               />
@@ -443,14 +442,14 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
                 type="text"
                 value={timeDisplay}
                 onChange={(e) => setTimeDisplay(e.target.value)}
-                placeholder="예: 픽업 09:00, 픽업 16:45"
+                placeholder="예: 09:00, 16:45"
                 className="px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 outline-none focus:border-[#1E60F3]"
               />
             </div>
 
             {/* Quick Time Chips */}
             <div className="flex items-center gap-1.5 overflow-x-auto pt-0.5 no-scrollbar">
-              {['픽업 09:00', '픽업 10:00', '픽업 13:00', '픽업 14:30', '픽업 16:45'].map((tag) => (
+              {['09:00', '10:00', '13:00', '14:30', '16:45'].map((tag) => (
                 <button
                   key={tag}
                   type="button"
@@ -460,7 +459,7 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
                     const match = tag.match(/(\d{2}:\d{2})/);
                     if (match) setPickupTime(match[1]);
                   }}
-                  className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-[11px] font-semibold text-slate-600 shrink-0 transition-colors cursor-pointer"
+                  className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-[11px] font-semibold text-slate-600 shrink-0 transition-colors cursor-pointer"
                 >
                   {tag}
                 </button>
@@ -510,7 +509,7 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
               type="text"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="예: T1 3층 게이트 하차 영접"
+              placeholder="예: VIP 전담 의전 영접, 수하물 3개 등 특이사항 입력"
               className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium text-slate-800 outline-none focus:border-[#1E60F3]"
             />
           </div>
