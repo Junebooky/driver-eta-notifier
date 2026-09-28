@@ -690,7 +690,7 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                 style={{ transform: `translateX(-${currentPage * 100}%)` }}
               >
                 {pages.map((pageSlots, pageIdx) => (
-                  <div key={pageIdx} className="w-full shrink-0">
+                  <div key={pageIdx} className="w-full shrink-0 px-2 py-1.5">
                     <div className="grid grid-cols-3 gap-2">
                       {pageSlots.map((slot, sIdx) => {
                         if (slot.type === 'home') {

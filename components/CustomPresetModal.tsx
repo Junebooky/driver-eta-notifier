@@ -1315,7 +1315,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
           {/* ========================================================= */}
           {!isHomeMode && (
             <div className="space-y-2 pt-2 border-t border-slate-100">
-              <div className="flex items-center justify-between text-sm font-bold text-slate-700 px-1">
+              <div className="flex items-center justify-between text-sm font-bold text-slate-700 px-2.5">
                 <span className="flex items-center gap-1.5">
                   <MapPin className="w-3.5 h-3.5 text-[#1E60F3]" />
                   <span>자주 가는 장소</span>
@@ -1338,8 +1338,8 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                   style={{ transform: `translateX(-${currentPage * 100}%)` }}
                 >
                   {pages.map((pageSlots, pageIdx) => (
-                    <div key={pageIdx} className="w-full shrink-0">
-                      <div className="grid grid-cols-3 gap-2 pt-1 content-start">
+                    <div key={pageIdx} className="w-full shrink-0 px-2.5 pt-2.5 pb-2">
+                      <div className="grid grid-cols-3 gap-2 content-start">
                         {pageSlots.map((slot) => {
                           // 1. Home Slot (Pinned at Slot 1 of Page 0)
                           if (slot.type === 'home') {
