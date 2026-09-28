@@ -742,7 +742,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
       // 3. New Preset
       if (isAdmin) {
         const newPreset: LocationPreset = {
-          id: `preset_${Date.now()}`,
+          id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `preset_${Date.now()}`,
           name: name.trim(),
           shortName: shortName.trim(),
           fullName: name.trim(),
@@ -780,7 +780,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
         setCurrentPage(0);
       } else {
         const newPreset: LocationPreset = {
-          id: `preset_${Date.now()}`,
+          id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `preset_${Date.now()}`,
           name: name.trim(),
           shortName: shortName.trim(),
           fullName: name.trim(),

@@ -80,7 +80,8 @@ export async function POST(req: NextRequest) {
       vehicle_no: cleanVehicleNo, // Strict Rule: Bind vehicle_no to avoid polluting common master presets
     };
 
-    if (id && !id.startsWith('custom_') && !id.startsWith('home_') && !id.startsWith('preset-')) {
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (id && typeof id === 'string' && UUID_REGEX.test(id)) {
       payload.id = id;
     }
 
@@ -135,6 +136,8 @@ export async function POST(req: NextRequest) {
       lng: parseFloat(resultData.lng),
       category: (resultData.category ? resultData.category.toUpperCase() : 'CUSTOM') as any,
       isGlobal: resultData.vehicle_no ? false : true,
+      isCommon: resultData.vehicle_no ? false : true,
+      type: resultData.vehicle_no ? 'personal' : 'common',
       vehicle_no: resultData.vehicle_no || null,
       vehicleNo: resultData.vehicle_no || null,
     };
