@@ -229,7 +229,8 @@ export function openNaviAppMain(navi: 'tmap' | 'kakao' | 'naver') {
   if (navi === 'tmap') {
     schemeUrl = 'tmap://';
   } else if (navi === 'kakao') {
-    schemeUrl = 'kakaonavi://';
+    // 카카오맵(KakaoMap) 앱 초기 메인화면 스킴 (kakaonavi는 별도 내비앱 미설치 시 Safari 주소 오류 발생)
+    schemeUrl = 'kakaomap://open';
   } else if (navi === 'naver') {
     schemeUrl = 'nmap://action/default';
   }

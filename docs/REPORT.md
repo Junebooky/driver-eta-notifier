@@ -3175,15 +3175,16 @@ flowchart TD
 ## 64. 홈 네브바 내비 아이콘 350ms 롱프레스 시 초기 메인화면(Default Launcher) 진입 구현
 
 ### 64.1 배경 및 작업 목적
-- 홈 헤더 네브바(`Header.tsx`)의 내비게이션 아이콘 3종(티맵, 카카오내비, 네이버지도)을 350ms 동안 길게 눌렀을 때, 목적지 설정 여부와 관계없이 각 내비 앱을 최초 실행한 것과 같은 '초기 메인 화면(Default Launcher)'으로 즉시 진입하도록 지원.
+- 홈 헤더 네브바(`Header.tsx`)의 내비게이션 아이콘 3종(티맵, 카카오맵, 네이버지도)을 350ms 동안 길게 눌렀을 때, 목적지 설정 여부와 관계없이 각 내비 앱을 최초 실행한 것과 같은 '초기 메인 화면(Default Launcher)'으로 즉시 진입하도록 지원.
+- **카카오맵 스킴 정합성 확보**: 별도 단독 앱인 '카카오내비'(`kakaonavi://`)가 미설치된 환경에서 iOS Safari "주소가 유효하지 않기 때문에 Safari가 해당 페이지를 열 수 없습니다" 에러 팝업이 발생하던 문제를 해결하기 위해, 정식 카카오맵 루트 스킴인 `kakaomap://open`으로 교체.
 - 짧은 탭(Short Press)의 기본 내비게이션 토글 동작 및 `RouteInfoCard.tsx`의 정식 길안내/딥링크 로직은 100% 무결하게 보존.
 
 ### 64.2 모듈별 상세 구현 내역
 
-#### 1. 내비 앱 초기 메인화면 런처 단독 함수 신설 ([`utils/navigation.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/utils/navigation.ts))
+#### 1. 내비 앱 초기 메인화면 런처 단독 함수 신설 및 스킴 최적화 ([`utils/navigation.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/utils/navigation.ts))
 - 목적지/출발지 파라미터 없이 각 앱의 루트 URL 스킴만 호출하는 `openNaviAppMain(navi)` 함수 구현:
   - TMAP: `tmap://`
-  - 카카오내비: `kakaonavi://`
+  - 카카오맵: `kakaomap://open` (미설치 오류 원천 차단 및 카카오맵 앱 즉시 실행)
   - 네이버지도: `nmap://action/default`
 
 #### 2. 홈 헤더 350ms 롱프레스 제스처 바인딩 ([`components/Header.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/Header.tsx))
@@ -3192,6 +3193,7 @@ flowchart TD
 - 터치 이동(10px 초과) 감지 시 스크롤로 판단하여 롱프레스 자동 취소.
 - 롱프레스 발화 후 손을 뗐을 때 일반 클릭 토글(`onSelectNavi`)이 오동작하지 않도록 `isLongPressRef` 플래그로 차단.
 - iOS Safari 시스템 메뉴 억제를 위한 `onContextMenu={(e) => e.preventDefault()}` 및 `select-none [-webkit-touch-callout:none]` 적용.
+- 툴팁 및 접근성 라벨을 "카카오맵 선택 (길게 누르면 앱 실행)"으로 직관화.
 
 ---
 
@@ -3203,7 +3205,8 @@ flowchart TD
 3. **시나리오 검증 결과**:
    - **Case 1 (단순 탭)**: 아이콘 짧은 탭 시 기존처럼 기본 내비 선택 링이 정상 전환됨 (PASS).
    - **Case 2 (목적지 유무 무관 롱프레스)**: 목적지 설정 상태에서도 350ms 롱프레스 시 길안내가 아닌 각 내비 앱의 초기 메인화면 스킴으로 직행함 (PASS).
-   - **Case 3 (터치 스크롤)**: 헤더 터치 후 스와이프/스크롤 시 롱프레스 타이머가 즉시 취소되어 오작동하지 않음 (PASS).
+   - **Case 3 (카카오맵 Safari 주소 오류 방지)**: `kakaomap://open`을 호출하여 iOS Safari 에러 팝업 없이 카카오맵이 즉시 실행됨 (PASS).
+   - **Case 4 (터치 스크롤)**: 헤더 터치 후 스와이프/스크롤 시 롱프레스 타이머가 즉시 취소되어 오작동하지 않음 (PASS).
 
 
 

@@ -176,8 +176,8 @@ export const Header: React.FC<HeaderProps> = ({
                 ? 'ring-2 ring-amber-400 scale-105 shadow-[0_4px_12px_rgba(254,229,0,0.35)] z-10'
                 : 'opacity-60 hover:opacity-100'
               }`}
-            title="카카오내비 선택 (길게 누르면 앱 실행)"
-            aria-label="카카오내비 선택"
+            title="카카오맵 선택 (길게 누르면 앱 실행)"
+            aria-label="카카오맵 선택"
           >
             <span>K</span>
           </button>
