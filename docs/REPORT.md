@@ -2300,6 +2300,94 @@ SELECT * FROM cockpit.presets;
    - **Case 4 (신규 입력)**: "SOYFAN 외 1명" 입력 후 저장 시 카톡 보고서에 정상 출력 확인.
    - **Case 5 (공백 입력)**: "     " 공백만 입력 후 저장 시 `null`로 저장되며 보고서 행 생략 확인.
 
+---
+
+## 48. 즐겨찾기 장소 등록 드롭다운 소거 및 관리자 '공통' 거점 분기 버그 수정 (2026-09-28)
+
+### 48.1 추진 배경 및 문제점
+1. **장소 검색 결과 선택 후 추천 드롭다운 잔존 및 하단 폼 가림 결함**:
+   - `CustomPresetModal.tsx`에서 검색 결과 POI 항목을 탭하여 선택했을 때, `setSearchQuery(poi.name)` 호출로 인해 250ms 디바운스 검색 `useEffect`가 다시 격발되어 자동완성 드롭다운이 재노출됨.
+   - 이로 인해 하단의 '거점 이름', '표시 이름 (최대 8자)', '취소', '저장' 버튼이 가려져 현장 기사의 조작 흐름이 끊기는 문제 발생.
+2. **관리자 모드(`isAdmin === true`)에서 신규 거점 등록 시 '개인'으로 오분류되는 결함**:
+   - `app/page.tsx`의 `handleAddCustomPreset`에서 관리자 인증 상태임에도 `vehicle_no: currentVehicleNo`가 무조건 할당되어 본사 공통 마스터(`vehicle_no === null`) 조건을 충족하지 못함.
+   - `PresetButtons.tsx`, `CustomPresetModal.tsx`, `LocationSearchModal.tsx`의 뱃지 판별식(`const isHQ = !preset.vehicle_no && !preset.vehicleNo;`)에 따라 관리자가 등록한 거점이 회색 `개인`으로 노출되고, 메인 프리셋 그리드 렌더링이 비활성화되어 있던 문제 해결 필요.
+
+---
+
+### 48.2 시스템 상태 흐름도 (State Flow Diagram)
+
+```mermaid
+flowchart TD
+    subgraph UI_Interaction ["장소 검색 및 선택 플로우"]
+        A["사용자 장소 검색어 입력"] --> B["TMAP API / Cache 자동완성 호출"]
+        B --> C["검색 결과 드롭다운 노출"]
+        C -->|항목 탭| D["handleSelectPoi 실행"]
+    end
+
+    subgraph Dismiss_Guard ["드롭다운 강제 소거 및 가드"]
+        D --> D1["1. isPlaceSelectedRef.current = true"]
+        D --> D2["2. setSearchResults([]) & setIsDropdownOpen(false)"]
+        D --> D3["3. searchInputRef.current?.blur() (가상키보드 해제)"]
+        D --> D4["4. 검색어 및 폼 필드 즉시 바인딩"]
+        D4 -.-> E["useEffect([searchQuery]) 재검색 트리거"]
+        E -->|isPlaceSelectedRef 감지| F["Early Return: 재검색 및 드롭다운 차단"]
+    end
+
+    subgraph Branch_Logic ["거점 타입 및 뱃지 결정 분기"]
+        G["저장 버튼 클릭 (handleSubmit)"] --> H{"관리자 인증 상태 (isAdmin)?"}
+        H -->|관리자 모드 (True)| I["type: 'common'<br/>isCommon: true<br/>isGlobal: true<br/>vehicle_no: null"]
+        H -->|일반 기사 모드 (False)| J["type: 'personal'<br/>isCommon: false<br/>vehicle_no: currentVehicleNo"]
+        I --> K["localStorage 및 Supabase 동기화"]
+        J --> K
+        K --> L["메인 카드 슬롯 렌더링"]
+        L --> M{"isHQ 조건 검사:<br/>isCommon || type==='common' || isGlobal || !vehicle_no"}
+        M -->|공통 거점| N["뱃지: 코발트/슬레이트 '공통'"]
+        M -->|개인 거점| O["뱃지: 블루 톤 '개인'"]
+    end
+```
+
+---
+
+### 48.3 핵심 구현 내역
+
+#### [태스크 1] 장소 검색 선택 시 추천 드롭다운 즉시 소거 및 재트리거 가드 주입 ([`components/CustomPresetModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/CustomPresetModal.tsx))
+1. **드롭다운 상태 및 조기 리턴 가드 플래그 신설**:
+   - `isDropdownOpen` 상태와 `isPlaceSelectedRef = useRef(false)`, `searchInputRef = useRef<HTMLInputElement | null>(null)` 도입.
+   - `useEffect([searchQuery])` 최상단에 `if (isPlaceSelectedRef.current) { isPlaceSelectedRef.current = false; return; }` 조기 리턴 가드를 주입하여, 선택된 장소명을 인풋에 세팅할 때 재검색 API 호출을 100% 차단.
+2. **`handleSelectPoi` 선택 핸들러 강화**:
+   - 항목 선택 즉시 진행 중인 `AbortController` 취소 및 `setSearchResults([])`, `setIsDropdownOpen(false)` 강제 소거.
+   - `searchInputRef.current?.blur()`를 호출하여 모바일 가상 키보드를 해제함으로써 화면 스크롤 간섭 없이 하단의 '거점 이름', '표시 이름 (최대 8자)', '취소', '저장' 버튼이 즉시 100% 온전하게 노출되도록 보장.
+3. **자택 모드(Home Mode) 동일 가드 및 터치 영역 일원화**:
+   - 일반 거점 등록뿐 아니라 자택 등록 모달에서도 동일한 Ref 및 드롭다운 가드 로직을 일관되게 적용.
+
+#### [태스크 2] 관리자 모드(`isAdmin`) 연동 및 '공통'/'개인' 타입 동적 분기 ([`components/CustomPresetModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/CustomPresetModal.tsx), [`components/PresetButtons.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/PresetButtons.tsx), [`components/LocationSearchModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/LocationSearchModal.tsx), [`app/page.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/page.tsx), [`types/index.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/types/index.ts))
+1. **데이터 모델 확장 (`types/index.ts`)**:
+   - `LocationPreset` 인터페이스에 `type?: 'common' | 'personal'`, `isCommon?: boolean`, `fullName?: string`, `createdAt?: string` 명시적 타입 필드 추가 및 `CustomPreset` 타입 에일리어스 제공.
+2. **신규 프리셋 생성 및 업데이트 로직 수정**:
+   - `CustomPresetModal.tsx`의 `handleSubmit`에서:
+     - `isAdmin === true`인 경우 `type: 'common'`, `isCommon: true`, `isGlobal: true`, `vehicle_no: null`, `vehicleNo: undefined`로 설정.
+     - `isAdmin === false`인 경우 `type: 'personal'`, `isCommon: false`, `isGlobal: false`, `vehicle_no: vehicleNo`로 안전하게 격리.
+   - `app/page.tsx`의 `handleAddCustomPreset`에서도 `isCommon = Boolean(isAdmin || newPreset.isCommon || newPreset.type === 'common')`을 기반으로 `vehicle_no`를 `isAdmin ? null : currentVehicleNo`로 정확히 분기.
+3. **모달 상단 UI 피드백 뱃지 추가**:
+   - `CustomPresetModal.tsx`의 장소 등록 헤더 영역 우측에 `isAdmin === true`일 때 `[공통 거점으로 등록]` 코발트 블루 뱃지(`bg-[#1E60F3] text-white text-xs font-bold px-2 py-0.5 rounded-full`)를 노출하여 등록 전 거점 위계를 명확히 식별할 수 있도록 지원.
+4. **거점 뱃지 판별식 일원화 및 메인 화면 카드 복원**:
+   - `PresetButtons.tsx`, `CustomPresetModal.tsx`, `LocationSearchModal.tsx`의 `isHQ` 판별식을 기존의 단순 `vehicle_no` 부재 검사에서 확장하여:
+     `const isHQ = Boolean(preset.isCommon || preset.type === 'common' || preset.isGlobal || (!preset.vehicle_no && !preset.vehicleNo));`
+     로 전면 일원화.
+   - `app/page.tsx` 내 '자주 가는 목적지' 독립 카드(`<PresetButtons ... />`)를 복원 연결하여 메인 화면 슬롯 하단에 `공통` 및 `개인` 뱃지가 정확히 렌더링되도록 조치.
+5. **API 라우트 영속 정합성 확보 (`app/api/presets/route.ts`)**:
+   - GET 요청 반환 시 `isCommon: row.vehicle_no ? false : true`, `type: row.vehicle_no ? 'personal' : 'common'`을 포함하도록 매핑을 정비하여 클라이언트-서버 간 데이터 무결성 보장.
+
+---
+
+### 48.4 검증 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 컴파일 에러 **0건 (Exit code 0)** 통과.
+2. **시나리오 검증 결과**:
+   - **Case 1 (일반 모드)**: 장소 검색 ➔ 항목 선택 ➔ 추천 드롭다운 즉시 소거 및 하단 폼(거점명/표시명/취소/저장) 노출 ➔ 저장 ➔ 메인 카드에 `개인` 뱃지 노출 확인.
+   - **Case 2 (관리자 모드)**: PIN 인증 후 모달 진입 시 `[공통 거점으로 등록]` 뱃지 확인 ➔ 장소 검색 ➔ 항목 선택 ➔ 저장 ➔ 메인 카드에 `공통` 뱃지 노출 및 `vehicle_no: null` 확인.
+
+
 
 
 

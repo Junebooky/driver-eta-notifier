@@ -243,18 +243,22 @@ export default function Home() {
   };
 
   const handleAddCustomPreset = async (newPreset: LocationPreset) => {
+    const isCommon = Boolean(isAdmin || newPreset.isCommon || newPreset.type === 'common');
     const presetWithVehicle: LocationPreset = {
       ...newPreset,
-      isGlobal: isAdmin,
-      driverId: isAdmin ? null : (profile.id || getOrCreateDeviceUuid()),
-      vehicle_no: currentVehicleNo,
-      vehicleNo: currentVehicleNo,
+      isGlobal: isCommon,
+      isCommon: isCommon,
+      type: isCommon ? 'common' : 'personal',
+      driverId: isCommon ? null : (profile.id || getOrCreateDeviceUuid()),
+      vehicle_no: isCommon ? null : currentVehicleNo,
+      vehicleNo: isCommon ? null : currentVehicleNo,
+      createdAt: newPreset.createdAt || new Date().toISOString(),
     };
 
     const existingIndex = presets.findIndex(
       (p) =>
         (p.id && p.id === newPreset.id) ||
-        (p.name === newPreset.name && (p.vehicle_no === currentVehicleNo || (!p.vehicle_no && isAdmin)))
+        (p.name === newPreset.name && (p.vehicle_no === presetWithVehicle.vehicle_no || (!p.vehicle_no && isCommon)))
     );
 
     let updated: LocationPreset[];
@@ -828,7 +832,7 @@ export default function Home() {
             />
 
             {/* 3. VIP Destination Presets (자주 가는 목적지 독립 카드) */}
-            {/* <PresetButtons
+            <PresetButtons
               presets={presets}
               homeLocation={profile.homeLocation}
               selectedOriginId={origin?.id}
@@ -845,7 +849,7 @@ export default function Home() {
               onEditPreset={handleOpenEditModal}
               onDeleteCustomPreset={handleDeleteCustomPreset}
               onReorderPresets={handleReorderPresets}
-            /> */}
+            />
 
             {/* 3. Route Estimation & ETA Status (Strictly Real-time TMAP) */}
             <RouteInfoCard

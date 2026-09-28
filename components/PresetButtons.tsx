@@ -753,7 +753,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
     const isOrigin = selectedOriginId === preset.id;
     const isDestination = selectedDestinationId === preset.id;
     const isThisItemDragging = isDragging && dragIndex === index;
-    const isHQ = !preset.vehicle_no && !preset.vehicleNo;
+    const isHQ = Boolean(preset.isCommon || preset.type === 'common' || preset.isGlobal || (!preset.vehicle_no && !preset.vehicleNo));
     const badgeLabel = isHQ ? '공통' : '개인';
 
     let stateClasses = `bg-white border-slate-200 text-slate-700 font-medium ${dynamicHoverClasses}`;

@@ -719,7 +719,7 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                         }
 
                         const p = slot.preset;
-                        const isHQ = !p.vehicle_no && !p.vehicleNo;
+                        const isHQ = Boolean(p.isCommon || p.type === 'common' || p.isGlobal || (!p.vehicle_no && !p.vehicleNo));
                         const isSelected = currentSelectedId === p.id;
 
                         return (

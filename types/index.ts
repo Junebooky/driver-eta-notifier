@@ -32,15 +32,21 @@ export interface LocationPreset {
   id: string;
   name: string;
   shortName: string;
+  fullName?: string;
   lat: number;
   lng: number;
   category: 'AIRPORT' | 'HOTEL' | 'CIRCUIT' | 'RETURN' | 'CUSTOM' | 'HOME' | 'GAS';
   address?: string;
   isGlobal?: boolean;
+  type?: 'common' | 'personal';
+  isCommon?: boolean;
   driverId?: string | null;
   vehicle_no?: string | null;
   vehicleNo?: string | null;
+  createdAt?: string;
 }
+
+export type CustomPreset = LocationPreset;
 
 export type ReportMode = 'DEPARTURE' | 'ARRIVED' | 'WAITING' | 'RETURN';
 

@@ -83,8 +83,11 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<PoiResult[]>([]);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const isPlaceSelectedRef = useRef(false);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   // Form Fields State
   const [name, setName] = useState('');
@@ -187,6 +190,12 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
 
   // Real-time POI Autocomplete with in-memory caching and AbortController
   useEffect(() => {
+    // Early return guard when a POI has just been selected
+    if (isPlaceSelectedRef.current) {
+      isPlaceSelectedRef.current = false;
+      return;
+    }
+
     const rawQuery = searchQuery.trim();
     const query = sanitizeSearchQuery(rawQuery);
     if (query.length < 2) {
@@ -195,6 +204,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
         abortControllerRef.current = null;
       }
       setSearchResults([]);
+      setIsDropdownOpen(false);
       setIsSearching(false);
       setSearchError(null);
       return;
@@ -207,6 +217,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
       }
       const cached = customPresetSearchCache.get(query)!;
       setSearchResults(cached);
+      setIsDropdownOpen(cached.length > 0);
       setIsSearching(false);
       setSearchError(cached.length === 0 ? '추천 검색 결과가 없습니다.' : null);
       return;
@@ -230,7 +241,10 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
           const data = await res.json();
           const pois: PoiResult[] = data.pois || [];
           customPresetSearchCache.set(query, pois);
-          setSearchResults(pois);
+          if (!isPlaceSelectedRef.current) {
+            setSearchResults(pois);
+            setIsDropdownOpen(pois.length > 0);
+          }
           if (pois.length === 0) {
             setSearchError('추천 검색 결과가 없습니다.');
           }
@@ -504,14 +518,30 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
   // Select POI from autocomplete results
   const handleSelectPoi = (poi: PoiResult) => {
     haptics.lightTap();
+    isPlaceSelectedRef.current = true;
+
+    // 1) 비동기 검색 취소 및 검색 결과 배열 즉시 비우기
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsSearching(false);
+    setSearchResults([]);
+
+    // 2) 드롭다운 가시성 플래그 강제 닫기
+    setIsDropdownOpen(false);
+
+    // 3) 모바일 가상 키보드 및 포커스 해제
+    searchInputRef.current?.blur();
+
     const cleanShort = poi.name.length > 8 ? poi.name.slice(0, 8) : poi.name;
     setName(poi.name);
     setShortName(cleanShort);
     setAddress(poi.address || poi.name);
     setLat(poi.lat);
     setLng(poi.lng);
-    setSearchResults([]);
     setSearchQuery(poi.name);
+    setSearchError(null);
   };
 
   // Delete a personal preset
@@ -529,6 +559,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
   // Start editing a preset
   const handleStartEdit = (preset: LocationPreset) => {
     haptics.lightTap();
+    isPlaceSelectedRef.current = true;
     setEditingItem(preset);
     setName(preset.name);
     setShortName(preset.shortName);
@@ -537,11 +568,13 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
     setLng(preset.lng);
     setSearchQuery('');
     setSearchResults([]);
+    setIsDropdownOpen(false);
     setSearchError(null);
   };
 
   // Reset top input form
   const handleCancelForm = () => {
+    isPlaceSelectedRef.current = false;
     setEditingItem(null);
     setName('');
     setShortName('');
@@ -550,6 +583,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
     setLng(null);
     setSearchQuery('');
     setSearchResults([]);
+    setIsDropdownOpen(false);
     setSearchError(null);
   };
 
@@ -582,13 +616,23 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
 
     // 2. Edit Preset
     if (editingItem && onUpdatePreset) {
+      const isCommonPreset = isAdmin
+        ? true
+        : Boolean(editingItem.isCommon || editingItem.type === 'common' || editingItem.isGlobal || (!editingItem.vehicle_no && !editingItem.vehicleNo));
+
       const updatedPreset: LocationPreset = {
         ...editingItem,
         name: name.trim(),
         shortName: shortName.trim(),
+        fullName: name.trim(),
         address: address.trim() || '사용자 지정 거점',
         lat,
         lng,
+        type: isCommonPreset ? 'common' : 'personal',
+        isCommon: isCommonPreset,
+        isGlobal: isCommonPreset,
+        vehicle_no: isCommonPreset ? null : editingItem.vehicle_no,
+        vehicleNo: isCommonPreset ? undefined : editingItem.vehicleNo,
       };
       onUpdatePreset(updatedPreset);
       const updatedList = items.map((p) => (p.id === updatedPreset.id ? updatedPreset : p));
@@ -598,14 +642,20 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
     } else {
       // 3. New Preset
       const newPreset: LocationPreset = {
-        id: `custom_${Date.now()}`,
+        id: `preset_${Date.now()}`,
         name: name.trim(),
         shortName: shortName.trim(),
+        fullName: name.trim(),
         lat,
         lng,
         category: isAdmin ? 'HOTEL' : 'CUSTOM',
         address: address.trim() || '사용자 지정 거점',
-        isGlobal: isAdmin,
+        type: isAdmin ? 'common' : 'personal', // 관리자면 '공통', 일반 기사면 '개인'
+        isCommon: Boolean(isAdmin),
+        isGlobal: Boolean(isAdmin),
+        vehicle_no: isAdmin ? null : (vehicleNo || null),
+        vehicleNo: isAdmin ? undefined : (vehicleNo || undefined),
+        createdAt: new Date().toISOString(),
       };
       onAddPreset(newPreset);
       const updatedList = [...items, newPreset];
@@ -752,10 +802,17 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
           {!isHomeMode ? (
             <div className="p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 bg-slate-50/70 space-y-3 shadow-2xs">
               <div className="flex items-center justify-between pb-1 border-b border-slate-200/60">
-                <span className="text-base font-black text-slate-800 flex items-center gap-1.5">
-                  <Plus className="w-3.5 h-3.5 text-[#1E60F3] stroke-[2.5]" />
-                  <span>{editingItem ? '거점 정보 수정' : '장소 등록'}</span>
-                </span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-base font-black text-slate-800 flex items-center gap-1.5">
+                    <Plus className="w-3.5 h-3.5 text-[#1E60F3] stroke-[2.5]" />
+                    <span>{editingItem ? '거점 정보 수정' : '장소 등록'}</span>
+                  </span>
+                  {isAdmin && (
+                    <span className="px-2 py-0.5 text-xs font-bold text-white bg-[#1E60F3] rounded-full shadow-xs">
+                      공통 거점으로 등록
+                    </span>
+                  )}
+                </div>
                 {editingItem && (
                   <button
                     type="button"
@@ -774,9 +831,19 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                 </label>
                 <div className="relative">
                   <input
+                    ref={searchInputRef}
                     type="text"
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => {
+                      isPlaceSelectedRef.current = false;
+                      setIsDropdownOpen(true);
+                      setSearchQuery(e.target.value);
+                    }}
+                    onFocus={() => {
+                      if (searchResults.length > 0) {
+                        setIsDropdownOpen(true);
+                      }
+                    }}
                     placeholder="장소명 또는 주소를 검색하세요 (예: 인천공항, 코엑스)"
                     className="w-full pl-11 pr-10 py-2.5 sm:py-3 bg-white border border-slate-200 rounded-xl text-slate-800 text-sm font-medium placeholder:text-sm placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] transition-colors"
                   />
@@ -787,7 +854,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                 </div>
 
                 {/* Autocomplete Results Dropdown (text-base font-semibold) */}
-                {searchResults.length > 0 && (
+                {isDropdownOpen && searchResults.length > 0 && (
                   <div className="mt-2 border border-slate-200 rounded-xl bg-white shadow-lg max-h-48 overflow-y-auto divide-y divide-slate-100 overscroll-contain">
                     <div className="p-2 text-[10px] font-bold text-slate-400 bg-slate-50 uppercase">
                       터치하여 거점 정보 자동 입력
@@ -882,9 +949,19 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                 </label>
                 <div className="relative">
                   <input
+                    ref={searchInputRef}
                     type="text"
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => {
+                      isPlaceSelectedRef.current = false;
+                      setIsDropdownOpen(true);
+                      setSearchQuery(e.target.value);
+                    }}
+                    onFocus={() => {
+                      if (searchResults.length > 0) {
+                        setIsDropdownOpen(true);
+                      }
+                    }}
                     placeholder="장소명 또는 주소 검색 (예: 자택 아파트명, 도로명)"
                     className="w-full pl-11 pr-10 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-lg font-medium placeholder:text-base placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] focus:bg-white transition-colors"
                     autoFocus
@@ -895,7 +972,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                   )}
                 </div>
 
-                {searchResults.length > 0 && (
+                {isDropdownOpen && searchResults.length > 0 && (
                   <div className="mt-2 border border-slate-200 rounded-xl bg-white shadow-lg max-h-52 overflow-y-auto divide-y divide-slate-100 overscroll-contain">
                     <div className="p-2 text-[10px] font-bold text-slate-400 bg-slate-50 uppercase">
                       터치하여 자택 주소 입력
@@ -1036,7 +1113,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
 
                           // 2..N Preset Slots
                           const { preset, index } = slot;
-                          const isHQ = !preset.vehicle_no && !preset.vehicleNo;
+                          const isHQ = Boolean(preset.isCommon || preset.type === 'common' || preset.isGlobal || (!preset.vehicle_no && !preset.vehicleNo));
                           const isBeingDragged = isDragging && dragIndex === index;
 
                           return (
