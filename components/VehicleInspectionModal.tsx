@@ -617,7 +617,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
               {/* Meter Inputs */}
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="block text-[12px] font-semibold text-slate-600 mb-1">
+                  <label className="block text-[13px] font-semibold text-slate-600 mb-1">
                     총 주행거리 (km)
                   </label>
                   <input
@@ -630,7 +630,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-[12px] font-semibold text-slate-600 mb-1">
+                  <label className="block text-[13px] font-semibold text-slate-600 mb-1">
                     주행가능거리 (km)
                   </label>
                   <input
@@ -646,7 +646,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
 
               {/* Dashboard Photo Slot */}
               <div>
-                <label className="block text-[12px] font-semibold text-slate-600 mb-1">
+                <label className="block text-[13px] font-semibold text-slate-600 mb-1">
                   계기판 AI 자동 입력 ✨
                 </label>
                 {receiptMeterPhoto ? (
@@ -708,7 +708,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
 
               {/* 2D Top-Down Interactive Vehicle Inspection Viewer */}
               <div className="space-y-1 pt-0.5">
-                <label className="block text-[12px] font-semibold text-slate-600">
+                <label className="block text-[13px] font-semibold text-slate-600">
                   차량 외관 2D 탑뷰 점검
                 </label>
                 <VehicleTopDownViewer
@@ -720,7 +720,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
 
               {/* Outer Damage Quick Chip Selector & Input */}
               <div className="space-y-1 pt-1">
-                <label className="block text-[12px] font-semibold text-slate-600">
+                <label className="block text-[13px] font-semibold text-slate-600">
                   외관 부위별 빠른 선택
                 </label>
                 <div className="flex flex-wrap gap-1.5">
@@ -759,7 +759,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                 </div>
 
                 <div className="pt-1">
-                  <label className="block text-[12px] font-semibold text-slate-600 mb-1">
+                  <label className="block text-[13px] font-semibold text-slate-600 mb-1">
                     외관 데미지 상세 (직접 수정 가능)
                   </label>
                   <input
@@ -779,7 +779,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
             <div className="space-y-3 animate-fade-in">
               {/* Range Input Only (Odometer Hidden) */}
               <div>
-                <label className="block text-[12px] font-semibold text-slate-600 mb-1">
+                <label className="block text-[13px] font-semibold text-slate-600 mb-1">
                   주행가능거리 (km)
                 </label>
                 <input
@@ -794,7 +794,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
 
               {/* Dashboard Photo Slot for Daily */}
               <div>
-                <label className="block text-[12px] font-semibold text-slate-600 mb-1">
+                <label className="block text-[13px] font-semibold text-slate-600 mb-1">
                   계기판 사진 (선택)
                 </label>
                 {dailyMeterPhoto ? (
@@ -857,7 +857,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
               {/* 2D Top-Down Interactive Vehicle Inspection Viewer */}
               <div className="space-y-1 pt-0.5">
                 <div className="flex items-center justify-between">
-                  <label className="block text-[12px] font-semibold text-slate-600">
+                  <label className="block text-[13px] font-semibold text-slate-600">
                     차량 외관 2D 탑뷰 점검
                   </label>
                   <div className="flex items-center gap-2 text-[10px] font-medium text-slate-500">
@@ -886,7 +886,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
               {/* Outer Damage Quick Chip Selector & One-Touch Clean */}
               <div className="space-y-1 pt-1">
                 <div className="flex items-center justify-between">
-                  <label className="block text-[12px] font-semibold text-slate-600">
+                  <label className="block text-[13px] font-semibold text-slate-600">
                     외관 부위별 빠른 선택
                   </label>
                 </div>
@@ -948,7 +948,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
               {/* Meter Inputs */}
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="block text-[12px] font-semibold text-slate-600 mb-1">
+                  <label className="block text-[13px] font-semibold text-slate-600 mb-1">
                     반납 총 주행거리 (km)
                   </label>
                   <input
@@ -961,7 +961,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-[12px] font-semibold text-slate-600 mb-1">
+                  <label className="block text-[13px] font-semibold text-slate-600 mb-1">
                     반납 주행가능거리 (km)
                   </label>
                   <input
@@ -977,7 +977,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
 
               {/* Task 4: Dashboard Photo Slot for Return */}
               <div>
-                <label className="block text-[12px] font-semibold text-slate-600 mb-1">
+                <label className="block text-[13px] font-semibold text-slate-600 mb-1">
                   계기판 AI 자동 입력 ✨
                 </label>
                 {returnMeterPhoto ? (
@@ -1040,7 +1040,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
               {/* 2D Top-Down Interactive Vehicle Inspection Viewer with Receipt Data Inheritance */}
               <div className="space-y-1 pt-0.5">
                 <div className="flex items-center justify-between">
-                  <label className="block text-[12px] font-semibold text-slate-600">
+                  <label className="block text-[13px] font-semibold text-slate-600">
                     차량 외관 2D 탑뷰 점검
                   </label>
                   {existingDamageParts.length > 0 && (
@@ -1067,7 +1067,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
               {/* Task 3: Outer Damage Quick Chip Selector & Input */}
               <div className="space-y-1 pt-1">
                 <div className="flex items-center justify-between">
-                  <label className="block text-[12px] font-semibold text-slate-600">
+                  <label className="block text-[13px] font-semibold text-slate-600">
                     외관 부위별 빠른 선택
                   </label>
                 </div>
@@ -1122,7 +1122,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                 </div>
 
                 <div className="pt-1">
-                  <label className="block text-[12px] font-semibold text-slate-600 mb-1">
+                  <label className="block text-[13px] font-semibold text-slate-600 mb-1">
                     외관 데미지 상세 (직접 수정 가능)
                   </label>
                   <input
@@ -1138,7 +1138,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
               {/* Parking & Key Location */}
               <div className="grid grid-cols-2 gap-2.5 pt-1">
                 <div>
-                  <label className="block text-[12px] font-semibold text-slate-600 mb-1">
+                  <label className="block text-[13px] font-semibold text-slate-600 mb-1">
                     주차위치 (선택)
                   </label>
                   <input
@@ -1150,7 +1150,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-[12px] font-semibold text-slate-600 mb-1">
+                  <label className="block text-[13px] font-semibold text-slate-600 mb-1">
                     차키위치 (선택)
                   </label>
                   <input

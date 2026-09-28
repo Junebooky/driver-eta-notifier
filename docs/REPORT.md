@@ -3225,3 +3225,20 @@ flowchart TD
    - `npm run build`: 전 15개 라우트 TypeScript / ESLint 컴파일 에러 **0건 (Exit code 0)** 통과.
 2. **UI 정합성**:
    - 차량 점검 모달의 기본 정보 입력란 폰트 크기가 `text-base`로 단정하게 반영됨.
+
+---
+
+## 66. 차량 점검 모달 라벨 폰트 크기 조정 (`text-[12px]` -> `text-[13px]`)
+
+### 66.1 배경 및 작업 목적
+- 차량 점검 모달(`VehicleInspectionModal.tsx`) 내 입력 항목 및 뷰어 라벨(`className="block text-[12px] font-semibold text-slate-600..."`)의 가독성을 높이기 위해 폰트 크기를 `12px`에서 `13px`(`text-[13px]`)로 일괄 상향 조정.
+
+### 66.2 모듈별 상세 구현 내역
+- [`components/VehicleInspectionModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/VehicleInspectionModal.tsx):
+  - 배차/일일/반납 탭 전반의 라벨 18개소 `text-[12px]` ➔ `text-[13px]` 일괄 변경.
+
+### 66.3 검증 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: 전 15개 라우트 TypeScript / ESLint 컴파일 에러 **0건 (Exit code 0)** 통과.
+2. **UI 정합성**:
+   - 모달 내 라벨 텍스트의 시인성 및 판독 편의성 향상.
