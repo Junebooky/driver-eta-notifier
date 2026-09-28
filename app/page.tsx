@@ -1082,7 +1082,6 @@ export default function Home() {
         onSelectLocation={handleSelectLocationFromSearch}
         onOpenHomeModal={() => setIsHomeModalOpen(true)}
         onOpenManagePresets={() => {
-          setIsLocationSearchOpen(false);
           setIsAddModalOpen(true);
         }}
         onTogglePresetFavorite={(preset, action) => {

@@ -1761,6 +1761,66 @@ SELECT * FROM cockpit.presets;
 4. **스케줄 모달 내 개인 거점 노출 검증**:
    - 스케줄 모달 출발지/도착지 선택 창 호출 시 `activePresets` 파이프라인을 통해 기사 개인 등록 거점(`MY`)이 누락 없이 정상 노출됨을 확인.
 
+---
+
+## 39. CustomPresetModal 상단 '장소 등록' 폼 상시 배치 및 하단 오리지널 '그리드 카드' 드래그 앤 드롭 완전 복원 (2026-09-28)
+
+### 39.1 추진 배경 및 목적
+1. **상단 '장소 등록' 폼 상시 노출 및 불필요한 아코디언 제거**:
+   - 접이식 토글 형태를 전면 철거하고, 모달 상단에 실시간 추천 검색, 거점 전체 명칭, 버튼 표기 명칭, 취소/저장 액션 바로 구성된 '장소 등록' 섹션을 상시 고정 배치하여 진입 즉시 등록이 가능하도록 개선.
+2. **하단 1열 세로 목록 제거 및 오리지널 '그리드 카드' UI 이식**:
+   - `[▲] [▼]` 화살표가 있는 낯선 세로형 1열 목록을 완전히 제거.
+   - 기존 메인 화면(`components/PresetButtons.tsx`)의 3열 그리드 카드 디자인(자택 1번 슬롯 고정, 둥근 라운드 박스, 축약 명칭, '공통'/'개인' 뱃지, 개인 거점 `✕` 삭제 버튼)을 충실히 복원.
+3. **코드베이스의 유려한 드래그 앤 드롭(Drag & Drop) 메커니즘 복원**:
+   - HTML5 네이티브 드래그와 모바일 터치 Center-Point Hysteresis 드래그(플로팅 칩 + 햅틱 피드백)를 결합하여 데스크톱과 모바일 어디서나 카드를 잡고 끌어 원하는 위치로 이동할 수 있도록 구축.
+   - 순서 변경 즉시 `cockpit_presets_order_${vehicleNo}` 및 Supabase DB에 저장되며, `LocationSearchModal`의 3x7 그리드 순서에도 0초 만에 완벽 동기화.
+
+---
+
+### 39.2 핵심 구현 내역
+
+#### [태스크 1] 상단 '장소 등록' 폼 상시 노출 배치 ([`components/CustomPresetModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/CustomPresetModal.tsx))
+1. **상시 고정 폼 컨테이너 (`bg-slate-50/70 border border-slate-200/90 rounded-2xl p-3.5`)**:
+   - 토글 버튼 없이 상단에 영구 노출.
+   - **장소 검색 (실시간 추천)**: 중립적 인풋 필드 및 실시간 자동완성 결과 드롭다운 탑재.
+   - **거점 전체 명칭** & **버튼 표기 명칭 (최대 8자 권장)**: 검색 결과 터치 시 자동 기입 및 기사 직접 수정 지원.
+   - **[취소] / [저장] 액션 바**: 저장 시 유효성 검증 후 하단 그리드에 즉시 추가/수정 반영.
+
+---
+
+#### [태스크 2] 하단 기존 '자주 가는 목적지 그리드 카드 UI' 및 드래그 앤 드롭 완전 복원 ([`components/CustomPresetModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/CustomPresetModal.tsx), [`components/PresetButtons.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/PresetButtons.tsx))
+1. **1열 세로형 리스트 전면 철거**:
+   - 긴 1열 세로 목록과 상하 이동 화살표 버튼을 100% 제거.
+2. **`PresetButtons.tsx` 기반 3열 그리드 카드 렌더링**:
+   - **1번 슬롯**: 🏠 자택 카드 고정 (아이콘, 자택 텍스트, 주소 요약, 에메랄드 뱃지).
+   - **2..N번 슬롯**: 등록된 거점 카드 (`items.map(...)`).
+     - 축약 명칭 (`text-xs font-bold text-slate-800`), 하단 `공통` 또는 `개인` 뱃지.
+     - 개인 거점(`MY`) 우측 상단 모서리에 컴팩트한 `✕` 삭제 버튼 탑재.
+     - 카드 터치 시 상단 폼에 데이터가 채워져 명칭 수정 가능.
+3. **듀얼 드래그 앤 드롭 (Desktop HTML5 + Mobile Touch Hysteresis)**:
+   - 마우스 드래그: `draggable={true}`, `onDragStart`, `onDragOver`, `onDrop`, `onDragEnd`.
+   - 터치 제스처: 280ms 롱프레스 감지, 화면 중심점 거리 계산(`checkCenterPointHysteresis`)을 통한 실시간 카드 교체 및 플로팅 칩 연동.
+   - 위치 변경 즉시 `haptics.lightTap()`과 함께 `cockpit_presets_${cleanV}` 및 `cockpit_presets_order_${cleanV}` 로컬 스토리지에 즉시 저장하고, `onReorderPresets`를 통해 Supabase에 실시간 반영.
+
+---
+
+#### [태스크 3] `LocationSearchModal`과의 유기적 연동 ([`app/page.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/page.tsx), [`components/LocationSearchModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/LocationSearchModal.tsx))
+1. **오버레이 팝업 아키텍처 (`z-[120]` over `z-[110]`)**:
+   - `LocationSearchModal` 내 `[⚙️ 순서 관리]` 클릭 시 `LocationSearchModal`을 닫지 않고 그 위에 `CustomPresetModal`이 자연스럽게 올라오도록 연동.
+2. **0초 무재부팅 순서 동기화**:
+   - `CustomPresetModal`에서 순서를 변경하면 `app/page.tsx`의 `presets` 상태가 즉시 갱신되어, 뒤편의 `LocationSearchModal` 3x7 캐러셀 그리드가 새로고침 없이 실시간으로 재배열됨을 보장.
+
+---
+
+### 39.3 검증 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 14개 라우트 컴파일 에러 **0건** 완료.
+2. **그리드 UI 및 상단 폼 상시 노출 검증**:
+   - 모달 오픈 즉시 상단에 장소 검색/등록 폼이 펼쳐져 있고, 하단에 익숙한 3열 그리드 카드(자택 1번 슬롯 포함)가 완벽하게 렌더링됨을 확인.
+3. **드래그 앤 드롭 및 순서 영속성 검증**:
+   - 카드를 잡고 끌어 위치를 변경할 때 플로팅 칩 및 실시간 스왑이 정상 작동하며, 모달을 닫아도 변경된 순서가 `cockpit_presets_order` 및 메인 화면/장소 검색 모달에 온전히 유지됨을 확인.
+
+
 
 
 
