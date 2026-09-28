@@ -3035,5 +3035,42 @@ flowchart TD
    - **Case 1 (미금역 POI 검색)**: `curl "http://localhost:3000/api/search?keyword=미금역"` 및 컴포넌트 연동 확인 결과, '미금역 (수인분당선)', '미금역 (신분당선)', 출구별 POI가 완벽히 반환됨을 확인 (PASS).
    - **Case 2 (Safari 복귀 빈 탭 제거)**: 거리뷰 호출 시 새 탭 생성 대신 현재 탭에서 이동하여, 뒤로가기 1회로 빈 탭 잔류 없이 앱으로 즉각 복귀 (PASS).
 
+---
+
+## 60. RoadviewModal 목적지 카드 화살표 확대 및 POI 추천검색어 '눈(Eye)' SVG 단독 배치 정비
+
+### 60.1 배경 및 작업 목적
+1. **현재 목적지 카드 화살표 박스(Border) 제거 및 크기 확대**:
+   - 모바일 기기별 유니코드 화살표('↗') 폰트 렌더링 왜곡 및 번잡한 외곽선 박스(`border border-blue-200`, `bg-white`, `shadow-2xs`)를 제거.
+   - Lucide `ArrowUpRight` 벡터 SVG 아이콘으로 교체하고 크기를 시원하게 키워(`w-6 h-6 sm:w-6.5 sm:h-6.5 stroke-[2.5]`) 시인성과 탭 인지도를 극대화.
+2. **POI 실시간 추천 검색어 목록 CTA 간소화 및 '눈(Eye)' SVG 단독 배치**:
+   - 검색 결과 각 행 우측의 '거리뷰' 텍스트와 감싸던 태그 박스를 전면 삭제.
+   - 모달 헤더 및 퀵 액션 바에서 확립된 '현장 거리뷰 뷰파인더' 메타포인 Lucide `Eye` SVG 벡터 아이콘을 단독으로 정렬하여 간결하고 직관적인 UI 완성.
+3. **Zero-DB 및 클라이언트 인터랙션 무결성 유지**:
+   - 불필요한 레이아웃 요소를 덜어내면서도 카드 전면 터치 및 hover/active 모션 인터랙션을 안정적으로 유지.
+
+---
+
+### 60.2 모듈별 상세 구현 내역
+
+#### 1. 현재 목적지 카드 화살표 박스 제거 및 대형 SVG 적용 ([`components/RoadviewModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/RoadviewModal.tsx))
+- `ArrowUpRight` 아이콘 import 추가.
+- 목적지 카드 우측 배지의 흰색 배경, 테두리, 그림자를 걷어내고, 호버/터치 시 부드럽게 대각선으로 이동하는 micro-interaction(`group-hover:translate-x-0.5 group-hover:-translate-y-0.5`)이 적용된 대형 `ArrowUpRight` SVG 아이콘 배치.
+
+#### 2. POI 추천 검색어 목록 눈(Eye) 아이콘 단독 배치 ([`components/RoadviewModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/RoadviewModal.tsx))
+- `searchResults.map` 렌더링 블록 내 우측 배지의 텍스트와 외곽선 박스를 완전히 삭제.
+- 깔끔한 코발트 블루(`#1E60F3`) 컬러와 인터랙션 스케일 효과(`group-hover:scale-110`)를 갖춘 `Eye` 아이콘(`stroke-[2.2]`) 단독 노출.
+
+---
+
+### 60.3 검증 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 TypeScript / ESLint 컴파일 에러 **0건 (Exit code 0)** 통과.
+2. **시나리오 검증 결과**:
+   - **Case 1 (목적지 카드)**: 번잡한 테두리 박스 없이 선명하고 큼직한 `ArrowUpRight` SVG 아이콘이 단정하게 배치됨 (PASS).
+   - **Case 2 (추천 검색어 목록)**: '미금역' 등 검색 시 각 행 우측에 '거리뷰' 텍스트 박스 없이 오직 깔끔한 `Eye` SVG 아이콘만 정렬됨 (PASS).
+   - **Case 3 (터치 동작 유지)**: 목적지 카드 및 추천 검색어 항목 탭 시 `openRoadview`가 즉시 호출되어 카카오 거리뷰로 즉시 연결됨 (PASS).
+
+
 
 

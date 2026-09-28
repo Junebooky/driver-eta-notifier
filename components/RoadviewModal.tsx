@@ -6,6 +6,7 @@ import {
   X,
   Search,
   Eye,
+  ArrowUpRight,
   Home,
   Clock,
   Sparkles,
@@ -322,9 +323,9 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
                       </div>
                       <div className="text-xs text-slate-500 truncate mt-0.5">{poi.address}</div>
                     </div>
-                    <span className="text-xs font-bold text-[#1E60F3] shrink-0 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-200 group-hover:bg-[#1E60F3] group-hover:text-white transition-colors">
-                      거리뷰 ↗
-                    </span>
+                    <div className="shrink-0 p-1.5 text-[#1E60F3] group-hover:scale-110 transition-transform">
+                      <Eye aria-hidden="true" className="w-5 h-5 sm:w-5.5 sm:h-5.5 stroke-[2.2]" />
+                    </div>
                   </button>
                 ))
               ) : (
@@ -360,9 +361,9 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
                     {currentDestination.address || currentDestination.fullName || currentDestination.name}
                   </p>
                 </div>
-                <span className="text-xs font-bold text-[#1E60F3] shrink-0 bg-white px-2.5 py-1 rounded-lg border border-blue-200 shadow-2xs group-hover:bg-[#1E60F3] group-hover:text-white transition-colors">
-                  ↗
-                </span>
+                <div className="shrink-0 p-1 text-[#1E60F3] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform">
+                  <ArrowUpRight aria-hidden="true" className="w-6 h-6 sm:w-6.5 sm:h-6.5 stroke-[2.5]" />
+                </div>
               </button>
             </div>
           )}
