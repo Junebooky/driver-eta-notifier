@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { LocationPreset } from '@/types';
+import { generateSmartDisplayName } from '@/utils/nameFormatter';
 import {
   X,
   Search,
@@ -92,12 +93,15 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
   // Form Fields State
   const [name, setName] = useState('');
   const [shortName, setShortName] = useState('');
+  const [recommendations, setRecommendations] = useState<string[]>([]);
   const [address, setAddress] = useState('');
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
 
   // Drag-and-Drop Gesture State
   const [isDragging, setIsDragging] = useState(false);
+  const isDraggingRef = useRef(false);
+  isDraggingRef.current = isDragging;
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const dragIndexRef = useRef<number | null>(null);
   dragIndexRef.current = dragIndex;
@@ -113,6 +117,14 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
   // Carousel Pagination State (4 rows x 3 columns = 12 slots)
   const PAGE_SIZE = 12;
   const [currentPage, setCurrentPage] = useState(0);
+  const currentPageRef = useRef(currentPage);
+  currentPageRef.current = currentPage;
+  const totalPagesRef = useRef(1);
+  const edgeTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const edgeDirectionRef = useRef<'left' | 'right' | null>(null);
+  const dotRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const pagesRef = useRef<any[]>([]);
+  const carouselContainerRef = useRef<HTMLDivElement | null>(null);
   const carouselTouchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   // Sync presets from props or vehicle localStorage
@@ -302,6 +314,73 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
     return null;
   };
 
+  const checkEdgePaging = (clientX: number) => {
+    const leftEdge = 45;
+    const rightEdge = window.innerWidth - 45;
+    const containerRect = carouselContainerRef.current?.getBoundingClientRect();
+    const isLeftEdge = clientX <= leftEdge || (containerRect && clientX <= containerRect.left + 45);
+    const isRightEdge = clientX >= rightEdge || (containerRect && clientX >= containerRect.right - 45);
+
+    if (isLeftEdge) {
+      if (edgeDirectionRef.current !== 'left') {
+        if (edgeTimerRef.current) clearTimeout(edgeTimerRef.current);
+        edgeDirectionRef.current = 'left';
+        edgeTimerRef.current = setTimeout(() => {
+          if (currentPageRef.current > 0) {
+            haptics.lightTap();
+            setCurrentPage((prev) => {
+              const next = Math.max(0, prev - 1);
+              currentPageRef.current = next;
+              return next;
+            });
+          }
+          edgeDirectionRef.current = null;
+        }, 300);
+      }
+    } else if (isRightEdge) {
+      if (edgeDirectionRef.current !== 'right') {
+        if (edgeTimerRef.current) clearTimeout(edgeTimerRef.current);
+        edgeDirectionRef.current = 'right';
+        edgeTimerRef.current = setTimeout(() => {
+          if (currentPageRef.current < totalPagesRef.current - 1) {
+            haptics.lightTap();
+            setCurrentPage((prev) => {
+              const next = Math.min(totalPagesRef.current - 1, prev + 1);
+              currentPageRef.current = next;
+              return next;
+            });
+          }
+          edgeDirectionRef.current = null;
+        }, 300);
+      }
+    } else {
+      if (edgeTimerRef.current) {
+        clearTimeout(edgeTimerRef.current);
+        edgeTimerRef.current = null;
+      }
+      edgeDirectionRef.current = null;
+    }
+  };
+
+  const checkDotHover = (clientX: number, clientY: number) => {
+    dotRefs.current.forEach((dotEl, dotIdx) => {
+      if (!dotEl) return;
+      const rect = dotEl.getBoundingClientRect();
+      if (
+        clientX >= rect.left - 12 &&
+        clientX <= rect.right + 12 &&
+        clientY >= rect.top - 12 &&
+        clientY <= rect.bottom + 12
+      ) {
+        if (currentPageRef.current !== dotIdx) {
+          haptics.lightTap();
+          setCurrentPage(dotIdx);
+          currentPageRef.current = dotIdx;
+        }
+      }
+    });
+  };
+
   const checkCenterPointHysteresis = (clientX: number, clientY: number) => {
     const currentDrag = dragIndexRef.current;
     if (currentDrag === null) return;
@@ -337,8 +416,9 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
         updated.splice(i, 0, movedItem);
 
         // 3. Update local state
-        itemsRef.current = updated;
-        setItems(updated);
+        const reindexed = updated.map((p, idx) => ({ ...p, order: idx }));
+        itemsRef.current = reindexed;
+        setItems(reindexed);
         setDragIndex(i);
         dragIndexRef.current = i;
 
@@ -351,6 +431,12 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
   };
 
   const endDrag = (releaseX?: number, releaseY?: number) => {
+    if (edgeTimerRef.current) {
+      clearTimeout(edgeTimerRef.current);
+      edgeTimerRef.current = null;
+    }
+    edgeDirectionRef.current = null;
+
     if (typeof releaseX === 'number' && typeof releaseY === 'number') {
       const targetIdx = calculateSlotIndex(releaseX, releaseY);
       const currentDrag = dragIndexRef.current;
@@ -377,7 +463,10 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
       isLongPressActiveRef.current = false;
     }, 100);
     prevRectsRef.current.clear();
-    commitReorder(itemsRef.current);
+    const finalItems = itemsRef.current.map((p, idx) => ({ ...p, order: idx }));
+    setItems(finalItems);
+    itemsRef.current = finalItems;
+    commitReorder(finalItems);
     haptics.lightTap();
   };
 
@@ -388,6 +477,8 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
     const handlePointerMove = (e: PointerEvent | MouseEvent) => {
       setPointerPos({ x: e.clientX, y: e.clientY });
       checkCenterPointHysteresis(e.clientX, e.clientY);
+      checkEdgePaging(e.clientX);
+      checkDotHover(e.clientX, e.clientY);
     };
 
     const handleTouchMove = (e: TouchEvent) => {
@@ -396,6 +487,8 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
       if (touch) {
         setPointerPos({ x: touch.clientX, y: touch.clientY });
         checkCenterPointHysteresis(touch.clientX, touch.clientY);
+        checkEdgePaging(touch.clientX);
+        checkDotHover(touch.clientX, touch.clientY);
       }
     };
 
@@ -534,9 +627,10 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
     // 3) 모바일 가상 키보드 및 포커스 해제
     searchInputRef.current?.blur();
 
-    const cleanShort = poi.name.length > 8 ? poi.name.slice(0, 8) : poi.name;
+    const abbrev = generateSmartDisplayName(poi.name);
     setName(poi.name);
-    setShortName(cleanShort);
+    setShortName(abbrev.primary);
+    setRecommendations(abbrev.candidates);
     setAddress(poi.address || poi.name);
     setLat(poi.lat);
     setLng(poi.lng);
@@ -550,9 +644,10 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
     haptics.warningPulse();
 
     const updated = items.filter((p) => p.id !== id);
-    setItems(updated);
-    itemsRef.current = updated;
-    commitReorder(updated);
+    const reindexed = updated.map((p, idx) => ({ ...p, order: idx }));
+    setItems(reindexed);
+    itemsRef.current = reindexed;
+    commitReorder(reindexed);
     onDeletePreset?.(id);
   };
 
@@ -563,6 +658,8 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
     setEditingItem(preset);
     setName(preset.name);
     setShortName(preset.shortName);
+    const abbrev = generateSmartDisplayName(preset.name);
+    setRecommendations(abbrev.candidates);
     setAddress(preset.address || '');
     setLat(preset.lat);
     setLng(preset.lng);
@@ -578,6 +675,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
     setEditingItem(null);
     setName('');
     setShortName('');
+    setRecommendations([]);
     setAddress('');
     setLat(null);
     setLng(null);
@@ -636,32 +734,74 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
       };
       onUpdatePreset(updatedPreset);
       const updatedList = items.map((p) => (p.id === updatedPreset.id ? updatedPreset : p));
-      setItems(updatedList);
-      itemsRef.current = updatedList;
-      commitReorder(updatedList);
+      const reindexed = updatedList.map((p, idx) => ({ ...p, order: idx }));
+      setItems(reindexed);
+      itemsRef.current = reindexed;
+      commitReorder(reindexed);
     } else {
       // 3. New Preset
-      const newPreset: LocationPreset = {
-        id: `preset_${Date.now()}`,
-        name: name.trim(),
-        shortName: shortName.trim(),
-        fullName: name.trim(),
-        lat,
-        lng,
-        category: isAdmin ? 'HOTEL' : 'CUSTOM',
-        address: address.trim() || '사용자 지정 거점',
-        type: isAdmin ? 'common' : 'personal', // 관리자면 '공통', 일반 기사면 '개인'
-        isCommon: Boolean(isAdmin),
-        isGlobal: Boolean(isAdmin),
-        vehicle_no: isAdmin ? null : (vehicleNo || null),
-        vehicleNo: isAdmin ? undefined : (vehicleNo || undefined),
-        createdAt: new Date().toISOString(),
-      };
-      onAddPreset(newPreset);
-      const updatedList = [...items, newPreset];
-      setItems(updatedList);
-      itemsRef.current = updatedList;
-      commitReorder(updatedList);
+      if (isAdmin) {
+        const newPreset: LocationPreset = {
+          id: `preset_${Date.now()}`,
+          name: name.trim(),
+          shortName: shortName.trim(),
+          fullName: name.trim(),
+          lat,
+          lng,
+          category: 'HOTEL',
+          address: address.trim() || '사용자 지정 거점',
+          type: 'common', // 관리자면 '공통'
+          isCommon: true,
+          isGlobal: true,
+          vehicle_no: null,
+          vehicleNo: undefined,
+          createdAt: new Date().toISOString(),
+        };
+
+        // [태스크 2] 기존 공통 거점들 중 맨 끝(즉, 개인 거점들이 시작되기 직전 위치)에 삽입하여 1페이지 전진 배치
+        const isCommonPreset = (p: LocationPreset) =>
+          Boolean(p.isCommon || p.type === 'common' || p.isGlobal || (!p.vehicle_no && !p.vehicleNo));
+
+        let insertIndex = 0;
+        for (let i = items.length - 1; i >= 0; i--) {
+          if (isCommonPreset(items[i])) {
+            insertIndex = i + 1;
+            break;
+          }
+        }
+        const updatedList = [...items];
+        updatedList.splice(insertIndex, 0, newPreset);
+        const reindexed = updatedList.map((p, idx) => ({ ...p, order: idx }));
+        setItems(reindexed);
+        itemsRef.current = reindexed;
+        commitReorder(reindexed);
+        onAddPreset(newPreset);
+        // 저장 즉시 1페이지 자동 포커스
+        setCurrentPage(0);
+      } else {
+        const newPreset: LocationPreset = {
+          id: `preset_${Date.now()}`,
+          name: name.trim(),
+          shortName: shortName.trim(),
+          fullName: name.trim(),
+          lat,
+          lng,
+          category: 'CUSTOM',
+          address: address.trim() || '사용자 지정 거점',
+          type: 'personal',
+          isCommon: false,
+          isGlobal: false,
+          vehicle_no: vehicleNo || null,
+          vehicleNo: vehicleNo || undefined,
+          createdAt: new Date().toISOString(),
+        };
+        const updatedList = [...items, newPreset];
+        const reindexed = updatedList.map((p, idx) => ({ ...p, order: idx }));
+        setItems(reindexed);
+        itemsRef.current = reindexed;
+        commitReorder(reindexed);
+        onAddPreset(newPreset);
+      }
     }
 
     handleCancelForm();
@@ -697,6 +837,9 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
   if (pages.length === 0) {
     pages.push([{ type: 'home' }]);
   }
+  totalPagesRef.current = totalPages;
+  currentPageRef.current = currentPage;
+  pagesRef.current = pages;
 
   // Horizontal swipe gestures for carousel
   const handleCarouselTouchStart = (e: React.TouchEvent) => {
@@ -900,7 +1043,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="검색 결과에서 장소를 선택하세요"
-                      className="w-full px-3.5 py-3 bg-white border border-slate-200 rounded-xl text-base font-semibold text-slate-900 placeholder:text-sm placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3]"
+                      className="w-full px-3.5 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder:text-sm placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3]"
                     />
                   </div>
 
@@ -915,8 +1058,27 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                       onChange={(e) => setShortName(e.target.value)}
                       placeholder="예: 소노펠리체"
                       maxLength={12}
-                      className="w-full px-3.5 py-3 bg-white border border-slate-200 rounded-xl text-base font-medium text-slate-900 placeholder:text-sm placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3]"
+                      className="w-full px-3.5 py-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-900 placeholder:text-sm placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3]"
                     />
+                    {recommendations.length > 1 && (
+                      <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                        <span className="text-[11px] font-medium text-slate-400">추천:</span>
+                        {recommendations.map((chip) => (
+                          <button
+                            key={chip}
+                            type="button"
+                            onClick={() => setShortName(chip)}
+                            className={`px-2 py-0.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                              shortName === chip
+                                ? 'bg-blue-50 text-[#1E60F3] border-blue-200'
+                                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            {chip}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1070,6 +1232,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
 
               {/* [태스크 5] Horizontal Carousel Slider for 12-slot Pages */}
               <div
+                ref={carouselContainerRef}
                 className="w-full overflow-hidden select-none touch-pan-y"
                 onTouchStart={handleCarouselTouchStart}
                 onTouchMove={handleCarouselTouchMove}
@@ -1186,10 +1349,20 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                   return (
                     <button
                       key={idx}
+                      ref={(el) => {
+                        dotRefs.current[idx] = el;
+                      }}
                       type="button"
                       onClick={() => {
                         haptics.lightTap();
                         setCurrentPage(idx);
+                      }}
+                      onMouseEnter={() => {
+                        if (isDraggingRef.current && currentPageRef.current !== idx) {
+                          haptics.lightTap();
+                          setCurrentPage(idx);
+                          currentPageRef.current = idx;
+                        }
                       }}
                       aria-label={`페이지 ${idx + 1}`}
                       className={`h-2 rounded-full transition-all duration-300 cursor-pointer focus:outline-none ${isActive

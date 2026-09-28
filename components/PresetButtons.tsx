@@ -69,8 +69,21 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
     address: homeLocation?.address || '',
   };
 
+  // Carousel Pagination State & Refs
+  const PAGE_SIZE = 12;
+  const [currentPage, setCurrentPage] = useState(0);
+  const currentPageRef = useRef(currentPage);
+  currentPageRef.current = currentPage;
+  const totalPagesRef = useRef(1);
+  const edgeTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const edgeDirectionRef = useRef<'left' | 'right' | null>(null);
+  const dotRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const carouselContainerRef = useRef<HTMLDivElement | null>(null);
+
   // Drag-and-Drop Gesture State
   const [isDragging, setIsDragging] = useState(false);
+  const isDraggingRef = useRef(false);
+  isDraggingRef.current = isDragging;
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [pointerPos, setPointerPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
@@ -118,6 +131,74 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
     prevRectsRef.current.clear();
   }, [items]);
 
+  // Edge Auto-Paging & Dot Hover during Drag
+  const checkEdgePaging = (clientX: number) => {
+    const leftEdge = 45;
+    const rightEdge = window.innerWidth - 45;
+    const containerRect = carouselContainerRef.current?.getBoundingClientRect();
+    const isLeftEdge = clientX <= leftEdge || (containerRect && clientX <= containerRect.left + 45);
+    const isRightEdge = clientX >= rightEdge || (containerRect && clientX >= containerRect.right - 45);
+
+    if (isLeftEdge) {
+      if (edgeDirectionRef.current !== 'left') {
+        if (edgeTimerRef.current) clearTimeout(edgeTimerRef.current);
+        edgeDirectionRef.current = 'left';
+        edgeTimerRef.current = setTimeout(() => {
+          if (currentPageRef.current > 0) {
+            haptics.lightTap();
+            setCurrentPage((prev) => {
+              const next = Math.max(0, prev - 1);
+              currentPageRef.current = next;
+              return next;
+            });
+          }
+          edgeDirectionRef.current = null;
+        }, 300);
+      }
+    } else if (isRightEdge) {
+      if (edgeDirectionRef.current !== 'right') {
+        if (edgeTimerRef.current) clearTimeout(edgeTimerRef.current);
+        edgeDirectionRef.current = 'right';
+        edgeTimerRef.current = setTimeout(() => {
+          if (currentPageRef.current < totalPagesRef.current - 1) {
+            haptics.lightTap();
+            setCurrentPage((prev) => {
+              const next = Math.min(totalPagesRef.current - 1, prev + 1);
+              currentPageRef.current = next;
+              return next;
+            });
+          }
+          edgeDirectionRef.current = null;
+        }, 300);
+      }
+    } else {
+      if (edgeTimerRef.current) {
+        clearTimeout(edgeTimerRef.current);
+        edgeTimerRef.current = null;
+      }
+      edgeDirectionRef.current = null;
+    }
+  };
+
+  const checkDotHover = (clientX: number, clientY: number) => {
+    dotRefs.current.forEach((dotEl, dotIdx) => {
+      if (!dotEl) return;
+      const rect = dotEl.getBoundingClientRect();
+      if (
+        clientX >= rect.left - 12 &&
+        clientX <= rect.right + 12 &&
+        clientY >= rect.top - 12 &&
+        clientY <= rect.bottom + 12
+      ) {
+        if (currentPageRef.current !== dotIdx) {
+          haptics.lightTap();
+          setCurrentPage(dotIdx);
+          currentPageRef.current = dotIdx;
+        }
+      }
+    });
+  };
+
   // Window listeners for Center-Point Hysteresis drag tracking
   useEffect(() => {
     if (!isDragging) return;
@@ -159,8 +240,9 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
           updated.splice(i, 0, movedItem);
 
           // 3. Update local state
-          itemsRef.current = updated;
-          setItems(updated);
+          const reindexed = updated.map((p, idx) => ({ ...p, order: idx }));
+          itemsRef.current = reindexed;
+          setItems(reindexed);
           setDragIndex(i);
           dragIndexRef.current = i;
 
@@ -179,6 +261,8 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
       if (touch) {
         setPointerPos({ x: touch.clientX, y: touch.clientY });
         checkCenterPointHysteresis(touch.clientX, touch.clientY);
+        checkEdgePaging(touch.clientX);
+        checkDotHover(touch.clientX, touch.clientY);
       }
     };
 
@@ -189,6 +273,8 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
     const handleMouseMove = (e: MouseEvent) => {
       setPointerPos({ x: e.clientX, y: e.clientY });
       checkCenterPointHysteresis(e.clientX, e.clientY);
+      checkEdgePaging(e.clientX);
+      checkDotHover(e.clientX, e.clientY);
     };
 
     const handleMouseUp = () => {
@@ -196,12 +282,21 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
     };
 
     const endDrag = () => {
+      if (edgeTimerRef.current) {
+        clearTimeout(edgeTimerRef.current);
+        edgeTimerRef.current = null;
+      }
+      edgeDirectionRef.current = null;
+
       setIsDragging(false);
       setDragIndex(null);
       dragIndexRef.current = null;
       isLongPressActiveRef.current = false;
       prevRectsRef.current.clear();
-      onReorderPresets?.(itemsRef.current);
+      const finalItems = itemsRef.current.map((p, idx) => ({ ...p, order: idx }));
+      setItems(finalItems);
+      itemsRef.current = finalItems;
+      onReorderPresets?.(finalItems);
       haptics.lightTap();
     };
 
@@ -549,13 +644,6 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
     : 'hover:border-slate-400 hover:text-slate-800 hover:bg-slate-50/80 hover:shadow-xs hover:-translate-y-0.5';
   const dynamicTextHoverClass = isTargetDestination ? 'group-hover:text-[#1E60F3]' : 'group-hover:text-slate-800';
 
-  // ==============================================================
-  // 4-ROW THRESHOLD HORIZONTAL PAGINATION (CAROUSEL)
-  // 3 columns x 4 rows = 12 slots maximum per page
-  // ==============================================================
-  const PAGE_SIZE = 12;
-  const [currentPage, setCurrentPage] = useState(0);
-
   type SlotItem =
     | { type: 'home' }
     | { type: 'preset'; preset: LocationPreset; index: number }
@@ -567,7 +655,9 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
     { type: 'add' },
   ];
 
-  const totalPages = Math.ceil(allSlots.length / PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(allSlots.length / PAGE_SIZE));
+  totalPagesRef.current = totalPages;
+  currentPageRef.current = currentPage;
 
   // Clamp current page when total pages shrink
   useEffect(() => {
@@ -579,6 +669,9 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
   const pages: SlotItem[][] = [];
   for (let i = 0; i < allSlots.length; i += PAGE_SIZE) {
     pages.push(allSlots.slice(i, i + PAGE_SIZE));
+  }
+  if (pages.length === 0) {
+    pages.push([{ type: 'home' }, { type: 'add' }]);
   }
 
   // Horizontal swipe gesture for carousel
@@ -908,6 +1001,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
 
       {/* 3-Column High-Density Grid with Horizontal Carousel Pagination (Max 4 rows per page) */}
       <div
+        ref={carouselContainerRef}
         className="w-full overflow-hidden select-none touch-pan-y px-1 pt-1 pb-7 sm:pb-8"
         onClickCapture={(e) => {
           if (isScrollingRef.current) {
@@ -950,10 +1044,20 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
             return (
               <button
                 key={idx}
+                ref={(el) => {
+                  dotRefs.current[idx] = el;
+                }}
                 type="button"
                 onClick={() => {
                   haptics.lightTap();
                   setCurrentPage(idx);
+                }}
+                onMouseEnter={() => {
+                  if (isDraggingRef.current && currentPageRef.current !== idx) {
+                    haptics.lightTap();
+                    setCurrentPage(idx);
+                    currentPageRef.current = idx;
+                  }
                 }}
                 aria-label={`페이지 ${idx + 1}`}
                 className={`h-2 rounded-full transition-all duration-300 cursor-pointer focus:outline-none ${isActive

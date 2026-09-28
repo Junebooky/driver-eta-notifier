@@ -2387,6 +2387,90 @@ flowchart TD
    - **Case 1 (일반 모드)**: 장소 검색 ➔ 항목 선택 ➔ 추천 드롭다운 즉시 소거 및 하단 폼(거점명/표시명/취소/저장) 노출 ➔ 저장 ➔ 메인 카드에 `개인` 뱃지 노출 확인.
    - **Case 2 (관리자 모드)**: PIN 인증 후 모달 진입 시 `[공통 거점으로 등록]` 뱃지 확인 ➔ 장소 검색 ➔ 항목 선택 ➔ 저장 ➔ 메인 카드에 `공통` 뱃지 노출 및 `vehicle_no: null` 확인.
 
+---
+
+## 49. [운행/거점] 표시 이름 지능형 축약 추천 칩 구현 및 공통 거점 1페이지 전진 배치·페이지 간 드래그 앤 드롭 개선
+
+### 49.1 배경 및 작업 목적
+1. **지능형 축약(Smart Abbreviation)**:
+   - 거점 등록 시 단순 8자리 절사(`slice(0, 8)`)로 인해 '포시즌스호텔 서'처럼 어색한 비문이 발생하거나, 공항 터미널(T1/T2), 노선 및 출구 번호와 같은 필수 식별 정보가 손실되는 문제를 방지.
+   - 교통 거점 정규화 및 어절 경계 분석 알고리즘을 도입하고, '표시 이름' 인풋창 하단에 2~3개의 원터치 추천 칩을 제공하여 운전자/관리자의 입력 편의를 극대화.
+2. **공통 거점 1페이지 전진 배치 (Page 1 Priority)**:
+   - 관리자 모드(`isAdmin === true`)에서 신규 공통 거점 등록 시 전체 프리셋 배열의 맨 끝(2페이지 이후)으로 밀려나지 않고, **기존 공통 거점 그룹의 직후(개인 거점 시작 직전, 또는 최우선 인덱스)**에 삽입되어 반드시 첫 페이지(1~12번 슬롯) 내에 배치되도록 보장.
+   - 등록 완료 즉시 슬라이더 페이지(`currentPage`)를 `0`(1페이지)으로 자동 전환하여 시각적 확인 보장.
+3. **페이지 간 크로스 페이지 드래그 앤 드롭 (Cross-Page Drag & Drop)**:
+   - 4행 3열(12개 슬롯 단위) 페이징 슬라이더 구조에서 드래그 중인 카드를 화면 좌/우 가장자리(Edge 45px 이내)로 이동 시 300ms 딜레이 후 자동 페이지 전환(Edge Auto-Paging).
+   - 하단 페이지네이션 닷(Dot) 인디케이터 위로 호버 시에도 즉시 해당 페이지로 전환.
+   - 전체 글로벌 인덱스 기준으로 자연스럽게 위치를 교환(FLIP 애니메이션)하고 손을 떼는 순간 브라우저 `localStorage`에 영속화.
+4. **Zero-DB / Pure Client-Side 원칙 준수**:
+   - 모든 순서, 정렬 및 캐러셀 페이지 상태는 브라우저 `localStorage`와 React 상태로 완결.
+
+---
+
+### 49.2 모듈별 구현 내역
+
+#### [태스크 1] 표시 이름 지능형 축약 유틸리티 및 원터치 추천 칩 구현 ([`utils/nameFormatter.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/utils/nameFormatter.ts), [`components/CustomPresetModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/CustomPresetModal.tsx))
+1. **지능형 축약 알고리즘 (`utils/nameFormatter.ts`)**:
+   - **인터페이스 규격**:
+     ```ts
+     export interface AbbreviationResult {
+       primary: string; // 기본 채움값 (최대 8자)
+       candidates: string[]; // 추천 칩 목록 (최대 8자, 중복 제외)
+     }
+     ```
+   - **정규화 및 토큰 압축 파이프라인**:
+     - 공항/교통 거점 정규화: `인천국제공항` ➔ `인천공항`, `김포국제공항` ➔ `김포공항`, `제([1-2])여객터미널`/`제([1-2])터미널` ➔ `T$1`, `국내선` ➔ `국내`, `국제선` ➔ `국제`.
+     - 불필요 텍스트 제거: 괄호 내 부가 정보 `\((.*?)\)` 제거, 지하철 호선명(`신분당선`, `공항철도` 등) 제거, `([0-9]+)번\s*출구` ➔ `$1번`.
+   - **후보 생성 전략**:
+     - 후보 A (첫 어절): 첫 번째 단어가 8자 이내인 경우 (`포시즌스호텔 서울` ➔ `포시즌스호텔`).
+     - 후보 B (결합형): 터미널/출구 번호가 결합된 2어절이 8자 이내인 경우 최우선 배치 (`인천공항 T2`, `광교중앙역 1번`).
+     - 후보 C (단일 장문): 단일 긴 단어의 경우 8자에서 안전 절사.
+     - 후보 D (대안 원본): 필요 시 원본의 앞 8자를 대안으로 등록.
+     - 최대 8자 제한, 중복 제거 후 최대 3개의 정제된 후보 목록 반환.
+2. **모달 입력 폼 및 원터치 추천 칩 연동 (`CustomPresetModal.tsx`)**:
+   - POI 검색 결과 탭(`handleSelectPoi`) 시 `generateSmartDisplayName(poi.name)`을 실행하여 기본 `shortName`을 세팅하고 `recommendations` 상태에 저장.
+   - 기존 거점 수정(`handleStartEdit`) 시에도 후보 칩 자동 계산.
+   - '표시 이름 (최대 8자)' 인풋창 하단에 `recommendations.length > 1`일 때 세련된 코발트 블루/슬레이트 원터치 추천 칩 렌더링. 칩 탭 시 즉시 `shortName`에 반영.
+
+#### [태스크 2] 공통 거점 등록 시 '1페이지 전진 배치' 정렬 엔진 구축 ([`components/CustomPresetModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/CustomPresetModal.tsx), [`app/page.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/page.tsx))
+1. **신규 공통 거점 삽입 위치 재배치**:
+   - 관리자 모드(`isAdmin === true`)에서 신규 공통 거점 등록 시 전체 배열의 끝에 추가하지 않고, 기존 공통 거점들의 직후(개인 거점들이 시작되기 직전 위치)에 인입하여 반드시 1페이지(1~12번 슬롯)에 우선 안착되도록 정렬.
+2. **전체 `order` 인덱스 재정규화**:
+   - 삽입 후 전체 프리셋 배열에 대해 `order: idx`를 0부터 순차 재부여하여 순서 중복/누락 원천 차단.
+3. **1페이지 자동 포커스**:
+   - 신규 공통 거점 등록 완료 시 `setCurrentPage(0)`을 호출하여 1페이지로 즉각 이동, 등록 결과를 바로 시각적으로 확인할 수 있도록 보장.
+
+#### [태스크 3] 페이지 간(1페이지 ↔ 2페이지) 크로스 페이지 드래그 앤 드롭 구현 ([`components/PresetButtons.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/PresetButtons.tsx), [`components/CustomPresetModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/CustomPresetModal.tsx))
+1. **글로벌 인덱스 기반 드래그 관리**:
+   - 12개 슬롯 단위 페이징 환경에서 전체 배열의 글로벌 인덱스를 기준으로 드래그 위치를 추적하고 슬롯 간 스왑 수행.
+2. **화면 가장자리 호버 시 자동 페이지 전환 (Edge Auto-Paging)**:
+   - 포인터의 X좌표가 화면/컨테이너 좌측 45px 이내에 300ms 체류 시 `currentPage > 0`일 때 이전 페이지로 전환.
+   - 포인터의 X좌표가 화면/컨테이너 우측 45px 이내에 300ms 체류 시 `currentPage < totalPages - 1`일 때 다음 페이지로 전환.
+   - 300ms 딜레이 타이머를 두어 의도치 않은 급격한 페이지 튐 방지.
+3. **하단 페이지네이션 닷(Dot) 호버 전환 지원**:
+   - 마우스 드래그: 닷 인디케이터 `onMouseEnter` 시 즉각 해당 페이지로 전환.
+   - 터치 드래그: 터치 좌표와 `dotRefs`의 Bounding Client Rect를 실시간 판별하여 즉각 해당 페이지로 전환.
+4. **드롭 시 즉각 안착 (Zero-Click Commit) 및 로컬 영속화**:
+   - 드롭 즉시 전체 배열 순서를 `localStorage`에 저장하고 햅틱 진동(`haptics.lightTap()`) 피드백 발생.
+
+---
+
+### 49.3 검증 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 컴파일 에러 **0건 (Exit code 0)** 완벽 통과.
+2. **시나리오 검증 결과**:
+   - **Case 1 (표시 이름 축약)**:
+     - `인천국제공항 제2여객터미널` ➔ primary: `인천공항 T2`, candidates: `['인천공항 T2', '인천공항', ...]`
+     - `김포국제공항 국내선` ➔ primary: `김포공항 국내`
+     - `광교중앙역 신분당선 1번출구` ➔ primary: `광교중앙역 1번`
+     - `포시즌스호텔 서울` ➔ primary: `포시즌스호텔`
+     - 인풋 하단 추천 칩 탭 시 표시 이름 즉시 반영 확인.
+   - **Case 2 (공통 거점 전진 배치)**:
+     - 관리자 모드에서 신규 거점 등록 시 2페이지로 밀리지 않고 1페이지 공통 거점 영역에 즉시 안착 및 1페이지 자동 포커스 확인.
+   - **Case 3 (크로스 페이지 드래그)**:
+     - 2페이지 거점을 좌측 엣지 또는 1페이지 닷 위로 드래그 시 1페이지로 자동 전환 확인.
+     - 1페이지 원하는 슬롯에 드롭 후 새로고침 시 변경된 순서 보존 확인.
+
 
 
 

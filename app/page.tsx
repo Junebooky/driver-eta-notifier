@@ -268,10 +268,28 @@ export default function Home() {
         ...presetWithVehicle,
         id: updated[existingIndex].id,
       };
+    } else if (isCommon) {
+      // [태스크 2] 공통 거점 등록 시 기존 공통 거점들 중 맨 끝(개인 거점들 시작 직전)에 삽입하여 1페이지 전진 배치
+      const isCommonPreset = (p: LocationPreset) =>
+        Boolean(p.isCommon || p.type === 'common' || p.isGlobal || (!p.vehicle_no && !p.vehicleNo));
+
+      let insertIndex = 0;
+      for (let i = presets.length - 1; i >= 0; i--) {
+        if (isCommonPreset(presets[i])) {
+          insertIndex = i + 1;
+          break;
+        }
+      }
+      const copy = [...presets];
+      copy.splice(insertIndex, 0, presetWithVehicle);
+      updated = deduplicatePresets(copy);
     } else {
       updated = deduplicatePresets([...presets, presetWithVehicle]);
     }
-    savePresetsToStorage(updated);
+
+    const reindexed = updated.map((p, idx) => ({ ...p, order: idx }));
+    savePresetsToStorage(reindexed);
+    setPresets(reindexed);
 
     if (selectionTarget === 'origin') {
       setOrigin(presetWithVehicle);
