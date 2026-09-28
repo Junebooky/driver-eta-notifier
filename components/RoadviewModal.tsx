@@ -309,9 +309,9 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
                   <span>장소 검색 중...</span>
                 </div>
               ) : searchResults.length > 0 ? (
-                searchResults.map((poi) => (
+                searchResults.map((poi, idx) => (
                   <button
-                    key={poi.id}
+                    key={`roadview-poi-${poi.id}-${idx}`}
                     type="button"
                     onClick={() => openRoadview(poi.lat, poi.lng)}
                     className="w-full p-3 text-left hover:bg-blue-50/70 transition-colors flex items-center justify-between gap-2.5 cursor-pointer group active:scale-[0.99]"
