@@ -43,9 +43,8 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
       <div className="w-full bg-slate-100/90 p-1 rounded-full relative flex items-center select-none shadow-inner">
         {/* Sliding Indicator Pill */}
         <div
-          className={`w-[calc(50%-4px)] h-[calc(100%-8px)] absolute top-1 left-1 rounded-full bg-[#1E60F3] shadow-[0_4px_14px_rgba(30,96,243,0.35)] transition-transform duration-300 ease-out pointer-events-none transform ${
-            isDeparture ? 'translate-x-0' : 'translate-x-full'
-          }`}
+          className={`w-[calc(50%-4px)] h-[calc(100%-8px)] absolute top-1 left-1 rounded-full bg-[#1E60F3] shadow-[0_4px_14px_rgba(30,96,243,0.35)] transition-transform duration-300 ease-out pointer-events-none transform ${isDeparture ? 'translate-x-0' : 'translate-x-full'
+            }`}
         />
 
         {/* Departure Tab */}
@@ -58,16 +57,14 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
           className="flex-1 py-2.5 rounded-full z-10 flex items-center justify-center space-x-2 cursor-pointer transition-colors duration-300"
         >
           <div
-            className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors duration-300 ${
-              isDeparture ? 'bg-white/20 text-white' : 'text-slate-400'
-            }`}
+            className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors duration-300 ${isDeparture ? 'bg-white/20 text-white' : 'text-slate-400'
+              }`}
           >
             <Play className={`w-3 h-3 ml-0.5 ${isDeparture ? 'fill-white text-white' : 'fill-slate-400 text-slate-400'}`} />
           </div>
           <span
-            className={`text-sm tracking-tight transition-colors duration-300 ${
-              isDeparture ? 'text-white font-black' : 'text-slate-500 font-semibold'
-            }`}
+            className={`text-sm tracking-tight transition-colors duration-300 ${isDeparture ? 'text-white font-black' : 'text-slate-500 font-semibold'
+              }`}
           >
             출발
           </span>
@@ -83,16 +80,14 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
           className="flex-1 py-2.5 rounded-full z-10 flex items-center justify-center space-x-2 cursor-pointer transition-colors duration-300"
         >
           <div
-            className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors duration-300 ${
-              !isDeparture ? 'bg-white/20 text-white' : 'text-slate-400'
-            }`}
+            className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors duration-300 ${!isDeparture ? 'bg-white/20 text-white' : 'text-slate-400'
+              }`}
           >
             <Square className={`w-2.5 h-2.5 ${!isDeparture ? 'fill-white text-white' : 'fill-slate-400 text-slate-400'}`} />
           </div>
           <span
-            className={`text-sm tracking-tight transition-colors duration-300 ${
-              !isDeparture ? 'text-white font-black' : 'text-slate-500 font-semibold'
-            }`}
+            className={`text-sm tracking-tight transition-colors duration-300 ${!isDeparture ? 'text-white font-black' : 'text-slate-500 font-semibold'
+              }`}
           >
             도착
           </span>
@@ -117,7 +112,7 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
             )}
           </button>
         </div>
-        <div className="text-sm font-medium text-slate-800 leading-relaxed bg-white p-3 rounded-xl border border-slate-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.03)] select-all whitespace-pre-line font-sans min-h-[130px] flex flex-col justify-start items-start text-left w-full">
+        <div className="text-xs font-medium text-slate-800 leading-relaxed bg-white p-3 rounded-xl border border-slate-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.03)] select-all whitespace-pre-line font-sans min-h-[130px] flex flex-col justify-start items-start text-left w-full">
           {reportPreviewText}
         </div>
       </div>

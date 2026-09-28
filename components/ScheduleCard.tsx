@@ -92,7 +92,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
         <div className="relative flex items-center gap-2 min-w-0">
           {/* Origin Dot */}
           <div className="absolute -left-[19px] w-2.5 h-2.5 rounded-full bg-slate-400 ring-2 ring-white" />
-          <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
+          <span className="w-8 h-5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 flex items-center justify-center shrink-0">
             출발
           </span>
           <span
@@ -115,7 +115,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
         <div className="relative flex items-center gap-2 min-w-0">
           {/* Destination Dot (Cobalt Accent) */}
           <div className="absolute -left-[19px] w-2.5 h-2.5 rounded-full bg-[#1E60F3] ring-2 ring-white shadow-xs" />
-          <span className="px-1.5 py-0.5 rounded text-[10px] bg-[#1E60F3] text-white font-bold shrink-0 shadow-xs">
+          <span className="w-8 h-5 rounded text-[10px] font-bold bg-[#1E60F3] text-white border border-[#1E60F3] flex items-center justify-center shrink-0 shadow-xs">
             도착
           </span>
           <span
