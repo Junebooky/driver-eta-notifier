@@ -364,10 +364,21 @@ export default function Home() {
       setOrigin(DEFAULT_PRESET_LOCATIONS[2]);
     }
 
-    // Supabase Sync with vehicle_no for security check
+    let currentIsAdmin = isAdmin;
     try {
-      await fetch(`/api/presets?id=${encodeURIComponent(id)}&vehicle_no=${encodeURIComponent(currentVehicleNo)}`, {
+      if (!currentIsAdmin && typeof window !== 'undefined') {
+        currentIsAdmin = localStorage.getItem(ADMIN_MODE_KEY) === 'true';
+      }
+    } catch (e) { }
+
+    // Supabase Sync with vehicle_no and admin permission check
+    try {
+      const adminParam = currentIsAdmin ? '&is_admin=true' : '';
+      await fetch(`/api/presets?id=${encodeURIComponent(id)}&vehicle_no=${encodeURIComponent(currentVehicleNo)}${adminParam}`, {
         method: 'DELETE',
+        headers: {
+          ...(currentIsAdmin ? { 'x-is-admin': 'true' } : {}),
+        },
       });
     } catch (e) {
       console.warn('Failed to delete preset from Supabase:', e);

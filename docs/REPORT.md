@@ -2471,6 +2471,20 @@ flowchart TD
      - 2페이지 거점을 좌측 엣지 또는 1페이지 닷 위로 드래그 시 1페이지로 자동 전환 확인.
      - 1페이지 원하는 슬롯에 드롭 후 새로고침 시 변경된 순서 보존 확인.
 
+---
+
+### 49.4 공통 거점 관리자 삭제 권한 및 DELETE 403 에러 해결 ([`app/api/presets/route.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/api/presets/route.ts), [`app/page.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/page.tsx))
+1. **문제 현상 및 원인**:
+   - 관리자 모드에서 신규 생성된 공통 거점(`vehicle_no: null`) 또는 기존 공통 거점 삭제 시, `DELETE /api/presets` 엔드포인트에서 관리자 인증 여부와 무관하게 `!targetPreset.vehicle_no` 조건을 만족하면 무조건 HTTP 403 Forbidden을 반환하던 구조적 결함 발생.
+2. **해결 내역**:
+   - `app/page.tsx`의 `handleDeleteCustomPreset`에서 관리자 인증 상태(`isAdmin === true` 또는 `localStorage` 저장값)일 때 `&is_admin=true` 쿼리 파라미터 및 `x-is-admin: true` 헤더를 전달하도록 개선.
+   - `app/api/presets/route.ts`의 `DELETE` 핸들러에서 `isAdmin` 플래그를 검증하여:
+     - 관리자(`isAdmin === true`): 공통 거점 및 전사 거점 삭제 권한 전면 허용.
+     - 일반 기사(`isAdmin === false`): 공통 거점 및 타 호차 거점 삭제 시 403 에러로 안전하게 방어.
+3. **검증 결과**:
+   - 일반 모드 호출 시 `403 Forbidden` (`{"error":"공통 마스터 거점은 관리자 모드에서만 삭제할 수 있습니다."}`) 정상 방어 확인.
+   - 관리자 모드(`is_admin=true`) 호출 시 `200 OK` (`{"success":true}`) 정상 삭제 및 DB 반영 확인.
+
 
 
 

@@ -154,6 +154,10 @@ export async function DELETE(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
     const rawVehicleNo = searchParams.get('vehicle_no');
+    const isAdmin =
+      searchParams.get('is_admin') === 'true' ||
+      searchParams.get('isAdmin') === 'true' ||
+      req.headers.get('x-is-admin') === 'true';
     const vehicleNo = rawVehicleNo?.match(/(\d+호차)/)?.[1] || (rawVehicleNo ? rawVehicleNo.trim() : null);
 
     if (!id) {
@@ -171,16 +175,16 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: '삭제할 거점을 찾을 수 없습니다.' }, { status: 404 });
     }
 
-    // 2. Strict Rule: vehicle_no IS NULL indicates Common Master Preset (deletion strictly forbidden)
-    if (!targetPreset.vehicle_no) {
+    // 2. Strict Rule: If not admin, vehicle_no IS NULL indicates Common Master Preset (deletion forbidden)
+    if (!isAdmin && !targetPreset.vehicle_no) {
       return NextResponse.json(
-        { error: '공통 마스터 거점(인천공항, 호텔, 서킷 등)은 삭제할 수 없습니다.' },
+        { error: '공통 마스터 거점은 관리자 모드에서만 삭제할 수 있습니다.' },
         { status: 403 }
       );
     }
 
-    // 3. Strict Rule: Only allow deletion if vehicle_no matches current vehicle
-    if (vehicleNo && targetPreset.vehicle_no !== vehicleNo) {
+    // 3. Strict Rule: If not admin, only allow deletion if vehicle_no matches current vehicle
+    if (!isAdmin && vehicleNo && targetPreset.vehicle_no !== vehicleNo) {
       return NextResponse.json(
         { error: '타 호차의 전용 거점은 삭제할 수 없습니다.' },
         { status: 403 }
