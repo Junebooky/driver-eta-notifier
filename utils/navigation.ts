@@ -224,20 +224,30 @@ export function launchRoutePreview(
  * 홈 네브바 롱프레스 전용: 목적지와 무관하게 각 내비 앱의 초기 메인화면을 실행합니다.
  */
 export function openNaviAppMain(navi: 'tmap' | 'kakao' | 'naver') {
+  if (typeof window === 'undefined') return;
+
+  const isAndroid = typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent);
   let schemeUrl = '';
 
   if (navi === 'tmap') {
-    schemeUrl = 'tmap://';
+    schemeUrl = isAndroid
+      ? 'intent:#Intent;package=com.skt.tmap.ku;end;'
+      : 'tmap://';
   } else if (navi === 'kakao') {
-    // 카카오맵(KakaoMap) 앱 초기 메인화면 스킴 (kakaonavi는 별도 내비앱 미설치 시 Safari 주소 오류 발생)
-    schemeUrl = 'kakaomap://open';
+    // kakaonavi://를 완전히 제거하고 통합 카카오맵 메인 실행으로 통일
+    schemeUrl = isAndroid
+      ? 'intent:#Intent;package=net.daum.android.map;end;'
+      : 'kakaomap://';
   } else if (navi === 'naver') {
-    schemeUrl = 'nmap://action/default';
+    schemeUrl = isAndroid
+      ? 'intent:#Intent;package=com.nhn.android.nmap;end;'
+      : 'nmap://action/default';
   }
 
   if (schemeUrl) {
     window.location.href = schemeUrl;
   }
 }
+
 
 

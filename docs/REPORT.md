@@ -3319,6 +3319,26 @@ flowchart TD
    - `npm run build`: 전 15개 라우트 TypeScript / ESLint 컴파일 에러 **0건 (Exit code 0)** 통과.
 2. **UI 정합성**:
    - 인수 및 반납 탭의 입력란 폰트 크기가 `text-sm`으로 정돈되어 최적의 가독성 및 균형미 확보.
+---
 
+## 70. 홈 헤더 롱프레스 런처 카카오맵 스킴 일원화 및 크로스 OS(iOS/Android) 무결성 확보
 
+### 70.1 배경 및 작업 목적
+- 홈 헤더 네브바(`components/Header.tsx`)의 내비 아이콘 롱프레스 시 각 내비 앱의 메인 홈 화면을 여는 `openNaviAppMain` 함수에서, 카카오 대상 스킴을 통합 카카오맵 기준으로 전면 일원화.
+- 단독 카카오내비(`kakaonavi://`) 미설치 환경에서 발생하던 iOS Safari "주소가 유효하지 않습니다" 에러 팝업을 원천 제거하고, 안드로이드 크롬의 커스텀 스킴 보안 차단 에러(`ERR_UNKNOWN_URL_SCHEME`)를 방어하기 위해 정규 안드로이드 인텐트 패키지 호출 파이프라인 구축.
+- 티맵, 네이버지도의 기존 롱프레스 로직 및 짧은 탭 전환 인터랙션 100% 보존.
 
+### 70.2 모듈별 상세 구현 내역
+- [`utils/navigation.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/utils/navigation.ts):
+  - `openNaviAppMain(navi)` 내 `isAndroid` OS 분기 주입:
+    - **TMAP**: iOS `tmap://` / Android `intent:#Intent;package=com.skt.tmap.ku;end;`
+    - **Kakao**: iOS `kakaomap://` / Android `intent:#Intent;package=net.daum.android.map;end;`
+    - **Naver**: iOS `nmap://action/default` / Android `intent:#Intent;package=com.nhn.android.nmap;end;`
+
+### 70.3 검증 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 TypeScript / ESLint 컴파일 에러 **0건 (Exit code 0)** 통과.
+2. **시나리오 검증 결과**:
+   - **Case 1 (iOS Safari 카카오 롱프레스)**: 헤더 'K' 아이콘 350ms 롱프레스 시 Safari 에러 팝업 없이 카카오맵 메인 화면 즉시 호출 확인 (PASS).
+   - **Case 2 (안드로이드 크롬 카카오 롱프레스)**: 카카오맵 패키지 인텐트(`net.daum.android.map`) 정상 발화 확인 (PASS).
+   - **Case 3 (기존 기능 불변성)**: 헤더 짧은 탭(단순 내비 전환) 및 티맵, 네이버 롱프레스가 기존대로 안정 구동됨 (PASS).
