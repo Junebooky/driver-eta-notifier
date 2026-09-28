@@ -12,6 +12,8 @@ import {
   getDailyInspection,
   formatInspectionDate,
   extractHocha,
+  getInspectionStorageKey,
+  STORAGE_KEY_INITIAL_INSPECTION,
   InitialInspectionData,
 } from '@/utils/vehicleReport';
 import { copyAndLaunchKakaoTalk } from '@/utils/kakao';
@@ -140,42 +142,253 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
   const [isOcrAnalyzing, setIsOcrAnalyzing] = useState<boolean>(false);
   const [ocrFeedback, setOcrFeedback] = useState<string | null>(null);
 
-  // Sync profile defaults when modal opens or profile updates
-  useEffect(() => {
-    if (isOpen) {
-      setVehicleHocha(detectedHocha);
-      setCarNumber(detectedCarNumber);
-      const stored = getInitialInspection();
-      setInitialData(stored);
+  const isLoadedRef = useRef(false);
 
-      // Auto restore receipt damage parts if stored
-      if (stored?.selectedParts && stored.selectedParts.length > 0) {
-        if (receiptSelectedParts.length === 0) {
-          setReceiptSelectedParts(stored.selectedParts);
-        }
-        if (receiptDamage === '무' && stored.outerDamage) {
-          setReceiptDamage(stored.outerDamage);
-        }
-      } else if (stored?.outerDamage && stored.outerDamage !== '무') {
-        const matched = DAMAGE_PART_CHIPS.filter((part) => stored.outerDamage!.includes(part));
-        if (matched.length > 0 && receiptSelectedParts.length === 0) {
-          setReceiptSelectedParts(matched);
-          setReceiptDamage(stored.outerDamage);
-        }
-      }
+  // Explicitly reset all inspection fields to pristine clean state
+  const resetToCleanState = () => {
+    setReceiptTotalKm('');
+    setReceiptDte('');
+    setReceiptDamage('무');
+    setReceiptSelectedParts([]);
+    setReceiptMeterPhoto(null);
 
-      // Check stored daily inspection
-      const storedDaily = getDailyInspection();
-      if (storedDaily) {
-        if (!dailyDte && storedDaily.range > 0) {
-          setDailyDte(String(storedDaily.range));
-        }
-        if (dailyNewParts.length === 0 && storedDaily.newDamages?.length > 0) {
-          setDailyNewParts(storedDaily.newDamages);
-        }
+    setDailyDte('');
+    setDailyNewParts([]);
+    setDailyMeterPhoto(null);
+
+    setReturnTotalKm('');
+    setReturnDte('');
+    setReturnDamage('무');
+    setReturnSelectedParts([]);
+    setReturnMeterPhoto(null);
+    setParkingLocation('');
+    setKeyLocation('');
+
+    setInitialData(null);
+  };
+
+  // Persist current inspection data to vehicle-specific isolated storage key
+  const saveVehicleInspectionData = (overrides?: Record<string, any>) => {
+    if (typeof window === 'undefined') return;
+    const currentKey = getInspectionStorageKey(profile.vehicleNo || vehicleHocha);
+
+    const initialKmNum = parseFloat(sanitizeNumericInput(receiptTotalKm)) || 0;
+    const initialDteNum = parseFloat(sanitizeNumericInput(receiptDte)) || 0;
+
+    let currentInitialData = initialData;
+    if (activeTab === 'pickup' || !currentInitialData) {
+      if (initialKmNum > 0 || receiptSelectedParts.length > 0 || (receiptDamage && receiptDamage !== '무')) {
+        currentInitialData = {
+          initialTotalKm: initialKmNum,
+          initialDte: initialDteNum,
+          inspectionDate: formatInspectionDate(),
+          vehicleHocha: vehicleHocha || detectedHocha,
+          carNumber: carNumber || detectedCarNumber,
+          outerDamage: receiptDamage,
+          selectedParts: receiptSelectedParts,
+          savedAt: initialData?.savedAt || new Date().toISOString(),
+        };
+        setInitialData(currentInitialData);
       }
     }
-  }, [isOpen, detectedHocha, detectedCarNumber]);
+
+    const payload = {
+      vehicleHocha: vehicleHocha || detectedHocha,
+      carNumber: carNumber || detectedCarNumber,
+      // Pickup
+      pickupOdo: receiptTotalKm,
+      pickupDte: receiptDte,
+      receiptDamage,
+      receiptSelectedParts,
+      damagePoints: receiptSelectedParts,
+      meterPhoto: receiptMeterPhoto,
+      // Daily
+      dailyDte,
+      dailyNewParts,
+      dailyMeterPhoto,
+      // Return
+      returnOdo: returnTotalKm,
+      returnDte,
+      returnDamage,
+      returnSelectedParts,
+      returnMeterPhoto,
+      parkingLocation,
+      keyLocation,
+      // Initial Data snapshot for return calculation
+      initialData: currentInitialData,
+      savedAt: new Date().toISOString(),
+      ...overrides,
+    };
+
+    try {
+      localStorage.setItem(currentKey, JSON.stringify(payload));
+    } catch (err) {
+      if (err instanceof DOMException && (err.name === 'QuotaExceededError' || err.code === 22)) {
+        try {
+          const lightweight = {
+            ...payload,
+            meterPhoto: null,
+            dailyMeterPhoto: null,
+            returnMeterPhoto: null,
+          };
+          localStorage.setItem(currentKey, JSON.stringify(lightweight));
+        } catch (e) {
+          console.warn('LocalStorage save failed even without images:', e);
+        }
+      } else {
+        console.warn('Failed to save vehicle inspection data to localStorage:', err);
+      }
+    }
+  };
+
+  // Sync profile defaults & restore isolated vehicle inspection data when modal opens or profile changes
+  useEffect(() => {
+    if (!isOpen) {
+      isLoadedRef.current = false;
+      return;
+    }
+
+    const currentKey = getInspectionStorageKey(profile.vehicleNo);
+    let rawData: string | null = null;
+    try {
+      rawData = localStorage.getItem(currentKey);
+      if (!rawData && profile.vehicleNo) {
+        rawData = localStorage.getItem(`cockpit_vehicle_inspection_${profile.vehicleNo.trim()}`);
+      }
+      if (!rawData) {
+        // Fallback: Check if legacy initial inspection exists and belongs to this vehicle
+        const legacyRaw = localStorage.getItem(STORAGE_KEY_INITIAL_INSPECTION);
+        if (legacyRaw) {
+          try {
+            const legacyParsed = JSON.parse(legacyRaw);
+            const legacyHocha = extractHocha(legacyParsed.vehicleHocha);
+            if (legacyHocha && legacyHocha === extractHocha(profile.vehicleNo)) {
+              rawData = JSON.stringify({
+                vehicleHocha: legacyParsed.vehicleHocha,
+                carNumber: legacyParsed.carNumber,
+                pickupOdo: String(legacyParsed.initialTotalKm || ''),
+                pickupDte: String(legacyParsed.initialDte || ''),
+                receiptDamage: legacyParsed.outerDamage || '무',
+                receiptSelectedParts: legacyParsed.selectedParts || [],
+                damagePoints: legacyParsed.selectedParts || [],
+                initialData: legacyParsed,
+                savedAt: legacyParsed.savedAt,
+              });
+              localStorage.setItem(currentKey, rawData);
+            }
+          } catch { }
+        }
+      }
+    } catch (e) {
+      console.warn('스토리지 읽기 실패:', e);
+    }
+
+    if (rawData) {
+      try {
+        const parsed = JSON.parse(rawData);
+        setVehicleHocha(parsed.vehicleHocha || detectedHocha);
+        setCarNumber(parsed.carNumber || detectedCarNumber);
+
+        // Pickup (Receipt) Data
+        const pOdo = parsed.pickupOdo || parsed.receiptTotalKm || '';
+        const pDte = parsed.pickupDte || parsed.receiptDte || '';
+        const pDamage = parsed.receiptDamage || parsed.outerDamage || '무';
+        const pParts = parsed.damagePoints || parsed.receiptSelectedParts || parsed.selectedParts || [];
+        const pPhoto = parsed.meterPhoto || parsed.receiptMeterPhoto || null;
+
+        setReceiptTotalKm(pOdo);
+        setReceiptDte(pDte);
+        setReceiptDamage(pDamage);
+        setReceiptSelectedParts(pParts);
+        setReceiptMeterPhoto(pPhoto);
+
+        // Daily Data
+        const dDte = parsed.dailyDte || (typeof parsed.range === 'number' ? String(parsed.range) : '');
+        const dParts = parsed.dailyNewParts || parsed.newDamages || [];
+        const dPhoto = parsed.dailyMeterPhoto || null;
+
+        setDailyDte(dDte);
+        setDailyNewParts(dParts);
+        setDailyMeterPhoto(dPhoto);
+
+        // Return Data
+        const rOdo = parsed.returnOdo || parsed.returnTotalKm || '';
+        const rDte = parsed.returnDte || '';
+        const rDamage = parsed.returnDamage || '무';
+        const rParts = parsed.returnSelectedParts || [];
+        const rPhoto = parsed.returnMeterPhoto || null;
+        const pLoc = parsed.parkingLocation || '';
+        const kLoc = parsed.keyLocation || '';
+
+        setReturnTotalKm(rOdo);
+        setReturnDte(rDte);
+        setReturnDamage(rDamage);
+        setReturnSelectedParts(rParts);
+        setReturnMeterPhoto(rPhoto);
+        setParkingLocation(pLoc);
+        setKeyLocation(kLoc);
+
+        // Initial Data for calculations
+        if (parsed.initialData) {
+          setInitialData(parsed.initialData);
+        } else if (pOdo || pParts.length > 0) {
+          setInitialData({
+            initialTotalKm: parseFloat(sanitizeNumericInput(pOdo)) || 0,
+            initialDte: parseFloat(sanitizeNumericInput(pDte)) || 0,
+            inspectionDate: parsed.inspectionDate || formatInspectionDate(),
+            vehicleHocha: parsed.vehicleHocha || detectedHocha,
+            carNumber: parsed.carNumber || detectedCarNumber,
+            outerDamage: pDamage,
+            selectedParts: pParts,
+            savedAt: parsed.savedAt || new Date().toISOString(),
+          });
+        } else {
+          setInitialData(null);
+        }
+      } catch (e) {
+        console.error('점검 데이터 파싱 실패:', e);
+        resetToCleanState();
+        setVehicleHocha(detectedHocha);
+        setCarNumber(detectedCarNumber);
+      }
+    } else {
+      // 해당 호차의 점검 기록이 없으면 깨끗한 초기 상태(Clean State)로 리셋
+      resetToCleanState();
+      setVehicleHocha(detectedHocha);
+      setCarNumber(detectedCarNumber);
+    }
+
+    isLoadedRef.current = true;
+  }, [isOpen, profile.vehicleNo, detectedHocha, detectedCarNumber]);
+
+  // Auto-persist changes to vehicle-isolated key when fields update
+  useEffect(() => {
+    if (!isOpen || !isLoadedRef.current) return;
+    const timer = setTimeout(() => {
+      saveVehicleInspectionData();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [
+    isOpen,
+    profile.vehicleNo,
+    vehicleHocha,
+    carNumber,
+    receiptTotalKm,
+    receiptDte,
+    receiptDamage,
+    receiptSelectedParts,
+    receiptMeterPhoto,
+    dailyDte,
+    dailyNewParts,
+    dailyMeterPhoto,
+    returnTotalKm,
+    returnDte,
+    returnDamage,
+    returnSelectedParts,
+    returnMeterPhoto,
+    parkingLocation,
+    keyLocation,
+  ]);
 
   useEffect(() => {
     setActiveTab(initialMode === 'receipt' ? 'pickup' : (initialMode || 'pickup'));
@@ -407,59 +620,17 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Handle Save (Confirm button) - saves to localStorage and closes
+  // Handle Save (Confirm button) - saves to vehicle-isolated localStorage and closes
   const handleConfirmSave = () => {
     haptics.lightTap();
-
-    if (activeTab === 'pickup') {
-      saveInitialInspection({
-        initialTotalKm: parseFloat(receiptTotalKm) || 0,
-        initialDte: parseFloat(receiptDte) || 0,
-        inspectionDate: formatInspectionDate(),
-        vehicleHocha,
-        carNumber,
-        outerDamage: receiptDamage,
-        selectedParts: receiptSelectedParts,
-      });
-    } else if (activeTab === 'daily') {
-      saveDailyInspection({
-        inspectionDate: formatInspectionDate(),
-        vehicleHocha,
-        carNumber,
-        range: parseFloat(dailyDte) || 0,
-        newDamages: dailyNewParts,
-      });
-    }
-
+    saveVehicleInspectionData();
     onClose();
   };
 
   // Handle Save & Launch KakaoTalk
   const handleKakaoLaunch = async () => {
     haptics.successPulse();
-
-    if (activeTab === 'pickup') {
-      saveInitialInspection({
-        initialTotalKm: parseFloat(receiptTotalKm) || 0,
-        initialDte: parseFloat(receiptDte) || 0,
-        inspectionDate: formatInspectionDate(),
-        vehicleHocha,
-        carNumber,
-        outerDamage: receiptDamage,
-        selectedParts: receiptSelectedParts,
-      });
-      const updated = getInitialInspection();
-      setInitialData(updated);
-    } else if (activeTab === 'daily') {
-      saveDailyInspection({
-        inspectionDate: formatInspectionDate(),
-        vehicleHocha,
-        carNumber,
-        range: parseFloat(dailyDte) || 0,
-        newDamages: dailyNewParts,
-      });
-    }
-
+    saveVehicleInspectionData();
     await copyAndLaunchKakaoTalk(previewText);
   };
 

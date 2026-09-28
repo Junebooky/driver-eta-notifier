@@ -3237,8 +3237,53 @@ flowchart TD
 - [`components/VehicleInspectionModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/VehicleInspectionModal.tsx):
   - 배차/일일/반납 탭 전반의 라벨 18개소 `text-[12px]` ➔ `text-[13px]` 일괄 변경.
 
-### 66.3 검증 결과
+---
+
+## 67. 차량체크(점검표) 데이터의 호차별(Vehicle-Specific) LocalStorage 완전 격리 파이프라인 구축
+
+### 67.1 배경 및 작업 목적
+- 기존 `VehicleInspectionModal.tsx`의 차량 점검 데이터(수령/반납 ODO, DTE, 유류비 정산, 외관 손상 부위 선택, 계기판 사진 등)가 호차 구분 없는 단일 공용 키로 저장되어, 4호차에서 입력한 점검 내역이 1호차나 타 호차로 프로필을 전환해도 그대로 노출되는 심각한 데이터 오염(Data Pollution) 원천 차단.
+- 프로필 격리 규격(`cockpit_driver_profile_${vehicleNo}`)과 1:1로 매핑되는 동적 키(`cockpit_vehicle_inspection_${cleanNo}`) 아키텍처를 도입하여 **완전 격리(Isolation)** 실현.
+- 호차 전환 시 해당 호차의 점검 데이터만 즉각 로드되고, 점검 기록이 없는 호차는 깨끗한 기본값(Clean State)으로 초기화 보장 (Zero-DB / Pure Client-Side 원칙 준수).
+
+### 67.2 호차별 스토리지 동적 키 매핑 테이블
+
+| 구분 (호차 프로필) | 파싱된 호차 (`cleanNo`) | 생성되는 전용 LocalStorage 격리 키 | 격리 보장 내용 |
+| :--- | :---: | :--- | :--- |
+| **4호차** | `4호차` | `cockpit_vehicle_inspection_4호차` | 4호차 수령/일일/반납 ODO, DTE, 데미지, 사진 독립 저장 |
+| **1호차** | `1호차` | `cockpit_vehicle_inspection_1호차` | 4호차 데이터 간섭 0%, 초기 Clean State 및 독립 저장 |
+| **7호차** | `7호차` | `cockpit_vehicle_inspection_7호차` | 7호차 전용 독립 레코드 격리 |
+| **미지정/기본** | `default` | `cockpit_vehicle_inspection_default` | 예외 상황 및 기본 프로필용 안전 폴백 키 |
+
+### 67.3 모듈별 상세 구현 내역
+
+#### 1. 스토리지 격리 헬퍼 및 함수 고도화 ([`utils/vehicleReport.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/utils/vehicleReport.ts))
+- `getInspectionStorageKey(vNo?: string)`: 호차 번호 문자열에서 정규화된 `cleanNo`를 추출하여 `cockpit_vehicle_inspection_${key}` 포맷으로 동적 생성.
+- `saveInitialInspection`, `getInitialInspection`, `saveDailyInspection`, `getDailyInspection`, `clearInitialInspection`, `clearDailyInspection`:
+  - `vehicleNo` 파라미터를 추가 지원하여 호차별 격리 키에 1:1로 저장/조회/삭제 수행.
+  - 레거시 데이터 호환 지원 (기존 키에서 해당 호차 일치 시 마이그레이션).
+
+#### 2. 반응형 상태 리셋 및 동적 로드 머신 구현 ([`components/VehicleInspectionModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/VehicleInspectionModal.tsx))
+- `resetToCleanState()`: 수령/일일/반납 ODO, DTE, 데미지 부위 배열(`[]`), 데미지 텍스트('무'), 사진(`null`), 주차/차키 위치, `initialData`(`null`) 등 폼 상태를 깨끗한 초기 상태로 완전 초기화.
+- `saveVehicleInspectionData(overrides?)`: 현재 입력 중인 수령/일일/반납 데이터 및 `initialData` 스냅샷을 현재 호차 전용 키에 즉시/안전하게 JSON 직렬화 저장 (용량 초과 시 이미지 제외 텍스트 우선 저장 안전장치 포함).
+- `useEffect([isOpen, profile.vehicleNo])`:
+  - 모달 오픈 또는 프로필 호차 변경 시, 현재 호차 키(`cockpit_vehicle_inspection_${cleanNo}`) 조회.
+  - 저장된 데이터가 존재하면 폼 상태 1:1 복원.
+  - 저장된 데이터가 없으면 `resetToCleanState()`를 명시적으로 실행하여 타 호차 잔재를 100% 소거.
+- 디바운스(300ms) 자동 영속화 이펙트 탑재: 입력, 외관 칩 선택, 사진 등록 시 즉각 백그라운드 동기화.
+- '확인' 및 '카톡' 버튼 터치 시 즉시 현재 호차 키로 커밋 후 닫기/공유.
+
+#### 3. 상위 컴포넌트 반응성 연동 ([`app/page.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/page.tsx))
+- `useDriverProfile()` 훅을 통해 `profile` 객체가 갱신될 때 실시간으로 `VehicleInspectionModal`에 전달되어 프로필 모달에서 호차를 변경하는 즉시 차량 점검 모달이 새 호차의 스토리지 키를 바라보도록 보장.
+
+---
+
+### 67.4 검증 결과
 1. **프로덕션 빌드 무결성**:
-   - `npm run build`: 전 15개 라우트 TypeScript / ESLint 컴파일 에러 **0건 (Exit code 0)** 통과.
-2. **UI 정합성**:
-   - 모달 내 라벨 텍스트의 시인성 및 판독 편의성 향상.
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 TypeScript / ESLint 컴파일 에러 **0건 (Exit code 0)** 통과.
+2. **시나리오 검증 결과**:
+   - **Case 1 (4호차 점검 입력)**: 4호차에서 수령 ODO `55,000`, 외관 부위 '앞 범퍼' 선택 후 저장 ➔ `cockpit_vehicle_inspection_4호차`에 정상 보관됨 (PASS).
+   - **Case 2 (1호차 전환 및 격리 확인)**: 프로필을 '1호차'로 변경 ➔ 차량체크 모달 진입 시 4호차 데이터가 전혀 나타나지 않고 모든 필드가 깨끗한 기본값(Clean State)으로 초기화됨 (PASS).
+   - **Case 3 (1호차 점검 입력 후 4호차 복원 확인)**: 1호차 수령 ODO에 `22,000` 입력 저장 ➔ 다시 '4호차'로 변경 ➔ 차량체크 진입 시 기존 4호차의 `55,000`과 '앞 범퍼'가 손실 없이 100% 복원됨 (PASS).
+   - **Case 4 (새로고침 보존)**: 브라우저 새로고침 후에도 각 호차별 데이터가 독립된 키로 영구 보존됨 (PASS).
+

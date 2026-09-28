@@ -6,6 +6,17 @@
 export const STORAGE_KEY_INITIAL_INSPECTION = 'cockpit_initial_inspection';
 export const STORAGE_KEY_DAILY_INSPECTION = 'cockpit_daily_inspection';
 
+/**
+ * Generate isolated localStorage key for a specific vehicle number
+ * e.g. "4호차" -> "cockpit_vehicle_inspection_4호차"
+ */
+export const getInspectionStorageKey = (vNo?: string): string => {
+  const cleanNo = (vNo || '').trim();
+  const hocha = extractHocha(cleanNo);
+  const key = hocha || cleanNo;
+  return key ? `cockpit_vehicle_inspection_${key}` : 'cockpit_vehicle_inspection_default';
+};
+
 export interface InitialInspectionData {
   initialTotalKm: number;
   initialDte: number;
@@ -253,32 +264,70 @@ export function generateDailyReport(params: {
 }
 
 /**
- * Save initial inspection data to localStorage
+ * Save initial inspection data to localStorage (Vehicle-Isolated)
  */
-export function saveInitialInspection(data: Omit<InitialInspectionData, 'savedAt'>): void {
+export function saveInitialInspection(
+  data: Omit<InitialInspectionData, 'savedAt'>,
+  vehicleNo?: string
+): void {
   if (typeof window === 'undefined') return;
+  const storageKey = getInspectionStorageKey(vehicleNo || data.vehicleHocha);
   try {
-    const payload: InitialInspectionData = {
-      ...data,
+    let existing: any = {};
+    const raw = localStorage.getItem(storageKey);
+    if (raw) {
+      try {
+        existing = JSON.parse(raw);
+      } catch {}
+    }
+
+    const payload = {
+      ...existing,
+      vehicleHocha: data.vehicleHocha,
+      carNumber: data.carNumber,
+      pickupOdo: String(data.initialTotalKm || ''),
+      pickupDte: String(data.initialDte || ''),
+      receiptDamage: data.outerDamage,
+      receiptSelectedParts: data.selectedParts || [],
+      damagePoints: data.selectedParts || [],
+      initialData: {
+        ...data,
+        savedAt: new Date().toISOString(),
+      },
       savedAt: new Date().toISOString(),
     };
-    localStorage.setItem(STORAGE_KEY_INITIAL_INSPECTION, JSON.stringify(payload));
+
+    localStorage.setItem(storageKey, JSON.stringify(payload));
   } catch (err) {
     console.warn('Failed to save initial vehicle inspection to localStorage:', err);
   }
 }
 
 /**
- * Retrieve initial inspection data from localStorage
+ * Retrieve initial inspection data from localStorage (Vehicle-Isolated)
  */
-export function getInitialInspection(): InitialInspectionData | null {
+export function getInitialInspection(vehicleNo?: string): InitialInspectionData | null {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY_INITIAL_INSPECTION);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed.initialTotalKm === 'number') {
-      return parsed as InitialInspectionData;
+    const storageKey = getInspectionStorageKey(vehicleNo);
+    const raw = localStorage.getItem(storageKey);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.initialData) {
+        return parsed.initialData as InitialInspectionData;
+      }
+      if (typeof parsed.initialTotalKm === 'number' || parsed.pickupOdo) {
+        return {
+          initialTotalKm: parseFloat(parsed.pickupOdo || parsed.initialTotalKm) || 0,
+          initialDte: parseFloat(parsed.pickupDte || parsed.initialDte) || 0,
+          inspectionDate: parsed.inspectionDate || formatInspectionDate(),
+          vehicleHocha: parsed.vehicleHocha,
+          carNumber: parsed.carNumber,
+          outerDamage: parsed.receiptDamage || parsed.outerDamage || '무',
+          selectedParts: parsed.damagePoints || parsed.receiptSelectedParts || parsed.selectedParts || [],
+          savedAt: parsed.savedAt || new Date().toISOString(),
+        };
+      }
     }
   } catch (err) {
     console.warn('Failed to parse initial vehicle inspection from localStorage:', err);
@@ -287,12 +336,13 @@ export function getInitialInspection(): InitialInspectionData | null {
 }
 
 /**
- * Clear initial inspection data from localStorage
+ * Clear initial inspection data from localStorage (Vehicle-Isolated)
  */
-export function clearInitialInspection(): void {
+export function clearInitialInspection(vehicleNo?: string): void {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.removeItem(STORAGE_KEY_INITIAL_INSPECTION);
+    const storageKey = getInspectionStorageKey(vehicleNo);
+    localStorage.removeItem(storageKey);
   } catch (err) {
     console.warn('Failed to clear initial vehicle inspection from localStorage:', err);
   }
@@ -308,32 +358,58 @@ export interface DailyInspectionData {
 }
 
 /**
- * Save daily inspection data to localStorage
+ * Save daily inspection data to localStorage (Vehicle-Isolated)
  */
-export function saveDailyInspection(data: Omit<DailyInspectionData, 'savedAt'>): void {
+export function saveDailyInspection(
+  data: Omit<DailyInspectionData, 'savedAt'>,
+  vehicleNo?: string
+): void {
   if (typeof window === 'undefined') return;
+  const storageKey = getInspectionStorageKey(vehicleNo || data.vehicleHocha);
   try {
-    const payload: DailyInspectionData = {
-      ...data,
+    let existing: any = {};
+    const raw = localStorage.getItem(storageKey);
+    if (raw) {
+      try {
+        existing = JSON.parse(raw);
+      } catch {}
+    }
+
+    const payload = {
+      ...existing,
+      vehicleHocha: data.vehicleHocha,
+      carNumber: data.carNumber,
+      dailyDte: String(data.range || ''),
+      dailyNewParts: data.newDamages || [],
       savedAt: new Date().toISOString(),
     };
-    localStorage.setItem(STORAGE_KEY_DAILY_INSPECTION, JSON.stringify(payload));
+
+    localStorage.setItem(storageKey, JSON.stringify(payload));
   } catch (err) {
     console.warn('Failed to save daily vehicle inspection to localStorage:', err);
   }
 }
 
 /**
- * Retrieve daily inspection data from localStorage
+ * Retrieve daily inspection data from localStorage (Vehicle-Isolated)
  */
-export function getDailyInspection(): DailyInspectionData | null {
+export function getDailyInspection(vehicleNo?: string): DailyInspectionData | null {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY_DAILY_INSPECTION);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed.range === 'number') {
-      return parsed as DailyInspectionData;
+    const storageKey = getInspectionStorageKey(vehicleNo);
+    const raw = localStorage.getItem(storageKey);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.dailyDte || typeof parsed.range === 'number') {
+        return {
+          inspectionDate: parsed.inspectionDate || formatInspectionDate(),
+          vehicleHocha: parsed.vehicleHocha,
+          carNumber: parsed.carNumber,
+          range: parseFloat(parsed.dailyDte || parsed.range) || 0,
+          newDamages: parsed.dailyNewParts || parsed.newDamages || [],
+          savedAt: parsed.savedAt || new Date().toISOString(),
+        };
+      }
     }
   } catch (err) {
     console.warn('Failed to parse daily vehicle inspection from localStorage:', err);
@@ -342,12 +418,13 @@ export function getDailyInspection(): DailyInspectionData | null {
 }
 
 /**
- * Clear daily inspection data from localStorage
+ * Clear daily inspection data from localStorage (Vehicle-Isolated)
  */
-export function clearDailyInspection(): void {
+export function clearDailyInspection(vehicleNo?: string): void {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.removeItem(STORAGE_KEY_DAILY_INSPECTION);
+    const storageKey = getInspectionStorageKey(vehicleNo);
+    localStorage.removeItem(storageKey);
   } catch (err) {
     console.warn('Failed to clear daily vehicle inspection from localStorage:', err);
   }
