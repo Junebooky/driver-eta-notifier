@@ -19,6 +19,7 @@ import { GasStationModal } from '@/components/GasStationModal';
 import { FlightModal } from '@/components/FlightModal';
 import { VehicleInspectionModal } from '@/components/VehicleInspectionModal';
 import { LocationSearchModal, SelectedLocationData } from '@/components/LocationSearchModal';
+import { RoadviewModal } from '@/components/RoadviewModal';
 import { ScheduleTab } from '@/components/ScheduleTab';
 import { Navigation, Calendar } from 'lucide-react';
 import { ScheduleItem, scheduleToPresets } from '@/data/ferrariSchedules';
@@ -97,6 +98,9 @@ export default function Home() {
 
   // Standalone Location Search & Preset Modal State
   const [isLocationSearchOpen, setIsLocationSearchOpen] = useState(false);
+
+  // Roadview Modal State
+  const [isRoadviewModalOpen, setIsRoadviewModalOpen] = useState(false);
 
   // Active vehicle identifier (e.g. '4호차', '1호차')
   const currentVehicleNo = useMemo(() => {
@@ -976,13 +980,14 @@ export default function Home() {
               onOpenPresetModal={handleOpenAddModal}
             />
 
-            {/* 2. Standalone 4-Column Quick Action Bar */}
+            {/* 2. Standalone 5-Column Quick Action Bar */}
             <QuickActionBar
               onOpenInspectionModal={() => setIsInspectionModalOpen(true)}
               onOpenPresetModal={handleOpenAddModal}
               onOpenAddModal={handleOpenAddModal}
               onOpenGasModal={() => setIsGasModalOpen(true)}
               onOpenFlightModal={() => setIsFlightModalOpen(true)}
+              onOpenRoadviewModal={() => setIsRoadviewModalOpen(true)}
             />
 
             {/* 3. Route Estimation & ETA Status (Strictly Real-time TMAP) */}
@@ -1259,6 +1264,15 @@ export default function Home() {
             handleAddCustomPreset(preset);
           }
         }}
+      />
+
+      {/* On-Site Roadview & Entry Route Inspection Modal */}
+      <RoadviewModal
+        isOpen={isRoadviewModalOpen}
+        onClose={() => setIsRoadviewModalOpen(false)}
+        currentDestination={destination}
+        presets={presets}
+        homeLocation={profile.homeLocation}
       />
 
     </main>

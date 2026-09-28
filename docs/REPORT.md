@@ -2894,3 +2894,63 @@ flowchart TD
    - **Case 1 (표시 이름 영속화)**: '서울김포비즈니스항공센터' 거점을 'SGBAC'로 수정 시, 비동기 응답 도착 후에도 원래 이름으로 롤백되지 않고 'SGBAC'가 유지됨 (PASS).
    - **Case 2 (새로고침 후 보존)**: 브라우저 새로고침(F5) 후에도 1페이지 슬롯에 'SGBAC'가 정상 노출됨 (PASS).
    - **Case 3 (전 기사 동기화)**: 타 기사 브라우저 세션/시크릿 창에서 접속 시 관리자가 수정한 공통 거점의 이름이 'SGBAC'로 정확히 동기화되어 나타남 (PASS).
+
+---
+
+## 57. 장소선택 모달 및 현장 로드뷰 모달 4행x3열(12슬롯) 그리드 확장 및 RoadviewModal 신설
+
+### 57.1 배경 및 작업 목적
+1. **장소선택 모달(`LocationSearchModal.tsx`) 그리드 4행 확장**:
+   - 기존 거점 퀵 선택이 페이지당 3열 규격에서 슬롯 개수가 불일치하거나 불필요한 스와이프/페이징을 유발하던 문제를 해결.
+   - 모바일 뷰포트 여백을 효율화하여 **4행(3열 x 4행 = 페이지당 12개 슬롯)**으로 확장(`PRESETS_PER_PAGE = 12`)하여 메인 거점 캐러셀과 동일한 12슬롯 탐색 위계를 확보.
+2. **상단 퀵 액션 바 5열 확장 (`QuickActionBar.tsx`)**:
+   - 상단 바를 `grid-cols-5`로 확장하고, 5번째 슬롯에 `[로드뷰]`(Lucide `Eye` 아이콘) 버튼을 추가.
+   - 모바일(375px) 뷰포트에서도 버튼과 텍스트가 줄바꿈되지 않도록 `w-12 h-12 sm:w-14 sm:h-14` 원형 버튼 크기와 반응형 텍스트 크기 최적화.
+3. **`RoadviewModal.tsx` 신설 및 기존 UI 완벽 계승**:
+   - 최근 검색(2열 카드) + 자주 가는 거점(4행 x 3열 = 12개 슬롯)의 친숙한 UI 구조를 그대로 계승.
+   - 상단 POI 실시간 검색바, 클립보드 복사 주소 퀵 카드, 현재 목적지 퀵 카드를 배치하고, 직관적인 단일 로드뷰 아이콘 버튼(`w-9 h-9`) 적용.
+   - 항목 탭 시 카카오 공식 웹 딥링크(`https://map.kakao.com/link/roadview/${lat},${lng}`)를 새 창으로 호출.
+4. **Zero-DB / Pure Client-Side 원칙 준수**:
+   - 백엔드 스키마 변경 없이 기존 `localStorage`(`cockpit_recent_searches`) 및 순수 클라이언트 상태만으로 완결.
+
+---
+
+### 57.2 모듈별 상세 구현 내역
+
+#### 1. 장소선택 모달 4행(12개 슬롯) 확장 ([`components/LocationSearchModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/LocationSearchModal.tsx))
+- `PRESETS_PER_PAGE = 12` (3열 x 4행) 상수 도입 및 `totalPages` / `pages` 페이징 연산 동기화.
+- 자택 슬롯 및 거점 버튼 슬롯의 높이를 `min-h-[54px] sm:min-h-[58px] p-2`로 최적화하여 4행(12개)이 모바일 화면에 답답함 없이 안착되도록 정렬.
+- 페이징 슬라이더 및 하단 캡슐형 인디케이터가 12개 슬롯 단위로 정확하게 연동.
+
+#### 2. 상단 퀵 액션 바 5열 개편 ([`components/QuickActionBar.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/QuickActionBar.tsx))
+- `QuickActionBarProps`에 `onOpenRoadviewModal?: () => void;` 핸들러 추가.
+- `grid grid-cols-5 gap-1.5 sm:gap-2` 그리드 적용 및 원형 버튼 크기를 `w-12 h-12 sm:w-14 sm:h-14`로 조정.
+- 5번째 버튼에 Lucide `Eye` 아이콘 및 `로드뷰` 라벨을 적용하고 탭 시 `onOpenRoadviewModal()` 트리거.
+
+#### 3. 현장 로드뷰 모달 컴포넌트 신설 ([`components/RoadviewModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/RoadviewModal.tsx))
+- **헤더**: 코발트 블루 뱃지 속 뷰파인더(`Eye`) 아이콘 + `현장 로드뷰` 타이틀 + `승하차 현장 및 진입로 사전 답사` 서브텍스트.
+- **실시간 POI 검색바**: 디바운스(`/api/search`) 검색 및 드롭다운 결과 탭 시 해당 좌표 카카오 로드뷰 딥링크 즉시 오픈.
+- **퀵 답사 섹션**:
+  - `복사한 주소`: 클립보드 텍스트 감지 시 노출되며, 우측 단일 아이콘 버튼(`w-9 h-9`) 탭 시 좌표 지오코딩 후 로드뷰 오픈.
+  - `현재 운행 목적지`: 현재 설정된 목적지 명칭 및 주소 노출, 우측 아이콘 버튼 탭 시 해당 좌표 로드뷰 즉시 오픈.
+- **최근 검색 (2열 카드)**: 기존 검색 이력 카드 유지, 탭 시 해당 위치 로드뷰 오픈.
+- **자주 가는 거점 퀵 선택 (4행 x 3열 = 12슬롯 그리드)**:
+  - 1페이지에 12개 슬롯(3열 x 4행) 렌더링 및 자택/공통/개인 뱃지 연동.
+  - 터치 스와이프 제스처 및 캡슐형 페이지네이션 인디케이터 제공.
+  - 거점 탭 시 카카오 로드뷰 딥링크(`https://map.kakao.com/link/roadview/${lat},${lng}`) 호출.
+
+#### 4. 메인 화면 상태 오케스트레이션 연동 ([`app/page.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/page.tsx))
+- `isRoadviewModalOpen` 상태 선언.
+- `<QuickActionBar onOpenRoadviewModal={() => setIsRoadviewModalOpen(true)} ... />` 연결.
+- `<RoadviewModal isOpen={isRoadviewModalOpen} onClose={() => setIsRoadviewModalOpen(false)} currentDestination={destination} presets={presets} homeLocation={profile.homeLocation} />` 오버레이 렌더링.
+
+---
+
+### 57.3 검증 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 컴파일 및 정적 페이지 생성 에러 **0건 (Exit code 0)** 통과.
+2. **시나리오 검증 결과**:
+   - **Case 1 (`LocationSearchModal` 4행 확인)**: 출발지/목적지 변경 시 거점 그리드가 4행(3열 x 4행 = 12개 슬롯)으로 쾌적하게 렌더링되고 페이징 인디케이터가 정상 동기화됨 (PASS).
+   - **Case 2 (`QuickActionBar` 5열 정렬)**: 375px 모바일 뷰포트에서도 `[차량체크]`, `[즐겨찾기]`, `[주유]`, `[항공편]`, `[로드뷰]` 5개 버튼이 줄바꿈이나 텍스트 잘림 없이 단정하게 정렬됨 (PASS).
+   - **Case 3 (`RoadviewModal` 렌더링 및 딥링크 호출)**: 로드뷰 모달 오픈 시 상단 검색바 + 복사/목적지 퀵 카드 + 최근 검색(2열) + 거점(3열x4행=12슬롯)이 온전히 노출되며, 거점 탭 시 카카오 로드뷰 창이 새 탭으로 즉시 열림 (PASS).
+

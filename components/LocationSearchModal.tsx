@@ -51,7 +51,7 @@ interface PoiResult {
 // In-memory 0ms instant cache for location searches
 const locationSearchCache = new Map<string, PoiResult[]>();
 const RECENT_SEARCHES_STORAGE_KEY = 'cockpit_recent_searches';
-const ITEMS_PER_PAGE = 21; // 3 columns x 7 rows
+const PRESETS_PER_PAGE = 12; // 3 columns x 4 rows
 
 export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
   isOpen,
@@ -295,12 +295,12 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
     ];
   }, [localPresets]);
 
-  const totalPages = Math.max(1, Math.ceil(allSlots.length / ITEMS_PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(allSlots.length / PRESETS_PER_PAGE));
 
   const pages = useMemo(() => {
     const result: (typeof allSlots)[] = [];
-    for (let i = 0; i < allSlots.length; i += ITEMS_PER_PAGE) {
-      result.push(allSlots.slice(i, i + ITEMS_PER_PAGE));
+    for (let i = 0; i < allSlots.length; i += PRESETS_PER_PAGE) {
+      result.push(allSlots.slice(i, i + PRESETS_PER_PAGE));
     }
     return result.length > 0 ? result : [[]];
   }, [allSlots]);
@@ -699,7 +699,7 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                               key="slot_home"
                               type="button"
                               onClick={handleSelectHome}
-                              className={`min-h-[64px] p-2.5 rounded-2xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-150 active:scale-95 group shadow-2xs ${currentSelectedId === 'slot_home'
+                              className={`min-h-[54px] sm:min-h-[58px] p-2 rounded-2xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-150 active:scale-95 group shadow-2xs ${currentSelectedId === 'slot_home'
                                 ? 'border-2 border-[#1E60F3] bg-blue-50/40 text-[#1E60F3] font-bold shadow-xs'
                                 : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/80'
                                 }`}
@@ -727,7 +727,7 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                             key={`${p.id}-${sIdx}`}
                             type="button"
                             onClick={() => handleSelectPreset(p)}
-                            className={`min-h-[64px] p-2.5 rounded-2xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-150 active:scale-95 group shadow-2xs ${isSelected
+                            className={`min-h-[54px] sm:min-h-[58px] p-2 rounded-2xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-150 active:scale-95 group shadow-2xs ${isSelected
                               ? 'border-2 border-[#1E60F3] bg-blue-50/40 text-[#1E60F3] font-bold shadow-xs'
                               : 'bg-white border-slate-200 hover:border-[#1E60F3]/60 hover:bg-blue-50/30'
                               }`}
