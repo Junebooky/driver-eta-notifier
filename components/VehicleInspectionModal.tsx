@@ -1317,7 +1317,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                     value={parkingLocation}
                     onChange={(e) => setParkingLocation(e.target.value)}
                     placeholder="예: B5 기둥 F"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors text-sm"
                   />
                 </div>
                 <div>
@@ -1329,7 +1329,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                     value={keyLocation}
                     onChange={(e) => setKeyLocation(e.target.value)}
                     placeholder="예: 운전석 뒷바퀴 위"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors text-sm"
                   />
                 </div>
               </div>
