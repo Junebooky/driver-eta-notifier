@@ -342,12 +342,12 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
             </label>
 
             <div
-              className={`relative flex items-center justify-between w-full px-5 py-4 bg-slate-50 border rounded-2xl transition-all shadow-xs group cursor-pointer ${formErrors.date
+              className={`relative flex items-center justify-between w-full px-5 py-3 bg-slate-50 border rounded-2xl transition-all shadow-xs group cursor-pointer ${formErrors.date
                 ? 'border-rose-400 bg-rose-50/50 ring-2 ring-rose-200'
                 : 'border-slate-200 hover:border-[#1E60F3]'
                 }`}
             >
-              <span className="text-base sm:text-lg font-semibold text-slate-800 tracking-tight">
+              <span className="text-lg font-semibold text-slate-900 tracking-tight">
                 {formatKoreanDate(pickupDate) || '날짜 선택'}
               </span>
               <Calendar className="w-5 h-5 text-[#1E60F3] group-hover:scale-110 transition-transform shrink-0" />
@@ -450,8 +450,8 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
               <span>픽업 시간</span>
             </label>
 
-            <div className="relative flex items-center justify-between w-full px-5 py-4 bg-slate-50 border border-slate-200 hover:border-[#1E60F3] rounded-2xl transition-all shadow-xs group cursor-pointer">
-              <span className="text-base sm:text-lg font-semibold text-slate-800 tracking-tight">
+            <div className="relative flex items-center justify-between w-full px-5 py-3 bg-slate-50 border border-slate-200 hover:border-[#1E60F3] rounded-2xl transition-all shadow-xs group cursor-pointer">
+              <span className="text-lg font-semibold text-slate-900 tracking-tight">
                 {formatKoreanTime(pickupTime) || '시간 선택'}
               </span>
               <Clock className="w-5 h-5 text-slate-400 group-hover:text-[#1E60F3] transition-colors shrink-0" />
@@ -480,7 +480,7 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
                 value={passenger}
                 onChange={(e) => setPassenger(e.target.value)}
                 placeholder="예: DENZEL SOFYAN"
-                className="w-full px-4 py-3 sm:py-3.5 rounded-xl border border-slate-200 text-base sm:text-lg font-semibold text-slate-800 placeholder:text-slate-400 outline-none focus:border-[#1E60F3]"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-lg font-semibold text-slate-900 placeholder:text-base placeholder:text-slate-400 outline-none focus:border-[#1E60F3]"
               />
             </div>
 
@@ -494,7 +494,7 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
                 value={flight}
                 onChange={(e) => setFlight(e.target.value.toUpperCase())}
                 placeholder="예: SQ 612"
-                className="w-full px-4 py-3 sm:py-3.5 rounded-xl border border-slate-200 text-base sm:text-lg font-semibold text-slate-800 placeholder:text-slate-400 outline-none focus:border-[#1E60F3] uppercase"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-lg font-semibold text-slate-900 placeholder:text-base placeholder:text-slate-400 outline-none focus:border-[#1E60F3] uppercase"
               />
             </div>
           </div>
@@ -509,7 +509,7 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="예: VIP 전담 의전 영접, 수하물 3개 등 특이사항 입력"
-              className="w-full px-4 py-3 sm:py-3.5 rounded-xl border border-slate-200 text-base sm:text-lg font-semibold text-slate-800 placeholder:text-slate-400 outline-none focus:border-[#1E60F3]"
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-lg font-semibold text-slate-900 placeholder:text-base placeholder:text-slate-400 outline-none focus:border-[#1E60F3]"
             />
           </div>
         </div>

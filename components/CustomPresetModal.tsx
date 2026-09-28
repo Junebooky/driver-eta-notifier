@@ -257,107 +257,6 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
     };
   }, [searchQuery]);
 
-  // Window Listeners for Mobile & Mouse Drag Tracking with Center-Point Hysteresis
-  useEffect(() => {
-    if (!isDragging) return;
-
-    const checkCenterPointHysteresis = (clientX: number, clientY: number) => {
-      const currentDrag = dragIndexRef.current;
-      if (currentDrag === null) return;
-
-      for (let i = 0; i < itemsRef.current.length; i++) {
-        if (i === currentDrag) continue;
-        const el = itemRefs.current[i];
-        if (!el) continue;
-
-        const rect = el.getBoundingClientRect();
-        const slotCenterX = rect.left + rect.width / 2;
-        const slotCenterY = rect.top + rect.height / 2;
-
-        const thresholdX = rect.width * 0.45;
-        const thresholdY = rect.height * 0.45;
-
-        if (
-          Math.abs(clientX - slotCenterX) < thresholdX &&
-          Math.abs(clientY - slotCenterY) < thresholdY
-        ) {
-          // 1. Capture previous bounding rects for FLIP animation
-          prevRectsRef.current.clear();
-          itemsRef.current.forEach((item, idx) => {
-            const cardEl = itemRefs.current[idx];
-            if (cardEl) {
-              prevRectsRef.current.set(item.id, cardEl.getBoundingClientRect());
-            }
-          });
-
-          // 2. Reorder array
-          const updated = [...itemsRef.current];
-          const [movedItem] = updated.splice(currentDrag, 1);
-          updated.splice(i, 0, movedItem);
-
-          // 3. Update local state
-          itemsRef.current = updated;
-          setItems(updated);
-          setDragIndex(i);
-          dragIndexRef.current = i;
-
-          if (typeof navigator !== 'undefined' && navigator.vibrate) {
-            navigator.vibrate(20);
-          }
-          break;
-        }
-      }
-    };
-
-    const handleTouchMove = (e: TouchEvent) => {
-      if (e.cancelable) e.preventDefault();
-      const touch = e.touches[0];
-      if (touch) {
-        setPointerPos({ x: touch.clientX, y: touch.clientY });
-        checkCenterPointHysteresis(touch.clientX, touch.clientY);
-      }
-    };
-
-    const handleTouchEnd = () => {
-      endDrag();
-    };
-
-    const handleMouseMove = (e: MouseEvent) => {
-      setPointerPos({ x: e.clientX, y: e.clientY });
-      checkCenterPointHysteresis(e.clientX, e.clientY);
-    };
-
-    const handleMouseUp = () => {
-      endDrag();
-    };
-
-    const endDrag = () => {
-      setIsDragging(false);
-      setDragIndex(null);
-      dragIndexRef.current = null;
-      setTimeout(() => {
-        isLongPressActiveRef.current = false;
-      }, 100);
-      prevRectsRef.current.clear();
-      commitReorder(itemsRef.current);
-      haptics.lightTap();
-    };
-
-    window.addEventListener('touchmove', handleTouchMove, { passive: false });
-    window.addEventListener('touchend', handleTouchEnd);
-    window.addEventListener('touchcancel', handleTouchEnd);
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-
-    return () => {
-      window.removeEventListener('touchmove', handleTouchMove);
-      window.removeEventListener('touchend', handleTouchEnd);
-      window.removeEventListener('touchcancel', handleTouchEnd);
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isDragging]);
-
   // Persist reordered array to localStorage and notify parent
   const commitReorder = (newItems: LocationPreset[]) => {
     if (vehicleNo) {
@@ -372,8 +271,158 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
     onReorderPresets?.(newItems);
   };
 
+  const calculateSlotIndex = (clientX: number, clientY: number): number | null => {
+    for (let i = 0; i < itemsRef.current.length; i++) {
+      const el = itemRefs.current[i];
+      if (!el) continue;
+      const rect = el.getBoundingClientRect();
+      if (
+        clientX >= rect.left &&
+        clientX <= rect.right &&
+        clientY >= rect.top &&
+        clientY <= rect.bottom
+      ) {
+        return i;
+      }
+    }
+    return null;
+  };
+
+  const checkCenterPointHysteresis = (clientX: number, clientY: number) => {
+    const currentDrag = dragIndexRef.current;
+    if (currentDrag === null) return;
+
+    for (let i = 0; i < itemsRef.current.length; i++) {
+      if (i === currentDrag) continue;
+      const el = itemRefs.current[i];
+      if (!el) continue;
+
+      const rect = el.getBoundingClientRect();
+      const slotCenterX = rect.left + rect.width / 2;
+      const slotCenterY = rect.top + rect.height / 2;
+
+      const thresholdX = rect.width * 0.45;
+      const thresholdY = rect.height * 0.45;
+
+      if (
+        Math.abs(clientX - slotCenterX) < thresholdX &&
+        Math.abs(clientY - slotCenterY) < thresholdY
+      ) {
+        // 1. Capture previous bounding rects for FLIP animation
+        prevRectsRef.current.clear();
+        itemsRef.current.forEach((item, idx) => {
+          const cardEl = itemRefs.current[idx];
+          if (cardEl) {
+            prevRectsRef.current.set(item.id, cardEl.getBoundingClientRect());
+          }
+        });
+
+        // 2. Reorder array
+        const updated = [...itemsRef.current];
+        const [movedItem] = updated.splice(currentDrag, 1);
+        updated.splice(i, 0, movedItem);
+
+        // 3. Update local state
+        itemsRef.current = updated;
+        setItems(updated);
+        setDragIndex(i);
+        dragIndexRef.current = i;
+
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+          navigator.vibrate(20);
+        }
+        break;
+      }
+    }
+  };
+
+  const endDrag = (releaseX?: number, releaseY?: number) => {
+    if (typeof releaseX === 'number' && typeof releaseY === 'number') {
+      const targetIdx = calculateSlotIndex(releaseX, releaseY);
+      const currentDrag = dragIndexRef.current;
+      if (targetIdx !== null && currentDrag !== null && targetIdx !== currentDrag) {
+        prevRectsRef.current.clear();
+        itemsRef.current.forEach((item, idx) => {
+          const cardEl = itemRefs.current[idx];
+          if (cardEl) {
+            prevRectsRef.current.set(item.id, cardEl.getBoundingClientRect());
+          }
+        });
+        const updated = [...itemsRef.current];
+        const [movedItem] = updated.splice(currentDrag, 1);
+        updated.splice(targetIdx, 0, movedItem);
+        itemsRef.current = updated;
+        setItems(updated);
+      }
+    }
+
+    setIsDragging(false);
+    setDragIndex(null);
+    dragIndexRef.current = null;
+    setTimeout(() => {
+      isLongPressActiveRef.current = false;
+    }, 100);
+    prevRectsRef.current.clear();
+    commitReorder(itemsRef.current);
+    haptics.lightTap();
+  };
+
+  // [태스크 1] Global Window Listeners for Pointer & Touch Drag Tracking with Zero-Click Release
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handlePointerMove = (e: PointerEvent | MouseEvent) => {
+      setPointerPos({ x: e.clientX, y: e.clientY });
+      checkCenterPointHysteresis(e.clientX, e.clientY);
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.cancelable) e.preventDefault();
+      const touch = e.touches[0];
+      if (touch) {
+        setPointerPos({ x: touch.clientX, y: touch.clientY });
+        checkCenterPointHysteresis(touch.clientX, touch.clientY);
+      }
+    };
+
+    const handleRelease = (e?: PointerEvent | MouseEvent | TouchEvent) => {
+      let releaseX = pointerPos.x;
+      let releaseY = pointerPos.y;
+      if (e) {
+        if ('clientX' in e && typeof e.clientX === 'number' && e.clientX > 0) {
+          releaseX = e.clientX;
+          releaseY = e.clientY;
+        } else if ('changedTouches' in e && e.changedTouches && e.changedTouches[0]) {
+          releaseX = e.changedTouches[0].clientX;
+          releaseY = e.changedTouches[0].clientY;
+        }
+      }
+      endDrag(releaseX, releaseY);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handleRelease);
+    window.addEventListener('pointercancel', handleRelease);
+    window.addEventListener('touchmove', handleTouchMove, { passive: false });
+    window.addEventListener('touchend', handleRelease);
+    window.addEventListener('touchcancel', handleRelease);
+    window.addEventListener('mousemove', handlePointerMove);
+    window.addEventListener('mouseup', handleRelease);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handleRelease);
+      window.removeEventListener('pointercancel', handleRelease);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleRelease);
+      window.removeEventListener('touchcancel', handleRelease);
+      window.removeEventListener('mousemove', handlePointerMove);
+      window.removeEventListener('mouseup', handleRelease);
+    };
+  }, [isDragging]);
+
   // Pointer start: 350ms Long-Press Timer separation from Short Tap
-  const handlePointerStart = (index: number, e: React.TouchEvent | React.MouseEvent) => {
+  const handlePointerStart = (index: number, e: React.TouchEvent | React.MouseEvent | React.PointerEvent) => {
     isLongPressActiveRef.current = false;
     isScrollingRef.current = false;
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
@@ -399,7 +448,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
     }, 350);
   };
 
-  const handlePointerMoveCheck = (e: React.TouchEvent | React.MouseEvent) => {
+  const handlePointerMoveCheck = (e: React.TouchEvent | React.MouseEvent | React.PointerEvent) => {
     if (!touchStartPosRef.current || isLongPressActiveRef.current) return;
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
@@ -420,12 +469,29 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
     }
+    if (isDragging) {
+      endDrag();
+    }
   };
 
-  const handlePointerEnd = () => {
+  const handlePointerEnd = (e?: React.TouchEvent | React.MouseEvent | React.PointerEvent) => {
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
       longPressTimerRef.current = null;
+    }
+    if (isDragging) {
+      let x = pointerPos.x;
+      let y = pointerPos.y;
+      if (e) {
+        if ('clientX' in e && typeof e.clientX === 'number') {
+          x = e.clientX;
+          y = e.clientY;
+        } else if ('changedTouches' in e && e.changedTouches && e.changedTouches[0]) {
+          x = e.changedTouches[0].clientX;
+          y = e.changedTouches[0].clientY;
+        }
+      }
+      endDrag(x, y);
     }
   };
 
@@ -433,48 +499,6 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
   const handleCardClick = (preset: LocationPreset) => {
     if (isDragging || isLongPressActiveRef.current) return;
     handleStartEdit(preset);
-  };
-
-  // HTML5 Drag & Drop handlers for desktop
-  const handleHtmlDragStart = (index: number, e: React.DragEvent) => {
-    setDragIndex(index);
-    dragIndexRef.current = index;
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  const handleHtmlDragOver = (index: number, e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  };
-
-  const handleHtmlDrop = (targetIdx: number, e: React.DragEvent) => {
-    e.preventDefault();
-    const sourceIdx = dragIndexRef.current;
-    if (sourceIdx !== null && sourceIdx !== targetIdx) {
-      prevRectsRef.current.clear();
-      itemsRef.current.forEach((item, idx) => {
-        const cardEl = itemRefs.current[idx];
-        if (cardEl) {
-          prevRectsRef.current.set(item.id, cardEl.getBoundingClientRect());
-        }
-      });
-
-      const updated = [...itemsRef.current];
-      const [movedItem] = updated.splice(sourceIdx, 1);
-      updated.splice(targetIdx, 0, movedItem);
-
-      itemsRef.current = updated;
-      setItems(updated);
-      commitReorder(updated);
-      haptics.lightTap();
-    }
-    setDragIndex(null);
-    dragIndexRef.current = null;
-  };
-
-  const handleHtmlDragEnd = () => {
-    setDragIndex(null);
-    dragIndexRef.current = null;
   };
 
   // Select POI from autocomplete results
@@ -775,7 +799,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
               <form onSubmit={handleSubmit} className="space-y-2.5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
                       거점 전체 명칭
                     </label>
                     <input
@@ -784,12 +808,12 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="검색 결과에서 거점을 선택하거나 입력하세요"
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 text-xs sm:text-sm font-bold focus:outline-none focus:border-[#1E60F3]"
+                      className="w-full px-3.5 py-3 bg-white border border-slate-200 rounded-xl text-lg font-bold text-slate-900 placeholder:text-base placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3]"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
                       버튼 표기 명칭 (최대 8자 권장)
                     </label>
                     <input
@@ -799,7 +823,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                       onChange={(e) => setShortName(e.target.value)}
                       placeholder="예: 소노펠리체"
                       maxLength={12}
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 text-xs sm:text-sm font-bold focus:outline-none focus:border-[#1E60F3]"
+                      className="w-full px-3.5 py-3 bg-white border border-slate-200 rounded-xl text-lg font-bold text-slate-900 placeholder:text-base placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3]"
                     />
                   </div>
                 </div>
@@ -809,16 +833,16 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                   <button
                     type="button"
                     onClick={handleCancelForm}
-                    className="w-1/3 py-2.5 rounded-xl bg-slate-200/80 hover:bg-slate-300 text-slate-700 text-xs font-bold active:scale-95 transition cursor-pointer"
+                    className="w-1/3 py-3 rounded-xl bg-slate-200/80 hover:bg-slate-300 text-slate-700 text-sm font-bold active:scale-95 transition cursor-pointer"
                   >
                     취소
                   </button>
                   <button
                     type="submit"
                     disabled={lat === null || !name.trim()}
-                    className="w-2/3 py-2.5 rounded-xl bg-[#1E60F3] hover:bg-[#1346D8] disabled:opacity-40 text-white text-xs font-black shadow-xs transition active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1.5"
+                    className="w-2/3 py-3 rounded-xl bg-[#1E60F3] hover:bg-[#1346D8] disabled:opacity-40 text-white text-sm font-black shadow-xs transition active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1.5"
                   >
-                    <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                    <Check className="w-4 h-4 stroke-[2.5]" />
                     <span>{editingItem ? '수정 완료' : '거점 저장'}</span>
                   </button>
                 </div>
@@ -890,7 +914,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="예: 자택, 우리집"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-bold focus:outline-none focus:border-blue-600 focus:bg-white"
+                    className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200 rounded-xl text-lg font-bold text-slate-900 placeholder:text-base placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:bg-white"
                   />
                 </div>
                 <div>
@@ -903,7 +927,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
                     placeholder="검색 결과에서 선택하거나 입력하세요"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-medium focus:outline-none focus:border-blue-600 focus:bg-white"
+                    className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200 rounded-xl text-lg font-bold text-slate-900 placeholder:text-base placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:bg-white"
                   />
                 </div>
 
@@ -996,18 +1020,13 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                               ref={(el) => {
                                 itemRefs.current[index] = el;
                               }}
-                              draggable={isDragging}
-                              onDragStart={(e) => handleHtmlDragStart(index, e)}
-                              onDragOver={(e) => handleHtmlDragOver(index, e)}
-                              onDrop={(e) => handleHtmlDrop(index, e)}
-                              onDragEnd={handleHtmlDragEnd}
+                              onPointerDown={(e) => handlePointerStart(index, e)}
                               onTouchStart={(e) => handlePointerStart(index, e)}
                               onTouchMove={handlePointerMoveCheck}
                               onTouchEnd={handlePointerEnd}
                               onTouchCancel={handlePointerCancel}
                               onMouseDown={(e) => handlePointerStart(index, e)}
                               onMouseUp={handlePointerEnd}
-                              onMouseLeave={handlePointerCancel}
                               onClick={() => handleCardClick(preset)}
                               className={`relative min-h-[64px] p-2.5 rounded-2xl border text-center flex flex-col justify-between items-center transition-all duration-300 select-none group shadow-2xs cursor-grab active:cursor-grabbing will-change-transform ${
                                 isBeingDragged
@@ -1016,6 +1035,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                               }`}
                               style={{
                                 transition: isBeingDragged ? 'none' : 'transform 300ms cubic-bezier(0.2, 0, 0, 1), box-shadow 200ms ease',
+                                touchAction: isBeingDragged ? 'none' : 'manipulation',
                               }}
                               title={`${preset.name} (길게 눌러 드래그 / 탭하여 수정)`}
                             >

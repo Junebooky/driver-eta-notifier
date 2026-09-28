@@ -1907,6 +1907,70 @@ SELECT * FROM cockpit.presets;
 6. **React Rules of Hooks 준수 (`if (!isOpen) return null` 위치 교정)**:
    - 모든 훅(`useState`, `useEffect`, `useLayoutEffect`, `useRef`)이 조건 없이 항상 동일한 순서로 호출된 후 최하단 JSX 렌더링 직전에 `isOpen`을 평가하도록 조기 반환 위치를 교정하여, 모달 개폐 시 발생하는 `Rendered more hooks than during the previous render` 에러를 원천 차단.
 
+---
+
+## 41. 드래그 릴리즈(Drop) 즉각 완결, 스케줄 모달 폰트 일원화, 거점 관리 인풋 18px(text-lg) 고정 (2026-09-28)
+
+### 41.1 추진 배경 및 목적
+1. **`CustomPresetModal.tsx` 드래그 릴리즈 시 추가 클릭 결함 원천 해결**:
+   - 기존에 HTML5 drag 속성(`draggable={isDragging}`)과 pointer/touch 이벤트가 중첩되어, 브라우저가 마우스 이동 시 네이티브 드래그 모드로 진입하면서 `mouseup` 이벤트가 억제되어 드래그 후 내려놓을 때 대상 위치를 한 번 더 클릭해야만 배치가 완료되던 결함을 발견.
+   - HTML5 DnD 속성을 전면 제거하고 전역 릴리즈 리스너(`pointerup`, `pointercancel`, `touchend`, `touchcancel`, `mouseup`)를 바인딩하여, 손가락이나 마우스를 떼는 순간 0초 만에 슬롯 위치를 커밋하고 플로팅 상태를 즉시 해제하는 **원터치 드롭 커밋 (Zero-Click Commit)** 구조 완성.
+2. **`ScheduleFormModal.tsx` 폰트 크기 및 높이 18px(`text-lg`) 일원화**:
+   - 모바일 뷰포트에서 출발지/도착지(`text-lg font-black`)에 비해 승객명, 픽업시간, 편명, 메모 폰트가 작아 보이던 불일치를 교정.
+   - 픽업 일자/시간 터치 박스와 승객명, 항공편명, 의전 메모 인풋의 패딩을 `py-3`으로 통일하고, 폰트 규격을 **`text-lg font-semibold text-slate-900 placeholder:text-base`**로 일원화하여 상하 모든 입력 필드가 시원하고 단정하게 정렬되도록 개선.
+3. **`CustomPresetModal.tsx` 거점 명칭 인풋 폰트 18px(`text-lg`) 상시 고정**:
+   - 모바일 화면에서 거점 명칭 인풋이 `text-xs`(12px)로 축소되던 반응형 클래스를 제거.
+   - 거점 전체 명칭과 버튼 표기 명칭 인풋을 **`text-lg font-bold text-slate-900 py-3 px-3.5 placeholder:text-base`**로 18px 상시 고정하여 입력 시인성 극대화.
+
+---
+
+### 41.2 핵심 구현 내역
+
+#### [태스크 1] CustomPresetModal 드랍 시 즉각 완료 (Zero-Click Commit) ([`components/CustomPresetModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/CustomPresetModal.tsx))
+1. **HTML5 DnD 속성 전면 제거**:
+   - 카드 엘리먼트에서 `draggable`, `onDragStart`, `onDragOver`, `onDrop`, `onDragEnd` 속성 및 관련 핸들러를 완전히 제거하여 브라우저의 네이티브 DnD 간섭을 원천 차단.
+2. **통합 포인터 리스너 및 전역 릴리즈 핸들러**:
+   - 카드의 `onPointerDown`, `onTouchStart`, `onMouseDown`으로 350ms 롱프레스 감지.
+   - 드래그 활성화 시 `window`에 `pointerup`, `pointercancel`, `touchend`, `touchcancel`, `mouseup` 전역 리스너를 결합.
+3. **릴리즈 즉각 커밋 (`endDrag`)**:
+   - 손가락 또는 마우스를 떼는 즉시 `calculateSlotIndex`로 릴리즈 좌표 하위의 거점 슬롯 인덱스를 계산하여 배열 순서를 최종 확정.
+   - `commitReorder`를 통해 `localStorage`와 Supabase DB에 0초 만에 영속 저장.
+   - `setIsDragging(false)`, `setDragIndex(null)`, `dragIndexRef.current = null`을 즉시 호출하여 플로팅 상태를 0ms 만에 정리하고 `haptics.lightTap()` 발생.
+
+---
+
+#### [태스크 2] ScheduleFormModal 폰트 크기 및 높이 일원화 ([`components/ScheduleFormModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ScheduleFormModal.tsx), [`components/EditScheduleModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/EditScheduleModal.tsx))
+1. **입력 필드 규격 상향 (`text-lg font-semibold text-slate-900 py-3`)**:
+   - **픽업 일자 / 픽업 시간**: 터치 박스 패딩 `py-3`, 표시 텍스트 `text-lg font-semibold text-slate-900`.
+   - **승객명 인풋**: `py-3 text-lg font-semibold text-slate-900 placeholder:text-base`.
+   - **항공편명 인풋**: `py-3 text-lg font-semibold text-slate-900 placeholder:text-base`.
+   - **의전 메모 인풋**: `py-3 text-lg font-semibold text-slate-900 placeholder:text-base`.
+2. **출발지/도착지와의 균형 및 수정 모달 동기화**:
+   - `ScheduleFormModal`뿐 아니라 `EditScheduleModal`의 입력 필드 규격도 동일하게 18px(`text-lg`)로 통일하여 배차표 관리 전반의 타이포그래피 정합성 확보.
+
+---
+
+#### [태스크 3] CustomPresetModal 거점 명칭 인풋 폰트 18px 상시 고정 ([`components/CustomPresetModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/CustomPresetModal.tsx))
+1. **거점 전체 명칭 인풋**:
+   - `text-xs sm:text-sm` ➔ **`text-lg font-bold text-slate-900 py-3 px-3.5 placeholder:text-base`** (18px 상시 고정).
+2. **버튼 표기 명칭 인풋**:
+   - `text-xs sm:text-sm` ➔ **`text-lg font-bold text-slate-900 py-3 px-3.5 placeholder:text-base`** (18px 상시 고정).
+3. **자택 등록 모드 인풋 동기화**:
+   - 자택 명칭 및 상세 주소 인풋 역시 `py-3 text-lg font-bold text-slate-900 placeholder:text-base`로 일괄 고도화.
+
+---
+
+### 41.3 검증 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 14개 라우트 컴파일 에러 **0건** 통과.
+2. **원터치 드롭 커밋 (Zero-Click) 검증**:
+   - 카드를 350ms 롱프레스로 들어 올린 뒤 다른 위치로 드래그하고 손가락(또는 마우스)을 떼자마자 추가 클릭 없이 즉각 해당 슬롯에 안착하고 순서가 저장됨을 확인.
+3. **스케줄 모달 18px 통일감 검증**:
+   - 모바일 환경에서 출발지/도착지와 승객명, 픽업시간, 편명 인풋의 글자 크기와 박스 높이가 18px 규격으로 균형 있게 정렬됨을 확인.
+4. **거점 관리 창 인풋 18px 고정 검증**:
+   - 모바일 화면에서도 거점 전체 명칭과 표기 명칭 입력창의 폰트가 `text-xs`로 축소되지 않고 18px(`text-lg`) 크기로 큼직하게 유지됨을 확인.
+
+
 
 
 

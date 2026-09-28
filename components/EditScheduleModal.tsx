@@ -124,7 +124,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
               value={timeDisplay}
               onChange={(e) => setTimeDisplay(e.target.value)}
               placeholder="예: 픽업 09:50, 픽업 09:00"
-              className="w-full px-4 py-3 sm:py-3.5 rounded-xl border border-slate-200 text-base sm:text-lg font-semibold text-slate-800 placeholder:text-slate-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-lg font-semibold text-slate-900 placeholder:text-base placeholder:text-slate-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 outline-none transition-all"
             />
             <p className="text-xs text-slate-400 font-medium">
               배차표 카드 상단에 노출되는 픽업 시간을 지정합니다.
@@ -142,7 +142,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
               value={passenger}
               onChange={(e) => setPassenger(e.target.value)}
               placeholder="예: DENZEL SOFYAN 외 1명 (TARA SOFYAN)"
-              className="w-full px-4 py-3 sm:py-3.5 rounded-xl border border-slate-200 text-base sm:text-lg font-semibold text-slate-800 placeholder:text-slate-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-lg font-semibold text-slate-900 placeholder:text-base placeholder:text-slate-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 outline-none transition-all"
             />
           </div>
 
@@ -157,7 +157,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
               value={flight}
               onChange={(e) => setFlight(e.target.value)}
               placeholder="예: SQ 612 또는 SQ 601 (16:45 출국)"
-              className="w-full px-4 py-3 sm:py-3.5 rounded-xl border border-slate-200 text-base sm:text-lg font-semibold text-slate-800 placeholder:text-slate-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 outline-none transition-all uppercase"
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-lg font-semibold text-slate-900 placeholder:text-base placeholder:text-slate-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 outline-none transition-all uppercase"
             />
             <p className="text-xs text-slate-400 font-medium">
               항공편명이 입력되면 카드 하단에 항공편 실시간 조회 버튼이 자동 활성화됩니다.
@@ -175,7 +175,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="예: CLUB CHALLENGE VIP 영접 • T1 입국장 피켓 대기"
-              className="w-full px-4 py-3 sm:py-3.5 rounded-xl border border-slate-200 text-base sm:text-lg font-semibold text-slate-800 placeholder:text-slate-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 outline-none transition-all resize-none leading-relaxed"
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-lg font-semibold text-slate-900 placeholder:text-base placeholder:text-slate-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 outline-none transition-all resize-none leading-relaxed"
             />
           </div>
 
