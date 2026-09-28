@@ -1904,6 +1904,9 @@ SELECT * FROM cockpit.presets;
    - 단순 탭 시 즉시 상단 수정 폼으로 거점 데이터가 채워지고, 350ms 이상 길게 누를 때만 드래그가 개시되며 주변 카드가 `cubic-bezier(0.2, 0, 0, 1)` 곡선을 따라 스무스하게 자리를 양보하고 드롭 시 햅틱 피드백이 발생함을 확인.
 5. **12슬롯 캐러셀 및 상시 도트 인디케이터 검증**:
    - 단일 페이지(12개 이하)에서도 하단에 코발트 블루 알약 도트가 안정적으로 렌더링되며, 13개 이상일 때 다중 도트와 가로 슬라이더가 유기적으로 동작함을 확인.
+6. **React Rules of Hooks 준수 (`if (!isOpen) return null` 위치 교정)**:
+   - 모든 훅(`useState`, `useEffect`, `useLayoutEffect`, `useRef`)이 조건 없이 항상 동일한 순서로 호출된 후 최하단 JSX 렌더링 직전에 `isOpen`을 평가하도록 조기 반환 위치를 교정하여, 모달 개폐 시 발생하는 `Rendered more hooks than during the previous render` 에러를 원천 차단.
+
 
 
 

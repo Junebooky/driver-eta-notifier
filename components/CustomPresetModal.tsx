@@ -358,8 +358,6 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
     };
   }, [isDragging]);
 
-  if (!isOpen) return null;
-
   // Persist reordered array to localStorage and notify parent
   const commitReorder = (newItems: LocationPreset[]) => {
     if (vehicleNo) {
@@ -665,6 +663,8 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
   };
 
   const draggedPreset = dragIndex !== null ? items[dragIndex] : null;
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 select-none overscroll-contain">
