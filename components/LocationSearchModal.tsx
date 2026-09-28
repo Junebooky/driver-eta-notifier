@@ -526,10 +526,17 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                     const isFav = isFavorite(poiLocationData);
 
                     return (
-                      <button
+                      <div
                         key={`${poi.id}-${idx}`}
-                        type="button"
+                        role="button"
+                        tabIndex={0}
                         onClick={() => handleSelectPoi(poi)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            handleSelectPoi(poi);
+                          }
+                        }}
                         className="w-full text-left p-3 rounded-xl hover:bg-blue-50/70 transition-all flex items-start gap-2.5 cursor-pointer group active:scale-[0.99]"
                       >
                         <div className="w-7 h-7 rounded-lg bg-blue-50 text-[#1E60F3] flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-[#1E60F3] group-hover:text-white transition-colors">
@@ -564,7 +571,7 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                             선택 ➔
                           </span>
                         </div>
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
