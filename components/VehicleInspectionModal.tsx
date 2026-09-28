@@ -666,7 +666,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-900 tracking-tight">
-                차량 수령·반납 점검표
+                차량 인수·반납 체크
               </h2>
               <p className="text-[11px] text-slate-400 font-normal">
                 {formatInspectionDate()}
@@ -712,7 +712,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                 className={`text-sm tracking-tight transition-colors duration-300 ${activeTab === 'pickup' ? 'text-white font-extrabold' : 'text-slate-500 font-semibold'
                   }`}
               >
-                차량 수령
+                인수
               </span>
             </button>
 
@@ -729,7 +729,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                 className={`text-sm tracking-tight transition-colors duration-300 ${activeTab === 'daily' ? 'text-white font-extrabold' : 'text-slate-500 font-semibold'
                   }`}
               >
-                일일 점검
+                데일리 체크
               </span>
             </button>
 
@@ -746,7 +746,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                 className={`text-sm tracking-tight transition-colors duration-300 ${activeTab === 'return' ? 'text-white font-extrabold' : 'text-slate-500 font-semibold'
                   }`}
               >
-                차량 반납
+                반납
               </span>
             </button>
           </div>
@@ -758,7 +758,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="block text-[13px] font-semibold text-slate-600 mb-1 truncate">
-                차량호차
+                호차
               </label>
               <input
                 type="text"
@@ -818,7 +818,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
               {/* Dashboard Photo Slot */}
               <div>
                 <label className="block text-[13px] font-semibold text-slate-600 mb-1">
-                  계기판 AI 자동 입력 ✨
+                  계기판 AI 자동 인식 ✨
                 </label>
                 {receiptMeterPhoto ? (
                   <div className="relative w-full h-28 rounded-xl overflow-hidden border border-slate-200 bg-slate-100 group">
@@ -880,7 +880,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
               {/* 2D Top-Down Interactive Vehicle Inspection Viewer */}
               <div className="space-y-1 pt-0.5">
                 <label className="block text-[13px] font-semibold text-slate-600">
-                  차량 외관 2D 탑뷰 점검
+                  차량 외관 체크
                 </label>
                 <VehicleTopDownViewer
                   selectedParts={receiptSelectedParts}
@@ -892,7 +892,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
               {/* Outer Damage Quick Chip Selector & Input */}
               <div className="space-y-1 pt-1">
                 <label className="block text-[13px] font-semibold text-slate-600">
-                  외관 부위별 빠른 선택
+                  흠집 위치 선택
                 </label>
                 <div className="flex flex-wrap gap-1.5">
                   {/* Clean reset chip */}
@@ -938,7 +938,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                     value={receiptDamage}
                     onChange={(e) => setReceiptDamage(e.target.value)}
                     placeholder="무 (미입력 시 '무' 표기)"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors text-base"
                   />
                 </div>
               </div>
@@ -1301,7 +1301,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                     value={returnDamage}
                     onChange={(e) => setReturnDamage(e.target.value)}
                     placeholder="예: 조수석 뒷 휠 기스 (수령 시와 동일)"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors text-base"
                   />
                 </div>
               </div>
@@ -1368,7 +1368,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
             onClick={handleConfirmSave}
             className="flex-[2] py-3.5 rounded-xl bg-[#1E60F3] hover:bg-[#1650D6] text-white font-bold text-sm transition-all shadow-md shadow-blue-500/20 active:scale-[0.98] cursor-pointer text-center flex items-center justify-center"
           >
-            확인
+            점검 완료
           </button>
 
           {/* Right: '카톡' Button (Compact Brand Button) */}
@@ -1381,7 +1381,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
             <svg className="w-4 h-4 fill-[#191919] shrink-0" viewBox="0 0 24 24">
               <path d="M12 3c-5.523 0-10 3.582-10 8 0 2.853 1.879 5.364 4.707 6.744l-.961 3.541c-.085.312.246.577.525.418l4.24-2.42c.484.06 1.002.097 1.489.097 5.523 0 10-3.582 10-8s-4.477-8-10-8z" />
             </svg>
-            <span>카톡</span>
+            <span>카톡 공유</span>
           </button>
         </div>
       </div>

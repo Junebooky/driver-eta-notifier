@@ -39,7 +39,7 @@ export const QuickActionBar: React.FC<QuickActionBarProps> = ({
             }
           }}
           className="flex flex-col items-center cursor-pointer group"
-          title="차량 수령·반납 점검표"
+          title="차량 인수·반납 체크"
         >
           <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white border border-slate-200/90 shadow-2xs flex items-center justify-center text-slate-700 hover:border-[#1E60F3] hover:text-[#1E60F3] hover:bg-blue-50/50 hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 group-hover:border-[#1E60F3] group-hover:text-[#1E60F3] group-hover:bg-blue-50/50 group-hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] group-hover:-translate-y-0.5">
             <ClipboardCheck className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2]" />

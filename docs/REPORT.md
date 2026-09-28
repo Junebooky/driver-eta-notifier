@@ -3295,10 +3295,28 @@ flowchart TD
     - Android scheme: `intent://route?ep=${lat},${lng}&by=CAR#Intent;scheme=kakaomap;package=net.daum.android.map;end;`
     - Android fallbackUrl: `STORE_URLS.kakao.android` (`net.daum.android.map` 카카오맵 플레이스토어)
 
-### 68.3 검증 결과
+---
+
+## 69. 차량 인수·반납 체크 UI 레이블 정예화 및 외관 데미지 인풋 텍스트 크기 조정 (`text-base`)
+
+### 69.1 배경 및 작업 목적
+- 차량 수령·반납 점검표의 용어를 현장 친화적인 **"차량 인수·반납 체크"** 및 직관적인 탭 명칭(**인수**, **데일리 체크**, **반납**)으로 정예화.
+- 외관 데미지 상세(직접 수정 가능) 입력창에 명시적인 `text-base` 폰트 크기를 부여하여 지나치게 크거나 튀지 않는 단정하고 균형 잡힌 타이포그래피 구현.
+
+### 69.2 모듈별 상세 구현 내역
+- [`components/QuickActionBar.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/QuickActionBar.tsx):
+  - 툴팁 및 레이블: "차량 수령·반납 점검표" ➔ **"차량 인수·반납 체크"**
+- [`components/VehicleInspectionModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/VehicleInspectionModal.tsx):
+  - 모달 타이틀: "차량 수령·반납 점검표" ➔ **"차량 인수·반납 체크"**
+  - 탭 명칭: "차량 수령" ➔ **"인수"**, "일일 점검" ➔ **"데일리 체크"**, "차량 반납" ➔ **"반납"**
+  - 라벨 정예화: "차량호차" ➔ **"호차"**, "계기판 AI 자동 입력" ➔ **"계기판 AI 자동 인식"**, "차량 외관 2D 탑뷰 점검" ➔ **"차량 외관 체크"**, "외관 부위별 빠른 선택" ➔ **"흠집 위치 선택"**
+  - 버튼 레이블: "확인" ➔ **"점검 완료"**, "카톡" ➔ **"카톡 공유"**
+  - 외관 데미지 직접 수정 인풋(인수/반납): `text-base` 클래스 명시 적용.
+
+### 69.3 검증 결과
 1. **프로덕션 빌드 무결성**:
-   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 TypeScript / ESLint 컴파일 에러 **0건 (Exit code 0)** 통과.
-2. **시나리오 검증 결과**:
-   - **Case 1 (카카오 길안내 즉시 실행)**: 카카오 토글 상태에서 하단 '안내 시작' 버튼 터치 시, Safari 주소 오류 팝업창 없이 카카오맵의 자동차 길안내 화면으로 즉각 직행함 (PASS).
-   - **Case 2 (티맵/네이버맵 불변성)**: 티맵(`tmap://`) 및 네이버지도(`nmap://`) 안내 시작 기능은 기존과 동일하게 무결하게 작동함 (PASS).
+   - `npm run build`: 전 15개 라우트 TypeScript / ESLint 컴파일 에러 **0건 (Exit code 0)** 통과.
+2. **UI 정합성**:
+   - 인수 및 반납 탭의 외관 데미지 입력란 폰트 크기가 `text-base`로 정돈되어 최적의 가독성 확보.
+
 
