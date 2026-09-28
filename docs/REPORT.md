@@ -3144,6 +3144,33 @@ flowchart TD
    - **Case 1 (AdminPinModal)**: 마스터 PIN 모달 진입 시 'PIN 4자리 입력'으로 단정하게 노출되고, 폰트 크기 `text-base` 적용 확인 (PASS).
    - **Case 2 (표시 이름 추천 칩 제거)**: 장소 등록 폼에서 '표시 이름' 하위의 불필요한 추천 태그들이 노출되지 않고 간결한 폼 유지 확인 (PASS).
 
+---
+
+## 63. AdminPinModal 스크롤 시 뒷 배경 이동/바운스 방지 (Body Scroll Lock & Touch/Wheel 격리)
+
+### 63.1 배경 및 작업 목적
+- 관리자 모드(`AdminPinModal.tsx`) 창이 열려 있는 상태에서 사용자가 모달 카드나 배경 오버레이를 터치 드래그하거나 마우스 휠/트랙패드 스크롤을 시도할 때, 모달 자체에 스크롤 가능한 요소가 없음에도 불구하고 뒷 배경(Cockpit 대시보드 화면)이 위아래로 움직이거나 바운스되는 현상 방지.
+
+### 63.2 모듈별 상세 구현 내역
+
+#### 1. 바디 스크롤 락 및 전역 터치/휠 이벤트 차단 ([`components/AdminPinModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/AdminPinModal.tsx))
+- `isOpen` 활성화 시 `document.body.style.overflow = 'hidden'` 적용 및 언마운트 시 기존 상태 복원.
+- 모달 열림 상태 동안 window 레벨의 `touchmove` 및 `wheel` 이벤트에 `e.preventDefault({ passive: false })`를 부착하여 iOS Safari/모바일 브라우저의 뷰포트 러버밴딩 및 데스크톱 트랙패드 스크롤을 원천 동결.
+
+#### 2. 오버레이 및 모달 컨테이너 CSS 스크롤 격리 ([`components/AdminPinModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/AdminPinModal.tsx))
+- 백드롭 래퍼와 내부 모달 카드에 `overscroll-contain`, `touch-none`, `style={{ overscrollBehavior: 'contain', touchAction: 'none' }}` 및 `onTouchMove={(e) => e.preventDefault()}`, `onWheel={(e) => e.preventDefault()}`을 적용하여 어떤 드래그 제스처에도 배경이 1px도 흔들리지 않도록 격리.
+- 클릭/탭/포커스/키보드 입력 인터랙션은 100% 정상 유지.
+
+---
+
+### 63.3 검증 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 TypeScript / ESLint 컴파일 에러 **0건 (Exit code 0)** 통과.
+2. **시나리오 검증 결과**:
+   - **Case 1 (배경 스크롤 방지)**: 관리자 모달 진입 후 모달 카드나 배경을 상하로 드래그/스크롤해도 뒷 배경 대시보드가 고정된 상태로 완벽히 정지함 (PASS).
+   - **Case 2 (인풋/버튼 인터랙션 유지)**: PIN 입력(클릭, 숫자 입력, 자동 제출) 및 모드 종료 버튼, 닫기 버튼 터치가 부드럽게 정상 작동함 (PASS).
+
+
 
 
 

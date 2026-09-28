@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, ShieldCheck, KeyRound, LogOut } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
@@ -19,6 +19,33 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
 }) => {
   const [pin, setPin] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  // Body Scroll Lock & Background Movement Prevention
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    // Completely prevent background rubberbanding / dragging on touch & wheel
+    const handleTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+    };
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+    };
+
+    window.addEventListener('touchmove', handleTouchMove, { passive: false });
+    window.addEventListener('wheel', handleWheel, { passive: false });
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('wheel', handleWheel);
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -82,7 +109,10 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center pt-[12vh] sm:items-center sm:pt-0 p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-50 flex items-start justify-center pt-[12vh] sm:items-center sm:pt-0 p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in overscroll-contain select-none touch-none"
+      style={{ overscrollBehavior: 'contain', touchAction: 'none' }}
+      onTouchMove={(e) => e.preventDefault()}
+      onWheel={(e) => e.preventDefault()}
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           handleClose();
@@ -90,7 +120,11 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
       }}
     >
       <div
-        className="w-full max-w-xs bg-white border border-slate-200 rounded-3xl shadow-2xl p-5 text-slate-900 space-y-4 transform transition-transform duration-200 ease-out focus-within:-translate-y-8 sm:focus-within:translate-y-0"
+        ref={modalRef}
+        className="w-full max-w-xs bg-white border border-slate-200 rounded-3xl shadow-2xl p-5 text-slate-900 space-y-4 transform transition-transform duration-200 ease-out focus-within:-translate-y-8 sm:focus-within:translate-y-0 overscroll-contain select-text"
+        style={{ overscrollBehavior: 'contain', touchAction: 'none' }}
+        onTouchMove={(e) => e.preventDefault()}
+        onWheel={(e) => e.preventDefault()}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
