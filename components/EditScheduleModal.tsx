@@ -115,7 +115,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
         >
           {/* Field 1: Time Display */}
           <div className="space-y-1.5">
-            <label className="text-base sm:text-lg font-extrabold text-slate-700 flex items-center gap-1.5">
+            <label className="text-base font-extrabold text-slate-700 flex items-center gap-1.5">
               <Clock className="w-4 h-4 text-[#1E60F3]" />
               <span>픽업 시간</span>
             </label>
@@ -124,7 +124,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
               value={timeDisplay}
               onChange={(e) => setTimeDisplay(e.target.value)}
               placeholder="예: 픽업 09:50, 픽업 09:00"
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-lg font-semibold text-slate-900 placeholder:text-base placeholder:text-slate-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-base font-semibold text-slate-900 placeholder:text-base placeholder:text-slate-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 outline-none transition-all"
             />
             <p className="text-sm text-slate-400 font-medium">
               배차표 카드 상단에 노출되는 픽업 시간을 지정합니다.
@@ -133,7 +133,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
 
           {/* Field 2: Passenger */}
           <div className="space-y-1.5">
-            <label className="text-base sm:text-lg font-extrabold text-slate-700 flex items-center gap-1.5">
+            <label className="text-base font-extrabold text-slate-700 flex items-center gap-1.5">
               <User className="w-4 h-4 text-[#1E60F3]" />
               <span>승객명 및 인원</span>
             </label>
@@ -142,13 +142,13 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
               value={passenger}
               onChange={(e) => setPassenger(e.target.value)}
               placeholder="예: DENZEL SOFYAN 외 1명 (TARA SOFYAN)"
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-lg font-semibold text-slate-900 placeholder:text-base placeholder:text-slate-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-base font-semibold text-slate-900 placeholder:text-base placeholder:text-slate-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 outline-none transition-all"
             />
           </div>
 
           {/* Field 3: Flight Number */}
           <div className="space-y-1.5">
-            <label className="text-base sm:text-lg font-extrabold text-slate-700 flex items-center gap-1.5">
+            <label className="text-base font-extrabold text-slate-700 flex items-center gap-1.5">
               <Plane className="w-4 h-4 text-indigo-500" />
               <span>항공편명 (선택)</span>
             </label>
@@ -157,7 +157,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
               value={flight}
               onChange={(e) => setFlight(e.target.value)}
               placeholder="예: SQ 612 또는 SQ 601 (16:45 출국)"
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-lg font-semibold text-slate-900 placeholder:text-base placeholder:text-slate-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 outline-none transition-all uppercase"
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-base font-semibold text-slate-900 placeholder:text-base placeholder:text-slate-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 outline-none transition-all uppercase"
             />
             <p className="text-sm text-slate-400 font-medium">
               항공편명이 입력되면 카드 하단에 항공편 실시간 조회 버튼이 자동 활성화됩니다.
@@ -166,7 +166,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
 
           {/* Field 4: Notes */}
           <div className="space-y-1.5">
-            <label className="text-base sm:text-lg font-extrabold text-slate-700 flex items-center gap-1.5">
+            <label className="text-base font-extrabold text-slate-700 flex items-center gap-1.5">
               <FileText className="w-4 h-4 text-slate-500" />
               <span>의전 메모 / 특이사항</span>
             </label>
@@ -175,7 +175,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="예: CLUB CHALLENGE VIP 영접 • T1 입국장 피켓 대기"
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-lg font-semibold text-slate-900 placeholder:text-base placeholder:text-slate-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 outline-none transition-all resize-none leading-relaxed"
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-base font-semibold text-slate-900 placeholder:text-base placeholder:text-slate-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 outline-none transition-all resize-none leading-relaxed"
             />
           </div>
 
@@ -187,13 +187,13 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
                 haptics.lightTap();
                 onClose();
               }}
-              className="flex-1 py-4 rounded-2xl bg-white border border-slate-200 text-slate-600 font-bold text-base sm:text-lg hover:bg-slate-100 transition-all cursor-pointer"
+              className="flex-1 py-4 rounded-2xl bg-white border border-slate-200 text-slate-600 font-bold text-base hover:bg-slate-100 transition-all cursor-pointer"
             >
               취소
             </button>
             <button
               type="submit"
-              className="flex-[2] py-4 rounded-2xl bg-[#1E60F3] hover:bg-[#1650D6] active:scale-[0.98] text-base sm:text-lg font-black text-white shadow-md shadow-blue-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
+              className="flex-[2] py-4 rounded-2xl bg-[#1E60F3] hover:bg-[#1650D6] active:scale-[0.98] text-base font-black text-white shadow-md shadow-blue-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
               <Check className="w-5 h-5 stroke-[2.5]" />
               <span>수정 완료</span>

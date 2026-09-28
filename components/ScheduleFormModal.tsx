@@ -131,7 +131,7 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed) && parsed.length > 0) return parsed;
         }
-      } catch (e) {}
+      } catch (e) { }
     }
     return DEFAULT_PRESET_LOCATIONS;
   });
@@ -149,7 +149,7 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
             setActivePresets(parsed);
           }
         }
-      } catch (e) {}
+      } catch (e) { }
     }
   }, [presets, vehicleNo, isOpen]);
 
@@ -336,7 +336,7 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
         >
           {/* [태스크 2] 픽업 일자 (단일 네이티브 날짜 터치 박스) */}
           <div className="space-y-2">
-            <label className="text-base sm:text-lg font-extrabold text-slate-700 flex items-center gap-2">
+            <label className="text-base font-extrabold text-slate-700 flex items-center gap-2">
               <Calendar className="w-5 h-5 text-[#1E60F3]" />
               <span>픽업 일자</span>
             </label>
@@ -347,7 +347,7 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
                 : 'border-slate-200 hover:border-[#1E60F3]'
                 }`}
             >
-              <span className="text-lg font-semibold text-slate-900 tracking-tight">
+              <span className="text-base font-semibold text-slate-900 tracking-tight">
                 {formatKoreanDate(pickupDate) || '날짜 선택'}
               </span>
               <Calendar className="w-5 h-5 text-[#1E60F3] group-hover:scale-110 transition-transform shrink-0" />
@@ -369,7 +369,7 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
 
           {/* [태스크 4] 픽업 경로 (출발지 ➔ 도착지) */}
           <div className="space-y-2.5">
-            <label className="text-base sm:text-lg font-extrabold text-slate-700 flex items-center gap-2">
+            <label className="text-base font-extrabold text-slate-700 flex items-center gap-2">
               <Navigation className="w-5 h-5 text-[#1E60F3]" />
               <span>픽업 경로 (출발지 ➔ 도착지)</span>
             </label>
@@ -393,7 +393,7 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
                     <span className="px-2.5 py-1 rounded-lg bg-slate-200 text-slate-700 font-black text-sm shrink-0">
                       출발
                     </span>
-                    <span className="text-lg font-black text-slate-900 truncate">
+                    <span className="text-base font-black text-slate-900 truncate">
                       {origin ? origin.name : '출발지를 선택해 주세요'}
                     </span>
                   </div>
@@ -426,7 +426,7 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
                     <span className="px-2.5 py-1 rounded-lg bg-[#1E60F3] text-white font-black text-sm shrink-0">
                       도착
                     </span>
-                    <span className="text-lg font-black text-slate-900 truncate">
+                    <span className="text-base font-black text-slate-900 truncate">
                       {destination ? destination.name : '도착지를 선택해 주세요'}
                     </span>
                   </div>
@@ -445,13 +445,13 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
 
           {/* 픽업 시간 (단일 네이티브 터치 박스) */}
           <div className="space-y-2">
-            <label className="text-base sm:text-lg font-extrabold text-slate-700 flex items-center gap-2">
+            <label className="text-base font-extrabold text-slate-700 flex items-center gap-2">
               <Clock className="w-5 h-5 text-[#1E60F3]" />
               <span>픽업 시간</span>
             </label>
 
             <div className="relative flex items-center justify-between w-full px-5 py-3 bg-slate-50 border border-slate-200 hover:border-[#1E60F3] rounded-2xl transition-all shadow-xs group cursor-pointer">
-              <span className="text-lg font-semibold text-slate-900 tracking-tight">
+              <span className="text-base font-semibold text-slate-900 tracking-tight">
                 {formatKoreanTime(pickupTime) || '시간 선택'}
               </span>
               <Clock className="w-5 h-5 text-slate-400 group-hover:text-[#1E60F3] transition-colors shrink-0" />
@@ -471,7 +471,7 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
           {/* 승객명 & 항공편명 & 의전 메모 */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="text-base sm:text-lg font-extrabold text-slate-700 flex items-center gap-1.5">
+              <label className="text-base font-extrabold text-slate-700 flex items-center gap-1.5">
                 <User className="w-4 h-4 text-[#1E60F3]" />
                 <span>승객명</span>
               </label>
@@ -480,12 +480,12 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
                 value={passenger}
                 onChange={(e) => setPassenger(e.target.value)}
                 placeholder="예: DENZEL SOFYAN"
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-lg font-semibold text-slate-900 placeholder:text-base placeholder:text-slate-400 outline-none focus:border-[#1E60F3]"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-base font-semibold text-slate-900 placeholder:text-base placeholder:text-slate-400 outline-none focus:border-[#1E60F3]"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-base sm:text-lg font-extrabold text-slate-700 flex items-center gap-1.5">
+              <label className="text-base font-extrabold text-slate-700 flex items-center gap-1.5">
                 <Plane className="w-4 h-4 text-indigo-500" />
                 <span>항공편명 (선택)</span>
               </label>
@@ -494,13 +494,13 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
                 value={flight}
                 onChange={(e) => setFlight(e.target.value.toUpperCase())}
                 placeholder="예: SQ 612"
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-lg font-semibold text-slate-900 placeholder:text-base placeholder:text-slate-400 outline-none focus:border-[#1E60F3] uppercase"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-base font-semibold text-slate-900 placeholder:text-base placeholder:text-slate-400 outline-none focus:border-[#1E60F3] uppercase"
               />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-base sm:text-lg font-extrabold text-slate-700 flex items-center gap-1.5">
+            <label className="text-base font-extrabold text-slate-700 flex items-center gap-1.5">
               <FileText className="w-4 h-4 text-slate-500" />
               <span>의전 메모 / 특이사항</span>
             </label>
@@ -509,7 +509,7 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="예: VIP 전담 의전 영접, 수하물 3개 등 특이사항 입력"
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-lg font-semibold text-slate-900 placeholder:text-base placeholder:text-slate-400 outline-none focus:border-[#1E60F3]"
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-base font-semibold text-slate-900 placeholder:text-base placeholder:text-slate-400 outline-none focus:border-[#1E60F3]"
             />
           </div>
         </div>
@@ -522,14 +522,14 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
               haptics.lightTap();
               onClose();
             }}
-            className="flex-1 py-4 rounded-2xl bg-white border border-slate-200 text-slate-600 font-bold text-base sm:text-lg hover:bg-slate-100 transition-all cursor-pointer"
+            className="flex-1 py-4 rounded-2xl bg-white border border-slate-200 text-slate-600 font-bold text-base hover:bg-slate-100 transition-all cursor-pointer"
           >
             취소
           </button>
           <button
             type="button"
             onClick={handleSubmit}
-            className="flex-[2] py-4 rounded-2xl bg-[#1E60F3] hover:bg-[#1650D6] text-white font-black text-base sm:text-lg shadow-md shadow-blue-500/25 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2"
+            className="flex-[2] py-4 rounded-2xl bg-[#1E60F3] hover:bg-[#1650D6] text-white font-black text-base shadow-md shadow-blue-500/25 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2"
           >
             <Check className="w-5 h-5 stroke-[2.5]" />
             <span>스케줄 등록 완료</span>
