@@ -31,62 +31,7 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
   onOpenPresetModal,
 }) => {
   return (
-    <div className="w-full bg-white border border-slate-100/80 rounded-2xl p-4 shadow-[0_8px_25px_rgba(30,96,243,0.06)] space-y-3 select-none">
-      {/* Top 4 Quick Utility Action Bar (Right-aligned, compact icon chips) */}
-      <div className="flex items-center justify-end gap-2 pb-0.5">
-        <button
-          type="button"
-          onClick={() => {
-            haptics.lightTap();
-            onOpenInspectionModal?.();
-          }}
-          className="p-2 bg-slate-100/90 hover:bg-slate-200 active:scale-95 rounded-xl transition flex items-center justify-center cursor-pointer shadow-2xs group"
-          title="차량 점검 (수령 / 일일 / 반납)"
-          aria-label="차량 점검"
-        >
-          <ClipboardCheck className="w-4 h-4 text-emerald-600 transition-transform group-hover:scale-110" />
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            haptics.lightTap();
-            onOpenFlightModal?.();
-          }}
-          className="p-2 bg-slate-100/90 hover:bg-slate-200 active:scale-95 rounded-xl transition flex items-center justify-center cursor-pointer shadow-2xs group"
-          title="인천공항 실시간 항공편 조회"
-          aria-label="항공편 조회"
-        >
-          <Plane className="w-4 h-4 text-sky-600 transition-transform group-hover:scale-110" />
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            haptics.lightTap();
-            onOpenGasModal?.();
-          }}
-          className="p-2 bg-slate-100/90 hover:bg-slate-200 active:scale-95 rounded-xl transition flex items-center justify-center cursor-pointer shadow-2xs group"
-          title="주변 주유소 실시간 유가 조회"
-          aria-label="주변 주유소"
-        >
-          <Fuel className="w-4 h-4 text-amber-600 transition-transform group-hover:scale-110" />
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            haptics.lightTap();
-            onOpenPresetModal?.();
-          }}
-          className="p-2 bg-slate-100/90 hover:bg-slate-200 active:scale-95 rounded-xl transition flex items-center justify-center cursor-pointer shadow-2xs group"
-          title="거점 관리 및 신규 등록"
-          aria-label="거점 관리"
-        >
-          <MapPinPlus className="w-4 h-4 text-indigo-600 transition-transform group-hover:scale-110" />
-        </button>
-      </div>
-
+    <div className="w-full bg-white border border-slate-100/80 rounded-2xl p-4 shadow-[0_8px_25px_rgba(30,96,243,0.06)] space-y-2.5 select-none">
       {/* Horizontal Cards (Origin ⇄ Destination) */}
       <div className="flex items-center space-x-2.5 w-full">
         {/* Origin Card (Neutral Gray 기준점) */}
@@ -187,15 +132,72 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
         </div>
       </div>
 
-      {/* Guide Caption */}
-      <div className="text-[11px] text-slate-500 px-1 flex items-center justify-between">
-        <div className="flex items-center space-x-1.5">
+      {/* Guide Caption & 4-Utility Monochrome Action Bar */}
+      <div className="flex items-center justify-between py-1 px-0.5 select-none">
+        {/* Left: Guide Caption */}
+        <div className="flex items-center space-x-1.5 min-w-0">
           <div className="w-3.5 h-3.5 rounded-full bg-[#1E60F3] text-white flex items-center justify-center text-[9px] font-black shrink-0 shadow-[0_1px_4px_rgba(30,96,243,0.3)]">
             i
           </div>
-          <span>카드를 탭하면 전용 팝업에서 장소 검색 및 거점 선택이 가능합니다.</span>
+          <span className="text-[11px] text-slate-500 font-medium truncate">
+            카드를 탭해 장소·거점을 선택하세요.
+          </span>
         </div>
-        <span className="text-slate-400 text-[11px]">⇄ 맞교환</span>
+
+        {/* Right: 4 Quick Utility Icon Buttons (Dark Monochrome on White) */}
+        <div className="flex items-center gap-1.5 shrink-0 ml-2">
+          <button
+            type="button"
+            onClick={() => {
+              haptics.lightTap();
+              onOpenInspectionModal?.();
+            }}
+            className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 active:scale-95 shadow-xs transition flex items-center justify-center cursor-pointer"
+            title="차량 점검 (수령 / 일일 / 반납)"
+            aria-label="차량 점검"
+          >
+            <ClipboardCheck className="w-4 h-4 text-slate-700" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              haptics.lightTap();
+              onOpenFlightModal?.();
+            }}
+            className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 active:scale-95 shadow-xs transition flex items-center justify-center cursor-pointer"
+            title="인천공항 실시간 항공편 조회"
+            aria-label="항공편 조회"
+          >
+            <Plane className="w-4 h-4 text-slate-700" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              haptics.lightTap();
+              onOpenGasModal?.();
+            }}
+            className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 active:scale-95 shadow-xs transition flex items-center justify-center cursor-pointer"
+            title="주변 주유소 실시간 유가 조회"
+            aria-label="주변 주유소"
+          >
+            <Fuel className="w-4 h-4 text-slate-700" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              haptics.lightTap();
+              onOpenPresetModal?.();
+            }}
+            className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 active:scale-95 shadow-xs transition flex items-center justify-center cursor-pointer"
+            title="거점 관리 및 신규 등록"
+            aria-label="거점 관리"
+          >
+            <MapPinPlus className="w-4 h-4 text-slate-700" />
+          </button>
+        </div>
       </div>
     </div>
   );

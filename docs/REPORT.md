@@ -1637,14 +1637,16 @@ SELECT * FROM cockpit.presets;
 #### [태스크 1] 가로형 출발·도착 카드 유지 및 상단 4대 퀵 유틸리티 바 배치 ([`components/OriginDestinationSelector.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/OriginDestinationSelector.tsx), [`app/page.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/page.tsx))
 1. **소제목 배제 및 가로형 레이아웃 100% 보존**:
    - 불필요한 섹션 타이틀 텍스트 일체 없이 `출발지 ⇄ 목적지` 좌우 가로형 플렉스 배치를 변함없이 유지.
-2. **상단 4대 퀵 유틸리티 바 이식**:
-   - 우측 상단에 둥근 아이콘 칩(`p-2 bg-slate-100/90 hover:bg-slate-200 active:scale-95 rounded-xl transition`) 4종 배치:
-     - 🚗 차량 점검: `<ClipboardCheck className="w-4 h-4 text-emerald-600" />` (`onOpenInspectionModal`)
-     - ✈️ 항공편 조회: `<Plane className="w-4 h-4 text-sky-600" />` (`onOpenFlightModal`)
-     - ⛽ 주변 주유소: `<Fuel className="w-4 h-4 text-amber-600" />` (`onOpenGasModal`)
-     - 📍 거점 관리: `<MapPinPlus className="w-4 h-4 text-indigo-600" />` (`onOpenPresetModal`)
+2. **하단 안내 라인 우측에 4대 퀵 유틸리티 바 이식 및 '⇄ 맞교환' 삭제**:
+   - 기존 상단 임시 툴바 레이아웃 및 하단 안내 문구 옆의 `'⇄ 맞교환'` 텍스트/아이콘을 완전 삭제.
+   - 안내 문구(`카드를 탭해 장소·거점을 선택하세요.`) 우측에 정갈한 단일 다크 슬레이트 톤의 모노톤 터치 박스(`p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 active:scale-95 shadow-xs transition`) 4종 배치:
+     - 🚗 차량 점검: `<ClipboardCheck className="w-4 h-4 text-slate-700" />` (`onOpenInspectionModal`)
+     - ✈️ 항공편 조회: `<Plane className="w-4 h-4 text-slate-700" />` (`onOpenFlightModal`)
+     - ⛽ 주변 주유소: `<Fuel className="w-4 h-4 text-slate-700" />` (`onOpenGasModal`)
+     - 📍 거점 관리: `<MapPinPlus className="w-4 h-4 text-slate-700" />` (`onOpenPresetModal`)
+   - 임의의 유채색을 전면 배제하고 흰 바탕에 짙은 획(Monochrome)만 보이는 정갈한 코크핏 룩 구현.
 3. **메인 화면 하단 상시 캐러셀 제거**:
-   - `app/page.tsx` 운행 탭 하단의 `PresetButtons` 상시 렌더링 블록을 제거하고, 상위 모달 핸들러를 `OriginDestinationSelector`의 상단 유틸리티 바와 직결.
+   - `app/page.tsx` 운행 탭 하단의 `PresetButtons` 상시 렌더링 블록을 제거하고, 상위 모달 핸들러를 `OriginDestinationSelector`의 하단 유틸리티 바와 직결.
 
 ---
 
