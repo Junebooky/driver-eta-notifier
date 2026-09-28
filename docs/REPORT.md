@@ -2830,13 +2830,67 @@ flowchart TD
    - 3열 카드의 우측 외곽선(스트로크)이 배경에 가려지지 않고 온전히 표시됨 확인.
    - 우측 상단 삭제 버튼(`✕`) 원형 배지가 잘리지 않고 완전한 원형으로 깔끔하게 노출됨 확인.
 
+---
 
+## 55. 공통 거점 표시 이름(SGBAC 등) 서버 UPDATE 영속화 및 전 기사 동기화 롤백 버그 해결
 
+### 55.1 배경 및 문제 정의
+1. **문제 현상**:
+   - 관리자가 공통 거점의 표시 이름을 'SGBAC'로 수정한 직후에는 클라이언트 낙관적 업데이트에 의해 화면에 'SGBAC'로 나타나지만, 1~3초 뒤 서버 비동기 응답이 도착하거나 주기적 재동기화(Refetch) 시 원래 풀네임('서울김포비즈니스항공센터')으로 롤백되는 결함 발생.
+2. **원인 분석**:
+   - **백엔드 UPDATE 엔드포인트 부재**: `app/api/presets/route.ts`에 `PUT` 메서드 핸들러가 구현되어 있지 않았으며, 기존 `POST` 핸들러는 `full_name` 컬럼 매핑 없이 `name`만을 처리함.
+   - **DB 스키마 한계**: Supabase `cockpit.presets` 테이블에 풀네임을 별도 보관하는 `full_name` 컬럼이 없어, 표시 이름을 수정하면 풀네임 정보가 유실되거나 풀네임이 표시 이름을 덮어쓰는 구조적 제약 존재.
+   - **API 매핑 불일치**: `GET /api/presets` 조회 시 `fullName: row.name`으로 매핑되어 표시 이름과 풀네임 간 구분이 명확하지 않았음.
+   - **클라이언트 롤백 레이스 컨디션**: `app/page.tsx`의 `handleUpdatePreset`에서 서버 응답 수신 시 클라이언트가 정제한 표시 이름을 강제 보존하지 않고 서버의 구 데이터나 응답에 의해 덮어씌워짐.
 
+---
 
+### 55.2 모듈별 상세 해결 내역
 
+#### 1. Supabase DB 스키마 보강 및 마이그레이션 (`supabase/migrations/20260928_add_full_name_and_updated_at_to_presets.sql`)
+- `cockpit.presets` 테이블에 `full_name TEXT NULL` 및 `updated_at TIMESTAMPTZ DEFAULT now()` 컬럼 추가.
+- 기존 거점들의 `full_name`을 현재 `name`으로 초기화(`UPDATE cockpit.presets SET full_name = name WHERE full_name IS NULL;`).
+- 호환성 뷰 `cockpit.cockpit_presets`를 갱신하여 `full_name` 컬럼이 뷰에도 즉시 노출되도록 반영.
 
+#### 2. 백엔드 API 매핑 및 UPDATE 엔진 구축 ([`app/api/presets/route.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/api/presets/route.ts))
+- **`GET` 핸들러 매핑 정합성 검증**:
+  - `name: row.name || row.display_name || row.full_name` (표시 이름)
+  - `shortName: row.name || row.short_name || row.display_name || row.full_name`
+  - `fullName: row.full_name || row.name` (풀네임)
+  - 표시 이름과 풀네임을 엄격히 분리하여 반환.
+- **`PUT` 핸들러 신설**:
+  - 거점 수정 요청(`body: { id, name, shortName, fullName, ... }`) 수신 시 `displayName`('SGBAC')과 `fullPlaceName`('서울김포비즈니스항공센터')을 분리하여 `cockpit.presets` 테이블에 `UPDATE`.
+  - 관리자/공통 거점인 경우 `vehicle_no: null`을 유지하고, 성공 시 업데이트된 `LocationPreset` 객체를 200 OK로 반환.
+  - Supabase UPDATE 예외 발생 시에도 클라이언트 동작이 중단되지 않도록 안전한 Fallback 응답 구조 수립.
+- **`POST` 핸들러 보강**:
+  - 신규 거점 등록 시에도 `name: displayName`, `full_name: fullPlaceName`을 명확히 구분하여 DB에 영속화.
 
+#### 3. 메인 페이지 낙관적 업데이트 및 롤백 방지 가드 ([`app/page.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/page.tsx))
+- **`handleUpdatePreset`**:
+  - 1단계: 로컬 `presets` 상태 및 `localStorage`(`cockpit_presets_${vehicleNo}`)에 즉시 낙관적 반영.
+  - 2단계: 백엔드로 `PUT /api/presets` 비동기 요청 전송.
+  - 3단계: 서버 응답 도착 시 `name: finalizedPreset.name`('SGBAC')을 강제 보존하여 비동기 응답에 의한 구 데이터 오염 및 롤백을 원천 차단.
+- **`fetchPresetsForVehicle`**:
+  - 서버에서 거점 목록을 조회하여 로컬과 병합할 때, 로컬에 저장된 최신 표시 이름을 보호하는 방어적 병합 로직 구축.
 
+#### 4. 거점 등록/수정 모달 페이로드 무결성 ([`components/CustomPresetModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/CustomPresetModal.tsx))
+- 수정 모드 진입 시(`handleStartEdit`, `presetToEdit` effect) "거점 이름" 인풋에 `preset.fullName || preset.name`, "표시 이름" 인풋에 `preset.shortName || preset.name`을 정확히 프리필.
+- 수정 제출(`handleSubmit`) 시:
+  - `displayName = (shortName.trim() || name.trim())` ➔ `name` 및 `shortName`에 할당 ('SGBAC').
+  - `placeName = (name.trim() || editingItem.fullName || editingItem.name)` ➔ `fullName`에 할당 ('서울김포비즈니스항공센터').
+  - 수정 직후 메인 화면과 모달 내 캐러셀에 'SGBAC'가 흔들림 없이 유지되도록 조치.
+- `LocationSearchModal.tsx`에서도 거점 버튼에 `{p.shortName || p.name}`을 노출하고 툴팁에 `{p.fullName || p.name}`을 제공하여 일관된 UX 제공.
 
+---
 
+### 55.3 검증 결과
+1. **단위 및 통합 테스트 (`scratch/test_preset_persistence.ts`, `scratch/test_api_presets_route.ts`)**:
+   - Supabase `cockpit.presets` 테이블에 `name = 'SGBAC'`, `full_name = '서울김포비즈니스항공센터'`가 정상 UPDATE됨을 확인 (PASS).
+   - `GET /api/presets` 호출 시 `name: 'SGBAC'`, `shortName: 'SGBAC'`, `fullName: '서울김포비즈니스항공센터'`가 완벽히 매핑되어 반환됨 확인 (PASS).
+   - `PUT /api/presets` 핸들러 파이프라인 무결성 확인 (PASS).
+2. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 컴파일 및 정적 페이지 생성 에러 **0건 (Exit code 0)** 통과.
+3. **시나리오 검증 결과**:
+   - **Case 1 (표시 이름 영속화)**: '서울김포비즈니스항공센터' 거점을 'SGBAC'로 수정 시, 비동기 응답 도착 후에도 원래 이름으로 롤백되지 않고 'SGBAC'가 유지됨 (PASS).
+   - **Case 2 (새로고침 후 보존)**: 브라우저 새로고침(F5) 후에도 1페이지 슬롯에 'SGBAC'가 정상 노출됨 (PASS).
+   - **Case 3 (전 기사 동기화)**: 타 기사 브라우저 세션/시크릿 창에서 접속 시 관리자가 수정한 공통 거점의 이름이 'SGBAC'로 정확히 동기화되어 나타남 (PASS).

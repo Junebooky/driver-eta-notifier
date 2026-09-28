@@ -37,9 +37,9 @@ export async function GET(req: NextRequest) {
 
     const presets: LocationPreset[] = sorted.map((row: any) => ({
       id: row.id,
-      name: row.name,
-      shortName: row.short_name || row.name,
-      fullName: row.name,
+      name: row.name || row.display_name || row.full_name,
+      shortName: row.name || row.short_name || row.display_name || row.full_name,
+      fullName: row.full_name || row.name,
       lat: parseFloat(row.lat),
       lng: parseFloat(row.lng),
       category: (row.category ? row.category.toUpperCase() : 'CUSTOM') as any,
@@ -49,6 +49,7 @@ export async function GET(req: NextRequest) {
       type: (row.vehicle_no ? 'personal' : 'common') as 'common' | 'personal',
       vehicle_no: row.vehicle_no || null,
       vehicleNo: row.vehicle_no || null,
+      order: row.order_index ?? 0,
     }));
 
     return NextResponse.json({ presets, fallback: false });
@@ -58,12 +59,110 @@ export async function GET(req: NextRequest) {
   }
 }
 
+export async function PUT(req: Request) {
+  try {
+    const body = await req.json();
+    const { id, name, shortName, fullName, address, lat, lng, type, isCommon, isGlobal, vehicle_no, vehicleNo, order, order_index, category } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: 'Missing preset id' }, { status: 400 });
+    }
+
+    const isPresetCommon = Boolean(isCommon || type === 'common' || isGlobal || (!vehicle_no && !vehicleNo));
+    const targetVehicle = isPresetCommon ? null : (vehicle_no || vehicleNo);
+    const cleanVehicleNo = targetVehicle ? (targetVehicle.match(/(\d+호차)/)?.[1] || targetVehicle.trim()) : null;
+
+    // Display Name ('SGBAC') vs Full Name ('서울김포비즈니스항공센터')
+    const displayName = (name || shortName || fullName || '').trim();
+    const fullPlaceName = (fullName || name || displayName).trim();
+
+    // DB 업데이트 페이로드 구성 (name 표시이름 보존, full_name 풀네임 보존)
+    const updatePayload: Record<string, any> = {
+      name: displayName,
+      full_name: fullPlaceName,
+      address: address || '',
+      lat: Number(lat),
+      lng: Number(lng),
+      vehicle_no: isPresetCommon ? null : cleanVehicleNo,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (category) {
+      updatePayload.category = category.toLowerCase();
+    }
+    if (typeof order === 'number') {
+      updatePayload.order_index = order;
+    } else if (typeof order_index === 'number') {
+      updatePayload.order_index = order_index;
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('presets')
+      .update(updatePayload)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Failed to update preset in DB:', error);
+      // DB 업데이트 실패 시에도 프론트엔드가 중단되지 않도록 적절한 응답 반환
+      return NextResponse.json({
+        ...body,
+        ...updatePayload,
+        preset: {
+          ...body,
+          ...updatePayload,
+          shortName: displayName,
+          fullName: fullPlaceName,
+          type: isPresetCommon ? 'common' : 'personal',
+          isCommon: isPresetCommon,
+          isGlobal: isPresetCommon,
+          vehicle_no: isPresetCommon ? null : cleanVehicleNo,
+          vehicleNo: isPresetCommon ? null : cleanVehicleNo,
+        },
+      }, { status: 200 });
+    }
+
+    const savedPreset: LocationPreset = {
+      id: data.id,
+      name: data.name || displayName,
+      shortName: data.name || displayName,
+      fullName: data.full_name || fullPlaceName,
+      address: data.address,
+      lat: parseFloat(data.lat),
+      lng: parseFloat(data.lng),
+      category: (data.category ? data.category.toUpperCase() : 'CUSTOM') as any,
+      isGlobal: isPresetCommon,
+      isCommon: isPresetCommon,
+      type: isPresetCommon ? 'common' : 'personal',
+      vehicle_no: data.vehicle_no || null,
+      vehicleNo: data.vehicle_no || null,
+      order: data.order_index ?? 0,
+    };
+
+    return NextResponse.json({
+      ...data,
+      preset: savedPreset,
+      name: savedPreset.name,
+      shortName: savedPreset.shortName,
+      fullName: savedPreset.fullName,
+      full_name: savedPreset.fullName,
+    }, { status: 200 });
+  } catch (err: any) {
+    console.error('PUT /api/presets error:', err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { id, name, shortName, address, lat, lng, category, order_index = 0, vehicle_no, vehicleNo } = body;
+    const { id, name, shortName, fullName, address, lat, lng, category, order, order_index = 0, vehicle_no, vehicleNo } = body;
 
-    if (!name || lat === undefined || lng === undefined) {
+    const displayName = (name || shortName || fullName || '').trim();
+    const fullPlaceName = (fullName || name || displayName).trim();
+
+    if (!displayName || lat === undefined || lng === undefined) {
       return NextResponse.json({ error: 'Missing required preset fields' }, { status: 400 });
     }
 
@@ -72,13 +171,15 @@ export async function POST(req: NextRequest) {
     const cleanVehicleNo = targetVehicle ? (targetVehicle.match(/(\d+호차)/)?.[1] || targetVehicle.trim()) : null;
 
     const payload: any = {
-      name,
+      name: displayName,
+      full_name: fullPlaceName,
       address: address || '',
       lat: Number(lat),
       lng: Number(lng),
       category: (category || 'custom').toLowerCase(),
-      order_index,
+      order_index: typeof order === 'number' ? order : order_index,
       vehicle_no: cleanVehicleNo, // Strict Rule: Bind vehicle_no to avoid polluting common master presets
+      updated_at: new Date().toISOString(),
     };
 
     const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -99,7 +200,7 @@ export async function POST(req: NextRequest) {
       resultData = data;
     } else {
       // Check if preset with same name exists for this vehicle
-      let checkQuery = supabaseAdmin.from('presets').select('id').eq('name', name);
+      let checkQuery = supabaseAdmin.from('presets').select('id').eq('name', displayName);
       if (cleanVehicleNo) {
         checkQuery = checkQuery.eq('vehicle_no', cleanVehicleNo);
       } else {
@@ -130,8 +231,9 @@ export async function POST(req: NextRequest) {
 
     const savedPreset: LocationPreset = {
       id: resultData.id,
-      name: resultData.name,
-      shortName: resultData.name,
+      name: resultData.name || displayName,
+      shortName: resultData.name || displayName,
+      fullName: resultData.full_name || fullPlaceName,
       address: resultData.address,
       lat: parseFloat(resultData.lat),
       lng: parseFloat(resultData.lng),
@@ -141,9 +243,17 @@ export async function POST(req: NextRequest) {
       type: resultData.vehicle_no ? 'personal' : 'common',
       vehicle_no: resultData.vehicle_no || null,
       vehicleNo: resultData.vehicle_no || null,
+      order: resultData.order_index ?? 0,
     };
 
-    return NextResponse.json({ preset: savedPreset });
+    return NextResponse.json({
+      preset: savedPreset,
+      ...resultData,
+      name: savedPreset.name,
+      shortName: savedPreset.shortName,
+      fullName: savedPreset.fullName,
+      full_name: savedPreset.fullName,
+    });
   } catch (err: any) {
     console.error('Error creating preset in Supabase:', err);
     return NextResponse.json({ error: err?.message, fallback: true }, { status: 500 });

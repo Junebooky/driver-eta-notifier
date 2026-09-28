@@ -203,9 +203,9 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
       } else if (presetToEdit) {
         setIsHomeEditMode(false);
         setEditingItem(presetToEdit);
-        setName(presetToEdit.name);
-        setShortName(presetToEdit.shortName);
-        const abbrev = generateSmartDisplayName(presetToEdit.name);
+        setName(presetToEdit.fullName || presetToEdit.name);
+        setShortName(presetToEdit.shortName || presetToEdit.name);
+        const abbrev = generateSmartDisplayName(presetToEdit.fullName || presetToEdit.name);
         setRecommendations(abbrev.candidates);
         setAddress(presetToEdit.address || '');
         setLat(presetToEdit.lat);
@@ -725,9 +725,9 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
     haptics.lightTap();
     isPlaceSelectedRef.current = true;
     setEditingItem(preset);
-    setName(preset.name);
-    setShortName(preset.shortName);
-    const abbrev = generateSmartDisplayName(preset.name);
+    setName(preset.fullName || preset.name);
+    setShortName(preset.shortName || preset.name);
+    const abbrev = generateSmartDisplayName(preset.fullName || preset.name);
     setRecommendations(abbrev.candidates);
     setAddress(preset.address || '');
     setLat(preset.lat);
@@ -795,12 +795,15 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
           : Boolean(editingItem.isCommon || editingItem.type === 'common' || editingItem.isGlobal || (!editingItem.vehicle_no && !editingItem.vehicleNo));
         const cleanVehicle = isCommonPreset ? null : (editingItem.vehicle_no || vehicleNo || null);
 
+        const displayName = (shortName.trim() || name.trim());
+        const placeName = (name.trim() || editingItem.fullName || editingItem.name || displayName);
+
         const updatedPreset: LocationPreset = {
           ...editingItem,
-          name: name.trim(),
-          shortName: shortName.trim(),
-          fullName: name.trim(),
-          address: address.trim() || '사용자 지정 거점',
+          name: displayName,
+          shortName: displayName,
+          fullName: placeName,
+          address: address.trim() || editingItem.address || '사용자 지정 거점',
           lat,
           lng,
           type: isCommonPreset ? 'common' : 'personal',
@@ -819,12 +822,14 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
         // 3. New Preset
         const isCommonPreset = Boolean(effectiveIsAdmin);
         const cleanVehicle = isCommonPreset ? null : (vehicleNo || null);
+        const displayName = (shortName.trim() || name.trim());
+        const placeName = (name.trim() || displayName);
 
         const newPreset: LocationPreset = {
           id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `preset_${Date.now()}`,
-          name: name.trim(),
-          shortName: shortName.trim(),
-          fullName: name.trim(),
+          name: displayName,
+          shortName: displayName,
+          fullName: placeName,
           lat,
           lng,
           category: isCommonPreset ? 'HOTEL' : 'CUSTOM',
@@ -1402,7 +1407,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                                 transition: isBeingDragged ? 'none' : 'transform 300ms cubic-bezier(0.2, 0, 0, 1), box-shadow 200ms ease',
                                 touchAction: isBeingDragged ? 'none' : 'manipulation',
                               }}
-                              title={`${preset.name} (길게 눌러 드래그 / 탭하여 수정)`}
+                              title={`${preset.fullName || preset.name} (길게 눌러 드래그 / 탭하여 수정)`}
                             >
                               {/* Delete Button (Personal MY or Admin mode) */}
                               {(!isHQ || effectiveIsAdmin) && (
@@ -1422,7 +1427,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
 
                               {/* Preset ShortName */}
                               <span className="text-sm font-bold tracking-tight text-slate-800 group-hover:text-[#1E60F3] truncate w-full transition-colors">
-                                {preset.shortName}
+                                {preset.shortName || preset.name}
                               </span>
 
                               {/* Badge: 공통 vs 개인 */}
@@ -1490,7 +1495,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
             }}
           >
             <span className="text-sm font-bold text-slate-900 tracking-tight whitespace-nowrap">
-              {draggedPreset.shortName}
+              {draggedPreset.shortName || draggedPreset.name}
             </span>
           </div>
         )}

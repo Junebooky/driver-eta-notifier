@@ -150,9 +150,27 @@ export default function Home() {
       if (res.ok) {
         const data = await res.json();
         if (data.presets && Array.isArray(data.presets)) {
-          const deduped = applyOrder(deduplicatePresets(data.presets));
-          setPresets(deduped);
-          localStorage.setItem(storageKey, JSON.stringify(deduped));
+          setPresets((prev) => {
+            const serverPresets: LocationPreset[] = data.presets;
+            const merged = serverPresets.map((sp) => {
+              const localMatch = prev.find((lp) => lp.id === sp.id);
+              if (localMatch) {
+                return {
+                  ...localMatch,
+                  ...sp,
+                  name: sp.name || localMatch.name,
+                  shortName: sp.shortName || sp.name || localMatch.shortName,
+                  fullName: sp.fullName || localMatch.fullName || sp.name,
+                };
+              }
+              return sp;
+            });
+            const deduped = applyOrder(deduplicatePresets(merged));
+            try {
+              localStorage.setItem(storageKey, JSON.stringify(deduped));
+            } catch (e) {}
+            return deduped;
+          });
         }
       }
     } catch (err) {
@@ -377,6 +395,9 @@ export default function Home() {
 
     const finalizedPreset: LocationPreset = {
       ...updatedPreset,
+      name: updatedPreset.name.trim(),
+      shortName: (updatedPreset.shortName || updatedPreset.name).trim(),
+      fullName: (updatedPreset.fullName || updatedPreset.name).trim(),
       type: isPresetCommon ? 'common' : 'personal',
       isCommon: isPresetCommon,
       isGlobal: isPresetCommon,
@@ -384,8 +405,13 @@ export default function Home() {
       vehicleNo: cleanVehicle || undefined,
     };
 
-    const updated = presets.map((p) => (p.id === finalizedPreset.id ? finalizedPreset : p));
-    savePresetsToStorage(updated);
+    // 1) 낙관적 로컬 상태 및 localStorage 즉시 반영
+    setPresets((prev) => {
+      const next = prev.map((p) => (p.id === finalizedPreset.id ? finalizedPreset : p));
+      savePresetsToStorage(next);
+      return next;
+    });
+
     if (destination.id === finalizedPreset.id) {
       setDestination(finalizedPreset);
     }
@@ -393,18 +419,40 @@ export default function Home() {
       setOrigin(finalizedPreset);
     }
 
-    // Supabase Sync with vehicle_no (Strict Rule: common presets have vehicle_no: null)
+    // 2) 서버 비동기 UPDATE (PUT /api/presets) 전송
     try {
-      await fetch('/api/presets', {
-        method: 'POST',
+      const res = await fetch('/api/presets', {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...finalizedPreset,
           vehicle_no: isPresetCommon ? null : currentVehicleNo,
         }),
       });
-    } catch (e) {
-      console.warn('Failed to sync updated preset to Supabase:', e);
+
+      if (res.ok) {
+        const serverData = await res.json();
+        const resPreset = serverData.preset || serverData;
+        // 서버 응답 수신 시, 클라이언트에서 수정한 표시 이름 강제 보존하여 롤백 방지
+        setPresets((prev) => {
+          const synced = prev.map((p) => {
+            if (p.id === finalizedPreset.id) {
+              return {
+                ...p,
+                ...resPreset,
+                name: finalizedPreset.name, // 클라이언트에서 수정한 표시 이름 ('SGBAC') 강제 보존!
+                shortName: finalizedPreset.shortName || finalizedPreset.name,
+                fullName: finalizedPreset.fullName || resPreset.full_name || resPreset.fullName || p.fullName,
+              };
+            }
+            return p;
+          });
+          savePresetsToStorage(synced);
+          return synced;
+        });
+      }
+    } catch (error) {
+      console.error('Failed to sync updated preset to server:', error);
     }
   };
 

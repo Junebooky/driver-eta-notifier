@@ -345,7 +345,7 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
     const data: SelectedLocationData = {
       id: preset.id,
       name: preset.name,
-      shortName: preset.shortName,
+      shortName: preset.shortName || preset.name,
       address: preset.address || preset.name,
       lat: preset.lat,
       lng: preset.lng,
@@ -731,10 +731,10 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                               ? 'border-2 border-[#1E60F3] bg-blue-50/40 text-[#1E60F3] font-bold shadow-xs'
                               : 'bg-white border-slate-200 hover:border-[#1E60F3]/60 hover:bg-blue-50/30'
                               }`}
-                            title={`${p.name} (${p.address || p.name})`}
+                            title={`${p.fullName || p.name} (${p.address || p.name})`}
                           >
                             <span className="text-sm font-bold tracking-tight text-slate-800 group-hover:text-[#1E60F3] truncate w-full transition-colors">
-                              {p.shortName}
+                              {p.shortName || p.name}
                             </span>
 
                             <span
