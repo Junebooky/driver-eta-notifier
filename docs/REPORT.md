@@ -3071,6 +3071,44 @@ flowchart TD
    - **Case 2 (추천 검색어 목록)**: '미금역' 등 검색 시 각 행 우측에 '거리뷰' 텍스트 박스 없이 오직 깔끔한 `Eye` SVG 아이콘만 정렬됨 (PASS).
    - **Case 3 (터치 동작 유지)**: 목적지 카드 및 추천 검색어 항목 탭 시 `openRoadview`가 즉시 호출되어 카카오 거리뷰로 즉시 연결됨 (PASS).
 
+---
+
+## 61. 즐겨찾기, 로드뷰, 장소검색 모달 내 '공통'/'개인' 라벨 박스 제거 및 순수 텍스트 전환
+
+### 61.1 배경 및 작업 목적
+1. **거점 슬롯 라벨 박스 시각적 답답함 해소**:
+   - `RoadviewModal.tsx`, `CustomPresetModal.tsx`, `LocationSearchModal.tsx` 내 거점 슬롯 하단에 표시되던 '공통', '개인' 라벨에 씌워져 있던 회색/하늘색 배경 박스(`bg-slate-100`, `bg-blue-50`, `rounded`, `px-1.5`, `py-0.2`)가 좁은 모바일 화면 슬롯에서 시각적 답답함을 유발.
+   - 배경 박스, 패딩, 테두리 반경을 전면 제거하여 단정한 순수 텍스트(`span`)로 간소화.
+2. **폰트 규격 및 시인성/색상 가독성 온전한 보존**:
+   - 기존의 폰트 크기(`text-[10px] font-bold`) 및 식별 색상(공통: `text-slate-600`, 개인: `text-[#1E60F3]`)을 엄격히 유지하고, `leading-none mt-0.5`를 적용하여 카드 내 텍스트 정렬을 최적화.
+3. **전역 일관성 및 Zero-DB 원칙 준수**:
+   - 즐겨찾기, 로드뷰, 장소검색 등 앱 전역의 거점 슬롯 라벨 스타일을 100% 동기화하고, 기존 프리셋 식별 로직(`isHQ`)을 무결하게 유지.
+
+---
+
+### 61.2 모듈별 상세 구현 내역
+
+#### 1. 로드뷰 모달 거점 슬롯 라벨 박스 제거 ([`components/RoadviewModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/RoadviewModal.tsx))
+- `bg-slate-100`, `bg-blue-50`, `px-1.5`, `py-0.2`, `rounded` 스타일 제거.
+- `text-[10px] font-bold mt-0.5 leading-none` 기반 순수 텍스트로 전환.
+
+#### 2. 즐겨찾기 관리 모달 거점 슬롯 라벨 박스 제거 ([`components/CustomPresetModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/CustomPresetModal.tsx))
+- 거점 캐러셀 그리드 내 '공통'/'개인' 배지 컨테이너의 배경 박스 및 패딩을 제거하고 플랫 텍스트로 전환.
+
+#### 3. 장소검색 모달 거점 슬롯 라벨 박스 제거 ([`components/LocationSearchModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/LocationSearchModal.tsx))
+- 출발지/목적지 탐색 4x3(12슬롯) 그리드 내 '공통'/'개인' 배지의 배경 박스를 제거하여 동일한 시각적 위계 확립.
+
+---
+
+### 61.3 검증 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 TypeScript / ESLint 컴파일 에러 **0건 (Exit code 0)** 통과.
+2. **시나리오 검증 결과**:
+   - **Case 1 (로드뷰 모달)**: `[로드뷰]` 모달 내 하단 12슬롯 거점 그리드 각 슬롯의 '공통', '개인' 라벨에 회색/하늘색 배경 박스가 완전히 사라지고 깔끔한 텍스트만 표시됨 (PASS).
+   - **Case 2 (즐겨찾기 모달)**: `[즐겨찾기]` 모달 내 거점 리스트의 라벨에 배경 박스 없이 단정한 텍스트로 노출됨 (PASS).
+   - **Case 3 (시인성 및 가독성 유지)**: 폰트 크기 및 색상(공통: slate-600, 개인: blue)이 왜곡되지 않고 카드 레이아웃과 조화롭게 유지됨 (PASS).
+
+
 
 
 

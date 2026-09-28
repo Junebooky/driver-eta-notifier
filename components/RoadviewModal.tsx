@@ -348,7 +348,7 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
               <button
                 type="button"
                 onClick={() => openRoadview(currentDestination.lat!, currentDestination.lng!)}
-                className="w-full p-3.5 rounded-2xl bg-white border border-[#1E60F3] hover:bg-blue-100/50 hover:border-[#1E60F3] transition-all text-left flex items-center justify-between group active:scale-[0.99] cursor-pointer shadow-xs"
+                className="w-full p-3.5 rounded-2xl bg-white border-2 border-[#1E60F3] hover:bg-blue-100/50 hover:border-[#1E60F3] transition-all text-left flex items-center justify-between group active:scale-[0.99] cursor-pointer shadow-xs"
               >
                 <div className="min-w-0 pr-2">
                   <div className="flex items-center gap-1.5">
@@ -468,7 +468,7 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
                             </span>
 
                             <span
-                              className={`text-[10px] font-bold px-1.5 py-0.2 rounded mt-0.5 ${isHQ ? 'bg-slate-100 text-slate-600' : 'bg-blue-50 text-[#1E60F3]'
+                              className={`text-[10px] font-bold mt-0.5 leading-none ${isHQ ? 'text-slate-600' : 'text-[#1E60F3]'
                                 }`}
                             >
                               {isHQ ? '공통' : '개인'}

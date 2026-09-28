@@ -1432,9 +1432,9 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
 
                               {/* Badge: 공통 vs 개인 */}
                               <span
-                                className={`text-[10px] font-bold px-1.5 py-0.2 rounded mt-0.5 ${isHQ
-                                  ? 'bg-slate-100 text-slate-600'
-                                  : 'bg-blue-50 text-[#1E60F3]'
+                                className={`text-[10px] font-bold mt-0.5 leading-none ${isHQ
+                                  ? 'text-slate-600'
+                                  : 'text-[#1E60F3]'
                                   }`}
                               >
                                 {isHQ ? '공통' : '개인'}
