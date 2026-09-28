@@ -778,7 +778,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="장소명 또는 주소를 검색하세요 (예: 인천공항, 코엑스)"
-                    className="w-full pl-11 pr-10 py-2.5 sm:py-3 bg-white border border-slate-200 rounded-xl text-slate-800 text-sm font-medium placeholder:text-base placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] transition-colors"
+                    className="w-full pl-11 pr-10 py-2.5 sm:py-3 bg-white border border-slate-200 rounded-xl text-slate-800 text-sm font-medium placeholder:text-sm placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] transition-colors"
                   />
                   <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-3 sm:top-3.5" />
                   {isSearching && (
@@ -848,7 +848,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                       onChange={(e) => setShortName(e.target.value)}
                       placeholder="예: 소노펠리체"
                       maxLength={12}
-                      className="w-full px-3.5 py-3 bg-white border border-slate-200 rounded-xl text-base font-medium text-slate-900 placeholder:text-base placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3]"
+                      className="w-full px-3.5 py-3 bg-white border border-slate-200 rounded-xl text-base font-medium text-slate-900 placeholder:text-sm placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3]"
                     />
                   </div>
                 </div>

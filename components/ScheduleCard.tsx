@@ -53,7 +53,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
       {/* Top Header: Date and Unified Pickup Time Badge + Edit Button */}
       <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
         <div className="flex items-center min-w-0">
-          <span className="text-xs font-bold text-slate-900 tracking-tight truncate">
+          <span className="text-base font-bold text-slate-900 tracking-tight truncate">
             {item.dateLabel}
           </span>
         </div>
@@ -96,7 +96,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
             출발
           </span>
           <span
-            className="text-base font-bold text-slate-900 tracking-tight min-w-0 max-w-[55%] truncate"
+            className="text-sm font-bold text-slate-900 tracking-tight min-w-0 max-w-[55%] truncate"
             title={item.origin_name}
           >
             {sanitizePlaceName(item.origin_name)}
@@ -119,7 +119,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
             도착
           </span>
           <span
-            className="text-base font-bold text-slate-900 tracking-tight min-w-0 max-w-[55%] truncate"
+            className="text-sm font-bold text-slate-900 tracking-tight min-w-0 max-w-[55%] truncate"
             title={item.destination_name}
           >
             {sanitizePlaceName(item.destination_name)}

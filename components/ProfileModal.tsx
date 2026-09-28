@@ -2,11 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { DriverProfile, NaviProvider } from '@/types';
-import { X, User, Car, Users, Navigation, Check, Phone, Fuel } from 'lucide-react';
+import { X, User, Car, Users, Navigation, Check, Phone } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 import { ENABLE_DEV_FLEET_SWITCHER, FLEET_PRESET_DRIVERS, FleetPresetDriver, getPresetPassengerName } from '@/utils/constants';
 import { getStoredVehicleProfile, setStoredVehicleProfile } from '@/hooks/useDriverProfile';
-import { resolveFuelTypeFromModel, FuelType } from '@/utils/fuelCalculation';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -94,10 +93,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [phone3, setPhone3] = useState(isInitialEmpty ? '' : (profile.phonePart3 || parsedPhone.p3));
   const [driverName, setDriverName] = useState(isInitialEmpty ? '' : (profile.driverName || ''));
   const [passengerName, setPassengerName] = useState(isInitialEmpty ? '' : (profile.passengerName || ''));
-  const [carModel, setCarModel] = useState(isInitialEmpty ? '' : (profile.carModel || ''));
-  const initialResolvedFuel = resolveFuelTypeFromModel(profile.carModel || profile.vehicleNo);
-  const [fuelType, setFuelType] = useState<FuelType>(profile.fuelType || initialResolvedFuel.fuelType);
-  const [fuelReason, setFuelReason] = useState<string>(initialResolvedFuel.reason);
   const [defaultNavi, setDefaultNavi] = useState<NaviProvider>(profile.defaultNavi || 'tmap');
   const [selectedPresetVehicle, setSelectedPresetVehicle] = useState<string | null>(null);
   const [nameError, setNameError] = useState(false);
@@ -249,9 +244,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
         setDriverName('');
         setPassengerName('');
         setDefaultNavi('tmap');
-        setCarModel('');
-        setFuelType('gasoline');
-        setFuelReason('차종 미입력 (보수적 안전마진: 휘발유 기본)');
       } else {
         const initial = parseVehicleDetails(profile.vehicleNo);
         const initPhone = parsePhoneDetails(profile.phone || profile.mobile);
@@ -274,11 +266,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
         setDriverName(stored?.driverName || profile.driverName || '');
         setPassengerName(initialPassenger);
         setDefaultNavi(stored?.defaultNavi || profile.defaultNavi || 'tmap');
-        const resolvedModel = stored?.carModel || profile.carModel || '';
-        setCarModel(resolvedModel);
-        const res = resolveFuelTypeFromModel(resolvedModel || cleanVehicleKey);
-        setFuelType(stored?.fuelType || profile.fuelType || res.fuelType);
-        setFuelReason(res.reason);
       }
 
       // Body Scroll Lock: Prevent background page scrolling & rubber-banding
@@ -330,12 +317,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
         if (stored.driverName && !driverName) setDriverName(stored.driverName);
         if (stored.carNumberFront) setPlateFront(stored.carNumberFront);
         if (stored.carNumberBack) setPlateBack(stored.carNumberBack);
-        if (stored.carModel) {
-          setCarModel(stored.carModel);
-          const res = resolveFuelTypeFromModel(stored.carModel);
-          setFuelType(stored.fuelType || res.fuelType);
-          setFuelReason(res.reason);
-        }
         if (stored.defaultNavi) setDefaultNavi(stored.defaultNavi);
         if (stored.phone) {
           const pObj = parsePhoneDetails(stored.phone);
@@ -346,25 +327,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       } else {
         const presetPass = getPresetPassengerName(cleanV);
         if (presetPass) setPassengerName(presetPass);
-        const res = resolveFuelTypeFromModel(cleanV);
-        setFuelReason(res.reason);
       }
     }
-  };
-
-  const handleCarModelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSelectedPresetVehicle(null);
-    const val = e.target.value;
-    setCarModel(val);
-    const res = resolveFuelTypeFromModel(val);
-    setFuelType(res.fuelType);
-    setFuelReason(res.reason);
-  };
-
-  const handleSelectFuelType = (type: FuelType) => {
-    haptics.lightTap();
-    setFuelType(type);
-    setFuelReason(type === 'gasoline' ? '직접 선택: 휘발유' : '직접 선택: 경유');
   };
 
   const handlePlateFrontChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -504,8 +468,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       phone: combinedPhone,
       passengerName: passengerName.trim(),
       defaultNavi: defaultNavi || 'tmap',
-      carModel: carModel.trim() || undefined,
-      fuelType,
     });
 
     const payload: Partial<DriverProfile> = {
@@ -521,8 +483,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       phonePart3: phone3.trim(),
       passengerName: passengerName.trim(),
       defaultNavi: defaultNavi || 'tmap',
-      carModel: carModel.trim() || undefined,
-      fuelType,
     };
 
     // 2. Trigger modal exit animation FIRST (60fps scale-down & fade-out without Jank)
@@ -620,12 +580,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                         setPhone2(pObj.p2);
                         setPhone3(pObj.p3);
                         setDefaultNavi(storedProfile?.defaultNavi || d.defaultNavi);
-                        if (storedProfile?.carModel) {
-                          setCarModel(storedProfile.carModel);
-                          const res = resolveFuelTypeFromModel(storedProfile.carModel);
-                          setFuelType(storedProfile.fuelType || res.fuelType);
-                          setFuelReason(res.reason);
-                        }
 
                         // Auto-inject vehicle-isolated passenger name from cockpit_driver_profile_${vehicleNo}
                         const targetPassenger =
@@ -727,53 +681,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             </div>
           </div>
 
-          {/* 3. Car Model & Fuel Fallback Pipeline (차종/유종 매핑 & 간편 칩) */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-sm font-bold text-slate-700 flex items-center">
-                <Fuel className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 차종 / 유종 (선택)
-              </label>
-              {fuelReason && (
-                <span className="text-[10px] font-bold text-[#1E60F3] bg-blue-50 border border-blue-200/80 px-1.5 py-0.5 rounded-md truncate max-w-[190px]">
-                  {fuelReason}
-                </span>
-              )}
-            </div>
-            <div className="space-y-2">
-              <input
-                type="text"
-                value={carModel}
-                onChange={handleCarModelChange}
-                placeholder="예: 520d, 520i, 카니발, 스타리아"
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-[#1E60F3] focus:bg-white font-bold transition-colors"
-              />
-              {/* 2-split easy chips for mixed or explicit fuel selection */}
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleSelectFuelType('gasoline')}
-                  className={`py-2 px-3 rounded-xl border text-sm font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 ${fuelType === 'gasoline'
-                    ? 'bg-[#1E60F3] text-white border-[#1E60F3] shadow-xs'
-                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                    }`}
-                >
-                  <span>휘발유</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSelectFuelType('diesel')}
-                  className={`py-2 px-3 rounded-xl border text-sm font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 ${fuelType === 'diesel'
-                    ? 'bg-[#1E60F3] text-white border-[#1E60F3] shadow-xs'
-                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                    }`}
-                >
-                  <span>경유</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* 4. Driver Name Field (드라이버 성명: 연락처 상단 배치) */}
+          {/* 3. Driver Name Field (드라이버 성명: 연락처 상단 배치) */}
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-1.5 flex items-center justify-between">
               <span className="flex items-center">
@@ -878,7 +786,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             </div>
           </div>
 
-          {/* 5. Passenger Name Field */}
+          {/* 4. Passenger Name Field */}
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-1.5 flex items-center">
               <Users className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 담당 승객명
@@ -892,7 +800,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             />
           </div>
 
-          {/* 6. Primary Navigation Switcher */}
+          {/* 5. Primary Navigation Switcher */}
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center">
               <Navigation className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 주력 내비게이션 앱

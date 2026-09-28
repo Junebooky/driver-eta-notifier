@@ -2219,5 +2219,47 @@ SELECT * FROM cockpit.presets;
 2. **모바일 콕핏 시인성 검증**:
    - 모든 뱃지, 폼 라벨, 서브 텍스트, 액션 버튼의 글자 크기가 14px(`text-sm`)로 일관되게 확대되어 시각적 가독성 극대화 확인.
 
+---
+
+## 46. 프로필 및 차량 점검 모달 내 유종 선택 및 유류비 계산기 UI 제거 및 UI 단순화 (2026-09-28)
+
+### 46.1 추진 배경 및 목적
+1. **미완성 정산 기능 조작 혼선 방지 및 차량 본연의 점검 기능 집중**:
+   - 프로필 모달 및 차량점검 모달(`VehicleInspectionModal`)에 추가되었던 차종/유종 선택, 유종 자동 판별 칩, 오피넷 3km 유류비 정산 계산기 UI를 전면 제외.
+   - Zero-DB / Pure Client-Side 원칙을 엄수하며, 현장 운전자의 불필요한 입력 부담과 조작 혼선을 없애고 수령/반납 점검표 본연의 기능에 집중.
+2. **상단 기본 제원 2열 원복 및 18px 모바일 시인성 규격 준수**:
+   - 기존 3열 그리드(`차량호차`, `차량번호`, `차종 (유종자동)`)에서 차종 인풋을 완전히 삭제하고 `grid grid-cols-2 gap-2`의 2열 대칭 구조로 원복.
+   - 모바일 환경에서의 탁월한 시인성을 위해 입력 인풋을 18px(`text-lg font-bold text-slate-900`) 규격으로 단정하게 재배치.
+
+### 46.2 핵심 구현 내역
+
+#### [태스크 1] 프로필 모달 내 '차종/유종 선택' UI 제외 ([`components/ProfileModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ProfileModal.tsx))
+1. **차종/유종 입력 폼 및 선택 칩 블록 제거**:
+   - '차종 / 유종 (선택)' 라벨, 차종 인풋, 그리고 `⛽ 휘발유` / `🛢️ 경유` 2분할 퀵 선택 버튼군을 완전히 삭제.
+2. **상태 및 로컬 스토리지 연동 정리**:
+   - `carModel`, `fuelType`, `fuelReason` 상태 변수 및 `handleCarModelChange`, `handleSelectFuelType` 핸들러 제거.
+   - 기사 성명, 연락처, 차량번호(앞자리/뒷자리), 호차별 승객명, 주력 내비게이션 등 필수 의전 프로필 필드는 100% 온전히 유지.
+   - `cockpit_driver_profile_${vehicleNo}` 저장 및 로드 로직에서 유종 관련 필드를 안전하게 정리하여 타입 에러 및 런타임 오류 방지.
+
+#### [태스크 2] 차량 점검 모달 상단 2열 원복 및 유종 관련 UI 전면 적출 ([`components/VehicleInspectionModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/VehicleInspectionModal.tsx))
+1. **상단 기본 제원 2열 원복 및 18px 시인성 규격 적용**:
+   - `차종 (유종자동)` 인풋을 완전히 삭제하고, 그리드 래퍼를 `grid grid-cols-2 gap-2`로 수정하여 `차량호차`와 `차량번호`만 1:1 대칭으로 렌더링.
+   - 인풋 폰트 스타일을 `text-lg font-bold text-slate-900` (18px) 규격으로 적용하여 모바일 터치 및 시인성 극대화.
+2. **차량 수령 탭 '차량 유종 선택' 칩 블록 삭제**:
+   - 수령 점검 탭 내 삽입되었던 `bg-slate-50/80 p-2.5 rounded-2xl border border-slate-200/80` 규격의 유종 선택(`⛽ 휘발유`, `🛢️ 경유`) UI 블록을 완전히 삭제.
+3. **차량 반납 탭 '오피넷 3km 유류비 정산 계산기' 블록 삭제**:
+   - 반납 점검 탭 내 위치한 `오피넷 3km 유류비 정산 계산기`(`bg-slate-50/90 rounded-2xl p-3 border border-slate-200/90` 및 상위 15% 초고가 절사 뱃지, DTE 증감 현황, 단가 칩, 권장 주유 금액 선택 버튼, 보고서 포함 체크박스 일체) 전면 적출.
+4. **카카오톡 보고서 연동 및 상태 클린업**:
+   - `selectedFuelType`, `gasStations`, `trimmedMeanPrices`, `chosenFuelAmount`, `includeFuelSettlement` 등의 미사용 상태 및 관련 이펙트(`fetchStations`) 완전 제거.
+   - 카카오톡 보고서 텍스트 생성 시 유류비 라인이 출력되지 않도록 연계 파라미터 정리.
+   - `@/utils/fuelCalculation` 및 `GasStation` 등 미사용 import를 깔끔히 제거하여 린트 에러 원천 차단.
+
+### 46.3 검증 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 컴파일 에러 **0건 (Exit code 0)** 통과.
+2. **Zero-DB 및 클라이언트 상태 무결성**:
+   - 수령/반납 데이터 바인딩 및 계기판 OCR, 2D 외관 점검, 주차/차키 위치, 카카오톡 전송 보고서 생성이 결함 없이 완벽히 동작함을 확인.
+
+
 
 
