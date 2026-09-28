@@ -122,13 +122,13 @@ export function buildDeepLink(
 
     if (isAndroid) {
       return {
-        scheme: `intent://navigate?name=${encodedName}&x=${lng}&y=${lat}&coord_type=wgs84#Intent;scheme=kakaonavi;package=com.locnall.KimGiSa;end;`,
+        scheme: `intent://route?ep=${lat},${lng}&by=CAR#Intent;scheme=kakaomap;package=net.daum.android.map;end;`,
         fallbackUrl: STORE_URLS.kakao.android,
       };
     }
     return {
-      scheme: `kakaonavi://navigate?name=${encodedName}&x=${lng}&y=${lat}&coord_type=wgs84`,
-      fallbackUrl: `kakaomap://route?ep=${lat},${lng}&by=CAR`,
+      scheme: `kakaomap://route?ep=${lat},${lng}&by=CAR`,
+      fallbackUrl: STORE_URLS.kakao.ios,
     };
   }
 

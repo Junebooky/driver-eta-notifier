@@ -3278,12 +3278,27 @@ flowchart TD
 
 ---
 
-### 67.4 검증 결과
+---
+
+## 68. 하단 내비게이션 안내시작 카카오맵 딥링크 스킴 정합성 복원 (Safari 유효하지 않은 주소 팝업 제거)
+
+### 68.1 배경 및 작업 목적
+- 홈 화면 하단 액션 패널(`ActionPanel.tsx`)의 '카카오내비 안내 시작' 버튼 터치 시, iOS Safari에서 `"주소가 유효하지 않기 때문에 Safari가 해당 페이지를 열 수 없습니다"`라는 시스템 경고 팝업이 노출된 직후 카카오맵으로 이동하는 결함 해결.
+- **원인 분석**: 목적지만 전달하는 단독 길안내 딥링크 빌더(`utils/navigation.ts:buildDeepLink`)에서 1차 호출 스킴으로 미설치 상태인 카카오내비 전용 스킴(`kakaonavi://navigate...`)을 실행하고, 2.5초 뒤 폴백으로 카카오맵(`kakaomap://route...`)을 호출하고 있었음.
+- **조치**: 1차 호출 스킴 자체를 공식 카카오맵 길안내 스킴인 `kakaomap://route?ep=${lat},${lng}&by=CAR`로 직접 지정하여 Safari 오류 팝업을 원천 차단하고 즉각적인 길안내 화면 전환 보장.
+
+### 68.2 모듈별 상세 구현 내역
+- [`utils/navigation.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/utils/navigation.ts):
+  - `buildDeepLink`의 `provider === 'kakao'` 목적지 단독 브랜치 개편:
+    - iOS scheme: `kakaonavi://navigate...` ➔ **`kakaomap://route?ep=${lat},${lng}&by=CAR`**
+    - iOS fallbackUrl: `STORE_URLS.kakao.ios` (`https://apps.apple.com/kr/app/id304608425` 카카오맵 앱스토어)
+    - Android scheme: `intent://route?ep=${lat},${lng}&by=CAR#Intent;scheme=kakaomap;package=net.daum.android.map;end;`
+    - Android fallbackUrl: `STORE_URLS.kakao.android` (`net.daum.android.map` 카카오맵 플레이스토어)
+
+### 68.3 검증 결과
 1. **프로덕션 빌드 무결성**:
    - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 TypeScript / ESLint 컴파일 에러 **0건 (Exit code 0)** 통과.
 2. **시나리오 검증 결과**:
-   - **Case 1 (4호차 점검 입력)**: 4호차에서 수령 ODO `55,000`, 외관 부위 '앞 범퍼' 선택 후 저장 ➔ `cockpit_vehicle_inspection_4호차`에 정상 보관됨 (PASS).
-   - **Case 2 (1호차 전환 및 격리 확인)**: 프로필을 '1호차'로 변경 ➔ 차량체크 모달 진입 시 4호차 데이터가 전혀 나타나지 않고 모든 필드가 깨끗한 기본값(Clean State)으로 초기화됨 (PASS).
-   - **Case 3 (1호차 점검 입력 후 4호차 복원 확인)**: 1호차 수령 ODO에 `22,000` 입력 저장 ➔ 다시 '4호차'로 변경 ➔ 차량체크 진입 시 기존 4호차의 `55,000`과 '앞 범퍼'가 손실 없이 100% 복원됨 (PASS).
-   - **Case 4 (새로고침 보존)**: 브라우저 새로고침 후에도 각 호차별 데이터가 독립된 키로 영구 보존됨 (PASS).
+   - **Case 1 (카카오 길안내 즉시 실행)**: 카카오 토글 상태에서 하단 '안내 시작' 버튼 터치 시, Safari 주소 오류 팝업창 없이 카카오맵의 자동차 길안내 화면으로 즉각 직행함 (PASS).
+   - **Case 2 (티맵/네이버맵 불변성)**: 티맵(`tmap://`) 및 네이버지도(`nmap://`) 안내 시작 기능은 기존과 동일하게 무결하게 작동함 (PASS).
 
