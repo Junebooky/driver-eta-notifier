@@ -1613,6 +1613,80 @@ SELECT * FROM cockpit.presets;
 4. **네이티브 날짜 피커 및 1.4배 폰트 UI 검증**:
    - 8자리 숫자 인풋이 단일 터치 박스로 대체되고, 한국어 포맷(`2026년 09월 28일 (월)`)과 1.4배 확대된 타이포그래피로 현장 가독성이 극대화됨을 확인.
 
+---
+
+## 37. 가로형 출발·도착 레이아웃 유지 및 상단 유틸리티 바 이식, 별표(#FEE500) 토글 인터랙션, 모달 거점 페이지네이션 및 폰트 표준화 (2026-09-28)
+
+### 37.1 추진 배경 및 목적
+1. **메인 화면 운행 동선 가로형 레이아웃 100% 보존 및 유틸리티 툴바 통합**:
+   - '운행 경로' 등의 불필요한 섹션 제목 텍스트를 배제하고 출발지/도착지의 좌우 가로형 배치를 온전히 유지.
+   - 메인 화면 하단에 상시 고정 노출되던 거대한 프리셋 캐러셀을 제거하여 운행 정보 카드와 공유 액션 패널의 시인성을 극대화하고, 출발·도착 카드 상단에 4대 퀵 유틸리티 바(차량 점검, 항공편 조회, 주변 주유소, 거점 관리)를 컴팩트하게 이식.
+2. **스케줄 모달 픽업 일자·시간 폰트 크기 표준화**:
+   - `ScheduleFormModal` 및 `EditScheduleModal`에서 지나치게 튀던 픽업 일자/시간 텍스트(`text-xl font-bold`)를 하단 승객명, 항공편명, 메모 인풋과 완벽히 동일한 규격인 `text-base sm:text-lg font-semibold text-slate-800`으로 통일하여 시각적 정합성 완성.
+3. **`LocationSearchModal` 거점 퀵 선택 3x7 캐러셀 및 캡슐형 인디케이터 적용**:
+   - 자주 가는 거점 목록이 1페이지 규격(3열 x 7행, 최대 21개)을 초과할 경우 좌우 터치 스와이프 및 클릭으로 넘겨볼 수 있는 캐러셀 구조 구축.
+   - 단일 페이지이더라도 기능성을 명시하는 기본 단일 활성 도트(`w-6 bg-[#1E60F3]`)를 표시하고 페이지 전환 시 캡슐형 도트가 유기적으로 연동되도록 구현.
+4. **'최근 검색' 섹션 신설 및 별표(⭐) 노란색(#FEE500) 원터치 토글 인터랙션**:
+   - TMAP 검색창 하단에 `cockpit_recent_searches` 기반의 '🕒 최근 검색' 섹션(최대 8개 가로 스크롤 카드, '전체 삭제' 버튼 포함) 신설.
+   - 최근 검색 카드 및 TMAP 검색 결과 리스트에 원터치 별표(`<Star />`)를 탑재하여, 클릭 시 즉시 `stroke-slate-300`에서 `#FEE500` 노란색으로 가득 차며 자주 가는 거점에 즉각 추가/해제되도록 인터랙션 구축.
+
+---
+
+### 37.2 핵심 구현 내역
+
+#### [태스크 1] 가로형 출발·도착 카드 유지 및 상단 4대 퀵 유틸리티 바 배치 ([`components/OriginDestinationSelector.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/OriginDestinationSelector.tsx), [`app/page.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/page.tsx))
+1. **소제목 배제 및 가로형 레이아웃 100% 보존**:
+   - 불필요한 섹션 타이틀 텍스트 일체 없이 `출발지 ⇄ 목적지` 좌우 가로형 플렉스 배치를 변함없이 유지.
+2. **상단 4대 퀵 유틸리티 바 이식**:
+   - 우측 상단에 둥근 아이콘 칩(`p-2 bg-slate-100/90 hover:bg-slate-200 active:scale-95 rounded-xl transition`) 4종 배치:
+     - 🚗 차량 점검: `<ClipboardCheck className="w-4 h-4 text-emerald-600" />` (`onOpenInspectionModal`)
+     - ✈️ 항공편 조회: `<Plane className="w-4 h-4 text-sky-600" />` (`onOpenFlightModal`)
+     - ⛽ 주변 주유소: `<Fuel className="w-4 h-4 text-amber-600" />` (`onOpenGasModal`)
+     - 📍 거점 관리: `<MapPinPlus className="w-4 h-4 text-indigo-600" />` (`onOpenPresetModal`)
+3. **메인 화면 하단 상시 캐러셀 제거**:
+   - `app/page.tsx` 운행 탭 하단의 `PresetButtons` 상시 렌더링 블록을 제거하고, 상위 모달 핸들러를 `OriginDestinationSelector`의 상단 유틸리티 바와 직결.
+
+---
+
+#### [태스크 2] 스케줄 등록/수정 모달 픽업 시간·일자 폰트 크기 표준화 ([`components/ScheduleFormModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ScheduleFormModal.tsx), [`components/EditScheduleModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/EditScheduleModal.tsx))
+1. **폰트 크기 하향 조정 및 시각적 균형 통일**:
+   - 픽업 일자(`formatKoreanDate`) 및 픽업 시간(`formatKoreanTime`) 표시 텍스트를 `text-xl font-bold`에서 **`text-base sm:text-lg font-semibold text-slate-800 tracking-tight`**로 정돈.
+   - `EditScheduleModal`의 입력 필드 및 레이블 타이포그래피 역시 `text-base sm:text-lg font-semibold`로 표준화하여 통일감 확보.
+
+---
+
+#### [태스크 3] `LocationSearchModal` 거점 퀵 선택에 페이지네이션 필(Pill) 도트 적용 ([`components/LocationSearchModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/LocationSearchModal.tsx))
+1. **3열 x 7행 (21개) 단위 슬라이더 분할**:
+   - 자택 슬롯 + 프리셋 목록을 1페이지당 21개 규격으로 분할하여 캐러셀 구조로 수용.
+   - 좌우 터치 스와이프 제스처(`onTouchStart`, `onTouchEnd`, 40px 임계치) 지원.
+2. **캡슐형 페이지 인디케이터**:
+   - 1페이지 이내일 때도 기본 단일 활성 도트(`w-6 bg-[#1E60F3] shadow-[0_2px_8px_rgba(30,96,243,0.35)]`)를 명시하고, 복수 페이지 생성 시 비활성 도트(`w-2 bg-slate-200`)와 유기적으로 전환.
+
+---
+
+#### [태스크 4] '최근 검색' 섹션 신설 및 별표(⭐) 노란색(#FEE500) 토글 인터랙션 ([`components/LocationSearchModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/LocationSearchModal.tsx))
+1. **'🕒 최근 검색' 섹션 구축**:
+   - `localStorage`의 `cockpit_recent_searches`와 연동하여 최근 선택한 거점을 최대 8개까지 가로 스크롤 카드 형태로 표시하고, '전체 삭제' 기능 제공.
+2. **원터치 별표(⭐) 토글 인터랙션**:
+   - '최근 검색' 카드 및 'TMAP 검색 결과' 행에 `<Star />` 버튼 배치.
+   - `e.stopPropagation()`으로 모달 닫힘을 차단하면서 원터치 토글:
+     - 비활성: `stroke-slate-300 fill-none text-slate-300 hover:stroke-slate-400`
+     - 활성: `fill-[#FEE500] stroke-[#FEE500] text-[#FEE500]`
+   - 별표 토글 즉시 거점 프리셋 목록(`localPresets`) 및 DB(`/api/presets`)에 즉시 추가/해제 반영.
+
+---
+
+### 37.3 검증 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 14개 라우트 컴파일 에러 **0건** 완료.
+2. **가로형 레이아웃 및 퀵 유틸리티 바 검증**:
+   - 섹션 타이틀 없이 출발지/도착지 좌우 배치가 안정적으로 유지되며, 상단 4대 버튼을 통해 각 전용 모달(차량점검, 항공편, 주유소, 거점관리)이 완벽히 트리거됨을 확인.
+3. **폰트 크기 표준화 검증**:
+   - 스케줄 모달에서 픽업 일자와 시간 텍스트가 승객명 및 항공편명 인풋과 동일한 `text-base sm:text-lg font-semibold text-slate-800`으로 자연스럽게 일치됨을 확인.
+4. **최근 검색 및 별표 토글 인터랙션 검증**:
+   - 검색창 하단에 최근 검색 목록이 가로 스크롤로 노출되고, 별표 클릭 시 `#FEE500` 노란색으로 즉시 활성화되며 거점 목록에 실시간 반영됨을 확인.
+
+
 
 
 

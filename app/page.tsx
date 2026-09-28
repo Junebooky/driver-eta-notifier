@@ -7,7 +7,6 @@ import { Header } from '@/components/Header';
 import { ProfileModal, parseVehicleDetails } from '@/components/ProfileModal';
 import { AdminPinModal } from '@/components/AdminPinModal';
 import { OriginDestinationSelector } from '@/components/OriginDestinationSelector';
-import { PresetButtons } from '@/components/PresetButtons';
 import { CustomPresetModal } from '@/components/CustomPresetModal';
 import { RouteInfoCard } from '@/components/RouteInfoCard';
 import { ReportTemplateSelector } from '@/components/ReportTemplateSelector';
@@ -785,7 +784,7 @@ export default function Home() {
         {/* Tab View Switch: [운행 대시보드] vs [배차 스케줄] */}
         {activeTab === 'drive' ? (
           <div className="flex-1 p-3.5 space-y-3 animate-fade-in">
-            {/* 1. Origin / Destination Separate Selection & Bidirectional Swap (⇄) UX */}
+            {/* 1. Origin / Destination Separate Selection & Bidirectional Swap (⇄) UX + Top 4 Quick Utility Bar */}
             <OriginDestinationSelector
               origin={origin}
               destination={destination}
@@ -796,25 +795,10 @@ export default function Home() {
                 setSelectionTarget(target);
                 setIsLocationSearchOpen(true);
               }}
-            />
-
-            {/* 2. Simplified High-Density Preset Chips Grid (Slot #1 Home Fixed + 2D Hysteresis Drag) */}
-            <PresetButtons
-              presets={presets}
-              homeLocation={profile.homeLocation}
-              selectedOriginId={origin?.id}
-              selectedDestinationId={destination?.id}
-              selectionTarget={selectionTarget}
-              isAdmin={isAdmin}
-              onSelectPreset={handleSelectPreset}
-              onOpenAddModal={handleOpenAddModal}
-              onOpenHomeModal={() => setIsHomeModalOpen(true)}
+              onOpenInspectionModal={() => setIsInspectionModalOpen(true)}
               onOpenFlightModal={() => setIsFlightModalOpen(true)}
               onOpenGasModal={() => setIsGasModalOpen(true)}
-              onOpenInspectionModal={() => setIsInspectionModalOpen(true)}
-              onEditPreset={handleOpenEditModal}
-              onDeleteCustomPreset={handleDeleteCustomPreset}
-              onReorderPresets={handleReorderPresets}
+              onOpenPresetModal={handleOpenAddModal}
             />
 
             {/* 3. Route Estimation & ETA Status (Strictly Real-time TMAP) */}
@@ -1067,6 +1051,13 @@ export default function Home() {
         currentSelectedId={selectionTarget === 'origin' ? origin?.id : destination?.id}
         onSelectLocation={handleSelectLocationFromSearch}
         onOpenHomeModal={() => setIsHomeModalOpen(true)}
+        onTogglePresetFavorite={(preset, action) => {
+          if (action === 'remove') {
+            handleDeleteCustomPreset(preset.id);
+          } else if (action === 'add') {
+            handleAddCustomPreset(preset);
+          }
+        }}
       />
 
     </main>

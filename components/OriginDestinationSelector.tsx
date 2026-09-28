@@ -1,7 +1,8 @@
 'use client';
 
+import React from 'react';
 import { LocationPreset } from '@/types';
-import { ArrowLeftRight, Search } from 'lucide-react';
+import { ArrowLeftRight, Search, ClipboardCheck, Plane, Fuel, MapPinPlus } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface OriginDestinationSelectorProps {
@@ -11,6 +12,10 @@ interface OriginDestinationSelectorProps {
   onSelectTarget: (target: 'origin' | 'destination') => void;
   onSwap: () => void;
   onOpenSearchModal?: (target: 'origin' | 'destination') => void;
+  onOpenInspectionModal?: () => void;
+  onOpenFlightModal?: () => void;
+  onOpenGasModal?: () => void;
+  onOpenPresetModal?: () => void;
 }
 
 export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps> = ({
@@ -20,9 +25,69 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
   onSelectTarget,
   onSwap,
   onOpenSearchModal,
+  onOpenInspectionModal,
+  onOpenFlightModal,
+  onOpenGasModal,
+  onOpenPresetModal,
 }) => {
   return (
-    <div className="w-full bg-white border border-slate-100/80 rounded-2xl p-4 shadow-[0_8px_25px_rgba(30,96,243,0.06)] space-y-2.5 select-none">
+    <div className="w-full bg-white border border-slate-100/80 rounded-2xl p-4 shadow-[0_8px_25px_rgba(30,96,243,0.06)] space-y-3 select-none">
+      {/* Top 4 Quick Utility Action Bar (Right-aligned, compact icon chips) */}
+      <div className="flex items-center justify-end gap-2 pb-0.5">
+        <button
+          type="button"
+          onClick={() => {
+            haptics.lightTap();
+            onOpenInspectionModal?.();
+          }}
+          className="p-2 bg-slate-100/90 hover:bg-slate-200 active:scale-95 rounded-xl transition flex items-center justify-center cursor-pointer shadow-2xs group"
+          title="차량 점검 (수령 / 일일 / 반납)"
+          aria-label="차량 점검"
+        >
+          <ClipboardCheck className="w-4 h-4 text-emerald-600 transition-transform group-hover:scale-110" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            haptics.lightTap();
+            onOpenFlightModal?.();
+          }}
+          className="p-2 bg-slate-100/90 hover:bg-slate-200 active:scale-95 rounded-xl transition flex items-center justify-center cursor-pointer shadow-2xs group"
+          title="인천공항 실시간 항공편 조회"
+          aria-label="항공편 조회"
+        >
+          <Plane className="w-4 h-4 text-sky-600 transition-transform group-hover:scale-110" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            haptics.lightTap();
+            onOpenGasModal?.();
+          }}
+          className="p-2 bg-slate-100/90 hover:bg-slate-200 active:scale-95 rounded-xl transition flex items-center justify-center cursor-pointer shadow-2xs group"
+          title="주변 주유소 실시간 유가 조회"
+          aria-label="주변 주유소"
+        >
+          <Fuel className="w-4 h-4 text-amber-600 transition-transform group-hover:scale-110" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            haptics.lightTap();
+            onOpenPresetModal?.();
+          }}
+          className="p-2 bg-slate-100/90 hover:bg-slate-200 active:scale-95 rounded-xl transition flex items-center justify-center cursor-pointer shadow-2xs group"
+          title="거점 관리 및 신규 등록"
+          aria-label="거점 관리"
+        >
+          <MapPinPlus className="w-4 h-4 text-indigo-600 transition-transform group-hover:scale-110" />
+        </button>
+      </div>
+
+      {/* Horizontal Cards (Origin ⇄ Destination) */}
       <div className="flex items-center space-x-2.5 w-full">
         {/* Origin Card (Neutral Gray 기준점) */}
         <div

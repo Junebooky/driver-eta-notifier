@@ -917,7 +917,7 @@ ${scheduleItemsFormatted}`.trim();
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#1E60F3] hover:bg-[#1650D6] text-white text-xs font-bold transition-all active:scale-95 shadow-xs cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>새 스케줄 직접 등록</span>
+              <span>새 스케줄 등록</span>
             </button>
             <button
               type="button"
@@ -950,7 +950,7 @@ ${scheduleItemsFormatted}`.trim();
                 type="button"
                 onClick={() => handleOpenScheduleFormModal()}
                 className="text-xs text-[#1E60F3] hover:text-[#1650D6] bg-blue-50 hover:bg-blue-100 border border-blue-200 flex items-center gap-1 py-1 px-2.5 rounded-lg transition-all font-bold cursor-pointer"
-                title="새 스케줄 직접 등록"
+                title="새 스케줄 등록"
               >
                 <Plus className="w-3 h-3" />
                 <span>일정 추가</span>

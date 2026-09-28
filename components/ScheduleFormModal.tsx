@@ -275,7 +275,7 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
             </div>
             <div>
               <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-snug">
-                새 스케줄 직접 등록
+                새 스케줄 등록
               </h3>
               <p className="text-sm font-semibold text-slate-500 mt-0.5">
                 {vehicleNo} 전담 VIP 의전 배차 일정
@@ -307,13 +307,12 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
             </label>
 
             <div
-              className={`relative flex items-center justify-between w-full px-5 py-4 bg-slate-50 border rounded-2xl transition-all shadow-xs group cursor-pointer ${
-                formErrors.date
-                  ? 'border-rose-400 bg-rose-50/50 ring-2 ring-rose-200'
-                  : 'border-slate-200 hover:border-[#1E60F3]'
-              }`}
+              className={`relative flex items-center justify-between w-full px-5 py-4 bg-slate-50 border rounded-2xl transition-all shadow-xs group cursor-pointer ${formErrors.date
+                ? 'border-rose-400 bg-rose-50/50 ring-2 ring-rose-200'
+                : 'border-slate-200 hover:border-[#1E60F3]'
+                }`}
             >
-              <span className="text-xl font-bold text-slate-900 tracking-tight">
+              <span className="text-base sm:text-lg font-semibold text-slate-800 tracking-tight">
                 {formatKoreanDate(pickupDate) || '날짜 선택'}
               </span>
               <Calendar className="w-5 h-5 text-[#1E60F3] group-hover:scale-110 transition-transform shrink-0" />
@@ -348,11 +347,10 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
                   haptics.lightTap();
                   setSearchModalTarget('origin');
                 }}
-                className={`p-4 rounded-2xl border transition-all cursor-pointer ${
-                  formErrors.origin
-                    ? 'border-rose-400 bg-rose-50/40 ring-1 ring-rose-200'
-                    : 'border-slate-200 bg-slate-50/80 hover:bg-slate-100/80 hover:border-slate-300'
-                }`}
+                className={`p-4 rounded-2xl border transition-all cursor-pointer ${formErrors.origin
+                  ? 'border-rose-400 bg-rose-50/40 ring-1 ring-rose-200'
+                  : 'border-slate-200 bg-slate-50/80 hover:bg-slate-100/80 hover:border-slate-300'
+                  }`}
                 title="출발지 검색 및 선택"
               >
                 <div className="flex items-center justify-between">
@@ -366,7 +364,7 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
                   </div>
                   <div className="flex items-center gap-1.5 text-sm font-bold text-[#1E60F3] shrink-0 ml-2">
                     <Search className="w-4 h-4 text-[#1E60F3]" />
-                    <span>변경</span>
+
                   </div>
                 </div>
                 {origin && (
@@ -382,11 +380,10 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
                   haptics.lightTap();
                   setSearchModalTarget('destination');
                 }}
-                className={`p-4 rounded-2xl border transition-all cursor-pointer ${
-                  formErrors.destination
-                    ? 'border-rose-400 bg-rose-50/40 ring-1 ring-rose-200'
-                    : 'border-slate-200 bg-slate-50/80 hover:bg-slate-100/80 hover:border-slate-300'
-                }`}
+                className={`p-4 rounded-2xl border transition-all cursor-pointer ${formErrors.destination
+                  ? 'border-rose-400 bg-rose-50/40 ring-1 ring-rose-200'
+                  : 'border-slate-200 bg-slate-50/80 hover:bg-slate-100/80 hover:border-slate-300'
+                  }`}
                 title="도착지 검색 및 선택"
               >
                 <div className="flex items-center justify-between">
@@ -400,7 +397,6 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
                   </div>
                   <div className="flex items-center gap-1.5 text-sm font-bold text-[#1E60F3] shrink-0 ml-2">
                     <Search className="w-4 h-4 text-[#1E60F3]" />
-                    <span>변경</span>
                   </div>
                 </div>
                 {destination && (
@@ -420,7 +416,7 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
             </label>
 
             <div className="relative flex items-center justify-between w-full px-5 py-4 bg-slate-50 border border-slate-200 hover:border-[#1E60F3] rounded-2xl transition-all shadow-xs group cursor-pointer">
-              <span className="text-xl font-bold text-slate-900 tracking-tight">
+              <span className="text-base sm:text-lg font-semibold text-slate-800 tracking-tight">
                 {formatKoreanTime(pickupTime) || '시간 선택'}
               </span>
               <Clock className="w-5 h-5 text-slate-400 group-hover:text-[#1E60F3] transition-colors shrink-0" />
