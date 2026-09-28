@@ -2593,6 +2593,92 @@ flowchart TD
    - **Case 3 (최초 등록)**:
      - 자택 데이터가 비어 있는 최초 진입 시 상단 타이틀이 **`자택 주소 등록`**, 인풋은 빈 칸, 하단 버튼은 **`자택 저장`** 및 비활성화(`disabled`) 상태로 렌더링됨 확인.
 
+---
+
+## 51. 관리자 모드 신규 거점 등록 시 '공통' 타입 즉시 반영 및 등록·수정 로직 일원화
+
+### 51.1 배경 및 버그 원인 분석
+1. **문제 현상**:
+   - 관리자 모드(`isAdmin === true`)에서 신규 거점을 등록했을 때 메인 화면이나 모달에서 최초에는 '개인' 뱃지로 렌더링되었다가, 해당 거점을 다시 클릭하여 '수정'을 완료해야만 '공통' 뱃지로 전환되던 지연 반영 결함 발생.
+2. **원인 규명**:
+   - **원인 1 (`app/page.tsx` 내 Supabase POST 요청 페이로드 오염)**:
+     - `app/page.tsx`의 `handleAddCustomPreset`에서 관리자 공통 거점(`isCommon === true`, `vehicle_no: null`)으로 생성했음에도, 하단의 `fetch('/api/presets', { body: JSON.stringify({ ...presetWithVehicle, vehicle_no: currentVehicleNo }) })`에서 `vehicle_no: currentVehicleNo`('4호차')가 강제 할당되어 Supabase로 전송됨.
+     - Supabase `/api/presets` POST 핸들러는 수신된 `vehicle_no`('4호차')를 저장하고 `data.preset`을 반환하였으며, 이를 수신한 클라이언트가 `setPresets`에서 `data.preset`(`vehicle_no: '4호차'`, `type: 'personal'`)으로 덮어쓰면서 로컬 스토리지까지 '개인' 거점으로 재오염되는 레이스 컨디션 발생.
+   - **원인 2 (`components/CustomPresetModal.tsx` 내 신규/수정 로직 이원화 및 `isAdmin` 스코프 취약점)**:
+     - `CustomPresetModal.tsx` 내 `handleSubmit`에서 신규 등록과 수정 시 `isCommonPreset` 판별 및 페이로드 조립 로직이 이원화되어 있었고, 컴포넌트 렌더 사이클에 따라 `isAdmin` prop과 `localStorage`(`protocol_cockpit_admin_mode_v1`) 간의 미세한 타이밍 불일치 가능성이 존재.
+
+---
+
+### 51.2 아키텍처 및 상태 전이 다이어그램
+
+```mermaid
+flowchart TD
+    subgraph Admin_Detection ["단일 진실 관리자 상태 판별"]
+        A["CustomPresetModal / page.tsx"] --> B["effectiveIsAdmin = Boolean(isAdmin || localStorage.admin_mode === 'true')"]
+    end
+
+    subgraph Modal_Creation ["CustomPresetModal: 단일화된 페이로드 생성"]
+        B --> C["신규 등록 (handleSubmit)"]
+        C --> D["isCommonPreset = Boolean(effectiveIsAdmin)<br/>cleanVehicle = isCommonPreset ? null : vehicleNo"]
+        D --> E["newPreset = {<br/>  type: isCommonPreset ? 'common' : 'personal',<br/>  isCommon: isCommonPreset,<br/>  isGlobal: isCommonPreset,<br/>  vehicle_no: cleanVehicle<br/>}"]
+        E --> F["onAddPreset(newPreset)"]
+    end
+
+    subgraph Page_Commit ["app/page.tsx: handleAddCustomPreset 스코프 가드"]
+        F --> G["isPresetCommon = Boolean(currentIsAdmin || newPreset.isCommon || ...)"]
+        G --> H["finalizedPreset = {<br/>  type: isPresetCommon ? 'common' : 'personal',<br/>  isCommon: isPresetCommon,<br/>  vehicle_no: isPresetCommon ? null : currentVehicleNo<br/>}"]
+        H --> I["1. savePresetsToStorage(reindexed)<br/>2. setPresets(reindexed) -> 0초 만에 공통 뱃지 렌더링"]
+        H --> J["Supabase Sync: vehicle_no: isPresetCommon ? null : currentVehicleNo"]
+    end
+
+    subgraph API_Defense ["/api/presets/route.ts 백엔드 가드"]
+        J --> K["isCommon = Boolean(body.isCommon || body.type === 'common' || body.isGlobal)<br/>cleanVehicleNo = isCommon ? null : targetVehicle"]
+        K --> L["DB vehicle_no: null 안착 및 type: 'common' 응답"]
+        L --> M["syncedPreset: isPresetCommon ? 'common' : ... 재오염 원천 차단"]
+    end
+```
+
+---
+
+### 51.3 상세 구현 내역
+
+#### [태스크 1] `CustomPresetModal.tsx` 신규 생성 페이로드 동기화 ([`components/CustomPresetModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/CustomPresetModal.tsx))
+1. **`effectiveIsAdmin` 단일 상태 산출**:
+   - `isAdmin` prop뿐 아니라 브라우저 `localStorage`의 `ADMIN_MODE_KEY`(`protocol_cockpit_admin_mode_v1`)를 복합 검증하여, 렌더링 시차 없이 항상 정확한 관리자 권한을 즉각 판별.
+2. **신규 생성 및 수정 핸들러 속성 일원화**:
+   - `handleSubmit` 내에서 `isCommonPreset = Boolean(effectiveIsAdmin)`과 `cleanVehicle = isCommonPreset ? null : (vehicleNo || null)`을 기준으로:
+     - `type: isCommonPreset ? 'common' : 'personal'`
+     - `isCommon: isCommonPreset`
+     - `isGlobal: isCommonPreset`
+     - `vehicle_no: cleanVehicle`
+     - `vehicleNo: cleanVehicle || undefined`
+     - `order: 0`
+   - 최초 등록 시점과 수정(`handleUpdate`) 시점 간의 속성 지정 방식을 100% 일치시켜 최초 등록 즉시 `common` 마스터 속성으로 확정.
+3. **모달 내부 관리자 뱃지 및 삭제 버튼 권한 일관성**:
+   - 헤더 뱃지(`공통 거점으로 등록`) 및 삭제 버튼 노출 여부(`!isHQ || effectiveIsAdmin`)에도 `effectiveIsAdmin`을 적용하여 UI 시각 상태와 실제 동작의 정합성 완비.
+
+#### [태스크 2] `app/page.tsx` 내 `handleAddCustomPreset` 스코프 가드 보강 ([`app/page.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/page.tsx), [`app/api/presets/route.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/api/presets/route.ts), [`types/index.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/types/index.ts))
+1. **상위 등록 핸들러 스코프 덮어쓰기 방어**:
+   - `handleAddCustomPreset` 진입 시 `isPresetCommon = Boolean(currentIsAdmin || newPreset.isCommon || newPreset.type === 'common' || ...)` 가드를 통해 상위 로직에서 `type`과 `isCommon`이 오염되지 않도록 보장.
+   - `finalizedPreset`을 생성하여 로컬 상태(`setPresets`)와 스토리지에 0초 만에 즉각 커밋하여, 메인 슬라이더 1페이지에 단정한 `공통` 뱃지가 새로고침 없이 즉시 렌더링되도록 처리.
+2. **Supabase POST 페이로드 정규화 및 응답 재오염 방어**:
+   - `body: JSON.stringify({ ...finalizedPreset, vehicle_no: isPresetCommon ? null : currentVehicleNo })` 형태로 전송하여 공통 거점의 `vehicle_no`가 호차 번호로 덮어씌워지지 않도록 수정.
+   - Supabase 응답 수신 시에도 `isPresetCommon ? 'common' : ...` 가드를 적용하여 비동기 응답 도착 후에도 공통 속성이 영속되도록 방어.
+3. **백엔드 엔드포인트 방어 강화 (`/api/presets/route.ts`)**:
+   - POST 핸들러에서 `isCommon = Boolean(body.isCommon || body.type === 'common' || body.isGlobal)`을 검사하여, 공통 거점일 경우 서버 측에서도 `cleanVehicleNo`를 무조건 `null`로 안착시켜 DB 무결성 유지.
+
+---
+
+### 51.4 검증 및 무결성 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 컴파일 및 정적 페이지 생성 에러 **0건 (Exit code 0)** 통과.
+2. **시나리오 테스트 검증**:
+   - **Case 1 (관리자 모드 신규 등록 즉시 공통 검증)**:
+     - 관리자 인증(`isAdmin === true`) 상태에서 '포시즌스호텔' 신규 등록 ➔ '수정' 과정을 거치지 않고도 **등록 즉시 1페이지 해당 슬롯 하단에 `공통` 뱃지가 즉시 노출됨**을 확인 (PASS).
+   - **Case 2 (일반 기사 모드 등록 격리 검증)**:
+     - 일반 기사 모드(`isAdmin === false`)에서 등록 시 `type: 'personal'`, `isCommon: false`, `vehicle_no: '4호차'`로 격리되며 `개인` 뱃지가 정확히 부여됨을 확인 (PASS).
+
+
 
 
 

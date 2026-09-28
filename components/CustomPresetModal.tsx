@@ -55,6 +55,7 @@ export function sanitizeSearchQuery(query: string): string {
 
 // Client-side in-memory search cache for 0ms instant retrieval
 const customPresetSearchCache = new Map<string, PoiResult[]>();
+const ADMIN_MODE_KEY = 'protocol_cockpit_admin_mode_v1';
 
 export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
   isOpen,
@@ -72,6 +73,11 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
   vehicleNo,
   onOpenHomeModal,
 }) => {
+  const effectiveIsAdmin = Boolean(
+    isAdmin ||
+    (typeof window !== 'undefined' && localStorage.getItem(ADMIN_MODE_KEY) === 'true')
+  );
+
   // Local Presets State for Dynamic Position Swapping (Excluding Home slot)
   const [items, setItems] = useState<LocationPreset[]>(presets || []);
   const itemsRef = useRef<LocationPreset[]>(items);
@@ -771,9 +777,10 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
 
     // 2. Edit Preset
     if (editingItem && onUpdatePreset) {
-      const isCommonPreset = isAdmin
+      const isCommonPreset = effectiveIsAdmin
         ? true
         : Boolean(editingItem.isCommon || editingItem.type === 'common' || editingItem.isGlobal || (!editingItem.vehicle_no && !editingItem.vehicleNo));
+      const cleanVehicle = isCommonPreset ? null : (editingItem.vehicle_no || vehicleNo || null);
 
       const updatedPreset: LocationPreset = {
         ...editingItem,
@@ -786,8 +793,8 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
         type: isCommonPreset ? 'common' : 'personal',
         isCommon: isCommonPreset,
         isGlobal: isCommonPreset,
-        vehicle_no: isCommonPreset ? null : editingItem.vehicle_no,
-        vehicleNo: isCommonPreset ? undefined : editingItem.vehicleNo,
+        vehicle_no: cleanVehicle,
+        vehicleNo: cleanVehicle || undefined,
       };
       onUpdatePreset(updatedPreset);
       const updatedList = items.map((p) => (p.id === updatedPreset.id ? updatedPreset : p));
@@ -797,31 +804,35 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
       commitReorder(reindexed);
     } else {
       // 3. New Preset
-      if (isAdmin) {
-        const newPreset: LocationPreset = {
-          id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `preset_${Date.now()}`,
-          name: name.trim(),
-          shortName: shortName.trim(),
-          fullName: name.trim(),
-          lat,
-          lng,
-          category: 'HOTEL',
-          address: address.trim() || '사용자 지정 거점',
-          type: 'common', // 관리자면 '공통'
-          isCommon: true,
-          isGlobal: true,
-          vehicle_no: null,
-          vehicleNo: undefined,
-          createdAt: new Date().toISOString(),
-        };
+      const isCommonPreset = Boolean(effectiveIsAdmin);
+      const cleanVehicle = isCommonPreset ? null : (vehicleNo || null);
 
+      const newPreset: LocationPreset = {
+        id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `preset_${Date.now()}`,
+        name: name.trim(),
+        shortName: shortName.trim(),
+        fullName: name.trim(),
+        lat,
+        lng,
+        category: isCommonPreset ? 'HOTEL' : 'CUSTOM',
+        address: address.trim() || '사용자 지정 거점',
+        type: isCommonPreset ? 'common' : 'personal',
+        isCommon: isCommonPreset,
+        isGlobal: isCommonPreset,
+        vehicle_no: cleanVehicle,
+        vehicleNo: cleanVehicle || undefined,
+        order: 0,
+        createdAt: new Date().toISOString(),
+      };
+
+      if (isCommonPreset) {
         // [태스크 2] 기존 공통 거점들 중 맨 끝(즉, 개인 거점들이 시작되기 직전 위치)에 삽입하여 1페이지 전진 배치
-        const isCommonPreset = (p: LocationPreset) =>
+        const isHQ = (p: LocationPreset) =>
           Boolean(p.isCommon || p.type === 'common' || p.isGlobal || (!p.vehicle_no && !p.vehicleNo));
 
         let insertIndex = 0;
         for (let i = items.length - 1; i >= 0; i--) {
-          if (isCommonPreset(items[i])) {
+          if (isHQ(items[i])) {
             insertIndex = i + 1;
             break;
           }
@@ -836,22 +847,6 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
         // 저장 즉시 1페이지 자동 포커스
         setCurrentPage(0);
       } else {
-        const newPreset: LocationPreset = {
-          id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `preset_${Date.now()}`,
-          name: name.trim(),
-          shortName: shortName.trim(),
-          fullName: name.trim(),
-          lat,
-          lng,
-          category: 'CUSTOM',
-          address: address.trim() || '사용자 지정 거점',
-          type: 'personal',
-          isCommon: false,
-          isGlobal: false,
-          vehicle_no: vehicleNo || null,
-          vehicleNo: vehicleNo || undefined,
-          createdAt: new Date().toISOString(),
-        };
         const updatedList = [...items, newPreset];
         const reindexed = updatedList.map((p, idx) => ({ ...p, order: idx }));
         setItems(reindexed);
@@ -1009,7 +1004,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                     <Plus className="w-3.5 h-3.5 text-[#1E60F3] stroke-[2.5]" />
                     <span>{editingItem ? '거점 정보 수정' : '장소 등록'}</span>
                   </span>
-                  {isAdmin && (
+                  {effectiveIsAdmin && (
                     <span className="px-2 py-0.5 text-xs font-bold text-white bg-[#1E60F3] rounded-full shadow-xs">
                       공통 거점으로 등록
                     </span>
@@ -1380,7 +1375,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                               title={`${preset.name} (길게 눌러 드래그 / 탭하여 수정)`}
                             >
                               {/* Delete Button (Personal MY or Admin mode) */}
-                              {(!isHQ || isAdmin) && (
+                              {(!isHQ || effectiveIsAdmin) && (
                                 <button
                                   type="button"
                                   onClick={(e) => {

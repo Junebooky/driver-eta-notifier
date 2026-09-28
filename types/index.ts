@@ -43,6 +43,7 @@ export interface LocationPreset {
   driverId?: string | null;
   vehicle_no?: string | null;
   vehicleNo?: string | null;
+  order?: number;
   createdAt?: string;
 }
 

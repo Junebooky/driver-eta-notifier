@@ -242,22 +242,37 @@ export default function Home() {
   };
 
   const handleAddCustomPreset = async (newPreset: LocationPreset) => {
-    const isCommon = Boolean(isAdmin || newPreset.isCommon || newPreset.type === 'common');
-    const presetWithVehicle: LocationPreset = {
+    let currentIsAdmin = isAdmin;
+    try {
+      if (!currentIsAdmin && typeof window !== 'undefined') {
+        currentIsAdmin = localStorage.getItem(ADMIN_MODE_KEY) === 'true';
+      }
+    } catch (e) { }
+
+    const isPresetCommon = Boolean(
+      currentIsAdmin ||
+      newPreset.isCommon ||
+      newPreset.type === 'common' ||
+      newPreset.isGlobal ||
+      (!newPreset.vehicle_no && !newPreset.vehicleNo)
+    );
+    const cleanVehicle = isPresetCommon ? null : currentVehicleNo;
+
+    const finalizedPreset: LocationPreset = {
       ...newPreset,
-      isGlobal: isCommon,
-      isCommon: isCommon,
-      type: isCommon ? 'common' : 'personal',
-      driverId: isCommon ? null : (profile.id || getOrCreateDeviceUuid()),
-      vehicle_no: isCommon ? null : currentVehicleNo,
-      vehicleNo: isCommon ? null : currentVehicleNo,
+      type: isPresetCommon ? 'common' : 'personal',
+      isCommon: isPresetCommon,
+      isGlobal: isPresetCommon,
+      driverId: isPresetCommon ? null : (profile.id || getOrCreateDeviceUuid()),
+      vehicle_no: cleanVehicle,
+      vehicleNo: cleanVehicle,
       createdAt: newPreset.createdAt || new Date().toISOString(),
     };
 
     const existingIndex = presets.findIndex(
       (p) =>
-        (p.id && p.id === newPreset.id) ||
-        (p.name === newPreset.name && (p.vehicle_no === presetWithVehicle.vehicle_no || (!p.vehicle_no && isCommon)))
+        (p.id && p.id === finalizedPreset.id) ||
+        (p.name === finalizedPreset.name && (p.vehicle_no === finalizedPreset.vehicle_no || (!p.vehicle_no && isPresetCommon)))
     );
 
     let updated: LocationPreset[];
@@ -265,10 +280,10 @@ export default function Home() {
       updated = [...presets];
       updated[existingIndex] = {
         ...updated[existingIndex],
-        ...presetWithVehicle,
+        ...finalizedPreset,
         id: updated[existingIndex].id,
       };
-    } else if (isCommon) {
+    } else if (isPresetCommon) {
       // [태스크 2] 공통 거점 등록 시 기존 공통 거점들 중 맨 끝(개인 거점들 시작 직전)에 삽입하여 1페이지 전진 배치
       const isCommonPreset = (p: LocationPreset) =>
         Boolean(p.isCommon || p.type === 'common' || p.isGlobal || (!p.vehicle_no && !p.vehicleNo));
@@ -281,10 +296,10 @@ export default function Home() {
         }
       }
       const copy = [...presets];
-      copy.splice(insertIndex, 0, presetWithVehicle);
+      copy.splice(insertIndex, 0, finalizedPreset);
       updated = deduplicatePresets(copy);
     } else {
-      updated = deduplicatePresets([...presets, presetWithVehicle]);
+      updated = deduplicatePresets([...presets, finalizedPreset]);
     }
 
     const reindexed = updated.map((p, idx) => ({ ...p, order: idx }));
@@ -292,28 +307,36 @@ export default function Home() {
     setPresets(reindexed);
 
     if (selectionTarget === 'origin') {
-      setOrigin(presetWithVehicle);
+      setOrigin(finalizedPreset);
     } else {
-      setDestination(presetWithVehicle);
+      setDestination(finalizedPreset);
     }
 
-    // Supabase Sync with vehicle_no
+    // Supabase Sync with vehicle_no (Strict Rule: common presets have vehicle_no: null)
     try {
       const res = await fetch('/api/presets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...presetWithVehicle,
-          vehicle_no: currentVehicleNo,
+          ...finalizedPreset,
+          vehicle_no: isPresetCommon ? null : currentVehicleNo,
         }),
       });
       if (res.ok) {
         const data = await res.json();
         if (data.preset) {
+          const syncedPreset: LocationPreset = {
+            ...data.preset,
+            type: isPresetCommon ? 'common' : (data.preset.type || 'personal'),
+            isCommon: isPresetCommon ? true : Boolean(data.preset.isCommon),
+            isGlobal: isPresetCommon ? true : Boolean(data.preset.isGlobal),
+            vehicle_no: isPresetCommon ? null : (data.preset.vehicle_no || currentVehicleNo),
+            vehicleNo: isPresetCommon ? null : (data.preset.vehicleNo || currentVehicleNo),
+          };
           setPresets((prev) => {
             const synced = prev.map((p) =>
-              p.id === presetWithVehicle.id || (p.name === data.preset.name && p.vehicle_no === data.preset.vehicle_no)
-                ? data.preset
+              p.id === finalizedPreset.id || (p.name === syncedPreset.name && p.vehicle_no === syncedPreset.vehicle_no)
+                ? syncedPreset
                 : p
             );
             const deduped = deduplicatePresets(synced);
@@ -330,23 +353,48 @@ export default function Home() {
   };
 
   const handleUpdatePreset = async (updatedPreset: LocationPreset) => {
-    const updated = presets.map((p) => (p.id === updatedPreset.id ? updatedPreset : p));
+    let currentIsAdmin = isAdmin;
+    try {
+      if (!currentIsAdmin && typeof window !== 'undefined') {
+        currentIsAdmin = localStorage.getItem(ADMIN_MODE_KEY) === 'true';
+      }
+    } catch (e) { }
+
+    const isPresetCommon = Boolean(
+      currentIsAdmin ||
+      updatedPreset.isCommon ||
+      updatedPreset.type === 'common' ||
+      updatedPreset.isGlobal ||
+      (!updatedPreset.vehicle_no && !updatedPreset.vehicleNo)
+    );
+    const cleanVehicle = isPresetCommon ? null : (updatedPreset.vehicle_no || currentVehicleNo);
+
+    const finalizedPreset: LocationPreset = {
+      ...updatedPreset,
+      type: isPresetCommon ? 'common' : 'personal',
+      isCommon: isPresetCommon,
+      isGlobal: isPresetCommon,
+      vehicle_no: cleanVehicle,
+      vehicleNo: cleanVehicle || undefined,
+    };
+
+    const updated = presets.map((p) => (p.id === finalizedPreset.id ? finalizedPreset : p));
     savePresetsToStorage(updated);
-    if (destination.id === updatedPreset.id) {
-      setDestination(updatedPreset);
+    if (destination.id === finalizedPreset.id) {
+      setDestination(finalizedPreset);
     }
-    if (origin.id === updatedPreset.id) {
-      setOrigin(updatedPreset);
+    if (origin.id === finalizedPreset.id) {
+      setOrigin(finalizedPreset);
     }
 
-    // Supabase Sync with vehicle_no
+    // Supabase Sync with vehicle_no (Strict Rule: common presets have vehicle_no: null)
     try {
       await fetch('/api/presets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...updatedPreset,
-          vehicle_no: updatedPreset.vehicle_no || currentVehicleNo,
+          ...finalizedPreset,
+          vehicle_no: isPresetCommon ? null : currentVehicleNo,
         }),
       });
     } catch (e) {

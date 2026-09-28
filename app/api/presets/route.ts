@@ -67,7 +67,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required preset fields' }, { status: 400 });
     }
 
-    const targetVehicle = vehicle_no || vehicleNo;
+    const isCommon = Boolean(body.isCommon || body.type === 'common' || body.isGlobal);
+    const targetVehicle = isCommon ? null : (vehicle_no || vehicleNo);
     const cleanVehicleNo = targetVehicle ? (targetVehicle.match(/(\d+호차)/)?.[1] || targetVehicle.trim()) : null;
 
     const payload: any = {
