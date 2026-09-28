@@ -2954,3 +2954,49 @@ flowchart TD
    - **Case 2 (`QuickActionBar` 5열 정렬)**: 375px 모바일 뷰포트에서도 `[차량체크]`, `[즐겨찾기]`, `[주유]`, `[항공편]`, `[로드뷰]` 5개 버튼이 줄바꿈이나 텍스트 잘림 없이 단정하게 정렬됨 (PASS).
    - **Case 3 (`RoadviewModal` 렌더링 및 딥링크 호출)**: 로드뷰 모달 오픈 시 상단 검색바 + 복사/목적지 퀵 카드 + 최근 검색(2열) + 거점(3열x4행=12슬롯)이 온전히 노출되며, 거점 탭 시 카카오 로드뷰 창이 새 탭으로 즉시 열림 (PASS).
 
+---
+
+## 58. RoadviewModal 간소화: 복사 주소 제거, 전면 카드 탭 일원화 및 서브텍스트 변경
+
+### 58.1 배경 및 작업 목적
+1. **클립보드 복사 주소 카드 완전 적출**:
+   - 기사가 필요 시 검색창에 직접 붙여넣기를 수행하므로, 모달 상단 공간을 불필요하게 점유하던 '복사한 주소' 감지 카드 및 관련 클립보드 비동기 권한/읽기 로직을 전면 삭제하여 검색창과 현재 목적지가 자연스럽게 이어지도록 레이아웃을 간결화.
+2. **헤더 서브텍스트 직관화**:
+   - 모달 상단 서브텍스트를 기존 '승하차 현장 및 진입로 사전 답사'에서 **`터치 한 번, 바로 거리뷰`**로 교체하여, 탭 즉시 카카오 로드뷰가 열린다는 점을 사용자에게 직관적으로 안내.
+3. **분리된 보조 아이콘 제거 및 카드 전체 탭 인터랙션 일원화**:
+   - 카드 내부에 별도로 분리되어 있던 작은 `bg-blue-50` 로드뷰 아이콘 버튼을 삭제.
+   - '현재 운행 목적지', '최근 검색' 2열 카드, '자주 가는 거점' 3열 카드 전체를 단일 클릭/터치 타깃으로 전환하고, `active:scale-[0.98]` 피드백을 적용하여 한 손 조작 환경에서도 손쉽게 로드뷰를 호출하도록 개선.
+
+---
+
+### 58.2 모듈별 상세 변경 내역
+
+#### 1. 클립보드 로직 및 UI 완전 적출 ([`components/RoadviewModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/RoadviewModal.tsx))
+- `copiedAddress`, `isResolvingClipboard` 상태 및 `handleOpenCopiedAddress` 핸들러 완전 삭제.
+- `navigator.clipboard.readText()` 호출 `useEffect` 및 불필요한 `Clipboard` 아이콘 import 제거.
+- JSX 내의 '복사한 주소' 카드 블록을 제거하여, 상단 검색창 바로 아래에 '현재 운행 목적지' 카드가 직관적으로 연결되도록 구성.
+
+#### 2. 헤더 서브텍스트 교체 ([`components/RoadviewModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/RoadviewModal.tsx))
+- 모달 상단 헤더 안내 문구를 `<p className="text-xs font-medium text-slate-500">터치 한 번, 바로 거리뷰</p>`로 업데이트.
+
+#### 3. 카드 전체 탭 인터랙션 및 시각 피드백 일원화 ([`components/RoadviewModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/RoadviewModal.tsx))
+- **현재 운행 목적지 카드**:
+  - 우측 분리 아이콘을 제거하고 카드 전체를 단일 `<button type="button">`으로 통합.
+  - 카드 내 우측에 `거리뷰 ↗` 배지를 단정하게 배치하고, 카드 어디를 터치하든 `openRoadview(currentDestination.lat, currentDestination.lng)`가 즉시 실행되도록 처리.
+- **최근 검색 (2열 카드)**:
+  - 카드 내부의 작은 보조 아이콘 버튼을 제거하고 카드 전체를 `<button type="button">`으로 전환.
+  - `active:scale-[0.98]` 시각적 탭 피드백을 적용하여 무마찰 딥링크 경험 제공.
+- **자주 가는 거점 (3열 그리드)**:
+  - 거점 카드 터치 시 `active:scale-[0.98]` 피드백과 함께 즉시 해당 위치의 카카오 거리뷰가 열리도록 정돈.
+
+---
+
+### 58.3 검증 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 컴파일 및 정적 페이지 생성 에러 **0건 (Exit code 0)** 통과.
+2. **시나리오 검증 결과**:
+   - **Case 1 (헤더 안내 문구)**: 모달 진입 시 '터치 한 번, 바로 거리뷰' 서브텍스트가 선명하게 노출됨 (PASS).
+   - **Case 2 (복사 주소 제거 확인)**: 클립보드 권한 요청이나 '복사한 주소' 카드 없이 상단 검색창과 현재 목적지가 군더더기 없이 이어짐 (PASS).
+   - **Case 3 (전면 터치 로드뷰)**: 현재 목적지 카드, 최근 검색 카드, 거점 그리드 카드를 탭했을 때 우측 작은 버튼을 조준할 필요 없이 카드 영역 어디를 눌러도 카카오 거리뷰 창이 즉시 실행됨 (PASS).
+
+
