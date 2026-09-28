@@ -2764,6 +2764,37 @@ flowchart TD
    - **Case 2 (신규 거점 강조 테두리)**: 거점 추가 완료 즉시 메인 슬롯의 방금 추가된 카드에 코발트 블루 점선 테두리(`#1E60F3`)와 은은한 블루 배경 및 글로우 그림자가 렌더링되어 한눈에 식별됨 (PASS).
    - **Case 3 (테두리 원복)**: 해당 카드를 탭하거나, 모달을 다시 열거나, 페이지를 새로고침했을 때 강조 테두리가 즉시 소거되고 일반 외곽선(`border-slate-200`)으로 원복됨 (PASS).
 
+---
+
+## 53. 메인 운행 대시보드 내 '자주 가는 목적지' 카드 섹션(PresetButtons) 영구 삭제
+
+### 53.1 배경 및 작업 목적
+1. **사용자 요구사항**:
+   - 메인 운행 대시보드 화면에 노출되던 '자주 가는 목적지' 카드 섹션을 완전히 제거할 것을 재확인.
+   - 목적지 및 거점 관리는 이미 상단 `OriginDestinationSelector`, 독립 `QuickActionBar`, `LocationSearchModal`, 그리고 `CustomPresetModal` 내부의 12슬롯 캐러셀에서 완벽히 수행 가능하므로, 메인 운행 뷰에 중복 노출되던 목적지 그리드 카드를 원천 배제.
+2. **영구 삭제 및 재발 방지**:
+   - `app/page.tsx` 내에서 `<PresetButtons>` 렌더링 블록 및 `import { PresetButtons }` 구문을 완전히 적출.
+   - `components/PresetButtons.tsx` 파일 자체를 저장소에서 영구 삭제(`git rm`)하여 향후 프롬프트 템플릿 등에 의한 재추가 가능성을 근본적으로 차단.
+
+---
+
+### 53.2 상세 변경 내역
+1. **`app/page.tsx`**:
+   - 상단 `import { PresetButtons } from '@/components/PresetButtons';` 삭제.
+   - 운행 탭(`activeTab === 'drive'`) 내 `QuickActionBar`와 `RouteInfoCard` 사이에 위치하던 `<PresetButtons ... />` JSX 블록 영구 삭제.
+   - 운행 탭의 레이아웃 흐름을 `OriginDestinationSelector` ➔ `QuickActionBar` ➔ `RouteInfoCard` ➔ `ReportTemplateSelector` ➔ `ActionPanel`로 단정하게 정리.
+2. **`components/PresetButtons.tsx`**:
+   - 파일 완전 삭제 (`git rm components/PresetButtons.tsx`).
+
+---
+
+### 53.3 검증 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 컴파일 및 정적 페이지 생성 에러 **0건 (Exit code 0)** 통과.
+2. **UI 렌더링 검증**:
+   - 메인 운행 대시보드에서 '자주 가는 목적지' 카드가 완전히 사라졌으며, 퀵 액션 바 바로 아래에 경로 안내 카드(`RouteInfoCard`)가 직관적으로 연결됨을 확인.
+
+
 
 
 
