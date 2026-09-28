@@ -103,6 +103,25 @@ export default function Home() {
   const fetchPresetsForVehicle = useCallback(async (vNo: string) => {
     const cleanV = vNo.match(/(\d+호차)/)?.[1] || vNo || '4호차';
     const storageKey = getPresetsStorageKey(cleanV);
+    const orderKey = `cockpit_presets_order_${cleanV}`;
+
+    const applyOrder = (list: LocationPreset[]) => {
+      try {
+        const orderStr = localStorage.getItem(orderKey);
+        if (orderStr) {
+          const ids: string[] = JSON.parse(orderStr);
+          if (Array.isArray(ids) && ids.length > 0) {
+            const indexMap = new Map(ids.map((id, i) => [id, i]));
+            return [...list].sort((a, b) => {
+              const posA = indexMap.has(a.id) ? indexMap.get(a.id)! : 999;
+              const posB = indexMap.has(b.id) ? indexMap.get(b.id)! : 999;
+              return posA - posB;
+            });
+          }
+        }
+      } catch (e) {}
+      return list;
+    };
 
     // 1. Load from vehicle-isolated localStorage first for instant UI response
     try {
@@ -110,7 +129,7 @@ export default function Home() {
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const deduped = deduplicatePresets(parsed);
+          const deduped = applyOrder(deduplicatePresets(parsed));
           setPresets(deduped);
           if (deduped.length !== parsed.length) {
             localStorage.setItem(storageKey, JSON.stringify(deduped));
@@ -127,7 +146,7 @@ export default function Home() {
       if (res.ok) {
         const data = await res.json();
         if (data.presets && Array.isArray(data.presets)) {
-          const deduped = deduplicatePresets(data.presets);
+          const deduped = applyOrder(deduplicatePresets(data.presets));
           setPresets(deduped);
           localStorage.setItem(storageKey, JSON.stringify(deduped));
         }
@@ -198,6 +217,7 @@ export default function Home() {
     setPresets(deduped);
     try {
       localStorage.setItem(getPresetsStorageKey(currentVehicleNo), JSON.stringify(deduped));
+      localStorage.setItem(`cockpit_presets_order_${currentVehicleNo}`, JSON.stringify(deduped.map((p) => p.id)));
     } catch (e) {
       console.warn('Failed to save ordered presets:', e);
     }
@@ -839,6 +859,7 @@ export default function Home() {
           <div className="flex-1 p-3.5 animate-fade-in">
             <ScheduleTab
               profile={profile}
+              presets={presets}
               onOpenProfileModal={() => setIsProfileModalOpen(true)}
               onSelectRouteForCockpit={handleSelectRouteFromSchedule}
               onOpenPredictionForSchedule={handleOpenPredictionForSchedule}
@@ -971,10 +992,19 @@ export default function Home() {
           setIsAddModalOpen(false);
           setEditingPreset(null);
         }}
+        presets={presets}
+        onReorderPresets={handleReorderPresets}
+        onDeletePreset={handleDeleteCustomPreset}
         onAddPreset={handleAddCustomPreset}
         presetToEdit={editingPreset}
         onUpdatePreset={handleUpdatePreset}
         isAdmin={isAdmin}
+        homeLocation={profile.homeLocation}
+        vehicleNo={currentVehicleNo}
+        onOpenHomeModal={() => {
+          setIsAddModalOpen(false);
+          setIsHomeModalOpen(true);
+        }}
       />
 
       {/* Home Location Address Registration Modal */}
@@ -1051,6 +1081,10 @@ export default function Home() {
         currentSelectedId={selectionTarget === 'origin' ? origin?.id : destination?.id}
         onSelectLocation={handleSelectLocationFromSearch}
         onOpenHomeModal={() => setIsHomeModalOpen(true)}
+        onOpenManagePresets={() => {
+          setIsLocationSearchOpen(false);
+          setIsAddModalOpen(true);
+        }}
         onTogglePresetFavorite={(preset, action) => {
           if (action === 'remove') {
             handleDeleteCustomPreset(preset.id);

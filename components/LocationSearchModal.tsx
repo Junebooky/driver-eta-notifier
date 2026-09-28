@@ -13,6 +13,7 @@ import {
   Navigation,
   Clock,
   Star,
+  Settings2,
 } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
@@ -36,6 +37,7 @@ interface LocationSearchModalProps {
   onSelectLocation: (location: SelectedLocationData) => void;
   onOpenHomeModal?: () => void;
   onTogglePresetFavorite?: (preset: LocationPreset, action: 'add' | 'remove') => void;
+  onOpenManagePresets?: () => void;
 }
 
 interface PoiResult {
@@ -61,6 +63,7 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
   onSelectLocation,
   onOpenHomeModal,
   onTogglePresetFavorite,
+  onOpenManagePresets,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -262,11 +265,11 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
             setSearchError('추천 검색 결과가 없습니다.');
           }
         } else {
-          setSearchError('TMAP 검색 서버 응답에 실패했습니다.');
+          setSearchError('검색 서버 응답에 실패했습니다.');
         }
       } catch (err: any) {
         if (err?.name === 'AbortError') return;
-        console.warn('TMAP Location Search error:', err);
+        console.warn('Location Search error:', err);
         setSearchError('장소 검색 중 오류가 발생했습니다.');
       } finally {
         if (abortControllerRef.current === controller) {
@@ -439,7 +442,7 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                   </h3>
                 </div>
                 <p className="text-[11px] text-slate-400 font-medium">
-                  자주 가는 거점을 원터치로 고르거나 TMAP으로 검색하세요.
+                  자주 가는 거점을 원터치로 고르거나 장소를 검색하세요.
                 </p>
               </div>
             </div>
@@ -499,11 +502,11 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
           style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
           onTouchMove={handleScrollTouch}
         >
-          {/* TMAP Search Results (If query length >= 2) */}
+          {/* Search Results (If query length >= 2) */}
           {searchQuery.trim().length >= 2 ? (
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs font-bold text-slate-700 px-1">
-                <span>TMAP 검색 결과</span>
+                <span>검색 결과</span>
                 {searchResults.length > 0 && (
                   <span className="text-[11px] text-[#1E60F3] font-black">
                     {searchResults.length}건 검색됨
@@ -667,9 +670,25 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                 <Sparkles className="w-3.5 h-3.5 text-[#1E60F3]" />
                 <span>자주 가는 거점 퀵 선택</span>
               </span>
-              <span className="text-[10px] text-slate-400 font-normal">
-                원터치 즉시 확정
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-slate-400 font-normal hidden sm:inline">
+                  원터치 즉시 확정
+                </span>
+                {onOpenManagePresets && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      haptics.lightTap();
+                      onOpenManagePresets();
+                    }}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 text-[11px] font-bold transition-all active:scale-95 cursor-pointer shadow-2xs"
+                    title="거점 순서 변경 및 관리"
+                  >
+                    <Settings2 className="w-3.5 h-3.5 text-slate-600" />
+                    <span>순서 관리</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* 3-Column Grid with Horizontal Carousel Slider */}
@@ -775,7 +794,7 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
         {/* Footer Guidance */}
         <div className="px-5 py-2.5 bg-slate-50 border-t border-slate-100 text-[11px] text-slate-500 flex items-center justify-between shrink-0">
           <span>거점을 터치하면 {isOrigin ? '출발지' : '목적지'}로 즉시 설정됩니다.</span>
-          <span className="text-slate-400 font-bold">TMAP 실시간</span>
+          <span className="text-slate-400 font-bold">실시간 장소 검색</span>
         </div>
       </div>
     </div>

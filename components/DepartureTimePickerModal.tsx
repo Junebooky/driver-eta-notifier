@@ -137,7 +137,7 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
                 출발 시간 선택
               </h3>
               <p className="text-[11px] text-slate-500 font-medium">
-                TMAP 실시간 및 미래 교통 예측을 위한 시간 설정
+                실시간 및 미래 교통 예측을 위한 출발 시간 설정
               </p>
             </div>
           </div>
@@ -289,7 +289,7 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
             className="flex-[2] py-3 rounded-xl bg-[#1E60F3] hover:bg-[#1650D6] text-white font-extrabold text-xs shadow-md shadow-blue-500/25 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-1.5"
           >
             <Check className="w-4 h-4 stroke-[2.5]" />
-            <span>이 시간으로 TMAP 예측 실행</span>
+            <span>이 시간으로 예측 실행</span>
           </button>
         </div>
       </div>

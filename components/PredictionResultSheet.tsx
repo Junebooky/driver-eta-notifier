@@ -218,7 +218,7 @@ export const PredictionResultSheet: React.FC<PredictionResultSheetProps> = ({
           <div className="mt-2.5 p-2.5 bg-blue-50/90 border border-blue-200/80 rounded-xl text-blue-900 text-[11px] leading-relaxed animate-fade-in flex items-start space-x-2">
             <Info className="w-3.5 h-3.5 text-[#1E60F3] shrink-0 mt-0.5" />
             <div>
-              <span className="font-bold block">네이버지도 & TMAP 빅데이터 기반 소요 시간 예측</span>
+              <span className="font-bold block">실시간 교통 빅데이터 기반 소요 시간 예측</span>
               <span>수도권 도로망의 시간대별 교통량 통계를 분석하여 출발 시각에 따른 정체 및 도착 예정 시각을 계산합니다.</span>
             </div>
           </div>

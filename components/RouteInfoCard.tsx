@@ -91,7 +91,7 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
                 이동 거리: <span className="text-slate-900 font-bold">{routeEstimate.distanceKm} km</span>
               </div>
               <div className="text-[11px] font-medium text-slate-400 whitespace-nowrap tracking-tight">
-                ({routeEstimate.trafficSummary || '실시간 교통 반영(TMAP)'})
+                ({routeEstimate.trafficSummary || '실시간 교통 반영'})
               </div>
             </div>
           )}

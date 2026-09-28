@@ -28,6 +28,7 @@ interface ScheduleFormModalProps {
   vehicleNo?: string;
   driverName?: string;
   passengerName?: string;
+  homeLocation?: { name: string; address: string; lat: number; lng: number } | null;
 }
 
 interface SelectedLocation {
@@ -112,11 +113,45 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
   onClose,
   onSave,
   initialDate,
-  presets = DEFAULT_PRESET_LOCATIONS,
+  presets,
   vehicleNo = '4호차',
   passengerName,
+  homeLocation,
 }) => {
   const [mounted, setMounted] = useState(false);
+
+  // Active Presets: Sync from props or vehicle-isolated localStorage to ensure Personal MY presets are included
+  const [activePresets, setActivePresets] = useState<LocationPreset[]>(() => {
+    if (presets && presets.length > 0) return presets;
+    if (typeof window !== 'undefined' && vehicleNo) {
+      const cleanV = vehicleNo.match(/(\d+호차)/)?.[1] || vehicleNo || '4호차';
+      try {
+        const cached = localStorage.getItem(`cockpit_presets_${cleanV}`);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch (e) {}
+    }
+    return DEFAULT_PRESET_LOCATIONS;
+  });
+
+  useEffect(() => {
+    if (presets && presets.length > 0) {
+      setActivePresets(presets);
+    } else if (typeof window !== 'undefined' && vehicleNo) {
+      const cleanV = vehicleNo.match(/(\d+호차)/)?.[1] || vehicleNo || '4호차';
+      try {
+        const cached = localStorage.getItem(`cockpit_presets_${cleanV}`);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setActivePresets(parsed);
+          }
+        }
+      } catch (e) {}
+    }
+  }, [presets, vehicleNo, isOpen]);
 
   // 1. Date Field (ISO: YYYY-MM-DD)
   const [pickupDate, setPickupDate] = useState(() => normalizeToIsoDate(initialDate));
@@ -158,18 +193,18 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
 
       // Default presets
       setOrigin({
-        name: presets[2]?.shortName || '조선팰리스 강남',
-        address: presets[2]?.address || '서울 강남구 테헤란로 231',
-        lat: presets[2]?.lat || 37.5042,
-        lng: presets[2]?.lng || 127.0425,
-        presetId: presets[2]?.id || 'josun_palace',
+        name: activePresets[2]?.shortName || '조선팰리스 강남',
+        address: activePresets[2]?.address || '서울 강남구 테헤란로 231',
+        lat: activePresets[2]?.lat || 37.5042,
+        lng: activePresets[2]?.lng || 127.0425,
+        presetId: activePresets[2]?.id || 'josun_palace',
       });
       setDestination({
-        name: presets[0]?.shortName || '인천공항 T1',
-        address: presets[0]?.address || '인천 중구 공항로 272',
-        lat: presets[0]?.lat || 37.4495,
-        lng: presets[0]?.lng || 126.4512,
-        presetId: presets[0]?.id || 'icn_t1',
+        name: activePresets[0]?.shortName || '인천공항 T1',
+        address: activePresets[0]?.address || '인천 중구 공항로 272',
+        lat: activePresets[0]?.lat || 37.4495,
+        lng: activePresets[0]?.lng || 126.4512,
+        presetId: activePresets[0]?.id || 'icn_t1',
       });
 
       setPickupTime('09:00');
@@ -508,7 +543,8 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
           isOpen={!!searchModalTarget}
           onClose={() => setSearchModalTarget(null)}
           target={searchModalTarget}
-          presets={presets}
+          presets={activePresets}
+          homeLocation={homeLocation}
           currentSelectedId={searchModalTarget === 'origin' ? origin?.presetId : destination?.presetId}
           onSelectLocation={(loc: SelectedLocationData) => {
             if (searchModalTarget === 'origin') {

@@ -1688,6 +1688,80 @@ SELECT * FROM cockpit.presets;
 4. **최근 검색 및 별표 토글 인터랙션 검증**:
    - 검색창 하단에 최근 검색 목록이 가로 스크롤로 노출되고, 별표 클릭 시 `#FEE500` 노란색으로 즉시 활성화되며 거점 목록에 실시간 반영됨을 확인.
 
+---
+
+## 38. 거점 관리 모달 순서 변경(Reorder) 복원, 플랫폼 중립적 검색명 교정 및 스케줄 모달 개인 거점(MY) 연동 (2026-09-28)
+
+### 38.1 추진 배경 및 목적
+1. **거점 종합 관리 및 순서 이동(Reorder) 기능 복원**:
+   - 기존 거점 관리 아이콘 탭 시 단순 "장소 등록" 폼만 표시되어 등록된 거점의 순서 변경이나 삭제가 불가능하던 문제를 해결.
+   - 전체 거점(🏠 자택, 🏢 공통 HQ, 👤 개인 MY)을 한눈에 관리할 수 있는 종합 뷰를 구성하고, `[▲] [▼]` 버튼 및 드래그 앤 드롭을 통한 실시간 순서 변경과 개인 거점 삭제 기능을 복원.
+   - 순서 변경 결과를 `cockpit_presets_order_${vehicleNo}` 및 Supabase DB에 즉각 동기화하여, 메인 화면 및 검색 모달의 거점 그리드에 실시간 반영.
+   - `LocationSearchModal` 내에도 `[⚙️ 순서 관리]` 바로가기 버튼을 탑재하여 언제든 순서 관리 창을 호출할 수 있도록 연결.
+2. **"TMAP" 특정 브랜드명 전면 걷어내기 및 플랫폼 중립화**:
+   - 카카오내비, 네이버지도 등 다양한 내비를 사용하는 기사님들의 혼선을 방지하기 위해 검색창 및 모달 안내에서 "TMAP" 명칭을 완전히 제거하고 플랫폼 중립적 레이블로 정돈.
+3. **새 스케줄 등록 모달 내 '개인(MY)' 거점 연동 누락 해결**:
+   - `ScheduleFormModal`에서 장소 검색 모달 호출 시 '공통(HQ)' 거점만 나오고 기사 개인이 등록한 '개인(MY)' 거점이 노출되지 않던 파이프라인 누락 문제를 수정하여 모든 거점이 완벽히 노출되도록 보장.
+
+---
+
+### 38.2 핵심 구현 내역
+
+#### [태스크 1] 거점 관리 모달 종합 뷰 개편 및 순서 변경(Reorder) 복원 ([`components/CustomPresetModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/CustomPresetModal.tsx), [`components/LocationSearchModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/LocationSearchModal.tsx), [`app/page.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/page.tsx))
+1. **모달 타이틀 및 상단 접이식 등록 바 (`[+ 새 거점 추가 등록하기]`)**:
+   - 타이틀: **`거점 및 자주 가는 목적지 관리`** 및 등록된 거점 수 뱃지(`N개`) 표기.
+   - 상단에 점선 테두리의 `[+ 새 거점 추가 등록하기]` 토글 버튼을 배치하여 탭 시에만 장소 검색 및 등록 폼이 부드럽게 펼쳐지도록 공간 최적화.
+2. **등록된 전체 거점 목록 카드 뷰 (🏠 자택 + 🏢 공통 HQ + 👤 개인 MY)**:
+   - 최상단 자택 카드: `🏠 자택` 뱃지 및 주소 표시, `[주소 변경/등록]` 버튼 연동.
+   - 거점 카드: `🏢 공통 HQ`와 `👤 개인 MY` 뱃지를 구분하여 시각적 명확성 확보.
+3. **위/아래 이동(`[▲] [▼]`) 및 드래그 앤 드롭 순서 변경**:
+   - 각 거점 카드 우측에 드래그 핸들(`<GripVertical />`)과 `[▲] [▼]` 이동 버튼 배치.
+   - 이동 시 `haptics.lightTap()`과 함께 `currentPresets` 순서가 즉시 바뀌고, `cockpit_presets_order_${vehicleNo}` 및 `cockpit_presets_${vehicleNo}` 로컬 스토리지에 즉각 저장.
+   - `app/page.tsx`의 `handleReorderPresets`를 통해 Supabase fleet DB(`presetOrder`)에 실시간 동기화.
+4. **개인 거점(`MY`) 삭제 및 명칭 수정**:
+   - 개인 거점 카드에 `[Pencil]`(수정) 및 `[Trash2]`(삭제) 버튼을 두어 불필요한 거점을 손쉽게 정리.
+5. **`LocationSearchModal` 내 `[⚙️ 순서 관리]` 직결 버튼 탑재**:
+   - '자주 가는 거점 퀵 선택' 섹션 우측 상단에 `[⚙️ 순서 관리]` 버튼을 추가하여 장소 선택 중에도 원터치로 거점 관리 모달을 열 수 있도록 연결.
+
+---
+
+#### [태스크 2] "TMAP" 명칭 제거 및 플랫폼 중립적 레이블 교정 ([`components/CustomPresetModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/CustomPresetModal.tsx), [`components/LocationSearchModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/LocationSearchModal.tsx), [`components/DepartureTimePickerModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/DepartureTimePickerModal.tsx), [`components/PredictionResultSheet.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/PredictionResultSheet.tsx), [`components/RouteInfoCard.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/RouteInfoCard.tsx))
+1. **헤더 및 검색창 레이블 변경**:
+   - `TMAP 장소 검색 (실시간 추천)` ➔ **`장소 검색 (실시간 추천)`**
+   - `TMAP 검색 결과` ➔ **`검색 결과`**
+   - `TMAP 실시간` ➔ **`실시간 장소 검색`**
+   - `TMAP 검색 서버 응답에 실패했습니다.` ➔ **`검색 서버 응답에 실패했습니다.`**
+2. **예측 및 소요 시간 안내 텍스트 교정**:
+   - `이 시간으로 TMAP 예측 실행` ➔ **`이 시간으로 예측 실행`**
+   - `네이버지도 & TMAP 빅데이터 기반 소요 시간 예측` ➔ **`실시간 교통 빅데이터 기반 소요 시간 예측`**
+   - `실시간 교통 반영(TMAP)` ➔ **`실시간 교통 반영`**
+3. **플레이스홀더 표준화**:
+   - `"장소명 또는 주소 검색 (예: 인천공항, 신라호텔, 코엑스)"`로 플랫폼 중립적 안내 유지.
+
+---
+
+#### [태스크 3] 새 스케줄 등록(`ScheduleFormModal.tsx`) 시 '개인(MY)' 거점 연동 누락 해결 ([`components/ScheduleFormModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ScheduleFormModal.tsx), [`components/ScheduleTab.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ScheduleTab.tsx), [`app/page.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/page.tsx))
+1. **데이터 파이프라인 동기화**:
+   - `app/page.tsx` ➔ `<ScheduleTab presets={presets} />` 전달.
+   - `ScheduleTab.tsx` ➔ `<ScheduleFormModal presets={presets} homeLocation={profile.homeLocation} />` 전달.
+2. **이중 복원 안전망 (Active Presets Fallback)**:
+   - `ScheduleFormModal.tsx` 내에서 `presets` prop이 없거나 비어 있을 경우에도 `cockpit_presets_${cleanV}` 로컬 스토리지에서 기사 개인의 거점을 능동적으로 복원하는 `activePresets` 상태 구축.
+3. **`LocationSearchModal` 거점 렌더링 일원화**:
+   - `ScheduleFormModal`에서 호출하는 `LocationSearchModal`에 `presets={activePresets}`와 `homeLocation={homeLocation}`을 온전히 전달하여 메인 화면과 100% 동일하게 **자택(🏠) + 공통 거점(🏢 HQ) + 기사 개인 거점(👤 MY)** 전체 그리드가 노출되도록 보장.
+
+---
+
+### 38.3 검증 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 14개 라우트 컴파일 에러 **0건** 완료.
+2. **거점 순서 이동 및 복원 검증**:
+   - `scratch/test_preset_management.ts` 실행을 통해 `cockpit_presets_order_${vehicleNo}` 저장 및 `applyOrder` 정렬 알고리즘이 100% 정상 작동함을 검증 완료.
+3. **플랫폼 중립적 레이블 검증**:
+   - 검색창, 결과창, 하단 푸터, 출발 시간 피커, 소요 시간 안내 등 모든 UI에서 "TMAP" 브랜드 텍스트가 정돈되고 플랫폼 중립적 명칭으로 교정됨을 확인.
+4. **스케줄 모달 내 개인 거점 노출 검증**:
+   - 스케줄 모달 출발지/도착지 선택 창 호출 시 `activePresets` 파이프라인을 통해 기사 개인 등록 거점(`MY`)이 누락 없이 정상 노출됨을 확인.
+
+
 
 
 

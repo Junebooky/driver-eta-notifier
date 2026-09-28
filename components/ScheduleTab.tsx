@@ -98,6 +98,7 @@ interface ScheduleTabProps {
   onNavigateForSchedule: (schedule: ScheduleItem) => void;
   onOpenFlightModal?: (flightId: string, type: 'arrival' | 'departure') => void;
   onSwitchVehicle?: (vehicleNo: string) => void;
+  presets?: LocationPreset[];
 }
 
 export const ScheduleTab: React.FC<ScheduleTabProps> = ({
@@ -108,6 +109,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
   onNavigateForSchedule,
   onOpenFlightModal,
   onSwitchVehicle,
+  presets,
 }) => {
   // Schedules state (starts with empty state by default, populated dynamically per vehicle)
   const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
@@ -1298,6 +1300,8 @@ ${scheduleItemsFormatted}`.trim();
         initialDate={scheduleFormInitialDate}
         vehicleNo={profile.vehicleNo}
         passengerName={profile.passengerName}
+        presets={presets}
+        homeLocation={profile.homeLocation}
       />
     </div>
   );
