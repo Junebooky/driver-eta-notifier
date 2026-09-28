@@ -808,7 +808,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="검색 결과에서 거점을 선택하거나 입력하세요"
-                      className="w-full px-3.5 py-3 bg-white border border-slate-200 rounded-xl text-base font-bold text-slate-900 placeholder:text-base placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3]"
+                      className="w-full px-3.5 py-3 bg-white border border-slate-200 rounded-xl text-base font-semibold text-slate-900 placeholder:text-base placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3]"
                     />
                   </div>
 
@@ -823,7 +823,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                       onChange={(e) => setShortName(e.target.value)}
                       placeholder="예: 소노펠리체"
                       maxLength={12}
-                      className="w-full px-3.5 py-3 bg-white border border-slate-200 rounded-xl text-lg font-bold text-slate-900 placeholder:text-base placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3]"
+                      className="w-full px-3.5 py-3 bg-white border border-slate-200 rounded-xl text-lg font-medium text-slate-900 placeholder:text-base placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3]"
                     />
                   </div>
                 </div>
@@ -927,7 +927,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
                     placeholder="검색 결과에서 선택하거나 입력하세요"
-                    className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200 rounded-xl text-lg font-bold text-slate-900 placeholder:text-base placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:bg-white"
+                    className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200 rounded-xl text-lg font-medium text-slate-900 placeholder:text-base placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:bg-white"
                   />
                 </div>
 

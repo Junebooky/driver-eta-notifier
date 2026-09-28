@@ -103,7 +103,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
           </span>
           {item.origin_address && (
             <span
-              className="text-sm text-slate-400 font-normal min-w-0 flex-1 truncate max-w-[180px]"
+              className="text-xs text-slate-400 font-normal min-w-0 flex-1 truncate max-w-[180px]"
               title={item.origin_address}
             >
               {item.origin_address}
@@ -126,7 +126,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
           </span>
           {item.destination_address && (
             <span
-              className="text-sm text-slate-400 font-normal min-w-0 flex-1 truncate max-w-[180px]"
+              className="text-xs text-slate-400 font-normal min-w-0 flex-1 truncate max-w-[180px]"
               title={item.destination_address}
             >
               {item.destination_address}
@@ -143,7 +143,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
             onEdit(item);
           }
         }}
-        className={`bg-slate-50/80 rounded-xl p-3 space-y-1.5 text-sm text-slate-700 border border-slate-100 transition-colors ${onEdit ? 'hover:bg-slate-100/90 cursor-pointer' : ''
+        className={`bg-slate-50/80 rounded-xl p-3 space-y-1.5 text-xs text-slate-700 border border-slate-100 transition-colors ${onEdit ? 'hover:bg-slate-100/90 cursor-pointer' : ''
           }`}
         title={onEdit ? '클릭하여 정보 수정' : undefined}
       >
