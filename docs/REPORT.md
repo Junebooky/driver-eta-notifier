@@ -3208,10 +3208,20 @@ flowchart TD
    - **Case 3 (카카오맵 Safari 주소 오류 방지)**: `kakaomap://open`을 호출하여 iOS Safari 에러 팝업 없이 카카오맵이 즉시 실행됨 (PASS).
    - **Case 4 (터치 스크롤)**: 헤더 터치 후 스와이프/스크롤 시 롱프레스 타이머가 즉시 취소되어 오작동하지 않음 (PASS).
 
+---
 
+## 65. 차량 점검 모달 차량호차/차량번호 입력 필드 텍스트 크기 조정 (`text-base`)
 
+### 65.1 배경 및 작업 목적
+- 차량 점검 모달(`VehicleInspectionModal.tsx`)의 차량호차(L597) 및 차량번호(L609) 인풋 텍스트 크기가 `text-lg`로 설정되어 있어 시각적으로 과도하게 크던 문제를 해결하기 위해, 조화롭고 깔끔한 표준 크기인 `text-base`로 통일 조정.
 
+### 65.2 모듈별 상세 구현 내역
+- [`components/VehicleInspectionModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/VehicleInspectionModal.tsx):
+  - 차량호차 인풋 클래스 `text-lg` -> `text-base` 변경.
+  - 차량번호 인풋 클래스 `text-lg` -> `text-base` 변경.
 
-
-
-
+### 65.3 검증 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: 전 15개 라우트 TypeScript / ESLint 컴파일 에러 **0건 (Exit code 0)** 통과.
+2. **UI 정합성**:
+   - 차량 점검 모달의 기본 정보 입력란 폰트 크기가 `text-base`로 단정하게 반영됨.

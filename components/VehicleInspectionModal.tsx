@@ -594,7 +594,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                 value={vehicleHocha}
                 onChange={(e) => setVehicleHocha(e.target.value)}
                 placeholder="4호차"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors text-lg"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors text-base"
               />
             </div>
             <div>
@@ -606,7 +606,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                 value={carNumber}
                 onChange={(e) => setCarNumber(e.target.value)}
                 placeholder="142호 7811"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors text-lg"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors text-base"
               />
             </div>
           </div>
