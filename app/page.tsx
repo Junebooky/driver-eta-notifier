@@ -8,6 +8,7 @@ import { ProfileModal, parseVehicleDetails } from '@/components/ProfileModal';
 import { AdminPinModal } from '@/components/AdminPinModal';
 import { OriginDestinationSelector } from '@/components/OriginDestinationSelector';
 import { QuickActionBar } from '@/components/QuickActionBar';
+import { PresetButtons } from '@/components/PresetButtons';
 import { CustomPresetModal } from '@/components/CustomPresetModal';
 import { RouteInfoCard } from '@/components/RouteInfoCard';
 import { ReportTemplateSelector } from '@/components/ReportTemplateSelector';
@@ -72,6 +73,9 @@ export default function Home() {
   const [presets, setPresets] = useState<LocationPreset[]>(DEFAULT_PRESET_LOCATIONS);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingPreset, setEditingPreset] = useState<LocationPreset | null>(null);
+
+  // Ephemeral newly added preset ID for temporary cobalt blue border highlight
+  const [newlyAddedPresetId, setNewlyAddedPresetId] = useState<string | null>(null);
 
   // Admin PIN Mode ('1010') State
   const [isAdmin, setIsAdmin] = useState(false);
@@ -232,11 +236,13 @@ export default function Home() {
   };
 
   const handleOpenAddModal = () => {
+    setNewlyAddedPresetId(null);
     setEditingPreset(null);
     setIsAddModalOpen(true);
   };
 
   const handleOpenEditModal = (preset: LocationPreset) => {
+    setNewlyAddedPresetId(null);
     setEditingPreset(preset);
     setIsAddModalOpen(true);
   };
@@ -305,6 +311,7 @@ export default function Home() {
     const reindexed = updated.map((p, idx) => ({ ...p, order: idx }));
     savePresetsToStorage(reindexed);
     setPresets(reindexed);
+    setNewlyAddedPresetId(finalizedPreset.id);
 
     if (selectionTarget === 'origin') {
       setOrigin(finalizedPreset);
@@ -628,6 +635,7 @@ export default function Home() {
 
   // Handle Preset Button Click
   const handleSelectPreset = (preset: LocationPreset) => {
+    setNewlyAddedPresetId(null);
     let resolvedPreset = preset;
     // Resolve Home slot
     if (preset.id === 'slot_home') {
@@ -930,7 +938,29 @@ export default function Home() {
               onOpenFlightModal={() => setIsFlightModalOpen(true)}
             />
 
-            {/* 3. Route Estimation & ETA Status (Strictly Real-time TMAP) */}
+            {/* 3. VIP Destination Presets (자주 가는 목적지 독립 카드) */}
+            <PresetButtons
+              presets={presets}
+              homeLocation={profile.homeLocation}
+              selectedOriginId={origin?.id}
+              selectedDestinationId={destination?.id}
+              selectionTarget={selectionTarget}
+              isAdmin={isAdmin}
+              onSelectPreset={handleSelectPreset}
+              onOpenAddModal={handleOpenAddModal}
+              onOpenHomeModal={() => setIsHomeModalOpen(true)}
+              onOpenFlightModal={() => setIsFlightModalOpen(true)}
+              onOpenGasModal={() => setIsGasModalOpen(true)}
+              onOpenInspectionModal={() => setIsInspectionModalOpen(true)}
+              onOpenPresetModal={handleOpenAddModal}
+              onEditPreset={handleOpenEditModal}
+              onDeleteCustomPreset={handleDeleteCustomPreset}
+              onReorderPresets={handleReorderPresets}
+              newlyAddedPresetId={newlyAddedPresetId}
+              onClearHighlight={() => setNewlyAddedPresetId(null)}
+            />
+
+            {/* 4. Route Estimation & ETA Status (Strictly Real-time TMAP) */}
             <RouteInfoCard
               routeEstimate={routeEstimate}
               isLoadingRoute={isLoadingRoute}
@@ -1115,6 +1145,8 @@ export default function Home() {
           setIsAddModalOpen(false);
           setIsHomeModalOpen(true);
         }}
+        newlyAddedPresetId={newlyAddedPresetId}
+        onClearHighlight={() => setNewlyAddedPresetId(null)}
       />
 
       {/* Home Location Address Registration Modal */}

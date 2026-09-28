@@ -29,6 +29,8 @@ interface CustomPresetModalProps {
   homeLocation?: { name: string; address: string; lat: number; lng: number } | null;
   vehicleNo?: string;
   onOpenHomeModal?: () => void;
+  newlyAddedPresetId?: string | null;
+  onClearHighlight?: () => void;
 }
 
 interface PoiResult {
@@ -72,11 +74,16 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
   homeLocation,
   vehicleNo,
   onOpenHomeModal,
+  newlyAddedPresetId = null,
+  onClearHighlight,
 }) => {
   const effectiveIsAdmin = Boolean(
     isAdmin ||
     (typeof window !== 'undefined' && localStorage.getItem(ADMIN_MODE_KEY) === 'true')
   );
+
+  // Ephemeral Save Success Feedback State (350ms Dynamic Check Interaction)
+  const [isSaveSuccess, setIsSaveSuccess] = useState(false);
 
   // Local Presets State for Dynamic Position Swapping (Excluding Home slot)
   const [items, setItems] = useState<LocationPreset[]>(presets || []);
@@ -746,6 +753,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
     setIsDropdownOpen(false);
     setSearchError(null);
     setIsHomeEditMode(false);
+    setIsSaveSuccess(false);
   };
 
   // Save new preset or update existing
@@ -760,106 +768,113 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
       return;
     }
 
+    // 1) 햅틱 및 시각 성공 상태 활성화
+    setIsSaveSuccess(true);
     haptics.successPulse();
 
-    // 1. Home Mode
-    if (isHomeMode && onSaveHome) {
-      onSaveHome({
-        name: name.trim() || '자택',
-        address: address.trim() || '자택 주소',
-        lat,
-        lng,
-      });
-      handleCancelForm();
-      onClose();
-      return;
-    }
-
-    // 2. Edit Preset
-    if (editingItem && onUpdatePreset) {
-      const isCommonPreset = effectiveIsAdmin
-        ? true
-        : Boolean(editingItem.isCommon || editingItem.type === 'common' || editingItem.isGlobal || (!editingItem.vehicle_no && !editingItem.vehicleNo));
-      const cleanVehicle = isCommonPreset ? null : (editingItem.vehicle_no || vehicleNo || null);
-
-      const updatedPreset: LocationPreset = {
-        ...editingItem,
-        name: name.trim(),
-        shortName: shortName.trim(),
-        fullName: name.trim(),
-        address: address.trim() || '사용자 지정 거점',
-        lat,
-        lng,
-        type: isCommonPreset ? 'common' : 'personal',
-        isCommon: isCommonPreset,
-        isGlobal: isCommonPreset,
-        vehicle_no: cleanVehicle,
-        vehicleNo: cleanVehicle || undefined,
-      };
-      onUpdatePreset(updatedPreset);
-      const updatedList = items.map((p) => (p.id === updatedPreset.id ? updatedPreset : p));
-      const reindexed = updatedList.map((p, idx) => ({ ...p, order: idx }));
-      setItems(reindexed);
-      itemsRef.current = reindexed;
-      commitReorder(reindexed);
-    } else {
-      // 3. New Preset
-      const isCommonPreset = Boolean(effectiveIsAdmin);
-      const cleanVehicle = isCommonPreset ? null : (vehicleNo || null);
-
-      const newPreset: LocationPreset = {
-        id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `preset_${Date.now()}`,
-        name: name.trim(),
-        shortName: shortName.trim(),
-        fullName: name.trim(),
-        lat,
-        lng,
-        category: isCommonPreset ? 'HOTEL' : 'CUSTOM',
-        address: address.trim() || '사용자 지정 거점',
-        type: isCommonPreset ? 'common' : 'personal',
-        isCommon: isCommonPreset,
-        isGlobal: isCommonPreset,
-        vehicle_no: cleanVehicle,
-        vehicleNo: cleanVehicle || undefined,
-        order: 0,
-        createdAt: new Date().toISOString(),
-      };
-
-      if (isCommonPreset) {
-        // [태스크 2] 기존 공통 거점들 중 맨 끝(즉, 개인 거점들이 시작되기 직전 위치)에 삽입하여 1페이지 전진 배치
-        const isHQ = (p: LocationPreset) =>
-          Boolean(p.isCommon || p.type === 'common' || p.isGlobal || (!p.vehicle_no && !p.vehicleNo));
-
-        let insertIndex = 0;
-        for (let i = items.length - 1; i >= 0; i--) {
-          if (isHQ(items[i])) {
-            insertIndex = i + 1;
-            break;
-          }
-        }
-        const updatedList = [...items];
-        updatedList.splice(insertIndex, 0, newPreset);
-        const reindexed = updatedList.map((p, idx) => ({ ...p, order: idx }));
-        setItems(reindexed);
-        itemsRef.current = reindexed;
-        commitReorder(reindexed);
-        onAddPreset(newPreset);
-        // 저장 즉시 1페이지 자동 포커스
-        setCurrentPage(0);
-      } else {
-        const updatedList = [...items, newPreset];
-        const reindexed = updatedList.map((p, idx) => ({ ...p, order: idx }));
-        setItems(reindexed);
-        itemsRef.current = reindexed;
-        commitReorder(reindexed);
-        onAddPreset(newPreset);
+    // 2) 350ms 동안 V 체크 표시를 사용자에게 인지시킨 후 실제 저장 및 폼 닫기 커밋
+    setTimeout(() => {
+      // 1. Home Mode
+      if (isHomeMode && onSaveHome) {
+        onSaveHome({
+          name: name.trim() || '자택',
+          address: address.trim() || '자택 주소',
+          lat,
+          lng,
+        });
+        handleCancelForm();
+        onClose();
+        setIsSaveSuccess(false);
+        return;
       }
-    }
 
-    handleCancelForm();
-    if (presetToEdit) {
-      onClose();
-    }
+      // 2. Edit Preset
+      if (editingItem && onUpdatePreset) {
+        const isCommonPreset = effectiveIsAdmin
+          ? true
+          : Boolean(editingItem.isCommon || editingItem.type === 'common' || editingItem.isGlobal || (!editingItem.vehicle_no && !editingItem.vehicleNo));
+        const cleanVehicle = isCommonPreset ? null : (editingItem.vehicle_no || vehicleNo || null);
+
+        const updatedPreset: LocationPreset = {
+          ...editingItem,
+          name: name.trim(),
+          shortName: shortName.trim(),
+          fullName: name.trim(),
+          address: address.trim() || '사용자 지정 거점',
+          lat,
+          lng,
+          type: isCommonPreset ? 'common' : 'personal',
+          isCommon: isCommonPreset,
+          isGlobal: isCommonPreset,
+          vehicle_no: cleanVehicle,
+          vehicleNo: cleanVehicle || undefined,
+        };
+        onUpdatePreset(updatedPreset);
+        const updatedList = items.map((p) => (p.id === updatedPreset.id ? updatedPreset : p));
+        const reindexed = updatedList.map((p, idx) => ({ ...p, order: idx }));
+        setItems(reindexed);
+        itemsRef.current = reindexed;
+        commitReorder(reindexed);
+      } else {
+        // 3. New Preset
+        const isCommonPreset = Boolean(effectiveIsAdmin);
+        const cleanVehicle = isCommonPreset ? null : (vehicleNo || null);
+
+        const newPreset: LocationPreset = {
+          id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `preset_${Date.now()}`,
+          name: name.trim(),
+          shortName: shortName.trim(),
+          fullName: name.trim(),
+          lat,
+          lng,
+          category: isCommonPreset ? 'HOTEL' : 'CUSTOM',
+          address: address.trim() || '사용자 지정 거점',
+          type: isCommonPreset ? 'common' : 'personal',
+          isCommon: isCommonPreset,
+          isGlobal: isCommonPreset,
+          vehicle_no: cleanVehicle,
+          vehicleNo: cleanVehicle || undefined,
+          order: 0,
+          createdAt: new Date().toISOString(),
+        };
+
+        if (isCommonPreset) {
+          // [태스크 2] 기존 공통 거점들 중 맨 끝(즉, 개인 거점들이 시작되기 직전 위치)에 삽입하여 1페이지 전진 배치
+          const isHQ = (p: LocationPreset) =>
+            Boolean(p.isCommon || p.type === 'common' || p.isGlobal || (!p.vehicle_no && !p.vehicleNo));
+
+          let insertIndex = 0;
+          for (let i = items.length - 1; i >= 0; i--) {
+            if (isHQ(items[i])) {
+              insertIndex = i + 1;
+              break;
+            }
+          }
+          const updatedList = [...items];
+          updatedList.splice(insertIndex, 0, newPreset);
+          const reindexed = updatedList.map((p, idx) => ({ ...p, order: idx }));
+          setItems(reindexed);
+          itemsRef.current = reindexed;
+          commitReorder(reindexed);
+          onAddPreset(newPreset);
+          // 저장 즉시 1페이지 자동 포커스
+          setCurrentPage(0);
+        } else {
+          const updatedList = [...items, newPreset];
+          const reindexed = updatedList.map((p, idx) => ({ ...p, order: idx }));
+          setItems(reindexed);
+          itemsRef.current = reindexed;
+          commitReorder(reindexed);
+          onAddPreset(newPreset);
+        }
+      }
+
+      handleCancelForm();
+      if (presetToEdit) {
+        onClose();
+      }
+      setIsSaveSuccess(false);
+    }, 350);
   };
 
   // ==============================================================
@@ -1146,11 +1161,15 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                   </button>
                   <button
                     type="submit"
-                    disabled={lat === null || !name.trim()}
-                    className="w-2/3 py-3 rounded-xl bg-[#1E60F3] hover:bg-[#1346D8] disabled:opacity-40 text-white text-sm font-black shadow-xs transition active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1.5"
+                    disabled={lat === null || !name.trim() || isSaveSuccess}
+                    className={`w-2/3 py-3 rounded-xl text-white text-sm font-black shadow-xs transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1.5 ${
+                      isSaveSuccess
+                        ? 'bg-[#1E60F3] shadow-[0_0_15px_rgba(30,96,243,0.35)]'
+                        : 'bg-[#1E60F3] hover:bg-[#1346D8] disabled:opacity-40'
+                    }`}
                   >
-                    <Check className="w-4 h-4 stroke-[2.5]" />
-                    <span>{editingItem ? '수정 완료' : '저장'}</span>
+                    {isSaveSuccess && <Check className="w-4 h-4 stroke-[2.5] animate-in zoom-in duration-150" />}
+                    <span>{isSaveSuccess ? '저장 완료' : editingItem ? '수정 완료' : '저장'}</span>
                   </button>
                 </div>
               </form>
@@ -1276,10 +1295,15 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                   </button>
                   <button
                     type="submit"
-                    disabled={lat === null || !name.trim()}
-                    className="w-2/3 py-3 rounded-xl bg-[#1E60F3] hover:bg-[#1346D8] disabled:opacity-40 text-white text-sm font-black shadow-xs transition active:scale-[0.98] cursor-pointer"
+                    disabled={lat === null || !name.trim() || isSaveSuccess}
+                    className={`w-2/3 py-3 rounded-xl text-white text-sm font-black shadow-xs transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1.5 ${
+                      isSaveSuccess
+                        ? 'bg-[#1E60F3] shadow-[0_0_15px_rgba(30,96,243,0.35)]'
+                        : 'bg-[#1E60F3] hover:bg-[#1346D8] disabled:opacity-40'
+                    }`}
                   >
-                    {isHomeEditMode ? '자택 수정' : '자택 저장'}
+                    {isSaveSuccess && <Check className="w-4 h-4 stroke-[2.5] animate-in zoom-in duration-150" />}
+                    <span>{isSaveSuccess ? '저장 완료' : isHomeEditMode ? '자택 수정' : '자택 저장'}</span>
                   </button>
                 </div>
               </form>
@@ -1349,6 +1373,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                           const { preset, index } = slot;
                           const isHQ = Boolean(preset.isCommon || preset.type === 'common' || preset.isGlobal || (!preset.vehicle_no && !preset.vehicleNo));
                           const isBeingDragged = isDragging && dragIndex === index;
+                          const isNewlyAdded = newlyAddedPresetId === preset.id;
 
                           return (
                             <div
@@ -1363,9 +1388,14 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                               onTouchCancel={handlePointerCancel}
                               onMouseDown={(e) => handlePointerStart(index, e)}
                               onMouseUp={handlePointerEnd}
-                              onClick={() => handleCardClick(preset)}
+                              onClick={() => {
+                                onClearHighlight?.();
+                                handleCardClick(preset);
+                              }}
                               className={`relative min-h-[64px] p-2.5 rounded-2xl border text-center flex flex-col justify-between items-center transition-all duration-300 select-none group shadow-2xs cursor-grab active:cursor-grabbing will-change-transform ${isBeingDragged
                                 ? 'scale-105 shadow-xl ring-2 ring-[#1E60F3]/40 z-30 opacity-90 border-2 border-[#1E60F3] bg-blue-50/50'
+                                : isNewlyAdded
+                                ? 'bg-blue-50/40 border-2 border-dashed border-[#1E60F3] shadow-[0_0_12px_rgba(30,96,243,0.22)]'
                                 : 'bg-white border-slate-200 hover:border-[#1E60F3]/60 hover:bg-blue-50/20 active:scale-95'
                                 }`}
                               style={{

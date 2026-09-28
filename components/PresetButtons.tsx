@@ -23,6 +23,8 @@ interface PresetButtonsProps {
   onEditPreset?: (preset: LocationPreset) => void;
   onDeleteCustomPreset?: (id: string) => void;
   onReorderPresets?: (reordered: LocationPreset[]) => void;
+  newlyAddedPresetId?: string | null;
+  onClearHighlight?: () => void;
 }
 
 export const PresetButtons: React.FC<PresetButtonsProps> = ({
@@ -42,6 +44,8 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
   onEditPreset,
   onDeleteCustomPreset,
   onReorderPresets,
+  newlyAddedPresetId = null,
+  onClearHighlight,
 }) => {
   const [isManageMode, setIsManageMode] = useState(false);
   const [managingPreset, setManagingPreset] = useState<LocationPreset | null>(null);
@@ -472,6 +476,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
 
     // Deliberate tap validated!
     haptics.lightTap();
+    onClearHighlight?.();
     if (isManageMode) {
       setManagingPreset(preset);
     } else {
@@ -848,6 +853,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
     const isThisItemDragging = isDragging && dragIndex === index;
     const isHQ = Boolean(preset.isCommon || preset.type === 'common' || preset.isGlobal || (!preset.vehicle_no && !preset.vehicleNo));
     const badgeLabel = isHQ ? '공통' : '개인';
+    const isNewlyAdded = newlyAddedPresetId === preset.id;
 
     let stateClasses = `bg-white border-slate-200 text-slate-700 font-medium ${dynamicHoverClasses}`;
     if (isDestination) {
@@ -861,6 +867,10 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
     if (isManageMode) {
       stateClasses += ' border-dashed border-[#1E60F3]/60 hover:bg-blue-50/50';
     }
+
+    const slotClass = isNewlyAdded
+      ? 'bg-blue-50/40 border-2 border-dashed border-[#1E60F3] shadow-[0_0_12px_rgba(30,96,243,0.22)]'
+      : stateClasses;
 
     return (
       <div
@@ -880,19 +890,27 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
             type="button"
             onTouchStart={(e) => handlePointerStart(index, e)}
             onTouchMove={handlePointerMoveCheck}
-            onTouchEnd={(e) => handlePointerEnd(preset, e)}
+            onTouchEnd={(e) => {
+              onClearHighlight?.();
+              handlePointerEnd(preset, e);
+            }}
             onTouchCancel={handlePointerCancel}
             onMouseDown={(e) => handlePointerStart(index, e)}
             onMouseMove={handlePointerMoveCheck}
-            onMouseUp={(e) => handlePointerEnd(preset, e)}
+            onMouseUp={(e) => {
+              onClearHighlight?.();
+              handlePointerEnd(preset, e);
+            }}
             onClick={(e) => {
               if (isScrollingRef.current) {
                 e.preventDefault();
                 e.stopPropagation();
+                return;
               }
+              onClearHighlight?.();
             }}
-            className={`w-full h-full min-h-[58px] px-2 py-2.5 rounded-xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-200 group select-none [-webkit-tap-highlight-color:transparent] ${activePressedIndex === index ? 'scale-[0.97] bg-slate-100/90' : ''
-              } ${stateClasses}`}
+            className={`w-full h-full min-h-[58px] px-2 py-2.5 rounded-xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-300 group select-none [-webkit-tap-highlight-color:transparent] ${activePressedIndex === index ? 'scale-[0.97] bg-slate-100/90' : ''
+              } ${slotClass}`}
             title={`${preset.name} (길게 눌러 순서 변경)`}
           >
             <span

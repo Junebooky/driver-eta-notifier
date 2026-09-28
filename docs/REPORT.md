@@ -2678,6 +2678,93 @@ flowchart TD
    - **Case 2 (일반 기사 모드 등록 격리 검증)**:
      - 일반 기사 모드(`isAdmin === false`)에서 등록 시 `type: 'personal'`, `isCommon: false`, `vehicle_no: '4호차'`로 격리되며 `개인` 뱃지가 정확히 부여됨을 확인 (PASS).
 
+---
+
+## 52. 저장 버튼 체크 피드백 인터랙션 전환 및 신규 거점 코발트 블루 하이라이트 UI 구현
+
+### 52.1 배경 및 작업 목적
+1. **저장 확정 시각 피드백 개선 (`components/CustomPresetModal.tsx`)**:
+   - 기존 저장 버튼에 상시 노출되던 `<Check>` 아이콘을 평상시에는 완전히 제거하고 텍스트(`저장` / `수정 완료`)만 단정하게 표시.
+   - 사용자가 서밋 버튼을 누른 순간에만 V 체크 아이콘이 부드럽게 팝업되며 `350ms` 동안 시각적·햅틱 확정 상태를 거친 뒤 폼이 닫히도록 하여, 투명도 변화에 의존하던 모호한 피드백을 직관적이고 확실한 인터랙션으로 개선.
+2. **신규 등록 거점 코발트 블루 강조 테두리 (`components/PresetButtons.tsx` & `app/page.tsx`)**:
+   - 신규 거점(공통/개인 무관)이 추가되었을 때, 메인 화면 '자주 가는 목적지' 슬롯 중 방금 추가된 카드 외곽선에 시그니처 코발트 블루(`#1E60F3`) 점선 테두리와 은은한 글로우 그림자를 일시 적용하여 한눈에 식별할 수 있도록 지원.
+   - 모달을 다시 열거나, 거점 카드를 탭하여 목적지로 선택하거나, 페이지를 새로고침하면 인메모리 상태가 자동으로 리셋되어 기본 카드 외곽선(`border-slate-200`)으로 안전하게 원복(Zero-DB In-Memory State 원칙).
+
+---
+
+### 52.2 인터랙션 및 상태 전이 다이어그램
+
+```mermaid
+flowchart TD
+    subgraph Modal_Interaction ["CustomPresetModal: 350ms 다이내믹 피드백"]
+        A["사용자 저장/수정 완료 클릭"] --> B["유효성 검사 (명칭, 좌표)"]
+        B --> C["1. setIsSaveSuccess(true)<br/>2. haptics.successPulse()<br/>3. Check 아이콘 팝업 + '저장 완료' 텍스트"]
+        C --> D["setTimeout (350ms 유지)"]
+        D --> E["onAddPreset(newPreset) / onUpdatePreset(updatedPreset)"]
+        E --> F["handleCancelForm() & setIsSaveSuccess(false)"]
+    end
+
+    subgraph Page_Highlight ["app/page.tsx: 인메모리 하이라이트 제어"]
+        E --> G["handleAddCustomPreset"]
+        G --> H["setNewlyAddedPresetId(finalizedPreset.id)"]
+        H --> I["PresetButtons props: newlyAddedPresetId 주입"]
+    end
+
+    subgraph Slot_Rendering ["PresetButtons.tsx: 코발트 블루 테두리 분기"]
+        I --> J{"preset.id === newlyAddedPresetId?"}
+        J -->|True| K["border-2 border-dashed border-[#1E60F3]<br/>bg-blue-50/40 shadow-[0_0_12px_rgba(30,96,243,0.22)]"]
+        J -->|False| L["bg-white border-slate-200 (기본 카드 스타일)"]
+    end
+
+    subgraph Reset_Trigger ["하이라이트 자동 원복 (In-Memory Reset)"]
+        M1["거점 카드 탭 (목적지/출발지 선택)"] --> N["onClearHighlight() -> setNewlyAddedPresetId(null)"]
+        M2["모달 재진입 (handleOpenAddModal / isAddModalOpen)"] --> N
+        M3["페이지 새로고침 (브라우저 리로드)"] --> N
+        N --> L
+    end
+```
+
+---
+
+### 52.3 상세 구현 내역
+
+#### [태스크 1] 저장 버튼 V 체크 아이콘의 동적 피드백 전환 ([`components/CustomPresetModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/CustomPresetModal.tsx))
+1. **피드백 상태 신설**:
+   - `const [isSaveSuccess, setIsSaveSuccess] = useState(false);` 선언.
+2. **버튼 렌더링 수정**:
+   - 평상시(`!isSaveSuccess`): 아이콘 없이 `{editingItem ? '수정 완료' : '저장'}` 텍스트만 단정하게 표시.
+   - 저장 성공 시(`isSaveSuccess === true`): `<Check className="w-4 h-4 stroke-[2.5] animate-in zoom-in duration-150" />` 아이콘이 즉시 나타나며 버튼 텍스트가 `저장 완료`로 전환되고 글로우 그림자(`shadow-[0_0_15px_rgba(30,96,243,0.35)]`)가 부여됨.
+   - 자택 주소 등록/수정 폼에서도 동일한 `isSaveSuccess` 피드백 로직을 적용하여 일관된 인터랙션 완성.
+3. **`handleSubmit` 타이밍 제어**:
+   - 필수 유효성 검증 완료 즉시 `setIsSaveSuccess(true)` 및 `haptics.successPulse()` 호출.
+   - `setTimeout(..., 350)` 동안 V 체크 표시를 사용자에게 인지시킨 후 실제 저장(`onAddPreset`/`onUpdatePreset`/`onSaveHome`)과 폼 초기화(`handleCancelForm()`)를 커밋하고 `isSaveSuccess`를 리셋.
+   - 더블 클릭 방지를 위해 `isSaveSuccess`가 활성화된 동안 서밋 버튼을 `disabled` 처리.
+
+#### [태스크 2] 신규 추가 거점 코발트 블루 강조 테두리 UI 구현 ([`app/page.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/page.tsx), [`components/PresetButtons.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/PresetButtons.tsx), [`components/CustomPresetModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/CustomPresetModal.tsx))
+1. **인메모리 하이라이트 상태 선언 (`app/page.tsx`)**:
+   - `const [newlyAddedPresetId, setNewlyAddedPresetId] = useState<string | null>(null);`를 최상위 컴포넌트 메모리에만 선언(`localStorage` 미저장).
+2. **신규 거점 등록 시 ID 주입**:
+   - `handleAddCustomPreset` 완료 시점에 `setNewlyAddedPresetId(finalizedPreset.id)` 주입.
+   - 메인 화면의 `<PresetButtons>` 및 모달 내부 `<CustomPresetModal>` 양쪽에 `newlyAddedPresetId`와 `onClearHighlight={() => setNewlyAddedPresetId(null)}` 전달.
+3. **슬롯 외곽선 코발트 블루 스타일 분기 (`components/PresetButtons.tsx`)**:
+   - `PresetButtonsProps`에 `newlyAddedPresetId?: string | null;` 및 `onClearHighlight?: () => void;` 선언.
+   - `isNewlyAdded = newlyAddedPresetId === preset.id;` 검사 후, `true`일 경우 `bg-blue-50/40 border-2 border-dashed border-[#1E60F3] shadow-[0_0_12px_rgba(30,96,243,0.22)]` 테두리 클래스 적용.
+4. **하이라이트 자동 해제 (원복) 보장**:
+   - 거점 카드를 탭하여 목적지/출발지로 선택할 때(`handleSelectPreset`, `handlePointerEnd`).
+   - 모달을 다시 열거나 수정을 시작할 때(`handleOpenAddModal`, `handleOpenEditModal`).
+   - 페이지를 새로고침했을 때 (순수 React In-Memory State이므로 기본 외곽선으로 자동 복귀).
+
+---
+
+### 52.4 검증 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 컴파일 및 정적 페이지 생성 에러 **0건 (Exit code 0)** 통과.
+2. **시나리오 검증 결과**:
+   - **Case 1 (체크 아이콘 피드백)**: 장소 등록 폼 진입 시 평상시 체크 아이콘 없는 순수 텍스트 상태 확인 ➔ '저장' 클릭 시 버튼에 V 체크 아이콘이 팝업되며 `저장 완료`로 350ms 동안 확실한 시각 피드백 제공 후 모달 폼 부드럽게 닫힘 (PASS).
+   - **Case 2 (신규 거점 강조 테두리)**: 거점 추가 완료 즉시 메인 슬롯의 방금 추가된 카드에 코발트 블루 점선 테두리(`#1E60F3`)와 은은한 블루 배경 및 글로우 그림자가 렌더링되어 한눈에 식별됨 (PASS).
+   - **Case 3 (테두리 원복)**: 해당 카드를 탭하거나, 모달을 다시 열거나, 페이지를 새로고침했을 때 강조 테두리가 즉시 소거되고 일반 외곽선(`border-slate-200`)으로 원복됨 (PASS).
+
+
 
 
 
