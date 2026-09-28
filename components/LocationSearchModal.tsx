@@ -145,7 +145,7 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
     setRecentSearches([]);
     try {
       localStorage.removeItem(RECENT_SEARCHES_STORAGE_KEY);
-    } catch (e) {}
+    } catch (e) { }
   };
 
   // Check if a Location is in Presets (Favorites)
@@ -416,9 +416,8 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
           <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-slate-100/80">
             <div className="flex items-center gap-2">
               <div
-                className={`w-7 h-7 rounded-lg flex items-center justify-center shadow-xs text-white ${
-                  isOrigin ? 'bg-slate-700' : 'bg-[#1E60F3]'
-                }`}
+                className={`w-7 h-7 rounded-lg flex items-center justify-center shadow-xs text-white ${isOrigin ? 'bg-slate-700' : 'bg-[#1E60F3]'
+                  }`}
               >
                 {isOrigin ? (
                   <Navigation className="w-3.5 h-3.5 fill-white" />
@@ -428,21 +427,13 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
               </div>
               <div>
                 <div className="flex items-center gap-1.5">
-                  <span
-                    className={`text-[11px] font-black px-1.5 py-0.5 rounded shadow-2xs ${
-                      isOrigin
-                        ? 'bg-slate-100 text-slate-700 border border-slate-200'
-                        : 'bg-blue-50 text-[#1E60F3] border border-blue-200'
-                    }`}
-                  >
-                    {isOrigin ? '출발지 설정' : '목적지 설정'}
-                  </span>
+
                   <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
-                    장소 검색 및 거점 선택
+                    장소 선택
                   </h3>
                 </div>
                 <p className="text-[11px] text-slate-400 font-medium">
-                  자주 가는 거점을 원터치로 고르거나 장소를 검색하세요.
+                  주소를 검색하거나 저장된 거점을 선택하세요.
                 </p>
               </div>
             </div>
@@ -563,11 +554,10 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                             aria-label="즐겨찾기 토글"
                           >
                             <Star
-                              className={`w-4 h-4 transition-all duration-200 ${
-                                isFav
-                                  ? 'fill-[#FEE500] stroke-[#FEE500] text-[#FEE500]'
-                                  : 'stroke-slate-300 fill-none text-slate-300 hover:stroke-slate-400'
-                              }`}
+                              className={`w-4 h-4 transition-all duration-200 ${isFav
+                                ? 'fill-[#FEE500] stroke-[#FEE500] text-[#FEE500]'
+                                : 'stroke-slate-300 fill-none text-slate-300 hover:stroke-slate-400'
+                                }`}
                             />
                           </button>
                           <span className="text-[10px] font-bold text-slate-400 group-hover:text-[#1E60F3] shrink-0 ml-1">
@@ -642,11 +632,10 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                           aria-label="즐겨찾기 토글"
                         >
                           <Star
-                            className={`w-3.5 h-3.5 transition-all duration-200 ${
-                              isFav
-                                ? 'fill-[#FEE500] stroke-[#FEE500] text-[#FEE500]'
-                                : 'stroke-slate-300 fill-none text-slate-300 hover:stroke-slate-400'
-                            }`}
+                            className={`w-3.5 h-3.5 transition-all duration-200 ${isFav
+                              ? 'fill-[#FEE500] stroke-[#FEE500] text-[#FEE500]'
+                              : 'stroke-slate-300 fill-none text-slate-300 hover:stroke-slate-400'
+                              }`}
                           />
                         </button>
                       </div>
@@ -685,7 +674,6 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                     title="거점 순서 변경 및 관리"
                   >
                     <Settings2 className="w-3.5 h-3.5 text-slate-600" />
-                    <span>순서 관리</span>
                   </button>
                 )}
               </div>
@@ -711,11 +699,10 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                               key="slot_home"
                               type="button"
                               onClick={handleSelectHome}
-                              className={`min-h-[64px] p-2.5 rounded-2xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-150 active:scale-95 group shadow-2xs ${
-                                currentSelectedId === 'slot_home'
-                                  ? 'border-2 border-[#1E60F3] bg-blue-50/40 text-[#1E60F3] font-bold shadow-xs'
-                                  : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/80'
-                              }`}
+                              className={`min-h-[64px] p-2.5 rounded-2xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-150 active:scale-95 group shadow-2xs ${currentSelectedId === 'slot_home'
+                                ? 'border-2 border-[#1E60F3] bg-blue-50/40 text-[#1E60F3] font-bold shadow-xs'
+                                : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/80'
+                                }`}
                               title={homeLocation?.name ? `자택: ${homeLocation.name}` : '자택 등록'}
                             >
                               <div className="flex items-center justify-center gap-1 w-full min-w-0">
@@ -740,11 +727,10 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                             key={`${p.id}-${sIdx}`}
                             type="button"
                             onClick={() => handleSelectPreset(p)}
-                            className={`min-h-[64px] p-2.5 rounded-2xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-150 active:scale-95 group shadow-2xs ${
-                              isSelected
-                                ? 'border-2 border-[#1E60F3] bg-blue-50/40 text-[#1E60F3] font-bold shadow-xs'
-                                : 'bg-white border-slate-200 hover:border-[#1E60F3]/60 hover:bg-blue-50/30'
-                            }`}
+                            className={`min-h-[64px] p-2.5 rounded-2xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-150 active:scale-95 group shadow-2xs ${isSelected
+                              ? 'border-2 border-[#1E60F3] bg-blue-50/40 text-[#1E60F3] font-bold shadow-xs'
+                              : 'bg-white border-slate-200 hover:border-[#1E60F3]/60 hover:bg-blue-50/30'
+                              }`}
                             title={`${p.name} (${p.address || p.name})`}
                           >
                             <span className="text-sm font-bold tracking-tight text-slate-800 group-hover:text-[#1E60F3] truncate w-full transition-colors">
@@ -752,11 +738,10 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                             </span>
 
                             <span
-                              className={`text-[10px] font-bold px-1.5 py-0.2 rounded mt-0.5 ${
-                                isHQ
-                                  ? 'bg-slate-100 text-slate-600'
-                                  : 'bg-blue-50 text-[#1E60F3]'
-                              }`}
+                              className={`text-[10px] font-bold px-1.5 py-0.2 rounded mt-0.5 ${isHQ
+                                ? 'bg-slate-100 text-slate-600'
+                                : 'bg-blue-50 text-[#1E60F3]'
+                                }`}
                             >
                               {isHQ ? '공통' : '개인'}
                             </span>
@@ -780,11 +765,10 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                     setCurrentPage(i);
                   }}
                   aria-label={`페이지 ${i + 1}`}
-                  className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
-                    currentPage === i
-                      ? 'w-6 bg-[#1E60F3] shadow-[0_2px_8px_rgba(30,96,243,0.35)]'
-                      : 'w-2 bg-slate-200 hover:bg-slate-300'
-                  }`}
+                  className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${currentPage === i
+                    ? 'w-6 bg-[#1E60F3] shadow-[0_2px_8px_rgba(30,96,243,0.35)]'
+                    : 'w-2 bg-slate-200 hover:bg-slate-300'
+                    }`}
                 />
               ))}
             </div>

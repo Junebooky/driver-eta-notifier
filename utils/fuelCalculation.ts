@@ -210,15 +210,15 @@ export function calculateRecommendedRefueling(params: {
     params.unitPrice && params.unitPrice > 0
       ? params.unitPrice
       : fuelType === 'diesel'
-      ? DEFAULT_FALLBACK_PRICES.diesel
-      : DEFAULT_FALLBACK_PRICES.gasoline;
+        ? DEFAULT_FALLBACK_PRICES.diesel
+        : DEFAULT_FALLBACK_PRICES.gasoline;
 
   const fuelEconomy =
     params.fuelEconomy && params.fuelEconomy > 0
       ? params.fuelEconomy
       : fuelType === 'diesel'
-      ? DEFAULT_FUEL_ECONOMY.diesel
-      : DEFAULT_FUEL_ECONOMY.gasoline;
+        ? DEFAULT_FUEL_ECONOMY.diesel
+        : DEFAULT_FUEL_ECONOMY.gasoline;
 
   if (shortageKm <= 0) {
     return {

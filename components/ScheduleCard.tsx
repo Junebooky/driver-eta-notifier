@@ -96,7 +96,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
             출발
           </span>
           <span
-            className="text-sm font-bold text-slate-900 tracking-tight min-w-0 max-w-[55%] truncate"
+            className="text-base font-bold text-slate-900 tracking-tight min-w-0 max-w-[55%] truncate"
             title={item.origin_name}
           >
             {sanitizePlaceName(item.origin_name)}
@@ -119,7 +119,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
             도착
           </span>
           <span
-            className="text-sm font-bold text-slate-900 tracking-tight min-w-0 max-w-[55%] truncate"
+            className="text-base font-bold text-slate-900 tracking-tight min-w-0 max-w-[55%] truncate"
             title={item.destination_name}
           >
             {sanitizePlaceName(item.destination_name)}

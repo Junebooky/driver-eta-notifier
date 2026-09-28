@@ -766,7 +766,7 @@ export default function Home() {
                 <Navigation className={`w-3 h-3 ${activeTab === 'drive' ? 'text-white fill-white' : 'text-slate-400'}`} />
               </div>
               <span
-                className={`text-sm tracking-tight transition-colors duration-300 ${activeTab === 'drive' ? 'text-white font-black' : 'text-slate-500 font-semibold'
+                className={`text-base tracking-tight transition-colors duration-300 ${activeTab === 'drive' ? 'text-white font-black' : 'text-slate-500 font-semibold'
                   }`}
               >
                 운행
@@ -789,7 +789,7 @@ export default function Home() {
                 <Calendar className={`w-3 h-3 ${activeTab === 'schedule' ? 'text-white' : 'text-slate-400'}`} />
               </div>
               <span
-                className={`text-sm tracking-tight transition-colors duration-300 ${activeTab === 'schedule' ? 'text-white font-black' : 'text-slate-500 font-semibold'
+                className={`text-base tracking-tight transition-colors duration-300 ${activeTab === 'schedule' ? 'text-white font-black' : 'text-slate-500 font-semibold'
                   }`}
               >
                 스케줄

@@ -67,7 +67,7 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
             <div className="w-4.5 h-4.5 rounded-full bg-[#1E60F3] text-white flex items-center justify-center shrink-0 shadow-[0_2px_6px_rgba(30,96,243,0.3)]">
               <Clock className="w-3 h-3 text-white stroke-[2.5]" />
             </div>
-            <span className="text-sm font-bold text-slate-600 uppercase tracking-tight">ETA</span>
+            <span className="text-base font-bold text-slate-600 uppercase tracking-tight">ETA</span>
           </div>
 
           {/* Large ETA & Duration display */}
@@ -127,9 +127,8 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
             aria-label="경로 새로고침"
           >
             <RefreshCw
-              className={`w-5 h-5 text-white transition-transform duration-500 ${
-                isLoadingRoute ? 'animate-spin' : 'group-hover:rotate-180'
-              }`}
+              className={`w-5 h-5 text-white transition-transform duration-500 ${isLoadingRoute ? 'animate-spin' : 'group-hover:rotate-180'
+                }`}
             />
           </button>
         </div>

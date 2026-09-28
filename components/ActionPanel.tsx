@@ -89,7 +89,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
       {/* Navigation Primary Action Button (Centered) */}
       <button
         onClick={handleFastPassAction}
-        className="w-full py-4 px-4 bg-[#1E60F3] hover:bg-[#1346D8] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/35 active:translate-y-0 active:scale-[0.97] active:bg-[#0f3bb8] text-white rounded-2xl font-bold text-sm tracking-tight shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-all duration-150 ease-out"
+        className="w-full py-4 px-4 bg-[#1E60F3] hover:bg-[#1346D8] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/35 active:translate-y-0 active:scale-[0.97] active:bg-[#0f3bb8] text-white rounded-2xl font-bold text-base tracking-tight shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-all duration-150 ease-out"
       >
         <Zap className="w-4.5 h-4.5 text-yellow-300 fill-yellow-300 shrink-0" />
         <span>{getNaviActionText(defaultNavi)}</span>
@@ -98,7 +98,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
       {/* KakaoTalk Pure Text Copy & App Launch Button (Centered) */}
       <button
         onClick={handleKakaoReportAction}
-        className="w-full py-4 px-4 bg-[#FEE500] hover:bg-[#FDD835] hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.97] text-[#191919] rounded-2xl font-bold text-sm tracking-tight shadow-[0_4px_14px_rgba(254,229,0,0.25)] flex items-center justify-center gap-2 cursor-pointer transition-all duration-150 ease-out"
+        className="w-full py-4 px-4 bg-[#FEE500] hover:bg-[#FDD835] hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.97] text-[#191919] rounded-2xl font-bold text-base tracking-tight shadow-[0_4px_14px_rgba(254,229,0,0.25)] flex items-center justify-center gap-2 cursor-pointer transition-all duration-150 ease-out"
       >
         {/* Authentic Kakao Speech Bubble Icon */}
         <svg className="w-4.5 h-4.5 fill-[#191919] shrink-0" viewBox="0 0 24 24">

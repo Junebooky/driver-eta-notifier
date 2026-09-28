@@ -262,8 +262,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           stored?.passengerName !== undefined && stored.passengerName !== ''
             ? stored.passengerName
             : profile.passengerName !== undefined && profile.passengerName !== ''
-            ? profile.passengerName
-            : getPresetPassengerName(cleanVehicleKey) || '';
+              ? profile.passengerName
+              : getPresetPassengerName(cleanVehicleKey) || '';
 
         setHocha(initial.hocha);
         setPlateFront(stored?.carNumberFront || profile.carNumberFront || initial.plateFront);
@@ -718,11 +718,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   onChange={handlePlateBackChange}
                   onKeyDown={handlePlateBackKeyDown}
                   placeholder="7811"
-                  className={`w-full px-3 py-2.5 rounded-xl text-slate-900 text-sm font-bold transition-all tracking-widest text-center ${
-                    plateError
-                      ? 'bg-rose-50/20 border-rose-400 ring-2 ring-rose-100 focus:outline-none focus:border-rose-500 focus:bg-white'
-                      : 'bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#1E60F3] focus:bg-white'
-                  }`}
+                  className={`w-full px-3 py-2.5 rounded-xl text-slate-900 text-sm font-bold transition-all tracking-widest text-center ${plateError
+                    ? 'bg-rose-50/20 border-rose-400 ring-2 ring-rose-100 focus:outline-none focus:border-rose-500 focus:bg-white'
+                    : 'bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#1E60F3] focus:bg-white'
+                    }`}
                 />
               </div>
             </div>
@@ -753,24 +752,22 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 <button
                   type="button"
                   onClick={() => handleSelectFuelType('gasoline')}
-                  className={`py-2 px-3 rounded-xl border text-sm font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 ${
-                    fuelType === 'gasoline'
-                      ? 'bg-[#1E60F3] text-white border-[#1E60F3] shadow-xs'
-                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                  }`}
+                  className={`py-2 px-3 rounded-xl border text-sm font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 ${fuelType === 'gasoline'
+                    ? 'bg-[#1E60F3] text-white border-[#1E60F3] shadow-xs'
+                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
                 >
-                  <span>⛽ 휘발유 (가솔린)</span>
+                  <span>휘발유</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => handleSelectFuelType('diesel')}
-                  className={`py-2 px-3 rounded-xl border text-sm font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 ${
-                    fuelType === 'diesel'
-                      ? 'bg-[#1E60F3] text-white border-[#1E60F3] shadow-xs'
-                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                  }`}
+                  className={`py-2 px-3 rounded-xl border text-sm font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 ${fuelType === 'diesel'
+                    ? 'bg-[#1E60F3] text-white border-[#1E60F3] shadow-xs'
+                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
                 >
-                  <span>🛢️ 경유 (디젤)</span>
+                  <span>경유</span>
                 </button>
               </div>
             </div>
@@ -802,11 +799,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 }
               }}
               placeholder="성함 입력"
-              className={`w-full px-3.5 py-2.5 rounded-xl text-slate-900 text-sm font-bold transition-all ${
-                nameError
-                  ? 'bg-rose-50/20 border-rose-400 ring-2 ring-rose-100 focus:outline-none focus:border-rose-500 focus:bg-white'
-                  : 'bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#1E60F3] focus:bg-white'
-              }`}
+              className={`w-full px-3.5 py-2.5 rounded-xl text-slate-900 text-sm font-bold transition-all ${nameError
+                ? 'bg-rose-50/20 border-rose-400 ring-2 ring-rose-100 focus:outline-none focus:border-rose-500 focus:bg-white'
+                : 'bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#1E60F3] focus:bg-white'
+                }`}
             />
           </div>
 
@@ -835,11 +831,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   onChange={handlePhone1Change}
                   onPaste={handlePhonePaste}
                   placeholder="010"
-                  className={`w-full px-2 py-2.5 rounded-xl text-slate-900 text-sm font-bold transition-all text-center tracking-wider ${
-                    phoneError
-                      ? 'bg-rose-50/20 border-rose-400 ring-2 ring-rose-100 focus:outline-none focus:border-rose-500 focus:bg-white'
-                      : 'bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#1E60F3] focus:bg-white'
-                  }`}
+                  className={`w-full px-2 py-2.5 rounded-xl text-slate-900 text-sm font-bold transition-all text-center tracking-wider ${phoneError
+                    ? 'bg-rose-50/20 border-rose-400 ring-2 ring-rose-100 focus:outline-none focus:border-rose-500 focus:bg-white'
+                    : 'bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#1E60F3] focus:bg-white'
+                    }`}
                 />
               </div>
               <span className="text-slate-300 font-bold text-sm select-none">-</span>
@@ -855,11 +850,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   onKeyDown={handlePhone2KeyDown}
                   onPaste={handlePhonePaste}
                   placeholder="0000"
-                  className={`w-full px-2 py-2.5 rounded-xl text-slate-900 text-sm font-bold transition-all text-center tracking-wider ${
-                    phoneError
-                      ? 'bg-rose-50/20 border-rose-400 ring-2 ring-rose-100 focus:outline-none focus:border-rose-500 focus:bg-white'
-                      : 'bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#1E60F3] focus:bg-white'
-                  }`}
+                  className={`w-full px-2 py-2.5 rounded-xl text-slate-900 text-sm font-bold transition-all text-center tracking-wider ${phoneError
+                    ? 'bg-rose-50/20 border-rose-400 ring-2 ring-rose-100 focus:outline-none focus:border-rose-500 focus:bg-white'
+                    : 'bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#1E60F3] focus:bg-white'
+                    }`}
                 />
               </div>
               <span className="text-slate-300 font-bold text-sm select-none">-</span>
@@ -875,11 +869,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   onKeyDown={handlePhone3KeyDown}
                   onPaste={handlePhonePaste}
                   placeholder="0000"
-                  className={`w-full px-2 py-2.5 rounded-xl text-slate-900 text-sm font-bold transition-all text-center tracking-wider ${
-                    phoneError
-                      ? 'bg-rose-50/20 border-rose-400 ring-2 ring-rose-100 focus:outline-none focus:border-rose-500 focus:bg-white'
-                      : 'bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#1E60F3] focus:bg-white'
-                  }`}
+                  className={`w-full px-2 py-2.5 rounded-xl text-slate-900 text-sm font-bold transition-all text-center tracking-wider ${phoneError
+                    ? 'bg-rose-50/20 border-rose-400 ring-2 ring-rose-100 focus:outline-none focus:border-rose-500 focus:bg-white'
+                    : 'bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#1E60F3] focus:bg-white'
+                    }`}
                 />
               </div>
             </div>

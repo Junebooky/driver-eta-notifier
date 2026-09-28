@@ -36,7 +36,7 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
         <div className="w-5 h-5 rounded-md bg-[#1E60F3] text-white flex items-center justify-center shadow-[0_2px_6px_rgba(30,96,243,0.3)]">
           <FileText className="w-3.5 h-3.5 text-white" />
         </div>
-        <h3 className="text-sm font-bold text-slate-900 tracking-tight">단톡방 보고</h3>
+        <h3 className="text-base font-bold text-slate-900 tracking-tight">단톡방 보고</h3>
       </div>
 
       {/* Mode Selector: Unified Sliding Segmented Control */}

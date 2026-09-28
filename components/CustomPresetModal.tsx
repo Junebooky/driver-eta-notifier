@@ -700,9 +700,34 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
         {/* [태스크 1] 모달 헤더 (개수 뱃지 삭제 & 깔끔한 텍스트+닫기 버튼) */}
         {/* ========================================================= */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50/90 shrink-0">
-          <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
-            {isHomeMode ? '자택 주소 등록' : '거점 및 자주 가는 목적지 관리'}
-          </h2>
+          <div className="flex items-center space-x-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[#1E60F3] flex items-center justify-center shadow-md shadow-blue-500/20 text-white shrink-0">
+              {isHomeMode ? (
+                <Home className="w-5 h-5 text-white" />
+              ) : (
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="w-5 h-5 text-white stroke-[2.2]"
+                >
+                  <path d="M19.914 11.105A7.298 7.298 0 0 0 20 10a8 8 0 0 0-16 0c0 4.993 5.539 10.193 7.399 11.799a1 1 0 0 1-1.202 0 32 32 0 0 0 .824-.738" />
+                  <circle cx="12" cy="10" r="3" />
+                  <path d="M16 18h6" />
+                  <path d="M19 15v6" />
+                </svg>
+              )}
+            </div>
+            <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-snug">
+              {isHomeMode ? '자택 주소 등록' : '거점 · 자주 가는 장소'}
+            </h2>
+          </div>
           <button
             type="button"
             onClick={onClose}
@@ -727,7 +752,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
           {!isHomeMode ? (
             <div className="p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 bg-slate-50/70 space-y-3 shadow-2xs">
               <div className="flex items-center justify-between pb-1 border-b border-slate-200/60">
-                <span className="text-sm font-black text-slate-800 flex items-center gap-1.5">
+                <span className="text-base font-black text-slate-800 flex items-center gap-1.5">
                   <Plus className="w-3.5 h-3.5 text-[#1E60F3] stroke-[2.5]" />
                   <span>{editingItem ? '거점 정보 수정' : '장소 등록'}</span>
                 </span>
@@ -745,15 +770,15 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
               {/* [태스크 2] 1. Real-time Search Bar (text-lg 인풋, w-5 h-5 돋보기, placeholder:text-base) */}
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">
-                  장소 검색 (실시간 추천)
+                  장소 검색
                 </label>
                 <div className="relative">
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="장소명 또는 주소 검색 (예: 인천공항, 코엑스)"
-                    className="w-full pl-11 pr-10 py-2.5 sm:py-3 bg-white border border-slate-200 rounded-xl text-slate-800 text-lg font-medium placeholder:text-base placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] transition-colors"
+                    placeholder="장소명 또는 주소를 검색하세요 (예: 인천공항, 코엑스)"
+                    className="w-full pl-11 pr-10 py-2.5 sm:py-3 bg-white border border-slate-200 rounded-xl text-slate-800 text-sm font-medium placeholder:text-base placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] transition-colors"
                   />
                   <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-3 sm:top-3.5" />
                   {isSearching && (
@@ -800,21 +825,21 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1">
-                      거점 전체 명칭
+                      거점 이름
                     </label>
                     <input
                       type="text"
                       required
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder="검색 결과에서 거점을 선택하거나 입력하세요"
-                      className="w-full px-3.5 py-3 bg-white border border-slate-200 rounded-xl text-base font-semibold text-slate-900 placeholder:text-base placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3]"
+                      placeholder="검색 결과에서 장소를 선택하세요"
+                      className="w-full px-3.5 py-3 bg-white border border-slate-200 rounded-xl text-base font-semibold text-slate-900 placeholder:text-sm placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3]"
                     />
                   </div>
 
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1">
-                      버튼 표기 명칭 (최대 8자 권장)
+                      표시 이름 (최대 8자)
                     </label>
                     <input
                       type="text"
@@ -823,7 +848,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                       onChange={(e) => setShortName(e.target.value)}
                       placeholder="예: 소노펠리체"
                       maxLength={12}
-                      className="w-full px-3.5 py-3 bg-white border border-slate-200 rounded-xl text-lg font-medium text-slate-900 placeholder:text-base placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3]"
+                      className="w-full px-3.5 py-3 bg-white border border-slate-200 rounded-xl text-base font-medium text-slate-900 placeholder:text-base placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3]"
                     />
                   </div>
                 </div>
@@ -843,7 +868,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                     className="w-2/3 py-3 rounded-xl bg-[#1E60F3] hover:bg-[#1346D8] disabled:opacity-40 text-white text-md font-black shadow-xs transition active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1.5"
                   >
                     <Check className="w-4 h-4 stroke-[2.5]" />
-                    <span>{editingItem ? '수정 완료' : '거점 저장'}</span>
+                    <span>{editingItem ? '수정 완료' : '저장'}</span>
                   </button>
                 </div>
               </form>
@@ -959,10 +984,10 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
               <div className="flex items-center justify-between text-sm font-bold text-slate-700 px-1">
                 <span className="flex items-center gap-1.5">
                   <MapPin className="w-3.5 h-3.5 text-[#1E60F3]" />
-                  <span>자주 가는 목적지 순서 변경</span>
+                  <span>자주 가는 장소</span>
                 </span>
                 <span className="text-[10px] text-slate-400 font-medium">
-                  길게 눌러 드래그 이동
+                  길게 눌러 순서를 변경하세요
                 </span>
               </div>
 
