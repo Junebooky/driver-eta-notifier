@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { LocationPreset } from '@/types';
 import {
   X,
@@ -105,6 +105,12 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
   const isLongPressActiveRef = useRef(false);
   const isScrollingRef = useRef(false);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const prevRectsRef = useRef<Map<string, DOMRect>>(new Map());
+
+  // Carousel Pagination State (4 rows x 3 columns = 12 slots)
+  const PAGE_SIZE = 12;
+  const [currentPage, setCurrentPage] = useState(0);
+  const carouselTouchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   // Sync presets from props or vehicle localStorage
   useEffect(() => {
@@ -150,6 +156,34 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
       }
     }
   }, [isOpen, presetToEdit]);
+
+  // FLIP (First, Last, Invert, Play) Layout Animation for fluid app-icon displacement
+  useLayoutEffect(() => {
+    if (prevRectsRef.current.size === 0) return;
+
+    items.forEach((item, idx) => {
+      if (idx === dragIndexRef.current) return;
+
+      const prev = prevRectsRef.current.get(item.id);
+      const el = itemRefs.current[idx];
+      if (prev && el) {
+        const cur = el.getBoundingClientRect();
+        const dx = prev.left - cur.left;
+        const dy = prev.top - cur.top;
+        if (dx !== 0 || dy !== 0) {
+          el.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
+          el.style.transition = 'none';
+
+          requestAnimationFrame(() => {
+            el.style.transition = 'transform 300ms cubic-bezier(0.2, 0, 0, 1)';
+            el.style.transform = '';
+          });
+        }
+      }
+    });
+
+    prevRectsRef.current.clear();
+  }, [items]);
 
   // Real-time POI Autocomplete with in-memory caching and AbortController
   useEffect(() => {
@@ -223,7 +257,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
     };
   }, [searchQuery]);
 
-  // Touch Move / Drag Window Listeners for Mobile Drag & Drop
+  // Window Listeners for Mobile & Mouse Drag Tracking with Center-Point Hysteresis
   useEffect(() => {
     if (!isDragging) return;
 
@@ -247,10 +281,21 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
           Math.abs(clientX - slotCenterX) < thresholdX &&
           Math.abs(clientY - slotCenterY) < thresholdY
         ) {
+          // 1. Capture previous bounding rects for FLIP animation
+          prevRectsRef.current.clear();
+          itemsRef.current.forEach((item, idx) => {
+            const cardEl = itemRefs.current[idx];
+            if (cardEl) {
+              prevRectsRef.current.set(item.id, cardEl.getBoundingClientRect());
+            }
+          });
+
+          // 2. Reorder array
           const updated = [...itemsRef.current];
           const [movedItem] = updated.splice(currentDrag, 1);
           updated.splice(i, 0, movedItem);
 
+          // 3. Update local state
           itemsRef.current = updated;
           setItems(updated);
           setDragIndex(i);
@@ -290,7 +335,10 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
       setIsDragging(false);
       setDragIndex(null);
       dragIndexRef.current = null;
-      isLongPressActiveRef.current = false;
+      setTimeout(() => {
+        isLongPressActiveRef.current = false;
+      }, 100);
+      prevRectsRef.current.clear();
       commitReorder(itemsRef.current);
       haptics.lightTap();
     };
@@ -326,7 +374,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
     onReorderPresets?.(newItems);
   };
 
-  // Pointer start for touch drag
+  // Pointer start: 350ms Long-Press Timer separation from Short Tap
   const handlePointerStart = (index: number, e: React.TouchEvent | React.MouseEvent) => {
     isLongPressActiveRef.current = false;
     isScrollingRef.current = false;
@@ -339,6 +387,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
       clearTimeout(longPressTimerRef.current);
     }
 
+    // [태스크 3] 카드를 350ms 이상 길게 누르고 있을 때만 Drag 트리거
     longPressTimerRef.current = setTimeout(() => {
       isLongPressActiveRef.current = true;
       setIsDragging(true);
@@ -349,7 +398,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
         navigator.vibrate(40);
       }
       haptics.successPulse();
-    }, 280);
+    }, 350);
   };
 
   const handlePointerMoveCheck = (e: React.TouchEvent | React.MouseEvent) => {
@@ -382,6 +431,12 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
     }
   };
 
+  // Short tap handler: only enters edit mode when NOT dragging
+  const handleCardClick = (preset: LocationPreset) => {
+    if (isDragging || isLongPressActiveRef.current) return;
+    handleStartEdit(preset);
+  };
+
   // HTML5 Drag & Drop handlers for desktop
   const handleHtmlDragStart = (index: number, e: React.DragEvent) => {
     setDragIndex(index);
@@ -398,6 +453,14 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
     e.preventDefault();
     const sourceIdx = dragIndexRef.current;
     if (sourceIdx !== null && sourceIdx !== targetIdx) {
+      prevRectsRef.current.clear();
+      itemsRef.current.forEach((item, idx) => {
+        const cardEl = itemRefs.current[idx];
+        if (cardEl) {
+          prevRectsRef.current.set(item.id, cardEl.getBoundingClientRect());
+        }
+      });
+
       const updated = [...itemsRef.current];
       const [movedItem] = updated.splice(sourceIdx, 1);
       updated.splice(targetIdx, 0, movedItem);
@@ -535,6 +598,72 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
     }
   };
 
+  // ==============================================================
+  // [태스크 5] 4행 3열 (12개 슬롯) 가로 캐러셀 페이징 슬롯 구성
+  // ==============================================================
+  type SlotItem =
+    | { type: 'home' }
+    | { type: 'preset'; preset: LocationPreset; index: number };
+
+  const allSlots: SlotItem[] = [
+    { type: 'home' },
+    ...items.map((preset, index) => ({ type: 'preset' as const, preset, index })),
+  ];
+
+  const totalPages = Math.max(1, Math.ceil(allSlots.length / PAGE_SIZE));
+
+  useEffect(() => {
+    if (currentPage >= totalPages && totalPages > 0) {
+      setCurrentPage(Math.max(0, totalPages - 1));
+    }
+  }, [totalPages, currentPage]);
+
+  const pages: SlotItem[][] = [];
+  for (let i = 0; i < allSlots.length; i += PAGE_SIZE) {
+    pages.push(allSlots.slice(i, i + PAGE_SIZE));
+  }
+  if (pages.length === 0) {
+    pages.push([{ type: 'home' }]);
+  }
+
+  // Horizontal swipe gestures for carousel
+  const handleCarouselTouchStart = (e: React.TouchEvent) => {
+    if (isDragging || isLongPressActiveRef.current) return;
+    carouselTouchStartRef.current = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY,
+    };
+  };
+
+  const handleCarouselTouchMove = (e: React.TouchEvent) => {
+    if (!carouselTouchStartRef.current || isDragging || isLongPressActiveRef.current) return;
+    const dx = e.touches[0].clientX - carouselTouchStartRef.current.x;
+    const dy = e.touches[0].clientY - carouselTouchStartRef.current.y;
+    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+      isScrollingRef.current = true;
+    }
+  };
+
+  const handleCarouselTouchEnd = (e: React.TouchEvent) => {
+    if (!carouselTouchStartRef.current || isDragging || isLongPressActiveRef.current) {
+      carouselTouchStartRef.current = null;
+      return;
+    }
+    const dx = e.changedTouches[0].clientX - carouselTouchStartRef.current.x;
+    const dy = e.changedTouches[0].clientY - carouselTouchStartRef.current.y;
+    carouselTouchStartRef.current = null;
+
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5 && totalPages > 1) {
+      if (dx < 0 && currentPage < totalPages - 1) {
+        haptics.lightTap();
+        setCurrentPage((prev) => prev + 1);
+      } else if (dx > 0 && currentPage > 0) {
+        haptics.lightTap();
+        setCurrentPage((prev) => prev - 1);
+      }
+    }
+  };
+
   const draggedPreset = dragIndex !== null ? items[dragIndex] : null;
 
   return (
@@ -544,24 +673,12 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* ========================================================= */}
-        {/* Modal Header (Fixed at top)                               */}
+        {/* [태스크 1] 모달 헤더 (개수 뱃지 삭제 & 깔끔한 텍스트+닫기 버튼) */}
         {/* ========================================================= */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50/90 shrink-0">
-          <div className="flex items-center gap-2">
-            <h2 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
-              {isHomeMode ? '자택 주소 등록' : '거점 및 자주 가는 목적지 관리'}
-            </h2>
-            {!isHomeMode && (
-              <span className="text-[10px] bg-blue-100 text-[#1E60F3] font-black px-2 py-0.5 rounded-full">
-                {items.length}개
-              </span>
-            )}
-            {isAdmin && !isHomeMode && (
-              <span className="text-[10px] bg-amber-500 text-white font-bold px-1.5 py-0.5 rounded">
-                전사 공통 모드
-              </span>
-            )}
-          </div>
+          <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+            {isHomeMode ? '자택 주소 등록' : '거점 및 자주 가는 목적지 관리'}
+          </h2>
           <button
             type="button"
             onClick={onClose}
@@ -581,7 +698,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
           style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
         >
           {/* ========================================================= */}
-          {/* [태스크 1] 상단: '장소 등록' 폼 상시 노출 배치             */}
+          {/* [태스크 1 & 2] 상단: '장소 등록' 폼 상시 노출 및 text-lg 검색창 */}
           {/* ========================================================= */}
           {!isHomeMode ? (
             <div className="p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 bg-slate-50/70 space-y-3 shadow-2xs">
@@ -601,7 +718,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                 )}
               </div>
 
-              {/* 1. Real-time Autocomplete Search Bar */}
+              {/* [태스크 2] 1. Real-time Search Bar (text-lg 인풋, w-5 h-5 돋보기, placeholder:text-base) */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   장소 검색 (실시간 추천)
@@ -612,15 +729,15 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="장소명 또는 주소 검색 (예: 인천공항, 신라호텔, 코엑스)"
-                    className="w-full pl-9 pr-8 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 text-xs sm:text-sm font-medium focus:outline-none focus:border-[#1E60F3] transition-colors"
+                    className="w-full pl-11 pr-10 py-2.5 sm:py-3 bg-white border border-slate-200 rounded-xl text-slate-800 text-lg font-medium placeholder:text-base placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] transition-colors"
                   />
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                  <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-3 sm:top-3.5" />
                   {isSearching && (
-                    <Loader2 className="w-4 h-4 text-[#1E60F3] animate-spin absolute right-3 top-2.5" />
+                    <Loader2 className="w-5 h-5 text-[#1E60F3] animate-spin absolute right-3.5 top-3 sm:top-3.5" />
                   )}
                 </div>
 
-                {/* Autocomplete Results Dropdown */}
+                {/* Autocomplete Results Dropdown (text-base font-semibold) */}
                 {searchResults.length > 0 && (
                   <div className="mt-2 border border-slate-200 rounded-xl bg-white shadow-lg max-h-48 overflow-y-auto divide-y divide-slate-100 overscroll-contain">
                     <div className="p-2 text-[10px] font-bold text-slate-400 bg-slate-50 uppercase">
@@ -638,12 +755,12 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                             handleSelectPoi(poi);
                           }
                         }}
-                        className="w-full p-2.5 text-left hover:bg-blue-50/80 active:bg-blue-100 transition-colors flex items-start gap-2 cursor-pointer group"
+                        className="w-full p-2.5 text-left hover:bg-blue-50/80 active:bg-blue-100 transition-colors flex items-start gap-2.5 cursor-pointer group"
                       >
-                        <MapPin className="w-3.5 h-3.5 text-[#1E60F3] shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
+                        <MapPin className="w-4 h-4 text-[#1E60F3] shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
                         <div className="min-w-0 flex-1">
-                          <div className="text-xs font-bold text-slate-900 truncate">{poi.name}</div>
-                          <div className="text-[10px] text-slate-500 truncate mt-0.5">{poi.address}</div>
+                          <div className="text-base font-semibold text-slate-900 truncate">{poi.name}</div>
+                          <div className="text-xs text-slate-500 truncate mt-0.5">{poi.address}</div>
                         </div>
                       </div>
                     ))}
@@ -667,7 +784,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="검색 결과에서 거점을 선택하거나 입력하세요"
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 text-xs font-bold focus:outline-none focus:border-[#1E60F3]"
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 text-xs sm:text-sm font-bold focus:outline-none focus:border-[#1E60F3]"
                     />
                   </div>
 
@@ -682,7 +799,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                       onChange={(e) => setShortName(e.target.value)}
                       placeholder="예: 소노펠리체"
                       maxLength={12}
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 text-xs font-bold focus:outline-none focus:border-[#1E60F3]"
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 text-xs sm:text-sm font-bold focus:outline-none focus:border-[#1E60F3]"
                     />
                   </div>
                 </div>
@@ -720,12 +837,12 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="장소명 또는 주소 검색 (예: 자택 아파트명, 도로명)"
-                    className="w-full pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-[#1E60F3] focus:bg-white font-medium transition-colors"
+                    className="w-full pl-11 pr-10 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-lg font-medium placeholder:text-base placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] focus:bg-white transition-colors"
                     autoFocus
                   />
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                  <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-3.5" />
                   {isSearching && (
-                    <Loader2 className="w-4 h-4 text-[#1E60F3] animate-spin absolute right-3 top-3" />
+                    <Loader2 className="w-5 h-5 text-[#1E60F3] animate-spin absolute right-3.5 top-3.5" />
                   )}
                 </div>
 
@@ -746,12 +863,12 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                             handleSelectPoi(poi);
                           }
                         }}
-                        className="w-full p-2.5 text-left hover:bg-blue-50/80 active:bg-blue-100 transition-colors flex items-start space-x-2 cursor-pointer group"
+                        className="w-full p-2.5 text-left hover:bg-blue-50/80 active:bg-blue-100 transition-colors flex items-start space-x-2.5 cursor-pointer group"
                       >
                         <MapPin className="w-4 h-4 text-[#1E60F3] shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
                         <div className="min-w-0 flex-1">
-                          <div className="text-xs font-bold text-slate-900 truncate">{poi.name}</div>
-                          <div className="text-[10px] text-slate-500 truncate mt-0.5">{poi.address}</div>
+                          <div className="text-base font-semibold text-slate-900 truncate">{poi.name}</div>
+                          <div className="text-xs text-slate-500 truncate mt-0.5">{poi.address}</div>
                         </div>
                       </div>
                     ))}
@@ -811,109 +928,156 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
           )}
 
           {/* ========================================================= */}
-          {/* [태스크 2] 하단: 기존 '자주 가는 목적지 그리드 카드 UI'     */}
-          {/* 및 드래그 앤 드롭 완전 복원 (PresetButtons.tsx 기반)        */}
+          {/* [태스크 3, 4, 5] 4행 3열(12슬롯) 캐러셀 & 롱프레스 스무스 리오더링 */}
           {/* ========================================================= */}
           {!isHomeMode && (
             <div className="space-y-2 pt-2 border-t border-slate-100">
               <div className="flex items-center justify-between text-xs font-bold text-slate-700 px-1">
                 <span className="flex items-center gap-1.5">
                   <MapPin className="w-3.5 h-3.5 text-[#1E60F3]" />
-                  <span>자주 가는 목적지 순서 변경 ({items.length + (homeLocation?.name ? 1 : 0)})</span>
+                  <span>자주 가는 목적지 순서 변경</span>
                 </span>
                 <span className="text-[10px] text-slate-400 font-medium">
-                  카드를 길게 눌러 드래그
+                  길게 눌러 드래그 이동
                 </span>
               </div>
 
-              {/* 3-Column Original Grid Cards */}
-              <div className="grid grid-cols-3 gap-2 pt-1 select-none">
-                {/* 1. Home Slot (Pinned at Slot 1) */}
+              {/* [태스크 5] Horizontal Carousel Slider for 12-slot Pages */}
+              <div
+                className="w-full overflow-hidden select-none touch-pan-y"
+                onTouchStart={handleCarouselTouchStart}
+                onTouchMove={handleCarouselTouchMove}
+                onTouchEnd={handleCarouselTouchEnd}
+              >
                 <div
-                  onClick={() => {
-                    if (onOpenHomeModal) {
-                      haptics.lightTap();
-                      onOpenHomeModal();
-                    }
-                  }}
-                  className="min-h-[64px] p-2.5 rounded-2xl border text-center flex flex-col justify-between items-center transition-all duration-150 active:scale-95 group shadow-2xs bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/80 cursor-pointer"
-                  title={homeLocation?.name ? `자택: ${homeLocation.name}` : '자택 등록'}
+                  className="flex transition-transform duration-300 ease-out will-change-transform"
+                  style={{ transform: `translateX(-${currentPage * 100}%)` }}
                 >
-                  <div className="flex items-center justify-center gap-1 w-full min-w-0">
-                    <Home className="w-3 h-3 text-slate-500 shrink-0 group-hover:text-[#1E60F3]" />
-                    <span className="text-xs font-bold tracking-tight text-slate-800 truncate">
-                      자택
-                    </span>
-                  </div>
-                  <span className="text-[10px] font-medium text-slate-400 group-hover:text-slate-600 truncate w-full mt-0.5">
-                    {homeLocation?.name ? homeLocation.name : '등록 필요'}
-                  </span>
-                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded mt-0.5 bg-emerald-50 text-emerald-600">
-                    자택
-                  </span>
-                </div>
+                  {pages.map((pageSlots, pageIdx) => (
+                    <div key={pageIdx} className="w-full shrink-0">
+                      <div className="grid grid-cols-3 gap-2 pt-1 content-start">
+                        {pageSlots.map((slot) => {
+                          // 1. Home Slot (Pinned at Slot 1 of Page 0)
+                          if (slot.type === 'home') {
+                            return (
+                              <div
+                                key="slot_home"
+                                onClick={() => {
+                                  if (onOpenHomeModal) {
+                                    haptics.lightTap();
+                                    onOpenHomeModal();
+                                  }
+                                }}
+                                className="min-h-[64px] p-2.5 rounded-2xl border text-center flex flex-col justify-center items-center transition-all duration-150 active:scale-95 group shadow-2xs bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/80 cursor-pointer"
+                                title={homeLocation?.name ? `자택: ${homeLocation.name}` : '자택 등록'}
+                              >
+                                <div className="flex items-center justify-center gap-1.5 w-full min-w-0">
+                                  <Home className="w-3.5 h-3.5 text-slate-500 shrink-0 group-hover:text-[#1E60F3]" />
+                                  <span className="text-xs font-bold tracking-tight text-slate-800 truncate">
+                                    자택
+                                  </span>
+                                </div>
+                                <span className="text-[11px] font-medium text-slate-400 group-hover:text-slate-600 truncate w-full mt-1">
+                                  {homeLocation?.name ? homeLocation.name : '등록 필요'}
+                                </span>
+                                {/* [태스크 4] 자택 전용 뱃지 완전히 제거됨 */}
+                              </div>
+                            );
+                          }
 
-                {/* 2..N Presets Cards with Drag & Drop */}
-                {items.map((preset, index) => {
-                  const isHQ = !preset.vehicle_no && !preset.vehicleNo;
-                  const isBeingDragged = isDragging && dragIndex === index;
+                          // 2..N Preset Slots
+                          const { preset, index } = slot;
+                          const isHQ = !preset.vehicle_no && !preset.vehicleNo;
+                          const isBeingDragged = isDragging && dragIndex === index;
 
-                  return (
-                    <div
-                      key={`${preset.id}-${index}`}
-                      ref={(el) => {
-                        itemRefs.current[index] = el;
-                      }}
-                      draggable={true}
-                      onDragStart={(e) => handleHtmlDragStart(index, e)}
-                      onDragOver={(e) => handleHtmlDragOver(index, e)}
-                      onDrop={(e) => handleHtmlDrop(index, e)}
-                      onDragEnd={handleHtmlDragEnd}
-                      onTouchStart={(e) => handlePointerStart(index, e)}
-                      onTouchMove={handlePointerMoveCheck}
-                      onTouchEnd={handlePointerEnd}
-                      onTouchCancel={handlePointerCancel}
-                      onMouseDown={(e) => handlePointerStart(index, e)}
-                      onClick={() => handleStartEdit(preset)}
-                      className={`relative min-h-[64px] p-2.5 rounded-2xl border text-center flex flex-col justify-between items-center transition-all select-none group shadow-2xs cursor-grab active:cursor-grabbing will-change-transform ${
-                        isBeingDragged
-                          ? 'opacity-30 border-2 border-dashed border-[#1E60F3] bg-blue-50/40 scale-95'
-                          : 'bg-white border-slate-200 hover:border-[#1E60F3]/60 hover:bg-blue-50/20 active:scale-95'
-                      }`}
-                      title={`${preset.name} (길게 눌러 드래그 / 탭하여 수정)`}
-                    >
-                      {/* Delete Button (Personal MY or Admin mode) */}
-                      {(!isHQ || isAdmin) && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeletePreset(preset.id, preset.shortName || preset.name);
-                          }}
-                          className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-slate-100 hover:bg-rose-500 hover:text-white text-slate-400 border border-slate-200 shadow-2xs flex items-center justify-center transition-all cursor-pointer z-10"
-                          title="거점 삭제"
-                          aria-label="거점 삭제"
-                        >
-                          <X className="w-3 h-3 stroke-[2.5]" />
-                        </button>
-                      )}
+                          return (
+                            <div
+                              key={`${preset.id}-${index}`}
+                              ref={(el) => {
+                                itemRefs.current[index] = el;
+                              }}
+                              draggable={isDragging}
+                              onDragStart={(e) => handleHtmlDragStart(index, e)}
+                              onDragOver={(e) => handleHtmlDragOver(index, e)}
+                              onDrop={(e) => handleHtmlDrop(index, e)}
+                              onDragEnd={handleHtmlDragEnd}
+                              onTouchStart={(e) => handlePointerStart(index, e)}
+                              onTouchMove={handlePointerMoveCheck}
+                              onTouchEnd={handlePointerEnd}
+                              onTouchCancel={handlePointerCancel}
+                              onMouseDown={(e) => handlePointerStart(index, e)}
+                              onMouseUp={handlePointerEnd}
+                              onMouseLeave={handlePointerCancel}
+                              onClick={() => handleCardClick(preset)}
+                              className={`relative min-h-[64px] p-2.5 rounded-2xl border text-center flex flex-col justify-between items-center transition-all duration-300 select-none group shadow-2xs cursor-grab active:cursor-grabbing will-change-transform ${
+                                isBeingDragged
+                                  ? 'scale-105 shadow-xl ring-2 ring-[#1E60F3]/40 z-30 opacity-90 border-2 border-[#1E60F3] bg-blue-50/50'
+                                  : 'bg-white border-slate-200 hover:border-[#1E60F3]/60 hover:bg-blue-50/20 active:scale-95'
+                              }`}
+                              style={{
+                                transition: isBeingDragged ? 'none' : 'transform 300ms cubic-bezier(0.2, 0, 0, 1), box-shadow 200ms ease',
+                              }}
+                              title={`${preset.name} (길게 눌러 드래그 / 탭하여 수정)`}
+                            >
+                              {/* Delete Button (Personal MY or Admin mode) */}
+                              {(!isHQ || isAdmin) && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeletePreset(preset.id, preset.shortName || preset.name);
+                                  }}
+                                  className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-slate-100 hover:bg-rose-500 hover:text-white text-slate-400 border border-slate-200 shadow-2xs flex items-center justify-center transition-all cursor-pointer z-10"
+                                  title="거점 삭제"
+                                  aria-label="거점 삭제"
+                                >
+                                  <X className="w-3 h-3 stroke-[2.5]" />
+                                </button>
+                              )}
 
-                      {/* Preset ShortName */}
-                      <span className="text-xs font-bold tracking-tight text-slate-800 group-hover:text-[#1E60F3] truncate w-full transition-colors">
-                        {preset.shortName}
-                      </span>
+                              {/* Preset ShortName */}
+                              <span className="text-xs font-bold tracking-tight text-slate-800 group-hover:text-[#1E60F3] truncate w-full transition-colors">
+                                {preset.shortName}
+                              </span>
 
-                      {/* Badge: 공통 vs 개인 */}
-                      <span
-                        className={`text-[10px] font-bold px-1.5 py-0.2 rounded mt-0.5 ${
-                          isHQ
-                            ? 'bg-slate-100 text-slate-600'
-                            : 'bg-blue-50 text-[#1E60F3]'
-                        }`}
-                      >
-                        {isHQ ? '공통' : '개인'}
-                      </span>
+                              {/* Badge: 공통 vs 개인 */}
+                              <span
+                                className={`text-[10px] font-bold px-1.5 py-0.2 rounded mt-0.5 ${
+                                  isHQ
+                                    ? 'bg-slate-100 text-slate-600'
+                                    : 'bg-blue-50 text-[#1E60F3]'
+                                }`}
+                              >
+                                {isHQ ? '공통' : '개인'}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* [태스크 5] 시그니처 도트 인디케이터 상시 노출 (1페이지 포함) */}
+              <div className="flex items-center justify-center gap-1.5 pt-3 pb-1">
+                {Array.from({ length: totalPages }).map((_, idx) => {
+                  const isActive = idx === currentPage;
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        haptics.lightTap();
+                        setCurrentPage(idx);
+                      }}
+                      aria-label={`페이지 ${idx + 1}`}
+                      className={`h-2 rounded-full transition-all duration-300 cursor-pointer focus:outline-none ${
+                        isActive
+                          ? 'w-6 bg-[#1E60F3] shadow-[0_2px_8px_rgba(30,96,243,0.35)]'
+                          : 'w-2 bg-slate-300 hover:bg-slate-400'
+                      }`}
+                    />
                   );
                 })}
               </div>
@@ -926,7 +1090,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
         {/* ========================================================= */}
         {isDragging && draggedPreset && (
           <div
-            className="fixed z-[150] pointer-events-none -translate-x-1/2 -translate-y-1/2 will-change-transform shadow-2xl rounded-2xl bg-white border-2 border-[#1E60F3] ring-2 ring-[#1E60F3]/40 px-3.5 py-2 flex items-center justify-center scale-95 opacity-95 transition-transform duration-100 ease-out"
+            className="fixed z-[150] pointer-events-none -translate-x-1/2 -translate-y-1/2 will-change-transform shadow-2xl rounded-2xl bg-white border-2 border-[#1E60F3] ring-2 ring-[#1E60F3]/40 px-4 py-2.5 flex items-center justify-center scale-105 opacity-95 transition-transform duration-100 ease-out"
             style={{
               left: `${pointerPos.x}px`,
               top: `${pointerPos.y}px`,

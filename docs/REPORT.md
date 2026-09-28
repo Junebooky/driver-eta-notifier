@@ -1820,6 +1820,92 @@ SELECT * FROM cockpit.presets;
 3. **드래그 앤 드롭 및 순서 영속성 검증**:
    - 카드를 잡고 끌어 위치를 변경할 때 플로팅 칩 및 실시간 스왑이 정상 작동하며, 모달을 닫아도 변경된 순서가 `cockpit_presets_order` 및 메인 화면/장소 검색 모달에 온전히 유지됨을 확인.
 
+---
+
+## 40. CustomPresetModal 헤더 뱃지 제거, 검색창 text-lg 확대, 350ms 롱프레스 스무스 리오더링, 자택 뱃지 삭제 및 4x3 12슬롯 캐러셀 페이징 (시그니처 도트 상시 노출) (2026-09-28)
+
+### 40.1 추진 배경 및 목적
+1. **모달 헤더 및 카드 뱃지 미니멀화**:
+   - 모달 상단 타이틀 우측에 렌더링되던 불필요한 등록 개수 뱃지(`{presets.length}개`)를 완전히 삭제하여 시각적 잡음을 줄이고 단정한 텍스트 타이틀과 닫기(`✕`) 버튼만 유지.
+   - 1번 고정 슬롯인 자택 카드에서 중복되는 초록색 `자택` 뱃지를 삭제하여 홈 아이콘과 주소 텍스트의 가독성을 높이고, 뱃지는 공통(`🏢 공통`)과 개인(`👤 개인`) 카드에만 노출되도록 정리.
+2. **장소 검색 인풋 폰트 및 아이콘 시인성 극대화 (`text-lg`)**:
+   - 기사님들이 차량 내 흔들리는 환경에서도 장소를 신속하고 정확하게 검색할 수 있도록 검색창 텍스트를 `text-lg font-medium text-slate-800`으로 확대.
+   - 플레이스홀더(`placeholder:text-base`), 좌측 돋보기 아이콘(`w-5 h-5`), 실시간 추천 결과 주요 명칭(`text-base font-semibold`)의 비례를 일괄 스케일업.
+3. **iOS/안드로이드 홈 화면 스타일 롱프레스 & 스무스 리오더링 (Smooth Transition)**:
+   - 짧은 탭(Short Tap)과 롱프레스(Long-Press) 제스처를 엄격히 분리하여, 짧게 탭할 때는 상단 폼에 거점 정보를 채우는 '수정 모드'로만 동작.
+   - 카드를 **350ms 이상 길게 누르고 있을 때만(Long-Press)** 드래그가 활성화되도록 타이머를 구축하고, 드래그 중인 카드는 `scale-105 shadow-xl ring-2 ring-[#1E60F3]/40 z-30 opacity-90` 스타일로 플로팅.
+   - 카드가 다른 슬롯 영역에 진입했을 때 순식간에 끊기듯 교체되는 대신 CSS FLIP `transition: all 0.3s cubic-bezier(0.2, 0, 0, 1)` 모션을 통해 주변 카드들이 스무스하게 옆으로 밀려나며 착지 공간을 열어주도록 구현하고, 드롭 시 `haptics.lightTap()` 발생.
+4. **4행 3열(12슬롯) 가로 캐러셀 페이징 및 시그니처 도트 상시 노출**:
+   - `PAGE_SIZE = 12` 규격으로 분할하여 세로 스크롤 과부하를 원천 차단하고 `PresetButtons.tsx`와 통일된 가로 슬라이더 구조 구축.
+   - **1페이지 상시 노출**: 거점이 12개 이하인 단일 페이지 환경에서도 도트 인디케이터를 숨기지 않고 중앙에 코발트 블루 가로 알약(`w-6 h-2 rounded-full bg-[#1E60F3]`) 1개를 상시 렌더링하여 통일된 디자인 큐 제공. 13개 이상 시 원형 도트(`w-2 h-2 bg-slate-300`)가 유기적으로 추가되며 좌우 스와이프 지원.
+
+---
+
+### 40.2 핵심 구현 내역
+
+#### [태스크 1] 모달 헤더 개수 뱃지 삭제 ([`components/CustomPresetModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/CustomPresetModal.tsx))
+- 모달 최상단 헤더에서 `{items.length}개` 뱃지 렌더링 요소를 완전히 제거.
+- `h2` 텍스트 타이틀(`거점 및 자주 가는 목적지 관리` 또는 `자택 주소 등록`)과 우측 닫기(`✕`) 원형 버튼만으로 구성된 단정하고 깔끔한 헤더 완성.
+
+---
+
+#### [태스크 2] 장소 검색 인풋 폰트 크기 확대 (`text-lg`) ([`components/CustomPresetModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/CustomPresetModal.tsx))
+- **인풋 텍스트**: `text-lg font-medium text-slate-800` (패딩: `pl-11 pr-10 py-2.5 sm:py-3`)
+- **플레이스홀더**: `placeholder:text-base placeholder:text-slate-400`
+- **좌측 돋보기 아이콘**: `w-5 h-5 text-slate-400 absolute left-3.5 top-3 sm:top-3.5`
+- **우측 스피너 아이콘**: `w-5 h-5 text-[#1E60F3] animate-spin absolute right-3.5`
+- **실시간 추천 드롭다운 주요 명칭**: `text-base font-semibold text-slate-900 truncate`
+
+---
+
+#### [태스크 3] iOS/안드로이드 홈 화면 스타일 롱프레스 및 스무스 리오더링 ([`components/CustomPresetModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/CustomPresetModal.tsx))
+1. **350ms Long-Press Timer 기반 탭/드래그 분리**:
+   - `handlePointerStart`: 터치/마우스 다운 시 350ms 타이머 구동.
+   - `handlePointerMoveCheck`: 터치 이동 거리(`deltaY > 8` 또는 `dist >= 10`) 발생 시 스크롤 중으로 판단하여 롱프레스 타이머를 즉시 취소, 모달 스크롤 방해 차단.
+   - 짧은 탭(350ms 미만 해제): 롱프레스 타이머를 해제하고 `handleCardClick(preset)`을 통해 상단 수정 폼에 데이터 로드.
+2. **플로팅 및 부드러운 자리 양보 모션 (FLIP Transition)**:
+   - 350ms 경과 시 진동 햅틱(`navigator.vibrate(40)`)과 함께 `isDragging = true` 전환.
+   - 드래그 활성 카드: `scale-105 shadow-xl ring-2 ring-[#1E60F3]/40 z-30 opacity-90 border-2 border-[#1E60F3] bg-blue-50/50`.
+   - 상단 플로팅 칩: `fixed z-[150]` 레이어로 포인터 위치(`pointerPos`)를 따라다니는 단축 명칭 칩 렌더링.
+   - 자리 양보 모션: 카드가 다른 슬롯 영역 중심점(`checkCenterPointHysteresis`)에 진입하면 `prevRectsRef` 기반 FLIP 애니메이션과 `transition: all 0.3s cubic-bezier(0.2, 0, 0, 1)`을 통해 주변 카드들이 유려하게 밀려나며 착지 공간을 개방.
+   - 드롭(`endDrag`): 슬롯에 안착하며 `haptics.lightTap()` 발생, `cockpit_presets_${cleanV}` 및 `cockpit_presets_order_${cleanV}` 저장, `onReorderPresets` Supabase 동기화. `setTimeout`을 통해 드래그 종료 직후의 브라우저 클릭 이벤트 간섭 차단.
+
+---
+
+#### [태스크 4] '자택' 전용 뱃지 제거 ([`components/CustomPresetModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/CustomPresetModal.tsx))
+- 1번 고정 슬롯 내 자택 카드의 초록색 뱃지(`<span ... bg-emerald-50 text-emerald-600>자택</span>`)를 전면 삭제.
+- 🏠 자택 아이콘과 자택 명칭, 그리고 등록된 주소 텍스트만 표시하여 여백과 가독성을 확보.
+- 뱃지는 2..N번 거점 카드의 `🏢 공통` / `👤 개인` 구분에만 명확히 노출되도록 정리.
+
+---
+
+#### [태스크 5] 4행 3열(12슬롯) 가로 캐러셀 페이징 및 시그니처 도트 상시 노출 ([`components/CustomPresetModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/CustomPresetModal.tsx))
+1. **12슬롯 단위 페이징 (`PAGE_SIZE = 12`)**:
+   - 자택 카드 1개 + 등록된 거점 N개를 묶어 12개 슬롯 단위(4행 x 3열)로 페이지 청킹.
+   - `overflow-hidden` 컨테이너 및 `flex transition-transform duration-300 ease-out` 가로 슬라이더 구조 구현.
+   - 드래그 중이 아닐 때 좌우 터치 스와이프 제스처(`onTouchStart`, `onTouchMove`, `onTouchEnd`, 40px 임계치) 지원.
+2. **시그니처 도트 인디케이터 상시 노출**:
+   - 조건부 렌더링(`totalPages > 1`)을 전면 제거하여 전체가 1페이지일 때도 그리드 하단에 도트 UI를 상시 배치.
+   - **활성 페이지**: `w-6 h-2 rounded-full bg-[#1E60F3] shadow-[0_2px_8px_rgba(30,96,243,0.35)] transition-all duration-300` (코발트 블루 가로 알약)
+   - **비활성 페이지**: `w-2 h-2 rounded-full bg-slate-300 hover:bg-slate-400 transition-all duration-300` (라이트 그레이 원형 도트)
+   - 1페이지일 때 중앙에 단일 가로 알약이 안정적으로 안착되며, 13개 이상 추가 시 다중 도트로 부드럽게 확장.
+
+---
+
+### 40.3 검증 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 14개 라우트 컴파일 에러 **0건** 완료.
+2. **헤더 및 자택 뱃지 제거 검증**:
+   - 모달 상단 헤더에서 숫자 뱃지가 사라지고 타이틀과 닫기 버튼만 단정하게 표시됨을 확인.
+   - 자택 카드 내 초록색 뱃지가 제거되어 주소 텍스트가 시원하게 노출됨을 확인.
+3. **검색창 text-lg 확대 검증**:
+   - 인풋 텍스트(`text-lg`), 플레이스홀더(`text-base`), 돋보기(`w-5 h-5`), 추천 목록(`text-base font-semibold`)이 일관된 크기로 시원하게 렌더링됨을 확인.
+4. **350ms 롱프레스 및 FLIP 스무스 리오더링 검증**:
+   - 단순 탭 시 즉시 상단 수정 폼으로 거점 데이터가 채워지고, 350ms 이상 길게 누를 때만 드래그가 개시되며 주변 카드가 `cubic-bezier(0.2, 0, 0, 1)` 곡선을 따라 스무스하게 자리를 양보하고 드롭 시 햅틱 피드백이 발생함을 확인.
+5. **12슬롯 캐러셀 및 상시 도트 인디케이터 검증**:
+   - 단일 페이지(12개 이하)에서도 하단에 코발트 블루 알약 도트가 안정적으로 렌더링되며, 13개 이상일 때 다중 도트와 가로 슬라이더가 유기적으로 동작함을 확인.
+
+
 
 
 
