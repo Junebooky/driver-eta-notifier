@@ -220,3 +220,23 @@ export function launchRoutePreview(
   launchNavigationApp(provider, destination, origin);
 }
 
+/**
+ * 홈 네브바 롱프레스 전용: 목적지와 무관하게 각 내비 앱의 초기 메인화면을 실행합니다.
+ */
+export function openNaviAppMain(navi: 'tmap' | 'kakao' | 'naver') {
+  let schemeUrl = '';
+
+  if (navi === 'tmap') {
+    schemeUrl = 'tmap://';
+  } else if (navi === 'kakao') {
+    schemeUrl = 'kakaonavi://';
+  } else if (navi === 'naver') {
+    schemeUrl = 'nmap://action/default';
+  }
+
+  if (schemeUrl) {
+    window.location.href = schemeUrl;
+  }
+}
+
+

@@ -1,9 +1,10 @@
 'use client';
 
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { DriverProfile, NaviProvider } from '@/types';
 import { Car, ChevronDown, Settings } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
+import { openNaviAppMain } from '@/utils/navigation';
 
 interface HeaderProps {
   profile: DriverProfile;
@@ -50,6 +51,61 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const headerLabel = formatHeaderDriverLabel(profile.vehicleNo, profile.driverName);
 
+  // Header.tsx 내부 상태 및 롱프레스 제어
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const isLongPressRef = useRef(false);
+  const startCoordRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, []);
+
+  const startLongPress = (navi: 'tmap' | 'kakao' | 'naver', e: React.TouchEvent | React.MouseEvent) => {
+    isLongPressRef.current = false;
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
+    startCoordRef.current = { x: clientX, y: clientY };
+
+    if (timerRef.current) clearTimeout(timerRef.current);
+
+    timerRef.current = setTimeout(() => {
+      isLongPressRef.current = true;
+      haptics.impactMedium();
+      openNaviAppMain(navi); // 목적지 무시하고 초기 메인화면으로 실행
+    }, 350);
+  };
+
+  const cancelLongPress = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  const checkTouchMove = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    const dx = Math.abs(touch.clientX - startCoordRef.current.x);
+    const dy = Math.abs(touch.clientY - startCoordRef.current.y);
+    // 10px 이상 터치 이동 시 스크롤 제스처로 간주하여 롱프레스 취소
+    if (dx > 10 || dy > 10) {
+      cancelLongPress();
+    }
+  };
+
+  const handleNaviClick = (navi: 'tmap' | 'kakao' | 'naver') => {
+    // 롱프레스가 발화된 직후 손을 뗐을 때 단순 클릭 토글 차단
+    if (isLongPressRef.current) {
+      isLongPressRef.current = false;
+      return;
+    }
+    haptics.lightTap();
+    onSelectNavi(navi);
+  };
+
   return (
     <header className="w-full bg-white/95 border-b border-slate-100/90 backdrop-blur pt-[max(env(safe-area-inset-top),1.25rem)] pb-2.5 px-4 sticky top-0 z-30 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
       <div className="max-w-md mx-auto flex items-center justify-between gap-2">
@@ -76,15 +132,19 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="ml-auto flex items-center gap-1.5 shrink-0">
           {/* TMAP Button (White circular background + Gradient 'T' Logo) */}
           <button
-            onClick={() => {
-              haptics.lightTap();
-              onSelectNavi('tmap');
-            }}
-            className={`w-9 h-9 rounded-full bg-white border border-slate-200 shadow-xs flex items-center justify-center transition-all duration-100 active:scale-90 cursor-pointer ${profile.defaultNavi === 'tmap'
+            onTouchStart={(e) => startLongPress('tmap', e)}
+            onTouchEnd={cancelLongPress}
+            onTouchMove={checkTouchMove}
+            onMouseDown={(e) => startLongPress('tmap', e)}
+            onMouseUp={cancelLongPress}
+            onMouseLeave={cancelLongPress}
+            onContextMenu={(e) => e.preventDefault()}
+            onClick={() => handleNaviClick('tmap')}
+            className={`w-9 h-9 rounded-full bg-white border border-slate-200 shadow-xs flex items-center justify-center transition-all duration-100 active:scale-90 cursor-pointer select-none [-webkit-touch-callout:none] ${profile.defaultNavi === 'tmap'
                 ? 'ring-2 ring-[#1E60F3] scale-105 shadow-[0_4px_12px_rgba(30,96,243,0.25)] z-10'
                 : 'opacity-60 hover:opacity-100'
               }`}
-            title="티맵 (TMAP) 선택"
+            title="티맵 (TMAP) 선택 (길게 누르면 앱 실행)"
             aria-label="티맵 선택"
           >
             <svg viewBox="0 0 24 24" className="w-4.5 h-4.5" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -104,15 +164,19 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* KakaoNavi Button */}
           <button
-            onClick={() => {
-              haptics.lightTap();
-              onSelectNavi('kakao');
-            }}
-            className={`w-9 h-9 rounded-full bg-[#FEE500] border border-amber-300 text-[#3C1E1E] font-black text-sm shadow-xs flex items-center justify-center transition-all duration-100 active:scale-90 cursor-pointer ${profile.defaultNavi === 'kakao'
+            onTouchStart={(e) => startLongPress('kakao', e)}
+            onTouchEnd={cancelLongPress}
+            onTouchMove={checkTouchMove}
+            onMouseDown={(e) => startLongPress('kakao', e)}
+            onMouseUp={cancelLongPress}
+            onMouseLeave={cancelLongPress}
+            onContextMenu={(e) => e.preventDefault()}
+            onClick={() => handleNaviClick('kakao')}
+            className={`w-9 h-9 rounded-full bg-[#FEE500] border border-amber-300 text-[#3C1E1E] font-black text-sm shadow-xs flex items-center justify-center transition-all duration-100 active:scale-90 cursor-pointer select-none [-webkit-touch-callout:none] ${profile.defaultNavi === 'kakao'
                 ? 'ring-2 ring-amber-400 scale-105 shadow-[0_4px_12px_rgba(254,229,0,0.35)] z-10'
                 : 'opacity-60 hover:opacity-100'
               }`}
-            title="카카오내비 선택"
+            title="카카오내비 선택 (길게 누르면 앱 실행)"
             aria-label="카카오내비 선택"
           >
             <span>K</span>
@@ -120,15 +184,19 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* NaverMap Button */}
           <button
-            onClick={() => {
-              haptics.lightTap();
-              onSelectNavi('naver');
-            }}
-            className={`w-9 h-9 rounded-full bg-[#03C75A] border border-emerald-400 text-white font-black text-sm shadow-xs flex items-center justify-center transition-all duration-100 active:scale-90 cursor-pointer ${profile.defaultNavi === 'naver'
+            onTouchStart={(e) => startLongPress('naver', e)}
+            onTouchEnd={cancelLongPress}
+            onTouchMove={checkTouchMove}
+            onMouseDown={(e) => startLongPress('naver', e)}
+            onMouseUp={cancelLongPress}
+            onMouseLeave={cancelLongPress}
+            onContextMenu={(e) => e.preventDefault()}
+            onClick={() => handleNaviClick('naver')}
+            className={`w-9 h-9 rounded-full bg-[#03C75A] border border-emerald-400 text-white font-black text-sm shadow-xs flex items-center justify-center transition-all duration-100 active:scale-90 cursor-pointer select-none [-webkit-touch-callout:none] ${profile.defaultNavi === 'naver'
                 ? 'ring-2 ring-emerald-500 scale-105 shadow-[0_4px_12px_rgba(3,199,90,0.35)] z-10'
                 : 'opacity-60 hover:opacity-100'
               }`}
-            title="네이버지도 선택"
+            title="네이버지도 선택 (길게 누르면 앱 실행)"
             aria-label="네이버지도 선택"
           >
             <span>N</span>

@@ -3170,6 +3170,42 @@ flowchart TD
    - **Case 1 (배경 스크롤 방지)**: 관리자 모달 진입 후 모달 카드나 배경을 상하로 드래그/스크롤해도 뒷 배경 대시보드가 고정된 상태로 완벽히 정지함 (PASS).
    - **Case 2 (인풋/버튼 인터랙션 유지)**: PIN 입력(클릭, 숫자 입력, 자동 제출) 및 모드 종료 버튼, 닫기 버튼 터치가 부드럽게 정상 작동함 (PASS).
 
+---
+
+## 64. 홈 네브바 내비 아이콘 350ms 롱프레스 시 초기 메인화면(Default Launcher) 진입 구현
+
+### 64.1 배경 및 작업 목적
+- 홈 헤더 네브바(`Header.tsx`)의 내비게이션 아이콘 3종(티맵, 카카오내비, 네이버지도)을 350ms 동안 길게 눌렀을 때, 목적지 설정 여부와 관계없이 각 내비 앱을 최초 실행한 것과 같은 '초기 메인 화면(Default Launcher)'으로 즉시 진입하도록 지원.
+- 짧은 탭(Short Press)의 기본 내비게이션 토글 동작 및 `RouteInfoCard.tsx`의 정식 길안내/딥링크 로직은 100% 무결하게 보존.
+
+### 64.2 모듈별 상세 구현 내역
+
+#### 1. 내비 앱 초기 메인화면 런처 단독 함수 신설 ([`utils/navigation.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/utils/navigation.ts))
+- 목적지/출발지 파라미터 없이 각 앱의 루트 URL 스킴만 호출하는 `openNaviAppMain(navi)` 함수 구현:
+  - TMAP: `tmap://`
+  - 카카오내비: `kakaonavi://`
+  - 네이버지도: `nmap://action/default`
+
+#### 2. 홈 헤더 350ms 롱프레스 제스처 바인딩 ([`components/Header.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/Header.tsx))
+- `startLongPress`, `cancelLongPress`, `checkTouchMove`, `handleNaviClick` 제어 로직 탑재.
+- 350ms 경과 시 햅틱 피드백(`haptics.impactMedium`)과 함께 `openNaviAppMain(navi)` 실행.
+- 터치 이동(10px 초과) 감지 시 스크롤로 판단하여 롱프레스 자동 취소.
+- 롱프레스 발화 후 손을 뗐을 때 일반 클릭 토글(`onSelectNavi`)이 오동작하지 않도록 `isLongPressRef` 플래그로 차단.
+- iOS Safari 시스템 메뉴 억제를 위한 `onContextMenu={(e) => e.preventDefault()}` 및 `select-none [-webkit-touch-callout:none]` 적용.
+
+---
+
+### 64.3 검증 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 TypeScript / ESLint 컴파일 에러 **0건 (Exit code 0)** 통과.
+2. **타 로직 불변성 검증**:
+   - `git diff components/RouteInfoCard.tsx`: 변경 사항 없음 (PASS).
+3. **시나리오 검증 결과**:
+   - **Case 1 (단순 탭)**: 아이콘 짧은 탭 시 기존처럼 기본 내비 선택 링이 정상 전환됨 (PASS).
+   - **Case 2 (목적지 유무 무관 롱프레스)**: 목적지 설정 상태에서도 350ms 롱프레스 시 길안내가 아닌 각 내비 앱의 초기 메인화면 스킴으로 직행함 (PASS).
+   - **Case 3 (터치 스크롤)**: 헤더 터치 후 스와이프/스크롤 시 롱프레스 타이머가 즉시 취소되어 오작동하지 않음 (PASS).
+
+
 
 
 

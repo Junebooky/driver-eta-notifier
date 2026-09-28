@@ -30,6 +30,13 @@ export const haptics = {
   },
 
   /**
+   * Alias for medium impact vibration
+   */
+  impactMedium: () => {
+    haptics.mediumTap();
+  },
+
+  /**
    * Heavy tap feedback for primary navigation launches and action executions (40ms)
    */
   heavyTap: () => {
