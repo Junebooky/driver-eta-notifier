@@ -938,7 +938,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                     value={receiptDamage}
                     onChange={(e) => setReceiptDamage(e.target.value)}
                     placeholder="무 (미입력 시 '무' 표기)"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors text-base"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors text-sm"
                   />
                 </div>
               </div>
@@ -1301,7 +1301,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                     value={returnDamage}
                     onChange={(e) => setReturnDamage(e.target.value)}
                     placeholder="예: 조수석 뒷 휠 기스 (수령 시와 동일)"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors text-base"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors text-sm"
                   />
                 </div>
               </div>
