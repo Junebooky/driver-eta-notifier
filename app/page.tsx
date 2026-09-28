@@ -407,6 +407,29 @@ export default function Home() {
   const handleSaveHomeLocation = async (homeData: HomeLocation) => {
     updateProfile({ homeLocation: homeData });
 
+    if (destination?.id === 'slot_home') {
+      setDestination({
+        id: 'slot_home',
+        name: homeData.name || '자택',
+        shortName: '자택',
+        lat: homeData.lat,
+        lng: homeData.lng,
+        category: 'HOME',
+        address: homeData.address,
+      });
+    }
+    if (origin?.id === 'slot_home') {
+      setOrigin({
+        id: 'slot_home',
+        name: homeData.name || '자택',
+        shortName: '자택',
+        lat: homeData.lat,
+        lng: homeData.lng,
+        category: 'HOME',
+        address: homeData.address,
+      });
+    }
+
     // Supabase Sync
     try {
       await fetch('/api/driver', {
@@ -1052,6 +1075,7 @@ export default function Home() {
         onClose={() => setIsHomeModalOpen(false)}
         onAddPreset={() => { }}
         isHomeMode={true}
+        homeLocation={profile.homeLocation}
         onSaveHome={handleSaveHomeLocation}
       />
 

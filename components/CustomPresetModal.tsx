@@ -97,6 +97,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
   const [address, setAddress] = useState('');
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
+  const [isHomeEditMode, setIsHomeEditMode] = useState(false);
 
   // Drag-and-Drop Gesture State
   const [isDragging, setIsDragging] = useState(false);
@@ -145,32 +146,77 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
     }
   }, [presets, vehicleNo, isOpen]);
 
-  // Sync external presetToEdit prop
+  // Sync external presetToEdit prop or homeLocation for Home Mode
   useEffect(() => {
     if (isOpen) {
-      if (presetToEdit) {
+      if (isHomeMode) {
+        setEditingItem(null);
+        let existingHome = homeLocation;
+        if (!existingHome && typeof window !== 'undefined') {
+          try {
+            const rawProfile = localStorage.getItem('protocol_cockpit_driver_profile_v1');
+            if (rawProfile) {
+              const parsed = JSON.parse(rawProfile);
+              if (parsed.homeLocation && (parsed.homeLocation.address || parsed.homeLocation.lat)) {
+                existingHome = parsed.homeLocation;
+              }
+            }
+          } catch (e) { }
+        }
+
+        if (existingHome && (existingHome.address || existingHome.lat)) {
+          setName(existingHome.name || '자택');
+          setAddress(existingHome.address || '');
+          setLat(existingHome.lat ?? null);
+          setLng(existingHome.lng ?? null);
+          setSearchQuery('');
+          setIsHomeEditMode(true);
+          const abbrev = generateSmartDisplayName(existingHome.name || '자택');
+          const homeCandidates = Array.from(new Set(['자택', abbrev.primary, ...abbrev.candidates])).slice(0, 4);
+          setRecommendations(homeCandidates);
+        } else {
+          setName('');
+          setAddress('');
+          setLat(null);
+          setLng(null);
+          setSearchQuery('');
+          setIsHomeEditMode(false);
+          setRecommendations([]);
+        }
+        setShortName('');
+        setSearchResults([]);
+        setIsDropdownOpen(false);
+        setSearchError(null);
+      } else if (presetToEdit) {
+        setIsHomeEditMode(false);
         setEditingItem(presetToEdit);
         setName(presetToEdit.name);
         setShortName(presetToEdit.shortName);
+        const abbrev = generateSmartDisplayName(presetToEdit.name);
+        setRecommendations(abbrev.candidates);
         setAddress(presetToEdit.address || '');
         setLat(presetToEdit.lat);
         setLng(presetToEdit.lng);
         setSearchQuery('');
         setSearchResults([]);
+        setIsDropdownOpen(false);
         setSearchError(null);
       } else {
+        setIsHomeEditMode(false);
         setEditingItem(null);
         setName('');
         setShortName('');
+        setRecommendations([]);
         setAddress('');
         setLat(null);
         setLng(null);
         setSearchQuery('');
         setSearchResults([]);
+        setIsDropdownOpen(false);
         setSearchError(null);
       }
     }
-  }, [isOpen, presetToEdit]);
+  }, [isOpen, presetToEdit, isHomeMode, homeLocation]);
 
   // FLIP (First, Last, Invert, Play) Layout Animation for fluid app-icon displacement
   useLayoutEffect(() => {
@@ -628,13 +674,23 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
     searchInputRef.current?.blur();
 
     const abbrev = generateSmartDisplayName(poi.name);
-    setName(poi.name);
-    setShortName(abbrev.primary);
-    setRecommendations(abbrev.candidates);
-    setAddress(poi.address || poi.name);
-    setLat(poi.lat);
-    setLng(poi.lng);
-    setSearchQuery(poi.name);
+    if (isHomeMode) {
+      const homeCandidates = Array.from(new Set(['자택', abbrev.primary, ...abbrev.candidates])).slice(0, 4);
+      setRecommendations(homeCandidates);
+      setName(poi.name);
+      setAddress(poi.address || poi.name);
+      setLat(poi.lat);
+      setLng(poi.lng);
+      setSearchQuery('');
+    } else {
+      setName(poi.name);
+      setShortName(abbrev.primary);
+      setRecommendations(abbrev.candidates);
+      setAddress(poi.address || poi.name);
+      setLat(poi.lat);
+      setLng(poi.lng);
+      setSearchQuery(poi.name);
+    }
     setSearchError(null);
   };
 
@@ -683,6 +739,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
     setSearchResults([]);
     setIsDropdownOpen(false);
     setSearchError(null);
+    setIsHomeEditMode(false);
   };
 
   // Save new preset or update existing
@@ -918,7 +975,9 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
               )}
             </div>
             <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-snug">
-              {isHomeMode ? '자택 주소 등록' : '거점 · 자주 가는 장소'}
+              {isHomeMode
+                ? (isHomeEditMode ? '자택 주소 수정' : '자택 주소 등록')
+                : '거점 · 자주 가는 장소'}
             </h2>
           </div>
           <button
@@ -1068,11 +1127,10 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                             key={chip}
                             type="button"
                             onClick={() => setShortName(chip)}
-                            className={`px-2 py-0.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
-                              shortName === chip
-                                ? 'bg-blue-50 text-[#1E60F3] border-blue-200'
-                                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                            }`}
+                            className={`px-2 py-0.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${shortName === chip
+                              ? 'bg-blue-50 text-[#1E60F3] border-blue-200'
+                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                              }`}
                           >
                             {chip}
                           </button>
@@ -1087,14 +1145,14 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                   <button
                     type="button"
                     onClick={handleCancelForm}
-                    className="w-1/3 py-3 rounded-xl bg-slate-200/80 hover:bg-slate-300 text-slate-700 text-ml font-bold active:scale-95 transition cursor-pointer"
+                    className="w-1/3 py-3 rounded-xl bg-slate-200/80 hover:bg-slate-300 text-slate-700 text-sm font-bold active:scale-95 transition cursor-pointer"
                   >
                     취소
                   </button>
                   <button
                     type="submit"
                     disabled={lat === null || !name.trim()}
-                    className="w-2/3 py-3 rounded-xl bg-[#1E60F3] hover:bg-[#1346D8] disabled:opacity-40 text-white text-md font-black shadow-xs transition active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1.5"
+                    className="w-2/3 py-3 rounded-xl bg-[#1E60F3] hover:bg-[#1346D8] disabled:opacity-40 text-white text-sm font-black shadow-xs transition active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1.5"
                   >
                     <Check className="w-4 h-4 stroke-[2.5]" />
                     <span>{editingItem ? '수정 완료' : '저장'}</span>
@@ -1126,7 +1184,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                     }}
                     placeholder="장소명 또는 주소 검색 (예: 자택 아파트명, 도로명)"
                     className="w-full pl-11 pr-10 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-lg font-medium placeholder:text-base placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] focus:bg-white transition-colors"
-                    autoFocus
+                    autoFocus={!isHomeEditMode}
                   />
                   <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-3.5" />
                   {isSearching && (
@@ -1180,6 +1238,24 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                     placeholder="예: 자택, 우리집"
                     className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200 rounded-xl text-lg font-bold text-slate-900 placeholder:text-base placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:bg-white"
                   />
+                  {recommendations.length > 0 && (
+                    <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                      <span className="text-[11px] font-medium text-slate-400">추천:</span>
+                      {recommendations.map((chip) => (
+                        <button
+                          key={chip}
+                          type="button"
+                          onClick={() => setName(chip)}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${name === chip
+                            ? 'bg-blue-50 text-[#1E60F3] border-blue-200'
+                            : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                            }`}
+                        >
+                          {chip}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-1">
@@ -1208,7 +1284,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                     disabled={lat === null || !name.trim()}
                     className="w-2/3 py-3 rounded-xl bg-[#1E60F3] hover:bg-[#1346D8] disabled:opacity-40 text-white text-sm font-black shadow-xs transition active:scale-[0.98] cursor-pointer"
                   >
-                    자택 저장
+                    {isHomeEditMode ? '자택 수정' : '자택 저장'}
                   </button>
                 </div>
               </form>

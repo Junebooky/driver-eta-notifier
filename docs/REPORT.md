@@ -2485,6 +2485,115 @@ flowchart TD
    - 일반 모드 호출 시 `403 Forbidden` (`{"error":"공통 마스터 거점은 관리자 모드에서만 삭제할 수 있습니다."}`) 정상 방어 확인.
    - 관리자 모드(`is_admin=true`) 호출 시 `200 OK` (`{"success":true}`) 정상 삭제 및 DB 반영 확인.
 
+---
+
+## 50. 자택(Home) 프리셋 수정 시 기등록 정보 자동 주입(Prefill) 및 수정 모드 전환
+
+### 50.1 배경 및 작업 목적
+- 기존 자택 주소가 이미 등록되어 있는 상태에서 자택 항목을 탭하거나 수정을 시도할 때, 기존 등록 정보가 채워지지 않고 빈 '자택 주소 등록' 폼이 뜨며 저장 버튼이 비활성화되던 문제를 전면 해결.
+- 기등록 자택 정보가 존재하면 모달 진입 즉시 **'자택 명칭'**과 **'자택 상세 주소'**가 인풋에 자동 주입(Prefill)되며, 헤더 타이틀은 **'자택 주소 수정'**, 저장 버튼은 **'자택 수정'**(`#1E60F3`)으로 부드럽게 전환되어 즉시 저장 가능한 활성화 상태를 유지하도록 구현.
+- 신규 POI 재검색 시에도 지능형 축약(`utils/nameFormatter.ts`) 결과가 추천 칩으로 자연스럽게 제안되며, Zero-DB / Pure Client-Side 원칙에 따라 브라우저 `localStorage` 및 드라이버 프로필과 즉각 동기화(Zero-Click Commit)되도록 완성.
+
+---
+
+### 50.2 아키텍처 및 상태 전이 다이어그램
+
+```mermaid
+flowchart TD
+    subgraph Trigger ["자택 모달 오픈 진입"]
+        A1["메인 카드 슬롯 1 (자택 🏠) 클릭"] --> B["onOpenHomeModal()"]
+        A2["거점 관리 모달 내 자택 슬롯 클릭"] --> B
+        A3["장소 검색 모달 내 자택 등록 클릭"] --> B
+        B --> C["setIsHomeModalOpen(true)"]
+    end
+
+    subgraph Modal_Init ["CustomPresetModal: useEffect 동기화"]
+        C --> D{"isHomeMode 감지"}
+        D --> E{"기등록 자택 데이터 검사<br/>(homeLocation prop || localStorage)"}
+        E -->|기등록 데이터 존재 (Case 1)| F1["isHomeEditMode = true<br/>name: existingHome.name ('자택')<br/>address: existingHome.address<br/>lat/lng: existingHome.lat/lng<br/>recommendations: 지능형 축약 추천 칩"]
+        E -->|데이터 없음 (Case 3: 신규)| F2["isHomeEditMode = false<br/>name: ''<br/>address: ''<br/>lat/lng: null<br/>recommendations: []"]
+    end
+
+    subgraph UI_Toggle ["동적 헤더 및 버튼 렌더링"]
+        F1 --> G1["상단 타이틀: '자택 주소 수정'<br/>하단 버튼: '자택 수정' (활성화 #1E60F3)<br/>검색창 autofocus 해제 (쾌적한 확인)"]
+        F2 --> G2["상단 타이틀: '자택 주소 등록'<br/>하단 버튼: '자택 저장' (비활성화 disabled)<br/>검색창 autofocus 활성화"]
+    end
+
+    subgraph Re_Search ["새 주소 검색 및 덮어쓰기 (Case 2)"]
+        G1 --> H["장소 검색창에 새 주소 입력"]
+        H --> I["POI 항목 터치 선택 (handleSelectPoi)"]
+        I --> J["1. name, address, lat, lng 즉시 갱신<br/>2. recommendations: ['자택', 축약명, ...] 제안<br/>3. searchInput.blur() & 드롭다운 즉시 소거"]
+    end
+
+    subgraph Commit ["저장 및 로컬 동기화 (handleSubmit)"]
+        G1 -->|자택 수정 탭| K["handleSaveHomeLocation"]
+        J -->|자택 수정 탭| K
+        G2 -->|자택 저장 탭| K
+        K --> L["updateProfile({ homeLocation: homeData })<br/>1. localStorage protocol_cockpit_driver_profile_v1 반영<br/>2. 호차별 격리 스토리지 cockpit_driver_profile_{N}호차 반영<br/>3. origin/destination이 slot_home일 경우 실시간 갱신"]
+        L --> M["모달 자동 종료 및 메인 화면 즉시 반영"]
+    end
+```
+
+---
+
+### 50.3 상세 구현 내역
+
+#### [태스크 1] 자택 프리셋 데이터 자동 주입(Prefill) 및 모드 분기 ([`components/CustomPresetModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/CustomPresetModal.tsx), [`app/page.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/page.tsx), [`hooks/useDriverProfile.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/hooks/useDriverProfile.ts))
+1. **누락되었던 `homeLocation` Prop 주입 및 단일 진실 공급원(Single Source of Truth) 확립 (`app/page.tsx`)**:
+   - `app/page.tsx` 내 자택 전용 모달 인스턴스에 `homeLocation={profile.homeLocation}`을 추가하여 상위 상태를 직결.
+   - `handleSaveHomeLocation` 내에서 `destination?.id === 'slot_home'` 및 `origin?.id === 'slot_home'`을 감지하여 메인 대시보드에 선택된 자택 정보의 명칭, 좌표, 주소까지 지연 없이 동기화.
+2. **`isHomeEditMode` 모드 분기 및 `useEffect` 상태 동기화 (`components/CustomPresetModal.tsx`)**:
+   - `isHomeEditMode` 상태를 신설하고 `useEffect([isOpen, presetToEdit, isHomeMode, homeLocation])` 블록에서 `isHomeMode` 진입 시:
+     - `homeLocation` prop 또는 `localStorage` fallback에서 기등록 자택 데이터를 조회.
+     - 기등록 정보가 존재할 경우:
+       - `name`: `existingHome.name || '자택'`
+       - `address`: `existingHome.address || ''`
+       - `lat` / `lng`: `existingHome.lat` / `existingHome.lng`
+       - `isHomeEditMode`: `true`
+       - `recommendations`: `['자택', abbrev.primary, ...abbrev.candidates]` 추천 칩 생성.
+     - 신규 등록일 경우:
+       - `name`: `''`, `address`: `''`, `lat/lng`: `null`, `isHomeEditMode`: `false`.
+3. **모달 타이틀 및 하단 버튼 동적 전환**:
+   - 상단 헤더 타이틀: `{isHomeMode ? (isHomeEditMode ? '자택 주소 수정' : '자택 주소 등록') : '거점 · 자주 가는 장소'}`
+   - 하단 액션 버튼: `{isHomeEditMode ? '자택 수정' : '자택 저장'}`
+   - `disabled={lat === null || !name.trim()}` 검증식을 적용하여, 수정 모드에서는 상세 주소 및 좌표가 이미 채워져 있으므로 진입 즉시 파란색 `#1E60F3` 활성화 상태 유지.
+   - 수정 모드 진입 시 모바일 키보드가 화면을 가리지 않도록 `autoFocus={!isHomeEditMode}` 분기 적용.
+4. **호차별 격리 프로필 스토리지 연동 (`hooks/useDriverProfile.ts`)**:
+   - `useDriverProfile` 내 `setStoredVehicleProfile` 및 프로필 초기화 시 `homeLocation`을 호차별 스토리지에 함께 보존하여 호차 전환 시에도 자택 데이터가 손실 없이 복원되도록 처리.
+
+#### [태스크 2] 신규 검색 시의 덮어쓰기 무마찰 인터랙션 ([`components/CustomPresetModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/CustomPresetModal.tsx))
+1. **신규 POI 선택 시 상태 갱신**:
+   - 기존 주소가 채워져 있는 상태에서 사용자가 검색창에 새로운 주소를 검색하여 특정 POI를 선택한 경우, `handleSelectPoi`에서:
+     - `name`: `poi.name`
+     - `address`: `poi.address || poi.name`
+     - `lat`: `poi.lat`, `lng`: `poi.lng`
+     - `searchQuery`: `''`로 즉시 초기화하여 폼을 깔끔하게 유지.
+2. **지능형 축약(`nameFormatter.ts`) 연동 추천 칩 제공**:
+   - `generateSmartDisplayName(poi.name)`의 축약 결과를 `Array.from(new Set(['자택', abbrev.primary, ...abbrev.candidates]))` 형태로 가공하여 '자택 명칭' 인풋 바로 아래에 원터치 추천 칩으로 노출.
+   - 운전자가 아파트/단지 명칭 전체를 쓰거나, 축약된 명칭 또는 '자택' 칩을 한 번의 탭으로 간편하게 교체할 수 있도록 편의성 극대화.
+3. **무마찰 저장 및 Zero-Click Commit**:
+   - `handleSubmit` ➔ `onSaveHome` 호출 시 기존 고유 식별자(`slot_home`)를 유지하며 `localStorage` 및 상위 프로필에 즉시 영속화된 후 모달이 닫히도록 완결.
+
+---
+
+### 50.4 검증 및 무결성 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 컴파일 및 정적 페이지 생성 에러 **0건 (Exit code 0)** 완벽 통과.
+2. **시나리오 검증 결과**:
+   - **Case 1 (기등록 자택 수정)**:
+     - 기등록 자택(예: `성수트리마제`)이 존재하는 상태에서 모달 진입 시:
+     - 상단 타이틀이 **`자택 주소 수정`**으로 노출됨 확인.
+     - '자택 명칭'에 `성수트리마제`, '자택 상세 주소'에 `서울특별시 성동구 왕십리로 16`이 온전히 자동 주입(Prefill)됨 확인.
+     - 하단 저장 버튼이 **`자택 수정`** 및 활성화(`#1E60F3`) 상태로 렌더링됨 확인.
+     - 명칭만 수정한 후 저장 시 로컬 스토리지 및 대시보드에 즉시 갱신 반영 확인.
+   - **Case 2 (주소 재검색 수정)**:
+     - 자택 수정 상태에서 검색창에 '한남더힐' 검색 ➔ POI 터치 시 '자택 명칭'과 '자택 상세 주소', 좌표가 신규 POI로 즉시 덮어쓰기 갱신됨 확인.
+     - 추천 칩(`['자택', '한남더힐', ...]`) 노출 및 탭 인터랙션 정상 확인.
+     - '자택 수정' 클릭 시 신규 주소와 좌표로 안전하게 갱신 저장됨 확인.
+   - **Case 3 (최초 등록)**:
+     - 자택 데이터가 비어 있는 최초 진입 시 상단 타이틀이 **`자택 주소 등록`**, 인풋은 빈 칸, 하단 버튼은 **`자택 저장`** 및 비활성화(`disabled`) 상태로 렌더링됨 확인.
+
+
 
 
 

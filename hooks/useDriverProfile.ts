@@ -162,6 +162,7 @@ export function useDriverProfile() {
             : storedForVehicle?.passengerName !== undefined
               ? (storedForVehicle.passengerName?.trim() || null)
               : null;
+        const resolvedHome = parsed.homeLocation || storedForVehicle?.homeLocation || null;
 
         setProfile((prev) => ({
           ...prev,
@@ -171,6 +172,7 @@ export function useDriverProfile() {
           mobile: resolvedPhone || prev.mobile || '',
           defaultNavi: parsed.defaultNavi || 'tmap',
           passengerName: resolvedPassenger,
+          homeLocation: resolvedHome,
         }));
       } else {
         setProfile({
@@ -212,6 +214,16 @@ export function useDriverProfile() {
             : null;
       }
 
+      let resolvedHomeLocation = prev.homeLocation ?? null;
+      if (newProfile.homeLocation !== undefined) {
+        resolvedHomeLocation = newProfile.homeLocation;
+      } else if (isSwitchingVehicle) {
+        const vehicleCache = getStoredVehicleProfile(cleanTargetVehicle);
+        if (vehicleCache?.homeLocation !== undefined) {
+          resolvedHomeLocation = vehicleCache.homeLocation;
+        }
+      }
+
       const updated: DriverProfile = {
         ...prev,
         ...newProfile,
@@ -220,6 +232,7 @@ export function useDriverProfile() {
         mobile: resolvedPhone,
         defaultNavi: newProfile.defaultNavi || prev.defaultNavi || 'tmap',
         passengerName: resolvedPassenger,
+        homeLocation: resolvedHomeLocation,
       };
 
       try {
@@ -232,6 +245,7 @@ export function useDriverProfile() {
             phone: updated.phone,
             passengerName: resolvedPassenger,
             defaultNavi: updated.defaultNavi,
+            homeLocation: resolvedHomeLocation,
           });
         }
       } catch (e) {
