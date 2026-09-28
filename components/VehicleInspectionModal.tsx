@@ -508,11 +508,13 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
       setReturnMeterPhoto(objectUrl);
     }
 
-    // Call Gemini Vision Dashboard OCR API
+    // Call Gemini Vision Dashboard OCR API with 3.5s Underground Shadow Zone Timeout Guard
     setIsOcrAnalyzing(true);
     setOcrFeedback(null);
     const reader = new FileReader();
     reader.onload = async () => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
       try {
         const base64Data = reader.result as string;
         const res = await fetch('/api/inspect-dashboard', {
@@ -522,6 +524,9 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
             image: base64Data,
             vehicleNo: vehicleHocha || profile.vehicleNo || '',
           }),
+          signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal
+            ? AbortSignal.timeout(3500)
+            : controller.signal,
         });
         if (res.ok) {
           const data = await res.json();
@@ -541,9 +546,16 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
             }
           }
         }
-      } catch (err) {
-        console.warn('Dashboard OCR analysis error:', err);
+      } catch (err: any) {
+        console.warn('Dashboard OCR analysis error (timeout or network):', err);
+        const isTimeout = err?.name === 'AbortError' || err?.name === 'TimeoutError';
+        setOcrFeedback(
+          isTimeout
+            ? '통신 지연(3.5초 타임아웃)으로 자동 인식을 건너뜁니다. 수동으로 입력해주세요.'
+            : '사진 인식을 완료하지 못했습니다. 수동으로 입력해주세요.'
+        );
       } finally {
+        clearTimeout(timeoutId);
         setIsOcrAnalyzing(false);
       }
     };

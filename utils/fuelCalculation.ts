@@ -32,33 +32,12 @@ export interface TrimmedMeanResult {
   trimmedCount: number;
 }
 
-export interface RefuelingRecommendation {
-  shortageKm: number;
-  fuelType: FuelType;
-  unitPrice: number;
-  fuelEconomy: number;
-  litersNeeded: number;
-  rawCost: number;
-  adjustedCost: number;
-  recommendedAmount: number;
-  chips: number[];
-}
-
 // Fallback baseline retail prices (KOTRA/Opinet Seoul Metro Average)
 export const DEFAULT_FALLBACK_PRICES = {
   gasoline: 1685,
   diesel: 1540,
   premiumGasoline: 1930,
 };
-
-// Typical real-world VIP mobility urban fuel economy (km/L)
-export const DEFAULT_FUEL_ECONOMY = {
-  gasoline: 9.8,  // Premium gasoline sedan/van (BMW 520i, G80, Carnival 3.5)
-  diesel: 11.5,   // Diesel sedan/van (BMW 520d, Carnival 2.2D, Staria 2.2D)
-};
-
-// Urban driving safety margin multiplier (도심 정체 및 공회전 감안 1.15배)
-export const URBAN_SAFETY_FACTOR = 1.15;
 
 /**
  * 1. 차종명 및 모델명 기반 유종 자동 매핑
@@ -190,80 +169,3 @@ export function calculateTrimmedMeanPrices(stations: GasStation[]): TrimmedMeanR
   };
 }
 
-/**
- * 3. 부족 DTE 기반 권장 주유 금액 산출기
- * - 부족 DTE = 최초 DTE - 반납 DTE
- * - 도심 안전 계수(1.15배) 적용
- * - 5천원 / 1만원 단위 원터치 칩 생성 (예: [25,000원(권장)])
- */
-export function calculateRecommendedRefueling(params: {
-  initialDte: number;
-  returnDte: number;
-  fuelType: FuelType;
-  unitPrice?: number;
-  fuelEconomy?: number;
-}): RefuelingRecommendation {
-  const { initialDte, returnDte, fuelType } = params;
-  const shortageKm = Math.max(0, initialDte - returnDte);
-
-  const unitPrice =
-    params.unitPrice && params.unitPrice > 0
-      ? params.unitPrice
-      : fuelType === 'diesel'
-        ? DEFAULT_FALLBACK_PRICES.diesel
-        : DEFAULT_FALLBACK_PRICES.gasoline;
-
-  const fuelEconomy =
-    params.fuelEconomy && params.fuelEconomy > 0
-      ? params.fuelEconomy
-      : fuelType === 'diesel'
-        ? DEFAULT_FUEL_ECONOMY.diesel
-        : DEFAULT_FUEL_ECONOMY.gasoline;
-
-  if (shortageKm <= 0) {
-    return {
-      shortageKm: 0,
-      fuelType,
-      unitPrice,
-      fuelEconomy,
-      litersNeeded: 0,
-      rawCost: 0,
-      adjustedCost: 0,
-      recommendedAmount: 0,
-      chips: [],
-    };
-  }
-
-  // 소요 리터 수
-  const litersNeeded = Math.round((shortageKm / fuelEconomy) * 10) / 10;
-  // 기준 금액
-  const rawCost = Math.round(litersNeeded * unitPrice);
-  // 도심 안전 계수 1.15배 반영
-  const adjustedCost = Math.round(rawCost * URBAN_SAFETY_FACTOR);
-
-  // 5,000원 단위 올림 (예: 21,300원 -> 25,000원)
-  const recommendedAmount = Math.ceil(adjustedCost / 5000) * 5000;
-
-  // 원터치 칩 생성 (추천값 전후 5천원/1만원 단위)
-  const chipSet = new Set<number>();
-  if (recommendedAmount > 5000) {
-    chipSet.add(recommendedAmount - 5000);
-  }
-  chipSet.add(recommendedAmount);
-  chipSet.add(recommendedAmount + 5000);
-  chipSet.add(recommendedAmount + 10000);
-
-  const chips = Array.from(chipSet).sort((a, b) => a - b);
-
-  return {
-    shortageKm,
-    fuelType,
-    unitPrice,
-    fuelEconomy,
-    litersNeeded,
-    rawCost,
-    adjustedCost,
-    recommendedAmount,
-    chips,
-  };
-}

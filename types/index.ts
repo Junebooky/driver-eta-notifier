@@ -33,6 +33,7 @@ export interface LocationPreset {
   name: string;
   shortName: string;
   fullName?: string;
+  full_name?: string;
   lat: number;
   lng: number;
   category: 'AIRPORT' | 'HOTEL' | 'CIRCUIT' | 'RETURN' | 'CUSTOM' | 'HOME' | 'GAS';

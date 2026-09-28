@@ -37,8 +37,8 @@ export async function GET(req: NextRequest) {
 
     const presets: LocationPreset[] = sorted.map((row: any) => ({
       id: row.id,
-      name: row.name || row.display_name || row.full_name,
-      shortName: row.name || row.short_name || row.display_name || row.full_name,
+      name: row.name || (row.full_name ? row.full_name.slice(0, 8) : '거점'),
+      shortName: row.name || row.short_name || (row.full_name ? row.full_name.slice(0, 8) : '거점'),
       fullName: row.full_name || row.name,
       lat: parseFloat(row.lat),
       lng: parseFloat(row.lng),
@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
-    const { id, name, shortName, fullName, address, lat, lng, type, isCommon, isGlobal, vehicle_no, vehicleNo, order, order_index, category } = body;
+    const { id, name, shortName, fullName, full_name, address, lat, lng, type, isCommon, isGlobal, vehicle_no, vehicleNo, order, order_index, category } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'Missing preset id' }, { status: 400 });
@@ -73,13 +73,13 @@ export async function PUT(req: Request) {
     const cleanVehicleNo = targetVehicle ? (targetVehicle.match(/(\d+호차)/)?.[1] || targetVehicle.trim()) : null;
 
     // Display Name ('SGBAC') vs Full Name ('서울김포비즈니스항공센터')
-    const displayName = (name || shortName || fullName || '').trim();
-    const fullPlaceName = (fullName || name || displayName).trim();
+    const displayName = (name || shortName || (fullName ? fullName.slice(0, 8) : '')).trim();
+    const fullPlaceName = (fullName || full_name || name || displayName).trim();
 
     // DB 업데이트 페이로드 구성 (name 표시이름 보존, full_name 풀네임 보존)
     const updatePayload: Record<string, any> = {
-      name: displayName,
-      full_name: fullPlaceName,
+      name: displayName || (fullPlaceName ? fullPlaceName.slice(0, 8) : '거점'),
+      full_name: fullPlaceName || displayName,
       address: address || '',
       lat: Number(lat),
       lng: Number(lng),
@@ -157,10 +157,10 @@ export async function PUT(req: Request) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { id, name, shortName, fullName, address, lat, lng, category, order, order_index = 0, vehicle_no, vehicleNo } = body;
+    const { id, name, shortName, fullName, full_name, address, lat, lng, category, order, order_index = 0, vehicle_no, vehicleNo } = body;
 
-    const displayName = (name || shortName || fullName || '').trim();
-    const fullPlaceName = (fullName || name || displayName).trim();
+    const displayName = (name || shortName || (fullName ? fullName.slice(0, 8) : '')).trim();
+    const fullPlaceName = (fullName || full_name || name || displayName).trim();
 
     if (!displayName || lat === undefined || lng === undefined) {
       return NextResponse.json({ error: 'Missing required preset fields' }, { status: 400 });
@@ -171,8 +171,8 @@ export async function POST(req: NextRequest) {
     const cleanVehicleNo = targetVehicle ? (targetVehicle.match(/(\d+호차)/)?.[1] || targetVehicle.trim()) : null;
 
     const payload: any = {
-      name: displayName,
-      full_name: fullPlaceName,
+      name: displayName || (fullPlaceName ? fullPlaceName.slice(0, 8) : '거점'),
+      full_name: fullPlaceName || displayName,
       address: address || '',
       lat: Number(lat),
       lng: Number(lng),

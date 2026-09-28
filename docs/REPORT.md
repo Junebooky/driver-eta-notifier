@@ -3342,3 +3342,67 @@ flowchart TD
    - **Case 1 (iOS Safari 카카오 롱프레스)**: 헤더 'K' 아이콘 350ms 롱프레스 시 Safari 에러 팝업 없이 카카오맵 메인 화면 즉시 호출 확인 (PASS).
    - **Case 2 (안드로이드 크롬 카카오 롱프레스)**: 카카오맵 패키지 인텐트(`net.daum.android.map`) 정상 발화 확인 (PASS).
    - **Case 3 (기존 기능 불변성)**: 헤더 짧은 탭(단순 내비 전환) 및 티맵, 네이버 롱프레스가 기존대로 안정 구동됨 (PASS).
+
+---
+
+## 71. 프로토콜 콕핏 전면 코드베이스 정비 및 기술 부채 청산 리팩토링 (2026-09-29)
+
+### 71.1 배경 및 작업 목적
+- 전체 코드베이스 전수 검토 결과 확인된 사문화된 스텁 파일 제거, 공통 거점 표시 이름(`name`)과 풀네임(`full_name`)의 동기화 무결성 확보, 그리고 지하 주차장 음영 지역(B5 등) 네트워크 3.5초 타임아웃 방어선 구축을 단행.
+- Zero-DB / Pure Client-Side 원칙(로컬 우선 상태 관리)과 18px 모바일 시인성 규격을 엄수하며, 프로덕션 빌드 무결성을 전면 검증.
+
+---
+
+### 71.2 모듈별 상세 구현 내역
+
+#### [태스크 1] 사문화된 스텁 및 미사용 파일 제거 (Dead Code Cleansing)
+1. **사문화된 파일 삭제**:
+   - `components/PlaceRegisterModal.tsx`: 과거 장소 등록용 임시 스텁 파일 완전 삭제 (`git rm`).
+   - `scratch/test_preset_management.ts`: 프리셋 관리 테스트용 임시 스크립트 삭제 (`git rm`).
+   - 프로젝트 전역에서 `PlaceRegisterModal` import 및 참조 잔재 0건 확인.
+2. **미사용 계산 로직 정리 (`utils/fuelCalculation.ts`)**:
+   - 오피넷 유류비 계산기 UI 제거 이후 다른 곳에서 참조되지 않는 `RefuelingRecommendation` 인터페이스, `DEFAULT_FUEL_ECONOMY`, `URBAN_SAFETY_FACTOR`, `calculateRecommendedRefueling` 함수를 완전히 제거하여 번들 경량화.
+
+---
+
+#### [태스크 2] 공통 거점 `name`(축약명) vs `full_name`(전체명) DB/클라이언트 동기화 무결성 보강
+1. **API 계층 정합성 확보 ([`app/api/presets/route.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/api/presets/route.ts))**:
+   - `GET`: Supabase 레코드 매핑 시 화면 표시용 8자 축약명(`name`)과 장소 풀네임(`fullName`)의 매핑 무결성 확립:
+     ```typescript
+     name: row.name || (row.full_name ? row.full_name.slice(0, 8) : '거점'),
+     shortName: row.name || row.short_name || (row.full_name ? row.full_name.slice(0, 8) : '거점'),
+     fullName: row.full_name || row.name,
+     ```
+   - `PUT` & `POST`: 클라이언트 페이로드로부터 `displayName` (축약명)과 `fullPlaceName` (풀네임)을 각각 추출하여 DB `name` 컬럼과 `full_name` 컬럼에 명확히 구분하여 UPDATE / UPSERT.
+2. **타입 정의 보강 ([`types/index.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/types/index.ts))**:
+   - `LocationPreset` 인터페이스에 `full_name?: string` 속성을 추가하여 DB 응답 객체와의 호환성 확보.
+3. **클라이언트 동기화 방어 ([`app/page.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/page.tsx))**:
+   - `fetchPresetsForVehicle`: 서버로부터 공통 프리셋 목록을 동기화하여 로컬 상태(`presets`)와 병합할 때, 기사가 설정한 축약 `name`('SGBAC' 등)이 서버의 긴 풀네임으로 역전되거나 풀리는 현상을 완벽히 차단.
+   - `handleSaveNewPreset` & `handleUpdatePreset`: 신규 등록/수정 시 `finalizedPreset.name`을 최우선 보존하여 서버 응답 데이터가 축약명을 덮어쓰지 않도록 낙관적 상태 및 응답 동기화 가드 구축.
+
+---
+
+#### [태스크 3] 지하 주차장 음영 지역 API 호출 3.5초 타임아웃 가드 주입
+1. **계기판 AI OCR 비전 파싱 ([`components/VehicleInspectionModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/VehicleInspectionModal.tsx))**:
+   - `/api/inspect-dashboard` fetch에 `AbortSignal.timeout(3500)` 및 `AbortController` 3.5초 안전 타이머 주입.
+   - 지하 음영 지역에서 3.5초 경과 시 타임아웃을 안전하게 catch하고 로딩 스피너(`setIsOcrAnalyzing(false)`)를 즉시 해제.
+   - 운전자 피드백("통신 지연(3.5초 타임아웃)으로 자동 인식을 건너뜁니다. 수동으로 입력해주세요.")을 노출하여 주행 전 화면 멈춤 없이 즉각적인 수동 입력 모드 복귀 보장.
+2. **항공편 실시간 운항 정보 조회 ([`components/FlightModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/FlightModal.tsx))**:
+   - `/api/flight` fetch에 3.5초 타임아웃 주입.
+   - 통신 지연 시 즉각 스피너를 해제하고 안내 문구 출력.
+3. **메인 코크핏 네트워크 호출 ([`app/page.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/page.tsx))**:
+   - `fetchPresetsForVehicle`: 프리셋 백그라운드 동기화에 3.5s 타임아웃 적용.
+   - `fetchRouteEstimate`: 실시간 TMAP 경로 계산(`/api/route`) 호출에 3.5s 타임아웃 적용. 통신 음영 지연 발생 시 즉시 Haversine 직선거리 기반 추정치로 폴백 전환하여 로딩 스피너 해제 및 즉각적인 예상 소요 시간 표시.
+   - `fetchPrediction`: 미래 출발 예측 조회에 3.5s 타임아웃 적용.
+   - `syncDriverProfile`: 드라이버 프로필 원격 동기화에 3.5s 타임아웃 적용.
+
+---
+
+### 71.3 검증 및 테스트 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 TypeScript / ESLint 컴파일 에러 **0건 (Exit code 0)** 통과.
+2. **시나리오 테스트 강제 검증**:
+   - **Case 1 (스텁 제거 확인)**: `PlaceRegisterModal.tsx` 및 `scratch/test_preset_management.ts` 삭제 후에도 거점 편집 및 등록 모달(`CustomPresetModal`)이 에러 없이 정상 구동됨 (PASS).
+   - **Case 2 (공통 거점 축약명 보존)**: 관리자가 'SGBAC'로 축약 저장한 공통 거점이 새로고침 및 백그라운드 서버 동기화 후에도 풀네임('서울김포비즈니스항공센터')으로 되돌아가지 않고 8자 'SGBAC'로 변함없이 유지됨 (PASS).
+   - **Case 3 (지하 주차장 음영 지역 방어)**: 3.5초 경과 시 네트워크 행(hang) 현상 없이 모든 로딩 스피너가 해제되고 수동 입력 및 Haversine 폴백 상태로 즉각 복귀함을 검증 완료 (PASS).
+

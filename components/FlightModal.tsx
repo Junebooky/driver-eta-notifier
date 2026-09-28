@@ -75,8 +75,14 @@ export const FlightModal: React.FC<FlightModalProps> = ({
     setErrorMsg(null);
     setIsCopied(false);
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
     try {
-      const res = await fetch(`/api/flight?flightId=${encodeURIComponent(query)}&type=${type}`);
+      const res = await fetch(`/api/flight?flightId=${encodeURIComponent(query)}&type=${type}`, {
+        signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal
+          ? AbortSignal.timeout(3500)
+          : controller.signal,
+      });
       const data = await res.json();
 
       if (!res.ok || !data.success) {
@@ -87,8 +93,14 @@ export const FlightModal: React.FC<FlightModalProps> = ({
       haptics.lightTap();
     } catch (err: any) {
       setFlight(null);
-      setErrorMsg(err.message || '운항 정보를 불러오지 못했습니다.');
+      const isTimeout = err?.name === 'AbortError' || err?.name === 'TimeoutError';
+      setErrorMsg(
+        isTimeout
+          ? '통신 지연(3.5초 타임아웃)으로 조회를 중단했습니다. 수동으로 항공편을 확인해주세요.'
+          : (err.message || '운항 정보를 불러오지 못했습니다.')
+      );
     } finally {
+      clearTimeout(timeoutId);
       setIsLoading(false);
     }
   };

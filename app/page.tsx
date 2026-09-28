@@ -148,9 +148,15 @@ export default function Home() {
       console.warn('Failed to load presets from vehicle storage:', e);
     }
 
-    // 2. Fetch from API with vehicle_no parameter (Supabase cockpit.presets SSOT)
+    // 2. Fetch from API with vehicle_no parameter (Supabase cockpit.presets SSOT) with 3.5s timeout guard
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
     try {
-      const res = await fetch(`/api/presets?vehicle_no=${encodeURIComponent(cleanV)}`);
+      const res = await fetch(`/api/presets?vehicle_no=${encodeURIComponent(cleanV)}`, {
+        signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal
+          ? AbortSignal.timeout(3500)
+          : controller.signal,
+      });
       if (res.ok) {
         const data = await res.json();
         if (data.presets && Array.isArray(data.presets)) {
@@ -159,15 +165,39 @@ export default function Home() {
             const merged = serverPresets.map((sp) => {
               const localMatch = prev.find((lp) => lp.id === sp.id);
               if (localMatch) {
+                // 기사가 설정한 축약 name이 fullName으로 역전되지 않도록 가드 보강
+                let safeName = localMatch.name?.trim();
+                if (sp.name && sp.name.trim() !== '') {
+                  const spName = sp.name.trim();
+                  if (spName.length <= 8) {
+                    safeName = spName;
+                  } else if (!safeName) {
+                    safeName = spName.slice(0, 8);
+                  }
+                }
+                if (!safeName) {
+                  safeName = (sp.fullName || localMatch.fullName || '거점').slice(0, 8);
+                }
+
+                const safeFullName = sp.fullName || sp.full_name || localMatch.fullName || localMatch.full_name || sp.name || safeName;
+
                 return {
                   ...localMatch,
                   ...sp,
-                  name: sp.name || localMatch.name,
-                  shortName: sp.shortName || sp.name || localMatch.shortName,
-                  fullName: sp.fullName || localMatch.fullName || sp.name,
+                  name: safeName,
+                  shortName: safeName,
+                  fullName: safeFullName,
                 };
               }
-              return sp;
+              const displayN = sp.name && sp.name.length <= 8
+                ? sp.name
+                : (sp.fullName ? sp.fullName.slice(0, 8) : '거점');
+              return {
+                ...sp,
+                name: displayN,
+                shortName: displayN,
+                fullName: sp.fullName || sp.full_name || sp.name,
+              };
             });
             const deduped = applyOrder(deduplicatePresets(merged));
             try {
@@ -178,7 +208,9 @@ export default function Home() {
         }
       }
     } catch (err) {
-      console.warn('Failed to fetch presets for vehicle from API:', err);
+      console.warn('Failed to fetch presets for vehicle from API (timeout or network):', err);
+    } finally {
+      clearTimeout(timeoutId);
     }
   }, []);
 
@@ -210,25 +242,35 @@ export default function Home() {
         }
 
         if (!profile.driverName || !profile.phone) {
-          const dRes = await fetch(`/api/driver?vehicle_no=${encodeURIComponent(profile.vehicleNo)}`);
-          if (dRes.ok) {
-            const dData = await dRes.json();
-            if (dData.driver) {
-              const { vehicle_no, car_number, driver_name, phone, default_navi } = dData.driver;
-              const fullVehicleNo = car_number ? `${vehicle_no} ${car_number}` : vehicle_no;
-              updateProfile({
-                vehicleNo: fullVehicleNo,
-                carNumber: car_number || undefined,
-                driverName: driver_name || profile.driverName,
-                phone: phone || profile.phone,
-                mobile: phone || profile.mobile,
-                defaultNavi: default_navi || profile.defaultNavi || 'tmap',
-              });
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 3500);
+          try {
+            const dRes = await fetch(`/api/driver?vehicle_no=${encodeURIComponent(profile.vehicleNo)}`, {
+              signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal
+                ? AbortSignal.timeout(3500)
+                : controller.signal,
+            });
+            if (dRes.ok) {
+              const dData = await dRes.json();
+              if (dData.driver) {
+                const { vehicle_no, car_number, driver_name, phone, default_navi } = dData.driver;
+                const fullVehicleNo = car_number ? `${vehicle_no} ${car_number}` : vehicle_no;
+                updateProfile({
+                  vehicleNo: fullVehicleNo,
+                  carNumber: car_number || undefined,
+                  driverName: driver_name || profile.driverName,
+                  phone: phone || profile.phone,
+                  mobile: phone || profile.mobile,
+                  defaultNavi: default_navi || profile.defaultNavi || 'tmap',
+                });
+              }
             }
+          } finally {
+            clearTimeout(timeoutId);
           }
         }
       } catch (err) {
-        console.warn('Supabase remote driver sync skipped/unavailable:', err);
+        console.warn('Supabase remote driver sync skipped/unavailable (timeout or network):', err);
       }
     }
 
@@ -340,7 +382,9 @@ export default function Home() {
       setDestination(finalizedPreset);
     }
 
-    // Supabase Sync with vehicle_no (Strict Rule: common presets have vehicle_no: null)
+    // Supabase Sync with vehicle_no (Strict Rule: common presets have vehicle_no: null) with 3.5s timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
     try {
       const res = await fetch('/api/presets', {
         method: 'POST',
@@ -349,12 +393,18 @@ export default function Home() {
           ...finalizedPreset,
           vehicle_no: isPresetCommon ? null : currentVehicleNo,
         }),
+        signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal
+          ? AbortSignal.timeout(3500)
+          : controller.signal,
       });
       if (res.ok) {
         const data = await res.json();
         if (data.preset) {
           const syncedPreset: LocationPreset = {
             ...data.preset,
+            name: finalizedPreset.name,
+            shortName: finalizedPreset.shortName || finalizedPreset.name,
+            fullName: finalizedPreset.fullName || data.preset.fullName || data.preset.full_name,
             type: isPresetCommon ? 'common' : (data.preset.type || 'personal'),
             isCommon: isPresetCommon ? true : Boolean(data.preset.isCommon),
             isGlobal: isPresetCommon ? true : Boolean(data.preset.isGlobal),
@@ -376,7 +426,9 @@ export default function Home() {
         }
       }
     } catch (e) {
-      console.warn('Failed to sync new preset to Supabase:', e);
+      console.warn('Failed to sync new preset to Supabase (timeout or network):', e);
+    } finally {
+      clearTimeout(timeoutId);
     }
   };
 
@@ -423,7 +475,9 @@ export default function Home() {
       setOrigin(finalizedPreset);
     }
 
-    // 2) 서버 비동기 UPDATE (PUT /api/presets) 전송
+    // 2) 서버 비동기 UPDATE (PUT /api/presets) 전송 with 3.5s timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
     try {
       const res = await fetch('/api/presets', {
         method: 'PUT',
@@ -432,6 +486,9 @@ export default function Home() {
           ...finalizedPreset,
           vehicle_no: isPresetCommon ? null : currentVehicleNo,
         }),
+        signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal
+          ? AbortSignal.timeout(3500)
+          : controller.signal,
       });
 
       if (res.ok) {
@@ -456,7 +513,9 @@ export default function Home() {
         });
       }
     } catch (error) {
-      console.error('Failed to sync updated preset to server:', error);
+      console.warn('Failed to sync updated preset to server (timeout or network):', error);
+    } finally {
+      clearTimeout(timeoutId);
     }
   };
 
@@ -477,7 +536,9 @@ export default function Home() {
       }
     } catch (e) { }
 
-    // Supabase Sync with vehicle_no and admin permission check
+    // Supabase Sync with vehicle_no and admin permission check with 3.5s timeout
+    const deleteController = new AbortController();
+    const deleteTimeoutId = setTimeout(() => deleteController.abort(), 3500);
     try {
       const adminParam = currentIsAdmin ? '&is_admin=true' : '';
       await fetch(`/api/presets?id=${encodeURIComponent(id)}&vehicle_no=${encodeURIComponent(currentVehicleNo)}${adminParam}`, {
@@ -485,9 +546,14 @@ export default function Home() {
         headers: {
           ...(currentIsAdmin ? { 'x-is-admin': 'true' } : {}),
         },
+        signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal
+          ? AbortSignal.timeout(3500)
+          : deleteController.signal,
       });
     } catch (e) {
-      console.warn('Failed to delete preset from Supabase:', e);
+      console.warn('Failed to delete preset from Supabase (timeout or network):', e);
+    } finally {
+      clearTimeout(deleteTimeoutId);
     }
   };
 
@@ -597,16 +663,22 @@ export default function Home() {
   const [predictionResult, setPredictionResult] = useState<PredictionResult | null>(null);
   const [isLoadingPrediction, setIsLoadingPrediction] = useState(false);
 
-  // Fetch route duration & ETA from API with dynamic client clock calculation
+  // Fetch route duration & ETA from API with dynamic client clock calculation with 3.5s timeout guard
   const fetchRouteEstimate = useCallback(
     async (start: LocationPreset, end: LocationPreset) => {
       setIsLoadingRoute(true);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
       try {
         const url = `/api/route?startX=${start.lng}&startY=${start.lat}&endX=${end.lng}&endY=${end.lat}&startName=${encodeURIComponent(
           start.shortName
         )}&endName=${encodeURIComponent(end.shortName)}`;
 
-        const res = await fetch(url);
+        const res = await fetch(url, {
+          signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal
+            ? AbortSignal.timeout(3500)
+            : controller.signal,
+        });
         if (!res.ok) {
           throw new Error(`Route API error ${res.status}`);
         }
@@ -629,20 +701,23 @@ export default function Home() {
           isCached: Boolean(data.isCached),
         });
       } catch (err: any) {
-        console.warn('Falling back to haversine estimate:', err?.message);
+        console.warn('Falling back to haversine estimate (timeout or network):', err?.message);
         const fallback = calculateHaversineEstimate(start.lat, start.lng, end.lat, end.lng);
         setRouteEstimate(fallback);
       } finally {
+        clearTimeout(timeoutId);
         setIsLoadingRoute(false);
       }
     },
     []
   );
 
-  // Fetch AI Prediction for future departure time (Isolated simulation only)
+  // Fetch AI Prediction for future departure time (Isolated simulation only) with 3.5s timeout guard
   const fetchPrediction = useCallback(
     async (targetDate: Date, start: LocationPreset, end: LocationPreset) => {
       setIsLoadingPrediction(true);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
       try {
         const res = await fetch('/api/route/prediction', {
           method: 'POST',
@@ -652,6 +727,9 @@ export default function Home() {
             destination: { name: end.shortName || end.name, lat: end.lat, lng: end.lng },
             predictionTime: targetDate.toISOString(),
           }),
+          signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal
+            ? AbortSignal.timeout(3500)
+            : controller.signal,
         });
         if (!res.ok) {
           throw new Error(`Prediction API error ${res.status}`);
@@ -659,8 +737,9 @@ export default function Home() {
         const data: PredictionResult = await res.json();
         setPredictionResult(data);
       } catch (err: any) {
-        console.warn('Prediction fetch error:', err);
+        console.warn('Prediction fetch error (timeout or network):', err);
       } finally {
+        clearTimeout(timeoutId);
         setIsLoadingPrediction(false);
       }
     },
