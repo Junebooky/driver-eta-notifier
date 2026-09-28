@@ -94,34 +94,30 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <div className="w-7 h-7 rounded-xl bg-[#1E60F3] text-white flex items-center justify-center shadow-xs">
-              <ShieldCheck className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <h3 className="text-sm font-black text-slate-900">관리자 모드</h3>
-              <p className="text-[11px] text-slate-400 font-medium">전사 공통 거점 관리</p>
-            </div>
-          </div>
+        <div className="relative flex flex-col items-center justify-center text-center pt-0.5">
           <button
             type="button"
             onClick={handleClose}
-            className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 cursor-pointer transition-colors"
+            className="absolute right-0 top-0 w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 cursor-pointer transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
+          <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 text-[#1E60F3] flex items-center justify-center shadow-xs mb-1.5">
+            <ShieldCheck className="w-4.5 h-4.5 text-[#1E60F3]" />
+          </div>
+          <h3 className="text-base font-black text-slate-900 leading-snug">관리자 모드</h3>
+          <p className="text-[12px] text-slate-400 font-medium leading-relaxed mt-0.5">공통 거점 관리</p>
         </div>
 
         {isAdmin ? (
           <div className="space-y-3 pt-1">
-            <div className="bg-blue-50/50 border border-blue-100/80 rounded-xl p-3.5 space-y-1.5">
-              <div className="text-[#1E60F3] font-bold text-sm flex items-center gap-1.5">
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-2 text-center shadow-xs">
+              <div className="text-[#1E60F3] font-bold text-sm flex items-center justify-center gap-1.5">
                 <span>✓</span>
-                <span>전사 공통 거점 편집 권한</span>
+                <span>모든 드라이버에 적용됩니다</span>
               </div>
-              <p className="text-sm text-slate-600 leading-relaxed">
-                추가 또는 삭제하는 거점은 모든 의전 드라이버 앱에 실시간 공통 거점으로 일괄 반영됩니다.
+              <p className="text-sm text-slate-600 leading-loose text-center">
+                여기서 추가·삭제한 거점은<br /> 모든 드라이버 앱에 즉시 반영됩니다.
               </p>
             </div>
 
