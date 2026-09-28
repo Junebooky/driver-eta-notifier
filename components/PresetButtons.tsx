@@ -871,6 +871,27 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
 
   return (
     <div className="w-full bg-white border border-slate-100/80 rounded-2xl p-4 shadow-[0_8px_25px_rgba(30,96,243,0.06)] select-none space-y-3">
+      {/* Header: '자주 가는 목적지' 헤더 영역은 좌측 타이틀 텍스트만 단정하게 유지 */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center space-x-2 shrink-0">
+          <div className="w-6 h-6 rounded-lg bg-[#1E60F3] flex items-center justify-center shadow-xs shrink-0">
+            <svg
+              viewBox="0 0 24 24"
+              className="w-3.5 h-3.5 text-white"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" />
+              <circle cx="12" cy="10" r="3" />
+            </svg>
+          </div>
+          <h2 className="text-sm font-bold text-slate-900 tracking-tight whitespace-nowrap">자주 가는 목적지</h2>
+        </div>
+      </div>
+
       {/* Management Mode Guidance Bar */}
       {isManageMode && (
         <div className="px-3 py-1.5 rounded-xl bg-blue-50/90 border border-blue-200 text-[#1E60F3] text-[11px] font-bold flex items-center justify-between animate-fade-in">
