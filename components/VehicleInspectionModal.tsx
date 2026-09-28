@@ -582,11 +582,11 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
         </div>
 
         {/* Scrollable Form Body */}
-        <div className="flex-1 overflow-y-auto px-5 py-2 space-y-4 text-sm">
+        <div className="flex-1 overflow-y-auto px-5 py-2 space-y-4 text-base">
           {/* Vehicle Basic Info Row: 2 columns (차량호차, 차량번호) */}
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1 truncate">
+              <label className="block text-[13px] font-semibold text-slate-600 mb-1 truncate">
                 차량호차
               </label>
               <input
@@ -598,7 +598,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1 truncate">
+              <label className="block text-[13px] font-semibold text-slate-600 mb-1 truncate">
                 차량번호
               </label>
               <input
