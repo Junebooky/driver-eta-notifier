@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { toKatec, toWgs84 } from '@/utils/coordinate';
 import { GasStation, GasPrices } from '@/types';
 import { calculateHaversineEstimate } from '@/utils/navigation';
+import { calculateTrimmedMeanPrices } from '@/utils/fuelCalculation';
 
 interface GasCacheEntry {
   stations: GasStation[];
@@ -419,8 +420,11 @@ export async function GET(req: NextRequest) {
       timestamp: Date.now(),
     });
 
+    const trimmedMean = calculateTrimmedMeanPrices(enrichedStations);
+
     return NextResponse.json({
       gasStations: enrichedStations,
+      trimmedMean,
       cached: false,
     });
   } catch (error) {
@@ -431,8 +435,10 @@ export async function GET(req: NextRequest) {
         stations: tmapPoiFallback,
         timestamp: Date.now(),
       });
+      const trimmedMean = calculateTrimmedMeanPrices(tmapPoiFallback);
       return NextResponse.json({
         gasStations: tmapPoiFallback,
+        trimmedMean,
         cached: false,
         isFallback: true,
       });
@@ -444,8 +450,10 @@ export async function GET(req: NextRequest) {
       timestamp: Date.now() - (CACHE_TTL_MS - 3 * 60 * 1000),
     });
 
+    const trimmedMean = calculateTrimmedMeanPrices(fallback);
     return NextResponse.json({
       gasStations: fallback,
+      trimmedMean,
       cached: false,
       isFallback: true,
     });

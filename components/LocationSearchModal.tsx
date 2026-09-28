@@ -472,7 +472,7 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="장소명, 지하철역, 건물명 검색 (예: 포시즌스호텔, 코엑스)"
-                className="w-full pl-10 pr-10 py-3 bg-white border border-slate-200 rounded-2xl text-xs sm:text-sm font-bold text-slate-900 placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 transition-all shadow-xs"
+                className="w-full pl-10 pr-10 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 transition-all shadow-xs"
               />
               {isSearching ? (
                 <Loader2 className="w-4 h-4 text-[#1E60F3] animate-spin absolute right-3.5 top-1/2 -translate-y-1/2" />
@@ -505,7 +505,7 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
           {/* Search Results (If query length >= 2) */}
           {searchQuery.trim().length >= 2 ? (
             <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs font-bold text-slate-700 px-1">
+              <div className="flex items-center justify-between text-sm font-bold text-slate-700 px-1">
                 <span>검색 결과</span>
                 {searchResults.length > 0 && (
                   <span className="text-[11px] text-[#1E60F3] font-black">
@@ -546,7 +546,7 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                           <MapPin className="w-3.5 h-3.5" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs sm:text-sm font-bold text-slate-900 truncate group-hover:text-[#1E60F3] transition-colors">
+                          <p className="text-sm font-bold text-slate-900 truncate group-hover:text-[#1E60F3] transition-colors">
                             {poi.name}
                           </p>
                           <p className="text-[11px] text-slate-400 truncate mt-0.5">
@@ -580,7 +580,7 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                 </div>
               ) : !isSearching ? (
                 <div className="text-center py-8 bg-slate-50 rounded-2xl border border-slate-100 space-y-1.5">
-                  <p className="text-xs font-bold text-slate-600">
+                  <p className="text-sm font-bold text-slate-600">
                     {searchError || '검색된 장소가 없습니다.'}
                   </p>
                   <p className="text-[11px] text-slate-400">
@@ -596,7 +596,7 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
           {/* ========================================================= */}
           {recentSearches.length > 0 && (
             <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs font-bold text-slate-700 px-1">
+              <div className="flex items-center justify-between text-sm font-bold text-slate-700 px-1">
                 <span className="flex items-center gap-1.5">
                   <Clock className="w-3.5 h-3.5 text-slate-500" />
                   <span>최근 검색</span>
@@ -630,7 +630,7 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                       title={`${item.name} (${item.address})`}
                     >
                       <div className="flex items-start justify-between gap-1 w-full">
-                        <span className="text-xs font-bold text-slate-800 group-hover:text-[#1E60F3] truncate transition-colors flex-1 pr-1">
+                        <span className="text-sm font-bold text-slate-800 group-hover:text-[#1E60F3] truncate transition-colors flex-1 pr-1">
                           {item.shortName || item.name}
                         </span>
 
@@ -665,7 +665,7 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
           {/* [태스크 3] '자주 가는 거점 퀵 선택' 캐러셀 & 캡슐형 인디케이터 */}
           {/* ========================================================= */}
           <div className="space-y-2.5">
-            <div className="flex items-center justify-between text-xs font-bold text-slate-700 px-1">
+            <div className="flex items-center justify-between text-sm font-bold text-slate-700 px-1">
               <span className="flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-[#1E60F3]" />
                 <span>자주 가는 거점 퀵 선택</span>
@@ -720,7 +720,7 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                             >
                               <div className="flex items-center justify-center gap-1 w-full min-w-0">
                                 <Home className="w-3 h-3 text-slate-500 shrink-0 group-hover:text-[#1E60F3]" />
-                                <span className="text-xs font-bold tracking-tight text-slate-800 truncate">
+                                <span className="text-sm font-bold tracking-tight text-slate-800 truncate">
                                   자택
                                 </span>
                               </div>
@@ -747,7 +747,7 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                             }`}
                             title={`${p.name} (${p.address || p.name})`}
                           >
-                            <span className="text-xs font-bold tracking-tight text-slate-800 group-hover:text-[#1E60F3] truncate w-full transition-colors">
+                            <span className="text-sm font-bold tracking-tight text-slate-800 group-hover:text-[#1E60F3] truncate w-full transition-colors">
                               {p.shortName}
                             </span>
 

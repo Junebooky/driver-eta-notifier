@@ -14,6 +14,8 @@ export interface DriverProfile {
   carNumberFront?: string; // e.g. '142호'
   carNumberBack?: string;  // e.g. '7811'
   driverName: string;      // e.g. '윤태준'
+  carModel?: string;       // e.g. '520d' | '카니발'
+  fuelType?: 'gasoline' | 'diesel'; // '휘발유' | '경유'
   phone?: string;          // e.g. '010-6348-8726'
   mobile?: string;         // alias for phone
   phonePart1?: string;     // e.g. '010'

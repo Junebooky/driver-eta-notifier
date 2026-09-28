@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { LocationPreset, HomeLocation } from '@/types';
-import { Plus, Trash2, Pencil, SlidersHorizontal, Home as HomeIcon, ShieldAlert, Fuel, Plane, ClipboardCheck, X } from 'lucide-react';
+import { Plus, Trash2, Pencil, Home as HomeIcon, ShieldAlert, X } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface PresetButtonsProps {
@@ -656,37 +656,33 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                 e.stopPropagation();
               }
             }}
-            className={`w-full h-full min-h-[58px] px-2 py-2.5 rounded-xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-200 group select-none [-webkit-tap-highlight-color:transparent] ${
-              activePressedIndex === 'home' ? 'scale-[0.97] bg-slate-100/90' : ''
-            } ${
-              isHomeDestination
+            className={`w-full h-full min-h-[58px] px-2 py-2.5 rounded-xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-200 group select-none [-webkit-tap-highlight-color:transparent] ${activePressedIndex === 'home' ? 'scale-[0.97] bg-slate-100/90' : ''
+              } ${isHomeDestination
                 ? 'border-2 border-[#1E60F3] text-[#1E60F3] bg-white font-bold shadow-sm shadow-blue-500/10'
                 : isHomeOrigin
                   ? 'bg-slate-50/80 text-slate-800 border-slate-300/90 ring-1 ring-slate-200/60 font-bold shadow-2xs'
                   : `bg-white border-slate-200 text-slate-700 font-semibold ${dynamicHoverClasses}`
-            } ${isManageMode ? 'border-dashed border-[#1E60F3]/60' : ''}`}
+              } ${isManageMode ? 'border-dashed border-[#1E60F3]/60' : ''}`}
             title={`${homePreset.name} (${homePreset.address})`}
           >
             <div className="flex items-center justify-center gap-1 w-full">
               <HomeIcon
-                className={`w-3.5 h-3.5 shrink-0 transition-colors ${
-                  isHomeDestination
+                className={`w-3.5 h-3.5 shrink-0 transition-colors ${isHomeDestination
                     ? 'text-[#1E60F3]'
                     : isHomeOrigin
                       ? 'text-slate-600'
                       : isTargetDestination
                         ? 'text-slate-500 group-hover:text-[#1E60F3]'
                         : 'text-slate-500 group-hover:text-slate-700'
-                }`}
+                  }`}
               />
               <span
-                className={`text-xs tracking-tight truncate font-bold ${
-                  isHomeDestination
+                className={`text-sm tracking-tight truncate font-bold ${isHomeDestination
                     ? 'text-[#1E60F3]'
                     : isHomeOrigin
                       ? 'text-slate-900'
-                      : `text-slate-700 ${dynamicTextHoverClass}`
-                } transition-colors`}
+                      : `text-slate-800 ${dynamicTextHoverClass}`
+                  } transition-colors`}
               >
                 자택
               </span>
@@ -731,14 +727,13 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
               e.stopPropagation();
             }
           }}
-          className={`w-full h-full min-h-[58px] py-2.5 px-2 rounded-xl border border-dashed border-slate-300 dark:border-slate-600 bg-slate-50/80 ${dynamicHoverClasses} text-slate-800 flex flex-col justify-between items-center transition-all duration-200 cursor-pointer group select-none [-webkit-tap-highlight-color:transparent] ${
-            activePressedIndex === 'home' ? 'scale-[0.97] bg-slate-100/90' : ''
-          }`}
+          className={`w-full h-full min-h-[58px] py-2.5 px-2 rounded-xl border border-dashed border-slate-300 dark:border-slate-600 bg-slate-50/80 ${dynamicHoverClasses} text-slate-800 flex flex-col justify-between items-center transition-all duration-200 cursor-pointer group select-none [-webkit-tap-highlight-color:transparent] ${activePressedIndex === 'home' ? 'scale-[0.97] bg-slate-100/90' : ''
+            }`}
           title="자택 주소를 등록하세요"
         >
           <div className="flex items-center justify-center gap-1 w-full">
             <HomeIcon className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 shrink-0 transition-colors" />
-            <span className="text-xs font-bold text-slate-600 group-hover:text-slate-800 tracking-tight transition-colors">
+            <span className="text-sm font-bold text-slate-600 group-hover:text-slate-800 tracking-tight transition-colors">
               자택
             </span>
           </div>
@@ -803,19 +798,17 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                 e.stopPropagation();
               }
             }}
-            className={`w-full h-full min-h-[58px] px-2 py-2.5 rounded-xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-200 group select-none [-webkit-tap-highlight-color:transparent] ${
-              activePressedIndex === index ? 'scale-[0.97] bg-slate-100/90' : ''
-            } ${stateClasses}`}
+            className={`w-full h-full min-h-[58px] px-2 py-2.5 rounded-xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-200 group select-none [-webkit-tap-highlight-color:transparent] ${activePressedIndex === index ? 'scale-[0.97] bg-slate-100/90' : ''
+              } ${stateClasses}`}
             title={`${preset.name} (길게 눌러 순서 변경)`}
           >
             <span
-              className={`text-xs font-bold tracking-tight truncate w-full ${
-                isDestination
+              className={`text-sm font-bold tracking-tight truncate w-full ${isDestination
                   ? 'text-[#1E60F3]'
                   : isOrigin
                     ? 'text-slate-900'
-                    : `text-slate-700 ${dynamicTextHoverClass}`
-              } transition-colors`}
+                    : `text-slate-800 ${dynamicTextHoverClass}`
+                } transition-colors`}
             >
               {preset.shortName}
             </span>
@@ -861,13 +854,11 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
           return;
         }
       }}
-      className={`w-full h-full min-h-[58px] py-2.5 px-2 rounded-xl border border-dashed border-slate-300 ${
-        isTargetDestination
+      className={`w-full h-full min-h-[58px] py-2.5 px-2 rounded-xl border border-dashed border-slate-300 ${isTargetDestination
           ? 'hover:border-blue-300/80 hover:bg-blue-50/40 hover:text-[#1E60F3]'
           : 'hover:border-slate-400 hover:bg-slate-50/80 hover:text-slate-800'
-      } bg-white hover:shadow-xs hover:-translate-y-0.5 text-slate-400 text-xs font-medium flex flex-col justify-between items-center transition-all duration-200 cursor-pointer select-none touch-pan-y [-webkit-tap-highlight-color:transparent] ${
-        activePressedIndex === 'add' ? 'scale-[0.97] bg-slate-100/90' : ''
-      }`}
+        } bg-white hover:shadow-xs hover:-translate-y-0.5 text-slate-400 text-sm font-medium flex flex-col justify-between items-center transition-all duration-200 cursor-pointer select-none touch-pan-y [-webkit-tap-highlight-color:transparent] ${activePressedIndex === 'add' ? 'scale-[0.97] bg-slate-100/90' : ''
+        }`}
       title="새 거점 검색 및 등록"
     >
       <div className="flex items-center justify-center gap-1 w-full">
@@ -880,118 +871,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
 
   return (
     <div className="w-full bg-white border border-slate-100/80 rounded-2xl p-4 shadow-[0_8px_25px_rgba(30,96,243,0.06)] select-none space-y-3">
-      {/* [태스크 2] 독립 4열 퀵 액션 바 (차량체크 → 즐겨찾기 → 주유 → 항공편) */}
-      <div className="grid grid-cols-4 gap-2 py-3 px-2 mb-3 bg-slate-50/70 border border-slate-200/80 rounded-2xl">
-        {/* 1. 차량체크 */}
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => {
-            haptics.lightTap();
-            onOpenInspectionModal?.();
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              onOpenInspectionModal?.();
-            }
-          }}
-          className="flex flex-col items-center cursor-pointer group"
-          title="차량 수령·반납 점검표"
-        >
-          <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-white border border-slate-200/90 shadow-2xs flex items-center justify-center text-slate-700 hover:border-[#1E60F3] hover:text-[#1E60F3] hover:bg-blue-50/50 hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 group-hover:border-[#1E60F3] group-hover:text-[#1E60F3] group-hover:bg-blue-50/50 group-hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] group-hover:-translate-y-0.5">
-            <ClipboardCheck className="w-6 h-6 sm:w-6.5 sm:h-6.5 stroke-[2]" />
-          </div>
-          <span className="mt-1.5 text-xs font-bold text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors">
-            차량체크
-          </span>
-        </div>
-
-        {/* 2. 즐겨찾기 */}
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => {
-            haptics.lightTap();
-            if (onOpenPresetModal) {
-              onOpenPresetModal();
-            } else if (onOpenAddModal) {
-              onOpenAddModal();
-            } else {
-              setIsManageMode((prev) => !prev);
-            }
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              if (onOpenPresetModal) onOpenPresetModal();
-              else if (onOpenAddModal) onOpenAddModal();
-              else setIsManageMode((prev) => !prev);
-            }
-          }}
-          className="flex flex-col items-center cursor-pointer group"
-          title="거점 및 목적지 관리"
-        >
-          <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-white border border-slate-200/90 shadow-2xs flex items-center justify-center text-slate-700 hover:border-[#1E60F3] hover:text-[#1E60F3] hover:bg-blue-50/50 hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 group-hover:border-[#1E60F3] group-hover:text-[#1E60F3] group-hover:bg-blue-50/50 group-hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] group-hover:-translate-y-0.5">
-            <SlidersHorizontal className="w-6 h-6 sm:w-6.5 sm:h-6.5 stroke-[2]" />
-          </div>
-          <span className="mt-1.5 text-xs font-bold text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors">
-            즐겨찾기
-          </span>
-        </div>
-
-        {/* 3. 주유 */}
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => {
-            haptics.lightTap();
-            onOpenGasModal?.();
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              onOpenGasModal?.();
-            }
-          }}
-          className="flex flex-col items-center cursor-pointer group"
-          title="주변 주유소 실시간 유가 조회"
-        >
-          <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-white border border-slate-200/90 shadow-2xs flex items-center justify-center text-slate-700 hover:border-[#1E60F3] hover:text-[#1E60F3] hover:bg-blue-50/50 hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 group-hover:border-[#1E60F3] group-hover:text-[#1E60F3] group-hover:bg-blue-50/50 group-hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] group-hover:-translate-y-0.5">
-            <Fuel className="w-6 h-6 sm:w-6.5 sm:h-6.5 stroke-[2]" />
-          </div>
-          <span className="mt-1.5 text-xs font-bold text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors">
-            주유
-          </span>
-        </div>
-
-        {/* 4. 항공편 */}
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => {
-            haptics.lightTap();
-            onOpenFlightModal?.();
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              onOpenFlightModal?.();
-            }
-          }}
-          className="flex flex-col items-center cursor-pointer group"
-          title="인천공항 실시간 운항 정보"
-        >
-          <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-white border border-slate-200/90 shadow-2xs flex items-center justify-center text-slate-700 hover:border-[#1E60F3] hover:text-[#1E60F3] hover:bg-blue-50/50 hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 group-hover:border-[#1E60F3] group-hover:text-[#1E60F3] group-hover:bg-blue-50/50 group-hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] group-hover:-translate-y-0.5">
-            <Plane className="w-6 h-6 sm:w-6.5 sm:h-6.5 stroke-[2]" />
-          </div>
-          <span className="mt-1.5 text-xs font-bold text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors">
-            항공편
-          </span>
-        </div>
-      </div>
-
-      {/* [태스크 1] Header: '자주 가는 목적지' 헤더 영역은 좌측 타이틀 텍스트만 단정하게 유지 */}
+      {/* Header: '자주 가는 목적지' 헤더 영역은 좌측 타이틀 텍스트만 단정하게 유지 */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center space-x-2 shrink-0">
           <div className="w-6 h-6 rounded-lg bg-[#1E60F3] flex items-center justify-center shadow-xs shrink-0">
@@ -1047,9 +927,8 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
           {pages.map((pageSlots, pageIdx) => (
             <div key={pageIdx} className="w-full shrink-0">
               <div
-                className={`grid grid-cols-3 gap-2 content-start ${
-                  totalPages > 1 ? 'min-h-[268px]' : ''
-                }`}
+                className={`grid grid-cols-3 gap-2 content-start ${totalPages > 1 ? 'min-h-[268px]' : ''
+                  }`}
               >
                 {pageSlots.map((slot) => {
                   if (slot.type === 'home') return renderHomeSlot();
@@ -1077,11 +956,10 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                   setCurrentPage(idx);
                 }}
                 aria-label={`페이지 ${idx + 1}`}
-                className={`h-2 rounded-full transition-all duration-300 cursor-pointer focus:outline-none ${
-                  isActive
+                className={`h-2 rounded-full transition-all duration-300 cursor-pointer focus:outline-none ${isActive
                     ? 'w-6 bg-[#1E60F3] shadow-[0_2px_8px_rgba(30,96,243,0.35)]'
                     : 'w-2 bg-slate-300 hover:bg-slate-400'
-                }`}
+                  }`}
               />
             );
           })}
@@ -1099,7 +977,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
             top: `${pointerPos.y}px`,
           }}
         >
-          <span className="text-xs font-bold text-slate-900 tracking-tight whitespace-nowrap">
+          <span className="text-sm font-bold text-slate-900 tracking-tight whitespace-nowrap">
             {draggedPreset.shortName}
           </span>
         </div>
@@ -1149,7 +1027,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                       setManagingPreset(null);
                       onEditPreset(p);
                     }}
-                    className="w-full py-2.5 px-4 bg-[#1E60F3] hover:bg-[#1346D8] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/35 active:translate-y-0 active:scale-[0.97] active:bg-[#0f3bb8] text-white font-bold rounded-xl text-xs flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs transition-all duration-150 ease-out"
+                    className="w-full py-2.5 px-4 bg-[#1E60F3] hover:bg-[#1346D8] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/35 active:translate-y-0 active:scale-[0.97] active:bg-[#0f3bb8] text-white font-bold rounded-xl text-sm flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs transition-all duration-150 ease-out"
                   >
                     <Pencil className="w-3.5 h-3.5 text-white" />
                     <span>수정</span>
@@ -1166,7 +1044,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                       setManagingPreset(null);
                       onDeleteCustomPreset(idToDelete);
                     }}
-                    className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 font-semibold rounded-xl text-xs flex items-center justify-center space-x-1.5 cursor-pointer active:translate-y-0 active:scale-[0.97] transition-all duration-150 ease-out"
+                    className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 font-semibold rounded-xl text-sm flex items-center justify-center space-x-1.5 cursor-pointer active:translate-y-0 active:scale-[0.97] transition-all duration-150 ease-out"
                   >
                     <Trash2 className="w-3.5 h-3.5 text-slate-500" />
                     <span>
@@ -1184,7 +1062,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                 <button
                   type="button"
                   onClick={() => setManagingPreset(null)}
-                  className="w-full py-2.5 px-4 text-slate-400 hover:text-slate-600 font-medium text-xs flex items-center justify-center space-x-1.5 cursor-pointer transition-colors active:scale-95"
+                  className="w-full py-2.5 px-4 text-slate-400 hover:text-slate-600 font-medium text-sm flex items-center justify-center space-x-1.5 cursor-pointer transition-colors active:scale-95"
                 >
                   <X className="w-3.5 h-3.5 text-slate-400" />
                   <span>닫기</span>

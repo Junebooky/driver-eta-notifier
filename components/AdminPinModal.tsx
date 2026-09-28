@@ -116,11 +116,11 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
         {isAdmin ? (
           <div className="space-y-3 pt-1">
             <div className="bg-blue-50/50 border border-blue-100/80 rounded-xl p-3.5 space-y-1.5">
-              <div className="text-[#1E60F3] font-bold text-xs flex items-center gap-1.5">
+              <div className="text-[#1E60F3] font-bold text-sm flex items-center gap-1.5">
                 <span>✓</span>
                 <span>전사 공통 거점 편집 권한</span>
               </div>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <p className="text-sm text-slate-600 leading-relaxed">
                 추가 또는 삭제하는 거점은 모든 의전 드라이버 앱에 실시간 공통 거점으로 일괄 반영됩니다.
               </p>
             </div>
@@ -132,7 +132,7 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
                 onToggleAdmin(false);
                 handleClose();
               }}
-              className="w-full py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+              className="w-full py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold transition-colors flex items-center justify-center gap-2 cursor-pointer active:scale-98"
             >
               <LogOut className="w-4 h-4 text-slate-500" />
               <span>관리자 모드 종료</span>
@@ -141,7 +141,7 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
         ) : (
           <form onSubmit={handleSubmit} className="space-y-3 pt-1">
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1 flex items-center gap-1">
+              <label className="block text-sm font-bold text-slate-600 mb-1 flex items-center gap-1">
                 <KeyRound className="w-3.5 h-3.5 text-slate-400" />
                 마스터 PIN 입력
               </label>
@@ -166,7 +166,7 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
             <button
               type="submit"
               disabled={!pin}
-              className="w-full py-3 bg-[#1E60F3] hover:bg-[#1346D8] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/35 active:translate-y-0 active:scale-[0.97] active:bg-[#0f3bb8] disabled:opacity-50 text-white rounded-xl text-xs font-extrabold shadow-xs transition-all duration-150 ease-out cursor-pointer"
+              className="w-full py-3 bg-[#1E60F3] hover:bg-[#1346D8] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/35 active:translate-y-0 active:scale-[0.97] active:bg-[#0f3bb8] disabled:opacity-50 text-white rounded-xl text-sm font-extrabold shadow-xs transition-all duration-150 ease-out cursor-pointer"
             >
               관리자 모드 활성화
             </button>

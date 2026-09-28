@@ -25,14 +25,35 @@ export function getOrCreateDeviceUuid(): string {
   }
 }
 
+export function getVehicleStorageKey(vehicleNo: string): string {
+  const hochaMatch = vehicleNo.match(/(\d+)호차/);
+  const cleanKey = hochaMatch ? `${hochaMatch[1]}호차` : vehicleNo.trim();
+  return `cockpit_driver_profile_${cleanKey}`;
+}
+
 export function getStoredVehicleProfile(vehicleNo: string): Partial<DriverProfile> | null {
   if (typeof window === 'undefined' || !vehicleNo) return null;
   try {
+    const hochaMatch = vehicleNo.match(/(\d+)호차/);
+    const cleanKey = hochaMatch ? `${hochaMatch[1]}호차` : vehicleNo.trim();
+
+    // 1. Direct vehicle-isolated key: cockpit_driver_profile_${cleanKey}
+    const directKey = `cockpit_driver_profile_${cleanKey}`;
+    const direct = localStorage.getItem(directKey);
+    if (direct) {
+      return JSON.parse(direct);
+    }
+
+    // 2. Also check without suffix or with raw vehicleNo
+    const rawDirect = localStorage.getItem(`cockpit_driver_profile_${vehicleNo.trim()}`);
+    if (rawDirect) {
+      return JSON.parse(rawDirect);
+    }
+
+    // 3. Fallback to backward-compatible map
     const raw = localStorage.getItem(VEHICLE_PROFILES_KEY);
     if (!raw) return null;
     const map = JSON.parse(raw);
-    const hochaMatch = vehicleNo.match(/(\d+)호차/);
-    const cleanKey = hochaMatch ? `${hochaMatch[1]}호차` : vehicleNo.trim();
     return map[cleanKey] || null;
   } catch {
     return null;
@@ -42,14 +63,23 @@ export function getStoredVehicleProfile(vehicleNo: string): Partial<DriverProfil
 export function setStoredVehicleProfile(vehicleNo: string, data: Partial<DriverProfile>): void {
   if (typeof window === 'undefined' || !vehicleNo) return;
   try {
-    const raw = localStorage.getItem(VEHICLE_PROFILES_KEY);
-    const map = raw ? JSON.parse(raw) : {};
     const hochaMatch = vehicleNo.match(/(\d+)호차/);
     const cleanKey = hochaMatch ? `${hochaMatch[1]}호차` : vehicleNo.trim();
-    map[cleanKey] = {
-      ...(map[cleanKey] || {}),
+
+    const existing = getStoredVehicleProfile(cleanKey) || {};
+    const updated = {
+      ...existing,
       ...data,
     };
+
+    // 1. Save directly to isolated key: cockpit_driver_profile_${cleanKey}
+    const directKey = `cockpit_driver_profile_${cleanKey}`;
+    localStorage.setItem(directKey, JSON.stringify(updated));
+
+    // 2. Backward compatibility map
+    const raw = localStorage.getItem(VEHICLE_PROFILES_KEY);
+    const map = raw ? JSON.parse(raw) : {};
+    map[cleanKey] = updated;
     localStorage.setItem(VEHICLE_PROFILES_KEY, JSON.stringify(map));
   } catch (err) {
     console.warn('Failed to store vehicle profile in localStorage:', err);

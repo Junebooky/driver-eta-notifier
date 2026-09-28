@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { DriverProfile, NaviProvider } from '@/types';
-import { X, User, Car, Users, Navigation, Check, Phone } from 'lucide-react';
+import { X, User, Car, Users, Navigation, Check, Phone, Fuel } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 import { ENABLE_DEV_FLEET_SWITCHER, FLEET_PRESET_DRIVERS, FleetPresetDriver, getPresetPassengerName } from '@/utils/constants';
-import { getStoredVehicleProfile } from '@/hooks/useDriverProfile';
+import { getStoredVehicleProfile, setStoredVehicleProfile } from '@/hooks/useDriverProfile';
+import { resolveFuelTypeFromModel, FuelType } from '@/utils/fuelCalculation';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -93,6 +94,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [phone3, setPhone3] = useState(isInitialEmpty ? '' : (profile.phonePart3 || parsedPhone.p3));
   const [driverName, setDriverName] = useState(isInitialEmpty ? '' : (profile.driverName || ''));
   const [passengerName, setPassengerName] = useState(isInitialEmpty ? '' : (profile.passengerName || ''));
+  const [carModel, setCarModel] = useState(isInitialEmpty ? '' : (profile.carModel || ''));
+  const initialResolvedFuel = resolveFuelTypeFromModel(profile.carModel || profile.vehicleNo);
+  const [fuelType, setFuelType] = useState<FuelType>(profile.fuelType || initialResolvedFuel.fuelType);
+  const [fuelReason, setFuelReason] = useState<string>(initialResolvedFuel.reason);
   const [defaultNavi, setDefaultNavi] = useState<NaviProvider>(profile.defaultNavi || 'tmap');
   const [selectedPresetVehicle, setSelectedPresetVehicle] = useState<string | null>(null);
   const [nameError, setNameError] = useState(false);
@@ -244,25 +249,36 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
         setDriverName('');
         setPassengerName('');
         setDefaultNavi('tmap');
+        setCarModel('');
+        setFuelType('gasoline');
+        setFuelReason('차종 미입력 (보수적 안전마진: 휘발유 기본)');
       } else {
         const initial = parseVehicleDetails(profile.vehicleNo);
         const initPhone = parsePhoneDetails(profile.phone || profile.mobile);
         const cleanVehicleKey = initial.hocha ? `${initial.hocha}호차` : profile.vehicleNo;
-        const storedPassenger = getStoredVehicleProfile(cleanVehicleKey)?.passengerName;
+        // Direct read from cockpit_driver_profile_${vehicleNo}
+        const stored = getStoredVehicleProfile(cleanVehicleKey);
         const initialPassenger =
-          profile.passengerName !== undefined && profile.passengerName !== ''
+          stored?.passengerName !== undefined && stored.passengerName !== ''
+            ? stored.passengerName
+            : profile.passengerName !== undefined && profile.passengerName !== ''
             ? profile.passengerName
-            : storedPassenger || getPresetPassengerName(cleanVehicleKey) || '';
+            : getPresetPassengerName(cleanVehicleKey) || '';
 
         setHocha(initial.hocha);
-        setPlateFront(profile.carNumberFront || initial.plateFront);
-        setPlateBack(profile.carNumberBack || initial.plateBack);
+        setPlateFront(stored?.carNumberFront || profile.carNumberFront || initial.plateFront);
+        setPlateBack(stored?.carNumberBack || profile.carNumberBack || initial.plateBack);
         setPhone1(profile.phonePart1 || initPhone.p1 || '010');
         setPhone2(profile.phonePart2 || initPhone.p2 || '');
         setPhone3(profile.phonePart3 || initPhone.p3 || '');
-        setDriverName(profile.driverName || '');
+        setDriverName(stored?.driverName || profile.driverName || '');
         setPassengerName(initialPassenger);
-        setDefaultNavi(profile.defaultNavi || 'tmap');
+        setDefaultNavi(stored?.defaultNavi || profile.defaultNavi || 'tmap');
+        const resolvedModel = stored?.carModel || profile.carModel || '';
+        setCarModel(resolvedModel);
+        const res = resolveFuelTypeFromModel(resolvedModel || cleanVehicleKey);
+        setFuelType(stored?.fuelType || profile.fuelType || res.fuelType);
+        setFuelReason(res.reason);
       }
 
       // Body Scroll Lock: Prevent background page scrolling & rubber-banding
@@ -304,7 +320,51 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
   const handleHochaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSelectedPresetVehicle(null);
-    setHocha(e.target.value.slice(0, 10));
+    const val = e.target.value.slice(0, 10);
+    setHocha(val);
+    if (val.trim()) {
+      const cleanV = val.trim().includes('호차') ? val.trim() : `${val.trim()}호차`;
+      const stored = getStoredVehicleProfile(cleanV);
+      if (stored) {
+        if (stored.passengerName) setPassengerName(stored.passengerName);
+        if (stored.driverName && !driverName) setDriverName(stored.driverName);
+        if (stored.carNumberFront) setPlateFront(stored.carNumberFront);
+        if (stored.carNumberBack) setPlateBack(stored.carNumberBack);
+        if (stored.carModel) {
+          setCarModel(stored.carModel);
+          const res = resolveFuelTypeFromModel(stored.carModel);
+          setFuelType(stored.fuelType || res.fuelType);
+          setFuelReason(res.reason);
+        }
+        if (stored.defaultNavi) setDefaultNavi(stored.defaultNavi);
+        if (stored.phone) {
+          const pObj = parsePhoneDetails(stored.phone);
+          setPhone1(pObj.p1);
+          setPhone2(pObj.p2);
+          setPhone3(pObj.p3);
+        }
+      } else {
+        const presetPass = getPresetPassengerName(cleanV);
+        if (presetPass) setPassengerName(presetPass);
+        const res = resolveFuelTypeFromModel(cleanV);
+        setFuelReason(res.reason);
+      }
+    }
+  };
+
+  const handleCarModelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSelectedPresetVehicle(null);
+    const val = e.target.value;
+    setCarModel(val);
+    const res = resolveFuelTypeFromModel(val);
+    setFuelType(res.fuelType);
+    setFuelReason(res.reason);
+  };
+
+  const handleSelectFuelType = (type: FuelType) => {
+    haptics.lightTap();
+    setFuelType(type);
+    setFuelReason(type === 'gasoline' ? '직접 선택: 휘발유' : '직접 선택: 경유');
   };
 
   const handlePlateFrontChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -433,6 +493,21 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       return;
     }
 
+    // Save vehicle-isolated profile to cockpit_driver_profile_${vehicleNo}
+    const cleanHochaKey = hTrim ? (hTrim.includes('호차') ? hTrim : `${hTrim}호차`) : '4호차';
+    setStoredVehicleProfile(cleanHochaKey, {
+      vehicleNo: combinedVehicleNo,
+      carNumber: combinedPlate || undefined,
+      carNumberFront: pFront,
+      carNumberBack: pBack,
+      driverName: driverName.trim(),
+      phone: combinedPhone,
+      passengerName: passengerName.trim(),
+      defaultNavi: defaultNavi || 'tmap',
+      carModel: carModel.trim() || undefined,
+      fuelType,
+    });
+
     const payload: Partial<DriverProfile> = {
       vehicleNo: combinedVehicleNo,
       carNumber: combinedPlate || undefined,
@@ -446,6 +521,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       phonePart3: phone3.trim(),
       passengerName: passengerName.trim(),
       defaultNavi: defaultNavi || 'tmap',
+      carModel: carModel.trim() || undefined,
+      fuelType,
     };
 
     // 2. Trigger modal exit animation FIRST (60fps scale-down & fade-out without Jank)
@@ -532,22 +609,29 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                         setPhoneError(false);
                         setPlateError(false);
                         setValidationMsg(null);
-                        const pObj = parsePhoneDetails(d.phone);
+                        const cleanV = d.vehicleNo.match(/(\d+)호차/)?.[1] ? `${d.vehicleNo.match(/(\d+)호차/)![1]}호차` : d.vehicleNo;
+                        const storedProfile = getStoredVehicleProfile(cleanV);
+                        const pObj = parsePhoneDetails(storedProfile?.phone || d.phone);
                         setHocha(d.hocha);
-                        setPlateFront(d.plateFront);
-                        setPlateBack(d.plateBack);
-                        setDriverName(d.driverName);
+                        setPlateFront(storedProfile?.carNumberFront || d.plateFront);
+                        setPlateBack(storedProfile?.carNumberBack || d.plateBack);
+                        setDriverName(storedProfile?.driverName || d.driverName);
                         setPhone1(pObj.p1);
                         setPhone2(pObj.p2);
                         setPhone3(pObj.p3);
-                        setDefaultNavi(d.defaultNavi);
+                        setDefaultNavi(storedProfile?.defaultNavi || d.defaultNavi);
+                        if (storedProfile?.carModel) {
+                          setCarModel(storedProfile.carModel);
+                          const res = resolveFuelTypeFromModel(storedProfile.carModel);
+                          setFuelType(storedProfile.fuelType || res.fuelType);
+                          setFuelReason(res.reason);
+                        }
 
-                        // Auto-inject vehicle-isolated passenger name
-                        const storedPassenger = getStoredVehicleProfile(d.vehicleNo)?.passengerName;
+                        // Auto-inject vehicle-isolated passenger name from cockpit_driver_profile_${vehicleNo}
                         const targetPassenger =
+                          storedProfile?.passengerName ||
                           d.passengerName ||
-                          storedPassenger ||
-                          getPresetPassengerName(d.vehicleNo) ||
+                          getPresetPassengerName(cleanV) ||
                           '';
                         setPassengerName(targetPassenger);
                       }}
@@ -556,7 +640,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                         : 'bg-white text-slate-700 border-slate-200 hover:border-[#1E60F3]/50 hover:bg-slate-50'
                         }`}
                     >
-                      <div className="text-xs font-black truncate">{d.vehicleNo}</div>
+                      <div className="text-sm font-black truncate">{d.vehicleNo}</div>
                       <div className={`text-[10px] font-bold truncate ${isCurrent ? 'text-blue-100' : 'text-slate-600'}`}>
                         {d.driverName}
                       </div>
@@ -572,7 +656,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
           {/* 1. Hocha (Optional) Field */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center">
+            <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center">
               <Car className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 호차 (선택)
             </label>
             <div className="relative flex items-center">
@@ -586,7 +670,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 className="w-full pl-3.5 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-[#1E60F3] focus:bg-white font-bold transition-colors"
               />
               <span
-                className={`absolute right-3 text-xs font-black transition-colors pointer-events-none ${hocha ? 'text-[#1E60F3]' : 'text-slate-300'
+                className={`absolute right-3 text-sm font-black transition-colors pointer-events-none ${hocha ? 'text-[#1E60F3]' : 'text-slate-300'
                   }`}
               >
                 호차
@@ -596,7 +680,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
           {/* 2. License Plate Separated Inputs (plateFront & plateBack) */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+            <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center justify-between">
               <span className="flex items-center">
                 <Car className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 차량 번호판
               </span>
@@ -644,9 +728,57 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             </div>
           </div>
 
-          {/* 3. Driver Name Field (드라이버 성명: 연락처 상단 배치) */}
+          {/* 3. Car Model & Fuel Fallback Pipeline (차종/유종 매핑 & 간편 칩) */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-sm font-bold text-slate-700 flex items-center">
+                <Fuel className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 차종 / 유종 (선택)
+              </label>
+              {fuelReason && (
+                <span className="text-[10px] font-bold text-[#1E60F3] bg-blue-50 border border-blue-200/80 px-1.5 py-0.5 rounded-md truncate max-w-[190px]">
+                  {fuelReason}
+                </span>
+              )}
+            </div>
+            <div className="space-y-2">
+              <input
+                type="text"
+                value={carModel}
+                onChange={handleCarModelChange}
+                placeholder="예: 520d, 520i, 카니발, 스타리아"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-[#1E60F3] focus:bg-white font-bold transition-colors"
+              />
+              {/* 2-split easy chips for mixed or explicit fuel selection */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleSelectFuelType('gasoline')}
+                  className={`py-2 px-3 rounded-xl border text-sm font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 ${
+                    fuelType === 'gasoline'
+                      ? 'bg-[#1E60F3] text-white border-[#1E60F3] shadow-xs'
+                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>⛽ 휘발유 (가솔린)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSelectFuelType('diesel')}
+                  className={`py-2 px-3 rounded-xl border text-sm font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 ${
+                    fuelType === 'diesel'
+                      ? 'bg-[#1E60F3] text-white border-[#1E60F3] shadow-xs'
+                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  <span>🛢️ 경유 (디젤)</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* 4. Driver Name Field (드라이버 성명: 연락처 상단 배치) */}
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-1.5 flex items-center justify-between">
               <span className="flex items-center">
                 <User className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 드라이버 성명
               </span>
@@ -680,7 +812,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
           {/* 4. Mobile Phone Number Field (가로 1줄 3칸 분할 입력) */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+            <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center justify-between">
               <span className="flex items-center">
                 <Phone className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 연락처
               </span>
@@ -710,7 +842,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   }`}
                 />
               </div>
-              <span className="text-slate-300 font-bold text-xs select-none">-</span>
+              <span className="text-slate-300 font-bold text-sm select-none">-</span>
               <div className="relative">
                 <input
                   ref={phone2Ref}
@@ -730,7 +862,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   }`}
                 />
               </div>
-              <span className="text-slate-300 font-bold text-xs select-none">-</span>
+              <span className="text-slate-300 font-bold text-sm select-none">-</span>
               <div className="relative">
                 <input
                   ref={phone3Ref}
@@ -755,7 +887,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
           {/* 5. Passenger Name Field */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center">
+            <label className="block text-sm font-bold text-slate-700 mb-1.5 flex items-center">
               <Users className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 담당 승객명
             </label>
             <input
@@ -769,7 +901,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
           {/* 6. Primary Navigation Switcher */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-2 flex items-center">
+            <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center">
               <Navigation className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 주력 내비게이션 앱
             </label>
             <div className="grid grid-cols-3 gap-2">
@@ -816,7 +948,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'
                   }`}
               >
-                <div className="w-6 h-6 rounded-full bg-[#FEE500] border border-amber-300 text-[#3C1E1E] flex items-center justify-center text-xs font-black shadow-2xs">
+                <div className="w-6 h-6 rounded-full bg-[#FEE500] border border-amber-300 text-[#3C1E1E] flex items-center justify-center text-sm font-black shadow-2xs">
                   K
                 </div>
                 <span className="text-[11px] font-extrabold">카카오</span>
@@ -835,7 +967,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'
                   }`}
               >
-                <div className="w-6 h-6 rounded-full bg-[#03C75A] border border-emerald-400 text-white flex items-center justify-center text-xs font-black shadow-2xs">
+                <div className="w-6 h-6 rounded-full bg-[#03C75A] border border-emerald-400 text-white flex items-center justify-center text-sm font-black shadow-2xs">
                   N
                 </div>
                 <span className="text-[11px] font-extrabold">네이버</span>
@@ -846,7 +978,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
           {/* Validation Notice Banner */}
           {validationMsg && (
-            <div className="p-2.5 rounded-xl bg-rose-50/90 border border-rose-200/90 flex items-center gap-2 text-xs font-bold text-rose-600 animate-fade-in shadow-2xs">
+            <div className="p-2.5 rounded-xl bg-rose-50/90 border border-rose-200/90 flex items-center gap-2 text-sm font-bold text-rose-600 animate-fade-in shadow-2xs">
               <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0 animate-ping" />
               <span>{validationMsg}</span>
             </div>

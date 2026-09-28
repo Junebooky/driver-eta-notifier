@@ -329,7 +329,7 @@ export const GasStationModal: React.FC<GasStationModalProps> = ({
                 haptics.lightTap();
                 setSortFilter('FASTEST');
               }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-xl text-sm font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                 sortFilter === 'FASTEST'
                   ? 'bg-[#1E60F3] text-white shadow-2xs'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -344,7 +344,7 @@ export const GasStationModal: React.FC<GasStationModalProps> = ({
                 haptics.lightTap();
                 setSortFilter('CHEAPEST');
               }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-xl text-sm font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                 sortFilter === 'CHEAPEST'
                   ? 'bg-[#1E60F3] text-white shadow-2xs'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -371,24 +371,24 @@ export const GasStationModal: React.FC<GasStationModalProps> = ({
           {isLoading ? (
             <div className="py-14 flex flex-col items-center justify-center space-y-2.5 text-slate-400">
               <RefreshCw className="w-7 h-7 animate-spin text-[#1E60F3]" />
-              <p className="text-xs font-bold text-slate-700">인근 주유소 및 실시간 경로 분석 중...</p>
+              <p className="text-sm font-bold text-slate-700">인근 주유소 및 실시간 경로 분석 중...</p>
               <p className="text-[11px] text-slate-400">3대 유종 유가 및 도로 교통정보 결합 중</p>
             </div>
           ) : errorMsg ? (
             <div className="py-12 text-center space-y-2">
               <AlertCircle className="w-7 h-7 text-rose-500 mx-auto" />
-              <p className="text-xs font-bold text-slate-700">{errorMsg}</p>
+              <p className="text-sm font-bold text-slate-700">{errorMsg}</p>
               <button
                 type="button"
                 onClick={() => acquireLocationAndFetch(true)}
-                className="text-xs text-[#1E60F3] font-bold underline cursor-pointer"
+                className="text-sm text-[#1E60F3] font-bold underline cursor-pointer"
               >
                 다시 시도
               </button>
             </div>
           ) : sortedStations.length === 0 ? (
             <div className="py-14 text-center text-slate-400 space-y-1">
-              <p className="text-xs font-bold text-slate-600">인근에 검색된 주유소가 없습니다.</p>
+              <p className="text-sm font-bold text-slate-600">인근에 검색된 주유소가 없습니다.</p>
               <p className="text-[11px]">잠시 후 다시 새로고침해 주세요.</p>
             </div>
           ) : (
@@ -426,26 +426,26 @@ export const GasStationModal: React.FC<GasStationModalProps> = ({
                   <div className="mt-2.5 pt-2 border-t border-slate-100 grid grid-cols-3 divide-x divide-slate-100 text-center bg-slate-50/80 py-1.5 px-1 rounded-xl">
                     <div className="px-1">
                       <span className="block text-[10px] font-bold text-slate-400">휘발유</span>
-                      <span className="text-xs font-black text-slate-800">
+                      <span className="text-sm font-black text-slate-800">
                         {station.prices?.gasoline ? `${station.prices.gasoline.toLocaleString()}원` : '-'}
                       </span>
                     </div>
                     <div className="px-1">
                       <span className="block text-[10px] font-bold text-slate-400">경유</span>
-                      <span className="text-xs font-black text-slate-800">
+                      <span className="text-sm font-black text-slate-800">
                         {station.prices?.diesel ? `${station.prices.diesel.toLocaleString()}원` : '-'}
                       </span>
                     </div>
                     <div className="px-1">
                       <span className="block text-[10px] font-bold text-slate-400">고급휘발유</span>
-                      <span className="text-xs font-black text-slate-800">
+                      <span className="text-sm font-black text-slate-800">
                         {station.prices?.premiumGasoline ? `${station.prices.premiumGasoline.toLocaleString()}원` : '-'}
                       </span>
                     </div>
                   </div>
 
                   {/* [태스크 3] Bottom Row: 실시간 소요시간/거리 + [원스톱 내비 런처: 우상향 45도 화살표] */}
-                  <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-slate-100 text-xs">
+                  <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-slate-100 text-sm">
                     <div className="text-slate-500 font-medium flex items-center gap-1.5">
                       <span className="font-black text-slate-900 text-sm">
                         약 {station.durationMinutes}분

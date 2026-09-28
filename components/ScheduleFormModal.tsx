@@ -390,7 +390,7 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="px-2.5 py-1 rounded-lg bg-slate-200 text-slate-700 font-black text-xs shrink-0">
+                    <span className="px-2.5 py-1 rounded-lg bg-slate-200 text-slate-700 font-black text-sm shrink-0">
                       출발
                     </span>
                     <span className="text-lg font-black text-slate-900 truncate">
@@ -423,7 +423,7 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="px-2.5 py-1 rounded-lg bg-[#1E60F3] text-white font-black text-xs shrink-0">
+                    <span className="px-2.5 py-1 rounded-lg bg-[#1E60F3] text-white font-black text-sm shrink-0">
                       도착
                     </span>
                     <span className="text-lg font-black text-slate-900 truncate">

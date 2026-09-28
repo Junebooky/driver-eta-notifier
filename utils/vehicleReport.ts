@@ -12,6 +12,8 @@ export interface InitialInspectionData {
   inspectionDate: string;
   vehicleHocha?: string;
   carNumber?: string;
+  carModel?: string;
+  fuelType?: 'gasoline' | 'diesel';
   outerDamage?: string;
   selectedParts?: string[];
   savedAt: string;
@@ -30,6 +32,8 @@ export interface ReceiptReportParams {
   date?: Date;
   vehicleHocha?: string;
   carNumber?: string;
+  carModel?: string;
+  fuelType?: 'gasoline' | 'diesel';
   totalKm: number | string;
   dte: number | string;
   outerDamage?: string;
@@ -39,12 +43,15 @@ export interface ReturnReportParams {
   date?: Date;
   vehicleHocha?: string;
   carNumber?: string;
+  carModel?: string;
+  fuelType?: 'gasoline' | 'diesel';
   returnTotalKm: number | string;
   returnDte: number | string;
   outerDamage?: string;
   parkingLocation?: string;
   keyLocation?: string;
   initialData?: InitialInspectionData | null;
+  fuelSettlement?: string;
 }
 
 /**
@@ -188,6 +195,10 @@ export function generateReturnReport(params: ReturnReportParams): string {
     });
   } else {
     lines.push(`• 외관 데미지 : ${damage}`);
+  }
+
+  if (params.fuelSettlement && params.fuelSettlement.trim()) {
+    lines.push(`• 유류비 정산 : ${params.fuelSettlement.trim()}`);
   }
 
   const parking = params.parkingLocation?.trim();

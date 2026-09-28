@@ -25,8 +25,21 @@ import {
   Gauge,
   Camera,
   CalendarCheck,
+  Fuel,
+  Sparkles,
+  Zap,
 } from 'lucide-react';
 import { VehicleTopDownViewer } from '@/components/VehicleTopDownViewer';
+import {
+  resolveFuelTypeFromModel,
+  resolveFuelTypeFromTachometer,
+  calculateTrimmedMeanPrices,
+  calculateRecommendedRefueling,
+  FuelType,
+  TrimmedMeanResult,
+  DEFAULT_FALLBACK_PRICES,
+} from '@/utils/fuelCalculation';
+import { GasStation } from '@/types';
 
 interface VehicleInspectionModalProps {
   isOpen: boolean;
@@ -134,6 +147,28 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
     return receiptSelectedParts;
   }, [initialData, receiptSelectedParts]);
 
+  // Vehicle Model & Fuel Fallback Pipeline State
+  const initialFuelRes = resolveFuelTypeFromModel(profile.carModel || profile.vehicleNo);
+  const [carModel, setCarModel] = useState<string>(profile.carModel || '');
+  const [selectedFuelType, setSelectedFuelType] = useState<FuelType>(
+    profile.fuelType || initialFuelRes.fuelType
+  );
+  const [fuelResolutionReason, setFuelResolutionReason] = useState<string>(initialFuelRes.reason);
+  const [isOcrAnalyzing, setIsOcrAnalyzing] = useState<boolean>(false);
+  const [ocrFeedback, setOcrFeedback] = useState<string | null>(null);
+
+  // Opinet 3km Gas Stations & Trimmed Mean Calculation
+  const [gasStations, setGasStations] = useState<GasStation[]>([]);
+  const [trimmedMeanPrices, setTrimmedMeanPrices] = useState<TrimmedMeanResult>({
+    gasoline: DEFAULT_FALLBACK_PRICES.gasoline,
+    diesel: DEFAULT_FALLBACK_PRICES.diesel,
+    premiumGasoline: DEFAULT_FALLBACK_PRICES.premiumGasoline,
+    sampleCount: 0,
+    trimmedCount: 0,
+  });
+  const [chosenFuelAmount, setChosenFuelAmount] = useState<number | null>(null);
+  const [includeFuelSettlement, setIncludeFuelSettlement] = useState<boolean>(true);
+
   // Sync profile defaults when modal opens or profile updates
   useEffect(() => {
     if (isOpen) {
@@ -141,6 +176,20 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
       setCarNumber(detectedCarNumber);
       const stored = getInitialInspection();
       setInitialData(stored);
+
+      if (stored?.carModel) {
+        setCarModel(stored.carModel);
+      } else if (profile.carModel) {
+        setCarModel(profile.carModel);
+      }
+
+      if (stored?.fuelType) {
+        setSelectedFuelType(stored.fuelType);
+        setFuelResolutionReason(stored.fuelType === 'diesel' ? '수령 점검 저장 유종 (경유)' : '수령 점검 저장 유종 (휘발유)');
+      } else if (profile.fuelType) {
+        setSelectedFuelType(profile.fuelType);
+        setFuelResolutionReason('기사 프로필 지정 유종');
+      }
 
       // Auto restore receipt damage parts if stored
       if (stored?.selectedParts && stored.selectedParts.length > 0) {
@@ -168,8 +217,38 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
           setDailyNewParts(storedDaily.newDamages);
         }
       }
+
+      // Fetch 3km Opinet stations for Trimmed Mean calculation (excluding top 15% outliers)
+      const fetchStations = async (lat: number, lng: number) => {
+        try {
+          const res = await fetch(`/api/gas-stations?lat=${lat}&lng=${lng}&fuelType=all`);
+          if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data.gasStations) && data.gasStations.length > 0) {
+              setGasStations(data.gasStations);
+              if (data.trimmedMean) {
+                setTrimmedMeanPrices(data.trimmedMean);
+              } else {
+                setTrimmedMeanPrices(calculateTrimmedMeanPrices(data.gasStations));
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Opinet stations fetch error in inspection modal:', e);
+        }
+      };
+
+      if (typeof navigator !== 'undefined' && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => fetchStations(pos.coords.latitude, pos.coords.longitude),
+          () => fetchStations(37.5042, 127.0425),
+          { timeout: 5000 }
+        );
+      } else {
+        fetchStations(37.5042, 127.0425);
+      }
     }
-  }, [isOpen, detectedHocha, detectedCarNumber]);
+  }, [isOpen, detectedHocha, detectedCarNumber, profile.carModel, profile.fuelType]);
 
   useEffect(() => {
     setActiveTab(initialMode === 'receipt' ? 'pickup' : (initialMode || 'pickup'));
@@ -268,7 +347,14 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
     }
   };
 
-  // Local meter photo upload handler (Pure in-memory Object URL, No-DB)
+  const handleCarModelChange = (val: string) => {
+    setCarModel(val);
+    const res = resolveFuelTypeFromModel(val);
+    setSelectedFuelType(res.fuelType);
+    setFuelResolutionReason(res.reason);
+  };
+
+  // Local meter photo upload handler + Gemini Vision AI Dashboard & Tachometer Analysis
   const handleMeterPhotoUpload = (
     e: React.ChangeEvent<HTMLInputElement>,
     mode: 'pickup' | 'daily' | 'return'
@@ -288,6 +374,55 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
       if (returnMeterPhoto) URL.revokeObjectURL(returnMeterPhoto);
       setReturnMeterPhoto(objectUrl);
     }
+
+    // Call Gemini Vision Dashboard OCR & Tachometer Redline API
+    setIsOcrAnalyzing(true);
+    setOcrFeedback(null);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const base64Data = reader.result as string;
+        const res = await fetch('/api/inspect-dashboard', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            image: base64Data,
+            carModel: carModel || profile.carModel || '',
+            vehicleNo: vehicleHocha || profile.vehicleNo || '',
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success) {
+            haptics.successPulse();
+            if (typeof data.totalKm === 'number') {
+              if (mode === 'pickup') setReceiptTotalKm(String(data.totalKm));
+              if (mode === 'return') setReturnTotalKm(String(data.totalKm));
+            }
+            if (typeof data.dte === 'number') {
+              if (mode === 'pickup') setReceiptDte(String(data.dte));
+              if (mode === 'daily') setDailyDte(String(data.dte));
+              if (mode === 'return') setReturnDte(String(data.dte));
+            }
+            if (data.fuelType) {
+              setSelectedFuelType(data.fuelType);
+              if (data.tachometerRedlineRpm) {
+                setFuelResolutionReason(`타코미터 레드존 ${data.tachometerRedlineRpm} RPM 감지: ${data.fuelType === 'diesel' ? '경유' : '휘발유'}`);
+              }
+            }
+            if (data.reasoning) {
+              setOcrFeedback(data.reasoning);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Dashboard OCR analysis error:', err);
+      } finally {
+        setIsOcrAnalyzing(false);
+      }
+    };
+    reader.readAsDataURL(file);
+
     // Reset file input value so same file can be reselected
     e.target.value = '';
   };
@@ -295,6 +430,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
   // Remove meter photo
   const handleRemoveMeterPhoto = (mode: 'pickup' | 'daily' | 'return') => {
     haptics.lightTap();
+    setOcrFeedback(null);
     if (mode === 'pickup') {
       if (receiptMeterPhoto) URL.revokeObjectURL(receiptMeterPhoto);
       setReceiptMeterPhoto(null);
@@ -307,12 +443,43 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
     }
   };
 
+  // Mathematical comparisons for fuel shortfall & recommended refueling
+  const returnDteNum = parseFloat(returnDte.replace(/,/g, '')) || 0;
+  const initialDteNum = initialData?.initialDte || 0;
+  const dteDiff = initialDteNum > 0 && returnDteNum > 0 ? returnDteNum - initialDteNum : 0;
+  const dteShortage = dteDiff < 0 ? Math.abs(dteDiff) : 0;
+
+  const currentUnitPrice =
+    selectedFuelType === 'diesel' ? trimmedMeanPrices.diesel : trimmedMeanPrices.gasoline;
+
+  const refuelingRec = useMemo(() => {
+    return calculateRecommendedRefueling({
+      initialDte: initialDteNum,
+      returnDte: returnDteNum,
+      fuelType: selectedFuelType,
+      unitPrice: currentUnitPrice,
+    });
+  }, [initialDteNum, returnDteNum, selectedFuelType, currentUnitPrice]);
+
+  const effectiveFuelAmount =
+    chosenFuelAmount !== null ? chosenFuelAmount : refuelingRec.recommendedAmount;
+
+  const fuelSettlementReportLine = useMemo(() => {
+    if (!includeFuelSettlement || dteShortage <= 0 || effectiveFuelAmount <= 0) {
+      return undefined;
+    }
+    const fuelLabel = selectedFuelType === 'diesel' ? '경유' : '휘발유';
+    return `${effectiveFuelAmount.toLocaleString()}원 (DTE -${dteShortage} km 권장 주유 / ${fuelLabel} ${currentUnitPrice.toLocaleString()}원)`;
+  }, [includeFuelSettlement, dteShortage, effectiveFuelAmount, selectedFuelType, currentUnitPrice]);
+
   // Real-time Preview Text Generation
   const previewText = useMemo(() => {
     if (activeTab === 'pickup') {
       return generateReceiptReport({
         vehicleHocha,
         carNumber,
+        carModel,
+        fuelType: selectedFuelType,
         totalKm: receiptTotalKm,
         dte: receiptDte,
         outerDamage: receiptDamage,
@@ -330,18 +497,23 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
       return generateReturnReport({
         vehicleHocha,
         carNumber,
+        carModel,
+        fuelType: selectedFuelType,
         returnTotalKm,
         returnDte,
         outerDamage: returnDamage,
         parkingLocation,
         keyLocation,
         initialData,
+        fuelSettlement: fuelSettlementReportLine,
       });
     }
   }, [
     activeTab,
     vehicleHocha,
     carNumber,
+    carModel,
+    selectedFuelType,
     receiptTotalKm,
     receiptDte,
     receiptDamage,
@@ -354,6 +526,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
     parkingLocation,
     keyLocation,
     initialData,
+    fuelSettlementReportLine,
   ]);
 
   if (!isOpen) return null;
@@ -369,6 +542,8 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
         inspectionDate: formatInspectionDate(),
         vehicleHocha,
         carNumber,
+        carModel,
+        fuelType: selectedFuelType,
         outerDamage: receiptDamage,
         selectedParts: receiptSelectedParts,
       });
@@ -396,6 +571,8 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
         inspectionDate: formatInspectionDate(),
         vehicleHocha,
         carNumber,
+        carModel,
+        fuelType: selectedFuelType,
         outerDamage: receiptDamage,
         selectedParts: receiptSelectedParts,
       });
@@ -489,7 +666,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
             >
               <Gauge className={`w-3.5 h-3.5 ${activeTab === 'pickup' ? 'text-white' : 'text-slate-400'}`} />
               <span
-                className={`text-xs tracking-tight transition-colors duration-300 ${activeTab === 'pickup' ? 'text-white font-extrabold' : 'text-slate-500 font-semibold'
+                className={`text-sm tracking-tight transition-colors duration-300 ${activeTab === 'pickup' ? 'text-white font-extrabold' : 'text-slate-500 font-semibold'
                   }`}
               >
                 차량 수령
@@ -506,7 +683,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
             >
               <CalendarCheck className={`w-3.5 h-3.5 ${activeTab === 'daily' ? 'text-white' : 'text-slate-400'}`} />
               <span
-                className={`text-xs tracking-tight transition-colors duration-300 ${activeTab === 'daily' ? 'text-white font-extrabold' : 'text-slate-500 font-semibold'
+                className={`text-sm tracking-tight transition-colors duration-300 ${activeTab === 'daily' ? 'text-white font-extrabold' : 'text-slate-500 font-semibold'
                   }`}
               >
                 일일 점검
@@ -523,7 +700,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
             >
               <RotateCcw className={`w-3.5 h-3.5 ${activeTab === 'return' ? 'text-white' : 'text-slate-400'}`} />
               <span
-                className={`text-xs tracking-tight transition-colors duration-300 ${activeTab === 'return' ? 'text-white font-extrabold' : 'text-slate-500 font-semibold'
+                className={`text-sm tracking-tight transition-colors duration-300 ${activeTab === 'return' ? 'text-white font-extrabold' : 'text-slate-500 font-semibold'
                   }`}
               >
                 차량 반납
@@ -533,31 +710,43 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
         </div>
 
         {/* Scrollable Form Body */}
-        <div className="flex-1 overflow-y-auto px-5 py-2 space-y-4 text-xs">
-          {/* Vehicle Basic Info Row */}
-          <div className="grid grid-cols-2 gap-2.5">
+        <div className="flex-1 overflow-y-auto px-5 py-2 space-y-4 text-sm">
+          {/* Vehicle Basic Info Row: 3 columns (호차, 번호, 차종) */}
+          <div className="grid grid-cols-3 gap-2">
             <div>
-              <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                차량호차 (선택 시 출력)
+              <label className="block text-[12px] font-semibold text-slate-600 mb-1 truncate">
+                차량호차
               </label>
               <input
                 type="text"
                 value={vehicleHocha}
                 onChange={(e) => setVehicleHocha(e.target.value)}
-                placeholder="예: 4호차"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors"
+                placeholder="4호차"
+                className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors text-sm"
               />
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+              <label className="block text-[12px] font-semibold text-slate-600 mb-1 truncate">
                 차량번호
               </label>
               <input
                 type="text"
                 value={carNumber}
                 onChange={(e) => setCarNumber(e.target.value)}
-                placeholder="예: 142호 7811"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors"
+                placeholder="142호 7811"
+                className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-[12px] font-semibold text-slate-600 mb-1 truncate">
+                차종 (유종자동)
+              </label>
+              <input
+                type="text"
+                value={carModel}
+                onChange={(e) => handleCarModelChange(e.target.value)}
+                placeholder="카니발/520d"
+                className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors text-sm"
               />
             </div>
           </div>
@@ -568,7 +757,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
               {/* Meter Inputs */}
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                  <label className="block text-[12px] font-semibold text-slate-600 mb-1">
                     총 주행거리 (km)
                   </label>
                   <input
@@ -581,7 +770,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                  <label className="block text-[12px] font-semibold text-slate-600 mb-1">
                     주행가능거리 (km)
                   </label>
                   <input
@@ -597,7 +786,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
 
               {/* Dashboard Photo Slot */}
               <div>
-                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                <label className="block text-[12px] font-semibold text-slate-600 mb-1">
                   계기판 AI 자동 입력 ✨
                 </label>
                 {receiptMeterPhoto ? (
@@ -634,15 +823,75 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                       className="w-full py-2.5 px-3 rounded-xl border border-dashed border-slate-300 hover:border-[#1E60F3] bg-slate-50 hover:bg-blue-50/20 text-slate-500 hover:text-[#1E60F3] flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                     >
                       <Camera className="w-4 h-4 text-slate-400 shrink-0" />
-                      <span className="text-xs font-semibold">계기판 사진 등록</span>
+                      <span className="text-sm font-semibold">계기판 사진 등록</span>
                     </button>
                   </div>
                 )}
               </div>
 
+              {/* OCR Analysis State & Feedback Banner */}
+              {isOcrAnalyzing && (
+                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-blue-50/70 border border-blue-200/80 text-blue-700 text-sm animate-pulse">
+                  <Sparkles className="w-4 h-4 text-[#1E60F3] shrink-0 animate-spin" />
+                  <span>Gemini Vision이 계기판 주행거리 및 타코미터 RPM을 분석 중입니다...</span>
+                </div>
+              )}
+              {ocrFeedback && !isOcrAnalyzing && (
+                <div className="flex items-start gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 text-sm">
+                  <Sparkles className="w-3.5 h-3.5 text-[#1E60F3] shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="font-semibold text-slate-800">계기판 자동 인식 완료</p>
+                    <p className="text-[11px] text-slate-500 leading-relaxed mt-0.5">{ocrFeedback}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Fuel Type 2-Split Quick Chips with Fallback Reason */}
+              <div className="bg-slate-50/80 p-2.5 rounded-2xl border border-slate-200/80 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1">
+                    <Fuel className="w-3.5 h-3.5 text-[#1E60F3]" />
+                    차량 유종 선택
+                  </label>
+                  <span className="text-[10px] text-slate-500 font-medium truncate max-w-[200px]" title={fuelResolutionReason}>
+                    {fuelResolutionReason}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      haptics.lightTap();
+                      setSelectedFuelType('gasoline');
+                      setFuelResolutionReason('기사 직접 수동 선택 (휘발유)');
+                    }}
+                    className={`py-2 px-3 rounded-xl border text-sm font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${selectedFuelType === 'gasoline'
+                      ? 'bg-[#1E60F3] text-white border-[#1E60F3] shadow-xs'
+                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100/70'
+                      }`}
+                  >
+                    <span>⛽ 휘발유</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      haptics.lightTap();
+                      setSelectedFuelType('diesel');
+                      setFuelResolutionReason('기사 직접 수동 선택 (경유)');
+                    }}
+                    className={`py-2 px-3 rounded-xl border text-sm font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${selectedFuelType === 'diesel'
+                      ? 'bg-[#1E60F3] text-white border-[#1E60F3] shadow-xs'
+                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100/70'
+                      }`}
+                  >
+                    <span>🛢️ 경유</span>
+                  </button>
+                </div>
+              </div>
+
               {/* 2D Top-Down Interactive Vehicle Inspection Viewer */}
               <div className="space-y-1 pt-0.5">
-                <label className="block text-[11px] font-semibold text-slate-600">
+                <label className="block text-[12px] font-semibold text-slate-600">
                   차량 외관 2D 탑뷰 점검
                 </label>
                 <VehicleTopDownViewer
@@ -654,7 +903,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
 
               {/* Outer Damage Quick Chip Selector & Input */}
               <div className="space-y-1 pt-1">
-                <label className="block text-[11px] font-semibold text-slate-600">
+                <label className="block text-[12px] font-semibold text-slate-600">
                   외관 부위별 빠른 선택
                 </label>
                 <div className="flex flex-wrap gap-1.5">
@@ -662,12 +911,12 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                   <button
                     type="button"
                     onClick={() => handleResetDamageToClean('pickup')}
-                    className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer flex items-center ${isReceiptClean
+                    className={`px-2.5 py-1 text-sm rounded-lg border transition-all cursor-pointer flex items-center ${isReceiptClean
                       ? 'border-[#1E60F3]/40 bg-blue-50/70 text-slate-800 font-bold shadow-xs'
                       : 'border-slate-200 bg-white text-slate-400 font-medium hover:bg-slate-50'
                       }`}
                   >
-                    <span className={isReceiptClean ? 'text-[#1E60F3] font-black text-xs mr-1' : 'text-slate-300 text-xs mr-1'}>
+                    <span className={isReceiptClean ? 'text-[#1E60F3] font-black text-sm mr-1' : 'text-slate-300 text-sm mr-1'}>
                       ✓
                     </span>
                     <span>이상 없음 (무)</span>
@@ -681,7 +930,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                         key={part}
                         type="button"
                         onClick={() => handleToggleDamageChip(part, 'pickup')}
-                        className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer ${isSelected
+                        className={`px-2.5 py-1 text-sm rounded-lg border transition-all cursor-pointer ${isSelected
                           ? 'border-[#1E60F3]/40 bg-[#1E60F3]/85 hover:bg-[#1E60F3]/90 text-white font-bold shadow-xs'
                           : 'border-slate-200 bg-slate-50 text-slate-600 font-medium hover:bg-slate-100'
                           }`}
@@ -693,7 +942,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                 </div>
 
                 <div className="pt-1">
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                  <label className="block text-[12px] font-semibold text-slate-600 mb-1">
                     외관 데미지 상세 (직접 수정 가능)
                   </label>
                   <input
@@ -713,7 +962,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
             <div className="space-y-3 animate-fade-in">
               {/* Range Input Only (Odometer Hidden) */}
               <div>
-                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                <label className="block text-[12px] font-semibold text-slate-600 mb-1">
                   주행가능거리 (km)
                 </label>
                 <input
@@ -728,7 +977,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
 
               {/* Dashboard Photo Slot for Daily */}
               <div>
-                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                <label className="block text-[12px] font-semibold text-slate-600 mb-1">
                   계기판 사진 (선택)
                 </label>
                 {dailyMeterPhoto ? (
@@ -765,16 +1014,33 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                       className="w-full py-2.5 px-3 rounded-xl border border-dashed border-slate-300 hover:border-[#1E60F3] bg-slate-50 hover:bg-blue-50/20 text-slate-500 hover:text-[#1E60F3] flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                     >
                       <Camera className="w-4 h-4 text-slate-400 shrink-0" />
-                      <span className="text-xs font-semibold">계기판 사진 등록</span>
+                      <span className="text-sm font-semibold">계기판 사진 등록</span>
                     </button>
                   </div>
                 )}
               </div>
 
+              {/* OCR Analysis State & Feedback Banner */}
+              {isOcrAnalyzing && (
+                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-blue-50/70 border border-blue-200/80 text-blue-700 text-sm animate-pulse">
+                  <Sparkles className="w-4 h-4 text-[#1E60F3] shrink-0 animate-spin" />
+                  <span>Gemini Vision이 계기판을 분석 중입니다...</span>
+                </div>
+              )}
+              {ocrFeedback && !isOcrAnalyzing && (
+                <div className="flex items-start gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 text-sm">
+                  <Sparkles className="w-3.5 h-3.5 text-[#1E60F3] shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="font-semibold text-slate-800">계기판 인식 완료</p>
+                    <p className="text-[11px] text-slate-500 leading-relaxed mt-0.5">{ocrFeedback}</p>
+                  </div>
+                </div>
+              )}
+
               {/* 2D Top-Down Interactive Vehicle Inspection Viewer */}
               <div className="space-y-1 pt-0.5">
                 <div className="flex items-center justify-between">
-                  <label className="block text-[11px] font-semibold text-slate-600">
+                  <label className="block text-[12px] font-semibold text-slate-600">
                     차량 외관 2D 탑뷰 점검
                   </label>
                   <div className="flex items-center gap-2 text-[10px] font-medium text-slate-500">
@@ -803,7 +1069,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
               {/* Outer Damage Quick Chip Selector & One-Touch Clean */}
               <div className="space-y-1 pt-1">
                 <div className="flex items-center justify-between">
-                  <label className="block text-[11px] font-semibold text-slate-600">
+                  <label className="block text-[12px] font-semibold text-slate-600">
                     외관 부위별 빠른 선택
                   </label>
                 </div>
@@ -812,12 +1078,12 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                   <button
                     type="button"
                     onClick={handleResetDailyDamage}
-                    className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer flex items-center gap-1 ${dailyNewParts.length === 0
+                    className={`px-2.5 py-1 text-sm rounded-lg border transition-all cursor-pointer flex items-center gap-1 ${dailyNewParts.length === 0
                       ? 'border-[#1E60F3]/40 bg-blue-50/70 text-[#1E60F3] font-bold shadow-xs'
                       : 'border-slate-200 bg-white text-slate-400 font-medium hover:bg-slate-50'
                       }`}
                   >
-                    <span className={dailyNewParts.length === 0 ? 'text-[#1E60F3] font-black text-xs mr-0.5' : 'text-slate-300 text-xs mr-0.5'}>
+                    <span className={dailyNewParts.length === 0 ? 'text-[#1E60F3] font-black text-sm mr-0.5' : 'text-slate-300 text-sm mr-0.5'}>
                       ✓
                     </span>
                     <span>이상없음 (무) </span>
@@ -833,7 +1099,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                         key={part}
                         type="button"
                         onClick={() => handleToggleDailyDamage(part)}
-                        className={`px-2.5 py-1 text-xs rounded-lg border transition-all flex items-center gap-1 ${isExisting
+                        className={`px-2.5 py-1 text-sm rounded-lg border transition-all flex items-center gap-1 ${isExisting
                           ? 'border-slate-200 bg-slate-100 text-slate-500 font-medium cursor-default opacity-85'
                           : isNew
                             ? 'border-red-400 bg-red-500 hover:bg-red-600 text-white font-bold shadow-xs ring-1 ring-red-400/50 cursor-pointer'
@@ -865,7 +1131,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
               {/* Meter Inputs */}
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                  <label className="block text-[12px] font-semibold text-slate-600 mb-1">
                     반납 총 주행거리 (km)
                   </label>
                   <input
@@ -878,7 +1144,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                  <label className="block text-[12px] font-semibold text-slate-600 mb-1">
                     반납 주행가능거리 (km)
                   </label>
                   <input
@@ -894,7 +1160,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
 
               {/* Task 4: Dashboard Photo Slot for Return */}
               <div>
-                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                <label className="block text-[12px] font-semibold text-slate-600 mb-1">
                   계기판 AI 자동 입력 ✨
                 </label>
                 {returnMeterPhoto ? (
@@ -931,16 +1197,33 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                       className="w-full py-2.5 px-3 rounded-xl border border-dashed border-slate-300 hover:border-[#1E60F3] bg-slate-50 hover:bg-blue-50/20 text-slate-500 hover:text-[#1E60F3] flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                     >
                       <Camera className="w-4 h-4 text-slate-400 shrink-0" />
-                      <span className="text-xs font-semibold">계기판 사진 등록</span>
+                      <span className="text-sm font-semibold">계기판 사진 등록</span>
                     </button>
                   </div>
                 )}
               </div>
 
+              {/* OCR Analysis State & Feedback Banner */}
+              {isOcrAnalyzing && (
+                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-blue-50/70 border border-blue-200/80 text-blue-700 text-sm animate-pulse">
+                  <Sparkles className="w-4 h-4 text-[#1E60F3] shrink-0 animate-spin" />
+                  <span>Gemini Vision이 반납 계기판을 분석 중입니다...</span>
+                </div>
+              )}
+              {ocrFeedback && !isOcrAnalyzing && (
+                <div className="flex items-start gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 text-sm">
+                  <Sparkles className="w-3.5 h-3.5 text-[#1E60F3] shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="font-semibold text-slate-800">반납 계기판 인식 완료</p>
+                    <p className="text-[11px] text-slate-500 leading-relaxed mt-0.5">{ocrFeedback}</p>
+                  </div>
+                </div>
+              )}
+
               {/* 2D Top-Down Interactive Vehicle Inspection Viewer with Receipt Data Inheritance */}
               <div className="space-y-1 pt-0.5">
                 <div className="flex items-center justify-between">
-                  <label className="block text-[11px] font-semibold text-slate-600">
+                  <label className="block text-[12px] font-semibold text-slate-600">
                     차량 외관 2D 탑뷰 점검
                   </label>
                   {existingDamageParts.length > 0 && (
@@ -967,7 +1250,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
               {/* Task 3: Outer Damage Quick Chip Selector & Input */}
               <div className="space-y-1 pt-1">
                 <div className="flex items-center justify-between">
-                  <label className="block text-[11px] font-semibold text-slate-600">
+                  <label className="block text-[12px] font-semibold text-slate-600">
                     외관 부위별 빠른 선택
                   </label>
                 </div>
@@ -976,12 +1259,12 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                   <button
                     type="button"
                     onClick={() => handleResetDamageToClean('return')}
-                    className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer flex items-center ${isReturnClean
+                    className={`px-2.5 py-1 text-sm rounded-lg border transition-all cursor-pointer flex items-center ${isReturnClean
                       ? 'border-[#1E60F3]/40 bg-blue-50/70 text-slate-800 font-bold shadow-xs'
                       : 'border-slate-200 bg-white text-slate-400 font-medium hover:bg-slate-50'
                       }`}
                   >
-                    <span className={isReturnClean ? 'text-[#1E60F3] font-black text-xs mr-1' : 'text-slate-300 text-xs mr-1'}>
+                    <span className={isReturnClean ? 'text-[#1E60F3] font-black text-sm mr-1' : 'text-slate-300 text-sm mr-1'}>
                       ✓
                     </span>
                     <span>이상 없음 (무)</span>
@@ -998,7 +1281,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                         key={part}
                         type="button"
                         onClick={() => handleToggleDamageChip(part, 'return')}
-                        className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer flex items-center gap-1 ${isNew
+                        className={`px-2.5 py-1 text-sm rounded-lg border transition-all cursor-pointer flex items-center gap-1 ${isNew
                           ? 'border-red-400 bg-red-500 hover:bg-red-600 text-white font-bold shadow-xs ring-1 ring-red-400/50'
                           : isSelected
                             ? 'border-[#1E60F3]/40 bg-[#1E60F3]/85 hover:bg-[#1E60F3]/90 text-white font-bold shadow-xs'
@@ -1022,7 +1305,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                 </div>
 
                 <div className="pt-1">
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                  <label className="block text-[12px] font-semibold text-slate-600 mb-1">
                     외관 데미지 상세 (직접 수정 가능)
                   </label>
                   <input
@@ -1035,10 +1318,167 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                 </div>
               </div>
 
+              {/* Opinet 3km Trimmed Mean Fuel Refueling Calculator */}
+              <div className="bg-slate-50/90 rounded-2xl p-3 border border-slate-200/90 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-5 h-5 rounded-md bg-[#1E60F3] text-white flex items-center justify-center">
+                      <Fuel className="w-3 h-3" />
+                    </div>
+                    <span className="text-sm font-bold text-slate-800">오피넷 3km 유류비 정산 계산기</span>
+                  </div>
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-[#1E60F3] border border-blue-200/60">
+                    상위 15% 초고가 절사
+                  </span>
+                </div>
+
+                {/* DTE Status Badge */}
+                <div className="flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200/70 text-sm">
+                  <span className="text-slate-600 font-medium">계기판 DTE 증감 현황</span>
+                  {initialDteNum > 0 && returnDteNum > 0 ? (
+                    dteDiff < 0 ? (
+                      <span className="font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-md">
+                        {dteDiff} km 부족 (주유/정산 대상)
+                      </span>
+                    ) : (
+                      <span className="font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
+                        +{dteDiff} km (반납 기준 충족)
+                      </span>
+                    )
+                  ) : (
+                    <span className="text-slate-400 font-medium text-[11px]">
+                      {initialDteNum === 0 ? '수령 DTE 미기록' : '반납 DTE 입력 필요'}
+                    </span>
+                  )}
+                </div>
+
+                {/* 2-Split Fuel Switch */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500 font-medium">유종 선택</span>
+                    <span className="text-slate-400 text-[10px] truncate max-w-[200px]" title={fuelResolutionReason}>
+                      {fuelResolutionReason}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        haptics.lightTap();
+                        setSelectedFuelType('gasoline');
+                        setFuelResolutionReason('기사 직접 수동 선택 (휘발유)');
+                      }}
+                      className={`py-1.5 px-2.5 rounded-xl border text-sm font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${selectedFuelType === 'gasoline'
+                        ? 'bg-[#1E60F3] text-white border-[#1E60F3] shadow-xs'
+                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                        }`}
+                    >
+                      <span>⛽ 휘발유</span>
+                      <span className="text-[10px] font-normal opacity-90">
+                        {trimmedMeanPrices.gasoline.toLocaleString()}원
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        haptics.lightTap();
+                        setSelectedFuelType('diesel');
+                        setFuelResolutionReason('기사 직접 수동 선택 (경유)');
+                      }}
+                      className={`py-1.5 px-2.5 rounded-xl border text-sm font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${selectedFuelType === 'diesel'
+                        ? 'bg-[#1E60F3] text-white border-[#1E60F3] shadow-xs'
+                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                        }`}
+                    >
+                      <span>🛢️ 경유</span>
+                      <span className="text-[10px] font-normal opacity-90">
+                        {trimmedMeanPrices.diesel.toLocaleString()}원
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Refueling Calculation Detail (When DTE shortage > 0) */}
+                {dteShortage > 0 && (
+                  <div className="space-y-2 pt-1">
+                    <div className="p-2.5 rounded-xl bg-blue-50/50 border border-blue-100 text-sm space-y-1 text-slate-700">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-slate-500">부족 소모량 추정</span>
+                        <span className="font-semibold text-slate-800">
+                          약 {refuelingRec.litersNeeded.toFixed(1)} L (연비 {selectedFuelType === 'diesel' ? '11.5' : '9.8'} km/L)
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-slate-500">3km 평균단가 (절사평균)</span>
+                        <span className="font-semibold text-slate-800">
+                          {currentUnitPrice.toLocaleString()}원/L ({trimmedMeanPrices.sampleCount}개소 중 고가 {trimmedMeanPrices.trimmedCount}개소 제외)
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] pt-1 border-t border-blue-100">
+                        <span className="text-slate-600 font-medium">도심 안전계수 (1.15배) 산출</span>
+                        <span className="font-extrabold text-[#1E60F3] text-sm">
+                          {effectiveFuelAmount.toLocaleString()}원
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* One-touch Refueling Amount Chips (5천원 / 1만원 단위) */}
+                    <div className="space-y-1">
+                      <label className="block text-[12px] font-semibold text-slate-600">
+                        원터치 권장 주유 금액 선택
+                      </label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {refuelingRec.chips.map((amount) => {
+                          const isSelected = effectiveFuelAmount === amount;
+                          const isRecommended = amount === refuelingRec.recommendedAmount;
+                          return (
+                            <button
+                              key={amount}
+                              type="button"
+                              onClick={() => {
+                                haptics.lightTap();
+                                setChosenFuelAmount(amount);
+                              }}
+                              className={`px-2.5 py-1.5 rounded-xl border text-sm font-bold transition-all cursor-pointer flex items-center gap-1 ${isSelected
+                                ? 'bg-[#1E60F3] text-white border-[#1E60F3] shadow-sm shadow-blue-500/25 ring-2 ring-blue-300'
+                                : isRecommended
+                                  ? 'bg-blue-50/80 text-[#1E60F3] border-[#1E60F3]/60 hover:bg-blue-100/60'
+                                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                                }`}
+                            >
+                              <span>{amount.toLocaleString()}원</span>
+                              {isRecommended && (
+                                <span className={`text-[10px] px-1 py-0.2 rounded-xs font-extrabold ${isSelected ? 'bg-white text-[#1E60F3]' : 'bg-[#1E60F3] text-white'}`}>
+                                  권장
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Checkbox to include in return report */}
+                    <label className="flex items-center gap-2 pt-1 text-sm text-slate-700 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={includeFuelSettlement}
+                        onChange={(e) => {
+                          haptics.lightTap();
+                          setIncludeFuelSettlement(e.target.checked);
+                        }}
+                        className="w-4 h-4 text-[#1E60F3] rounded border-slate-300 focus:ring-[#1E60F3] accent-[#1E60F3] cursor-pointer"
+                      />
+                      <span className="font-medium">반납 카톡 보고서에 유류비 정산 내역 포함</span>
+                    </label>
+                  </div>
+                )}
+              </div>
+
               {/* Parking & Key Location */}
               <div className="grid grid-cols-2 gap-2.5 pt-1">
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                  <label className="block text-[12px] font-semibold text-slate-600 mb-1">
                     주차위치 (선택)
                   </label>
                   <input
@@ -1050,7 +1490,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                  <label className="block text-[12px] font-semibold text-slate-600 mb-1">
                     차키위치 (선택)
                   </label>
                   <input
@@ -1083,7 +1523,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
                 )}
               </button>
             </div>
-            <pre className="p-3 bg-white border border-slate-200 rounded-xl text-xs font-mono text-slate-800 whitespace-pre-wrap leading-relaxed select-all shadow-inner">
+            <pre className="p-3 bg-white border border-slate-200 rounded-xl text-sm font-mono text-slate-800 whitespace-pre-wrap leading-relaxed select-all shadow-inner">
               {previewText}
             </pre>
           </div>

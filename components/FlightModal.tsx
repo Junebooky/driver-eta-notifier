@@ -182,7 +182,7 @@ export const FlightModal: React.FC<FlightModalProps> = ({
               className="flex-1 py-2 rounded-xl z-10 flex items-center justify-center cursor-pointer transition-colors duration-300"
             >
               <span
-                className={`text-xs tracking-tight transition-colors duration-300 ${isArrival ? 'text-white font-black' : 'text-slate-500 font-bold hover:text-slate-800'
+                className={`text-sm tracking-tight transition-colors duration-300 ${isArrival ? 'text-white font-black' : 'text-slate-500 font-bold hover:text-slate-800'
                   }`}
               >
                 입국
@@ -200,7 +200,7 @@ export const FlightModal: React.FC<FlightModalProps> = ({
               className="flex-1 py-2 rounded-xl z-10 flex items-center justify-center cursor-pointer transition-colors duration-300"
             >
               <span
-                className={`text-xs tracking-tight transition-colors duration-300 ${!isArrival ? 'text-white font-black' : 'text-slate-500 font-bold hover:text-slate-800'
+                className={`text-sm tracking-tight transition-colors duration-300 ${!isArrival ? 'text-white font-black' : 'text-slate-500 font-bold hover:text-slate-800'
                   }`}
               >
                 출국
@@ -238,7 +238,7 @@ export const FlightModal: React.FC<FlightModalProps> = ({
               <button
                 type="submit"
                 disabled={isLoading}
-                className="px-3.5 py-1.5 bg-[#1E60F3] hover:bg-[#1650D6] active:scale-95 text-white text-xs font-black rounded-lg shadow-xs flex items-center gap-1 disabled:opacity-50 transition-all cursor-pointer"
+                className="px-3.5 py-1.5 bg-[#1E60F3] hover:bg-[#1650D6] active:scale-95 text-white text-sm font-black rounded-lg shadow-xs flex items-center gap-1 disabled:opacity-50 transition-all cursor-pointer"
               >
                 {isLoading ? (
                   <RefreshCw className="w-3.5 h-3.5 animate-spin" />
@@ -256,7 +256,7 @@ export const FlightModal: React.FC<FlightModalProps> = ({
           {isLoading ? (
             <div className="py-14 flex flex-col items-center justify-center space-y-2.5 text-slate-400">
               <RefreshCw className="w-7 h-7 animate-spin text-[#1E60F3]" />
-              <p className="text-xs font-bold text-slate-700">
+              <p className="text-sm font-bold text-slate-700">
                 인천공항공사 실시간 운항 데이터 조회 중...
               </p>
               <p className="text-[11px] text-slate-400">게이트 및 체크인 카운터 매핑 분석 중</p>
@@ -267,7 +267,7 @@ export const FlightModal: React.FC<FlightModalProps> = ({
               <h4 className="text-base font-bold text-slate-800 mt-3">
                 운항 정보를 찾을 수 없습니다
               </h4>
-              <p className="text-xs text-slate-400 mt-1">
+              <p className="text-sm text-slate-400 mt-1">
                 편명 또는 [입국/출국] 탭 설정을 확인해 주세요.
               </p>
             </div>
@@ -291,7 +291,7 @@ export const FlightModal: React.FC<FlightModalProps> = ({
                     </div>
 
                     {flight.flightDate && (
-                      <span className="text-xs font-bold text-slate-400">
+                      <span className="text-sm font-bold text-slate-400">
                         {flight.flightDate}
                       </span>
                     )}
@@ -304,14 +304,14 @@ export const FlightModal: React.FC<FlightModalProps> = ({
                       <span className="block text-2xl font-black text-slate-900 leading-none">
                         {flight.type === 'arrival' ? (flight.airportCode || 'DEP') : 'ICN'}
                       </span>
-                      <span className="text-xs font-medium text-slate-400 truncate block mt-1">
+                      <span className="text-sm font-medium text-slate-400 truncate block mt-1">
                         {flight.type === 'arrival' ? flight.airport : '인천국제공항'}
                       </span>
                     </div>
 
                     {/* Flight Path Connector */}
                     <div className="flex flex-col items-center justify-center px-3 shrink-0">
-                      <span className="text-xs font-black tracking-widest text-slate-400">
+                      <span className="text-sm font-black tracking-widest text-slate-400">
                         TO
                       </span>
                       <div className="w-14 border-b border-dashed border-slate-300 mt-1" />
@@ -322,7 +322,7 @@ export const FlightModal: React.FC<FlightModalProps> = ({
                       <span className="block text-2xl font-black text-slate-900 leading-none">
                         {flight.type === 'arrival' ? 'ICN' : (flight.airportCode || 'ARR')}
                       </span>
-                      <span className="text-xs font-medium text-slate-400 truncate block mt-1">
+                      <span className="text-sm font-medium text-slate-400 truncate block mt-1">
                         {flight.type === 'arrival' ? '인천국제공항' : flight.airport}
                       </span>
                     </div>
@@ -359,7 +359,7 @@ export const FlightModal: React.FC<FlightModalProps> = ({
                       <div className="pt-3 pb-1 border-t border-slate-100 flex items-center justify-between">
                         {/* Left: Scheduled Time */}
                         <div className="text-left flex-1">
-                          <span className="block text-xs font-medium text-slate-400 mb-1">
+                          <span className="block text-sm font-medium text-slate-400 mb-1">
                             스케줄 예정 시각
                           </span>
                           <span className="block text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-none">
@@ -397,7 +397,7 @@ export const FlightModal: React.FC<FlightModalProps> = ({
                         {/* Right: Estimated Time */}
                         <div className="text-right flex-1">
                           <span
-                            className={`block text-xs font-semibold mb-1 ${theme.textColor}`}
+                            className={`block text-sm font-semibold mb-1 ${theme.textColor}`}
                           >
                             {flight.type === 'arrival' ? '예상 착륙 시각' : '예상 출발 시각'}
                           </span>
@@ -459,17 +459,17 @@ export const FlightModal: React.FC<FlightModalProps> = ({
                         return (
                           <div className="space-y-1 mt-1.5">
                             {hasExit && curbside ? (
-                              <p className="text-xs text-slate-500 font-medium">
+                              <p className="text-sm text-slate-500 font-medium">
                                 영접 위치:{' '}
                                 <span className="font-bold text-[#1E60F3]">{curbside}</span>
                               </p>
                             ) : (
-                              <p className="text-xs text-slate-500 font-medium">
+                              <p className="text-sm text-slate-500 font-medium">
                                 영접 위치: 착륙 1~2시간 전 자동 확정
                               </p>
                             )}
                             {parking && !parking.includes('확인 필요') && (
-                              <p className="text-xs text-slate-500 font-medium">
+                              <p className="text-sm text-slate-500 font-medium">
                                 추천 주차:{' '}
                                 <span className="font-bold text-slate-800">{parking}</span>
                               </p>
@@ -480,7 +480,7 @@ export const FlightModal: React.FC<FlightModalProps> = ({
 
                     {/* 출국 시에만 체크인 카운터 노출 (입국 시 탑승구 문구 완전 삭제) */}
                     {flight.type === 'departure' && flight.checkinRange && (
-                      <p className="text-xs text-slate-500 font-medium mt-1.5">
+                      <p className="text-sm text-slate-500 font-medium mt-1.5">
                         체크인 카운터:{' '}
                         <span className="font-bold text-slate-900">{flight.checkinRange}</span>
                       </p>
@@ -519,7 +519,7 @@ export const FlightModal: React.FC<FlightModalProps> = ({
           ) : (
             <div className="py-12 text-center text-slate-400 space-y-1 bg-white rounded-2xl border border-slate-200/80 p-4">
               <Plane className="w-8 h-8 text-slate-300 mx-auto" />
-              <p className="text-xs font-bold text-slate-600">항공편명을 입력 후 조회해 주세요.</p>
+              <p className="text-sm font-bold text-slate-600">항공편명을 입력 후 조회해 주세요.</p>
               <p className="text-[11px]">실시간 게이트 및 하차 도어가 자동 계산됩니다.</p>
             </div>
           )}
@@ -542,7 +542,7 @@ export const FlightModal: React.FC<FlightModalProps> = ({
               <button
                 type="button"
                 onClick={handleOpenKakaoTalk}
-                className="w-16 h-12 bg-[#FEE500] hover:bg-[#FDD835] active:scale-95 text-[#191919] rounded-2xl font-black text-xs flex items-center justify-center gap-1 cursor-pointer transition-all shadow-2xs shrink-0"
+                className="w-16 h-12 bg-[#FEE500] hover:bg-[#FDD835] active:scale-95 text-[#191919] rounded-2xl font-black text-sm flex items-center justify-center gap-1 cursor-pointer transition-all shadow-2xs shrink-0"
                 title="단톡방 보고서 복사 및 카카오톡 실행"
               >
                 {/* Authentic Kakao Speech Bubble Icon */}

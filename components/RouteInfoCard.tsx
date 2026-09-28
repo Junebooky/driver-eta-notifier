@@ -50,7 +50,7 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
 
       {/* Underground Parking / GPS Status Notice */}
       {isUndergroundFallback && (
-        <div className="mb-2.5 flex items-start space-x-2 bg-amber-50/95 border border-amber-200 p-2 rounded-xl text-amber-800 text-xs font-medium relative z-10 backdrop-blur-xs">
+        <div className="mb-2.5 flex items-start space-x-2 bg-amber-50/95 border border-amber-200 p-2 rounded-xl text-amber-800 text-sm font-medium relative z-10 backdrop-blur-xs">
           <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
           <div className="flex-1 text-[11px] leading-tight">
             <span className="font-bold block text-amber-900">지하 주차장 GPS 수신 음영 감지</span>
@@ -67,7 +67,7 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
             <div className="w-4.5 h-4.5 rounded-full bg-[#1E60F3] text-white flex items-center justify-center shrink-0 shadow-[0_2px_6px_rgba(30,96,243,0.3)]">
               <Clock className="w-3 h-3 text-white stroke-[2.5]" />
             </div>
-            <span className="text-xs font-bold text-slate-600 uppercase tracking-tight">ETA</span>
+            <span className="text-sm font-bold text-slate-600 uppercase tracking-tight">ETA</span>
           </div>
 
           {/* Large ETA & Duration display */}
@@ -87,7 +87,7 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
           {/* Subtitle: Real-time Distance & Traffic provider in separated vertical hierarchy */}
           {routeEstimate && (
             <div className="mt-1.5 space-y-0.5">
-              <div className="text-xs text-slate-500 font-normal">
+              <div className="text-sm text-slate-500 font-normal">
                 이동 거리: <span className="text-slate-900 font-bold">{routeEstimate.distanceKm} km</span>
               </div>
               <div className="text-[11px] font-medium text-slate-400 whitespace-nowrap tracking-tight">

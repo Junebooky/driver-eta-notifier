@@ -186,7 +186,7 @@ export const PredictionResultSheet: React.FC<PredictionResultSheetProps> = ({
 
             {/* Detailed Briefing Text: e.g. "9월 25일 금요일 오후 3시 30분 출발하면" */}
             <div className="flex items-center space-x-1">
-              <span className="text-xs sm:text-sm font-bold text-slate-800 tracking-tight">
+              <span className="text-sm font-bold text-slate-800 tracking-tight">
                 {headerBriefing}
               </span>
               <button
@@ -245,7 +245,7 @@ export const PredictionResultSheet: React.FC<PredictionResultSheetProps> = ({
                   haptics.lightTap();
                   onOpenTimePicker();
                 }}
-                className="mt-3 px-4 py-1.5 rounded-full border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-50 active:scale-95 transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                className="mt-3 px-4 py-1.5 rounded-full border border-slate-300 text-sm font-bold text-slate-700 hover:bg-slate-50 active:scale-95 transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
                 title="출발 시각 다시 선택"
               >
                 <span>시간변경</span>
@@ -306,7 +306,7 @@ export const PredictionResultSheet: React.FC<PredictionResultSheetProps> = ({
                     {/* Left Column: Fixed-width Time Label (오후 3:30, 1시간 후, 2시간 후) */}
                     <div className="w-20 sm:w-24 shrink-0 text-left">
                       <span
-                        className={`text-xs sm:text-sm leading-none ${isBaseRow
+                        className={`text-sm leading-none ${isBaseRow
                             ? 'font-bold text-slate-800'
                             : 'font-semibold text-slate-400'
                           }`}
@@ -357,7 +357,7 @@ export const PredictionResultSheet: React.FC<PredictionResultSheetProps> = ({
                           {/* Relative Difference Text (e.g., -7분, -12분, -17분, -20분) right aligned above bar end */}
                           {diffText && (
                             <div
-                              className="absolute -top-4 font-bold text-xs leading-none z-20 pointer-events-none transition-all duration-300"
+                              className="absolute -top-4 font-bold text-sm leading-none z-20 pointer-events-none transition-all duration-300"
                               style={{ left: `${Math.max(20, gaugePercent - 6)}%` }}
                             >
                               <span className={diffTextColor}>{diffText}</span>

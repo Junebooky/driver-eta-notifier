@@ -2021,3 +2021,203 @@ SELECT * FROM cockpit.presets;
    - 퀵 액션 바가 **`차량체크` $\rightarrow$ `즐겨찾기` $\rightarrow$ `주유` $\rightarrow$ `항공편`** 순서로 오차 없이 정렬됨을 확인.
 3. **코발트 블루 인터랙션 검증**:
    - 마우스 호버 및 액티브 시 코발트 블루(`#1E60F3`) 테두리, 배경 색조, 그림자(`rgba(30,96,243,0.18)`), 상향 모션이 유려하게 동작하고, 각 컬럼 탭 시 해당 모달이 정상 호출됨을 확인.
+
+---
+
+## 43. 차량체크 지능화 및 유류비 정산 엔진 구축 (Fallback Pipeline, Opinet 3km Trimmed Mean, 호차별 프로필 격리) (2026-09-28)
+
+### 43.1 추진 배경 및 목적
+1. **차종/유종 불확실성 해소 (Fallback Pipeline)**:
+   - 기사가 차량의 유종(휘발유 vs 경유)을 즉시 인지하지 못하더라도 차종명 알파벳(`520i`=휘발유, `520d`=경유)으로 자동 매핑.
+   - 가솔린/디젤이 혼재된 다목적 차량(카니발, 스타리아 등)을 위한 2분할 간편 칩(`[⛽ 휘발유] [🛢️ 경유]`) 및 자동 감지 상태 뱃지 제공.
+   - 계기판 사진 등록 시 Gemini Vision이 타코미터 레드존(디젤: 4,000~5,200 RPM vs 가솔린: 5,800~7,500 RPM)을 판독하여 유종 자동 감지.
+   - 끝까지 유종을 확정할 수 없는 경우, 과소 청구 방지 및 보수적 정산을 위해 '휘발유' 단가를 기본 안전 마진으로 채택.
+2. **오피넷(Opinet) 반경 3km 이상치 절사 주유비 계산기**:
+   - 현 위치 또는 반납지 반경 3km 내 주유소 가격 중 서울 시내 극단적으로 비싼 상위 15% 초고가 주유소를 자동 제외(Trimmed Mean)하여 합리적인 기준 단가 산출.
+   - 반납 시 부족한 DTE를 채우기 위한 권장 주유 금액을 도심 정체 안전 계수(1.15배)를 반영하고, 5천원/1만원 단위 원터치 칩(예: `[25,000원(권장)]`)으로 자동 산출.
+   - 반납 카카오톡 전송 보고서에 유류비 정산 내역(`• 유류비 정산 : 25,000원 (DTE -296 km 권장 주유 / 휘발유 1,650원)`) 포함 여부를 체크박스로 원터치 제어.
+3. **호차별 승객명 및 프로필 격리**:
+   - 의전 행사 차량별(`cockpit_driver_profile_${vehicleNo}`)로 승객명, 차종, 유종, 프로필 설정을 개별 격리 저장하여 호차 전환 시 승객 정보가 뒤섞이지 않도록 보장.
+4. **No-DB / Pure Client-Side 원칙 준수**:
+   - Supabase 테이블 생성 및 백엔드 쿼리를 일체 배제하고 React State 및 브라우저 `localStorage`만으로 완결.
+
+---
+
+### 43.2 핵심 구현 내역
+
+#### [태스크 1] 유류비 정산 수학 엔진 및 Fallback Pipeline 모듈 신설 ([`utils/fuelCalculation.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/utils/fuelCalculation.ts))
+1. **차종 알파벳 및 키워드 기반 유종 판별 (`resolveFuelTypeFromModel`)**:
+   - `520d`, `e220d`, `c220d`, `320d`, `tdi`, `crdi` 등 디젤 접미사 ➔ `diesel`.
+   - `520i`, `e300`, `c200`, `g80`, `g90`, `petrol` 등 가솔린 접미사 ➔ `gasoline`.
+   - 카니발, 스타리아 등 혼재 차종 ➔ 2분할 칩 확인 권장 안내 및 초기값 할당.
+   - 미확인 시 ➔ 보수적 정산을 위한 휘발유 기본 채택 (`fallback_margin`).
+2. **타코미터 레드존 RPM 판별 (`resolveFuelTypeFromTachometer`)**:
+   - 레드존 $\le$ 5,200 RPM ➔ `diesel`.
+   - 레드존 $\ge$ 5,500 RPM ➔ `gasoline`.
+3. **오피넷 3km 상위 15% 이상치 절사 평균 (`calculateTrimmedMeanPrices`)**:
+   - 수집된 주유소 가격을 오름차순 정렬 후 상위 15%(`Math.floor(prices.length * 0.15)`)를 배제한 Trimmed Mean 단가 계산.
+4. **도심 안전 계수 반영 권장 주유비 산출 (`calculateRecommendedRefueling`)**:
+   - 부족 DTE에 따른 소모량(L) 역산 (디젤: 11.5 km/L, 가솔린: 9.8 km/L).
+   - 기준 유류비 $\times$ 도심 정체 안전 계수(1.15배) 산출 후 5,000원 단위 올림 처리(`Math.ceil(adjustedCost / 5000) * 5000`).
+   - 추천값 전후 5천원/1만원 단위 원터치 칩 리스트 생성.
+
+---
+
+#### [태스크 2] Gemini Vision 계기판 OCR & 타코미터 레드존 판독 API ([`app/api/inspect-dashboard/route.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/api/inspect-dashboard/route.ts))
+- 계기판 사진 Base64를 수신하여 Gemini Vision(`gemini-3.8-flash` / `@google/genai`)에 전송.
+- 누적 주행거리(ODO), 주행가능거리(DTE), 타코미터 레드존 RPM 수치를 구조화된 JSON으로 추출.
+- API 키 부재 또는 분석 실패 시에도 서비스가 중단되지 않는 정규식 Fallback 탑재.
+
+---
+
+#### [태스크 3] 오피넷 API 절사 평균 탑재 ([`app/api/gas-stations/route.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/api/gas-stations/route.ts))
+- 반경 3km 내 주유소 목록 반환 시 `trimmedMean` (휘발유, 경유, 고급유 단가 및 표본/절사 수)을 함께 연산하여 응답 페이로드에 포함.
+
+---
+
+#### [태스크 4] 차량 점검 모달 인풋 3열 개편 및 유류비 정산 계산기 탑재 ([`components/VehicleInspectionModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/VehicleInspectionModal.tsx))
+1. **기본 정보 3열 그리드**:
+   - 차량호차, 차량번호, 차종(유종자동 연동) 3열 인풋 배치.
+2. **수령(Pickup) 탭**:
+   - Gemini Vision OCR 분석 상태 인디케이터 및 인식 결과 배너 탑재.
+   - `[⛽ 휘발유] [🛢️ 경유]` 2분할 퀵 선택 칩과 감지 근거 뱃지 상시 노출.
+3. **일일(Daily) & 반납(Return) 탭**:
+   - 계기판 사진 등록 시 OCR 자동 입력 배너 연동.
+4. **반납(Return) 탭 3km 절사 유류비 정산 계산기**:
+   - 수령 대비 반납 DTE 증감 상태 뱃지 (`-296 km 부족 (주유/정산 대상)`).
+   - 2분할 유종 토글 칩 및 3km 절사평균 단가 실시간 연동.
+   - 부족 소모량(L), 3km 단가, 도심 안전계수 1.15배 반영 실정산 추산액 표시.
+   - 원터치 권장 주유 금액 칩 그리드 (`[25,000원(권장)]` 코발트 블루 강조).
+   - 반납 카카오톡 보고서 유류비 정산 내역 포함 체크박스 연동.
+
+---
+
+#### [태스크 5] 카카오톡 반납 보고서 서식 확장 ([`utils/vehicleReport.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/utils/vehicleReport.ts))
+- 반납 보고서 생성 시 유류비 정산 내역이 활성화된 경우 `• 유류비 정산 : 25,000원 (DTE -296 km 권장 주유 / 휘발유 1,650원)` 행을 표준 서식 규격에 맞춰 자동 삽입.
+
+---
+
+#### [태스크 6] 호차별 승객명 및 프로필 로컬 스토리지 격리 ([`components/ProfileModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ProfileModal.tsx), [`hooks/useDriverProfile.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/hooks/useDriverProfile.ts), [`types/index.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/types/index.ts))
+1. **격리 키 규격 준수**:
+   - `cockpit_driver_profile_${vehicleNo}` (예: `cockpit_driver_profile_4호차`) 키로 각 호차의 승객명, 차종, 유종, 비상연락처를 독립적으로 분리 저장 및 로드.
+2. **ProfileModal 연동**:
+   - 차종 인풋 및 2분할 유종 선택 칩(`[⛽ 휘발유] [🛢️ 경유]`) 탑재.
+   - 상단 차량 호차 선택 시 해당 호차의 격리 프로필을 즉시 불러와 동기화.
+
+---
+
+### 43.3 검증 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 컴파일 에러 **0건** 완료.
+2. **Fallback Pipeline 검증**:
+   - `520d` ➔ 경유, `520i` ➔ 휘발유, `카니발/스타리아` ➔ 2분할 칩 안내, 미확인 ➔ 휘발유 안전 마진으로 완벽 분기 확인.
+3. **Trimmed Mean 15% 이상치 절사 검증**:
+   - 극단적 고가 주유소가 제외된 공정 평균 단가로 DTE 부족분 주유비가 도심 안전 계수(1.15배) 및 5천원 단위 올림으로 정확히 계산됨을 확인.
+4. **호차별 프로필 격리 검증**:
+   - `cockpit_driver_profile_${vehicleNo}`를 통해 호차 간 승객명 및 차량 정보가 침범 없이 완전히 격리 보존됨을 확인.
+
+---
+
+## 44. 상단 4열 퀵 액션 바 독립 분리 및 프리셋 시인성 고도화 (2026-09-28)
+
+### 44.1 추진 배경 및 목적
+1. **퀵 액션 바와 자주 가는 목적지의 이중 테두리 결합 문제 해소**:
+   - `PresetButtons.tsx` 내부 카드 상단에 4열 퀵 액션 바가 중첩 렌더링되면서 외부 흰색 카드와 내부 회색 배경(`bg-slate-50/70`) 및 이중 테두리가 겹쳐 발생하는 시각적 노이즈를 근본적으로 해결.
+2. **독립 퀵 액션 바 컴포넌트(`QuickActionBar.tsx`) 분리**:
+   - 순수 흰색 평면 단일 카드(`w-full bg-white border border-slate-100/80 rounded-2xl p-4 shadow-[0_8px_25px_rgba(30,96,243,0.06)] select-none`)로 완전 분리.
+3. **'즐겨찾기' 아이콘 교체 및 라벨 타이포그래피 정돈**:
+   - 두 번째 액션 버튼인 '즐겨찾기'의 아이콘을 슬라이더(`SlidersHorizontal`)에서 공식 지침 규격인 `lucide-map-pin-plus` SVG로 교체.
+   - 4개 버튼(`차량체크`, `즐겨찾기`, `주유`, `항공편`) 하단 라벨 텍스트의 폰트 굵기를 `font-bold`에서 정갈한 `font-medium`으로 조정.
+4. **'자주 가는 목적지' 독립 카드 복원 및 목적지 명칭 폰트 크기 상향**:
+   - `PresetButtons.tsx`에서 퀵 액션 바 코드를 전면 적출하여 순수 목적지 캐러셀 카드로 복원.
+   - 카드 내부의 목적지 명칭 텍스트(`title`) 폰트 크기를 `text-xs`에서 `text-sm font-bold text-slate-800`으로 상향하고, 3열 레이아웃 `truncate` 및 `min-h-[58px]` 규격을 엄수.
+
+---
+
+### 44.2 핵심 구현 내역
+
+#### [태스크 1] 4열 퀵 액션 바 독립 컴포넌트 분리 (`components/QuickActionBar.tsx`, `app/page.tsx`)
+1. **독립 컴포넌트 신설 (`QuickActionBar.tsx`)**:
+   - 단일 카드 래퍼 규격 적용:
+     `<div className="w-full bg-white border border-slate-100/80 rounded-2xl p-4 shadow-[0_8px_25px_rgba(30,96,243,0.06)] select-none">`
+   - 내부의 불필요한 회색 배경(`bg-slate-50/70`)과 내부 외곽선(`border border-slate-200/80 rounded-2xl`)을 전면 제거하여 단정한 흰색 단일 평면 카드 완성.
+2. **`app/page.tsx` 마운트 순서 재배열**:
+   - 1. `OriginDestinationSelector` (출발/도착 카드)
+   - 2. `QuickActionBar` (독립 4열 퀵 액션 바: 차량체크 → 즐겨찾기 → 주유 → 항공편)
+   - 3. `PresetButtons` (자주 가는 목적지 독립 카드)
+
+---
+
+#### [태스크 2] '즐겨찾기' 아이콘 교체 및 라벨 폰트 굵기 조정 (`components/QuickActionBar.tsx`)
+1. **'즐겨찾기' 아이콘**:
+   - `SlidersHorizontal`을 제거하고 `lucide-map-pin-plus` 정밀 SVG 패스(핀 + 서클 + 플러스) 적용.
+2. **라벨 타이포그래피**:
+   - `text-xs font-medium text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors`로 일원화.
+
+---
+
+#### [태스크 3] '자주 가는 목적지' 카드 복원 및 명칭 14px(`text-sm`) 상향 (`components/PresetButtons.tsx`)
+1. **퀵 액션 바 적출 및 단독 카드 복원**:
+   - 상단 퀵 액션 바 코드 및 불필요한 `lucide-react` 아이콘(`SlidersHorizontal`, `Fuel`, `Plane`, `ClipboardCheck`) 임포트 정리.
+2. **목적지 명칭 가독성 상향**:
+   - 일반 거점: `text-sm font-bold text-slate-800 tracking-tight truncate w-full`
+   - 자택 거점(등록/미등록 공통): `text-sm font-bold tracking-tight truncate`
+   - 드래그 중인 플로팅 칩: `text-sm font-bold text-slate-900 tracking-tight`
+   - 3열 그리드에서 텍스트 오버플로우 방지를 위한 `truncate` 및 `min-h-[58px]` 규격 완벽 보존.
+
+---
+
+### 44.3 검증 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 컴파일 에러 **0건 (Exit code 0)** 통과.
+2. **이중 박스 제거 및 시각적 위계 검증**:
+   - 출발/도착 카드 아래에 `QuickActionBar`가 독립된 흰색 단일 카드로 깔끔하게 자리잡고, 그 아래에 '자주 가는 목적지' 카드가 분리되어 시각적 밀도와 여백이 이상적으로 정돈됨을 확인.
+3. **아이콘 및 폰트 굵기/크기 검증**:
+   - '즐겨찾기'에 핀-플러스 아이콘이 정상 렌더링되고, 4개 라벨이 `font-medium`으로 부드럽게 표현되며, 자주 가는 목적지 명칭이 `text-sm`으로 시원하고 또렷하게 출력됨을 확인.
+
+---
+
+## 45. 전사 폰트 가독성 고도화: 코드베이스 내 초소형 폰트(text-xs, 12px) 전면 퇴출 및 text-sm(14px) 상향 (2026-09-28)
+
+### 45.1 추진 배경 및 목적
+1. **의전 드라이버 주행 환경에서의 초소형(12px) 폰트 판독성 한계 극복**:
+   - 장갑 착용 및 거치대 환경에서 운전석 시야 거리가 확보될 때 12px(`text-xs`) 폰트는 판독 피로도가 높음.
+   - 서비스 철학인 "시원한 폰트 가독성"에 맞춰 코드베이스 전반의 모든 폰트 사이즈를 최소 14px(`text-sm`) 이상으로 상향 평준화.
+2. **전체 컴포넌트 일괄 탐색 및 무결점 치환**:
+   - 총 21개 컴포넌트 및 페이지 파일에서 177개소의 `text-xs`를 `text-sm`으로 전면 치환.
+
+### 45.2 핵심 구현 내역
+1. **타깃 파일 및 치환 건수**:
+   - `components/VehicleInspectionModal.tsx`: 38건
+   - `components/ScheduleTab.tsx`: 18건
+   - `components/FlightModal.tsx`: 17건
+   - `components/ProfileModal.tsx`: 16건
+   - `components/CustomPresetModal.tsx`: 15건
+   - `components/DepartureTimePickerModal.tsx`: 11건
+   - `components/GasStationModal.tsx`: 10건
+   - `components/LocationSearchModal.tsx`: 9건
+   - `components/ScheduleCard.tsx`: 6건
+   - `components/AdminPinModal.tsx`: 5건
+   - `components/QuickActionBar.tsx`: 4건
+   - `components/PresetButtons.tsx`: 4건
+   - `components/A2HSBanner.tsx`: 4건
+   - `components/PredictionResultSheet.tsx`: 4건
+   - `components/RouteInfoCard.tsx`: 3건
+   - `components/Header.tsx`: 3건
+   - `components/ScheduleFormModal.tsx`: 2건
+   - `components/ReportTemplateSelector.tsx`: 2건
+   - `components/EditScheduleModal.tsx`: 2건
+   - `app/page.tsx`: 2건
+   - `app/tmap/page.tsx`: 2건
+   - **총계**: 21개 파일, 177개 치환 완료 (`text-xs sm:text-sm` 중복 패턴 정리 포함)
+2. **검증**:
+   - 코드베이스 내 `text-xs` 및 `font-xs` 잔존 여부 전수 검사 결과: **0건**.
+
+### 45.3 검증 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 컴파일 에러 **0건 (Exit code 0)** 통과.
+2. **모바일 콕핏 시인성 검증**:
+   - 모든 뱃지, 폼 라벨, 서브 텍스트, 액션 버튼의 글자 크기가 14px(`text-sm`)로 일관되게 확대되어 시각적 가독성 극대화 확인.
+
+
+

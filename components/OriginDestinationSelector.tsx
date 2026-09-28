@@ -43,11 +43,10 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
               onOpenSearchModal('origin');
             }
           }}
-          className={`flex-1 min-w-0 w-full p-3 rounded-2xl border text-left cursor-pointer transition-all duration-150 active:scale-95 ${
-            selectionTarget === 'origin'
-              ? 'bg-slate-50/80 text-slate-800 border-slate-300/90 ring-2 ring-slate-200/60 shadow-xs'
-              : 'bg-white border-slate-200/80 hover:border-slate-300'
-          }`}
+          className={`flex-1 min-w-0 w-full p-3 rounded-2xl border text-left cursor-pointer transition-all duration-150 active:scale-95 ${selectionTarget === 'origin'
+            ? 'bg-slate-50/80 text-slate-800 border-slate-300/90 ring-2 ring-slate-200/60 shadow-xs'
+            : 'bg-white border-slate-200/80 hover:border-slate-300'
+            }`}
           title="출발지 검색 및 변경"
         >
           <div className="flex items-center justify-between w-full">
@@ -56,21 +55,19 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
             </span>
             <span className="text-[10px] text-slate-400 font-medium flex items-center gap-0.5 group-hover:text-slate-600">
               <Search className="w-3 h-3 text-slate-400" />
-              <span>검색</span>
+
             </span>
           </div>
           <div
-            className={`text-sm font-bold truncate mt-1.5 w-full ${
-              selectionTarget === 'origin' ? 'text-slate-900' : 'text-slate-700'
-            }`}
+            className={`text-base font-bold truncate mt-1.5 w-full ${selectionTarget === 'origin' ? 'text-slate-900' : 'text-slate-700'
+              }`}
             title={origin.name}
           >
             {origin.shortName}
           </div>
           <div
-            className={`text-[11px] truncate mt-0.5 font-normal w-full ${
-              selectionTarget === 'origin' ? 'text-slate-500' : 'text-slate-400'
-            }`}
+            className={`text-[11px] truncate mt-0.5 font-normal w-full ${selectionTarget === 'origin' ? 'text-slate-500' : 'text-slate-400'
+              }`}
             title={origin.address || origin.name}
           >
             {origin.address || origin.name}
@@ -101,11 +98,10 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
               onOpenSearchModal('destination');
             }
           }}
-          className={`flex-1 min-w-0 w-full p-3 rounded-2xl text-left cursor-pointer transition-all duration-150 active:scale-95 ${
-            selectionTarget === 'destination'
-              ? 'bg-white border-2 border-[#1E60F3] shadow-sm shadow-blue-500/10'
-              : 'bg-white border border-slate-200/80 hover:border-slate-300'
-          }`}
+          className={`flex-1 min-w-0 w-full p-3 rounded-2xl text-left cursor-pointer transition-all duration-150 active:scale-95 ${selectionTarget === 'destination'
+            ? 'bg-white border-2 border-[#1E60F3] shadow-sm shadow-blue-500/10'
+            : 'bg-white border border-slate-200/80 hover:border-slate-300'
+            }`}
           title="목적지 검색 및 변경"
         >
           <div className="flex items-center justify-between w-full">
@@ -114,11 +110,11 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
             </span>
             <span className="text-[10px] text-blue-500 font-medium flex items-center gap-0.5">
               <Search className="w-3 h-3 text-[#1E60F3]" />
-              <span>검색</span>
+
             </span>
           </div>
           <div
-            className="text-sm font-bold truncate mt-1.5 w-full text-slate-900"
+            className="text-base font-bold truncate mt-1.5 w-full text-slate-900"
             title={destination.name}
           >
             {destination.shortName}
@@ -145,7 +141,7 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
         </div>
 
         {/* Right: 4 Quick Utility Icon Buttons (Dark Monochrome on White) */}
-        <div className="flex items-center gap-1.5 shrink-0 ml-2">
+        {/* <div className="flex items-center gap-1.5 shrink-0 ml-2">
           <button
             type="button"
             onClick={() => {
@@ -197,7 +193,7 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
           >
             <MapPinPlus className="w-4 h-4 text-slate-700" />
           </button>
-        </div>
+        </div> */}
       </div>
     </div>
   );

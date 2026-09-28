@@ -60,7 +60,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
 
         <div className="flex items-center gap-1.5 shrink-0">
           {/* Pure Single Pickup Time Badge */}
-          <div className="px-2.5 py-1 rounded-full text-xs font-black bg-slate-900 text-white tracking-tight shadow-xs">
+          <div className="px-2.5 py-1 rounded-full text-sm font-black bg-slate-900 text-white tracking-tight shadow-xs">
             {formatPickupTimeBadge(item)}
           </div>
 
@@ -103,7 +103,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
           </span>
           {item.origin_address && (
             <span
-              className="text-xs text-slate-400 font-normal min-w-0 flex-1 truncate max-w-[180px]"
+              className="text-sm text-slate-400 font-normal min-w-0 flex-1 truncate max-w-[180px]"
               title={item.origin_address}
             >
               {item.origin_address}
@@ -126,7 +126,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
           </span>
           {item.destination_address && (
             <span
-              className="text-xs text-slate-400 font-normal min-w-0 flex-1 truncate max-w-[180px]"
+              className="text-sm text-slate-400 font-normal min-w-0 flex-1 truncate max-w-[180px]"
               title={item.destination_address}
             >
               {item.destination_address}
@@ -143,9 +143,8 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
             onEdit(item);
           }
         }}
-        className={`bg-slate-50/80 rounded-xl p-3 space-y-1.5 text-xs text-slate-700 border border-slate-100 transition-colors ${
-          onEdit ? 'hover:bg-slate-100/90 cursor-pointer' : ''
-        }`}
+        className={`bg-slate-50/80 rounded-xl p-3 space-y-1.5 text-sm text-slate-700 border border-slate-100 transition-colors ${onEdit ? 'hover:bg-slate-100/90 cursor-pointer' : ''
+          }`}
         title={onEdit ? '클릭하여 정보 수정' : undefined}
       >
         {/* Passenger */}
@@ -190,7 +189,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
               haptics.lightTap();
               onSelectForCockpit(item);
             }}
-            className="text-xs font-bold text-slate-600 hover:text-[#1E60F3] flex items-center gap-0.5 cursor-pointer transition-colors py-1.5 px-2 -ml-2 rounded-lg hover:bg-slate-100 min-w-0"
+            className="text-sm font-bold text-slate-600 hover:text-[#1E60F3] flex items-center gap-0.5 cursor-pointer transition-colors py-1.5 px-2 -ml-2 rounded-lg hover:bg-slate-100 min-w-0"
             title="관제 대시보드에 출발/도착지 설정"
           >
             <span className="truncate">관제 연동</span>

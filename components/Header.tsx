@@ -60,7 +60,7 @@ export const Header: React.FC<HeaderProps> = ({
               haptics.lightTap();
               onOpenProfileModal();
             }}
-            className="flex items-center space-x-1.5 bg-white px-3 py-1.5 rounded-full border border-slate-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.04)] text-xs font-bold text-slate-800 cursor-pointer hover:bg-slate-50 active:scale-95 transition-all min-w-0 max-w-full"
+            className="flex items-center space-x-1.5 bg-white px-3 py-1.5 rounded-full border border-slate-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.04)] text-sm font-bold text-slate-800 cursor-pointer hover:bg-slate-50 active:scale-95 transition-all min-w-0 max-w-full"
             title={`${profile.vehicleNo || ''} ${profile.driverName || ''} • 담당승객: ${profile.passengerName || '미지정'}`.trim()}
           >
             <Car className="w-3.5 h-3.5 text-[#1E60F3] fill-[#1E60F3] shrink-0" />
@@ -108,7 +108,7 @@ export const Header: React.FC<HeaderProps> = ({
               haptics.lightTap();
               onSelectNavi('kakao');
             }}
-            className={`w-9 h-9 rounded-full bg-[#FEE500] border border-amber-300 text-[#3C1E1E] font-black text-xs shadow-xs flex items-center justify-center transition-all duration-100 active:scale-90 cursor-pointer ${profile.defaultNavi === 'kakao'
+            className={`w-9 h-9 rounded-full bg-[#FEE500] border border-amber-300 text-[#3C1E1E] font-black text-sm shadow-xs flex items-center justify-center transition-all duration-100 active:scale-90 cursor-pointer ${profile.defaultNavi === 'kakao'
                 ? 'ring-2 ring-amber-400 scale-105 shadow-[0_4px_12px_rgba(254,229,0,0.35)] z-10'
                 : 'opacity-60 hover:opacity-100'
               }`}
@@ -124,7 +124,7 @@ export const Header: React.FC<HeaderProps> = ({
               haptics.lightTap();
               onSelectNavi('naver');
             }}
-            className={`w-9 h-9 rounded-full bg-[#03C75A] border border-emerald-400 text-white font-black text-xs shadow-xs flex items-center justify-center transition-all duration-100 active:scale-90 cursor-pointer ${profile.defaultNavi === 'naver'
+            className={`w-9 h-9 rounded-full bg-[#03C75A] border border-emerald-400 text-white font-black text-sm shadow-xs flex items-center justify-center transition-all duration-100 active:scale-90 cursor-pointer ${profile.defaultNavi === 'naver'
                 ? 'ring-2 ring-emerald-500 scale-105 shadow-[0_4px_12px_rgba(3,199,90,0.35)] z-10'
                 : 'opacity-60 hover:opacity-100'
               }`}

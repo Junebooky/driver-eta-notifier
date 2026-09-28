@@ -126,7 +126,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
               placeholder="예: 픽업 09:50, 픽업 09:00"
               className="w-full px-4 py-3 rounded-xl border border-slate-200 text-lg font-semibold text-slate-900 placeholder:text-base placeholder:text-slate-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 outline-none transition-all"
             />
-            <p className="text-xs text-slate-400 font-medium">
+            <p className="text-sm text-slate-400 font-medium">
               배차표 카드 상단에 노출되는 픽업 시간을 지정합니다.
             </p>
           </div>
@@ -159,7 +159,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
               placeholder="예: SQ 612 또는 SQ 601 (16:45 출국)"
               className="w-full px-4 py-3 rounded-xl border border-slate-200 text-lg font-semibold text-slate-900 placeholder:text-base placeholder:text-slate-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 outline-none transition-all uppercase"
             />
-            <p className="text-xs text-slate-400 font-medium">
+            <p className="text-sm text-slate-400 font-medium">
               항공편명이 입력되면 카드 하단에 항공편 실시간 조회 버튼이 자동 활성화됩니다.
             </p>
           </div>

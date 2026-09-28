@@ -32,7 +32,7 @@ function TmapLauncherContent() {
         <Navigation className="w-8 h-8" />
       </div>
 
-      <div className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-bold mb-3">
+      <div className="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm font-bold mb-3">
         <span>VIP PROTOCOL ROUTE</span>
       </div>
 
@@ -63,7 +63,7 @@ function TmapLauncherContent() {
 
         <Link
           href="/"
-          className="w-full py-3.5 px-4 bg-zinc-900 hover:bg-zinc-850 active:scale-95 text-zinc-300 hover:text-white font-bold text-xs rounded-2xl border border-zinc-800 flex items-center justify-center space-x-2 transition-all"
+          className="w-full py-3.5 px-4 bg-zinc-900 hover:bg-zinc-850 active:scale-95 text-zinc-300 hover:text-white font-bold text-sm rounded-2xl border border-zinc-800 flex items-center justify-center space-x-2 transition-all"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>웹 관제 상황실로 이동</span>

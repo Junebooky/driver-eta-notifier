@@ -160,7 +160,7 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
         >
           {/* Quick Date Chips */}
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+            <label className="text-sm font-bold text-slate-700 flex items-center gap-1.5">
               <Calendar className="w-3.5 h-3.5 text-[#1E60F3]" />
               <span>날짜 선택</span>
             </label>
@@ -175,7 +175,7 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
                   key={label}
                   type="button"
                   onClick={() => handleQuickDate(offset)}
-                  className="flex-1 py-2 rounded-xl text-xs font-bold border border-slate-200 hover:border-[#1E60F3] hover:bg-blue-50/40 text-slate-700 hover:text-[#1E60F3] transition-all cursor-pointer shadow-2xs active:scale-95"
+                  className="flex-1 py-2 rounded-xl text-sm font-bold border border-slate-200 hover:border-[#1E60F3] hover:bg-blue-50/40 text-slate-700 hover:text-[#1E60F3] transition-all cursor-pointer shadow-2xs active:scale-95"
                 >
                   {label}
                 </button>
@@ -200,7 +200,7 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
 
           {/* Quick Time Chips */}
           <div className="space-y-1.5 pt-1">
-            <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+            <label className="text-sm font-bold text-slate-700 flex items-center gap-1.5">
               <Clock className="w-3.5 h-3.5 text-[#1E60F3]" />
               <span>시간 선택</span>
             </label>
@@ -209,28 +209,28 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
               <button
                 type="button"
                 onClick={handleSetNow}
-                className="flex-1 py-2 rounded-xl text-xs font-bold border border-slate-200 hover:border-[#1E60F3] hover:bg-blue-50/40 text-slate-700 hover:text-[#1E60F3] transition-all cursor-pointer shadow-2xs active:scale-95"
+                className="flex-1 py-2 rounded-xl text-sm font-bold border border-slate-200 hover:border-[#1E60F3] hover:bg-blue-50/40 text-slate-700 hover:text-[#1E60F3] transition-all cursor-pointer shadow-2xs active:scale-95"
               >
                 지금
               </button>
               <button
                 type="button"
                 onClick={() => handleAddMinutes(10)}
-                className="flex-1 py-2 rounded-xl text-xs font-bold border border-slate-200 hover:border-[#1E60F3] hover:bg-blue-50/40 text-slate-700 hover:text-[#1E60F3] transition-all cursor-pointer shadow-2xs active:scale-95"
+                className="flex-1 py-2 rounded-xl text-sm font-bold border border-slate-200 hover:border-[#1E60F3] hover:bg-blue-50/40 text-slate-700 hover:text-[#1E60F3] transition-all cursor-pointer shadow-2xs active:scale-95"
               >
                 +10분
               </button>
               <button
                 type="button"
                 onClick={() => handleAddMinutes(30)}
-                className="flex-1 py-2 rounded-xl text-xs font-bold border border-slate-200 hover:border-[#1E60F3] hover:bg-blue-50/40 text-slate-700 hover:text-[#1E60F3] transition-all cursor-pointer shadow-2xs active:scale-95"
+                className="flex-1 py-2 rounded-xl text-sm font-bold border border-slate-200 hover:border-[#1E60F3] hover:bg-blue-50/40 text-slate-700 hover:text-[#1E60F3] transition-all cursor-pointer shadow-2xs active:scale-95"
               >
                 +30분
               </button>
               <button
                 type="button"
                 onClick={() => handleAddMinutes(60)}
-                className="flex-1 py-2 rounded-xl text-xs font-bold border border-slate-200 hover:border-[#1E60F3] hover:bg-blue-50/40 text-slate-700 hover:text-[#1E60F3] transition-all cursor-pointer shadow-2xs active:scale-95"
+                className="flex-1 py-2 rounded-xl text-sm font-bold border border-slate-200 hover:border-[#1E60F3] hover:bg-blue-50/40 text-slate-700 hover:text-[#1E60F3] transition-all cursor-pointer shadow-2xs active:scale-95"
               >
                 +1시간
               </button>
@@ -255,14 +255,14 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
           {/* Selection Summary Card */}
           <div className="p-3.5 rounded-2xl bg-blue-50/60 border border-blue-200/80 flex items-center justify-between shadow-2xs">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-[#1E60F3] text-white flex items-center justify-center font-bold text-xs shadow-xs">
+              <div className="w-8 h-8 rounded-xl bg-[#1E60F3] text-white flex items-center justify-center font-bold text-sm shadow-xs">
                 예측
               </div>
               <div>
                 <p className="text-[11px] font-bold text-[#1E60F3]">
                   선택한 출발 시각
                 </p>
-                <p className="text-xs font-black text-slate-900">
+                <p className="text-sm font-black text-slate-900">
                   {dateLabel} {timeLabel}
                 </p>
               </div>
@@ -279,14 +279,14 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
               haptics.lightTap();
               onClose();
             }}
-            className="flex-1 py-3 rounded-xl bg-white border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-100 transition-all cursor-pointer"
+            className="flex-1 py-3 rounded-xl bg-white border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-100 transition-all cursor-pointer"
           >
             취소
           </button>
           <button
             type="button"
             onClick={handleConfirm}
-            className="flex-[2] py-3 rounded-xl bg-[#1E60F3] hover:bg-[#1650D6] text-white font-extrabold text-xs shadow-md shadow-blue-500/25 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-1.5"
+            className="flex-[2] py-3 rounded-xl bg-[#1E60F3] hover:bg-[#1650D6] text-white font-extrabold text-sm shadow-md shadow-blue-500/25 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-1.5"
           >
             <Check className="w-4 h-4 stroke-[2.5]" />
             <span>이 시간으로 예측 실행</span>

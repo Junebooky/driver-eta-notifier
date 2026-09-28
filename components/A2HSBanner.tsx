@@ -104,11 +104,11 @@ export const A2HSBanner: React.FC = () => {
           onClick={handleInstallClick}
           className="flex items-center space-x-2.5 min-w-0 flex-1 text-left cursor-pointer active:opacity-90 group"
         >
-          <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center text-white shrink-0 text-xs shadow-2xs group-hover:scale-105 transition-transform">
+          <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center text-white shrink-0 text-sm shadow-2xs group-hover:scale-105 transition-transform">
             <Zap className="w-4 h-4 fill-white text-white" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-black tracking-tight truncate flex items-center gap-1.5">
+            <p className="text-sm font-black tracking-tight truncate flex items-center gap-1.5">
               <span>⚡️ 터치하여 전용 앱으로 추가</span>
               <span className="text-[10px] bg-white/25 text-white font-extrabold px-1.5 py-0.2 rounded-full shrink-0">
                 원터치
@@ -160,7 +160,7 @@ export const A2HSBanner: React.FC = () => {
             </div>
 
             {/* 2-Step Action Guidance */}
-            <div className="space-y-2.5 text-xs">
+            <div className="space-y-2.5 text-sm">
               <div className="flex items-start space-x-3 bg-slate-50 p-3 rounded-2xl border border-slate-100">
                 <span className="w-6 h-6 rounded-full bg-blue-100 text-[#1E60F3] font-black flex items-center justify-center shrink-0 text-[11px]">
                   1
@@ -197,7 +197,7 @@ export const A2HSBanner: React.FC = () => {
                 haptics.lightTap();
                 setShowIOSModal(false);
               }}
-              className="w-full mt-4 py-3 bg-[#1E60F3] hover:bg-blue-600 text-white text-xs font-black rounded-xl shadow-md shadow-blue-500/20 active:scale-95 transition-transform cursor-pointer"
+              className="w-full mt-4 py-3 bg-[#1E60F3] hover:bg-blue-600 text-white text-sm font-black rounded-xl shadow-md shadow-blue-500/20 active:scale-95 transition-transform cursor-pointer"
             >
               확인
             </button>

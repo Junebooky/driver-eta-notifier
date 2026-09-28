@@ -7,6 +7,7 @@ import { Header } from '@/components/Header';
 import { ProfileModal, parseVehicleDetails } from '@/components/ProfileModal';
 import { AdminPinModal } from '@/components/AdminPinModal';
 import { OriginDestinationSelector } from '@/components/OriginDestinationSelector';
+import { QuickActionBar } from '@/components/QuickActionBar';
 import { PresetButtons } from '@/components/PresetButtons';
 import { CustomPresetModal } from '@/components/CustomPresetModal';
 import { RouteInfoCard } from '@/components/RouteInfoCard';
@@ -120,7 +121,7 @@ export default function Home() {
             });
           }
         }
-      } catch (e) {}
+      } catch (e) { }
       return list;
     };
 
@@ -171,7 +172,7 @@ export default function Home() {
       if (savedAdmin === 'true') {
         setIsAdmin(true);
       }
-    } catch (e) {}
+    } catch (e) { }
   }, []);
 
   // Supabase Fleet Architecture Driver Profile Sync (Only for onboarded profiles)
@@ -228,7 +229,7 @@ export default function Home() {
     setIsAdmin(status);
     try {
       localStorage.setItem(ADMIN_MODE_KEY, String(status));
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const handleOpenAddModal = () => {
@@ -297,7 +298,7 @@ export default function Home() {
             const deduped = deduplicatePresets(synced);
             try {
               localStorage.setItem(getPresetsStorageKey(currentVehicleNo), JSON.stringify(deduped));
-            } catch (e) {}
+            } catch (e) { }
             return deduped;
           });
         }
@@ -699,7 +700,7 @@ export default function Home() {
           <p className="text-sm font-semibold text-slate-800 mb-1.5 leading-snug">
             VIP 의전 관제 시스템에 접속하셨습니다.
           </p>
-          <p className="text-xs text-slate-500 font-normal leading-relaxed">
+          <p className="text-sm text-slate-500 font-normal leading-relaxed">
             원활한 이동 보고를 위해 드라이버 정보를 등록해 주세요.
           </p>
         </div>
@@ -726,7 +727,7 @@ export default function Home() {
 
         {/* Admin Mode Active Banner */}
         {isAdmin && (
-          <div className="px-4 py-2 bg-blue-600 text-white text-xs font-bold flex items-center justify-between shadow-sm animate-fade-in">
+          <div className="px-4 py-2 bg-blue-600 text-white text-sm font-bold flex items-center justify-between shadow-sm animate-fade-in">
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-blue-300 animate-ping" />
               관리자 모드 활성화 (전사 공통 거점 등록·삭제 가능)
@@ -745,9 +746,8 @@ export default function Home() {
           <div className="w-full bg-slate-100/90 p-1 rounded-full relative flex items-center select-none shadow-inner">
             {/* Sliding Indicator Pill */}
             <div
-              className={`w-[calc(50%-4px)] h-[calc(100%-8px)] absolute top-1 left-1 rounded-full bg-[#1E60F3] shadow-[0_4px_14px_rgba(30,96,243,0.35)] transition-transform duration-300 ease-out pointer-events-none transform ${
-                activeTab === 'drive' ? 'translate-x-0' : 'translate-x-full'
-              }`}
+              className={`w-[calc(50%-4px)] h-[calc(100%-8px)] absolute top-1 left-1 rounded-full bg-[#1E60F3] shadow-[0_4px_14px_rgba(30,96,243,0.35)] transition-transform duration-300 ease-out pointer-events-none transform ${activeTab === 'drive' ? 'translate-x-0' : 'translate-x-full'
+                }`}
             />
 
             {/* Drive Tab Button */}
@@ -760,16 +760,14 @@ export default function Home() {
               className="flex-1 py-2.5 rounded-full z-10 flex items-center justify-center space-x-2 cursor-pointer transition-colors duration-300"
             >
               <div
-                className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors duration-300 ${
-                  activeTab === 'drive' ? 'bg-white/20 text-white' : 'text-slate-400'
-                }`}
+                className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors duration-300 ${activeTab === 'drive' ? 'bg-white/20 text-white' : 'text-slate-400'
+                  }`}
               >
                 <Navigation className={`w-3 h-3 ${activeTab === 'drive' ? 'text-white fill-white' : 'text-slate-400'}`} />
               </div>
               <span
-                className={`text-sm tracking-tight transition-colors duration-300 ${
-                  activeTab === 'drive' ? 'text-white font-black' : 'text-slate-500 font-semibold'
-                }`}
+                className={`text-sm tracking-tight transition-colors duration-300 ${activeTab === 'drive' ? 'text-white font-black' : 'text-slate-500 font-semibold'
+                  }`}
               >
                 운행
               </span>
@@ -785,16 +783,14 @@ export default function Home() {
               className="flex-1 py-2.5 rounded-full z-10 flex items-center justify-center space-x-2 cursor-pointer transition-colors duration-300 relative"
             >
               <div
-                className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors duration-300 ${
-                  activeTab === 'schedule' ? 'bg-white/20 text-white' : 'text-slate-400'
-                }`}
+                className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors duration-300 ${activeTab === 'schedule' ? 'bg-white/20 text-white' : 'text-slate-400'
+                  }`}
               >
                 <Calendar className={`w-3 h-3 ${activeTab === 'schedule' ? 'text-white' : 'text-slate-400'}`} />
               </div>
               <span
-                className={`text-sm tracking-tight transition-colors duration-300 ${
-                  activeTab === 'schedule' ? 'text-white font-black' : 'text-slate-500 font-semibold'
-                }`}
+                className={`text-sm tracking-tight transition-colors duration-300 ${activeTab === 'schedule' ? 'text-white font-black' : 'text-slate-500 font-semibold'
+                  }`}
               >
                 스케줄
               </span>
@@ -822,8 +818,17 @@ export default function Home() {
               onOpenPresetModal={handleOpenAddModal}
             />
 
-            {/* 2. VIP Destination Presets & 4-Column Quick Action Bar */}
-            <PresetButtons
+            {/* 2. Standalone 4-Column Quick Action Bar */}
+            <QuickActionBar
+              onOpenInspectionModal={() => setIsInspectionModalOpen(true)}
+              onOpenPresetModal={handleOpenAddModal}
+              onOpenAddModal={handleOpenAddModal}
+              onOpenGasModal={() => setIsGasModalOpen(true)}
+              onOpenFlightModal={() => setIsFlightModalOpen(true)}
+            />
+
+            {/* 3. VIP Destination Presets (자주 가는 목적지 독립 카드) */}
+            {/* <PresetButtons
               presets={presets}
               homeLocation={profile.homeLocation}
               selectedOriginId={origin?.id}
@@ -840,7 +845,7 @@ export default function Home() {
               onEditPreset={handleOpenEditModal}
               onDeleteCustomPreset={handleDeleteCustomPreset}
               onReorderPresets={handleReorderPresets}
-            />
+            /> */}
 
             {/* 3. Route Estimation & ETA Status (Strictly Real-time TMAP) */}
             <RouteInfoCard
@@ -1032,7 +1037,7 @@ export default function Home() {
       <CustomPresetModal
         isOpen={isHomeModalOpen}
         onClose={() => setIsHomeModalOpen(false)}
-        onAddPreset={() => {}}
+        onAddPreset={() => { }}
         isHomeMode={true}
         onSaveHome={handleSaveHomeLocation}
       />

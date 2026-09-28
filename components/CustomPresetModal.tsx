@@ -727,7 +727,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
           {!isHomeMode ? (
             <div className="p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 bg-slate-50/70 space-y-3 shadow-2xs">
               <div className="flex items-center justify-between pb-1 border-b border-slate-200/60">
-                <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                <span className="text-sm font-black text-slate-800 flex items-center gap-1.5">
                   <Plus className="w-3.5 h-3.5 text-[#1E60F3] stroke-[2.5]" />
                   <span>{editingItem ? '거점 정보 수정' : '장소 등록'}</span>
                 </span>
@@ -744,7 +744,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
 
               {/* [태스크 2] 1. Real-time Search Bar (text-lg 인풋, w-5 h-5 돋보기, placeholder:text-base) */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
+                <label className="block text-sm font-bold text-slate-700 mb-1">
                   장소 검색 (실시간 추천)
                 </label>
                 <div className="relative">
@@ -784,7 +784,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                         <MapPin className="w-4 h-4 text-[#1E60F3] shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
                         <div className="min-w-0 flex-1">
                           <div className="text-base font-semibold text-slate-900 truncate">{poi.name}</div>
-                          <div className="text-xs text-slate-500 truncate mt-0.5">{poi.address}</div>
+                          <div className="text-sm text-slate-500 truncate mt-0.5">{poi.address}</div>
                         </div>
                       </div>
                     ))}
@@ -799,7 +799,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
               <form onSubmit={handleSubmit} className="space-y-2.5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                    <label className="block text-sm font-bold text-slate-700 mb-1">
                       거점 전체 명칭
                     </label>
                     <input
@@ -808,12 +808,12 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="검색 결과에서 거점을 선택하거나 입력하세요"
-                      className="w-full px-3.5 py-3 bg-white border border-slate-200 rounded-xl text-lg font-bold text-slate-900 placeholder:text-base placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3]"
+                      className="w-full px-3.5 py-3 bg-white border border-slate-200 rounded-xl text-base font-bold text-slate-900 placeholder:text-base placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3]"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                    <label className="block text-sm font-bold text-slate-700 mb-1">
                       버튼 표기 명칭 (최대 8자 권장)
                     </label>
                     <input
@@ -852,7 +852,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
             /* Home Mode Standalone Registration Form */
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                <label className="block text-sm font-bold text-slate-700 mb-1.5">
                   장소 검색 (실시간 추천)
                 </label>
                 <div className="relative">
@@ -892,7 +892,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                         <MapPin className="w-4 h-4 text-[#1E60F3] shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
                         <div className="min-w-0 flex-1">
                           <div className="text-base font-semibold text-slate-900 truncate">{poi.name}</div>
-                          <div className="text-xs text-slate-500 truncate mt-0.5">{poi.address}</div>
+                          <div className="text-sm text-slate-500 truncate mt-0.5">{poi.address}</div>
                         </div>
                       </div>
                     ))}
@@ -905,7 +905,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
 
               <form onSubmit={handleSubmit} className="space-y-3 pt-2 border-t border-slate-100">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                  <label className="block text-sm font-bold text-slate-700 mb-1">
                     자택 명칭
                   </label>
                   <input
@@ -918,7 +918,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                  <label className="block text-sm font-bold text-slate-700 mb-1">
                     자택 상세 주소
                   </label>
                   <input
@@ -935,14 +935,14 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                   <button
                     type="button"
                     onClick={onClose}
-                    className="w-1/3 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold active:scale-95 transition cursor-pointer"
+                    className="w-1/3 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold active:scale-95 transition cursor-pointer"
                   >
                     취소
                   </button>
                   <button
                     type="submit"
                     disabled={lat === null || !name.trim()}
-                    className="w-2/3 py-3 rounded-xl bg-[#1E60F3] hover:bg-[#1346D8] disabled:opacity-40 text-white text-xs font-black shadow-xs transition active:scale-[0.98] cursor-pointer"
+                    className="w-2/3 py-3 rounded-xl bg-[#1E60F3] hover:bg-[#1346D8] disabled:opacity-40 text-white text-sm font-black shadow-xs transition active:scale-[0.98] cursor-pointer"
                   >
                     자택 저장
                   </button>
@@ -956,7 +956,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
           {/* ========================================================= */}
           {!isHomeMode && (
             <div className="space-y-2 pt-2 border-t border-slate-100">
-              <div className="flex items-center justify-between text-xs font-bold text-slate-700 px-1">
+              <div className="flex items-center justify-between text-sm font-bold text-slate-700 px-1">
                 <span className="flex items-center gap-1.5">
                   <MapPin className="w-3.5 h-3.5 text-[#1E60F3]" />
                   <span>자주 가는 목적지 순서 변경</span>
@@ -997,7 +997,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                               >
                                 <div className="flex items-center justify-center gap-1.5 w-full min-w-0">
                                   <Home className="w-3.5 h-3.5 text-slate-500 shrink-0 group-hover:text-[#1E60F3]" />
-                                  <span className="text-xs font-bold tracking-tight text-slate-800 truncate">
+                                  <span className="text-sm font-bold tracking-tight text-slate-800 truncate">
                                     자택
                                   </span>
                                 </div>
@@ -1055,7 +1055,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                               )}
 
                               {/* Preset ShortName */}
-                              <span className="text-xs font-bold tracking-tight text-slate-800 group-hover:text-[#1E60F3] truncate w-full transition-colors">
+                              <span className="text-sm font-bold tracking-tight text-slate-800 group-hover:text-[#1E60F3] truncate w-full transition-colors">
                                 {preset.shortName}
                               </span>
 
@@ -1113,7 +1113,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
               top: `${pointerPos.y}px`,
             }}
           >
-            <span className="text-xs font-bold text-slate-900 tracking-tight whitespace-nowrap">
+            <span className="text-sm font-bold text-slate-900 tracking-tight whitespace-nowrap">
               {draggedPreset.shortName}
             </span>
           </div>
