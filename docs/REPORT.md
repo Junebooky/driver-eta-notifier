@@ -3108,6 +3108,43 @@ flowchart TD
    - **Case 2 (즐겨찾기 모달)**: `[즐겨찾기]` 모달 내 거점 리스트의 라벨에 배경 박스 없이 단정한 텍스트로 노출됨 (PASS).
    - **Case 3 (시인성 및 가독성 유지)**: 폰트 크기 및 색상(공통: slate-600, 개인: blue)이 왜곡되지 않고 카드 레이아웃과 조화롭게 유지됨 (PASS).
 
+---
+
+## 62. AdminPinModal 텍스트/플레이스홀더 정돈 및 거점 등록 표시 이름 추천 칩 제거
+
+### 62.1 배경 및 작업 목적
+1. **관리자 마스터 PIN 입력 모달 보안 및 시각적 정돈**:
+   - `AdminPinModal.tsx`의 인풋 플레이스홀더에 노출되던 기본 PIN 힌트(`(기본: 1010)`)를 제거하고 `PIN 4자리 입력` 단일 문구로 교체.
+   - 인풋 텍스트 크기를 `text-lg`에서 `text-base`로 정돈하여 다른 입력 폼과의 일관성을 유지.
+2. **거점 등록 시 '표시 이름' 추천 칩 제거**:
+   - `CustomPresetModal.tsx`에서 신규 거점 등록 시 '표시 이름' 아래에 노출되던 추천 태그(`recommendations`)를 제거하여, UI 번잡함을 해소하고 기사가 원하는 명칭만 깔끔하게 입력할 수 있도록 폼 영역 간소화.
+3. **스케줄 카드 경로 연동 라벨 업데이트 동기화**:
+   - `ScheduleCard.tsx` 내 `관제 연동` 액션 버튼 라벨을 `경로 적용`으로 직관화.
+
+---
+
+### 62.2 모듈별 상세 구현 내역
+
+#### 1. 관리자 마스터 PIN 입력 모달 플레이스홀더 및 폰트 크기 조정 ([`components/AdminPinModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/AdminPinModal.tsx))
+- `placeholder="PIN 4자리 입력"`으로 변경하여 보안성 확보.
+- `text-base` 적용으로 단정한 폼 타이포그래피 구현.
+
+#### 2. 거점 등록 '표시 이름' 추천 태그 칩 제거 ([`components/CustomPresetModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/CustomPresetModal.tsx))
+- `shortName` 인풋 하단의 `{recommendations.length > 1 && ...}` 블록을 완전히 삭제하여 깔끔한 레이아웃 구성.
+
+#### 3. 스케줄 카드 액션 버튼 명칭 갱신 ([`components/ScheduleCard.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ScheduleCard.tsx))
+- `관제 연동` ➔ `경로 적용` 라벨 변경 적용.
+
+---
+
+### 62.3 검증 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 TypeScript / ESLint 컴파일 에러 **0건 (Exit code 0)** 통과.
+2. **시나리오 검증 결과**:
+   - **Case 1 (AdminPinModal)**: 마스터 PIN 모달 진입 시 'PIN 4자리 입력'으로 단정하게 노출되고, 폰트 크기 `text-base` 적용 확인 (PASS).
+   - **Case 2 (표시 이름 추천 칩 제거)**: 장소 등록 폼에서 '표시 이름' 하위의 불필요한 추천 태그들이 노출되지 않고 간결한 폼 유지 확인 (PASS).
+
+
 
 
 

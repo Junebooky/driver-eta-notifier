@@ -152,12 +152,12 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
                 maxLength={4}
                 value={pin}
                 onChange={handlePinChange}
-                placeholder="PIN 4자리 입력 (기본: 1010)"
+                placeholder="PIN 4자리 입력"
                 autoFocus
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-center text-lg tracking-widest font-black focus:outline-none focus:border-[#1E60F3] focus:bg-white transition-all"
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-center text-base tracking-widest font-black focus:outline-none focus:border-[#1E60F3] focus:bg-white transition-all"
               />
               {errorMsg && (
-                <p className="text-[11px] font-bold text-rose-500 mt-1 text-center">
+                <p className="text-[11px] font-semibold text-rose-500 mt-1 text-center">
                   {errorMsg}
                 </p>
               )}

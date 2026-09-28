@@ -192,7 +192,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
             className="text-sm font-bold text-slate-600 hover:text-[#1E60F3] flex items-center gap-0.5 cursor-pointer transition-colors py-1.5 px-2 -ml-2 rounded-lg hover:bg-slate-100 min-w-0"
             title="관제 대시보드에 출발/도착지 설정"
           >
-            <span className="truncate">관제 연동</span>
+            <span className="truncate">경로 적용</span>
             <ChevronRight className="w-3.5 h-3.5 shrink-0" />
           </button>
         )}

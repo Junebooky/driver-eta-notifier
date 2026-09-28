@@ -1134,24 +1134,6 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                       maxLength={12}
                       className="w-full px-3.5 py-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-900 placeholder:text-sm placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3]"
                     />
-                    {recommendations.length > 1 && (
-                      <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                        <span className="text-[11px] font-medium text-slate-400">추천:</span>
-                        {recommendations.map((chip) => (
-                          <button
-                            key={chip}
-                            type="button"
-                            onClick={() => setShortName(chip)}
-                            className={`px-2 py-0.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${shortName === chip
-                              ? 'bg-blue-50 text-[#1E60F3] border-blue-200'
-                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                              }`}
-                          >
-                            {chip}
-                          </button>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 </div>
 
