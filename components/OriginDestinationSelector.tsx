@@ -152,7 +152,7 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
               haptics.lightTap();
               onOpenInspectionModal?.();
             }}
-            className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 active:scale-95 shadow-xs transition flex items-center justify-center cursor-pointer"
+            className="w-7.5 h-7.5 sm:w-8 sm:h-8 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 active:scale-95 shadow-xs transition flex items-center justify-center cursor-pointer"
             title="차량 점검 (수령 / 일일 / 반납)"
             aria-label="차량 점검"
           >
@@ -165,7 +165,7 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
               haptics.lightTap();
               onOpenFlightModal?.();
             }}
-            className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 active:scale-95 shadow-xs transition flex items-center justify-center cursor-pointer"
+            className="w-7.5 h-7.5 sm:w-8 sm:h-8 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 active:scale-95 shadow-xs transition flex items-center justify-center cursor-pointer"
             title="인천공항 실시간 항공편 조회"
             aria-label="항공편 조회"
           >
@@ -178,7 +178,7 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
               haptics.lightTap();
               onOpenGasModal?.();
             }}
-            className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 active:scale-95 shadow-xs transition flex items-center justify-center cursor-pointer"
+            className="w-7.5 h-7.5 sm:w-8 sm:h-8 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 active:scale-95 shadow-xs transition flex items-center justify-center cursor-pointer"
             title="주변 주유소 실시간 유가 조회"
             aria-label="주변 주유소"
           >
@@ -191,7 +191,7 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
               haptics.lightTap();
               onOpenPresetModal?.();
             }}
-            className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 active:scale-95 shadow-xs transition flex items-center justify-center cursor-pointer"
+            className="w-7.5 h-7.5 sm:w-8 sm:h-8 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 active:scale-95 shadow-xs transition flex items-center justify-center cursor-pointer"
             title="거점 관리 및 신규 등록"
             aria-label="거점 관리"
           >
