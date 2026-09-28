@@ -27,7 +27,7 @@ interface ScheduleFormModalProps {
   presets?: LocationPreset[];
   vehicleNo?: string;
   driverName?: string;
-  passengerName?: string;
+  passengerName?: string | null;
   homeLocation?: { name: string; address: string; lat: number; lng: number } | null;
 }
 
@@ -208,7 +208,7 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
       });
 
       setPickupTime('09:00');
-      setPassenger(passengerName || 'DENZEL SOFYAN');
+      setPassenger(passengerName || '');
       setFlight('');
       setNotes('');
       setSearchModalTarget(null);

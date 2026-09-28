@@ -2260,6 +2260,47 @@ SELECT * FROM cockpit.presets;
 2. **Zero-DB 및 클라이언트 상태 무결성**:
    - 수령/반납 데이터 바인딩 및 계기판 OCR, 2D 외관 점검, 주차/차키 위치, 카카오톡 전송 보고서 생성이 결함 없이 완벽히 동작함을 확인.
 
+---
+
+## 47. 담당승객(passengerName) 영속 저장 및 카카오톡 보고서 출력 버그 수정 (2026-09-28)
+
+### 47.1 추진 배경 및 문제점
+1. **담당승객 삭제 후 재진입 시 이전 승객명 부활 결함**:
+   - 사용자가 프로필 설정에서 담당승객 값을 모두 지우고 저장하더라도, 모달을 다시 열거나 호차를 전환했을 때 `parsed.passengerName !== ''` 등 빈 문자열을 falsy로 취급하는 조건문 때문에 `storedForVehicle?.passengerName || getPresetPassengerName(cleanHocha)`로 폴백되어 이전 승객명('VIP 게스트 A' 또는 'SOYFAN 외 1명')이 다시 채워지는 문제 발생.
+2. **미입력 시 카카오톡 보고서에 '담당승객 : 미지정' 강제 노출 결함**:
+   - `utils/reportGenerator.ts`에서 `profile.passengerName?.trim() || '미지정'`으로 처리되어, 승객을 지정하지 않았음에도 보고서에 `• 담당승객: 미지정`이 강제 출력되어 현장 관제 가독성을 저해하는 문제 발생.
+
+### 47.2 핵심 구현 내역
+
+#### 1. 담당승객 정규화 및 null 영속 저장 ([`components/ProfileModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/ProfileModal.tsx), [`hooks/useDriverProfile.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/hooks/useDriverProfile.ts))
+- **공백 제거 및 null 변환**:
+  - `const normalizedPassenger = passengerName.trim();`
+  - `const valueToSave = normalizedPassenger.length > 0 ? normalizedPassenger : null;`
+- **폴백 로직 전면 제거**:
+  - `ProfileModal` 진입 및 `useDriverProfile` 로드 시 `stored.passengerName ?? ''` 형태로 nullish coalescing을 적용하여, 빈 값이나 `null`이 정상 상태로 보존되도록 개선.
+  - 저장 직후 `valueToSave === null`일 경우 로컬 state를 즉시 `""`로 동기화.
+
+#### 2. DB (Supabase `drivers`) 동기화 시 명시적 null 저장 ([`app/api/driver/route.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/api/driver/route.ts), [`app/page.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/page.tsx))
+- **POST 핸들러**: `passenger_name`이 빈 문자열이거나 미입력 시 `null`을 명시적으로 페이로드에 포함하여 Supabase `drivers` 테이블에 `NULL`이 정상 업데이트되도록 보장.
+- **GET 핸들러**: 데이터 조회 시 `data.passenger_name ?? null`로 처리하여, 기존 DB에 `NULL`로 저장된 레코드가 `DRIVER_DEFAULTS`로 재오염되지 않도록 차단.
+
+#### 3. 카카오톡 보고서 조건부 렌더링 및 '미지정' 완전 퇴출 ([`utils/reportGenerator.ts`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/utils/reportGenerator.ts), [`components/Header.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/Header.tsx))
+- **보고서 행 완전 생략**:
+  - `hasPassenger ? '• 담당승객: ' + passengerName : null` 구조로 수정하고 `lines.filter(Boolean)`을 거쳐, 승객명이 비어 있으면 `담당승객` 행 자체를 완전히 생략하며 불필요한 공백 라인도 남지 않도록 구현.
+- **헤더 툴팁 정리**:
+  - `Header.tsx` 툴팁에서도 `미지정` 문구를 제거하고 승객명이 존재할 때만 `• 담당승객: ...`을 렌더링하도록 일원화.
+
+### 47.3 검증 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 컴파일 에러 **0건 (Exit code 0)** 통과.
+2. **시나리오 검증**:
+   - **Case 1 (기존 승객 유지)**: "VIP 게스트 A" 저장 시 정상 유지.
+   - **Case 2 (전체 삭제 후 재진입)**: 입력창 전체 삭제 후 저장 ➔ 재진입 시 빈칸 유지 (이전 값 부활 없음).
+   - **Case 3 (빈칸 보고서)**: 카카오톡 보고서 생성 시 `담당승객` 행 완전 생략 확인.
+   - **Case 4 (신규 입력)**: "SOYFAN 외 1명" 입력 후 저장 시 카톡 보고서에 정상 출력 확인.
+   - **Case 5 (공백 입력)**: "     " 공백만 입력 후 저장 시 `null`로 저장되며 보고서 행 생략 확인.
+
+
 
 
 

@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
       }
       const enriched = data.map((d: any) => ({
         ...d,
-        passenger_name: d.passenger_name || DRIVER_DEFAULTS[d.vehicle_no]?.passenger_name || '',
+        passenger_name: d.passenger_name ?? null,
       }));
       return NextResponse.json({ drivers: enriched, fallback: false });
     }
@@ -85,7 +85,7 @@ export async function GET(req: NextRequest) {
         car_number: '',
         driver_name: '',
         phone: '',
-        passenger_name: '',
+        passenger_name: null,
         default_navi: 'tmap',
       };
       return NextResponse.json({ driver: fallbackDriver, fallback: true });
@@ -93,7 +93,7 @@ export async function GET(req: NextRequest) {
 
     const driverWithPassenger = {
       ...data,
-      passenger_name: data.passenger_name || DRIVER_DEFAULTS[targetVehicleNo]?.passenger_name || '',
+      passenger_name: data.passenger_name ?? null,
     };
     return NextResponse.json({ driver: driverWithPassenger, fallback: false });
   } catch (err: any) {
@@ -151,7 +151,10 @@ export async function POST(req: NextRequest) {
 
     if (rawDriverName) payload.driver_name = rawDriverName;
     if (rawPhone) payload.phone = rawPhone;
-    if (rawPassengerName !== undefined) payload.passenger_name = rawPassengerName;
+    if (rawPassengerName !== undefined) {
+      const normalized = typeof rawPassengerName === 'string' ? rawPassengerName.trim() : rawPassengerName;
+      payload.passenger_name = normalized && normalized.length > 0 ? normalized : null;
+    }
     if (rawDefaultNavi) payload.default_navi = rawDefaultNavi;
 
     const { data, error } = await supabaseAdmin

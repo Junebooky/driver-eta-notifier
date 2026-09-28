@@ -98,7 +98,7 @@ export const EMPTY_PROFILE: DriverProfile = {
   phonePart3: '',
   phone: '',
   mobile: '',
-  passengerName: '',
+  passengerName: null,
   defaultNavi: 'tmap',
   targetChatRoom: '',
 };
@@ -115,7 +115,7 @@ export const DEFAULT_DRIVER_PROFILE: DriverProfile = {
   phonePart3: '8726',
   phone: '010-6348-8726',
   mobile: '010-6348-8726',
-  passengerName: 'SOYFAN 외 1명',
+  passengerName: null,
   defaultNavi: 'tmap',
   targetChatRoom: '',
 };
@@ -157,9 +157,11 @@ export function useDriverProfile() {
         const cleanHocha = hochaMatch ? `${hochaMatch[1]}호차` : initialVehicle;
         const storedForVehicle = getStoredVehicleProfile(cleanHocha);
         const resolvedPassenger =
-          parsed.passengerName !== undefined && parsed.passengerName !== ''
-            ? parsed.passengerName
-            : storedForVehicle?.passengerName || getPresetPassengerName(cleanHocha) || '';
+          parsed.passengerName !== undefined
+            ? (parsed.passengerName?.trim() || null)
+            : storedForVehicle?.passengerName !== undefined
+              ? (storedForVehicle.passengerName?.trim() || null)
+              : null;
 
         setProfile((prev) => ({
           ...prev,
@@ -198,16 +200,16 @@ export function useDriverProfile() {
       const cleanTargetVehicle = targetHochaMatch ? `${targetHochaMatch[1]}호차` : targetVehicle.trim();
       const isSwitchingVehicle = newProfile.vehicleNo !== undefined && newProfile.vehicleNo !== prev.vehicleNo;
 
-      let resolvedPassenger = prev.passengerName;
+      let resolvedPassenger = prev.passengerName ?? null;
       if (newProfile.passengerName !== undefined) {
-        resolvedPassenger = newProfile.passengerName;
+        resolvedPassenger = newProfile.passengerName ? newProfile.passengerName.trim() || null : null;
       } else if (isSwitchingVehicle) {
         // When vehicle is switched without explicit passenger name, load target vehicle's isolated passenger!
         const vehicleCache = getStoredVehicleProfile(cleanTargetVehicle);
         resolvedPassenger =
           vehicleCache?.passengerName !== undefined
-            ? vehicleCache.passengerName
-            : getPresetPassengerName(cleanTargetVehicle) || '';
+            ? (vehicleCache.passengerName ? vehicleCache.passengerName.trim() || null : null)
+            : null;
       }
 
       const updated: DriverProfile = {

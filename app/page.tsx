@@ -898,11 +898,10 @@ export default function Home() {
                   (p) => p.vehicleNo === cleanVNo || p.hocha === cleanVNo.replace(/[^0-9]/g, '')
                 );
                 const storedPassenger = getStoredVehicleProfile(cleanVNo)?.passengerName;
-                const defaultPassenger = matchedPreset?.passengerName || getPresetPassengerName(cleanVNo);
                 const effectivePassenger =
-                  storedPassenger !== undefined && storedPassenger !== ''
-                    ? storedPassenger
-                    : defaultPassenger;
+                  storedPassenger !== undefined
+                    ? (storedPassenger?.trim() || null)
+                    : (matchedPreset?.passengerName?.trim() || null);
 
                 if (matchedPreset) {
                   const fullVehicle = `${matchedPreset.vehicleNo} ${matchedPreset.carNumber}`;
@@ -996,7 +995,9 @@ export default function Home() {
               car_number: pNum || undefined,
               driver_name: updated.driverName,
               phone: updated.phone || updated.mobile || undefined,
-              passenger_name: updated.passengerName !== undefined ? updated.passengerName : profile.passengerName,
+              passenger_name: updated.passengerName !== undefined
+                ? (updated.passengerName ? updated.passengerName.trim() || null : null)
+                : (profile.passengerName ? profile.passengerName.trim() || null : null),
               default_navi: updated.defaultNavi ?? profile.defaultNavi,
             }),
           }).catch((err) => console.warn('Supabase driver profile sync error:', err));

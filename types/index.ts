@@ -21,7 +21,7 @@ export interface DriverProfile {
   phonePart1?: string;     // e.g. '010'
   phonePart2?: string;     // e.g. '6348'
   phonePart3?: string;     // e.g. '8726'
-  passengerName: string;   // e.g. 'SOYFAN 외 1명'
+  passengerName?: string | null;   // e.g. 'SOYFAN 외 1명'
   defaultNavi: NaviProvider; // 'tmap' | 'kakao' | 'naver'
   targetChatRoom?: string; // e.g. 'VIP 의전 단톡방'
   homeLocation?: HomeLocation | null;

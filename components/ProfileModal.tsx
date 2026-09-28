@@ -92,7 +92,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [phone2, setPhone2] = useState(isInitialEmpty ? '' : (profile.phonePart2 || parsedPhone.p2));
   const [phone3, setPhone3] = useState(isInitialEmpty ? '' : (profile.phonePart3 || parsedPhone.p3));
   const [driverName, setDriverName] = useState(isInitialEmpty ? '' : (profile.driverName || ''));
-  const [passengerName, setPassengerName] = useState(isInitialEmpty ? '' : (profile.passengerName || ''));
+  const [passengerName, setPassengerName] = useState(isInitialEmpty ? '' : (profile.passengerName ?? ''));
   const [defaultNavi, setDefaultNavi] = useState<NaviProvider>(profile.defaultNavi || 'tmap');
   const [selectedPresetVehicle, setSelectedPresetVehicle] = useState<string | null>(null);
   const [nameError, setNameError] = useState(false);
@@ -127,7 +127,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 carNumber: d.car_number || '',
                 driverName: d.driver_name || '',
                 phone: d.phone || '',
-                passengerName: d.passenger_name || getPresetPassengerName(d.vehicle_no) || '',
+                passengerName: d.passenger_name ?? null,
                 defaultNavi: (d.default_navi as NaviProvider) || 'tmap',
               };
               presetMap.set(d.vehicle_no, presetObj);
@@ -251,11 +251,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
         // Direct read from cockpit_driver_profile_${vehicleNo}
         const stored = getStoredVehicleProfile(cleanVehicleKey);
         const initialPassenger =
-          stored?.passengerName !== undefined && stored.passengerName !== ''
-            ? stored.passengerName
-            : profile.passengerName !== undefined && profile.passengerName !== ''
-              ? profile.passengerName
-              : getPresetPassengerName(cleanVehicleKey) || '';
+          stored?.passengerName !== undefined
+            ? (stored.passengerName ?? '')
+            : (profile.passengerName ?? '');
 
         setHocha(initial.hocha);
         setPlateFront(stored?.carNumberFront || profile.carNumberFront || initial.plateFront);
@@ -313,7 +311,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       const cleanV = val.trim().includes('호차') ? val.trim() : `${val.trim()}호차`;
       const stored = getStoredVehicleProfile(cleanV);
       if (stored) {
-        if (stored.passengerName) setPassengerName(stored.passengerName);
+        if (stored.passengerName !== undefined) setPassengerName(stored.passengerName ?? '');
         if (stored.driverName && !driverName) setDriverName(stored.driverName);
         if (stored.carNumberFront) setPlateFront(stored.carNumberFront);
         if (stored.carNumberBack) setPlateBack(stored.carNumberBack);
@@ -324,9 +322,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           setPhone2(pObj.p2);
           setPhone3(pObj.p3);
         }
-      } else {
-        const presetPass = getPresetPassengerName(cleanV);
-        if (presetPass) setPassengerName(presetPass);
       }
     }
   };
@@ -459,6 +454,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
     // Save vehicle-isolated profile to cockpit_driver_profile_${vehicleNo}
     const cleanHochaKey = hTrim ? (hTrim.includes('호차') ? hTrim : `${hTrim}호차`) : '4호차';
+    const normalizedPassenger = passengerName.trim();
+    const valueToSave = normalizedPassenger.length > 0 ? normalizedPassenger : null;
+
     setStoredVehicleProfile(cleanHochaKey, {
       vehicleNo: combinedVehicleNo,
       carNumber: combinedPlate || undefined,
@@ -466,7 +464,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       carNumberBack: pBack,
       driverName: driverName.trim(),
       phone: combinedPhone,
-      passengerName: passengerName.trim(),
+      passengerName: valueToSave,
       defaultNavi: defaultNavi || 'tmap',
     });
 
@@ -481,9 +479,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       phonePart1: phone1.trim(),
       phonePart2: phone2.trim(),
       phonePart3: phone3.trim(),
-      passengerName: passengerName.trim(),
+      passengerName: valueToSave,
       defaultNavi: defaultNavi || 'tmap',
     };
+
+    if (valueToSave === null) {
+      setPassengerName('');
+    }
 
     // 2. Trigger modal exit animation FIRST (60fps scale-down & fade-out without Jank)
     setIsMounted(false);
@@ -583,10 +585,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
                         // Auto-inject vehicle-isolated passenger name from cockpit_driver_profile_${vehicleNo}
                         const targetPassenger =
-                          storedProfile?.passengerName ||
-                          d.passengerName ||
-                          getPresetPassengerName(cleanV) ||
-                          '';
+                          storedProfile?.passengerName !== undefined
+                            ? (storedProfile.passengerName ?? '')
+                            : (d.passengerName ?? '');
                         setPassengerName(targetPassenger);
                       }}
                       className={`p-2 rounded-xl text-left border transition-all cursor-pointer ${isCurrent
