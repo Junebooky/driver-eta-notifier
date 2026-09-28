@@ -668,20 +668,20 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
             <div className="flex items-center justify-center gap-1 w-full">
               <HomeIcon
                 className={`w-3.5 h-3.5 shrink-0 transition-colors ${isHomeDestination
-                    ? 'text-[#1E60F3]'
-                    : isHomeOrigin
-                      ? 'text-slate-600'
-                      : isTargetDestination
-                        ? 'text-slate-500 group-hover:text-[#1E60F3]'
-                        : 'text-slate-500 group-hover:text-slate-700'
+                  ? 'text-[#1E60F3]'
+                  : isHomeOrigin
+                    ? 'text-slate-600'
+                    : isTargetDestination
+                      ? 'text-slate-500 group-hover:text-[#1E60F3]'
+                      : 'text-slate-500 group-hover:text-slate-700'
                   }`}
               />
               <span
                 className={`text-sm tracking-tight truncate font-bold ${isHomeDestination
-                    ? 'text-[#1E60F3]'
-                    : isHomeOrigin
-                      ? 'text-slate-900'
-                      : `text-slate-800 ${dynamicTextHoverClass}`
+                  ? 'text-[#1E60F3]'
+                  : isHomeOrigin
+                    ? 'text-slate-900'
+                    : `text-slate-800 ${dynamicTextHoverClass}`
                   } transition-colors`}
               >
                 자택
@@ -804,10 +804,10 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
           >
             <span
               className={`text-sm font-bold tracking-tight truncate w-full ${isDestination
-                  ? 'text-[#1E60F3]'
-                  : isOrigin
-                    ? 'text-slate-900'
-                    : `text-slate-800 ${dynamicTextHoverClass}`
+                ? 'text-[#1E60F3]'
+                : isOrigin
+                  ? 'text-slate-900'
+                  : `text-slate-800 ${dynamicTextHoverClass}`
                 } transition-colors`}
             >
               {preset.shortName}
@@ -855,8 +855,8 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
         }
       }}
       className={`w-full h-full min-h-[58px] py-2.5 px-2 rounded-xl border border-dashed border-slate-300 ${isTargetDestination
-          ? 'hover:border-blue-300/80 hover:bg-blue-50/40 hover:text-[#1E60F3]'
-          : 'hover:border-slate-400 hover:bg-slate-50/80 hover:text-slate-800'
+        ? 'hover:border-blue-300/80 hover:bg-blue-50/40 hover:text-[#1E60F3]'
+        : 'hover:border-slate-400 hover:bg-slate-50/80 hover:text-slate-800'
         } bg-white hover:shadow-xs hover:-translate-y-0.5 text-slate-400 text-sm font-medium flex flex-col justify-between items-center transition-all duration-200 cursor-pointer select-none touch-pan-y [-webkit-tap-highlight-color:transparent] ${activePressedIndex === 'add' ? 'scale-[0.97] bg-slate-100/90' : ''
         }`}
       title="새 거점 검색 및 등록"
@@ -871,27 +871,6 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
 
   return (
     <div className="w-full bg-white border border-slate-100/80 rounded-2xl p-4 shadow-[0_8px_25px_rgba(30,96,243,0.06)] select-none space-y-3">
-      {/* Header: '자주 가는 목적지' 헤더 영역은 좌측 타이틀 텍스트만 단정하게 유지 */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center space-x-2 shrink-0">
-          <div className="w-6 h-6 rounded-lg bg-[#1E60F3] flex items-center justify-center shadow-xs shrink-0">
-            <svg
-              viewBox="0 0 24 24"
-              className="w-3.5 h-3.5 text-white"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" />
-              <circle cx="12" cy="10" r="3" />
-            </svg>
-          </div>
-          <h2 className="text-sm font-bold text-slate-900 tracking-tight whitespace-nowrap">자주 가는 목적지</h2>
-        </div>
-      </div>
-
       {/* Management Mode Guidance Bar */}
       {isManageMode && (
         <div className="px-3 py-1.5 rounded-xl bg-blue-50/90 border border-blue-200 text-[#1E60F3] text-[11px] font-bold flex items-center justify-between animate-fade-in">
@@ -957,8 +936,8 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
                 }}
                 aria-label={`페이지 ${idx + 1}`}
                 className={`h-2 rounded-full transition-all duration-300 cursor-pointer focus:outline-none ${isActive
-                    ? 'w-6 bg-[#1E60F3] shadow-[0_2px_8px_rgba(30,96,243,0.35)]'
-                    : 'w-2 bg-slate-300 hover:bg-slate-400'
+                  ? 'w-6 bg-[#1E60F3] shadow-[0_2px_8px_rgba(30,96,243,0.35)]'
+                  : 'w-2 bg-slate-300 hover:bg-slate-400'
                   }`}
               />
             );
