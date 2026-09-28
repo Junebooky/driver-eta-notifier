@@ -69,12 +69,12 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Official Kakao Roadview Deep Link Handler
+  // Official Kakao Roadview Deep Link Handler (Safari 빈 탭 생성 방지: 현재 창 이동)
   const openRoadview = (lat: number, lng: number) => {
     if (!lat || !lng) return;
     haptics.successPulse();
     const url = `https://map.kakao.com/link/roadview/${lat},${lng}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+    window.location.href = url;
   };
 
   // Body Scroll Lock
@@ -150,7 +150,7 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
 
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`, {
+        const res = await fetch(`/api/search?keyword=${encodeURIComponent(query)}&lat=37.5665&lng=126.9780`, {
           signal: controller.signal,
         });
 
@@ -159,13 +159,16 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
         }
 
         const data = await res.json();
-        const pois: PoiResult[] = (data.pois || []).map((poi: any) => ({
-          id: poi.id || `poi_${Math.random()}`,
-          name: poi.name,
-          address: poi.address,
-          lat: poi.lat,
-          lng: poi.lng,
-        }));
+        const rawList = Array.isArray(data) ? data : (data.pois || data.places || []);
+        const pois: PoiResult[] = rawList
+          .map((poi: any) => ({
+            id: String(poi.id || `poi_${Math.random()}`),
+            name: poi.name || poi.title || '',
+            address: poi.address || poi.roadAddress || poi.fullAddress || '',
+            lat: typeof poi.lat === 'number' ? poi.lat : parseFloat(poi.lat || poi.noorLat || poi.frontLat),
+            lng: typeof poi.lng === 'number' ? poi.lng : parseFloat(poi.lng || poi.noorLon || poi.frontLon),
+          }))
+          .filter((p: PoiResult) => p.name && !isNaN(p.lat) && !isNaN(p.lng));
 
         roadviewSearchCache.set(query, pois);
         setSearchResults(pois);
@@ -180,7 +183,7 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
       } finally {
         setIsSearching(false);
       }
-    }, 280);
+    }, 250);
 
     return () => {
       clearTimeout(timer);
@@ -338,13 +341,13 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
           {/* Quick Destination Card (현재 운행 목적지 카드 전체 터치) */}
           {currentDestination && currentDestination.lat && currentDestination.lng && (
             <div className="space-y-1.5">
-              <span className="text-[11px] font-bold text-slate-400 tracking-tight block px-0.5">
+              <span className="text-[13px] font-bold text-slate-400 tracking-tight block px-0.5">
                 현재 운행 목적지
               </span>
               <button
                 type="button"
                 onClick={() => openRoadview(currentDestination.lat!, currentDestination.lng!)}
-                className="w-full p-3.5 rounded-2xl bg-blue-50/50 border border-blue-200/80 hover:bg-blue-100/50 hover:border-[#1E60F3] transition-all text-left flex items-center justify-between group active:scale-[0.99] cursor-pointer shadow-xs"
+                className="w-full p-3.5 rounded-2xl bg-white border border-[#1E60F3] hover:bg-blue-100/50 hover:border-[#1E60F3] transition-all text-left flex items-center justify-between group active:scale-[0.99] cursor-pointer shadow-xs"
               >
                 <div className="min-w-0 pr-2">
                   <div className="flex items-center gap-1.5">
@@ -358,7 +361,7 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
                   </p>
                 </div>
                 <span className="text-xs font-bold text-[#1E60F3] shrink-0 bg-white px-2.5 py-1 rounded-lg border border-blue-200 shadow-2xs group-hover:bg-[#1E60F3] group-hover:text-white transition-colors">
-                  거리뷰 ↗
+                  ↗
                 </span>
               </button>
             </div>
@@ -464,9 +467,8 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
                             </span>
 
                             <span
-                              className={`text-[10px] font-bold px-1.5 py-0.2 rounded mt-0.5 ${
-                                isHQ ? 'bg-slate-100 text-slate-600' : 'bg-blue-50 text-[#1E60F3]'
-                              }`}
+                              className={`text-[10px] font-bold px-1.5 py-0.2 rounded mt-0.5 ${isHQ ? 'bg-slate-100 text-slate-600' : 'bg-blue-50 text-[#1E60F3]'
+                                }`}
                             >
                               {isHQ ? '공통' : '개인'}
                             </span>
@@ -491,11 +493,10 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
                       setCurrentPage(i);
                     }}
                     aria-label={`페이지 ${i + 1}`}
-                    className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
-                      currentPage === i
-                        ? 'w-6 bg-[#1E60F3] shadow-[0_2px_8px_rgba(30,96,243,0.35)]'
-                        : 'w-2 bg-slate-200 hover:bg-slate-300'
-                    }`}
+                    className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${currentPage === i
+                      ? 'w-6 bg-[#1E60F3] shadow-[0_2px_8px_rgba(30,96,243,0.35)]'
+                      : 'w-2 bg-slate-200 hover:bg-slate-300'
+                      }`}
                   />
                 ))}
               </div>

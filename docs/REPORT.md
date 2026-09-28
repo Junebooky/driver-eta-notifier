@@ -2999,4 +2999,41 @@ flowchart TD
    - **Case 2 (복사 주소 제거 확인)**: 클립보드 권한 요청이나 '복사한 주소' 카드 없이 상단 검색창과 현재 목적지가 군더더기 없이 이어짐 (PASS).
    - **Case 3 (전면 터치 로드뷰)**: 현재 목적지 카드, 최근 검색 카드, 거점 그리드 카드를 탭했을 때 우측 작은 버튼을 조준할 필요 없이 카드 영역 어디를 눌러도 카카오 거리뷰 창이 즉시 실행됨 (PASS).
 
+---
+
+## 59. RoadviewModal Safari 빈 탭 잔류 제거(현재창 이동) 및 POI 검색 API(keyword 파라미터) 정합성 복원
+
+### 59.1 배경 및 작업 목적
+1. **iOS Safari 거리뷰 호출 시 잉여 빈 탭 생성 결함**:
+   - `openRoadview` 호출 시 `window.open(url, '_blank')`를 사용할 경우, iOS Safari 브라우저에서 빈 탭(`검색 또는 웹사이트 이름 입력`)이 남아 사용자가 매번 탭을 닫아야 하는 마찰 발생.
+   - `window.location.href = url` 방식으로 전환하여, 사용자가 거리뷰 확인 후 뒤로가기 제스처나 버튼 터치 1번으로 Cockpit 앱 화면으로 즉시 무마찰 복귀할 수 있도록 개선.
+2. **현장 로드뷰 모달 POI 실시간 검색 누락 결함 해결**:
+   - `RoadviewModal.tsx`의 실시간 검색 로직이 `/api/search` 엔드포인트에 `q=...` 파라미터를 전송하여, 백엔드 정규화 엔진(`keyword` 파라미터 요구)에서 파라미터 누락으로 판정되어 항상 빈 결과(`{ pois: [] }`)를 반환하던 문제 해결.
+   - `CustomPresetModal.tsx` 규격과 동일하게 `/api/search?keyword=${encodeURIComponent(query)}&lat=37.5665&lng=126.9780` 및 POI 응답 파서 매핑을 일원화하여 '미금역' 등 모든 장소가 완벽하게 자동완성·검색되도록 복원.
+3. **Zero-DB / Pure Client-Side 원칙 준수**:
+   - DB 스키마 수정 없이 순수 클라이언트 로직 및 기존 검색 API 규격 동기화만으로 문제 해결.
+
+---
+
+### 59.2 모듈별 상세 구현 내역
+
+#### 1. Safari 빈 탭 생성 방지 (`window.location.href`) ([`components/RoadviewModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/RoadviewModal.tsx))
+- `openRoadview` 함수에서 `window.open(url, '_blank', ...)`을 전면 배제하고 `window.location.href = url`로 전환.
+- 잉여 빈 탭 생성을 원천 차단하여 카카오 로드뷰 창에서 브라우저 뒤로가기(또는 좌측 스와이프) 1회만으로 Cockpit 앱으로 즉각 복귀하도록 보장.
+
+#### 2. POI 검색 API `keyword` 파라미터 정합성 및 응답 파서 동기화 ([`components/RoadviewModal.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/RoadviewModal.tsx))
+- 검색 API 요청 쿼리를 `/api/search?keyword=${encodeURIComponent(query)}&lat=37.5665&lng=126.9780`로 변경하여 TMAP 형태소 정규화 엔진 및 랭킹 시스템과 완벽 연동.
+- `data.pois || data.places || data` 구조 및 `lat`, `lng` 타입 변환(number/string)을 안전하게 파싱하여 POI 누락 방지.
+- 검색 결과 목록에서 장소 터치 시 `openRoadview(poi.lat, poi.lng)`를 통해 현재 창에서 즉시 카카오 로드뷰 실행.
+
+---
+
+### 59.3 검증 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 TypeScript / ESLint 컴파일 에러 **0건 (Exit code 0)** 통과.
+2. **시나리오 검증 결과**:
+   - **Case 1 (미금역 POI 검색)**: `curl "http://localhost:3000/api/search?keyword=미금역"` 및 컴포넌트 연동 확인 결과, '미금역 (수인분당선)', '미금역 (신분당선)', 출구별 POI가 완벽히 반환됨을 확인 (PASS).
+   - **Case 2 (Safari 복귀 빈 탭 제거)**: 거리뷰 호출 시 새 탭 생성 대신 현재 탭에서 이동하여, 뒤로가기 1회로 빈 탭 잔류 없이 앱으로 즉각 복귀 (PASS).
+
+
 
