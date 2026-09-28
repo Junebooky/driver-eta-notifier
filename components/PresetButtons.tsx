@@ -19,6 +19,7 @@ interface PresetButtonsProps {
   onOpenFlightModal?: () => void;
   onOpenGasModal?: () => void;
   onOpenInspectionModal?: () => void;
+  onOpenPresetModal?: () => void;
   onEditPreset?: (preset: LocationPreset) => void;
   onDeleteCustomPreset?: (id: string) => void;
   onReorderPresets?: (reordered: LocationPreset[]) => void;
@@ -37,6 +38,7 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
   onOpenFlightModal,
   onOpenGasModal,
   onOpenInspectionModal,
+  onOpenPresetModal,
   onEditPreset,
   onDeleteCustomPreset,
   onReorderPresets,
@@ -878,7 +880,118 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
 
   return (
     <div className="w-full bg-white border border-slate-100/80 rounded-2xl p-4 shadow-[0_8px_25px_rgba(30,96,243,0.06)] select-none space-y-3">
-      {/* Header: Classic Teardrop MapPin with Center Circular Cutout in Cobalt Badge on Left, Utility Buttons on Right */}
+      {/* [태스크 2] 독립 4열 퀵 액션 바 (차량체크 → 즐겨찾기 → 주유 → 항공편) */}
+      <div className="grid grid-cols-4 gap-2 py-3 px-2 mb-3 bg-slate-50/70 border border-slate-200/80 rounded-2xl">
+        {/* 1. 차량체크 */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            haptics.lightTap();
+            onOpenInspectionModal?.();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onOpenInspectionModal?.();
+            }
+          }}
+          className="flex flex-col items-center cursor-pointer group"
+          title="차량 수령·반납 점검표"
+        >
+          <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-white border border-slate-200/90 shadow-2xs flex items-center justify-center text-slate-700 hover:border-[#1E60F3] hover:text-[#1E60F3] hover:bg-blue-50/50 hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 group-hover:border-[#1E60F3] group-hover:text-[#1E60F3] group-hover:bg-blue-50/50 group-hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] group-hover:-translate-y-0.5">
+            <ClipboardCheck className="w-6 h-6 sm:w-6.5 sm:h-6.5 stroke-[2]" />
+          </div>
+          <span className="mt-1.5 text-xs font-bold text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors">
+            차량체크
+          </span>
+        </div>
+
+        {/* 2. 즐겨찾기 */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            haptics.lightTap();
+            if (onOpenPresetModal) {
+              onOpenPresetModal();
+            } else if (onOpenAddModal) {
+              onOpenAddModal();
+            } else {
+              setIsManageMode((prev) => !prev);
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              if (onOpenPresetModal) onOpenPresetModal();
+              else if (onOpenAddModal) onOpenAddModal();
+              else setIsManageMode((prev) => !prev);
+            }
+          }}
+          className="flex flex-col items-center cursor-pointer group"
+          title="거점 및 목적지 관리"
+        >
+          <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-white border border-slate-200/90 shadow-2xs flex items-center justify-center text-slate-700 hover:border-[#1E60F3] hover:text-[#1E60F3] hover:bg-blue-50/50 hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 group-hover:border-[#1E60F3] group-hover:text-[#1E60F3] group-hover:bg-blue-50/50 group-hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] group-hover:-translate-y-0.5">
+            <SlidersHorizontal className="w-6 h-6 sm:w-6.5 sm:h-6.5 stroke-[2]" />
+          </div>
+          <span className="mt-1.5 text-xs font-bold text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors">
+            즐겨찾기
+          </span>
+        </div>
+
+        {/* 3. 주유 */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            haptics.lightTap();
+            onOpenGasModal?.();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onOpenGasModal?.();
+            }
+          }}
+          className="flex flex-col items-center cursor-pointer group"
+          title="주변 주유소 실시간 유가 조회"
+        >
+          <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-white border border-slate-200/90 shadow-2xs flex items-center justify-center text-slate-700 hover:border-[#1E60F3] hover:text-[#1E60F3] hover:bg-blue-50/50 hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 group-hover:border-[#1E60F3] group-hover:text-[#1E60F3] group-hover:bg-blue-50/50 group-hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] group-hover:-translate-y-0.5">
+            <Fuel className="w-6 h-6 sm:w-6.5 sm:h-6.5 stroke-[2]" />
+          </div>
+          <span className="mt-1.5 text-xs font-bold text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors">
+            주유
+          </span>
+        </div>
+
+        {/* 4. 항공편 */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            haptics.lightTap();
+            onOpenFlightModal?.();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onOpenFlightModal?.();
+            }
+          }}
+          className="flex flex-col items-center cursor-pointer group"
+          title="인천공항 실시간 운항 정보"
+        >
+          <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-white border border-slate-200/90 shadow-2xs flex items-center justify-center text-slate-700 hover:border-[#1E60F3] hover:text-[#1E60F3] hover:bg-blue-50/50 hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 group-hover:border-[#1E60F3] group-hover:text-[#1E60F3] group-hover:bg-blue-50/50 group-hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] group-hover:-translate-y-0.5">
+            <Plane className="w-6 h-6 sm:w-6.5 sm:h-6.5 stroke-[2]" />
+          </div>
+          <span className="mt-1.5 text-xs font-bold text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors">
+            항공편
+          </span>
+        </div>
+      </div>
+
+      {/* [태스크 1] Header: '자주 가는 목적지' 헤더 영역은 좌측 타이틀 텍스트만 단정하게 유지 */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center space-x-2 shrink-0">
           <div className="w-6 h-6 rounded-lg bg-[#1E60F3] flex items-center justify-center shadow-xs shrink-0">
@@ -896,76 +1009,6 @@ export const PresetButtons: React.FC<PresetButtonsProps> = ({
             </svg>
           </div>
           <h2 className="text-sm font-bold text-slate-900 tracking-tight whitespace-nowrap">자주 가는 목적지</h2>
-        </div>
-
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {/* Modal Action Buttons (Vehicle Inspection, Flight, Gas Station) */}
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            {onOpenInspectionModal && (
-              <button
-                type="button"
-                onClick={() => {
-                  haptics.lightTap();
-                  onOpenInspectionModal();
-                }}
-                className="w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-slate-700 hover:bg-[#1E60F3] hover:text-white hover:border-[#1E60F3] active:scale-95 flex items-center justify-center transition-all cursor-pointer"
-                title="차량 수령·반납 점검표"
-                aria-label="차량 점검"
-              >
-                <ClipboardCheck className="w-4 h-4" />
-              </button>
-            )}
-
-            {onOpenFlightModal && (
-              <button
-                type="button"
-                onClick={() => {
-                  haptics.lightTap();
-                  onOpenFlightModal();
-                }}
-                className="w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-slate-700 hover:bg-[#1E60F3] hover:text-white hover:border-[#1E60F3] active:scale-95 flex items-center justify-center transition-all cursor-pointer"
-                title="인천공항 실시간 운항 관제"
-                aria-label="항공편 조회"
-              >
-                <Plane className="w-4 h-4" />
-              </button>
-            )}
-
-            {onOpenGasModal && (
-              <button
-                type="button"
-                onClick={() => {
-                  haptics.lightTap();
-                  onOpenGasModal();
-                }}
-                className="w-10 h-10 rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-slate-700 hover:bg-[#1E60F3] hover:text-white hover:border-[#1E60F3] active:scale-95 flex items-center justify-center transition-all cursor-pointer"
-                title="실시간 주유소 추천"
-                aria-label="주유소 추천"
-              >
-                <Fuel className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-
-          {/* Proper separation distance & vertical divider between modal triggers and preset editor */}
-          <div className="h-4 w-px bg-slate-200/80 ml-1.5 sm:ml-2 mr-0.5 sm:mr-1 shrink-0" />
-
-          {/* Preset Destination Management Toggle (Small & flat icon, clearly differentiated for grid editing) */}
-          <button
-            type="button"
-            onClick={() => {
-              haptics.lightTap();
-              setIsManageMode(!isManageMode);
-            }}
-            className={`p-1.5 sm:p-2 rounded-lg transition-all active:scale-90 flex items-center justify-center cursor-pointer ${isManageMode
-                ? 'bg-[#1E60F3] text-white shadow-xs'
-                : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
-              }`}
-            title={isManageMode ? '거점 관리 완료' : '거점 수정 및 삭제 관리'}
-            aria-label="거점 관리"
-          >
-            <SlidersHorizontal className="w-3.5 h-3.5" />
-          </button>
         </div>
       </div>
 

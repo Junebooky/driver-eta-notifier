@@ -126,7 +126,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
             setItems(parsed);
           }
         }
-      } catch (e) {}
+      } catch (e) { }
     }
   }, [presets, vehicleNo, isOpen]);
 
@@ -752,7 +752,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="장소명 또는 주소 검색 (예: 인천공항, 신라호텔, 코엑스)"
+                    placeholder="장소명 또는 주소 검색 (예: 인천공항, 코엑스)"
                     className="w-full pl-11 pr-10 py-2.5 sm:py-3 bg-white border border-slate-200 rounded-xl text-slate-800 text-lg font-medium placeholder:text-base placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] transition-colors"
                   />
                   <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-3 sm:top-3.5" />
@@ -833,14 +833,14 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                   <button
                     type="button"
                     onClick={handleCancelForm}
-                    className="w-1/3 py-3 rounded-xl bg-slate-200/80 hover:bg-slate-300 text-slate-700 text-sm font-bold active:scale-95 transition cursor-pointer"
+                    className="w-1/3 py-3 rounded-xl bg-slate-200/80 hover:bg-slate-300 text-slate-700 text-ml font-bold active:scale-95 transition cursor-pointer"
                   >
                     취소
                   </button>
                   <button
                     type="submit"
                     disabled={lat === null || !name.trim()}
-                    className="w-2/3 py-3 rounded-xl bg-[#1E60F3] hover:bg-[#1346D8] disabled:opacity-40 text-white text-sm font-black shadow-xs transition active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1.5"
+                    className="w-2/3 py-3 rounded-xl bg-[#1E60F3] hover:bg-[#1346D8] disabled:opacity-40 text-white text-md font-black shadow-xs transition active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1.5"
                   >
                     <Check className="w-4 h-4 stroke-[2.5]" />
                     <span>{editingItem ? '수정 완료' : '거점 저장'}</span>
@@ -1028,11 +1028,10 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                               onMouseDown={(e) => handlePointerStart(index, e)}
                               onMouseUp={handlePointerEnd}
                               onClick={() => handleCardClick(preset)}
-                              className={`relative min-h-[64px] p-2.5 rounded-2xl border text-center flex flex-col justify-between items-center transition-all duration-300 select-none group shadow-2xs cursor-grab active:cursor-grabbing will-change-transform ${
-                                isBeingDragged
-                                  ? 'scale-105 shadow-xl ring-2 ring-[#1E60F3]/40 z-30 opacity-90 border-2 border-[#1E60F3] bg-blue-50/50'
-                                  : 'bg-white border-slate-200 hover:border-[#1E60F3]/60 hover:bg-blue-50/20 active:scale-95'
-                              }`}
+                              className={`relative min-h-[64px] p-2.5 rounded-2xl border text-center flex flex-col justify-between items-center transition-all duration-300 select-none group shadow-2xs cursor-grab active:cursor-grabbing will-change-transform ${isBeingDragged
+                                ? 'scale-105 shadow-xl ring-2 ring-[#1E60F3]/40 z-30 opacity-90 border-2 border-[#1E60F3] bg-blue-50/50'
+                                : 'bg-white border-slate-200 hover:border-[#1E60F3]/60 hover:bg-blue-50/20 active:scale-95'
+                                }`}
                               style={{
                                 transition: isBeingDragged ? 'none' : 'transform 300ms cubic-bezier(0.2, 0, 0, 1), box-shadow 200ms ease',
                                 touchAction: isBeingDragged ? 'none' : 'manipulation',
@@ -1062,11 +1061,10 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
 
                               {/* Badge: 공통 vs 개인 */}
                               <span
-                                className={`text-[10px] font-bold px-1.5 py-0.2 rounded mt-0.5 ${
-                                  isHQ
-                                    ? 'bg-slate-100 text-slate-600'
-                                    : 'bg-blue-50 text-[#1E60F3]'
-                                }`}
+                                className={`text-[10px] font-bold px-1.5 py-0.2 rounded mt-0.5 ${isHQ
+                                  ? 'bg-slate-100 text-slate-600'
+                                  : 'bg-blue-50 text-[#1E60F3]'
+                                  }`}
                               >
                                 {isHQ ? '공통' : '개인'}
                               </span>
@@ -1092,11 +1090,10 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                         setCurrentPage(idx);
                       }}
                       aria-label={`페이지 ${idx + 1}`}
-                      className={`h-2 rounded-full transition-all duration-300 cursor-pointer focus:outline-none ${
-                        isActive
-                          ? 'w-6 bg-[#1E60F3] shadow-[0_2px_8px_rgba(30,96,243,0.35)]'
-                          : 'w-2 bg-slate-300 hover:bg-slate-400'
-                      }`}
+                      className={`h-2 rounded-full transition-all duration-300 cursor-pointer focus:outline-none ${isActive
+                        ? 'w-6 bg-[#1E60F3] shadow-[0_2px_8px_rgba(30,96,243,0.35)]'
+                        : 'w-2 bg-slate-300 hover:bg-slate-400'
+                        }`}
                     />
                   );
                 })}

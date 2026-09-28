@@ -1736,7 +1736,7 @@ SELECT * FROM cockpit.presets;
    - `네이버지도 & TMAP 빅데이터 기반 소요 시간 예측` ➔ **`실시간 교통 빅데이터 기반 소요 시간 예측`**
    - `실시간 교통 반영(TMAP)` ➔ **`실시간 교통 반영`**
 3. **플레이스홀더 표준화**:
-   - `"장소명 또는 주소 검색 (예: 인천공항, 신라호텔, 코엑스)"`로 플랫폼 중립적 안내 유지.
+   - `"장소명 또는 주소 검색 (예: 조선펠리스, 코엑스)"`로 플랫폼 중립적 안내 유지.
 
 ---
 
@@ -1970,14 +1970,54 @@ SELECT * FROM cockpit.presets;
 4. **거점 관리 창 인풋 18px 고정 검증**:
    - 모바일 화면에서도 거점 전체 명칭과 표기 명칭 입력창의 폰트가 `text-xs`로 축소되지 않고 18px(`text-lg`) 크기로 큼직하게 유지됨을 확인.
 
+---
 
+## 42. 운행 탭 독립 4열 퀵 액션 바 신설 및 순서 개편 (차량체크 → 즐겨찾기 → 주유 → 항공편) (2026-09-28)
 
+### 42.1 추진 배경 및 목적
+1. **헤더 우측 오밀조밀한 유틸리티 버튼의 모바일 사용성 한계 해소**:
+   - 기존 `components/PresetButtons.tsx` 상단 헤더 우측에 배치되어 있던 작은 원형 버튼들(차량점검, 항공기, 주유소, 거점관리)은 터치 타깃이 협소하고 시각적 밀도가 과도하여 조작 실수를 유발할 위험이 있었음.
+   - 헤더 라인에서는 우측 유틸리티 버튼들을 완전히 제거하고 좌측의 단정한 '자주 가는 목적지' 타이틀 텍스트만 남기도록 정돈.
+2. **배달의민족 스타일 독립 가로 4열 퀵 액션 섹션 신설**:
+   - 모바일 친화적인 원형 아이콘 서클과 하단 텍스트 라벨을 결합한 배달의민족 스타일 독립 4열 액션 바를 구성.
+   - 지정된 업무 우선순위에 맞추어 **`차량체크` $\rightarrow$ `즐겨찾기` $\rightarrow$ `주유` $\rightarrow$ `항공편`** 순서로 전면 재정렬.
+3. **코발트 블루(`#1E60F3`) 인터랙션 및 터치 타깃 최적화**:
+   - 마우스 호버 및 터치 시 코발트 블루 테두리, 배경 색조, 소프트 섀도우(`hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)]`), 부드러운 상향 모션(`hover:-translate-y-0.5`)을 적용.
+   - 원형 아이콘과 하단 라벨을 감싸는 전체 컬럼(`flex flex-col items-center cursor-pointer`)을 하나의 터치 타깃으로 바인딩하여 모바일 탭 조작성을 극대화.
 
+---
 
+### 42.2 핵심 구현 내역
 
+#### [태스크 1] 헤더 우측 버튼 정리 및 좌측 타이틀 단정화 ([`components/PresetButtons.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/PresetButtons.tsx))
+- `PresetButtons.tsx` 상단 헤더 우측의 작은 버튼 묶음(차량점검, 항공편, 주유소, 거점관리 토글)을 전면 제거.
+- 좌측의 마커 아이콘 뱃지와 '자주 가는 목적지' 텍스트만 깔끔하게 남겨 헤더 가독성 대폭 향상.
 
+---
 
+#### [태스크 2] 독립 4열 퀵 액션 바 신설 및 순서 지정 ([`components/PresetButtons.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/components/PresetButtons.tsx), [`app/page.tsx`](file:///Users/gotow/Documents/neonfamily101/driver-eta-notifier/app/page.tsx))
+1. **컨테이너 레이아웃**:
+   - `grid grid-cols-4 gap-2 py-3 px-2 mb-3 bg-slate-50/70 border border-slate-200/80 rounded-2xl`
+2. **시퀀스 및 라벨 (순서 엄수)**:
+   1. **`차량체크`**: 차량 점검표 모달 호출 (`ClipboardCheck`, `w-6 h-6 sm:w-6.5 sm:h-6.5 stroke-[2]`)
+   2. **`즐겨찾기`**: 거점 및 목적지 관리 모달 호출 (`SlidersHorizontal`, `onOpenPresetModal` / `onOpenAddModal`)
+   3. **`주유`**: 주변 주유소/오피넷 실시간 유가 모달 호출 (`Fuel`)
+   4. **`항공편`**: 인천공항 실시간 운항 정보 모달 호출 (`Plane`)
+3. **원형 서클 및 인터랙션 규격**:
+   - **서클 규격**: `w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-white border border-slate-200/90 shadow-2xs flex items-center justify-center`
+   - **호버/액티브**: `hover:border-[#1E60F3] hover:text-[#1E60F3] hover:bg-blue-50/50 hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200`
+4. **하단 라벨 및 터치 타깃**:
+   - 라벨 규격: `mt-1.5 text-xs font-bold text-slate-700 text-center tracking-tight`
+   - 컬럼 전체(`flex flex-col items-center cursor-pointer group`)를 단일 터치 타깃으로 바인딩하여 쾌적한 탭 지원.
+5. **운행 탭 마운트 (`app/page.tsx`)**:
+   - 운행 탭(`activeTab === 'drive'`) 내 `OriginDestinationSelector` 바로 아래에 `PresetButtons`를 정식 마운트하여 운행 화면 진입 시 독립 4열 퀵 액션 바가 직관적으로 노출되도록 연동.
 
+---
 
-
-
+### 42.3 검증 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 14개 라우트 컴파일 에러 **0건** 완료.
+2. **정확한 순서 정렬 검증**:
+   - 퀵 액션 바가 **`차량체크` $\rightarrow$ `즐겨찾기` $\rightarrow$ `주유` $\rightarrow$ `항공편`** 순서로 오차 없이 정렬됨을 확인.
+3. **코발트 블루 인터랙션 검증**:
+   - 마우스 호버 및 액티브 시 코발트 블루(`#1E60F3`) 테두리, 배경 색조, 그림자(`rgba(30,96,243,0.18)`), 상향 모션이 유려하게 동작하고, 각 컬럼 탭 시 해당 모달이 정상 호출됨을 확인.

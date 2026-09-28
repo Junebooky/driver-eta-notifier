@@ -7,6 +7,7 @@ import { Header } from '@/components/Header';
 import { ProfileModal, parseVehicleDetails } from '@/components/ProfileModal';
 import { AdminPinModal } from '@/components/AdminPinModal';
 import { OriginDestinationSelector } from '@/components/OriginDestinationSelector';
+import { PresetButtons } from '@/components/PresetButtons';
 import { CustomPresetModal } from '@/components/CustomPresetModal';
 import { RouteInfoCard } from '@/components/RouteInfoCard';
 import { ReportTemplateSelector } from '@/components/ReportTemplateSelector';
@@ -819,6 +820,26 @@ export default function Home() {
               onOpenFlightModal={() => setIsFlightModalOpen(true)}
               onOpenGasModal={() => setIsGasModalOpen(true)}
               onOpenPresetModal={handleOpenAddModal}
+            />
+
+            {/* 2. VIP Destination Presets & 4-Column Quick Action Bar */}
+            <PresetButtons
+              presets={presets}
+              homeLocation={profile.homeLocation}
+              selectedOriginId={origin?.id}
+              selectedDestinationId={destination?.id}
+              selectionTarget={selectionTarget}
+              isAdmin={isAdmin}
+              onSelectPreset={handleSelectPreset}
+              onOpenAddModal={handleOpenAddModal}
+              onOpenHomeModal={() => setIsHomeModalOpen(true)}
+              onOpenFlightModal={() => setIsFlightModalOpen(true)}
+              onOpenGasModal={() => setIsGasModalOpen(true)}
+              onOpenInspectionModal={() => setIsInspectionModalOpen(true)}
+              onOpenPresetModal={handleOpenAddModal}
+              onEditPreset={handleOpenEditModal}
+              onDeleteCustomPreset={handleDeleteCustomPreset}
+              onReorderPresets={handleReorderPresets}
             />
 
             {/* 3. Route Estimation & ETA Status (Strictly Real-time TMAP) */}
