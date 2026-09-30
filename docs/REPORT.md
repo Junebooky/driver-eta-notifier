@@ -3491,3 +3491,54 @@ flowchart TD
    - **Case 3 (차량체크 제출 무결성)**: 인풋 필드를 임의로 비우고 점검 완료/카톡 공유 시에도 프로필 차량번호가 Fallback으로 적용되어 빈 문자열 누락이 방지됨 (PASS).
    - **Case 4 (맞교환 상단 `+` 버튼 및 세로 3단 전환)**: 맞교환 버튼 바로 위에 대칭 규격의 `+` 원형 버튼이 배치되며, 클릭 시 부드럽게 세로 3단 뷰로 펼쳐지고 `LocationSearchModal`이 호출됨 (PASS).
    - **Case 5 (관리자 지정동선 잠금 및 아코디언)**: 관리자 경로 로드 시 `+` 버튼이 숨겨지고 임의 추가/삭제가 불가능하며, `[지정동선 N곳 ▾]` 배지를 터치할 때만 통제 경유지들이 아코디언으로 전개됨 (PASS).
+
+---
+
+## 73. 다중 경유지(+) 연속 추가 지원(최대 5개) 및 세로 모드 주소 인라인(Inline) 슬림화 (2026-09-30)
+
+### 73.1 추진 배경 및 작업 목적
+1. **세로 모드 카드 주소 인라인(Inline) 슬림화**:
+   - 세로 모드 전개 시 각 카드(출발지/경유지/목적지)가 3줄(배지 / 명칭 / 상세주소)을 차지하여 거치대 화면에서 전체 높이가 지나치게 길어지는 문제를 해결.
+   - 장소명(`font-bold text-sm sm:text-base text-slate-900`)과 상세주소(`text-xs text-slate-400 truncate`)를 `flex items-baseline gap-2 min-w-0 mt-0.5` 한 줄 인라인으로 배치하고, 카드 내부 패딩을 `py-2.5 px-3.5`로 슬림화하여 수직 공간 낭비를 획기적으로 축소.
+2. **다중 경유지(+) 연속 추가 인터랙션 (최대 5개)**:
+   - 기존 단일 `waypoint` 구조를 `waypoints: LocationPreset[]` 다중 배열로 확장.
+   - 각 경유지 카드 우측 상단의 `✕` 버튼 좌측에 동일한 미니멀 슬레이트 규격(`w-7 h-7 rounded-full bg-white border border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50`)의 `+` 원형 아이콘 버튼 배치.
+   - `+` 터치 시 `LocationSearchModal`을 호출하여 새로운 경유지를 목록에 순차적으로 추가.
+   - 경유지가 5개에 도달하면 `+` 버튼을 자동으로 숨겨 외부 내비 딥링크 허용 규격(최대 5개)을 방어.
+3. **내비 딥링크 및 TMAP ETA 연동**:
+   - 복수 경유지 배열(`waypoints`)을 TMAP `passList`, Kakao `&vp=`, Naver `&v1~v5` 규격으로 직렬화하여 전달.
+   - `app/api/route/route.ts` TMAP API 다구간 ETA 연산 및 Haversine Fallback 다중 경유지 지원.
+
+---
+
+### 73.2 모듈별 핵심 구현 내역
+1. **`components/OriginDestinationSelector.tsx`**:
+   - Props에 `waypoints: LocationPreset[]`, `onSelectWaypoint: (index: number) => void`, `onAddWaypoint: () => void`, `onRemoveWaypoint: (index: number) => void` 추가 및 단일 `waypoint` 하위 호환성 유지.
+   - 출발지, 경유지(1~5), 목적지 카드 전체에 장소명 + 상세주소 1열 인라인 flex (`flex items-baseline gap-2 min-w-0 mt-0.5`) 및 컴팩트 패딩 (`py-2.5 px-3.5`) 적용.
+   - 경유지 슬롯 우측 상단 `flex items-center gap-1.5` 컨테이너에 `+` (새 경유지 추가) 및 `✕` (해당 경유지 삭제) 듀얼 미니멀 슬레이트 버튼 탑재. 5개 도달 시 또는 `isAdminRoute` 활성화 시 `+` 자동 은닉.
+2. **`app/page.tsx`**:
+   - `waypoints: LocationPreset[]` 다중 배열 상태 및 `editingWaypointIndex: number` 관리.
+   - `useEffect` 마운트 복원 시 단일 객체(`parsed.waypoint`)와 다중 배열(`parsed.waypoints`) 하위 호환성 완벽 지원.
+   - 로컬스토리지 자동 영속화: `{ origin, destination, waypoints, adminWaypoints, isAdminRoute }` 전체 직렬화.
+   - 경유지 추가(`handleAddWaypoint`), 개별 경유지 수정 터치(`handleSelectWaypoint`), 개별 경유지 삭제(`handleRemoveWaypoint`), 검색 모달 연동(`applyWaypointSelection`) 파이프라인 완성.
+   - 스케줄 탭 및 배차 연동 시 경유지 상태 초기화 동기화.
+3. **`utils/navigation.ts` & `components/ActionPanel.tsx`**:
+   - `waypoints` 배열을 전달받아 최대 5개까지 슬라이싱 후 3사 내비 스킴 직렬화:
+     - TMAP: `passList=${waypoints.map(w => `${w.lng},${w.lat}`).join('_')}`
+     - 카카오맵: `&vp=`
+     - 네이버 지도: `&v1lat=...&v1lng=...&v1name=...` (최대 v5까지 동적 루프)
+   - `ActionPanel`의 1초 패스트패스 및 길안내 실행 시 복수 경유지를 정확히 주입.
+4. **`app/api/route/route.ts`**:
+   - `passList` 복수 경유지 파라미터 파싱 및 TMAP API 전달 / 다구간 Haversine Fallback 연산 보장.
+
+---
+
+### 73.3 검증 및 테스트 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 TypeScript / ESLint 컴파일 에러 **0건 (Exit code 0)** 통과.
+2. **기능 검증**:
+   - 세로 모드 전개 시 장소명과 상세주소가 한 줄 인라인으로 표시되어 전체 높이가 슬림하게 유지됨 확인.
+   - 경유지 `+` 클릭 시 새 경유지 순차 추가 및 `✕` 클릭 시 해당 인덱스 경유지만 정확히 삭제됨 확인.
+   - 5개 경유지 도달 시 `+` 버튼 자동 은닉 및 최대 5개 초과 방어 확인.
+   - 로컬스토리지 저장 및 새로고침 시 다중 경유지 배열 정상 복원 확인.
+

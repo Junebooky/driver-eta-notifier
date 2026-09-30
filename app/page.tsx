@@ -622,7 +622,8 @@ export default function Home() {
 
   const [isInitialized, setIsInitialized] = useState(false);
   const [destination, setDestination] = useState<LocationPreset>(DEFAULT_PRESET_LOCATIONS[0]);
-  const [waypoint, setWaypoint] = useState<LocationPreset | null>(null);
+  const [waypoints, setWaypoints] = useState<LocationPreset[]>([]);
+  const [editingWaypointIndex, setEditingWaypointIndex] = useState<number>(-1);
   const [adminWaypoints, setAdminWaypoints] = useState<LocationPreset[]>([]);
   const [isAdminRoute, setIsAdminRoute] = useState(false);
   const isRouteRestoredRef = useRef(false);
@@ -633,7 +634,7 @@ export default function Home() {
   const [isOnboarding, setIsOnboarding] = useState(false);
   const [onboardingStage, setOnboardingStage] = useState<'splash' | 'sheet' | null>(null);
 
-  // [태스크 1] Hydration-Safe 마운트 시 복원 로직
+  // [태스크 1 & 2] Hydration-Safe 마운트 시 복원 로직 (다중 경유지 및 단일 경유지 하위 호환)
   useEffect(() => {
     try {
       const savedRoute = localStorage.getItem(LAST_ROUTE_STORAGE_KEY);
@@ -641,7 +642,11 @@ export default function Home() {
         const parsed = JSON.parse(savedRoute);
         if (parsed.origin) setOrigin(parsed.origin);
         if (parsed.destination) setDestination(parsed.destination);
-        if (parsed.waypoint) setWaypoint(parsed.waypoint);
+        if (Array.isArray(parsed.waypoints)) {
+          setWaypoints(parsed.waypoints);
+        } else if (parsed.waypoint) {
+          setWaypoints([parsed.waypoint]);
+        }
         if (parsed.adminWaypoints) setAdminWaypoints(parsed.adminWaypoints);
         if (typeof parsed.isAdminRoute === 'boolean') setIsAdminRoute(parsed.isAdminRoute);
       }
@@ -652,7 +657,7 @@ export default function Home() {
     }
   }, [setOrigin]);
 
-  // [태스크 1] 상태 변경 시 자동 영속화
+  // [태스크 1 & 2] 상태 변경 시 자동 영속화 (다중 경유지 배열 직렬화)
   useEffect(() => {
     if (!isRouteRestoredRef.current) return;
     if (origin || destination) {
@@ -662,7 +667,8 @@ export default function Home() {
           JSON.stringify({
             origin,
             destination,
-            waypoint: waypoint || null,
+            waypoints: waypoints || [],
+            waypoint: waypoints && waypoints[0] ? waypoints[0] : null,
             adminWaypoints: adminWaypoints || [],
             isAdminRoute: Boolean(isAdminRoute),
           })
@@ -671,7 +677,7 @@ export default function Home() {
         console.error('[Cockpit] 최근 경로 저장 실패:', error);
       }
     }
-  }, [origin, destination, waypoint, adminWaypoints, isAdminRoute]);
+  }, [origin, destination, waypoints, adminWaypoints, isAdminRoute]);
 
   // Initialization Gate: check driver onboarding status on first launch before revealing dashboard
   useEffect(() => {
@@ -811,9 +817,10 @@ export default function Home() {
   // Recalculate route whenever origin, destination, or waypoints change (Strictly Real-time TMAP)
   useEffect(() => {
     if (origin && destination) {
-      const effectiveWaypoints = isAdminRoute && adminWaypoints.length > 0
-        ? adminWaypoints
-        : (waypoint && waypoint.lat && waypoint.lng ? [waypoint] : []);
+      const effectiveWaypoints =
+        isAdminRoute && adminWaypoints.length > 0
+          ? adminWaypoints
+          : waypoints.filter((w) => w && w.lat && w.lng && (w.lat !== 0 || w.lng !== 0));
       fetchRouteEstimate(origin, destination, effectiveWaypoints);
     }
   }, [
@@ -821,35 +828,29 @@ export default function Home() {
     origin?.lng,
     destination?.lat,
     destination?.lng,
-    waypoint?.lat,
-    waypoint?.lng,
+    waypoints,
     adminWaypoints,
     isAdminRoute,
-    fetchRouteEstimate
+    fetchRouteEstimate,
   ]);
 
-  // Waypoint Add & Remove handlers
+  // Waypoint Add, Select & Remove handlers (Supporting up to 5 multi-waypoints)
   const handleAddWaypoint = () => {
-    const initialWaypoint: LocationPreset = {
-      id: `waypoint_${Date.now()}`,
-      name: '경유지 선택',
-      shortName: '경유지',
-      lat: 0,
-      lng: 0,
-      address: '터치하여 장소를 검색하세요',
-      category: 'CUSTOM',
-    };
-    setWaypoint(initialWaypoint);
-    setIsAdminRoute(false);
-    setAdminWaypoints([]);
+    if (waypoints.length >= 5) return;
+    setEditingWaypointIndex(-1);
     setSelectionTarget('waypoint');
     setIsLocationSearchOpen(true);
   };
 
-  const handleRemoveWaypoint = () => {
-    setWaypoint(null);
+  const handleSelectWaypoint = (index: number) => {
+    setEditingWaypointIndex(index);
+    setSelectionTarget('waypoint');
+    setIsLocationSearchOpen(true);
+  };
+
+  const handleRemoveWaypoint = (index: number) => {
+    setWaypoints((prev) => prev.filter((_, i) => i !== index));
     setIsAdminRoute(false);
-    setAdminWaypoints([]);
     if (selectionTarget === 'waypoint') {
       setSelectionTarget('destination');
     }
@@ -863,6 +864,22 @@ export default function Home() {
     if (origin && destination) {
       fetchPrediction(date, origin, destination);
     }
+  };
+
+  // Helper to insert or update waypoint
+  const applyWaypointSelection = (resolvedPreset: LocationPreset) => {
+    if (editingWaypointIndex >= 0 && editingWaypointIndex < waypoints.length) {
+      setWaypoints((prev) => {
+        const copy = [...prev];
+        copy[editingWaypointIndex] = resolvedPreset;
+        return copy;
+      });
+    } else {
+      setWaypoints((prev) => (prev.length >= 5 ? prev : [...prev, resolvedPreset]));
+    }
+    setIsAdminRoute(false);
+    setEditingWaypointIndex(-1);
+    setSelectionTarget('destination');
   };
 
   // Handle Preset Button Click
@@ -892,9 +909,7 @@ export default function Home() {
       saveRecentPreset(resolvedPreset);
       setSelectionTarget('destination');
     } else if (selectionTarget === 'waypoint') {
-      setWaypoint(resolvedPreset);
-      setIsAdminRoute(false);
-      setSelectionTarget('destination');
+      applyWaypointSelection(resolvedPreset);
     } else {
       setDestination(resolvedPreset);
     }
@@ -916,9 +931,7 @@ export default function Home() {
       setOrigin(gasPreset);
       setSelectionTarget('destination');
     } else if (selectionTarget === 'waypoint') {
-      setWaypoint(gasPreset);
-      setIsAdminRoute(false);
-      setSelectionTarget('destination');
+      applyWaypointSelection(gasPreset);
     } else {
       setDestination(gasPreset);
       setSelectionTarget('destination');
@@ -931,9 +944,7 @@ export default function Home() {
       setOrigin(preset);
       setSelectionTarget('destination');
     } else if (selectionTarget === 'waypoint') {
-      setWaypoint(preset);
-      setIsAdminRoute(false);
-      setSelectionTarget('destination');
+      applyWaypointSelection(preset);
     } else {
       setDestination(preset);
       setSelectionTarget('destination');
@@ -957,9 +968,7 @@ export default function Home() {
       saveRecentPreset(resolvedPreset);
       setSelectionTarget('destination');
     } else if (selectionTarget === 'waypoint') {
-      setWaypoint(resolvedPreset);
-      setIsAdminRoute(false);
-      setSelectionTarget('destination');
+      applyWaypointSelection(resolvedPreset);
     } else {
       setDestination(resolvedPreset);
     }
@@ -984,7 +993,7 @@ export default function Home() {
       const schedAdminWps = schedule?.adminWaypoints || schedule?.waypoints || [];
       setIsAdminRoute(isSchedAdmin);
       setAdminWaypoints(schedAdminWps);
-      setWaypoint(null);
+      setWaypoints([]);
       fetchRouteEstimate(originPreset, destinationPreset, isSchedAdmin ? schedAdminWps : []);
       setActiveTab('drive');
       haptics.success();
@@ -1001,7 +1010,7 @@ export default function Home() {
       setDestination(destinationPreset);
       setIsAdminRoute(isSchedAdmin);
       setAdminWaypoints(schedAdminWps);
-      setWaypoint(null);
+      setWaypoints([]);
       fetchRouteEstimate(originPreset, destinationPreset, isSchedAdmin ? schedAdminWps : []);
 
       let naviWaypoints: Array<{ name: string; lat: number; lng: number }> = [];
@@ -1189,19 +1198,22 @@ export default function Home() {
             <OriginDestinationSelector
               origin={origin}
               destination={destination}
-              waypoint={waypoint}
+              waypoints={waypoints}
               adminWaypoints={adminWaypoints}
               isAdminRoute={isAdminRoute}
               selectionTarget={selectionTarget}
               onSelectTarget={(target) => setSelectionTarget(target)}
               onSelectOrigin={() => setSelectionTarget('origin')}
               onSelectDestination={() => setSelectionTarget('destination')}
-              onSelectWaypoint={() => setSelectionTarget('waypoint')}
+              onSelectWaypoint={(index) => handleSelectWaypoint(index)}
               onAddWaypoint={handleAddWaypoint}
               onRemoveWaypoint={handleRemoveWaypoint}
               onSwap={handleSwapOriginDestination}
-              onOpenSearchModal={(target) => {
+              onOpenSearchModal={(target, wpIndex) => {
                 setSelectionTarget(target);
+                if (target === 'waypoint') {
+                  setEditingWaypointIndex(typeof wpIndex === 'number' ? wpIndex : -1);
+                }
                 setIsLocationSearchOpen(true);
               }}
               onOpenInspectionModal={() => setIsInspectionModalOpen(true)}
@@ -1232,7 +1244,7 @@ export default function Home() {
                 if (origin && destination) {
                   const effectiveWaypoints = isAdminRoute && adminWaypoints.length > 0
                     ? adminWaypoints
-                    : (waypoint && waypoint.lat && waypoint.lng ? [waypoint] : []);
+                    : (waypoints && waypoints.length > 0 ? waypoints : []);
                   fetchRouteEstimate(origin, destination, effectiveWaypoints);
                 }
               }}
@@ -1251,7 +1263,7 @@ export default function Home() {
               defaultNavi={profile.defaultNavi}
               origin={origin}
               destination={destination}
-              waypoint={waypoint}
+              waypoints={waypoints}
               adminWaypoints={adminWaypoints}
               isAdminRoute={isAdminRoute}
               routeEstimate={routeEstimate}
@@ -1492,7 +1504,9 @@ export default function Home() {
           selectionTarget === 'origin'
             ? origin?.id
             : selectionTarget === 'waypoint'
-            ? waypoint?.id
+            ? (editingWaypointIndex >= 0 && editingWaypointIndex < waypoints.length
+                ? waypoints[editingWaypointIndex]?.id
+                : undefined)
             : destination?.id
         }
         onSelectLocation={handleSelectLocationFromSearch}

@@ -8,18 +8,19 @@ import { haptics } from '@/utils/haptics';
 export interface OriginDestinationSelectorProps {
   origin: LocationPreset;
   destination: LocationPreset;
-  waypoint: LocationPreset | null;
+  waypoints?: LocationPreset[];
+  waypoint?: LocationPreset | null;
   adminWaypoints?: LocationPreset[];
   isAdminRoute?: boolean;
   selectionTarget?: 'origin' | 'destination' | 'waypoint';
   onSelectTarget?: (target: 'origin' | 'destination' | 'waypoint') => void;
   onSelectOrigin?: () => void;
   onSelectDestination?: () => void;
-  onSelectWaypoint?: () => void;
+  onSelectWaypoint?: (index: number) => void;
   onAddWaypoint: () => void;
-  onRemoveWaypoint: () => void;
+  onRemoveWaypoint: (index: number) => void;
   onSwap?: () => void;
-  onOpenSearchModal?: (target: 'origin' | 'destination' | 'waypoint') => void;
+  onOpenSearchModal?: (target: 'origin' | 'destination' | 'waypoint', waypointIndex?: number) => void;
   onOpenInspectionModal?: () => void;
   onOpenFlightModal?: () => void;
   onOpenGasModal?: () => void;
@@ -29,6 +30,7 @@ export interface OriginDestinationSelectorProps {
 export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps> = ({
   origin,
   destination,
+  waypoints = [],
   waypoint,
   adminWaypoints = [],
   isAdminRoute = false,
@@ -44,6 +46,11 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
 }) => {
   const [isAccordionOpen, setIsAccordionOpen] = useState(false);
 
+  // Normalize multi-waypoints (backward compatible with single waypoint)
+  const activeWaypoints: LocationPreset[] =
+    waypoints && waypoints.length > 0 ? waypoints : waypoint ? [waypoint] : [];
+  const hasWaypoints = activeWaypoints.length > 0;
+
   const handleOriginClick = () => {
     haptics.lightTap();
     if (onSelectOrigin) onSelectOrigin();
@@ -58,22 +65,22 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
     if (onOpenSearchModal) onOpenSearchModal('destination');
   };
 
-  const handleWaypointClick = () => {
+  const handleWaypointClick = (index: number) => {
     haptics.lightTap();
-    if (onSelectWaypoint) onSelectWaypoint();
+    if (onSelectWaypoint) onSelectWaypoint(index);
     if (onSelectTarget) onSelectTarget('waypoint');
-    if (onOpenSearchModal) onOpenSearchModal('waypoint');
+    if (onOpenSearchModal) onOpenSearchModal('waypoint', index);
   };
 
   return (
-    <div className="w-full bg-white border border-slate-100/80 rounded-2xl p-4 shadow-[0_8px_25px_rgba(30,96,243,0.06)] space-y-2.5 select-none transition-all duration-300 ease-in-out">
-      {waypoint ? (
-        /* Vertical 3-Tier Transition View (Origin ➔ Waypoint ➔ Destination) */
-        <div className="space-y-2 w-full transition-all duration-300 ease-in-out animate-in fade-in slide-in-from-top-2">
-          {/* 1. Origin Slot */}
+    <div className="w-full bg-white border border-slate-100/80 rounded-2xl p-4 shadow-[0_8px_25px_rgba(30,96,243,0.06)] space-y-2 select-none transition-all duration-300 ease-in-out">
+      {hasWaypoints ? (
+        /* Vertical Multi-Tier Slim Inline View (Origin ➔ Waypoints (1~5) ➔ Destination) */
+        <div className="space-y-1.5 w-full transition-all duration-300 ease-in-out animate-in fade-in slide-in-from-top-2">
+          {/* 1. Origin Slot (Inline Slim) */}
           <div
             onClick={handleOriginClick}
-            className={`w-full p-3 rounded-2xl border text-left cursor-pointer transition-all duration-150 active:scale-98 ${
+            className={`w-full py-2.5 px-3.5 rounded-2xl border text-left cursor-pointer transition-all duration-150 active:scale-98 ${
               selectionTarget === 'origin'
                 ? 'bg-slate-50/80 text-slate-800 border-slate-300/90 ring-2 ring-slate-200/60 shadow-xs'
                 : 'bg-white border-slate-200/80 hover:border-slate-300'
@@ -88,66 +95,96 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
                 <Search className="w-3 h-3 text-slate-400" />
               </span>
             </div>
-            <div className="text-base font-bold truncate mt-1.5 text-slate-900">
-              {origin.shortName}
-            </div>
-            <div className="text-[11px] truncate mt-0.5 font-normal text-slate-500">
-              {origin.address || origin.name}
+            <div className="flex items-baseline gap-2 min-w-0 mt-0.5">
+              <span className="text-sm sm:text-base font-bold text-slate-900 shrink-0 truncate max-w-[55%]">
+                {origin.shortName || origin.name}
+              </span>
+              <span className="text-xs text-slate-400 truncate">
+                {origin.address || origin.name}
+              </span>
             </div>
           </div>
 
-          {/* 2. Waypoint Slot (Minimalist Slate Pin + Pure SVG +/X interaction, no '경유' label) */}
-          <div
-            onClick={handleWaypointClick}
-            className={`w-full p-3 rounded-2xl border text-left cursor-pointer transition-all duration-150 active:scale-98 ${
-              selectionTarget === 'waypoint'
-                ? 'bg-slate-50/80 border-slate-400 ring-2 ring-slate-300/60 shadow-xs'
-                : 'bg-white border-slate-200/80 hover:border-slate-300'
-            }`}
-            title="경유지 검색 및 변경"
-          >
-            <div className="flex items-center justify-between w-full">
-              <div className="flex items-center gap-1.5">
-                <div className="w-5 h-5 rounded-md bg-slate-700 text-white flex items-center justify-center shadow-xs">
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
+          {/* 2. Waypoint Slots (Dynamic Array with + and ✕ dual control, max 5) */}
+          {activeWaypoints.map((wp, index) => (
+            <div
+              key={wp.id || `wp_${index}`}
+              onClick={() => handleWaypointClick(index)}
+              className={`w-full py-2.5 px-3.5 rounded-2xl border text-left cursor-pointer transition-all duration-150 active:scale-98 ${
+                selectionTarget === 'waypoint'
+                  ? 'bg-slate-50/80 border-slate-400 ring-2 ring-slate-300/60 shadow-xs'
+                  : 'bg-white border-slate-200/80 hover:border-slate-300'
+              }`}
+              title="경유지 검색 및 변경"
+            >
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-5 h-5 rounded-md bg-slate-700 text-white flex items-center justify-center shadow-xs">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </div>
+                  <span className="text-[11px] font-semibold text-slate-600">
+                    {activeWaypoints.length > 1
+                      ? `경유지 ${index + 1}`
+                      : wp.name && wp.name !== '경유지 선택'
+                      ? wp.shortName || wp.name
+                      : '장소 검색'}
+                  </span>
                 </div>
-                <span className="text-[11px] font-semibold text-slate-600">
-                  {waypoint.name && waypoint.name !== '경유지 선택' ? waypoint.shortName || waypoint.name : '장소 검색'}
+                <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                  {/* 5개 미만일 때만 + 버튼 노출 */}
+                  {activeWaypoints.length < 5 && !isAdminRoute && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        haptics.mediumTap();
+                        onAddWaypoint();
+                      }}
+                      className="w-7 h-7 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-50 active:scale-95 transition-all cursor-pointer"
+                      title="경유지 추가"
+                      aria-label="경유지 추가"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                      </svg>
+                    </button>
+                  )}
+                  {/* 개별 경유지 삭제 버튼 */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      haptics.lightTap();
+                      onRemoveWaypoint(index);
+                    }}
+                    className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-700 active:scale-95 transition-all cursor-pointer"
+                    title="경유지 삭제"
+                    aria-label="경유지 삭제"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div className="flex items-baseline gap-2 min-w-0 mt-0.5">
+                <span className="text-sm sm:text-base font-bold text-slate-900 shrink-0 truncate max-w-[55%]">
+                  {wp.shortName || wp.name}
+                </span>
+                <span className="text-xs text-slate-400 truncate">
+                  {wp.address || '터치하여 장소를 검색하세요'}
                 </span>
               </div>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    haptics.lightTap();
-                    onRemoveWaypoint();
-                  }}
-                  className="w-6 h-6 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center active:scale-90 transition-all cursor-pointer"
-                  title="경유지 취소"
-                  aria-label="경유지 취소"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
             </div>
-            <div className="text-base font-bold truncate mt-1.5 text-slate-900">
-              {waypoint.shortName || waypoint.name}
-            </div>
-            <div className="text-[11px] truncate mt-0.5 font-normal text-slate-500">
-              {waypoint.address || '터치하여 장소를 검색하세요'}
-            </div>
-          </div>
+          ))}
 
-          {/* 3. Destination Slot */}
+          {/* 3. Destination Slot (Inline Slim) */}
           <div
             onClick={handleDestinationClick}
-            className={`w-full p-3 rounded-2xl text-left cursor-pointer transition-all duration-150 active:scale-98 ${
+            className={`w-full py-2.5 px-3.5 rounded-2xl text-left cursor-pointer transition-all duration-150 active:scale-98 ${
               selectionTarget === 'destination'
                 ? 'bg-white border-2 border-[#1E60F3] shadow-sm shadow-blue-500/10'
                 : 'bg-white border border-slate-200/80 hover:border-slate-300'
@@ -162,11 +199,13 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
                 <Search className="w-3 h-3 text-[#1E60F3]" />
               </span>
             </div>
-            <div className="text-base font-bold truncate mt-1.5 text-slate-900">
-              {destination.shortName}
-            </div>
-            <div className="text-[11px] truncate mt-0.5 font-normal text-slate-500">
-              {destination.address || destination.name}
+            <div className="flex items-baseline gap-2 min-w-0 mt-0.5">
+              <span className="text-sm sm:text-base font-bold text-slate-900 shrink-0 truncate max-w-[55%]">
+                {destination.shortName || destination.name}
+              </span>
+              <span className="text-xs text-slate-400 truncate">
+                {destination.address || destination.name}
+              </span>
             </div>
           </div>
         </div>
@@ -176,7 +215,7 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
           {/* Origin Card (Neutral Gray 기준점) */}
           <div
             onClick={handleOriginClick}
-            className={`flex-1 min-w-0 w-full p-3 rounded-2xl border text-left cursor-pointer transition-all duration-150 active:scale-95 ${
+            className={`flex-1 min-w-0 w-full py-2.5 px-3 rounded-2xl border text-left cursor-pointer transition-all duration-150 active:scale-95 ${
               selectionTarget === 'origin'
                 ? 'bg-slate-50/80 text-slate-800 border-slate-300/90 ring-2 ring-slate-200/60 shadow-xs'
                 : 'bg-white border-slate-200/80 hover:border-slate-300'
@@ -192,7 +231,7 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
               </span>
             </div>
             <div
-              className={`text-base font-bold truncate mt-1.5 w-full ${
+              className={`text-base font-bold truncate mt-1 w-full ${
                 selectionTarget === 'origin' ? 'text-slate-900' : 'text-slate-700'
               }`}
               title={origin.name}
@@ -211,7 +250,7 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
 
           {/* Action Stack: Matching style '+' Waypoint Button stacked above Swap Button */}
           <div className="flex flex-col gap-1.5 items-center shrink-0">
-            {!isAdminRoute && !waypoint && (
+            {!isAdminRoute && activeWaypoints.length < 5 && (
               <button
                 type="button"
                 onClick={(e) => {
@@ -248,7 +287,7 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
           {/* Destination Card (2px Cobalt Outline 핵심 타깃 - 순수 화이트 배경) */}
           <div
             onClick={handleDestinationClick}
-            className={`flex-1 min-w-0 w-full p-3 rounded-2xl text-left cursor-pointer transition-all duration-150 active:scale-95 ${
+            className={`flex-1 min-w-0 w-full py-2.5 px-3 rounded-2xl text-left cursor-pointer transition-all duration-150 active:scale-95 ${
               selectionTarget === 'destination'
                 ? 'bg-white border-2 border-[#1E60F3] shadow-sm shadow-blue-500/10'
                 : 'bg-white border border-slate-200/80 hover:border-slate-300'
@@ -289,7 +328,7 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
                 <Search className="w-3 h-3 text-[#1E60F3]" />
               </span>
             </div>
-            <div className="text-base font-bold truncate mt-1.5 w-full text-slate-900" title={destination.name}>
+            <div className="text-base font-bold truncate mt-1 w-full text-slate-900" title={destination.name}>
               {destination.shortName}
             </div>
             <div
@@ -322,12 +361,12 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
                 <span className="w-4 h-4 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-[10px] font-bold shrink-0 border border-slate-200">
                   {index + 1}
                 </span>
-                <div className="flex-1 min-w-0">
-                  <span className="font-semibold text-slate-800 truncate block">
+                <div className="flex-1 min-w-0 flex items-baseline gap-2">
+                  <span className="font-semibold text-slate-800 truncate shrink-0 max-w-[55%]">
                     {wp.shortName || wp.name}
                   </span>
                   {wp.address && (
-                    <span className="text-[10px] text-slate-400 truncate block">
+                    <span className="text-[10px] text-slate-400 truncate">
                       {wp.address}
                     </span>
                   )}
@@ -339,14 +378,16 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
       )}
 
       {/* Guide Caption */}
-      <div className="flex items-center justify-between py-1 px-0.5 select-none">
+      <div className="flex items-center justify-between py-0.5 px-0.5 select-none">
         <div className="flex items-center space-x-1.5 min-w-0">
           <div className="w-3.5 h-3.5 rounded-full bg-[#1E60F3] text-white flex items-center justify-center text-[9px] font-black shrink-0 shadow-[0_1px_4px_rgba(30,96,243,0.3)]">
             i
           </div>
           <span className="text-[11px] text-slate-500 font-medium truncate">
-            {waypoint
-              ? '경유지 카드를 탭해 변경하거나 우측 X로 취소하세요.'
+            {hasWaypoints
+              ? activeWaypoints.length < 5
+                ? '경유지 카드를 탭해 변경하거나 + 로 추가, ✕ 로 삭제하세요.'
+                : '최대 경유지(5개)가 설정되었습니다.'
               : isAdminRoute
               ? '관리자 지정동선 대열 통제 주행 모드입니다.'
               : '카드를 탭해 장소·거점을 선택하세요.'}

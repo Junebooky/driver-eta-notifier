@@ -11,6 +11,7 @@ interface ActionPanelProps {
   defaultNavi: NaviProvider;
   origin: LocationPreset;
   destination: LocationPreset;
+  waypoints?: LocationPreset[];
   waypoint?: LocationPreset | null;
   adminWaypoints?: LocationPreset[];
   isAdminRoute?: boolean;
@@ -42,6 +43,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   defaultNavi,
   origin,
   destination,
+  waypoints,
   waypoint,
   adminWaypoints = [],
   isAdminRoute = false,
@@ -91,11 +93,13 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
           lng: w.lng,
         })),
       ];
-    } else if (waypoint) {
-      // Personal Route Sequence: Driver Realtime GPS ➔ Personal Waypoint ➔ Destination
-      naviWaypoints = [
-        { name: waypoint.shortName || waypoint.name, lat: waypoint.lat, lng: waypoint.lng },
-      ];
+    } else {
+      const activeWaypoints = waypoints && waypoints.length > 0 ? waypoints : (waypoint ? [waypoint] : []);
+      naviWaypoints = activeWaypoints.slice(0, 5).map((w) => ({
+        name: w.shortName || w.name,
+        lat: w.lat,
+        lng: w.lng,
+      }));
     }
 
     launchNavigationApp(

@@ -134,9 +134,9 @@ export function buildDeepLink(
   }
 
   if (provider === 'kakao') {
-    // KakaoMap: &vp=lat,lng
-    const viaParam = validWaypoints.length > 0
-      ? validWaypoints.map((w) => `&vp=${w.lat},${w.lng}`).join('')
+    // KakaoMap: &vp=lat,lng (up to 5 waypoints)
+    const viaParam = validWaypoints.slice(0, 5).length > 0
+      ? validWaypoints.slice(0, 5).map((w) => `&vp=${w.lat},${w.lng}`).join('')
       : '';
 
     if (origin) {
@@ -164,14 +164,12 @@ export function buildDeepLink(
     };
   }
 
-  // Naver: &v1lat=..&v1lng=..&v2lat=..&v2lng=..
+  // Naver: &v1lat=..&v1lng=..&v1name=.. up to &v5lat=..
   let naverViaParam = '';
-  if (validWaypoints[0]) {
-    naverViaParam += `&v1lat=${validWaypoints[0].lat}&v1lng=${validWaypoints[0].lng}&v1name=${encodeURIComponent(validWaypoints[0].name)}`;
-  }
-  if (validWaypoints[1]) {
-    naverViaParam += `&v2lat=${validWaypoints[1].lat}&v2lng=${validWaypoints[1].lng}&v2name=${encodeURIComponent(validWaypoints[1].name)}`;
-  }
+  validWaypoints.slice(0, 5).forEach((wp, idx) => {
+    const i = idx + 1;
+    naverViaParam += `&v${i}lat=${wp.lat}&v${i}lng=${wp.lng}&v${i}name=${encodeURIComponent(wp.name)}`;
+  });
 
   if (origin) {
     const encodedOriginName = encodeURIComponent(origin.name);
