@@ -36,6 +36,7 @@ interface VehicleInspectionModalProps {
   isOpen: boolean;
   onClose: () => void;
   profile: DriverProfile;
+  profilePlateNumber?: string;
   initialMode?: 'pickup' | 'daily' | 'return' | 'receipt';
 }
 
@@ -75,6 +76,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
   isOpen,
   onClose,
   profile,
+  profilePlateNumber,
   initialMode = 'pickup',
 }) => {
   const normalizedInitialMode = initialMode === 'receipt' ? 'pickup' : (initialMode || 'pickup');
@@ -86,13 +88,14 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
   }, [profile.vehicleNo]);
 
   const detectedCarNumber = useMemo(() => {
+    if (profilePlateNumber?.trim()) return profilePlateNumber.trim();
     const p = profile as any;
     if (p.plateNumber?.trim()) return p.plateNumber.trim();
     if (profile.carNumber?.trim()) return profile.carNumber.trim();
     const parts = (profile.vehicleNo || '').split(' ');
     if (parts.length >= 2) return parts.slice(1).join(' ').trim();
     return '';
-  }, [profile.plateNumber, profile.carNumber, profile.vehicleNo]);
+  }, [profilePlateNumber, profile.plateNumber, profile.carNumber, profile.vehicleNo]);
 
   // Form Fields State
   const [vehicleHocha, setVehicleHocha] = useState(detectedHocha);
@@ -176,6 +179,13 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
 
     const initialKmNum = parseFloat(sanitizeNumericInput(receiptTotalKm)) || 0;
     const initialDteNum = parseFloat(sanitizeNumericInput(receiptDte)) || 0;
+    const effectiveCarNumber =
+      overrides?.carNumber?.trim() ||
+      carNumber?.trim() ||
+      profilePlateNumber?.trim() ||
+      profile.plateNumber?.trim() ||
+      profile.carNumber?.trim() ||
+      detectedCarNumber;
 
     let currentInitialData = initialData;
     if (activeTab === 'pickup' || !currentInitialData) {
@@ -185,7 +195,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
           initialDte: initialDteNum,
           inspectionDate: formatInspectionDate(),
           vehicleHocha: vehicleHocha || detectedHocha,
-          carNumber: carNumber || detectedCarNumber,
+          carNumber: effectiveCarNumber,
           outerDamage: receiptDamage,
           selectedParts: receiptSelectedParts,
           savedAt: initialData?.savedAt || new Date().toISOString(),
@@ -196,7 +206,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
 
     const payload = {
       vehicleHocha: vehicleHocha || detectedHocha,
-      carNumber: carNumber || detectedCarNumber,
+      carNumber: effectiveCarNumber,
       // Pickup
       pickupOdo: receiptTotalKm,
       pickupDte: receiptDte,
@@ -363,12 +373,13 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
     isLoadedRef.current = true;
   }, [isOpen, profile.vehicleNo, detectedHocha, detectedCarNumber]);
 
-  // Task 5: Real-time synchronization of profile plateNumber to carNumber when modal is open
+  // Task 2: Real-time synchronization of profilePlateNumber / profile.plateNumber to carNumber when modal is open or profile updates
   useEffect(() => {
-    if (isOpen && detectedCarNumber) {
-      setCarNumber(detectedCarNumber);
+    const targetPlate = profilePlateNumber?.trim() || profile.plateNumber?.trim() || detectedCarNumber;
+    if (isOpen && targetPlate) {
+      setCarNumber(targetPlate);
     }
-  }, [isOpen, detectedCarNumber]);
+  }, [isOpen, profilePlateNumber, profile.plateNumber, detectedCarNumber]);
 
   // Auto-persist changes to vehicle-isolated key when fields update
   useEffect(() => {
@@ -592,10 +603,17 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
 
   // Real-time Preview Text Generation
   const previewText = useMemo(() => {
+    const effectiveCarNumber =
+      carNumber?.trim() ||
+      profilePlateNumber?.trim() ||
+      profile.plateNumber?.trim() ||
+      profile.carNumber?.trim() ||
+      detectedCarNumber;
+
     if (activeTab === 'pickup') {
       return generateReceiptReport({
         vehicleHocha,
-        carNumber,
+        carNumber: effectiveCarNumber,
         totalKm: receiptTotalKm,
         dte: receiptDte,
         outerDamage: receiptDamage,
@@ -604,7 +622,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
       return generateDailyReport({
         date: formatInspectionDate(),
         vehicleNo: vehicleHocha,
-        plateNumber: carNumber,
+        plateNumber: effectiveCarNumber,
         range: parseFloat(dailyDte) || 0,
         existingDamages: existingDamageParts,
         newDamages: dailyNewParts,
@@ -612,7 +630,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
     } else {
       return generateReturnReport({
         vehicleHocha,
-        carNumber,
+        carNumber: effectiveCarNumber,
         returnTotalKm,
         returnDte,
         outerDamage: returnDamage,
@@ -625,6 +643,10 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
     activeTab,
     vehicleHocha,
     carNumber,
+    detectedCarNumber,
+    profilePlateNumber,
+    profile.plateNumber,
+    profile.carNumber,
     receiptTotalKm,
     receiptDte,
     receiptDamage,
@@ -644,14 +666,32 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
   // Handle Save (Confirm button) - saves to vehicle-isolated localStorage and closes
   const handleConfirmSave = () => {
     haptics.lightTap();
-    saveVehicleInspectionData();
+    const effectiveCarNumber =
+      carNumber?.trim() ||
+      profilePlateNumber?.trim() ||
+      profile.plateNumber?.trim() ||
+      profile.carNumber?.trim() ||
+      detectedCarNumber;
+    if (!carNumber?.trim() && effectiveCarNumber) {
+      setCarNumber(effectiveCarNumber);
+    }
+    saveVehicleInspectionData({ carNumber: effectiveCarNumber });
     onClose();
   };
 
   // Handle Save & Launch KakaoTalk
   const handleKakaoLaunch = async () => {
     haptics.successPulse();
-    saveVehicleInspectionData();
+    const effectiveCarNumber =
+      carNumber?.trim() ||
+      profilePlateNumber?.trim() ||
+      profile.plateNumber?.trim() ||
+      profile.carNumber?.trim() ||
+      detectedCarNumber;
+    if (!carNumber?.trim() && effectiveCarNumber) {
+      setCarNumber(effectiveCarNumber);
+    }
+    saveVehicleInspectionData({ carNumber: effectiveCarNumber });
     await copyAndLaunchKakaoTalk(previewText);
   };
 

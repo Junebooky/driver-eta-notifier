@@ -633,53 +633,43 @@ export default function Home() {
   const [isOnboarding, setIsOnboarding] = useState(false);
   const [onboardingStage, setOnboardingStage] = useState<'splash' | 'sheet' | null>(null);
 
-  // Task 1: Restore last route (origin, destination, waypoint, adminWaypoints, isAdminRoute) from localStorage
+  // [태스크 1] Hydration-Safe 마운트 시 복원 로직
   useEffect(() => {
     try {
-      const savedRouteStr = localStorage.getItem(LAST_ROUTE_STORAGE_KEY);
-      if (savedRouteStr) {
-        const saved = JSON.parse(savedRouteStr);
-        if (saved.origin && typeof saved.origin.lat === 'number' && typeof saved.origin.lng === 'number') {
-          setOrigin(saved.origin);
-        }
-        if (saved.destination && typeof saved.destination.lat === 'number' && typeof saved.destination.lng === 'number') {
-          setDestination(saved.destination);
-        }
-        if (saved.waypoint) {
-          setWaypoint(saved.waypoint);
-        }
-        if (Array.isArray(saved.adminWaypoints)) {
-          setAdminWaypoints(saved.adminWaypoints);
-        }
-        if (typeof saved.isAdminRoute === 'boolean') {
-          setIsAdminRoute(saved.isAdminRoute);
-        }
+      const savedRoute = localStorage.getItem(LAST_ROUTE_STORAGE_KEY);
+      if (savedRoute) {
+        const parsed = JSON.parse(savedRoute);
+        if (parsed.origin) setOrigin(parsed.origin);
+        if (parsed.destination) setDestination(parsed.destination);
+        if (parsed.waypoint) setWaypoint(parsed.waypoint);
+        if (parsed.adminWaypoints) setAdminWaypoints(parsed.adminWaypoints);
+        if (typeof parsed.isAdminRoute === 'boolean') setIsAdminRoute(parsed.isAdminRoute);
       }
-    } catch (e) {
-      console.warn('Failed to restore last route from localStorage:', e);
+    } catch (error) {
+      console.warn('[Cockpit] 최근 경로 로드 실패 (기본값 유지):', error);
     } finally {
       isRouteRestoredRef.current = true;
     }
   }, [setOrigin]);
 
-  // Task 1: Auto-persist route state changes to localStorage
+  // [태스크 1] 상태 변경 시 자동 영속화
   useEffect(() => {
     if (!isRouteRestoredRef.current) return;
-    try {
-      if (origin && destination) {
+    if (origin || destination) {
+      try {
         localStorage.setItem(
           LAST_ROUTE_STORAGE_KEY,
           JSON.stringify({
             origin,
             destination,
-            waypoint,
-            adminWaypoints,
-            isAdminRoute,
+            waypoint: waypoint || null,
+            adminWaypoints: adminWaypoints || [],
+            isAdminRoute: Boolean(isAdminRoute),
           })
         );
+      } catch (error) {
+        console.error('[Cockpit] 최근 경로 저장 실패:', error);
       }
-    } catch (e) {
-      console.warn('Failed to persist last route to localStorage:', e);
     }
   }, [origin, destination, waypoint, adminWaypoints, isAdminRoute]);
 
@@ -1487,6 +1477,7 @@ export default function Home() {
         isOpen={isInspectionModalOpen}
         onClose={() => setIsInspectionModalOpen(false)}
         profile={profile}
+        profilePlateNumber={profile.plateNumber}
         initialMode={inspectionInitialMode}
       />
 
