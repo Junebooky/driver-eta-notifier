@@ -624,6 +624,7 @@ export default function Home() {
   const [destination, setDestination] = useState<LocationPreset>(DEFAULT_PRESET_LOCATIONS[0]);
   const [waypoints, setWaypoints] = useState<LocationPreset[]>([]);
   const [editingWaypointIndex, setEditingWaypointIndex] = useState<number>(-1);
+  const [waypointInsertIndex, setWaypointInsertIndex] = useState<number | null>(null);
   const [adminWaypoints, setAdminWaypoints] = useState<LocationPreset[]>([]);
   const [isAdminRoute, setIsAdminRoute] = useState(false);
   const isRouteRestoredRef = useRef(false);
@@ -834,15 +835,18 @@ export default function Home() {
     fetchRouteEstimate,
   ]);
 
-  // Waypoint Add, Select & Remove handlers (Supporting up to 5 multi-waypoints)
-  const handleAddWaypoint = () => {
+  // Waypoint Add, Select & Remove handlers (Supporting up to 5 multi-waypoints with index-based insert)
+  const handleAddWaypoint = (afterIndex?: number) => {
     if (waypoints.length >= 5) return;
+    const targetIndex = typeof afterIndex === 'number' ? afterIndex + 1 : waypoints.length;
+    setWaypointInsertIndex(targetIndex);
     setEditingWaypointIndex(-1);
     setSelectionTarget('waypoint');
     setIsLocationSearchOpen(true);
   };
 
   const handleSelectWaypoint = (index: number) => {
+    setWaypointInsertIndex(null);
     setEditingWaypointIndex(index);
     setSelectionTarget('waypoint');
     setIsLocationSearchOpen(true);
@@ -851,6 +855,7 @@ export default function Home() {
   const handleRemoveWaypoint = (index: number) => {
     setWaypoints((prev) => prev.filter((_, i) => i !== index));
     setIsAdminRoute(false);
+    setWaypointInsertIndex(null);
     if (selectionTarget === 'waypoint') {
       setSelectionTarget('destination');
     }
@@ -866,7 +871,7 @@ export default function Home() {
     }
   };
 
-  // Helper to insert or update waypoint
+  // Helper to insert or update waypoint (with index-based splice support)
   const applyWaypointSelection = (resolvedPreset: LocationPreset) => {
     if (editingWaypointIndex >= 0 && editingWaypointIndex < waypoints.length) {
       setWaypoints((prev) => {
@@ -875,10 +880,19 @@ export default function Home() {
         return copy;
       });
     } else {
-      setWaypoints((prev) => (prev.length >= 5 ? prev : [...prev, resolvedPreset]));
+      setWaypoints((prev) => {
+        const next = [...prev];
+        if (typeof waypointInsertIndex === 'number' && waypointInsertIndex >= 0 && waypointInsertIndex <= next.length) {
+          next.splice(waypointInsertIndex, 0, resolvedPreset);
+        } else {
+          next.push(resolvedPreset);
+        }
+        return next.slice(0, 5); // 최대 5개 상한 방어
+      });
     }
     setIsAdminRoute(false);
     setEditingWaypointIndex(-1);
+    setWaypointInsertIndex(null);
     setSelectionTarget('destination');
   };
 
@@ -1213,6 +1227,7 @@ export default function Home() {
                 setSelectionTarget(target);
                 if (target === 'waypoint') {
                   setEditingWaypointIndex(typeof wpIndex === 'number' ? wpIndex : -1);
+                  setWaypointInsertIndex(null);
                 }
                 setIsLocationSearchOpen(true);
               }}
@@ -1496,7 +1511,10 @@ export default function Home() {
       {/* Standalone Location Search & Preset Modal */}
       <LocationSearchModal
         isOpen={isLocationSearchOpen}
-        onClose={() => setIsLocationSearchOpen(false)}
+        onClose={() => {
+          setIsLocationSearchOpen(false);
+          setWaypointInsertIndex(null);
+        }}
         target={selectionTarget}
         presets={presets}
         homeLocation={profile.homeLocation}

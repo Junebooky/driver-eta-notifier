@@ -3542,3 +3542,44 @@ flowchart TD
    - 5개 경유지 도달 시 `+` 버튼 자동 은닉 및 최대 5개 초과 방어 확인.
    - 로컬스토리지 저장 및 새로고침 시 다중 경유지 배열 정상 복원 확인.
 
+---
+
+## 74. 경유지 중간 삽입(Index-based Insert) 로직 구현 및 경유지 라벨 아이콘 제거 (2026-09-30)
+
+### 74.1 추진 배경 및 작업 목적
+1. **경유지 중간 위치(+) 삽입 결함 해결**:
+   - 기존에는 경유지 1번 카드의 `+`를 눌러도 새 경유지가 배열 맨 끝(경유지 3 뒤)에 추가되는 순서 불일치 문제가 발생.
+   - 각 경유지 카드의 `+` 버튼 클릭 시 해당 위치의 바로 다음(`index + 1`)에 새 경유지가 정확히 삽입(`Array.prototype.splice`)되도록 인덱스 기반 삽입 파이프라인을 구축.
+2. **경유지 라벨 아이콘 제거 및 순수 텍스트화**:
+   - 경유지 라벨 좌측의 어두운 배경 핀 아이콘 마크업을 완전히 제거.
+   - 별도의 배경색이나 테두리 박스 없이 `text-xs font-semibold text-slate-700` 스타일의 순수 텍스트(`경유지 N`)만 미니멀하고 단정하게 노출하여 시각적 노이즈를 제거.
+
+---
+
+### 74.2 모듈별 핵심 구현 내역
+1. **`components/OriginDestinationSelector.tsx`**:
+   - Props 함수 시그니처 갱신: `onAddWaypoint: (afterIndex?: number) => void`.
+   - 경유지 라벨 영역의 핀 아이콘 박스(`<div className="w-5 h-5 rounded-md bg-slate-700 ...">`) 제거 및 `<div className="flex items-center"><span className="text-xs font-semibold text-slate-700">경유지 {index + 1}</span></div>` 순수 텍스트로 단순화.
+   - 각 경유지 카드의 `+` 버튼 클릭 시 `onAddWaypoint(index)`로 현재 경유지 인덱스를 전달.
+2. **`app/page.tsx`**:
+   - `const [waypointInsertIndex, setWaypointInsertIndex] = useState<number | null>(null);` 삽입 타깃 인덱스 상태 신설.
+   - `handleAddWaypoint(afterIndex?: number)`:
+     - `afterIndex` 전달 시 `afterIndex + 1`을 타깃 인덱스로 설정, 미전달 시 `waypoints.length`로 설정.
+     - `setWaypointInsertIndex(targetIndex)`, `setEditingWaypointIndex(-1)` 동기화.
+   - `handleSelectWaypoint(index)` & `handleRemoveWaypoint(index)`:
+     - `setWaypointInsertIndex(null)`로 인덱스 상태 초기화.
+   - `applyWaypointSelection(resolvedPreset)`:
+     - 기존 수정 모드(`editingWaypointIndex >= 0`)가 아닐 때, `waypointInsertIndex`가 존재하면 `next.splice(waypointInsertIndex, 0, resolvedPreset)`로 원하는 중간 위치에 정확히 삽입.
+     - 최대 5개 상한(`next.slice(0, 5)`) 안전하게 방어 및 핸들링 완료 후 `waypointInsertIndex`를 `null`로 초기화.
+   - `LocationSearchModal` 닫힘(`onClose`) 및 다른 타깃 선택 시 `waypointInsertIndex` 안전 초기화.
+
+---
+
+### 74.3 검증 및 테스트 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 TypeScript / ESLint 컴파일 에러 **0건 (Exit code 0)** 통과.
+2. **시나리오 검증 결과**:
+   - **경유지 중간 삽입**: 경유지 1, 2, 3이 존재하는 상태에서 경유지 1번 카드의 `+` 클릭 후 새 장소 선택 시, 해당 장소가 '경유지 2'로 진입하고 기존 경유지 2, 3이 각각 '경유지 3', '경유지 4'로 한 칸씩 정확히 밀려남을 확인 (PASS).
+   - **경유지 라벨 순수 텍스트화**: 핀 아이콘 박스가 완전히 제거되고 정갈한 `경유지 N` 텍스트만 표시됨을 확인 (PASS).
+
+

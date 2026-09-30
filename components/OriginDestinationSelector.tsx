@@ -17,7 +17,7 @@ export interface OriginDestinationSelectorProps {
   onSelectOrigin?: () => void;
   onSelectDestination?: () => void;
   onSelectWaypoint?: (index: number) => void;
-  onAddWaypoint: () => void;
+  onAddWaypoint: (afterIndex?: number) => void;
   onRemoveWaypoint: (index: number) => void;
   onSwap?: () => void;
   onOpenSearchModal?: (target: 'origin' | 'destination' | 'waypoint', waypointIndex?: number) => void;
@@ -118,19 +118,9 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
               title="경유지 검색 및 변경"
             >
               <div className="flex items-center justify-between w-full">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-5 h-5 rounded-md bg-slate-700 text-white flex items-center justify-center shadow-xs">
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  </div>
-                  <span className="text-[11px] font-semibold text-slate-600">
-                    {activeWaypoints.length > 1
-                      ? `경유지 ${index + 1}`
-                      : wp.name && wp.name !== '경유지 선택'
-                      ? wp.shortName || wp.name
-                      : '장소 검색'}
+                <div className="flex items-center">
+                  <span className="text-xs font-semibold text-slate-700">
+                    경유지 {index + 1}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
@@ -141,7 +131,7 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
                       onClick={(e) => {
                         e.stopPropagation();
                         haptics.mediumTap();
-                        onAddWaypoint();
+                        onAddWaypoint(index);
                       }}
                       className="w-7 h-7 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-50 active:scale-95 transition-all cursor-pointer"
                       title="경유지 추가"
