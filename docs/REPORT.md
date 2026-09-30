@@ -3405,4 +3405,89 @@ flowchart TD
    - **Case 1 (스텁 제거 확인)**: `PlaceRegisterModal.tsx` 및 `scratch/test_preset_management.ts` 삭제 후에도 거점 편집 및 등록 모달(`CustomPresetModal`)이 에러 없이 정상 구동됨 (PASS).
    - **Case 2 (공통 거점 축약명 보존)**: 관리자가 'SGBAC'로 축약 저장한 공통 거점이 새로고침 및 백그라운드 서버 동기화 후에도 풀네임('서울김포비즈니스항공센터')으로 되돌아가지 않고 8자 'SGBAC'로 변함없이 유지됨 (PASS).
    - **Case 3 (지하 주차장 음영 지역 방어)**: 3.5초 경과 시 네트워크 행(hang) 현상 없이 모든 로딩 스피너가 해제되고 수동 입력 및 Haversine 폴백 상태로 즉각 복귀함을 검증 완료 (PASS).
+---
 
+## 72. 최근 경로 영속화, 코드베이스 일체형 경유지(+) 인터랙션, 관리자 지정동선 잠금 및 차량번호 자동 바인딩
+
+### 72.1 배경 및 작업 목적
+- **디자인 일체성 강제**: 기존 프로젝트의 '미니멀 슬레이트 콕핏' 디자인 시스템(`bg-white`, `border-slate-200`, `text-slate-500`, `shadow-sm`, `active:scale-95`)을 100% 동일하게 계승하며, 일체의 이질적인 원색이나 새 디자인 요소를 배제하고 조작계의 시각적 대칭 완성.
+- **텍스트 배제 및 순수 '+' 아이콘 적용**: 목적지나 조작계에 '경유'라는 텍스트 라벨을 배제하고, 순수 `+` SVG 아이콘(`strokeWidth="2"`) 버튼으로만 조작계 구성.
+- **관리자 지정동선 (대열 통제 모드: Strict Lock)**: 관리자가 등록한 공통 경로 패키지 선택 시 기사의 임의 경유지 추가/삭제를 원천 차단하고, 평소에는 가로 2단 기본 뷰를 유지하다가 은은한 회색 아코디언 배지(`[지정동선 N곳 ▾]`) 터치 시에만 통제 도로 목록을 전개. 길안내 시작 시 [기사 현위치(GPS)] ➔ [관리자 공식 출발지] ➔ [통제 경유지 1~N] ➔ [최종 목적지] 시퀀스로 3사 내비에 주입하여 단일 대열 주행 강제.
+- **개인 운행 모드 경유지 설정**: 관리자 패키지가 아닐 때만 `+` 버튼이 활성화되며, 터치 시 세로 3단('출발 ➔ 경유 ➔ 목적')으로 부드럽게 전환되어 기존 `LocationSearchModal`을 통해 도로/POI 경유지 지정 가능.
+- **최근 경로 LocalStorage 영속화**: 앱 종료 또는 재접속 시 직전 설정된 `origin`, `destination`, `waypoint`, `adminWaypoints`, `isAdminRoute` 상태를 무손실 복원.
+- **기사 프로필 차량번호 자동 바인딩**: `VehicleInspectionModal` 진입 시 프로필에 등록된 차량번호(`plateNumber` / `carNumber`)를 모달 내부 차량번호 인풋에 실시간 우선 주입.
+
+---
+
+### 72.2 모듈별 상세 구현 내역
+
+#### [태스크 1] `app/page.tsx` 최근 경로 LocalStorage 영속화 및 경로 타입 분기
+1. **영속화 키 선언 및 상태 격리**:
+   - `const LAST_ROUTE_STORAGE_KEY = 'cockpit_last_route';` 선언.
+   - `waypoint: LocationPreset | null`, `adminWaypoints: LocationPreset[]`, `isAdminRoute: boolean` 상태 신설.
+2. **마운트 시 자동 복원**:
+   - 마운트 시 `localStorage`에서 직전의 `origin`, `destination`, `waypoint`, `adminWaypoints`, `isAdminRoute` 여부를 복원.
+   - `isRouteRestoredRef` 가드를 사용하여 복원 완료 전 기본 초기값으로 로컬스토리지가 덮어쓰여지는 레이스 컨디션 방지.
+3. **상태 변경 시 자동 동기화**:
+   - 경로 상태 변경 시 `LAST_ROUTE_STORAGE_KEY`에 JSON 직렬화하여 실시간 영속화.
+4. **관리자 패키지 로드 연동**:
+   - 스케줄 탭 및 배차 패키지 선택 시 `isAdminRoute: true`와 함께 관리자가 지정한 통제 경유지 배열(`adminWaypoints`)을 상태로 보관 및 경로 계산 주입.
+
+---
+
+#### [태스크 2] `components/OriginDestinationSelector.tsx` 맞교환 상단 `+` 버튼 & 아코디언 UI
+1. **Props 확장**:
+   - `origin`, `destination`, `waypoint`, `adminWaypoints`, `isAdminRoute`, `onSelectOrigin`, `onSelectDestination`, `onSelectWaypoint`, `onAddWaypoint`, `onRemoveWaypoint`, `onSwap` 인터페이스 완비.
+2. **조작계 버튼 수직 배치**:
+   - 맞교환 버튼 영역에 수직 플렉스(`flex flex-col gap-1.5 items-center`)를 구성.
+   - `!isAdminRoute && !waypoint`인 경우, 맞교환 버튼 바로 위에 동일한 규격(`w-8 h-8 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-50 active:scale-95 transition-all`)의 `+` 원형 아이콘 버튼 배치.
+3. **관리자 지정동선 '자세히보기' 은은한 회색 아코디언**:
+   - `isAdminRoute && adminWaypoints.length > 0`인 경우:
+     - 목적지 텍스트 우측에 `text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200 transition-colors flex items-center gap-1` 스타일의 `[지정동선 {adminWaypoints.length}곳 ▾]` 배지 배치.
+     - 클릭 시 하단으로 슬라이드 다운되며 통제 도로 지점 목록(삭제 불가, 읽기 전용)을 부드럽게 노출.
+4. **개인 운행 경유지 세로 스무스 트랜지션**:
+   - 기사가 `+`를 눌러 `waypoint`가 활성화되면 전체 컨테이너가 `transition-all duration-300 ease-in-out`과 함께 세로 3단으로 펼쳐지며 경유지 슬롯(미니멀 슬레이트 핀 + 우측 `X` 롤백 버튼)이 노출되도록 구성.
+
+---
+
+#### [태스크 3] `LocationSearchModal.tsx` 경유지 타깃 검색 지원
+1. **타깃 모드 확장**:
+   - `target: 'origin' | 'destination' | 'waypoint'` 지원.
+   - 모달 헤더 뱃지(`[경유지 설정]`) 및 타이틀 직관화.
+2. **검색 결과 경유지 슬롯 주입**:
+   - 경유지 슬롯 탭 시 검색창에서 도로명/POI를 선택하면 `waypoint` 상태로 자동 주입 후 모달 닫힘.
+
+---
+
+#### [태스크 4] 실제 내비게이션 딥링크 및 TMAP ETA 연동
+1. **길안내 실행 시 기사 현위치(GPS) 시작점 매핑**:
+   - 기사 스마트폰의 실시간 GPS 위치를 '출발지'로 설정.
+   - 관리자 경로일 경우: [기사 실시간 현위치] ➔ [관리자 공식 출발지] ➔ [통제 경유지 1~N] ➔ [최종 목적지] 시퀀스로 딥링크 생성.
+   - 개인 운행일 경우: [기사 실시간 현위치] ➔ [선택 경유지(있을 경우)] ➔ [목적지] 시퀀스로 딥링크 생성.
+2. **3사 내비게이션 스킴별 경유지 파라미터 직렬화**:
+   - **티맵 (TMAP)**: `passList=${lng},${lat}_${lng},${lat}` 포맷으로 경유지 좌표 순차 연결.
+   - **카카오맵**: `&vp=${lat},${lng}` 포맷 매핑.
+   - **네이버 지도**: `&v1lat=${lat}&v1lng=${lng}&v1name=${name}&v2lat=...` 순서로 매핑.
+3. **TMAP API 및 Haversine 다구간 거리 계산 연동**:
+   - `/api/route`: `passList` 파라미터를 수신하여 TMAP API 경유지 요청 및 쿼터 방어 캐시 키(`getCacheKey`)에 반영.
+   - Haversine 폴백: 경유지 목록을 수신하여 `출발지 ➔ 경유지 ➔ 목적지` 다구간 거리를 합산한 정확한 거리/시간 추정치 제공.
+
+---
+
+#### [태스크 5] 기사 프로필 차량번호 ➔ `VehicleInspectionModal.tsx` 실시간 자동 바인딩
+1. **차량번호 감지 우선순위**:
+   - `profile.plateNumber`가 존재하면 최우선으로 `detectedCarNumber`로 확정하고, 차순위로 `profile.carNumber` 및 `profile.vehicleNo` 파싱값 참조.
+2. **모달 오픈 시 실시간 동기화**:
+   - `useEffect([isOpen, detectedCarNumber])` 훅을 통해 모달이 열릴 때 프로필의 차량번호를 내부 인풋 상태(`carNumber`)에 자동 주입 및 실시간 동기화.
+
+---
+
+### 72.3 검증 및 테스트 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 TypeScript / ESLint 컴파일 에러 **0건 (Exit code 0)** 통과.
+2. **시나리오 검증 결과**:
+   - **Case 1 (최근 경로 LocalStorage 영속화 복원)**: 출발지, 목적지, 경유지 설정 후 브라우저 새로고침 시 `cockpit_last_route`로부터 설정된 경로와 관리자 모드 여부가 즉시 복원됨 (PASS).
+   - **Case 2 (맞교환 상단 `+` 버튼 및 세로 3단 전환)**: 맞교환 버튼 바로 위에 대칭 규격의 `+` 원형 버튼이 배치되며, 클릭 시 부드럽게 세로 3단 뷰로 펼쳐지고 `LocationSearchModal`이 호출됨 (PASS).
+   - **Case 3 (관리자 지정동선 잠금 및 아코디언)**: 관리자 경로 로드 시 `+` 버튼이 숨겨지고 임의 추가/삭제가 불가능하며, `[지정동선 N곳 ▾]` 배지를 터치할 때만 통제 경유지들이 아코디언으로 전개됨 (PASS).
+   - **Case 4 (3사 내비 딥링크 GPS 시작점 & 경유지 파라미터 매핑)**: 길안내 시작 시 실시간 GPS를 시작점으로 하여 관리자 경로는 [기사 현위치 ➔ 공식 출발지 ➔ 통제 경유지 ➔ 목적지], 개인 운행은 [기사 현위치 ➔ 경유지 ➔ 목적지] 시퀀스로 TMAP `passList` / Kakao `vp` / Naver `v1`에 정확히 주입됨 (PASS).
+   - **Case 5 (차량번호 자동 바인딩)**: 프로필의 `plateNumber`가 `VehicleInspectionModal` 오픈 시 차량번호 인풋에 즉각 바인딩됨 (PASS).

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useDriverProfile, getOrCreateDeviceUuid, getStoredVehicleProfile } from '@/hooks/useDriverProfile';
 import { useLocation } from '@/hooks/useLocation';
 import { Header } from '@/components/Header';
@@ -53,6 +53,7 @@ export function deduplicatePresets(list: LocationPreset[]): LocationPreset[] {
 }
 
 const ADMIN_MODE_KEY = 'protocol_cockpit_admin_mode_v1';
+const LAST_ROUTE_STORAGE_KEY = 'cockpit_last_route';
 
 export default function Home() {
   const { profile, isLoaded, updateProfile, setPreferredNavi } = useDriverProfile();
@@ -66,8 +67,8 @@ export default function Home() {
     saveRecentPreset,
   } = useLocation();
 
-  // Selection target mode: 'origin' or 'destination' (default: 'destination')
-  const [selectionTarget, setSelectionTarget] = useState<'origin' | 'destination'>('destination');
+  // Selection target mode: 'origin', 'destination', or 'waypoint' (default: 'destination')
+  const [selectionTarget, setSelectionTarget] = useState<'origin' | 'destination' | 'waypoint'>('destination');
 
   // Ordered Presets State (combining defaults + customs with permanent order persistence)
   const [presets, setPresets] = useState<LocationPreset[]>(DEFAULT_PRESET_LOCATIONS);
@@ -621,11 +622,66 @@ export default function Home() {
 
   const [isInitialized, setIsInitialized] = useState(false);
   const [destination, setDestination] = useState<LocationPreset>(DEFAULT_PRESET_LOCATIONS[0]);
+  const [waypoint, setWaypoint] = useState<LocationPreset | null>(null);
+  const [adminWaypoints, setAdminWaypoints] = useState<LocationPreset[]>([]);
+  const [isAdminRoute, setIsAdminRoute] = useState(false);
+  const isRouteRestoredRef = useRef(false);
+
   const [activeTab, setActiveTab] = useState<'drive' | 'schedule'>('drive');
   const [reportMode, setReportMode] = useState<ReportMode>('DEPARTURE');
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isOnboarding, setIsOnboarding] = useState(false);
   const [onboardingStage, setOnboardingStage] = useState<'splash' | 'sheet' | null>(null);
+
+  // Task 1: Restore last route (origin, destination, waypoint, adminWaypoints, isAdminRoute) from localStorage
+  useEffect(() => {
+    try {
+      const savedRouteStr = localStorage.getItem(LAST_ROUTE_STORAGE_KEY);
+      if (savedRouteStr) {
+        const saved = JSON.parse(savedRouteStr);
+        if (saved.origin && typeof saved.origin.lat === 'number' && typeof saved.origin.lng === 'number') {
+          setOrigin(saved.origin);
+        }
+        if (saved.destination && typeof saved.destination.lat === 'number' && typeof saved.destination.lng === 'number') {
+          setDestination(saved.destination);
+        }
+        if (saved.waypoint) {
+          setWaypoint(saved.waypoint);
+        }
+        if (Array.isArray(saved.adminWaypoints)) {
+          setAdminWaypoints(saved.adminWaypoints);
+        }
+        if (typeof saved.isAdminRoute === 'boolean') {
+          setIsAdminRoute(saved.isAdminRoute);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to restore last route from localStorage:', e);
+    } finally {
+      isRouteRestoredRef.current = true;
+    }
+  }, [setOrigin]);
+
+  // Task 1: Auto-persist route state changes to localStorage
+  useEffect(() => {
+    if (!isRouteRestoredRef.current) return;
+    try {
+      if (origin && destination) {
+        localStorage.setItem(
+          LAST_ROUTE_STORAGE_KEY,
+          JSON.stringify({
+            origin,
+            destination,
+            waypoint,
+            adminWaypoints,
+            isAdminRoute,
+          })
+        );
+      }
+    } catch (e) {
+      console.warn('Failed to persist last route to localStorage:', e);
+    }
+  }, [origin, destination, waypoint, adminWaypoints, isAdminRoute]);
 
   // Initialization Gate: check driver onboarding status on first launch before revealing dashboard
   useEffect(() => {
@@ -665,14 +721,21 @@ export default function Home() {
 
   // Fetch route duration & ETA from API with dynamic client clock calculation with 3.5s timeout guard
   const fetchRouteEstimate = useCallback(
-    async (start: LocationPreset, end: LocationPreset) => {
+    async (start: LocationPreset, end: LocationPreset, waypoints: LocationPreset[] = []) => {
       setIsLoadingRoute(true);
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 3500);
       try {
+        const validWaypoints = (waypoints || []).filter(
+          (w) => w && typeof w.lat === 'number' && typeof w.lng === 'number' && (w.lat !== 0 || w.lng !== 0)
+        );
+        const passListParam =
+          validWaypoints.length > 0
+            ? `&passList=${validWaypoints.map((w) => `${w.lng},${w.lat}`).join('_')}`
+            : '';
         const url = `/api/route?startX=${start.lng}&startY=${start.lat}&endX=${end.lng}&endY=${end.lat}&startName=${encodeURIComponent(
-          start.shortName
-        )}&endName=${encodeURIComponent(end.shortName)}`;
+          start.shortName || start.name
+        )}&endName=${encodeURIComponent(end.shortName || end.name)}${passListParam}`;
 
         const res = await fetch(url, {
           signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal
@@ -702,7 +765,16 @@ export default function Home() {
         });
       } catch (err: any) {
         console.warn('Falling back to haversine estimate (timeout or network):', err?.message);
-        const fallback = calculateHaversineEstimate(start.lat, start.lng, end.lat, end.lng);
+        const validWaypoints = (waypoints || []).filter(
+          (w) => w && typeof w.lat === 'number' && typeof w.lng === 'number' && (w.lat !== 0 || w.lng !== 0)
+        );
+        const fallback = calculateHaversineEstimate(
+          start.lat,
+          start.lng,
+          end.lat,
+          end.lng,
+          validWaypoints.map((w) => ({ lat: w.lat, lng: w.lng }))
+        );
         setRouteEstimate(fallback);
       } finally {
         clearTimeout(timeoutId);
@@ -746,12 +818,52 @@ export default function Home() {
     []
   );
 
-  // Recalculate route whenever origin or destination coordinates change (Strictly Real-time TMAP)
+  // Recalculate route whenever origin, destination, or waypoints change (Strictly Real-time TMAP)
   useEffect(() => {
     if (origin && destination) {
-      fetchRouteEstimate(origin, destination);
+      const effectiveWaypoints = isAdminRoute && adminWaypoints.length > 0
+        ? adminWaypoints
+        : (waypoint && waypoint.lat && waypoint.lng ? [waypoint] : []);
+      fetchRouteEstimate(origin, destination, effectiveWaypoints);
     }
-  }, [origin?.lat, origin?.lng, destination?.lat, destination?.lng, fetchRouteEstimate]);
+  }, [
+    origin?.lat,
+    origin?.lng,
+    destination?.lat,
+    destination?.lng,
+    waypoint?.lat,
+    waypoint?.lng,
+    adminWaypoints,
+    isAdminRoute,
+    fetchRouteEstimate
+  ]);
+
+  // Waypoint Add & Remove handlers
+  const handleAddWaypoint = () => {
+    const initialWaypoint: LocationPreset = {
+      id: `waypoint_${Date.now()}`,
+      name: '경유지 선택',
+      shortName: '경유지',
+      lat: 0,
+      lng: 0,
+      address: '터치하여 장소를 검색하세요',
+      category: 'CUSTOM',
+    };
+    setWaypoint(initialWaypoint);
+    setIsAdminRoute(false);
+    setAdminWaypoints([]);
+    setSelectionTarget('waypoint');
+    setIsLocationSearchOpen(true);
+  };
+
+  const handleRemoveWaypoint = () => {
+    setWaypoint(null);
+    setIsAdminRoute(false);
+    setAdminWaypoints([]);
+    if (selectionTarget === 'waypoint') {
+      setSelectionTarget('destination');
+    }
+  };
 
   // Handle Departure Time selection from Wheel Picker (Simulation Preview Only)
   const handleConfirmDepartureTime = (date: Date) => {
@@ -789,6 +901,10 @@ export default function Home() {
       setOrigin(resolvedPreset);
       saveRecentPreset(resolvedPreset);
       setSelectionTarget('destination');
+    } else if (selectionTarget === 'waypoint') {
+      setWaypoint(resolvedPreset);
+      setIsAdminRoute(false);
+      setSelectionTarget('destination');
     } else {
       setDestination(resolvedPreset);
     }
@@ -806,19 +922,31 @@ export default function Home() {
       address: station.address || `${station.name} (${station.brandName})`,
     };
 
-    setDestination(gasPreset);
-    setSelectionTarget('destination');
-    if (origin) {
-      fetchRouteEstimate(origin, gasPreset);
+    if (selectionTarget === 'origin') {
+      setOrigin(gasPreset);
+      setSelectionTarget('destination');
+    } else if (selectionTarget === 'waypoint') {
+      setWaypoint(gasPreset);
+      setIsAdminRoute(false);
+      setSelectionTarget('destination');
+    } else {
+      setDestination(gasPreset);
+      setSelectionTarget('destination');
     }
   };
 
   // Select flight airport terminal as destination (Origin strictly preserved)
   const handleSelectFlightDestination = (preset: LocationPreset) => {
-    setDestination(preset);
-    setSelectionTarget('destination');
-    if (origin) {
-      fetchRouteEstimate(origin, preset);
+    if (selectionTarget === 'origin') {
+      setOrigin(preset);
+      setSelectionTarget('destination');
+    } else if (selectionTarget === 'waypoint') {
+      setWaypoint(preset);
+      setIsAdminRoute(false);
+      setSelectionTarget('destination');
+    } else {
+      setDestination(preset);
+      setSelectionTarget('destination');
     }
   };
 
@@ -838,6 +966,10 @@ export default function Home() {
       setOrigin(resolvedPreset);
       saveRecentPreset(resolvedPreset);
       setSelectionTarget('destination');
+    } else if (selectionTarget === 'waypoint') {
+      setWaypoint(resolvedPreset);
+      setIsAdminRoute(false);
+      setSelectionTarget('destination');
     } else {
       setDestination(resolvedPreset);
     }
@@ -855,10 +987,15 @@ export default function Home() {
 
   // Schedule Tab Action Handlers
   const handleSelectRouteFromSchedule = useCallback(
-    (originPreset: LocationPreset, destinationPreset: LocationPreset) => {
+    (originPreset: LocationPreset, destinationPreset: LocationPreset, schedule?: ScheduleItem) => {
       setOrigin(originPreset);
       setDestination(destinationPreset);
-      fetchRouteEstimate(originPreset, destinationPreset);
+      const isSchedAdmin = Boolean(schedule?.isAdminRoute);
+      const schedAdminWps = schedule?.adminWaypoints || schedule?.waypoints || [];
+      setIsAdminRoute(isSchedAdmin);
+      setAdminWaypoints(schedAdminWps);
+      setWaypoint(null);
+      fetchRouteEstimate(originPreset, destinationPreset, isSchedAdmin ? schedAdminWps : []);
       setActiveTab('drive');
       haptics.success();
     },
@@ -867,14 +1004,30 @@ export default function Home() {
 
   const handleNavigateForSchedule = useCallback(
     (schedule: ScheduleItem) => {
-      const { originPreset, destinationPreset } = scheduleToPresets(schedule);
+      const { originPreset, destinationPreset, adminWaypoints: rawAdminWps, isAdminRoute: rawIsAdmin } = scheduleToPresets(schedule);
+      const isSchedAdmin = Boolean(rawIsAdmin);
+      const schedAdminWps: LocationPreset[] = rawAdminWps || [];
       setOrigin(originPreset);
       setDestination(destinationPreset);
-      fetchRouteEstimate(originPreset, destinationPreset);
+      setIsAdminRoute(isSchedAdmin);
+      setAdminWaypoints(schedAdminWps);
+      setWaypoint(null);
+      fetchRouteEstimate(originPreset, destinationPreset, isSchedAdmin ? schedAdminWps : []);
+
+      let naviWaypoints: Array<{ name: string; lat: number; lng: number }> = [];
+      if (isSchedAdmin) {
+        // Admin Route Sequence: Driver Realtime GPS ➔ Official Origin ➔ Admin Waypoints ➔ Destination
+        naviWaypoints = [
+          { name: originPreset.shortName || originPreset.name, lat: originPreset.lat, lng: originPreset.lng },
+          ...schedAdminWps.map((w) => ({ name: w.shortName || w.name, lat: w.lat, lng: w.lng })),
+        ];
+      }
+
       launchNavigationApp(
         profile.defaultNavi,
         { name: destinationPreset.name, lat: destinationPreset.lat, lng: destinationPreset.lng },
-        { name: originPreset.name, lat: originPreset.lat, lng: originPreset.lng }
+        undefined, // Realtime GPS starting point
+        naviWaypoints
       );
       haptics.heavyTap();
     },
@@ -1046,8 +1199,16 @@ export default function Home() {
             <OriginDestinationSelector
               origin={origin}
               destination={destination}
+              waypoint={waypoint}
+              adminWaypoints={adminWaypoints}
+              isAdminRoute={isAdminRoute}
               selectionTarget={selectionTarget}
               onSelectTarget={(target) => setSelectionTarget(target)}
+              onSelectOrigin={() => setSelectionTarget('origin')}
+              onSelectDestination={() => setSelectionTarget('destination')}
+              onSelectWaypoint={() => setSelectionTarget('waypoint')}
+              onAddWaypoint={handleAddWaypoint}
+              onRemoveWaypoint={handleRemoveWaypoint}
               onSwap={handleSwapOriginDestination}
               onOpenSearchModal={(target) => {
                 setSelectionTarget(target);
@@ -1079,7 +1240,10 @@ export default function Home() {
               onRequestGps={requestGpsLocation}
               onRefreshRoute={() => {
                 if (origin && destination) {
-                  fetchRouteEstimate(origin, destination);
+                  const effectiveWaypoints = isAdminRoute && adminWaypoints.length > 0
+                    ? adminWaypoints
+                    : (waypoint && waypoint.lat && waypoint.lng ? [waypoint] : []);
+                  fetchRouteEstimate(origin, destination, effectiveWaypoints);
                 }
               }}
               onOpenTimePicker={() => setIsTimePickerOpen(true)}
@@ -1097,6 +1261,9 @@ export default function Home() {
               defaultNavi={profile.defaultNavi}
               origin={origin}
               destination={destination}
+              waypoint={waypoint}
+              adminWaypoints={adminWaypoints}
+              isAdminRoute={isAdminRoute}
               routeEstimate={routeEstimate}
               reportText={reportPreviewText}
               targetChatRoom={profile.targetChatRoom}
@@ -1330,7 +1497,13 @@ export default function Home() {
         target={selectionTarget}
         presets={presets}
         homeLocation={profile.homeLocation}
-        currentSelectedId={selectionTarget === 'origin' ? origin?.id : destination?.id}
+        currentSelectedId={
+          selectionTarget === 'origin'
+            ? origin?.id
+            : selectionTarget === 'waypoint'
+            ? waypoint?.id
+            : destination?.id
+        }
         onSelectLocation={handleSelectLocationFromSearch}
         onOpenHomeModal={() => setIsHomeModalOpen(true)}
         onOpenManagePresets={() => {

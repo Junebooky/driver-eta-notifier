@@ -93,7 +93,7 @@ function parseAndValidate8DigitDate(raw: string) {
 interface ScheduleTabProps {
   profile: DriverProfile;
   onOpenProfileModal: () => void;
-  onSelectRouteForCockpit: (origin: LocationPreset, destination: LocationPreset) => void;
+  onSelectRouteForCockpit: (origin: LocationPreset, destination: LocationPreset, schedule?: ScheduleItem) => void;
   onOpenPredictionForSchedule: (schedule: ScheduleItem) => void;
   onNavigateForSchedule: (schedule: ScheduleItem) => void;
   onOpenFlightModal?: (flightId: string, type: 'arrival' | 'departure') => void;
@@ -1001,7 +1001,7 @@ ${scheduleItemsFormatted}`.trim();
                 onPredict={(sch) => onOpenPredictionForSchedule(sch)}
                 onSelectForCockpit={(sch) => {
                   const { originPreset, destinationPreset } = scheduleToPresets(sch);
-                  onSelectRouteForCockpit(originPreset, destinationPreset);
+                  onSelectRouteForCockpit(originPreset, destinationPreset, sch);
                 }}
                 onOpenFlight={onOpenFlightModal}
                 onEdit={(sch) => {

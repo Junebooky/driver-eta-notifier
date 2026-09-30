@@ -30,7 +30,7 @@ export interface SelectedLocationData {
 interface LocationSearchModalProps {
   isOpen: boolean;
   onClose: () => void;
-  target: 'origin' | 'destination';
+  target: 'origin' | 'destination' | 'waypoint';
   presets: LocationPreset[];
   homeLocation?: { name: string; address: string; lat: number; lng: number } | null;
   currentSelectedId?: string;
@@ -396,6 +396,7 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
   };
 
   const isOrigin = target === 'origin';
+  const isWaypoint = target === 'waypoint';
 
   return (
     <div
@@ -416,8 +417,9 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
           <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-slate-100/80">
             <div className="flex items-center gap-2">
               <div
-                className={`w-7 h-7 rounded-lg flex items-center justify-center shadow-xs text-white ${isOrigin ? 'bg-slate-700' : 'bg-[#1E60F3]'
-                  }`}
+                className={`w-7 h-7 rounded-lg flex items-center justify-center shadow-xs text-white ${
+                  isOrigin ? 'bg-slate-700' : isWaypoint ? 'bg-slate-800' : 'bg-[#1E60F3]'
+                }`}
               >
                 {isOrigin ? (
                   <Navigation className="w-3.5 h-3.5 fill-white" />
@@ -427,13 +429,12 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
               </div>
               <div>
                 <div className="flex items-center gap-1.5">
-
                   <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
-                    장소 선택
+                    {isOrigin ? '출발지 선택' : isWaypoint ? '경유지 선택' : '목적지 선택'}
                   </h3>
                 </div>
                 <p className="text-[11px] text-slate-400 font-medium">
-                  주소를 검색하거나 저장된 거점을 선택하세요.
+                  {isWaypoint ? '경유할 장소나 주소를 검색하세요.' : '주소를 검색하거나 저장된 거점을 선택하세요.'}
                 </p>
               </div>
             </div>

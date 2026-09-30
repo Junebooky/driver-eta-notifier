@@ -86,11 +86,13 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
   }, [profile.vehicleNo]);
 
   const detectedCarNumber = useMemo(() => {
+    const p = profile as any;
+    if (p.plateNumber?.trim()) return p.plateNumber.trim();
     if (profile.carNumber?.trim()) return profile.carNumber.trim();
     const parts = (profile.vehicleNo || '').split(' ');
     if (parts.length >= 2) return parts.slice(1).join(' ').trim();
     return '';
-  }, [profile.carNumber, profile.vehicleNo]);
+  }, [profile.plateNumber, profile.carNumber, profile.vehicleNo]);
 
   // Form Fields State
   const [vehicleHocha, setVehicleHocha] = useState(detectedHocha);
@@ -287,7 +289,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
       try {
         const parsed = JSON.parse(rawData);
         setVehicleHocha(parsed.vehicleHocha || detectedHocha);
-        setCarNumber(parsed.carNumber || detectedCarNumber);
+        setCarNumber(detectedCarNumber || parsed.carNumber || '');
 
         // Pickup (Receipt) Data
         const pOdo = parsed.pickupOdo || parsed.receiptTotalKm || '';
@@ -360,6 +362,13 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
 
     isLoadedRef.current = true;
   }, [isOpen, profile.vehicleNo, detectedHocha, detectedCarNumber]);
+
+  // Task 5: Real-time synchronization of profile plateNumber to carNumber when modal is open
+  useEffect(() => {
+    if (isOpen && detectedCarNumber) {
+      setCarNumber(detectedCarNumber);
+    }
+  }, [isOpen, detectedCarNumber]);
 
   // Auto-persist changes to vehicle-isolated key when fields update
   useEffect(() => {

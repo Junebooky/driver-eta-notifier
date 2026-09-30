@@ -21,19 +21,38 @@ export function calculateHaversineEstimate(
   startLat: number,
   startLng: number,
   endLat: number,
-  endLng: number
+  endLng: number,
+  waypoints?: Array<{ lat: number; lng: number }>
 ) {
   const R = 6371; // Earth radius in km
-  const dLat = ((endLat - startLat) * Math.PI) / 180;
-  const dLng = ((endLng - startLng) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((startLat * Math.PI) / 180) *
-      Math.cos((endLat * Math.PI) / 180) *
-      Math.sin(dLng / 2) *
-      Math.sin(dLng / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const straightKm = R * c;
+  const calcLeg = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLng = ((lng2 - lng1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLng / 2) *
+        Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  let straightKm = 0;
+  const validWaypoints = (waypoints || []).filter((w) => w && !isNaN(w.lat) && !isNaN(w.lng));
+
+  if (validWaypoints.length > 0) {
+    let prevLat = startLat;
+    let prevLng = startLng;
+    for (const wp of validWaypoints) {
+      straightKm += calcLeg(prevLat, prevLng, wp.lat, wp.lng);
+      prevLat = wp.lat;
+      prevLng = wp.lng;
+    }
+    straightKm += calcLeg(prevLat, prevLng, endLat, endLng);
+  } else {
+    straightKm = calcLeg(startLat, startLng, endLat, endLng);
+  }
 
   // Detour factor 1.35x for urban road distance
   const distanceKm = Math.max(1, Math.round(straightKm * 1.35 * 10) / 10);
@@ -74,87 +93,108 @@ export function buildDeepLink(
   provider: NaviProvider,
   target: LocationTarget,
   isAndroid: boolean,
-  origin?: LocationTarget
+  origin?: LocationTarget,
+  waypoints?: LocationTarget[]
 ): { scheme: string; fallbackUrl: string } {
   const { name, lat, lng } = target;
   const encodedName = encodeURIComponent(name);
+  const validWaypoints = (waypoints || []).filter((w) => w && !isNaN(w.lat) && !isNaN(w.lng));
 
   if (provider === 'tmap') {
+    // TMAP passList: 'lng,lat_lng,lat'
+    const passList = validWaypoints.length > 0
+      ? validWaypoints.map((w) => `${w.lng},${w.lat}`).join('_')
+      : '';
+    const passListParam = passList ? `&passList=${encodeURIComponent(passList)}` : '';
+
     if (origin) {
       const encodedOriginName = encodeURIComponent(origin.name);
       if (isAndroid) {
         return {
-          scheme: `intent://route?startname=${encodedOriginName}&startx=${origin.lng}&starty=${origin.lat}&goalname=${encodedName}&goalx=${lng}&goaly=${lat}#Intent;scheme=tmap;package=com.skt.tmap.ku;end;`,
+          scheme: `intent://route?startname=${encodedOriginName}&startx=${origin.lng}&starty=${origin.lat}&goalname=${encodedName}&goalx=${lng}&goaly=${lat}${passListParam}#Intent;scheme=tmap;package=com.skt.tmap.ku;end;`,
           fallbackUrl: STORE_URLS.tmap.android,
         };
       }
       return {
-        scheme: `tmap://route?startname=${encodedOriginName}&startx=${origin.lng}&starty=${origin.lat}&goalname=${encodedName}&goalx=${lng}&goaly=${lat}`,
+        scheme: `tmap://route?startname=${encodedOriginName}&startx=${origin.lng}&starty=${origin.lat}&goalname=${encodedName}&goalx=${lng}&goaly=${lat}${passListParam}`,
         fallbackUrl: STORE_URLS.tmap.ios,
       };
     }
 
     if (isAndroid) {
       return {
-        scheme: `intent://route?goalname=${encodedName}&goalx=${lng}&goaly=${lat}&coordType=WGS84GEO#Intent;scheme=tmap;package=com.skt.tmap.ku;end;`,
+        scheme: `intent://route?goalname=${encodedName}&goalx=${lng}&goaly=${lat}&coordType=WGS84GEO${passListParam}#Intent;scheme=tmap;package=com.skt.tmap.ku;end;`,
         fallbackUrl: STORE_URLS.tmap.android,
       };
     }
     return {
-      scheme: `tmap://route?goalname=${encodedName}&goalx=${lng}&goaly=${lat}&coordType=WGS84GEO`,
+      scheme: `tmap://route?goalname=${encodedName}&goalx=${lng}&goaly=${lat}&coordType=WGS84GEO${passListParam}`,
       fallbackUrl: STORE_URLS.tmap.ios,
     };
   }
 
   if (provider === 'kakao') {
+    // KakaoMap: &vp=lat,lng
+    const viaParam = validWaypoints.length > 0
+      ? validWaypoints.map((w) => `&vp=${w.lat},${w.lng}`).join('')
+      : '';
+
     if (origin) {
       if (isAndroid) {
         return {
-          scheme: `intent://route?sp=${origin.lat},${origin.lng}&ep=${lat},${lng}&by=CAR#Intent;scheme=kakaomap;package=net.daum.android.map;end;`,
+          scheme: `intent://route?sp=${origin.lat},${origin.lng}&ep=${lat},${lng}${viaParam}&by=CAR#Intent;scheme=kakaomap;package=net.daum.android.map;end;`,
           fallbackUrl: STORE_URLS.kakao.android,
         };
       }
       return {
-        scheme: `kakaomap://route?sp=${origin.lat},${origin.lng}&ep=${lat},${lng}&by=CAR`,
+        scheme: `kakaomap://route?sp=${origin.lat},${origin.lng}&ep=${lat},${lng}${viaParam}&by=CAR`,
         fallbackUrl: STORE_URLS.kakao.ios,
       };
     }
 
     if (isAndroid) {
       return {
-        scheme: `intent://route?ep=${lat},${lng}&by=CAR#Intent;scheme=kakaomap;package=net.daum.android.map;end;`,
+        scheme: `intent://route?ep=${lat},${lng}${viaParam}&by=CAR#Intent;scheme=kakaomap;package=net.daum.android.map;end;`,
         fallbackUrl: STORE_URLS.kakao.android,
       };
     }
     return {
-      scheme: `kakaomap://route?ep=${lat},${lng}&by=CAR`,
+      scheme: `kakaomap://route?ep=${lat},${lng}${viaParam}&by=CAR`,
       fallbackUrl: STORE_URLS.kakao.ios,
     };
   }
 
-  // Naver
+  // Naver: &v1lat=..&v1lng=..&v2lat=..&v2lng=..
+  let naverViaParam = '';
+  if (validWaypoints[0]) {
+    naverViaParam += `&v1lat=${validWaypoints[0].lat}&v1lng=${validWaypoints[0].lng}&v1name=${encodeURIComponent(validWaypoints[0].name)}`;
+  }
+  if (validWaypoints[1]) {
+    naverViaParam += `&v2lat=${validWaypoints[1].lat}&v2lng=${validWaypoints[1].lng}&v2name=${encodeURIComponent(validWaypoints[1].name)}`;
+  }
+
   if (origin) {
     const encodedOriginName = encodeURIComponent(origin.name);
     if (isAndroid) {
       return {
-        scheme: `intent://route/car?slat=${origin.lat}&slng=${origin.lng}&sname=${encodedOriginName}&dlat=${lat}&dlng=${lng}&dname=${encodedName}&appname=driver-eta-notifier#Intent;scheme=nmap;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.nhn.android.nmap;end;`,
+        scheme: `intent://route/car?slat=${origin.lat}&slng=${origin.lng}&sname=${encodedOriginName}&dlat=${lat}&dlng=${lng}&dname=${encodedName}${naverViaParam}&appname=driver-eta-notifier#Intent;scheme=nmap;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.nhn.android.nmap;end;`,
         fallbackUrl: STORE_URLS.naver.android,
       };
     }
     return {
-      scheme: `nmap://route/car?slat=${origin.lat}&slng=${origin.lng}&sname=${encodedOriginName}&dlat=${lat}&dlng=${lng}&dname=${encodedName}&appname=driver-eta-notifier`,
+      scheme: `nmap://route/car?slat=${origin.lat}&slng=${origin.lng}&sname=${encodedOriginName}&dlat=${lat}&dlng=${lng}&dname=${encodedName}${naverViaParam}&appname=driver-eta-notifier`,
       fallbackUrl: STORE_URLS.naver.ios,
     };
   }
 
   if (isAndroid) {
     return {
-      scheme: `intent://navigation?dlat=${lat}&dlng=${lng}&dname=${encodedName}&appname=driver-eta-notifier#Intent;scheme=nmap;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.nhn.android.nmap;end;`,
+      scheme: `intent://route/car?dlat=${lat}&dlng=${lng}&dname=${encodedName}${naverViaParam}&appname=driver-eta-notifier#Intent;scheme=nmap;action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;package=com.nhn.android.nmap;end;`,
       fallbackUrl: STORE_URLS.naver.android,
     };
   }
   return {
-    scheme: `nmap://navigation?dlat=${lat}&dlng=${lng}&dname=${encodedName}&appname=driver-eta-notifier`,
+    scheme: `nmap://route/car?dlat=${lat}&dlng=${lng}&dname=${encodedName}${naverViaParam}&appname=driver-eta-notifier`,
     fallbackUrl: STORE_URLS.naver.ios,
   };
 }
@@ -165,13 +205,14 @@ export function buildDeepLink(
 export function launchNavigationApp(
   provider: NaviProvider,
   target: LocationTarget,
-  origin?: LocationTarget
+  origin?: LocationTarget,
+  waypoints?: LocationTarget[]
 ): void {
   if (typeof window === 'undefined') return;
 
   const userAgent = navigator.userAgent || '';
   const isAndroid = /Android/i.test(userAgent);
-  const { scheme, fallbackUrl } = buildDeepLink(provider, target, isAndroid, origin);
+  const { scheme, fallbackUrl } = buildDeepLink(provider, target, isAndroid, origin, waypoints);
 
   let timer: NodeJS.Timeout | null = null;
 
@@ -215,9 +256,10 @@ export function launchNavigationApp(
 export function launchRoutePreview(
   provider: NaviProvider,
   origin: LocationTarget,
-  destination: LocationTarget
+  destination: LocationTarget,
+  waypoints?: LocationTarget[]
 ): void {
-  launchNavigationApp(provider, destination, origin);
+  launchNavigationApp(provider, destination, origin, waypoints);
 }
 
 /**

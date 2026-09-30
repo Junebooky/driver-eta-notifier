@@ -18,26 +18,45 @@ interface CacheEntry {
 const routeCache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 3 * 60 * 1000; // 180 seconds
 
-function getCacheKey(startLat: number, startLng: number, endLat: number, endLng: number): string {
+function getCacheKey(startLat: number, startLng: number, endLat: number, endLng: number, passList?: string): string {
   // Round coordinates to ~100m precision (0.001 deg) for quota defense
   const sLat = (Math.round(startLat * 1000) / 1000).toFixed(3);
   const sLng = (Math.round(startLng * 1000) / 1000).toFixed(3);
   const eLat = (Math.round(endLat * 1000) / 1000).toFixed(3);
   const eLng = (Math.round(endLng * 1000) / 1000).toFixed(3);
-  return `${sLat},${sLng}->${eLat},${eLng}`;
+  const pKey = passList ? `_via_${passList}` : '';
+  return `${sLat},${sLng}->${eLat},${eLng}${pKey}`;
+}
+
+function parsePassListToWaypoints(passList?: string): Array<{ lat: number; lng: number }> {
+  if (!passList) return [];
+  return passList
+    .split('_')
+    .map((pointStr) => {
+      const [lngStr, latStr] = pointStr.split(',');
+      const lat = parseFloat(latStr);
+      const lng = parseFloat(lngStr);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        return { lat, lng };
+      }
+      return null;
+    })
+    .filter(Boolean) as Array<{ lat: number; lng: number }>;
 }
 
 async function handleRouteCalculation(
   startLat: number,
   startLng: number,
   endLat: number,
-  endLng: number
+  endLng: number,
+  passList?: string
 ) {
   const useMock = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
   const apiKey = process.env.TMAP_API_KEY;
 
-  const cacheKey = getCacheKey(startLat, startLng, endLat, endLng);
+  const cacheKey = getCacheKey(startLat, startLng, endLat, endLng, passList);
   const nowTimestamp = Date.now();
+  const parsedWaypoints = parsePassListToWaypoints(passList);
 
   // 1. Quota Defense: Check 3-minute Cache first
   if (routeCache.has(cacheKey)) {
@@ -58,7 +77,7 @@ async function handleRouteCalculation(
 
   // 2. If Mock Mode explicitly enabled or API key missing
   if (useMock || !apiKey || apiKey === 'your_tmap_api_key') {
-    const fallbackData = calculateHaversineEstimate(startLat, startLng, endLat, endLng);
+    const fallbackData = calculateHaversineEstimate(startLat, startLng, endLat, endLng, parsedWaypoints);
     return NextResponse.json({
       ...fallbackData,
       trafficSummary: '원활 (모의 데이터)',
@@ -74,22 +93,28 @@ async function handleRouteCalculation(
   const timeoutId = setTimeout(() => controller.abort(), 4500); // 4.5s timeout threshold
 
   try {
+    const requestPayload: any = {
+      startX: startLng,
+      startY: startLat,
+      endX: endLng,
+      endY: endLat,
+      reqCoordType: 'WGS84GEO',
+      resCoordType: 'WGS84GEO',
+      searchOption: 0, // 0: Recommended optimal traffic route
+      trafficInfo: 'Y', // Real-time traffic inclusion
+    };
+
+    if (passList) {
+      requestPayload.passList = passList;
+    }
+
     const response = await fetch(tmapUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         appKey: apiKey,
       },
-      body: JSON.stringify({
-        startX: startLng,
-        startY: startLat,
-        endX: endLng,
-        endY: endLat,
-        reqCoordType: 'WGS84GEO',
-        resCoordType: 'WGS84GEO',
-        searchOption: 0, // 0: Recommended optimal traffic route
-        trafficInfo: 'Y', // Real-time traffic inclusion
-      }),
+      body: JSON.stringify(requestPayload),
       signal: controller.signal,
     });
 
@@ -97,7 +122,7 @@ async function handleRouteCalculation(
 
     if (!response.ok) {
       console.warn(`TMAP Route API error HTTP ${response.status}. Falling back to estimate.`);
-      const fallbackData = calculateHaversineEstimate(startLat, startLng, endLat, endLng);
+      const fallbackData = calculateHaversineEstimate(startLat, startLng, endLat, endLng, parsedWaypoints);
       return NextResponse.json({ ...fallbackData, isCached: false });
     }
 
@@ -130,12 +155,12 @@ async function handleRouteCalculation(
   } catch (error: any) {
     clearTimeout(timeoutId);
     console.warn('TMAP Route API call failed or timed out:', error?.message);
-    const fallbackData = calculateHaversineEstimate(startLat, startLng, endLat, endLng);
+    const fallbackData = calculateHaversineEstimate(startLat, startLng, endLat, endLng, parsedWaypoints);
     return NextResponse.json({ ...fallbackData, isCached: false });
   }
 }
 
-// Support GET requests (query params: startX, startY, endX, endY or startLat, startLng, endLat, endLng)
+// Support GET requests (query params: startX, startY, endX, endY or startLat, startLng, endLat, endLng, passList)
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -144,14 +169,15 @@ export async function GET(req: NextRequest) {
     const startLat = parseFloat(searchParams.get('startY') || searchParams.get('startLat') || '37.5042');
     const endLng = parseFloat(searchParams.get('endX') || searchParams.get('endLng') || '126.4512');
     const endLat = parseFloat(searchParams.get('endY') || searchParams.get('endLat') || '37.4495');
+    const passList = searchParams.get('passList') || undefined;
 
-    return await handleRouteCalculation(startLat, startLng, endLat, endLng);
+    return await handleRouteCalculation(startLat, startLng, endLat, endLng, passList);
   } catch (err: any) {
     return NextResponse.json({ error: err?.message }, { status: 500 });
   }
 }
 
-// Support POST requests (body: { startLat, startLng, endLat, endLng } or { startX, startY, endX, endY })
+// Support POST requests (body: { startLat, startLng, endLat, endLng, passList } or { startX, startY, endX, endY, passList })
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
@@ -160,8 +186,9 @@ export async function POST(req: NextRequest) {
     const startLat = parseFloat(String(body.startLat ?? body.startY ?? '37.5042'));
     const endLng = parseFloat(String(body.endLng ?? body.endX ?? '126.4512'));
     const endLat = parseFloat(String(body.endLat ?? body.endY ?? '37.4495'));
+    const passList = body.passList || undefined;
 
-    return await handleRouteCalculation(startLat, startLng, endLat, endLng);
+    return await handleRouteCalculation(startLat, startLng, endLat, endLng, passList);
   } catch (err: any) {
     return NextResponse.json({ error: err?.message }, { status: 500 });
   }

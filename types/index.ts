@@ -25,6 +25,7 @@ export interface DriverProfile {
   defaultNavi: NaviProvider; // 'tmap' | 'kakao' | 'naver'
   targetChatRoom?: string; // e.g. 'VIP 의전 단톡방'
   homeLocation?: HomeLocation | null;
+  plateNumber?: string;    // e.g. '142호 7811' (alias for carNumber)
 }
 
 

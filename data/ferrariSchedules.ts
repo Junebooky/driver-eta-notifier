@@ -24,6 +24,9 @@ export interface ScheduleItem {
   destination_preset_id: string;
   destination_lat: number;
   destination_lng: number;
+  waypoints?: LocationPreset[];
+  adminWaypoints?: LocationPreset[];
+  isAdminRoute?: boolean;
 }
 
 /**
@@ -80,7 +83,7 @@ export const CONFIRMED_FERRARI_SCHEDULES: ScheduleItem[] = [
     notes: "CLUB CHALLENGE VIP 영접 • T1 입국장 피켓 대기"
   },
 
-  // Day 2 (9월 18일 금요일): 조선팰리스 강남 픽업 → 인제 스피디움 호텔 이동
+  // Day 2 (9월 18일 금요일): 조선팰리스 강남 픽업 → 인제 스피디움 호텔 이동 (관리자 지정동선 대열 주행)
   {
     id: "sch-day2-01",
     date: "2026-09-18",
@@ -100,7 +103,28 @@ export const CONFIRMED_FERRARI_SCHEDULES: ScheduleItem[] = [
     destination_lng: 128.2917,
     status: "confirmed",
     passenger: "DENZEL SOFYAN 외 1명 (TARA SOFYAN)",
-    notes: "CLUB CHALLENGE 서킷 행사 이동 • 인제 호텔 체크인"
+    notes: "CLUB CHALLENGE 서킷 행사 이동 • 가평·내린천휴게소 경유 대열 이동",
+    isAdminRoute: true,
+    adminWaypoints: [
+      {
+        id: "admin-wp-gapyeong",
+        name: "가평휴게소(춘천방향)",
+        shortName: "가평휴게소",
+        address: "경기 가평군 설악면 미원리 100",
+        lat: 37.7025,
+        lng: 127.5385,
+        category: "CUSTOM",
+      },
+      {
+        id: "admin-wp-naerincheon",
+        name: "내린천휴게소(양양방향)",
+        shortName: "내린천휴게소",
+        address: "강원 인제군 상남면 서울양양고속도로 117",
+        lat: 37.9405,
+        lng: 128.2831,
+        category: "CUSTOM",
+      },
+    ]
   },
 
   // Day 3 (9월 19일 토요일): 인제 서킷 트랙 종료 후 서울 조선팰리스 복귀
@@ -158,6 +182,8 @@ export const CONFIRMED_FERRARI_SCHEDULES: ScheduleItem[] = [
 export function scheduleToPresets(item: ScheduleItem): {
   originPreset: LocationPreset;
   destinationPreset: LocationPreset;
+  adminWaypoints?: LocationPreset[];
+  isAdminRoute?: boolean;
 } {
   const originPreset: LocationPreset = {
     id: item.origin_preset_id,
@@ -179,5 +205,10 @@ export function scheduleToPresets(item: ScheduleItem): {
     category: item.destination_name.includes('공항') ? 'AIRPORT' : item.destination_name.includes('호텔') ? 'HOTEL' : item.destination_name.includes('트랙') ? 'CIRCUIT' : 'CUSTOM',
   };
 
-  return { originPreset, destinationPreset };
+  return {
+    originPreset,
+    destinationPreset,
+    adminWaypoints: item.adminWaypoints || item.waypoints || [],
+    isAdminRoute: Boolean(item.isAdminRoute || (item.adminWaypoints && item.adminWaypoints.length > 0)),
+  };
 }

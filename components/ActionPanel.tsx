@@ -11,6 +11,9 @@ interface ActionPanelProps {
   defaultNavi: NaviProvider;
   origin: LocationPreset;
   destination: LocationPreset;
+  waypoint?: LocationPreset | null;
+  adminWaypoints?: LocationPreset[];
+  isAdminRoute?: boolean;
   routeEstimate: RouteEstimate | null;
   reportText: string;
   targetChatRoom?: string;
@@ -39,6 +42,9 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   defaultNavi,
   origin,
   destination,
+  waypoint,
+  adminWaypoints = [],
+  isAdminRoute = false,
   routeEstimate,
   reportText,
   targetChatRoom,
@@ -66,12 +72,38 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
       console.warn('Clipboard write failed:', err);
     }
 
-    // 2. Launch Selected Navigation Deep Link (Alt A: Immediate GPS Turn-by-Turn, Destination only)
-    launchNavigationApp(defaultNavi, {
+    // 2. Launch Selected Navigation Deep Link with Waypoints and Real-time Driver GPS mapping
+    const targetNavi = {
       name: destination.name,
       lat: destination.lat,
       lng: destination.lng,
-    });
+    };
+
+    let naviWaypoints: Array<{ name: string; lat: number; lng: number }> = [];
+
+    if (isAdminRoute) {
+      // Admin Route Sequence: Driver Realtime GPS ➔ Official Origin ➔ Admin Waypoints ➔ Destination
+      naviWaypoints = [
+        { name: origin.shortName || origin.name, lat: origin.lat, lng: origin.lng },
+        ...(adminWaypoints || []).map((w) => ({
+          name: w.shortName || w.name,
+          lat: w.lat,
+          lng: w.lng,
+        })),
+      ];
+    } else if (waypoint) {
+      // Personal Route Sequence: Driver Realtime GPS ➔ Personal Waypoint ➔ Destination
+      naviWaypoints = [
+        { name: waypoint.shortName || waypoint.name, lat: waypoint.lat, lng: waypoint.lng },
+      ];
+    }
+
+    launchNavigationApp(
+      defaultNavi,
+      targetNavi,
+      undefined, // Start navigation directly from driver's smartphone GPS
+      naviWaypoints
+    );
   };
 
   /**
