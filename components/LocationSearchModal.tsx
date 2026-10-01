@@ -25,6 +25,8 @@ export interface SelectedLocationData {
   lat: number;
   lng: number;
   category?: LocationPreset['category'];
+  isPackage?: boolean;
+  packageData?: LocationPreset['packageData'];
 }
 
 interface LocationSearchModalProps {
@@ -350,6 +352,8 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
       lat: preset.lat,
       lng: preset.lng,
       category: preset.category,
+      isPackage: preset.isPackage,
+      packageData: preset.packageData,
     };
     recordRecentSearch(data);
     onSelectLocation(data);
@@ -722,6 +726,7 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                         const p = slot.preset;
                         const isHQ = Boolean(p.isCommon || p.type === 'common' || p.isGlobal || (!p.vehicle_no && !p.vehicleNo));
                         const isSelected = currentSelectedId === p.id;
+                        const isPkg = Boolean(p.isPackage);
 
                         return (
                           <button
@@ -734,17 +739,26 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                               }`}
                             title={`${p.fullName || p.name} (${p.address || p.name})`}
                           >
-                            <span className="text-sm font-bold tracking-tight text-slate-800 group-hover:text-[#1E60F3] truncate w-full transition-colors">
-                              {p.shortName || p.name}
-                            </span>
+                            <div className="flex items-center justify-center gap-1 w-full min-w-0">
+                              {isPkg && (
+                                <span className="text-xs text-slate-500 font-bold shrink-0 leading-none" title="경로 패키지">
+                                  ⤳
+                                </span>
+                              )}
+                              <span className="text-sm font-bold tracking-tight text-slate-800 group-hover:text-[#1E60F3] truncate transition-colors">
+                                {p.shortName || p.name}
+                              </span>
+                            </div>
 
                             <span
-                              className={`text-[10px] font-bold mt-0.5 leading-none ${isHQ
+                              className={`text-[10px] font-bold mt-0.5 leading-none ${isPkg
+                                ? 'text-slate-600 bg-slate-100 px-1 py-0.5 rounded border border-slate-200'
+                                : isHQ
                                 ? 'text-slate-600'
                                 : 'text-[#1E60F3]'
                                 }`}
                             >
-                              {isHQ ? '공통' : '개인'}
+                              {isPkg ? '경로' : isHQ ? '공통' : '개인'}
                             </span>
                           </button>
                         );

@@ -1408,18 +1408,27 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                               )}
 
                               {/* Preset ShortName */}
-                              <span className="text-sm font-bold tracking-tight text-slate-800 group-hover:text-[#1E60F3] truncate w-full transition-colors">
-                                {preset.shortName || preset.name}
-                              </span>
+                              <div className="flex items-center justify-center gap-1 w-full min-w-0">
+                                {preset.isPackage && (
+                                  <span className="text-xs text-slate-500 font-bold shrink-0 leading-none" title="경로 패키지">
+                                    ⤳
+                                  </span>
+                                )}
+                                <span className="text-sm font-bold tracking-tight text-slate-800 group-hover:text-[#1E60F3] truncate transition-colors">
+                                  {preset.shortName || preset.name}
+                                </span>
+                              </div>
 
-                              {/* Badge: 공통 vs 개인 */}
+                              {/* Badge: 공통 vs 개인 vs 경로 */}
                               <span
-                                className={`text-[10px] font-bold mt-0.5 leading-none ${isHQ
+                                className={`text-[10px] font-bold mt-0.5 leading-none ${preset.isPackage
+                                  ? 'text-slate-600 bg-slate-100 px-1 py-0.5 rounded border border-slate-200'
+                                  : isHQ
                                   ? 'text-slate-600'
                                   : 'text-[#1E60F3]'
                                   }`}
                               >
-                                {isHQ ? '공통' : '개인'}
+                                {preset.isPackage ? '경로' : isHQ ? '공통' : '개인'}
                               </span>
                             </div>
                           );

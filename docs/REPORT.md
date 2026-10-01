@@ -3582,4 +3582,45 @@ flowchart TD
    - **경유지 중간 삽입**: 경유지 1, 2, 3이 존재하는 상태에서 경유지 1번 카드의 `+` 클릭 후 새 장소 선택 시, 해당 장소가 '경유지 2'로 진입하고 기존 경유지 2, 3이 각각 '경유지 3', '경유지 4'로 한 칸씩 정확히 밀려남을 확인 (PASS).
    - **경유지 라벨 순수 텍스트화**: 핀 아이콘 박스가 완전히 제거되고 정갈한 `경유지 N` 텍스트만 표시됨을 확인 (PASS).
 
+---
+
+## 75. 출발지-경유지-목적지 '경로 패키지 거점' 순차 저장 및 원터치 일괄 로드 구현 (2026-10-01)
+
+### 75.1 추진 배경 및 작업 목적
+1. **다중 경유지 동선 재사용 비효율 개선**:
+   - 기존 즐겨찾기(프리셋)는 단일 목적지(POI)만 등록 가능하여, 출발지 및 다중 경유지가 포함된 반복 의전 동선을 매번 새로 검색·설정해야 하는 현장 피로도를 해결.
+2. **슬롯 선택 팝업 제거 및 순차 자동 적재(Sequential Stack)**:
+   - "몇 번 슬롯에 저장하시겠습니까?"와 같은 번거로운 단계별 모달 팝업을 완전히 배제.
+   - 경로 저장 트리거 시 기본 명칭(`${origin.shortName || origin.name} ➔ ${destination.shortName || destination.name}`) 확인 후, 12개 슬롯 중 첫 번째 빈 슬롯에 자동 적재(FIFO / Next Available Slot Append).
+3. **원터치 패키지 로드**:
+   - 거점 모달/그리드에서 해당 패키지를 터치하면 출발지, 다중 경유지(0~5개), 최종 목적지가 한 번에 메인 콕핏에 로드되며 즉각 실시간 TMAP 경로 연산 및 내비 연동이 완료.
+4. **미니멀 슬레이트 디자인 통일**:
+   - 무채색 미니멀 슬레이트 규격(`w-8 h-8 rounded-full bg-white border border-slate-200 shadow-sm text-slate-500 hover:text-slate-700 hover:bg-slate-50 active:scale-95`)의 북마크/저장 버튼 및 `⤳` 경로 표식/배지 적용.
+
+---
+
+### 75.2 모듈별 핵심 구현 내역
+1. **`types/index.ts` 패키지 데이터 모델 확장**:
+   - `LocationPreset`에 `isPackage?: boolean` 및 `packageData?: { origin: LocationPreset; waypoints: LocationPreset[]; destination: LocationPreset; }` 옵셔널 필드 확장.
+2. **`components/OriginDestinationSelector.tsx` '경로 저장' 조작계 탑재**:
+   - `OriginDestinationSelectorProps`에 `onSaveRouteAsPreset?: () => void` 추가.
+   - 가이드 캡션 하단 바 우측에 북마크 SVG 아이콘 버튼 배치 (세로 모드/가로 모드 공통 접근성 확보).
+3. **`app/page.tsx` 순차 자동 저장 핸들러 (`handleSaveRouteAsPreset`)**:
+   - 슬롯 번호 질의 없이 기본 명칭 제안 후 비어 있는 첫 번째 슬롯(또는 12개 초과 시 마지막 슬롯 대체)에 자동 적재.
+   - `savePresetsToStorage`로 호차별 로컬스토리지 격리 저장 및 Supabase `/api/presets` 백그라운드 동기화 (3.5초 타임아웃 가드).
+4. **`app/page.tsx` & `components/LocationSearchModal.tsx` 원터치 일괄 로드 및 UI 표식**:
+   - `handleSelectPreset` 및 `handleSelectLocationFromSearch`에서 `preset.isPackage && preset.packageData` 감지 시 출발지, 경유지 배열, 목적지를 동시 세팅하고 즉시 경로 재계산 트리거.
+   - `LocationSearchModal` 및 `CustomPresetModal`의 12슬롯 그리드에 미니멀 `⤳` 아이콘 및 `경로` 배지 표기.
+
+---
+
+### 75.3 검증 및 테스트 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 TypeScript / ESLint 컴파일 에러 **0건 (Exit code 0)** 통과.
+2. **시나리오 검증 결과**:
+   - **경로 저장**: 출발지, 경유지 2곳, 목적지가 세팅된 상태에서 북마크 버튼 클릭 ➔ 슬롯 선택창 없이 명칭 확인 후 빈 슬롯에 자동 적재 확인 (PASS).
+   - **원터치 로드**: 거점 그리드에서 경로 패키지 터치 ➔ 출발지, 경유지 2곳, 목적지가 콕핏에 일괄 바인딩되며 실시간 경로 연산이 즉시 트리거됨을 확인 (PASS).
+   - **UI 식별성**: 거점 카드에 `⤳` 기호와 `경로` 배지가 깔끔하게 표시되어 단일 거점과 명확히 구분됨 (PASS).
+
+
 

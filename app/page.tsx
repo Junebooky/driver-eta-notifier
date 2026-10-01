@@ -899,6 +899,18 @@ export default function Home() {
   // Handle Preset Button Click
   const handleSelectPreset = (preset: LocationPreset) => {
     setNewlyAddedPresetId(null);
+
+    // [태스크 4] 경로 패키지 거점 원터치 일괄 로드
+    if (preset.isPackage && preset.packageData) {
+      setOrigin(preset.packageData.origin);
+      setWaypoints(preset.packageData.waypoints || []);
+      setDestination(preset.packageData.destination);
+      setIsAdminRoute(false);
+      setSelectionTarget('destination');
+      haptics.success();
+      return;
+    }
+
     let resolvedPreset = preset;
     // Resolve Home slot
     if (preset.id === 'slot_home') {
@@ -967,6 +979,17 @@ export default function Home() {
 
   // Handler for selecting location from standalone LocationSearchModal
   const handleSelectLocationFromSearch = (loc: SelectedLocationData) => {
+    // [태스크 4] 검색 모달 내 경로 패키지 거점 선택 시 원터치 일괄 로드
+    if (loc.isPackage && loc.packageData) {
+      setOrigin(loc.packageData.origin);
+      setWaypoints(loc.packageData.waypoints || []);
+      setDestination(loc.packageData.destination);
+      setIsAdminRoute(false);
+      setSelectionTarget('destination');
+      haptics.success();
+      return;
+    }
+
     const resolvedPreset: LocationPreset = {
       id: loc.id || `loc_${Date.now()}`,
       name: loc.name,
@@ -996,6 +1019,70 @@ export default function Home() {
     setOrigin(currentDestination);
     setDestination(currentOrigin);
     saveRecentPreset(currentDestination);
+  };
+
+  // [태스크 3] 출발지-경유지-목적지 '경로 패키지 거점' 순차 자동 저장 핸들러 (슬롯 번호 질의 배제)
+  const handleSaveRouteAsPreset = () => {
+    if (!origin || !destination) return;
+
+    const defaultName = `${origin.shortName || origin.name} ➔ ${destination.shortName || destination.name}`;
+    const routeName = window.prompt('거점으로 저장할 경로 명칭을 입력하세요:', defaultName);
+    if (!routeName || !routeName.trim()) return;
+
+    const trimmedName = routeName.trim();
+    const newPackagePreset: LocationPreset = {
+      id: `pkg-${Date.now()}`,
+      name: trimmedName,
+      shortName: trimmedName.slice(0, 10),
+      fullName: `${trimmedName} (${origin.name} ➔ ${waypoints.map((w) => w.name).join(' ➔ ')}${waypoints.length ? ' ➔ ' : ''}${destination.name})`,
+      lat: destination.lat,
+      lng: destination.lng,
+      address: destination.address || destination.name,
+      category: 'CUSTOM',
+      type: 'personal',
+      isCommon: false,
+      isGlobal: false,
+      vehicle_no: currentVehicleNo,
+      vehicleNo: currentVehicleNo,
+      createdAt: new Date().toISOString(),
+      isPackage: true,
+      packageData: {
+        origin,
+        waypoints: [...waypoints],
+        destination,
+      },
+    };
+
+    setPresets((prev) => {
+      const next = [...prev];
+      // 12개 프리셋 목록 중 비어 있는 첫 번째 인덱스(빈 슬롯) 탐색
+      const emptyIndex = next.findIndex((p) => !p.name || p.name.includes('설정되지 않음'));
+      if (emptyIndex !== -1) {
+        next[emptyIndex] = { ...newPackagePreset, order: emptyIndex };
+      } else if (next.length < 12) {
+        next.push({ ...newPackagePreset, order: next.length });
+      } else {
+        // 12개가 꽉 찬 경우 12번째 슬롯(인덱스 11)에 대체 적재
+        next[11] = { ...newPackagePreset, order: 11 };
+      }
+      savePresetsToStorage(next);
+      return next;
+    });
+
+    // Supabase DB 백그라운드 동기화 (3.5초 타임아웃 방어)
+    fetch('/api/presets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...newPackagePreset,
+        vehicle_no: currentVehicleNo,
+      }),
+      signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal
+        ? AbortSignal.timeout(3500)
+        : undefined,
+    }).catch((err) => console.warn('Background preset sync failed:', err));
+
+    haptics.success();
   };
 
   // Schedule Tab Action Handlers
@@ -1235,6 +1322,7 @@ export default function Home() {
               onOpenFlightModal={() => setIsFlightModalOpen(true)}
               onOpenGasModal={() => setIsGasModalOpen(true)}
               onOpenPresetModal={handleOpenAddModal}
+              onSaveRouteAsPreset={handleSaveRouteAsPreset}
             />
 
             {/* 2. Standalone 5-Column Quick Action Bar */}

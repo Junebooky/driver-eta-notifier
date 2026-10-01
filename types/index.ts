@@ -47,6 +47,12 @@ export interface LocationPreset {
   vehicleNo?: string | null;
   order?: number;
   createdAt?: string;
+  isPackage?: boolean; // 패키지 경로 여부
+  packageData?: {
+    origin: LocationPreset;
+    waypoints: LocationPreset[];
+    destination: LocationPreset;
+  };
 }
 
 export type CustomPreset = LocationPreset;

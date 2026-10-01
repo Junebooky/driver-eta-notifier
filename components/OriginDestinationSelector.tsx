@@ -25,6 +25,7 @@ export interface OriginDestinationSelectorProps {
   onOpenFlightModal?: () => void;
   onOpenGasModal?: () => void;
   onOpenPresetModal?: () => void;
+  onSaveRouteAsPreset?: () => void;
 }
 
 export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps> = ({
@@ -43,6 +44,7 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
   onRemoveWaypoint,
   onSwap,
   onOpenSearchModal,
+  onSaveRouteAsPreset,
 }) => {
   const [isAccordionOpen, setIsAccordionOpen] = useState(false);
 
@@ -367,9 +369,9 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
         </div>
       )}
 
-      {/* Guide Caption */}
-      <div className="flex items-center justify-between py-0.5 px-0.5 select-none">
-        <div className="flex items-center space-x-1.5 min-w-0">
+      {/* Guide Caption & Route Save Action */}
+      <div className="flex items-center justify-between py-0.5 px-0.5 select-none gap-2">
+        <div className="flex items-center space-x-1.5 min-w-0 flex-1">
           <div className="w-3.5 h-3.5 rounded-full bg-[#1E60F3] text-white flex items-center justify-center text-[9px] font-black shrink-0 shadow-[0_1px_4px_rgba(30,96,243,0.3)]">
             i
           </div>
@@ -383,6 +385,24 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
               : '카드를 탭해 장소·거점을 선택하세요.'}
           </span>
         </div>
+
+        {onSaveRouteAsPreset && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              haptics.mediumTap();
+              onSaveRouteAsPreset();
+            }}
+            className="w-8 h-8 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-50 active:scale-95 transition-all shrink-0 cursor-pointer"
+            title="현재 경로를 거점으로 저장"
+            aria-label="현재 경로를 거점으로 저장"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+            </svg>
+          </button>
+        )}
       </div>
     </div>
   );
