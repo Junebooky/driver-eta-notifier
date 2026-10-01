@@ -737,7 +737,11 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                               ? 'border-2 border-[#1E60F3] bg-blue-50/40 text-[#1E60F3] font-bold shadow-xs'
                               : 'bg-white border-slate-200 hover:border-[#1E60F3]/60 hover:bg-blue-50/30'
                               }`}
-                            title={`${p.fullName || p.name} (${p.address || p.name})`}
+                            title={
+                              isPkg
+                                ? (p.full_name || p.fullName || p.name)
+                                : `${p.fullName || p.full_name || p.name} (${p.address || p.name})`
+                            }
                           >
                             <div className="flex items-center justify-center gap-1 w-full min-w-0">
                               {isPkg && (

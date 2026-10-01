@@ -1021,20 +1021,36 @@ export default function Home() {
     saveRecentPreset(currentDestination);
   };
 
-  // [태스크 3] 출발지-경유지-목적지 '경로 패키지 거점' 순차 자동 저장 핸들러 (슬롯 번호 질의 배제)
+  // [태스크 1] 출발지-경유지-목적지 '경로 패키지 거점' 순차 자동 저장 핸들러 (버튼 '표시 이름(최대 8자)' 설정 보강)
   const handleSaveRouteAsPreset = () => {
     if (!origin || !destination) return;
 
-    const defaultName = `${origin.shortName || origin.name} ➔ ${destination.shortName || destination.name}`;
-    const routeName = window.prompt('거점으로 저장할 경로 명칭을 입력하세요:', defaultName);
-    if (!routeName || !routeName.trim()) return;
+    // 1. 전체 경로명(full_name) 자동 조합
+    const waypointNames = waypoints.map((w) => w.shortName || w.name).join(' ➔ ');
+    const fullRouteName = waypointNames
+      ? `${origin.shortName || origin.name} ➔ ${waypointNames} ➔ ${destination.shortName || destination.name}`
+      : `${origin.shortName || origin.name} ➔ ${destination.shortName || destination.name}`;
 
-    const trimmedName = routeName.trim();
+    // 2. 8자 추천 기본 표시명 생성 (출발지 3자 ➔ 목적지 4자 조합 최대 8자)
+    const defaultShortName = `${(origin.shortName || origin.name).slice(0, 3)}➔${(destination.shortName || destination.name).slice(0, 4)}`.slice(0, 8);
+
+    // 3. 기사/관리자에게 버튼에 표기할 8자 표시 이름 질의
+    const inputDisplayName = window.prompt(
+      `[거점 버튼 표시 이름 설정]\n그리드 버튼에 표시할 축약 이름을 입력하세요 (최대 8자):\n\n전체 경로: ${fullRouteName}`,
+      defaultShortName
+    );
+
+    if (!inputDisplayName || !inputDisplayName.trim()) return;
+
+    // 8자 제한 안전 절삭
+    const finalizedDisplayName = inputDisplayName.trim().slice(0, 8);
+
     const newPackagePreset: LocationPreset = {
       id: `pkg-${Date.now()}`,
-      name: trimmedName,
-      shortName: trimmedName.slice(0, 10),
-      fullName: `${trimmedName} (${origin.name} ➔ ${waypoints.map((w) => w.name).join(' ➔ ')}${waypoints.length ? ' ➔ ' : ''}${destination.name})`,
+      name: finalizedDisplayName, // 그리드 버튼에 표시될 8자 이름
+      shortName: finalizedDisplayName,
+      full_name: fullRouteName,   // 상세 출발지-경유지-목적지 전체 이름
+      fullName: fullRouteName,
       lat: destination.lat,
       lng: destination.lng,
       address: destination.address || destination.name,

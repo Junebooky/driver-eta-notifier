@@ -1389,7 +1389,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                                 transition: isBeingDragged ? 'none' : 'transform 300ms cubic-bezier(0.2, 0, 0, 1), box-shadow 200ms ease',
                                 touchAction: isBeingDragged ? 'none' : 'manipulation',
                               }}
-                              title={`${preset.fullName || preset.name} (길게 눌러 드래그 / 탭하여 수정)`}
+                              title={`${preset.full_name || preset.fullName || preset.name} (길게 눌러 드래그 / 탭하여 수정)`}
                             >
                               {/* Delete Button (Personal MY or Admin mode) */}
                               {(!isHQ || effectiveIsAdmin) && (
