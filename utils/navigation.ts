@@ -4,6 +4,7 @@ export interface LocationTarget {
   name: string;
   lat: number;
   lng: number;
+  address?: string;
 }
 
 export function formatEtaTime(date: Date): string {
@@ -207,6 +208,29 @@ export function launchNavigationApp(
   waypoints?: LocationTarget[]
 ): void {
   if (typeof window === 'undefined') return;
+
+  // 1. Kakao SDK Navi start with viaPoints if window.Kakao?.Navi is available
+  if (provider === 'kakao') {
+    if (typeof window !== 'undefined' && (window as any).Kakao?.Navi?.start) {
+      try {
+        const validWaypoints = (waypoints || []).filter((w) => w && !isNaN(w.lat) && !isNaN(w.lng));
+        (window as any).Kakao.Navi.start({
+          name: target.name,
+          x: target.lng,
+          y: target.lat,
+          coordType: 'wgs84',
+          viaPoints: validWaypoints.slice(0, 3).map((wp) => ({
+            name: wp.name,
+            x: wp.lng,
+            y: wp.lat,
+          })),
+        });
+        return;
+      } catch (e) {
+        console.warn('Kakao.Navi.start failed, falling back to scheme', e);
+      }
+    }
+  }
 
   const userAgent = navigator.userAgent || '';
   const isAndroid = /Android/i.test(userAgent);
