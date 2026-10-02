@@ -211,23 +211,37 @@ export function launchNavigationApp(
 
   // 1. Kakao SDK Navi start with viaPoints if window.Kakao?.Navi is available
   if (provider === 'kakao') {
-    if (typeof window !== 'undefined' && (window as any).Kakao?.Navi?.start) {
-      try {
-        const validWaypoints = (waypoints || []).filter((w) => w && !isNaN(w.lat) && !isNaN(w.lng));
-        (window as any).Kakao.Navi.start({
-          name: target.name,
-          x: target.lng,
-          y: target.lat,
-          coordType: 'wgs84',
-          viaPoints: validWaypoints.slice(0, 3).map((wp) => ({
-            name: wp.name,
-            x: wp.lng,
-            y: wp.lat,
-          })),
-        });
-        return;
-      } catch (e) {
-        console.warn('Kakao.Navi.start failed, falling back to scheme', e);
+    if (typeof window !== 'undefined' && (window as any).Kakao) {
+      const kakao = (window as any).Kakao;
+      if (typeof kakao.isInitialized === 'function' && !kakao.isInitialized()) {
+        const key = process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY;
+        if (key) {
+          try {
+            kakao.init(key);
+          } catch (e) {
+            console.warn('Kakao.init failed:', e);
+          }
+        }
+      }
+
+      if (kakao.Navi?.start) {
+        try {
+          const validWaypoints = (waypoints || []).filter((w) => w && !isNaN(w.lat) && !isNaN(w.lng));
+          kakao.Navi.start({
+            name: target.name,
+            x: target.lng,
+            y: target.lat,
+            coordType: 'wgs84',
+            viaPoints: validWaypoints.slice(0, 3).map((wp) => ({
+              name: wp.name,
+              x: wp.lng,
+              y: wp.lat,
+            })),
+          });
+          return;
+        } catch (e) {
+          console.warn('Kakao.Navi.start failed, falling back to scheme', e);
+        }
       }
     }
   }

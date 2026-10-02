@@ -3703,6 +3703,34 @@ flowchart TD
    - **티맵 스마트 어시스트 시트**: 선호 내비가 티맵일 때 다중 경유지 상태에서 [티맵 안내 시작] 탭 시 스마트 어시스트 시트가 즉시 노출되고, 영역 A를 통한 네이버/카카오 전환, 영역 B의 각 경유지별 2초 `✓` 복사, 영역 C의 티맵 목적지 실행이 유기적으로 동작함을 확인 (PASS).
    - **메인 경유지 카드 개별 복사**: 메인 콕핏 경유지 카드 우측 상단 복사 아이콘 클릭 시 주소가 클립보드에 정확히 복사되고 `✓` 아이콘으로 전환됨 확인 (PASS).
 
+---
+
+## 78. app/layout.tsx 카카오 SDK 스크립트 탑재 및 Kakao.init 초기화 연동 (2026-10-02)
+
+### 78.1 추진 배경 및 결함 원인
+1. **카카오 SDK 스크립트 누락에 따른 `window.Kakao` 미정의 해결**:
+   - 환경 변수(`NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY`)와 도메인은 등록되어 있었으나 `app/layout.tsx`에 카카오 자바스크립트 SDK `<script>` 태그가 누락되어 브라우저 런타임에서 `window.Kakao`가 `undefined`로 평가됨.
+   - 이로 인해 카카오내비 SDK(`Kakao.Navi.start`)가 호출되지 못하고 카카오맵 웹/앱 스킴 폴백(`kakaomap://`)으로 빠져 경유지가 누락되는 문제 원천 차단.
+
+---
+
+### 78.2 모듈별 핵심 구현 내역
+1. **`app/layout.tsx` 카카오 SDK 로드 및 자동 초기화 파이프라인**:
+   - `next/script` 컴포넌트를 활용하여 카카오 공식 SDK(`https://t1.kakaocdn.net/kakao_js_sdk/2.7.4/kakao.min.js`)를 `strategy="beforeInteractive"`로 주입.
+   - 인라인 `<Script id="kakao-sdk-init" strategy="afterInteractive">`를 통해 브라우저 마운트 시 `window.Kakao.isInitialized()` 여부를 검증하고 `window.Kakao.init(process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY)`로 자동 초기화.
+2. **`utils/navigation.ts` 런타임 방어적 초기화 가드 추가**:
+   - `launchNavigationApp` 내에서 `window.Kakao` 감지 시 `kakao.isInitialized()`를 확인하여, 미초기화 상태일 경우 `process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY`로 즉시 초기화한 후 `kakao.Navi.start`를 호출하도록 이중 안전망 구축.
+
+---
+
+### 78.3 검증 및 테스트 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 TypeScript / ESLint 컴파일 에러 **0건 (Exit code 0)** 통과.
+2. **시나리오 검증 결과**:
+   - 최상단 레이아웃을 통해 카카오 SDK가 사전 로드되어 `window.Kakao`가 정상 인스턴스로 바인딩됨 확인.
+   - 카카오내비 실행 시 `Kakao.Navi.start`가 경유지(`viaPoints`) 목록과 함께 정상적으로 호출됨 확인 (PASS).
+
+
 
 
 
