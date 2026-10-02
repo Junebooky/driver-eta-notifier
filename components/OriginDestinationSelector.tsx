@@ -84,11 +84,10 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
           {/* 1. Origin Slot (Inline Slim) */}
           <div
             onClick={handleOriginClick}
-            className={`w-full py-2.5 px-3.5 rounded-2xl border text-left cursor-pointer transition-all duration-150 active:scale-98 ${
-              selectionTarget === 'origin'
-                ? 'bg-slate-50/80 text-slate-800 border-slate-300/90 ring-2 ring-slate-200/60 shadow-xs'
-                : 'bg-white border-slate-200/80 hover:border-slate-300'
-            }`}
+            className={`w-full py-2.5 px-3.5 rounded-2xl border text-left cursor-pointer transition-all duration-150 active:scale-98 ${selectionTarget === 'origin'
+              ? 'bg-slate-50/80 text-slate-800 border-slate-300/90 ring-2 ring-slate-200/60 shadow-xs'
+              : 'bg-white border-slate-200/80 hover:border-slate-300'
+              }`}
             title="출발지 검색 및 변경"
           >
             <div className="flex items-center justify-between w-full">
@@ -114,11 +113,10 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
             <div
               key={wp.id || `wp_${index}`}
               onClick={() => handleWaypointClick(index)}
-              className={`w-full py-2.5 px-3.5 rounded-2xl border text-left cursor-pointer transition-all duration-150 active:scale-98 ${
-                selectionTarget === 'waypoint'
-                  ? 'bg-slate-50/80 border-slate-400 ring-2 ring-slate-300/60 shadow-xs'
-                  : 'bg-white border-slate-200/80 hover:border-slate-300'
-              }`}
+              className={`w-full py-2.5 px-3.5 rounded-2xl border text-left cursor-pointer transition-all duration-150 active:scale-98 ${selectionTarget === 'waypoint'
+                ? 'bg-slate-50/80 border-slate-400 ring-2 ring-slate-300/60 shadow-xs'
+                : 'bg-white border-slate-200/80 hover:border-slate-300'
+                }`}
               title="경유지 검색 및 변경"
             >
               <div className="flex items-center justify-between w-full">
@@ -218,11 +216,10 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
           {/* 3. Destination Slot (Inline Slim) */}
           <div
             onClick={handleDestinationClick}
-            className={`w-full py-2.5 px-3.5 rounded-2xl text-left cursor-pointer transition-all duration-150 active:scale-98 ${
-              selectionTarget === 'destination'
-                ? 'bg-white border-2 border-[#1E60F3] shadow-sm shadow-blue-500/10'
-                : 'bg-white border border-slate-200/80 hover:border-slate-300'
-            }`}
+            className={`w-full py-2.5 px-3.5 rounded-2xl text-left cursor-pointer transition-all duration-150 active:scale-98 ${selectionTarget === 'destination'
+              ? 'bg-white border-2 border-[#1E60F3] shadow-sm shadow-blue-500/10'
+              : 'bg-white border border-slate-200/80 hover:border-slate-300'
+              }`}
             title="목적지 검색 및 변경"
           >
             <div className="flex items-center justify-between w-full">
@@ -249,11 +246,10 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
           {/* Origin Card (Neutral Gray 기준점) */}
           <div
             onClick={handleOriginClick}
-            className={`flex-1 min-w-0 w-full py-2.5 px-3 rounded-2xl border text-left cursor-pointer transition-all duration-150 active:scale-95 ${
-              selectionTarget === 'origin'
-                ? 'bg-slate-50/80 text-slate-800 border-slate-300/90 ring-2 ring-slate-200/60 shadow-xs'
-                : 'bg-white border-slate-200/80 hover:border-slate-300'
-            }`}
+            className={`flex-1 min-w-0 w-full py-2.5 px-3 rounded-2xl border text-left cursor-pointer transition-all duration-150 active:scale-95 ${selectionTarget === 'origin'
+              ? 'bg-slate-50/80 text-slate-800 border-slate-300/90 ring-2 ring-slate-200/60 shadow-xs'
+              : 'bg-white border-slate-200/80 hover:border-slate-300'
+              }`}
             title="출발지 검색 및 변경"
           >
             <div className="flex items-center justify-between w-full">
@@ -265,17 +261,15 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
               </span>
             </div>
             <div
-              className={`text-base font-bold truncate mt-1 w-full ${
-                selectionTarget === 'origin' ? 'text-slate-900' : 'text-slate-700'
-              }`}
+              className={`text-base font-bold truncate mt-1 w-full ${selectionTarget === 'origin' ? 'text-slate-900' : 'text-slate-700'
+                }`}
               title={origin.name}
             >
               {origin.shortName}
             </div>
             <div
-              className={`text-[11px] truncate mt-0.5 font-normal w-full ${
-                selectionTarget === 'origin' ? 'text-slate-500' : 'text-slate-400'
-              }`}
+              className={`text-[11px] truncate mt-0.5 font-normal w-full ${selectionTarget === 'origin' ? 'text-slate-500' : 'text-slate-400'
+                }`}
               title={origin.address || origin.name}
             >
               {origin.address || origin.name}
@@ -321,11 +315,10 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
           {/* Destination Card (2px Cobalt Outline 핵심 타깃 - 순수 화이트 배경) */}
           <div
             onClick={handleDestinationClick}
-            className={`flex-1 min-w-0 w-full py-2.5 px-3 rounded-2xl text-left cursor-pointer transition-all duration-150 active:scale-95 ${
-              selectionTarget === 'destination'
-                ? 'bg-white border-2 border-[#1E60F3] shadow-sm shadow-blue-500/10'
-                : 'bg-white border border-slate-200/80 hover:border-slate-300'
-            }`}
+            className={`flex-1 min-w-0 w-full py-2.5 px-3 rounded-2xl text-left cursor-pointer transition-all duration-150 active:scale-95 ${selectionTarget === 'destination'
+              ? 'bg-white border-2 border-[#1E60F3] shadow-sm shadow-blue-500/10'
+              : 'bg-white border border-slate-200/80 hover:border-slate-300'
+              }`}
             title="목적지 검색 및 변경"
           >
             <div className="flex items-center justify-between w-full">
@@ -346,9 +339,8 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
                   >
                     <span>지정동선 {adminWaypoints.length}곳</span>
                     <svg
-                      className={`w-3 h-3 text-slate-500 transition-transform duration-200 ${
-                        isAccordionOpen ? 'rotate-180' : ''
-                      }`}
+                      className={`w-3 h-3 text-slate-500 transition-transform duration-200 ${isAccordionOpen ? 'rotate-180' : ''
+                        }`}
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -423,8 +415,8 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
                 ? '경유지 카드를 탭해 변경하거나 + 로 추가, ✕ 로 삭제하세요.'
                 : '최대 경유지(5개)가 설정되었습니다.'
               : isAdminRoute
-              ? '관리자 지정동선 대열 통제 주행 모드입니다.'
-              : '카드를 탭해 장소·거점을 선택하세요.'}
+                ? '관리자 지정동선 대열 통제 주행 모드입니다.'
+                : '카드를 탭해 장소·거점을 선택하세요.'}
           </span>
         </div>
 

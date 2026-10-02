@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { NaviProvider, LocationPreset, RouteEstimate, DriverProfile } from '@/types';
 import { launchNavigationApp, calculateHaversineEstimate } from '@/utils/navigation';
 import { generateVipReportText, copyAndLaunchKakaoTalk } from '@/utils/kakao';
@@ -54,6 +54,22 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   const [isTmapAssistOpen, setIsTmapAssistOpen] = useState(false);
   const [copiedWpIndex, setCopiedWpIndex] = useState<number | null>(null);
   const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Background scroll lock when Tmap assist modal is active
+  useEffect(() => {
+    if (isTmapAssistOpen) {
+      const originalOverflow = document.body.style.overflow;
+      const originalTouchAction = document.body.style.touchAction;
+
+      document.body.style.overflow = 'hidden';
+      document.body.style.touchAction = 'none';
+
+      return () => {
+        document.body.style.overflow = originalOverflow;
+        document.body.style.touchAction = originalTouchAction;
+      };
+    }
+  }, [isTmapAssistOpen]);
 
   // Active waypoints resolution
   const activeWaypointsList: LocationPreset[] = isAdminRoute
@@ -176,13 +192,12 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
       {/* Tmap Smart Assist Bottom Sheet / Modal */}
       {isTmapAssistOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 select-none overscroll-contain"
-          style={{ overscrollBehavior: 'contain', touchAction: 'pan-y' }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overscroll-contain touch-none select-none animate-in fade-in duration-200"
           onClick={() => setIsTmapAssistOpen(false)}
         >
           <div
-            className="w-full max-w-lg bg-white rounded-t-3xl sm:rounded-2xl border border-slate-100 shadow-2xl overflow-hidden flex flex-col max-h-[85dvh] animate-in slide-in-from-bottom-6 duration-300"
-            style={{ overscrollBehavior: 'contain', touchAction: 'pan-y' }}
+            className="w-full max-w-lg bg-white rounded-3xl border border-slate-100 shadow-2xl overflow-hidden flex flex-col max-h-[85dvh] animate-in zoom-in-95 duration-200 touch-auto"
+            style={{ overscrollBehavior: 'contain' }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
@@ -196,7 +211,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
                     티맵 경유지 스마트 어시스트
                   </h3>
                   <p className="text-[11px] text-slate-500 font-medium">
-                    경유지 {activeWaypointsList.length}곳이 등록된 코스입니다
+                    경유지 {activeWaypointsList.length}곳이 준비됐어요
                   </p>
                 </div>
               </div>
@@ -215,17 +230,15 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
 
             {/* Modal Body */}
             <div className="p-5 space-y-4 overflow-y-auto max-h-[85dvh] flex-1 text-slate-800 overscroll-contain touch-pan-y">
-              {/* 영역 A: 원터치 자동 전환 권장 */}
-              <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-2.5">
-                <div className="flex items-start gap-2">
-                  <div className="w-5 h-5 rounded-full bg-blue-100 text-[#1E60F3] flex items-center justify-center shrink-0 mt-0.5">
-                    <Zap className="w-3 h-3 fill-[#1E60F3]" />
-                  </div>
-                  <div className="text-xs text-slate-700 font-medium leading-relaxed">
-                    <span className="font-bold text-slate-900">네이버 지도</span> 또는 <span className="font-bold text-slate-900">카카오내비</span>로 열면 모든 경유지가 <strong className="text-[#1E60F3]">자동으로 입력</strong>됩니다.
-                  </div>
+              {/* 원터치 다이렉트 연동 원형 버튼 영역 */}
+              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 flex flex-col items-center gap-2.5">
+                <div className="text-center">
+                  <p className="text-xs font-semibold text-slate-800">경유지 자동 연동 원터치 실행</p>
+                  <p className="text-[11px] text-slate-500">아래 앱을 탭하시면 모든 경유지가 포함되어 즉시 실행됩니다</p>
                 </div>
-                <div className="grid grid-cols-2 gap-2 pt-1">
+
+                <div className="flex items-center justify-center gap-6 pt-1">
+                  {/* 네이버 지도 원형 버튼 */}
                   <button
                     type="button"
                     onClick={async () => {
@@ -233,10 +246,17 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
                       setIsTmapAssistOpen(false);
                       await launchNavigationApp('naver', targetNavi, undefined, naviWaypoints);
                     }}
-                    className="py-3 px-2.5 bg-[#03C75A] hover:bg-[#02b350] active:scale-98 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
+                    className="w-16 h-16 sm:w-18 sm:h-18 rounded-full bg-[#03C75A] text-white flex flex-col items-center justify-center shadow-md hover:brightness-105 active:scale-95 transition-all cursor-pointer"
+                    title="네이버 지도로 경유지 자동 연결"
                   >
-                    <span>네이버 지도로 자동 연결</span>
+                    {/* 내비 화살표 아이콘 */}
+                    <svg className="w-5 h-5 -rotate-45 fill-current ml-0.5" viewBox="0 0 24 24">
+                      <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z" />
+                    </svg>
+                    <span className="text-[11px] font-bold tracking-tight mt-0.5">네이버</span>
                   </button>
+
+                  {/* 카카오내비 원형 버튼 */}
                   <button
                     type="button"
                     onClick={async () => {
@@ -244,9 +264,14 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
                       setIsTmapAssistOpen(false);
                       await launchNavigationApp('kakao', targetNavi, undefined, naviWaypoints);
                     }}
-                    className="py-3 px-2.5 bg-[#FEE500] hover:bg-[#FDD835] active:scale-98 text-[#191919] rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
+                    className="w-16 h-16 sm:w-18 sm:h-18 rounded-full bg-[#FEE500] text-[#191919] flex flex-col items-center justify-center shadow-md hover:brightness-95 active:scale-95 transition-all cursor-pointer"
+                    title="카카오내비로 경유지 자동 연결"
                   >
-                    <span>카카오내비로 자동 연결</span>
+                    {/* 내비 화살표 아이콘 */}
+                    <svg className="w-5 h-5 -rotate-45 fill-current ml-0.5" viewBox="0 0 24 24">
+                      <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z" />
+                    </svg>
+                    <span className="text-[11px] font-bold tracking-tight mt-0.5">카카오</span>
                   </button>
                 </div>
               </div>
@@ -254,7 +279,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
               {/* 영역 B: 티맵 주소 개별 복사 목록 */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between px-0.5">
-                  <span className="text-xs font-bold text-slate-700">경유지 주소 복사 (티맵에서 검색 후 추가)</span>
+                  <span className="text-xs font-bold text-slate-700">티맵용 경유지 복사</span>
                   <span className="text-[11px] text-slate-400">총 {activeWaypointsList.length}개</span>
                 </div>
                 <div className="space-y-1.5 max-h-[36vh] overflow-y-auto pr-0.5">

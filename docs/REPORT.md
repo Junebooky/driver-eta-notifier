@@ -3794,6 +3794,48 @@ flowchart TD
    - '서울 영등포구' 등 개별 등록 단일 거점은 파란색 **'개인'** 라벨 정상 표기 확인 (PASS).
    - 'SGBAC ➔' 및 '콘래드➔연남' 등 경유지가 포함된 패키지 거점은 앰버색 **'경유'** 라벨과 `⤳` 기호로 명확히 구분되어 렌더링됨 확인 (PASS).
 
+---
+
+## 81. 티맵 어시스트 모달 배경 스크롤 차단(Scroll Lock) 및 원터치 내비 원형(Circle) 버튼 리디자인 (2026-10-02)
+
+### 81.1 추진 배경 및 작업 목적
+1. **모달 활성화 시 뒷배경 스크롤 전이(Scroll Bleed / Scroll Lock) 결함 차단**:
+   - `components/ActionPanel.tsx`의 티맵 경유지 스마트 어시스트 모달 활성화 시, 모바일 화면을 드래그하면 모달 뒤쪽 메인 페이지가 스크롤되는 결함을 원천 차단.
+   - `useEffect` 기반 `body` 스타일 제어(`overflow: hidden`, `touchAction: none`) 및 오버레이 백드롭 제스처 격리를 통해 조작 안정성 확보.
+2. **원터치 내비 연결 버튼 직관적 원형(Circle) 리디자인**:
+   - 모달 상단의 네이버 지도 / 카카오내비 경유지 자동 연동 실행 영역을 기존 텍스트 위주 직사각형에서 내이티브 내비 앱 감성의 **수평 중앙 정렬 2개 원형(Circle) 버튼**으로 전면 교체.
+   - 고유 브랜드 컬러(네이버 `#03C75A`, 카카오 `#FEE500`)와 길안내 지향 45도 회전 화살표 SVG, 초소형 굵은 라벨('네이버', '카카오')을 결합하여 운전석 원핸드 시인성 및 터치 조작성 극대화.
+
+---
+
+### 81.2 모듈별 핵심 구현 내역
+1. **`components/ActionPanel.tsx` 모달 배경 스크롤 잠금(Scroll Lock) 구현**:
+   - `isTmapAssistOpen` 상태를 감지하는 `useEffect` 스크롤 락 훅 추가:
+     - 모달 오픈 시 `document.body.style.overflow = 'hidden'`, `document.body.style.touchAction = 'none'`을 적용.
+     - 클린업 함수에서 기존 `overflow` 및 `touchAction`을 안전하게 복원.
+   - 최상단 오버레이 백드롭 요소에 `overscroll-contain touch-none` 클래스를 적용하여 배경 터치 제스처 침범을 원천 차단.
+   - 모달 내부 컨텐츠 컨테이너에는 `touch-auto`를 주입하여 내부 리스트 스크롤만 정상 격리 동작하도록 구성.
+2. **`components/ActionPanel.tsx` 네이버·카카오 원터치 원형(Circle) 내비 버튼 구현**:
+   - 기존 직사각형 버튼 컨테이너를 수평 중앙 정렬된 2개의 원형 버튼 레이아웃(`flex items-center justify-center gap-6`)으로 전면 교체.
+   - **원형 버튼 규격**:
+     - 직경: `w-16 h-16 sm:w-18 sm:h-18 rounded-full`
+     - 레이아웃 및 인터랙션: `flex flex-col items-center justify-center shadow-md hover:brightness-105 active:scale-95 transition-all cursor-pointer`
+     - 네이버: 배경 `#03C75A`, 흰색 텍스트 및 45도 회전 길안내 화살표 SVG, `text-[11px] font-bold tracking-tight mt-0.5` '네이버' 라벨.
+     - 카카오: 배경 `#FEE500`, 어두운 텍스트(`#191919`) 및 45도 회전 길안내 화살표 SVG, `text-[11px] font-bold tracking-tight mt-0.5` '카카오' 라벨.
+   - 버튼 클릭 시 `setIsTmapAssistOpen(false)`로 모달을 닫고, `launchNavigationApp`을 비동기 호출하여 모든 경유지가 포함된 내비 앱을 즉시 실행.
+
+---
+
+### 81.3 검증 및 테스트 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 TypeScript / ESLint 컴파일 에러 **0건 (Exit code 0)** 통과.
+2. **시나리오 검증 결과**:
+   - 티맵 어시스트 모달 활성화 시, 모바일 화면을 드래그해도 뒤쪽 메인 페이지가 위아래로 움직이지 않고 완벽히 고정됨 확인 (PASS).
+   - 모달 내부의 경유지 복사 목록 영역만 부드럽게 스크롤됨(`touch-auto`) 확인 (PASS).
+   - 모달 내 네이버/카카오 버튼이 깔끔한 원형으로 렌더링되며, 원 안에 내비 화살표와 텍스트('네이버', '카카오')가 조화롭게 배치됨 확인 (PASS).
+   - 각 원형 버튼 터치 시 모달이 닫히고 해당 플랫폼 앱으로 모든 경유지가 바인딩되어 실행됨 확인 (PASS).
+
+
 
 
 
