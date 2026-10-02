@@ -3796,14 +3796,15 @@ flowchart TD
 
 ---
 
-## 81. 티맵 어시스트 모달 배경 스크롤 차단(Scroll Lock) 및 원터치 내비 원형(Circle) 버튼 리디자인 (2026-10-02)
+## 81. 티맵 어시스트 모달 배경 스크롤 차단(Scroll Lock) 및 원터치 내비 라운드 사각형(Squircle) 버튼 리디자인 (2026-10-02)
 
 ### 81.1 추진 배경 및 작업 목적
 1. **모달 활성화 시 뒷배경 스크롤 전이(Scroll Bleed / Scroll Lock) 결함 차단**:
    - `components/ActionPanel.tsx`의 티맵 경유지 스마트 어시스트 모달 활성화 시, 모바일 화면을 드래그하면 모달 뒤쪽 메인 페이지가 스크롤되는 결함을 원천 차단.
    - `useEffect` 기반 `body` 스타일 제어(`overflow: hidden`, `touchAction: none`) 및 오버레이 백드롭 제스처 격리를 통해 조작 안정성 확보.
-2. **원터치 내비 연결 버튼 직관적 원형(Circle) 리디자인**:
-   - 모달 상단의 네이버 지도 / 카카오내비 경유지 자동 연동 실행 영역을 기존 텍스트 위주 직사각형에서 내이티브 내비 앱 감성의 **수평 중앙 정렬 2개 원형(Circle) 버튼**으로 전면 교체.
+2. **원터치 내비 연결 버튼 직관적 라운드 사각형(Squircle) 리디자인**:
+   - 모달 상단의 네이버 지도 / 카카오내비 경유지 자동 연동 실행 영역을 직관적인 **수평 중앙 정렬 2개 라운드 사각형(`rounded-2xl`) 버튼**으로 개편.
+   - 완전 원형 대신 iOS/Android 앱 아이콘 감성의 세련된 스퀘어클(Squircle, `rounded-2xl`)을 적용하여 안정감 있는 터치 영역과 시각적 조화를 실현.
    - 고유 브랜드 컬러(네이버 `#03C75A`, 카카오 `#FEE500`)와 길안내 지향 45도 회전 화살표 SVG, 초소형 굵은 라벨('네이버', '카카오')을 결합하여 운전석 원핸드 시인성 및 터치 조작성 극대화.
 
 ---
@@ -3815,14 +3816,14 @@ flowchart TD
      - 클린업 함수에서 기존 `overflow` 및 `touchAction`을 안전하게 복원.
    - 최상단 오버레이 백드롭 요소에 `overscroll-contain touch-none` 클래스를 적용하여 배경 터치 제스처 침범을 원천 차단.
    - 모달 내부 컨텐츠 컨테이너에는 `touch-auto`를 주입하여 내부 리스트 스크롤만 정상 격리 동작하도록 구성.
-2. **`components/ActionPanel.tsx` 네이버·카카오 원터치 원형(Circle) 내비 버튼 구현**:
-   - 기존 직사각형 버튼 컨테이너를 수평 중앙 정렬된 2개의 원형 버튼 레이아웃(`flex items-center justify-center gap-6`)으로 전면 교체.
-   - **원형 버튼 규격**:
-     - 직경: `w-16 h-16 sm:w-18 sm:h-18 rounded-full`
+2. **`components/ActionPanel.tsx` 네이버·카카오 원터치 라운드 사각형(Squircle) 내비 버튼 구현**:
+   - 기존 직사각형 버튼 컨테이너를 수평 중앙 정렬된 2개의 라운드 사각형 버튼 레이아웃(`flex items-center justify-center gap-6`)으로 전면 교체.
+   - **버튼 규격**:
+     - 직경 및 모서리: `w-16 h-16 sm:w-18 sm:h-18 rounded-2xl`
      - 레이아웃 및 인터랙션: `flex flex-col items-center justify-center shadow-md hover:brightness-105 active:scale-95 transition-all cursor-pointer`
      - 네이버: 배경 `#03C75A`, 흰색 텍스트 및 45도 회전 길안내 화살표 SVG, `text-[11px] font-bold tracking-tight mt-0.5` '네이버' 라벨.
      - 카카오: 배경 `#FEE500`, 어두운 텍스트(`#191919`) 및 45도 회전 길안내 화살표 SVG, `text-[11px] font-bold tracking-tight mt-0.5` '카카오' 라벨.
-   - 버튼 클릭 시 `setIsTmapAssistOpen(false)`로 모달을 닫고, `launchNavigationApp`을 비동기 호출하여 모든 경유지가 포함된 내비 앱을 즉시 실행.
+   - 버튼 클릭 시 `haptics.mediumTap()` 햅틱 피드백과 함께 `setIsTmapAssistOpen(false)`로 모달을 닫고, `launchNavigationApp`을 비동기 호출하여 모든 경유지가 포함된 내비 앱을 즉시 실행.
 
 ---
 
@@ -3832,8 +3833,8 @@ flowchart TD
 2. **시나리오 검증 결과**:
    - 티맵 어시스트 모달 활성화 시, 모바일 화면을 드래그해도 뒤쪽 메인 페이지가 위아래로 움직이지 않고 완벽히 고정됨 확인 (PASS).
    - 모달 내부의 경유지 복사 목록 영역만 부드럽게 스크롤됨(`touch-auto`) 확인 (PASS).
-   - 모달 내 네이버/카카오 버튼이 깔끔한 원형으로 렌더링되며, 원 안에 내비 화살표와 텍스트('네이버', '카카오')가 조화롭게 배치됨 확인 (PASS).
-   - 각 원형 버튼 터치 시 모달이 닫히고 해당 플랫폼 앱으로 모든 경유지가 바인딩되어 실행됨 확인 (PASS).
+   - 모달 내 네이버/카카오 버튼이 라운드 사각형(`rounded-2xl`) 형태로 세련되게 렌더링되며, 내비 화살표와 텍스트('네이버', '카카오')가 조화롭게 배치됨 확인 (PASS).
+   - 각 라운드 사각형 버튼 터치 시 모달이 닫히고 해당 플랫폼 앱으로 모든 경유지가 바인딩되어 실행됨 확인 (PASS).
 
 
 

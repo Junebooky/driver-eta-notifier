@@ -230,15 +230,16 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
 
             {/* Modal Body */}
             <div className="p-5 space-y-4 overflow-y-auto max-h-[85dvh] flex-1 text-slate-800 overscroll-contain touch-pan-y">
-              {/* 원터치 다이렉트 연동 원형 버튼 영역 */}
+              {/* 원터치 다이렉트 연동 라운드 사각형 버튼 영역 */}
               <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 flex flex-col items-center gap-2.5">
                 <div className="text-center">
-                  <p className="text-xs font-semibold text-slate-800">경유지 자동 연동 원터치 실행</p>
-                  <p className="text-[11px] text-slate-500">아래 앱을 탭하시면 모든 경유지가 포함되어 즉시 실행됩니다</p>
+                  <p className="text-xs font-semibold text-slate-800">경유지까지 한 번에 안내받기</p>
+                  <p className="text-[11px] text-slate-500">티맵은 경유지 자동 추가를 지원하지 않아요.
+                    네이버지도 또는 카카오내비를 선택하세요.</p>
                 </div>
 
                 <div className="flex items-center justify-center gap-6 pt-1">
-                  {/* 네이버 지도 원형 버튼 */}
+                  {/* 네이버 지도 라운드 사각형 버튼 */}
                   <button
                     type="button"
                     onClick={async () => {
@@ -246,7 +247,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
                       setIsTmapAssistOpen(false);
                       await launchNavigationApp('naver', targetNavi, undefined, naviWaypoints);
                     }}
-                    className="w-16 h-16 sm:w-18 sm:h-18 rounded-full bg-[#03C75A] text-white flex flex-col items-center justify-center shadow-md hover:brightness-105 active:scale-95 transition-all cursor-pointer"
+                    className="w-16 h-16 sm:w-18 sm:h-18 rounded-2xl bg-[#03C75A] text-white flex flex-col items-center justify-center shadow-md hover:brightness-105 active:scale-95 transition-all cursor-pointer"
                     title="네이버 지도로 경유지 자동 연결"
                   >
                     {/* 내비 화살표 아이콘 */}
@@ -256,7 +257,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
                     <span className="text-[11px] font-bold tracking-tight mt-0.5">네이버</span>
                   </button>
 
-                  {/* 카카오내비 원형 버튼 */}
+                  {/* 카카오내비 라운드 사각형 버튼 */}
                   <button
                     type="button"
                     onClick={async () => {
@@ -264,7 +265,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
                       setIsTmapAssistOpen(false);
                       await launchNavigationApp('kakao', targetNavi, undefined, naviWaypoints);
                     }}
-                    className="w-16 h-16 sm:w-18 sm:h-18 rounded-full bg-[#FEE500] text-[#191919] flex flex-col items-center justify-center shadow-md hover:brightness-95 active:scale-95 transition-all cursor-pointer"
+                    className="w-16 h-16 sm:w-18 sm:h-18 rounded-2xl bg-[#FEE500] text-[#191919] flex flex-col items-center justify-center shadow-md hover:brightness-95 active:scale-95 transition-all cursor-pointer"
                     title="카카오내비로 경유지 자동 연결"
                   >
                     {/* 내비 화살표 아이콘 */}
@@ -334,7 +335,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
                     setIsTmapAssistOpen(false);
                     await launchNavigationApp('tmap', targetNavi, undefined, []);
                   }}
-                  className="w-full py-3.5 px-4 bg-[#1E60F3] hover:bg-[#1346D8] active:scale-98 text-white rounded-2xl font-bold text-sm tracking-tight shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all"
+                  className="w-full py-3.5 px-4 bg-[#1E60F3] hover:bg-[#1346D8] active:scale-98 text-white rounded-2xl font-bold text-base tracking-tight shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all"
                 >
                   <Zap className="w-4 h-4 text-yellow-300 fill-yellow-300 shrink-0" />
                   <span>티맵 목적지 안내 시작</span>
