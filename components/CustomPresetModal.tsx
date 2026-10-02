@@ -1358,7 +1358,16 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
 
                           // 2..N Preset Slots
                           const { preset, index } = slot;
-                          const isHQ = Boolean(preset.isCommon || preset.type === 'common' || preset.isGlobal || (!preset.vehicle_no && !preset.vehicleNo));
+                          const isViaPreset = Boolean(
+                            preset.isPackage ||
+                            preset.is_package ||
+                            (preset.packageData?.waypoints && preset.packageData.waypoints.length > 0) ||
+                            (preset.package_data?.waypoints && preset.package_data.waypoints.length > 0) ||
+                            preset.id?.startsWith('pkg-') ||
+                            preset.full_name?.includes('➔') ||
+                            preset.name?.includes('➔')
+                          );
+                          const isDefault = Boolean(preset.isCommon || preset.type === 'common' || preset.isGlobal || (!preset.vehicle_no && !preset.vehicleNo));
                           const isBeingDragged = isDragging && dragIndex === index;
                           const isNewlyAdded = newlyAddedPresetId === preset.id;
 
@@ -1392,7 +1401,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                               title={`${preset.full_name || preset.fullName || preset.name} (길게 눌러 드래그 / 탭하여 수정)`}
                             >
                               {/* Delete Button (Personal MY or Admin mode) */}
-                              {(!isHQ || effectiveIsAdmin) && (
+                              {(!isDefault || effectiveIsAdmin) && (
                                 <button
                                   type="button"
                                   onClick={(e) => {
@@ -1409,8 +1418,8 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
 
                               {/* Preset ShortName */}
                               <div className="flex items-center justify-center gap-1 w-full min-w-0">
-                                {preset.isPackage && (
-                                  <span className="text-xs text-slate-500 font-bold shrink-0 leading-none" title="경로 패키지">
+                                {isViaPreset && (
+                                  <span className="text-xs text-amber-600 font-bold shrink-0 leading-none" title="경로 패키지">
                                     ⤳
                                   </span>
                                 )}
@@ -1420,16 +1429,19 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                               </div>
 
                               {/* Badge: 공통 vs 개인 vs 경로 */}
-                              <span
-                                className={`text-[10px] font-bold mt-0.5 leading-none ${preset.isPackage
-                                  ? 'text-slate-600 bg-slate-100 px-1 py-0.5 rounded border border-slate-200'
-                                  : isHQ
-                                  ? 'text-slate-600'
-                                  : 'text-[#1E60F3]'
-                                  }`}
-                              >
-                                {preset.isPackage ? '경로' : isHQ ? '공통' : '개인'}
-                              </span>
+                              {isViaPreset ? (
+                                <span className="text-[10px] sm:text-xs font-semibold text-amber-600 mt-0.5 leading-none">
+                                  경유
+                                </span>
+                              ) : isDefault ? (
+                                <span className="text-[10px] sm:text-xs font-medium text-slate-400 mt-0.5 leading-none">
+                                  공통
+                                </span>
+                              ) : (
+                                <span className="text-[10px] sm:text-xs font-medium text-blue-600 mt-0.5 leading-none">
+                                  개인
+                                </span>
+                              )}
                             </div>
                           );
                         })}

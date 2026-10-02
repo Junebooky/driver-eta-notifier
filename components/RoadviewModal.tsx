@@ -451,7 +451,16 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
                         }
 
                         const p = slot.preset;
-                        const isHQ = Boolean(
+                        const isViaPreset = Boolean(
+                          p.isPackage ||
+                          p.is_package ||
+                          (p.packageData?.waypoints && p.packageData.waypoints.length > 0) ||
+                          (p.package_data?.waypoints && p.package_data.waypoints.length > 0) ||
+                          p.id?.startsWith('pkg-') ||
+                          p.full_name?.includes('➔') ||
+                          p.name?.includes('➔')
+                        );
+                        const isDefault = Boolean(
                           p.isCommon || p.type === 'common' || p.isGlobal || (!p.vehicle_no && !p.vehicleNo)
                         );
 
@@ -463,16 +472,30 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
                             className="min-h-[54px] sm:min-h-[58px] p-2 rounded-2xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-150 active:scale-[0.98] group shadow-2xs bg-white border-slate-200 hover:border-[#1E60F3]/60 hover:bg-blue-50/30"
                             title={`${p.fullName || p.name} 거리뷰 보기`}
                           >
-                            <span className="text-sm font-bold tracking-tight text-slate-800 group-hover:text-[#1E60F3] truncate w-full transition-colors">
-                              {p.shortName || p.name}
-                            </span>
+                            <div className="flex items-center justify-center gap-1 w-full min-w-0">
+                              {isViaPreset && (
+                                <span className="text-xs text-amber-600 font-bold shrink-0 leading-none" title="경로 패키지">
+                                  ⤳
+                                </span>
+                              )}
+                              <span className="text-sm font-bold tracking-tight text-slate-800 group-hover:text-[#1E60F3] truncate transition-colors">
+                                {p.shortName || p.name}
+                              </span>
+                            </div>
 
-                            <span
-                              className={`text-[10px] font-bold mt-0.5 leading-none ${isHQ ? 'text-slate-600' : 'text-[#1E60F3]'
-                                }`}
-                            >
-                              {isHQ ? '공통' : '개인'}
-                            </span>
+                            {isViaPreset ? (
+                              <span className="text-[10px] sm:text-xs font-semibold text-amber-600 mt-0.5 leading-none">
+                                경유
+                              </span>
+                            ) : isDefault ? (
+                              <span className="text-[10px] sm:text-xs font-medium text-slate-400 mt-0.5 leading-none">
+                                공통
+                              </span>
+                            ) : (
+                              <span className="text-[10px] sm:text-xs font-medium text-blue-600 mt-0.5 leading-none">
+                                개인
+                              </span>
+                            )}
                           </button>
                         );
                       })}

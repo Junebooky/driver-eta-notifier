@@ -48,7 +48,13 @@ export interface LocationPreset {
   order?: number;
   createdAt?: string;
   isPackage?: boolean; // 패키지 경로 여부
+  is_package?: boolean;
   packageData?: {
+    origin: LocationPreset;
+    waypoints: LocationPreset[];
+    destination: LocationPreset;
+  };
+  package_data?: {
     origin: LocationPreset;
     waypoints: LocationPreset[];
     destination: LocationPreset;

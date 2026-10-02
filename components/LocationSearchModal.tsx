@@ -724,9 +724,17 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                         }
 
                         const p = slot.preset;
-                        const isHQ = Boolean(p.isCommon || p.type === 'common' || p.isGlobal || (!p.vehicle_no && !p.vehicleNo));
+                        const isViaPreset = Boolean(
+                          p.isPackage ||
+                          p.is_package ||
+                          (p.packageData?.waypoints && p.packageData.waypoints.length > 0) ||
+                          (p.package_data?.waypoints && p.package_data.waypoints.length > 0) ||
+                          p.id?.startsWith('pkg-') ||
+                          p.full_name?.includes('➔') ||
+                          p.name?.includes('➔')
+                        );
+                        const isDefault = Boolean(p.isCommon || p.type === 'common' || p.isGlobal || (!p.vehicle_no && !p.vehicleNo));
                         const isSelected = currentSelectedId === p.id;
-                        const isPkg = Boolean(p.isPackage);
 
                         return (
                           <button
@@ -738,14 +746,14 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                               : 'bg-white border-slate-200 hover:border-[#1E60F3]/60 hover:bg-blue-50/30'
                               }`}
                             title={
-                              isPkg
+                              isViaPreset
                                 ? (p.full_name || p.fullName || p.name)
                                 : `${p.fullName || p.full_name || p.name} (${p.address || p.name})`
                             }
                           >
                             <div className="flex items-center justify-center gap-1 w-full min-w-0">
-                              {isPkg && (
-                                <span className="text-xs text-slate-500 font-bold shrink-0 leading-none" title="경로 패키지">
+                              {isViaPreset && (
+                                <span className="text-xs text-amber-600 font-bold shrink-0 leading-none" title="경로 패키지">
                                   ⤳
                                 </span>
                               )}
@@ -754,16 +762,19 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                               </span>
                             </div>
 
-                            <span
-                              className={`text-[10px] font-bold mt-0.5 leading-none ${isPkg
-                                ? 'text-slate-600 bg-slate-100 px-1 py-0.5 rounded border border-slate-200'
-                                : isHQ
-                                ? 'text-slate-600'
-                                : 'text-[#1E60F3]'
-                                }`}
-                            >
-                              {isPkg ? '경로' : isHQ ? '공통' : '개인'}
-                            </span>
+                            {isViaPreset ? (
+                              <span className="text-[10px] sm:text-xs font-semibold text-amber-600 mt-0.5 leading-none">
+                                경유
+                              </span>
+                            ) : isDefault ? (
+                              <span className="text-[10px] sm:text-xs font-medium text-slate-400 mt-0.5 leading-none">
+                                공통
+                              </span>
+                            ) : (
+                              <span className="text-[10px] sm:text-xs font-medium text-blue-600 mt-0.5 leading-none">
+                                개인
+                              </span>
+                            )}
                           </button>
                         );
                       })}

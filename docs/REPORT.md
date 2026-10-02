@@ -3760,6 +3760,41 @@ flowchart TD
    - 초기 접속 직후(1초 이내) 다중 경유지 코스에서 카카오 버튼 탭 시 네이버 지도로 튕기지 않고 최대 1.5초 폴링 대기 후 카카오내비 앱이 정규 실행됨 확인 (PASS).
    - SDK 미초기화 또는 준비 불가 시 다중 경유지가 네이버 지도로 안전하게 폴백되어 유실되지 않음을 확인 (PASS).
 
+---
+
+## 80. 거점 그리드 '경유' 라벨 3단계 분기 체계 구축 및 식별성 강화 (2026-10-02)
+
+### 80.1 추진 배경 및 작업 목적
+1. **패키지 거점 라벨 표기 결함 해결**:
+   - 거점 모달("자주 가는 장소")에서 경유지가 설정된 경로 패키지 거점이 단일 개인 거점과 동일하게 '개인'으로 표기되어, 버튼만 보고 경유지 포함 여부를 직관적으로 식별하기 어렵던 결함을 해결.
+2. **3단계 명확한 시각적 분기 정책 확립**:
+   - **'공통'** (`text-slate-400 font-medium`): 시스템 기본 제공 고정 거점 (`isDefault`).
+   - **'경유'** (`text-amber-600 font-semibold`): 경유지가 포함된 경로 패키지 거점 (`isViaPreset`) + 앰버색 `⤳` 기호 노출.
+   - **'개인'** (`text-blue-600 font-medium`): 기사/관리자가 개별 등록한 단일 목적지 거점.
+
+---
+
+### 80.2 모듈별 핵심 구현 내역
+1. **`types/index.ts` 패키지 타입 모델 보강**:
+   - `LocationPreset`에 `is_package?: boolean` 및 `package_data?: any` 필드를 확장하여 카멜케이스/스네이크케이스 혼용 대응.
+2. **`components/LocationSearchModal.tsx` 3단계 분기 로직 적용**:
+   - `isViaPreset` 가드 판별식 구현 (`p.isPackage || p.is_package || (p.packageData?.waypoints && p.packageData.waypoints.length > 0) || p.id?.startsWith('pkg-') || p.full_name?.includes('➔') || p.name?.includes('➔')`).
+   - 하단 라벨 렌더링을 3단계 삼항 연산자로 교체하여 '경유' (`text-amber-600`), '공통' (`text-slate-400`), '개인' (`text-blue-600`)으로 명확히 구분.
+   - 상단 `⤳` 경로 기호도 `isViaPreset`과 동기화하여 앰버색으로 일관 표기.
+3. **`components/CustomPresetModal.tsx` & `components/RoadviewModal.tsx` 동일 규격 동기화**:
+   - 즐겨찾기 편집 모달 및 거리뷰 모달의 거점 그리드에도 동일한 `isViaPreset` / `isDefault` 3단계 라벨 및 `⤳` 기호 표기 체계를 적용하여 모달 간 100% 일관된 UI 제공.
+
+---
+
+### 80.3 검증 및 테스트 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 TypeScript / ESLint 컴파일 에러 **0건 (Exit code 0)** 통과.
+2. **시나리오 검증 결과**:
+   - '용산CGV', 'SGBAC' 등 기본 제공 거점은 회색 **'공통'** 라벨 정상 표기 확인 (PASS).
+   - '서울 영등포구' 등 개별 등록 단일 거점은 파란색 **'개인'** 라벨 정상 표기 확인 (PASS).
+   - 'SGBAC ➔' 및 '콘래드➔연남' 등 경유지가 포함된 패키지 거점은 앰버색 **'경유'** 라벨과 `⤳` 기호로 명확히 구분되어 렌더링됨 확인 (PASS).
+
+
 
 
 

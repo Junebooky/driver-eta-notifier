@@ -58,9 +58,9 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   // Active waypoints resolution
   const activeWaypointsList: LocationPreset[] = isAdminRoute
     ? [
-        { ...origin, name: origin.shortName || origin.name },
-        ...(adminWaypoints || []).map((w) => ({ ...w, name: w.shortName || w.name })),
-      ]
+      { ...origin, name: origin.shortName || origin.name },
+      ...(adminWaypoints || []).map((w) => ({ ...w, name: w.shortName || w.name })),
+    ]
     : (waypoints && waypoints.length > 0 ? waypoints : (waypoint ? [waypoint] : []));
 
   const targetNavi = {
@@ -188,7 +188,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
             {/* Modal Header */}
             <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-slate-100 shrink-0">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-xs">
+                <div className="w-8 h-8 rounded-xl bg-[#1E60F3] text-white flex items-center justify-center shadow-xs">
                   <Navigation className="w-4 h-4 text-white" />
                 </div>
                 <div>
