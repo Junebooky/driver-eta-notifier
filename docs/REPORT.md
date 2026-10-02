@@ -3730,6 +3730,37 @@ flowchart TD
    - 최상단 레이아웃을 통해 카카오 SDK가 사전 로드되어 `window.Kakao`가 정상 인스턴스로 바인딩됨 확인.
    - 카카오내비 실행 시 `Kakao.Navi.start`가 경유지(`viaPoints`) 목록과 함께 정상적으로 호출됨 확인 (PASS).
 
+---
+
+## 79. 카카오 SDK 런타임 비동기 대기(Polling) 가드 및 레이스 컨디션 방어 (2026-10-02)
+
+### 79.1 추진 배경 및 해결 목적
+1. **CDN 스크립트 마운트 레이스 컨디션(Race Condition) 방어**:
+   - `app/layout.tsx`에 SDK를 주입했음에도 초기 접속 직후 브라우저 런타임 마운트 속도와 외부 CDN 스크립트 파싱 시점 간의 미세한 타이밍 차이가 발생할 수 있음.
+   - 이로 인해 `window.Kakao` 객체가 안착되기 전 길안내 버튼이 클릭되면 카카오내비가 미지원된 것으로 간주되어 네이버 지도로 조기 폴백(Early Fallback)되는 현상을 원천 방지.
+2. **비동기 폴링 가드(`ensureKakaoSdkReady`) 구축**:
+   - 카카오 SDK 로드 및 초기화 여부를 최대 1.5초간 안전하게 폴링 대기하고, 준비 완료 즉시 대기를 해제하여 `Kakao.Navi.start`를 정규 실행하도록 안정성을 극대화.
+
+---
+
+### 79.2 모듈별 핵심 구현 내역
+1. **`utils/navigation.ts` 비동기 폴링 헬퍼 및 `launchNavigationApp` 비동기화**:
+   - `ensureKakaoSdkReady(timeoutMs = 1500, intervalMs = 50)` 함수 선언: 50ms 간격으로 `window.Kakao` 및 `Kakao.Navi` 객체를 감지하고 `Kakao.init`을 즉시 체결하는 Promise 가드 구현.
+   - `launchNavigationApp` 및 `launchRoutePreview`를 `async/await` 함수 시그니처(`Promise<void>`)로 전환.
+   - `provider === 'kakao'` 분기 시 `await ensureKakaoSdkReady(1500)` 가드를 주입하여 준비 완료 즉시 `Kakao.Navi.start` 실행, 1.5초 타임아웃 초과 시에만 경유지 보존을 위해 네이버 지도로 안전 폴백.
+2. **`components/ActionPanel.tsx` 비동기 호출 안전 바인딩**:
+   - `handleFastPassAction` 및 모달 내 원터치 실행 버튼 핸들러를 `async/await`로 정돈하여 Promise 반환을 깔끔하게 처리.
+
+---
+
+### 79.3 검증 및 테스트 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 TypeScript / ESLint 컴파일 에러 **0건 (Exit code 0)** 통과.
+2. **시나리오 검증 결과**:
+   - 초기 접속 직후(1초 이내) 다중 경유지 코스에서 카카오 버튼 탭 시 네이버 지도로 튕기지 않고 최대 1.5초 폴링 대기 후 카카오내비 앱이 정규 실행됨 확인 (PASS).
+   - SDK 미초기화 또는 준비 불가 시 다중 경유지가 네이버 지도로 안전하게 폴백되어 유실되지 않음을 확인 (PASS).
+
+
 
 
 

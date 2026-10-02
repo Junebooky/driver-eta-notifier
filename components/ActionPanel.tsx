@@ -79,7 +79,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   /**
    * 1-Second Fast Pass Action (Synchronous Clipboard Copy on Safari User Activation + Navi Launch + Haptics)
    */
-  const handleFastPassAction = () => {
+  const handleFastPassAction = async () => {
     // Confirmation pulse haptic feedback for primary fast pass action
     haptics.successPulse();
 
@@ -106,7 +106,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
     }
 
     // 3. Direct launch for Naver, Kakao, or Tmap without waypoints
-    launchNavigationApp(
+    await launchNavigationApp(
       defaultNavi,
       targetNavi,
       undefined, // Start navigation directly from driver's smartphone GPS
@@ -228,10 +228,10 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
                 <div className="grid grid-cols-2 gap-2 pt-1">
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={async () => {
                       haptics.mediumTap();
                       setIsTmapAssistOpen(false);
-                      launchNavigationApp('naver', targetNavi, undefined, naviWaypoints);
+                      await launchNavigationApp('naver', targetNavi, undefined, naviWaypoints);
                     }}
                     className="py-3 px-2.5 bg-[#03C75A] hover:bg-[#02b350] active:scale-98 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
                   >
@@ -239,10 +239,10 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={async () => {
                       haptics.mediumTap();
                       setIsTmapAssistOpen(false);
-                      launchNavigationApp('kakao', targetNavi, undefined, naviWaypoints);
+                      await launchNavigationApp('kakao', targetNavi, undefined, naviWaypoints);
                     }}
                     className="py-3 px-2.5 bg-[#FEE500] hover:bg-[#FDD835] active:scale-98 text-[#191919] rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
                   >
@@ -304,10 +304,10 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
               <div className="pt-2 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={async () => {
                     haptics.successPulse();
                     setIsTmapAssistOpen(false);
-                    launchNavigationApp('tmap', targetNavi, undefined, []);
+                    await launchNavigationApp('tmap', targetNavi, undefined, []);
                   }}
                   className="w-full py-3.5 px-4 bg-[#1E60F3] hover:bg-[#1346D8] active:scale-98 text-white rounded-2xl font-bold text-sm tracking-tight shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all"
                 >

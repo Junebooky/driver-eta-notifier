@@ -199,50 +199,93 @@ export function buildDeepLink(
 }
 
 /**
+ * 카카오 SDK 런타임 비동기 대기(Polling) 가드 헬퍼
+ * 스크립트 마운트 지연 및 레이스 컨디션을 방지하기 위해 최대 1.5초간 window.Kakao 및 Navi 모듈의 준비를 추적
+ */
+export const ensureKakaoSdkReady = (timeoutMs: number = 1500, intervalMs: number = 50): Promise<boolean> => {
+  if (typeof window === 'undefined') return Promise.resolve(false);
+
+  const kakaoKey = process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY;
+  const startTime = Date.now();
+
+  return new Promise((resolve) => {
+    const check = () => {
+      const kakao = (window as any).Kakao;
+
+      // SDK 객체 및 Navi 모듈이 준비된 경우
+      if (kakao) {
+        if (typeof kakao.isInitialized === 'function' && !kakao.isInitialized() && kakaoKey) {
+          try {
+            kakao.init(kakaoKey);
+          } catch (e) {
+            console.warn('[KakaoNavi] kakao.init failed:', e);
+          }
+        }
+        if (typeof kakao.isInitialized === 'function' && kakao.isInitialized() && kakao.Navi) {
+          resolve(true);
+          return;
+        }
+      }
+
+      // 제한 시간 초과 시 false 반환
+      if (Date.now() - startTime >= timeoutMs) {
+        console.warn('[KakaoNavi] SDK 초기화 대기 시간(1.5초) 초과');
+        resolve(false);
+        return;
+      }
+
+      setTimeout(check, intervalMs);
+    };
+
+    check();
+  });
+};
+
+/**
   Safari / Mobile Chrome Deep Link Trigger with Pagehide / Visibilitychange Safeguard
  */
-export function launchNavigationApp(
+export async function launchNavigationApp(
   provider: NaviProvider,
   target: LocationTarget,
   origin?: LocationTarget,
   waypoints?: LocationTarget[]
-): void {
+): Promise<void> {
   if (typeof window === 'undefined') return;
 
-  // 1. Kakao SDK Navi start with viaPoints if window.Kakao?.Navi is available
+  // 1. Kakao SDK Navi start with viaPoints and Polling Guard
   if (provider === 'kakao') {
-    if (typeof window !== 'undefined' && (window as any).Kakao) {
-      const kakao = (window as any).Kakao;
-      if (typeof kakao.isInitialized === 'function' && !kakao.isInitialized()) {
-        const key = process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY;
-        if (key) {
-          try {
-            kakao.init(key);
-          } catch (e) {
-            console.warn('Kakao.init failed:', e);
-          }
-        }
-      }
+    const isReady = await ensureKakaoSdkReady(1500);
+    const kakao = typeof window !== 'undefined' ? (window as any).Kakao : null;
 
-      if (kakao.Navi?.start) {
-        try {
-          const validWaypoints = (waypoints || []).filter((w) => w && !isNaN(w.lat) && !isNaN(w.lng));
-          kakao.Navi.start({
-            name: target.name,
-            x: target.lng,
-            y: target.lat,
-            coordType: 'wgs84',
-            viaPoints: validWaypoints.slice(0, 3).map((wp) => ({
-              name: wp.name,
-              x: wp.lng,
-              y: wp.lat,
-            })),
-          });
-          return;
-        } catch (e) {
-          console.warn('Kakao.Navi.start failed, falling back to scheme', e);
-        }
+    if (isReady && kakao?.Navi?.start) {
+      try {
+        const validWaypoints = (waypoints || []).filter((w) => w && !isNaN(w.lat) && !isNaN(w.lng));
+        kakao.Navi.start({
+          name: target.name,
+          x: target.lng,
+          y: target.lat,
+          coordType: 'wgs84',
+          viaPoints: validWaypoints.slice(0, 3).map((wp) => ({
+            name: wp.name,
+            x: wp.lng,
+            y: wp.lat,
+          })),
+        });
+        return;
+      } catch (e) {
+        console.warn('Kakao.Navi.start failed, falling back', e);
       }
+    }
+
+    // 1.5초 대기 후에도 SDK가 구동되지 않을 때만 다중 경유지 네이버 지도로 안전 폴백
+    const validWaypoints = (waypoints || []).filter((w) => w && !isNaN(w.lat) && !isNaN(w.lng));
+    if (validWaypoints && validWaypoints.length > 0) {
+      console.warn('[KakaoNavi] SDK 준비 불가로 네이버 지도로 전환 실행');
+      const userAgent = navigator.userAgent || '';
+      const isAndroid = /Android/i.test(userAgent);
+      const { scheme } = buildDeepLink('naver', target, isAndroid, origin, waypoints);
+      window.location.href = scheme;
+      return;
     }
   }
 
@@ -289,13 +332,13 @@ export function launchNavigationApp(
  * 정식 경로 보기 (Route Preview):
  * 지정된 출발지와 목적지 좌표를 모두 전달하여 내비 앱에서 전체 경로와 교통 흐름을 브리핑받을 수 있도록 호출합니다.
  */
-export function launchRoutePreview(
+export async function launchRoutePreview(
   provider: NaviProvider,
   origin: LocationTarget,
   destination: LocationTarget,
   waypoints?: LocationTarget[]
-): void {
-  launchNavigationApp(provider, destination, origin, waypoints);
+): Promise<void> {
+  await launchNavigationApp(provider, destination, origin, waypoints);
 }
 
 /**
