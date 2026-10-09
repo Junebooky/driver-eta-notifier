@@ -3860,6 +3860,35 @@ flowchart TD
 2. **시나리오 검증 결과**:
    - 승객 지정 상태에서 `[4호차 142호 7811 윤태준]\n• 담당승객: SOFYAN 외 1명\n• 이동: 조선팰리스 강남 → 인천공항 T1\n• ETA: 10:22` 형태로 완벽하게 포맷팅됨 확인 (PASS).
 
+---
+
+## 83. 스케줄 탭 모바일 다운로드 파일 업로드 보정 및 PDF 일정 파싱 지원 (2026-10-09)
+
+### 83.1 추진 배경 및 결함 현상
+1. **모바일 파일 앱 업로드 무반응 결함 해결**:
+   - iOS 파일 앱 또는 안드로이드 다운로드 폴더에서 다운로드받은 일정표 파일을 업로드할 때, 기존 `<input accept="image/*">` 제한으로 인해 PDF 문서가 선택 불가하거나, 브라우저가 `file.type`을 `""` 또는 `application/octet-stream`으로 반환하여 업로드가 무반응으로 거절되던 결함을 해결.
+2. **PDF 배차표 일정 자동 파싱 파이프라인 구축**:
+   - 카카오톡 또는 이메일로 전달받는 PDF 형태의 배차표/일정표 문서를 Gemini 3.8 Flash 멀티모달 파서가 직접 읽어 기사 본인 일정을 발췌하도록 지원.
+
+### 83.2 모듈별 핵심 구현 내역
+1. **`components/ScheduleTab.tsx` 파일 인풋 확장 및 MIME/확장자 듀얼 검증**:
+   - `<input type="file">`의 `accept` 속성을 `image/*,application/pdf,.pdf,.png,.jpg,.jpeg,.webp,.heic`로 전면 확장.
+   - `handleFileUpload` 핸들러 구축: `file.type`과 파일 확장자(`.(jpg|jpeg|png|webp|heic|bmp|pdf)`)를 대소문자 무시로 동시 검사하여 모바일 파일 시스템의 MIME 누락 현상을 완벽 차단.
+   - 업로드 API 호출 시 `fileName`, `fileType` 메타데이터를 함께 전송.
+   - 분석 진행 1단계 문구를 '1단계 · 운항 지시서 및 일정표 분석 중...'으로 다변화.
+2. **`app/api/schedule/parse/route.ts` PDF 멀티모달 파싱 대응**:
+   - `ParseScheduleRequestBody` 인터페이스에 `fileName`, `fileType` 선택 속성 확장.
+   - Base64 데이터 추출 정규식을 확장하여 `application/pdf` 및 모든 미디어 타입을 추출하도록 개편.
+   - 파일명 확장자 기반 MIME 보정 로직을 탑재하여 `application/octet-stream`이나 빈 MIME으로 전달되어도 `.pdf`인 경우 `application/pdf`로 자동 교정.
+   - Gemini 3.8 Flash `inlineData`에 `application/pdf`를 전달하고, PDF 전용 정밀 분석 프롬프트를 주입하여 배차표 표 구조를 파싱하도록 구성.
+
+### 83.3 검증 및 테스트 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 TypeScript / ESLint 컴파일 에러 **0건 (Exit code 0)** 통과.
+2. **시나리오 검증 결과**:
+   - 모바일 파일 앱 및 다운로드 폴더에서 이미지뿐 아니라 PDF 파일이 정상 선택되고 유효성 검사를 통과함 확인 (PASS).
+   - PDF 파일 업로드 시 Gemini 3.8 Flash가 표 구조를 인식하여 기사 3중 앵커 기준 본인 배차 일정을 정확히 JSON으로 추출 및 동기화함 확인 (PASS).
+
 
 
 

@@ -5,6 +5,8 @@ import { searchTmapPoi, ResolvedPlaceLocation } from '@/services/tmapService';
 
 interface ParseScheduleRequestBody {
   imageBase64: string;
+  fileName?: string;
+  fileType?: string;
   profile: {
     vehicleNo: string;
     driverName: string;
@@ -186,11 +188,11 @@ async function resolveScheduleLocation(
 export async function POST(req: NextRequest) {
   try {
     const body: ParseScheduleRequestBody = await req.json();
-    const { imageBase64, profile } = body;
+    const { imageBase64, fileName, fileType, profile } = body;
 
     if (!imageBase64) {
       return NextResponse.json(
-        { success: false, error: '배차표 이미지(imageBase64)가 제공되지 않았습니다.' },
+        { success: false, error: '배차표 파일 데이터(imageBase64)가 제공되지 않았습니다.' },
         { status: 400 }
       );
     }
@@ -218,18 +220,44 @@ export async function POST(req: NextRequest) {
     const rawMobile = profile?.mobile || '010-6348-8726';
     const mobileClean = rawMobile.replace(/[^0-9]/g, '');
 
-    // 2. Extract Base64 Image Payload
+    // 2. Extract Base64 Image/Document Payload & Robust MIME Detection
     let mimeType = 'image/jpeg';
     let base64Data = imageBase64;
-    const match = imageBase64.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
-    if (match) {
-      mimeType = match[1];
-      base64Data = match[2];
+    const dataUrlMatch = imageBase64.match(/^data:([^;]+);base64,(.+)$/);
+    if (dataUrlMatch) {
+      mimeType = dataUrlMatch[1].toLowerCase().trim();
+      base64Data = dataUrlMatch[2].trim();
+    }
+
+    // 모바일 파일 앱/다운로드 폴더의 MIME 유실(octet-stream, 빈값) 방어 및 확장자 기반 보정
+    const lowerFileName = (fileName || '').toLowerCase().trim();
+    const declaredType = (fileType || '').toLowerCase().trim();
+
+    if (lowerFileName.endsWith('.pdf') || declaredType === 'application/pdf' || mimeType === 'application/pdf') {
+      mimeType = 'application/pdf';
+    } else if (lowerFileName.endsWith('.png') || declaredType === 'image/png' || mimeType === 'image/png') {
+      mimeType = 'image/png';
+    } else if (lowerFileName.endsWith('.webp') || declaredType === 'image/webp' || mimeType === 'image/webp') {
+      mimeType = 'image/webp';
+    } else if (lowerFileName.endsWith('.heic') || declaredType === 'image/heic' || mimeType === 'image/heic') {
+      mimeType = 'image/heic';
+    } else if (
+      lowerFileName.endsWith('.jpg') ||
+      lowerFileName.endsWith('.jpeg') ||
+      declaredType.includes('jpeg') ||
+      declaredType.includes('jpg')
+    ) {
+      mimeType = 'image/jpeg';
+    } else if (!mimeType.startsWith('image/') && mimeType !== 'application/pdf') {
+      // 알 수 없는 MIME(application/octet-stream 등)은 기본 이미지로 폴백
+      mimeType = 'image/jpeg';
     }
 
     // 3. Gemini 3.8 Flash Multimodal System Prompt & 3-Anchor Guardrails
-    const systemPrompt = `당신은 대한민국 최고 수준의 VIP 의전 관제 시스템 전담 배차표 OCR 파싱 AI입니다.
-업로드된 배차표(이미지, 엑셀 캡처, 일정표 문서)를 정밀 분석하여, 지정된 기사 본인의 배차 일정만 100% 엄격하게 발췌(Filter & Extract)하십시오.
+    const isPdf = mimeType === 'application/pdf';
+    const docLabel = isPdf ? 'PDF 문서' : '이미지';
+    const systemPrompt = `당신은 대한민국 최고 수준의 VIP 의전 관제 시스템 전담 배차표 OCR/문서 파싱 AI입니다.
+업로드된 배차표(${docLabel}, 엑셀 캡처, 일정표 표 문서)를 정밀 분석하여, 지정된 기사 본인의 배차 일정만 100% 엄격하게 발췌(Filter & Extract)하십시오.
 
 [현재 기사 식별 3중 앵커 (ANCHORS)]
 1. 기사명 후보군 (한글 및 영문 DRIVER NAME):
@@ -279,6 +307,10 @@ export async function POST(req: NextRequest) {
   ]
 }`;
 
+    const userPrompt = isPdf
+      ? '배차표 PDF 문서를 정밀 분석하여 3중 앵커 조건에 부합하는 본인 배차 일정만 정밀 발췌해줘.'
+      : '배차표 이미지를 분석하여 3중 앵커 조건에 부합하는 본인 배차 일정만 정밀 발췌해줘.';
+
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: 'gemini-3.8-flash',
@@ -289,7 +321,7 @@ export async function POST(req: NextRequest) {
             data: base64Data,
           },
         },
-        '배차표 이미지를 분석하여 3중 앵커 조건에 부합하는 본인 배차 일정만 정밀 발췌해줘.',
+        userPrompt,
       ],
       config: {
         systemInstruction: systemPrompt,

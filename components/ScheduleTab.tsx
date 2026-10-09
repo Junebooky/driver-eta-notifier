@@ -20,7 +20,7 @@ const THINKING_STEPS = [
 ];
 
 const COCKPIT_ANALYSIS_STAGES = [
-  { step: 1, text: '1단계 · 운항 지시서 이미지 분석 중...', percent: 32 },
+  { step: 1, text: '1단계 · 운항 지시서 및 일정표 분석 중...', percent: 32 },
   { step: 2, text: '2단계 · 기사 및 차량 정보 식별 중...', percent: 50 },
   { step: 3, text: '3단계 · VIP 및 항공편 정보 추출 중...', percent: 68 },
   { step: 4, text: '4단계 · 기사님의 개인 스케줄 구성 중...', percent: 84 },
@@ -361,12 +361,36 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
       reader.readAsDataURL(file);
     });
 
-  // Handle batch image upload and sequential AI parsing (Calls Gemini 3.8 Flash Vision with 3-anchor guardrail)
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle batch image/PDF upload and sequential AI parsing (Calls Gemini 3.8 Flash Vision with 3-anchor guardrail)
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = e.target.files;
     if (!fileList || fileList.length === 0) return;
     const files = Array.from(fileList);
-    const totalFiles = files.length;
+
+    // 모바일 다운로드 파일 확장자 및 MIME 유효성 검사 (MIME 유실 방어)
+    const validFiles = files.filter((file) => {
+      const fileName = file.name.toLowerCase();
+      const isImageExt = /\.(jpg|jpeg|png|webp|heic|bmp)$/i.test(fileName);
+      const isPdfExt = /\.pdf$/i.test(fileName);
+      const isImageMime = file.type.startsWith('image/');
+      const isPdfMime = file.type === 'application/pdf';
+      return isImageMime || isPdfMime || isImageExt || isPdfExt;
+    });
+
+    if (validFiles.length === 0) {
+      const invalidMsg = '이미지(JPG, PNG) 또는 PDF 파일만 업로드 가능합니다.';
+      setCopilotResponse({
+        query: '파일 업로드 오류',
+        reply: invalidMsg,
+        type: 'schedule_parse',
+      });
+      startTypewriter(invalidMsg);
+      haptics.warningPulse();
+      if (e.target) e.target.value = '';
+      return;
+    }
+
+    const totalFiles = validFiles.length;
 
     haptics.mediumTap();
     stopTypewriter();
@@ -380,7 +404,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
     setIsThinking(false);
     setDisplayedReply('');
     setCopilotResponse({
-      query: totalFiles > 1 ? `배차표 ${totalFiles}장 정밀 관제 분석` : `배차표 정밀 관제 분석: ${files[0].name}`,
+      query: totalFiles > 1 ? `배차표 ${totalFiles}건 정밀 관제 분석` : `배차표 정밀 관제 분석: ${validFiles[0].name}`,
       reply: '',
       type: 'thinking',
     });
@@ -394,7 +418,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
       const elapsed = Date.now() - startTime;
 
       if (elapsed < 2400) {
-        // 0.0s ~ 2.4s: 1단계 · 운항 지시서 이미지 분석 중... (15% ~ 32%)
+        // 0.0s ~ 2.4s: 1단계 · 운항 지시서 및 일정표 분석 중... (15% ~ 32%)
         const ratio = elapsed / 2400;
         setScheduleAnalysisStage(0);
         setScheduleAnalysisProgress(Math.round(15 + ratio * 17));
@@ -452,7 +476,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
 
     try {
       for (let i = 0; i < totalFiles; i++) {
-        const file = files[i];
+        const file = validFiles[i];
         const base64Data = await readFileAsDataUrl(file);
 
         const res = await fetch('/api/schedule/parse', {
@@ -460,6 +484,8 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             imageBase64: base64Data,
+            fileName: file.name,
+            fileType: file.type,
             profile: {
               vehicleNo: hochaStr,
               driverName,
@@ -544,16 +570,16 @@ ${driverName} 기사님(${hochaStr} · ${plateNo})의 의전 일정 총 ${allPar
 ${scheduleItemsFormatted}`.trim();
 
         setCopilotResponse({
-          query: totalFiles > 1 ? `배차표 ${totalFiles}장 일괄 동기화 완료` : `배차표 이미지 분석 완료`,
+          query: totalFiles > 1 ? `배차표 ${totalFiles}건 일괄 동기화 완료` : `배차표 분석 완료`,
           reply: replyText,
           type: 'schedule_parse',
         });
         startTypewriter(replyText);
         haptics.success();
       } else {
-        const noMatchText = `기사님, 배차표에서 ${driverName} 기사님(${hochaStr} · ${plateNo})의 배차 일정이 발견되지 않았습니다. 프로필 정보나 배차표 이미지를 다시 한번 확인해 주시기 바랍니다.`;
+        const noMatchText = `기사님, 배차표에서 ${driverName} 기사님(${hochaStr} · ${plateNo})의 배차 일정이 발견되지 않았습니다. 프로필 정보나 배차표 파일을 다시 한번 확인해 주시기 바랍니다.`;
         setCopilotResponse({
-          query: totalFiles > 1 ? `배차표 ${totalFiles}장 일괄 분석 결과` : `배차표 이미지 분석 결과`,
+          query: totalFiles > 1 ? `배차표 ${totalFiles}건 일괄 분석 결과` : `배차표 분석 결과`,
           reply: noMatchText,
           type: 'schedule_parse',
         });
@@ -561,7 +587,7 @@ ${scheduleItemsFormatted}`.trim();
         haptics.warningPulse();
       }
     } catch (err: any) {
-      console.error('Image analysis error:', err);
+      console.error('File analysis error:', err);
       if (scheduleAnalysisTimerRef.current) {
         clearInterval(scheduleAnalysisTimerRef.current);
         scheduleAnalysisTimerRef.current = null;
@@ -570,7 +596,7 @@ ${scheduleItemsFormatted}`.trim();
       setScheduleAnalysisCompleted(false);
       setIsThinking(false);
       setThinkingStep(null);
-      const errMsg = `기사님, 배차표 이미지 분석 중 네트워크 연결에 문제가 발생했습니다. 잠시 후 다시 시도해 주시기 바랍니다.`;
+      const errMsg = `기사님, 배차표 파일 분석 중 네트워크 연결에 문제가 발생했습니다. 잠시 후 다시 시도해 주시기 바랍니다.`;
       setCopilotResponse({
         query: `배차표 분석 안내`,
         reply: errMsg,
@@ -741,12 +767,12 @@ ${scheduleItemsFormatted}`.trim();
 
   return (
     <div className="w-full min-h-[calc(100dvh-130px)] flex flex-col justify-between relative pb-6 select-none">
-      {/* Hidden File Input for Image Upload (multiple enabled) */}
+      {/* Hidden File Input for Image/PDF Upload (multiple enabled) */}
       <input
         type="file"
         ref={fileInputRef}
-        onChange={handleImageUpload}
-        accept="image/*"
+        onChange={handleFileUpload}
+        accept="image/*,application/pdf,.pdf,.png,.jpg,.jpeg,.webp,.heic"
         multiple
         className="hidden"
       />
@@ -1230,8 +1256,8 @@ ${scheduleItemsFormatted}`.trim();
             }}
             disabled={isAnalyzing}
             className="w-9 h-9 text-slate-400 hover:text-slate-600 active:scale-95 flex items-center justify-center shrink-0 transition-colors cursor-pointer rounded-full hover:bg-slate-50"
-            title="배차표 엑셀/이미지 업로드"
-            aria-label="이미지 업로드"
+            title="배차표 이미지/PDF 업로드"
+            aria-label="배차표 업로드"
           >
             <Camera className="w-4 h-4" />
           </button>
