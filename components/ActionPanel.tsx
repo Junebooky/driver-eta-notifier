@@ -235,6 +235,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
                 <div className="text-center">
                   <p className="text-xs font-semibold text-slate-800">경유지까지 한 번에 안내받기</p>
                   <p className="text-[11px] text-slate-500">티맵은 경유지 자동 추가를 지원하지 않아요.
+                    <br />
                     네이버지도 또는 카카오내비를 선택하세요.</p>
                 </div>
 
@@ -251,7 +252,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
                     title="네이버 지도로 경유지 자동 연결"
                   >
                     {/* 내비 화살표 아이콘 */}
-                    <svg className="w-5 h-5 -rotate-45 fill-current ml-0.5" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 rotate-45 fill-current ml-0.5" viewBox="0 0 24 24">
                       <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z" />
                     </svg>
                     <span className="text-[11px] font-bold tracking-tight mt-0.5">네이버</span>
@@ -269,7 +270,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
                     title="카카오내비로 경유지 자동 연결"
                   >
                     {/* 내비 화살표 아이콘 */}
-                    <svg className="w-5 h-5 -rotate-45 fill-current ml-0.5" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 rotate-45 fill-current ml-0.5" viewBox="0 0 24 24">
                       <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z" />
                     </svg>
                     <span className="text-[11px] font-bold tracking-tight mt-0.5">카카오</span>

@@ -4,6 +4,7 @@ export interface GenerateReportParams {
   profile: DriverProfile;
   origin?: LocationPreset | string;
   destination: LocationPreset | string;
+  waypoints?: (LocationPreset | string)[];
   etaFormatted?: string;
   distanceKm?: number;
   durationMinutes?: number;
@@ -33,6 +34,7 @@ export function generateReportText({
   profile,
   origin,
   destination,
+  waypoints,
   etaFormatted = '03:08',
   mode,
   departureTimeText,
@@ -64,13 +66,19 @@ export function generateReportText({
     return lines.join('\n');
   }
 
+  const wpList = (waypoints || [])
+    .map((w) => (typeof w === 'string' ? w : w.shortName))
+    .filter(Boolean);
+
+  const routePath = [originName, ...wpList, destName].join(' → ');
+
   const lines = [
     header,
     hasPassenger ? `• 담당승객: ${passengerName}` : null,
     departureTimeText
       ? `• 출발 예정: ${originName} (${departureTimeText})`
-      : `• 출발지: ${originName}`,
-    `• 목적지: ${destName}`,
+      : `• 이동: ${routePath}`,
+    departureTimeText ? `• 목적지: ${destName}` : null,
     departureTimeText
       ? `• 예상 도착(ETA): ${cleanEta}`
       : `• ETA: ${cleanEta}`,

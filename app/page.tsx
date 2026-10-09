@@ -1183,16 +1183,21 @@ export default function Home() {
 
   // Real-time dynamic report text generated from current state
   const reportPreviewText = useMemo(() => {
+    const effectiveWaypoints = isAdminRoute && adminWaypoints.length > 0
+      ? adminWaypoints
+      : (waypoints && waypoints.length > 0 ? waypoints : []);
+
     return generateReportText({
       mode: reportMode,
       profile,
       origin,
       destination,
+      waypoints: effectiveWaypoints,
       etaFormatted: routeEstimate?.etaFormatted,
       distanceKm: routeEstimate?.distanceKm,
       durationMinutes: routeEstimate?.durationMinutes,
     });
-  }, [reportMode, profile, origin, destination, routeEstimate]);
+  }, [reportMode, profile, origin, destination, isAdminRoute, adminWaypoints, waypoints, routeEstimate]);
 
   // Pre-initialization & Onboarding Splash Gate: completely blocks dashboard FOUC on initial mount
   if (!isInitialized || (isOnboarding && onboardingStage === 'splash')) {

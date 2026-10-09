@@ -2,6 +2,7 @@
  * VIP Protocol Reporting and KakaoTalk App Launch Utility
  */
 
+import { LocationPreset } from '@/types';
 import { formatReportHeader } from './reportGenerator';
 
 export interface VipReportParams {
@@ -10,6 +11,7 @@ export interface VipReportParams {
   passengerName?: string;
   destinationName: string;
   originName: string;
+  waypoints?: (LocationPreset | string)[];
   distanceKm?: number;
   durationMinutes?: number;
   etaFormatted: string;
@@ -26,6 +28,7 @@ export function generateVipReportText({
   passengerName,
   destinationName,
   originName,
+  waypoints,
   etaFormatted,
   mode = 'DEPARTURE',
   departureTimeText,
@@ -52,13 +55,19 @@ export function generateVipReportText({
     return lines.join('\n');
   }
 
+  const wpList = (waypoints || [])
+    .map((w) => (typeof w === 'string' ? w : w.shortName))
+    .filter(Boolean);
+
+  const routePath = [originName, ...wpList, destinationName].join(' → ');
+
   const lines = [
     header,
     hasPassenger ? `• 담당승객: ${passenger}` : null,
     departureTimeText
       ? `• 출발 예정: ${originName} (${departureTimeText})`
-      : `• 출발지: ${originName}`,
-    `• 목적지: ${destinationName}`,
+      : `• 이동: ${routePath}`,
+    departureTimeText ? `• 목적지: ${destinationName}` : null,
     departureTimeText
       ? `• 예상 도착(ETA): ${cleanEta}`
       : `• ETA: ${cleanEta}`,

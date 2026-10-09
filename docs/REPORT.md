@@ -3836,6 +3836,31 @@ flowchart TD
    - 모달 내 네이버/카카오 버튼이 라운드 사각형(`rounded-2xl`) 형태로 세련되게 렌더링되며, 내비 화살표와 텍스트('네이버', '카카오')가 조화롭게 배치됨 확인 (PASS).
    - 각 라운드 사각형 버튼 터치 시 모달이 닫히고 해당 플랫폼 앱으로 모든 경유지가 바인딩되어 실행됨 확인 (PASS).
 
+---
+
+## 82. 단톡방 보고 텍스트('reportPreviewText') 이동 경로 포맷 간소화 ('• 이동: 출발지 → 목적지') (2026-10-09)
+
+### 82.1 추진 배경 및 수정 목적
+1. **보고 텍스트 가독성 및 직관성 향상**:
+   - 기존의 `• 출발지: ...`, `• 목적지: ...` 2개 행 분리 출력 방식을 한눈에 동선을 파악할 수 있는 인라인 화살표 포맷인 **`• 이동: 출발지 → 목적지`** 단일 행으로 통합 개편.
+   - 다중 경유지가 포함된 경우에도 `출발지 → 경유지1 → 경유지2 → 목적지` 형태로 일목요연하게 자연스러운 이동 경로를 표현하도록 설계.
+
+### 82.2 모듈별 핵심 구현 내역
+1. **`utils/reportGenerator.ts` (`generateReportText`)**:
+   - `GenerateReportParams` 인터페이스에 `waypoints?: (LocationPreset | string)[]` 추가.
+   - `[originName, ...wpList, destName].join(' → ')` 파이프라인을 구축하여 `• 이동: ${routePath}` 형식으로 포맷 변경.
+2. **`app/page.tsx` (`reportPreviewText`)**:
+   - `useMemo` 내부에서 관리자 지정동선(`adminWaypoints`) 및 사용자 경유지(`waypoints`)를 종합한 `effectiveWaypoints`를 `generateReportText`에 전달하여 실시간 보고서에 즉시 반영.
+3. **`utils/kakao.ts` (`generateVipReportText`)**:
+   - 동일 규격을 적용하여 단톡방 전송용 텍스트에서도 `• 이동: ${routePath}`가 일관되게 적용되도록 동기화.
+
+### 82.3 검증 및 테스트 결과
+1. **프로덕션 빌드 무결성**:
+   - `npm run build`: Next.js 16.3.5 Turbopack 기준 전 15개 라우트 TypeScript / ESLint 컴파일 에러 **0건 (Exit code 0)** 통과.
+2. **시나리오 검증 결과**:
+   - 승객 지정 상태에서 `[4호차 142호 7811 윤태준]\n• 담당승객: SOFYAN 외 1명\n• 이동: 조선팰리스 강남 → 인천공항 T1\n• ETA: 10:22` 형태로 완벽하게 포맷팅됨 확인 (PASS).
+
+
 
 
 
