@@ -51,7 +51,7 @@ A03 must first deliver real screenshot-based visual mockups based on screenshots
 4. Render conditional VIP shortcuts in `components/QuickActionBar.tsx` only after verified assignment capability check. The five existing shortcuts and standalone use must remain intact.
 5. Create authenticated report save / submit / approve endpoints and server-side validation (valid time pairs, overnight, non-negative mileage, integer expense amounts, duplicate protection).
 6. Build `/vip/admin` sheet view with row filters, report drilldown, and Excel export matching the uploaded company workbook's useful columns.
-7. Add secure private receipt upload, existing 車량체크 odometer photo analysis prefill, error indicators and offline draft queue, after the core data path is verified.
+7. Add secure private receipt upload, existing 차량체크 odometer photo analysis prefill, error indicators and offline draft queue, after the core data path is verified.
 8. Keep original 차량체크 mileage value as the sole editable entry point for records covering the same job and custody period; admin corrections must be audited.
 
 ## Admin sheet rule
