@@ -25,6 +25,20 @@ Project task: [A03 Design Issue #3](https://github.com/Junebooky/driver-eta-noti
 - Company HQ admin sheet lists job records and detailed review; the database, not Excel, will be source of truth in A02 implementation.
 - A03 does **not** design or implement unapproved scope changes. When input screenshots are missing, request them; do not ask the user to choose layouts instead of preparing options.
 
+## Receipt AI & Admin audit design extension (2026-10-22)
+AI Receipt upload/categorization is proposed in [Issue #8](https://github.com/Junebooky/driver-eta-notifier/issues/8). The user explicitly added a separate **Admin Receipt Review Workspace** design task: [Issue #9](https://github.com/Junebooky/driver-eta-notifier/issues/9). The split-view is part of the A03 design backlog and must be included in the visual admin-dashboard exploration **after actual app/admin screenshots are supplied**.
+
+Show realistic, production-quality mockup images (at least 2 variants) for:
+- **Receipt photo on the LEFT** and **editable AI-extracted fields on the RIGHT** in an admin split drawer/modal, opening from one row of the expense table.
+- Image inspection controls: **Rotate 90°**, zoom in/out, fit, pan, multipage thumbnails; preserve uploaded original. 
+- OCR correction **inline next to the photo**, including merchant, date/time, category, amount, payer and assigned job; clear unsaved/saved/error/conflict status.
+- **Save** and **Approve & Next** as distinct actions, with a clear queue position and automatic movement to the next pending, filtered, authorized receipt **only after successful approval**.
+- Keyboard accessibility; prevent plain Enter triggering approval while typing or during Korean IME. Consider Ctrl/⌘+Enter or an explicit focused Approve & Next button as a safer default, with visible shortcut hint.
+- Wrong amount (OCR 8 vs 3), image rotated sideways, image zoomed, ambiguous/duplicate receipt, missing information, review loading, submission approved, no pending receipts.
+- Mobile/tablet responsive fallback (stack photo and form vertically, no tiny fields or cut-off controls).
+
+A03 remains design-only. Do not turn this into an A02 engineering task until the user approves the visual design. Security/access/audit rules and acceptance are in Issue #9.
+
 ## Deliverables and quality bar
 - Screenshot-based realistic mockups, not wireframes or prose-only designs.
 - At least three differentiated and polished shortcut-layout options, and detailed recommended form/admin views.
