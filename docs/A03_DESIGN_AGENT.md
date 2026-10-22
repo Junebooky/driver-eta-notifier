@@ -56,6 +56,21 @@ A03 should show high-fidelity visual mockup options for:
 
 Use #1E60F3/white, trustworthy dense admin information hierarchy and one-hand driver UX. Show desktop-wide dashboard and mobile Cockpit scenarios plus narrow-screen behavior. Do not present fake counts or locations as real data. Final handoff after user approves screenshots.
 
+## Admin-to-driver digital dispatch design extension (2026-10-22)
+New design task added by user: [Direct Admin-to-Driver Digital Group Dispatch #12](https://github.com/Junebooky/driver-eta-notifier/issues/12), linked with [Fleet & Dispatch Board #10](https://github.com/Junebooky/driver-eta-notifier/issues/10), [Driver Vehicle Check-in #11](https://github.com/Junebooky/driver-eta-notifier/issues/11) and [Master Backlog #7](https://github.com/Junebooky/driver-eta-notifier/issues/7).
+
+**A03 = design-only; no A02 coding until the user approves actual mockups.** Do not publish private customer contact data into screenshot mocks, GitHub or sample fixtures.
+
+Deliver real, high-fidelity design image options built from the existing actual Driver Cockpit screenshots and admin references when supplied:
+- **HQ Group Dispatch:** shared event header (client, date, destination, arrival-by deadline), expandable passenger rows each with its own pickup address/time, passenger/phone, vehicle class/exact plate, driver assignment, notes; grouped summary, draft/edit/send controls; errors/booking conflicts.
+- **AI email helper (optional):** manager pastes customer email text or uploads email screenshot, AI pre-fills a draft, manager validates before publishing; show ambiguous fields clearly. Preserve manual data-entry path.
+- **Driver mission card:** new dispatch banner, client/date/pickup, TMAP deep-link to pickup/target, masked/access-controlled passenger phone and click-to-call, highlighted notes, `배차 확인`, versioned `확인완료` timestamp.
+- **HQ acknowledgment board:** three individual drivers under one group booking, badges for `미확인`, `확인완료`, changed/reconfirmation required, failed notification, manager resend alert, and no-ack escalation.
+- **Push permissions & fallbacks:** driver permission enable/denied screens, notification/in-app banner; never pretend push guarantees user sees it.
+- **Change handling:** manager edits assigned pickup/address/driver after publish → new revision; affected driver must re-ack. Cancellation and same-day urgent dispatch states.
+
+Important implementation-related design constraints: correct recipient is authenticated driver_id, not just `vehicle_no`; an acknowledged dispatch is NOT the same as driver acceptance or vehicle pickup. Avoid overloading existing `출근시간/퇴근시간` two-clock report. If user hasn't supplied an admin screenshot, propose generic admin workspace options but distinguish them from screenshot-matched reconstruction. #1E60F3 minimal visual style.
+
 ## Deliverables and quality bar
 - Screenshot-based realistic mockups, not wireframes or prose-only designs.
 - At least three differentiated and polished shortcut-layout options, and detailed recommended form/admin views.
