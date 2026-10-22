@@ -81,7 +81,7 @@ export const FlightModal: React.FC<FlightModalProps> = ({
   }, [isOpen, initialFlightId, initialType, recentFlightKey]);
 
   const handleSearch = async (targetId?: string, targetType?: FlightType) => {
-    const query = (targetId || flightQuery).trim().toUpperCase();
+    const query = (targetId || flightQuery).replace(/\s+/g, '').trim().toUpperCase();
     const type = targetType || activeType;
 
     if (!/^[A-Z0-9]{3,12}$/.test(query)) {
