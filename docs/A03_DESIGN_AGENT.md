@@ -39,6 +39,23 @@ Show realistic, production-quality mockup images (at least 2 variants) for:
 
 A03 remains design-only. Do not turn this into an A02 engineering task until the user approves the visual design. Security/access/audit rules and acceptance are in Issue #9.
 
+## Fleet & Dispatch and vehicle verification design extension (2026-10-22)
+The user added two interconnected design-backlog tasks:
+- [Fleet & Dispatch Board #10](https://github.com/Junebooky/driver-eta-notifier/issues/10)
+- [Driver Vehicle Check-in #11](https://github.com/Junebooky/driver-eta-notifier/issues/11)
+
+**This is an extension of A03's design responsibilities, not permission for A02 to start coding.** Obtain real current app and eventual admin screenshots before claiming screenshot fidelity.
+
+A03 should show high-fidelity visual mockup options for:
+1. Admin dashboard with live availability **category chips** for exact model + seating configurations (Staria 9/10, Sprinter, Carnival Normal/High-Limousine, G90/G90 LWB), date-time range picker, separate `현재 차고지` physical state and `예약 가능` period-dependent availability, and helpful zero-availability and uncertainty states.
+2. Dispatch booking drawer: `기사 포함` vs `차량만`, eligible driver picker only with driver, flexible class reservation, exact vehicle assignment, tentative holds, overlap conflict, and a per-vehicle week/day timeline grouped by model.
+3. Car-only vehicle check-out / return modal: starting/ending odometer, fuel level, four exterior photos, condition/damage, keys, return/mismatch states. These are vehicle custody events, **not** chauffeur work-time fields.
+4. Driver check-in in Cockpit: preassigned vehicle shown immediately for **one-tap confirmation**; two-step model category → plate list only when unassigned/flexible/swapping. Last four digits are easy visual search labels; full plate must be visible where needed.
+5. Match success, flexible car claim confirmation, mismatched plate warning with manager alert, pending swap approval, denied claim because car booked/maintenance, and live garage count updates after confirmed events.
+6. Integration with existing `차량체크` starting mileage photo, without redundant entry, while preserving the two-only work-time contract (`출근시간`, `퇴근시간`).
+
+Use #1E60F3/white, trustworthy dense admin information hierarchy and one-hand driver UX. Show desktop-wide dashboard and mobile Cockpit scenarios plus narrow-screen behavior. Do not present fake counts or locations as real data. Final handoff after user approves screenshots.
+
 ## Deliverables and quality bar
 - Screenshot-based realistic mockups, not wireframes or prose-only designs.
 - At least three differentiated and polished shortcut-layout options, and detailed recommended form/admin views.
