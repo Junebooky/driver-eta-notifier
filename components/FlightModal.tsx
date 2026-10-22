@@ -39,38 +39,64 @@ export const FlightModal: React.FC<FlightModalProps> = ({
 }) => {
   const [activeType, setActiveType] = useState<FlightType>('arrival');
   const [flightQuery, setFlightQuery] = useState('');
+  const [recentFlight, setRecentFlight] = useState('');
+  // The most recent search is scoped to the current driver's vehicle on this device.
+  const recentFlightKey = `cockpit_last_flight_${profile.vehicleNo?.trim() || 'default'}`;
   const [flight, setFlight] = useState<FlightInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
 
-  // Auto-trigger search when launched with an initial flight ID (e.g., from ScheduleCard)
+  // Re-open with the last searched number; a schedule-provided number takes priority.
+  // Do not auto-query a remembered flight: its live information may already be stale.
   useEffect(() => {
-    if (isOpen) {
-      setIsCopied(false);
-      setErrorMsg(null);
-      if (initialFlightId) {
-        const cleanQuery = initialFlightId.split('(')[0].trim().toUpperCase();
-        const type = initialType || 'arrival';
-        setActiveType(type);
-        setFlightQuery(cleanQuery);
-        handleSearch(cleanQuery, type);
-      } else {
-        setFlightQuery('');
-        setFlight(null);
+    if (!isOpen) return;
+    setIsCopied(false);
+    setErrorMsg(null);
+    setFlight(null);
+    let rememberedNumber = '';
+    let rememberedType: FlightType = 'arrival';
+    try {
+      const stored = JSON.parse(window.localStorage.getItem(recentFlightKey) || '{}');
+      if (typeof stored.flightId === 'string' && /^[A-Z0-9]{2,12}$/.test(stored.flightId)) {
+        rememberedNumber = stored.flightId;
       }
+      if (stored.type === 'arrival' || stored.type === 'departure') {
+        rememberedType = stored.type;
+      }
+    } catch {
+      // Storage can be disabled or contain stale data; continue with an empty form.
     }
-  }, [isOpen, initialFlightId, initialType]);
+    setRecentFlight(rememberedNumber);
+    if (initialFlightId) {
+      const cleanQuery = initialFlightId.split('(')[0].replace(/\s+/g, '').trim().toUpperCase();
+      const type = initialType || 'arrival';
+      setActiveType(type);
+      setFlightQuery(cleanQuery);
+      if (cleanQuery) handleSearch(cleanQuery, type);
+    } else {
+      setActiveType(rememberedType);
+      setFlightQuery(rememberedNumber);
+    }
+  }, [isOpen, initialFlightId, initialType, recentFlightKey]);
 
   const handleSearch = async (targetId?: string, targetType?: FlightType) => {
-    const query = (targetId || flightQuery).trim().toUpperCase();
+    const query = (targetId || flightQuery).replace(/\s+/g, '').trim().toUpperCase();
     const type = targetType || activeType;
 
-    if (!query) {
-      setErrorMsg('항공편명을 입력해 주세요. (예: KE012, OZ741)');
+    if (!/^[A-Z0-9]{3,12}$/.test(query)) {
+      setErrorMsg('정확한 항공편명을 입력해 주세요. (예: KE012, OZ741)');
       return;
     }
 
+    // Save the latest search even if the provider is temporarily unavailable.
+    // Only store the flight number and direction: never store the API credential.
+    setRecentFlight(query);
+    try {
+      window.localStorage.setItem(recentFlightKey, JSON.stringify({ flightId: query, type }));
+    } catch {
+      // Private browsing/storage restrictions should not prevent flight lookup.
+    }
     setIsLoading(true);
     setErrorMsg(null);
     setIsCopied(false);
@@ -234,7 +260,7 @@ export const FlightModal: React.FC<FlightModalProps> = ({
               type="text"
               value={flightQuery}
               onChange={(e) => setFlightQuery(e.target.value.toUpperCase())}
-              placeholder="항공편명 입력 (예: KE012, OZ741)"
+              placeholder={recentFlight ? `최근 검색: ${recentFlight}` : '항공편명 입력 (예: KE012, OZ741)'}
               className="w-full pl-3.5 pr-20 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#1E60F3] focus:bg-white rounded-xl text-slate-900 text-sm font-bold tracking-wider placeholder:tracking-normal placeholder:font-medium placeholder:text-slate-400 focus:outline-none transition-all uppercase"
             />
             <div className="absolute right-1.5 flex items-center space-x-1">
