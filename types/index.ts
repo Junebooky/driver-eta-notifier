@@ -26,6 +26,8 @@ export interface DriverProfile {
   targetChatRoom?: string; // e.g. 'VIP 의전 단톡방'
   homeLocation?: HomeLocation | null;
   plateNumber?: string;    // e.g. '142호 7811' (alias for carNumber)
+  clientName?: string;     // e.g. '인터코스'
+  passengerCount?: string; // e.g. '9명'
 }
 
 
