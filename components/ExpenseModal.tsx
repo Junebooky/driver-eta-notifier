@@ -17,6 +17,7 @@ import {
   X,
   CheckCircle2,
   Camera,
+  ReceiptText,
 } from 'lucide-react';
 import {
   ExpenseItem,
@@ -164,40 +165,45 @@ const ExpenseModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) => 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-white text-slate-800 overflow-hidden select-none animate-in fade-in duration-200">
-      {/* 1. Top Header */}
-      <header className="sticky top-0 z-30 bg-white border-b border-slate-100/80 w-full shadow-2xs">
-        <div className="max-w-lg mx-auto px-4 py-3.5 flex items-center justify-between w-full">
-          <button
-            type="button"
-            onClick={() => {
-              haptics.lightTap();
-              onClose();
-            }}
-            className="p-1.5 -ml-1.5 text-slate-700 hover:text-slate-900 rounded-full hover:bg-slate-100 active:scale-95 transition-all"
-            aria-label="뒤로가기"
-          >
-            <ChevronLeft className="w-6 h-6 stroke-[2.4]" />
-          </button>
-
-          <div className="text-center">
-            <div className="flex items-center justify-center gap-1.5">
-              <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                경비지출
-              </h1>
-              {isDemoMode ? (
-                <span className="text-[10px] bg-blue-50 text-[#1E60F3] font-semibold px-1.5 py-0.2 rounded border border-blue-100">
-                  샘플
-                </span>
-              ) : (
-                <span className="text-[10px] bg-slate-100 text-slate-500 font-semibold px-1.5 py-0.2 rounded">
-                  임시저장
-                </span>
-              )}
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in select-none overscroll-contain"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          haptics.lightTap();
+          onClose();
+        }
+      }}
+    >
+      <div
+        className="w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[92dvh] h-[92dvh] sm:h-auto sm:max-h-[90vh] animate-in slide-in-from-bottom-6 sm:animate-scale-up duration-300 relative"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* 1. Modal Header */}
+        <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-8 h-8 rounded-xl bg-[#1E60F3] text-white flex items-center justify-center shadow-xs shrink-0">
+              <ReceiptText className="w-4 h-4 stroke-[2.2]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <h2 className="text-base font-bold text-slate-900 tracking-tight">경비지출</h2>
+                {isDemoMode ? (
+                  <span className="text-[10px] bg-blue-50 text-[#1E60F3] font-semibold px-1.5 py-0.2 rounded border border-blue-100">
+                    샘플
+                  </span>
+                ) : (
+                  <span className="text-[10px] bg-slate-100 text-slate-500 font-semibold px-1.5 py-0.2 rounded">
+                    임시저장
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-400 font-normal">
+                VIP 의전 경비 정산 내역
+              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center space-x-1">
             {/* Demo fixture toggle */}
             {isDemoMode ? (
               <button
@@ -226,20 +232,32 @@ const ExpenseModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) => 
                 haptics.lightTap();
                 setIsDatePickerOpen(true);
               }}
-              className="p-1.5 text-slate-700 hover:text-slate-900 rounded-full hover:bg-slate-100 active:scale-95 transition-all"
-              aria-label="날짜 선택"
+              className="p-1.5 text-slate-600 hover:text-slate-900 rounded-full hover:bg-slate-100"
+              title="날짜 선택"
             >
-              <CalendarIcon className="w-5 h-5 stroke-[2]" />
+              <CalendarIcon className="w-4 h-4 stroke-[2]" />
+            </button>
+
+            {/* Close button */}
+            <button
+              type="button"
+              onClick={() => {
+                haptics.lightTap();
+                onClose();
+              }}
+              className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 active:scale-95 flex items-center justify-center text-slate-500 cursor-pointer transition-all"
+              aria-label="닫기"
+            >
+              <X className="w-4 h-4 stroke-[2.2]" />
             </button>
           </div>
         </div>
-      </header>
 
-      {/* Main Scrollable Content (Pure White Background) */}
-      <main
-        ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-4 py-3 space-y-4 max-w-lg mx-auto w-full pb-24 bg-white"
-      >
+        {/* Main Scrollable Content (Pure White Background) */}
+        <main
+          ref={scrollContainerRef}
+          className="flex-1 overflow-y-auto px-4 py-3 space-y-4 w-full pb-6 bg-white"
+        >
         {/* Notice for Reference Demo vs Fresh Draft */}
         {isDemoMode && (
           <div className="bg-blue-50/70 border border-blue-100 rounded-xl px-3 py-2 flex items-center justify-between text-xs text-blue-700">
@@ -613,6 +631,7 @@ const ExpenseModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) => 
           )}
         </section>
       </main>
+      </div>
 
       {/* Add / Edit Expense Modal (Right Screen) */}
       <AddExpenseModal

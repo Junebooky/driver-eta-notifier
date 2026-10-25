@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import {
-  ChevronLeft,
   Sun,
   Moon,
   Clock,
@@ -21,6 +20,7 @@ import {
   ArrowRight,
   Sparkles,
   RotateCcw,
+  NotebookPen,
 } from 'lucide-react';
 import { DriverProfile } from '@/types';
 import {
@@ -239,41 +239,45 @@ const DrivingLogModalContent: React.FC<{
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#F8FAFC] text-slate-800 overflow-hidden select-none animate-in fade-in duration-200">
-      {/* 1. Header with date and back navigation (Aligned within max-w-lg mx-auto on desktop) */}
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-100 w-full shadow-2xs">
-        <div className="max-w-lg mx-auto px-4 py-3.5 flex items-center justify-between w-full">
-          <button
-            type="button"
-            onClick={() => {
-              haptics.lightTap();
-              onClose();
-            }}
-            className="p-1.5 -ml-1.5 text-slate-700 hover:text-slate-900 rounded-full hover:bg-slate-100 active:scale-95 transition-all"
-            aria-label="뒤로가기"
-          >
-            <ChevronLeft className="w-6 h-6 stroke-[2.4]" />
-          </button>
-
-          <div className="text-center">
-            <div className="flex items-center justify-center gap-1.5">
-              <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">운행일지</h1>
-              {logData.isDemoFixture ? (
-                <span className="text-[10px] bg-blue-50 text-[#1E60F3] font-semibold px-1.5 py-0.2 rounded border border-blue-100">
-                  샘플
-                </span>
-              ) : (
-                <span className="text-[10px] bg-slate-100 text-slate-500 font-semibold px-1.5 py-0.2 rounded">
-                  임시저장
-                </span>
-              )}
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in select-none overscroll-contain"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          haptics.lightTap();
+          onClose();
+        }
+      }}
+    >
+      <div
+        className="w-full max-w-lg bg-[#F8FAFC] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[92dvh] h-[92dvh] sm:h-auto sm:max-h-[90vh] animate-in slide-in-from-bottom-6 sm:animate-scale-up duration-300 relative"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* 1. Modal Header */}
+        <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-8 h-8 rounded-xl bg-[#1E60F3] text-white flex items-center justify-center shadow-xs shrink-0">
+              <NotebookPen className="w-4 h-4 stroke-[2.2]" />
             </div>
-            <p className="text-[11px] sm:text-xs text-slate-500 font-normal">
-              {logData.date || formatKoreanDate()}
-            </p>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <h2 className="text-base font-bold text-slate-900 tracking-tight">운행일지</h2>
+                {logData.isDemoFixture ? (
+                  <span className="text-[10px] bg-blue-50 text-[#1E60F3] font-semibold px-1.5 py-0.2 rounded border border-blue-100">
+                    샘플
+                  </span>
+                ) : (
+                  <span className="text-[10px] bg-slate-100 text-slate-500 font-semibold px-1.5 py-0.2 rounded">
+                    임시저장
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-400 font-normal">
+                {logData.date || formatKoreanDate()}
+              </p>
+            </div>
           </div>
 
-          <div className="w-8 flex justify-end">
+          <div className="flex items-center space-x-1">
             {logData.isDemoFixture ? (
               <button
                 type="button"
@@ -293,15 +297,26 @@ const DrivingLogModalContent: React.FC<{
                 <Sparkles className="w-4 h-4 stroke-[2]" />
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={() => {
+                haptics.lightTap();
+                onClose();
+              }}
+              className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 active:scale-95 flex items-center justify-center text-slate-500 cursor-pointer transition-all"
+              aria-label="닫기"
+            >
+              <X className="w-4 h-4 stroke-[2.2]" />
+            </button>
           </div>
         </div>
-      </header>
 
-      {/* Main Scrollable Content */}
-      <main
-        ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto px-4 py-4 space-y-4 max-w-lg mx-auto w-full pb-24"
-      >
+        {/* Main Scrollable Content */}
+        <main
+          ref={scrollContainerRef}
+          className="flex-1 overflow-y-auto px-4 py-4 space-y-4 w-full pb-4"
+        >
         {/* Notice Banner for Demo Fixture or Empty Report */}
         {logData.isDemoFixture && (
           <div className="bg-blue-50/70 border border-blue-100 rounded-xl px-3 py-2 flex items-center justify-between text-xs text-blue-700">
@@ -673,27 +688,26 @@ const DrivingLogModalContent: React.FC<{
         </section>
       </main>
 
-      {/* 8. Fixed Bottom Buttons: 임시저장 and 운행일지 제출 (Aligned in max-w-lg mx-auto) */}
-      <footer className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-100 shadow-lg">
-        <div className="max-w-lg mx-auto px-4 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))]">
+        {/* 8. Bottom Action Buttons inside Modal Card */}
+        <div className="p-3.5 bg-white/95 backdrop-blur-md border-t border-slate-100 shrink-0">
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
               onClick={handleTemporarySave}
-              className="w-full py-3.5 border border-slate-200 bg-white text-slate-700 text-sm font-bold rounded-xl hover:bg-slate-50 active:scale-98 transition-all shadow-2xs"
+              className="w-full py-3 border border-slate-200 bg-white text-slate-700 text-sm font-bold rounded-xl hover:bg-slate-50 active:scale-98 transition-all shadow-2xs cursor-pointer"
             >
               임시저장
             </button>
             <button
               type="button"
               onClick={handleSubmitLog}
-              className="w-full py-3.5 bg-[#1E60F3] text-white text-sm font-bold rounded-xl shadow-[0_4px_14px_rgba(30,96,243,0.35)] hover:bg-blue-600 active:scale-98 transition-all"
+              className="w-full py-3 bg-[#1E60F3] text-white text-sm font-bold rounded-xl shadow-[0_4px_14px_rgba(30,96,243,0.35)] hover:bg-blue-600 active:scale-98 transition-all cursor-pointer"
             >
               운행일지 제출
             </button>
           </div>
         </div>
-      </footer>
+      </div>
 
       {/* 일정 추가 / 수정 Bottom Sheet Popup */}
       <AddScheduleModal
