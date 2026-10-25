@@ -20,6 +20,8 @@ import { FlightModal } from '@/components/FlightModal';
 import { VehicleInspectionModal } from '@/components/VehicleInspectionModal';
 import { LocationSearchModal, SelectedLocationData } from '@/components/LocationSearchModal';
 import { RoadviewModal } from '@/components/RoadviewModal';
+import { DrivingLogModal } from '@/components/DrivingLogModal';
+import { ExpenseModal } from '@/components/ExpenseModal';
 import { ScheduleTab } from '@/components/ScheduleTab';
 import { Navigation, Calendar } from 'lucide-react';
 import { ScheduleItem, scheduleToPresets } from '@/data/ferrariSchedules';
@@ -102,6 +104,29 @@ export default function Home() {
 
   // Roadview Modal State
   const [isRoadviewModalOpen, setIsRoadviewModalOpen] = useState(false);
+
+  // Driving Log (운행일지) & Expense (경비지출) Modals State
+  const [isDrivingLogOpen, setIsDrivingLogOpen] = useState(false);
+  const [isExpenseOpen, setIsExpenseOpen] = useState(false);
+
+  // VIP Assignment Capability & Isolated Preview Gate State (Issue #14)
+  const [isVipAssigned, setIsVipAssigned] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('vip') === '0' || params.get('standard') === '1') return false;
+      if (params.get('vip') === '1' || params.get('preview') === 'vip') return true;
+      const stored = localStorage.getItem('cockpit_vip_preview_enabled');
+      if (stored !== null) return stored === 'true';
+    }
+    return true;
+  });
+
+  // Map search callback state for Driving Log 일정 추가
+  const [isSelectingForSchedule, setIsSelectingForSchedule] = useState(false);
+  const [selectedLocationForSchedule, setSelectedLocationForSchedule] = useState<{
+    name: string;
+    address?: string;
+  } | null>(null);
 
   // Active vehicle identifier (e.g. '4호차', '1호차')
   const currentVehicleNo = useMemo(() => {
@@ -979,6 +1004,18 @@ export default function Home() {
 
   // Handler for selecting location from standalone LocationSearchModal
   const handleSelectLocationFromSearch = (loc: SelectedLocationData) => {
+    // Route back to Driving Log 일정 추가 if requested from AddScheduleModal
+    if (isSelectingForSchedule) {
+      setSelectedLocationForSchedule({
+        name: loc.name || loc.shortName,
+        address: loc.address,
+      });
+      setIsSelectingForSchedule(false);
+      setIsLocationSearchOpen(false);
+      haptics.selection();
+      return;
+    }
+
     // [태스크 4] 검색 모달 내 경로 패키지 거점 선택 시 원터치 일괄 로드
     if (loc.isPackage && loc.packageData) {
       setOrigin(loc.packageData.origin);
@@ -1346,8 +1383,11 @@ export default function Home() {
               onSaveRouteAsPreset={handleSaveRouteAsPreset}
             />
 
-            {/* 2. Standalone 5-Column Quick Action Bar */}
+            {/* 2. Standalone 7-Button Quick Action Bar (4 Top / 3 Centered) */}
             <QuickActionBar
+              isVipEnabled={isVipAssigned}
+              onOpenDrivingLogModal={() => setIsDrivingLogOpen(true)}
+              onOpenExpenseModal={() => setIsExpenseOpen(true)}
               onOpenInspectionModal={() => setIsInspectionModalOpen(true)}
               onOpenPresetModal={handleOpenAddModal}
               onOpenAddModal={handleOpenAddModal}
@@ -1657,6 +1697,24 @@ export default function Home() {
         currentDestination={destination}
         presets={presets}
         homeLocation={profile.homeLocation}
+      />
+
+      {/* Driving Log (운행일지) Full-Screen Mobile Modal */}
+      <DrivingLogModal
+        isOpen={isDrivingLogOpen}
+        onClose={() => setIsDrivingLogOpen(false)}
+        driverProfile={profile}
+        onOpenLocationSearch={() => {
+          setIsSelectingForSchedule(true);
+          setIsLocationSearchOpen(true);
+        }}
+        selectedLocationFromMap={selectedLocationForSchedule}
+      />
+
+      {/* Expense (경비지출) Modal Shell */}
+      <ExpenseModal
+        isOpen={isExpenseOpen}
+        onClose={() => setIsExpenseOpen(false)}
       />
 
     </main>
