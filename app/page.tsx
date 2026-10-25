@@ -109,6 +109,25 @@ export default function Home() {
   const [isDrivingLogOpen, setIsDrivingLogOpen] = useState(false);
   const [isExpenseOpen, setIsExpenseOpen] = useState(false);
 
+  // VIP Assignment Capability & Isolated Preview Gate State (Issue #14)
+  const [isVipAssigned, setIsVipAssigned] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('vip') === '0' || params.get('standard') === '1') return false;
+      if (params.get('vip') === '1' || params.get('preview') === 'vip') return true;
+      const stored = localStorage.getItem('cockpit_vip_preview_enabled');
+      if (stored !== null) return stored === 'true';
+    }
+    return true;
+  });
+
+  // Map search callback state for Driving Log 일정 추가
+  const [isSelectingForSchedule, setIsSelectingForSchedule] = useState(false);
+  const [selectedLocationForSchedule, setSelectedLocationForSchedule] = useState<{
+    name: string;
+    address?: string;
+  } | null>(null);
+
   // Active vehicle identifier (e.g. '4호차', '1호차')
   const currentVehicleNo = useMemo(() => {
     return profile.vehicleNo?.match(/(\d+호차)/)?.[1] || '4호차';
@@ -985,6 +1004,18 @@ export default function Home() {
 
   // Handler for selecting location from standalone LocationSearchModal
   const handleSelectLocationFromSearch = (loc: SelectedLocationData) => {
+    // Route back to Driving Log 일정 추가 if requested from AddScheduleModal
+    if (isSelectingForSchedule) {
+      setSelectedLocationForSchedule({
+        name: loc.name || loc.shortName,
+        address: loc.address,
+      });
+      setIsSelectingForSchedule(false);
+      setIsLocationSearchOpen(false);
+      haptics.selection();
+      return;
+    }
+
     // [태스크 4] 검색 모달 내 경로 패키지 거점 선택 시 원터치 일괄 로드
     if (loc.isPackage && loc.packageData) {
       setOrigin(loc.packageData.origin);
@@ -1354,6 +1385,7 @@ export default function Home() {
 
             {/* 2. Standalone 7-Button Quick Action Bar (4 Top / 3 Centered) */}
             <QuickActionBar
+              isVipEnabled={isVipAssigned}
               onOpenDrivingLogModal={() => setIsDrivingLogOpen(true)}
               onOpenExpenseModal={() => setIsExpenseOpen(true)}
               onOpenInspectionModal={() => setIsInspectionModalOpen(true)}
@@ -1672,7 +1704,11 @@ export default function Home() {
         isOpen={isDrivingLogOpen}
         onClose={() => setIsDrivingLogOpen(false)}
         driverProfile={profile}
-        onOpenLocationSearch={() => setIsLocationSearchOpen(true)}
+        onOpenLocationSearch={() => {
+          setIsSelectingForSchedule(true);
+          setIsLocationSearchOpen(true);
+        }}
+        selectedLocationFromMap={selectedLocationForSchedule}
       />
 
       {/* Expense (경비지출) Modal Shell */}

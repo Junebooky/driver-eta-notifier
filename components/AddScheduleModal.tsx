@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { X, Clock, Search, MapPin, Map, MoreVertical, Loader2 } from 'lucide-react';
-import { RouteStopItem, REFERENCE_RECENT_LOCATIONS } from '@/utils/drivingLog';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Clock, Search, MapPin, Map, MoreVertical, Loader2, AlertCircle } from 'lucide-react';
+import { RouteStopItem, isValidTimeHHMM } from '@/utils/drivingLog';
 import { haptics } from '@/utils/haptics';
 
 interface AddScheduleModalProps {
@@ -11,6 +11,7 @@ interface AddScheduleModalProps {
   onSave: (stop: RouteStopItem) => void;
   editingStop?: RouteStopItem | null;
   onOpenMapSearch?: () => void;
+  selectedLocationFromMap?: { name: string; address?: string } | null;
 }
 
 interface StoredSearchItem {
@@ -24,13 +25,34 @@ interface PoiApiItem {
   address: string;
 }
 
+const getStoredRecentLocations = (): Array<{ name: string; address: string }> => {
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('cockpit_recent_searches');
+      if (stored) {
+        const parsed = JSON.parse(stored) as StoredSearchItem[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.slice(0, 4).map((item) => ({
+            name: item.name || item.shortName || '',
+            address: item.address || '',
+          }));
+        }
+      }
+    } catch {
+      // Fallback
+    }
+  }
+  return [];
+};
+
 const AddScheduleModalContent: React.FC<{
   onClose: () => void;
   onSave: (stop: RouteStopItem) => void;
   editingStop?: RouteStopItem | null;
   onOpenMapSearch?: () => void;
-}> = ({ onClose, onSave, editingStop, onOpenMapSearch }) => {
-  // Derive initial values pure without effect
+  selectedLocationFromMap?: { name: string; address?: string } | null;
+}> = ({ onClose, onSave, editingStop, onOpenMapSearch, selectedLocationFromMap }) => {
+  // Derive initial values purely
   const [time, setTime] = useState(() => {
     if (editingStop?.time) return editingStop.time;
     const now = new Date();
@@ -39,29 +61,19 @@ const AddScheduleModalContent: React.FC<{
     return `${hh}:${mm}`;
   });
 
-  const [place, setPlace] = useState(editingStop?.place || '');
-  const [address, setAddress] = useState(editingStop?.address || '');
+  const [place, setPlace] = useState(
+    () => selectedLocationFromMap?.name || editingStop?.place || ''
+  );
+  const [address, setAddress] = useState(
+    () => selectedLocationFromMap?.address || editingStop?.address || ''
+  );
   const [memo, setMemo] = useState(editingStop?.memo || '');
+  const [timeError, setTimeError] = useState<string | null>(null);
 
-  const recentLocations: Array<{ name: string; address: string }> = useMemo(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const stored = localStorage.getItem('cockpit_recent_searches');
-        if (stored) {
-          const parsed = JSON.parse(stored) as StoredSearchItem[];
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed.slice(0, 4).map((item) => ({
-              name: item.name || item.shortName || '',
-              address: item.address || '',
-            }));
-          }
-        }
-      } catch {
-        // Fallback
-      }
-    }
-    return REFERENCE_RECENT_LOCATIONS;
-  }, []);
+  // Stored recent searches (empty if user has no search history)
+  const [recentLocations] = useState<Array<{ name: string; address: string }>>(
+    getStoredRecentLocations
+  );
 
   const [searchSuggestions, setSearchSuggestions] = useState<Array<{ name: string; address: string }>>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -105,7 +117,7 @@ const AddScheduleModalContent: React.FC<{
     }, 250);
   };
 
-  const handleSelectRecent = (loc: { name: string; address: string }) => {
+  const handleSelectLocation = (loc: { name: string; address: string }) => {
     haptics.selection();
     setPlace(loc.name);
     setAddress(loc.address);
@@ -114,8 +126,17 @@ const AddScheduleModalContent: React.FC<{
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!time.trim() || !place.trim()) {
-      alert('시간과 장소를 입력해주세요.');
+
+    // Strict 24h format validation
+    if (!isValidTimeHHMM(time.trim())) {
+      setTimeError('올바른 시간(00:00 ~ 23:59)을 입력해주세요.');
+      haptics.warningPulse();
+      return;
+    }
+    setTimeError(null);
+
+    if (!place.trim()) {
+      alert('장소를 입력해주세요.');
       return;
     }
 
@@ -162,12 +183,23 @@ const AddScheduleModalContent: React.FC<{
             <input
               type="text"
               value={time}
-              onChange={(e) => setTime(e.target.value)}
+              onChange={(e) => {
+                setTime(e.target.value);
+                if (timeError) setTimeError(null);
+              }}
               placeholder="예) 08:30"
               maxLength={5}
-              className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200/90 rounded-xl text-sm font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 transition-all shadow-2xs"
+              className={`w-full pl-10 pr-4 py-3 bg-white border ${
+                timeError ? 'border-red-400 ring-2 ring-red-100' : 'border-slate-200/90'
+              } rounded-xl text-sm font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 transition-all shadow-2xs`}
             />
           </div>
+          {timeError && (
+            <div className="flex items-center gap-1.5 mt-1.5 text-xs text-red-600">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+              <span>{timeError}</span>
+            </div>
+          )}
         </div>
 
         {/* 2. 장소 */}
@@ -208,7 +240,7 @@ const AddScheduleModalContent: React.FC<{
                 <button
                   key={idx}
                   type="button"
-                  onClick={() => handleSelectRecent(item)}
+                  onClick={() => handleSelectLocation(item)}
                   className="w-full text-left px-3.5 py-2.5 hover:bg-blue-50/60 transition-colors flex items-start gap-2.5"
                 >
                   <MapPin className="w-4 h-4 text-[#1E60F3] shrink-0 mt-0.5" />
@@ -226,49 +258,57 @@ const AddScheduleModalContent: React.FC<{
         <div>
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold text-slate-700">최근 검색한 장소</span>
-            <button
-              type="button"
-              onClick={() => {
-                haptics.lightTap();
-                if (onOpenMapSearch) onOpenMapSearch();
-              }}
-              className="text-xs text-slate-400 hover:text-slate-600 transition-colors font-medium flex items-center gap-0.5"
-            >
-              전체보기 &gt;
-            </button>
+            {recentLocations.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.lightTap();
+                  if (onOpenMapSearch) onOpenMapSearch();
+                }}
+                className="text-xs text-slate-400 hover:text-slate-600 transition-colors font-medium flex items-center gap-0.5"
+              >
+                전체보기 &gt;
+              </button>
+            )}
           </div>
 
-          <div className="divide-y divide-slate-100 border border-slate-100/90 rounded-2xl bg-white overflow-hidden shadow-2xs">
-            {recentLocations.map((loc, idx) => (
-              <div
-                key={idx}
-                onClick={() => handleSelectRecent(loc)}
-                className="flex items-center justify-between px-3.5 py-3 hover:bg-slate-50/80 cursor-pointer transition-colors group"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-500 group-hover:text-[#1E60F3] group-hover:bg-blue-50/50 group-hover:border-blue-100 transition-colors shrink-0">
-                    <MapPin className="w-4 h-4 stroke-[2]" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-xs font-bold text-slate-800 group-hover:text-[#1E60F3] transition-colors truncate">
-                      {loc.name}
-                    </div>
-                    <div className="text-[11px] text-slate-400 truncate mt-0.5">{loc.address}</div>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleSelectRecent(loc);
-                  }}
-                  className="p-1 text-slate-300 hover:text-slate-500 rounded transition-colors"
+          {recentLocations.length > 0 ? (
+            <div className="divide-y divide-slate-100 border border-slate-100/90 rounded-2xl bg-white overflow-hidden shadow-2xs">
+              {recentLocations.map((loc, idx) => (
+                <div
+                  key={idx}
+                  onClick={() => handleSelectLocation(loc)}
+                  className="flex items-center justify-between px-3.5 py-3 hover:bg-slate-50/80 cursor-pointer transition-colors group"
                 >
-                  <MoreVertical className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
-          </div>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-500 group-hover:text-[#1E60F3] group-hover:bg-blue-50/50 group-hover:border-blue-100 transition-colors shrink-0">
+                      <MapPin className="w-4 h-4 stroke-[2]" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-slate-800 group-hover:text-[#1E60F3] transition-colors truncate">
+                        {loc.name}
+                      </div>
+                      <div className="text-[11px] text-slate-400 truncate mt-0.5">{loc.address}</div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSelectLocation(loc);
+                    }}
+                    className="p-1 text-slate-300 hover:text-slate-500 rounded transition-colors"
+                  >
+                    <MoreVertical className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="border border-dashed border-slate-200 rounded-2xl p-4 text-center text-xs text-slate-400 bg-slate-50/50">
+              <span>최근 검색한 장소가 없습니다. 상단 검색창을 이용해주세요.</span>
+            </div>
+          )}
         </div>
 
         {/* 4. 메모 (선택) */}
@@ -309,6 +349,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
   onSave,
   editingStop,
   onOpenMapSearch,
+  selectedLocationFromMap,
 }) => {
   // Body scroll lock
   useEffect(() => {
@@ -327,13 +368,14 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
       {/* Backdrop Click */}
       <div className="absolute inset-0" onClick={onClose} />
 
-      {/* Fresh component mounted on open or editingStop change */}
+      {/* Fresh component mounted on open, editingStop, or selectedLocationFromMap change */}
       <AddScheduleModalContent
-        key={`${editingStop?.id || 'new'}`}
+        key={`${editingStop?.id || 'new'}-${selectedLocationFromMap?.name || ''}`}
         onClose={onClose}
         onSave={onSave}
         editingStop={editingStop}
         onOpenMapSearch={onOpenMapSearch}
+        selectedLocationFromMap={selectedLocationFromMap}
       />
     </div>
   );

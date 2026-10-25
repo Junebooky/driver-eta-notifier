@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import {
   ChevronLeft,
@@ -18,6 +18,9 @@ import {
   CheckCircle2,
   AlertCircle,
   X,
+  ArrowRight,
+  Sparkles,
+  RotateCcw,
 } from 'lucide-react';
 import { DriverProfile } from '@/types';
 import {
@@ -29,6 +32,9 @@ import {
   loadDrivingLogDraft,
   saveDrivingLogDraft,
   formatKoreanDate,
+  checkStopTimelineConsistency,
+  clampTimeComponent,
+  createReferenceDemoFixture,
 } from '@/utils/drivingLog';
 import { AddScheduleModal } from './AddScheduleModal';
 import { haptics } from '@/utils/haptics';
@@ -38,15 +44,24 @@ interface DrivingLogModalProps {
   onClose: () => void;
   driverProfile: DriverProfile;
   onOpenLocationSearch?: () => void;
+  selectedLocationFromMap?: { name: string; address?: string } | null;
 }
 
 const DrivingLogModalContent: React.FC<{
   onClose: () => void;
   driverProfile: DriverProfile;
   onOpenLocationSearch?: () => void;
-}> = ({ onClose, driverProfile, onOpenLocationSearch }) => {
+  selectedLocationFromMap?: { name: string; address?: string } | null;
+}> = ({ onClose, driverProfile, onOpenLocationSearch, selectedLocationFromMap }) => {
+  const scrollContainerRef = useRef<HTMLElement>(null);
+
   // Master driving log state initialized purely
   const [logData, setLogData] = useState<DrivingLogData>(() => loadDrivingLogDraft(driverProfile));
+
+  // Auto-scroll to top when modal mounts
+  useEffect(() => {
+    scrollContainerRef.current?.scrollTo({ top: 0 });
+  }, []);
 
   // Time edit modal states
   const [timePickerTarget, setTimePickerTarget] = useState<'clockIn' | 'clockOut' | null>(null);
@@ -99,7 +114,7 @@ const DrivingLogModalContent: React.FC<{
     haptics.lightTap();
     setTimePickerTarget(target);
     const curr = target === 'clockIn' ? logData.clockIn : logData.clockOut;
-    const [hh, mm] = curr.split(':');
+    const [hh, mm] = (curr || (target === 'clockIn' ? '06:40' : '21:50')).split(':');
     setPickerHour(hh || '08');
     setPickerMinute(mm || '00');
   };
@@ -107,7 +122,9 @@ const DrivingLogModalContent: React.FC<{
   const applyTimePicker = () => {
     if (!timePickerTarget) return;
     haptics.selection();
-    const formattedTime = `${pickerHour.padStart(2, '0')}:${pickerMinute.padStart(2, '0')}`;
+    const cleanH = clampTimeComponent(pickerHour, 23);
+    const cleanM = clampTimeComponent(pickerMinute, 59);
+    const formattedTime = `${cleanH}:${cleanM}`;
     handleTimeChange(timePickerTarget, formattedTime);
     setTimePickerTarget(null);
   };
@@ -130,6 +147,7 @@ const DrivingLogModalContent: React.FC<{
       endKm: formattedEnd,
       distanceKm: formatted,
       isOdoManualOverride: true,
+      odoSource: 'manual',
     }));
     setIsEditingMileage(false);
     haptics.success();
@@ -171,18 +189,18 @@ const DrivingLogModalContent: React.FC<{
   const handleSaveSummary = () => {
     setLogData((prev) => ({
       ...prev,
-      clientName: tempClientName.trim() || '인터코스',
-      passengerCount: tempPassengerCount.trim() || '9명',
+      clientName: tempClientName.trim(),
+      passengerCount: tempPassengerCount.trim(),
     }));
     setIsEditingSummary(false);
     haptics.selection();
     showToast('수행 요약 정보가 저장되었습니다.');
   };
 
-  // Temporary save to localStorage
+  // Temporary save to localStorage (Strictly draft status)
   const handleTemporarySave = () => {
     haptics.success();
-    const success = saveDrivingLogDraft(logData, driverProfile.vehicleNo);
+    const success = saveDrivingLogDraft({ ...logData, status: 'draft' });
     if (success) {
       showToast('운행일지가 임시저장되었습니다.');
     } else {
@@ -190,41 +208,114 @@ const DrivingLogModalContent: React.FC<{
     }
   };
 
-  // Submit Driving Log
+  // Submit Driving Log (Preserves draft status & informs user of preview isolation)
   const handleSubmitLog = () => {
     haptics.success();
-    saveDrivingLogDraft({ ...logData, status: 'submitted' }, driverProfile.vehicleNo);
+    saveDrivingLogDraft({ ...logData, status: 'draft' });
     setIsPreviewSubmitModalOpen(true);
+  };
+
+  // Toggle reference demo fixture vs clean real report
+  const handleLoadDemoFixture = () => {
+    haptics.selection();
+    const demo = createReferenceDemoFixture(driverProfile);
+    setLogData(demo);
+    setTempStartKm(demo.startKm);
+    setTempEndKm(demo.endKm);
+    setTempClientName(demo.clientName);
+    setTempPassengerCount(demo.passengerCount);
+    showToast('레퍼런스 샘플 데이터를 불러왔습니다.');
+  };
+
+  const handleResetToRealDraft = () => {
+    haptics.selection();
+    const fresh = loadDrivingLogDraft(driverProfile);
+    setLogData(fresh);
+    setTempStartKm(fresh.startKm);
+    setTempEndKm(fresh.endKm);
+    setTempClientName(fresh.clientName);
+    setTempPassengerCount(fresh.passengerCount);
+    showToast('실제 빈 일지 상태로 초기화했습니다.');
   };
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-[#F8FAFC] text-slate-800 overflow-hidden select-none animate-in fade-in duration-200">
-      {/* 1. Header with date and back navigation */}
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-100 px-4 py-3.5 flex items-center justify-between">
-        <button
-          type="button"
-          onClick={() => {
-            haptics.lightTap();
-            onClose();
-          }}
-          className="p-1.5 -ml-1.5 text-slate-700 hover:text-slate-900 rounded-full hover:bg-slate-100 active:scale-95 transition-all"
-          aria-label="뒤로가기"
-        >
-          <ChevronLeft className="w-6 h-6 stroke-[2.4]" />
-        </button>
+      {/* 1. Header with date and back navigation (Aligned within max-w-lg mx-auto on desktop) */}
+      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-100 w-full shadow-2xs">
+        <div className="max-w-lg mx-auto px-4 py-3.5 flex items-center justify-between w-full">
+          <button
+            type="button"
+            onClick={() => {
+              haptics.lightTap();
+              onClose();
+            }}
+            className="p-1.5 -ml-1.5 text-slate-700 hover:text-slate-900 rounded-full hover:bg-slate-100 active:scale-95 transition-all"
+            aria-label="뒤로가기"
+          >
+            <ChevronLeft className="w-6 h-6 stroke-[2.4]" />
+          </button>
 
-        <div className="text-center">
-          <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">운행일지</h1>
-          <p className="text-[11px] sm:text-xs text-slate-500 font-normal">
-            {logData.date || formatKoreanDate()}
-          </p>
+          <div className="text-center">
+            <div className="flex items-center justify-center gap-1.5">
+              <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">운행일지</h1>
+              {logData.isDemoFixture ? (
+                <span className="text-[10px] bg-blue-50 text-[#1E60F3] font-semibold px-1.5 py-0.2 rounded border border-blue-100">
+                  샘플
+                </span>
+              ) : (
+                <span className="text-[10px] bg-slate-100 text-slate-500 font-semibold px-1.5 py-0.2 rounded">
+                  임시저장
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] sm:text-xs text-slate-500 font-normal">
+              {logData.date || formatKoreanDate()}
+            </p>
+          </div>
+
+          <div className="w-8 flex justify-end">
+            {logData.isDemoFixture ? (
+              <button
+                type="button"
+                onClick={handleResetToRealDraft}
+                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100"
+                title="실제 빈 일지로 전환"
+              >
+                <RotateCcw className="w-4 h-4 stroke-[2]" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleLoadDemoFixture}
+                className="p-1.5 text-blue-500 hover:text-blue-700 rounded-full hover:bg-blue-50"
+                title="레퍼런스 샘플 불러오기"
+              >
+                <Sparkles className="w-4 h-4 stroke-[2]" />
+              </button>
+            )}
+          </div>
         </div>
-
-        <div className="w-8" />
       </header>
 
       {/* Main Scrollable Content */}
-      <main className="flex-1 overflow-y-auto px-4 py-4 space-y-4 max-w-lg mx-auto w-full pb-24">
+      <main
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto px-4 py-4 space-y-4 max-w-lg mx-auto w-full pb-24"
+      >
+        {/* Notice Banner for Demo Fixture or Empty Report */}
+        {logData.isDemoFixture && (
+          <div className="bg-blue-50/70 border border-blue-100 rounded-xl px-3 py-2 flex items-center justify-between text-xs text-blue-700">
+            <span className="font-medium">레퍼런스 스크린샷 시연 모드입니다.</span>
+            <button
+              type="button"
+              onClick={handleResetToRealDraft}
+              className="underline text-[11px] font-bold hover:text-blue-900"
+            >
+              빈 일지로 작성
+            </button>
+          </div>
+        )}
+
         {/* 2. Summary Hero Card (수행담당, 차량번호, 고객명, 담당승객 수) */}
         <section className="bg-white border border-slate-100 rounded-2xl shadow-[0_4px_20px_rgba(30,96,243,0.05)] overflow-hidden">
           {/* Top Illustration Banner */}
@@ -270,7 +361,9 @@ const DrivingLogModalContent: React.FC<{
             {/* Column 3: 고객명 */}
             <div className="px-1">
               <div className="text-xs sm:text-sm font-bold text-slate-900 truncate flex items-center justify-center gap-0.5">
-                <span>{logData.clientName}</span>
+                <span className={logData.clientName ? '' : 'text-slate-400 font-normal'}>
+                  {logData.clientName || '고객명 입력'}
+                </span>
                 <Pencil className="w-2.5 h-2.5 text-slate-300 group-hover:text-[#1E60F3] transition-colors" />
               </div>
               <div className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">고객명</div>
@@ -279,7 +372,9 @@ const DrivingLogModalContent: React.FC<{
             {/* Column 4: 담당승객 수 */}
             <div className="px-1">
               <div className="text-xs sm:text-sm font-bold text-slate-900 truncate flex items-center justify-center gap-0.5">
-                <span>{logData.passengerCount}</span>
+                <span className={logData.passengerCount ? '' : 'text-slate-400 font-normal'}>
+                  {logData.passengerCount || '인원 입력'}
+                </span>
                 <Pencil className="w-2.5 h-2.5 text-slate-300 group-hover:text-[#1E60F3] transition-colors" />
               </div>
               <div className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">담당승객 수</div>
@@ -303,7 +398,7 @@ const DrivingLogModalContent: React.FC<{
               <div>
                 <span className="text-[11px] text-slate-400 font-medium block">출근시간</span>
                 <span className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight group-hover:text-[#1E60F3] transition-colors">
-                  {logData.clockIn}
+                  {logData.clockIn || '--:--'}
                 </span>
               </div>
             </div>
@@ -326,7 +421,7 @@ const DrivingLogModalContent: React.FC<{
               <div>
                 <span className="text-[11px] text-slate-400 font-medium block">퇴근시간</span>
                 <span className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight group-hover:text-[#1E60F3] transition-colors">
-                  {logData.clockOut}
+                  {logData.clockOut || '--:--'}
                 </span>
               </div>
             </div>
@@ -354,14 +449,15 @@ const DrivingLogModalContent: React.FC<{
           </div>
         </section>
 
-        {/* 5. 주행거리 (시작 km, 종료 km, 오늘 운행) */}
+        {/* 5. 주행거리 (시작 km -> 종료 km, emphasized 오늘 운행 box) */}
         <section className="bg-white border border-slate-100 rounded-2xl p-4 shadow-[0_4px_16px_rgba(0,0,0,0.03)] space-y-3">
           <div className="flex items-center gap-2">
             <Navigation className="w-4 h-4 text-[#1E60F3] stroke-[2.2]" />
             <h2 className="text-sm font-bold text-slate-900 tracking-tight">주행거리</h2>
           </div>
 
-          <div className="grid grid-cols-3 gap-2 items-center">
+          {/* Improved hierarchy with directional arrow and emphasized 오늘 운행 box */}
+          <div className="flex items-center gap-2">
             {/* 시작 km */}
             <div
               onClick={() => {
@@ -370,17 +466,20 @@ const DrivingLogModalContent: React.FC<{
                 setMileageError(null);
                 setIsEditingMileage(true);
               }}
-              className="bg-slate-50/90 border border-slate-200/80 rounded-xl p-2.5 text-center cursor-pointer hover:border-[#1E60F3] hover:bg-blue-50/30 transition-all group"
+              className="flex-1 bg-white border border-slate-200/90 rounded-xl p-2.5 text-center cursor-pointer hover:border-[#1E60F3] shadow-2xs group"
               title="클릭하여 시작 km 수정"
             >
               <div className="text-[11px] text-slate-400 font-medium">시작 km</div>
               <div className="text-xs sm:text-sm font-bold text-slate-800 mt-0.5 flex items-center justify-center gap-1">
-                <span>{logData.startKm}</span>
+                <span>{logData.startKm || '-'}</span>
                 <Pencil className="w-3 h-3 text-slate-300 group-hover:text-[#1E60F3] transition-colors" />
               </div>
             </div>
 
-            {/* Arrow & 종료 km */}
+            {/* Directional Arrow */}
+            <ArrowRight className="w-4 h-4 text-slate-400 shrink-0" />
+
+            {/* 종료 km */}
             <div
               onClick={() => {
                 setTempStartKm(logData.startKm);
@@ -388,20 +487,20 @@ const DrivingLogModalContent: React.FC<{
                 setMileageError(null);
                 setIsEditingMileage(true);
               }}
-              className="bg-slate-50/90 border border-slate-200/80 rounded-xl p-2.5 text-center cursor-pointer hover:border-[#1E60F3] hover:bg-blue-50/30 transition-all group relative"
+              className="flex-1 bg-white border border-slate-200/90 rounded-xl p-2.5 text-center cursor-pointer hover:border-[#1E60F3] shadow-2xs group"
               title="클릭하여 종료 km 수정"
             >
               <div className="text-[11px] text-slate-400 font-medium">종료 km</div>
               <div className="text-xs sm:text-sm font-bold text-slate-800 mt-0.5 flex items-center justify-center gap-1">
-                <span>{logData.endKm}</span>
+                <span>{logData.endKm || '-'}</span>
                 <Pencil className="w-3 h-3 text-slate-300 group-hover:text-[#1E60F3] transition-colors" />
               </div>
             </div>
 
-            {/* 오늘 운행 */}
-            <div className="bg-white border border-blue-100 rounded-xl p-2.5 text-center shadow-2xs">
-              <div className="text-[11px] text-slate-400 font-medium">오늘 운행</div>
-              <div className="text-xs sm:text-sm font-extrabold text-[#1E60F3] mt-0.5">
+            {/* 오늘 운행 box (Emphasized cobalt blue) */}
+            <div className="min-w-[92px] shrink-0 bg-blue-50/80 border border-blue-200/90 rounded-xl p-2.5 text-center shadow-2xs">
+              <div className="text-[11px] text-[#1E60F3] font-semibold">오늘 운행</div>
+              <div className="text-xs sm:text-sm font-black text-[#1E60F3] mt-0.5">
                 {logData.distanceKm}
               </div>
             </div>
@@ -434,86 +533,120 @@ const DrivingLogModalContent: React.FC<{
             </button>
           </div>
 
-          {/* Timeline List */}
-          <div className="relative pl-1 pr-1 space-y-3">
-            {/* Continuous thin vertical line */}
-            {logData.stops.length > 1 && (
-              <div
-                className="absolute left-[5.4rem] sm:left-[6.1rem] top-3 bottom-3 w-[2px] bg-blue-100 pointer-events-none"
-                style={{ zIndex: 0 }}
-              />
-            )}
+          {/* Timeline List or Empty State */}
+          {logData.stops.length > 0 ? (
+            <div className="relative pl-1 pr-1 space-y-3">
+              {/* Continuous thin vertical line */}
+              {logData.stops.length > 1 && (
+                <div
+                  className="absolute left-[5.4rem] sm:left-[6.1rem] top-3 bottom-3 w-[2px] bg-blue-100 pointer-events-none"
+                  style={{ zIndex: 0 }}
+                />
+              )}
 
-            {logData.stops.map((stop, idx) => (
-              <div
-                key={stop.id}
-                className="relative flex items-center justify-between text-xs sm:text-sm py-0.5 group z-10"
-              >
-                <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
-                  {/* Number Badge */}
-                  <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-600 text-[11px] font-semibold flex items-center justify-center shrink-0">
-                    {idx + 1}
-                  </span>
+              {logData.stops.map((stop, idx) => {
+                // Check timeline consistency against duty hours
+                const consistency = checkStopTimelineConsistency(
+                  logData.clockIn,
+                  logData.clockOut,
+                  stop.time
+                );
 
-                  {/* Time */}
-                  <span className="font-semibold text-slate-700 w-11 sm:w-13 shrink-0 text-left">
-                    {stop.time}
-                  </span>
-
-                  {/* Blue Connected Dot */}
-                  <div className="w-2.5 h-2.5 rounded-full bg-[#1E60F3] shrink-0 ring-4 ring-white" />
-
-                  {/* Location Place Name */}
-                  <div className="min-w-0 flex-1 pl-1">
-                    <span className="font-bold text-slate-800 truncate block">{stop.place}</span>
-                    {stop.memo && (
-                      <span className="text-[11px] text-slate-400 truncate block">{stop.memo}</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* More Action Button */}
-                <div className="relative shrink-0">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setActiveMenuStopId(activeMenuStopId === stop.id ? null : stop.id);
-                    }}
-                    className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+                return (
+                  <div
+                    key={stop.id}
+                    className="relative flex items-center justify-between text-xs sm:text-sm py-0.5 group z-10"
                   >
-                    <MoreHorizontal className="w-4 h-4" />
-                  </button>
+                    <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+                      {/* Number Badge */}
+                      <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-600 text-[11px] font-semibold flex items-center justify-center shrink-0">
+                        {idx + 1}
+                      </span>
 
-                  {/* Dropdown Menu */}
-                  {activeMenuStopId === stop.id && (
-                    <div className="absolute right-0 top-full mt-1 w-24 bg-white border border-slate-100 rounded-xl shadow-lg z-20 py-1 divide-y divide-slate-100 animate-in fade-in duration-150">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingStop(stop);
-                          setActiveMenuStopId(null);
-                          setIsAddStopOpen(true);
-                        }}
-                        className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-1.5"
-                      >
-                        <Pencil className="w-3 h-3 text-slate-400" />
-                        <span>수정</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteStop(stop.id)}
-                        className="w-full text-left px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 flex items-center gap-1.5"
-                      >
-                        <Trash2 className="w-3 h-3 text-red-500" />
-                        <span>삭제</span>
-                      </button>
+                      {/* Time */}
+                      <span className="font-semibold text-slate-700 w-11 sm:w-13 shrink-0 text-left">
+                        {stop.time}
+                      </span>
+
+                      {/* Blue Connected Dot */}
+                      <div className="w-2.5 h-2.5 rounded-full bg-[#1E60F3] shrink-0 ring-4 ring-white" />
+
+                      {/* Location Place Name & Inconsistency Warning */}
+                      <div className="min-w-0 flex-1 pl-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-slate-800 truncate block">{stop.place}</span>
+                          {!consistency.isConsistent && (
+                            <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.2 rounded font-medium shrink-0">
+                              {consistency.warning}
+                            </span>
+                          )}
+                        </div>
+                        {stop.memo && (
+                          <span className="text-[11px] text-slate-400 truncate block">{stop.memo}</span>
+                        )}
+                      </div>
                     </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+
+                    {/* More Action Button */}
+                    <div className="relative shrink-0">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveMenuStopId(activeMenuStopId === stop.id ? null : stop.id);
+                        }}
+                        className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+                      >
+                        <MoreHorizontal className="w-4 h-4" />
+                      </button>
+
+                      {/* Dropdown Menu */}
+                      {activeMenuStopId === stop.id && (
+                        <div className="absolute right-0 top-full mt-1 w-24 bg-white border border-slate-100 rounded-xl shadow-lg z-20 py-1 divide-y divide-slate-100 animate-in fade-in duration-150">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingStop(stop);
+                              setActiveMenuStopId(null);
+                              setIsAddStopOpen(true);
+                            }}
+                            className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-1.5"
+                          >
+                            <Pencil className="w-3 h-3 text-slate-400" />
+                            <span>수정</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteStop(stop.id)}
+                            className="w-full text-left px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 flex items-center gap-1.5"
+                          >
+                            <Trash2 className="w-3 h-3 text-red-500" />
+                            <span>삭제</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="border border-dashed border-slate-200 rounded-2xl p-6 text-center text-xs text-slate-400 bg-slate-50/40 space-y-2">
+              <p>등록된 운행 일정이 없습니다.</p>
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.lightTap();
+                  setEditingStop(null);
+                  setIsAddStopOpen(true);
+                }}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-[#1E60F3] hover:underline"
+              >
+                <Plus className="w-3 h-3" />
+                <span>첫 번째 일정 추가하기</span>
+              </button>
+            </div>
+          )}
         </section>
 
         {/* 7. 특이사항 textarea */}
@@ -540,23 +673,25 @@ const DrivingLogModalContent: React.FC<{
         </section>
       </main>
 
-      {/* 8. Fixed Bottom Buttons: 임시저장 and 운행일지 제출 */}
-      <footer className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-100 px-4 py-3.5 max-w-lg mx-auto pb-[max(0.875rem,env(safe-area-inset-bottom))]">
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            onClick={handleTemporarySave}
-            className="w-full py-3.5 border border-slate-200 bg-white text-slate-700 text-sm font-bold rounded-xl hover:bg-slate-50 active:scale-98 transition-all shadow-2xs"
-          >
-            임시저장
-          </button>
-          <button
-            type="button"
-            onClick={handleSubmitLog}
-            className="w-full py-3.5 bg-[#1E60F3] text-white text-sm font-bold rounded-xl shadow-[0_4px_14px_rgba(30,96,243,0.35)] hover:bg-blue-600 active:scale-98 transition-all"
-          >
-            운행일지 제출
-          </button>
+      {/* 8. Fixed Bottom Buttons: 임시저장 and 운행일지 제출 (Aligned in max-w-lg mx-auto) */}
+      <footer className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-100 shadow-lg">
+        <div className="max-w-lg mx-auto px-4 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))]">
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={handleTemporarySave}
+              className="w-full py-3.5 border border-slate-200 bg-white text-slate-700 text-sm font-bold rounded-xl hover:bg-slate-50 active:scale-98 transition-all shadow-2xs"
+            >
+              임시저장
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmitLog}
+              className="w-full py-3.5 bg-[#1E60F3] text-white text-sm font-bold rounded-xl shadow-[0_4px_14px_rgba(30,96,243,0.35)] hover:bg-blue-600 active:scale-98 transition-all"
+            >
+              운행일지 제출
+            </button>
+          </div>
         </div>
       </footer>
 
@@ -570,9 +705,10 @@ const DrivingLogModalContent: React.FC<{
         onSave={handleSaveStop}
         editingStop={editingStop}
         onOpenMapSearch={onOpenLocationSearch}
+        selectedLocationFromMap={selectedLocationFromMap}
       />
 
-      {/* Time Picker Modal */}
+      {/* Time Picker Modal with strict clamping */}
       {timePickerTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl p-5 w-full max-w-xs shadow-xl space-y-4">
@@ -591,7 +727,7 @@ const DrivingLogModalContent: React.FC<{
 
             <div className="flex items-center justify-center gap-3 py-2">
               <div className="flex flex-col items-center">
-                <span className="text-[11px] text-slate-400 mb-1">시 (Hour)</span>
+                <span className="text-[11px] text-slate-400 mb-1">시 (00~23)</span>
                 <input
                   type="number"
                   min="0"
@@ -603,7 +739,7 @@ const DrivingLogModalContent: React.FC<{
               </div>
               <span className="text-2xl font-bold text-slate-400 mt-4">:</span>
               <div className="flex flex-col items-center">
-                <span className="text-[11px] text-slate-400 mb-1">분 (Minute)</span>
+                <span className="text-[11px] text-slate-400 mb-1">분 (00~59)</span>
                 <input
                   type="number"
                   min="0"
@@ -768,15 +904,15 @@ const DrivingLogModalContent: React.FC<{
           <div className="bg-white rounded-2xl p-5 w-full max-w-sm shadow-2xl space-y-4">
             <div className="flex items-center gap-2.5 text-[#1E60F3]">
               <CheckCircle2 className="w-5 h-5 stroke-[2.2]" />
-              <h3 className="text-base font-bold text-slate-900">운행일지 제출 (개발 미리보기)</h3>
+              <h3 className="text-base font-bold text-slate-900">임시저장 완료 (개발 미리보기)</h3>
             </div>
 
             <p className="text-xs text-slate-600 leading-relaxed">
-              입력하신 운행일지가 기기에 안전하게 임시 저장되었습니다.
+              작성하신 운행일지가 기기에 안전하게 <span className="font-bold text-slate-800">[임시저장]</span> 상태로 보관되었습니다.
               <br />
               <br />
               <span className="text-slate-400">
-                ※ 본사 정식 제출 및 관리자 시트 전송은 보안 지침(Issue #14)에 따라 Supabase 서버 인증 및 회사 배차 권한 백엔드 준비 완료 후 활성화됩니다.
+                ※ 본사 제출 및 관리자 시트 전송은 보안 지침(Issue #14)에 따라 Supabase 서버 인증 및 회사 배차 권한 백엔드 검증 완료 후 활성화됩니다.
               </span>
             </p>
 
@@ -810,6 +946,7 @@ export const DrivingLogModal: React.FC<DrivingLogModalProps> = ({
   onClose,
   driverProfile,
   onOpenLocationSearch,
+  selectedLocationFromMap,
 }) => {
   // Lock body scroll when modal is open
   useEffect(() => {
@@ -829,6 +966,7 @@ export const DrivingLogModal: React.FC<DrivingLogModalProps> = ({
       onClose={onClose}
       driverProfile={driverProfile}
       onOpenLocationSearch={onOpenLocationSearch}
+      selectedLocationFromMap={selectedLocationFromMap}
     />
   );
 };

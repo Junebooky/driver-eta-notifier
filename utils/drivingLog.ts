@@ -1,5 +1,8 @@
 /**
  * Pure Client-Side Driving Log (운행일지) Calculation & Storage Utilities
+ *
+ * Implements strict calculation, validation, multi-job draft isolation,
+ * verified vehicle inspection matching, and demo fixture separation.
  */
 
 import { DriverProfile } from '@/types';
@@ -16,6 +19,7 @@ export interface RouteStopItem {
 
 export interface DrivingLogData {
   reportId: string;
+  assignmentId?: string;     // Unique job assignment ID
   date: string;              // "2026년 10월 20일 (화)"
   rawDate: string;           // "2026-10-20"
   // Driver / Vehicle / Customer summary
@@ -32,15 +36,38 @@ export interface DrivingLogData {
   endKm: string;             // 종료 km: "154,861"
   distanceKm: string;        // 오늘 운행: "136 km"
   isOdoManualOverride?: boolean;
+  odoSource?: 'inspection_verified' | 'manual' | 'demo';
   // Route timeline
   stops: RouteStopItem[];
   // Special notes
   notes: string;
   savedAt?: string;
-  status?: 'draft' | 'submitted';
+  status: 'draft';           // Kept as 'draft' until authenticated HQ backend is ready
+  isDemoFixture?: boolean;   // True when populated with reference sample data
 }
 
-export const DRIVING_LOG_STORAGE_KEY_PREFIX = 'cockpit_driving_log_';
+export const DRIVING_LOG_STORAGE_PREFIX = 'cockpit_driving_log_report_';
+export const DRIVING_LOG_INDEX_KEY = 'cockpit_driving_log_index';
+
+/**
+ * Strict 24-hour HH:mm time validation
+ * Validates 00:00 to 23:59
+ */
+export const isValidTimeHHMM = (time?: string | null): boolean => {
+  if (!time) return false;
+  const regex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+  return regex.test(time.trim());
+};
+
+/**
+ * Clamp hour (0..23) and minute (0..59)
+ */
+export const clampTimeComponent = (val: number | string, max: number): string => {
+  const num = parseInt(String(val).replace(/[^0-9]/g, ''), 10);
+  if (isNaN(num)) return '00';
+  const clamped = Math.max(0, Math.min(num, max));
+  return String(clamped).padStart(2, '0');
+};
 
 /**
  * Format Date into Korean weekday string
@@ -67,23 +94,23 @@ export const formatIsoDate = (d: Date = new Date()): string => {
 
 /**
  * Calculate duty duration from clock-in to clock-out with overnight rollover support.
- * Returns { hours, minutes, formatted }
+ * Returns { hours, minutes, formatted, totalMinutes, error }
  * e.g. "06:40" to "21:50" -> "15시간 10분"
  */
 export const calculateDutyDuration = (
   clockIn?: string | null,
   clockOut?: string | null
-): { hours: number; minutes: number; formatted: string; totalMinutes: number } => {
+): { hours: number; minutes: number; formatted: string; totalMinutes: number; error: string | null } => {
   if (!clockIn || !clockOut) {
-    return { hours: 0, minutes: 0, formatted: '0시간 0분', totalMinutes: 0 };
+    return { hours: 0, minutes: 0, formatted: '0시간 0분', totalMinutes: 0, error: null };
+  }
+
+  if (!isValidTimeHHMM(clockIn) || !isValidTimeHHMM(clockOut)) {
+    return { hours: 0, minutes: 0, formatted: '시간 확인 필요', totalMinutes: 0, error: '올바른 시간(HH:mm)을 입력해주세요.' };
   }
 
   const [inH, inM] = clockIn.split(':').map((v) => parseInt(v, 10));
   const [outH, outM] = clockOut.split(':').map((v) => parseInt(v, 10));
-
-  if (isNaN(inH) || isNaN(inM) || isNaN(outH) || isNaN(outM)) {
-    return { hours: 0, minutes: 0, formatted: '0시간 0분', totalMinutes: 0 };
-  }
 
   const startTotalMinutes = inH * 60 + inM;
   let endTotalMinutes = outH * 60 + outM;
@@ -98,7 +125,55 @@ export const calculateDutyDuration = (
   const minutes = diffMinutes % 60;
 
   const formatted = `${hours}시간 ${minutes}분`;
-  return { hours, minutes, formatted, totalMinutes: diffMinutes };
+  return { hours, minutes, formatted, totalMinutes: diffMinutes, error: null };
+};
+
+/**
+ * Check if a stop timestamp falls outside the 출근 ~ 퇴근 window
+ */
+export const checkStopTimelineConsistency = (
+  clockIn?: string | null,
+  clockOut?: string | null,
+  stopTime?: string | null
+): { isConsistent: boolean; warning?: string } => {
+  if (!clockIn || !clockOut || !stopTime) {
+    return { isConsistent: true };
+  }
+  if (!isValidTimeHHMM(clockIn) || !isValidTimeHHMM(clockOut) || !isValidTimeHHMM(stopTime)) {
+    return { isConsistent: true };
+  }
+
+  const [inH, inM] = clockIn.split(':').map((v) => parseInt(v, 10));
+  const [outH, outM] = clockOut.split(':').map((v) => parseInt(v, 10));
+  const [stopH, stopM] = stopTime.split(':').map((v) => parseInt(v, 10));
+
+  const startMinutes = inH * 60 + inM;
+  let endMinutes = outH * 60 + outM;
+  let stopMinutes = stopH * 60 + stopM;
+
+  // Handle overnight
+  if (endMinutes < startMinutes) {
+    endMinutes += 24 * 60;
+    if (stopMinutes < startMinutes) {
+      stopMinutes += 24 * 60;
+    }
+  }
+
+  if (stopMinutes < startMinutes) {
+    return {
+      isConsistent: false,
+      warning: `출근시간(${clockIn}) 이전 일정입니다.`,
+    };
+  }
+
+  if (stopMinutes > endMinutes) {
+    return {
+      isConsistent: false,
+      warning: `퇴근시간(${clockOut}) 이후 일정입니다.`,
+    };
+  }
+
+  return { isConsistent: true };
 };
 
 /**
@@ -160,53 +235,100 @@ export const calculateDrivingDistance = (
 };
 
 /**
- * Get initial reference mock stops (matching the reference screenshot)
+ * Check if today's vehicle inspection has verified odometer records for this specific vehicle
  */
-export const getReferenceDefaultStops = (): RouteStopItem[] => [
-  { id: 'stop-1', time: '07:00', place: '차고지', address: '경기 성남시 분당구 판교로' },
-  { id: 'stop-2', time: '08:50', place: '메리어트 호텔', address: '서울 강남구 봉은사로 120' },
-  { id: 'stop-3', time: '09:50', place: '판교 오피스', address: '경기도 성남시 분당구 판교로 123' },
-  { id: 'stop-4', time: '11:25', place: '메리어트 호텔', address: '서울 강남구 봉은사로 120' },
-  { id: 'stop-5', time: '13:30', place: '판교 오피스', address: '경기도 성남시 분당구 판교로 123' },
-  { id: 'stop-6', time: '17:05', place: '강남 올리브영', address: '서울 강남구 테헤란로 231' },
-  { id: 'stop-7', time: '21:30', place: '메리어트 호텔', address: '서울 강남구 봉은사로 120' },
-  { id: 'stop-8', time: '22:15', place: '차고지', address: '경기 성남시 분당구 판교로' },
-];
+export const getVerifiedInspectionOdometer = (
+  vehicleNo?: string,
+  targetDateIso: string = formatIsoDate()
+): { startKm: string; endKm: string; isVerified: boolean } => {
+  if (typeof window === 'undefined' || !vehicleNo) {
+    return { startKm: '', endKm: '', isVerified: false };
+  }
+
+  try {
+    const cleanNo = vehicleNo.match(/(\d+호차)/)?.[1] || vehicleNo.trim();
+    const storageKey = `cockpit_vehicle_inspection_${cleanNo}`;
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) return { startKm: '', endKm: '', isVerified: false };
+
+    const parsed = JSON.parse(raw);
+    // Strict date and vehicle match
+    const inspectDate = parsed.savedAt ? formatIsoDate(new Date(parsed.savedAt)) : '';
+    if (inspectDate && inspectDate !== targetDateIso) {
+      // Stale inspection record from another date -> do not prefill silently
+      return { startKm: '', endKm: '', isVerified: false };
+    }
+
+    const startKm = parsed.pickupOdo ? formatOdometer(parsed.pickupOdo) : '';
+    const endKm = parsed.returnOdo ? formatOdometer(parsed.returnOdo) : '';
+
+    return {
+      startKm,
+      endKm,
+      isVerified: Boolean(startKm && endKm),
+    };
+  } catch {
+    return { startKm: '', endKm: '', isVerified: false };
+  }
+};
 
 /**
- * Reference recent locations (matching the reference screenshot 일정 추가)
+ * Reference Demo Fixture
+ * Matches the user-provided reference screenshots for review & visual QA
  */
-export const REFERENCE_RECENT_LOCATIONS = [
-  {
-    name: '메리어트 호텔',
-    address: '서울 강남구 봉은사로 120',
-  },
-  {
-    name: '판교 오피스',
-    address: '경기도 성남시 분당구 판교로 123',
-  },
-  {
-    name: '인천공항 T1',
-    address: '인천 중구 공항로 272',
-  },
-  {
-    name: '강남 올리브영',
-    address: '서울 강남구 테헤란로 231',
-  },
-];
+export const createReferenceDemoFixture = (driverProfile?: DriverProfile): DrivingLogData => {
+  const driverName = driverProfile?.driverName || '윤태준';
+  const carNumber =
+    driverProfile?.plateNumber ||
+    driverProfile?.carNumber ||
+    (driverProfile?.carNumberFront && driverProfile?.carNumberBack
+      ? `${driverProfile.carNumberFront} ${driverProfile.carNumberBack}`
+      : '142호 7811');
+
+  return {
+    reportId: 'demo_reference_fixture',
+    assignmentId: 'ASSIGN-20261020-001',
+    date: '2026년 10월 20일 (화)',
+    rawDate: '2026-10-20',
+    driverName,
+    carNumber,
+    clientName: '인터코스',
+    passengerCount: '9명',
+    clockIn: '06:40',
+    clockOut: '21:50',
+    totalDutyHours: '15시간 10분',
+    startKm: '154,725',
+    endKm: '154,861',
+    distanceKm: '136 km',
+    stops: [
+      { id: 'ref-1', time: '07:00', place: '차고지', address: '경기 성남시 분당구 판교로' },
+      { id: 'ref-2', time: '08:50', place: '메리어트 호텔', address: '서울 강남구 봉은사로 120' },
+      { id: 'ref-3', time: '09:50', place: '판교 오피스', address: '경기도 성남시 분당구 판교로 123' },
+      { id: 'ref-4', time: '11:25', place: '메리어트 호텔', address: '서울 강남구 봉은사로 120' },
+      { id: 'ref-5', time: '13:30', place: '판교 오피스', address: '경기도 성남시 분당구 판교로 123' },
+      { id: 'ref-6', time: '17:05', place: '강남 올리브영', address: '서울 강남구 테헤란로 231' },
+      { id: 'ref-7', time: '21:30', place: '메리어트 호텔', address: '서울 강남구 봉은사로 120' },
+      { id: 'ref-8', time: '21:45', place: '차고지', address: '경기 성남시 분당구 판교로' },
+    ],
+    notes: '',
+    status: 'draft',
+    isDemoFixture: true,
+  };
+};
 
 /**
- * Load driving log draft from localStorage or generate defaults from active driver profile
+ * Load or initialize a real Driving Log draft
+ * Sourced purely from verified inputs; does NOT inject fake schedules or fictitious customer data
  */
 export const loadDrivingLogDraft = (
   driverProfile: DriverProfile,
+  reportId?: string,
   dateIso: string = formatIsoDate()
 ): DrivingLogData => {
-  const storageKey = `${DRIVING_LOG_STORAGE_KEY_PREFIX}${driverProfile.vehicleNo || 'default'}_${dateIso}`;
-
-  if (typeof window !== 'undefined') {
+  // Check if a specific draft exists
+  if (typeof window !== 'undefined' && reportId) {
     try {
-      const stored = localStorage.getItem(storageKey);
+      const stored = localStorage.getItem(`${DRIVING_LOG_STORAGE_PREFIX}${reportId}`);
       if (stored) {
         return JSON.parse(stored);
       }
@@ -215,7 +337,7 @@ export const loadDrivingLogDraft = (
     }
   }
 
-  // Derive initial values
+  // Derive verified driver and vehicle identity
   const driverName = driverProfile.driverName || '윤태준';
   const carNumber =
     driverProfile.plateNumber ||
@@ -224,68 +346,74 @@ export const loadDrivingLogDraft = (
       ? `${driverProfile.carNumberFront} ${driverProfile.carNumberBack}`
       : '142호 7811');
 
-  const clientName =
-    driverProfile.clientName ||
-    (driverProfile.targetChatRoom ? driverProfile.targetChatRoom.replace(/(단톡방|의전|VIP).*/g, '').trim() : '') ||
-    '인터코스';
+  // Client name & passenger count from verified profile fields or empty
+  const clientName = driverProfile.clientName || '';
+  const passengerCount = driverProfile.passengerCount || '';
 
-  const passengerCount =
-    driverProfile.passengerCount ||
-    (driverProfile.passengerName ? driverProfile.passengerName.replace(/[^0-9명]/g, '') : '') ||
-    '9명';
-
-  // Check if odometer was recorded in vehicle inspection
-  let startKm = '154,725';
-  let endKm = '154,861';
-
-  if (typeof window !== 'undefined') {
-    try {
-      const inspectKey = `cockpit_vehicle_inspection_${driverProfile.vehicleNo?.trim() || 'default'}`;
-      const rawInspect = localStorage.getItem(inspectKey);
-      if (rawInspect) {
-        const parsed = JSON.parse(rawInspect);
-        if (parsed.pickupOdo) {
-          startKm = formatOdometer(parsed.pickupOdo);
-        }
-        if (parsed.returnOdo) {
-          endKm = formatOdometer(parsed.returnOdo);
-        }
-      }
-    } catch {
-      // ignore
-    }
-  }
-
+  // Check verified vehicle inspection odometer for today
+  const verifiedOdo = getVerifiedInspectionOdometer(driverProfile.vehicleNo, dateIso);
+  const startKm = verifiedOdo.startKm || '';
+  const endKm = verifiedOdo.endKm || '';
   const { formatted: distanceFormatted } = calculateDrivingDistance(startKm, endKm);
 
   return {
-    reportId: `report_${Date.now()}`,
+    reportId: reportId || `report_${Date.now()}`,
+    assignmentId: `ASSIGN-${dateIso.replace(/-/g, '')}-${Date.now().toString().slice(-4)}`,
     date: formatKoreanDate(new Date()),
     rawDate: dateIso,
     driverName,
     carNumber,
     clientName,
     passengerCount,
-    clockIn: '06:40',
-    clockOut: '21:50',
-    totalDutyHours: calculateDutyDuration('06:40', '21:50').formatted,
+    clockIn: '',
+    clockOut: '',
+    totalDutyHours: '0시간 0분',
     startKm,
     endKm,
     distanceKm: distanceFormatted,
-    stops: getReferenceDefaultStops(),
+    odoSource: verifiedOdo.isVerified ? 'inspection_verified' : undefined,
+    stops: [], // Fresh real report starts empty
     notes: '',
     status: 'draft',
+    isDemoFixture: false,
   };
 };
 
 /**
- * Save driving log draft to localStorage
+ * Save driving log draft to localStorage with unique report ID
  */
-export const saveDrivingLogDraft = (data: DrivingLogData, vehicleNo: string): boolean => {
+export const saveDrivingLogDraft = (data: DrivingLogData): boolean => {
   if (typeof window === 'undefined') return false;
   try {
-    const storageKey = `${DRIVING_LOG_STORAGE_KEY_PREFIX}${vehicleNo || 'default'}_${data.rawDate}`;
-    localStorage.setItem(storageKey, JSON.stringify({ ...data, savedAt: new Date().toISOString() }));
+    const payload: DrivingLogData = {
+      ...data,
+      status: 'draft', // Enforce draft status
+      savedAt: new Date().toISOString(),
+    };
+
+    // Save report payload
+    localStorage.setItem(`${DRIVING_LOG_STORAGE_PREFIX}${data.reportId}`, JSON.stringify(payload));
+
+    // Update index of drafts
+    const rawIndex = localStorage.getItem(DRIVING_LOG_INDEX_KEY);
+    const index: Array<{ reportId: string; date: string; clientName: string; updatedAt: string }> =
+      rawIndex ? JSON.parse(rawIndex) : [];
+
+    const existingIdx = index.findIndex((item) => item.reportId === data.reportId);
+    const indexEntry = {
+      reportId: data.reportId,
+      date: data.rawDate,
+      clientName: data.clientName || '미지정',
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (existingIdx >= 0) {
+      index[existingIdx] = indexEntry;
+    } else {
+      index.unshift(indexEntry);
+    }
+
+    localStorage.setItem(DRIVING_LOG_INDEX_KEY, JSON.stringify(index.slice(0, 30)));
     return true;
   } catch (e) {
     console.error('Failed to save driving log draft:', e);
