@@ -498,7 +498,7 @@ const DrivingLogModalContent: React.FC<{
             </div>
 
             {/* 오늘 운행 box (Emphasized cobalt blue) */}
-            <div className="min-w-[92px] shrink-0 bg-blue-50/80 border border-blue-200/90 rounded-xl p-2.5 text-center shadow-2xs">
+            <div className="min-w-[92px] shrink-0 bg-white border border-[#FFFFFF] rounded-xl p-2.5 text-center shadow-2xs">
               <div className="text-[11px] text-[#1E60F3] font-semibold">오늘 운행</div>
               <div className="text-xs sm:text-sm font-black text-[#1E60F3] mt-0.5">
                 {logData.distanceKm}
