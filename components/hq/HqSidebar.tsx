@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {
   LayoutDashboard,
   CalendarCheck,
+  Building2,
   Car,
   Users,
   FileSpreadsheet,
@@ -25,6 +26,7 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({ activeTab, onSelectTab }) 
   const menuItems = [
     { id: 'dashboard', label: '대시보드', icon: LayoutDashboard },
     { id: 'dispatch', label: '예약·배차 관리', icon: CalendarCheck },
+    { id: 'clients', label: '고객 관리', icon: Building2 },
     { id: 'vehicles', label: '차량 관리', icon: Car },
     { id: 'drivers', label: '기사 관리', icon: Users },
     { id: 'driving_logs', label: '운행일지 관리', icon: FileSpreadsheet },
