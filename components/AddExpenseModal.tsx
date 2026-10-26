@@ -23,7 +23,11 @@ import {
   Check,
   AlertCircle,
   Loader2,
+  RotateCw,
+  RotateCcw,
+  CheckCircle2,
 } from 'lucide-react';
+import { rotateImageDataUrl } from '@/utils/imageRotate';
 import {
   ExpenseItem,
   ExpenseCategoryKey,
@@ -131,6 +135,32 @@ const AddExpenseModalContent: React.FC<{
   const [isCategoryPickerOpen, setIsCategoryPickerOpen] = useState(false);
   const [isDateTimePickerOpen, setIsDateTimePickerOpen] = useState(false);
   const [isPhotoZoomOpen, setIsPhotoZoomOpen] = useState(false);
+
+  // Image rotation state
+  const [isRotating, setIsRotating] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 2500);
+  };
+
+  // Rotate receipt photo (+90 clockwise, -90 counter-clockwise)
+  const handleRotateImage = async (degrees: number = 90) => {
+    if (!receiptUrl || isRotating) return;
+    haptics.selection();
+    setIsRotating(true);
+    try {
+      const rotated = await rotateImageDataUrl(receiptUrl, degrees);
+      setReceiptUrl(rotated);
+      showToast(degrees > 0 ? '영수증을 90° 시계방향으로 회전했습니다.' : '영수증을 90° 반시계방향으로 회전했습니다.');
+    } catch (err) {
+      console.error('Failed to rotate receipt image:', err);
+      showToast('이미지 회전에 실패했습니다.');
+    } finally {
+      setIsRotating(false);
+    }
+  };
 
   // Validation & saving state
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -256,11 +286,25 @@ const AddExpenseModalContent: React.FC<{
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-700">영수증 사진</span>
               {receiptUrl && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleRotateImage(90)}
+                    disabled={isRotating}
+                    className="text-[11px] text-[#1E60F3] hover:text-blue-700 bg-blue-50 hover:bg-blue-100 disabled:opacity-50 px-2.5 py-1 rounded-full font-semibold flex items-center gap-1 transition-all active:scale-95 cursor-pointer"
+                    title="영수증 90° 시계방향 세우기"
+                  >
+                    {isRotating ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <RotateCw className="w-3.5 h-3.5" />
+                    )}
+                    <span>90° 세우기</span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => setIsPhotoZoomOpen(true)}
-                    className="text-[11px] text-[#1E60F3] font-semibold flex items-center gap-1 hover:underline"
+                    className="text-[11px] text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-full font-semibold flex items-center gap-1 transition-colors"
                   >
                     <ZoomIn className="w-3.5 h-3.5" />
                     <span>확대보기</span>
@@ -271,7 +315,7 @@ const AddExpenseModalContent: React.FC<{
                       haptics.lightTap();
                       setReceiptUrl(undefined);
                     }}
-                    className="text-[11px] text-red-500 font-semibold hover:underline"
+                    className="text-[11px] text-red-500 hover:text-red-600 hover:bg-red-50 px-2 py-1 rounded-full font-semibold transition-colors"
                   >
                     사진 삭제
                   </button>
@@ -280,22 +324,71 @@ const AddExpenseModalContent: React.FC<{
             </div>
 
             {receiptUrl ? (
-              <div className="relative w-full h-44 sm:h-52 bg-slate-900/5 rounded-2xl overflow-hidden border border-slate-200 flex items-center justify-center group shadow-2xs">
+              <div className="relative w-full h-48 sm:h-56 bg-slate-900/5 rounded-2xl overflow-hidden border border-slate-200 flex items-center justify-center group shadow-2xs">
+                {/* Image */}
                 <Image
                   src={receiptUrl}
                   alt="영수증 사진 미리보기"
                   fill
                   sizes="(max-width: 768px) 100vw, 500px"
-                  className="object-contain p-2"
+                  className="object-contain p-2 cursor-pointer transition-transform duration-200 group-hover:scale-[1.01]"
+                  onClick={() => setIsPhotoZoomOpen(true)}
                 />
-                {/* Floating change button */}
+
+                {/* Rotating Loading Overlay */}
+                {isRotating && (
+                  <div className="absolute inset-0 bg-white/75 backdrop-blur-xs flex flex-col items-center justify-center gap-2 z-20 animate-in fade-in duration-150">
+                    <Loader2 className="w-6 h-6 text-[#1E60F3] animate-spin" />
+                    <span className="text-xs font-bold text-slate-700">영수증 세우는 중...</span>
+                  </div>
+                )}
+
+                {/* Floating quick rotation pill controls on bottom-left */}
+                <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 z-10">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRotateImage(-90);
+                    }}
+                    disabled={isRotating}
+                    className="bg-black/70 hover:bg-black text-white text-xs font-semibold px-2.5 py-1.5 rounded-full flex items-center gap-1 backdrop-blur-xs shadow-md transition-all active:scale-95 disabled:opacity-40 cursor-pointer"
+                    title="반시계방향 90° 회전"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span className="text-[11px]">좌회전</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRotateImage(90);
+                    }}
+                    disabled={isRotating}
+                    className="bg-[#1E60F3]/90 hover:bg-[#1E60F3] text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 backdrop-blur-xs shadow-md transition-all active:scale-95 disabled:opacity-40 cursor-pointer"
+                    title="시계방향 90° 회전 (세우기)"
+                  >
+                    {isRotating ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <RotateCw className="w-3.5 h-3.5" />
+                    )}
+                    <span className="text-[11px]">90° 세우기</span>
+                  </button>
+                </div>
+
+                {/* Floating change button on bottom-right */}
                 <button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="absolute bottom-2.5 right-2.5 bg-black/75 hover:bg-black text-white text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5 backdrop-blur-xs shadow-md transition-all active:scale-95"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    fileInputRef.current?.click();
+                  }}
+                  className="absolute bottom-2.5 right-2.5 bg-black/70 hover:bg-black text-white text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5 backdrop-blur-xs shadow-md transition-all active:scale-95 z-10"
                 >
                   <Camera className="w-3.5 h-3.5" />
-                  <span>사진 변경</span>
+                  <span className="text-[11px]">사진 변경</span>
                 </button>
               </div>
             ) : (
@@ -699,24 +792,79 @@ const AddExpenseModalContent: React.FC<{
 
         {/* Modal: Full Receipt Photo Zoom */}
         {isPhotoZoomOpen && receiptUrl && (
-          <div className="fixed inset-0 z-70 flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in duration-200">
-            <button
-              type="button"
-              onClick={() => setIsPhotoZoomOpen(false)}
-              className="absolute top-4 right-4 p-2 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-colors"
-              aria-label="닫기"
-            >
-              <X className="w-6 h-6" />
-            </button>
-            <div className="relative w-full max-w-lg h-[80vh]">
+          <div className="fixed inset-0 z-70 flex flex-col items-center justify-between bg-black/95 backdrop-blur-md p-4 animate-in fade-in duration-200">
+            {/* Top Toolbar */}
+            <div className="w-full max-w-2xl flex items-center justify-between text-white py-2 px-1 z-20">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold tracking-tight text-white/95">영수증 원본 확대</span>
+                <span className="text-xs text-white/50 hidden sm:inline">누운 영수증을 바로 세울 수 있습니다</span>
+              </div>
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleRotateImage(-90)}
+                  disabled={isRotating}
+                  className="bg-white/15 hover:bg-white/25 active:scale-95 disabled:opacity-40 text-white text-xs font-semibold px-3 py-2 rounded-full flex items-center gap-1.5 backdrop-blur-xs transition-all cursor-pointer"
+                  title="반시계방향 90° 회전"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  <span className="hidden sm:inline">좌 90°</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleRotateImage(90)}
+                  disabled={isRotating}
+                  className="bg-[#1E60F3] hover:bg-blue-600 active:scale-95 disabled:opacity-40 text-white text-xs font-bold px-3.5 py-2 rounded-full flex items-center gap-1.5 shadow-lg transition-all cursor-pointer"
+                  title="시계방향 90° 회전 (세우기)"
+                >
+                  {isRotating ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <RotateCw className="w-4 h-4" />
+                  )}
+                  <span>90° 세우기</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsPhotoZoomOpen(false)}
+                  className="p-2 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-colors ml-1"
+                  aria-label="닫기"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Centered Image */}
+            <div className="relative w-full max-w-2xl flex-1 my-2">
               <Image
                 src={receiptUrl}
                 alt="영수증 원본 확대보기"
                 fill
-                sizes="(max-width: 768px) 100vw, 800px"
+                sizes="(max-width: 768px) 100vw, 900px"
                 className="object-contain"
               />
+
+              {isRotating && (
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex flex-col items-center justify-center gap-2 z-30 animate-in fade-in duration-150">
+                  <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+                  <span className="text-sm font-semibold text-white">회전 중...</span>
+                </div>
+              )}
             </div>
+
+            {/* Bottom Hint */}
+            <div className="text-center text-white/50 text-xs py-1">
+              가로로 누운 영수증은 상단 &apos;90° 세우기&apos; 버튼으로 바르게 세울 수 있습니다.
+            </div>
+          </div>
+        )}
+
+        {/* Floating Toast Notification */}
+        {toastMessage && (
+          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-60 bg-slate-900/90 text-white text-xs font-semibold px-4 py-2.5 rounded-full shadow-xl flex items-center gap-2 backdrop-blur-sm animate-in fade-in slide-in-from-bottom-2 duration-150 pointer-events-none">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{toastMessage}</span>
           </div>
         )}
       </div>
