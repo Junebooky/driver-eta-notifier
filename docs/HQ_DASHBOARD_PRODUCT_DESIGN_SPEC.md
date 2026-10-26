@@ -146,3 +146,16 @@ This design is successful if an HQ manager can answer **in seconds**:
 5. Which driving logs, expenses, and receipts await approval?
 
 **The dashboard exists to prevent forgotten dispatches and reduce retyping, not to show static ornamental metrics.**
+
+## 8. Gmail customer inbox inside HQ (new owner request — 2026-10-26)
+
+**New first-class feature:** [Gmail Inbox Issue #20](https://github.com/Junebooky/driver-eta-notifier/issues/20). The manager receives VIP booking enquiries in Gmail and wants to check them **inside HQ**, without keeping a separate browser tab open.
+
+**A03:** Keep the already-selected dashboard layout as the base. Add a clear entrance to `고객 이메일`: compare (a) a small sidebar entry and (b) `예약·배차 관리` → inbox tab, with unread badge and compact recent-unread preview accessible from dashboard. Choose a discoverable option without redesigning the seven KPI cards. Design a desktop read-only Gmail inbox with unread dots, sender, subject, time, safe snippet, search, filters and refresh/sync time, and a message/thread detail drawer. State `Google 계정 연결`, `연결 해제`, disconnected/error/expired permission/empty/loading. Buttons: `Gmail에서 열기`, future `예약 초안 만들기` (extract fields for manager review ONLY; never automatically dispatch).
+
+**Do not confuse channels:** This Gmail panel is **inbound CUSTOMER → HQ correspondence**. `배차 발송` still sends assigned schedules **HQ → DRIVER**; `고객 안내자료 발송` still sends the approved brochure **HQ → CUSTOMER** as a separately authorized outbound workflow. Gmail connection must not automatically email, delete, modify or mark source messages as read.
+
+**Backend compliance gate:** A02 (only after approval) must research Gmail OAuth restricted `gmail.readonly` permissions, Google's verification/security-assessment requirements, Workspace internal vs external audience, secure tokens, manager-only access and explicit mailbox sharing, minimal retention, sanitized email HTML and remote image tracking precautions. The Gmail website itself should not be embedded as an iframe; design our own read-only viewer using the Gmail API. Optional Gmail watch/PubSub sync is later; for MVP offer manual refresh and accurately labeled last-sync time. Prefer a dedicated business/company inbox or business-specific label, not importing the owner's entire private mailbox to all staff.
+
+**Deliverable update:** In addition to the five UI-image sets in §6, A03 should show a **sixth** supporting view: `고객 이메일` inbox/message detail and `예약 초안 만들기` action. This is design backlog only; no real Google account connection has been authorized.
+
