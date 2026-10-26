@@ -1381,6 +1381,8 @@ export default function Home() {
               onOpenGasModal={() => setIsGasModalOpen(true)}
               onOpenPresetModal={handleOpenAddModal}
               onSaveRouteAsPreset={handleSaveRouteAsPreset}
+              onSetCurrentLocation={requestGpsLocation}
+              isLocatingGps={isLocating}
             />
 
             {/* 2. Standalone 7-Button Quick Action Bar (4 Top / 3 Centered) */}
