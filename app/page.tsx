@@ -657,6 +657,7 @@ export default function Home() {
 
   const [activeTab, setActiveTab] = useState<'drive' | 'schedule'>('drive');
   const [reportMode, setReportMode] = useState<ReportMode>('DEPARTURE');
+  const [activeDisplayedReportText, setActiveDisplayedReportText] = useState<string>('');
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isOnboarding, setIsOnboarding] = useState(false);
   const [onboardingStage, setOnboardingStage] = useState<'splash' | 'sheet' | null>(null);
@@ -1219,12 +1220,15 @@ export default function Home() {
     []
   );
 
-  // Real-time dynamic report text generated from current state
-  const reportPreviewText = useMemo(() => {
-    const effectiveWaypoints = isAdminRoute && adminWaypoints.length > 0
+  // Resolved effective waypoints considering admin and user inputs
+  const effectiveWaypoints = useMemo(() => {
+    return isAdminRoute && adminWaypoints.length > 0
       ? adminWaypoints
       : (waypoints && waypoints.length > 0 ? waypoints : []);
+  }, [isAdminRoute, adminWaypoints, waypoints]);
 
+  // Real-time dynamic report text generated from current state
+  const reportPreviewText = useMemo(() => {
     return generateReportText({
       mode: reportMode,
       profile,
@@ -1235,7 +1239,7 @@ export default function Home() {
       distanceKm: routeEstimate?.distanceKm,
       durationMinutes: routeEstimate?.durationMinutes,
     });
-  }, [reportMode, profile, origin, destination, isAdminRoute, adminWaypoints, waypoints, routeEstimate]);
+  }, [reportMode, profile, origin, destination, effectiveWaypoints, routeEstimate]);
 
   // Pre-initialization & Onboarding Splash Gate: completely blocks dashboard FOUC on initial mount
   if (!isInitialized || (isOnboarding && onboardingStage === 'splash')) {
@@ -1426,11 +1430,19 @@ export default function Home() {
               onOpenTimePicker={() => setIsTimePickerOpen(true)}
             />
 
-            {/* 4. Report Template Selector */}
+            {/* 4. Report Template Selector with Globe English Translation */}
             <ReportTemplateSelector
               currentMode={reportMode}
               onSelectMode={(mode) => setReportMode(mode)}
               reportPreviewText={reportPreviewText}
+              profile={profile}
+              origin={origin}
+              destination={destination}
+              waypoints={effectiveWaypoints}
+              etaFormatted={routeEstimate?.etaFormatted}
+              onActiveReportTextChange={(text) => {
+                setActiveDisplayedReportText(text);
+              }}
             />
 
             {/* 5. 1-Sec Fast Pass & Kakao Share Action Panel */}
@@ -1442,7 +1454,7 @@ export default function Home() {
               adminWaypoints={adminWaypoints}
               isAdminRoute={isAdminRoute}
               routeEstimate={routeEstimate}
-              reportText={reportPreviewText}
+              reportText={activeDisplayedReportText || reportPreviewText}
               targetChatRoom={profile.targetChatRoom}
               profile={profile}
             />
