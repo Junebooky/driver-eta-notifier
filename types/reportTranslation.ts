@@ -1,6 +1,6 @@
 import { ReportMode } from './index';
 
-export type TranslationSource = 'approved' | 'cache' | 'gemini' | 'fallback';
+export type TranslationSource = 'approved' | 'cache' | 'google' | 'fallback';
 
 export interface PlaceTranslationRecord {
   place_id?: string;

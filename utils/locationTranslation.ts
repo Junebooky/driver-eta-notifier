@@ -23,6 +23,7 @@ export const COMPANY_APPROVED_ALIASES: Record<string, string> = {
   '인천공항 t1': 'Incheon Airport T1',
   '인천공항t1': 'Incheon Airport T1',
   '인천국제공항 제1여객터미널': 'Incheon Airport T1',
+  '인천국제공항제1여객터미널': 'Incheon Airport T1',
   '인천공항 제1여객터미널': 'Incheon Airport T1',
   '인천공항 1터미널': 'Incheon Airport T1',
   '인천공항1터미널': 'Incheon Airport T1',
@@ -30,6 +31,7 @@ export const COMPANY_APPROVED_ALIASES: Record<string, string> = {
   '인천공항 t2': 'Incheon Airport T2',
   '인천공항t2': 'Incheon Airport T2',
   '인천국제공항 제2여객터미널': 'Incheon Airport T2',
+  '인천국제공항제2여객터미널': 'Incheon Airport T2',
   '인천공항 제2여객터미널': 'Incheon Airport T2',
   '인천공항 2터미널': 'Incheon Airport T2',
   '인천공항2터미널': 'Incheon Airport T2',
@@ -125,6 +127,48 @@ const memoryCache = new Map<string, PlaceTranslationRecord>();
 const inFlightRequests = new Map<string, Promise<PlaceTranslationRecord>>();
 
 /**
+ * Decode HTML entities commonly returned by translation APIs
+ */
+export function decodeHtmlEntities(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&#x2F;/gi, '/')
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCharCode(parseInt(code, 16)));
+}
+
+/**
+ * Conservative shortening rules for English place names (Task 3)
+ * Avoids long official strings (e.g. Incheon International Airport Terminal 1 -> Incheon Airport T1)
+ * while preserving branches, hotel identities, and medical centers to avoid ambiguity.
+ */
+export function shortenEnglishPlaceName(translated: string): string {
+  if (!translated) return '';
+  let text = decodeHtmlEntities(translated).trim();
+
+  // Airport abbreviation rules
+  text = text
+    .replace(/Incheon International Airport\s*\(?Terminal\s*1\)?/gi, 'Incheon Airport T1')
+    .replace(/Incheon International Airport\s*\(?Terminal\s*2\)?/gi, 'Incheon Airport T2')
+    .replace(/Incheon Airport\s*\(?Terminal\s*1\)?/gi, 'Incheon Airport T1')
+    .replace(/Incheon Airport\s*\(?Terminal\s*2\)?/gi, 'Incheon Airport T2')
+    .replace(/Incheon International Airport/gi, 'Incheon Airport')
+    .replace(/Gimpo International Airport/gi, 'Gimpo Airport')
+    .replace(/\bTerminal\s*1\b/gi, 'T1')
+    .replace(/\bTerminal\s*2\b/gi, 'T2')
+    .replace(/Josun Palace Seoul Gangnam/gi, 'Josun Palace')
+    .replace(/Josun Palace Gangnam/gi, 'Josun Palace');
+
+  return text.trim();
+}
+
+/**
  * Normalize place name for lookup
  */
 export function normalizePlaceName(name: string): string {
@@ -138,11 +182,10 @@ export function normalizePlaceName(name: string): string {
 
 /**
  * Check if the address looks like a private home/apartment unit
- * Task 5: "Don't put private home addresses in a shared public/company-wide translation dictionary."
+ * Task 5: "Never store private home addresses in a shared global dictionary."
  */
 export function isPrivateAddress(text?: string): boolean {
   if (!text) return false;
-  // Match patterns like "101동 1204호", "3층 302호", "아파트 102동", "빌라 201호"
   const privatePatterns = [
     /\d+동\s*\d+호/,
     /\d+호/,
@@ -247,12 +290,15 @@ if (typeof window !== 'undefined') {
 
 /**
  * Reusable function to resolve short English place name
- * Implements Priority 1 (Aliases) -> Priority 2 (Cache) -> Priority 3 (Gemini Server API)
+ * Priority order:
+ * 1. Company-approved English alias
+ * 2. Existing saved or cached English name
+ * 3. Google Cloud Translation API (via server-side endpoint)
+ * 4. Original place name if translation fails
  */
 export async function getShortEnglishPlaceName(
   place: LocationPreset | string | PlaceTranslationRequest
 ): Promise<PlaceTranslationRecord> {
-  // Normalize input into PlaceTranslationRequest
   const req: PlaceTranslationRequest =
     typeof place === 'string'
       ? { name: place, shortName: place }
@@ -284,7 +330,7 @@ export async function getShortEnglishPlaceName(
   }
 
   // -------------------------------------------------------------
-  // Priority 2: Existing English names / Cache
+  // Priority 2: Existing saved or cached English names
   // -------------------------------------------------------------
   const cacheKey = getPlaceCacheKey(req);
   const cached = memoryCache.get(cacheKey) || memoryCache.get(normalizePlaceName(displayName));
@@ -302,7 +348,7 @@ export async function getShortEnglishPlaceName(
   }
 
   // -------------------------------------------------------------
-  // Priority 3: Gemini fallback via server-side API
+  // Priority 3: Google Cloud Translation API fallback via server
   // -------------------------------------------------------------
   const fetchPromise = (async (): Promise<PlaceTranslationRecord> => {
     try {
@@ -322,7 +368,7 @@ export async function getShortEnglishPlaceName(
           place_id: req.id,
           name_ko: displayName,
           name_en_short: data.name_en_short,
-          translation_source: data.translation_source || 'gemini',
+          translation_source: data.translation_source || 'google',
           last_verified_at: data.last_verified_at || now,
           is_uncertain: Boolean(data.is_uncertain),
         };
@@ -332,7 +378,7 @@ export async function getShortEnglishPlaceName(
       throw new Error('Invalid translation response');
     } catch (err) {
       console.warn('[Translation] Fallback triggered for place:', displayName, err);
-      // Fallback: Preserve original place name and keep report usable
+      // Priority 4: Original place name if translation fails
       return {
         place_id: req.id,
         name_ko: displayName,
@@ -352,7 +398,7 @@ export async function getShortEnglishPlaceName(
 
 /**
  * Convert ETA to 12-hour format with AM/PM (e.g. 7:34 PM, 11:20 AM)
- * Requirement: "Display ETA in natural English 12-hour format with AM/PM, preserving the actual ETA."
+ * Requirement: "ETA uses 12-hour English time with AM/PM."
  */
 export function formatEta12Hour(etaFormatted?: string): string {
   if (!etaFormatted) {
@@ -389,9 +435,7 @@ export function formatEta12Hour(etaFormatted?: string): string {
 
 /**
  * Format Vehicle No. for English report
- * Requirement:
- * - Vehicle numbers must remain unchanged, including Korean characters (e.g. 116허 1514).
- * - Strip '호차' prefix if present.
+ * Requirement: "Vehicle numbers remain unchanged, including Korean characters."
  */
 export function getReportVehicleNo(profile?: DriverProfile): string {
   if (!profile) return '116허 1514';
@@ -406,24 +450,15 @@ export function getReportVehicleNo(profile?: DriverProfile): string {
 /**
  * Fixed English Report Templates
  *
- * Departure (출발):
+ * Departure (출발)
  * • Vehicle No.: 116허 1514
  * • Route: Josun Palace → Incheon Airport T1
  * • ETA: 7:34 PM
  *
- * Arrival (도착):
+ * Arrival (도착)
  * • Vehicle No.: 116허 1514
  * • Destination: Incheon Airport T1
  * • Status: Arrived
- *
- * Formatting rules:
- * - Every line MUST start with • , including Vehicle No.
- * - Keep these keys exactly: Vehicle No.: Route: ETA: Destination: Status:
- * - Keep Arrived fixed for arrival reports.
- * - Vehicle numbers must remain unchanged, including Korean characters.
- * - Use → between departure and destination.
- * - Display ETA in natural English 12-hour format with AM/PM, preserving actual ETA.
- * - Do not add unnecessary sentences, explanations, or extra fields.
  */
 export function generateEnglishReportText({
   vehicleNo = '116허 1514',

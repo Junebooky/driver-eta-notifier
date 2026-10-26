@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { ReportMode, LocationPreset, DriverProfile } from '@/types';
 import { FileText, Play, Square, Copy, Check, Globe, Loader2 } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
@@ -8,6 +8,7 @@ import {
   getShortEnglishPlaceName,
   generateEnglishReportText,
   getReportVehicleNo,
+  lookupApprovedAlias,
 } from '@/utils/locationTranslation';
 
 interface ReportTemplateSelectorProps {
@@ -22,6 +23,11 @@ interface ReportTemplateSelectorProps {
   etaFormatted?: string;
   // Real-time synchronization with ActionPanel / parent state
   onActiveReportTextChange?: (text: string, language: 'ko' | 'en') => void;
+}
+
+interface PlaceCacheEntry {
+  key: string;
+  enName: string;
 }
 
 export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
@@ -39,45 +45,87 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
   const [language, setLanguage] = useState<'ko' | 'en'>('ko');
   const [isTranslating, setIsTranslating] = useState(false);
 
-  // Cached English place translations to prevent redundant requests
-  const [translatedOrigin, setTranslatedOrigin] = useState<string>('');
-  const [translatedDest, setTranslatedDest] = useState<string>('');
-  const [translatedWaypoints, setTranslatedWaypoints] = useState<string[]>([]);
+  // Cached English place translations with key validation to prevent displaying old places
+  const [cachedOrigin, setCachedOrigin] = useState<PlaceCacheEntry | null>(null);
+  const [cachedDest, setCachedDest] = useState<PlaceCacheEntry | null>(null);
+  const [cachedWaypoints, setCachedWaypoints] = useState<string[]>([]);
 
   const isDeparture = currentMode === 'DEPARTURE';
 
-  // Helper to re-generate the English text using current cached places & mode
-  const buildEnglishText = useCallback(
-    (originEn?: string, destEn?: string, wpsEn?: string[]) => {
-      const vNo = getReportVehicleNo(profile);
-      const oEn =
-        originEn ||
-        translatedOrigin ||
-        (typeof origin === 'string' ? origin : origin?.shortName || origin?.name || 'Current Location');
-      const dEn =
-        destEn ||
-        translatedDest ||
-        (typeof destination === 'string' ? destination : destination?.shortName || destination?.name || 'Destination');
-      const wpList = wpsEn !== undefined ? wpsEn : translatedWaypoints;
+  // Compute stable keys for origin and destination
+  const currentOriginKey =
+    typeof origin === 'string'
+      ? origin
+      : origin?.id || origin?.shortName || origin?.name || 'Current Location';
+  const currentDestKey =
+    typeof destination === 'string'
+      ? destination
+      : destination?.id || destination?.shortName || destination?.name || 'Destination';
 
-      return generateEnglishReportText({
-        vehicleNo: vNo,
-        originEn: oEn,
-        destinationEn: dEn,
-        waypointsEn: wpList,
-        etaFormatted,
-        mode: currentMode,
-      });
-    },
-    [profile, translatedOrigin, origin, translatedDest, destination, translatedWaypoints, etaFormatted, currentMode]
-  );
+  const prevOriginKeyRef = useRef(currentOriginKey);
+  const prevDestKeyRef = useRef(currentDestKey);
+
+  // Helper to re-generate the English text using current cached places & mode
+  const buildEnglishText = useCallback(() => {
+    const vNo = getReportVehicleNo(profile);
+
+    // Resolve Origin English Name: Check key match, then approved alias, then raw
+    let originEn = '';
+    if (cachedOrigin && cachedOrigin.key === currentOriginKey) {
+      originEn = cachedOrigin.enName;
+    } else {
+      const placeReq = typeof origin === 'string'
+        ? { name: origin, shortName: origin }
+        : origin ? { name: origin.name, shortName: origin.shortName, id: origin.id } : { name: '현 위치' };
+      const approvedO = lookupApprovedAlias(placeReq);
+      originEn =
+        approvedO ||
+        (typeof origin === 'string' ? origin : origin?.shortName || origin?.name || 'Current Location');
+    }
+
+    // Resolve Destination English Name: Check key match, then approved alias, then raw
+    let destEn = '';
+    if (cachedDest && cachedDest.key === currentDestKey) {
+      destEn = cachedDest.enName;
+    } else {
+      const placeReq = typeof destination === 'string'
+        ? { name: destination, shortName: destination }
+        : destination ? { name: destination.name, shortName: destination.shortName, id: destination.id } : { name: '목적지' };
+      const approvedD = lookupApprovedAlias(placeReq);
+      destEn =
+        approvedD ||
+        (typeof destination === 'string'
+          ? destination
+          : destination?.shortName || destination?.name || 'Destination');
+    }
+
+    return generateEnglishReportText({
+      vehicleNo: vNo,
+      originEn,
+      destinationEn: destEn,
+      waypointsEn: cachedWaypoints,
+      etaFormatted,
+      mode: currentMode,
+    });
+  }, [
+    profile,
+    cachedOrigin,
+    currentOriginKey,
+    origin,
+    cachedDest,
+    currentDestKey,
+    destination,
+    cachedWaypoints,
+    etaFormatted,
+    currentMode,
+  ]);
 
   // Dynamic English text computed during render
   const englishReportText = useMemo(() => {
     return buildEnglishText();
   }, [buildEnglishText]);
 
-  // Current active display text
+  // Current active display text (Task 1: The Copy button always copies the exact text currently displayed)
   const displayedReportText = language === 'en' ? englishReportText : reportPreviewText;
 
   // Propagate active text change to parent when displayedReportText changes
@@ -85,14 +133,55 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
     onActiveReportTextChange?.(displayedReportText, language);
   }, [displayedReportText, language, onActiveReportTextChange]);
 
+  // Invalidate old translations when departure/destination changes while in English mode (Task 6)
+  useEffect(() => {
+    const originChanged = currentOriginKey !== prevOriginKeyRef.current;
+    const destChanged = currentDestKey !== prevDestKeyRef.current;
+
+    if (originChanged) {
+      prevOriginKeyRef.current = currentOriginKey;
+    }
+    if (destChanged) {
+      prevDestKeyRef.current = currentDestKey;
+    }
+
+    // Only fetch if in English mode and place changed
+    if ((originChanged || destChanged) && language === 'en') {
+      let isMounted = true;
+      setIsTranslating(true);
+
+      Promise.all([
+        getShortEnglishPlaceName(origin || '현 위치'),
+        getShortEnglishPlaceName(destination || '목적지'),
+      ])
+        .then(([oRec, dRec]) => {
+          if (isMounted) {
+            setCachedOrigin({ key: currentOriginKey, enName: oRec.name_en_short });
+            setCachedDest({ key: currentDestKey, enName: dRec.name_en_short });
+          }
+        })
+        .catch((err) => {
+          console.warn('[ReportTemplateSelector] Re-translation error:', err);
+        })
+        .finally(() => {
+          if (isMounted) {
+            setIsTranslating(false);
+          }
+        });
+
+      return () => {
+        isMounted = false;
+      };
+    }
+  }, [currentOriginKey, currentDestKey, language, origin, destination]);
+
   // Language Toggle Handler (Globe button)
   const handleToggleLanguage = async () => {
     haptics.lightTap();
 
     if (language === 'en') {
-      // Toggle back to Korean instantly without network call
+      // Task 6: Switching back to Korean must not trigger API requests
       setLanguage('ko');
-      onActiveReportTextChange?.(reportPreviewText, 'ko');
       return;
     }
 
@@ -114,14 +203,13 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
         wpRecords = resolvedWps.map((r) => r.name_en_short);
       }
 
-      setTranslatedOrigin(originRecord.name_en_short);
-      setTranslatedDest(destRecord.name_en_short);
-      setTranslatedWaypoints(wpRecords);
-
+      setCachedOrigin({ key: currentOriginKey, enName: originRecord.name_en_short });
+      setCachedDest({ key: currentDestKey, enName: destRecord.name_en_short });
+      setCachedWaypoints(wpRecords);
       setLanguage('en');
     } catch (err) {
       console.warn('[ReportTemplateSelector] Translation fallback triggered:', err);
-      // Fallback: activate English mode with fallback names
+      // Fallback: activate English mode with preserved names
       setLanguage('en');
     } finally {
       setIsTranslating(false);
@@ -222,15 +310,15 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
 
           {/* Action Buttons: Globe (left) & Copy (right) */}
           <div className="flex items-center space-x-1.5">
-            {/* Task 1: Globe Button immediately to the LEFT of the Copy button */}
+            {/* Task 1: Globe Button immediately to the LEFT of the Copy button with circular button style */}
             <button
               type="button"
               onClick={handleToggleLanguage}
               disabled={isTranslating}
-              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-90 cursor-pointer ${
+              className={`w-8 h-8 rounded-full border flex items-center justify-center transition-all active:scale-90 cursor-pointer ${
                 language === 'en'
-                  ? 'bg-blue-50 hover:bg-blue-100 text-[#1E60F3] border border-blue-200/80 shadow-[0_2px_6px_rgba(30,96,243,0.15)]'
-                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                  ? 'bg-blue-50 hover:bg-blue-100 text-[#1E60F3] border-blue-200/80 shadow-[0_2px_6px_rgba(30,96,243,0.15)]'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-200/80'
               }`}
               title={language === 'en' ? '한국어 보고서로 전환' : 'Switch to English Report'}
               aria-label="보고서 언어 전환"
@@ -242,11 +330,11 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
               )}
             </button>
 
-            {/* Existing Copy Button */}
+            {/* Existing Copy Button with circular button style */}
             <button
               type="button"
               onClick={handleCopyMinimal}
-              className="w-8 h-8 rounded-lg flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all active:scale-90 cursor-pointer"
+              className="w-8 h-8 rounded-full border border-slate-200/80 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all active:scale-90 cursor-pointer"
               title="양식 복사"
               aria-label="양식 복사"
             >
