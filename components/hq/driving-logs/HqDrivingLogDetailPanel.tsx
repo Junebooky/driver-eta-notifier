@@ -166,46 +166,63 @@ export const HqDrivingLogDetailPanel: React.FC<HqDrivingLogDetailPanelProps> = (
             등록된 운행 경로 일정이 없습니다.
           </div>
         ) : (
-          <div className="relative pl-6 py-1 space-y-3 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-blue-200">
+          <div className="relative flex flex-col py-0.5">
             {log.stops.map((stop, index) => {
               const isFirst = index === 0;
               const isLast = index === log.stops.length - 1;
 
               return (
-                <div key={stop.id || index} className="relative group text-xs">
-                  {/* Timeline Bullet Node */}
-                  <div
-                    className={`absolute -left-6 top-1 w-2.5 h-2.5 rounded-full border-2 transition-all ${
-                      isFirst || isLast
-                        ? 'bg-[#1E60F3] border-white ring-2 ring-blue-100'
-                        : 'bg-white border-[#1E60F3] ring-1 ring-blue-50'
-                    }`}
-                  />
+                <div
+                  key={stop.id || index}
+                  className="relative flex items-center gap-2.5 text-xs py-1.5 group min-h-[30px]"
+                >
+                  {/* Dedicated Timeline Axis: vertical line & circle on the exact same axis */}
+                  <div className="relative flex flex-col items-center justify-center w-4 self-stretch shrink-0">
+                    {/* Top line segment */}
+                    {index > 0 && (
+                      <div className="absolute top-0 bottom-1/2 left-1/2 -translate-x-1/2 w-[2px] bg-blue-200 pointer-events-none" />
+                    )}
+                    {/* Bottom line segment */}
+                    {index < log.stops.length - 1 && (
+                      <div className="absolute top-1/2 bottom-0 left-1/2 -translate-x-1/2 w-[2px] bg-blue-200 pointer-events-none" />
+                    )}
 
-                  {/* Stop Information */}
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-baseline gap-2.5 min-w-0">
-                      <span className="font-bold text-slate-800 shrink-0 tabular-nums">
-                        {stop.time}
-                      </span>
-                      <span className="font-semibold text-slate-800 truncate" title={stop.place}>
-                        {stop.place}
-                      </span>
-                    </div>
-
-                    {/* Tag / Note */}
-                    {stop.note && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 shrink-0">
-                        {stop.note}
-                      </span>
+                    {/* Circle Node placed directly on the line */}
+                    {isFirst || isLast ? (
+                      <div className="relative z-10 w-3 h-3 rounded-full bg-blue-100 ring-2 ring-white flex items-center justify-center shrink-0">
+                        <div className="w-1.5 h-1.5 rounded-full bg-[#1E60F3]" />
+                      </div>
+                    ) : (
+                      <div className="relative z-10 w-2.5 h-2.5 rounded-full bg-white border-2 border-[#1E60F3] ring-2 ring-white shrink-0" />
                     )}
                   </div>
 
-                  {stop.address && (
-                    <div className="text-[10px] text-slate-400 mt-0.5 truncate pl-11">
-                      {stop.address}
+                  {/* Stop Information */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-baseline gap-2.5 min-w-0">
+                        <span className="font-bold text-slate-800 shrink-0 tabular-nums w-11">
+                          {stop.time}
+                        </span>
+                        <span className="font-semibold text-slate-800 truncate" title={stop.place}>
+                          {stop.place}
+                        </span>
+                      </div>
+
+                      {/* Tag / Note */}
+                      {stop.note && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 shrink-0">
+                          {stop.note}
+                        </span>
+                      )}
                     </div>
-                  )}
+
+                    {stop.address && (
+                      <div className="text-[10px] text-slate-400 mt-0.5 truncate pl-13.5">
+                        {stop.address}
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })}

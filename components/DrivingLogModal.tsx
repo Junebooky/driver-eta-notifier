@@ -581,15 +581,7 @@ const DrivingLogModalContent: React.FC<{
 
           {/* Timeline List or Empty State */}
           {logData.stops.length > 0 ? (
-            <div className="relative pl-1 pr-1 space-y-3">
-              {/* Continuous thin vertical line */}
-              {logData.stops.length > 1 && (
-                <div
-                  className="absolute left-[5.4rem] sm:left-[6.1rem] top-3 bottom-3 w-[2px] bg-blue-100 pointer-events-none"
-                  style={{ zIndex: 0 }}
-                />
-              )}
-
+            <div className="relative pl-1 pr-1 flex flex-col">
               {logData.stops.map((stop, idx) => {
                 // Check timeline consistency against duty hours
                 const consistency = checkStopTimelineConsistency(
@@ -601,7 +593,7 @@ const DrivingLogModalContent: React.FC<{
                 return (
                   <div
                     key={stop.id}
-                    className="relative flex items-center justify-between text-xs sm:text-sm py-0.5 group z-10"
+                    className="relative flex items-center justify-between text-xs sm:text-sm py-2 group z-10"
                   >
                     <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
                       {/* Number Badge */}
@@ -610,15 +602,27 @@ const DrivingLogModalContent: React.FC<{
                       </span>
 
                       {/* Time */}
-                      <span className="font-semibold text-slate-700 w-11 sm:w-13 shrink-0 text-left">
+                      <span className="font-semibold text-slate-700 w-11 sm:w-12 shrink-0 text-left tabular-nums">
                         {stop.time}
                       </span>
 
-                      {/* Blue Connected Dot */}
-                      <div className="w-2.5 h-2.5 rounded-full bg-[#1E60F3] shrink-0 ring-4 ring-white" />
+                      {/* Dedicated Timeline Axis: vertical line & circle on the exact same axis */}
+                      <div className="relative flex flex-col items-center justify-center w-4 self-stretch shrink-0">
+                        {/* Top line segment */}
+                        {idx > 0 && (
+                          <div className="absolute top-0 bottom-1/2 left-1/2 -translate-x-1/2 w-[2px] bg-blue-200 pointer-events-none" />
+                        )}
+                        {/* Bottom line segment */}
+                        {idx < logData.stops.length - 1 && (
+                          <div className="absolute top-1/2 bottom-0 left-1/2 -translate-x-1/2 w-[2px] bg-blue-200 pointer-events-none" />
+                        )}
+
+                        {/* Blue Connected Dot right on the vertical line */}
+                        <div className="relative z-10 w-2.5 h-2.5 rounded-full bg-[#1E60F3] ring-4 ring-white shrink-0" />
+                      </div>
 
                       {/* Location Place Name & Inconsistency Warning */}
-                      <div className="min-w-0 flex-1 pl-1">
+                      <div className="min-w-0 flex-1 pl-0.5">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="font-bold text-slate-800 truncate block">{stop.place}</span>
                           {!consistency.isConsistent && (
