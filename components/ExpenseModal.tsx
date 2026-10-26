@@ -18,7 +18,10 @@ import {
   CheckCircle2,
   Camera,
   ReceiptText,
+  Send,
+  Loader2,
 } from 'lucide-react';
+import { submitDriverExpensesToHq } from '@/utils/expenseHqStorage';
 import {
   ExpenseItem,
   ExpenseSortOption,
@@ -68,6 +71,10 @@ const ExpenseModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) => 
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isBreakdownOpen, setIsBreakdownOpen] = useState(false);
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
+
+  // HQ Dashboard Submission State
+  const [isSubmittingToHq, setIsSubmittingToHq] = useState(false);
+  const [hqSubmitSuccessToast, setHqSubmitSuccessToast] = useState<string | null>(null);
 
   // Toast feedback
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -425,7 +432,87 @@ const ExpenseModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) => 
           </div>
         </section>
 
-        {/* 5. Expense List Section */}
+        {/* 5. HQ Dashboard Submission Action Card */}
+        <section className="bg-gradient-to-r from-blue-50/80 via-indigo-50/40 to-blue-50/80 border border-blue-200/90 rounded-2xl p-4 sm:p-4.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#1E60F3] text-white flex items-center justify-center shadow-xs shrink-0">
+              <Send className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h4 className="text-sm font-extrabold text-slate-900 tracking-tight">
+                  본사(HQ) 대시보드로 경비 제출
+                </h4>
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    displayedItems.filter((i) => i.hqStatus !== '승인 완료' && i.hqStatus !== '검수 대기').length > 0
+                      ? 'bg-amber-100 text-amber-800'
+                      : 'bg-emerald-100 text-emerald-800'
+                  }`}
+                >
+                  {displayedItems.filter((i) => i.hqStatus !== '승인 완료' && i.hqStatus !== '검수 대기').length > 0
+                    ? `미전송 ${displayedItems.filter((i) => i.hqStatus !== '승인 완료' && i.hqStatus !== '검수 대기').length}건`
+                    : '전체 제출 완료'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5 truncate">
+                등록된 {displayedItems.length}건 ({formatKRW(totalAmount)})의 영수증과 결제 내역을 본사 검수 시스템으로 전송합니다.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (displayedItems.length === 0 || isSubmittingToHq) return;
+              haptics.success();
+              setIsSubmittingToHq(true);
+
+              const result = submitDriverExpensesToHq(
+                displayedItems,
+                '윤태준',
+                '116허 1514',
+                '카니발 하이리무진'
+              );
+
+              const nowIso = new Date().toISOString();
+              const updated = expenseList.map((item) => {
+                if (displayedItems.some((d) => d.id === item.id)) {
+                  return {
+                    ...item,
+                    hqStatus: '검수 대기' as const,
+                    submittedToHqAt: nowIso,
+                  };
+                }
+                return item;
+              });
+
+              setExpenseList(updated);
+              saveExpenses(updated, isDemoMode);
+              setIsSubmittingToHq(false);
+              setHqSubmitSuccessToast(
+                `본사(HQ) 대시보드로 ${result.count}건 (총 ${formatKRW(result.totalAmount)})이 성공적으로 전송되었습니다!`
+              );
+              setTimeout(() => setHqSubmitSuccessToast(null), 4000);
+            }}
+            disabled={isSubmittingToHq || displayedItems.length === 0}
+            className="w-full sm:w-auto px-4.5 py-2.5 bg-[#1E60F3] hover:bg-blue-600 disabled:opacity-50 text-white text-xs sm:text-sm font-bold rounded-xl shadow-md flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer shrink-0"
+          >
+            {isSubmittingToHq ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>전송 중...</span>
+              </>
+            ) : (
+              <>
+                <Send className="w-4 h-4" />
+                <span>본사로 전송하기</span>
+              </>
+            )}
+          </button>
+        </section>
+
+        {/* 6. Expense List Section */}
         <section className="space-y-3 pt-1">
           <div className="flex items-center justify-between">
             <h3 className="text-base font-bold text-slate-900 tracking-tight">지출 내역</h3>
@@ -580,13 +667,36 @@ const ExpenseModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) => 
 
                     {/* Middle: Details */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-sm font-bold text-slate-900 truncate">
                           {catMeta.label}
                         </span>
                         {item.receiptUrl && (
-                          <span className="text-[10px] bg-sky-50 text-sky-600 px-1.5 py-0.2 rounded border border-sky-100">
+                          <span className="text-[10px] bg-sky-50 text-sky-600 px-1.5 py-0.2 rounded border border-sky-100 font-semibold">
                             영수증
+                          </span>
+                        )}
+                        {item.hqStatus ? (
+                          <span
+                            className={`text-[10px] px-1.5 py-0.2 rounded font-bold border ${
+                              item.hqStatus === '승인 완료'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                : item.hqStatus === '검수 대기'
+                                ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                : item.hqStatus === '금액 확인'
+                                ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                : 'bg-slate-100 text-slate-600 border-slate-200'
+                            }`}
+                          >
+                            {item.hqStatus === '검수 대기'
+                              ? '본사 검수 대기'
+                              : item.hqStatus === '승인 완료'
+                              ? '본사 승인 완료'
+                              : item.hqStatus}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.2 rounded font-medium border border-slate-200">
+                            미전송
                           </span>
                         )}
                       </div>
@@ -631,6 +741,71 @@ const ExpenseModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) => 
           )}
         </section>
       </main>
+
+      {/* Sticky Bottom Submission Bar */}
+      {displayedItems.length > 0 && (
+        <div className="p-3.5 sm:p-4 border-t border-slate-100 bg-white shrink-0 shadow-lg">
+          <button
+            type="button"
+            onClick={() => {
+              if (displayedItems.length === 0 || isSubmittingToHq) return;
+              haptics.success();
+              setIsSubmittingToHq(true);
+
+              const result = submitDriverExpensesToHq(
+                displayedItems,
+                '윤태준',
+                '116허 1514',
+                '카니발 하이리무진'
+              );
+
+              const nowIso = new Date().toISOString();
+              const updated = expenseList.map((item) => {
+                if (displayedItems.some((d) => d.id === item.id)) {
+                  return {
+                    ...item,
+                    hqStatus: '검수 대기' as const,
+                    submittedToHqAt: nowIso,
+                  };
+                }
+                return item;
+              });
+
+              setExpenseList(updated);
+              saveExpenses(updated, isDemoMode);
+              setIsSubmittingToHq(false);
+              setHqSubmitSuccessToast(
+                `본사(HQ) 대시보드로 ${result.count}건 (총 ${formatKRW(result.totalAmount)})이 성공적으로 전송되었습니다!`
+              );
+              setTimeout(() => setHqSubmitSuccessToast(null), 4000);
+            }}
+            disabled={isSubmittingToHq}
+            className="w-full py-3.5 bg-[#1E60F3] hover:bg-blue-600 active:scale-98 disabled:opacity-50 text-white font-bold rounded-xl text-sm sm:text-base shadow-[0_4px_16px_rgba(30,96,243,0.3)] transition-all flex items-center justify-center gap-2 cursor-pointer"
+          >
+            {isSubmittingToHq ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span>본사 대시보드로 전송 중...</span>
+              </>
+            ) : (
+              <>
+                <Send className="w-5 h-5" />
+                <span>
+                  본사(HQ) 대시보드로 경비 제출하기 ({displayedItems.length}건 · {formatKRW(totalAmount)})
+                </span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* Floating Success Toast */}
+      {hqSubmitSuccessToast && (
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-60 bg-slate-900/95 text-white text-xs font-bold px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2 backdrop-blur-sm animate-in fade-in slide-in-from-bottom-2 duration-150">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{hqSubmitSuccessToast}</span>
+        </div>
+      )}
       </div>
 
       {/* Add / Edit Expense Modal (Right Screen) */}

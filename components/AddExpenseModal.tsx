@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import {
   X,
@@ -26,8 +26,10 @@ import {
   RotateCw,
   RotateCcw,
   CheckCircle2,
+  Send,
 } from 'lucide-react';
 import { rotateImageDataUrl } from '@/utils/imageRotate';
+import { submitSingleExpenseToHq } from '@/utils/expenseHqStorage';
 import {
   ExpenseItem,
   ExpenseCategoryKey,
@@ -136,14 +138,85 @@ const AddExpenseModalContent: React.FC<{
   const [isDateTimePickerOpen, setIsDateTimePickerOpen] = useState(false);
   const [isPhotoZoomOpen, setIsPhotoZoomOpen] = useState(false);
 
-  // Image rotation state
+  // Image rotation & Vision AI state
   const [isRotating, setIsRotating] = useState(false);
+  const [isAiScanning, setIsAiScanning] = useState(false);
+  const [ocrBannerInfo, setOcrBannerInfo] = useState<{
+    merchant: string;
+    amount: number | null;
+    category: string;
+    summary: string;
+  } | null>(null);
+  const [autoSubmitToHq, setAutoSubmitToHq] = useState(true);
+  const hasAutoScannedRef = useRef(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Validation & saving state
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSaving, setIsSaving] = useState(false);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 2500);
+    setTimeout(() => setToastMessage(null), 3000);
   };
+
+  // Vision AI Receipt Scanner using Gemini 3.8 Flash
+  const runVisionAiScan = useCallback(async (imageUrl: string) => {
+    if (!imageUrl) return;
+    setIsAiScanning(true);
+    setOcrBannerInfo(null);
+    try {
+      const res = await fetch('/api/receipt/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image: imageUrl,
+          driverName: '윤태준',
+          carModel: '116허 1514',
+        }),
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        if (data.merchant) setMerchant(data.merchant);
+        if (data.address) setAddress(data.address);
+        if (typeof data.amount === 'number' && data.amount > 0) {
+          setAmountRaw(formatKRW(data.amount, false));
+          setErrors((prev) => ({ ...prev, amount: '' }));
+        }
+        if (data.category && EXPENSE_CATEGORIES[data.category as ExpenseCategoryKey]) {
+          setCategory(data.category as ExpenseCategoryKey);
+        }
+        if (data.date) setDate(data.date);
+        if (data.time) setTime(data.time);
+        if (data.paymentMethod) setPaymentMethod(data.paymentMethod);
+
+        setOcrBannerInfo({
+          merchant: data.merchant,
+          amount: data.amount,
+          category: EXPENSE_CATEGORIES[data.category as ExpenseCategoryKey]?.label || '기타',
+          summary: data.summary,
+        });
+
+        haptics.success();
+        showToast('✨ Vision AI가 영수증 정보를 자동 판독하여 입력했습니다!');
+      } else {
+        showToast('영수증 분석을 완료하지 못했습니다. 직접 입력해 주세요.');
+      }
+    } catch (err) {
+      console.warn('Vision AI Scan Error:', err);
+      showToast('영수증 분석 중 오류가 발생했습니다.');
+    } finally {
+      setIsAiScanning(false);
+    }
+  }, []);
+
+  // Auto scan sample receipt or initial photo once on load
+  useEffect(() => {
+    if (initialPhotoUrl && !editingItem && !hasAutoScannedRef.current) {
+      hasAutoScannedRef.current = true;
+      runVisionAiScan(initialPhotoUrl);
+    }
+  }, [initialPhotoUrl, editingItem, runVisionAiScan]);
 
   // Rotate receipt photo (+90 clockwise, -90 counter-clockwise)
   const handleRotateImage = async (degrees: number = 90) => {
@@ -162,10 +235,6 @@ const AddExpenseModalContent: React.FC<{
     }
   };
 
-  // Validation & saving state
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [isSaving, setIsSaving] = useState(false);
-
   // Temp date/time picker state
   const [tempDate, setTempDate] = useState(date);
   const [tempHour, setTempHour] = useState(time.split(':')[0] || '11');
@@ -181,15 +250,7 @@ const AddExpenseModalContent: React.FC<{
     reader.onload = (event) => {
       const result = event.target?.result as string;
       setReceiptUrl(result);
-
-      // If fields are empty and user selected sample receipt, suggest fields
-      if (!merchant) {
-        if (file.name.includes('fuel') || file.name.includes('주유')) {
-          setMerchant('서울 만남의광장 주유소');
-          setCategory('fuel');
-          if (!amountRaw) setAmountRaw('72,000');
-        }
-      }
+      runVisionAiScan(result);
     };
     reader.readAsDataURL(file);
   };
@@ -243,7 +304,13 @@ const AddExpenseModalContent: React.FC<{
       receiptUrl,
       createdAt: editingItem?.createdAt || nowIso,
       updatedAt: nowIso,
+      hqStatus: autoSubmitToHq ? '검수 대기' : (editingItem?.hqStatus || '미제출'),
+      submittedToHqAt: autoSubmitToHq ? nowIso : editingItem?.submittedToHqAt,
     };
+
+    if (autoSubmitToHq) {
+      submitSingleExpenseToHq(finalItem, '윤태준', '116허 1514', '카니발 하이리무진');
+    }
 
     onSave(finalItem);
   };
@@ -284,13 +351,31 @@ const AddExpenseModalContent: React.FC<{
           {/* 1. Receipt Photograph Preview Area */}
           <section className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-700">영수증 사진</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-slate-700">영수증 사진</span>
+                {isAiScanning && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-[#1E60F3] text-[10px] font-bold animate-pulse">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    <span>AI 판독 중</span>
+                  </span>
+                )}
+              </div>
               {receiptUrl && (
                 <div className="flex items-center gap-1.5 sm:gap-2">
                   <button
                     type="button"
+                    onClick={() => runVisionAiScan(receiptUrl)}
+                    disabled={isAiScanning || isRotating}
+                    className="text-[11px] text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-50 px-2.5 py-1 rounded-full font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer"
+                    title="Vision AI 영수증 재분석"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>AI 재스캔</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => handleRotateImage(90)}
-                    disabled={isRotating}
+                    disabled={isRotating || isAiScanning}
                     className="text-[11px] text-[#1E60F3] hover:text-blue-700 bg-blue-50 hover:bg-blue-100 disabled:opacity-50 px-2.5 py-1 rounded-full font-semibold flex items-center gap-1 transition-all active:scale-95 cursor-pointer"
                     title="영수증 90° 시계방향 세우기"
                   >
@@ -314,6 +399,7 @@ const AddExpenseModalContent: React.FC<{
                     onClick={() => {
                       haptics.lightTap();
                       setReceiptUrl(undefined);
+                      setOcrBannerInfo(null);
                     }}
                     className="text-[11px] text-red-500 hover:text-red-600 hover:bg-red-50 px-2 py-1 rounded-full font-semibold transition-colors"
                   >
@@ -334,6 +420,24 @@ const AddExpenseModalContent: React.FC<{
                   className="object-contain p-2 cursor-pointer transition-transform duration-200 group-hover:scale-[1.01]"
                   onClick={() => setIsPhotoZoomOpen(true)}
                 />
+
+                {/* AI Scanning Radar Beam Overlay */}
+                {isAiScanning && (
+                  <div className="absolute inset-0 bg-blue-950/70 backdrop-blur-2xs flex flex-col items-center justify-center gap-2.5 z-25 text-white animate-in fade-in duration-200 overflow-hidden">
+                    <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_16px_#22d3ee] animate-[pulse_1.5s_infinite]" />
+                    <div className="w-11 h-11 rounded-2xl bg-blue-600/80 border border-blue-400/50 flex items-center justify-center shadow-lg animate-pulse">
+                      <Sparkles className="w-6 h-6 text-cyan-200" />
+                    </div>
+                    <div className="text-center px-4">
+                      <span className="text-xs font-black tracking-tight text-white block">
+                        Gemini Vision AI 영수증 분석 중...
+                      </span>
+                      <span className="text-[10px] text-cyan-200/90 block mt-0.5">
+                        상호명, 총 결제금액, 거래일시, 카테고리를 자동 추출하고 있습니다
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Rotating Loading Overlay */}
                 {isRotating && (
@@ -418,6 +522,31 @@ const AddExpenseModalContent: React.FC<{
               className="hidden"
               onChange={handlePhotoUpload}
             />
+
+            {/* AI OCR Recognition Result Banner */}
+            {ocrBannerInfo && (
+              <div className="bg-gradient-to-r from-blue-50/90 via-indigo-50/40 to-blue-50/90 border border-blue-200/90 rounded-2xl p-3.5 flex items-start gap-3 animate-in fade-in slide-in-from-top-1 duration-200 shadow-2xs">
+                <div className="w-7 h-7 rounded-xl bg-[#1E60F3] text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div className="flex-1 min-w-0 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-extrabold text-[#1E60F3] tracking-tight">
+                      Vision AI 자동 인식 및 분류 완료
+                    </span>
+                    <span className="text-[10px] bg-blue-100 text-[#1E60F3] px-2 py-0.5 rounded-full font-bold">
+                      Gemini 3.8 Flash
+                    </span>
+                  </div>
+                  <div className="text-slate-900 font-bold mt-1 text-xs truncate">
+                    {ocrBannerInfo.merchant} · {formatKRW(ocrBannerInfo.amount || 0)} ({ocrBannerInfo.category})
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                    {ocrBannerInfo.summary}
+                  </p>
+                </div>
+              </div>
+            )}
           </section>
 
           {/* 2. 지출 항목 (Category Selector) */}
@@ -621,6 +750,30 @@ const AddExpenseModalContent: React.FC<{
               />
             </div>
           </section>
+
+          {/* 9. Direct HQ Dashboard Submission Toggle */}
+          <section className="pt-1">
+            <label className="flex items-start gap-3 p-3.5 rounded-2xl bg-blue-50/70 border border-blue-200 hover:bg-blue-50/90 transition-all cursor-pointer">
+              <input
+                type="checkbox"
+                checked={autoSubmitToHq}
+                onChange={(e) => setAutoSubmitToHq(e.target.checked)}
+                className="w-4 h-4 mt-0.5 text-[#1E60F3] rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+              />
+              <div className="flex-1 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-extrabold text-slate-900">본사(HQ) 대시보드로 즉시 전송</span>
+                  <span className="text-[10px] font-bold bg-[#1E60F3] text-white px-1.5 py-0.2 rounded">
+                    권장
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  저장과 동시에 본사 경비 검수 시스템에 &apos;검수 대기&apos;로 즉시 등록되어 관리자에게 제출됩니다.
+                </p>
+              </div>
+              <Send className="w-4 h-4 text-[#1E60F3] shrink-0 mt-0.5" />
+            </label>
+          </section>
         </div>
 
         {/* Sticky Footer */}
@@ -628,16 +781,24 @@ const AddExpenseModalContent: React.FC<{
           <button
             type="button"
             onClick={handleSave}
-            disabled={isSaving}
+            disabled={isSaving || isAiScanning}
             className="w-full py-4 bg-[#1E60F3] hover:bg-blue-600 active:scale-98 disabled:opacity-50 text-white font-bold rounded-xl text-base shadow-[0_4px_16px_rgba(30,96,243,0.3)] transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
             {isSaving ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                <span>저장 중...</span>
+                <span>저장 및 본사 전송 중...</span>
+              </>
+            ) : autoSubmitToHq ? (
+              <>
+                <Send className="w-5 h-5" />
+                <span>{editingItem ? '수정 후 본사 제출' : '지출 저장 및 본사 제출'}</span>
               </>
             ) : (
-              <span>저장하기</span>
+              <>
+                <Check className="w-5 h-5" />
+                <span>{editingItem ? '지출 수정 완료' : '기기 내 저장'}</span>
+              </>
             )}
           </button>
         </div>

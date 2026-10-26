@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, Suspense } from 'react';
+import React, { useState, useMemo, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { HqSidebar } from '@/components/hq/HqSidebar';
 import { HqHeader } from '@/components/hq/HqHeader';
@@ -14,6 +14,9 @@ import { HqDriverStatusCard } from '@/components/hq/HqDriverStatusCard';
 import { HqAlertsCard } from '@/components/hq/HqAlertsCard';
 import { HqBookingDetailModal } from '@/components/hq/HqBookingDetailModal';
 import { HqDrivingLogsView } from '@/components/hq/driving-logs/HqDrivingLogsView';
+import { HqExpensesView } from '@/components/hq/expenses/HqExpensesView';
+import { getHqExpenses, getHqExpenseKpiSummary, HQ_EXPENSE_UPDATE_EVENT } from '@/utils/expenseHqStorage';
+import { HqExpenseRecord } from '@/types/expenseHq';
 import {
   HQ_KPI_METRICS,
   INITIAL_HQ_BOOKINGS,
@@ -39,6 +42,36 @@ function HqDashboardInner() {
   // Selected Booking for detail inspection drawer
   const [selectedBooking, setSelectedBooking] = useState<HqBooking | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+
+  // Dynamic live HQ Expenses from storage
+  const [hqExpenses, setHqExpenses] = useState<HqExpenseRecord[]>(() => getHqExpenses());
+  useEffect(() => {
+    const handleUpdate = () => {
+      setHqExpenses(getHqExpenses());
+    };
+    window.addEventListener(HQ_EXPENSE_UPDATE_EVENT, handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    return () => {
+      window.removeEventListener(HQ_EXPENSE_UPDATE_EVENT, handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, []);
+
+  const hqExpenseKpi = useMemo(() => getHqExpenseKpiSummary(hqExpenses), [hqExpenses]);
+
+  const mappedExpensesForCard = useMemo(() => {
+    return hqExpenses.slice(0, 4).map((e) => ({
+      id: e.id,
+      submittedAt: e.submittedAt,
+      driverName: e.driverName,
+      category: (['주유비', '통행료', '주차비', '식비'].includes(e.categoryLabel)
+        ? e.categoryLabel
+        : '기타') as HqBooking extends never ? never : '주유비' | '통행료' | '주차비' | '식비' | '기타',
+      amount: e.amount,
+      status: e.status,
+      hasReceiptImage: e.hasReceiptImage,
+    }));
+  }, [hqExpenses]);
 
   // Handle clicking KPI tile
   const handleSelectKpi = (metricId: string) => {
@@ -162,6 +195,9 @@ function HqDashboardInner() {
           {activeSidebarTab === 'driving_logs' ? (
             /* Dedicated 운행일지 관리 View */
             <HqDrivingLogsView initialSearchQuery={searchQuery} />
+          ) : activeSidebarTab === 'expenses' || activeSidebarTab === 'receipts' ? (
+            /* Dedicated 경비지출 관리 & 영수증 검수 View */
+            <HqExpensesView initialSearchQuery={searchQuery} />
           ) : (
             /* Operations Dashboard View */
             <>
@@ -248,10 +284,14 @@ function HqDashboardInner() {
                 />
 
                 <HqExpenseCard
-                  expenses={HQ_EXPENSES}
+                  expenses={mappedExpensesForCard.length > 0 ? mappedExpensesForCard : HQ_EXPENSES}
+                  todayTotalExpense={hqExpenseKpi.todayTotal}
+                  monthTotalExpense={hqExpenseKpi.monthTotal}
+                  pendingReceiptsCount={hqExpenseKpi.pendingCount}
                   onViewAll={() => setActiveTabOverride('expenses')}
                   onSelectExpense={(item) => {
-                    alert(`${item.driverName} 기사님의 ${item.category} 영수증 검수(${item.amount.toLocaleString()}원) 검토창을 엽니다.`);
+                    setActiveTabOverride('expenses');
+                    setSearchQuery(item.driverName);
                   }}
                 />
 

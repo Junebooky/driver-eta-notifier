@@ -139,6 +139,8 @@ export interface ExpenseItem {
   isRefund?: boolean;
   createdAt: string;
   updatedAt: string;
+  hqStatus?: '검수 대기' | '승인 완료' | '금액 확인' | '반려' | '미제출';
+  submittedToHqAt?: string;
 }
 
 export type ExpenseSortOption = 'newest' | 'oldest' | 'highest_amount' | 'lowest_amount';
