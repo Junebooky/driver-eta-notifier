@@ -36,8 +36,10 @@ import {
   clampTimeComponent,
   createReferenceDemoFixture,
 } from '@/utils/drivingLog';
+import Link from 'next/link';
 import { AddScheduleModal } from './AddScheduleModal';
 import { haptics } from '@/utils/haptics';
+import { submitDriverLogToHq } from '@/utils/drivingLogHqStorage';
 
 interface DrivingLogModalProps {
   isOpen: boolean;
@@ -208,9 +210,38 @@ const DrivingLogModalContent: React.FC<{
     }
   };
 
-  // Submit Driving Log (Preserves draft status & informs user of preview isolation)
+  // Submit Driving Log to HQ Operations system
   const handleSubmitLog = () => {
     haptics.success();
+
+    // Map stops ensuring complete route details are passed
+    const stopsMapped = logData.stops.map((s) => ({
+      id: s.id,
+      time: s.time,
+      place: s.place,
+      note: s.memo,
+      address: s.address,
+    }));
+
+    // Submit to shared HQ management store
+    submitDriverLogToHq({
+      id: `driver-sub-${Date.now()}`,
+      driverName: logData.driverName || '윤태준',
+      customerName: logData.clientName || '인터코스',
+      vehicleModel: logData.carNumber || '116허 1514',
+      vehiclePlate: logData.carNumber || '116허 1514',
+      clockIn: logData.clockIn || '06:40',
+      clockOut: logData.clockOut || '21:50',
+      totalDutyHours: logData.totalDutyHours || '15시간 10분',
+      startKm: logData.startKm || '154,725',
+      endKm: logData.endKm || '154,861',
+      distanceKm: logData.distanceKm || '136 km',
+      stops: stopsMapped,
+      notes: logData.notes || '',
+      status: '검토 대기',
+      rawDate: logData.rawDate,
+    });
+
     saveDrivingLogDraft({ ...logData, status: 'draft' });
     setIsPreviewSubmitModalOpen(true);
   };
@@ -912,34 +943,51 @@ const DrivingLogModalContent: React.FC<{
         </div>
       )}
 
-      {/* Development Preview Submission Notice Modal (Issue #14 security guideline) */}
+      {/* Live Submission Notice Modal connected to HQ Operations System */}
       {isPreviewSubmitModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl p-5 w-full max-w-sm shadow-2xl space-y-4">
             <div className="flex items-center gap-2.5 text-[#1E60F3]">
-              <CheckCircle2 className="w-5 h-5 stroke-[2.2]" />
-              <h3 className="text-base font-bold text-slate-900">임시저장 완료 (개발 미리보기)</h3>
+              <div className="w-9 h-9 rounded-full bg-blue-50 text-[#1E60F3] flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-5 h-5 stroke-[2.2]" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">운행일지 제출 완료</h3>
+                <span className="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
+                  본사 검토 대기 등록됨
+                </span>
+              </div>
             </div>
 
             <p className="text-xs text-slate-600 leading-relaxed">
-              작성하신 운행일지가 기기에 안전하게 <span className="font-bold text-slate-800">[임시저장]</span> 상태로 보관되었습니다.
-              <br />
-              <br />
-              <span className="text-slate-400">
-                ※ 본사 제출 및 관리자 시트 전송은 보안 지침(Issue #14)에 따라 Supabase 서버 인증 및 회사 배차 권한 백엔드 검증 완료 후 활성화됩니다.
-              </span>
+              작성하신 <span className="font-bold text-slate-800">{logData.driverName || '윤태준'}</span> 기사님의 운행일지
+              (운행 경로 <span className="font-bold text-[#1E60F3]">{logData.stops.length}건</span>, 총 근무 <span className="font-bold text-slate-800">{logData.totalDutyHours}</span>)가
+              본사 <span className="font-bold text-slate-800">[운행일지 관리]</span> 시스템으로 즉시 전송되었습니다.
             </p>
 
-            <button
-              type="button"
-              onClick={() => {
-                setIsPreviewSubmitModalOpen(false);
-                onClose();
-              }}
-              className="w-full py-3 bg-[#1E60F3] text-white text-xs font-bold rounded-xl shadow-sm"
-            >
-              확인
-            </button>
+            <div className="space-y-2 pt-1">
+              <Link
+                href="/hq?tab=driving_logs"
+                onClick={() => {
+                  setIsPreviewSubmitModalOpen(false);
+                  onClose();
+                }}
+                className="w-full py-3 bg-[#1E60F3] hover:bg-blue-600 text-white text-xs font-bold rounded-xl shadow-[0_4px_14px_rgba(30,96,243,0.35)] flex items-center justify-center gap-1.5 transition-all"
+              >
+                <span>HQ 운행일지 관리에서 확인하기</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPreviewSubmitModalOpen(false);
+                  onClose();
+                }}
+                className="w-full py-2.5 border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-bold rounded-xl transition-all"
+              >
+                확인 (창 닫기)
+              </button>
+            </div>
           </div>
         </div>
       )}

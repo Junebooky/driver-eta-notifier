@@ -9,6 +9,9 @@ export interface HqHeaderProps {
   onSearchChange: (query: string) => void;
   unreadAlertsCount?: number;
   onOpenNotifications?: () => void;
+  title?: string;
+  subtitle?: React.ReactNode;
+  searchPlaceholder?: string;
 }
 
 export const HqHeader: React.FC<HqHeaderProps> = ({
@@ -16,18 +19,25 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
   onSearchChange,
   unreadAlertsCount = 12,
   onOpenNotifications,
+  title = '운영 대시보드',
+  subtitle,
+  searchPlaceholder = '고객명, 예약번호, 기사명, 차량번호로...',
 }) => {
   return (
     <header className="bg-white border-b border-slate-100 px-6 py-3.5 flex items-center justify-between gap-4 sticky top-0 z-20">
       {/* Title & Greeting */}
       <div className="min-w-0">
         <h1 className="text-xl font-black text-slate-900 tracking-tight">
-          운영 대시보드
+          {title}
         </h1>
         <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500 font-medium">
-          <span className="font-bold text-slate-700">2024년 10월 24일 (목)</span>
-          <span className="text-slate-300">|</span>
-          <span className="text-slate-400">좋은 하루 되세요, 관리자님!</span>
+          {subtitle || (
+            <>
+              <span className="font-bold text-slate-700">2024년 10월 24일 (목)</span>
+              <span className="text-slate-300">|</span>
+              <span className="text-slate-400">좋은 하루 되세요, 관리자님!</span>
+            </>
+          )}
         </div>
       </div>
 
@@ -40,7 +50,7 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
             type="text"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="고객명, 예약번호, 기사명, 차량번호로..."
+            placeholder={searchPlaceholder}
             className="w-full pl-9 pr-8 py-2 bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-800 placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 transition-all"
           />
           {searchQuery && (
