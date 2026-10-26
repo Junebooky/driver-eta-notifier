@@ -71,6 +71,7 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<PoiResult[]>([]);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [isLocatingCurrent, setIsLocatingCurrent] = useState(false);
 
   // Local synced presets for 0ms favorite toggle
   const [localPresets, setLocalPresets] = useState<LocationPreset[]>(presets);
@@ -292,6 +293,7 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
   // Carousel Pagination Slots Construction
   const allSlots = useMemo(() => {
     return [
+      { type: 'current_location' as const },
       { type: 'home' as const },
       ...localPresets.map((preset) => ({ type: 'preset' as const, preset })),
     ];
@@ -380,6 +382,64 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
       onOpenHomeModal();
       onClose();
     }
+  };
+
+  // Handler: Selecting Current GPS Location (현위치)
+  const handleSelectCurrentLocation = () => {
+    haptics.mediumTap();
+    setIsLocatingCurrent(true);
+
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      setIsLocatingCurrent(false);
+      alert('이 브라우저에서는 위치 서비스를 지원하지 않습니다.');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        let resolvedAddress = `GPS 수신 (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`;
+
+        try {
+          const res = await fetch(`/api/reverse-geocode?lat=${latitude}&lng=${longitude}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.address) {
+              resolvedAddress = data.address;
+            }
+          }
+        } catch (e) {
+          console.warn('Reverse geocode error:', e);
+        }
+
+        const locationData: SelectedLocationData = {
+          id: 'gps_current',
+          name: '현위치',
+          shortName: '현위치',
+          address: resolvedAddress,
+          lat: latitude,
+          lng: longitude,
+          category: 'CUSTOM',
+        };
+
+        setIsLocatingCurrent(false);
+        haptics.successPulse();
+        recordRecentSearch(locationData);
+        onSelectLocation(locationData);
+        onClose();
+      },
+      (error) => {
+        console.warn('GPS location error:', error);
+        setIsLocatingCurrent(false);
+        haptics.errorAlert();
+        alert('현재 위치 정보를 가져올 수 없습니다. 브라우저 위치 권한을 확인해주세요.');
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 6000,
+        maximumAge: 30000,
+      }
+    );
   };
 
   // Handler: Selecting a POI Result
@@ -498,6 +558,43 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
           style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
           onTouchMove={handleScrollTouch}
         >
+          {/* 1-Tap '현위치로 설정' Quick Action Card (Always visible before active search query) */}
+          {searchQuery.trim().length < 2 && (
+            <button
+              type="button"
+              onClick={handleSelectCurrentLocation}
+              disabled={isLocatingCurrent}
+              className="w-full p-3.5 rounded-2xl border border-blue-200/90 bg-gradient-to-r from-blue-50/90 via-sky-50/50 to-white hover:bg-blue-100/60 hover:border-[#1E60F3] active:scale-[0.99] transition-all flex items-center justify-between group shadow-xs cursor-pointer text-left"
+              title="현재 GPS 위치를 선택"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-[#1E60F3] text-white flex items-center justify-center shrink-0 shadow-sm shadow-blue-500/25">
+                  {isLocatingCurrent ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                  ) : (
+                    <Navigation className="w-4 h-4 fill-white" />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-black text-slate-900 group-hover:text-[#1E60F3] transition-colors">
+                      현위치로 설정
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-[#1E60F3]">
+                      GPS 실시간
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                    현재 내 GPS 수신 위치를 {isOrigin ? '출발지' : '위치'}로 즉시 지정합니다
+                  </p>
+                </div>
+              </div>
+              <span className="text-xs font-bold text-[#1E60F3] shrink-0 ml-2">
+                {isLocatingCurrent ? '수신 중...' : '선택 ➔'}
+              </span>
+            </button>
+          )}
+
           {/* Search Results (If query length >= 2) */}
           {searchQuery.trim().length >= 2 ? (
             <div className="space-y-2">
@@ -698,6 +795,37 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                   <div key={pageIdx} className="w-full shrink-0 px-2 py-1.5">
                     <div className="grid grid-cols-3 gap-2">
                       {pageSlots.map((slot, sIdx) => {
+                        if (slot.type === 'current_location') {
+                          const isSelected = currentSelectedId === 'gps_current';
+                          return (
+                            <button
+                              key="slot_current_location"
+                              type="button"
+                              onClick={handleSelectCurrentLocation}
+                              disabled={isLocatingCurrent}
+                              className={`min-h-[54px] sm:min-h-[58px] p-2 rounded-2xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-150 active:scale-95 group shadow-2xs ${isSelected
+                                ? 'border-2 border-[#1E60F3] bg-blue-50/40 text-[#1E60F3] font-bold shadow-xs'
+                                : 'bg-white border-blue-200/70 hover:border-[#1E60F3] hover:bg-blue-50/30'
+                                }`}
+                              title="현재 위치 (GPS)로 설정"
+                            >
+                              <div className="flex items-center justify-center gap-1 w-full min-w-0">
+                                {isLocatingCurrent ? (
+                                  <Loader2 className="w-3 h-3 text-[#1E60F3] animate-spin shrink-0" />
+                                ) : (
+                                  <Navigation className="w-3 h-3 text-[#1E60F3] fill-[#1E60F3] shrink-0" />
+                                )}
+                                <span className="text-sm font-black tracking-tight text-slate-900 group-hover:text-[#1E60F3] truncate">
+                                  현위치
+                                </span>
+                              </div>
+                              <span className="text-[10px] font-bold text-[#1E60F3] group-hover:text-blue-700 truncate w-full mt-0.5">
+                                실시간 GPS
+                              </span>
+                            </button>
+                          );
+                        }
+
                         if (slot.type === 'home') {
                           return (
                             <button

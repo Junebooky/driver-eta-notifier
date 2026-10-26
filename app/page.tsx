@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import Link from 'next/link';
 import { useDriverProfile, getOrCreateDeviceUuid, getStoredVehicleProfile } from '@/hooks/useDriverProfile';
 import { useLocation } from '@/hooks/useLocation';
 import { Header } from '@/components/Header';
@@ -1279,17 +1280,25 @@ export default function Home() {
 
         {/* Admin Mode Active Banner */}
         {isAdmin && (
-          <div className="px-4 py-2 bg-blue-600 text-white text-sm font-bold flex items-center justify-between shadow-sm animate-fade-in">
+          <div className="px-4 py-2 bg-blue-600 text-white text-xs font-bold flex items-center justify-between shadow-sm animate-fade-in">
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-blue-300 animate-ping" />
-              관리자 모드 활성화 (전사 공통 거점 등록·삭제 가능)
+              관리자 모드 활성화
             </span>
-            <button
-              onClick={() => handleToggleAdmin(false)}
-              className="px-2 py-0.5 rounded bg-white/20 hover:bg-white/30 text-[11px] font-extrabold cursor-pointer"
-            >
-              종료
-            </button>
+            <div className="flex items-center gap-1.5">
+              <Link
+                href="/hq"
+                className="px-2 py-0.5 rounded bg-white text-[#1E60F3] hover:bg-blue-50 text-[11px] font-extrabold cursor-pointer transition-colors shadow-2xs"
+              >
+                HQ 대시보드 ➔
+              </Link>
+              <button
+                onClick={() => handleToggleAdmin(false)}
+                className="px-2 py-0.5 rounded bg-white/20 hover:bg-white/30 text-[11px] font-extrabold cursor-pointer"
+              >
+                종료
+              </button>
+            </div>
           </div>
         )}
 
@@ -1381,6 +1390,8 @@ export default function Home() {
               onOpenGasModal={() => setIsGasModalOpen(true)}
               onOpenPresetModal={handleOpenAddModal}
               onSaveRouteAsPreset={handleSaveRouteAsPreset}
+              onSetCurrentLocation={requestGpsLocation}
+              isLocatingGps={isLocating}
             />
 
             {/* 2. Standalone 7-Button Quick Action Bar (4 Top / 3 Centered) */}
