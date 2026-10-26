@@ -55,8 +55,7 @@ function EmptyPreview({ title, detail }: { title: string; detail: string }) {
   );
 }
 
-export function HqCustomersView() {
-  const [search, setSearch] = useState('');
+export function HqCustomersView({ search, onSearchChange }: { search: string; onSearchChange: (value: string) => void }) {
   const [sampleVisible, setSampleVisible] = useState(false);
   const [selectedTab, setSelectedTab] = useState<ClientTab>('overview');
 
@@ -110,7 +109,7 @@ export function HqCustomersView() {
             <input
               type="search"
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => onSearchChange(event.target.value)}
               placeholder="고객사·담당자·예약번호 검색"
               aria-label="고객사·담당자·예약번호 검색"
               className="w-full min-w-0 bg-transparent text-xs text-slate-800 outline-none placeholder:text-slate-400"
