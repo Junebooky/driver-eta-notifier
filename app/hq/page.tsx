@@ -15,6 +15,7 @@ import { HqAlertsCard } from '@/components/hq/HqAlertsCard';
 import { HqBookingDetailModal } from '@/components/hq/HqBookingDetailModal';
 import { HqDrivingLogsView } from '@/components/hq/driving-logs/HqDrivingLogsView';
 import { HqExpensesView } from '@/components/hq/expenses/HqExpensesView';
+import { HqCustomersView } from '@/components/hq/clients/HqCustomersView';
 import { getHqExpenses, getHqExpenseKpiSummary, HQ_EXPENSE_UPDATE_EVENT } from '@/utils/expenseHqStorage';
 import { HqExpenseRecord } from '@/types/expenseHq';
 import {
@@ -163,7 +164,10 @@ function HqDashboardInner() {
       {/* 1. Left Sidebar Navigation */}
       <HqSidebar
         activeTab={activeSidebarTab}
-        onSelectTab={setActiveTabOverride}
+        onSelectTab={(tab) => {
+          setSearchQuery('');
+          setActiveTabOverride(tab);
+        }}
       />
 
       {/* 2. Main Content Area */}
@@ -173,7 +177,7 @@ function HqDashboardInner() {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           unreadAlertsCount={12}
-          title={activeSidebarTab === 'driving_logs' ? '운행일지 관리' : '운영 대시보드'}
+          title={activeSidebarTab === 'clients' ? '고객 관리' : activeSidebarTab === 'driving_logs' ? '운행일지 관리' : '운영 대시보드'}
           subtitle={
             activeSidebarTab === 'driving_logs' ? (
               <>
@@ -184,15 +188,20 @@ function HqDashboardInner() {
             ) : undefined
           }
           searchPlaceholder={
-            activeSidebarTab === 'driving_logs'
-              ? '고객명, 기사명, 차량번호로 검색하세요...'
-              : '고객명, 예약번호, 기사명, 차량번호로...'
+            activeSidebarTab === 'clients'
+              ? '고객사·담당자·예약번호 검색'
+              : activeSidebarTab === 'driving_logs'
+                ? '고객명, 기사명, 차량번호로 검색하세요...'
+                : '고객명, 예약번호, 기사명, 차량번호로...'
           }
         />
 
         {/* Dashboard Scrollable Body */}
         <main className="flex-1 p-5 lg:p-6 space-y-5 overflow-y-auto">
-          {activeSidebarTab === 'driving_logs' ? (
+          {activeSidebarTab === 'clients' ? (
+            /* Customer 360 CRM UI shell — no real client data, email or backend linkage */
+            <HqCustomersView search={searchQuery} onSearchChange={setSearchQuery} />
+          ) : activeSidebarTab === 'driving_logs' ? (
             /* Dedicated 운행일지 관리 View */
             <HqDrivingLogsView initialSearchQuery={searchQuery} />
           ) : activeSidebarTab === 'expenses' || activeSidebarTab === 'receipts' ? (
