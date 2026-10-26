@@ -40,6 +40,7 @@ import Link from 'next/link';
 import { AddScheduleModal } from './AddScheduleModal';
 import { haptics } from '@/utils/haptics';
 import { submitDriverLogToHq } from '@/utils/drivingLogHqStorage';
+import { getHqExpenses } from '@/utils/expenseHqStorage';
 
 interface DrivingLogModalProps {
   isOpen: boolean;
@@ -223,19 +224,30 @@ const DrivingLogModalContent: React.FC<{
       address: s.address,
     }));
 
+    // Calculate current expenses for this driver
+    const currentDriverName = logData.driverName || '윤태준';
+    const currentVehiclePlate = logData.carNumber || '116허 1514';
+    const currentHqExpenses = getHqExpenses().filter(
+      (e) => e.driverName === currentDriverName || (Boolean(currentVehiclePlate) && e.vehiclePlate === currentVehiclePlate)
+    );
+    const calculatedExpenseAmount = currentHqExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const calculatedExpenseCount = currentHqExpenses.length;
+
     // Submit to shared HQ management store
     submitDriverLogToHq({
       id: `driver-sub-${Date.now()}`,
-      driverName: logData.driverName || '윤태준',
+      driverName: currentDriverName,
       customerName: logData.clientName || '인터코스',
-      vehicleModel: logData.carNumber || '116허 1514',
-      vehiclePlate: logData.carNumber || '116허 1514',
+      vehicleModel: currentVehiclePlate,
+      vehiclePlate: currentVehiclePlate,
       clockIn: logData.clockIn || '06:40',
       clockOut: logData.clockOut || '21:50',
       totalDutyHours: logData.totalDutyHours || '15시간 10분',
       startKm: logData.startKm || '154,725',
       endKm: logData.endKm || '154,861',
       distanceKm: logData.distanceKm || '136 km',
+      expenseAmount: calculatedExpenseAmount,
+      expenseCount: calculatedExpenseCount,
       stops: stopsMapped,
       notes: logData.notes || '',
       status: '검토 대기',

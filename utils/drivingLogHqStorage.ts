@@ -1,4 +1,5 @@
 import { HqDrivingLog, HqDrivingLogStatus } from '@/types/drivingLogHq';
+import { getHqExpenses } from '@/utils/expenseHqStorage';
 
 export const HQ_DRIVING_LOGS_STORAGE_KEY = 'cockpit_submitted_driving_logs_v1';
 export const HQ_LOGS_UPDATE_EVENT = 'cockpit_driving_log_updated';
@@ -597,27 +598,112 @@ export const INITIAL_HQ_DRIVING_LOGS: HqDrivingLog[] = [
 ];
 
 /**
- * Get all HQ driving logs, merged with user-submitted driver logs from localStorage
+ * Get all HQ driving logs, merged with user-submitted driver logs and synced with driver expenses
  */
 export const getHqDrivingLogs = (): HqDrivingLog[] => {
   if (typeof window === 'undefined') return INITIAL_HQ_DRIVING_LOGS;
 
   try {
     const raw = localStorage.getItem(HQ_DRIVING_LOGS_STORAGE_KEY);
-    if (!raw) {
-      // First time initialization
-      localStorage.setItem(HQ_DRIVING_LOGS_STORAGE_KEY, JSON.stringify(INITIAL_HQ_DRIVING_LOGS));
-      return INITIAL_HQ_DRIVING_LOGS;
+    let logs: HqDrivingLog[] = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(logs) || logs.length === 0) {
+      logs = [...INITIAL_HQ_DRIVING_LOGS];
     }
 
-    const parsed: HqDrivingLog[] = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      return parsed;
+    // Connect and dynamically aggregate expenses from HQ expenses storage
+    const hqExpenses = getHqExpenses();
+    let isModified = false;
+
+    // 1. Sync expenses for any matching driver or vehicle in existing logs
+    logs = logs.map((log) => {
+      const driverExps = hqExpenses.filter(
+        (e) =>
+          e.driverName === log.driverName ||
+          (Boolean(log.vehiclePlate) && Boolean(e.vehiclePlate) && e.vehiclePlate === log.vehiclePlate)
+      );
+
+      if (driverExps.length > 0) {
+        const totalAmount = driverExps.reduce((sum, e) => sum + e.amount, 0);
+        const count = driverExps.length;
+        if (log.expenseAmount !== totalAmount || log.expenseCount !== count) {
+          isModified = true;
+          return {
+            ...log,
+            expenseAmount: totalAmount,
+            expenseCount: count,
+          };
+        }
+      }
+      return log;
+    });
+
+    // 2. If '윤태준' has submitted expenses but does not yet have a driving log row, automatically create one
+    const yoonExpenses = hqExpenses.filter(
+      (e) => e.driverName === '윤태준' || e.vehiclePlate === '116허 1514'
+    );
+    const hasYoonLog = logs.some((l) => l.driverName === '윤태준');
+
+    if (yoonExpenses.length > 0 && !hasYoonLog) {
+      const yoonTotal = yoonExpenses.reduce((sum, e) => sum + e.amount, 0);
+      const firstExp = yoonExpenses[0];
+
+      const yoonDrivingLog: HqDrivingLog = {
+        id: 'driver-sub-yoon',
+        no: 1,
+        submittedAt: firstExp.submittedAt || '10/24 10:15',
+        submittedDate: firstExp.submittedDate || '2024. 10. 24 (목)',
+        drivingDate: '10/24',
+        rawDate: firstExp.rawDate || '2024-10-24',
+        driverName: '윤태준',
+        customerName: '인터코스',
+        vehicleModel: '116허 1514',
+        vehiclePlate: '116허 1514',
+        clockIn: '06:40',
+        clockOut: '21:50',
+        totalDutyHours: '15시간 10분',
+        startKm: '154,725',
+        endKm: '154,861',
+        distanceKm: '136 km',
+        expenseAmount: yoonTotal,
+        expenseCount: yoonExpenses.length,
+        status: '검토 대기',
+        stops: [
+          { id: 'd-1', time: '07:00', place: '차고지' },
+          { id: 'd-2', time: '08:50', place: '메리어트 호텔' },
+          { id: 'd-3', time: '09:50', place: '판교 오피스' },
+          { id: 'd-4', time: '11:25', place: '메리어트 호텔' },
+          { id: 'd-5', time: '13:30', place: '판교 오피스' },
+          { id: 'd-6', time: '17:05', place: '강남 올리브영' },
+          { id: 'd-7', time: '21:30', place: '메리어트 호텔' },
+          { id: 'd-8', time: '21:45', place: '차고지' },
+        ],
+        notes: `윤태준 기사의 경비지출(${yoonTotal.toLocaleString()}원 · ${yoonExpenses.length}건)이 운행일지와 실시간 연동되었습니다.`,
+        reviewHistory: [
+          {
+            id: `h-yoon-init`,
+            time: firstExp.submittedAt || '10/24 10:15',
+            message: `윤태준 기사의 경비지출(${yoonTotal.toLocaleString()}원)이 운행일지에 연동되었습니다.`,
+            actor: '시스템',
+            actionType: 'submission',
+          },
+        ],
+        isDriverSubmitted: true,
+      };
+
+      logs = [yoonDrivingLog, ...logs].map((item, idx) => ({
+        ...item,
+        no: idx + 1,
+      }));
+      isModified = true;
     }
 
-    return INITIAL_HQ_DRIVING_LOGS;
+    if (isModified || !raw) {
+      localStorage.setItem(HQ_DRIVING_LOGS_STORAGE_KEY, JSON.stringify(logs));
+    }
+
+    return logs;
   } catch (err) {
-    console.error('Failed to parse HQ driving logs from storage:', err);
+    console.error('Failed to parse and sync HQ driving logs from storage:', err);
     return INITIAL_HQ_DRIVING_LOGS;
   }
 };
@@ -631,6 +717,27 @@ export const submitDriverLogToHq = (newLog: Partial<HqDrivingLog>): HqDrivingLog
   const timeStr = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   const dateStr = `${now.getFullYear()}. ${String(now.getMonth() + 1).padStart(2, '0')}. ${String(now.getDate()).padStart(2, '0')}`;
 
+  const targetDriver = newLog.driverName || '윤태준';
+  const targetPlate = newLog.vehiclePlate || '116허 1514';
+
+  // Automatically lookup driver expenses if not explicitly provided
+  let expenseAmount = newLog.expenseAmount || 0;
+  let expenseCount = newLog.expenseCount || 0;
+
+  if (expenseAmount === 0) {
+    try {
+      const expenses = getHqExpenses().filter(
+        (e) => e.driverName === targetDriver || (Boolean(targetPlate) && e.vehiclePlate === targetPlate)
+      );
+      if (expenses.length > 0) {
+        expenseAmount = expenses.reduce((sum, e) => sum + e.amount, 0);
+        expenseCount = expenses.length;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   const fullLog: HqDrivingLog = {
     id: newLog.id || `driver-sub-${Date.now()}`,
     no: 1, // Will re-index below
@@ -638,18 +745,18 @@ export const submitDriverLogToHq = (newLog: Partial<HqDrivingLog>): HqDrivingLog
     submittedDate: dateStr,
     drivingDate: `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}`,
     rawDate: newLog.rawDate || now.toISOString().split('T')[0],
-    driverName: newLog.driverName || '윤태준',
+    driverName: targetDriver,
     customerName: newLog.customerName || '인터코스',
     vehicleModel: newLog.vehicleModel || '116허 1514',
-    vehiclePlate: newLog.vehiclePlate || '116허 1514',
+    vehiclePlate: targetPlate,
     clockIn: newLog.clockIn || '06:40',
     clockOut: newLog.clockOut || '21:50',
     totalDutyHours: newLog.totalDutyHours || '15시간 10분',
     startKm: newLog.startKm || '154,725',
     endKm: newLog.endKm || '154,861',
     distanceKm: newLog.distanceKm || '136 km',
-    expenseAmount: newLog.expenseAmount || 0,
-    expenseCount: newLog.expenseCount || 0,
+    expenseAmount,
+    expenseCount,
     status: '검토 대기',
     stops: newLog.stops && newLog.stops.length > 0 ? newLog.stops : [
       { id: 'd-1', time: '07:00', place: '차고지' },
@@ -666,8 +773,8 @@ export const submitDriverLogToHq = (newLog: Partial<HqDrivingLog>): HqDrivingLog
       {
         id: `h-init-${Date.now()}`,
         time: timeStr,
-        message: `${newLog.driverName || '윤태준'} 기사가 운행일지를 제출했습니다.`,
-        actor: newLog.driverName || '윤태준',
+        message: `${targetDriver} 기사가 운행일지를 제출했습니다.${expenseAmount > 0 ? ` (경비: ${expenseAmount.toLocaleString()}원)` : ''}`,
+        actor: targetDriver,
         actionType: 'submission',
       },
     ],
@@ -675,7 +782,7 @@ export const submitDriverLogToHq = (newLog: Partial<HqDrivingLog>): HqDrivingLog
   };
 
   // Prepend new submission and re-index `no`
-  const updatedLogs = [fullLog, ...currentLogs.filter((l) => l.id !== fullLog.id)].map((item, idx) => ({
+  const updatedLogs = [fullLog, ...currentLogs.filter((l) => l.id !== fullLog.id && l.driverName !== targetDriver)].map((item, idx) => ({
     ...item,
     no: idx + 1,
   }));

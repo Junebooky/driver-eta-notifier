@@ -11,6 +11,7 @@ import {
   exportDrivingLogsToCsv,
   HQ_LOGS_UPDATE_EVENT,
 } from '@/utils/drivingLogHqStorage';
+import { HQ_EXPENSE_UPDATE_EVENT } from '@/utils/expenseHqStorage';
 import { HqDrivingLogsKpi } from './HqDrivingLogsKpi';
 import { HqDrivingLogsFilterBar } from './HqDrivingLogsFilterBar';
 import { HqDrivingLogsTable } from './HqDrivingLogsTable';
@@ -71,10 +72,12 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
     };
 
     window.addEventListener(HQ_LOGS_UPDATE_EVENT, handleUpdate);
+    window.addEventListener(HQ_EXPENSE_UPDATE_EVENT, handleUpdate);
     window.addEventListener('storage', handleUpdate);
 
     return () => {
       window.removeEventListener(HQ_LOGS_UPDATE_EVENT, handleUpdate);
+      window.removeEventListener(HQ_EXPENSE_UPDATE_EVENT, handleUpdate);
       window.removeEventListener('storage', handleUpdate);
     };
   }, [refreshLogs]);

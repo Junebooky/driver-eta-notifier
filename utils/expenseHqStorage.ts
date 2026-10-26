@@ -296,6 +296,44 @@ export const submitDriverExpensesToHq = (
   const updated = [...newRecords, ...existing];
   saveHqExpenses(updated);
 
+  // Synchronize directly with driving logs in localStorage
+  if (typeof window !== 'undefined') {
+    try {
+      const rawLogs = localStorage.getItem('cockpit_submitted_driving_logs_v1');
+      if (rawLogs) {
+        const parsedLogs = JSON.parse(rawLogs);
+        if (Array.isArray(parsedLogs)) {
+          const allDriverExpenses = updated.filter(
+            (e) => e.driverName === driverName || (Boolean(vehiclePlate) && e.vehiclePlate === vehiclePlate)
+          );
+          const driverTotal = allDriverExpenses.reduce((sum, e) => sum + e.amount, 0);
+          const driverCount = allDriverExpenses.length;
+
+          let logFound = false;
+          const syncedLogs = parsedLogs.map((log) => {
+            if (log.driverName === driverName || (Boolean(vehiclePlate) && log.vehiclePlate === vehiclePlate)) {
+              logFound = true;
+              return {
+                ...log,
+                expenseAmount: driverTotal,
+                expenseCount: driverCount,
+              };
+            }
+            return log;
+          });
+
+          if (logFound) {
+            localStorage.setItem('cockpit_submitted_driving_logs_v1', JSON.stringify(syncedLogs));
+          }
+        }
+      }
+      // Broadcast update event so 운행일지 dashboard reacts immediately
+      window.dispatchEvent(new CustomEvent('cockpit_driving_log_updated'));
+    } catch (syncErr) {
+      console.warn('Failed to sync driving log with submitted expenses:', syncErr);
+    }
+  }
+
   return {
     success: true,
     count: newRecords.length,

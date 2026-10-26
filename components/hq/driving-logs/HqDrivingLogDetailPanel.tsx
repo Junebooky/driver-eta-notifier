@@ -272,11 +272,13 @@ export const HqDrivingLogDetailPanel: React.FC<HqDrivingLogDetailPanelProps> = (
           <div className="grid grid-cols-2 gap-1 text-center pt-1">
             <div>
               <div className="text-[10px] text-slate-400 font-medium">지출 건수</div>
-              <div className="text-xs font-bold text-slate-800 mt-0.5">{log.expenseCount}건</div>
+              <div className="text-xs font-bold text-slate-800 mt-0.5">
+                {log.expenseCount || (log.expenseAmount > 0 ? 1 : 0)}건
+              </div>
             </div>
             <div>
               <div className="text-[10px] text-slate-400 font-medium">지출 합계</div>
-              <div className="text-xs font-black text-slate-900 mt-0.5">
+              <div className="text-xs font-black text-[#1E60F3] mt-0.5">
                 {log.expenseAmount > 0 ? `${log.expenseAmount.toLocaleString()}원` : '0원'}
               </div>
             </div>

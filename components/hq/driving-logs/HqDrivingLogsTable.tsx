@@ -238,7 +238,16 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
 
                     {/* 경비지출 */}
                     <td className="py-3 px-3 text-right font-bold text-slate-800">
-                      {log.expenseAmount > 0 ? `${log.expenseAmount.toLocaleString()}원` : '-'}
+                      {log.expenseAmount > 0 ? (
+                        <div className="flex flex-col items-end">
+                          <span className="text-[#1E60F3] font-black">{log.expenseAmount.toLocaleString()}원</span>
+                          {log.expenseCount && log.expenseCount > 0 ? (
+                            <span className="text-[10px] text-slate-400 font-medium">({log.expenseCount}건)</span>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 font-medium">-</span>
+                      )}
                     </td>
 
                     {/* 상태 */}
