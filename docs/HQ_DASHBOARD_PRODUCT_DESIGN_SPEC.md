@@ -147,9 +147,12 @@ This design is successful if an HQ manager can answer **in seconds**:
 
 **The dashboard exists to prevent forgotten dispatches and reduce retyping, not to show static ornamental metrics.**
 
-## 8. Gmail customer inbox inside HQ (new owner request — 2026-10-26)
+### 2026-10-26 — NAVER Mail also required (supersedes Gmail-only inbox)
+The user also receives client messages on **NAVER Mail**, so the HQ design should now say **`고객 이메일 / 통합 메일함`**: one inbox with provider filters `전체 · Gmail · NAVER`, unified unread count, distinct provider account labels and connection/sync-error status. **Gmail uses its official OAuth API; NAVER uses secure IMAP (`imap.naver.com:993` SSL) with NAVER 2FA + application-specific password**. Never imply NAVER uses Gmail OAuth, request the primary NAVER password, or present a fake live inbox. A03 should show account-connect instructions and message viewer using synthetic placeholder emails. Both providers remain **read-only**; opening an email must not mark it read in the provider, and messages must not be forwarded to the whole company unless that company account's owner granted access. Full specs / compliance / refs in [Issue #20](https://github.com/Junebooky/driver-eta-notifier/issues/20). No account has been connected; no code/email data changes are approved.
 
-**New first-class feature:** [Gmail Inbox Issue #20](https://github.com/Junebooky/driver-eta-notifier/issues/20). The manager receives VIP booking enquiries in Gmail and wants to check them **inside HQ**, without keeping a separate browser tab open.
+## 8. Unified Gmail + NAVER customer inbox inside HQ (new owner request — 2026-10-26)
+
+**New first-class feature (now supporting both Gmail + NAVER):** [Gmail Inbox Issue #20](https://github.com/Junebooky/driver-eta-notifier/issues/20). The manager receives VIP booking enquiries in Gmail and wants to check them **inside HQ**, without keeping a separate browser tab open.
 
 **A03:** Keep the already-selected dashboard layout as the base. Add a clear entrance to `고객 이메일`: compare (a) a small sidebar entry and (b) `예약·배차 관리` → inbox tab, with unread badge and compact recent-unread preview accessible from dashboard. Choose a discoverable option without redesigning the seven KPI cards. Design a desktop read-only Gmail inbox with unread dots, sender, subject, time, safe snippet, search, filters and refresh/sync time, and a message/thread detail drawer. State `Google 계정 연결`, `연결 해제`, disconnected/error/expired permission/empty/loading. Buttons: `Gmail에서 열기`, future `예약 초안 만들기` (extract fields for manager review ONLY; never automatically dispatch).
 
