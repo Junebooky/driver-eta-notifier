@@ -166,7 +166,7 @@ export const HqDrivingLogDetailPanel: React.FC<HqDrivingLogDetailPanelProps> = (
             등록된 운행 경로 일정이 없습니다.
           </div>
         ) : (
-          <div className="relative flex flex-col py-0.5">
+          <div className="relative flex flex-col pt-1">
             {log.stops.map((stop, index) => {
               const isFirst = index === 0;
               const isLast = index === log.stops.length - 1;
@@ -174,31 +174,35 @@ export const HqDrivingLogDetailPanel: React.FC<HqDrivingLogDetailPanelProps> = (
               return (
                 <div
                   key={stop.id || index}
-                  className="relative flex items-center gap-2.5 text-xs py-1.5 group min-h-[30px]"
+                  className="relative flex items-start gap-2.5 text-xs group"
                 >
-                  {/* Dedicated Timeline Axis: vertical line & circle on the exact same axis */}
-                  <div className="relative flex flex-col items-center justify-center w-4 self-stretch shrink-0">
-                    {/* Top line segment */}
-                    {index > 0 && (
-                      <div className="absolute top-0 bottom-1/2 left-1/2 -translate-x-1/2 w-[2px] bg-blue-200 pointer-events-none" />
-                    )}
-                    {/* Bottom line segment */}
-                    {index < log.stops.length - 1 && (
-                      <div className="absolute top-1/2 bottom-0 left-1/2 -translate-x-1/2 w-[2px] bg-blue-200 pointer-events-none" />
-                    )}
+                  {/* Continuous Timeline Axis: line connects from first circle to last circle */}
+                  <div className="relative w-5 flex justify-center shrink-0 self-stretch min-h-[34px]">
+                    {/* Continuous Vertical Line */}
+                    <div
+                      className={`absolute left-1/2 -translate-x-1/2 w-[2px] bg-[#60A5FA] pointer-events-none ${
+                        isFirst
+                          ? 'top-2 bottom-0'
+                          : isLast
+                          ? 'top-0 h-2'
+                          : 'top-0 bottom-0'
+                      }`}
+                    />
 
                     {/* Circle Node placed directly on the line */}
-                    {isFirst || isLast ? (
-                      <div className="relative z-10 w-3 h-3 rounded-full bg-blue-100 ring-2 ring-white flex items-center justify-center shrink-0">
-                        <div className="w-1.5 h-1.5 rounded-full bg-[#1E60F3]" />
-                      </div>
-                    ) : (
-                      <div className="relative z-10 w-2.5 h-2.5 rounded-full bg-white border-2 border-[#1E60F3] ring-2 ring-white shrink-0" />
-                    )}
+                    <div className="relative z-10 mt-0.5 flex items-center justify-center">
+                      {isFirst || isLast ? (
+                        <div className="w-3.5 h-3.5 rounded-full bg-blue-100 ring-2 ring-white flex items-center justify-center shrink-0 shadow-2xs">
+                          <div className="w-2 h-2 rounded-full bg-[#1E60F3]" />
+                        </div>
+                      ) : (
+                        <div className="w-2.5 h-2.5 rounded-full bg-white border-2 border-[#1E60F3] ring-2 ring-white shrink-0 shadow-2xs" />
+                      )}
+                    </div>
                   </div>
 
                   {/* Stop Information */}
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 pb-3">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-baseline gap-2.5 min-w-0">
                         <span className="font-bold text-slate-800 shrink-0 tabular-nums w-11">

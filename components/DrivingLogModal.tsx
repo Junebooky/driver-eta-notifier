@@ -581,7 +581,7 @@ const DrivingLogModalContent: React.FC<{
 
           {/* Timeline List or Empty State */}
           {logData.stops.length > 0 ? (
-            <div className="relative pl-1 pr-1 flex flex-col">
+            <div className="relative pl-1 pr-1 flex flex-col pt-1">
               {logData.stops.map((stop, idx) => {
                 // Check timeline consistency against duty hours
                 const consistency = checkStopTimelineConsistency(
@@ -589,40 +589,46 @@ const DrivingLogModalContent: React.FC<{
                   logData.clockOut,
                   stop.time
                 );
+                const isFirst = idx === 0;
+                const isLast = idx === logData.stops.length - 1;
 
                 return (
                   <div
                     key={stop.id}
-                    className="relative flex items-center justify-between text-xs sm:text-sm py-2 group z-10"
+                    className="relative flex items-start justify-between text-xs sm:text-sm group z-10"
                   >
-                    <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+                    <div className="flex items-start gap-2.5 sm:gap-3 min-w-0 flex-1">
                       {/* Number Badge */}
-                      <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-600 text-[11px] font-semibold flex items-center justify-center shrink-0">
+                      <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-600 text-[11px] font-semibold flex items-center justify-center shrink-0 mt-0.5">
                         {idx + 1}
                       </span>
 
                       {/* Time */}
-                      <span className="font-semibold text-slate-700 w-11 sm:w-12 shrink-0 text-left tabular-nums">
+                      <span className="font-semibold text-slate-700 w-11 sm:w-12 shrink-0 text-left tabular-nums mt-0.5">
                         {stop.time}
                       </span>
 
-                      {/* Dedicated Timeline Axis: vertical line & circle on the exact same axis */}
-                      <div className="relative flex flex-col items-center justify-center w-4 self-stretch shrink-0">
-                        {/* Top line segment */}
-                        {idx > 0 && (
-                          <div className="absolute top-0 bottom-1/2 left-1/2 -translate-x-1/2 w-[2px] bg-blue-200 pointer-events-none" />
-                        )}
-                        {/* Bottom line segment */}
-                        {idx < logData.stops.length - 1 && (
-                          <div className="absolute top-1/2 bottom-0 left-1/2 -translate-x-1/2 w-[2px] bg-blue-200 pointer-events-none" />
-                        )}
+                      {/* Continuous Timeline Axis: line connects from first circle to last circle */}
+                      <div className="relative w-5 flex justify-center shrink-0 self-stretch min-h-[36px]">
+                        {/* Continuous Vertical Line */}
+                        <div
+                          className={`absolute left-1/2 -translate-x-1/2 w-[2px] bg-[#60A5FA] pointer-events-none ${
+                            isFirst
+                              ? 'top-2.5 bottom-0'
+                              : isLast
+                              ? 'top-0 h-2.5'
+                              : 'top-0 bottom-0'
+                          }`}
+                        />
 
-                        {/* Blue Connected Dot right on the vertical line */}
-                        <div className="relative z-10 w-2.5 h-2.5 rounded-full bg-[#1E60F3] ring-4 ring-white shrink-0" />
+                        {/* Blue Connected Dot placed directly on the line */}
+                        <div className="relative z-10 mt-1 flex items-center justify-center">
+                          <div className="w-2.5 h-2.5 rounded-full bg-[#1E60F3] ring-4 ring-white shrink-0 shadow-2xs" />
+                        </div>
                       </div>
 
                       {/* Location Place Name & Inconsistency Warning */}
-                      <div className="min-w-0 flex-1 pl-0.5">
+                      <div className="min-w-0 flex-1 pl-0.5 pb-3">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="font-bold text-slate-800 truncate block">{stop.place}</span>
                           {!consistency.isConsistent && (
@@ -632,13 +638,13 @@ const DrivingLogModalContent: React.FC<{
                           )}
                         </div>
                         {stop.memo && (
-                          <span className="text-[11px] text-slate-400 truncate block">{stop.memo}</span>
+                          <span className="text-[11px] text-slate-400 truncate block mt-0.5">{stop.memo}</span>
                         )}
                       </div>
                     </div>
 
                     {/* More Action Button */}
-                    <div className="relative shrink-0">
+                    <div className="relative shrink-0 mt-0.5">
                       <button
                         type="button"
                         onClick={(e) => {
