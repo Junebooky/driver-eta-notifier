@@ -226,6 +226,39 @@ export const getHqExpenses = (): HqExpenseRecord[] => {
   }
 };
 
+let cachedExpensesRaw = '';
+let cachedExpensesSnapshot: HqExpenseRecord[] = INITIAL_HQ_EXPENSES;
+
+export const subscribeHqExpenses = (callback: () => void): (() => void) => {
+  if (typeof window === 'undefined') return () => {};
+  window.addEventListener(HQ_EXPENSE_UPDATE_EVENT, callback);
+  window.addEventListener('cockpit_hq_expense_updated', callback);
+  window.addEventListener('storage', callback);
+  return () => {
+    window.removeEventListener(HQ_EXPENSE_UPDATE_EVENT, callback);
+    window.removeEventListener('cockpit_hq_expense_updated', callback);
+    window.removeEventListener('storage', callback);
+  };
+};
+
+export const getHqExpensesSnapshot = (): HqExpenseRecord[] => {
+  if (typeof window === 'undefined') return INITIAL_HQ_EXPENSES;
+  try {
+    const raw = localStorage.getItem(HQ_EXPENSES_STORAGE_KEY);
+    if (raw && raw === cachedExpensesRaw) return cachedExpensesSnapshot;
+    const synced = getHqExpenses();
+    cachedExpensesRaw = localStorage.getItem(HQ_EXPENSES_STORAGE_KEY) || '';
+    cachedExpensesSnapshot = synced;
+    return cachedExpensesSnapshot;
+  } catch {
+    return INITIAL_HQ_EXPENSES;
+  }
+};
+
+export const getHqExpensesServerSnapshot = (): HqExpenseRecord[] => {
+  return INITIAL_HQ_EXPENSES;
+};
+
 /**
  * Save all HQ expenses to localStorage & dispatch notification event
  */

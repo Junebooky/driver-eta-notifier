@@ -1,4 +1,4 @@
-export type DispatchStatus = '미배정' | '배차 완료' | '운행 중' | '운행 완료' | '취소';
+export type DispatchStatus = '미배정' | '배차 완료' | '운행 중' | '운행 완료' | '취소' | '작성 중' | '재확인 필요';
 export type DriverAckStatus = '미확인' | '확인완료' | '재확인 필요' | '-';
 export type CustomerBrochureStatus = '미생성' | '미발송' | '발송됨' | '재발송 필요' | '실패';
 
@@ -35,8 +35,43 @@ export interface HqKpiMetric {
   subtext: string;
   trendText?: string;
   trendColor?: 'red' | 'blue' | 'slate';
-  iconType: 'calendar' | 'users' | 'document' | 'send' | 'refresh' | 'clipboard' | 'receipt';
+  iconType: 'calendar' | 'users' | 'document' | 'send' | 'refresh' | 'clipboard' | 'receipt' | 'mail' | 'group';
   urgencyLevel?: 'normal' | 'urgent' | 'warning';
+}
+
+export interface HqUnconfirmedDispatchItem {
+  id: string;
+  pickupTime: string;
+  customerName: string;
+  driverName: string;
+  vehicleModel: string;
+  destination: string;
+  waitingTime: string;
+  isUrgent?: boolean;
+}
+
+export interface HqUnsentDraftItem {
+  id: string;
+  createdAt: string;
+  customerName: string;
+  pickupTime: string;
+  destination: string;
+  status: string;
+}
+
+export interface HqDriverAllocationSlice {
+  label: string;
+  count: number;
+  percentage: number;
+  color: string;
+}
+
+export interface HqDriverAllocationStats {
+  totalDrivers: number;
+  active: HqDriverAllocationSlice;
+  standby: HqDriverAllocationSlice;
+  offDuty: HqDriverAllocationSlice;
+  unassigned: HqDriverAllocationSlice;
 }
 
 export interface HqDrivingLogItem {

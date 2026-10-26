@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useSyncExternalStore } from 'react';
 import Image from 'next/image';
 import {
   Receipt,
@@ -18,13 +18,15 @@ import {
   Loader2,
   Sparkles,
 } from 'lucide-react';
-import { HqExpenseRecord, HqExpenseStatus } from '@/types/expenseHq';
+import { HqExpenseStatus } from '@/types/expenseHq';
 import {
-  getHqExpenses,
+  subscribeHqExpenses,
+  getHqExpensesSnapshot,
+  getHqExpensesServerSnapshot,
   getHqExpenseKpiSummary,
   updateHqExpenseStatus,
+  saveHqExpenses,
   exportExpensesToCsv,
-  HQ_EXPENSE_UPDATE_EVENT,
 } from '@/utils/expenseHqStorage';
 import { EXPENSE_CATEGORIES, formatKRW } from '@/utils/expense';
 import { renderCategoryIcon } from '@/components/AddExpenseModal';
@@ -38,11 +40,13 @@ export interface HqExpensesViewProps {
 export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
   initialSearchQuery = '',
 }) => {
-  const [expenses, setExpenses] = useState<HqExpenseRecord[]>(() => getHqExpenses());
-  const [selectedExpenseId, setSelectedExpenseId] = useState<string | null>(() => {
-    const list = getHqExpenses();
-    return list[0]?.id || null;
-  });
+  // Live master expenses list via useSyncExternalStore (SSR and Hydration safe)
+  const expenses = useSyncExternalStore(
+    subscribeHqExpenses,
+    getHqExpensesSnapshot,
+    getHqExpensesServerSnapshot
+  );
+  const [selectedExpenseId, setSelectedExpenseId] = useState<string | null>(null);
 
   // Filters
   const [selectedCategory, setSelectedCategory] = useState<string>('전체');
@@ -61,20 +65,6 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
   };
-
-  const refreshExpenses = useCallback(() => {
-    const loaded = getHqExpenses();
-    setExpenses(loaded);
-  }, []);
-
-  useEffect(() => {
-    window.addEventListener(HQ_EXPENSE_UPDATE_EVENT, refreshExpenses);
-    window.addEventListener('storage', refreshExpenses);
-    return () => {
-      window.removeEventListener(HQ_EXPENSE_UPDATE_EVENT, refreshExpenses);
-      window.removeEventListener('storage', refreshExpenses);
-    };
-  }, [refreshExpenses]);
 
   // Selected item
   const selectedExpense = useMemo(() => {
@@ -133,7 +123,6 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
       '본사 관리자'
     );
     if (updated) {
-      refreshExpenses();
       showToast(`${selectedExpense.driverName} 기사님의 경비 상태가 '${newStatus}'(으)로 변경되었습니다.`);
     }
   };
@@ -148,7 +137,7 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
       const updatedList = expenses.map((e) =>
         e.id === selectedExpense.id ? { ...e, receiptUrl: rotated } : e
       );
-      setExpenses(updatedList);
+      saveHqExpenses(updatedList);
       showToast('영수증 사진이 90° 회전되었습니다.');
     } catch (err) {
       console.error('Failed to rotate receipt in inspection drawer:', err);
