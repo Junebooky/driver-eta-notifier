@@ -1,5 +1,16 @@
 # A03 — Senior Product Design Agent
 
+## NEW A03 DESIGN ASSIGNMENT — 2026-10-27: `현장 팁` / Senior Chauffeur Knowledge Sharing
+
+**Read full, authoritative requirements:** [Issue #23 — Driver field tips](https://github.com/Junebooky/driver-eta-notifier/issues/23). The user wants experienced drivers' field knowledge about **hotel parking free minutes, airport legal waiting/guest pickup, exact pickup entrance, Sprinter entry constraints, and camera blind-spot/parking-enforcement awareness** shared with newer drivers. **Do NOT add a crowded new sidebar/module**; fit one small `현장 팁` icon/button on Cockpit's existing selected destination/schedule/place card.
+
+**A03: Draw actual mobile UI mockup images** (1) unobtrusive tip entry on location card, (2) 1-screen location tip sheet with simple parking/waiting/pickup/camera categories, source & last verification, (3) 15-second senior driver `현장 팁 제보` form, and (4) inaccurate/outdated tip flag + manager confirmation. Keep #1E60F3 white minimal. Example hotel `조선팰리스 30분 무료` comes from the user, is **unverified**, and must show `기사 제보 / 호텔 확인 필요`, not an official policy badge.
+
+**Camera category:** User explicitly requests `카메라 사각지대`. Show it as **camera visibility / enforcement caution information**, never as a guarantee that stopping or waiting is legal. Do NOT create navigable camera-evasion blind-spot pins or routes to prohibited waiting places. Prioritize official permitted waiting/pickup guidance; display `주정차 가능 여부 별도 확인` where appropriate.
+
+**Gate:** Design only; user review before any A02 integration. Never include private VIP customer data/photos in public repo mockups.
+
+
 ## CURRENT HQ Dashboard directive — 2026-10-26 (HIGHEST PRIORITY)
 
 **READ FIRST:** [HQ Dashboard Product & Design Specification](https://github.com/Junebooky/driver-eta-notifier/blob/feat/vip-korea-report-preview/docs/HQ_DASHBOARD_PRODUCT_DESIGN_SPEC.md).
