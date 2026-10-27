@@ -208,3 +208,32 @@ export interface DbDispatchAcknowledgmentRow {
   device_summary?: string | null;
   created_at?: string;
 }
+
+export interface DbOrgPlaceRow {
+  id: string;
+  org_id: string;
+  name: string;
+  aliases: string[];
+  road_address: string;
+  lat: number;
+  lng: number;
+  entry_gate_notes?: string | null;
+  verified_by?: string | null;
+  verified_at?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface OrgPlace {
+  id: string;
+  orgId: string;
+  name: string;
+  aliases: string[];
+  roadAddress: string;
+  lat: number;
+  lng: number;
+  entryGateNotes?: string;
+  verifiedBy?: string;
+  verifiedAt?: string;
+}
+
