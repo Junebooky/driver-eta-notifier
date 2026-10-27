@@ -799,18 +799,17 @@ export default function Home() {
           isCached: Boolean(data.isCached),
         });
       } catch (err: any) {
-        console.warn('Falling back to haversine estimate (timeout or network):', err?.message);
-        const validWaypoints = (waypoints || []).filter(
-          (w) => w && typeof w.lat === 'number' && typeof w.lng === 'number' && (w.lat !== 0 || w.lng !== 0)
-        );
-        const fallback = calculateHaversineEstimate(
-          start.lat,
-          start.lng,
-          end.lat,
-          end.lng,
-          validWaypoints.map((w) => ({ lat: w.lat, lng: w.lng }))
-        );
-        setRouteEstimate(fallback);
+        console.warn('TMAP Route API call failed or timed out:', err?.message);
+        setRouteEstimate({
+          distanceKm: 0,
+          durationMinutes: 0,
+          etaFormatted: '--:--',
+          trafficSummary: 'TMAP 경로 조회 불가',
+          isMock: false,
+          isFallback: false,
+          isUnavailable: true,
+          error: 'TMAP 실시간 경로를 불러올 수 없습니다.',
+        });
       } finally {
         clearTimeout(timeoutId);
         setIsLoadingRoute(false);
@@ -819,32 +818,51 @@ export default function Home() {
     []
   );
 
-  // Fetch AI Prediction for future departure time (Isolated simulation only) with 3.5s timeout guard
+  // Fetch AI Prediction for future departure time (Strictly Genuine TMAP Prediction) with 8s timeout guard
   const fetchPrediction = useCallback(
-    async (targetDate: Date, start: LocationPreset, end: LocationPreset) => {
+    async (targetDate: Date, start: LocationPreset, end: LocationPreset, currentWaypoints?: LocationPreset[]) => {
       setIsLoadingPrediction(true);
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
       try {
+        const validWaypoints = (currentWaypoints || []).filter(
+          (w) => w && typeof w.lat === 'number' && typeof w.lng === 'number' && (w.lat !== 0 || w.lng !== 0)
+        );
         const res = await fetch('/api/route/prediction', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             departure: { name: start.shortName || start.name, lat: start.lat, lng: start.lng },
             destination: { name: end.shortName || end.name, lat: end.lat, lng: end.lng },
+            waypoints: validWaypoints.map((w) => ({ name: w.name, lat: w.lat, lng: w.lng })),
             predictionTime: targetDate.toISOString(),
           }),
-          signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal
-            ? AbortSignal.timeout(3500)
-            : controller.signal,
+          signal: controller.signal,
         });
         if (!res.ok) {
-          throw new Error(`Prediction API error ${res.status}`);
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData?.error || `Prediction API error ${res.status}`);
         }
         const data: PredictionResult = await res.json();
         setPredictionResult(data);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.warn('Prediction fetch error (timeout or network):', err);
+        const isAbort = err instanceof Error && err.name === 'AbortError';
+        const errorMsg = err instanceof Error ? err.message : '예측 정보를 불러올 수 없습니다.';
+        setPredictionResult({
+          baseDurationMinutes: null,
+          predictedDurationMinutes: null,
+          predictedDistanceKm: null,
+          departureTimeIso: targetDate.toISOString(),
+          departureTimeFormatted: '--:--',
+          arrivalTimeFormatted: null,
+          trafficSummary: 'TMAP 예측 불가',
+          isMock: false,
+          isFallback: false,
+          isUnavailable: true,
+          error: isAbort ? '요청 시간이 초과되었습니다.' : errorMsg,
+          timeline: [],
+        });
       } finally {
         clearTimeout(timeoutId);
         setIsLoadingPrediction(false);
@@ -905,7 +923,11 @@ export default function Home() {
     setIsTimePickerOpen(false);
     setIsPredictionSheetOpen(true);
     if (origin && destination) {
-      fetchPrediction(date, origin, destination);
+      const effectiveWaypoints =
+        isAdminRoute && adminWaypoints.length > 0
+          ? adminWaypoints
+          : waypoints.filter((w) => w && w.lat && w.lng && (w.lat !== 0 || w.lng !== 0));
+      fetchPrediction(date, origin, destination, effectiveWaypoints);
     }
   };
 

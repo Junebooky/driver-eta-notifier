@@ -76,6 +76,8 @@ export interface RouteEstimate {
   isFallback?: boolean;
   fallbackNotice?: string;
   isCached?: boolean;
+  isUnavailable?: boolean;
+  error?: string;
 }
 
 export type FuelCode = 'D047' | 'B027' | 'B034';
