@@ -46,7 +46,13 @@ import {
   formatPickerDateTime,
   validateExpenseInput,
 } from '@/utils/expense';
+import {
+  SAMPLE_RECEIPT_PRESETS,
+  ReceiptScanResult,
+} from '@/utils/receiptOcr';
 import { haptics } from '@/utils/haptics';
+
+export { SAMPLE_RECEIPT_PRESETS };
 
 interface CachedOcrResult {
   merchant?: string;
@@ -63,51 +69,17 @@ interface CachedOcrResult {
 // In-memory client cache for OCR results to avoid calling Gemini API repeatedly
 const clientOcrCache = new Map<string, CachedOcrResult>();
 
-// Predefined sample receipt fixture presets (Zero Gemini API fees, instant 0ms load)
-export const SAMPLE_RECEIPT_PRESETS: Record<
-  string,
-  {
-    merchant: string;
-    address: string;
-    amount: number;
-    category: ExpenseCategoryKey;
-    date: string;
-    time: string;
-    summary: string;
-    memo: string;
+// Collision-free client cache key computation
+function computeClientCacheKey(str: string): string {
+  if (!str) return '';
+  if (str.startsWith('/')) return str;
+  let hash = 0;
+  for (let i = 0; i < Math.min(str.length, 2048); i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
   }
-> = {
-  '/images/receipt_sample_hangang.jpg': {
-    merchant: '한강주유소',
-    address: '경기도 고양시 덕양구 행주로 57-28',
-    amount: 48000,
-    category: 'fuel',
-    date: '2026-10-26',
-    time: '12:36',
-    summary: '한강주유소에서 휘발유 48,000원 결제 영수증으로 판독되었습니다.',
-    memo: 'VIP 의전 배차 전 주유',
-  },
-  '/images/receipt_sample_fuel.jpg': {
-    merchant: '서울 만남의광장 주유소',
-    address: '서울 서초구 양재대로12길 73-71',
-    amount: 72000,
-    category: 'fuel',
-    date: '2026-10-24',
-    time: '11:32',
-    summary: '서울 만남의광장 주유소에서 경유 72,000원 결제 영수증으로 인식되었습니다.',
-    memo: '서울 서초구 양재대로 주유',
-  },
-  '/images/receipt_sample_cu.jpg': {
-    merchant: 'CU 고양강매점',
-    address: '경기도 고양시 덕양구 강매로247 (강매동 521-7)',
-    amount: 9500,
-    category: 'meal',
-    date: '2024-10-26',
-    time: '19:22',
-    summary: 'CU 고양강매점에서 식음료 9,500원 결제 영수증으로 판독되었습니다.',
-    memo: '야간 대기 식대',
-  },
-};
+  return `${str.length}_${hash}_${str.slice(-32)}`;
+}
 
 interface AddExpenseModalProps {
   isOpen: boolean;
@@ -216,6 +188,7 @@ const AddExpenseModalContent: React.FC<{
     amount: number | null;
     category: string;
     summary: string;
+    modelName?: string;
     isZeroCost?: boolean;
   } | null>(() => {
     if (initialPreset) {
@@ -224,6 +197,7 @@ const AddExpenseModalContent: React.FC<{
         amount: initialPreset.amount,
         category: EXPENSE_CATEGORIES[initialPreset.category]?.label || '주유비',
         summary: initialPreset.summary,
+        modelName: '샘플 프리셋 (비용 0원)',
         isZeroCost: true,
       };
     }
@@ -277,7 +251,7 @@ const AddExpenseModalContent: React.FC<{
     if (SAMPLE_RECEIPT_PRESETS[imageUrl]) {
       const p = SAMPLE_RECEIPT_PRESETS[imageUrl];
       setMerchant(p.merchant);
-      setAddress(p.address);
+      setAddress(p.address || '');
       setAmountRaw(formatKRW(p.amount, false));
       setCategory(p.category);
       setDate(p.date);
@@ -288,6 +262,7 @@ const AddExpenseModalContent: React.FC<{
         amount: p.amount,
         category: EXPENSE_CATEGORIES[p.category]?.label || '기타',
         summary: p.summary,
+        modelName: '샘플 프리셋 (비용 0원)',
         isZeroCost: true,
       });
       haptics.success();
@@ -296,7 +271,7 @@ const AddExpenseModalContent: React.FC<{
     }
 
     // Step 2: Check client-side cache (Zero Gemini API call)
-    const cacheKey = imageUrl.length > 200 ? `${imageUrl.slice(0, 50)}_${imageUrl.length}` : imageUrl;
+    const cacheKey = computeClientCacheKey(imageUrl);
     const cached = clientOcrCache.get(cacheKey);
     if (cached) {
       if (cached.merchant) setMerchant(cached.merchant);
@@ -316,6 +291,7 @@ const AddExpenseModalContent: React.FC<{
         amount: cached.amount ?? null,
         category: EXPENSE_CATEGORIES[cached.category as ExpenseCategoryKey]?.label || '기타',
         summary: cached.summary || '캐시된 영수증 정보입니다.',
+        modelName: cached.modelUsed || 'Gemini 3.1 Flash-Lite (비용 0원 · 캐시)',
         isZeroCost: true,
       });
       haptics.success();
@@ -335,7 +311,7 @@ const AddExpenseModalContent: React.FC<{
           carModel: '116허 1514',
         }),
       });
-      const data = await res.json();
+      const data: ReceiptScanResult = await res.json();
       if (data && data.success) {
         clientOcrCache.set(cacheKey, data);
         if (data.merchant) setMerchant(data.merchant);
@@ -351,19 +327,30 @@ const AddExpenseModalContent: React.FC<{
         if (data.time) setTime(data.time);
         if (data.paymentMethod) setPaymentMethod(data.paymentMethod);
 
-        const isZeroFee = Boolean(data.modelUsed?.includes('0원') || data.modelUsed?.includes('샘플') || data.modelUsed?.includes('캐시'));
+        const isZeroFee = Boolean(data.isCached || data.modelUsed?.includes('0원') || data.modelUsed?.includes('샘플') || data.modelUsed?.includes('캐시'));
+        let modelDisplayName = 'Gemini 3.1 Flash-Lite';
+        if (data.modelUsed) {
+          if (data.modelUsed.includes('3.8')) modelDisplayName = 'Gemini 3.8 Flash (정밀 폴백)';
+          else if (data.modelUsed.includes('3.5')) modelDisplayName = 'Gemini 3.5 Flash-Lite';
+          else if (data.modelUsed.includes('3.1')) modelDisplayName = 'Gemini 3.1 Flash-Lite';
+        }
+        if (isZeroFee) {
+          modelDisplayName += ' (비용 0원 · 캐시)';
+        }
+
         setOcrBannerInfo({
           merchant: data.merchant,
           amount: data.amount,
           category: EXPENSE_CATEGORIES[data.category as ExpenseCategoryKey]?.label || '기타',
           summary: data.summary,
+          modelName: modelDisplayName,
           isZeroCost: isZeroFee,
         });
 
         haptics.success();
         showToast(isZeroFee
           ? '✨ 샘플/캐시 영수증 정보가 즉시 적용되었습니다. (API 비용 0원)'
-          : '✨ Vision AI가 영수증 정보를 자동 판독하여 입력했습니다!');
+          : `✨ Vision AI (${modelDisplayName})가 영수증 정보를 자동 판독했습니다!`);
       } else {
         showToast('영수증 분석을 완료하지 못했습니다. 직접 입력해 주세요.');
       }
@@ -375,9 +362,10 @@ const AddExpenseModalContent: React.FC<{
     }
   }, []);
 
-  // Auto scan sample receipt or initial photo once on load (Skips Gemini if already a sample preset)
+  // Auto scan sample receipt or initial photo once on load (Skips Gemini if already a sample preset or editing an item)
   useEffect(() => {
-    if (initialPhotoUrl && !editingItem && !hasAutoScannedRef.current) {
+    if (editingItem) return;
+    if (initialPhotoUrl && !hasAutoScannedRef.current) {
       hasAutoScannedRef.current = true;
       if (SAMPLE_RECEIPT_PRESETS[initialPhotoUrl]) {
         console.log('[AddExpenseModal] Loaded sample preset without Gemini API call.');
@@ -456,7 +444,7 @@ const AddExpenseModalContent: React.FC<{
       if (matchedPresetKey && SAMPLE_RECEIPT_PRESETS[matchedPresetKey]) {
         const p = SAMPLE_RECEIPT_PRESETS[matchedPresetKey];
         setMerchant(p.merchant);
-        setAddress(p.address);
+        setAddress(p.address || '');
         setAmountRaw(formatKRW(p.amount, false));
         setCategory(p.category);
         setDate(p.date);
@@ -887,10 +875,10 @@ const AddExpenseModalContent: React.FC<{
                       {ocrBannerInfo.isZeroCost ? (
                         <>
                           <Sparkles className="w-2.5 h-2.5 text-emerald-600" />
-                          <span>Gemini 3.8 Flash (비용 0원 · 캐시)</span>
+                          <span>{ocrBannerInfo.modelName || 'Gemini 3.1 Flash-Lite (비용 0원 · 캐시)'}</span>
                         </>
                       ) : (
-                        <span>Gemini 3.8 Flash</span>
+                        <span>{ocrBannerInfo.modelName || 'Gemini 3.1 Flash-Lite'}</span>
                       )}
                     </span>
                   </div>

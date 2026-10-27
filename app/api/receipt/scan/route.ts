@@ -3,156 +3,21 @@ import { GoogleGenAI } from '@google/genai';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { ExpenseCategoryKey, PaymentMethod } from '@/utils/expense';
+import {
+  ReceiptScanResult,
+  calculateReceiptOcrCost,
+  matchSampleReceipt,
+  validateReceiptScanResult,
+  shouldTriggerFallback,
+  checkRateLimit,
+} from '@/utils/receiptOcr';
 
-export interface ReceiptScanRequestBody {
-  image: string; // Base64 data URL or relative path e.g. /images/receipt_sample_fuel.jpg
-  carModel?: string;
-  driverName?: string;
-}
-
-export interface ReceiptScanResult {
-  success: boolean;
-  merchant: string;
-  address: string | null;
-  amount: number | null;
-  date: string | null;
-  time: string | null;
-  category: ExpenseCategoryKey;
-  paymentMethod: PaymentMethod;
-  summary: string;
-  confidence: number;
-  modelUsed?: string;
-  error?: string;
-}
-
-// Global server-side OCR cache to prevent redundant Gemini API calls and fee waste
+// Global server-side OCR cache to prevent redundant Gemini API calls (Zero Fee Waste)
 const globalReceiptOcrCache = new Map<string, ReceiptScanResult>();
 
-// Predefined deterministic data for known sample receipts (Zero Gemini API fees)
-function getSampleReceiptData(identifier: string): ReceiptScanResult | null {
-  const lower = identifier.toLowerCase();
-
-  // Exact 64-character SHA-256 hash matching
-  if (/^[a-f0-9]{64}$/.test(lower)) {
-    // 1. Hangang Gas Station Sample
-    if (
-      lower === '06a6e3751da4a1d4e9c7307ef34cc15021b7f879d97a09805b3dfef722c84306' ||
-      lower === '10cf194efa1d4c46866676b4595f9ee22ed1d1f96fc36614e4d70a0b7c661ff9'
-    ) {
-      return {
-        success: true,
-        merchant: '한강주유소',
-        address: '경기도 고양시 덕양구 행주로 57-28',
-        amount: 48000,
-        date: '2026-10-26',
-        time: '12:36',
-        category: 'fuel',
-        paymentMethod: 'company_card',
-        summary: '한강주유소에서 휘발유 48,000원 결제 영수증으로 판독되었습니다. (샘플 데이터 즉시 로드 · API 비용 0원)',
-        confidence: 0.99,
-        modelUsed: '샘플 프리셋 (비용 0원)',
-      };
-    }
-
-    // 2. Mannamui Gwangjang Fuel Sample
-    if (
-      lower === '85626cd9cc748946cfa2c2923735142e0be5960cf432e5717e4d03162c436f43' ||
-      lower === '965cbdc71fa6e88d3ac2a290493e935309407eee96ceb141acc3db02d3845471'
-    ) {
-      return {
-        success: true,
-        merchant: '서울 만남의광장 주유소',
-        address: '서울 서초구 양재대로12길 73-71',
-        amount: 72000,
-        date: '2026-10-24',
-        time: '11:32',
-        category: 'fuel',
-        paymentMethod: 'company_card',
-        summary: '서울 만남의광장 주유소에서 경유 72,000원 결제 영수증으로 인식되었습니다. (샘플 데이터 즉시 로드 · API 비용 0원)',
-        confidence: 0.98,
-        modelUsed: '샘플 프리셋 (비용 0원)',
-      };
-    }
-
-    // 3. CU Convenience Store Sample
-    if (
-      lower === '70d6e1959bfc99a3d071d7c680f1563edc540e758bbbd014a58d1535b9a9bfd6' ||
-      lower === 'd4beb96c5a067ba410814f6688fd71c0bd3ceeca7384f5002bbe1e1e40985f90'
-    ) {
-      return {
-        success: true,
-        merchant: 'CU 고양강매점',
-        address: '경기도 고양시 덕양구 강매로247 (강매동 521-7)',
-        amount: 9500,
-        date: '2024-10-26',
-        time: '19:22',
-        category: 'meal',
-        paymentMethod: 'company_card',
-        summary: 'CU 고양강매점에서 식음료 9,500원 결제 영수증으로 판독되었습니다. (샘플 데이터 즉시 로드 · API 비용 0원)',
-        confidence: 0.98,
-        modelUsed: '샘플 프리셋 (비용 0원)',
-      };
-    }
-
-    return null;
-  }
-
-  // URL / Filename keyword matching (Only when not a raw base64 or long string)
-  if (lower.includes('hangang') || lower.includes('한강')) {
-    return {
-      success: true,
-      merchant: '한강주유소',
-      address: '경기도 고양시 덕양구 행주로 57-28',
-      amount: 48000,
-      date: '2026-10-26',
-      time: '12:36',
-      category: 'fuel',
-      paymentMethod: 'company_card',
-      summary: '한강주유소에서 휘발유 48,000원 결제 영수증으로 판독되었습니다. (샘플 데이터 즉시 로드 · API 비용 0원)',
-      confidence: 0.99,
-      modelUsed: '샘플 프리셋 (비용 0원)',
-    };
-  }
-
-  if (lower.includes('fuel') || lower.includes('만남의광장')) {
-    return {
-      success: true,
-      merchant: '서울 만남의광장 주유소',
-      address: '서울 서초구 양재대로12길 73-71',
-      amount: 72000,
-      date: '2026-10-24',
-      time: '11:32',
-      category: 'fuel',
-      paymentMethod: 'company_card',
-      summary: '서울 만남의광장 주유소에서 경유 72,000원 결제 영수증으로 인식되었습니다. (샘플 데이터 즉시 로드 · API 비용 0원)',
-      confidence: 0.98,
-      modelUsed: '샘플 프리셋 (비용 0원)',
-    };
-  }
-
-  if (lower.includes('receipt_sample_cu') || lower.includes('cu.jpg') || lower.includes('고양강매')) {
-    return {
-      success: true,
-      merchant: 'CU 고양강매점',
-      address: '경기도 고양시 덕양구 강매로247 (강매동 521-7)',
-      amount: 9500,
-      date: '2024-10-26',
-      time: '19:22',
-      category: 'meal',
-      paymentMethod: 'company_card',
-      summary: 'CU 고양강매점에서 식음료 9,500원 결제 영수증으로 판독되었습니다. (샘플 데이터 즉시 로드 · API 비용 0원)',
-      confidence: 0.98,
-      modelUsed: '샘플 프리셋 (비용 0원)',
-    };
-  }
-
-  return null;
-}
-
-// Fallback deterministic recognition for common demo receipts
+// Fallback deterministic recognition for offline/demo environments
 function getFallbackReceiptData(image: string): ReceiptScanResult {
-  const sample = getSampleReceiptData(image);
+  const sample = matchSampleReceipt(image);
   if (sample) return sample;
 
   const now = new Date();
@@ -169,14 +34,35 @@ function getFallbackReceiptData(image: string): ReceiptScanResult {
     time: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
     category: 'other',
     paymentMethod: 'company_card',
-    summary: '영수증이 업로드되었습니다. 세부 금액을 확인해 주세요.',
+    summary: '영수증이 업로드되었습니다. 세부 금액과 거래처를 확인해 주세요.',
     confidence: 0.5,
     modelUsed: 'deterministic-fallback',
   };
 }
 
 export async function POST(req: NextRequest) {
+  const requestStartTime = Date.now();
+
   try {
+    // Step 0: Security & Rate Limiting Check
+    const clientIp =
+      req.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
+      req.headers.get('x-real-ip') ||
+      'internal-driver-client';
+
+    const rateLimitPerMin = parseInt(process.env.GEMINI_OCR_RATE_LIMIT_PER_MIN || '20', 10);
+    const rateCheck = checkRateLimit(clientIp, rateLimitPerMin, 60_000);
+    if (!rateCheck.allowed) {
+      console.warn(`[Receipt OCR RateLimit] Client ${clientIp} exceeded rate limit (${rateLimitPerMin}/min).`);
+      return NextResponse.json(
+        {
+          success: false,
+          error: `영수증 스캔 요청 횟수 제한(분당 ${rateLimitPerMin}회)을 초과했습니다. 잠시 후 다시 시도해 주세요.`,
+        },
+        { status: 429 }
+      );
+    }
+
     const body = (await req.json()) as Record<string, unknown>;
     const rawImage = body.image || body.imagePath || body.imageUrl || '';
     const image = typeof rawImage === 'string' ? rawImage : '';
@@ -190,8 +76,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Step 1: Check known sample paths or keywords FIRST (0ms, 0 Gemini API cost)
-    const directSample = getSampleReceiptData(image);
+    // Step 1: Upload Payload Size Guardrail (e.g. Max 10MB)
+    const maxImageSizeMb = parseFloat(process.env.MAX_RECEIPT_IMAGE_SIZE_MB || '10');
+    const approximateSizeBytes = (image.length * 3) / 4;
+    const approximateSizeMb = approximateSizeBytes / (1024 * 1024);
+    if (approximateSizeMb > maxImageSizeMb) {
+      console.warn(`[Receipt OCR Payload] Image size (${approximateSizeMb.toFixed(2)}MB) exceeds limit (${maxImageSizeMb}MB).`);
+      return NextResponse.json(
+        {
+          success: false,
+          error: `영수증 사진 용량이 제한(${maxImageSizeMb}MB)을 초과했습니다. 사진 크기를 줄인 후 다시 업로드해 주세요.`,
+        },
+        { status: 413 }
+      );
+    }
+
+    // Step 2: Check known sample paths/presets FIRST (0ms, 0 Gemini API cost)
+    const directSample = matchSampleReceipt(image);
     if (directSample) {
       console.log(`[Receipt OCR: Sample Presets] Matched sample identifier: ${image.slice(0, 40)}. Skipping Gemini API.`);
       return NextResponse.json(directSample);
@@ -200,7 +101,7 @@ export async function POST(req: NextRequest) {
     let mimeType = 'image/jpeg';
     let base64Data = image;
 
-    // Case 1: Relative file path in /public (e.g. /images/receipt_sample_fuel.jpg)
+    // Case A: Relative file path in /public (e.g. /images/receipt_sample_fuel.jpg)
     if (image.startsWith('/')) {
       try {
         const filePath = path.join(process.cwd(), 'public', image.replace(/^\//, ''));
@@ -215,7 +116,7 @@ export async function POST(req: NextRequest) {
         console.warn('Failed to load local file for OCR:', fileErr);
       }
     } else {
-      // Case 2: Base64 data URL
+      // Case B: Base64 data URL
       const match = image.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
       if (match) {
         mimeType = match[1];
@@ -223,27 +124,28 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Step 2: Compute hash of base64 content
+    // Step 3: Compute SHA-256 hash of normalized base64 content
     const imageHash = crypto.createHash('sha256').update(base64Data).digest('hex');
 
     // Check if the hash matches any known sample receipt
-    const hashSample = getSampleReceiptData(imageHash);
+    const hashSample = matchSampleReceipt(imageHash);
     if (hashSample) {
-      console.log(`[Receipt OCR: Sample Hash] Image hash matched sample receipt: ${imageHash}. Skipping Gemini API.`);
+      console.log(`[Receipt OCR: Sample Hash] Image hash matched sample receipt: ${imageHash.slice(0, 12)}. Skipping Gemini API.`);
       return NextResponse.json(hashSample);
     }
 
-    // Step 3: Check in-memory cache to prevent duplicate Gemini API calls for identical photos
+    // Step 4: Check in-memory cache to prevent duplicate Gemini API calls for identical photos
     if (globalReceiptOcrCache.has(imageHash)) {
       const cached = globalReceiptOcrCache.get(imageHash)!;
       console.log(`[Receipt OCR: Cache Hit] Returning cached OCR result for hash ${imageHash.slice(0, 8)}... (0 API cost)`);
       return NextResponse.json({
         ...cached,
-        modelUsed: `${cached.modelUsed || 'gemini-3.8-flash'} (캐시 재사용 · 비용 0원)`,
+        isCached: true,
+        modelUsed: `${cached.modelUsed || 'gemini-3.1-flash-lite'} (캐시 재사용 · 비용 0원)`,
       });
     }
 
-    // Step 4: Check Gemini API Key
+    // Step 5: Check Server-Side Gemini API Key
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       console.log('[Receipt OCR: Fallback] No GEMINI_API_KEY detected. Returning deterministic fallback.');
@@ -252,19 +154,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(fallbackResult);
     }
 
+    // Server-side configurable models (Defaults to cheaper Gemini 3.1 Flash-Lite)
+    const primaryModel = process.env.GEMINI_RECEIPT_MODEL || 'gemini-3.1-flash-lite';
+    const fallbackModel = process.env.GEMINI_FALLBACK_MODEL || 'gemini-3.8-flash';
+    const minConfidence = parseFloat(process.env.GEMINI_OCR_MIN_CONFIDENCE || '0.60');
+
     const ai = new GoogleGenAI({ apiKey });
+
     const prompt = `You are an expert Korean receipt OCR and VIP limousine driver expense classification AI.
 Carefully examine this receipt image and extract structured data for a corporate mobility expense report.
 
 Driver context: "${driverName || '윤태준'}", Vehicle: "${carModel || '116허 1514'}".
 
-Extract the following fields with high precision:
+CRITICAL EXTRACTION RULES:
 1. "merchant": Store/Merchant name (상호명, 가맹점명, 주유소명, 주차장명, 톨게이트명).
    - E.g. "서울 만남의광장 주유소", "한국도로공사", "스타벅스 강남대로점", "코엑스 주차장", "현대모비스 오토큐".
-2. "address": Store address if printed on the receipt (가맹점 주소, 소재지). If not visible, null.
-3. "amount": The FINAL total payment amount (합계금액 / 결제금액 / 승인금액 / 청구금액) in KRW as an integer number (no commas, no currency symbols). E.g. 72000.
-4. "date": Transaction date in "YYYY-MM-DD" format. If only month/day (MM-DD or MM/DD) is visible, use year 2026 or 2024.
-5. "time": Transaction time in "HH:mm" (24-hour format). If seconds are present, omit them. If not visible, null.
+2. "address": Store address if printed on the receipt (가맹점 주소, 소재지). If not visible, return null.
+3. "amount": The FINAL TOTAL payment/approved amount (합계금액 / 결제금액 / 승인금액 / 청구금액) in KRW as an integer number (no commas, no currency symbols).
+   - NEVER return intermediate subtotal, VAT, unit prices, or discount amounts.
+   - If multiple amounts appear, choose the final card approval amount (신용카드 승인금액).
+   - If amount cannot be determined with certainty, return null. DO NOT fabricate or hallucinate numbers.
+4. "date": Transaction date in "YYYY-MM-DD" format. E.g. "2026-10-24".
+5. "time": Transaction time in "HH:mm" (24-hour format). Omit seconds. If not visible, return null.
 6. "category": Must be STRICTLY one of the following exact keys:
    - "fuel": Gas station / 주유소, GS칼텍스, SK에너지, S-OIL, HD현대오일뱅크, 알뜰주유소, 휘발유, 경유, 등유, LPG 충전소, 요소수
    - "toll": Highway toll / 통행료, 한국도로공사, 하이패스, 민자고속도로 요금소
@@ -306,93 +217,117 @@ Return strictly a single valid JSON object with this exact schema (no markdown f
       prompt,
     ];
 
-    const modelName = 'gemini-3.8-flash';
-    const response = await ai.models.generateContent({
-      model: modelName,
-      contents,
-      config: {
-        temperature: 0.1,
-        responseMimeType: 'application/json',
-      },
-    });
+    // Step 6: Primary Call (Cheaper Flash-Lite Model by Default)
+    let selectedModel = primaryModel;
+    let fallbackUsed = false;
+    let fallbackReason: string | undefined;
 
-    const rawText = response.text?.trim() || '{}';
-    let parsed: Record<string, unknown> = {};
+    let primaryResponse;
+    let primarySuccess = true;
+
     try {
-      const cleaned = rawText.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
-      parsed = JSON.parse(cleaned);
-    } catch {
-      console.warn('Failed to parse Gemini receipt OCR response as JSON:', rawText);
+      primaryResponse = await ai.models.generateContent({
+        model: primaryModel,
+        contents,
+        config: {
+          temperature: 0.1,
+          responseMimeType: 'application/json',
+        },
+      });
+    } catch (primaryErr) {
+      console.warn(`[Receipt OCR] Primary model ${primaryModel} failed:`, primaryErr);
+      primarySuccess = false;
     }
 
-    const validCategories: ExpenseCategoryKey[] = [
-      'fuel',
-      'toll',
-      'parking',
-      'meal',
-      'wash',
-      'stay',
-      'transit',
-      'other',
-      'unclassified',
-    ];
-    const parsedCategory = typeof parsed.category === 'string' ? parsed.category : '';
-    const category: ExpenseCategoryKey = (validCategories as string[]).includes(parsedCategory)
-      ? (parsedCategory as ExpenseCategoryKey)
-      : 'other';
-
-    const validPaymentMethods: PaymentMethod[] = [
-      'company_card',
-      'driver_personal',
-      'client_card',
-      'cash',
-      'other',
-      'unspecified',
-    ];
-    const parsedPaymentMethod = typeof parsed.paymentMethod === 'string' ? parsed.paymentMethod : '';
-    const paymentMethod: PaymentMethod = (validPaymentMethods as string[]).includes(parsedPaymentMethod)
-      ? (parsedPaymentMethod as PaymentMethod)
-      : 'company_card';
-
-    const merchant =
-      typeof parsed.merchant === 'string' && parsed.merchant.trim()
-        ? parsed.merchant.trim()
-        : '상호 미확인 가맹점';
-    const amount = typeof parsed.amount === 'number' ? Math.round(parsed.amount) : null;
-    const address = typeof parsed.address === 'string' && parsed.address.trim() ? parsed.address.trim() : null;
-    const date = typeof parsed.date === 'string' && parsed.date.trim() ? parsed.date.trim() : null;
-    const time = typeof parsed.time === 'string' && parsed.time.trim() ? parsed.time.trim() : null;
-    const confidence = typeof parsed.confidence === 'number' ? parsed.confidence : 0.85;
-
-    let summary = typeof parsed.summary === 'string' && parsed.summary.trim() ? parsed.summary.trim() : '';
-    if (!summary) {
-      summary = `${merchant}${amount ? ` · ${amount.toLocaleString()}원` : ''} 영수증이 판독되었습니다.`;
+    let parsedPrimary: Record<string, unknown> = {};
+    if (primarySuccess && primaryResponse) {
+      try {
+        const rawText = primaryResponse.text?.trim() || '{}';
+        const cleaned = rawText.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
+        parsedPrimary = JSON.parse(cleaned);
+      } catch {
+        console.warn('[Receipt OCR] Failed to parse primary model JSON output.');
+        primarySuccess = false;
+      }
     }
 
-    const scanResult: ReceiptScanResult = {
-      success: true,
-      merchant,
-      address,
-      amount,
-      date,
-      time,
-      category,
-      paymentMethod,
-      summary,
-      confidence,
-      modelUsed: modelName,
-    };
+    const { result: validatedResult, rejectionReasons } = validateReceiptScanResult(
+      parsedPrimary,
+      primaryModel
+    );
 
-    globalReceiptOcrCache.set(imageHash, scanResult);
+    // Step 7: Conditional Fallback Decision
+    // RULE: Never retry automatically without a clear validation reason!
+    const fallbackCheck = shouldTriggerFallback(validatedResult, minConfidence);
 
-    return NextResponse.json(scanResult);
+    let finalResult = validatedResult;
+    let totalInputTokens = primaryResponse?.usageMetadata?.promptTokenCount || 0;
+    let totalOutputTokens = primaryResponse?.usageMetadata?.candidatesTokenCount || 0;
+
+    if ((!primarySuccess || fallbackCheck.fallbackNeeded) && fallbackModel !== primaryModel) {
+      fallbackUsed = true;
+      fallbackReason = fallbackCheck.reason || (rejectionReasons.length ? rejectionReasons.join(',') : 'primary_failed');
+      selectedModel = fallbackModel;
+
+      console.log(
+        `[Receipt OCR: Fallback Triggered] Validation reason: ${fallbackReason}. Calling stronger fallback model: ${fallbackModel}`
+      );
+
+      try {
+        const fallbackResponse = await ai.models.generateContent({
+          model: fallbackModel,
+          contents,
+          config: {
+            temperature: 0.1,
+            responseMimeType: 'application/json',
+          },
+        });
+
+        totalInputTokens += fallbackResponse?.usageMetadata?.promptTokenCount || 0;
+        totalOutputTokens += fallbackResponse?.usageMetadata?.candidatesTokenCount || 0;
+
+        const rawText = fallbackResponse.text?.trim() || '{}';
+        const cleaned = rawText.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
+        const parsedFallback = JSON.parse(cleaned);
+        const { result: validatedFallback } = validateReceiptScanResult(parsedFallback, fallbackModel);
+        finalResult = validatedFallback;
+      } catch (fbErr) {
+        console.error(`[Receipt OCR] Fallback model ${fallbackModel} also failed:`, fbErr);
+      }
+    }
+
+    const totalElapsedMs = Date.now() - requestStartTime;
+    const { costUsd, costKrw } = calculateReceiptOcrCost(
+      selectedModel,
+      totalInputTokens,
+      totalOutputTokens
+    );
+
+    finalResult.fallbackUsed = fallbackUsed;
+    finalResult.fallbackReason = fallbackReason;
+    finalResult.modelUsed = selectedModel;
+    finalResult.inputTokens = totalInputTokens;
+    finalResult.outputTokens = totalOutputTokens;
+    finalResult.estimatedCostUsd = costUsd;
+    finalResult.estimatedCostKrw = costKrw;
+    finalResult.processingTimeMs = totalElapsedMs;
+
+    // Secure Sanitized Logging: Never log personal info, customer name, or card numbers
+    console.log(
+      `[Receipt OCR Telemetry] model=${selectedModel}${fallbackUsed ? ` (fallback: ${fallbackReason})` : ''} | latency=${totalElapsedMs}ms | tokens=(in:${totalInputTokens}, out:${totalOutputTokens}) | cost=$${costUsd.toFixed(6)} (~${costKrw}원) | status=${finalResult.success ? 'SUCCESS' : 'PARTIAL'}`
+    );
+
+    // Save in server-side cache
+    globalReceiptOcrCache.set(imageHash, finalResult);
+
+    return NextResponse.json(finalResult);
   } catch (err: unknown) {
-    console.error('Receipt Scan API Error:', err);
-    // Provide deterministic fallback instead of hard 500 error
+    console.error('Receipt Scan API Fatal Error:', err);
     const errMsg = err instanceof Error ? err.message : '영수증 판독 중 오류가 발생했습니다.';
     return NextResponse.json({
       ...getFallbackReceiptData(''),
       error: errMsg,
+      processingTimeMs: Date.now() - requestStartTime,
     });
   }
 }
