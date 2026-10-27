@@ -26,6 +26,11 @@ export interface HqBooking {
   isToday?: boolean;
   isTomorrow?: boolean;
   isDispatchTarget?: boolean;
+  groupId?: string;
+  groupName?: string;
+  groupTotalVehicles?: number;
+  groupVehicleIndex?: number;
+  customerId?: string;
 }
 
 export interface HqKpiMetric {

@@ -94,29 +94,42 @@ function HqDashboardInner() {
     });
   }, [bookings, searchQuery, activeDispatchTab, activeKpiFilter]);
 
-  // Create new booking from Quick Dispatch panel
-  const handleCreateBooking = (newBookingData: Partial<HqBooking>, isDraft: boolean) => {
-    const newBooking: HqBooking = {
-      id: `b-${Date.now()}`,
-      bookingNo: `#241024-${String(bookings.length + 1).padStart(3, '0')}`,
-      no: bookings.length + 1,
-      customerName: newBookingData.customerName || '신규 고객',
-      pickupTime: newBookingData.pickupTime || '14:00',
-      pickupDate: newBookingData.pickupDate || '2024. 10. 24',
-      pickupLocation: newBookingData.pickupLocation || '서울 강남',
-      destination: newBookingData.destination || '인천공항 T1',
-      driverName: newBookingData.driverName || '-',
-      driverPhone: newBookingData.driverPhone,
-      vehicleModel: newBookingData.vehicleModel || '차량 미지정',
-      vehiclePlate: newBookingData.vehiclePlate || '미배정',
-      dispatchStatus: newBookingData.dispatchStatus || (isDraft ? '미배정' : '배차 완료'),
-      driverAck: newBookingData.driverAck || (isDraft ? '-' : '미확인'),
-      customerBrochure: '미발송',
-      isToday: true,
-      isDispatchTarget: true,
-    };
+  // Create new booking(s) from Quick Dispatch panel
+  const handleCreateBooking = (
+    newBookingData: Partial<HqBooking> | Partial<HqBooking>[],
+    isDraft: boolean
+  ) => {
+    const list = Array.isArray(newBookingData) ? newBookingData : [newBookingData];
+    const createdBookings: HqBooking[] = list.map((item, idx) => {
+      const currentNo = bookings.length + idx + 1;
+      return {
+        id: item.id || `b-${Date.now()}-${idx}`,
+        bookingNo: item.bookingNo || `#261026-${String(currentNo).padStart(3, '0')}`,
+        no: currentNo,
+        customerName: item.customerName || '신규 고객',
+        pickupTime: item.pickupTime || '14:00',
+        pickupDate: item.pickupDate || '2026. 10. 26',
+        pickupLocation: item.pickupLocation || '서울 강남',
+        destination: item.destination || '인천공항 T1',
+        driverName: item.driverName || '-',
+        driverPhone: item.driverPhone,
+        vehicleModel: item.vehicleModel || '차량 미지정',
+        vehiclePlate: item.vehiclePlate || '미배정',
+        dispatchStatus: item.dispatchStatus || (isDraft ? '미배정' : '배차 완료'),
+        driverAck: item.driverAck || (isDraft ? '-' : '미확인'),
+        customerBrochure: '미발송',
+        isToday: true,
+        isDispatchTarget: true,
+        groupId: item.groupId,
+        groupName: item.groupName,
+        groupTotalVehicles: item.groupTotalVehicles,
+        groupVehicleIndex: item.groupVehicleIndex,
+        customerId: item.customerId,
+        notes: item.notes,
+      };
+    });
 
-    setBookings((prev) => [newBooking, ...prev]);
+    setBookings((prev) => [...createdBookings, ...prev]);
   };
 
   // Update existing booking from modal

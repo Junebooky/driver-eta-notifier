@@ -11,6 +11,7 @@ import {
 import { HqBooking } from '@/types/hq';
 import { AVAILABLE_DRIVERS, AVAILABLE_VEHICLES } from '@/utils/hqData';
 import { haptics } from '@/utils/haptics';
+import { stripManufacturerName } from '@/utils/vehicleData';
 
 export interface HqBookingDetailModalProps {
   booking: HqBooking | null;
@@ -204,8 +205,8 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                     배정 차량:{' '}
                     <strong className="text-slate-900 font-bold">
                       {booking.vehiclePlate && booking.vehiclePlate !== '미배정'
-                        ? `${booking.vehiclePlate} · ${booking.vehicleModel}`
-                        : booking.vehicleModel}
+                        ? `${booking.vehiclePlate} · ${stripManufacturerName(booking.vehicleModel)}`
+                        : stripManufacturerName(booking.vehicleModel)}
                     </strong>
                   </div>
                 </div>

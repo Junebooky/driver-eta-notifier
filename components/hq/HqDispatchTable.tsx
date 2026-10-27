@@ -11,10 +11,11 @@ import {
   FileText,
   MoreHorizontal,
   RotateCcw,
+  Users,
 } from 'lucide-react';
 import { HqBooking } from '@/types/hq';
 import { haptics } from '@/utils/haptics';
-import { VIP_REAL_VEHICLES } from '@/utils/vehicleData';
+import { VIP_REAL_VEHICLES, stripManufacturerName } from '@/utils/vehicleData';
 
 export interface HqDispatchTableProps {
   bookings: HqBooking[];
@@ -272,13 +273,12 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
               <th className="py-2.5 px-3">배차 상태</th>
               <th className="py-2.5 px-3">기사 확인</th>
               <th className="py-2.5 px-3">고객 안내자료</th>
-              <th className="py-2.5 px-3 text-center">작업</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100/80 text-xs">
             {filteredList.length === 0 ? (
               <tr>
-                <td colSpan={11} className="py-12 text-center text-slate-400 font-medium">
+                <td colSpan={10} className="py-12 text-center text-slate-400 font-medium">
                   조건에 일치하는 예약 데이터가 없습니다.
                 </td>
               </tr>
@@ -300,9 +300,17 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                       {b.no}
                     </td>
 
-                    {/* 고객명 */}
+                    {/* 고객명 & 그룹 배차 표시 */}
                     <td className="py-3 px-3 font-bold text-slate-900 group-hover:text-[#1E60F3] transition-colors whitespace-nowrap">
-                      {b.customerName}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span>{b.customerName}</span>
+                        {b.groupId && b.groupTotalVehicles && b.groupTotalVehicles > 1 && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-[#1E60F3] border border-blue-100/80 shadow-2xs">
+                            <Users className="w-2.5 h-2.5" />
+                            {b.groupVehicleIndex || 1}호차 ({b.groupTotalVehicles}대)
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     {/* 픽업 시간 */}
@@ -319,7 +327,7 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                       )}
                     </td>
 
-                    {/* 차량: 차량번호 + 차량기종 함께 표시 */}
+                    {/* 차량: 차량번호 + 제조사명 제거된 모델명 */}
                     <td className="py-3 px-3 whitespace-nowrap">
                       {b.vehicleModel === '-' && (!b.vehiclePlate || b.vehiclePlate === '미배정') ? (
                         <span className="text-slate-400 font-normal">-</span>
@@ -328,8 +336,8 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                           <div className="font-bold text-slate-900 text-xs tracking-tight">
                             {b.vehiclePlate && b.vehiclePlate !== '미배정' ? b.vehiclePlate : '-'}
                           </div>
-                          <div className="text-[11px] text-slate-500 font-medium">
-                            {b.vehicleModel}
+                          <div className="text-[11px] text-slate-500 font-medium truncate max-w-[140px]" title={b.vehicleModel}>
+                            {stripManufacturerName(b.vehicleModel)}
                           </div>
                         </div>
                       )}
@@ -411,61 +419,6 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                           미발송
                         </span>
                       )}
-                    </td>
-
-                    {/* 작업 */}
-                    <td
-                      className="py-3 px-3 text-right whitespace-nowrap"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div className="flex items-center justify-end gap-2">
-                        {isUnassigned ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              haptics.lightTap();
-                              onAssignDriver(b);
-                            }}
-                            className="text-[11px] font-bold text-[#1E60F3] hover:underline cursor-pointer"
-                          >
-                            기사 배정
-                          </button>
-                        ) : isDraft ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              haptics.lightTap();
-                              onResendBrochure(b);
-                            }}
-                            className="text-[11px] font-bold text-[#1E60F3] hover:underline cursor-pointer"
-                          >
-                            재발송
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              haptics.lightTap();
-                              onViewBooking(b);
-                            }}
-                            className="text-[11px] font-bold text-[#1E60F3] hover:underline cursor-pointer"
-                          >
-                            보기
-                          </button>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            haptics.lightTap();
-                            onViewBooking(b);
-                          }}
-                          className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-                          title="상세 옵션"
-                        >
-                          <MoreHorizontal className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
                     </td>
                   </tr>
                 );

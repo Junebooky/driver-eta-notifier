@@ -39,6 +39,18 @@ export interface VipRealVehicle {
   fuelType: '디젤' | '가솔린' | '하이브리드';
 }
 
+/**
+ * Strips manufacturer/brand prefix from vehicle model for cleaner UI display.
+ * E.g., '벤츠 S 560' -> 'S 560', '현대 스타리아 리무진' -> '스타리아 리무진', '제네시스 G90L' -> 'G90L', '기아 카니발' -> '카니발'
+ * Preserves the underlying raw model string untouched in the database/state.
+ */
+export function stripManufacturerName(rawModel: string | undefined | null): string {
+  if (!rawModel || rawModel === '-' || rawModel === '미배정') return rawModel || '-';
+  return rawModel
+    .replace(/^(벤츠|메르세데스-벤츠|Mercedes-Benz|현대|Hyundai|기아|Kia|제네시스|Genesis|BMW)\s+/i, '')
+    .trim();
+}
+
 export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
   // 1. [벤츠 스프린터 투어러 (319 CDI)] 1대
   {
