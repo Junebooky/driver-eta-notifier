@@ -27,10 +27,13 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
   onOpenTimePicker,
 }) => {
   // Parse strict 24h time (HH:mm) and duration from etaFormatted or durationMinutes
-  let timePart = '14:35';
+  let timePart = '--:--';
   let durationPart = '';
 
-  if (routeEstimate?.etaFormatted) {
+  if (routeEstimate?.isUnavailable) {
+    timePart = '--:--';
+    durationPart = '(조회 불가)';
+  } else if (routeEstimate?.etaFormatted) {
     const timeMatch = routeEstimate.etaFormatted.match(/(\d{1,2}:\d{2})/);
     if (timeMatch) {
       timePart = timeMatch[1].padStart(5, '0');
@@ -39,7 +42,7 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
     }
   }
 
-  if (routeEstimate?.durationMinutes) {
+  if (!routeEstimate?.isUnavailable && routeEstimate?.durationMinutes) {
     durationPart = `(${routeEstimate.durationMinutes}분 소요)`;
   }
 
@@ -88,7 +91,10 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
           {routeEstimate && (
             <div className="mt-1.5 space-y-0.5">
               <div className="text-sm text-slate-500 font-normal">
-                이동 거리: <span className="text-slate-900 font-bold">{routeEstimate.distanceKm} km</span>
+                이동 거리:{' '}
+                <span className="text-slate-900 font-bold">
+                  {routeEstimate.isUnavailable ? '-' : `${routeEstimate.distanceKm} km`}
+                </span>
               </div>
               <div className="text-[11px] font-medium text-slate-400 whitespace-nowrap tracking-tight">
                 ({routeEstimate.trafficSummary || '실시간 교통 반영'})

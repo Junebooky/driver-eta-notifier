@@ -76,7 +76,7 @@ async function handleRouteCalculation(
   }
 
   // 2. If Mock Mode explicitly enabled or API key missing
-  if (useMock || !apiKey || apiKey === 'your_tmap_api_key') {
+  if (useMock) {
     const fallbackData = calculateHaversineEstimate(startLat, startLng, endLat, endLng, parsedWaypoints);
     return NextResponse.json({
       ...fallbackData,
@@ -87,13 +87,33 @@ async function handleRouteCalculation(
     });
   }
 
+  if (!apiKey || apiKey === 'your_tmap_api_key') {
+    return NextResponse.json(
+      {
+        error: 'TMAP API 키가 설정되지 않아 실시간 경로를 조회할 수 없습니다.',
+        isUnavailable: true,
+      },
+      { status: 500 }
+    );
+  }
+
   // 3. Server-Side TMAP API Call (Key strictly hidden from client)
   const tmapUrl = `https://apis.openapi.sk.com/tmap/routes?version=1&format=json`;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 4500); // 4.5s timeout threshold
 
   try {
-    const requestPayload: any = {
+    const requestPayload: {
+      startX: number;
+      startY: number;
+      endX: number;
+      endY: number;
+      reqCoordType: string;
+      resCoordType: string;
+      searchOption: number;
+      trafficInfo: string;
+      passList?: string;
+    } = {
       startX: startLng,
       startY: startLat,
       endX: endLng,
@@ -121,17 +141,35 @@ async function handleRouteCalculation(
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      console.warn(`TMAP Route API error HTTP ${response.status}. Falling back to estimate.`);
-      const fallbackData = calculateHaversineEstimate(startLat, startLng, endLat, endLng, parsedWaypoints);
-      return NextResponse.json({ ...fallbackData, isCached: false });
+      console.warn(`TMAP Route API error HTTP ${response.status}`);
+      return NextResponse.json(
+        {
+          error: `TMAP 실시간 경로 API 오류 (HTTP ${response.status})`,
+          isUnavailable: true,
+        },
+        { status: 502 }
+      );
     }
 
-    const data = await response.json();
-    const totalTimeSeconds = data?.features?.[0]?.properties?.totalTime || 3300;
-    const totalDistanceMeters = data?.features?.[0]?.properties?.totalDistance || 62000;
+    const data = await response.json().catch(() => null);
+    const totalTimeSeconds = data?.features?.[0]?.properties?.totalTime;
+    const totalDistanceMeters = data?.features?.[0]?.properties?.totalDistance;
 
-    const durationMinutes = Math.round(totalTimeSeconds / 60);
-    const distanceKm = Math.round((totalDistanceMeters / 1000) * 10) / 10;
+    if (typeof totalTimeSeconds !== 'number' || totalTimeSeconds <= 0) {
+      console.warn('TMAP Route API response missing valid totalTime:', data);
+      return NextResponse.json(
+        {
+          error: 'TMAP 경로 소요 시간 데이터가 유효하지 않습니다.',
+          isUnavailable: true,
+        },
+        { status: 502 }
+      );
+    }
+
+    const durationMinutes = Math.max(1, Math.round(totalTimeSeconds / 60));
+    const distanceKm = typeof totalDistanceMeters === 'number'
+      ? Math.round((totalDistanceMeters / 1000) * 10) / 10
+      : 0;
 
     const etaTime = new Date(nowTimestamp + durationMinutes * 60 * 1000);
     const hours = String(etaTime.getHours()).padStart(2, '0');
@@ -152,11 +190,16 @@ async function handleRouteCalculation(
     routeCache.set(cacheKey, { data: resultData, timestamp: nowTimestamp });
 
     return NextResponse.json(resultData);
-  } catch (error: any) {
+  } catch (error: unknown) {
     clearTimeout(timeoutId);
-    console.warn('TMAP Route API call failed or timed out:', error?.message);
-    const fallbackData = calculateHaversineEstimate(startLat, startLng, endLat, endLng, parsedWaypoints);
-    return NextResponse.json({ ...fallbackData, isCached: false });
+    console.warn('TMAP Route API call failed or timed out:', error instanceof Error ? error.message : error);
+    return NextResponse.json(
+      {
+        error: 'TMAP 실시간 경로 요청 시간이 초과되었거나 연결에 실패했습니다.',
+        isUnavailable: true,
+      },
+      { status: 504 }
+    );
   }
 }
 
@@ -172,8 +215,9 @@ export async function GET(req: NextRequest) {
     const passList = searchParams.get('passList') || undefined;
 
     return await handleRouteCalculation(startLat, startLng, endLat, endLng, passList);
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -189,7 +233,8 @@ export async function POST(req: NextRequest) {
     const passList = body.passList || undefined;
 
     return await handleRouteCalculation(startLat, startLng, endLat, endLng, passList);
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

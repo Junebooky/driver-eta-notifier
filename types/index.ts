@@ -26,6 +26,8 @@ export interface DriverProfile {
   targetChatRoom?: string; // e.g. 'VIP 의전 단톡방'
   homeLocation?: HomeLocation | null;
   plateNumber?: string;    // e.g. '142호 7811' (alias for carNumber)
+  clientName?: string;     // e.g. '인터코스'
+  passengerCount?: string; // e.g. '9명'
 }
 
 
@@ -74,6 +76,8 @@ export interface RouteEstimate {
   isFallback?: boolean;
   fallbackNotice?: string;
   isCached?: boolean;
+  isUnavailable?: boolean;
+  error?: string;
 }
 
 export type FuelCode = 'D047' | 'B027' | 'B034';
