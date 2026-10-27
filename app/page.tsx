@@ -23,6 +23,8 @@ import { LocationSearchModal, SelectedLocationData } from '@/components/Location
 import { RoadviewModal } from '@/components/RoadviewModal';
 import { DrivingLogModal } from '@/components/DrivingLogModal';
 import { ExpenseModal } from '@/components/ExpenseModal';
+import { FieldTipModal } from '@/components/FieldTipModal';
+import { getFieldTipsCount } from '@/utils/fieldTipData';
 import { ScheduleTab } from '@/components/ScheduleTab';
 import { Navigation, Calendar } from 'lucide-react';
 import { ScheduleItem, scheduleToPresets } from '@/data/ferrariSchedules';
@@ -110,6 +112,9 @@ export default function Home() {
   const [isDrivingLogOpen, setIsDrivingLogOpen] = useState(false);
   const [isExpenseOpen, setIsExpenseOpen] = useState(false);
 
+  // Field Tips (현장 팁) Modal State
+  const [isFieldTipModalOpen, setIsFieldTipModalOpen] = useState(false);
+
   // VIP Assignment Capability & Isolated Preview Gate State (Issue #14)
   const [isVipAssigned, setIsVipAssigned] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -133,6 +138,12 @@ export default function Home() {
   const currentVehicleNo = useMemo(() => {
     return profile.vehicleNo?.match(/(\d+호차)/)?.[1] || '4호차';
   }, [profile.vehicleNo]);
+
+  // Active Field Tips Count for current location (Defaults to origin or 조선팰리스 강남)
+  const currentFieldTipsCount = useMemo(() => {
+    const targetPlace = origin?.name || '조선팰리스 강남';
+    return getFieldTipsCount(targetPlace);
+  }, [origin?.name]);
 
   // Fetch Presets with Vehicle Isolation (Common Master + Vehicle's Custom Presets)
   const fetchPresetsForVehicle = useCallback(async (vNo: string) => {
@@ -1395,6 +1406,11 @@ export default function Home() {
               onOpenPresetModal={handleOpenAddModal}
               onSaveRouteAsPreset={handleSaveRouteAsPreset}
               onSetCurrentLocation={requestGpsLocation}
+              onOpenFieldTips={() => {
+                haptics.selection();
+                setIsFieldTipModalOpen(true);
+              }}
+              fieldTipsCount={currentFieldTipsCount}
               isLocatingGps={isLocating}
             />
 
@@ -1738,6 +1754,22 @@ export default function Home() {
       <ExpenseModal
         isOpen={isExpenseOpen}
         onClose={() => setIsExpenseOpen(false)}
+      />
+
+      {/* Field Tips (현장 팁) Modal */}
+      <FieldTipModal
+        isOpen={isFieldTipModalOpen}
+        onClose={() => setIsFieldTipModalOpen(false)}
+        currentPlaceName={origin?.name || '조선팰리스 강남'}
+        currentAddress={origin?.address || '서울 강남구 테헤란로 231'}
+        originPlaceName={origin?.name}
+        originAddress={origin?.address}
+        destinationPlaceName={destination?.name}
+        destinationAddress={destination?.address}
+        onOpenRoadview={() => {
+          setIsFieldTipModalOpen(false);
+          setIsRoadviewModalOpen(true);
+        }}
       />
 
     </main>

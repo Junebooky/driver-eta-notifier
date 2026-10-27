@@ -2,7 +2,7 @@
 
 import React, { useState, useRef } from 'react';
 import { LocationPreset } from '@/types';
-import { ArrowLeftRight, Search, Navigation, Loader2 } from 'lucide-react';
+import { ArrowLeftRight, Search, Navigation, Loader2, Lightbulb, Bookmark } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 export interface OriginDestinationSelectorProps {
@@ -27,6 +27,8 @@ export interface OriginDestinationSelectorProps {
   onOpenPresetModal?: () => void;
   onSaveRouteAsPreset?: () => void;
   onSetCurrentLocation?: () => void;
+  onOpenFieldTips?: () => void;
+  fieldTipsCount?: number;
   isLocatingGps?: boolean;
 }
 
@@ -48,6 +50,8 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
   onOpenSearchModal,
   onSaveRouteAsPreset,
   onSetCurrentLocation,
+  onOpenFieldTips,
+  fieldTipsCount = 3,
   isLocatingGps = false,
 }) => {
   const [isAccordionOpen, setIsAccordionOpen] = useState(false);
@@ -474,23 +478,43 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
           </span>
         </div>
 
-        {onSaveRouteAsPreset && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              haptics.mediumTap();
-              onSaveRouteAsPreset();
-            }}
-            className="w-8 h-8 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-50 active:scale-95 transition-all shrink-0 cursor-pointer"
-            title="현재 경로를 거점으로 저장"
-            aria-label="현재 경로를 거점으로 저장"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-            </svg>
-          </button>
-        )}
+        {/* Action Buttons: [💡 현장 팁 3] and [🔖] */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {onOpenFieldTips && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                haptics.selection();
+                onOpenFieldTips();
+              }}
+              className="h-8 px-3 rounded-xl bg-white border border-[#1E60F3] shadow-2xs flex items-center gap-1.5 text-[#1E60F3] hover:bg-blue-50/60 active:scale-95 transition-all cursor-pointer"
+              title="현장 팁 보기"
+              aria-label="현장 팁 보기"
+            >
+              <Lightbulb className="w-3.5 h-3.5 fill-[#1E60F3] text-[#1E60F3]" />
+              <span className="text-xs font-black tracking-tight">
+                현장 팁 {fieldTipsCount}
+              </span>
+            </button>
+          )}
+
+          {onSaveRouteAsPreset && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                haptics.mediumTap();
+                onSaveRouteAsPreset();
+              }}
+              className="w-8 h-8 rounded-xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-50 active:scale-95 transition-all cursor-pointer"
+              title="현재 경로를 거점으로 저장"
+              aria-label="현재 경로를 거점으로 저장"
+            >
+              <Bookmark className="w-4 h-4 text-slate-600" />
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
