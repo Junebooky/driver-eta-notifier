@@ -57,3 +57,49 @@ export const rotateImageDataUrl = (
     img.src = imageUrl;
   });
 };
+
+/**
+ * Inspect image orientation and aspect ratio
+ */
+export const checkImageOrientation = (
+  imageUrl: string
+): Promise<{ width: number; height: number; isLandscape: boolean; aspectRatio: number }> => {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined') {
+      resolve({ width: 0, height: 0, isLandscape: false, aspectRatio: 1 });
+      return;
+    }
+
+    const img = new window.Image();
+    img.crossOrigin = 'anonymous';
+
+    img.onload = () => {
+      const width = img.naturalWidth || img.width;
+      const height = img.naturalHeight || img.height;
+      const isLandscape = width > height;
+      const aspectRatio = height > 0 ? width / height : 1;
+      resolve({ width, height, isLandscape, aspectRatio });
+    };
+
+    img.onerror = () => {
+      resolve({ width: 0, height: 0, isLandscape: false, aspectRatio: 1 });
+    };
+
+    img.src = imageUrl;
+  });
+};
+
+/**
+ * Automatically rotate 90° clockwise if image is landscape (lying down)
+ * so receipts are always standing upright
+ */
+export const autoEnsureUprightReceipt = async (
+  imageUrl: string
+): Promise<{ url: string; wasRotated: boolean }> => {
+  const { isLandscape } = await checkImageOrientation(imageUrl);
+  if (isLandscape) {
+    const rotated = await rotateImageDataUrl(imageUrl, 90);
+    return { url: rotated, wasRotated: true };
+  }
+  return { url: imageUrl, wasRotated: false };
+};

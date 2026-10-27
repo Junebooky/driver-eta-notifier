@@ -708,6 +708,39 @@ export const getHqDrivingLogs = (): HqDrivingLog[] => {
   }
 };
 
+let cachedLogsRaw = '';
+let cachedLogsSnapshot: HqDrivingLog[] = INITIAL_HQ_DRIVING_LOGS;
+
+export const subscribeHqDrivingLogs = (callback: () => void): (() => void) => {
+  if (typeof window === 'undefined') return () => {};
+  window.addEventListener(HQ_LOGS_UPDATE_EVENT, callback);
+  window.addEventListener('cockpit_hq_expense_updated', callback);
+  window.addEventListener('storage', callback);
+  return () => {
+    window.removeEventListener(HQ_LOGS_UPDATE_EVENT, callback);
+    window.removeEventListener('cockpit_hq_expense_updated', callback);
+    window.removeEventListener('storage', callback);
+  };
+};
+
+export const getHqDrivingLogsSnapshot = (): HqDrivingLog[] => {
+  if (typeof window === 'undefined') return INITIAL_HQ_DRIVING_LOGS;
+  try {
+    const raw = localStorage.getItem(HQ_DRIVING_LOGS_STORAGE_KEY);
+    if (raw && raw === cachedLogsRaw) return cachedLogsSnapshot;
+    const synced = getHqDrivingLogs();
+    cachedLogsRaw = localStorage.getItem(HQ_DRIVING_LOGS_STORAGE_KEY) || '';
+    cachedLogsSnapshot = synced;
+    return cachedLogsSnapshot;
+  } catch {
+    return INITIAL_HQ_DRIVING_LOGS;
+  }
+};
+
+export const getHqDrivingLogsServerSnapshot = (): HqDrivingLog[] => {
+  return INITIAL_HQ_DRIVING_LOGS;
+};
+
 /**
  * Save driver-submitted log from Cockpit to HQ driving logs list
  */

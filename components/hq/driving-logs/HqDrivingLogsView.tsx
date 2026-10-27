@@ -1,17 +1,16 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useSyncExternalStore } from 'react';
 import {
-  HqDrivingLog,
   HqDrivingLogStatus,
 } from '@/types/drivingLogHq';
 import {
-  getHqDrivingLogs,
+  subscribeHqDrivingLogs,
+  getHqDrivingLogsSnapshot,
+  getHqDrivingLogsServerSnapshot,
   updateHqDrivingLogStatus,
   exportDrivingLogsToCsv,
-  HQ_LOGS_UPDATE_EVENT,
 } from '@/utils/drivingLogHqStorage';
-import { HQ_EXPENSE_UPDATE_EVENT } from '@/utils/expenseHqStorage';
 import { HqDrivingLogsKpi } from './HqDrivingLogsKpi';
 import { HqDrivingLogsFilterBar } from './HqDrivingLogsFilterBar';
 import { HqDrivingLogsTable } from './HqDrivingLogsTable';
@@ -25,12 +24,13 @@ export interface HqDrivingLogsViewProps {
 export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
   initialSearchQuery = '',
 }) => {
-  // Master logs list from storage initialized lazily
-  const [logs, setLogs] = useState<HqDrivingLog[]>(() => getHqDrivingLogs());
-  const [selectedLogId, setSelectedLogId] = useState<string | null>(() => {
-    const initLogs = getHqDrivingLogs();
-    return initLogs[0]?.id || null;
-  });
+  // Master logs list via useSyncExternalStore (SSR and Hydration safe)
+  const logs = useSyncExternalStore(
+    subscribeHqDrivingLogs,
+    getHqDrivingLogsSnapshot,
+    getHqDrivingLogsServerSnapshot
+  );
+  const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
 
   // Filters
   const [dateRange] = useState('2024. 10. 24 (목) ~ 2024. 10. 24 (목)');
@@ -50,37 +50,6 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
   };
-
-  // Refresh logs from external events
-  const refreshLogs = useCallback(() => {
-    const loaded = getHqDrivingLogs();
-    setLogs(loaded);
-
-    // Maintain or initialize selection
-    setSelectedLogId((prev) => {
-      if (prev && loaded.some((l) => l.id === prev)) {
-        return prev;
-      }
-      return loaded[0]?.id || null;
-    });
-  }, []);
-
-  useEffect(() => {
-    // Listen to custom updates from Driver Cockpit or other tabs
-    const handleUpdate = () => {
-      refreshLogs();
-    };
-
-    window.addEventListener(HQ_LOGS_UPDATE_EVENT, handleUpdate);
-    window.addEventListener(HQ_EXPENSE_UPDATE_EVENT, handleUpdate);
-    window.addEventListener('storage', handleUpdate);
-
-    return () => {
-      window.removeEventListener(HQ_LOGS_UPDATE_EVENT, handleUpdate);
-      window.removeEventListener(HQ_EXPENSE_UPDATE_EVENT, handleUpdate);
-      window.removeEventListener('storage', handleUpdate);
-    };
-  }, [refreshLogs]);
 
   // Derived filter options
   const driverOptions = useMemo(() => {
@@ -163,21 +132,18 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
   // Status Action Handlers
   const handleApprove = (logId: string) => {
     const updated = updateHqDrivingLogStatus(logId, '승인 완료');
-    setLogs(updated);
     const target = updated.find((l) => l.id === logId);
     showToast(`${target?.driverName || '해당'} 기사의 운행일지가 승인 완료되었습니다.`);
   };
 
   const handleRequestRevision = (logId: string, reason: string) => {
     const updated = updateHqDrivingLogStatus(logId, '보완 필요', reason);
-    setLogs(updated);
     const target = updated.find((l) => l.id === logId);
     showToast(`${target?.driverName || '해당'} 기사에게 보완 요청을 전송했습니다.`);
   };
 
   const handleReject = (logId: string, reason: string) => {
     const updated = updateHqDrivingLogStatus(logId, '반려', reason);
-    setLogs(updated);
     const target = updated.find((l) => l.id === logId);
     showToast(`${target?.driverName || '해당'} 기사의 운행일지가 반려 처리되었습니다.`);
   };

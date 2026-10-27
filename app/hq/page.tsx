@@ -1,29 +1,25 @@
 'use client';
 
-import React, { useState, useMemo, useEffect, Suspense } from 'react';
+import React, { useState, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { HqSidebar } from '@/components/hq/HqSidebar';
 import { HqHeader } from '@/components/hq/HqHeader';
 import { HqKpiTiles } from '@/components/hq/HqKpiTiles';
 import { HqDispatchTable } from '@/components/hq/HqDispatchTable';
 import { HqQuickDispatch } from '@/components/hq/HqQuickDispatch';
-import { HqDrivingLogCard } from '@/components/hq/HqDrivingLogCard';
-import { HqExpenseCard } from '@/components/hq/HqExpenseCard';
-import { HqFleetCard } from '@/components/hq/HqFleetCard';
-import { HqDriverStatusCard } from '@/components/hq/HqDriverStatusCard';
-import { HqAlertsCard } from '@/components/hq/HqAlertsCard';
 import { HqBookingDetailModal } from '@/components/hq/HqBookingDetailModal';
 import { HqDrivingLogsView } from '@/components/hq/driving-logs/HqDrivingLogsView';
 import { HqExpensesView } from '@/components/hq/expenses/HqExpensesView';
-import { getHqExpenses, getHqExpenseKpiSummary, HQ_EXPENSE_UPDATE_EVENT } from '@/utils/expenseHqStorage';
-import { HqExpenseRecord } from '@/types/expenseHq';
+import { HqEmailInboxView } from '@/components/hq/email/HqEmailInboxView';
+import { HqUnconfirmedDispatchesCard } from '@/components/hq/dispatch/HqUnconfirmedDispatchesCard';
+import { HqUnsentDraftsCard } from '@/components/hq/dispatch/HqUnsentDraftsCard';
+import { HqDriverAllocationDonutCard } from '@/components/hq/dispatch/HqDriverAllocationDonutCard';
 import {
   HQ_KPI_METRICS,
   INITIAL_HQ_BOOKINGS,
-  HQ_DRIVING_LOGS,
-  HQ_EXPENSES,
-  HQ_VEHICLE_CLASSES,
-  HQ_ALERTS,
+  HQ_UNCONFIRMED_DISPATCHES,
+  HQ_UNSENT_DRAFTS,
+  HQ_DRIVER_ALLOCATION,
 } from '@/utils/hqData';
 import { HqBooking } from '@/types/hq';
 
@@ -31,7 +27,7 @@ function HqDashboardInner() {
   const searchParams = useSearchParams();
   const tabParam = searchParams.get('tab');
   const [activeTabOverride, setActiveTabOverride] = useState<string | null>(null);
-  const activeSidebarTab = activeTabOverride ?? tabParam ?? 'dashboard';
+  const activeSidebarTab = activeTabOverride ?? tabParam ?? 'dispatch';
   const [searchQuery, setSearchQuery] = useState('');
   const [activeDispatchTab, setActiveDispatchTab] = useState<'today' | 'target' | 'tomorrow'>('today');
   const [activeKpiFilter, setActiveKpiFilter] = useState<string | null>(null);
@@ -42,36 +38,6 @@ function HqDashboardInner() {
   // Selected Booking for detail inspection drawer
   const [selectedBooking, setSelectedBooking] = useState<HqBooking | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-
-  // Dynamic live HQ Expenses from storage
-  const [hqExpenses, setHqExpenses] = useState<HqExpenseRecord[]>(() => getHqExpenses());
-  useEffect(() => {
-    const handleUpdate = () => {
-      setHqExpenses(getHqExpenses());
-    };
-    window.addEventListener(HQ_EXPENSE_UPDATE_EVENT, handleUpdate);
-    window.addEventListener('storage', handleUpdate);
-    return () => {
-      window.removeEventListener(HQ_EXPENSE_UPDATE_EVENT, handleUpdate);
-      window.removeEventListener('storage', handleUpdate);
-    };
-  }, []);
-
-  const hqExpenseKpi = useMemo(() => getHqExpenseKpiSummary(hqExpenses), [hqExpenses]);
-
-  const mappedExpensesForCard = useMemo(() => {
-    return hqExpenses.slice(0, 4).map((e) => ({
-      id: e.id,
-      submittedAt: e.submittedAt,
-      driverName: e.driverName,
-      category: (['주유비', '통행료', '주차비', '식비'].includes(e.categoryLabel)
-        ? e.categoryLabel
-        : '기타') as HqBooking extends never ? never : '주유비' | '통행료' | '주차비' | '식비' | '기타',
-      amount: e.amount,
-      status: e.status,
-      hasReceiptImage: e.hasReceiptImage,
-    }));
-  }, [hqExpenses]);
 
   // Handle clicking KPI tile
   const handleSelectKpi = (metricId: string) => {
@@ -172,22 +138,26 @@ function HqDashboardInner() {
         <HqHeader
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
-          unreadAlertsCount={12}
-          title={activeSidebarTab === 'driving_logs' ? '운행일지 관리' : '운영 대시보드'}
+          unreadAlertsCount={5}
+          title={
+            activeSidebarTab === 'driving_logs'
+              ? '운행일지 관리'
+              : activeSidebarTab === 'expenses'
+              ? '경비지출 관리'
+              : activeSidebarTab === 'emails'
+              ? '고객 이메일'
+              : '예약·배차 관리'
+          }
           subtitle={
-            activeSidebarTab === 'driving_logs' ? (
+            activeSidebarTab === 'dispatch' || activeSidebarTab === 'dashboard' ? (
               <>
-                <span className="font-bold text-slate-700">2024년 10월 24일 (목)</span>
+                <span className="font-bold text-slate-700">2026년 10월 26일 (월)</span>
                 <span className="text-slate-300">|</span>
-                <span className="text-slate-500">기사별 운행일지를 확인하고 검토·승인할 수 있습니다.</span>
+                <span className="text-slate-400">업무 현황 · 예약 및 배차 관리</span>
               </>
             ) : undefined
           }
-          searchPlaceholder={
-            activeSidebarTab === 'driving_logs'
-              ? '고객명, 기사명, 차량번호로 검색하세요...'
-              : '고객명, 예약번호, 기사명, 차량번호로...'
-          }
+          searchPlaceholder="고객명, 예약번호, 기사명, 차량번호 검색..."
         />
 
         {/* Dashboard Scrollable Body */}
@@ -198,8 +168,16 @@ function HqDashboardInner() {
           ) : activeSidebarTab === 'expenses' || activeSidebarTab === 'receipts' ? (
             /* Dedicated 경비지출 관리 & 영수증 검수 View */
             <HqExpensesView initialSearchQuery={searchQuery} />
+          ) : activeSidebarTab === 'emails' ? (
+            /* Dedicated 고객 이메일 (AI) View */
+            <HqEmailInboxView
+              onCreateBooking={(newBooking) => {
+                setBookings((prev) => [newBooking, ...prev]);
+                setActiveTabOverride('dispatch');
+              }}
+            />
           ) : (
-            /* Operations Dashboard View */
+            /* Operations Reservation & Dispatch View */
             <>
               {/* Section 1: 7 Top KPI Metric Tiles */}
               <section aria-label="운영 지표 현황">
@@ -210,29 +188,29 @@ function HqDashboardInner() {
                 />
               </section>
 
-              {/* Section 2: Main Working Area (Left ~2/3 Table + Right ~1/3 Quick Dispatch) */}
+              {/* Section 2: Main Working Area (Left 8 Cols Table + Right 4 Cols Quick Dispatch in 12-col grid) */}
               <section
                 aria-label="오늘 및 내일 배차 작업 영역"
-                className="grid grid-cols-1 xl:grid-cols-3 gap-5"
+                className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start"
               >
-                {/* Left 2 Columns: 오늘 / 내일 배차 현황 */}
-                <div className="xl:col-span-2">
+                {/* Left ~65% (8 cols): 예약 목록 */}
+                <div className="xl:col-span-8">
                   <HqDispatchTable
-                    bookings={filteredBookings.slice(0, 8)}
+                    bookings={filteredBookings}
                     activeTab={activeDispatchTab}
                     onSelectTab={setActiveDispatchTab}
                     onOpenNewBooking={() => {
                       setSelectedBooking({
                         id: `new_${Date.now()}`,
-                        bookingNo: `#241024-${String(bookings.length + 1).padStart(3, '0')}`,
+                        bookingNo: `#261026-${String(bookings.length + 1).padStart(3, '0')}`,
                         no: bookings.length + 1,
                         customerName: '',
                         pickupTime: '14:00',
-                        pickupDate: '2024. 10. 24',
+                        pickupDate: '2026. 10. 26',
                         pickupLocation: '',
                         destination: '',
                         driverName: '-',
-                        vehicleModel: 'S클래스',
+                        vehicleModel: '-',
                         vehiclePlate: '미배정',
                         dispatchStatus: '미배정',
                         driverAck: '-',
@@ -255,8 +233,8 @@ function HqDashboardInner() {
                   />
                 </div>
 
-                {/* Right 1 Column: 빠른 배차 생성 */}
-                <div className="xl:col-span-1">
+                {/* Right ~35% (4 cols): 빠른 배차 생성 */}
+                <div className="xl:col-span-4">
                   <HqQuickDispatch
                     onCreateBooking={handleCreateBooking}
                     onOpenGroupDispatchModal={() => {
@@ -269,62 +247,38 @@ function HqDashboardInner() {
                 </div>
               </section>
 
-              {/* Section 3: Lower Panels (3 Cards: 운행일지 검토 + 경비지출/영수증 + 차량 운영 현황) */}
+              {/* Section 3: Bottom Panels (3 Cards: 미확인 배차 + 미발송 초안 + 오늘 기사 배정 현황) */}
               <section
-                aria-label="검토 및 자산 운영 현황"
-                className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5"
+                aria-label="미확인 배차, 미발송 초안 및 기사 배정 현황"
+                className="grid grid-cols-1 lg:grid-cols-3 gap-5"
               >
-                <HqDrivingLogCard
-                  logs={HQ_DRIVING_LOGS}
-                  onViewAll={() => setActiveTabOverride('driving_logs')}
-                  onSelectLog={(log) => {
-                    setActiveTabOverride('driving_logs');
-                    setSearchQuery(log.driverName);
-                  }}
-                />
-
-                <HqExpenseCard
-                  expenses={mappedExpensesForCard.length > 0 ? mappedExpensesForCard : HQ_EXPENSES}
-                  todayTotalExpense={hqExpenseKpi.todayTotal}
-                  monthTotalExpense={hqExpenseKpi.monthTotal}
-                  pendingReceiptsCount={hqExpenseKpi.pendingCount}
-                  onViewAll={() => setActiveTabOverride('expenses')}
-                  onSelectExpense={(item) => {
-                    setActiveTabOverride('expenses');
-                    setSearchQuery(item.driverName);
-                  }}
-                />
-
-                <HqFleetCard
-                  vehicleClasses={HQ_VEHICLE_CLASSES}
-                  onViewAll={() => setActiveTabOverride('vehicles')}
-                  onSelectClass={(v) => {
-                    alert(`${v.className} 차고지 현황: ${v.activeCount}/${v.totalCount}대 운행 중 (예약 가능: ${v.availableCount}대)`);
-                  }}
-                />
-              </section>
-
-              {/* Section 4: Bottom Panels (2 Cards: 기사 현황 + 알림/후속 조치) */}
-              <section
-                aria-label="기사 상태 및 알림 후속 조치"
-                className="grid grid-cols-1 lg:grid-cols-2 gap-5"
-              >
-                <HqDriverStatusCard
-                  onViewAll={() => setActiveTabOverride('drivers')}
-                />
-
-                <HqAlertsCard
-                  alerts={HQ_ALERTS}
-                  onViewAll={() => setActiveTabOverride('settings')}
-                  onAction={(alertItem) => {
-                    const targetBooking = bookings.find((b) => b.bookingNo === alertItem.bookingNo);
-                    if (targetBooking) {
-                      setSelectedBooking(targetBooking);
+                <HqUnconfirmedDispatchesCard
+                  items={HQ_UNCONFIRMED_DISPATCHES}
+                  onViewAll={() => setActiveDispatchTab('target')}
+                  onSelectItem={(item) => {
+                    const target = bookings.find((b) => b.customerName === item.customerName);
+                    if (target) {
+                      setSelectedBooking(target);
                       setIsDetailModalOpen(true);
-                    } else {
-                      alert(`알림 조치: ${alertItem.message}`);
                     }
                   }}
+                />
+
+                <HqUnsentDraftsCard
+                  items={HQ_UNSENT_DRAFTS}
+                  onViewAll={() => setActiveDispatchTab('target')}
+                  onSelectItem={(item) => {
+                    const target = bookings.find((b) => b.customerName === item.customerName);
+                    if (target) {
+                      setSelectedBooking(target);
+                      setIsDetailModalOpen(true);
+                    }
+                  }}
+                />
+
+                <HqDriverAllocationDonutCard
+                  stats={HQ_DRIVER_ALLOCATION}
+                  onViewAll={() => setActiveTabOverride('drivers')}
                 />
               </section>
             </>
