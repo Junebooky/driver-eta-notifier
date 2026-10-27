@@ -5,12 +5,12 @@ import Link from 'next/link';
 import {
   LayoutDashboard,
   CalendarCheck,
+  Building2,
   Mail,
   Car,
   Users,
   FileSpreadsheet,
   Receipt,
-  FileCheck,
   BarChart3,
   Settings,
   Smartphone,
@@ -23,15 +23,15 @@ export interface HqSidebarProps {
 }
 
 export const HqSidebar: React.FC<HqSidebarProps> = ({ activeTab, onSelectTab }) => {
-  const menuItems: { id: string; label: string; icon: React.ElementType; badge?: number }[] = [
+  const menuItems: { id: string; label: string; icon: React.ElementType; badge?: number; badgeColor?: string }[] = [
     { id: 'dashboard', label: '대시보드', icon: LayoutDashboard },
     { id: 'dispatch', label: '예약·배차 관리', icon: CalendarCheck },
-    { id: 'emails', label: '고객 이메일', icon: Mail, badge: 5 },
+    { id: 'customers', label: '고객 관리', icon: Building2 },
+    { id: 'emails', label: '고객 이메일', icon: Mail, badge: 12, badgeColor: 'bg-rose-500 text-white' },
     { id: 'vehicles', label: '차량 관리', icon: Car },
     { id: 'drivers', label: '기사 관리', icon: Users },
     { id: 'driving_logs', label: '운행일지 관리', icon: FileSpreadsheet },
-    { id: 'expenses', label: '경비지출 관리', icon: Receipt },
-    { id: 'receipts', label: '영수증 검수', icon: FileCheck },
+    { id: 'expenses', label: '경비지출', icon: Receipt },
     { id: 'reports', label: '보고서·통계', icon: BarChart3 },
     { id: 'settings', label: '설정·권한', icon: Settings },
   ];
@@ -85,7 +85,9 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({ activeTab, onSelectTab }) 
                 <span className="truncate">{item.label}</span>
               </div>
               {item.badge !== undefined && (
-                <span className="w-5 h-5 rounded-full bg-blue-100 text-[#1E60F3] text-[10px] font-black flex items-center justify-center shrink-0">
+                <span className={`w-5 h-5 rounded-full text-[10px] font-black flex items-center justify-center shrink-0 ${
+                  item.badgeColor || 'bg-blue-100 text-[#1E60F3]'
+                }`}>
                   {item.badge}
                 </span>
               )}

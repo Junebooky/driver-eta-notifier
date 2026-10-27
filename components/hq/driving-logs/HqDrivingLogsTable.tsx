@@ -211,8 +211,15 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
                     {/* 고객명 */}
                     <td className="py-3 px-3 text-slate-800 font-semibold">{log.customerName}</td>
 
-                    {/* 차량 */}
-                    <td className="py-3 px-3 text-slate-600">{log.vehicleModel}</td>
+                    {/* 차량: 차량번호 + 차량기종 함께 표시 */}
+                    <td className="py-3 px-3 whitespace-nowrap">
+                      <div className="font-bold text-slate-900 text-xs tracking-tight">
+                        {log.vehiclePlate || '-'}
+                      </div>
+                      <div className="text-[11px] text-slate-500 font-medium">
+                        {log.vehicleModel}
+                      </div>
+                    </td>
 
                     {/* 출근시간 */}
                     <td className="py-3 px-2 text-center text-slate-600">{log.clockIn}</td>

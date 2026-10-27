@@ -199,7 +199,7 @@ ${bodyText}
    - "modification": Customer asking to change an existing booking (e.g. flight delay, time shift)
    - "cancellation": Customer requesting cancellation (Never cancel automatically, add a warning)
 5. Vehicle class ("requestedVehicleClass"):
-   - Typical: "카니발 하이리무진", "세단 (G90/벤츠 S)", "스프린터", or exact model mentioned. Default to "카니발 하이리무진" if unspecified.
+   - Typical: "벤츠 스프린터", "현대 스타리아 리무진", "기아 카니발 하이리무진", "제네시스 (G90/GV80)", "벤츠 S560", or exact model mentioned. Default to "현대 스타리아 리무진" if unspecified.
 6. MANDATORY ASSIGNMENT RULE:
    - "assignedDriver" MUST ALWAYS BE null.
    - "assignedVehicle" MUST ALWAYS BE null.

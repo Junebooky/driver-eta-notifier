@@ -25,6 +25,25 @@ export interface HqExpenseRecord {
   memo?: string;
   ocrExtracted?: boolean;
   ocrSummary?: string;
+  ocrDetails?: {
+    merchantName: string;
+    bizNo?: string;
+    phone?: string;
+    address?: string;
+    paymentTime?: string;
+    cardName?: string;
+    cardNumber?: string;
+    approvalNo?: string;
+    items?: {
+      name: string;
+      unitPrice: number;
+      qty: number;
+      amount: number;
+    }[];
+    subtotal?: number;
+    vat?: number;
+    total?: number;
+  };
   reviewNotes?: string;
   reviewedAt?: string;
   reviewedBy?: string;

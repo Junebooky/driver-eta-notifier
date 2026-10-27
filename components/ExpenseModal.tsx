@@ -38,6 +38,7 @@ import {
   saveExpenses,
 } from '@/utils/expense';
 import { AddExpenseModal, renderCategoryIcon } from './AddExpenseModal';
+import { autoEnsureUprightReceipt } from '@/utils/imageRotate';
 import { haptics } from '@/utils/haptics';
 
 interface ExpenseModalProps {
@@ -165,7 +166,7 @@ const ExpenseModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) => 
       displayedItems,
       '윤태준',
       '116허 1514',
-      '카니발 하이리무진'
+      '현대 스타리아 리무진'
     );
 
     const nowIso = new Date().toISOString();
@@ -188,16 +189,17 @@ const ExpenseModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) => 
     setTimeout(() => setHqSubmitSuccessToast(null), 4000);
   };
 
-  // Quick photo upload from top action card
+  // Quick photo upload from top action card (Forces upright vertical orientation)
   const handleQuickPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     haptics.selection();
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const result = event.target?.result as string;
-      setUploadedReceiptUrl(result);
+      const { url: uprightUrl } = await autoEnsureUprightReceipt(result);
+      setUploadedReceiptUrl(uprightUrl);
       setEditingItem(null);
       setIsAddModalOpen(true);
     };
@@ -366,7 +368,7 @@ const ExpenseModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) => 
           tabIndex={0}
           onClick={() => {
             haptics.selection();
-            setUploadedReceiptUrl('/images/receipt_sample_fuel.jpg');
+            setUploadedReceiptUrl('/images/receipt_sample_hangang.jpg');
             setEditingItem(null);
             setIsAddModalOpen(true);
           }}

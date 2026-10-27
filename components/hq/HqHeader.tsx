@@ -53,7 +53,7 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
             placeholder={searchPlaceholder}
             className="w-full pl-9 pr-8 py-2 bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-800 placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 transition-all"
           />
-          {searchQuery && (
+          {searchQuery ? (
             <button
               type="button"
               onClick={() => onSearchChange('')}
@@ -62,6 +62,10 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
             >
               <X className="w-2.5 h-2.5" />
             </button>
+          ) : (
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none px-1.5 py-0.5 rounded-md bg-white border border-slate-200 text-[10px] font-mono text-slate-400 shadow-2xs">
+              ⌘ K
+            </div>
           )}
         </div>
 

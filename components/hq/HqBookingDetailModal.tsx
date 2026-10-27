@@ -45,7 +45,7 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
       driverName: drv.name,
       driverPhone: drv.phone,
       vehicleModel: veh ? veh.class : booking.vehicleModel,
-      vehiclePlate: veh ? veh.name.match(/\((.*?)\)/)?.[1] || '7789' : '7789',
+      vehiclePlate: veh ? veh.plate : booking.vehiclePlate || '미배정',
       dispatchStatus: '배차 완료',
       driverAck: '미확인',
       driverAckTime: undefined,
@@ -201,7 +201,12 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                     )}
                   </div>
                   <div>
-                    배정 차량: <strong className="text-slate-900 font-bold">{booking.vehicleModel}</strong> ({booking.vehiclePlate})
+                    배정 차량:{' '}
+                    <strong className="text-slate-900 font-bold">
+                      {booking.vehiclePlate && booking.vehiclePlate !== '미배정'
+                        ? `${booking.vehiclePlate} · ${booking.vehicleModel}`
+                        : booking.vehicleModel}
+                    </strong>
                   </div>
                 </div>
 

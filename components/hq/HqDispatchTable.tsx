@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { HqBooking } from '@/types/hq';
 import { haptics } from '@/utils/haptics';
+import { VIP_REAL_VEHICLES } from '@/utils/vehicleData';
 
 export interface HqDispatchTableProps {
   bookings: HqBooking[];
@@ -59,7 +60,7 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
       if (activeTab === 'tomorrow' && !b.isTomorrow) return false;
       if (activeTab === 'target' && b.dispatchStatus === '배차 완료') return false;
 
-      // 2. Search Query (Customer, BookingNo, Destination, Driver)
+      // 2. Search Query (Customer, BookingNo, Destination, Driver, Vehicle)
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matches =
@@ -67,7 +68,9 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
           b.bookingNo.toLowerCase().includes(q) ||
           b.destination.toLowerCase().includes(q) ||
           b.pickupLocation.toLowerCase().includes(q) ||
-          b.driverName.toLowerCase().includes(q);
+          b.driverName.toLowerCase().includes(q) ||
+          b.vehicleModel.toLowerCase().includes(q) ||
+          (b.vehiclePlate && b.vehiclePlate.toLowerCase().includes(q));
         if (!matches) return false;
       }
 
@@ -78,7 +81,13 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
       if (driverFilter !== 'all' && b.driverName !== driverFilter) return false;
 
       // 5. Vehicle Filter
-      if (vehicleFilter !== 'all' && b.vehicleModel !== vehicleFilter) return false;
+      if (vehicleFilter !== 'all') {
+        const matchesVehicle =
+          b.vehiclePlate === vehicleFilter ||
+          b.vehicleModel === vehicleFilter ||
+          b.vehicleModel.includes(vehicleFilter);
+        if (!matchesVehicle) return false;
+      }
 
       // 6. Customer Filter
       if (customerFilter !== 'all' && b.customerName !== customerFilter) return false;
@@ -211,12 +220,11 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
           className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-bold focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
         >
           <option value="all">전체 차량</option>
-          <option value="G90">G90</option>
-          <option value="Staria 9">Staria 9</option>
-          <option value="Sprinter">Sprinter</option>
-          <option value="G90 LWB">G90 LWB</option>
-          <option value="Carnival HL">Carnival HL</option>
-          <option value="Staria 10">Staria 10</option>
+          {VIP_REAL_VEHICLES.map((v) => (
+            <option key={v.id} value={v.plate}>
+              {v.plate} · {v.modelShort}
+            </option>
+          ))}
         </select>
 
         {/* Dropdown 4: 전체 고객사 */}
@@ -311,12 +319,19 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                       )}
                     </td>
 
-                    {/* 차량 */}
-                    <td className="py-3 px-3 text-slate-700 font-medium whitespace-nowrap">
-                      {b.vehicleModel === '-' ? (
+                    {/* 차량: 차량번호 + 차량기종 함께 표시 */}
+                    <td className="py-3 px-3 whitespace-nowrap">
+                      {b.vehicleModel === '-' && (!b.vehiclePlate || b.vehiclePlate === '미배정') ? (
                         <span className="text-slate-400 font-normal">-</span>
                       ) : (
-                        b.vehicleModel
+                        <div>
+                          <div className="font-bold text-slate-900 text-xs tracking-tight">
+                            {b.vehiclePlate && b.vehiclePlate !== '미배정' ? b.vehiclePlate : '-'}
+                          </div>
+                          <div className="text-[11px] text-slate-500 font-medium">
+                            {b.vehicleModel}
+                          </div>
+                        </div>
                       )}
                     </td>
 

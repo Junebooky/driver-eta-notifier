@@ -14,6 +14,8 @@ import {
   FileCheck,
   Send,
   Eye,
+  Plus,
+  Reply,
 } from 'lucide-react';
 import {
   HqEmailSummary,
@@ -32,17 +34,58 @@ import {
   convertDraftToHqBooking,
 } from '@/utils/emailHqStorage';
 import { haptics } from '@/utils/haptics';
+import { HqComposeEmailModal } from './HqComposeEmailModal';
 
 export interface HqEmailInboxViewProps {
   onCreateBooking?: (booking: HqBooking) => void;
 }
 
 const AVAILABLE_DRIVERS = [
-  { name: '윤태준', phone: '010-8842-1920', vehicle: '카니발 하이리무진', plate: '116허 1514', available: true },
-  { name: '김민수', phone: '010-3829-4821', vehicle: '벤츠 S클래스', plate: '8920', available: true },
-  { name: '이재훈', phone: '010-9182-3746', vehicle: '카니발 하이리무진', plate: '3190', available: true },
-  { name: '박서연', phone: '010-7281-9304', vehicle: '제네시스 G90', plate: '221하 8841', available: true },
+  { name: '윤태준', phone: '010-8842-1920', vehicle: '현대 스타리아 리무진', plate: '116허 1514', available: true },
+  { name: '김민수', phone: '010-3829-4821', vehicle: '벤츠 S560', plate: '01호 3343', available: true },
+  { name: '이재훈', phone: '010-9182-3746', vehicle: '기아 카니발 하이리무진', plate: '193호 5336', available: true },
+  { name: '박서연', phone: '010-7281-9304', vehicle: '제네시스 G90 리무진', plate: '102부 4280', available: true },
+  { name: '정태훈', phone: '010-5542-1928', vehicle: '벤츠 스프린터 519 CDI', plate: '703서 2658', available: true },
 ];
+
+// Module-level client cache container to eliminate tab-switch latency and provide 0ms instant display
+interface ClientEmailStore {
+  emails: HqEmailSummary[];
+  totalServerCount: number;
+  lastSync: string;
+  isConnected: boolean;
+  selectedEmailId: string | null;
+  detailMap: Map<string, HqEmailDetail>;
+}
+
+const clientEmailStore: ClientEmailStore = {
+  emails: [],
+  totalServerCount: 0,
+  lastSync: '',
+  isConnected: true,
+  selectedEmailId: null,
+  detailMap: new Map(),
+};
+
+function setStoreEmailData(
+  emails: HqEmailSummary[],
+  total: number,
+  lastSync: string,
+  isConnected: boolean
+) {
+  clientEmailStore.emails = emails;
+  clientEmailStore.totalServerCount = total;
+  clientEmailStore.lastSync = lastSync;
+  clientEmailStore.isConnected = isConnected;
+}
+
+function setStoreSelectedEmailId(id: string | null) {
+  clientEmailStore.selectedEmailId = id;
+}
+
+function setStoreEmailDetail(id: string, detail: HqEmailDetail) {
+  clientEmailStore.detailMap.set(id, detail);
+}
 
 export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({ onCreateBooking }) => {
   // Sync email drafts from external store (SSR and hydration safe)
@@ -52,11 +95,16 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({ onCreateBook
     getEmailDraftsServerSnapshot
   );
 
-  // Email inbox state
-  const [emails, setEmails] = useState<HqEmailSummary[]>([]);
-  const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null);
-  const [emailDetail, setEmailDetail] = useState<HqEmailDetail | null>(null);
-  const [isLoadingInbox, setIsLoadingInbox] = useState(true);
+  // Email inbox state - initialized from module cache for 0ms instant render
+  const [emails, setEmails] = useState<HqEmailSummary[]>(() => clientEmailStore.emails);
+  const [selectedEmailId, setSelectedEmailId] = useState<string | null>(() => clientEmailStore.selectedEmailId);
+  const [emailDetail, setEmailDetail] = useState<HqEmailDetail | null>(() => {
+    if (clientEmailStore.selectedEmailId && clientEmailStore.detailMap.has(clientEmailStore.selectedEmailId)) {
+      return clientEmailStore.detailMap.get(clientEmailStore.selectedEmailId)!;
+    }
+    return null;
+  });
+  const [isLoadingInbox, setIsLoadingInbox] = useState(() => clientEmailStore.emails.length === 0);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [isAnalyzingAi, setIsAnalyzingAi] = useState(false);
 
@@ -72,6 +120,13 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({ onCreateBook
   const [searchQuery, setSearchQuery] = useState('');
   const [settings, setSettings] = useState(getEmailSettings);
   const [isNoticeModalOpen, setIsNoticeModalOpen] = useState(false);
+
+  // Compose & Reply Email Modal State
+  const [isComposeOpen, setIsComposeOpen] = useState(false);
+  const [composeTo, setComposeTo] = useState('');
+  const [composeCc, setComposeCc] = useState('');
+  const [composeSubject, setComposeSubject] = useState('');
+  const [composeBody, setComposeBody] = useState('');
 
   // In-progress user edits overlay for the currently selected draft
   const [draftEdits, setDraftEdits] = useState<Partial<HqEmailExtractedDraft> | null>(null);
@@ -96,28 +151,42 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({ onCreateBook
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Connection metadata
-  const [lastSyncTime, setLastSyncTime] = useState<string>('');
-  const [totalServerCount, setTotalServerCount] = useState<number>(0);
-  const [isConnected, setIsConnected] = useState<boolean>(true);
+  // Connection metadata - initialized from module cache
+  const [lastSyncTime, setLastSyncTime] = useState<string>(() => clientEmailStore.lastSync);
+  const [totalServerCount, setTotalServerCount] = useState<number>(() => clientEmailStore.totalServerCount);
+  const [isConnected, setIsConnected] = useState<boolean>(() => clientEmailStore.isConnected);
 
-  // Initial fetch on mount
+  // Initial fetch on mount (uses cached data immediately if present)
   useEffect(() => {
     let ignore = false;
     const loadInitial = async () => {
+      // If we don't have client-side cached emails yet, show loader
+      if (clientEmailStore.emails.length === 0) {
+        setIsLoadingInbox(true);
+      }
       try {
         const res = await fetch('/api/email/inbox');
         const data = await res.json();
         if (!ignore && data.ok && Array.isArray(data.emails)) {
+          const total = data.totalCount || data.emails.length;
+          const syncTime = data.lastSync || new Date().toLocaleTimeString();
+          const connStatus = data.status?.ok ?? true;
+
+          setStoreEmailData(data.emails, total, syncTime, connStatus);
+
           setEmails(data.emails);
-          setTotalServerCount(data.totalCount || data.emails.length);
-          setLastSyncTime(data.lastSync || new Date().toLocaleTimeString());
-          setIsConnected(data.status?.ok ?? true);
+          setTotalServerCount(total);
+          setLastSyncTime(syncTime);
+          setIsConnected(connStatus);
 
           setSelectedEmailId((prev) => {
             if (prev) return prev;
-            const candidate = data.emails.find((e: HqEmailSummary) => e.candidateClassification === 'booking_candidate') || data.emails[0];
-            return candidate ? candidate.id : null;
+            const candidate =
+              data.emails.find((e: HqEmailSummary) => e.candidateClassification === 'booking_candidate') ||
+              data.emails[0];
+            const chosenId = candidate ? candidate.id : null;
+            setStoreSelectedEmailId(chosenId);
+            return chosenId;
           });
         }
       } catch (err) {
@@ -133,16 +202,28 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({ onCreateBook
     };
   }, []);
 
-  // Fetch single email detail when selection changes
+  // Fetch single email detail when selection changes (with client memory cache)
   useEffect(() => {
     if (!selectedEmailId) return;
+    setStoreSelectedEmailId(selectedEmailId);
+
     let ignore = false;
     const loadDetail = async () => {
+      const cached = clientEmailStore.detailMap.get(selectedEmailId);
+      if (cached) {
+        if (!ignore) {
+          setEmailDetail(cached);
+          setIsLoadingDetail(false);
+        }
+        return;
+      }
+
       setIsLoadingDetail(true);
       try {
         const res = await fetch(`/api/email/${selectedEmailId}`);
         const data = await res.json();
         if (!ignore && data.ok && data.email) {
+          setStoreEmailDetail(selectedEmailId, data.email);
           setEmailDetail(data.email);
         }
       } catch (err) {
@@ -151,6 +232,7 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({ onCreateBook
         if (!ignore) setIsLoadingDetail(false);
       }
     };
+
     loadDetail();
     return () => {
       ignore = true;
@@ -161,21 +243,32 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({ onCreateBook
   const handleSelectEmail = (emailId: string) => {
     haptics.lightTap();
     setSelectedEmailId(emailId);
+    setStoreSelectedEmailId(emailId);
     setDraftEdits(null);
     setMobileActivePane('detail'); // On mobile/tablet, immediately jump to detail view
+    const cached = clientEmailStore.detailMap.get(emailId);
+    if (cached) {
+      setEmailDetail(cached);
+    }
   };
 
-  // Manual refresh trigger
+  // Manual refresh trigger - explicitly calls server with ?refresh=true
   const handleManualRefresh = async () => {
     setIsLoadingInbox(true);
     try {
-      const res = await fetch('/api/email/inbox');
+      const res = await fetch('/api/email/inbox?refresh=true');
       const data = await res.json();
       if (data.ok && Array.isArray(data.emails)) {
+        const total = data.totalCount || data.emails.length;
+        const syncTime = data.lastSync || new Date().toLocaleTimeString();
+        const connStatus = data.status?.ok ?? true;
+
+        setStoreEmailData(data.emails, total, syncTime, connStatus);
+
         setEmails(data.emails);
-        setTotalServerCount(data.totalCount || data.emails.length);
-        setLastSyncTime(data.lastSync || new Date().toLocaleTimeString());
-        setIsConnected(data.status?.ok ?? true);
+        setTotalServerCount(total);
+        setLastSyncTime(syncTime);
+        setIsConnected(connStatus);
         showToast('네이버 메일함과 최신 동기화되었습니다.');
       }
     } catch (err) {
@@ -184,6 +277,67 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({ onCreateBook
     } finally {
       setIsLoadingInbox(false);
     }
+  };
+
+  // Open blank compose email to anyone
+  const handleOpenNewCompose = () => {
+    haptics.lightTap();
+    setComposeTo('');
+    setComposeCc('');
+    setComposeSubject('');
+    setComposeBody('');
+    setIsComposeOpen(true);
+  };
+
+  // Reply to the currently selected email
+  const handleReplyEmail = () => {
+    if (!emailDetail) return;
+    haptics.lightTap();
+    setComposeTo(emailDetail.from.address || '');
+    setComposeCc('');
+    setComposeSubject(
+      emailDetail.subject.startsWith('Re:')
+        ? emailDetail.subject
+        : `Re: ${emailDetail.subject}`
+    );
+    const quote = `\n\n\n----- Original Message -----\n보낸 사람: ${emailDetail.from.name} <${emailDetail.from.address}>\n수신 일시: ${emailDetail.receivedAt}\n제목: ${emailDetail.subject}\n\n${emailDetail.bodyText || ''}`;
+    setComposeBody(quote);
+    setIsComposeOpen(true);
+  };
+
+  // Send customer dispatch confirmation notification email
+  const handleSendBookingNotificationEmail = () => {
+    if (!activeDraft) return;
+    haptics.selection();
+    const recipient = emailDetail?.from.address || '';
+    setComposeTo(recipient);
+    setComposeCc('');
+    setComposeSubject(`[VIP LIMOUSINE] ${activeDraft.passengerName || '고객'}님 의전 차량 배차 확정 안내`);
+
+    const assignedDriverInfo = activeDraft.assignedDriver
+      ? AVAILABLE_DRIVERS.find((d) => d.name === activeDraft.assignedDriver)
+      : null;
+
+    const notificationBody = `안녕하세요, VIP LIMOUSINE KOREA 종합관제팀입니다.
+요청해주신 VIP 의전 차량 배차가 성공적으로 확정되었습니다.
+
+[운행 일정 상세]
+• 승객/고객명: ${activeDraft.passengerName || '미지정'} (탑승 ${activeDraft.passengerCount}명 / 수하물 ${activeDraft.luggageCount}개)
+• 운행 일자: ${activeDraft.pickupDate}
+• 픽업 시간: ${activeDraft.pickupTime}
+• 픽업 장소: ${activeDraft.pickupLocation}
+• 도착 목적지: ${activeDraft.dropoffLocation}
+${activeDraft.flightNumber ? `• 항공편명: ${activeDraft.flightNumber}\n` : ''}• 배차 차량: ${activeDraft.assignedVehicle || activeDraft.requestedVehicleClass}${activeDraft.assignedVehiclePlate ? ` (${activeDraft.assignedVehiclePlate})` : ''}
+• 담당 기사: ${activeDraft.assignedDriver ? `${activeDraft.assignedDriver} 기사 (${assignedDriverInfo?.phone || '010-8842-1920'})` : '배정 진행 중'}
+${activeDraft.specialRequests ? `• 요청 및 특이사항: ${activeDraft.specialRequests}\n` : ''}
+기사님이 픽업 예정 시간 20분 전 현장에 도착하여 대기할 예정이며, 차량 내부에는 VIP 전용 생수 및 편의용품이 완비되어 있습니다.
+일정 변경 또는 문의사항이 있으시면 언제든지 본 메일 또는 관제센터로 회신 부탁드립니다.
+
+감사합니다.
+VIP LIMOUSINE KOREA 종합관제팀 드림`;
+
+    setComposeBody(notificationBody);
+    setIsComposeOpen(true);
   };
 
   // Selected email summary object
@@ -396,11 +550,10 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({ onCreateBook
                 <Mail className="w-4 h-4 text-blue-300" />
               </div>
               <h1 className="text-xl font-black tracking-tight">고객 이메일 · AI 배차 어시스턴트</h1>
-              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border flex items-center gap-1.5 ${
-                isConnected
+              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border flex items-center gap-1.5 ${isConnected
                   ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
                   : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-              }`}>
+                }`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
                 {isConnected ? 'NAVER IMAP 읽기 전용 연결됨' : 'NAVER IMAP 오프라인'}
               </span>
@@ -410,12 +563,23 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({ onCreateBook
             </p>
           </div>
 
-          {/* Quick Stats & Sync Action */}
-          <div className="flex items-center gap-3">
+          {/* Quick Stats, Compose & Sync Actions */}
+          <div className="flex items-center gap-2.5 flex-wrap">
             <div className="bg-white/10 backdrop-blur-md rounded-xl px-3.5 py-2 border border-white/10 text-right">
               <p className="text-[10px] text-blue-200 font-semibold uppercase tracking-wider">최근 동기화</p>
               <p className="text-xs font-bold text-white">{lastSyncTime || '확인 중...'}</p>
             </div>
+
+            {/* Compose Email to Anyone Button */}
+            <button
+              type="button"
+              onClick={handleOpenNewCompose}
+              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-white text-[#0B1E48] hover:bg-blue-50 active:scale-95 text-xs font-black shadow-sm transition-all cursor-pointer"
+              title="어떤 수신인에게든 이메일을 직접 작성하여 발송합니다."
+            >
+              <Plus className="w-3.5 h-3.5 text-[#1E60F3]" />
+              <span>+ 메일 쓰기</span>
+            </button>
 
             <button
               type="button"
@@ -486,18 +650,16 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({ onCreateBook
             <button
               type="button"
               onClick={() => setSelectedProvider('all')}
-              className={`px-2.5 py-1 rounded-md transition-all ${
-                selectedProvider === 'all' ? 'bg-white text-slate-900 shadow-xs' : 'hover:text-slate-900'
-              }`}
+              className={`px-2.5 py-1 rounded-md transition-all ${selectedProvider === 'all' ? 'bg-white text-slate-900 shadow-xs' : 'hover:text-slate-900'
+                }`}
             >
               전체 제공자
             </button>
             <button
               type="button"
               onClick={() => setSelectedProvider('naver')}
-              className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 ${
-                selectedProvider === 'naver' ? 'bg-white text-emerald-600 shadow-xs' : 'hover:text-slate-900'
-              }`}
+              className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 ${selectedProvider === 'naver' ? 'bg-white text-emerald-600 shadow-xs' : 'hover:text-slate-900'
+                }`}
             >
               <span className="w-2 h-2 rounded-full bg-emerald-500" />
               NAVER
@@ -505,9 +667,8 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({ onCreateBook
             <button
               type="button"
               onClick={() => setSelectedProvider('gmail')}
-              className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 ${
-                selectedProvider === 'gmail' ? 'bg-white text-rose-600 shadow-xs' : 'hover:text-slate-900'
-              }`}
+              className={`px-2.5 py-1 rounded-md transition-all flex items-center gap-1 ${selectedProvider === 'gmail' ? 'bg-white text-rose-600 shadow-xs' : 'hover:text-slate-900'
+                }`}
             >
               <span className="w-2 h-2 rounded-full bg-rose-400" />
               Gmail
@@ -529,11 +690,10 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({ onCreateBook
                 key={pill.id}
                 type="button"
                 onClick={() => setSelectedAiFilter(pill.id)}
-                className={`px-2.5 py-1 rounded-lg transition-all ${
-                  selectedAiFilter === pill.id
+                className={`px-2.5 py-1 rounded-lg transition-all ${selectedAiFilter === pill.id
                     ? 'bg-[#0B1E48] text-white shadow-xs'
                     : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
-                }`}
+                  }`}
               >
                 {pill.label}
               </button>
@@ -559,11 +719,10 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({ onCreateBook
           <button
             type="button"
             onClick={handleToggleAutoAi}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
-              settings.autoAiCandidateExtraction
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border cursor-pointer ${settings.autoAiCandidateExtraction
                 ? 'bg-blue-50 border-blue-300 text-[#1E60F3]'
                 : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'
-            }`}
+              }`}
             title="수신되는 예약 메일 후보를 백그라운드에서 자동 분석할지 여부"
           >
             <Sparkles className="w-3.5 h-3.5" />
@@ -577,18 +736,16 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({ onCreateBook
         <button
           type="button"
           onClick={() => setMobileActivePane('list')}
-          className={`flex-1 py-2 rounded-lg transition-all text-center ${
-            mobileActivePane === 'list' ? 'bg-white text-slate-900 shadow-xs' : 'hover:text-slate-900'
-          }`}
+          className={`flex-1 py-2 rounded-lg transition-all text-center ${mobileActivePane === 'list' ? 'bg-white text-slate-900 shadow-xs' : 'hover:text-slate-900'
+            }`}
         >
           1. 수신 메일함 ({filteredEmails.length})
         </button>
         <button
           type="button"
           onClick={() => setMobileActivePane('detail')}
-          className={`flex-1 py-2 rounded-lg transition-all text-center flex items-center justify-center gap-1 ${
-            mobileActivePane === 'detail' ? 'bg-white text-blue-600 shadow-xs' : 'hover:text-slate-900'
-          }`}
+          className={`flex-1 py-2 rounded-lg transition-all text-center flex items-center justify-center gap-1 ${mobileActivePane === 'detail' ? 'bg-white text-blue-600 shadow-xs' : 'hover:text-slate-900'
+            }`}
         >
           <Eye className="w-3.5 h-3.5" />
           <span>2. 원본 본문</span>
@@ -596,9 +753,8 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({ onCreateBook
         <button
           type="button"
           onClick={() => setMobileActivePane('draft')}
-          className={`flex-1 py-2 rounded-lg transition-all text-center flex items-center justify-center gap-1 ${
-            mobileActivePane === 'draft' ? 'bg-white text-purple-600 shadow-xs' : 'hover:text-slate-900'
-          }`}
+          className={`flex-1 py-2 rounded-lg transition-all text-center flex items-center justify-center gap-1 ${mobileActivePane === 'draft' ? 'bg-white text-purple-600 shadow-xs' : 'hover:text-slate-900'
+            }`}
         >
           <Sparkles className="w-3.5 h-3.5" />
           <span>3. AI 배차 초안</span>
@@ -615,9 +771,8 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({ onCreateBook
         {/* ========================================================= */}
         {/* PANE 1: 수신 메일 목록 (Inbox List)                         */}
         {/* ========================================================= */}
-        <div className={`xl:col-span-4 bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden flex flex-col min-h-[720px] ${
-          mobileActivePane !== 'list' ? 'hidden xl:flex' : 'flex'
-        }`}>
+        <div className={`xl:col-span-4 bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden flex flex-col min-h-[720px] ${mobileActivePane !== 'list' ? 'hidden xl:flex' : 'flex'
+          }`}>
           {/* List Header */}
           <div className="p-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
             <div className="flex items-center gap-2">
@@ -647,18 +802,16 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({ onCreateBook
                   <div
                     key={email.id}
                     onClick={() => handleSelectEmail(email.id)}
-                    className={`p-3.5 transition-all cursor-pointer relative group ${
-                      isSelected
+                    className={`p-3.5 transition-all cursor-pointer relative group ${isSelected
                         ? 'bg-blue-50/90 border-l-4 border-l-[#1E60F3] shadow-xs'
                         : 'hover:bg-slate-50/80 border-l-4 border-l-transparent'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-1.5 min-w-0">
                         <span
-                          className={`w-2 h-2 rounded-full shrink-0 ${
-                            email.provider === 'naver' ? 'bg-emerald-500' : 'bg-rose-500'
-                          }`}
+                          className={`w-2 h-2 rounded-full shrink-0 ${email.provider === 'naver' ? 'bg-emerald-500' : 'bg-rose-500'
+                            }`}
                           title={email.provider.toUpperCase()}
                         />
                         <span className={`text-xs truncate ${isSelected ? 'font-black text-blue-900' : 'font-bold text-slate-800'}`}>
@@ -723,9 +876,8 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({ onCreateBook
         {/* ========================================================= */}
         {/* PANE 2: 선택된 메일 원본 본문 뷰어 (Original Safe Viewer)    */}
         {/* ========================================================= */}
-        <div className={`xl:col-span-4 bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden flex flex-col min-h-[720px] ${
-          mobileActivePane !== 'detail' ? 'hidden xl:flex' : 'flex'
-        }`}>
+        <div className={`xl:col-span-4 bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden flex flex-col min-h-[720px] ${mobileActivePane !== 'detail' ? 'hidden xl:flex' : 'flex'
+          }`}>
           {/* Viewer Header */}
           <div className="p-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
             <div className="flex items-center gap-2">
@@ -739,18 +891,16 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({ onCreateBook
                   <button
                     type="button"
                     onClick={() => setBodyDisplayMode('text')}
-                    className={`px-2 py-0.5 rounded transition-all ${
-                      bodyDisplayMode === 'text' ? 'bg-white text-slate-900 shadow-xs' : 'hover:text-slate-900'
-                    }`}
+                    className={`px-2 py-0.5 rounded transition-all ${bodyDisplayMode === 'text' ? 'bg-white text-slate-900 shadow-xs' : 'hover:text-slate-900'
+                      }`}
                   >
                     텍스트
                   </button>
                   <button
                     type="button"
                     onClick={() => setBodyDisplayMode('html')}
-                    className={`px-2 py-0.5 rounded transition-all ${
-                      bodyDisplayMode === 'html' ? 'bg-white text-emerald-600 shadow-xs' : 'hover:text-slate-900'
-                    }`}
+                    className={`px-2 py-0.5 rounded transition-all ${bodyDisplayMode === 'html' ? 'bg-white text-emerald-600 shadow-xs' : 'hover:text-slate-900'
+                      }`}
                   >
                     서식(HTML)
                   </button>
@@ -782,15 +932,6 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({ onCreateBook
               </div>
             ) : emailDetail ? (
               <div className="space-y-3.5">
-                {/* Security Header Banner */}
-                <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-xl p-2.5 flex items-center justify-between text-[11px]">
-                  <div className="flex items-center gap-1.5 text-emerald-800 font-semibold">
-                    <Shield className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    <span>네이버 IMAP 읽기 전용 (EXAMINE) · \Seen 플래그 보존됨</span>
-                  </div>
-                  <span className="text-[10px] text-emerald-700/80 font-mono">UID: {emailDetail.uid}</span>
-                </div>
-
                 {/* Mail Header Details */}
                 <div className="border border-slate-200/80 rounded-xl p-3 space-y-1.5 text-xs bg-slate-50/40">
                   <div className="flex items-start justify-between gap-2">
@@ -832,6 +973,29 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({ onCreateBook
 
                 {/* Quick Action in Middle Viewer */}
                 <div className="pt-2 flex items-center justify-between gap-2 border-t border-slate-100">
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={handleReplyEmail}
+                      className="flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 text-xs font-bold transition-all cursor-pointer"
+                      title="보낸 사람에게 회신(답장) 메일을 작성합니다."
+                    >
+                      <Reply className="w-3.5 h-3.5 text-slate-600" />
+                      <span>답장</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEmailStatusOverride(emailDetail.id, 'skipped');
+                        showToast('해당 이메일이 비관련 메일로 분류되었습니다.');
+                      }}
+                      className="px-2.5 py-2 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-100 text-xs font-bold transition-all"
+                    >
+                      비관련 분류
+                    </button>
+                  </div>
+
                   <button
                     type="button"
                     onClick={() => handleTriggerAiAnalysis()}
@@ -840,17 +1004,6 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({ onCreateBook
                   >
                     <Sparkles className={`w-3.5 h-3.5 ${isAnalyzingAi ? 'animate-spin' : ''}`} />
                     <span>{isAnalyzingAi ? 'Gemini AI 분석 진행 중...' : '✨ 이 메일 AI 예약 분석'}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEmailStatusOverride(emailDetail.id, 'skipped');
-                      showToast('해당 이메일이 비관련 메일로 분류되었습니다.');
-                    }}
-                    className="px-3 py-2 rounded-xl text-slate-500 hover:text-slate-700 hover:bg-slate-100 text-xs font-bold transition-all"
-                  >
-                    비관련 분류
                   </button>
                 </div>
               </div>
@@ -867,9 +1020,8 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({ onCreateBook
         {/* ========================================================= */}
         {/* PANE 3: AI 예약 어시스턴트 & 초안 편집기 (AI Draft & Dispatch) */}
         {/* ========================================================= */}
-        <div className={`xl:col-span-4 bg-white rounded-2xl border border-blue-200/80 shadow-md p-4 flex flex-col justify-between min-h-[720px] ${
-          mobileActivePane !== 'draft' ? 'hidden xl:flex' : 'flex'
-        }`}>
+        <div className={`xl:col-span-4 bg-white rounded-2xl border border-blue-200/80 shadow-md p-4 flex flex-col justify-between min-h-[720px] ${mobileActivePane !== 'draft' ? 'hidden xl:flex' : 'flex'
+          }`}>
           {activeDraft ? (
             <div className="space-y-3.5">
               {/* Draft Header */}
@@ -889,13 +1041,12 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({ onCreateBook
                     신뢰도 {Math.round(activeDraft.confidence * 100)}%
                   </span>
                   <span
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                      activeDraft.tripType === 'modification'
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${activeDraft.tripType === 'modification'
                         ? 'bg-amber-100 text-amber-800'
                         : activeDraft.tripType === 'group'
                           ? 'bg-purple-100 text-purple-800'
                           : 'bg-emerald-100 text-emerald-800'
-                    }`}
+                      }`}
                   >
                     {activeDraft.tripType === 'modification'
                       ? '일정 변경/지연'
@@ -1073,7 +1224,7 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({ onCreateBook
                       <option value="">-- 기사 선택 (미배정) --</option>
                       {AVAILABLE_DRIVERS.map((d) => (
                         <option key={d.name} value={d.name}>
-                          {d.name} 기사 ({d.vehicle})
+                          {d.name} 기사 ({d.plate} · {d.vehicle})
                         </option>
                       ))}
                     </select>
@@ -1108,7 +1259,17 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({ onCreateBook
                   <span>AI 재분석</span>
                 </button>
 
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                  <button
+                    type="button"
+                    onClick={handleSendBookingNotificationEmail}
+                    className="flex items-center gap-1 px-2.5 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#1E60F3] border border-blue-200 text-xs font-bold transition-all cursor-pointer"
+                    title="고객에게 배차 확정 안내 메일을 작성하여 발송합니다."
+                  >
+                    <Mail className="w-3.5 h-3.5" />
+                    <span>고객 안내 발송</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={handleSaveDraft}
@@ -1221,6 +1382,19 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({ onCreateBook
           </div>
         </div>
       )}
+
+      {/* Compose & Send Email to Anyone Modal */}
+      <HqComposeEmailModal
+        isOpen={isComposeOpen}
+        onClose={() => setIsComposeOpen(false)}
+        initialTo={composeTo}
+        initialCc={composeCc}
+        initialSubject={composeSubject}
+        initialBody={composeBody}
+        onSentSuccess={({ to }) => {
+          showToast(`메일 발송 완료: ${to}`);
+        }}
+      />
     </div>
   );
 };

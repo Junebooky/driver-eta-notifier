@@ -57,7 +57,9 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
   }, [logs]);
 
   const vehicleOptions = useMemo(() => {
-    return Array.from(new Set(logs.map((l) => l.vehicleModel))).filter(Boolean);
+    return Array.from(
+      new Set(logs.map((l) => (l.vehiclePlate ? `${l.vehiclePlate} · ${l.vehicleModel}` : l.vehicleModel)))
+    ).filter(Boolean);
   }, [logs]);
 
   const customerOptions = useMemo(() => {
@@ -93,8 +95,13 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
       }
 
       // 3. Vehicle Filter
-      if (selectedVehicle !== '전체' && log.vehicleModel !== selectedVehicle) {
-        return false;
+      if (selectedVehicle !== '전체') {
+        const matchesV =
+          log.vehicleModel === selectedVehicle ||
+          log.vehiclePlate === selectedVehicle ||
+          `${log.vehiclePlate} · ${log.vehicleModel}` === selectedVehicle ||
+          selectedVehicle.includes(log.vehiclePlate);
+        if (!matchesV) return false;
       }
 
       // 4. Customer Filter

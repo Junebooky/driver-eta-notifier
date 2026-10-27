@@ -1,11 +1,55 @@
 import { HqExpenseRecord, HqExpenseStatus, HqExpenseKpiSummary } from '@/types/expenseHq';
 import { ExpenseItem, EXPENSE_CATEGORIES, PAYMENT_METHODS } from '@/utils/expense';
 
-export const HQ_EXPENSES_STORAGE_KEY = 'cockpit_hq_expenses_v1';
+export const HQ_EXPENSES_STORAGE_KEY = 'cockpit_hq_expenses_v2';
 export const HQ_EXPENSE_UPDATE_EVENT = 'cockpit_hq_expense_updated';
 
-// 8 Rich Initial Mock HQ Expenses
+// 9 Rich Initial Mock HQ Expenses (Exact match with HQ Operations System)
 export const INITIAL_HQ_EXPENSES: HqExpenseRecord[] = [
+  {
+    id: 'hq-exp-09',
+    no: 9,
+    submittedAt: '10/26 19:33',
+    submittedDate: '2024. 10. 26 (토)',
+    rawDate: '2024-10-26',
+    time: '19:33',
+    driverName: '윤태준',
+    vehicleModel: '현대 스타리아 리무진',
+    vehiclePlate: '116허 1514',
+    category: 'meal',
+    categoryLabel: '식비',
+    merchant: 'CU 고양강매점',
+    address: '경기도 고양시 덕양구 강매로247 (강매동 521-7)',
+    amount: 9500,
+    paymentMethod: 'company_card',
+    paymentMethodLabel: '회사 카드',
+    status: '검수 대기',
+    hasReceiptImage: true,
+    receiptUrl: '/images/receipt_sample_cu.jpg',
+    memo: '야간 VIP 운행 대기 중 식대 (삼각김밥, 음료 등)',
+    ocrExtracted: true,
+    ocrSummary: 'CU 고양강매점 식음료 영수증 인식 완료 (총 7,500원 / 청구 9,500원)',
+    ocrDetails: {
+      merchantName: 'CU 고양강매점',
+      bizNo: '780-85-02777',
+      phone: '031-962-1027',
+      address: '경기도 고양시 덕양구 강매로247 (강매동 521-7)',
+      paymentTime: '2024-10-26 19:22:17',
+      cardName: 'KB국민카드',
+      cardNumber: '9445-12**-****-7731',
+      approvalNo: '30012536',
+      items: [
+        { name: '삼각김밥참치마요', unitPrice: 1200, qty: 1, amount: 1200 },
+        { name: 'CU파떡에그구이봉', unitPrice: 2300, qty: 1, amount: 2300 },
+        { name: '바나나우유', unitPrice: 1800, qty: 1, amount: 1800 },
+        { name: 'PB생수500ml', unitPrice: 700, qty: 1, amount: 700 },
+        { name: '비타500', unitPrice: 1500, qty: 1, amount: 1500 },
+      ],
+      subtotal: 6819,
+      vat: 681,
+      total: 7500,
+    },
+  },
   {
     id: 'hq-exp-01',
     no: 1,
@@ -14,8 +58,8 @@ export const INITIAL_HQ_EXPENSES: HqExpenseRecord[] = [
     rawDate: '2024-10-24',
     time: '14:30',
     driverName: '정태훈',
-    vehicleModel: '카니발 하이리무진',
-    vehiclePlate: '서울 78바 3120',
+    vehicleModel: '기아 카니발 하이리무진',
+    vehiclePlate: '193호 5336',
     category: 'fuel',
     categoryLabel: '주유비',
     merchant: 'GS칼텍스 삼일주유소',
@@ -38,8 +82,8 @@ export const INITIAL_HQ_EXPENSES: HqExpenseRecord[] = [
     rawDate: '2024-10-24',
     time: '13:20',
     driverName: '김민수',
-    vehicleModel: 'S클래스 8920',
-    vehiclePlate: '서울 12가 8920',
+    vehicleModel: '벤츠 S560',
+    vehiclePlate: '01호 3343',
     category: 'toll',
     categoryLabel: '통행료',
     merchant: '인천국제공항고속도로 신공항영업소',
@@ -49,6 +93,7 @@ export const INITIAL_HQ_EXPENSES: HqExpenseRecord[] = [
     paymentMethodLabel: '회사 카드',
     status: '검수 대기',
     hasReceiptImage: true,
+    receiptUrl: '/images/receipt_sample_fuel.jpg',
     memo: '호텔신라 ➔ 인천공항 T1 왕복 톨게이트 비용',
     ocrExtracted: true,
     ocrSummary: '신공항하이웨이 인천공항영업소 통행료 18,000원',
@@ -61,8 +106,8 @@ export const INITIAL_HQ_EXPENSES: HqExpenseRecord[] = [
     rawDate: '2024-10-24',
     time: '11:45',
     driverName: '이준호',
-    vehicleModel: 'G90 리무진',
-    vehiclePlate: '서울 34다 9182',
+    vehicleModel: '제네시스 G90 리무진',
+    vehiclePlate: '102부 4280',
     category: 'parking',
     categoryLabel: '주차비',
     merchant: '코엑스 인터컨티넨탈 호텔 주차장',
@@ -72,6 +117,7 @@ export const INITIAL_HQ_EXPENSES: HqExpenseRecord[] = [
     paymentMethodLabel: '회사 카드',
     status: '승인 완료',
     hasReceiptImage: true,
+    receiptUrl: '/images/receipt_sample_fuel.jpg',
     memo: '고객 오찬 회담 대기 중 주차 요금',
     ocrExtracted: true,
     reviewNotes: '호텔 공식 주차 확인 완료 (법인카드 승인 번호 일치)',
@@ -86,7 +132,7 @@ export const INITIAL_HQ_EXPENSES: HqExpenseRecord[] = [
     rawDate: '2024-10-24',
     time: '10:15',
     driverName: '윤태준',
-    vehicleModel: '116허 1514',
+    vehicleModel: '현대 스타리아 리무진',
     vehiclePlate: '116허 1514',
     category: 'fuel',
     categoryLabel: '주유비',
@@ -110,8 +156,8 @@ export const INITIAL_HQ_EXPENSES: HqExpenseRecord[] = [
     rawDate: '2024-10-23',
     time: '18:30',
     driverName: '박서연',
-    vehicleModel: '마이바흐 GLS',
-    vehiclePlate: '서울 56라 4402',
+    vehicleModel: '제네시스 GV80',
+    vehiclePlate: '203호 5947',
     category: 'meal',
     categoryLabel: '식비',
     merchant: '영종도 한식당',
@@ -121,6 +167,7 @@ export const INITIAL_HQ_EXPENSES: HqExpenseRecord[] = [
     paymentMethodLabel: '회사 카드',
     status: '승인 완료',
     hasReceiptImage: true,
+    receiptUrl: '/images/receipt_sample_cu.jpg',
     memo: 'VIP 야간 장기 대기로 인한 석식 식대',
     ocrExtracted: true,
     reviewNotes: '영수증 및 대기 일지 확인 승인',
@@ -135,8 +182,8 @@ export const INITIAL_HQ_EXPENSES: HqExpenseRecord[] = [
     rawDate: '2024-10-23',
     time: '16:10',
     driverName: '최동욱',
-    vehicleModel: '스프린터 15인승',
-    vehiclePlate: '경기 89바 1029',
+    vehicleModel: '벤츠 스프린터 519 CDI',
+    vehiclePlate: '703서 2658',
     category: 'wash',
     categoryLabel: '세차비',
     merchant: '강남 프리미엄 손세차 클럽',
@@ -146,6 +193,7 @@ export const INITIAL_HQ_EXPENSES: HqExpenseRecord[] = [
     paymentMethodLabel: '회사 카드',
     status: '승인 완료',
     hasReceiptImage: true,
+    receiptUrl: '/images/receipt_sample_fuel.jpg',
     memo: '국빈 영접 전 내외관 특수 세차',
     ocrExtracted: true,
     reviewNotes: '정기 특수 세차 배정건 정상 처리',
@@ -160,8 +208,8 @@ export const INITIAL_HQ_EXPENSES: HqExpenseRecord[] = [
     rawDate: '2024-10-23',
     time: '14:00',
     driverName: '김민수',
-    vehicleModel: 'S클래스 8920',
-    vehiclePlate: '서울 12가 8920',
+    vehicleModel: '벤츠 S560',
+    vehiclePlate: '01호 3343',
     category: 'parking',
     categoryLabel: '주차비',
     merchant: '여의도 파크원 타워 주차장',
@@ -171,6 +219,7 @@ export const INITIAL_HQ_EXPENSES: HqExpenseRecord[] = [
     paymentMethodLabel: '회사 카드',
     status: '금액 확인',
     hasReceiptImage: true,
+    receiptUrl: '/images/receipt_sample_fuel.jpg',
     memo: '고객사 컨퍼런스 4시간 주차',
     ocrExtracted: true,
     reviewNotes: '주차 할인권 미적용 여부 기사 확인 요망',
@@ -184,9 +233,9 @@ export const INITIAL_HQ_EXPENSES: HqExpenseRecord[] = [
     submittedDate: '2024. 10. 22 (화)',
     rawDate: '2024-10-22',
     time: '17:40',
-    driverName: '강현우',
-    vehicleModel: 'G90 리무진',
-    vehiclePlate: '서울 23너 6711',
+    driverName: '강원우',
+    vehicleModel: '제네시스 G90L',
+    vehiclePlate: '208호 2269',
     category: 'other',
     categoryLabel: '정비비',
     merchant: '제네시스 강남 서비스센터',
@@ -196,6 +245,7 @@ export const INITIAL_HQ_EXPENSES: HqExpenseRecord[] = [
     paymentMethodLabel: '회사 카드',
     status: '승인 완료',
     hasReceiptImage: true,
+    receiptUrl: '/images/receipt_sample_fuel.jpg',
     memo: '와이퍼 블레이드 교체 및 냉각수 보충',
     ocrExtracted: true,
     reviewNotes: '공식 서비스센터 정비 명세서 확인 승인',
@@ -279,7 +329,7 @@ export const submitDriverExpensesToHq = (
   items: ExpenseItem[],
   driverName: string = '윤태준',
   vehiclePlate: string = '116허 1514',
-  vehicleModel: string = '카니발 하이리무진'
+  vehicleModel: string = '현대 스타리아 리무진'
 ): { success: boolean; count: number; totalAmount: number } => {
   if (!items || items.length === 0) {
     return { success: false, count: 0, totalAmount: 0 };
@@ -381,7 +431,7 @@ export const submitSingleExpenseToHq = (
   item: ExpenseItem,
   driverName: string = '윤태준',
   vehiclePlate: string = '116허 1514',
-  vehicleModel: string = '카니발 하이리무진'
+  vehicleModel: string = '현대 스타리아 리무진'
 ): HqExpenseRecord => {
   submitDriverExpensesToHq([item], driverName, vehiclePlate, vehicleModel);
   const updated = getHqExpenses();
@@ -426,7 +476,6 @@ export const updateHqExpenseStatus = (
  * Calculate KPI summary for HQ Dashboard
  */
 export const getHqExpenseKpiSummary = (expenses: HqExpenseRecord[] = getHqExpenses()): HqExpenseKpiSummary => {
-  const todayRaw = new Date().toISOString().slice(0, 10);
   let todayTotal = 0;
   let monthTotal = 0;
   let pendingCount = 0;
@@ -435,17 +484,15 @@ export const getHqExpenseKpiSummary = (expenses: HqExpenseRecord[] = getHqExpens
 
   expenses.forEach((e) => {
     monthTotal += e.amount;
-    if (e.rawDate === todayRaw || e.submittedAt.includes(new Date().getMonth() + 1 + '/')) {
-      todayTotal += e.amount;
-    }
+    todayTotal += e.amount;
     if (e.status === '검수 대기') pendingCount += 1;
     else if (e.status === '승인 완료') approvedCount += 1;
     else if (e.status === '금액 확인' || e.status === '반려') actionNeededCount += 1;
   });
 
   return {
-    todayTotal: todayTotal || 170000,
-    monthTotal: monthTotal || 4320000,
+    todayTotal,
+    monthTotal,
     pendingCount,
     approvedCount,
     actionNeededCount,

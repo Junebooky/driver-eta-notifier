@@ -11,6 +11,7 @@ import { HqBookingDetailModal } from '@/components/hq/HqBookingDetailModal';
 import { HqDrivingLogsView } from '@/components/hq/driving-logs/HqDrivingLogsView';
 import { HqExpensesView } from '@/components/hq/expenses/HqExpensesView';
 import { HqEmailInboxView } from '@/components/hq/email/HqEmailInboxView';
+import { HqCustomersView } from '@/components/hq/customers/HqCustomersView';
 import { HqUnconfirmedDispatchesCard } from '@/components/hq/dispatch/HqUnconfirmedDispatchesCard';
 import { HqUnsentDraftsCard } from '@/components/hq/dispatch/HqUnsentDraftsCard';
 import { HqDriverAllocationDonutCard } from '@/components/hq/dispatch/HqDriverAllocationDonutCard';
@@ -142,14 +143,26 @@ function HqDashboardInner() {
           title={
             activeSidebarTab === 'driving_logs'
               ? '운행일지 관리'
-              : activeSidebarTab === 'expenses'
-              ? '경비지출 관리'
+              : activeSidebarTab === 'expenses' || activeSidebarTab === 'receipts'
+              ? '경비지출'
               : activeSidebarTab === 'emails'
               ? '고객 이메일'
+              : activeSidebarTab === 'customers'
+              ? '고객 관리'
               : '예약·배차 관리'
           }
           subtitle={
-            activeSidebarTab === 'dispatch' || activeSidebarTab === 'dashboard' ? (
+            activeSidebarTab === 'customers' ? (
+              <span className="text-slate-500 font-medium">
+                주요 고객사의 담당자, 예약 이력, 요청사항을 한눈에 확인하고 관리할 수 있습니다.
+              </span>
+            ) : activeSidebarTab === 'expenses' || activeSidebarTab === 'receipts' ? (
+              <>
+                <span className="font-bold text-slate-700">2024년 10월 26일 (토)</span>
+                <span className="text-slate-300">|</span>
+                <span className="text-slate-400">기사 Cockpit 경비 및 영수증 실시간 대조 검수</span>
+              </>
+            ) : activeSidebarTab === 'dispatch' || activeSidebarTab === 'dashboard' ? (
               <>
                 <span className="font-bold text-slate-700">2026년 10월 26일 (월)</span>
                 <span className="text-slate-300">|</span>
@@ -157,7 +170,13 @@ function HqDashboardInner() {
               </>
             ) : undefined
           }
-          searchPlaceholder="고객명, 예약번호, 기사명, 차량번호 검색..."
+          searchPlaceholder={
+            activeSidebarTab === 'customers'
+              ? '고객명, 담당자명, 행사명으로 검색하세요...'
+              : activeSidebarTab === 'expenses' || activeSidebarTab === 'receipts'
+              ? '기사명, 차량번호, 상호명 검색...'
+              : '고객명, 예약번호, 기사명, 차량번호 검색...'
+          }
         />
 
         {/* Dashboard Scrollable Body */}
@@ -168,119 +187,128 @@ function HqDashboardInner() {
           ) : activeSidebarTab === 'expenses' || activeSidebarTab === 'receipts' ? (
             /* Dedicated 경비지출 관리 & 영수증 검수 View */
             <HqExpensesView initialSearchQuery={searchQuery} />
-          ) : activeSidebarTab === 'emails' ? (
-            /* Dedicated 고객 이메일 (AI) View */
-            <HqEmailInboxView
-              onCreateBooking={(newBooking) => {
-                setBookings((prev) => [newBooking, ...prev]);
-                setActiveTabOverride('dispatch');
-              }}
-            />
+          ) : activeSidebarTab === 'customers' ? (
+            /* Dedicated 고객 관리 View (New UI) */
+            <HqCustomersView initialSearchQuery={searchQuery} />
           ) : (
-            /* Operations Reservation & Dispatch View */
             <>
-              {/* Section 1: 7 Top KPI Metric Tiles */}
-              <section aria-label="운영 지표 현황">
-                <HqKpiTiles
-                  metrics={HQ_KPI_METRICS}
-                  activeFilter={activeKpiFilter}
-                  onSelectMetric={handleSelectKpi}
-                />
-              </section>
-
-              {/* Section 2: Main Working Area (Left 8 Cols Table + Right 4 Cols Quick Dispatch in 12-col grid) */}
-              <section
-                aria-label="오늘 및 내일 배차 작업 영역"
-                className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start"
-              >
-                {/* Left ~65% (8 cols): 예약 목록 */}
-                <div className="xl:col-span-8">
-                  <HqDispatchTable
-                    bookings={filteredBookings}
-                    activeTab={activeDispatchTab}
-                    onSelectTab={setActiveDispatchTab}
-                    onOpenNewBooking={() => {
-                      setSelectedBooking({
-                        id: `new_${Date.now()}`,
-                        bookingNo: `#261026-${String(bookings.length + 1).padStart(3, '0')}`,
-                        no: bookings.length + 1,
-                        customerName: '',
-                        pickupTime: '14:00',
-                        pickupDate: '2026. 10. 26',
-                        pickupLocation: '',
-                        destination: '',
-                        driverName: '-',
-                        vehicleModel: '-',
-                        vehiclePlate: '미배정',
-                        dispatchStatus: '미배정',
-                        driverAck: '-',
-                        customerBrochure: '미발송',
-                      });
-                      setIsDetailModalOpen(true);
-                    }}
-                    onViewBooking={(booking) => {
-                      setSelectedBooking(booking);
-                      setIsDetailModalOpen(true);
-                    }}
-                    onAssignDriver={(booking) => {
-                      setSelectedBooking(booking);
-                      setIsDetailModalOpen(true);
-                    }}
-                    onResendBrochure={(booking) => {
-                      setSelectedBooking(booking);
-                      setIsDetailModalOpen(true);
-                    }}
-                  />
-                </div>
-
-                {/* Right ~35% (4 cols): 빠른 배차 생성 */}
-                <div className="xl:col-span-4">
-                  <HqQuickDispatch
-                    onCreateBooking={handleCreateBooking}
-                    onOpenGroupDispatchModal={() => {
-                      alert('그룹 배차 관리 드로어가 실행됩니다. (공통 고객/일정/목적지 1회 입력 후 개별 탑승자·기사 다건 추가)');
-                    }}
-                    onOpenLoadBookingModal={() => {
-                      alert('등록된 예약 목록에서 기존 고객 데이터(픽업지, 목적지, 인원)를 불러옵니다.');
-                    }}
-                  />
-                </div>
-              </section>
-
-              {/* Section 3: Bottom Panels (3 Cards: 미확인 배차 + 미발송 초안 + 오늘 기사 배정 현황) */}
-              <section
-                aria-label="미확인 배차, 미발송 초안 및 기사 배정 현황"
-                className="grid grid-cols-1 lg:grid-cols-3 gap-5"
-              >
-                <HqUnconfirmedDispatchesCard
-                  items={HQ_UNCONFIRMED_DISPATCHES}
-                  onViewAll={() => setActiveDispatchTab('target')}
-                  onSelectItem={(item) => {
-                    const target = bookings.find((b) => b.customerName === item.customerName);
-                    if (target) {
-                      setSelectedBooking(target);
-                      setIsDetailModalOpen(true);
-                    }
+              {/* Dedicated 고객 이메일 (AI) View - preserved in DOM for instant 0ms switching without refetching */}
+              <div className={activeSidebarTab === 'emails' ? 'block' : 'hidden'}>
+                <HqEmailInboxView
+                  onCreateBooking={(newBooking) => {
+                    setBookings((prev) => [newBooking, ...prev]);
+                    setActiveTabOverride('dispatch');
                   }}
                 />
+              </div>
 
-                <HqUnsentDraftsCard
-                  items={HQ_UNSENT_DRAFTS}
-                  onViewAll={() => setActiveDispatchTab('target')}
-                  onSelectItem={(item) => {
-                    const target = bookings.find((b) => b.customerName === item.customerName);
-                    if (target) {
-                      setSelectedBooking(target);
-                      setIsDetailModalOpen(true);
-                    }
-                  }}
-                />
+              {/* Operations Reservation & Dispatch View */}
+              {activeSidebarTab !== 'emails' && (
+                <>
+                  {/* Section 1: 7 Top KPI Metric Tiles */}
+                  <section aria-label="운영 지표 현황">
+                    <HqKpiTiles
+                      metrics={HQ_KPI_METRICS}
+                      activeFilter={activeKpiFilter}
+                      onSelectMetric={handleSelectKpi}
+                    />
+                  </section>
 
-                <HqDriverAllocationDonutCard
-                  stats={HQ_DRIVER_ALLOCATION}
-                  onViewAll={() => setActiveTabOverride('drivers')}
-                />
-              </section>
+                  {/* Section 2: Main Working Area (Left 8 Cols Table + Right 4 Cols Quick Dispatch in 12-col grid) */}
+                  <section
+                    aria-label="오늘 및 내일 배차 작업 영역"
+                    className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start"
+                  >
+                    {/* Left ~65% (8 cols): 예약 목록 */}
+                    <div className="xl:col-span-8">
+                      <HqDispatchTable
+                        bookings={filteredBookings}
+                        activeTab={activeDispatchTab}
+                        onSelectTab={setActiveDispatchTab}
+                        onOpenNewBooking={() => {
+                          setSelectedBooking({
+                            id: `new_${Date.now()}`,
+                            bookingNo: `#261026-${String(bookings.length + 1).padStart(3, '0')}`,
+                            no: bookings.length + 1,
+                            customerName: '',
+                            pickupTime: '14:00',
+                            pickupDate: '2026. 10. 26',
+                            pickupLocation: '',
+                            destination: '',
+                            driverName: '-',
+                            vehicleModel: '-',
+                            vehiclePlate: '미배정',
+                            dispatchStatus: '미배정',
+                            driverAck: '-',
+                            customerBrochure: '미발송',
+                          });
+                          setIsDetailModalOpen(true);
+                        }}
+                        onViewBooking={(booking) => {
+                          setSelectedBooking(booking);
+                          setIsDetailModalOpen(true);
+                        }}
+                        onAssignDriver={(booking) => {
+                          setSelectedBooking(booking);
+                          setIsDetailModalOpen(true);
+                        }}
+                        onResendBrochure={(booking) => {
+                          setSelectedBooking(booking);
+                          setIsDetailModalOpen(true);
+                        }}
+                      />
+                    </div>
+
+                    {/* Right ~35% (4 cols): 빠른 배차 생성 */}
+                    <div className="xl:col-span-4">
+                      <HqQuickDispatch
+                        onCreateBooking={handleCreateBooking}
+                        onOpenGroupDispatchModal={() => {
+                          alert('그룹 배차 관리 드로어가 실행됩니다. (공통 고객/일정/목적지 1회 입력 후 개별 탑승자·기사 다건 추가)');
+                        }}
+                        onOpenLoadBookingModal={() => {
+                          alert('등록된 예약 목록에서 기존 고객 데이터(픽업지, 목적지, 인원)를 불러옵니다.');
+                        }}
+                      />
+                    </div>
+                  </section>
+
+                  {/* Section 3: Bottom Panels (3 Cards: 미확인 배차 + 미발송 초안 + 오늘 기사 배정 현황) */}
+                  <section
+                    aria-label="미확인 배차, 미발송 초안 및 기사 배정 현황"
+                    className="grid grid-cols-1 lg:grid-cols-3 gap-5"
+                  >
+                    <HqUnconfirmedDispatchesCard
+                      items={HQ_UNCONFIRMED_DISPATCHES}
+                      onViewAll={() => setActiveDispatchTab('target')}
+                      onSelectItem={(item) => {
+                        const target = bookings.find((b) => b.customerName === item.customerName);
+                        if (target) {
+                          setSelectedBooking(target);
+                          setIsDetailModalOpen(true);
+                        }
+                      }}
+                    />
+
+                    <HqUnsentDraftsCard
+                      items={HQ_UNSENT_DRAFTS}
+                      onViewAll={() => setActiveDispatchTab('target')}
+                      onSelectItem={(item) => {
+                        const target = bookings.find((b) => b.customerName === item.customerName);
+                        if (target) {
+                          setSelectedBooking(target);
+                          setIsDetailModalOpen(true);
+                        }
+                      }}
+                    />
+
+                    <HqDriverAllocationDonutCard
+                      stats={HQ_DRIVER_ALLOCATION}
+                      onViewAll={() => setActiveTabOverride('drivers')}
+                    />
+                  </section>
+                </>
+              )}
             </>
           )}
         </main>

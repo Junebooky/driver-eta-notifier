@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { HqBooking } from '@/types/hq';
 import { haptics } from '@/utils/haptics';
+import { VIP_REAL_VEHICLES } from '@/utils/vehicleData';
 
 export interface HqQuickDispatchProps {
   onCreateBooking: (booking: Partial<HqBooking>, isDraft: boolean) => void;
@@ -18,21 +19,21 @@ export interface HqQuickDispatchProps {
 }
 
 const DRIVER_OPTIONS = [
-  { id: '김기사', name: '김기사', vehicle: 'G90 (8920)' },
-  { id: '이기사', name: '이기사', vehicle: 'Staria 9 (4102)' },
-  { id: '박기사', name: '박기사', vehicle: 'Sprinter (9011)' },
-  { id: '최기사', name: '최기사', vehicle: 'G90 LWB (2290)' },
-  { id: '정기사', name: '정기사', vehicle: 'Carnival HL (3190)' },
+  { id: '윤태준', name: '윤태준 기사', vehicle: '현대 스타리아 리무진 (116허 1514)', defaultVehicle: '현대 스타리아 리무진', plate: '116허 1514' },
+  { id: '김민수', name: '김민수 기사', vehicle: '벤츠 S560 (01호 3343)', defaultVehicle: '벤츠 S560', plate: '01호 3343' },
+  { id: '이재훈', name: '이재훈 기사', vehicle: '기아 카니발 하이리무진 (193호 5336)', defaultVehicle: '기아 카니발 하이리무진', plate: '193호 5336' },
+  { id: '박서연', name: '박서연 기사', vehicle: '제네시스 G90 리무진 (102부 4280)', defaultVehicle: '제네시스 G90 리무진', plate: '102부 4280' },
+  { id: '정태훈', name: '정태훈 기사', vehicle: '벤츠 스프린터 519 CDI (703서 2658)', defaultVehicle: '벤츠 스프린터 519 CDI', plate: '703서 2658' },
+  { id: '최영식', name: '최영식 기사', vehicle: '벤츠 스프린터 투어러 (125호 9982)', defaultVehicle: '벤츠 스프린터 투어러 (319 CDI)', plate: '125호 9982' },
+  { id: '이준호', name: '이준호 기사', vehicle: '제네시스 GV80 (203호 5947)', defaultVehicle: '제네시스 GV80', plate: '203호 5947' },
 ];
 
-const VEHICLE_OPTIONS = [
-  { id: 'G90', name: 'G90' },
-  { id: 'Staria 9', name: 'Staria 9' },
-  { id: 'Sprinter', name: 'Sprinter' },
-  { id: 'G90 LWB', name: 'G90 LWB' },
-  { id: 'Carnival HL', name: 'Carnival HL' },
-  { id: 'Staria 10', name: 'Staria 10' },
-];
+const VEHICLE_OPTIONS = VIP_REAL_VEHICLES.map((v) => ({
+  id: v.id,
+  plate: v.plate,
+  model: v.model,
+  name: `${v.plate} · ${v.model}`,
+}));
 
 export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
   onCreateBooking,
@@ -54,6 +55,11 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
       return;
     }
 
+    const matchedDriver = DRIVER_OPTIONS.find((d) => d.name === selectedDriver || d.id === selectedDriver);
+    const matchedVehicle = VEHICLE_OPTIONS.find((v) => v.name === selectedVehicle || v.id === selectedVehicle);
+    const vehiclePlate = matchedVehicle?.plate || matchedDriver?.plate || (selectedDriver ? '배정완료' : '미배정');
+    const vehicleModel = matchedVehicle?.model || selectedVehicle || matchedDriver?.defaultVehicle || '-';
+
     const newBooking: Partial<HqBooking> = {
       customerName: customerName.trim() || '신규 고객 예약 (가칭)',
       pickupTime: pickupTime.slice(-5) || '14:00',
@@ -61,8 +67,8 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
       pickupLocation: pickupLocation || '서울 강남',
       destination: destination || '인천공항 T1',
       driverName: selectedDriver || '-',
-      vehicleModel: selectedVehicle || '-',
-      vehiclePlate: selectedDriver ? '배정완료' : '미배정',
+      vehicleModel,
+      vehiclePlate,
       dispatchStatus: isDraft || !selectedDriver ? '작성 중' : '배차 완료',
       driverAck: isDraft || !selectedDriver ? '-' : '미확인',
       customerBrochure: '미발송',
