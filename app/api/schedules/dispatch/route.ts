@@ -37,6 +37,32 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Unresolved Place Publish Guard:
+    // When publishing to driver mobile, places MUST be verified with coordinates
+    // or explicit confirmation to prevent sending drivers to guessed/erroneous locations.
+    const isPublishing = dispatchStatus === 'published';
+    const hasValidCoordinates =
+      typeof originLat === 'number' &&
+      typeof originLng === 'number' &&
+      typeof destinationLat === 'number' &&
+      typeof destinationLng === 'number';
+
+    const isUnverified = placeVerified === false || !hasValidCoordinates;
+    if (isPublishing && isUnverified && !body.allowUnverified) {
+      return NextResponse.json(
+        {
+          error: '미확인 장소가 포함되어 있어 배차를 발송할 수 없습니다. 주소 및 핀을 확정해주세요.',
+          code: 'UNRESOLVED_PLACE_GUARD',
+          unverifiedFields: {
+            origin: !originAddress || originLat == null,
+            destination: !destinationAddress || destinationLat == null,
+            placeVerified: Boolean(placeVerified),
+          },
+        },
+        { status: 400 }
+      );
+    }
+
     const nowIso = new Date().toISOString();
     const formattedPickupTime = pickupTime.length === 5 ? `${pickupTime}:00` : pickupTime;
     const resolvedTimeDisplay = timeDisplay || `픽업 ${pickupTime.slice(0, 5)}`;
