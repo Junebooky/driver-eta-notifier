@@ -310,16 +310,66 @@ export const getHqExpensesServerSnapshot = (): HqExpenseRecord[] => {
 };
 
 /**
- * Save all HQ expenses to localStorage & dispatch notification event
+ * Save all HQ expenses to localStorage & dispatch notification event.
+ * Includes a multi-tier quota defense system to prevent browser QuotaExceededError:
+ * - Tier 1: Prunes large base64 data URLs from older records (keeping top 3 recent receipt images)
+ * - Tier 2: Prunes all base64 data URLs (retaining static image paths and all financial/audit metadata)
+ * - Tier 3: Limits maximum retained records to most recent 50
  */
 export const saveHqExpenses = (expenses: HqExpenseRecord[]): void => {
   if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(HQ_EXPENSES_STORAGE_KEY, JSON.stringify(expenses));
-    window.dispatchEvent(new CustomEvent(HQ_EXPENSE_UPDATE_EVENT, { detail: { count: expenses.length } }));
-  } catch (err) {
-    console.error('Failed to save HQ expenses to storage:', err);
+
+  const tryPersist = (records: HqExpenseRecord[]): boolean => {
+    try {
+      localStorage.setItem(HQ_EXPENSES_STORAGE_KEY, JSON.stringify(records));
+      window.dispatchEvent(
+        new CustomEvent(HQ_EXPENSE_UPDATE_EVENT, { detail: { count: records.length } })
+      );
+      return true;
+    } catch (e) {
+      return false;
+    }
+  };
+
+  // 1. Direct attempt
+  if (tryPersist(expenses)) return;
+
+  console.warn('[HQ Expense Storage] LocalStorage quota exceeded on direct write. Initiating Tier 1 defense...');
+
+  // 2. Tier 1: Prune large base64 images from older records (beyond the top 3 newest)
+  const tier1Records = expenses.map((rec, idx) => {
+    if (idx >= 3 && rec.receiptUrl && rec.receiptUrl.startsWith('data:image/')) {
+      return { ...rec, receiptUrl: undefined };
+    }
+    return rec;
+  });
+  if (tryPersist(tier1Records)) {
+    console.info('[HQ Expense Storage] LocalStorage quota relieved via Tier 1 (pruned older receipt images).');
+    return;
   }
+
+  // 3. Tier 2: Strip all base64 data URLs (preserve static paths like /images/receipt_sample_fuel.jpg)
+  console.warn('[HQ Expense Storage] LocalStorage quota still exceeded. Initiating Tier 2 defense...');
+  const tier2Records = expenses.map((rec) => {
+    if (rec.receiptUrl && rec.receiptUrl.startsWith('data:image/')) {
+      return { ...rec, receiptUrl: undefined };
+    }
+    return rec;
+  });
+  if (tryPersist(tier2Records)) {
+    console.info('[HQ Expense Storage] LocalStorage quota relieved via Tier 2 (stripped data URLs, metadata preserved).');
+    return;
+  }
+
+  // 4. Tier 3: Limit to most recent 50 records without base64 images
+  console.warn('[HQ Expense Storage] LocalStorage quota critical. Initiating Tier 3 defense...');
+  const tier3Records = tier2Records.slice(0, 50);
+  if (tryPersist(tier3Records)) {
+    console.info('[HQ Expense Storage] LocalStorage quota relieved via Tier 3 (clamped to 50 items).');
+    return;
+  }
+
+  console.warn('[HQ Expense Storage] Critical storage limit reached. Unable to persist all expenses to LocalStorage.');
 };
 
 /**

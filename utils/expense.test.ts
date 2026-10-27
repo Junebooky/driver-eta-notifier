@@ -125,4 +125,111 @@ assert(Boolean(invalidCheck.errors.category), 'category error present');
 assert(Boolean(invalidCheck.errors.merchant), 'merchant error present');
 assert(Boolean(invalidCheck.errors.amount), 'amount error present');
 
-console.log('All 20/20 Expense Unit Tests Passed Successfully!');
+console.log('All 20/20 Expense Input & Pure Domain Tests Passed Successfully!');
+
+// 9. Quota Defense & LocalStorage QuotaExceededError Resiliency Test
+console.log('--- Testing LocalStorage Quota Defense ---');
+import { saveHqExpenses, getHqExpenses, HQ_EXPENSES_STORAGE_KEY, HqExpenseRecord } from './expenseHqStorage';
+import { saveExpenses, loadExpenses, EXPENSE_STORAGE_KEY } from './expense';
+
+const storageMock: Record<string, string> = {};
+let maxAllowedLength = 3000; // Trigger quota if payload exceeds 3000 characters
+
+(globalThis as any).window = {
+  dispatchEvent: () => true,
+  CustomEvent: class CustomEvent {
+    constructor(public type: string, public detail: any) {}
+  },
+};
+
+(globalThis as any).localStorage = {
+  getItem: (key: string) => storageMock[key] || null,
+  setItem: (key: string, val: string) => {
+    if (val.length > maxAllowedLength) {
+      const err = new Error("Failed to execute 'setItem' on 'Storage': Setting the value exceeded the quota.");
+      err.name = 'QuotaExceededError';
+      throw err;
+    }
+    storageMock[key] = val;
+  },
+  removeItem: (key: string) => {
+    delete storageMock[key];
+  },
+  clear: () => {
+    Object.keys(storageMock).forEach((k) => delete storageMock[k]);
+  },
+  length: 0,
+  key: () => null,
+};
+
+// Create a list of 10 HQ expenses where older records have huge base64 strings
+const dummyHeavyExpenses: HqExpenseRecord[] = Array.from({ length: 8 }, (_, i) => ({
+  id: `hq-test-${i}`,
+  no: i + 1,
+  submittedAt: '10/28 01:00',
+  submittedDate: '2026. 10. 28',
+  rawDate: '2026-10-28',
+  time: '01:00',
+  driverName: '윤태준',
+  vehicleModel: '스타리아',
+  vehiclePlate: '116허 1514',
+  category: 'fuel',
+  categoryLabel: '주유비',
+  merchant: `테스트 가맹점 ${i}`,
+  amount: 50000,
+  paymentMethod: 'company_card',
+  paymentMethodLabel: '회사 카드',
+  status: '검수 대기',
+  hasReceiptImage: true,
+  receiptUrl: `data:image/jpeg;base64,${'A'.repeat(800)}`, // Each is ~800 chars -> Total > 6400 chars > 3000 maxAllowedLength
+}));
+
+// Test Scenario A: Quota allows top 3 records with images (Tier 1 defense)
+// Direct payload is ~9,600 chars; setting quota to 6,500 forces Tier 1 (which is ~5,600 chars)
+maxAllowedLength = 6500;
+saveHqExpenses(dummyHeavyExpenses);
+assert(Boolean(storageMock[HQ_EXPENSES_STORAGE_KEY]), 'saveHqExpenses recovered and saved under quota');
+const savedHqTier1 = JSON.parse(storageMock[HQ_EXPENSES_STORAGE_KEY]);
+assert(savedHqTier1.length === 8, 'All 8 records preserved');
+assert(savedHqTier1[0].receiptUrl !== undefined, 'Top 0 receiptUrl preserved in Tier 1');
+assert(savedHqTier1[1].receiptUrl !== undefined, 'Top 1 receiptUrl preserved in Tier 1');
+assert(savedHqTier1[2].receiptUrl !== undefined, 'Top 2 receiptUrl preserved in Tier 1');
+assert(savedHqTier1[5].receiptUrl === undefined, 'Older record receiptUrl pruned to relieve quota in Tier 1');
+assert(savedHqTier1[5].hasReceiptImage === true, 'Metadata hasReceiptImage preserved');
+assert(savedHqTier1[5].amount === 50000, 'Metadata amount preserved');
+console.log('✓ saveHqExpenses successfully relieved quota through Tier 1 defense');
+
+// Test Scenario B: Tight quota forces stripping all base64 images (Tier 2 defense)
+// Setting quota to 3,500 forces Tier 2 (all base64 pruned, ~3,200 chars)
+maxAllowedLength = 3500;
+saveHqExpenses(dummyHeavyExpenses);
+const savedHqTier2 = JSON.parse(storageMock[HQ_EXPENSES_STORAGE_KEY]);
+assert(savedHqTier2.length === 8, 'All 8 records preserved in Tier 2');
+assert(savedHqTier2[0].receiptUrl === undefined, 'All base64 pruned in Tier 2');
+assert(savedHqTier2[0].hasReceiptImage === true, 'Metadata hasReceiptImage preserved in Tier 2');
+assert(savedHqTier2[0].merchant === '테스트 가맹점 0', 'Merchant preserved in Tier 2');
+console.log('✓ saveHqExpenses successfully relieved quota through Tier 2 defense');
+
+// Test driver saveExpenses quota defense
+const dummyDriverItems: ExpenseItem[] = Array.from({ length: 6 }, (_, i) => ({
+  id: `driver-test-${i}`,
+  category: 'meal',
+  date: '2026-10-28',
+  time: '12:00',
+  merchant: `식당 ${i}`,
+  amount: 12000,
+  paymentMethod: 'company_card',
+  receiptUrl: `data:image/jpeg;base64,${'B'.repeat(800)}`,
+  createdAt: '',
+  updatedAt: '',
+}));
+
+maxAllowedLength = 4000;
+saveExpenses(dummyDriverItems, false);
+assert(Boolean(storageMock[EXPENSE_STORAGE_KEY]), 'saveExpenses recovered and saved under quota');
+const savedDriver = JSON.parse(storageMock[EXPENSE_STORAGE_KEY]);
+assert(savedDriver.length === 6, 'All 6 driver items preserved');
+assert(savedDriver[5].receiptUrl === undefined, 'Older driver item receiptUrl pruned');
+
+console.log('✓ saveExpenses successfully relieved quota through Tier 1 defense');
+console.log('🎉 ALL 24 EXPENSE & QUOTA DEFENSE TESTS PASSED! 🎉');

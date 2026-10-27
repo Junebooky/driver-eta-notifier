@@ -1,16 +1,29 @@
 /**
- * Client-side Image Rotation Utility
+ * Client-side Image Rotation & Compression Utility
  *
  * Physically rotates image via HTML5 Canvas by specified degrees (e.g. +90°, -90°, 180°).
  * Swaps canvas width and height for 90°/270° rotations so horizontal receipts become cleanly vertical.
+ * Compresses and downscales high-res mobile photos to prevent LocalStorage QuotaExceededError.
  */
 
-export const rotateImageDataUrl = (
+/**
+ * Compress and downscale an image data URL to ensure it never exceeds localStorage quota.
+ * Scales down large camera photos (e.g. 4032x3024) to max 1200x1200 while preserving readability for OCR and UI preview.
+ * Compresses to JPEG with target quality (default 0.75), reducing size from 5MB+ to ~60-120KB.
+ */
+export const compressReceiptImage = (
   imageUrl: string,
-  degrees: number = 90
+  maxDimension: number = 1200,
+  quality: number = 0.75
 ): Promise<string> => {
   return new Promise((resolve) => {
     if (typeof window === 'undefined') {
+      resolve(imageUrl);
+      return;
+    }
+
+    // Pass through local static asset paths (e.g. /images/...)
+    if (imageUrl.startsWith('/') || !imageUrl.startsWith('data:image/')) {
       resolve(imageUrl);
       return;
     }
@@ -20,29 +33,119 @@ export const rotateImageDataUrl = (
 
     img.onload = () => {
       try {
+        let width = img.naturalWidth || img.width;
+        let height = img.naturalHeight || img.height;
+
+        if (width <= 0 || height <= 0) {
+          resolve(imageUrl);
+          return;
+        }
+
+        // Calculate aspect-preserving dimensions within maxDimension bounding box
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+
         const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
         const ctx = canvas.getContext('2d');
         if (!ctx) {
           resolve(imageUrl);
           return;
         }
 
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const compressed = canvas.toDataURL('image/jpeg', quality);
+        resolve(compressed);
+      } catch (err) {
+        console.warn('Image compression failed, using original:', err);
+        resolve(imageUrl);
+      }
+    };
+
+    img.onerror = () => {
+      resolve(imageUrl);
+    };
+
+    img.src = imageUrl;
+  });
+};
+
+export const rotateImageDataUrl = (
+  imageUrl: string,
+  degrees: number = 90,
+  maxDimension: number = 1200,
+  quality: number = 0.75
+): Promise<string> => {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined') {
+      resolve(imageUrl);
+      return;
+    }
+
+    // Pass through local static asset paths
+    if (imageUrl.startsWith('/') || !imageUrl.startsWith('data:image/')) {
+      resolve(imageUrl);
+      return;
+    }
+
+    const img = new window.Image();
+    img.crossOrigin = 'anonymous';
+
+    img.onload = () => {
+      try {
+        let origWidth = img.naturalWidth || img.width;
+        let origHeight = img.naturalHeight || img.height;
+
         // Normalize degrees to 0, 90, 180, 270
         const normalized = ((degrees % 360) + 360) % 360;
         const isQuarterTurn = normalized === 90 || normalized === 270;
 
-        // Swap dimensions if turned 90 or 270 degrees
-        canvas.width = isQuarterTurn ? img.height : img.width;
-        canvas.height = isQuarterTurn ? img.width : img.height;
+        let targetWidth = isQuarterTurn ? origHeight : origWidth;
+        let targetHeight = isQuarterTurn ? origWidth : origHeight;
 
-        // Clear and rotate around center
+        // Downscale if exceeds maxDimension
+        if (targetWidth > maxDimension || targetHeight > maxDimension) {
+          if (targetWidth > targetHeight) {
+            targetHeight = Math.round((targetHeight * maxDimension) / targetWidth);
+            targetWidth = maxDimension;
+          } else {
+            targetWidth = Math.round((targetWidth * maxDimension) / targetHeight);
+            targetHeight = maxDimension;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(imageUrl);
+          return;
+        }
+
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.translate(canvas.width / 2, canvas.height / 2);
         ctx.rotate((normalized * Math.PI) / 180);
-        ctx.drawImage(img, -img.width / 2, -img.height / 2);
 
-        // Export as JPEG with high quality
-        const rotatedDataUrl = canvas.toDataURL('image/jpeg', 0.92);
+        const drawWidth = isQuarterTurn ? canvas.height : canvas.width;
+        const drawHeight = isQuarterTurn ? canvas.width : canvas.height;
+        ctx.drawImage(img, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+
+        // Export as JPEG with reasonable quality
+        const rotatedDataUrl = canvas.toDataURL('image/jpeg', quality);
         resolve(rotatedDataUrl);
       } catch (err) {
         console.warn('Canvas image rotation failed, falling back to original:', err);
@@ -91,15 +194,18 @@ export const checkImageOrientation = (
 
 /**
  * Automatically rotate 90° clockwise if image is landscape (lying down)
- * so receipts are always standing upright
+ * so receipts are always standing upright and properly compressed
  */
 export const autoEnsureUprightReceipt = async (
   imageUrl: string
 ): Promise<{ url: string; wasRotated: boolean }> => {
-  const { isLandscape } = await checkImageOrientation(imageUrl);
+  // 1. First compress the image
+  const compressed = await compressReceiptImage(imageUrl, 1200, 0.75);
+  // 2. Check orientation on compressed image
+  const { isLandscape } = await checkImageOrientation(compressed);
   if (isLandscape) {
-    const rotated = await rotateImageDataUrl(imageUrl, 90);
+    const rotated = await rotateImageDataUrl(compressed, 90, 1200, 0.75);
     return { url: rotated, wasRotated: true };
   }
-  return { url: imageUrl, wasRotated: false };
+  return { url: compressed, wasRotated: false };
 };

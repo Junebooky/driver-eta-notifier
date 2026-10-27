@@ -425,14 +425,42 @@ export function loadExpenses(): { items: ExpenseItem[]; isDemo: boolean } {
 }
 
 /**
- * Pure saver for expenses to localStorage
+ * Pure saver for expenses to localStorage with multi-tier quota defense
  */
 export function saveExpenses(items: ExpenseItem[], isDemo: boolean = false): void {
   if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(EXPENSE_STORAGE_KEY, JSON.stringify(items));
-    localStorage.setItem(EXPENSE_DEMO_FLAG_KEY, isDemo ? 'true' : 'false');
-  } catch (err) {
-    console.error('Failed to save expenses to localStorage:', err);
-  }
+
+  const tryPersist = (records: ExpenseItem[]): boolean => {
+    try {
+      localStorage.setItem(EXPENSE_STORAGE_KEY, JSON.stringify(records));
+      localStorage.setItem(EXPENSE_DEMO_FLAG_KEY, isDemo ? 'true' : 'false');
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  // 1. Direct attempt
+  if (tryPersist(items)) return;
+
+  // 2. Tier 1: Prune large base64 images from older records (beyond the top 3 newest)
+  const tier1Items = items.map((rec, idx) => {
+    if (idx >= 3 && rec.receiptUrl && rec.receiptUrl.startsWith('data:image/')) {
+      return { ...rec, receiptUrl: undefined };
+    }
+    return rec;
+  });
+  if (tryPersist(tier1Items)) return;
+
+  // 3. Tier 2: Strip all base64 data URLs
+  const tier2Items = items.map((rec) => {
+    if (rec.receiptUrl && rec.receiptUrl.startsWith('data:image/')) {
+      return { ...rec, receiptUrl: undefined };
+    }
+    return rec;
+  });
+  if (tryPersist(tier2Items)) return;
+
+  // 4. Tier 3: Clamp to top 30 records
+  tryPersist(tier2Items.slice(0, 30));
 }

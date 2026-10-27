@@ -33,6 +33,7 @@ import {
   rotateImageDataUrl,
   checkImageOrientation,
   autoEnsureUprightReceipt,
+  compressReceiptImage,
 } from '@/utils/imageRotate';
 import { submitSingleExpenseToHq } from '@/utils/expenseHqStorage';
 import {
@@ -482,8 +483,8 @@ const AddExpenseModalContent: React.FC<{
     }
   };
 
-  // Submit handler (Enforces upright receipt orientation)
-  const handleSave = () => {
+  // Submit handler (Enforces upright receipt orientation & compressed safe size)
+  const handleSave = async () => {
     // 1. Enforce upright orientation for receipt photo: block if lying down
     if (receiptUrl && isReceiptLyingDown) {
       haptics.warningPulse();
@@ -514,6 +515,16 @@ const AddExpenseModalContent: React.FC<{
     setIsSaving(true);
     haptics.mediumTap();
 
+    // 2. Compress image if it is a base64 data URL to prevent localStorage quota exhaustion
+    let safeReceiptUrl = receiptUrl;
+    if (safeReceiptUrl && safeReceiptUrl.startsWith('data:image/') && safeReceiptUrl.length > 100_000) {
+      try {
+        safeReceiptUrl = await compressReceiptImage(safeReceiptUrl, 1200, 0.75);
+      } catch (e) {
+        console.warn('Pre-save receipt compression skipped:', e);
+      }
+    }
+
     const nowIso = new Date().toISOString();
     const finalItem: ExpenseItem = {
       id: editingItem?.id || `exp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -525,7 +536,7 @@ const AddExpenseModalContent: React.FC<{
       amount: amountNum,
       paymentMethod,
       memo: memo.trim() || undefined,
-      receiptUrl,
+      receiptUrl: safeReceiptUrl,
       createdAt: editingItem?.createdAt || nowIso,
       updatedAt: nowIso,
       hqStatus: autoSubmitToHq ? '검수 대기' : (editingItem?.hqStatus || '미제출'),
