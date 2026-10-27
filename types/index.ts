@@ -181,11 +181,34 @@ export interface DbScheduleRow {
   destination_lng?: number | null;
   passenger_name?: string | null;
   passenger_count?: number;
+  passenger_phone?: string | null;
   passenger_note?: string | null;
   flight_number?: string | null;
   flight_type?: string | null;
   protocol_notes?: string | null;
   status: string;
+  org_id?: string;
+  driver_id?: string | null;
+  driver_name?: string | null;
+  vehicle_id?: string | null;
+  dispatch_status?: 'draft' | 'published' | 'cancelled';
+  version?: number;
+  place_verified?: boolean;
+  published_at?: string | null;
+  published_by?: string | null;
+  last_ack_version?: number;
+  last_ack_at?: string | null;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface DbDispatchAcknowledgmentRow {
+  id: string;
+  schedule_id: string;
+  version: number;
+  driver_id: string;
+  driver_name: string;
+  acknowledged_at: string;
+  device_summary?: string | null;
+  created_at?: string;
 }
