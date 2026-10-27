@@ -84,6 +84,7 @@ export const UNRELATED_NEGATIVE_KEYWORDS = [
 
 /**
  * Classify incoming email header and preview before Gemini invocation
+ * Prevents calling expensive Gemini APIs on spam, newsletters, or payment receipts.
  */
 export function classifyEmailCandidate(
   subject: string,
@@ -112,7 +113,7 @@ export function classifyEmailCandidate(
   }
 
   // Sender heuristics
-  const isNoReply = fromAddress.includes('no-reply') || fromAddress.includes('noreply') || fromAddress.includes('naver.com');
+  const isNoReply = fromAddress.includes('no-reply') || fromAddress.includes('noreply');
   const hasStrongSubjectKeyword = ['예약', '픽업', '의전', '배차', 'airport transfer', 'chauffeur', 'booking'].some(
     (kw) => normalizedSubject.includes(kw)
   );
@@ -136,7 +137,6 @@ export function classifyEmailCandidate(
     classification = 'unrelated';
     reason = `일반 알림 또는 비관련 메일 (${matchedNegative[0]})`;
   } else {
-    // Plain personal or client email without obvious keywords
     classification = isNoReply ? 'unrelated' : 'uncertain';
     reason = isNoReply ? '자동 발신 메일' : '키워드 미일치 (수동 분석 권장)';
   }

@@ -4,26 +4,39 @@ import {
   checkNaverImapStatus,
   isNaverImapConfigured,
 } from '@/services/naverImapService';
+import { getInboxCandidateEmails } from '@/services/emailIntakeService';
 
 export const dynamic = 'force-dynamic';
 
-// Server-side in-memory cache to prevent redundant IMAP connections and reduce latency
 interface ServerInboxCache {
   data: any;
   cachedAt: number;
 }
 
 let serverInboxCache: ServerInboxCache | null = null;
-const CACHE_TTL_MS = 60 * 1000; // 60 seconds cache
+const CACHE_TTL_MS = 60 * 1000;
 
 export async function GET(req: NextRequest) {
   try {
     const isConfigured = isNaverImapConfigured();
     const url = new URL(req.url);
     const forceRefresh = url.searchParams.get('refresh') === 'true';
+    const mode = url.searchParams.get('mode');
+
+    // If explicit synthetic mode or not configured with real credentials, return safe synthetic candidate emails
+    if (mode === 'synthetic' || !isConfigured) {
+      const candidateEmails = await getInboxCandidateEmails();
+      return NextResponse.json({
+        ok: true,
+        isConfigured: false,
+        isSynthetic: true,
+        emails: candidateEmails,
+        totalCount: candidateEmails.length,
+        notice: 'HQ 이메일 인박스는 현재 승인된 테스트 모드로 동작 중입니다 (실제 편지함 접근 차단).',
+      });
+    }
 
     const now = Date.now();
-    // Return cached inbox if fresh and not forced to refresh
     if (!forceRefresh && serverInboxCache && now - serverInboxCache.cachedAt < CACHE_TTL_MS) {
       return NextResponse.json({
         ...serverInboxCache.data,
@@ -45,7 +58,6 @@ export async function GET(req: NextRequest) {
       fromServerCache: false,
     };
 
-    // Update server cache
     serverInboxCache = {
       data: responseData,
       cachedAt: now,
@@ -56,7 +68,6 @@ export async function GET(req: NextRequest) {
     const errorMsg = err instanceof Error ? err.message : String(err);
     console.error('Error in /api/email/inbox:', errorMsg);
 
-    // If fetch failed but we have stale cache, return it with warning
     if (serverInboxCache) {
       return NextResponse.json({
         ...serverInboxCache.data,
@@ -65,12 +76,15 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    return NextResponse.json(
-      {
-        ok: false,
-        error: errorMsg,
-      },
-      { status: 500 }
-    );
+    // Fallback to synthetic candidate emails on error
+    const candidateEmails = await getInboxCandidateEmails();
+    return NextResponse.json({
+      ok: true,
+      isConfigured: false,
+      isSynthetic: true,
+      emails: candidateEmails,
+      totalCount: candidateEmails.length,
+      warning: errorMsg,
+    });
   }
 }
