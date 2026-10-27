@@ -63,6 +63,13 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
             {item.dateLabel}
           </span>
 
+          {/* Cancelled Dispatch Alert */}
+          {(item.dispatch_status === 'cancelled' || item.status === 'cancelled') && (
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-300">
+              배차 취소됨
+            </span>
+          )}
+
           {/* Stale Ack: Re-ack Needed on Version Bump */}
           {isStaleAck && (
             <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-200">
