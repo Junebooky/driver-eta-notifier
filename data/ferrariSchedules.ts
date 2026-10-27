@@ -12,7 +12,7 @@ export interface ScheduleItem {
   origin_address: string;
   destination_name: string;
   destination_address: string;
-  status: 'confirmed' | 'pending' | 'completed';
+  status: 'confirmed' | 'pending' | 'completed' | 'cancelled';
   passenger: string;
   passenger_phone?: string;
   flight?: string;
