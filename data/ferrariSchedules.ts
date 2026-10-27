@@ -14,6 +14,7 @@ export interface ScheduleItem {
   destination_address: string;
   status: 'confirmed' | 'pending' | 'completed';
   passenger: string;
+  passenger_phone?: string;
   flight?: string;
   flightType?: 'arrival' | 'departure';
   notes?: string;
@@ -27,6 +28,19 @@ export interface ScheduleItem {
   waypoints?: LocationPreset[];
   adminWaypoints?: LocationPreset[];
   isAdminRoute?: boolean;
+  // Dispatch Lifecycle & Acknowledgment (Issue #25)
+  org_id?: string;
+  driver_id?: string;
+  driver_name?: string;
+  vehicle_id?: string;
+  dispatch_status?: 'draft' | 'published' | 'cancelled';
+  version?: number;
+  place_verified?: boolean;
+  published_at?: string;
+  published_by?: string;
+  last_ack_version?: number;
+  last_ack_at?: string;
+  isAcknowledged?: boolean;
 }
 
 /**
