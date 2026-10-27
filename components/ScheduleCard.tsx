@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { ScheduleItem } from '@/data/ferrariSchedules';
-import { Navigation, Clock, User, Plane, FileText, ChevronRight, Pencil } from 'lucide-react';
+import { Navigation, Clock, User, Plane, FileText, ChevronRight, Pencil, Check, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 import { sanitizePlaceName } from '@/utils/formatters';
 
@@ -13,6 +13,7 @@ interface ScheduleCardProps {
   onSelectForCockpit?: (item: ScheduleItem) => void;
   onOpenFlight?: (flightId: string, type: 'arrival' | 'departure') => void;
   onEdit?: (item: ScheduleItem) => void;
+  onAcknowledge?: (item: ScheduleItem) => void;
 }
 
 export const ScheduleCard: React.FC<ScheduleCardProps> = ({
@@ -22,6 +23,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
   onSelectForCockpit,
   onOpenFlight,
   onEdit,
+  onAcknowledge,
 }) => {
   const isDeparture =
     item.flightType === 'departure' ||
@@ -48,14 +50,33 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
     return sanitized ? `픽업 ${sanitized}` : '픽업';
   };
 
+  const isStaleAck = Boolean(
+    item.version && item.version > 1 && (!item.last_ack_version || item.last_ack_version < item.version)
+  );
+
   return (
     <div className="w-full bg-white rounded-2xl p-4 border border-slate-200/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-md transition-all space-y-3.5 relative overflow-hidden">
-      {/* Top Header: Date and Unified Pickup Time Badge + Edit Button */}
+      {/* Top Header: Date, Unified Pickup Time Badge, Status Badges & Edit Button */}
       <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
-        <div className="flex items-center min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
           <span className="text-base font-bold text-slate-900 tracking-tight truncate">
             {item.dateLabel}
           </span>
+
+          {/* Stale Ack: Re-ack Needed on Version Bump */}
+          {isStaleAck && (
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-200">
+              배차 변경됨 (v{item.version})
+            </span>
+          )}
+
+          {/* Unresolved Place Warning */}
+          {item.place_verified === false && (
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-600 border border-rose-200 flex items-center gap-0.5">
+              <AlertTriangle className="w-2.5 h-2.5" />
+              <span>위치 확인 필요</span>
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
@@ -179,23 +200,52 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
         )}
       </div>
 
-      {/* Card Footer: Left Route Set & Right Multi-Action Floating Buttons */}
-      <div className="flex items-center justify-between pt-1 gap-1">
-        {/* Left: One-touch Cockpit Bind */}
-        {onSelectForCockpit && (
-          <button
-            type="button"
-            onClick={() => {
-              haptics.lightTap();
-              onSelectForCockpit(item);
-            }}
-            className="text-sm font-bold text-slate-600 hover:text-[#1E60F3] flex items-center gap-0.5 cursor-pointer transition-colors py-1.5 px-2 -ml-2 rounded-lg hover:bg-slate-100 min-w-0"
-            title="관제 대시보드에 출발/도착지 설정"
-          >
-            <span className="truncate">경로 적용</span>
-            <ChevronRight className="w-3.5 h-3.5 shrink-0" />
-          </button>
-        )}
+      {/* Card Footer: Left Route Set / Ack Action & Right Multi-Action Floating Buttons */}
+      <div className="flex items-center justify-between pt-1 gap-2 flex-wrap">
+        {/* Left: Cockpit Route Bind & Driver Acknowledgment Button */}
+        <div className="flex items-center gap-1.5 min-w-0">
+          {onSelectForCockpit && (
+            <button
+              type="button"
+              onClick={() => {
+                haptics.lightTap();
+                onSelectForCockpit(item);
+              }}
+              className="text-xs font-bold text-slate-600 hover:text-[#1E60F3] flex items-center gap-0.5 cursor-pointer transition-colors py-1 px-1.5 rounded-lg hover:bg-slate-100 min-w-0 shrink-0"
+              title="관제 대시보드에 출발/도착지 설정"
+            >
+              <span className="truncate">경로 적용</span>
+              <ChevronRight className="w-3 h-3 shrink-0" />
+            </button>
+          )}
+
+          {/* Driver Acknowledgment Primary Action */}
+          {onAcknowledge && (
+            item.isAcknowledged ? (
+              <div
+                className="py-1 px-2.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200/80 font-bold text-xs flex items-center gap-1 shrink-0 shadow-2xs"
+                title={`배차 확인 완료 (v${item.last_ack_version || item.version || 1})`}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>배차 확인됨</span>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  haptics.successPulse();
+                  onAcknowledge(item);
+                }}
+                className="py-1.5 px-3 rounded-xl bg-[#1E60F3] hover:bg-[#1650D6] active:scale-95 text-white font-extrabold text-xs shadow-sm shadow-blue-500/25 flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
+                title="본사 배차 수신 확인"
+              >
+                <Check className="w-3.5 h-3.5 stroke-[3]" />
+                <span>배차 확인</span>
+              </button>
+            )
+          )}
+        </div>
 
         {/* Right: Multi-Action Buttons (Conditional Flight + White Clock + Solid Blue Navigation) */}
         <div className="flex items-center gap-2 ml-auto shrink-0">

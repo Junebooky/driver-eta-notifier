@@ -689,7 +689,7 @@ ${scheduleItemsFormatted}`.trim();
             driverName: profile.driverName,
             passengerName: profile.passengerName,
           },
-          schedules: schedules.length > 0 ? schedules : CONFIRMED_FERRARI_SCHEDULES,
+          schedules: schedules,
         }),
       });
 
@@ -706,17 +706,6 @@ ${scheduleItemsFormatted}`.trim();
 
       // Start Typewriter effect
       startTypewriter(data.reply);
-
-      // Auto-load schedules if user requested schedules or confirmed load
-      if (
-        schedules.length === 0 &&
-        (targetQuery.includes('배차') ||
-          targetQuery.includes('등록') ||
-          targetQuery.includes('샘플') ||
-          targetQuery.includes('전체'))
-      ) {
-        setSchedules(sortSchedulesChronologically(CONFIRMED_FERRARI_SCHEDULES));
-      }
       haptics.success();
     } catch (err) {
       console.error('Copilot query error:', err);
@@ -746,6 +735,44 @@ ${scheduleItemsFormatted}`.trim();
     haptics.lightTap();
     setSchedules([]);
     setSelectedDateFilter('all');
+  };
+
+  // Driver Acknowledgment handler
+  const handleAcknowledgeSchedule = async (item: ScheduleItem) => {
+    try {
+      const res = await fetch('/api/schedules/ack', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scheduleId: item.id,
+          version: item.version || 1,
+          driverId: profile.driverName || 'driver_4',
+          driverName: profile.driverName || '기사님',
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && (data.ok || data.success)) {
+        setSchedules((prev) =>
+          prev.map((s) =>
+            s.id === item.id
+              ? {
+                  ...s,
+                  isAcknowledged: true,
+                  last_ack_version: item.version || 1,
+                  last_ack_at: new Date().toISOString(),
+                }
+              : s
+          )
+        );
+        haptics.success();
+      } else {
+        console.error('Failed to acknowledge schedule:', data);
+        haptics.errorAlert();
+      }
+    } catch (err) {
+      console.error('Error acknowledging schedule:', err);
+      haptics.errorAlert();
+    }
   };
 
   // Filtered schedules (Chronological order guaranteed)
@@ -931,10 +958,10 @@ ${scheduleItemsFormatted}`.trim();
 
           {/* Typography */}
           <h2 className="text-xl font-bold text-slate-900 tracking-tight mt-6">
-            내 스케줄, AI가 바로 만들어드려요 ✨
+            배정된 일정이 없습니다 ✨
           </h2>
           <p className="text-sm text-slate-500 mt-2 text-center max-w-xs leading-relaxed">
-            배차표 이미지나 텍스트만 등록해 주세요
+            본사에서 배차가 발송되면 여기에 표시됩니다. 배차표 파일이나 텍스트를 직접 등록할 수도 있습니다.
           </p>
 
           {/* Convenience Helper: 1-Click Ferrari Confirmed Schedule Loader & Manual Register */}
@@ -1034,6 +1061,7 @@ ${scheduleItemsFormatted}`.trim();
                   setEditingSchedule(sch);
                   setIsEditModalOpen(true);
                 }}
+                onAcknowledge={handleAcknowledgeSchedule}
               />
             ))}
           </div>
