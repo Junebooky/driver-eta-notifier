@@ -12,6 +12,8 @@ export interface HqExpenseRecord {
   driverName: string;
   vehicleModel: string;
   vehiclePlate: string;
+  customerName?: string; // e.g. "Ferrari", "BMW Korea", "CHANEL", "신세계그룹"
+  customerId?: string; // e.g. "cust-ferrari"
   category: ExpenseCategoryKey;
   categoryLabel: string; // e.g. "주유비", "통행료"
   merchant: string;

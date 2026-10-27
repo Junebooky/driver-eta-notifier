@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useSyncExternalStore } from 'react';
+import Image from 'next/image';
 import {
   Search,
   Plus,
@@ -20,6 +21,12 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
+  Receipt,
+  CheckCircle2,
+  Clock3,
+  Eye,
+  X,
+  Building2,
 } from 'lucide-react';
 import { HqCustomer } from '@/types/customerHq';
 import { INITIAL_HQ_CUSTOMERS } from '@/utils/customerHqData';
@@ -28,6 +35,13 @@ import { HqCustomerRegisterModal } from './HqCustomerRegisterModal';
 import { HqCustomerEditModal } from './HqCustomerEditModal';
 import { HqComposeEmailModal } from '@/components/hq/email/HqComposeEmailModal';
 import { haptics } from '@/utils/haptics';
+import {
+  getHqExpensesSnapshot,
+  getHqExpensesServerSnapshot,
+  subscribeHqExpenses,
+} from '@/utils/expenseHqStorage';
+import { HqExpenseRecord, HqExpenseStatus } from '@/types/expenseHq';
+import { formatKRW } from '@/utils/expense';
 
 export interface HqCustomersViewProps {
   initialSearchQuery?: string;
@@ -51,10 +65,20 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 8;
 
-  // Active Detail Tab ('overview' | 'contacts' | 'history' | 'events' | 'requests' | 'communications')
+  // Active Detail Tab ('overview' | 'billing' | 'contacts' | 'history' | 'events' | 'requests' | 'communications')
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'contacts' | 'history' | 'events' | 'requests' | 'communications'
+    'overview' | 'billing' | 'contacts' | 'history' | 'events' | 'requests' | 'communications'
   >('overview');
+
+  // Live HQ Expenses subscription
+  const allExpenses = useSyncExternalStore(
+    subscribeHqExpenses,
+    getHqExpensesSnapshot,
+    getHqExpensesServerSnapshot
+  );
+
+  // Receipt preview modal state
+  const [previewReceipt, setPreviewReceipt] = useState<HqExpenseRecord | null>(null);
 
   // Modals
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
@@ -82,6 +106,96 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
       null
     );
   }, [customers, selectedCustomerId]);
+
+  // Filter expenses belonging to selected customer
+  const customerExpenses = useMemo(() => {
+    if (!selectedCustomer) return [];
+    const custNameLower = selectedCustomer.name.toLowerCase();
+    const custId = selectedCustomer.id;
+
+    return allExpenses.filter((e) => {
+      if (e.customerId && e.customerId === custId) return true;
+      if (e.customerName) {
+        const expCustLower = e.customerName.toLowerCase();
+        if (expCustLower.includes(custNameLower) || custNameLower.includes(expCustLower)) {
+          return true;
+        }
+      }
+      return false;
+    });
+  }, [allExpenses, selectedCustomer]);
+
+  // Billing statistics
+  const billingStats = useMemo(() => {
+    const total = customerExpenses.reduce((sum, item) => sum + (item.amount || 0), 0);
+    const approved = customerExpenses
+      .filter((item) => item.status === '승인 완료')
+      .reduce((sum, item) => sum + (item.amount || 0), 0);
+    const pending = customerExpenses
+      .filter((item) => item.status === '검수 대기' || item.status === '금액 확인')
+      .reduce((sum, item) => sum + (item.amount || 0), 0);
+    const receiptCount = customerExpenses.filter((item) => item.hasReceiptImage).length;
+
+    return {
+      total,
+      approved,
+      pending,
+      count: customerExpenses.length,
+      receiptCount,
+    };
+  }, [customerExpenses]);
+
+  // Category badge helper
+  const getCategoryBadge = (category: string) => {
+    switch (category) {
+      case '주유비':
+        return <span className="px-2 py-0.5 rounded-md font-bold bg-amber-50 text-amber-700 border border-amber-200">주유비</span>;
+      case '통행료':
+        return <span className="px-2 py-0.5 rounded-md font-bold bg-blue-50 text-blue-700 border border-blue-200">통행료</span>;
+      case '주차비':
+        return <span className="px-2 py-0.5 rounded-md font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">주차비</span>;
+      case '세차비':
+        return <span className="px-2 py-0.5 rounded-md font-bold bg-cyan-50 text-cyan-700 border border-cyan-200">세차비</span>;
+      case '식대':
+        return <span className="px-2 py-0.5 rounded-md font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">식대</span>;
+      default:
+        return <span className="px-2 py-0.5 rounded-md font-bold bg-slate-100 text-slate-700 border border-slate-200">{category}</span>;
+    }
+  };
+
+  // Status badge helper
+  const getStatusBadge = (status: HqExpenseStatus) => {
+    switch (status) {
+      case '승인 완료':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <CheckCircle2 className="w-3 h-3" />
+            승인 완료
+          </span>
+        );
+      case '반려':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+            <AlertCircle className="w-3 h-3" />
+            반려
+          </span>
+        );
+      case '금액 확인':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+            <AlertCircle className="w-3 h-3" />
+            금액 확인
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-sky-50 text-sky-700 border border-sky-200">
+            <Clock3 className="w-3 h-3" />
+            검수 대기
+          </span>
+        );
+    }
+  };
 
   // Filtered customers
   const filteredCustomers = useMemo(() => {
@@ -427,10 +541,11 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                 </button>
               </div>
 
-              {/* 6 Sub-Navigation Tabs with Active Blue Underline */}
+              {/* Sub-Navigation Tabs with Active Blue Underline */}
               <div className="flex items-center gap-6 mt-6 border-b border-slate-100 text-xs font-bold text-slate-500 overflow-x-auto">
                 {[
                   { id: 'overview', label: '개요', icon: LayoutGrid },
+                  { id: 'billing', label: '청구 내역', icon: Receipt },
                   { id: 'contacts', label: '담당자', icon: Users },
                   { id: 'history', label: '예약 이력', icon: Clock },
                   { id: 'events', label: '행사', icon: Calendar },
@@ -449,6 +564,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                         setActiveTab(
                           tab.id as
                             | 'overview'
+                            | 'billing'
                             | 'contacts'
                             | 'history'
                             | 'events'
@@ -462,6 +578,11 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                     >
                       <Icon className="w-3.5 h-3.5" />
                       <span>{tab.label}</span>
+                      {tab.id === 'billing' && customerExpenses.length > 0 && (
+                        <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-blue-100 text-[#1E60F3]">
+                          {customerExpenses.length}
+                        </span>
+                      )}
                       {isActive && (
                         <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#1E60F3] rounded-full" />
                       )}
@@ -755,6 +876,184 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                     </ul>
                   </div>
                 </div>
+
+                {/* 7. 배차 경비 청구 요약 카드 (Full width) */}
+                <div className="md:col-span-2 bg-gradient-to-r from-blue-50/80 via-white to-slate-50/80 rounded-2xl border border-blue-100 shadow-xs p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-[#1E60F3] text-white flex items-center justify-center shrink-0 shadow-sm">
+                      <Receipt className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-xs font-black text-slate-900">
+                          {selectedCustomer.name} 배차 경비 청구 요약
+                        </h3>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-[#1E60F3]">
+                          {billingStats.count}건 제출
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                        기사가 제출한 유류비/통행료/주차비 영수증이 고객사 배차 스케줄과 자동 맵핑됩니다.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+                    <div className="text-right">
+                      <div className="text-[10px] text-slate-400 font-medium">총 청구 금액</div>
+                      <div className="text-base font-black text-[#1E60F3]">
+                        {formatKRW(billingStats.total)}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        haptics.lightTap();
+                        setActiveTab('billing');
+                      }}
+                      className="px-3.5 py-2 rounded-xl bg-white hover:bg-blue-50 text-[#1E60F3] border border-blue-200 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    >
+                      <span>청구 내역 전체보기</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB: 청구 내역 (Billing & Dispatched Expenses) */}
+            {activeTab === 'billing' && (
+              <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-black text-slate-900">
+                        {selectedCustomer.name} 배차 경비 청구 내역
+                      </h3>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-100 text-[#1E60F3]">
+                        자동 맵핑 완료
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      배차된 스케줄 및 기사 운행 내역을 기반으로 자동 분류된 영수증과 경비 지출 명세입니다.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500 font-medium">
+                      총 <strong className="text-slate-900">{customerExpenses.length}</strong>건
+                    </span>
+                  </div>
+                </div>
+
+                {/* KPI Metrics */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="p-3.5 rounded-xl bg-slate-50/80 border border-slate-200/70">
+                    <span className="text-[11px] font-bold text-slate-400">총 청구 금액</span>
+                    <p className="text-base font-black text-slate-900 mt-1">
+                      {formatKRW(billingStats.total)}
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-emerald-50/50 border border-emerald-100">
+                    <span className="text-[11px] font-bold text-emerald-600">승인 완료 금액</span>
+                    <p className="text-base font-black text-emerald-700 mt-1">
+                      {formatKRW(billingStats.approved)}
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-amber-50/50 border border-amber-100">
+                    <span className="text-[11px] font-bold text-amber-600">검수 대기 금액</span>
+                    <p className="text-base font-black text-amber-700 mt-1">
+                      {formatKRW(billingStats.pending)}
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-blue-50/50 border border-blue-100">
+                    <span className="text-[11px] font-bold text-[#1E60F3]">첨부 영수증 증빙</span>
+                    <p className="text-base font-black text-blue-700 mt-1">
+                      {billingStats.receiptCount}건 <span className="text-xs font-normal text-slate-400">/ {billingStats.count}건</span>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Table of Dispatched Expenses for Customer */}
+                <div className="overflow-x-auto rounded-xl border border-slate-100">
+                  <table className="w-full text-left text-xs select-none">
+                    <thead>
+                      <tr className="bg-slate-50/80 border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                        <th className="py-2.5 px-3 w-10 text-center">NO</th>
+                        <th className="py-2.5 px-3">일시</th>
+                        <th className="py-2.5 px-3">기사 / 차량</th>
+                        <th className="py-2.5 px-3">항목</th>
+                        <th className="py-2.5 px-3">상호 / 가맹점</th>
+                        <th className="py-2.5 px-3 text-right">청구 금액</th>
+                        <th className="py-2.5 px-3 text-center">영수증</th>
+                        <th className="py-2.5 px-3 text-center">상태</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {customerExpenses.length > 0 ? (
+                        customerExpenses.map((item, idx) => (
+                          <tr
+                            key={item.id}
+                            className="hover:bg-slate-50/80 transition-colors"
+                          >
+                            <td className="py-3 px-3 text-slate-400 text-center font-semibold text-[11px]">
+                              {idx + 1}
+                            </td>
+                            <td className="py-3 px-3 text-slate-600 whitespace-nowrap text-[11px] font-medium">
+                              {item.submittedAt}
+                            </td>
+                            <td className="py-3 px-3 whitespace-nowrap">
+                              <div className="font-bold text-slate-900">{item.driverName}</div>
+                              <div className="text-[11px] text-slate-500 font-medium">{item.vehiclePlate}</div>
+                            </td>
+                            <td className="py-3 px-3 whitespace-nowrap">
+                              {getCategoryBadge(item.categoryLabel)}
+                            </td>
+                            <td className="py-3 px-3 max-w-[140px] truncate">
+                              <span className="font-bold text-slate-800">{item.merchant}</span>
+                            </td>
+                            <td className="py-3 px-3 text-right font-black text-slate-900 whitespace-nowrap">
+                              {formatKRW(item.amount)}
+                            </td>
+                            <td className="py-3 px-3 text-center whitespace-nowrap">
+                              {item.receiptUrl ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    haptics.lightTap();
+                                    setPreviewReceipt(item);
+                                  }}
+                                  className="inline-flex items-center gap-1 text-[11px] bg-blue-50 text-[#1E60F3] hover:bg-blue-100 px-2 py-0.5 rounded font-bold border border-blue-200 transition-colors cursor-pointer"
+                                >
+                                  <Eye className="w-3 h-3" />
+                                  <span>확인</span>
+                                </button>
+                              ) : (
+                                <span className="text-[10px] text-slate-300">-</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-3 text-center whitespace-nowrap">
+                              {getStatusBadge(item.status)}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={8} className="py-12 text-center text-slate-400">
+                            <Receipt className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                            <p className="font-bold text-slate-600">배차 경비 청구 내역이 없습니다</p>
+                            <p className="text-[11px] text-slate-400 mt-1">
+                              기사가 영수증을 등록하거나 배차가 완료되면 자동으로 이곳에 매핑되어 집계됩니다.
+                            </p>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
 
@@ -1001,6 +1300,92 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
         initialTo={composeModalState.to}
         initialSubject={composeModalState.subject}
       />
+
+      {/* 4. Modal: 영수증 사진 및 증빙 상세 확인 */}
+      {previewReceipt && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setPreviewReceipt(null)}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Receipt className="w-4 h-4 text-[#1E60F3]" />
+                <h3 className="font-black text-sm text-slate-900">영수증 원본 증빙</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewReceipt(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-3">
+              {previewReceipt.receiptUrl ? (
+                <div className="relative w-full h-[360px] bg-slate-900/5 rounded-xl overflow-hidden border border-slate-200 flex items-center justify-center">
+                  <Image
+                    src={previewReceipt.receiptUrl}
+                    alt="영수증 원본"
+                    fill
+                    sizes="(max-width: 768px) 100vw, 400px"
+                    className="object-contain p-2"
+                  />
+                </div>
+              ) : (
+                <div className="h-48 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 text-xs">
+                  첨부된 영수증 사진이 없습니다.
+                </div>
+              )}
+
+              <div className="bg-slate-50/80 rounded-xl p-3 border border-slate-200/70 text-xs space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">고객사</span>
+                  <span className="font-bold text-[#1E60F3] bg-blue-50 px-2 py-0.5 rounded border border-blue-100/80">
+                    {previewReceipt.customerName || selectedCustomer?.name}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">가맹점 상호</span>
+                  <span className="font-bold text-slate-800">{previewReceipt.merchant}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">기사 / 차량</span>
+                  <span className="font-medium text-slate-700">
+                    {previewReceipt.driverName} ({previewReceipt.vehiclePlate})
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">제출 일시</span>
+                  <span className="font-medium text-slate-700">{previewReceipt.submittedAt}</span>
+                </div>
+                <div className="flex justify-between pt-1 border-t border-slate-200/60 items-center">
+                  <span className="text-slate-500 font-bold">청구 금액</span>
+                  <span className="text-sm font-black text-[#1E60F3]">
+                    {formatKRW(previewReceipt.amount)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-50 border-t border-slate-100 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setPreviewReceipt(null)}
+                className="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold transition-all cursor-pointer"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -25,6 +25,7 @@ import {
   Utensils,
   Wrench,
   HelpCircle,
+  Building2,
 } from 'lucide-react';
 import { HqExpenseStatus, HqExpenseRecord } from '@/types/expenseHq';
 import {
@@ -108,6 +109,7 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
           item.vehiclePlate.toLowerCase().includes(q) ||
           item.vehicleModel.toLowerCase().includes(q) ||
           item.merchant.toLowerCase().includes(q) ||
+          (Boolean(item.customerName) && item.customerName!.toLowerCase().includes(q)) ||
           (item.memo && item.memo.toLowerCase().includes(q));
         if (!matches) return false;
       }
@@ -544,6 +546,7 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
                   <th className="py-2.5 px-3 w-10 text-center">NO</th>
                   <th className="py-2.5 px-3">제출일시</th>
                   <th className="py-2.5 px-3">기사 / 차량</th>
+                  <th className="py-2.5 px-3">고객사</th>
                   <th className="py-2.5 px-3">항목</th>
                   <th className="py-2.5 px-3">상호 / 가맹점</th>
                   <th className="py-2.5 px-3 text-right">금액</th>
@@ -581,6 +584,12 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
                         <div className="text-[10px] text-slate-400 font-medium truncate max-w-[140px]" title={item.vehicleModel}>
                           {item.vehicleModel}
                         </div>
+                      </td>
+                      <td className="py-3 px-3 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50/70 text-[#1E60F3] font-bold text-[11px] border border-blue-100 shadow-2xs">
+                          <Building2 className="w-3 h-3 text-[#1E60F3] shrink-0" />
+                          <span className="truncate max-w-[110px]">{item.customerName || '일반 / 미지정'}</span>
+                        </span>
                       </td>
                       <td className="py-3 px-3 whitespace-nowrap">
                         {getCategoryBadge(item.categoryLabel)}
@@ -665,52 +674,15 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
                 </button>
               </div>
 
-              {/* Sub-tab 1: 사진 (Photo Viewer) */}
+              {/* Sub-tab 1: 사진 (Photo Viewer) - Enlarged inspection view */}
               {inspectorTab === 'photo' && (
-                <div className="space-y-3">
-                  {/* Photo Toolbar */}
-                  <div className="flex items-center justify-end gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => handleRotateCurrentReceipt(90)}
-                      disabled={isRotating || !selectedExpense.receiptUrl}
-                      className="text-xs text-slate-700 hover:text-[#1E60F3] bg-white hover:bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-2xs"
-                    >
-                      {isRotating ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <RotateCw className="w-3.5 h-3.5" />
-                      )}
-                      <span>90° 회전</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setIsReceiptZoomOpen(true)}
-                      disabled={!selectedExpense.receiptUrl}
-                      className="text-xs text-slate-700 hover:text-[#1E60F3] bg-white hover:bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-2xs"
-                    >
-                      <ZoomIn className="w-3.5 h-3.5" />
-                      <span>확대</span>
-                    </button>
-                  </div>
-
-                  {/* Photo Container */}
+                <div>
+                  {/* Photo Container - Enlarged without toolbar */}
                   {selectedExpense.receiptUrl ? (
-                    <div className="relative w-full h-[580px] lg:h-[640px] xl:h-[680px] bg-slate-900/5 rounded-2xl overflow-hidden border border-slate-200 flex items-center justify-center group shadow-2xs">
-                      {/* Top Right Maximize Icon */}
-                      <button
-                        type="button"
-                        onClick={() => setIsReceiptZoomOpen(true)}
-                        className="absolute top-2.5 right-2.5 z-20 w-7 h-7 rounded-full bg-black/60 hover:bg-black text-white flex items-center justify-center transition-all cursor-pointer shadow-md"
-                        title="전체화면 확대"
-                      >
-                        <Maximize2 className="w-3.5 h-3.5" />
-                      </button>
-
-                      {/* Receipt Image */}
+                    <div className="relative w-full h-[680px] lg:h-[760px] xl:h-[820px] bg-slate-900/5 rounded-2xl overflow-hidden border border-slate-200 flex items-center justify-center group shadow-2xs">
+                      {/* Receipt Image - Maximum display area */}
                       <div
-                        className="relative w-full h-full p-3 pb-16 flex items-center justify-center transition-transform duration-300"
+                        className="relative w-full h-full p-2 pb-16 flex items-center justify-center transition-transform duration-300"
                         style={{
                           transform: `rotate(${rotationAngle}deg)`,
                         }}
@@ -719,9 +691,8 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
                           src={selectedExpense.receiptUrl}
                           alt="검수 영수증 원본"
                           fill
-                          sizes="(max-width: 768px) 100vw, 600px"
-                          className="object-contain p-3 pb-16 cursor-pointer"
-                          onClick={() => setIsReceiptZoomOpen(true)}
+                          sizes="(max-width: 768px) 100vw, 800px"
+                          className="object-contain p-2 pb-16"
                         />
                       </div>
 
@@ -733,8 +704,17 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
                             <div className="font-bold text-xs text-slate-900 truncate">
                               {selectedExpense.merchant}
                             </div>
-                            <div className="text-[11px] text-slate-500 font-medium">
-                              {selectedExpense.submittedDate} {selectedExpense.time} | {selectedExpense.categoryLabel}
+                            <div className="text-[11px] text-slate-500 font-medium flex items-center gap-1.5 flex-wrap">
+                              {selectedExpense.customerName && (
+                                <span className="inline-flex items-center gap-0.5 text-[#1E60F3] font-bold">
+                                  <Building2 className="w-3 h-3" />
+                                  {selectedExpense.customerName}
+                                </span>
+                              )}
+                              <span>•</span>
+                              <span>
+                                {selectedExpense.submittedDate} {selectedExpense.time} | {selectedExpense.categoryLabel}
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -783,6 +763,15 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
 
                   {/* Merchant & Payment Specs */}
                   <div className="bg-slate-50/80 rounded-xl p-3 border border-slate-200/80 space-y-1.5">
+                    <div className="flex justify-between py-1 border-b border-slate-200/60 items-center">
+                      <span className="text-slate-400 font-medium flex items-center gap-1">
+                        <Building2 className="w-3.5 h-3.5 text-[#1E60F3]" />
+                        배차 고객사
+                      </span>
+                      <span className="font-bold text-slate-800 bg-blue-50 text-[#1E60F3] px-2 py-0.5 rounded border border-blue-100/80 text-[11px]">
+                        {selectedExpense.customerName || '일반 / 미지정'}
+                      </span>
+                    </div>
                     <div className="flex justify-between py-1 border-b border-slate-200/60">
                       <span className="text-slate-400 font-medium">가맹점 상호</span>
                       <span className="font-bold text-slate-800">{selectedExpense.merchant}</span>

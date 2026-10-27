@@ -129,7 +129,8 @@ console.log('All 20/20 Expense Input & Pure Domain Tests Passed Successfully!');
 
 // 9. Quota Defense & LocalStorage QuotaExceededError Resiliency Test
 console.log('--- Testing LocalStorage Quota Defense ---');
-import { saveHqExpenses, getHqExpenses, HQ_EXPENSES_STORAGE_KEY, HqExpenseRecord } from './expenseHqStorage';
+import { saveHqExpenses, getHqExpenses, HQ_EXPENSES_STORAGE_KEY } from './expenseHqStorage';
+import { HqExpenseRecord } from '@/types/expenseHq';
 import { saveExpenses, loadExpenses, EXPENSE_STORAGE_KEY } from './expense';
 
 const storageMock: Record<string, string> = {};

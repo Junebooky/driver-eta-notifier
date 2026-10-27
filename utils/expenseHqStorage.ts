@@ -60,6 +60,8 @@ export const INITIAL_HQ_EXPENSES: HqExpenseRecord[] = [
     driverName: '정태훈',
     vehicleModel: '기아 카니발 하이리무진',
     vehiclePlate: '193호 5336',
+    customerName: 'BMW Korea',
+    customerId: 'cust-bmw',
     category: 'fuel',
     categoryLabel: '주유비',
     merchant: 'GS칼텍스 삼일주유소',
@@ -84,6 +86,8 @@ export const INITIAL_HQ_EXPENSES: HqExpenseRecord[] = [
     driverName: '김민수',
     vehicleModel: '벤츠 S560',
     vehiclePlate: '01호 3343',
+    customerName: '신세계그룹',
+    customerId: 'cust-shinsegae',
     category: 'toll',
     categoryLabel: '통행료',
     merchant: '인천국제공항고속도로 신공항영업소',
@@ -108,6 +112,8 @@ export const INITIAL_HQ_EXPENSES: HqExpenseRecord[] = [
     driverName: '이준호',
     vehicleModel: '제네시스 G90 리무진',
     vehiclePlate: '102부 4280',
+    customerName: 'CHANEL',
+    customerId: 'cust-chanel',
     category: 'parking',
     categoryLabel: '주차비',
     merchant: '코엑스 인터컨티넨탈 호텔 주차장',
@@ -134,6 +140,8 @@ export const INITIAL_HQ_EXPENSES: HqExpenseRecord[] = [
     driverName: '윤태준',
     vehicleModel: '현대 스타리아 리무진',
     vehiclePlate: '116허 1514',
+    customerName: 'Ferrari',
+    customerId: 'cust-ferrari',
     category: 'fuel',
     categoryLabel: '주유비',
     merchant: '서울 만남의광장 주유소',
@@ -158,6 +166,8 @@ export const INITIAL_HQ_EXPENSES: HqExpenseRecord[] = [
     driverName: '박서연',
     vehicleModel: '제네시스 GV80',
     vehiclePlate: '203호 5947',
+    customerName: 'Samsung',
+    customerId: 'cust-samsung',
     category: 'meal',
     categoryLabel: '식비',
     merchant: '영종도 한식당',
@@ -184,6 +194,8 @@ export const INITIAL_HQ_EXPENSES: HqExpenseRecord[] = [
     driverName: '최동욱',
     vehicleModel: '벤츠 스프린터 519 CDI',
     vehiclePlate: '703서 2658',
+    customerName: 'Intercos',
+    customerId: 'cust-intercos',
     category: 'wash',
     categoryLabel: '세차비',
     merchant: '강남 프리미엄 손세차 클럽',
@@ -210,6 +222,8 @@ export const INITIAL_HQ_EXPENSES: HqExpenseRecord[] = [
     driverName: '김민수',
     vehicleModel: '벤츠 S560',
     vehiclePlate: '01호 3343',
+    customerName: '신세계그룹',
+    customerId: 'cust-shinsegae',
     category: 'parking',
     categoryLabel: '주차비',
     merchant: '여의도 파크원 타워 주차장',
@@ -236,6 +250,8 @@ export const INITIAL_HQ_EXPENSES: HqExpenseRecord[] = [
     driverName: '강원우',
     vehicleModel: '제네시스 G90L',
     vehiclePlate: '208호 2269',
+    customerName: 'Hyundai',
+    customerId: 'cust-hyundai',
     category: 'other',
     categoryLabel: '정비비',
     merchant: '제네시스 강남 서비스센터',
@@ -255,6 +271,93 @@ export const INITIAL_HQ_EXPENSES: HqExpenseRecord[] = [
 ];
 
 /**
+ * Automatically resolve customer from dispatched schedule, driving log, and fleet assignments
+ */
+export function resolveCustomerForExpense(params: {
+  driverName?: string;
+  vehiclePlate?: string;
+  date?: string;
+  rawDate?: string;
+  time?: string;
+  memo?: string;
+}): { customerName: string; customerId?: string } {
+  const driver = (params.driverName || '').trim();
+  const plate = (params.vehiclePlate || '').trim();
+  const memo = (params.memo || '').toLowerCase();
+  const dateStr = params.rawDate || params.date || '';
+
+  // 1. Text keyword hints in memo
+  if (memo.includes('ferrari') || memo.includes('페라리')) return { customerName: 'Ferrari', customerId: 'cust-ferrari' };
+  if (memo.includes('chanel') || memo.includes('샤넬')) return { customerName: 'CHANEL', customerId: 'cust-chanel' };
+  if (memo.includes('bmw')) return { customerName: 'BMW Korea', customerId: 'cust-bmw' };
+  if (memo.includes('신세계')) return { customerName: '신세계그룹', customerId: 'cust-shinsegae' };
+  if (memo.includes('samsung') || memo.includes('삼성')) return { customerName: 'Samsung', customerId: 'cust-samsung' };
+  if (memo.includes('hyundai') || memo.includes('현대')) return { customerName: 'Hyundai', customerId: 'cust-hyundai' };
+  if (memo.includes('netflix') || memo.includes('넷플릭스')) return { customerName: 'Netflix', customerId: 'cust-netflix' };
+  if (memo.includes('intercos') || memo.includes('인터코스')) return { customerName: 'Intercos', customerId: 'cust-intercos' };
+  if (memo.includes('sk') || memo.includes('하이닉스')) return { customerName: 'SK하이닉스', customerId: 'cust-sk' };
+  if (memo.includes('lg')) return { customerName: 'LG전자', customerId: 'cust-lg' };
+
+  // 2. Schedule lookup from cache if available in localStorage
+  if (typeof window !== 'undefined') {
+    try {
+      const cachedSchedulesRaw = localStorage.getItem('cockpit_schedules_cache_v1');
+      if (cachedSchedulesRaw) {
+        const schedules = JSON.parse(cachedSchedulesRaw);
+        if (Array.isArray(schedules)) {
+          const matched = schedules.find((s) => {
+            const dateMatch = !dateStr || s.date === dateStr;
+            const driverMatch = driver && s.driver_name && s.driver_name.includes(driver);
+            const vehicleMatch = plate && (s.vehicle_no?.includes(plate) || s.vehicle_plate?.includes(plate));
+            return dateMatch && (driverMatch || vehicleMatch);
+          });
+          if (matched) {
+            if (matched.customerName) return { customerName: matched.customerName, customerId: matched.customerId };
+            if (matched.notes?.includes('CLUB CHALLENGE') || matched.notes?.includes('Ferrari') || matched.passenger?.includes('SOFYAN')) {
+              return { customerName: 'Ferrari', customerId: 'cust-ferrari' };
+            }
+          }
+        }
+      }
+    } catch {}
+  }
+
+  // 3. Driver & Vehicle assignment mapping
+  if (driver === '정태훈' || plate.includes('5336')) {
+    return { customerName: 'BMW Korea', customerId: 'cust-bmw' };
+  }
+  if (driver === '김민수' || plate.includes('3343')) {
+    return { customerName: '신세계그룹', customerId: 'cust-shinsegae' };
+  }
+  if (driver === '이준호' || plate.includes('4280')) {
+    return { customerName: 'CHANEL', customerId: 'cust-chanel' };
+  }
+  if (driver === '윤태준' || plate.includes('1514') || plate.includes('7811')) {
+    return { customerName: 'Ferrari', customerId: 'cust-ferrari' };
+  }
+  if (driver === '박서연' || plate.includes('5947')) {
+    return { customerName: 'Samsung', customerId: 'cust-samsung' };
+  }
+  if (driver === '최동욱' || plate.includes('2658')) {
+    return { customerName: 'Intercos', customerId: 'cust-intercos' };
+  }
+  if (driver === '강원우' || plate.includes('2269')) {
+    return { customerName: 'Hyundai', customerId: 'cust-hyundai' };
+  }
+  if (driver === '이호준') {
+    return { customerName: 'LG전자', customerId: 'cust-lg' };
+  }
+  if (driver === '정태호') {
+    return { customerName: 'SK하이닉스', customerId: 'cust-sk' };
+  }
+  if (driver === '이재훈') {
+    return { customerName: 'Hyundai', customerId: 'cust-hyundai' };
+  }
+
+  return { customerName: 'Ferrari', customerId: 'cust-ferrari' };
+}
+
+/**
  * Read all HQ expenses from localStorage
  */
 export const getHqExpenses = (): HqExpenseRecord[] => {
@@ -267,7 +370,24 @@ export const getHqExpenses = (): HqExpenseRecord[] => {
     }
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed) && parsed.length > 0) {
-      return parsed;
+      // Auto backfill customerName if missing in existing localStorage
+      return parsed.map((item) => {
+        if (!item.customerName) {
+          const resolved = resolveCustomerForExpense({
+            driverName: item.driverName,
+            vehiclePlate: item.vehiclePlate,
+            date: item.rawDate,
+            time: item.time,
+            memo: item.memo,
+          });
+          return {
+            ...item,
+            customerName: resolved.customerName,
+            customerId: resolved.customerId,
+          };
+        }
+        return item;
+      });
     }
     return INITIAL_HQ_EXPENSES;
   } catch (err) {
@@ -399,6 +519,13 @@ export const submitDriverExpensesToHq = (
     totalAmount += item.amount;
     const catMeta = EXPENSE_CATEGORIES[item.category] || EXPENSE_CATEGORIES.other;
     const payMeta = PAYMENT_METHODS.find((p) => p.key === item.paymentMethod);
+    const resolvedCustomer = resolveCustomerForExpense({
+      driverName,
+      vehiclePlate,
+      date: item.date,
+      time: item.time,
+      memo: item.memo,
+    });
 
     return {
       id: `hq-sub-${Date.now()}-${index}`,
@@ -410,6 +537,8 @@ export const submitDriverExpensesToHq = (
       driverName,
       vehicleModel,
       vehiclePlate,
+      customerName: resolvedCustomer.customerName,
+      customerId: resolvedCustomer.customerId,
       category: item.category,
       categoryLabel: catMeta.label,
       merchant: item.merchant,
