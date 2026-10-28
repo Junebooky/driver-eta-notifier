@@ -357,21 +357,24 @@ export function resolveCustomerForExpense(params: {
   return { customerName: 'Ferrari', customerId: 'cust-ferrari' };
 }
 
+let memoryExpenses: HqExpenseRecord[] = [...INITIAL_HQ_EXPENSES];
+
 /**
- * Read all HQ expenses from localStorage
+ * Read all HQ expenses from localStorage (or memory cache in Node test environment)
  */
 export const getHqExpenses = (): HqExpenseRecord[] => {
-  if (typeof window === 'undefined') return INITIAL_HQ_EXPENSES;
+  if (typeof window === 'undefined') return memoryExpenses;
   try {
     const raw = localStorage.getItem(HQ_EXPENSES_STORAGE_KEY);
     if (!raw) {
       localStorage.setItem(HQ_EXPENSES_STORAGE_KEY, JSON.stringify(INITIAL_HQ_EXPENSES));
+      memoryExpenses = [...INITIAL_HQ_EXPENSES];
       return INITIAL_HQ_EXPENSES;
     }
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed) && parsed.length > 0) {
       // Auto backfill customerName if missing in existing localStorage
-      return parsed.map((item) => {
+      const synced = parsed.map((item) => {
         if (!item.customerName) {
           const resolved = resolveCustomerForExpense({
             driverName: item.driverName,
@@ -388,6 +391,8 @@ export const getHqExpenses = (): HqExpenseRecord[] => {
         }
         return item;
       });
+      memoryExpenses = synced;
+      return synced;
     }
     return INITIAL_HQ_EXPENSES;
   } catch (err) {
@@ -412,7 +417,7 @@ export const subscribeHqExpenses = (callback: () => void): (() => void) => {
 };
 
 export const getHqExpensesSnapshot = (): HqExpenseRecord[] => {
-  if (typeof window === 'undefined') return INITIAL_HQ_EXPENSES;
+  if (typeof window === 'undefined') return memoryExpenses;
   try {
     const raw = localStorage.getItem(HQ_EXPENSES_STORAGE_KEY);
     if (raw && raw === cachedExpensesRaw) return cachedExpensesSnapshot;
@@ -437,6 +442,7 @@ export const getHqExpensesServerSnapshot = (): HqExpenseRecord[] => {
  * - Tier 3: Limits maximum retained records to most recent 50
  */
 export const saveHqExpenses = (expenses: HqExpenseRecord[]): void => {
+  memoryExpenses = expenses;
   if (typeof window === 'undefined') return;
 
   const tryPersist = (records: HqExpenseRecord[]): boolean => {
@@ -492,6 +498,16 @@ export const saveHqExpenses = (expenses: HqExpenseRecord[]): void => {
   console.warn('[HQ Expense Storage] Critical storage limit reached. Unable to persist all expenses to LocalStorage.');
 };
 
+export interface ExpenseSubmissionContext {
+  customerId?: string;
+  customerName?: string;
+  bookingId?: string;
+  eventId?: string;
+  drivingLogId?: string;
+  billableToCustomer?: boolean;
+  approvalNo?: string;
+}
+
 /**
  * Submit one or more driver expenses to the HQ Dashboard
  */
@@ -499,10 +515,11 @@ export const submitDriverExpensesToHq = (
   items: ExpenseItem[],
   driverName: string = '윤태준',
   vehiclePlate: string = '116허 1514',
-  vehicleModel: string = '현대 스타리아 리무진'
-): { success: boolean; count: number; totalAmount: number } => {
+  vehicleModel: string = '현대 스타리아 리무진',
+  context?: ExpenseSubmissionContext
+): { success: boolean; count: number; totalAmount: number; records: HqExpenseRecord[] } => {
   if (!items || items.length === 0) {
-    return { success: false, count: 0, totalAmount: 0 };
+    return { success: false, count: 0, totalAmount: 0, records: [] };
   }
 
   const existing = getHqExpenses();
@@ -519,16 +536,19 @@ export const submitDriverExpensesToHq = (
     totalAmount += item.amount;
     const catMeta = EXPENSE_CATEGORIES[item.category] || EXPENSE_CATEGORIES.other;
     const payMeta = PAYMENT_METHODS.find((p) => p.key === item.paymentMethod);
-    const resolvedCustomer = resolveCustomerForExpense({
-      driverName,
-      vehiclePlate,
-      date: item.date,
-      time: item.time,
-      memo: item.memo,
-    });
+    const resolvedCustomer =
+      context?.customerName && context?.customerId
+        ? { customerName: context.customerName, customerId: context.customerId }
+        : resolveCustomerForExpense({
+            driverName,
+            vehiclePlate,
+            date: item.date,
+            time: item.time,
+            memo: item.memo,
+          });
 
     return {
-      id: `hq-sub-${Date.now()}-${index}`,
+      id: item.id || `hq-sub-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 6)}`,
       no: existing.length + index + 1,
       submittedAt,
       submittedDate,
@@ -537,8 +557,15 @@ export const submitDriverExpensesToHq = (
       driverName,
       vehicleModel,
       vehiclePlate,
-      customerName: resolvedCustomer.customerName,
-      customerId: resolvedCustomer.customerId,
+      customerName: context?.customerName || resolvedCustomer.customerName,
+      customerId: context?.customerId || resolvedCustomer.customerId,
+      bookingId: context?.bookingId,
+      eventId: context?.eventId,
+      drivingLogId: context?.drivingLogId,
+      billableToCustomer:
+        context?.billableToCustomer !== undefined
+          ? context.billableToCustomer
+          : item.category !== 'meal',
       category: item.category,
       categoryLabel: catMeta.label,
       merchant: item.merchant,
@@ -550,8 +577,15 @@ export const submitDriverExpensesToHq = (
       receiptUrl: item.receiptUrl,
       hasReceiptImage: Boolean(item.receiptUrl),
       memo: item.memo || '기사 Cockpit 앱에서 제출됨',
-      ocrExtracted: Boolean(item.receiptUrl),
+      ocrExtracted: Boolean(item.receiptUrl || context?.approvalNo),
       ocrSummary: `${item.merchant} ${item.amount.toLocaleString()}원 결제 내역`,
+      ocrDetails: context?.approvalNo
+        ? {
+            approvalNo: context.approvalNo,
+            supplyAmount: Math.round(item.amount / 1.1),
+            vat: item.amount - Math.round(item.amount / 1.1),
+          }
+        : undefined,
     };
   });
 
@@ -565,20 +599,27 @@ export const submitDriverExpensesToHq = (
       if (rawLogs) {
         const parsedLogs = JSON.parse(rawLogs);
         if (Array.isArray(parsedLogs)) {
-          const allDriverExpenses = updated.filter(
-            (e) => e.driverName === driverName || (Boolean(vehiclePlate) && e.vehiclePlate === vehiclePlate)
-          );
-          const driverTotal = allDriverExpenses.reduce((sum, e) => sum + e.amount, 0);
-          const driverCount = allDriverExpenses.length;
-
           let logFound = false;
           const syncedLogs = parsedLogs.map((log) => {
-            if (log.driverName === driverName || (Boolean(vehiclePlate) && log.vehiclePlate === vehiclePlate)) {
+            const isMatched = context?.bookingId
+              ? log.bookingId === context.bookingId
+              : !log.bookingId &&
+                (log.driverName === driverName ||
+                  (Boolean(vehiclePlate) && log.vehiclePlate === vehiclePlate));
+
+            if (isMatched) {
+              const matchingExps = updated.filter((e) =>
+                log.bookingId
+                  ? e.bookingId === log.bookingId
+                  : !e.bookingId &&
+                    (e.driverName === driverName ||
+                      (Boolean(vehiclePlate) && e.vehiclePlate === vehiclePlate))
+              );
               logFound = true;
               return {
                 ...log,
-                expenseAmount: driverTotal,
-                expenseCount: driverCount,
+                expenseAmount: matchingExps.reduce((sum, e) => sum + e.amount, 0),
+                expenseCount: matchingExps.length,
               };
             }
             return log;
@@ -600,6 +641,7 @@ export const submitDriverExpensesToHq = (
     success: true,
     count: newRecords.length,
     totalAmount,
+    records: newRecords,
   };
 };
 
@@ -610,11 +652,11 @@ export const submitSingleExpenseToHq = (
   item: ExpenseItem,
   driverName: string = '윤태준',
   vehiclePlate: string = '116허 1514',
-  vehicleModel: string = '현대 스타리아 리무진'
+  vehicleModel: string = '현대 스타리아 리무진',
+  context?: ExpenseSubmissionContext
 ): HqExpenseRecord => {
-  submitDriverExpensesToHq([item], driverName, vehiclePlate, vehicleModel);
-  const updated = getHqExpenses();
-  return updated[0];
+  const res = submitDriverExpensesToHq([item], driverName, vehiclePlate, vehicleModel, context);
+  return res.records[0] || getHqExpenses()[0];
 };
 
 /**
@@ -640,6 +682,38 @@ export const updateHqExpenseStatus = (
     ...existing[index],
     status,
     reviewNotes: reviewNotes !== undefined ? reviewNotes : existing[index].reviewNotes,
+    reviewedAt: `${m}/${d} ${hours}:${mins}`,
+    reviewedBy: reviewer,
+  };
+
+  const nextList = [...existing];
+  nextList[index] = updatedItem;
+  saveHqExpenses(nextList);
+
+  return updatedItem;
+};
+
+/**
+ * Update arbitrary fields on an HQ expense record (e.g., amount, billableToCustomer, status, category)
+ */
+export const updateHqExpenseRecord = (
+  id: string,
+  patch: Partial<HqExpenseRecord>,
+  reviewer: string = '본사 관리자'
+): HqExpenseRecord | null => {
+  const existing = getHqExpenses();
+  const index = existing.findIndex((e) => e.id === id);
+  if (index === -1) return null;
+
+  const now = new Date();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const mins = String(now.getMinutes()).padStart(2, '0');
+
+  const updatedItem: HqExpenseRecord = {
+    ...existing[index],
+    ...patch,
     reviewedAt: `${m}/${d} ${hours}:${mins}`,
     reviewedBy: reviewer,
   };

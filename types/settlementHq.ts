@@ -56,12 +56,14 @@ export interface AppliedPricingSnapshot {
   overtimeHourlyRate?: number;
   driverLaborCost10h: number;
   vatMode: VatHandlingMode;
+  snapshotLocked?: boolean;    // true when confirmed/locked against future preset edits
 }
 
 export interface CustomerContractTerms {
   baseHours: number;              // e.g. 10 (hours)
-  baseRate: number;               // e.g. 650000 (KRW) per vehicle
+  baseRate: number;               // e.g. 650000 (KRW) per vehicle (or default for single vehicle)
   vehicleOnlyRate?: number;       // 차량만 대여 시 계약 요금
+  vehicleBaseRatesByIndex?: Record<number, number>; // 다중 차종 행사 시 호차별 개별 기본요금 보존/지정
   overtimeHourlyRate?: number;    // 초과시간 요율 (미등록 시 undefined -> 임의 계산 금지)
   roundingUnitMinutes: number;    // 10, 30, 60, or 1 (minute)
   roundingMethod: 'ceil' | 'round' | 'floor' | 'exact';
@@ -96,16 +98,18 @@ export interface EventVehicleSettlement {
   drivingLogId?: string;
   drivingLogStatus?: string;
 
-  // 1. Garage vs Customer Service Times (핵심 운영 원칙)
+  // 1. Garage vs Customer Service Times (핵심 운영 원칙 — 임의 기본값 추정 금지)
   garageDepartureTime?: string;   // e.g. "08:00" (차고지 픽업 - 청구 제외)
-  customerServiceStart: string;   // e.g. "09:00" (고객사 서비스 시작)
-  customerServiceEnd: string;     // e.g. "21:50" (고객사 서비스 종료)
+  customerServiceStart: string;   // e.g. "09:00" or "확인 필요"
+  customerServiceEnd: string;     // e.g. "21:50" or "서비스 시간 확인 필요"
   garageArrivalTime?: string;     // e.g. "22:30" (차고지 복귀 - 청구 제외)
   totalDutyFormatted?: string;    // e.g. "14시간 30분" (법정 근로시간 관리용 기록 보존)
+  isServiceTimeVerified: boolean; // false when driving log or service end time is missing
+  serviceTimeWarning?: string;    // "서비스 시간 확인 필요 (운행 종료시간 미제출)"
 
   // 2. Calculated Service Times (고객사 청구 기준)
-  customerServiceMinutes: number; // 770 (12시간 50분)
-  customerServiceFormatted: string; // "12시간 50분"
+  customerServiceMinutes: number; // 770 (12시간 50분), or 0 if unverified
+  customerServiceFormatted: string; // "12시간 50분" or "서비스 시간 확인 필요"
   baseContractHours: number;      // 10
   overtimeMinutes: number;        // 170 (2시간 50분)
   billedOvertimeHours: number;    // 3.0 (based on rounding rule)
@@ -118,26 +122,29 @@ export interface EventVehicleSettlement {
   isOvertimeRateConfirmed: boolean;
   vehicleFareSubtotal: number;    // baseFare + overtimeFare
   hasContractTerms: boolean;      // if false, fares are 0
-  contractWarning?: string;       // "요금 미등록 / 초과요율 확인 필요"
+  contractWarning?: string;       // "요금 미등록 / 초과요율 확인 필요 / 서비스 시간 확인 필요"
 
   // 4. Mileage & Notes
   mileageKm?: string;             // "280 km"
   notes?: string;                 // 운행 특이사항
 
-  // 5. Expenses & Receipts (고객 재청구 실비 vs 회사 부담 직접비 분리)
+  // 5. Expenses & Receipts (고객 재청구 실비 vs 회사 실제 지출 원가 정확 반영)
   expenses: HqExpenseRecord[];
-  approvedExpensesTotal: number;  // 관리자 승인 완료된 고객 재청구 실비
-  companyDirectExpensesTotal: number; // 회사 자체 부담 차량 직접비 (유류비/유지비 등)
-  pendingExpensesTotal: number;   // 미승인/검수대기 (청구 미반영)
-  hasDuplicateWarning?: boolean;  // 중복 영수증 의심 플래그
+  approvedExpensesTotal: number;       // 관리자 승인 완료된 고객 재청구 실비 (매출 가산)
+  reimbursableExpenseCost: number;     // 고객 재청구 실비 중 회사가 실제 지출한 원가 (이익 부풀림 방지용 차감 원가)
+  companyDirectExpensesTotal: number;  // 회사 자체 부담 차량 직접비 (고객 미청구 유류비/식비 등)
+  companyTotalExpenseOutflow: number;  // 회사 실제 경비 지출 합계 (reimbursableExpenseCost + companyDirectExpensesTotal)
+  pendingExpensesTotal: number;        // 미승인/검수대기 (청구 미반영)
+  rejectedExpensesTotal?: number;      // 반려된 경비 (청구 제외)
+  hasDuplicateWarning?: boolean;       // 중복 영수증 의심 플래그
 
   // 6. Company Cost & Direct Profit Analysis (관리자 전용, 고객사 리포트에 절대 노출 금지)
   clientTotalRevenue: number;     // vehicleFareSubtotal + approvedExpensesTotal (고객사 매출)
   driverLaborCost: number;        // 기사 인건비 (차량만 대여 시 0원, 스프린터 한15만/영20만, 일반 한10만/영15만)
   driverOvertimeLaborWarning?: string; // 초과 근무 발생 시 "기사 초과수당 요율 미정 (관리자 확인)"
-  vehicleDirectCost: number;      // 차량 직접비
+  vehicleDirectCost: number;      // 회사 실제 경비 지출 원가 (reimbursableExpenseCost + companyDirectExpensesTotal)
   otherDirectCost: number;        // 기타 직접비 (외주비 등)
-  directProfit: number;           // 고객사 매출 - 기사 인건비 - 차량 직접비 - 기타 직접비
+  directProfit: number;           // 고객사 매출 - 기사 인건비 - vehicleDirectCost - otherDirectCost
   directMarginPercent: number;    // (directProfit / clientTotalRevenue) * 100
   profitConfirmStatus: ProfitConfirmStatus; // 'provisional' (잠정 수익) | 'confirmed' (확정 직접이익)
 
@@ -153,6 +160,11 @@ export interface EventSettlementReport {
   reportNo: string;              // "REP-20241026-001"
   status: SettlementReportStatus;
   createdAt: string;
+  updatedAt?: string;
+
+  // Demo / Test Flag
+  isDemoScenario?: boolean;      // true for DEMO/TEST scenarios
+  demoScenarioCode?: 'A' | 'B' | 'C' | 'D' | string;
 
   // 1. Client & Agency & Brand Relationship
   customerId: string;            // "cust-chanel"
@@ -166,6 +178,7 @@ export interface EventSettlementReport {
   eventId: string;
   eventName: string;             // "2024 CHANEL Cruise Collection Preview"
   eventDate: string;             // "2024. 10. 22"
+  rawDate?: string;              // "2026-10-22"
   location: string;              // "조선팰리스 서울 강남"
   groupId?: string;              // linked booking group
 
@@ -174,7 +187,8 @@ export interface EventSettlementReport {
   isTemporaryPreset: boolean;
   vatMode: VatHandlingMode;
   contractTerms?: CustomerContractTerms;
-  contractWarning?: string;      // "임시 단가 프리셋 적용 중 / 계약조건 확인 필요"
+  contractWarning?: string;      // "임시 단가 프리셋 적용 중 / 계약조건 확인 필요 / 서비스 시간 확인 필요"
+  hasUnverifiedItems?: boolean;  // 시간 미확정, 초과요율 미등록, 검수대기 영수증 등이 남아 있는지 여부
 
   // 4. Vehicles & Drivers list
   vehicles: EventVehicleSettlement[];
@@ -192,21 +206,25 @@ export interface EventSettlementReport {
   totalPendingExpenses: number;
   supplyAmount: number;          // 공급가액 (차량요금 + 고객청구 승인경비)
   vatAmount: number;             // VAT (vatMode === 'excluded' 일 때 10%, 'unset' 이면 0)
-  grandTotal: number;            // 최종 청구금액
+  grandTotal: number;            // 최종 청구 예정/확정 금액
 
   // 6. Internal Profitability Totals (본사 관리자 전용 - 고객사 리포트 제외)
-  totalDriverLaborCost: number;  // 기사 인건비 합계
-  totalVehicleDirectCost: number;// 차량 직접비 합계
-  totalOtherDirectCost: number;  // 기타 직접비 합계
-  totalDirectCost: number;       // 총 직접원가 (기사 인건비 + 차량 직접비 + 기타 직접비)
-  totalDirectProfit: number;     // 배차별 직접이익 합계 (고객사 매출 - 총 직접원가)
-  averageDirectMarginPercent: number; // 직접이익률 (%)
+  totalDriverLaborCost: number;        // 기사 인건비 합계
+  totalReimbursableExpenseCost: number;// 고객 재청구 실비의 실제 회사 지출원가 합계
+  totalCompanyAbsorbedExpenseCost: number; // 회사 자체 부담 직접비 합계
+  totalVehicleDirectCost: number;      // 총 경비/차량 직접비 원가 합계
+  totalOtherDirectCost: number;        // 기타 직접비 합계
+  totalDirectCost: number;             // 총 직접원가 (기사 인건비 + 차량/경비 직접비 + 기타 직접비)
+  totalDirectProfit: number;           // 배차별 직접이익 합계 (고객사 매출 - 총 직접원가)
+  averageDirectMarginPercent: number;  // 직접이익률 (%)
   profitConfirmStatus: ProfitConfirmStatus;
+  areAllDirectCostsConfirmed?: boolean;
+
   // 향후 영업이익/순이익 확장용 필드
-  indirectCostAllocation?: number; // 본사 관리비/간접비 배부액
-  estimatedOperatingProfit?: number; // 추정 영업이익
-  taxAndFinanceCost?: number;      // 금융비용 및 세금
-  estimatedNetProfit?: number;     // 추정 순이익
+  indirectCostAllocation?: number;
+  estimatedOperatingProfit?: number;
+  taxAndFinanceCost?: number;
+  estimatedNetProfit?: number;
 
   // 7. Review & Audit
   adminNotes?: string;

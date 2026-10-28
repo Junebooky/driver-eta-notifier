@@ -437,8 +437,9 @@ export function calculateDurationMinutes(startTime: string, endTime: string): nu
 /**
  * Extract customer service start and end times from a driving log.
  * - Garage departure (차고지) is excluded.
- * - Service start is the first customer-related stop (or booking pickup time).
- * - Service end is the last customer-related stop (before garage return).
+ * - Service start is the first customer-related stop (or explicit customerServiceStart).
+ * - Service end is the last customer-related stop (before garage return, or explicit customerServiceEnd).
+ * - CRITICAL RULE: Never fabricate '09:00' or '19:00' when driving log or service end time is missing.
  */
 export function resolveServiceTimes(
   log?: HqDrivingLog | null,
@@ -448,68 +449,108 @@ export function resolveServiceTimes(
   serviceStart: string;
   serviceEnd: string;
   garageArrival: string;
-  source: 'driving_log_explicit' | 'driving_log_stops' | 'booking_fallback';
+  isServiceTimeVerified: boolean;
+  serviceTimeWarning?: string;
+  source: 'driving_log_explicit' | 'driving_log_stops' | 'unverified_missing';
 } {
-  if (log?.customerServiceStart && log?.customerServiceEnd) {
+  const isValidHHMM = (val?: string | null): val is string =>
+    Boolean(val && /^\d{1,2}:\d{2}$/.test(val.trim()));
+
+  // 1. Explicit customerServiceStart & customerServiceEnd on driving log
+  if (log && isValidHHMM(log.customerServiceStart) && isValidHHMM(log.customerServiceEnd)) {
     return {
-      garageDeparture: log.garageDepartureTime || log.clockIn || '08:00',
-      serviceStart: log.customerServiceStart,
-      serviceEnd: log.customerServiceEnd,
-      garageArrival: log.garageArrivalTime || log.clockOut || '21:00',
+      garageDeparture: log.garageDepartureTime || log.clockIn || '미기록',
+      serviceStart: log.customerServiceStart.trim(),
+      serviceEnd: log.customerServiceEnd.trim(),
+      garageArrival: log.garageArrivalTime || log.clockOut || '미기록',
+      isServiceTimeVerified: true,
       source: 'driving_log_explicit',
     };
   }
 
-  if (log?.stops && log.stops.length >= 2) {
-    const stops = log.stops;
-    let startStop = stops.find(
-      (s) =>
-        s.note?.includes('픽업') ||
-        s.note?.includes('탑승') ||
-        (!s.place.includes('차고지') && !s.place.includes('출근'))
-    );
-    if (!startStop) startStop = stops[1] || stops[0];
-
-    const reversed = [...stops].reverse();
-    let endStop = reversed.find(
-      (s) =>
-        s.note?.includes('하차') ||
-        s.note?.includes('종료') ||
-        (!s.place.includes('차고지') && !s.place.includes('퇴근') && !s.place.includes('입고'))
-    );
-    if (!endStop || endStop === startStop) endStop = reversed[1] || stops[stops.length - 1];
-
-    const garageDep = stops[0]?.time || log.clockIn || '08:00';
-    const garageArr = stops[stops.length - 1]?.time || log.clockOut || '21:00';
-
+  // Partial explicit fields: start exists, end is missing
+  if (log && isValidHHMM(log.customerServiceStart) && !isValidHHMM(log.customerServiceEnd)) {
     return {
-      garageDeparture: garageDep,
-      serviceStart: startStop.time,
-      serviceEnd: endStop.time,
-      garageArrival: garageArr,
-      source: 'driving_log_stops',
+      garageDeparture: log.garageDepartureTime || log.clockIn || '미기록',
+      serviceStart: log.customerServiceStart.trim(),
+      serviceEnd: '미입력',
+      garageArrival: log.garageArrivalTime || log.clockOut || '미기록',
+      isServiceTimeVerified: false,
+      serviceTimeWarning: '운행일지 서비스 종료시간 누락 — 서비스 시간 확인 필요 (임의 종료시간 추정 안 함)',
+      source: 'unverified_missing',
     };
   }
 
-  const bPickup = fallbackBooking?.pickupTime || '09:00';
+  // 2. Extract from driving log stops if available
+  if (log?.stops && log.stops.length >= 2) {
+    const stops = log.stops;
+    const customerStops = stops.filter(
+      (s) =>
+        isValidHHMM(s.time) &&
+        !s.place.includes('차고지') &&
+        !s.place.includes('출근') &&
+        !s.place.includes('퇴근') &&
+        !s.place.includes('입고')
+    );
+
+    if (customerStops.length >= 2) {
+      const startStop = customerStops[0];
+      const endStop = customerStops[customerStops.length - 1];
+      const garageDep = stops[0]?.time || log.clockIn || '미기록';
+      const garageArr = stops[stops.length - 1]?.time || log.clockOut || '미기록';
+
+      return {
+        garageDeparture: garageDep,
+        serviceStart: startStop.time,
+        serviceEnd: endStop.time,
+        garageArrival: garageArr,
+        isServiceTimeVerified: true,
+        source: 'driving_log_stops',
+      };
+    }
+
+    // Only 1 customer stop (e.g. pickup recorded, dropoff missing)
+    const partialStart = customerStops[0]?.time || fallbackBooking?.pickupTime || '미입력';
+    return {
+      garageDeparture: stops[0]?.time || log.clockIn || '미기록',
+      serviceStart: partialStart,
+      serviceEnd: '미입력',
+      garageArrival: log.clockOut || '미기록',
+      isServiceTimeVerified: false,
+      serviceTimeWarning: '고객 서비스 종료 정차지 미입력 — 서비스 시간 확인 필요 (임의 종료시간 추정 안 함)',
+      source: 'unverified_missing',
+    };
+  }
+
+  // 3. Driving log missing or has no valid stops -> NEVER fabricate 09:00 ~ 19:00
+  const bPickup = fallbackBooking?.pickupTime && isValidHHMM(fallbackBooking.pickupTime)
+    ? fallbackBooking.pickupTime
+    : '미입력';
+
   return {
-    garageDeparture: '08:00',
+    garageDeparture: log?.clockIn || '미기록',
     serviceStart: bPickup,
-    serviceEnd: '19:00',
-    garageArrival: '20:00',
-    source: 'booking_fallback',
+    serviceEnd: '미입력',
+    garageArrival: log?.clockOut || '미기록',
+    isServiceTimeVerified: false,
+    serviceTimeWarning: log
+      ? '운행일지 내 고객 서비스 시작·종료시간 누락 — 서비스 시간 확인 필요'
+      : '기사 운행일지 미제출 — 서비스 시간 확인 필요 (임의 10시간 추정 금지)',
+    source: 'unverified_missing',
   };
 }
 
 /**
  * 4-Tier Pricing Priority Resolution:
- * 1. booking_override (appliedPricingSnapshot on booking)
+ * 1. booking_override (appliedPricingSnapshot on booking with pricingSource === 'booking_override')
  * 2. event_special (customContractTerms on event/report)
  * 3. customer_contract (customer.contractTerms)
- * 4. preset (DEFAULT_VEHICLE_PRICING_PRESETS)
- * 5. unregistered (if vehicle model has no preset and no contract)
+ * 4. locked booking snapshot (if booking was created with snapshotLocked === true, preserves its historical preset rate)
+ * 5. preset (live vehiclePresets)
+ * 6. unregistered (if vehicle model has no preset and no contract)
  */
 export function resolveEffectivePricingTerms(params: {
+  vehicleIndex?: number;
   vehicleModel?: string | null;
   serviceMode?: ServiceIncludeMode;
   bookingSnapshot?: AppliedPricingSnapshot | null;
@@ -529,6 +570,7 @@ export function resolveEffectivePricingTerms(params: {
   contractWarning?: string;
 } {
   const {
+    vehicleIndex,
     vehicleModel,
     serviceMode = 'with_driver',
     bookingSnapshot,
@@ -537,10 +579,90 @@ export function resolveEffectivePricingTerms(params: {
     vehiclePresets = DEFAULT_VEHICLE_PRICING_PRESETS,
   } = params;
 
+  const matchedPreset = findVehiclePricingPreset(vehicleModel, vehiclePresets);
+  const presetBaseFare = matchedPreset?.isRegistered
+    ? serviceMode === 'vehicle_only'
+      ? matchedPreset.vehicleOnlyRate
+      : matchedPreset.withDriverRate
+    : 0;
+
+  // Helper to resolve vehicle-specific base fare without flattening heterogeneous multi-vehicle events
+  const resolveTierBaseFare = (terms: CustomerContractTerms): number => {
+    if (vehicleIndex !== undefined && terms.vehicleBaseRatesByIndex?.[vehicleIndex] !== undefined) {
+      return terms.vehicleBaseRatesByIndex[vehicleIndex];
+    }
+    if (serviceMode === 'vehicle_only' && terms.vehicleOnlyRate !== undefined && terms.vehicleOnlyRate > 0) {
+      return terms.vehicleOnlyRate;
+    }
+    if (terms.baseRate > 0) {
+      return terms.baseRate;
+    }
+    if (bookingSnapshot?.baseVehicleFare && bookingSnapshot.baseVehicleFare > 0) {
+      return bookingSnapshot.baseVehicleFare;
+    }
+    return presetBaseFare;
+  };
+
   // Tier 4 (Highest Priority): Individual Booking Snapshot Override
   if (bookingSnapshot && bookingSnapshot.pricingSource === 'booking_override') {
+    const fallbackTerms = eventSpecialTerms || customerContractTerms;
     return {
       pricingSource: 'booking_override',
+      isTemporaryPreset: bookingSnapshot.isTemporaryPreset,
+      hasContractTerms: bookingSnapshot.baseVehicleFare > 0,
+      baseHours: bookingSnapshot.baseHours || fallbackTerms?.baseHours || 10,
+      baseFare: bookingSnapshot.baseVehicleFare,
+      overtimeHourlyRate:
+        bookingSnapshot.overtimeHourlyRate ?? fallbackTerms?.overtimeHourlyRate,
+      roundingUnitMinutes: fallbackTerms?.roundingUnitMinutes || 30,
+      roundingMethod: fallbackTerms?.roundingMethod || 'ceil',
+      vatMode:
+        bookingSnapshot.vatMode && bookingSnapshot.vatMode !== 'unset'
+          ? bookingSnapshot.vatMode
+          : fallbackTerms?.vatMode || 'unset',
+    };
+  }
+
+  // Tier 3: Event Special Terms
+  if (eventSpecialTerms) {
+    const rate = resolveTierBaseFare(eventSpecialTerms);
+    if (rate > 0) {
+      return {
+        pricingSource: eventSpecialTerms.pricingSource || 'event_special',
+        isTemporaryPreset: Boolean(eventSpecialTerms.isTemporaryPreset),
+        hasContractTerms: true,
+        baseHours: eventSpecialTerms.baseHours || 10,
+        baseFare: rate,
+        overtimeHourlyRate: eventSpecialTerms.overtimeHourlyRate,
+        roundingUnitMinutes: eventSpecialTerms.roundingUnitMinutes || 30,
+        roundingMethod: eventSpecialTerms.roundingMethod || 'ceil',
+        vatMode: eventSpecialTerms.vatMode || 'unset',
+      };
+    }
+  }
+
+  // Tier 2: Customer Contract Terms
+  if (customerContractTerms) {
+    const rate = resolveTierBaseFare(customerContractTerms);
+    if (rate > 0) {
+      return {
+        pricingSource: customerContractTerms.pricingSource || 'customer_contract',
+        isTemporaryPreset: Boolean(customerContractTerms.isTemporaryPreset),
+        hasContractTerms: true,
+        baseHours: customerContractTerms.baseHours || 10,
+        baseFare: rate,
+        overtimeHourlyRate: customerContractTerms.overtimeHourlyRate,
+        roundingUnitMinutes: customerContractTerms.roundingUnitMinutes || 30,
+        roundingMethod: customerContractTerms.roundingMethod || 'ceil',
+        vatMode: customerContractTerms.vatMode || 'unset',
+      };
+    }
+  }
+
+  // Locked Snapshot Preservation (Scenario D-7: preserves historical preset snapshot when global preset changes later)
+  if (bookingSnapshot && bookingSnapshot.snapshotLocked && bookingSnapshot.baseVehicleFare > 0) {
+    return {
+      pricingSource: bookingSnapshot.pricingSource || 'preset',
       isTemporaryPreset: bookingSnapshot.isTemporaryPreset,
       hasContractTerms: true,
       baseHours: bookingSnapshot.baseHours || 10,
@@ -549,49 +671,13 @@ export function resolveEffectivePricingTerms(params: {
       roundingUnitMinutes: 30,
       roundingMethod: 'ceil',
       vatMode: bookingSnapshot.vatMode || 'unset',
-    };
-  }
-
-  // Tier 3: Event Special Terms
-  if (eventSpecialTerms && eventSpecialTerms.baseRate > 0) {
-    const rate =
-      serviceMode === 'vehicle_only' && eventSpecialTerms.vehicleOnlyRate !== undefined
-        ? eventSpecialTerms.vehicleOnlyRate
-        : eventSpecialTerms.baseRate;
-    return {
-      pricingSource: eventSpecialTerms.pricingSource || 'event_special',
-      isTemporaryPreset: Boolean(eventSpecialTerms.isTemporaryPreset),
-      hasContractTerms: true,
-      baseHours: eventSpecialTerms.baseHours || 10,
-      baseFare: rate,
-      overtimeHourlyRate: eventSpecialTerms.overtimeHourlyRate,
-      roundingUnitMinutes: eventSpecialTerms.roundingUnitMinutes || 30,
-      roundingMethod: eventSpecialTerms.roundingMethod || 'ceil',
-      vatMode: eventSpecialTerms.vatMode || 'unset',
-    };
-  }
-
-  // Tier 2: Customer Contract Terms
-  if (customerContractTerms && customerContractTerms.baseRate > 0) {
-    const rate =
-      serviceMode === 'vehicle_only' && customerContractTerms.vehicleOnlyRate !== undefined
-        ? customerContractTerms.vehicleOnlyRate
-        : customerContractTerms.baseRate;
-    return {
-      pricingSource: customerContractTerms.pricingSource || 'customer_contract',
-      isTemporaryPreset: Boolean(customerContractTerms.isTemporaryPreset),
-      hasContractTerms: true,
-      baseHours: customerContractTerms.baseHours || 10,
-      baseFare: rate,
-      overtimeHourlyRate: customerContractTerms.overtimeHourlyRate,
-      roundingUnitMinutes: customerContractTerms.roundingUnitMinutes || 30,
-      roundingMethod: customerContractTerms.roundingMethod || 'ceil',
-      vatMode: customerContractTerms.vatMode || 'unset',
+      contractWarning: bookingSnapshot.isTemporaryPreset
+        ? '배차 시점 확정 스냅샷(임시 프리셋) 보존 적용 중'
+        : undefined,
     };
   }
 
   // Tier 1: Temporary Vehicle Pricing Preset (기본 10시간 기준)
-  const matchedPreset = findVehiclePricingPreset(vehicleModel, vehiclePresets);
   if (matchedPreset && matchedPreset.isRegistered) {
     const baseFare =
       serviceMode === 'vehicle_only'
@@ -788,6 +874,8 @@ export function createBookingPricingSnapshot(params: {
   serviceMode?: ServiceIncludeMode;
   requestedLanguage?: RequestedDriverLanguage;
   customer?: HqCustomer | null;
+  vehiclePresets?: VehiclePricingPreset[];
+  driverProfiles?: DriverProfilePreset[];
 }): AppliedPricingSnapshot {
   const {
     vehicleModel,
@@ -795,18 +883,22 @@ export function createBookingPricingSnapshot(params: {
     serviceMode = 'with_driver',
     requestedLanguage = 'ko',
     customer,
+    vehiclePresets = DEFAULT_VEHICLE_PRICING_PRESETS,
+    driverProfiles = DEFAULT_DRIVER_PROFILES,
   } = params;
 
   const resolvedPricing = resolveEffectivePricingTerms({
     vehicleModel,
     serviceMode,
     customerContractTerms: customer?.contractTerms,
+    vehiclePresets,
   });
 
   const labor = calculateDriverLaborCost({
     driverName,
     vehicleModel,
     serviceMode,
+    profiles: driverProfiles,
   });
 
   return {
@@ -820,12 +912,16 @@ export function createBookingPricingSnapshot(params: {
     overtimeHourlyRate: resolvedPricing.overtimeHourlyRate,
     driverLaborCost10h: labor.driverLaborCost,
     vatMode: resolvedPricing.vatMode,
+    snapshotLocked: true,
   };
 }
 
 /**
  * Check for duplicate receipt suspicion:
- * Flags if another receipt has the exact same merchant, amount, and date (or approvalNo)
+ * 1. Exact OCR approvalNo match is always a duplicate (same physical card transaction).
+ * 2. Same merchant + same amount + same date is ONLY flagged if it belongs to the same
+ *    booking/event/customer (or has no distinct booking/event/customer separation).
+ *    Separate events/customers with different approvalNos are NOT falsely blocked (Scenario D-5).
  */
 export function checkDuplicateReceipt(
   target: HqExpenseRecord,
@@ -834,12 +930,32 @@ export function checkDuplicateReceipt(
   const duplicates = allExpenses.filter((e) => {
     if (e.id === target.id) return false;
 
-    if (
-      target.ocrDetails?.approvalNo &&
-      e.ocrDetails?.approvalNo &&
-      target.ocrDetails.approvalNo.trim() === e.ocrDetails.approvalNo.trim()
-    ) {
-      return true;
+    const targetApproval = target.ocrDetails?.approvalNo?.trim();
+    const otherApproval = e.ocrDetails?.approvalNo?.trim();
+
+    if (targetApproval && otherApproval) {
+      if (targetApproval === otherApproval) {
+        return true;
+      }
+      // Different valid card approval numbers on different bookings/customers -> distinct transactions
+      if (
+        (target.bookingId && e.bookingId && target.bookingId !== e.bookingId) ||
+        (target.eventId && e.eventId && target.eventId !== e.eventId) ||
+        (target.customerId && e.customerId && target.customerId !== e.customerId)
+      ) {
+        return false;
+      }
+    }
+
+    // If explicitly linked to different customers or different events/bookings, do not cross-flag unless approvalNo matched above
+    if (target.customerId && e.customerId && target.customerId !== e.customerId) {
+      return false;
+    }
+    if (target.eventId && e.eventId && target.eventId !== e.eventId) {
+      return false;
+    }
+    if (target.bookingId && e.bookingId && target.bookingId !== e.bookingId) {
+      return false;
     }
 
     const sameMerchant =
@@ -867,6 +983,7 @@ export function checkDuplicateReceipt(
 export function buildEventSettlementReport(params: {
   id: string;
   reportNo: string;
+  eventId?: string;
   customer: HqCustomer;
   eventName: string;
   eventDate: string;
@@ -883,10 +1000,14 @@ export function buildEventSettlementReport(params: {
   adminNotes?: string;
   vehiclePresets?: VehiclePricingPreset[];
   driverProfiles?: DriverProfilePreset[];
+  isDemoScenario?: boolean;
+  demoScenarioCode?: string;
+  areAllDirectCostsConfirmed?: boolean;
 }): EventSettlementReport {
   const {
     id,
     reportNo,
+    eventId: explicitEventId,
     customer,
     eventName,
     eventDate,
@@ -903,7 +1024,16 @@ export function buildEventSettlementReport(params: {
     adminNotes,
     vehiclePresets = DEFAULT_VEHICLE_PRICING_PRESETS,
     driverProfiles = DEFAULT_DRIVER_PROFILES,
+    isDemoScenario,
+    demoScenarioCode,
+    areAllDirectCostsConfirmed = false,
   } = params;
+
+  const resolvedEventId =
+    explicitEventId || bookings[0]?.eventId || bookings[0]?.groupId || `ev-${id}`;
+
+  // Track claimed legacy expenses (without bookingId) so a single receipt is never double-counted across multiple vehicles in the same event
+  const claimedExpenseIds = new Set<string>();
 
   // Build per-vehicle settlements
   const vehicles: EventVehicleSettlement[] = bookings.map((booking, idx) => {
@@ -911,24 +1041,69 @@ export function buildEventSettlementReport(params: {
     const serviceMode: ServiceIncludeMode = booking.serviceMode || 'with_driver';
     const requestedLanguage: RequestedDriverLanguage = booking.requestedLanguage || 'ko';
 
-    // Find matching driving log by driver name or vehicle plate
-    const matchingLog = drivingLogs.find(
-      (l) =>
-        (booking.driverName && l.driverName === booking.driverName) ||
-        (booking.vehiclePlate && l.vehiclePlate.includes(booking.vehiclePlate))
-    );
+    // 1. Strict Driving Log Matching:
+    // Priority A: Exact bookingId match
+    // Priority B: Fallback only if log does NOT have a conflicting bookingId/eventId/customerId/date
+    const matchingLog =
+      drivingLogs.find((l) => l.bookingId && l.bookingId === booking.id) ||
+      drivingLogs.find((l) => {
+        if (l.bookingId && l.bookingId !== booking.id) return false;
+        if (l.eventId && booking.eventId && l.eventId !== booking.eventId) return false;
+        if (l.customerId && booking.customerId && l.customerId !== booking.customerId) return false;
+        if (l.rawDate && booking.pickupDate && l.rawDate !== booking.pickupDate) return false;
 
-    // Filter expenses belonging to this driver or vehicle
+        const isDriverMatch = booking.driverName && l.driverName === booking.driverName;
+        const isPlateMatch =
+          booking.vehiclePlate &&
+          l.vehiclePlate &&
+          (l.vehiclePlate.includes(booking.vehiclePlate) ||
+            booking.vehiclePlate.includes(l.vehiclePlate));
+        return Boolean(isDriverMatch || isPlateMatch);
+      });
+
+    // 2. Strict Expense Matching:
+    // Priority A: Exact bookingId or drivingLogId match
+    // Priority B: Fallback only if expense does NOT have a conflicting bookingId/eventId/customerId/date
     const vehicleExpenses = expenses.filter((e) => {
+      if (claimedExpenseIds.has(e.id)) return false;
+
+      if (e.bookingId) {
+        if (e.bookingId === booking.id) {
+          claimedExpenseIds.add(e.id);
+          return true;
+        }
+        return false;
+      }
+
+      if (matchingLog?.id && e.drivingLogId === matchingLog.id) {
+        claimedExpenseIds.add(e.id);
+        return true;
+      }
+
+      if (e.eventId && booking.eventId && e.eventId !== booking.eventId) return false;
+      if (e.customerId && booking.customerId && e.customerId !== booking.customerId) return false;
+      if (e.rawDate && booking.pickupDate && e.rawDate !== booking.pickupDate) return false;
+
       const isDriverMatch = booking.driverName && e.driverName === booking.driverName;
-      const isPlateMatch = booking.vehiclePlate && e.vehiclePlate.includes(booking.vehiclePlate);
-      return isDriverMatch || isPlateMatch;
+      const isPlateMatch =
+        booking.vehiclePlate &&
+        e.vehiclePlate &&
+        (e.vehiclePlate.includes(booking.vehiclePlate) ||
+          booking.vehiclePlate.includes(e.vehiclePlate));
+
+      if (isDriverMatch || isPlateMatch) {
+        claimedExpenseIds.add(e.id);
+        return true;
+      }
+      return false;
     });
 
-    // Separate Client-Billable Approved Expenses vs Company Direct Expenses vs Pending
+    // Separate Client-Billable Approved Expenses vs Reimbursable Cost vs Company Absorbed Cost vs Pending vs Rejected
     let approvedExpensesTotal = 0;
+    let reimbursableExpenseCost = 0;
     let companyDirectExpensesTotal = 0;
     let pendingExpensesTotal = 0;
+    let rejectedExpensesTotal = 0;
     let hasDuplicateWarning = false;
 
     const auditedExpenses: HqExpenseRecord[] = vehicleExpenses.map((exp) => {
@@ -939,12 +1114,21 @@ export function buildEventSettlementReport(params: {
 
       // 식비/내부 세차비 등 billableToCustomer === false 인 경우 회사 자체 부담 직접비로 분류
       const isClientBillable = exp.billableToCustomer !== false && exp.category !== 'meal';
+      // 고객사 카드로 직접 결제된 경우가 아니면 회사(또는 기사)가 선지출한 실제 비용 유출임
+      const isCompanyOutflow = exp.paymentMethod !== 'client_card';
 
-      if (exp.status === '승인 완료' && !dupCheck.isDuplicate) {
+      if (exp.status === '반려') {
+        rejectedExpensesTotal += exp.amount;
+      } else if (exp.status === '승인 완료' && !dupCheck.isDuplicate) {
         if (isClientBillable) {
           approvedExpensesTotal += exp.amount;
+          if (isCompanyOutflow) {
+            reimbursableExpenseCost += exp.amount;
+          }
         } else {
-          companyDirectExpensesTotal += exp.amount;
+          if (isCompanyOutflow) {
+            companyDirectExpensesTotal += exp.amount;
+          }
         }
       } else {
         pendingExpensesTotal += exp.amount;
@@ -952,19 +1136,29 @@ export function buildEventSettlementReport(params: {
 
       return {
         ...exp,
+        bookingId: exp.bookingId || booking.id,
+        eventId: exp.eventId || resolvedEventId,
+        drivingLogId: exp.drivingLogId || matchingLog?.id,
         isDuplicateSuspicion: dupCheck.isDuplicate,
         duplicateReason: dupCheck.reason,
         billableToCustomer: exp.status === '승인 완료' && !dupCheck.isDuplicate && isClientBillable,
       };
     });
 
-    // Resolve Customer Service Times (excluding garage pickup/return)
+    const companyTotalExpenseOutflow = reimbursableExpenseCost + companyDirectExpensesTotal;
+
+    // Resolve Customer Service Times (excluding garage pickup/return, NEVER fabricating 09:00 ~ 19:00)
     const times = resolveServiceTimes(matchingLog, booking);
-    const serviceMinutes = calculateDurationMinutes(times.serviceStart, times.serviceEnd);
-    const serviceFormatted = formatMinutesKorean(serviceMinutes);
+    const serviceMinutes = times.isServiceTimeVerified
+      ? calculateDurationMinutes(times.serviceStart, times.serviceEnd)
+      : 0;
+    const serviceFormatted = times.isServiceTimeVerified
+      ? formatMinutesKorean(serviceMinutes)
+      : '서비스 시간 확인 필요';
 
     // Resolve 4-Tier Effective Pricing for this vehicle
     const effectivePricing = resolveEffectivePricingTerms({
+      vehicleIndex: vIndex,
       vehicleModel: booking.vehicleModel,
       serviceMode,
       bookingSnapshot: booking.appliedPricingSnapshot,
@@ -1013,15 +1207,34 @@ export function buildEventSettlementReport(params: {
         : undefined;
 
     // Client Revenue vs Direct Profit Calculation
+    // IMPORTANT: vehicleDirectCost includes BOTH reimbursableExpenseCost (company outflow billed to client)
+    // AND companyDirectExpensesTotal (company-absorbed cost), preventing profit inflation!
     const clientTotalRevenue = fareCalc.vehicleFareSubtotal + approvedExpensesTotal;
+    const isVehicleFullyConfirmed =
+      times.isServiceTimeVerified &&
+      fareCalc.hasContractTerms &&
+      !effectivePricing.isTemporaryPreset &&
+      fareCalc.isOvertimeRateConfirmed &&
+      pendingExpensesTotal === 0 &&
+      !hasDuplicateWarning &&
+      !driverOvertimeLaborWarning &&
+      areAllDirectCostsConfirmed &&
+      (status === 'approved' || status === 'invoiced');
+
     const profitAnalysis = calculateDispatchDirectProfit({
       clientRevenue: clientTotalRevenue,
       driverLaborCost: laborCalc.driverLaborCost,
-      vehicleDirectCost: companyDirectExpensesTotal,
+      vehicleDirectCost: companyTotalExpenseOutflow,
       otherDirectCost: 0,
-      allDirectCostsVerified:
-        status === 'approved' || status === 'invoiced' || companyDirectExpensesTotal > 0,
+      allDirectCostsVerified: isVehicleFullyConfirmed,
     });
+
+    const combinedContractWarning = [
+      times.serviceTimeWarning,
+      fareCalc.contractWarning || effectivePricing.contractWarning,
+    ]
+      .filter(Boolean)
+      .join(' · ') || undefined;
 
     return {
       vehicleIndex: vIndex,
@@ -1046,26 +1259,33 @@ export function buildEventSettlementReport(params: {
       customerServiceStart: times.serviceStart,
       customerServiceEnd: times.serviceEnd,
       garageArrivalTime: times.garageArrival,
-      totalDutyFormatted: matchingLog?.totalDutyHours || '12시간 00분',
+      isServiceTimeVerified: times.isServiceTimeVerified,
+      serviceTimeWarning: times.serviceTimeWarning,
+      totalDutyFormatted: matchingLog?.totalDutyHours || '운행일지 미제출',
       customerServiceMinutes: serviceMinutes,
       customerServiceFormatted: serviceFormatted,
       baseContractHours: fareCalc.baseContractHours,
       overtimeMinutes: fareCalc.overtimeMinutes,
       billedOvertimeHours: fareCalc.billedOvertimeHours,
-      overtimeFormatted: fareCalc.overtimeFormatted,
-      billedOvertimeFormatted: fareCalc.billedOvertimeFormatted,
+      overtimeFormatted: times.isServiceTimeVerified ? fareCalc.overtimeFormatted : '확인 필요',
+      billedOvertimeFormatted: times.isServiceTimeVerified
+        ? fareCalc.billedOvertimeFormatted
+        : '서비스 시간 확인 필요',
       baseFare: fareCalc.baseFare,
       overtimeFare: fareCalc.overtimeFare,
-      isOvertimeRateConfirmed: fareCalc.isOvertimeRateConfirmed,
+      isOvertimeRateConfirmed: times.isServiceTimeVerified && fareCalc.isOvertimeRateConfirmed,
       vehicleFareSubtotal: fareCalc.vehicleFareSubtotal,
       hasContractTerms: fareCalc.hasContractTerms,
-      contractWarning: fareCalc.contractWarning || effectivePricing.contractWarning,
+      contractWarning: combinedContractWarning,
       mileageKm: matchingLog?.distanceKm || '기록 확인 중',
       notes: matchingLog?.notes || booking.notes,
       expenses: auditedExpenses,
       approvedExpensesTotal,
+      reimbursableExpenseCost,
       companyDirectExpensesTotal,
+      companyTotalExpenseOutflow,
       pendingExpensesTotal,
+      rejectedExpensesTotal,
       hasDuplicateWarning,
       clientTotalRevenue,
       driverLaborCost: profitAnalysis.driverLaborCost,
@@ -1090,6 +1310,11 @@ export function buildEventSettlementReport(params: {
   const totalVehicleFare = vehicles.reduce((sum, v) => sum + v.vehicleFareSubtotal, 0);
   const totalApprovedExpenses = vehicles.reduce((sum, v) => sum + v.approvedExpensesTotal, 0);
   const totalPendingExpenses = vehicles.reduce((sum, v) => sum + v.pendingExpensesTotal, 0);
+  const totalReimbursableExpenseCost = vehicles.reduce((sum, v) => sum + v.reimbursableExpenseCost, 0);
+  const totalCompanyAbsorbedExpenseCost = vehicles.reduce(
+    (sum, v) => sum + v.companyDirectExpensesTotal,
+    0
+  );
 
   const supplyAmount = totalVehicleFare + totalApprovedExpenses;
 
@@ -1114,26 +1339,51 @@ export function buildEventSettlementReport(params: {
 
   const isAnyTemporary = vehicles.some((v) => v.isTemporaryPreset);
   const isAnyUnregistered = vehicles.some((v) => !v.hasContractTerms);
+  const isAnyServiceTimeUnverified = vehicles.some((v) => !v.isServiceTimeVerified);
+  const isAnyOvertimeUnconfirmed = vehicles.some((v) => !v.isOvertimeRateConfirmed);
+  const hasUnverifiedItems =
+    isAnyTemporary ||
+    isAnyUnregistered ||
+    isAnyServiceTimeUnverified ||
+    isAnyOvertimeUnconfirmed ||
+    totalPendingExpenses > 0;
+
   const primaryPricingSource: PricingTierSource =
     vehicles[0]?.pricingSource || (customContractTerms ? 'event_special' : 'preset');
 
   const profitConfirmStatus: ProfitConfirmStatus =
-    !isAnyTemporary && !isAnyUnregistered && (status === 'approved' || status === 'invoiced')
+    !hasUnverifiedItems &&
+    vehicles.every((v) => v.profitConfirmStatus === 'confirmed') &&
+    areAllDirectCostsConfirmed &&
+    (status === 'approved' || status === 'invoiced')
       ? 'confirmed'
       : 'provisional';
+
+  const warningParts: string[] = [];
+  if (isAnyServiceTimeUnverified) {
+    warningParts.push('서비스 시작/종료시간 확인 필요 차량이 있습니다.');
+  }
+  if (isAnyUnregistered || isAnyOvertimeUnconfirmed) {
+    warningParts.push('일부 차량 요금 또는 초과요율이 미등록 상태입니다. (관리자 확인 필요)');
+  }
+  if (isAnyTemporary) {
+    warningParts.push('현재 임시 요금 프리셋(10시간 기준)이 적용된 예상 정산서입니다.');
+  }
 
   return {
     id,
     reportNo,
     status,
     createdAt: new Date().toISOString(),
+    isDemoScenario,
+    demoScenarioCode,
     customerId: customer.id,
     customerName: customer.name,
     orderingAgency,
     endBrand: customer.name,
     billingTarget,
     billingTargetName,
-    eventId: `ev-${id}`,
+    eventId: resolvedEventId,
     eventName,
     eventDate,
     location,
@@ -1141,15 +1391,15 @@ export function buildEventSettlementReport(params: {
     isTemporaryPreset: isAnyTemporary,
     vatMode: resolvedVatMode,
     contractTerms: customContractTerms || customer.contractTerms,
-    contractWarning: isAnyUnregistered
-      ? '일부 차량 요금 또는 초과요율이 미등록 상태입니다. (관리자 확인 필요)'
-      : isAnyTemporary
-      ? '현재 임시 요금 프리셋(10시간 기준)이 적용된 예상 정산서입니다.'
-      : undefined,
+    contractWarning: warningParts.length > 0 ? warningParts.join(' ') : undefined,
+    hasUnverifiedItems,
     vehicles,
     totalVehiclesCount,
     totalCustomerServiceMinutes,
-    totalServiceHoursFormatted: formatMinutesKorean(totalCustomerServiceMinutes),
+    totalServiceHoursFormatted:
+      isAnyServiceTimeUnverified && totalCustomerServiceMinutes === 0
+        ? '서비스 시간 확인 필요'
+        : formatMinutesKorean(totalCustomerServiceMinutes),
     totalOvertimeMinutes,
     totalOvertimeHoursFormatted: formatMinutesKorean(totalOvertimeMinutes),
     totalBaseFare,
@@ -1157,6 +1407,8 @@ export function buildEventSettlementReport(params: {
     totalVehicleFare,
     totalApprovedExpenses,
     totalPendingExpenses,
+    totalReimbursableExpenseCost,
+    totalCompanyAbsorbedExpenseCost,
     supplyAmount,
     vatAmount,
     grandTotal,
@@ -1167,6 +1419,7 @@ export function buildEventSettlementReport(params: {
     totalDirectProfit,
     averageDirectMarginPercent,
     profitConfirmStatus,
+    areAllDirectCostsConfirmed,
     adminNotes,
   };
 }

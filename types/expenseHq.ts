@@ -28,7 +28,7 @@ export interface HqExpenseRecord {
   ocrExtracted?: boolean;
   ocrSummary?: string;
   ocrDetails?: {
-    merchantName: string;
+    merchantName?: string;
     bizNo?: string;
     phone?: string;
     address?: string;
@@ -36,6 +36,7 @@ export interface HqExpenseRecord {
     cardName?: string;
     cardNumber?: string;
     approvalNo?: string;
+    supplyAmount?: number;
     items?: {
       name: string;
       unitPrice: number;
@@ -54,6 +55,7 @@ export interface HqExpenseRecord {
   eventId?: string;
   eventName?: string;
   bookingId?: string;
+  drivingLogId?: string;
   isDuplicateSuspicion?: boolean; // 중복 영수증 의심
   duplicateReason?: string;
   duplicateOfId?: string;

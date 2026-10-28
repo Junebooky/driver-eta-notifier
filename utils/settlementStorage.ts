@@ -7,14 +7,32 @@ import {
   CustomerContractTerms,
   DriverProfilePreset,
   EventSettlementReport,
+  RequestedDriverLanguage,
+  ServiceIncludeMode,
   SettlementReportStatus,
   VatHandlingMode,
   VehiclePricingPreset,
 } from '@/types/settlementHq';
+import { HqCustomer } from '@/types/customerHq';
 import { INITIAL_HQ_CUSTOMERS } from '@/utils/customerHqData';
-import { getHqExpensesSnapshot } from '@/utils/expenseHqStorage';
+import {
+  getHqExpenses,
+  getHqExpensesSnapshot,
+  saveHqExpenses,
+  submitDriverExpensesToHq,
+  updateHqExpenseRecord,
+  updateHqExpenseStatus,
+} from '@/utils/expenseHqStorage';
+import {
+  getHqDrivingLogs,
+  saveHqDrivingLogs,
+  submitDriverLogToHq,
+  updateHqDrivingLog,
+} from '@/utils/drivingLogHqStorage';
 import {
   buildEventSettlementReport,
+  calculateOvertimeAndFare,
+  createBookingPricingSnapshot,
   DEFAULT_DRIVER_PROFILES,
   DEFAULT_VEHICLE_PRICING_PRESETS,
 } from '@/utils/settlementCalculator';
@@ -24,6 +42,8 @@ import { HqBooking } from '@/types/hq';
 export const SETTLEMENT_REPORTS_STORAGE_KEY = 'cockpit_hq_settlement_reports_v2';
 export const VEHICLE_PRESETS_STORAGE_KEY = 'cockpit_hq_vehicle_presets_v2';
 export const DRIVER_PROFILES_STORAGE_KEY = 'cockpit_hq_driver_profiles_v2';
+export const HQ_BOOKINGS_STORAGE_KEY = 'cockpit_hq_bookings_v2';
+export const HQ_CUSTOMERS_STORAGE_KEY = 'cockpit_hq_customers_v2';
 export const SETTLEMENT_UPDATE_EVENT = 'cockpit_settlement_updated';
 
 function buildSeedSettlementReports(
@@ -529,10 +549,12 @@ function buildSeedSettlementReports(
   return [report1, report2, report3, report4, report5];
 }
 
-// In-memory caches for useSyncExternalStore
+// In-memory caches for both Browser useSyncExternalStore and Node E2E integration tests
 let cachedReports: EventSettlementReport[] | null = null;
 let cachedVehiclePresets: VehiclePricingPreset[] | null = null;
 let cachedDriverProfiles: DriverProfilePreset[] | null = null;
+let cachedBookings: HqBooking[] = [];
+let cachedCustomers: HqCustomer[] = [...INITIAL_HQ_CUSTOMERS];
 const serverFallbackReports: EventSettlementReport[] = buildSeedSettlementReports();
 
 function emitSettlementChange() {
@@ -541,9 +563,78 @@ function emitSettlementChange() {
   }
 }
 
+export function getHqCustomersSnapshot(): HqCustomer[] {
+  if (typeof window === 'undefined') return cachedCustomers;
+  try {
+    const raw = localStorage.getItem(HQ_CUSTOMERS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        cachedCustomers = parsed;
+        return cachedCustomers;
+      }
+    }
+  } catch (err) {
+    console.error('Failed to read HQ customers:', err);
+  }
+  return cachedCustomers;
+}
+
+export function saveHqCustomers(customers: HqCustomer[]): void {
+  cachedCustomers = customers;
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(HQ_CUSTOMERS_STORAGE_KEY, JSON.stringify(customers));
+    } catch (err) {
+      console.error('Failed to save HQ customers:', err);
+    }
+  }
+  emitSettlementChange();
+}
+
+export function upsertHqCustomer(customer: HqCustomer): HqCustomer {
+  const existing = getHqCustomersSnapshot();
+  const idx = existing.findIndex((c) => c.id === customer.id || c.name === customer.name);
+  const next =
+    idx >= 0
+      ? existing.map((c, i) => (i === idx ? { ...c, ...customer } : c))
+      : [customer, ...existing];
+  saveHqCustomers(next);
+  return customer;
+}
+
+export function getHqBookingsSnapshot(): HqBooking[] {
+  if (typeof window === 'undefined') return cachedBookings;
+  try {
+    const raw = localStorage.getItem(HQ_BOOKINGS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        cachedBookings = parsed;
+        return cachedBookings;
+      }
+    }
+  } catch (err) {
+    console.error('Failed to read HQ bookings:', err);
+  }
+  return cachedBookings;
+}
+
+export function saveHqBookings(bookings: HqBooking[]): void {
+  cachedBookings = bookings;
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(HQ_BOOKINGS_STORAGE_KEY, JSON.stringify(bookings));
+    } catch (err) {
+      console.error('Failed to save HQ bookings:', err);
+    }
+  }
+  emitSettlementChange();
+}
+
 export function getVehiclePresetsSnapshot(): VehiclePricingPreset[] {
-  if (typeof window === 'undefined') return DEFAULT_VEHICLE_PRICING_PRESETS;
   if (cachedVehiclePresets) return cachedVehiclePresets;
+  if (typeof window === 'undefined') return DEFAULT_VEHICLE_PRICING_PRESETS;
   try {
     const raw = localStorage.getItem(VEHICLE_PRESETS_STORAGE_KEY);
     if (raw) {
@@ -570,8 +661,8 @@ export function saveVehiclePresets(presets: VehiclePricingPreset[]): void {
 }
 
 export function getDriverProfilesSnapshot(): DriverProfilePreset[] {
-  if (typeof window === 'undefined') return DEFAULT_DRIVER_PROFILES;
   if (cachedDriverProfiles) return cachedDriverProfiles;
+  if (typeof window === 'undefined') return DEFAULT_DRIVER_PROFILES;
   try {
     const raw = localStorage.getItem(DRIVER_PROFILES_STORAGE_KEY);
     if (raw) {
@@ -598,8 +689,14 @@ export function saveDriverProfiles(profiles: DriverProfilePreset[]): void {
 }
 
 export function getSettlementReportsSnapshot(): EventSettlementReport[] {
-  if (typeof window === 'undefined') return serverFallbackReports;
   if (cachedReports) return cachedReports;
+  if (typeof window === 'undefined') {
+    cachedReports = buildSeedSettlementReports(
+      getVehiclePresetsSnapshot(),
+      getDriverProfilesSnapshot()
+    );
+    return cachedReports;
+  }
   try {
     const raw = localStorage.getItem(SETTLEMENT_REPORTS_STORAGE_KEY);
     if (raw) {
@@ -635,28 +732,296 @@ export function saveSettlementReports(reports: EventSettlementReport[]): void {
   emitSettlementChange();
 }
 
+/**
+ * Create or update an EventSettlementReport (invoice draft) from a group of bookings,
+ * automatically linking matching driving logs and expenses.
+ */
+export function upsertEventSettlementFromBookings(params: {
+  reportId: string;
+  reportNo?: string;
+  eventId?: string;
+  customer: HqCustomer;
+  eventName: string;
+  eventDate: string;
+  location: string;
+  bookings: HqBooking[];
+  orderingAgency?: string;
+  billingTarget?: 'ordering_agency' | 'end_brand' | 'custom';
+  billingTargetName?: string;
+  customContractTerms?: CustomerContractTerms;
+  vatMode?: VatHandlingMode;
+  status?: SettlementReportStatus;
+  adminNotes?: string;
+  isDemoScenario?: boolean;
+  demoScenarioCode?: string;
+  areAllDirectCostsConfirmed?: boolean;
+}): EventSettlementReport {
+  const existingBookings = getHqBookingsSnapshot();
+  const bookingIds = new Set(params.bookings.map((b) => b.id));
+  const mergedBookings = [
+    ...params.bookings,
+    ...existingBookings.filter((b) => !bookingIds.has(b.id)),
+  ];
+  saveHqBookings(mergedBookings);
+
+  const existingReports = getSettlementReportsSnapshot();
+  const prevReport = existingReports.find((r) => r.id === params.reportId);
+
+  const built = buildEventSettlementReport({
+    id: params.reportId,
+    reportNo: params.reportNo || prevReport?.reportNo || `SET-${Date.now().toString().slice(-6)}`,
+    eventId: params.eventId || prevReport?.eventId || `ev-${params.reportId}`,
+    customer: params.customer,
+    eventName: params.eventName,
+    eventDate: params.eventDate,
+    location: params.location,
+    bookings: params.bookings,
+    drivingLogs: getHqDrivingLogs(),
+    expenses: getHqExpenses(),
+    orderingAgency: params.orderingAgency ?? prevReport?.orderingAgency,
+    billingTarget: params.billingTarget ?? prevReport?.billingTarget,
+    billingTargetName: params.billingTargetName ?? prevReport?.billingTargetName,
+    customContractTerms: params.customContractTerms ?? prevReport?.contractTerms,
+    vatMode: params.vatMode ?? prevReport?.vatMode,
+    status: params.status ?? prevReport?.status ?? 'draft',
+    adminNotes: params.adminNotes ?? prevReport?.adminNotes,
+    vehiclePresets: getVehiclePresetsSnapshot(),
+    driverProfiles: getDriverProfilesSnapshot(),
+    isDemoScenario: params.isDemoScenario ?? prevReport?.isDemoScenario,
+    demoScenarioCode: params.demoScenarioCode ?? prevReport?.demoScenarioCode,
+    areAllDirectCostsConfirmed:
+      params.areAllDirectCostsConfirmed ?? prevReport?.areAllDirectCostsConfirmed ?? false,
+  });
+
+  const idx = existingReports.findIndex((r) => r.id === params.reportId);
+  const nextReports =
+    idx >= 0
+      ? existingReports.map((r, i) => (i === idx ? built : r))
+      : [built, ...existingReports];
+
+  saveSettlementReports(nextReports);
+  return built;
+}
+
+/**
+ * Re-sync a specific settlement report (or all active dynamic reports) when driving logs,
+ * expenses, or bookings are updated.
+ */
+export function syncSettlementReportById(reportId: string): EventSettlementReport | null {
+  const reports = getSettlementReportsSnapshot();
+  const target = reports.find((r) => r.id === reportId);
+  if (!target) return null;
+
+  const customers = getHqCustomersSnapshot();
+  const customer: HqCustomer =
+    customers.find((c) => c.id === target.customerId || c.name === target.customerName) || {
+      id: target.customerId,
+      name: target.customerName,
+      tier: 'VIP',
+      isFavorite: false,
+      primaryContactName: '전담 매니저',
+      contactCountExtra: 0,
+      recentSnippet: target.eventName,
+      mainPhone: '010-0000-0000',
+      mainEmail: 'vip@viplimo.co.kr',
+      department: '의전총괄팀',
+      preferences: [],
+      notes: [],
+      recentRequests: [],
+      contacts: [],
+      eventsHistory: [],
+      tripsHistory: [],
+      communications: [],
+      contractTerms: target.contractTerms,
+    };
+
+  const allBookings = getHqBookingsSnapshot();
+  const vehicleBookingIds = new Set(target.vehicles.map((v) => v.bookingId));
+  let matchedBookings = allBookings.filter(
+    (b) => vehicleBookingIds.has(b.id) || (b.eventId && b.eventId === target.eventId)
+  );
+
+  if (matchedBookings.length === 0) {
+    // Reconstruct bookings from report vehicles if not in dynamic booking store
+    matchedBookings = target.vehicles.map((v, idx) => ({
+      id: v.bookingId || `b-sync-${idx + 1}`,
+      bookingNo: v.bookingNo || `#SYNC-${idx + 1}`,
+      no: idx + 1,
+      customerName: target.customerName,
+      customerId: target.customerId,
+      eventId: target.eventId,
+      pickupDate: target.eventDate.slice(0, 12).replace(/\.\s*/g, '-').replace(/[^0-9-]/g, ''),
+      pickupTime: v.customerServiceStart !== '미입력' ? v.customerServiceStart : '09:00',
+      pickupLocation: target.location,
+      destination: target.location,
+      driverName: v.serviceMode === 'vehicle_only' ? '-' : v.driverName,
+      driverPhone: v.driverPhone,
+      vehicleModel: v.vehicleModelRaw || v.vehicleModel,
+      vehiclePlate: v.vehiclePlate,
+      dispatchStatus: (v.dispatchStatus as HqBooking['dispatchStatus']) || '운행 완료',
+      driverAck: '확인완료',
+      customerBrochure: '발송됨',
+      groupVehicleIndex: v.vehicleIndex,
+      requestedLanguage: v.requestedLanguage,
+      serviceMode: v.serviceMode,
+      notes: v.notes,
+    }));
+  }
+
+  return upsertEventSettlementFromBookings({
+    reportId: target.id,
+    reportNo: target.reportNo,
+    eventId: target.eventId,
+    customer,
+    eventName: target.eventName,
+    eventDate: target.eventDate,
+    location: target.location,
+    bookings: matchedBookings,
+    orderingAgency: target.orderingAgency,
+    billingTarget: target.billingTarget,
+    billingTargetName: target.billingTargetName,
+    customContractTerms: target.contractTerms,
+    vatMode: target.vatMode,
+    status: target.status,
+    adminNotes: target.adminNotes,
+    isDemoScenario: target.isDemoScenario,
+    demoScenarioCode: target.demoScenarioCode,
+    areAllDirectCostsConfirmed: target.areAllDirectCostsConfirmed,
+  });
+}
+
+/**
+ * Reassign vehicle or driver on a booking and automatically recalculate its settlement report (Scenario C-3)
+ */
+export function reassignBookingVehicleOrDriver(params: {
+  reportId: string;
+  bookingId: string;
+  newVehicleModel?: string;
+  newVehiclePlate?: string;
+  newDriverName?: string;
+  newDriverPhone?: string;
+  newServiceMode?: ServiceIncludeMode;
+  newRequestedLanguage?: RequestedDriverLanguage;
+}): EventSettlementReport | null {
+  const bookings = getHqBookingsSnapshot();
+  const reports = getSettlementReportsSnapshot();
+  const report = reports.find((r) => r.id === params.reportId);
+  if (!report) return null;
+
+  const customers = getHqCustomersSnapshot();
+  const customer = customers.find((c) => c.id === report.customerId);
+
+  const updatedBookings = bookings.map((b) => {
+    if (b.id !== params.bookingId) return b;
+    const nextModel = params.newVehicleModel ?? b.vehicleModel;
+    const nextDriver = params.newDriverName ?? b.driverName;
+    const nextMode = params.newServiceMode ?? b.serviceMode ?? 'with_driver';
+    const nextLang = params.newRequestedLanguage ?? b.requestedLanguage ?? 'ko';
+
+    const updatedSnapshot = createBookingPricingSnapshot({
+      vehicleModel: nextModel,
+      driverName: nextDriver,
+      serviceMode: nextMode,
+      requestedLanguage: nextLang,
+      customer,
+      vehiclePresets: getVehiclePresetsSnapshot(),
+      driverProfiles: getDriverProfilesSnapshot(),
+    });
+
+    return {
+      ...b,
+      vehicleModel: nextModel,
+      vehiclePlate: params.newVehiclePlate ?? b.vehiclePlate,
+      driverName: nextDriver,
+      driverPhone: params.newDriverPhone ?? b.driverPhone,
+      serviceMode: nextMode,
+      requestedLanguage: nextLang,
+      appliedPricingSnapshot: updatedSnapshot,
+    };
+  });
+
+  saveHqBookings(updatedBookings);
+
+  // Also update any matching driving log's vehicle/driver so the log stays linked
+  const logs = getHqDrivingLogs();
+  const targetLog = logs.find((l) => l.bookingId === params.bookingId);
+  if (targetLog) {
+    updateHqDrivingLog(targetLog.id, {
+      vehicleModel: params.newVehicleModel ?? targetLog.vehicleModel,
+      vehiclePlate: params.newVehiclePlate ?? targetLog.vehiclePlate,
+      driverName: params.newDriverName ?? targetLog.driverName,
+    });
+  }
+
+  // If the report had per-vehicle base rates locked in contractTerms, clear the reassigned vehicle's index so its new model rate applies
+  if (report.contractTerms?.vehicleBaseRatesByIndex) {
+    const vehicleRow = report.vehicles.find((v) => v.bookingId === params.bookingId);
+    if (vehicleRow) {
+      const nextByIndex = { ...report.contractTerms.vehicleBaseRatesByIndex };
+      delete nextByIndex[vehicleRow.vehicleIndex];
+      const nextReports = reports.map((r) =>
+        r.id === report.id
+          ? {
+              ...r,
+              contractTerms: {
+                ...r.contractTerms!,
+                vehicleBaseRatesByIndex: nextByIndex,
+              },
+            }
+          : r
+      );
+      saveSettlementReports(nextReports);
+    }
+  }
+
+  return syncSettlementReportById(params.reportId);
+}
+
 export function updateSettlementReportStatus(
   reportId: string,
   newStatus: SettlementReportStatus,
-  adminNotes?: string
+  adminNotes?: string,
+  areAllDirectCostsConfirmed?: boolean
 ): EventSettlementReport | null {
   const reports = getSettlementReportsSnapshot();
   let updatedItem: EventSettlementReport | null = null;
 
   const next = reports.map((r) => {
     if (r.id !== reportId) return r;
+    const directConfirmed =
+      areAllDirectCostsConfirmed !== undefined
+        ? areAllDirectCostsConfirmed
+        : Boolean(r.areAllDirectCostsConfirmed);
+
+    const allVehiclesVerified = r.vehicles.every(
+      (v) =>
+        v.isServiceTimeVerified &&
+        v.hasContractTerms &&
+        !v.isTemporaryPreset &&
+        v.isOvertimeRateConfirmed &&
+        v.pendingExpensesTotal === 0 &&
+        !v.hasDuplicateWarning &&
+        !v.driverOvertimeLaborWarning
+    );
+
+    const canConfirmProfit =
+      (newStatus === 'approved' || newStatus === 'invoiced') &&
+      allVehiclesVerified &&
+      !r.hasUnverifiedItems &&
+      directConfirmed;
+
     updatedItem = {
       ...r,
       status: newStatus,
       adminNotes: adminNotes !== undefined ? adminNotes : r.adminNotes,
+      areAllDirectCostsConfirmed: directConfirmed,
       approvedBy:
         newStatus === 'approved' || newStatus === 'invoiced' ? '본사 정산 관리자' : r.approvedBy,
       approvedAt:
         newStatus === 'approved' || newStatus === 'invoiced'
           ? new Date().toLocaleString('ko-KR')
           : r.approvedAt,
-      profitConfirmStatus:
-        newStatus === 'approved' || newStatus === 'invoiced' ? 'confirmed' : r.profitConfirmStatus,
+      profitConfirmStatus: canConfirmProfit ? 'confirmed' : 'provisional',
     };
     return updatedItem;
   });
@@ -674,64 +1039,88 @@ export function updateSettlementReportContractTerms(
   const target = reports.find((r) => r.id === reportId);
   if (!target) return null;
 
+  // Multi-vehicle base rate preservation:
+  // If the event has multiple vehicles with different base fares, do NOT overwrite all vehicles with a single flat baseRate
+  // unless vehicleBaseRatesByIndex is explicitly provided or the event has only 1 vehicle.
+  const distinctBaseFares = new Set(target.vehicles.map((v) => v.baseFare).filter((f) => f > 0));
+  const isHeterogeneousMultiVehicle = target.vehicles.length > 1 && distinctBaseFares.size > 1;
+
+  const preservedByIndex: Record<number, number> = {
+    ...(target.contractTerms?.vehicleBaseRatesByIndex || {}),
+    ...(terms.vehicleBaseRatesByIndex || {}),
+  };
+
+  if (isHeterogeneousMultiVehicle && !terms.vehicleBaseRatesByIndex) {
+    target.vehicles.forEach((v) => {
+      if (v.baseFare > 0 && preservedByIndex[v.vehicleIndex] === undefined) {
+        preservedByIndex[v.vehicleIndex] = v.baseFare;
+      }
+    });
+  }
+
+  const normalizedTerms: CustomerContractTerms = {
+    ...terms,
+    vehicleBaseRatesByIndex:
+      Object.keys(preservedByIndex).length > 0 ? preservedByIndex : undefined,
+  };
+
   // Recalculate vehicles with the updated event/customer contract terms
   const updatedVehicles = target.vehicles.map((v) => {
-    const baseHours = terms.baseHours || 10;
-    const baseMinutes = baseHours * 60;
-    const overtimeMinutes = Math.max(0, v.customerServiceMinutes - baseMinutes);
+    const baseHours = normalizedTerms.baseHours || 10;
 
-    const unit = terms.roundingUnitMinutes || 30;
-    let billedOvertimeHours = 0;
-    if (overtimeMinutes > 0) {
-      if (terms.roundingMethod === 'exact') {
-        billedOvertimeHours = overtimeMinutes / 60;
-      } else if (terms.roundingMethod === 'floor') {
-        billedOvertimeHours = (Math.floor(overtimeMinutes / unit) * unit) / 60;
-      } else if (terms.roundingMethod === 'round') {
-        billedOvertimeHours = (Math.round(overtimeMinutes / unit) * unit) / 60;
-      } else {
-        billedOvertimeHours = (Math.ceil(overtimeMinutes / unit) * unit) / 60;
-      }
+    // Determine effective base fare for this specific vehicle without flattening multi-vehicle events
+    let effectiveBaseFare = normalizedTerms.baseRate;
+    if (normalizedTerms.vehicleBaseRatesByIndex?.[v.vehicleIndex] !== undefined) {
+      effectiveBaseFare = normalizedTerms.vehicleBaseRatesByIndex[v.vehicleIndex];
+    } else if (
+      v.serviceMode === 'vehicle_only' &&
+      normalizedTerms.vehicleOnlyRate !== undefined &&
+      normalizedTerms.vehicleOnlyRate > 0
+    ) {
+      effectiveBaseFare = normalizedTerms.vehicleOnlyRate;
+    } else if (effectiveBaseFare <= 0 && v.baseFare > 0) {
+      effectiveBaseFare = v.baseFare;
     }
 
-    const baseFare =
-      v.serviceMode === 'vehicle_only' && terms.vehicleOnlyRate !== undefined
-        ? terms.vehicleOnlyRate
-        : terms.baseRate;
+    const fareCalc = calculateOvertimeAndFare(
+      v.isServiceTimeVerified ? v.customerServiceMinutes : 0,
+      {
+        ...normalizedTerms,
+        baseHours,
+        baseRate: effectiveBaseFare,
+      }
+    );
 
-    const hasOvertimeRate =
-      typeof terms.overtimeHourlyRate === 'number' && terms.overtimeHourlyRate > 0;
-    const overtimeFare =
-      overtimeMinutes > 0 && hasOvertimeRate
-        ? Math.round(billedOvertimeHours * (terms.overtimeHourlyRate || 0))
-        : 0;
-
-    const vehicleFareSubtotal = baseFare + overtimeFare;
-    const clientTotalRevenue = vehicleFareSubtotal + v.approvedExpensesTotal;
+    const clientTotalRevenue = fareCalc.vehicleFareSubtotal + v.approvedExpensesTotal;
     const totalDirectCost = v.driverLaborCost + v.vehicleDirectCost + v.otherDirectCost;
     const directProfit = clientTotalRevenue - totalDirectCost;
     const directMarginPercent =
       clientTotalRevenue > 0 ? Number(((directProfit / clientTotalRevenue) * 100).toFixed(2)) : 0;
 
+    const driverOvertimeLaborWarning =
+      fareCalc.overtimeMinutes > 0 && v.serviceMode === 'with_driver'
+        ? `초과 서비스(${fareCalc.overtimeFormatted}) 발생 — 기사 초과수당 요율 미정 (관리자 확인 필요)`
+        : undefined;
+
     return {
       ...v,
-      pricingSource: terms.pricingSource || 'customer_contract',
-      isTemporaryPreset: Boolean(terms.isTemporaryPreset),
+      pricingSource: normalizedTerms.pricingSource || 'customer_contract',
+      isTemporaryPreset: Boolean(normalizedTerms.isTemporaryPreset),
       baseContractHours: baseHours,
-      overtimeMinutes,
-      billedOvertimeHours,
-      billedOvertimeFormatted:
-        overtimeMinutes > 0
-          ? hasOvertimeRate
-            ? `${billedOvertimeHours.toFixed(1).replace(/\.0$/, '')}시간 (${unit}분 단위)`
-            : '초과요율 미등록 (관리자 확인 필요)'
-          : '0시간',
-      baseFare,
-      overtimeFare,
-      isOvertimeRateConfirmed: hasOvertimeRate || overtimeMinutes === 0,
-      vehicleFareSubtotal,
-      hasContractTerms: baseFare > 0,
-      contractWarning: undefined,
+      overtimeMinutes: fareCalc.overtimeMinutes,
+      billedOvertimeHours: fareCalc.billedOvertimeHours,
+      overtimeFormatted: v.isServiceTimeVerified ? fareCalc.overtimeFormatted : '확인 필요',
+      billedOvertimeFormatted: v.isServiceTimeVerified
+        ? fareCalc.billedOvertimeFormatted
+        : '서비스 시간 확인 필요',
+      baseFare: fareCalc.baseFare,
+      overtimeFare: fareCalc.overtimeFare,
+      isOvertimeRateConfirmed: v.isServiceTimeVerified && fareCalc.isOvertimeRateConfirmed,
+      vehicleFareSubtotal: fareCalc.vehicleFareSubtotal,
+      hasContractTerms: fareCalc.hasContractTerms,
+      contractWarning:
+        [v.serviceTimeWarning, fareCalc.contractWarning].filter(Boolean).join(' · ') || undefined,
+      driverOvertimeLaborWarning,
       clientTotalRevenue,
       directProfit,
       directMarginPercent,
@@ -742,22 +1131,32 @@ export function updateSettlementReportContractTerms(
   const totalOvertimeFare = updatedVehicles.reduce((s, v) => s + v.overtimeFare, 0);
   const totalVehicleFare = updatedVehicles.reduce((s, v) => s + v.vehicleFareSubtotal, 0);
   const supplyAmount = totalVehicleFare + target.totalApprovedExpenses;
-  const effectiveVatMode = vatMode || terms.vatMode || target.vatMode;
+  const effectiveVatMode = vatMode || normalizedTerms.vatMode || target.vatMode;
   const vatAmount = effectiveVatMode === 'excluded' ? Math.round(supplyAmount * 0.1) : 0;
   const grandTotal = supplyAmount + vatAmount;
   const totalDirectProfit = supplyAmount - target.totalDirectCost;
   const averageDirectMarginPercent =
     supplyAmount > 0 ? Number(((totalDirectProfit / supplyAmount) * 100).toFixed(2)) : 0;
 
+  const isAnyTemporary = updatedVehicles.some((v) => v.isTemporaryPreset);
+  const isAnyUnregistered = updatedVehicles.some((v) => !v.hasContractTerms);
+  const isAnyServiceTimeUnverified = updatedVehicles.some((v) => !v.isServiceTimeVerified);
+  const isAnyOvertimeUnconfirmed = updatedVehicles.some((v) => !v.isOvertimeRateConfirmed);
+  const hasUnverifiedItems =
+    isAnyTemporary ||
+    isAnyUnregistered ||
+    isAnyServiceTimeUnverified ||
+    isAnyOvertimeUnconfirmed ||
+    target.totalPendingExpenses > 0;
+
   const updatedReport: EventSettlementReport = {
     ...target,
-    pricingSource: terms.pricingSource || 'customer_contract',
-    isTemporaryPreset: Boolean(terms.isTemporaryPreset),
+    pricingSource: normalizedTerms.pricingSource || 'customer_contract',
+    isTemporaryPreset: isAnyTemporary,
     vatMode: effectiveVatMode,
-    contractTerms: terms,
-    contractWarning: terms.isTemporaryPreset
-      ? '임시 요금 프리셋 적용 중'
-      : undefined,
+    contractTerms: normalizedTerms,
+    hasUnverifiedItems,
+    contractWarning: isAnyTemporary ? '임시 요금 프리셋 적용 중' : undefined,
     vehicles: updatedVehicles,
     totalBaseFare,
     totalOvertimeFare,
@@ -767,6 +1166,12 @@ export function updateSettlementReportContractTerms(
     grandTotal,
     totalDirectProfit,
     averageDirectMarginPercent,
+    profitConfirmStatus:
+      !hasUnverifiedItems &&
+      Boolean(target.areAllDirectCostsConfirmed) &&
+      (target.status === 'approved' || target.status === 'invoiced')
+        ? 'confirmed'
+        : 'provisional',
   };
 
   const next = reports.map((r) => (r.id === reportId ? updatedReport : r));
@@ -907,3 +1312,758 @@ export function exportAdminProfitabilityCsv(report: EventSettlementReport): stri
 
   return lines.join('\n');
 }
+
+/**
+ * Reset all DEMO/TEST scenario data without touching real/seed records
+ */
+export function resetDemoPipelineData(): void {
+  const reports = getSettlementReportsSnapshot().filter((r) => !r.isDemoScenario);
+  saveSettlementReports(
+    reports.length > 0
+      ? reports
+      : buildSeedSettlementReports(getVehiclePresetsSnapshot(), getDriverProfilesSnapshot())
+  );
+
+  const bookings = getHqBookingsSnapshot().filter((b) => !b.id.startsWith('b-demo-'));
+  saveHqBookings(bookings);
+
+  const logs = getHqDrivingLogs().filter((l) => !l.id.startsWith('log-demo-'));
+  saveHqDrivingLogs(logs);
+
+  const expenses = getHqExpenses().filter((e) => !e.id.startsWith('exp-demo-'));
+  saveHqExpenses(expenses);
+
+  const customers = getHqCustomersSnapshot().filter((c) => !c.id.startsWith('cust-demo-'));
+  saveHqCustomers(customers);
+}
+
+/**
+ * Execute End-to-End Pipeline Verification Scenarios A, B, C, and D
+ * (Customers -> Event/Bookings -> Driving Logs -> Service/Overtime Calc -> Expense Submission/Review -> Invoice Draft -> Admin Approval -> Export)
+ */
+export function runDemoPipelineScenario(scenario: 'A' | 'B' | 'C' | 'D' | 'ALL'): {
+  executedScenarios: string[];
+  reports: EventSettlementReport[];
+  summaryLog: string[];
+} {
+  const summaryLog: string[] = [];
+  const executedScenarios: string[] = [];
+
+  if (scenario === 'A' || scenario === 'C' || scenario === 'ALL') {
+    executedScenarios.push('A');
+    const customerA: HqCustomer = upsertHqCustomer({
+      id: 'cust-demo-a',
+      name: '[DEMO/TEST] 오르비타 바이오 코리아',
+      tier: 'VIP',
+      isFavorite: false,
+      primaryContactName: '강현우 팀장',
+      contactCountExtra: 0,
+      recentSnippet: '[DEMO/TEST] 단일 차량 기본 의전',
+      mainPhone: '010-7701-1001',
+      mainEmail: 'hw.kang@orbita-demo.kr',
+      department: '의전총괄팀',
+      preferences: ['Sprinter 519 CDI'],
+      notes: [],
+      recentRequests: [],
+      contacts: [],
+      eventsHistory: [],
+      tripsHistory: [],
+      communications: [],
+    });
+
+    const snapshotA = createBookingPricingSnapshot({
+      vehicleModel: '벤츠 스프린터 519 CDI',
+      driverName: '정태훈',
+      serviceMode: 'with_driver',
+      requestedLanguage: 'ko',
+      customer: customerA,
+    });
+
+    const bookingA: HqBooking = {
+      id: 'b-demo-a-1',
+      bookingNo: '#DEMO-A-001',
+      no: 901,
+      customerName: customerA.name,
+      customerId: customerA.id,
+      eventId: 'ev-demo-a',
+      pickupDate: '2026-10-27',
+      pickupTime: '09:00',
+      pickupLocation: '그랜드 인터컨티넨탈 서울 파르나스',
+      destination: '송도 바이오 클러스터 R&D 센터',
+      driverName: '정태훈',
+      driverPhone: '010-5542-1928',
+      vehicleModel: '벤츠 스프린터 519 CDI',
+      vehiclePlate: '703서 2658',
+      dispatchStatus: '운행 완료',
+      driverAck: '확인완료',
+      customerBrochure: '발송됨',
+      groupVehicleIndex: 1,
+      requestedLanguage: 'ko',
+      serviceMode: 'with_driver',
+      appliedPricingSnapshot: snapshotA,
+      notes: '[DEMO 시나리오 A] 단일 차량 기본 10시간 의전 (차고지 픽업 제외 검증)',
+    };
+
+    // Submit Driving Log: Garage 08:00 -> Service Start 09:00 -> Service End 19:00 -> Garage Return 20:00
+    const logA = submitDriverLogToHq({
+      id: 'log-demo-a-1',
+      bookingId: bookingA.id,
+      eventId: 'ev-demo-a',
+      customerId: customerA.id,
+      customerName: customerA.name,
+      rawDate: '2026-10-27',
+      drivingDate: '10/27',
+      driverName: '정태훈',
+      vehicleModel: '벤츠 스프린터 519 CDI',
+      vehiclePlate: '703서 2658',
+      clockIn: '08:00',
+      clockOut: '20:00',
+      garageDepartureTime: '08:00',
+      customerServiceStart: '09:00',
+      customerServiceEnd: '19:00',
+      garageArrivalTime: '20:00',
+      totalDutyHours: '12시간 00분',
+      distanceKm: '148 km',
+      status: '승인 완료',
+      stops: [
+        { id: 'sa-1', time: '08:00', place: '차고지 출발' },
+        { id: 'sa-2', time: '09:00', place: '인터컨티넨탈 파르나스', note: '고객 픽업 (서비스 시작)' },
+        { id: 'sa-3', time: '19:00', place: '인터컨티넨탈 파르나스', note: '고객 하차 (서비스 종료)' },
+        { id: 'sa-4', time: '20:00', place: '차고지 복귀' },
+      ],
+      notes: '차고지 이동(08:00~09:00, 19:00~20:00) 제외, 순수 고객 서비스 10시간(09:00~19:00)',
+    });
+
+    // Remove any previous demo A expenses before re-adding
+    saveHqExpenses(getHqExpenses().filter((e) => !e.id.startsWith('exp-demo-a-')));
+
+    // Submit 2 expenses: 15,000 parking (billable) + 12,000 meal (company direct)
+    submitDriverExpensesToHq(
+      [
+        {
+          id: 'exp-demo-a-parking',
+          category: 'parking',
+          merchant: '파르나스타워 지하주차장',
+          amount: 15000,
+          date: '2026-10-27',
+          time: '15:30',
+          paymentMethod: 'company_card',
+          memo: '[DEMO-A] 고객사 청구용 주차비 영수증',
+          createdAt: '2026-10-27T15:30:00Z',
+          updatedAt: '2026-10-27T15:30:00Z',
+        },
+      ],
+      '정태훈',
+      '703서 2658',
+      '벤츠 스프린터 519 CDI',
+      {
+        customerId: customerA.id,
+        customerName: customerA.name,
+        bookingId: bookingA.id,
+        eventId: 'ev-demo-a',
+        drivingLogId: logA.id,
+        billableToCustomer: true,
+        approvalNo: 'AP-DEMO-A-1001',
+      }
+    );
+
+    submitDriverExpensesToHq(
+      [
+        {
+          id: 'exp-demo-a-meal',
+          category: 'meal',
+          merchant: '송도 한옥마을 식당',
+          amount: 12000,
+          date: '2026-10-27',
+          time: '12:40',
+          paymentMethod: 'company_card',
+          memo: '[DEMO-A] 기사 중식대 (회사 부담 직접비)',
+          createdAt: '2026-10-27T12:40:00Z',
+          updatedAt: '2026-10-27T12:40:00Z',
+        },
+      ],
+      '정태훈',
+      '703서 2658',
+      '벤츠 스프린터 519 CDI',
+      {
+        customerId: customerA.id,
+        customerName: customerA.name,
+        bookingId: bookingA.id,
+        eventId: 'ev-demo-a',
+        drivingLogId: logA.id,
+        billableToCustomer: false,
+        approvalNo: 'AP-DEMO-A-1002',
+      }
+    );
+
+    // Approve both receipts
+    updateHqExpenseStatus('exp-demo-a-parking', '승인 완료', '고객사 실비 청구 승인');
+    updateHqExpenseStatus('exp-demo-a-meal', '승인 완료', '회사 부담 식대 승인');
+
+    const reportA = upsertEventSettlementFromBookings({
+      reportId: 'rep-demo-scenario-a',
+      reportNo: 'DEMO-A-261027',
+      eventId: 'ev-demo-a',
+      customer: customerA,
+      eventName: '[DEMO/TEST] 시나리오 A — 단일 차량 기본 의전 (Sprinter 519 CDI)',
+      eventDate: '2026. 10. 27 (화)',
+      location: '그랜드 인터컨티넨탈 파르나스 · 송도 R&D 센터',
+      bookings: [bookingA],
+      status: 'reviewing',
+      isDemoScenario: true,
+      demoScenarioCode: 'A',
+      adminNotes:
+        '시나리오 A: 차고지 출발(08:00) 제외 서비스 10시간(09:00~19:00), 청구 815,000원(기본 80만+주차 1.5만), 인건비 15만, 직접비 2.7만(보전원가 1.5만+식대 1.2만), 직접이익 638,000원.',
+    });
+
+    summaryLog.push(
+      `[시나리오 A 완료] 고객사 청구합계 ₩${reportA.supplyAmount.toLocaleString()} / 기사인건비 ₩${reportA.totalDriverLaborCost.toLocaleString()} / 차량직접비 ₩${reportA.totalVehicleDirectCost.toLocaleString()} / 배차직접이익 ₩${reportA.totalDirectProfit.toLocaleString()}`
+    );
+  }
+
+  if (scenario === 'B' || scenario === 'C' || scenario === 'ALL') {
+    executedScenarios.push('B');
+    const customerB: HqCustomer = upsertHqCustomer({
+      id: 'cust-demo-b',
+      name: '[DEMO/TEST] 메종 드 파리 코리아',
+      tier: 'VIP',
+      isFavorite: false,
+      primaryContactName: '박지훈 프로듀서',
+      contactCountExtra: 0,
+      recentSnippet: '[DEMO/TEST] 복수 차량 3대 갈라 디너 의전',
+      mainPhone: '010-8821-2002',
+      mainEmail: 'jh.park@maison-demo.kr',
+      department: '글로벌 이벤트팀',
+      preferences: ['Sprinter 519 CDI', 'Sprinter 319 CDI', 'S 560'],
+      notes: [],
+      recentRequests: [],
+      contacts: [],
+      eventsHistory: [],
+      tripsHistory: [],
+      communications: [],
+    });
+
+    const bookingsB: HqBooking[] = [
+      {
+        id: 'b-demo-b-1',
+        bookingNo: '#DEMO-B-001',
+        no: 902,
+        customerName: customerB.name,
+        customerId: customerB.id,
+        eventId: 'ev-demo-b',
+        groupId: 'grp-demo-b',
+        groupName: '[DEMO/TEST] 메종 드 파리 갈라 디너',
+        groupTotalVehicles: 3,
+        groupVehicleIndex: 1,
+        pickupDate: '2026-10-28',
+        pickupTime: '09:00',
+        pickupLocation: '서울 신라호텔',
+        destination: '성수동 특별 전시장',
+        driverName: '정태훈',
+        driverPhone: '010-5542-1928',
+        vehicleModel: '벤츠 스프린터 519 CDI',
+        vehiclePlate: '703서 2658',
+        dispatchStatus: '운행 완료',
+        driverAck: '확인완료',
+        customerBrochure: '발송됨',
+        requestedLanguage: 'ko',
+        serviceMode: 'with_driver',
+        notes: '1호차: Sprinter 519 CDI (800,000원) / 한국어 기사 (150,000원) / 12시간 20분 운행',
+      },
+      {
+        id: 'b-demo-b-2',
+        bookingNo: '#DEMO-B-002',
+        no: 903,
+        customerName: customerB.name,
+        customerId: customerB.id,
+        eventId: 'ev-demo-b',
+        groupId: 'grp-demo-b',
+        groupName: '[DEMO/TEST] 메종 드 파리 갈라 디너',
+        groupTotalVehicles: 3,
+        groupVehicleIndex: 2,
+        pickupDate: '2026-10-28',
+        pickupTime: '09:30',
+        pickupLocation: '인천공항 T2 CIP 라운지',
+        destination: '서울 신라호텔',
+        driverName: '최영식',
+        driverPhone: '010-2341-9876',
+        vehicleModel: '벤츠 스프린터 투어러 (319 CDI)',
+        vehiclePlate: '125호 9982',
+        dispatchStatus: '운행 완료',
+        driverAck: '확인완료',
+        customerBrochure: '발송됨',
+        requestedLanguage: 'en',
+        serviceMode: 'with_driver',
+        notes: '2호차: Sprinter 319 CDI (1,000,000원) / 영어 가능 기사 (200,000원) / 10시간 정시 운행',
+      },
+      {
+        id: 'b-demo-b-3',
+        bookingNo: '#DEMO-B-003',
+        no: 904,
+        customerName: customerB.name,
+        customerId: customerB.id,
+        eventId: 'ev-demo-b',
+        groupId: 'grp-demo-b',
+        groupName: '[DEMO/TEST] 메종 드 파리 갈라 디너',
+        groupTotalVehicles: 3,
+        groupVehicleIndex: 3,
+        pickupDate: '2026-10-28',
+        pickupTime: '09:00',
+        pickupLocation: '서울 신라호텔',
+        destination: '한남동 VIP 라운지',
+        driverName: '김민수',
+        driverPhone: '010-3829-4821',
+        vehicleModel: '벤츠 S560',
+        vehiclePlate: '01호 3343',
+        dispatchStatus: '운행 완료',
+        driverAck: '확인완료',
+        customerBrochure: '발송됨',
+        requestedLanguage: 'en',
+        serviceMode: 'with_driver',
+        notes: '3호차: S 560 (650,000원) / 일반차량 영어 가능 기사 (150,000원) / 11시간 운행',
+      },
+    ];
+
+    submitDriverLogToHq({
+      id: 'log-demo-b-1',
+      bookingId: 'b-demo-b-1',
+      eventId: 'ev-demo-b',
+      customerId: customerB.id,
+      customerName: customerB.name,
+      rawDate: '2026-10-28',
+      drivingDate: '10/28',
+      driverName: '정태훈',
+      vehicleModel: '벤츠 스프린터 519 CDI',
+      vehiclePlate: '703서 2658',
+      clockIn: '07:50',
+      clockOut: '22:10',
+      garageDepartureTime: '07:50',
+      customerServiceStart: '09:00',
+      customerServiceEnd: '21:20',
+      garageArrivalTime: '22:10',
+      totalDutyHours: '14시간 20분',
+      distanceKm: '185 km',
+      status: '승인 완료',
+      stops: [],
+      notes: '1호차 서비스 09:00~21:20 (12시간 20분, 초과 2시간 20분)',
+    });
+
+    submitDriverLogToHq({
+      id: 'log-demo-b-2',
+      bookingId: 'b-demo-b-2',
+      eventId: 'ev-demo-b',
+      customerId: customerB.id,
+      customerName: customerB.name,
+      rawDate: '2026-10-28',
+      drivingDate: '10/28',
+      driverName: '최영식',
+      vehicleModel: '벤츠 스프린터 투어러 (319 CDI)',
+      vehiclePlate: '125호 9982',
+      clockIn: '08:10',
+      clockOut: '20:20',
+      garageDepartureTime: '08:10',
+      customerServiceStart: '09:30',
+      customerServiceEnd: '19:30',
+      garageArrivalTime: '20:20',
+      totalDutyHours: '12시간 10분',
+      distanceKm: '210 km',
+      status: '승인 완료',
+      stops: [],
+      notes: '2호차 서비스 09:30~19:30 (10시간 00분, 초과 0분)',
+    });
+
+    submitDriverLogToHq({
+      id: 'log-demo-b-3',
+      bookingId: 'b-demo-b-3',
+      eventId: 'ev-demo-b',
+      customerId: customerB.id,
+      customerName: customerB.name,
+      rawDate: '2026-10-28',
+      drivingDate: '10/28',
+      driverName: '김민수',
+      vehicleModel: '벤츠 S560',
+      vehiclePlate: '01호 3343',
+      clockIn: '08:00',
+      clockOut: '20:50',
+      garageDepartureTime: '08:00',
+      customerServiceStart: '09:00',
+      customerServiceEnd: '20:00',
+      garageArrivalTime: '20:50',
+      totalDutyHours: '12시간 50분',
+      distanceKm: '130 km',
+      status: '승인 완료',
+      stops: [],
+      notes: '3호차 서비스 09:00~20:00 (11시간 00분, 초과 1시간)',
+    });
+
+    saveHqExpenses(getHqExpenses().filter((e) => !e.id.startsWith('exp-demo-b-')));
+
+    // Exp B1: 1호차 톨비 18,000원 (승인 완료)
+    submitDriverExpensesToHq(
+      [
+        {
+          id: 'exp-demo-b-1-toll',
+          category: 'toll',
+          merchant: '수도권제1순환고속도로 톨게이트',
+          amount: 18000,
+          date: '2026-10-28',
+          time: '14:10',
+          paymentMethod: 'company_card',
+          memo: '[DEMO-B] 1호차 고속도로 통행료 (승인 완료)',
+          createdAt: '2026-10-28T14:10:00Z',
+          updatedAt: '2026-10-28T14:10:00Z',
+        },
+      ],
+      '정태훈',
+      '703서 2658',
+      '벤츠 스프린터 519 CDI',
+      {
+        customerId: customerB.id,
+        customerName: customerB.name,
+        bookingId: 'b-demo-b-1',
+        eventId: 'ev-demo-b',
+        drivingLogId: 'log-demo-b-1',
+        billableToCustomer: true,
+        approvalNo: 'AP-DEMO-B-2001',
+      }
+    );
+    updateHqExpenseStatus('exp-demo-b-1-toll', '승인 완료', '고객사 청구 승인');
+
+    // Exp B2: 2호차 공항 주차비 24,000원 (승인 완료)
+    submitDriverExpensesToHq(
+      [
+        {
+          id: 'exp-demo-b-2-parking',
+          category: 'parking',
+          merchant: '인천국제공항 T2 단기주차장',
+          amount: 24000,
+          date: '2026-10-28',
+          time: '11:20',
+          paymentMethod: 'company_card',
+          memo: '[DEMO-B] 2호차 공항 픽업 주차비 (승인 완료)',
+          createdAt: '2026-10-28T11:20:00Z',
+          updatedAt: '2026-10-28T11:20:00Z',
+        },
+      ],
+      '최영식',
+      '125호 9982',
+      '벤츠 스프린터 투어러 (319 CDI)',
+      {
+        customerId: customerB.id,
+        customerName: customerB.name,
+        bookingId: 'b-demo-b-2',
+        eventId: 'ev-demo-b',
+        drivingLogId: 'log-demo-b-2',
+        billableToCustomer: true,
+        approvalNo: 'AP-DEMO-B-2002',
+      }
+    );
+    updateHqExpenseStatus('exp-demo-b-2-parking', '승인 완료', '고객사 청구 승인');
+
+    // Exp B3: 3호차 발렛 주차비 30,000원 (검수 대기 -> 미반영 검증)
+    submitDriverExpensesToHq(
+      [
+        {
+          id: 'exp-demo-b-3-pending',
+          category: 'parking',
+          merchant: '한남동 라운지 발렛파킹',
+          amount: 30000,
+          date: '2026-10-28',
+          time: '18:00',
+          paymentMethod: 'company_card',
+          memo: '[DEMO-B] 3호차 발렛비 (검수 대기 - 청구 미반영 검증)',
+          createdAt: '2026-10-28T18:00:00Z',
+          updatedAt: '2026-10-28T18:00:00Z',
+        },
+      ],
+      '김민수',
+      '01호 3343',
+      '벤츠 S560',
+      {
+        customerId: customerB.id,
+        customerName: customerB.name,
+        bookingId: 'b-demo-b-3',
+        eventId: 'ev-demo-b',
+        drivingLogId: 'log-demo-b-3',
+        billableToCustomer: true,
+        approvalNo: 'AP-DEMO-B-2003',
+      }
+    );
+
+    // Exp B4: 1호차 반려 영수증 9,500원 (반려 -> 청구 및 원가 제외 검증)
+    submitDriverExpensesToHq(
+      [
+        {
+          id: 'exp-demo-b-4-rejected',
+          category: 'other',
+          merchant: '성수동 카페 개인음료',
+          amount: 9500,
+          date: '2026-10-28',
+          time: '16:00',
+          paymentMethod: 'driver_personal',
+          memo: '[DEMO-B] 사적 지출 반려 처리 건',
+          createdAt: '2026-10-28T16:00:00Z',
+          updatedAt: '2026-10-28T16:00:00Z',
+        },
+      ],
+      '정태훈',
+      '703서 2658',
+      '벤츠 스프린터 519 CDI',
+      {
+        customerId: customerB.id,
+        customerName: customerB.name,
+        bookingId: 'b-demo-b-1',
+        eventId: 'ev-demo-b',
+        drivingLogId: 'log-demo-b-1',
+        billableToCustomer: false,
+        approvalNo: 'AP-DEMO-B-2004',
+      }
+    );
+    updateHqExpenseStatus('exp-demo-b-4-rejected', '반려', '업무 무관 개인 음료 반려');
+
+    const reportB = upsertEventSettlementFromBookings({
+      reportId: 'rep-demo-scenario-b',
+      reportNo: 'DEMO-B-261028',
+      eventId: 'ev-demo-b',
+      customer: customerB,
+      eventName: '[DEMO/TEST] 시나리오 B — 복수 차량(3대) + 초과시간 + 대행사 발주',
+      eventDate: '2026. 10. 28 (수)',
+      location: '서울 신라호텔 · 성수동 전시장 · 한남동 라운지',
+      bookings: bookingsB,
+      orderingAgency: '제일기획 (Cheil Worldwide)',
+      billingTarget: 'ordering_agency',
+      billingTargetName: '제일기획 귀하 (최종브랜드: 메종 드 파리)',
+      customContractTerms: {
+        baseHours: 10,
+        baseRate: 0, // Per-vehicle model rates preserved in vehicleBaseRatesByIndex below
+        vehicleBaseRatesByIndex: {
+          1: 800000,
+          2: 1000000,
+          3: 650000,
+        },
+        overtimeHourlyRate: 80000,
+        roundingUnitMinutes: 30,
+        roundingMethod: 'ceil',
+        vatMode: 'unset',
+        isTemporaryPreset: false,
+        pricingSource: 'event_special',
+      },
+      status: 'reviewing',
+      isDemoScenario: true,
+      demoScenarioCode: 'B',
+      adminNotes:
+        '시나리오 B: 3대 투입(519 CDI 80만 + 319 CDI 100만 + S560 65만 = 기본 245만), 초과요금 28만(1호차 2.5h=20만 + 3호차 1h=8만), 승인경비 4.2만, 청구합계 2,772,000원, 기사인건비 합계 500,000원.',
+    });
+
+    summaryLog.push(
+      `[시나리오 B 완료] 3대 기본요금 ₩${reportB.totalBaseFare.toLocaleString()} / 초과요금 ₩${reportB.totalOvertimeFare.toLocaleString()} / 승인실비 ₩${reportB.totalApprovedExpenses.toLocaleString()} / 총청구액 ₩${reportB.supplyAmount.toLocaleString()} / 기사인건비 ₩${reportB.totalDriverLaborCost.toLocaleString()}`
+    );
+  }
+
+  if (scenario === 'C' || scenario === 'ALL') {
+    executedScenarios.push('C');
+    // C-1: Update 1호차 service end time in Scenario B from 21:20 to 22:00 -> automatic recalculation
+    updateHqDrivingLog('log-demo-b-1', {
+      customerServiceEnd: '22:00',
+      notes: '[시나리오 C-1 수정] 서비스 종료시간 21:20 → 22:00 수정 (총 13시간, 초과 3시간 자동 재계산)',
+    });
+    const syncedB = syncSettlementReportById('rep-demo-scenario-b');
+
+    // C-2: Update Scenario A parking receipt from 15,000 to 20,000 -> automatic recalculation
+    updateHqExpenseRecord('exp-demo-a-parking', {
+      amount: 20000,
+      memo: '[시나리오 C-2 수정] 주차비 금액 15,000원 → 20,000원 수정 후 정산 자동 반영',
+    });
+    const syncedA = syncSettlementReportById('rep-demo-scenario-a');
+
+    summaryLog.push(
+      `[시나리오 C 완료] C-1 종료시간 수정 후 시나리오 B 초과요금 ₩${syncedB?.totalOvertimeFare.toLocaleString()}(총청구 ₩${syncedB?.supplyAmount.toLocaleString()}) / C-2 영수증 금액 수정 후 시나리오 A 청구합계 ₩${syncedA?.supplyAmount.toLocaleString()}`
+    );
+  }
+
+  if (scenario === 'D' || scenario === 'ALL') {
+    executedScenarios.push('D');
+    const customerD: HqCustomer = upsertHqCustomer({
+      id: 'cust-demo-d',
+      name: '[DEMO/TEST] 노바테크 로보틱스 (예외검증 D)',
+      tier: '주요',
+      isFavorite: false,
+      primaryContactName: '최유진 책임매니저',
+      contactCountExtra: 0,
+      recentSnippet: '[DEMO/TEST] 예외 및 경계 조건 검증 시나리오 D',
+      mainPhone: '010-3391-4004',
+      mainEmail: 'yj.choi@novatech-demo.kr',
+      department: '총무의전팀',
+      preferences: ['Sprinter 519 CDI'],
+      notes: [],
+      recentRequests: [],
+      contacts: [],
+      eventsHistory: [],
+      tripsHistory: [],
+      communications: [],
+    });
+
+    // D-1 (종료시간 누락), D-2 (초과요율 미등록), D-3 (영어 요청 + 한국어 기사 예외 배정), D-6 (차량만 대여 600,000원 & 인건비 0원)
+    const bookingsD: HqBooking[] = [
+      {
+        id: 'b-demo-d-1',
+        bookingNo: '#DEMO-D-001',
+        no: 911,
+        customerName: customerD.name,
+        customerId: customerD.id,
+        eventId: 'ev-demo-d',
+        groupVehicleIndex: 1,
+        pickupDate: '2026-10-28',
+        pickupTime: '09:00',
+        pickupLocation: '판교 노바테크 본사',
+        destination: '인천공항 T2',
+        driverName: '정태훈',
+        driverPhone: '010-5542-1928',
+        vehicleModel: '벤츠 스프린터 519 CDI',
+        vehiclePlate: '703서 2658',
+        dispatchStatus: '운행 중',
+        driverAck: '확인완료',
+        customerBrochure: '발송됨',
+        requestedLanguage: 'en', // D-3: 영어 요청이나 한국어 전용 기사(정태훈) 배정
+        serviceMode: 'with_driver',
+        notes: '[시나리오 D-1 & D-3] 운행일지 종료시간 누락(임의 추정 금지) + 영어 요청/한국어 기사 예외배정 경고',
+      },
+      {
+        id: 'b-demo-d-2',
+        bookingNo: '#DEMO-D-002',
+        no: 912,
+        customerName: customerD.name,
+        customerId: customerD.id,
+        eventId: 'ev-demo-d',
+        groupVehicleIndex: 2,
+        pickupDate: '2026-10-28',
+        pickupTime: '09:00',
+        pickupLocation: '판교 노바테크 본사',
+        destination: '코엑스 컨벤션센터',
+        driverName: '최영식',
+        driverPhone: '010-2341-9876',
+        vehicleModel: '벤츠 스프린터 투어러 (319 CDI)',
+        vehiclePlate: '125호 9982',
+        dispatchStatus: '운행 완료',
+        driverAck: '확인완료',
+        customerBrochure: '발송됨',
+        requestedLanguage: 'en',
+        serviceMode: 'with_driver',
+        notes: '[시나리오 D-2] 12시간 운행(2시간 초과)했으나 초과요율 미등록 시 임의 초과요금 0원 처리 검증',
+      },
+      {
+        id: 'b-demo-d-3',
+        bookingNo: '#DEMO-D-003',
+        no: 913,
+        customerName: customerD.name,
+        customerId: customerD.id,
+        eventId: 'ev-demo-d',
+        groupVehicleIndex: 3,
+        pickupDate: '2026-10-28',
+        pickupTime: '09:00',
+        pickupLocation: '판교 노바테크 본사',
+        destination: '수원 컨벤션센터',
+        driverName: '-',
+        vehicleModel: '벤츠 스프린터 519 CDI',
+        vehiclePlate: '71두 3338',
+        dispatchStatus: '운행 완료',
+        driverAck: '-',
+        customerBrochure: '발송됨',
+        requestedLanguage: 'ko',
+        serviceMode: 'vehicle_only', // D-6: 차량만 대여 (600,000원, 인건비 0원)
+        notes: '[시나리오 D-6] 차량만 대여(600,000원) 선택 시 기사 인건비 0원 검증',
+      },
+    ];
+
+    // Log for D-1: service end time missing!
+    submitDriverLogToHq({
+      id: 'log-demo-d-1',
+      bookingId: 'b-demo-d-1',
+      eventId: 'ev-demo-d',
+      customerId: customerD.id,
+      customerName: customerD.name,
+      rawDate: '2026-10-28',
+      drivingDate: '10/28',
+      driverName: '정태훈',
+      vehicleModel: '벤츠 스프린터 519 CDI',
+      vehiclePlate: '703서 2658',
+      clockIn: '08:00',
+      clockOut: '',
+      garageDepartureTime: '08:00',
+      customerServiceStart: '09:00',
+      customerServiceEnd: undefined, // Missing!
+      stops: [{ id: 'sd1-1', time: '09:00', place: '판교 본사 픽업' }],
+      notes: '종료시간 미입력 상태 — 서비스 시간 확인 필요 표시 검증',
+    });
+
+    // Log for D-2: 12 hours service (09:00~21:00), 2 hours overtime, but no overtime rate registered
+    submitDriverLogToHq({
+      id: 'log-demo-d-2',
+      bookingId: 'b-demo-d-2',
+      eventId: 'ev-demo-d',
+      customerId: customerD.id,
+      customerName: customerD.name,
+      rawDate: '2026-10-28',
+      drivingDate: '10/28',
+      driverName: '최영식',
+      vehicleModel: '벤츠 스프린터 투어러 (319 CDI)',
+      vehiclePlate: '125호 9982',
+      clockIn: '08:00',
+      clockOut: '21:50',
+      garageDepartureTime: '08:00',
+      customerServiceStart: '09:00',
+      customerServiceEnd: '21:00',
+      garageArrivalTime: '21:50',
+      stops: [],
+      notes: '12시간 서비스 수행 (초과 2시간 발생, 초과요율 미등록)',
+    });
+
+    // Log for D-6: Vehicle only 10h
+    submitDriverLogToHq({
+      id: 'log-demo-d-3',
+      bookingId: 'b-demo-d-3',
+      eventId: 'ev-demo-d',
+      customerId: customerD.id,
+      customerName: customerD.name,
+      rawDate: '2026-10-28',
+      drivingDate: '10/28',
+      driverName: '차량만 대여',
+      vehicleModel: '벤츠 스프린터 519 CDI',
+      vehiclePlate: '71두 3338',
+      clockIn: '09:00',
+      clockOut: '19:00',
+      customerServiceStart: '09:00',
+      customerServiceEnd: '19:00',
+      stops: [],
+      notes: '차량만 대여 10시간 (09:00~19:00)',
+    });
+
+    const reportD = upsertEventSettlementFromBookings({
+      reportId: 'rep-demo-scenario-d',
+      reportNo: 'DEMO-D-261028',
+      eventId: 'ev-demo-d',
+      customer: customerD,
+      eventName: '[DEMO/TEST] 시나리오 D — 예외·경계 조건 종합 검증 (종료시간 누락·초과요율 미등록·차량만 대여)',
+      eventDate: '2026. 10. 28 (수)',
+      location: '판교 노바테크 · 코엑스 · 수원 컨벤션',
+      bookings: bookingsD,
+      status: 'draft',
+      isDemoScenario: true,
+      demoScenarioCode: 'D',
+      adminNotes:
+        '시나리오 D: 1호차 종료시간 누락(서비스 시간 확인 필요) + 영어불일치 경고, 2호차 2시간 초과(초과요율 미등록으로 임의 가산 없음), 3호차 차량만 대여(60만원, 기사 인건비 0원).',
+    });
+
+    summaryLog.push(
+      `[시나리오 D 완료] 1호차 시간검증=${reportD.vehicles[0]?.isServiceTimeVerified ? '완료' : '확인필요'} / 2호차 미등록초과요금=₩${reportD.vehicles[1]?.overtimeFare} / 3호차 차량만대여 인건비=₩${reportD.vehicles[2]?.driverLaborCost}`
+    );
+  }
+
+  return {
+    executedScenarios,
+    reports: getSettlementReportsSnapshot(),
+    summaryLog,
+  };
+}
+
+

@@ -39,6 +39,8 @@ import {
   getSettlementReportsServerSnapshot,
   getSettlementReportsSnapshot,
   getVehiclePresetsSnapshot,
+  resetDemoPipelineData,
+  runDemoPipelineScenario,
   saveDriverProfiles,
   saveVehiclePresets,
   subscribeSettlementReports,
@@ -97,6 +99,8 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
   const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
   const [isContractModalOpen, setIsContractModalOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [demoLogs, setDemoLogs] = useState<string[]>([]);
+  const [confirmDirectCostsOnApprove, setConfirmDirectCostsOnApprove] = useState(false);
 
   // Contract Edit Form State
   const [editBaseHours, setEditBaseHours] = useState(10);
@@ -347,7 +351,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
           <button
             type="button"
             onClick={() => {
@@ -360,6 +364,76 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
             <span>기본 요금 프리셋 · 인건비 설정</span>
           </button>
         </div>
+      </div>
+
+      {/* 1-B. End-to-End Pipeline Scenario Generator & Automated Verification Runner (DEMO/TEST) */}
+      <div className="bg-slate-900 text-white rounded-2xl p-4 border border-slate-800 space-y-2.5 print:hidden">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="px-2 py-0.5 rounded bg-blue-600 text-white text-[10px] font-black tracking-wide">
+              DEMO / TEST 자동 검증
+            </span>
+            <span className="text-xs font-black text-white">
+              End-to-End 업무·정산 파이프라인 통합 시나리오 실행기
+            </span>
+            <span className="text-[11px] text-slate-400">
+              (고객사 등록 → 배차 → 운행일지 → 서비스/초과시간 → 영수증 검수 → 정산 초안 → 승인·출력)
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {(
+              [
+                { code: 'A', label: '시나리오 A (단일차량·영수증)' },
+                { code: 'B', label: '시나리오 B (복수3대·초과·대행사)' },
+                { code: 'C', label: '시나리오 C (수정·자동재계산)' },
+                { code: 'D', label: '시나리오 D (예외·경계조건)' },
+                { code: 'ALL', label: '전체 A~D 통합 실행' },
+              ] as const
+            ).map((btn) => (
+              <button
+                key={btn.code}
+                type="button"
+                onClick={() => {
+                  haptics.selection();
+                  const res = runDemoPipelineScenario(btn.code);
+                  setDemoLogs(res.summaryLog);
+                  const firstDemo = res.reports.find((r) => r.isDemoScenario);
+                  if (firstDemo) setSelectedReportId(firstDemo.id);
+                  showToast(`시나리오 ${btn.code} E2E 파이프라인 데이터 생성 및 정산 검증이 완료되었습니다.`);
+                }}
+                className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
+                  btn.code === 'ALL'
+                    ? 'bg-[#1E60F3] hover:bg-blue-500 text-white shadow-xs'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+                }`}
+              >
+                {btn.label}
+              </button>
+            ))}
+
+            <button
+              type="button"
+              onClick={() => {
+                haptics.lightTap();
+                resetDemoPipelineData();
+                setDemoLogs([]);
+                showToast('DEMO/TEST 시나리오 데이터가 초기화되었습니다.');
+              }}
+              className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-rose-950/80 hover:bg-rose-900 text-rose-200 border border-rose-800/70 cursor-pointer"
+            >
+              DEMO 초기화
+            </button>
+          </div>
+        </div>
+
+        {demoLogs.length > 0 && (
+          <div className="p-2.5 rounded-xl bg-slate-950/90 border border-slate-800 text-[11px] text-emerald-300 font-mono space-y-1">
+            {demoLogs.map((logLine, i) => (
+              <div key={i}>✓ {logLine}</div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 2. Section 8: 6 Admin Settlement & Profitability KPI Tiles (Hidden in Client Print) */}
@@ -822,15 +896,29 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                           </div>
                         )}
 
-                        <div className="p-2.5 rounded-xl bg-blue-50/60 border border-blue-200/80">
-                          <span className="text-[10px] text-[#1E60F3] font-bold block">
+                        <div
+                          className={`p-2.5 rounded-xl border ${
+                            v.isServiceTimeVerified
+                              ? 'bg-blue-50/60 border-blue-200/80'
+                              : 'bg-rose-50/80 border-rose-300'
+                          }`}
+                        >
+                          <span
+                            className={`text-[10px] font-bold block ${
+                              v.isServiceTimeVerified ? 'text-[#1E60F3]' : 'text-rose-700'
+                            }`}
+                          >
                             고객사 서비스 시작~종료
                           </span>
                           <span className="font-black text-slate-900 mt-0.5 block">
                             {v.customerServiceStart} ~ {v.customerServiceEnd}
                           </span>
-                          <span className="text-[10px] text-blue-700 font-semibold">
-                            정산 기준 시간
+                          <span
+                            className={`text-[10px] font-semibold ${
+                              v.isServiceTimeVerified ? 'text-blue-700' : 'text-rose-700'
+                            }`}
+                          >
+                            {v.isServiceTimeVerified ? '정산 기준 시간' : '서비스 시간 확인 필요'}
                           </span>
                         </div>
 
@@ -838,7 +926,11 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                           <span className="text-[10px] text-slate-400 font-bold block">
                             총 서비스 시간 (기본 {v.baseContractHours}h)
                           </span>
-                          <span className="font-black text-slate-900 mt-0.5 block">
+                          <span
+                            className={`font-black mt-0.5 block ${
+                              v.isServiceTimeVerified ? 'text-slate-900' : 'text-rose-600'
+                            }`}
+                          >
                             {v.customerServiceFormatted}
                           </span>
                           <span className="text-[10px] text-slate-500">
@@ -863,7 +955,9 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                             초과시간 요금
                           </span>
                           <span className="font-black text-slate-900 mt-0.5 block">
-                            {v.overtimeMinutes === 0
+                            {!v.isServiceTimeVerified
+                              ? '시간 확인 필요'
+                              : v.overtimeMinutes === 0
                               ? '₩0 (초과 없음)'
                               : v.isOvertimeRateConfirmed
                               ? formatKRW(v.overtimeFare)
@@ -908,13 +1002,13 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
 
                           <div>
                             <span className="text-[10px] text-slate-400 font-bold block">
-                              회사 부담 직접비 (C)
+                              차량 관련 직접비 (C)
                             </span>
                             <span className="font-black text-slate-200 mt-0.5 block">
                               {formatKRW(v.vehicleDirectCost + v.otherDirectCost)}
                             </span>
                             <span className="text-[10px] text-slate-400">
-                              고객 재청구 제외 비용
+                              보전실비 {formatKRW(v.reimbursableExpenseCost || 0)} + 자체부담 {formatKRW(v.companyDirectExpensesTotal)}
                             </span>
                           </div>
 
@@ -928,7 +1022,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                             <span className="text-[10px] text-slate-300">
                               {v.profitConfirmStatus === 'confirmed'
                                 ? '확정 직접이익'
-                                : '잠정 수익 (예상)'}
+                                : '잠정 손익 (일부 미확정)'}
                             </span>
                           </div>
 
@@ -946,13 +1040,24 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                         </div>
                       )}
 
-                      {/* Notices (English surcharge, overtime labor, driver notes) */}
+                      {/* Notices (Service time warning, English surcharge, overtime labor, driver notes) */}
                       {(v.notes ||
+                        v.serviceTimeWarning ||
                         (reportViewMode === 'admin_internal' &&
                           (v.englishSurchargeNotice ||
                             v.driverOvertimeLaborWarning ||
                             v.languageMismatchWarning))) && (
                         <div className="text-[11px] text-slate-600 space-y-1 pt-1">
+                          {v.serviceTimeWarning && (
+                            <p className="text-rose-600 font-bold">
+                              • ⚠️ {v.serviceTimeWarning}
+                            </p>
+                          )}
+                          {v.languageMismatchWarning && reportViewMode === 'admin_internal' && (
+                            <p className="text-rose-600 font-bold">
+                              • ⚠️ {v.languageMismatchWarning}
+                            </p>
+                          )}
                           {v.notes && (
                             <p className="font-medium text-slate-700">
                               • <strong>운행 특이사항:</strong> {v.notes}
@@ -1037,6 +1142,8 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                                     className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                                       exp.status === '승인 완료'
                                         ? 'bg-emerald-50 text-emerald-700'
+                                        : exp.status === '반려'
+                                        ? 'bg-rose-50 text-rose-700'
                                         : 'bg-amber-50 text-amber-700'
                                     }`}
                                   >
@@ -1116,7 +1223,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                       <span className="px-2 py-0.5 rounded bg-white text-[#1E60F3] font-black text-[10px] border border-blue-200">
                         {selectedReport.profitConfirmStatus === 'confirmed'
                           ? '확정 직접이익'
-                          : '잠정 수익 (예상)'}
+                          : '잠정 손익 (일부 미확정)'}
                       </span>
                     </div>
                     <div className="flex justify-between text-slate-600">
@@ -1132,7 +1239,9 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                       </span>
                     </div>
                     <div className="flex justify-between text-slate-600">
-                      <span>(-) 차량/기타 직접비 (회사 자체 부담분)</span>
+                      <span>
+                        (-) 차량/기타 직접비 (보전실비원가 {formatKRW(selectedReport.totalReimbursableExpenseCost || 0)} + 자체부담 {formatKRW(selectedReport.totalCompanyAbsorbedExpenseCost || 0)})
+                      </span>
                       <span className="font-bold text-rose-600">
                         -{formatKRW(selectedReport.totalVehicleDirectCost + selectedReport.totalOtherDirectCost)}
                       </span>
@@ -1175,11 +1284,24 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
 
               {/* Admin Approval Workflow Footer (Print Hidden) */}
               <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 print:hidden">
-                <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5">
-                  <Info className="w-4 h-4 text-[#1E60F3] shrink-0" />
-                  <span>
-                    관리자 검토·승인 완료 후에만 실제 청구서로 확정 및 고객사 외부 발송이 가능합니다.
-                  </span>
+                <div className="text-xs text-slate-500 font-medium flex flex-col gap-1">
+                  <div className="flex items-center gap-1.5">
+                    <Info className="w-4 h-4 text-[#1E60F3] shrink-0" />
+                    <span>
+                      관리자 검토·승인 완료 후에만 실제 청구서로 확정 및 고객사 외부 발송이 가능합니다.
+                    </span>
+                  </div>
+                  <label className="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={confirmDirectCostsOnApprove}
+                      onChange={(e) => setConfirmDirectCostsOnApprove(e.target.checked)}
+                      className="rounded border-slate-300 text-[#1E60F3]"
+                    />
+                    <span>
+                      기사 인건비 및 차량 직접원가 최종 확정 확인 (미체크 또는 미확정 항목 존재 시 &apos;잠정 손익&apos; 유지)
+                    </span>
+                  </label>
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
@@ -1198,7 +1320,12 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                     type="button"
                     onClick={() => {
                       haptics.successPulse();
-                      updateSettlementReportStatus(selectedReport.id, 'approved');
+                      updateSettlementReportStatus(
+                        selectedReport.id,
+                        'approved',
+                        undefined,
+                        confirmDirectCostsOnApprove
+                      );
                       showToast('정산 리포트 검토 및 승인이 완료되어 고객사 청구서 발행이 활성화되었습니다.');
                     }}
                     className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-xs"
@@ -1534,3 +1661,4 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
 };
 
 export default HqReportsView;
+

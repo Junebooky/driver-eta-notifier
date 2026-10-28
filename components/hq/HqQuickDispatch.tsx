@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useSyncExternalStore } from 'react';
 import {
   Car,
   Calendar,
@@ -32,9 +32,17 @@ import {
   calculateDriverLaborCost,
   createBookingPricingSnapshot,
   DEFAULT_DRIVER_PROFILES,
+  DEFAULT_VEHICLE_PRICING_PRESETS,
   getSortedDriversForLanguage,
   resolveEffectivePricingTerms,
 } from '@/utils/settlementCalculator';
+import {
+  getDriverProfilesSnapshot,
+  getHqCustomersSnapshot,
+  getVehiclePresetsSnapshot,
+  subscribeSettlementReports,
+  upsertEventSettlementFromBookings,
+} from '@/utils/settlementStorage';
 import { formatKRW } from '@/utils/expense';
 
 export interface HqQuickDispatchProps {
@@ -123,11 +131,28 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
   // 4. UI feedback
   const [notificationMsg, setNotificationMsg] = useState<string | null>(null);
 
+  // Live store subscriptions for presets, driver language qualifications, and customers
+  const liveVehiclePresets = useSyncExternalStore(
+    subscribeSettlementReports,
+    getVehiclePresetsSnapshot,
+    () => DEFAULT_VEHICLE_PRICING_PRESETS
+  );
+  const liveDriverProfiles = useSyncExternalStore(
+    subscribeSettlementReports,
+    getDriverProfilesSnapshot,
+    () => DEFAULT_DRIVER_PROFILES
+  );
+  const liveCustomers = useSyncExternalStore(
+    subscribeSettlementReports,
+    getHqCustomersSnapshot,
+    () => INITIAL_HQ_CUSTOMERS
+  );
+
   // Selected customer object
   const selectedCustomerObj = useMemo(() => {
     if (!selectedCustomerId) return null;
-    return INITIAL_HQ_CUSTOMERS.find((c) => c.id === selectedCustomerId) || null;
-  }, [selectedCustomerId]);
+    return liveCustomers.find((c) => c.id === selectedCustomerId) || null;
+  }, [selectedCustomerId, liveCustomers]);
 
   // Close customer dropdown on outside click
   useEffect(() => {
@@ -146,16 +171,16 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
   // Filter customers matching input
   const filteredCustomerSuggestions = useMemo(() => {
     if (!customerName.trim()) {
-      return INITIAL_HQ_CUSTOMERS.slice(0, 6);
+      return liveCustomers.slice(0, 6);
     }
     const q = customerName.toLowerCase();
-    return INITIAL_HQ_CUSTOMERS.filter(
+    return liveCustomers.filter(
       (c) =>
         c.name.toLowerCase().includes(q) ||
-        c.primaryContactName.toLowerCase().includes(q) ||
-        c.department.toLowerCase().includes(q)
+        (c.primaryContactName || '').toLowerCase().includes(q) ||
+        (c.department || '').toLowerCase().includes(q)
     ).slice(0, 8);
-  }, [customerName]);
+  }, [customerName, liveCustomers]);
 
   // Handle selecting a customer from Customer Management Data
   const handleSelectCustomer = (customer: HqCustomer) => {
@@ -178,7 +203,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
     }
 
     // Auto-detect if customer prefers English-capable driver
-    const prefersEnglish = customer.preferences.some((p) => p.includes('영어'));
+    const prefersEnglish = (customer.preferences || []).some((p) => p.includes('영어'));
     if (prefersEnglish) {
       setCommonLanguage('en');
       setAllocations((prev) =>
@@ -235,7 +260,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
 
         // Auto-select matching vehicle if driver is selected
         if (field === 'selectedDriver') {
-          const drv = DEFAULT_DRIVER_PROFILES.find(
+          const drv = liveDriverProfiles.find(
             (d) => `${d.name} 기사` === value || d.name === value || d.id === value
           );
           if (drv) {
@@ -293,7 +318,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
       for (const alloc of allocations) {
         if (alloc.serviceMode === 'with_driver' && alloc.requestedLanguage === 'en' && alloc.selectedDriver) {
           const cleanName = alloc.selectedDriver.replace(/\s*기사$/, '').trim();
-          const drv = DEFAULT_DRIVER_PROFILES.find((d) => d.name === cleanName);
+          const drv = liveDriverProfiles.find((d) => d.name === cleanName);
           if (drv && !drv.isEnglishVerified && !alloc.languageOverrideConfirmed) {
             alert(
               `${alloc.vehicleIndex}호차: 영어 가능 기사가 요청되었으나 한국어 전용 기사(${drv.name})가 선택되었습니다.\n영어가 가능한 기사로 변경하거나 '관리자 예외 배정 확인'을 체크해 주세요.`
@@ -306,6 +331,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
 
     const totalVehicles = allocations.length;
     const isMultiVehicleGroup = totalVehicles > 1;
+    const sharedEventId = `ev-${Date.now()}`;
     const sharedGroupId = isMultiVehicleGroup ? `grp-${Date.now()}` : undefined;
     const sharedGroupName =
       groupEventTitle.trim() ||
@@ -314,7 +340,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
     const createdBookings: Partial<HqBooking>[] = allocations.map((alloc, idx) => {
       const vehicleNum = idx + 1;
       const cleanDriverName = alloc.selectedDriver.replace(/\s*기사$/, '').trim();
-      const matchedDriver = DEFAULT_DRIVER_PROFILES.find(
+      const matchedDriver = liveDriverProfiles.find(
         (d) => d.name === cleanDriverName || d.id === cleanDriverName
       );
       const matchedVehicle = VEHICLE_OPTIONS.find(
@@ -358,20 +384,25 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
         .filter(Boolean)
         .join(' / ');
 
-      // Capture immutable pricing snapshot at dispatch time
+      // Capture immutable pricing snapshot at dispatch time using live presets & driver profiles
       const pricingSnapshot = createBookingPricingSnapshot({
         vehicleModel: resolvedModel,
         driverName: cleanDriverName,
         serviceMode: alloc.serviceMode,
         requestedLanguage: alloc.requestedLanguage,
         customer: selectedCustomerObj,
+        vehiclePresets: liveVehiclePresets,
+        driverProfiles: liveDriverProfiles,
       });
 
       return {
+        id: `b-live-${Date.now()}-${vehicleNum}`,
+        bookingNo: `#261028-${String(vehicleNum).padStart(3, '0')}`,
         customerName: customerName.trim() || '신규 고객 예약',
-        customerId: selectedCustomerId || undefined,
+        customerId: selectedCustomerId || `cust-${Date.now()}`,
         orderingAgency: orderingAgency.trim() || undefined,
         endBrand: endBrand.trim() || customerName.trim() || undefined,
+        eventId: sharedEventId,
         eventName: sharedGroupName,
         billingTarget: orderingAgency.trim() ? billingTarget : 'end_brand',
         billingTargetName:
@@ -385,7 +416,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
         driverName:
           alloc.serviceMode === 'vehicle_only'
             ? '차량만 대여'
-            : alloc.selectedDriver || '-',
+            : cleanDriverName || alloc.selectedDriver || '-',
         driverPhone: matchedDriver?.phone,
         driverIsEnglishVerified: matchedDriver?.isEnglishVerified,
         vehicleModel: resolvedModel,
@@ -413,6 +444,44 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
         serviceMode: alloc.serviceMode,
         appliedPricingSnapshot: pricingSnapshot,
       };
+    });
+
+    // Automatically generate & sync an invoice draft (EventSettlementReport) in settlementStorage
+    const fallbackCustomer: HqCustomer = selectedCustomerObj || {
+      id: selectedCustomerId || `cust-${Date.now()}`,
+      name: customerName.trim() || '신규 고객사',
+      tier: 'VIP',
+      isFavorite: false,
+      primaryContactName: '전담 담당자',
+      contactCountExtra: 0,
+      recentSnippet: '신규 배차 생성',
+      mainPhone: '010-0000-0000',
+      mainEmail: 'vip@viplimo.co.kr',
+      department: '기업 의전팀',
+      preferences: [],
+      notes: [],
+      recentRequests: [],
+      contacts: [],
+      eventsHistory: [],
+      tripsHistory: [],
+      communications: [],
+    };
+
+    upsertEventSettlementFromBookings({
+      reportId: `rep-${sharedEventId}`,
+      eventId: sharedEventId,
+      customer: fallbackCustomer,
+      eventName: sharedGroupName,
+      eventDate: '2026. 10. 26 (월)',
+      location: pickupLocation || '서울 강남',
+      bookings: createdBookings as HqBooking[],
+      orderingAgency: orderingAgency.trim() || undefined,
+      billingTarget: orderingAgency.trim() ? billingTarget : 'end_brand',
+      billingTargetName:
+        orderingAgency.trim() && billingTarget === 'ordering_agency'
+          ? `${orderingAgency.trim()} 귀하`
+          : `${fallbackCustomer.name} 귀하`,
+      status: 'draft',
     });
 
     haptics.successPulse();
@@ -788,9 +857,12 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
             {/* List of Allocation Cards */}
             <div className="space-y-2.5">
               {allocations.map((alloc, idx) => {
-                const sortedDrivers = getSortedDriversForLanguage(alloc.requestedLanguage);
+                const sortedDrivers = getSortedDriversForLanguage(
+                  alloc.requestedLanguage,
+                  liveDriverProfiles
+                );
                 const cleanSelectedDriver = alloc.selectedDriver.replace(/\s*기사$/, '').trim();
-                const selectedDriverObj = DEFAULT_DRIVER_PROFILES.find(
+                const selectedDriverObj = liveDriverProfiles.find(
                   (d) => d.name === cleanSelectedDriver
                 );
                 const hasLanguageMismatch =
@@ -805,6 +877,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                     alloc.selectedVehicleModel || selectedDriverObj?.defaultVehicleRaw,
                   serviceMode: alloc.serviceMode,
                   customerContractTerms: selectedCustomerObj?.contractTerms,
+                  vehiclePresets: liveVehiclePresets,
                 });
 
                 const previewLabor = calculateDriverLaborCost({
@@ -812,6 +885,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                   vehicleModel:
                     alloc.selectedVehicleModel || selectedDriverObj?.defaultVehicleRaw,
                   serviceMode: alloc.serviceMode,
+                  profiles: liveDriverProfiles,
                 });
 
                 return (

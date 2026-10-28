@@ -597,11 +597,25 @@ export const INITIAL_HQ_DRIVING_LOGS: HqDrivingLog[] = [
   },
 ];
 
+let memoryDrivingLogs: HqDrivingLog[] = [...INITIAL_HQ_DRIVING_LOGS];
+
+export const saveHqDrivingLogs = (logs: HqDrivingLog[]): void => {
+  memoryDrivingLogs = logs;
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(HQ_DRIVING_LOGS_STORAGE_KEY, JSON.stringify(logs));
+      window.dispatchEvent(new CustomEvent(HQ_LOGS_UPDATE_EVENT, { detail: { count: logs.length } }));
+    } catch (e) {
+      console.warn('Failed to save HQ driving logs to localStorage:', e);
+    }
+  }
+};
+
 /**
  * Get all HQ driving logs, merged with user-submitted driver logs and synced with driver expenses
  */
 export const getHqDrivingLogs = (): HqDrivingLog[] => {
-  if (typeof window === 'undefined') return INITIAL_HQ_DRIVING_LOGS;
+  if (typeof window === 'undefined') return memoryDrivingLogs;
 
   try {
     const raw = localStorage.getItem(HQ_DRIVING_LOGS_STORAGE_KEY);
@@ -614,13 +628,19 @@ export const getHqDrivingLogs = (): HqDrivingLog[] => {
     const hqExpenses = getHqExpenses();
     let isModified = false;
 
-    // 1. Sync expenses for any matching driver or vehicle in existing logs
+    // 1. Sync expenses for any matching booking, driver, or vehicle in existing logs
     logs = logs.map((log) => {
-      const driverExps = hqExpenses.filter(
-        (e) =>
+      const driverExps = hqExpenses.filter((e) => {
+        if (log.bookingId && e.bookingId) {
+          return e.bookingId === log.bookingId;
+        }
+        if (log.bookingId && !e.bookingId) return false;
+        if (!log.bookingId && e.bookingId) return false;
+        return (
           e.driverName === log.driverName ||
           (Boolean(log.vehiclePlate) && Boolean(e.vehiclePlate) && e.vehiclePlate === log.vehiclePlate)
-      );
+        );
+      });
 
       if (driverExps.length > 0) {
         const totalAmount = driverExps.reduce((sum, e) => sum + e.amount, 0);
@@ -637,11 +657,11 @@ export const getHqDrivingLogs = (): HqDrivingLog[] => {
       return log;
     });
 
-    // 2. If '윤태준' has submitted expenses but does not yet have a driving log row, automatically create one
+    // 2. If '윤태준' has submitted legacy expenses (without bookingId) but does not yet have a legacy driving log row, automatically create one
     const yoonExpenses = hqExpenses.filter(
-      (e) => e.driverName === '윤태준' || e.vehiclePlate === '116허 1514'
+      (e) => !e.bookingId && (e.driverName === '윤태준' || e.vehiclePlate === '116허 1514')
     );
-    const hasYoonLog = logs.some((l) => l.driverName === '윤태준');
+    const hasYoonLog = logs.some((l) => !l.bookingId && l.driverName === '윤태준');
 
     if (yoonExpenses.length > 0 && !hasYoonLog) {
       const yoonTotal = yoonExpenses.reduce((sum, e) => sum + e.amount, 0);
@@ -701,6 +721,7 @@ export const getHqDrivingLogs = (): HqDrivingLog[] => {
       localStorage.setItem(HQ_DRIVING_LOGS_STORAGE_KEY, JSON.stringify(logs));
     }
 
+    memoryDrivingLogs = logs;
     return logs;
   } catch (err) {
     console.error('Failed to parse and sync HQ driving logs from storage:', err);
@@ -724,7 +745,7 @@ export const subscribeHqDrivingLogs = (callback: () => void): (() => void) => {
 };
 
 export const getHqDrivingLogsSnapshot = (): HqDrivingLog[] => {
-  if (typeof window === 'undefined') return INITIAL_HQ_DRIVING_LOGS;
+  if (typeof window === 'undefined') return memoryDrivingLogs;
   try {
     const raw = localStorage.getItem(HQ_DRIVING_LOGS_STORAGE_KEY);
     if (raw && raw === cachedLogsRaw) return cachedLogsSnapshot;
@@ -743,6 +764,7 @@ export const getHqDrivingLogsServerSnapshot = (): HqDrivingLog[] => {
 
 /**
  * Save driver-submitted log from Cockpit to HQ driving logs list
+ * Supports multiple events on the same day by the same driver via distinct bookingId/eventId (Scenario D-4)
  */
 export const submitDriverLogToHq = (newLog: Partial<HqDrivingLog>): HqDrivingLog => {
   const currentLogs = getHqDrivingLogs();
@@ -759,9 +781,16 @@ export const submitDriverLogToHq = (newLog: Partial<HqDrivingLog>): HqDrivingLog
 
   if (expenseAmount === 0) {
     try {
-      const expenses = getHqExpenses().filter(
-        (e) => e.driverName === targetDriver || (Boolean(targetPlate) && e.vehiclePlate === targetPlate)
-      );
+      const expenses = getHqExpenses().filter((e) => {
+        if (newLog.bookingId && e.bookingId) {
+          return e.bookingId === newLog.bookingId;
+        }
+        if (newLog.bookingId && !e.bookingId) return false;
+        return (
+          e.driverName === targetDriver ||
+          (Boolean(targetPlate) && e.vehiclePlate === targetPlate)
+        );
+      });
       if (expenses.length > 0) {
         expenseAmount = expenses.reduce((sum, e) => sum + e.amount, 0);
         expenseCount = expenses.length;
@@ -772,37 +801,49 @@ export const submitDriverLogToHq = (newLog: Partial<HqDrivingLog>): HqDrivingLog
   }
 
   const fullLog: HqDrivingLog = {
-    id: newLog.id || `driver-sub-${Date.now()}`,
+    id: newLog.id || `driver-sub-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     no: 1, // Will re-index below
-    submittedAt: timeStr,
-    submittedDate: dateStr,
-    drivingDate: `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}`,
+    submittedAt: newLog.submittedAt || timeStr,
+    submittedDate: newLog.submittedDate || dateStr,
+    drivingDate:
+      newLog.drivingDate ||
+      `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}`,
     rawDate: newLog.rawDate || now.toISOString().split('T')[0],
     driverName: targetDriver,
     customerName: newLog.customerName || '인터코스',
+    customerId: newLog.customerId,
+    bookingId: newLog.bookingId,
+    eventId: newLog.eventId,
     vehicleModel: newLog.vehicleModel || '현대 스타리아 리무진',
     vehiclePlate: targetPlate,
     clockIn: newLog.clockIn || '06:40',
     clockOut: newLog.clockOut || '21:50',
+    garageDepartureTime: newLog.garageDepartureTime,
+    customerServiceStart: newLog.customerServiceStart,
+    customerServiceEnd: newLog.customerServiceEnd,
+    garageArrivalTime: newLog.garageArrivalTime,
     totalDutyHours: newLog.totalDutyHours || '15시간 10분',
     startKm: newLog.startKm || '154,725',
     endKm: newLog.endKm || '154,861',
     distanceKm: newLog.distanceKm || '136 km',
     expenseAmount,
     expenseCount,
-    status: '검토 대기',
-    stops: newLog.stops && newLog.stops.length > 0 ? newLog.stops : [
-      { id: 'd-1', time: '07:00', place: '차고지' },
-      { id: 'd-2', time: '08:50', place: '메리어트 호텔' },
-      { id: 'd-3', time: '09:50', place: '판교 오피스' },
-      { id: 'd-4', time: '11:25', place: '메리어트 호텔' },
-      { id: 'd-5', time: '13:30', place: '판교 오피스' },
-      { id: 'd-6', time: '17:05', place: '강남 올리브영' },
-      { id: 'd-7', time: '21:30', place: '메리어트 호텔' },
-      { id: 'd-8', time: '21:45', place: '차고지' },
-    ],
+    status: newLog.status || '검토 대기',
+    stops:
+      newLog.stops !== undefined
+        ? newLog.stops
+        : [
+            { id: 'd-1', time: '07:00', place: '차고지' },
+            { id: 'd-2', time: '08:50', place: '메리어트 호텔' },
+            { id: 'd-3', time: '09:50', place: '판교 오피스' },
+            { id: 'd-4', time: '11:25', place: '메리어트 호텔' },
+            { id: 'd-5', time: '13:30', place: '판교 오피스' },
+            { id: 'd-6', time: '17:05', place: '강남 올리브영' },
+            { id: 'd-7', time: '21:30', place: '메리어트 호텔' },
+            { id: 'd-8', time: '21:45', place: '차고지' },
+          ],
     notes: newLog.notes || '',
-    reviewHistory: [
+    reviewHistory: newLog.reviewHistory || [
       {
         id: `h-init-${Date.now()}`,
         time: timeStr,
@@ -814,18 +855,61 @@ export const submitDriverLogToHq = (newLog: Partial<HqDrivingLog>): HqDrivingLog
     isDriverSubmitted: true,
   };
 
-  // Prepend new submission and re-index `no`
-  const updatedLogs = [fullLog, ...currentLogs.filter((l) => l.id !== fullLog.id && l.driverName !== targetDriver)].map((item, idx) => ({
+  // Replace only if exact id or exact bookingId matches; allow same driver to have multiple logs for different bookings/events
+  const updatedLogs = [
+    fullLog,
+    ...currentLogs.filter((l) => {
+      if (l.id === fullLog.id) return false;
+      if (fullLog.bookingId && l.bookingId && l.bookingId === fullLog.bookingId) return false;
+      if (!fullLog.bookingId && !l.bookingId && l.driverName === targetDriver && l.rawDate === fullLog.rawDate) {
+        return false;
+      }
+      return true;
+    }),
+  ].map((item, idx) => ({
     ...item,
     no: idx + 1,
   }));
 
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(HQ_DRIVING_LOGS_STORAGE_KEY, JSON.stringify(updatedLogs));
-    window.dispatchEvent(new CustomEvent(HQ_LOGS_UPDATE_EVENT, { detail: fullLog }));
-  }
-
+  saveHqDrivingLogs(updatedLogs);
   return fullLog;
+};
+
+/**
+ * Update Driving Log fields (e.g., customerServiceStart, customerServiceEnd, stops, vehiclePlate, driverName)
+ */
+export const updateHqDrivingLog = (
+  logId: string,
+  patch: Partial<HqDrivingLog>,
+  actor: string = '본사 관리자'
+): HqDrivingLog | null => {
+  const currentLogs = getHqDrivingLogs();
+  const index = currentLogs.findIndex((l) => l.id === logId);
+  if (index === -1) return null;
+
+  const now = new Date();
+  const timeStr = `${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+  const existing = currentLogs[index];
+  const updatedLog: HqDrivingLog = {
+    ...existing,
+    ...patch,
+    reviewHistory: [
+      {
+        id: `audit-edit-${Date.now()}`,
+        time: timeStr,
+        message: `${actor}가 운행일지 데이터를 수정했습니다.`,
+        actor,
+        actionType: 'submission',
+      },
+      ...(existing.reviewHistory || []),
+    ],
+  };
+
+  const nextLogs = [...currentLogs];
+  nextLogs[index] = updatedLog;
+  saveHqDrivingLogs(nextLogs);
+  return updatedLog;
 };
 
 /**
@@ -873,11 +957,7 @@ export const updateHqDrivingLogStatus = (
     };
   });
 
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(HQ_DRIVING_LOGS_STORAGE_KEY, JSON.stringify(updatedLogs));
-    window.dispatchEvent(new CustomEvent(HQ_LOGS_UPDATE_EVENT, { detail: { logId, newStatus } }));
-  }
-
+  saveHqDrivingLogs(updatedLogs);
   return updatedLogs;
 };
 
