@@ -20,6 +20,7 @@ import { HqCustomer } from '@/types/customerHq';
 import {
   CUSTOMER_TRIGGER_LABELS,
   generateCustomerNotificationDraft,
+  formatSmsAppUrl,
 } from '@/utils/customerMessageGenerator';
 
 interface HqCustomerMessageModalProps {
@@ -59,6 +60,19 @@ export default function HqCustomerMessageModal({
     message: string;
   } | null>(null);
 
+  const phoneInputRef = useRef<HTMLInputElement>(null);
+  const emailInputRef = useRef<HTMLInputElement>(null);
+
+  // Identity ref to initialize only when a NEW booking opens
+  const activeBookingKeyRef = useRef<string | null>(null);
+
+  // Flags to prevent background polling or state rerenders from wiping user input
+  const isPhoneEditedRef = useRef(false);
+  const isEmailEditedRef = useRef(false);
+  const isSmsBodyEditedRef = useRef(false);
+  const isEmailBodyEditedRef = useRef(false);
+  const isEmailSubjectEditedRef = useRef(false);
+
   const matchedCustomer = useMemo(() => {
     if (!booking) return null;
     if (booking.customerId) {
@@ -66,15 +80,56 @@ export default function HqCustomerMessageModal({
       if (byId) return byId;
     }
     const cleanName = (booking.customerName || '').trim().toLowerCase();
-    return (
-      customers.find(
-        (c) => c.name.trim().toLowerCase() === cleanName
-      ) || null
-    );
+    if (!cleanName) return null;
+
+    // 1. Exact match
+    const exact = customers.find((c) => c.name.trim().toLowerCase() === cleanName);
+    if (exact) return exact;
+
+    // 2. Fuzzy substring match (e.g. "Ferrari Korea" <-> "Ferrari", "BMW Korea" <-> "BMW")
+    const fuzzy = customers.find((c) => {
+      const cName = c.name.trim().toLowerCase();
+      return cleanName.includes(cName) || cName.includes(cleanName);
+    });
+    if (fuzzy) return fuzzy;
+
+    // 3. Fallback to endBrand
+    if (booking.endBrand) {
+      const bBrand = booking.endBrand.trim().toLowerCase();
+      const byBrand = customers.find((c) => {
+        const cName = c.name.trim().toLowerCase();
+        return bBrand.includes(cName) || cName.includes(bBrand);
+      });
+      if (byBrand) return byBrand;
+    }
+    return null;
   }, [booking, customers]);
 
+  // Initialize draft when modal opens for a new booking
   useEffect(() => {
-    if (!booking || !isOpen) return;
+    if (!booking || !isOpen) {
+      activeBookingKeyRef.current = null;
+      isPhoneEditedRef.current = false;
+      isEmailEditedRef.current = false;
+      isSmsBodyEditedRef.current = false;
+      isEmailBodyEditedRef.current = false;
+      isEmailSubjectEditedRef.current = false;
+      return;
+    }
+
+    const bookingKey = booking.scheduleId || booking.id;
+    // If already initialized for this exact booking, do NOT wipe user edits on background polls!
+    if (activeBookingKeyRef.current === bookingKey) {
+      return;
+    }
+
+    activeBookingKeyRef.current = bookingKey;
+    isPhoneEditedRef.current = false;
+    isEmailEditedRef.current = false;
+    isSmsBodyEditedRef.current = false;
+    isEmailBodyEditedRef.current = false;
+    isEmailSubjectEditedRef.current = false;
+
     const defaultTrigger: CustomerNotificationTrigger =
       initialTrigger ||
       booking.pendingCustomerTrigger ||
@@ -89,26 +144,70 @@ export default function HqCustomerMessageModal({
     setLanguage(defaultLang);
     setFeedback(null);
     setCopiedFlag(false);
-  }, [booking, isOpen, initialTrigger]);
 
-  const generatedDraft = useMemo(() => {
+    const initialDraft = generateCustomerNotificationDraft({
+      booking,
+      trigger: defaultTrigger,
+      language: defaultLang,
+      customerRecord: matchedCustomer,
+    });
+
+    setRecipientPhone(initialDraft.recipientPhone || '');
+    setRecipientEmail(initialDraft.recipientEmail || '');
+    setEmailSubject(initialDraft.emailSubject || '');
+    setEmailBody(initialDraft.emailBody || '');
+    setSmsBody(initialDraft.smsBody || '');
+  }, [booking, isOpen, initialTrigger, matchedCustomer]);
+
+  const handleSelectTrigger = (nextTrigger: CustomerNotificationTrigger) => {
+    setTrigger(nextTrigger);
+    if (!booking) return;
+    const nextDraft = generateCustomerNotificationDraft({
+      booking,
+      trigger: nextTrigger,
+      language,
+      customerRecord: matchedCustomer,
+    });
+    if (!isSmsBodyEditedRef.current) setSmsBody(nextDraft.smsBody);
+    if (!isEmailBodyEditedRef.current) setEmailBody(nextDraft.emailBody);
+    if (!isEmailSubjectEditedRef.current) setEmailSubject(nextDraft.emailSubject);
+    if (!isPhoneEditedRef.current && !recipientPhone.trim() && nextDraft.recipientPhone) {
+      setRecipientPhone(nextDraft.recipientPhone);
+    }
+    if (!isEmailEditedRef.current && !recipientEmail.trim() && nextDraft.recipientEmail) {
+      setRecipientEmail(nextDraft.recipientEmail);
+    }
+  };
+
+  const handleSelectLanguage = (nextLang: 'ko' | 'en') => {
+    setLanguage(nextLang);
+    if (!booking) return;
+    const nextDraft = generateCustomerNotificationDraft({
+      booking,
+      trigger,
+      language: nextLang,
+      customerRecord: matchedCustomer,
+    });
+    if (!isSmsBodyEditedRef.current) setSmsBody(nextDraft.smsBody);
+    if (!isEmailBodyEditedRef.current) setEmailBody(nextDraft.emailBody);
+    if (!isEmailSubjectEditedRef.current) setEmailSubject(nextDraft.emailSubject);
+    if (!isPhoneEditedRef.current && !recipientPhone.trim() && nextDraft.recipientPhone) {
+      setRecipientPhone(nextDraft.recipientPhone);
+    }
+    if (!isEmailEditedRef.current && !recipientEmail.trim() && nextDraft.recipientEmail) {
+      setRecipientEmail(nextDraft.recipientEmail);
+    }
+  };
+
+  const missingFieldsWarning = useMemo(() => {
     if (!booking) return null;
     return generateCustomerNotificationDraft({
       booking,
       trigger,
       language,
       customerRecord: matchedCustomer,
-    });
+    }).missingFieldsWarning;
   }, [booking, trigger, language, matchedCustomer]);
-
-  useEffect(() => {
-    if (!generatedDraft) return;
-    setRecipientPhone(generatedDraft.recipientPhone);
-    setRecipientEmail(generatedDraft.recipientEmail);
-    setEmailSubject(generatedDraft.emailSubject);
-    setEmailBody(generatedDraft.emailBody);
-    setSmsBody(generatedDraft.smsBody);
-  }, [generatedDraft]);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -181,6 +280,7 @@ export default function HqCustomerMessageModal({
     setSubmitting(true);
     setFeedback(null);
     try {
+      const recipientVal = channel === 'sms' ? recipientPhone.trim() : recipientEmail.trim();
       const res = await fetch('/api/schedules/customer-notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -190,7 +290,9 @@ export default function HqCustomerMessageModal({
           trigger,
           channel,
           language,
-          recipient: channel === 'sms' ? recipientPhone : recipientEmail,
+          recipient:
+            recipientVal ||
+            (channel === 'sms' ? '고객사/탑승객 연락처(수동발송)' : '고객사 이메일(수동발송)'),
           subject: channel === 'email' ? emailSubject : undefined,
           body: channel === 'sms' ? smsBody : emailBody,
           deliveryMethod,
@@ -204,7 +306,10 @@ export default function HqCustomerMessageModal({
       }
       setFeedback({
         type: 'success',
-        message: '고객사 안내 메시지 발송 완료 내역이 Supabase에 기록되었으며 대기 알림이 해제되었습니다.',
+        message:
+          deliveryMethod === 'sms_app'
+            ? `${recipientVal || '수신처'} 번호로 문자앱을 열었으며 발송 이력이 Supabase에 기록되었습니다.`
+            : '고객사 안내 메시지 발송 완료 내역이 Supabase에 기록되었으며 대기 알림이 해제되었습니다.',
       });
       onSentSuccess?.();
     } catch (err: any) {
@@ -274,9 +379,23 @@ export default function HqCustomerMessageModal({
     }
   };
 
-  const cleanSmsHref = recipientPhone
-    ? `sms:${recipientPhone.replace(/[^0-9+]/g, '')}?body=${encodeURIComponent(smsBody)}`
-    : `sms:?body=${encodeURIComponent(smsBody)}`;
+  const cleanSmsHref = useMemo(() => {
+    return formatSmsAppUrl(recipientPhone, smsBody);
+  }, [recipientPhone, smsBody]);
+
+  const handleOpenSmsAppClick = async (e: React.MouseEvent<HTMLAnchorElement>) => {
+    const cleanDigits = recipientPhone.replace(/[^0-9+]/g, '');
+    if (!cleanDigits) {
+      e.preventDefault();
+      setFeedback({
+        type: 'warning',
+        message: '수신 연락처(전화번호)를 먼저 입력해주세요. 번호가 있어야 문자앱으로 바로 전송할 수 있습니다.',
+      });
+      phoneInputRef.current?.focus();
+      return;
+    }
+    await handleRecordSent('sms_app');
+  };
 
   const historyList = booking.customerNotifications || [];
 
@@ -353,7 +472,7 @@ export default function HqCustomerMessageModal({
                   <button
                     key={t}
                     type="button"
-                    onClick={() => setTrigger(t)}
+                    onClick={() => handleSelectTrigger(t)}
                     className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors cursor-pointer ${
                       isSelected
                         ? 'bg-indigo-600 text-white shadow-xs'
@@ -370,7 +489,7 @@ export default function HqCustomerMessageModal({
             <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5">
               <button
                 type="button"
-                onClick={() => setLanguage('ko')}
+                onClick={() => handleSelectLanguage('ko')}
                 className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-bold cursor-pointer ${
                   language === 'ko' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600'
                 }`}
@@ -379,7 +498,7 @@ export default function HqCustomerMessageModal({
               </button>
               <button
                 type="button"
-                onClick={() => setLanguage('en')}
+                onClick={() => handleSelectLanguage('en')}
                 className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-bold cursor-pointer ${
                   language === 'en' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600'
                 }`}
@@ -390,10 +509,10 @@ export default function HqCustomerMessageModal({
             </div>
           </div>
 
-          {generatedDraft?.missingFieldsWarning && (
+          {missingFieldsWarning && (
             <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs font-bold text-amber-900">
               <AlertCircle className="h-4 w-4 shrink-0 text-amber-600" />
-              <span>{generatedDraft.missingFieldsWarning} — 발송 전 내용을 반드시 확인해주세요.</span>
+              <span>{missingFieldsWarning} — 발송 전 내용을 반드시 확인해주세요.</span>
             </div>
           )}
 
@@ -433,9 +552,13 @@ export default function HqCustomerMessageModal({
                   수신 연락처 (고객사 담당자 / 탑승객 휴대폰)
                 </label>
                 <input
+                  ref={phoneInputRef}
                   type="tel"
                   value={recipientPhone}
-                  onChange={(e) => setRecipientPhone(e.target.value)}
+                  onChange={(e) => {
+                    setRecipientPhone(e.target.value);
+                    isPhoneEditedRef.current = true;
+                  }}
                   placeholder="예: 010-1234-5678"
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium focus:border-indigo-500 focus:outline-hidden"
                 />
@@ -450,7 +573,10 @@ export default function HqCustomerMessageModal({
                 <textarea
                   rows={7}
                   value={smsBody}
-                  onChange={(e) => setSmsBody(e.target.value)}
+                  onChange={(e) => {
+                    setSmsBody(e.target.value);
+                    isSmsBodyEditedRef.current = true;
+                  }}
                   className="w-full rounded-xl border border-slate-300 bg-slate-50/50 p-3 text-xs leading-relaxed font-medium text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-hidden"
                 />
               </div>
@@ -462,9 +588,13 @@ export default function HqCustomerMessageModal({
                   수신 이메일 주소
                 </label>
                 <input
+                  ref={emailInputRef}
                   type="email"
                   value={recipientEmail}
-                  onChange={(e) => setRecipientEmail(e.target.value)}
+                  onChange={(e) => {
+                    setRecipientEmail(e.target.value);
+                    isEmailEditedRef.current = true;
+                  }}
                   placeholder="customer@company.com"
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium focus:border-indigo-500 focus:outline-hidden"
                 />
@@ -476,7 +606,10 @@ export default function HqCustomerMessageModal({
                 <input
                   type="text"
                   value={emailSubject}
-                  onChange={(e) => setEmailSubject(e.target.value)}
+                  onChange={(e) => {
+                    setEmailSubject(e.target.value);
+                    isEmailSubjectEditedRef.current = true;
+                  }}
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold text-slate-900 focus:border-indigo-500 focus:outline-hidden"
                 />
               </div>
@@ -487,7 +620,10 @@ export default function HqCustomerMessageModal({
                 <textarea
                   rows={9}
                   value={emailBody}
-                  onChange={(e) => setEmailBody(e.target.value)}
+                  onChange={(e) => {
+                    setEmailBody(e.target.value);
+                    isEmailBodyEditedRef.current = true;
+                  }}
                   className="w-full rounded-xl border border-slate-300 bg-slate-50/50 p-3 text-xs leading-relaxed font-medium text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-hidden"
                 />
               </div>
@@ -583,7 +719,7 @@ export default function HqCustomerMessageModal({
               <>
                 <a
                   href={cleanSmsHref}
-                  onClick={() => handleRecordSent('sms_app')}
+                  onClick={handleOpenSmsAppClick}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-xs font-extrabold text-white hover:bg-emerald-700"
                 >
                   <Smartphone className="h-3.5 w-3.5" />

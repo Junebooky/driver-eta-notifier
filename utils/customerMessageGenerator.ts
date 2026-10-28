@@ -22,6 +22,40 @@ export const CUSTOMER_TRIGGER_LABELS: Record<CustomerNotificationTrigger, string
   arrived_pickup: '픽업지 도착 안내',
 };
 
+export function extractPhoneFromString(text?: string | null): string | null {
+  if (!text) return null;
+  const match = text.match(/(?:01[0-9]|02|0[3-9][0-9])-?[0-9]{3,4}-?[0-9]{4}|\+?[0-9]{1,3}[-.\s]?[0-9]{2,4}[-.\s]?[0-9]{3,4}[-.\s]?[0-9]{4}/);
+  return match ? match[0].trim() : null;
+}
+
+export function extractEmailFromString(text?: string | null): string | null {
+  if (!text) return null;
+  const match = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+  return match ? match[0].trim() : null;
+}
+
+/**
+ * Builds platform-compatible SMS URI.
+ * macOS and iOS Messages require '&body=', while Android and standard RFC 5724 require '?body='.
+ */
+export function formatSmsAppUrl(phone: string, body: string): string {
+  const cleanNumber = phone.replace(/[^0-9+]/g, '');
+  const encodedBody = encodeURIComponent(body);
+
+  if (!cleanNumber) {
+    return `sms:?body=${encodedBody}`;
+  }
+
+  const isApple =
+    typeof navigator !== 'undefined' &&
+    (/iPhone|iPad|iPod|Macintosh|Mac OS X/i.test(navigator.userAgent) ||
+      (typeof navigator.platform === 'string' && /Mac|iPhone|iPad|iPod/i.test(navigator.platform)));
+
+  return isApple
+    ? `sms:${cleanNumber}&body=${encodedBody}`
+    : `sms:${cleanNumber}?body=${encodedBody}`;
+}
+
 function formatKstTimeOnly(isoStr?: string): string {
   if (!isoStr) return '';
   try {
@@ -86,9 +120,19 @@ export function generateCustomerNotificationDraft(params: {
   const prevPlate = booking.previousVehiclePlate || '';
 
   const primaryContact = customerRecord?.contacts?.find((c) => c.isPrimary) || customerRecord?.contacts?.[0];
-  const recipientEmail = customerRecord?.mainEmail || primaryContact?.email || '';
+  const recipientEmail =
+    customerRecord?.mainEmail ||
+    primaryContact?.email ||
+    extractEmailFromString(booking.notes) ||
+    extractEmailFromString(booking.passengerName) ||
+    '';
   const recipientPhone =
-    booking.passengerPhone || customerRecord?.mainPhone || primaryContact?.phone || '';
+    booking.passengerPhone ||
+    extractPhoneFromString(booking.passengerName) ||
+    extractPhoneFromString(booking.notes) ||
+    customerRecord?.mainPhone ||
+    primaryContact?.phone ||
+    '';
   const contactName =
     primaryContact?.name || customerRecord?.primaryContactName || passenger || `${customerName} 담당자`;
 
