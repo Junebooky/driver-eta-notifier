@@ -1,4 +1,7 @@
 import assert from 'node:assert';
+
+process.env.DEV_AUTH_ENABLED = 'true';
+
 import { executeSupabaseSql } from '../scripts/supabase-sql.mjs';
 import { signCockpitSession } from '../lib/auth/serverAuth';
 

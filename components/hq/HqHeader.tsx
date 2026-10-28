@@ -4,6 +4,7 @@ import React from 'react';
 import { Search, X, Bell, ChevronDown, Menu, RefreshCw, PhoneCall, Calculator, Award } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 import { formatKoreanFullDateLabel } from '@/utils/dispatchConflictDetector';
+import { DevAuthSwitcher } from '@/components/DevAuthSwitcher';
 
 export interface HqHeaderProps {
   searchQuery: string;
@@ -182,6 +183,9 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
               </span>
             )}
           </button>
+
+          {/* Dev Test Account Switcher (only renders on localhost with DEV_AUTH_ENABLED) */}
+          <DevAuthSwitcher />
 
           {/* Admin Profile Pill */}
           <div className="hidden sm:flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl border border-slate-200/70 bg-white hover:bg-slate-50 transition-all shadow-2xs">

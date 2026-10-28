@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+
+process.env.DEV_AUTH_ENABLED = 'true';
+
 import {
   detectDispatchConflicts,
   mapScheduleItemToHqBooking,

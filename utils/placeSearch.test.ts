@@ -37,3 +37,4 @@ runPlaceSearchTests().catch((err) => {
   console.error('❌ Place Search test failed:', err);
   process.exit(1);
 });
+

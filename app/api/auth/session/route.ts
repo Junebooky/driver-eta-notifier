@@ -5,59 +5,141 @@ import {
   signCockpitSession,
   extractAuthToken,
   CockpitAuthSession,
+  isDevAuthAllowed,
+  DEV_ACCOUNTS,
+  DevAccountKey,
 } from '@/lib/auth/serverAuth';
 import { cleanDriverIdentity } from '@/utils/dispatchConflictDetector';
 
 export const dynamic = 'force-dynamic';
 
-const DEFAULT_HQ_SECRET = process.env.HQ_ADMIN_SECRET || 'vip_limo_hq_2026';
-
 /**
  * GET: Validates existing token and returns active session data.
+ * In local dev mode (DEV_AUTH_ENABLED=true), if no session exists,
+ * automatically issues a dev admin session so local testing is never blocked.
  */
 export async function GET(req: NextRequest) {
   try {
+    const isDev = isDevAuthAllowed();
     const token = extractAuthToken(req);
-    if (!token) {
-      return NextResponse.json(
-        { ok: false, authenticated: false, error: 'No active session' },
-        { status: 401 }
-      );
+
+    if (token) {
+      const session = await parseAndVerifyToken(token);
+      if (session) {
+        return NextResponse.json({
+          ok: true,
+          authenticated: true,
+          session,
+          isDevAllowed: isDev,
+        });
+      }
     }
 
-    const session = await parseAndVerifyToken(token);
-    if (!session) {
-      return NextResponse.json(
-        { ok: false, authenticated: false, error: 'Invalid or expired session' },
-        { status: 401 }
-      );
+    // In local development, seamlessly auto-issue HQ Admin session
+    if (isDev) {
+      const devAdmin = DEV_ACCOUNTS.admin;
+      const autoToken = signCockpitSession(devAdmin, 60 * 60 * 24 * 7);
+
+      const res = NextResponse.json({
+        ok: true,
+        authenticated: true,
+        session: devAdmin,
+        isDevAutoLogin: true,
+        isDevAllowed: true,
+      });
+
+      res.cookies.set('cockpit_session', autoToken, {
+        httpOnly: true,
+        path: '/',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 7,
+      });
+
+      return res;
     }
 
-    return NextResponse.json({
-      ok: true,
-      authenticated: true,
-      session,
-    });
+    // In Preview / Production: Strictly return 401 unauthenticated
+    return NextResponse.json(
+      { ok: false, authenticated: false, isDevAllowed: false, error: '활성화된 세션이 없습니다.' },
+      { status: 401 }
+    );
   } catch (err: any) {
     return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
   }
 }
 
 /**
- * POST: Authenticates HQ admin or Driver and issues a signed session token.
+ * POST: Handles session switching (dev mode) and credential-based logins.
  */
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { role = 'hq', secret, driverName, vehicleNo, phone } = body;
+    const { action, target, role, secret, driverName, vehicleNo } = body;
+    const isDev = isDevAuthAllowed();
 
-    // 1. HQ Admin Login
+    // 1. Instant Dev Account Switcher (Localhost only)
+    if (action === 'dev_switch' || body.accountKey) {
+      if (!isDev) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: '개발용 계정 전환은 외부/운영 환경에서 비활성화되어 있습니다. (403 Forbidden)',
+          },
+          { status: 403 }
+        );
+      }
+
+      const key = (target || body.accountKey || 'admin') as DevAccountKey;
+      const selectedAccount = DEV_ACCOUNTS[key] || DEV_ACCOUNTS.admin;
+      const token = signCockpitSession(selectedAccount, 60 * 60 * 24 * 7);
+
+      const res = NextResponse.json({
+        ok: true,
+        authenticated: true,
+        switchedTo: key,
+        session: selectedAccount,
+        isDevAllowed: true,
+      });
+
+      res.cookies.set('cockpit_session', token, {
+        httpOnly: true,
+        path: '/',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 7,
+      });
+
+      return res;
+    }
+
+    // 2. Logout Action
+    if (action === 'logout') {
+      const res = NextResponse.json({ ok: true, authenticated: false });
+      res.cookies.set('cockpit_session', '', {
+        httpOnly: true,
+        path: '/',
+        maxAge: 0,
+      });
+      return res;
+    }
+
+    // 3. HQ Admin Login (Production credential-based)
     if (role === 'hq' || role === 'hq_admin') {
-      const isDevOrTest = process.env.NODE_ENV !== 'production';
-      const providedSecret = secret || '';
+      const configuredHqSecret = process.env.HQ_ADMIN_SECRET;
 
-      // Verify secret
-      if (!isDevOrTest && providedSecret !== DEFAULT_HQ_SECRET) {
+      if (!configuredHqSecret) {
+        if (!isDev) {
+          return NextResponse.json(
+            {
+              ok: false,
+              error: '서버에 관리자 비밀키(HQ_ADMIN_SECRET)가 구성되지 않았습니다.',
+            },
+            { status: 500 }
+          );
+        }
+      }
+
+      const providedSecret = (secret || '').trim();
+      if (configuredHqSecret && providedSecret !== configuredHqSecret) {
         return NextResponse.json(
           { ok: false, error: '본사 관리자 비밀키가 일치하지 않습니다.' },
           { status: 403 }
@@ -71,16 +153,14 @@ export async function POST(req: NextRequest) {
         driverName: '본사 관리자',
       };
 
-      const token = signCockpitSession(sessionPayload, 60 * 60 * 24 * 14); // 14 days
+      const token = signCockpitSession(sessionPayload, 60 * 60 * 24 * 14);
 
       const res = NextResponse.json({
         ok: true,
         role: 'hq_admin',
-        token,
         session: sessionPayload,
       });
 
-      // Set cookie for browser sessions
       res.cookies.set('cockpit_session', token, {
         httpOnly: true,
         path: '/',
@@ -91,7 +171,7 @@ export async function POST(req: NextRequest) {
       return res;
     }
 
-    // 2. Driver Login (Verified against cockpit.drivers table)
+    // 4. Driver Login (Verified against cockpit.drivers table)
     if (role === 'driver') {
       if (!driverName?.trim() && !vehicleNo?.trim()) {
         return NextResponse.json(
@@ -101,7 +181,6 @@ export async function POST(req: NextRequest) {
       }
 
       const cleanName = cleanDriverIdentity(driverName);
-
       let query = supabaseAdmin.from('drivers').select('*');
       if (cleanName) {
         query = query.ilike('driver_name', `%${cleanName}%`);
@@ -119,9 +198,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Pick matching driver record
       const matched = drivers[0];
-
       const sessionPayload: Omit<CockpitAuthSession, 'issuedAt' | 'expiresAt'> = {
         userId: `driver_${matched.id || matched.vehicle_no}`,
         org: 'vip_limousine_korea',
@@ -132,12 +209,11 @@ export async function POST(req: NextRequest) {
         carNumber: matched.car_number,
       };
 
-      const token = signCockpitSession(sessionPayload, 60 * 60 * 24 * 30); // 30 days for mobile app
+      const token = signCockpitSession(sessionPayload, 60 * 60 * 24 * 30);
 
       const res = NextResponse.json({
         ok: true,
         role: 'driver',
-        token,
         driver: matched,
         session: sessionPayload,
       });
@@ -152,9 +228,11 @@ export async function POST(req: NextRequest) {
       return res;
     }
 
-    return NextResponse.json({ ok: false, error: '지원하지 않는 역할(role)입니다.' }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, error: '지원하지 않는 역할 또는 요청 형식입니다.' },
+      { status: 400 }
+    );
   } catch (err: any) {
     return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
   }
 }
-

@@ -11,14 +11,79 @@ export interface CockpitAuthSession {
   driverName?: string;
   vehicleNo?: string;
   carNumber?: string;
+  displayName?: string;
   issuedAt: number;
   expiresAt: number;
 }
 
-const AUTH_SECRET =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.SESSION_SECRET ||
-  'cockpit-vip-limo-secret-key-salt-2026';
+/**
+ * Checks whether local development authentication (auto-login, dev account switching) is allowed.
+ * Strictly forbidden in Vercel Preview, Production, or when DEV_AUTH_ENABLED !== 'true'.
+ */
+export function isDevAuthAllowed(): boolean {
+  if (process.env.DEV_AUTH_ENABLED !== 'true') return false;
+  if (process.env.NODE_ENV === 'production') return false;
+  if (process.env.VERCEL === '1') return false;
+  if (process.env.VERCEL_ENV === 'preview' || process.env.VERCEL_ENV === 'production') return false;
+  return true;
+}
+
+/**
+ * Resolves the signing secret for Cockpit tokens.
+ * In non-dev environments, if no secret is configured, returns null (never use hardcoded fallbacks).
+ */
+export function getAuthSecret(): string | null {
+  const configured =
+    process.env.COCKPIT_AUTH_SECRET ||
+    process.env.SESSION_SECRET ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (configured && configured.trim().length > 0) {
+    return configured.trim();
+  }
+
+  // Fallback secret ONLY allowed in strict local dev environment
+  if (isDevAuthAllowed()) {
+    return 'cockpit-dev-local-secret-key-salt-2026-strict-local-only';
+  }
+
+  return null;
+}
+
+/**
+ * Standard development test profiles for instant role & driver switching on localhost.
+ */
+export const DEV_ACCOUNTS = {
+  admin: {
+    userId: 'dev_admin_hq',
+    org: 'vip_limousine_korea' as const,
+    role: 'hq_admin' as const,
+    driverName: '본사 관리자',
+    displayName: '본사 관리자 (HQ Admin)',
+  },
+  driver_a: {
+    userId: 'dev_driver_yoon',
+    org: 'vip_limousine_korea' as const,
+    role: 'driver' as const,
+    driverId: 'drv_yoon_01',
+    driverName: '윤기사',
+    vehicleNo: '7호차',
+    carNumber: '서울31가7777',
+    displayName: '기사 A (윤기사 · 7호차)',
+  },
+  driver_b: {
+    userId: 'dev_driver_park',
+    org: 'vip_limousine_korea' as const,
+    role: 'driver' as const,
+    driverId: 'drv_park_02',
+    driverName: '박기사',
+    vehicleNo: '8호차',
+    carNumber: '서울32나8888',
+    displayName: '기사 B (박기사 · 8호차)',
+  },
+} as const;
+
+export type DevAccountKey = keyof typeof DEV_ACCOUNTS;
 
 function base64UrlEncode(str: string): string {
   return Buffer.from(str)
@@ -43,6 +108,11 @@ export function signCockpitSession(
   payload: Omit<CockpitAuthSession, 'issuedAt' | 'expiresAt'>,
   ttlSeconds: number = 60 * 60 * 24 * 7 // 7 days default
 ): string {
+  const secret = getAuthSecret();
+  if (!secret) {
+    throw new Error('인증 서명 비밀키(AUTH_SECRET)가 설정되지 않았습니다.');
+  }
+
   const now = Math.floor(Date.now() / 1000);
   const fullSession: CockpitAuthSession = {
     ...payload,
@@ -54,7 +124,7 @@ export function signCockpitSession(
   const payloadJson = JSON.stringify(fullSession);
   const encodedPayload = base64UrlEncode(payloadJson);
 
-  const hmac = crypto.createHmac('sha256', AUTH_SECRET);
+  const hmac = crypto.createHmac('sha256', secret);
   hmac.update(`cockpit_s1.${encodedPayload}`);
   const signature = hmac.digest('base64url');
 
@@ -75,12 +145,18 @@ export async function parseAndVerifyToken(token: string): Promise<CockpitAuthSes
     if (parts.length !== 3) return null;
 
     const [, encodedPayload, providedSig] = parts;
+    const secret = getAuthSecret();
+    if (!secret) return null;
 
-    const hmac = crypto.createHmac('sha256', AUTH_SECRET);
+    const hmac = crypto.createHmac('sha256', secret);
     hmac.update(`cockpit_s1.${encodedPayload}`);
     const expectedSig = hmac.digest('base64url');
 
-    if (!crypto.timingSafeEqual(Buffer.from(providedSig), Buffer.from(expectedSig))) {
+    try {
+      if (!crypto.timingSafeEqual(Buffer.from(providedSig), Buffer.from(expectedSig))) {
+        return null;
+      }
+    } catch {
       return null;
     }
 
@@ -172,10 +248,6 @@ export interface AuthVerificationResult {
 /**
  * Verifies that the incoming request has a valid, authenticated session.
  * Rejects requests when unauthenticated (401) or unauthorized (403).
- *
- * NOTE: P0 requirement:
- * "인증 설정이 없는 개발 환경에서도 무조건 접근을 허용하지 않는다."
- * Every API caller must present a verified token.
  */
 export async function verifyServerAuth(
   req: Request | NextRequest,
@@ -201,7 +273,6 @@ export async function verifyServerAuth(
   }
 
   if (requiredRole && session.role !== requiredRole) {
-    // If hq_admin is required, a driver token is strictly forbidden
     if (requiredRole === 'hq_admin' && session.role !== 'hq_admin') {
       return {
         ok: false,
@@ -234,11 +305,14 @@ export function driverCanAccessSchedule(
   schedule: Record<string, any>
 ): boolean {
   if (session.role === 'hq_admin') return true;
-
   if (session.role !== 'driver') return false;
 
   // Unassigned bookings are invisible and untouchable by drivers
-  if (schedule.vehicle_no === '미배정' || schedule.dispatch_status === 'unassigned' || schedule.dispatch_status === 'draft') {
+  if (
+    schedule.vehicle_no === '미배정' ||
+    schedule.dispatch_status === 'unassigned' ||
+    schedule.dispatch_status === 'draft'
+  ) {
     return false;
   }
 
@@ -259,4 +333,3 @@ export function driverCanAccessSchedule(
 
   return false;
 }
-

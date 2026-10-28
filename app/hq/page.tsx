@@ -501,10 +501,10 @@ function HqDashboardInner() {
       const exists = prev.some((b) => b.id === updated.id || (updated.scheduleId && b.scheduleId === updated.scheduleId));
       const next = exists
         ? prev.map((b) =>
-            b.id === updated.id || (updated.scheduleId && b.scheduleId === updated.scheduleId)
-              ? updated
-              : b
-          )
+          b.id === updated.id || (updated.scheduleId && b.scheduleId === updated.scheduleId)
+            ? updated
+            : b
+        )
         : [updated, ...prev];
       return annotateBookingsWithConflicts(next);
     });
@@ -545,18 +545,18 @@ function HqDashboardInner() {
             activeSidebarTab === 'operations'
               ? '실시간 행사 운영 보드'
               : activeSidebarTab === 'quotes'
-              ? '가격표 견적기 및 견적서 관리'
-              : activeSidebarTab === 'driving_logs'
-              ? '운행일지 관리'
-              : activeSidebarTab === 'expenses' || activeSidebarTab === 'receipts'
-              ? '경비지출 · 영수증 검수'
-              : activeSidebarTab === 'emails'
-              ? '고객 이메일 · 예약 접수'
-              : activeSidebarTab === 'customers'
-              ? '고객 관리'
-              : activeSidebarTab === 'reports'
-              ? '정산 · 수익성 · 종합 리포트'
-              : '예약 · 배차 통합 관제'
+                ? '가격표 견적기 및 견적서 관리'
+                : activeSidebarTab === 'driving_logs'
+                  ? '운행일지 관리'
+                  : activeSidebarTab === 'expenses' || activeSidebarTab === 'receipts'
+                    ? '경비지출 · 영수증 검수'
+                    : activeSidebarTab === 'emails'
+                      ? '고객 이메일 · 예약 접수'
+                      : activeSidebarTab === 'customers'
+                        ? '고객 관리'
+                        : activeSidebarTab === 'reports'
+                          ? '정산 · 수익성 · 종합 리포트'
+                          : '예약 · 배차 통합 관제'
           }
           subtitle={
             activeSidebarTab === 'operations' ? (
@@ -595,10 +595,10 @@ function HqDashboardInner() {
             activeSidebarTab === 'customers'
               ? '고객명, 담당자명, 행사명으로 검색하세요...'
               : activeSidebarTab === 'reports'
-              ? '고객사, 행사명, 대행사, 기사명, 차량 검색...'
-              : activeSidebarTab === 'expenses' || activeSidebarTab === 'receipts'
-              ? '기사명, 차량번호, 상호명 검색...'
-              : '고객사, 승객명, 예약번호, 기사명, 차량번호 검색...'
+                ? '고객사, 행사명, 대행사, 기사명, 차량 검색...'
+                : activeSidebarTab === 'expenses' || activeSidebarTab === 'receipts'
+                  ? '기사명, 차량번호, 상호명 검색...'
+                  : '고객사, 승객명, 예약번호, 기사명, 차량번호 검색...'
           }
         />
 
@@ -684,21 +684,19 @@ function HqDashboardInner() {
 
                   {/* Omission, Imminent Unacknowledged Escalation & Customer Message Strip */}
                   {operationalCounts.totalActionNeeded > 0 ||
-                  escalationSummary.pendingCustomerMsgCount > 0 ? (
+                    escalationSummary.pendingCustomerMsgCount > 0 ? (
                     <div
-                      className={`p-3.5 rounded-2xl text-white shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                        escalationSummary.criticalCount > 0
+                      className={`p-3.5 rounded-2xl text-white shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${escalationSummary.criticalCount > 0
                           ? 'bg-gradient-to-r from-rose-900 via-red-800 to-rose-900 ring-2 ring-rose-400/50'
                           : 'bg-gradient-to-r from-[#0B1E48] via-[#102A63] to-[#163880]'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-start sm:items-center gap-2.5">
                         <div
-                          className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-                            escalationSummary.criticalCount > 0
+                          className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${escalationSummary.criticalCount > 0
                               ? 'bg-white/20 border border-white/40 animate-pulse'
                               : 'bg-amber-400/20 border border-amber-300/40'
-                          }`}
+                            }`}
                         >
                           {escalationSummary.criticalCount > 0 ? (
                             <ShieldAlert className="w-4 h-4 text-white" />
@@ -711,10 +709,9 @@ function HqDashboardInner() {
                             <span>
                               {escalationSummary.criticalCount > 0
                                 ? `초긴급 픽업 임박 미확인·누락 경보 ${escalationSummary.criticalCount}건!`
-                                : `배차 전달 누락 방지 점검 · 확인 필요 ${
-                                    operationalCounts.totalActionNeeded +
-                                    escalationSummary.pendingCustomerMsgCount
-                                  }건`}
+                                : `배차 전달 누락 방지 점검 · 확인 필요 ${operationalCounts.totalActionNeeded +
+                                escalationSummary.pendingCustomerMsgCount
+                                }건`}
                             </span>
                           </div>
                           <p className="text-[11px] text-white/80 font-medium mt-0.5">
@@ -840,11 +837,10 @@ function HqDashboardInner() {
                     <button
                       type="button"
                       onClick={() => setMobileDispatchSubView('list')}
-                      className={`flex-1 py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                        mobileDispatchSubView === 'list'
+                      className={`flex-1 py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${mobileDispatchSubView === 'list'
                           ? 'bg-white text-slate-900 shadow-xs'
                           : 'hover:text-slate-900'
-                      }`}
+                        }`}
                     >
                       <CalendarCheck className="w-3.5 h-3.5 text-[#1E60F3]" />
                       <span>배차 대기함 · 예약 목록 ({kpiAndHeaderFilteredBookings.length})</span>
@@ -852,11 +848,10 @@ function HqDashboardInner() {
                     <button
                       type="button"
                       onClick={() => setMobileDispatchSubView('form')}
-                      className={`flex-1 py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                        mobileDispatchSubView === 'form'
+                      className={`flex-1 py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${mobileDispatchSubView === 'form'
                           ? 'bg-white text-[#1E60F3] shadow-xs'
                           : 'hover:text-slate-900'
-                      }`}
+                        }`}
                     >
                       <PhoneCall className="w-3.5 h-3.5" />
                       <span>전화 예약 · 빠른 배차 생성</span>
@@ -869,9 +864,8 @@ function HqDashboardInner() {
                     className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start"
                   >
                     <div
-                      className={`xl:col-span-8 ${
-                        mobileDispatchSubView !== 'list' ? 'hidden xl:block' : 'block'
-                      }`}
+                      className={`xl:col-span-7 2xl:col-span-7 ${mobileDispatchSubView !== 'list' ? 'hidden xl:block' : 'block'
+                        }`}
                     >
                       <HqDispatchTable
                         bookings={kpiAndHeaderFilteredBookings}
@@ -899,9 +893,8 @@ function HqDashboardInner() {
                     </div>
 
                     <div
-                      className={`xl:col-span-4 ${
-                        mobileDispatchSubView !== 'form' ? 'hidden xl:block' : 'block'
-                      }`}
+                      className={`xl:col-span-5 2xl:col-span-5 ${mobileDispatchSubView !== 'form' ? 'hidden xl:block' : 'block'
+                        }`}
                     >
                       <HqQuickDispatch
                         existingBookings={bookings}
@@ -973,11 +966,10 @@ function HqDashboardInner() {
             setActiveTabOverride('dispatch');
             setMobileDispatchSubView('list');
           }}
-          className={`flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold cursor-pointer relative ${
-            activeSidebarTab === 'dispatch' && mobileDispatchSubView === 'list'
+          className={`flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold cursor-pointer relative ${activeSidebarTab === 'dispatch' && mobileDispatchSubView === 'list'
               ? 'text-[#1E60F3] bg-blue-50/70'
               : 'text-slate-500'
-          }`}
+            }`}
         >
           <CalendarCheck className="w-4 h-4 mb-0.5" />
           <span>예약·배차</span>
@@ -994,11 +986,10 @@ function HqDashboardInner() {
             setActiveTabOverride('dispatch');
             setMobileDispatchSubView('form');
           }}
-          className={`flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold cursor-pointer ${
-            activeSidebarTab === 'dispatch' && mobileDispatchSubView === 'form'
+          className={`flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold cursor-pointer ${activeSidebarTab === 'dispatch' && mobileDispatchSubView === 'form'
               ? 'text-[#1E60F3] bg-blue-50/70'
               : 'text-slate-500'
-          }`}
+            }`}
         >
           <PhoneCall className="w-4 h-4 mb-0.5" />
           <span>빠른배차</span>
@@ -1012,11 +1003,10 @@ function HqDashboardInner() {
             setActiveDispatchTab('all');
             setMobileDispatchSubView('list');
           }}
-          className={`flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold cursor-pointer relative ${
-            activeSidebarTab === 'dispatch' && activeKpiFilter === 'kpi_sent_unacknowledged'
+          className={`flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold cursor-pointer relative ${activeSidebarTab === 'dispatch' && activeKpiFilter === 'kpi_sent_unacknowledged'
               ? 'text-[#1E60F3] bg-blue-50/70'
               : 'text-slate-500'
-          }`}
+            }`}
         >
           <Clock className="w-4 h-4 mb-0.5" />
           <span>미확인점검</span>
@@ -1030,9 +1020,8 @@ function HqDashboardInner() {
         <button
           type="button"
           onClick={() => setActiveTabOverride('emails')}
-          className={`flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold cursor-pointer ${
-            activeSidebarTab === 'emails' ? 'text-[#1E60F3] bg-blue-50/70' : 'text-slate-500'
-          }`}
+          className={`flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold cursor-pointer ${activeSidebarTab === 'emails' ? 'text-[#1E60F3] bg-blue-50/70' : 'text-slate-500'
+            }`}
         >
           <Mail className="w-4 h-4 mb-0.5" />
           <span>이메일</span>
@@ -1043,11 +1032,10 @@ function HqDashboardInner() {
           onClick={() =>
             setActiveTabOverride(activeSidebarTab === 'reports' ? 'customers' : 'reports')
           }
-          className={`flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold cursor-pointer ${
-            activeSidebarTab === 'reports' || activeSidebarTab === 'customers'
+          className={`flex flex-col items-center justify-center py-1 rounded-xl text-[10px] font-bold cursor-pointer ${activeSidebarTab === 'reports' || activeSidebarTab === 'customers'
               ? 'text-[#1E60F3] bg-blue-50/70'
               : 'text-slate-500'
-          }`}
+            }`}
         >
           {activeSidebarTab === 'customers' ? (
             <Building2 className="w-4 h-4 mb-0.5" />
@@ -1101,10 +1089,10 @@ function HqDashboardInner() {
         booking={
           customerMsgTarget
             ? bookings.find(
-                (b) =>
-                  b.id === customerMsgTarget.booking.id ||
-                  (b.scheduleId && b.scheduleId === customerMsgTarget.booking.scheduleId)
-              ) || customerMsgTarget.booking
+              (b) =>
+                b.id === customerMsgTarget.booking.id ||
+                (b.scheduleId && b.scheduleId === customerMsgTarget.booking.scheduleId)
+            ) || customerMsgTarget.booking
             : null
         }
         customers={liveCustomers}

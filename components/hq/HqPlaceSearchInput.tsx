@@ -298,3 +298,4 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
     </div>
   );
 };
+
