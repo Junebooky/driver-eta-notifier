@@ -198,6 +198,10 @@ export interface DbScheduleRow {
   published_by?: string | null;
   last_ack_version?: number;
   last_ack_at?: string | null;
+  operation_status?: 'ready' | 'arrived_pickup' | 'boarded' | 'in_transit' | 'completed';
+  operation_updated_at?: string | null;
+  operation_history?: any[];
+  source_quote_no?: string | null;
   created_at?: string;
   updated_at?: string;
 }

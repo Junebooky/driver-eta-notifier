@@ -1,10 +1,11 @@
 import { RouteStopItem, DrivingLogData, DRIVING_LOG_INDEX_KEY, DRIVING_LOG_STORAGE_PREFIX, saveDrivingLogDraft, loadDrivingLogDraft } from '@/utils/drivingLog';
 import { DriverProfile } from '@/types';
+import { getKstTodayDateStr } from '@/utils/dispatchConflictDetector';
 
 /**
- * Appends a navigation route destination to today's active driving log draft.
- * Avoids duplicate additions within 30 minutes for the same destination.
- * Does not fabricate artificial arrival times or odometer numbers.
+ * Appends a planned route stop to today's active driving log draft in KST.
+ * Clearly designates the stop as [예정 경로] (planned route).
+ * Records navigation launch as departure time, NEVER fabricating arrival time or odometer.
  */
 export function addNavigationRouteToDrivingLog(params: {
   originName?: string;
@@ -15,7 +16,19 @@ export function addNavigationRouteToDrivingLog(params: {
   if (typeof window === 'undefined') return { success: false, isDuplicate: false };
 
   try {
-    const todayIso = new Date().toISOString().slice(0, 10);
+    // 1. KST date and time formatting
+    const todayIso = getKstTodayDateStr();
+    const nowKst = new Date();
+    const kstTimeParts = new Intl.DateTimeFormat('ko-KR', {
+      timeZone: 'Asia/Seoul',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).formatToParts(nowKst);
+    const hh = kstTimeParts.find((p) => p.type === 'hour')?.value || '09';
+    const mm = kstTimeParts.find((p) => p.type === 'minute')?.value || '00';
+    const departureTimeStr = `${hh}:${mm}`;
+
     const rawIndex = localStorage.getItem(DRIVING_LOG_INDEX_KEY);
     const indexList: Array<{ reportId: string; date: string }> = rawIndex ? JSON.parse(rawIndex) : [];
 
@@ -41,22 +54,22 @@ export function addNavigationRouteToDrivingLog(params: {
       activeLog = loadDrivingLogDraft(defaultProfile, undefined, todayIso);
     }
 
-    const now = new Date();
-    const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-
-    // Duplicate check: check if the last stop is identical
+    // 2. Duplicate check: check if the last stop is identical (avoid duplicate clicks within same destination)
     const stops = activeLog.stops || [];
     const lastStop = stops.length > 0 ? stops[stops.length - 1] : null;
     if (lastStop && lastStop.place.trim().toLowerCase() === params.destinationName.trim().toLowerCase()) {
       return { success: true, isDuplicate: true, stop: lastStop };
     }
 
+    // 3. Mark as planned route stop without fabricating destination arrival time
     const newStop: RouteStopItem = {
       id: `stop-nav-${Date.now()}`,
-      time: currentTimeStr, // Navigation start time (departure)
+      time: '', // 도착시각은 실제 도착 후 기록하도록 비워둠
       place: params.destinationName.trim(),
       address: params.destinationAddress || undefined,
-      memo: params.originName ? `${params.originName} ➔ ${params.destinationName} (내비 연동)` : '내비게이션 안내 경로',
+      memo: params.originName
+        ? `[예정 경로] ${params.originName} ➔ ${params.destinationName} (출발 ${departureTimeStr})`
+        : `[예정 경로] ${params.destinationName} (출발 ${departureTimeStr})`,
     };
 
     activeLog.stops = [...stops, newStop];

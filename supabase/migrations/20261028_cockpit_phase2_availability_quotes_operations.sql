@@ -91,3 +91,4 @@ INSERT INTO cockpit.pricing_presets (
 ON CONFLICT (id) DO UPDATE SET
   base_fare = EXCLUDED.base_fare,
   updated_at = now();
+

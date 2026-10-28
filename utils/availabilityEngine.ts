@@ -213,7 +213,8 @@ export async function checkFleetAvailability(
 
     if (conflicting) {
       const sStart = conflicting.pickup_time?.slice(0, 5) || '09:00';
-      const sEnd = conflicting.end_time?.slice(0, 5) || '19:00';
+      const hasRealEndTime = Boolean(conflicting.end_time);
+      const sEnd = hasRealEndTime ? conflicting.end_time!.slice(0, 5) : '종료 미정 (확인 필요)';
       return {
         id: v.id,
         plate: v.plate,
@@ -221,7 +222,9 @@ export async function checkFleetAvailability(
         category: (v.category as any) || 'sprinter',
         capacity: v.capacity,
         isAvailable: false,
-        unavailabilityReason: `기존 배차와 충돌 (${conflicting.passenger_name || 'VIP'}: ${conflicting.origin} → ${conflicting.destination})`,
+        unavailabilityReason: hasRealEndTime
+          ? `기존 배차와 충돌 (${conflicting.passenger_name || 'VIP'}: ${conflicting.origin} → ${conflicting.destination})`
+          : `기존 배차(${conflicting.origin} → ${conflicting.destination})의 종료시간이 미확정되어 중복 주의`,
         currentStatus: 'in_service',
         conflictingTrip: {
           scheduleId: conflicting.id,
@@ -276,7 +279,8 @@ export async function checkFleetAvailability(
 
     if (conflicting) {
       const sStart = conflicting.pickup_time?.slice(0, 5) || '09:00';
-      const sEnd = conflicting.end_time?.slice(0, 5) || '19:00';
+      const hasRealEndTime = Boolean(conflicting.end_time);
+      const sEnd = hasRealEndTime ? conflicting.end_time!.slice(0, 5) : '종료 미정 (확인 필요)';
       return {
         id: p.id,
         name: p.name,
@@ -286,7 +290,9 @@ export async function checkFleetAvailability(
         isAvailable: false,
         isEnglishVerified: isEnglish,
         languageLabel: p.languageLabel,
-        unavailabilityReason: `기존 배차와 충돌 (${conflicting.passenger_name || 'VIP'})`,
+        unavailabilityReason: hasRealEndTime
+          ? `기존 배차와 충돌 (${conflicting.passenger_name || 'VIP'})`
+          : `기존 배차의 종료시간 미확정으로 중복 주의 (${conflicting.passenger_name || 'VIP'})`,
         conflictingTrip: {
           scheduleId: conflicting.id,
           customerName: conflicting.customer_name || conflicting.passenger_name || '고객사',

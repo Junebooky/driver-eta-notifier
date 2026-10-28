@@ -3,6 +3,7 @@ import {
   checkServerDispatchConflicts,
   DispatchUpsertInput,
   upsertServerDispatchSchedule,
+  queryServerSchedules,
 } from '@/lib/dispatch/scheduleServerStore';
 import { ScheduleItem } from '@/data/ferrariSchedules';
 
@@ -127,6 +128,33 @@ export async function POST(req: NextRequest) {
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     console.error('POST /api/schedules/dispatch error:', message);
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+  }
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const date = searchParams.get('date');
+    const onlyDispatched = searchParams.get('onlyDispatched') === 'true';
+
+    const { schedules, error } = await queryServerSchedules({
+      role: 'hq',
+      statusParam: onlyDispatched ? 'published' : 'all',
+      date,
+    });
+
+    if (error) {
+      return NextResponse.json({ ok: false, error }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      ok: true,
+      schedules: schedules || [],
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    console.error('GET /api/schedules/dispatch error:', message);
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }

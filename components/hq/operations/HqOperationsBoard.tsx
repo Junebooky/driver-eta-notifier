@@ -73,12 +73,12 @@ export const HqOperationsBoard: React.FC = () => {
           driverPhone: s.driver_phone || s.driverPhone || '',
           vehiclePlate: s.vehicle_plate || s.vehiclePlate || '배정 대기',
           vehicleModel: s.vehicle_model || s.vehicleModel || 'Mercedes-Benz Sprinter',
-          startDate: s.start_date || s.startDate || '',
-          startTime: s.start_time || s.startTime || '09:00',
-          endDate: s.end_date || s.endDate || '',
+          startDate: s.date || s.start_date || s.startDate || '',
+          startTime: s.pickup_time || s.start_time || s.startTime || '09:00',
+          endDate: s.end_date || s.endDate || s.date || '',
           endTime: s.end_time || s.endTime || '19:00',
-          pickupLocation: s.pickup_location || s.pickupLocation || '픽업지',
-          dropoffLocation: s.dropoff_location || s.dropoffLocation || '목적지',
+          pickupLocation: s.origin_name || s.origin || s.pickup_location || s.pickupLocation || '픽업지',
+          dropoffLocation: s.destination_name || s.destination || s.dropoff_location || s.dropoffLocation || '목적지',
           operationStatus: (s.operation_status || s.operationStatus || 'ready') as OperationStatus,
           operationUpdatedAt: s.operation_updated_at || s.operationUpdatedAt,
           operationHistory: s.operation_history || s.operationHistory || [],
@@ -344,3 +344,4 @@ export const HqOperationsBoard: React.FC = () => {
     </div>
   );
 };
+

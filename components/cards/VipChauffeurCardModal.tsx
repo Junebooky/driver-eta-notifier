@@ -26,6 +26,11 @@ export const VipChauffeurCardModal: React.FC<VipChauffeurCardModalProps> = ({
 
   if (!isOpen) return null;
 
+  // Combination matching check: Sample asset is specifically for Yoon Tae-jun & Sprinter 519 CDI (73호 2553)
+  const isSampleMatch =
+    driverName.includes('윤태준') &&
+    (vehicleModel.includes('519') || vehiclePlate.includes('2553'));
+
   const handleShareOrCopy = () => {
     const cardUrl =
       format === 'vertical'
@@ -53,8 +58,8 @@ export const VipChauffeurCardModal: React.FC<VipChauffeurCardModalProps> = ({
                 <h3 className="text-sm md:text-base font-bold text-amber-200">
                   VIP LIMOUSINE KOREA
                 </h3>
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-medium">
-                  공식 의전 배차 소개서
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-semibold">
+                  의전 배차 소개서 [TEST/DEMO]
                 </span>
               </div>
               <p className="text-xs text-slate-400">
@@ -71,6 +76,15 @@ export const VipChauffeurCardModal: React.FC<VipChauffeurCardModalProps> = ({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Disclaimer Banner when looking at a different vehicle or driver */}
+        {!isSampleMatch && (
+          <div className="px-5 py-2 bg-amber-500/10 border-b border-amber-500/20 text-amber-200 text-xs flex items-center justify-between">
+            <span>
+              ℹ️ 아래 카드는 <strong>윤태준 실장 • Sprinter 519 CDI (73호 2553)</strong> 테스트 샘플 양식입니다. ({driverName} 기사님 및 {vehicleModel} 전용 카드는 추후 자동 생성됩니다)
+            </span>
+          </div>
+        )}
 
         {/* View Mode Switcher */}
         <div className="flex items-center justify-between px-5 py-2.5 bg-slate-900/40 border-b border-slate-800 shrink-0">
@@ -169,3 +183,4 @@ export const VipChauffeurCardModal: React.FC<VipChauffeurCardModalProps> = ({
     </div>
   );
 };
+

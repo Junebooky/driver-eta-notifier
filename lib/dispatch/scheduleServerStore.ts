@@ -173,6 +173,10 @@ export function hydrateRawScheduleRow(raw: Record<string, any>): DbScheduleRow &
     published_by: raw.published_by ?? meta.publishedBy ?? null,
     last_ack_version: lastAckVersion,
     last_ack_at: raw.last_ack_at ?? meta.lastAckAt ?? null,
+    operation_status: raw.operation_status || 'ready',
+    operation_updated_at: raw.operation_updated_at || null,
+    operation_history: Array.isArray(raw.operation_history) ? raw.operation_history : [],
+    source_quote_no: raw.source_quote_no || null,
     created_at: raw.created_at,
     updated_at: raw.updated_at,
     _meta: {
@@ -276,6 +280,10 @@ export function mapHydratedRowToScheduleItem(rawRow: Record<string, any>): Sched
     service_mode: meta.serviceMode,
     applied_pricing_snapshot: meta.appliedPricingSnapshot,
     cancel_reason: meta.cancelReason || undefined,
+    operation_status: row.operation_status || 'ready',
+    operation_updated_at: row.operation_updated_at || undefined,
+    operation_history: row.operation_history || [],
+    source_quote_no: row.source_quote_no || undefined,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -309,12 +317,25 @@ export async function ensureDriverVehicleKeyExists(params: {
     payload.phone = params.driverPhone;
   }
 
+  // 1. Check if vehicle_no already exists in cockpit.drivers to preserve driver profile
+  const { data: existing } = await supabaseAdmin
+    .from('drivers')
+    .select('vehicle_no, driver_name')
+    .eq('vehicle_no', cleanKey)
+    .maybeSingle();
+
+  if (existing) {
+    // Preserve existing verified driver profile, never overwrite via dispatch
+    return cleanKey;
+  }
+
+  // 2. Only insert if record does not exist
   const { error } = await supabaseAdmin
     .from('drivers')
-    .upsert(payload, { onConflict: 'vehicle_no' });
+    .insert(payload);
 
   if (error) {
-    console.warn(`[ScheduleStore] Notice upserting cockpit.drivers for '${cleanKey}':`, error.message);
+    console.warn(`[ScheduleStore] Notice inserting cockpit.drivers for '${cleanKey}':`, error.message);
   }
   return cleanKey;
 }
@@ -850,6 +871,10 @@ export async function upsertServerDispatchSchedule(
     passenger_note: encodeScheduleMeta(nextMeta),
     flight_number: input.flightNumber?.trim() || null,
     protocol_notes: input.notes?.trim() || null,
+    driver_name: cleanDrv || input.driverName || null,
+    driver_phone: input.driverPhone || null,
+    vehicle_plate: resolvedPlate || null,
+    vehicle_model: resolvedModel || null,
     dispatch_status: effectiveDispatchStatus,
     version: nextVersion,
     last_ack_version: lastAckVersion,
@@ -905,8 +930,33 @@ export async function acknowledgeServerSchedule(params: {
   }
 
   const hydrated = hydrateRawScheduleRow(raw);
+
+  // Guard 1: Block acknowledging cancelled schedules
+  if (hydrated.dispatch_status === 'cancelled' || hydrated.status === 'cancelled') {
+    return { error: '취소된 배차는 확인할 수 없습니다.', statusCode: 400 };
+  }
+
+  // Guard 2: Block acknowledging outdated versions
+  const currentVersion = hydrated.version || 1;
+  if (typeof params.version === 'number' && params.version > 0 && params.version < currentVersion) {
+    return {
+      error: `최신 버전(v${currentVersion})의 배차가 아닙니다. 변경된 배차를 재확인해주세요.`,
+      statusCode: 409,
+    };
+  }
+
+  // Guard 3: Block acknowledging by a different driver
+  const assignedDriver = cleanDriverIdentity(hydrated.driver_name || hydrated._meta.driverName);
+  const reqDriver = cleanDriverIdentity(params.driverName);
+  if (assignedDriver && reqDriver && assignedDriver !== reqDriver) {
+    return {
+      error: `해당 배차의 담당 기사(${hydrated.driver_name})만 확인할 수 있습니다.`,
+      statusCode: 403,
+    };
+  }
+
   const nowIso = new Date().toISOString();
-  const ackVersion = typeof params.version === 'number' && params.version > 0 ? params.version : hydrated.version || 1;
+  const ackVersion = typeof params.version === 'number' && params.version > 0 ? params.version : currentVersion;
 
   const prevHistory = hydrated._meta.ackHistory || [];
   const nextMeta: HqScheduleMeta = {

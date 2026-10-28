@@ -48,14 +48,23 @@ export async function calculateQuote(input: QuoteCalculationInput): Promise<HqQu
 
   // 3. Resolve base rate & overtime rate per vehicle
   const fallbackPreset = findVehiclePricingPreset(input.vehicleModel, DEFAULT_VEHICLE_PRICING_PRESETS) || DEFAULT_VEHICLE_PRICING_PRESETS[0];
-  const matchedPreset =
-    presets.find((p) => p.model_name === input.vehicleModel || input.vehicleModel?.includes(p.model_name)) ||
-    fallbackPreset;
+  const normModel = (input.vehicleModel || '').toUpperCase().replace(/\s+/g, '');
+  const matchedFromSupabase = presets.find((p) => {
+    if (p.model_name === input.vehicleModel) return true;
+    const pNorm = (p.model_name || '').toUpperCase().replace(/\s+/g, '');
+    if (normModel.includes('319') && p.id === 'preset-sprinter-319') return true;
+    if (normModel.includes('519') && p.id === 'preset-sprinter-519') return true;
+    if ((normModel.includes('VCLASS') || normModel.includes('V-CLASS')) && p.id === 'preset-v-class') return true;
+    if ((normModel.includes('SCLASS') || normModel.includes('S-CLASS') || normModel.includes('S560')) && p.id === 'preset-s-class') return true;
+    if (normModel.includes('G90') && p.id === 'preset-genesis-g90') return true;
+    return normModel.includes(pNorm) || pNorm.includes(normModel);
+  });
+  const matchedPreset = matchedFromSupabase || fallbackPreset;
 
   let baseRatePerVehicle =
     serviceMode === 'vehicle_only'
-      ? (matchedPreset.vehicle_only_fare || matchedPreset.vehicleOnlyFare || 600000)
-      : (matchedPreset.base_fare || matchedPreset.baseFare10h || 800000);
+      ? (matchedPreset.vehicle_only_fare ?? matchedPreset.vehicleOnlyFare ?? matchedPreset.vehicleOnlyRate ?? 600000)
+      : (matchedPreset.base_fare ?? matchedPreset.baseFare10h ?? matchedPreset.withDriverRate ?? 800000);
 
   // If customer contract overrides base rate:
   if (customerContract?.baseRatePerVehicle) {

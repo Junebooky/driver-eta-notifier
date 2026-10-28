@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { HqQuoteItem } from '@/types/quoteHq';
+import { calculateQuote } from '@/utils/quoteCalculator';
+import { normalizeDateToIso, normalizeTimeHHmm } from '@/utils/dispatchConflictDetector';
+import { encodeScheduleMeta, UNASSIGNED_VEHICLE_SENTINEL } from '@/lib/dispatch/scheduleServerStore';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,7 +16,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'quoteNo가 필요합니다.' }, { status: 400 });
     }
 
-    // 1. Strict Duplicate Check in cockpit.schedules
+    // 1. Strict Duplicate Check in cockpit.schedules by source_quote_no
     const { data: existingBookings, error: checkErr } = await supabaseAdmin
       .from('schedules')
       .select('id, dispatch_status, created_at')
@@ -35,7 +38,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // 2. Fetch quote from cockpit.customers or use provided quote
+    // 2. Fetch or load target quote
     let targetQuote: HqQuoteItem | null = providedQuote || null;
     let targetCustomerId: string | null = targetQuote?.customerId || null;
 
@@ -60,53 +63,111 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: `견적서(${quoteNo})를 찾을 수 없습니다.` }, { status: 404 });
     }
 
-    // 3. Create schedule row(s) in cockpit.schedules
-    const createdBookingIds: string[] = [];
-    const count = Math.max(1, targetQuote.vehicleCount || 1);
+    // 3. Server-side Quote Verification (Never blindly trust client pricing numbers)
+    const verifiedQuote = await calculateQuote({
+      customerId: targetCustomerId || undefined,
+      customerName: targetQuote.customerName,
+      contactPerson: targetQuote.contactPerson,
+      contactPhone: targetQuote.contactPhone,
+      date: targetQuote.date,
+      serviceStartTime: targetQuote.serviceStartTime,
+      serviceEndTime: targetQuote.serviceEndTime,
+      serviceHours: targetQuote.serviceHours,
+      origin: targetQuote.origin,
+      destination: targetQuote.destination,
+      vehicleModel: targetQuote.vehicleModel,
+      vehicleCount: targetQuote.vehicleCount,
+      driverLanguage: targetQuote.driverLanguage,
+      serviceMode: targetQuote.serviceMode,
+      notes: targetQuote.notes,
+    });
+    verifiedQuote.quoteNo = targetQuote.quoteNo;
+
+    // 4. Prepare Atomic Batch Insertion for all vehicles
+    const count = Math.max(1, verifiedQuote.vehicleCount || 1);
     const groupId = count > 1 ? `grp-${Date.now().toString(36)}` : null;
     const nowIso = new Date().toISOString();
+    const isoDate = normalizeDateToIso(verifiedQuote.date) || nowIso.slice(0, 10);
+    const startTimeHHmm = normalizeTimeHHmm(verifiedQuote.serviceStartTime) || '09:00';
+    const endTimeHHmm = normalizeTimeHHmm(verifiedQuote.serviceEndTime) || '19:00';
+
+    const recordsToInsert: Record<string, any>[] = [];
 
     for (let i = 0; i < count; i++) {
-      const bookingId = `bk-${Date.now().toString(36)}-${i + 1}`;
-      const scheduleRow: Record<string, any> = {
-        id: bookingId,
-        source_quote_no: targetQuote.quoteNo,
-        customer_id: targetCustomerId || targetQuote.customerId || null,
-        customer_name: targetQuote.customerName,
-        event_name: targetQuote.notes ? `${targetQuote.customerName} - ${targetQuote.notes}` : `${targetQuote.customerName} 의전 예약`,
-        vehicle_model: targetQuote.vehicleModel,
-        pickup_location: targetQuote.origin,
-        dropoff_location: targetQuote.destination,
-        start_date: targetQuote.date,
-        start_time: targetQuote.serviceStartTime || '09:00',
-        end_date: targetQuote.date,
-        end_time: targetQuote.serviceEndTime || '19:00',
-        dispatch_status: 'draft', // 대기함(미배정)
+      const scheduleMeta = {
+        driverLanguage: verifiedQuote.driverLanguage,
+        serviceMode: verifiedQuote.serviceMode,
+        serviceHours: verifiedQuote.serviceHours,
+        baseFareTotal: verifiedQuote.baseFareTotal,
+        overtimeFareTotal: verifiedQuote.overtimeFareTotal,
+        englishSurchargeTotal: verifiedQuote.englishSurchargeTotal,
+        supplyPriceTotal: verifiedQuote.supplyPriceTotal,
+        vatAmount: verifiedQuote.vatAmount,
+        estimatedGrandTotal: verifiedQuote.estimatedGrandTotal,
+        sourceQuoteNo: verifiedQuote.quoteNo,
+        bookingNo: `BK-${isoDate.replace(/-/g, '').slice(2)}-${String(i + 1).padStart(2, '0')}`,
+        customerName: verifiedQuote.customerName,
+        customerId: targetCustomerId || null,
+        dispatchStatus: 'draft',
+        version: 1,
+        lastAckVersion: 0,
+      };
+
+      const row: Record<string, any> = {
+        // ID: omitted so PostgreSQL generates genuine UUID via default gen_random_uuid()
+        vehicle_no: UNASSIGNED_VEHICLE_SENTINEL, // '미배정'
+        date: isoDate,
+        pickup_time: `${startTimeHHmm}:00`,
+        time_display: `픽업 ${startTimeHHmm}`,
+        origin: verifiedQuote.origin.trim(),
+        destination: verifiedQuote.destination.trim(),
+        passenger_name: verifiedQuote.contactPerson || verifiedQuote.customerName,
+        passenger_count: 1,
+        status: 'draft',
+        dispatch_status: 'draft', // 본사 대표님 배차 대기함
         operation_status: 'ready',
+        end_date: isoDate,
+        end_time: `${endTimeHHmm}:00`,
+        driver_name: null,
+        driver_phone: null,
+        vehicle_plate: null,
+        vehicle_model: verifiedQuote.vehicleModel,
+        customer_id: targetCustomerId || null,
+        customer_name: verifiedQuote.customerName,
+        event_name: verifiedQuote.notes ? `${verifiedQuote.customerName} - ${verifiedQuote.notes}` : `${verifiedQuote.customerName} 의전 예약`,
         group_id: groupId,
-        group_name: count > 1 ? `${targetQuote.customerName} 의전 행사` : null,
+        group_name: count > 1 ? `${verifiedQuote.customerName} 의전 행사` : null,
         group_total_vehicles: count,
         group_vehicle_index: i + 1,
-        schedule_meta: {
-          driverLanguage: targetQuote.driverLanguage,
-          serviceMode: targetQuote.serviceMode,
-          serviceHours: targetQuote.serviceHours,
-          estimatedGrandTotal: targetQuote.estimatedGrandTotal,
-          sourceQuoteNo: targetQuote.quoteNo,
-        },
+        version: 1,
+        last_ack_version: 0,
+        source_quote_no: verifiedQuote.quoteNo,
+        schedule_meta: scheduleMeta,
+        passenger_note: encodeScheduleMeta(scheduleMeta as any),
         created_at: nowIso,
         updated_at: nowIso,
       };
 
-      const { error: insertErr } = await supabaseAdmin.from('schedules').insert(scheduleRow);
-      if (insertErr) {
-        console.error('[Convert Quote] Insert schedule error:', insertErr);
-        return NextResponse.json({ ok: false, error: `예약 생성 실패: ${insertErr.message}` }, { status: 500 });
-      }
-      createdBookingIds.push(bookingId);
+      recordsToInsert.push(row);
     }
 
-    // 4. Update Quote status in customer JSONB
+    // 5. Atomic Batch Insert (All-or-nothing rollback on any failure)
+    const { data: insertedRows, error: insertErr } = await supabaseAdmin
+      .from('schedules')
+      .insert(recordsToInsert)
+      .select('id, vehicle_no, date, pickup_time');
+
+    if (insertErr || !insertedRows) {
+      console.error('[Convert Quote API] Atomic batch insertion error:', insertErr);
+      return NextResponse.json(
+        { ok: false, error: `예약 저장 실패: ${insertErr?.message || '알 수 없는 DB 오류'}` },
+        { status: 500 }
+      );
+    }
+
+    const createdBookingIds = insertedRows.map((r: any) => r.id);
+
+    // 6. Update Quote status to 'converted' in cockpit.customers
     if (targetCustomerId) {
       const { data: custData } = await supabaseAdmin
         .from('customers')

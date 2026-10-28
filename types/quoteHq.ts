@@ -53,3 +53,4 @@ export interface QuoteCalculationInput {
   serviceMode?: 'with_driver' | 'vehicle_only';
   notes?: string;
 }
+

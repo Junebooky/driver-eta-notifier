@@ -57,13 +57,15 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
   const [isCalculating, setIsCalculating] = useState(false);
   const [calculatedQuote, setCalculatedQuote] = useState<HqQuoteItem | null>(null);
   const [isConverting, setIsConverting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [conversionSuccess, setConversionSuccess] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [isChauffeurCardOpen, setIsChauffeurCardOpen] = useState(false);
   const [isPrintMode, setIsPrintMode] = useState(false);
 
-  // Recalculate quote when key inputs change
+  // Recalculate quote in-memory when key inputs change (Pure calculation, ZERO database writes)
   useEffect(() => {
     if (!isOpen) return;
 
@@ -89,7 +91,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
           notes,
         };
 
-        const res = await fetch('/api/quotes', {
+        const res = await fetch('/api/quotes/calculate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -132,6 +134,48 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
   ]);
 
   if (!isOpen) return null;
+
+  // Explicit Save Quote to DB (Only on button click)
+  const handleSaveQuote = async () => {
+    if (!calculatedQuote) return;
+    setIsSaving(true);
+    setErrorMessage(null);
+    setSaveSuccess(null);
+    try {
+      const res = await fetch('/api/quotes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerName,
+          contactPerson,
+          contactPhone,
+          date,
+          serviceStartTime,
+          serviceEndTime,
+          serviceHours: Number(serviceHours),
+          origin,
+          destination,
+          vehicleModel,
+          vehicleCount: Number(vehicleCount),
+          driverLanguage,
+          serviceMode,
+          notes,
+          quoteNo: calculatedQuote.quoteNo,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setSaveSuccess(`견적서(${calculatedQuote.quoteNo})가 고객사(${customerName}) 정보에 안전하게 저장되었습니다.`);
+        setTimeout(() => setSaveSuccess(null), 4000);
+      } else {
+        setErrorMessage(data.error || '견적서 저장에 실패했습니다.');
+      }
+    } catch (e: any) {
+      setErrorMessage(e.message || '저장 중 네트워크 오류가 발생했습니다.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   // Convert quote to live booking in cockpit.schedules
   const handleConvertToBooking = async () => {
@@ -454,9 +498,16 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                   </div>
                 )}
 
+                {saveSuccess && (
+                  <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg text-blue-300 text-xs flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 shrink-0 text-blue-400" />
+                    <span>{saveSuccess}</span>
+                  </div>
+                )}
+
                 {conversionSuccess && (
                   <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-emerald-300 text-xs flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
                     <span>{conversionSuccess}</span>
                   </div>
                 )}
@@ -464,21 +515,26 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
 
               {/* Action Buttons */}
               <div className="pt-4 border-t border-slate-800 space-y-2">
-                <button
-                  type="button"
-                  onClick={handleConvertToBooking}
-                  disabled={isConverting || !calculatedQuote}
-                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-50 text-slate-950 font-bold text-sm shadow-lg shadow-amber-500/20 transition flex items-center justify-center gap-2"
-                >
-                  {isConverting ? (
-                    '예약 전환 및 배차 대기 등록 중...'
-                  ) : (
-                    <>
-                      <CheckCircle2 className="w-4 h-4" />
-                      확정 예약으로 전환 (대표님 배차 대기함 전송)
-                    </>
-                  )}
-                </button>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={handleSaveQuote}
+                    disabled={isSaving || !calculatedQuote}
+                    className="w-full py-2.5 px-3 rounded-xl border border-amber-500/50 bg-amber-500/10 hover:bg-amber-500/20 disabled:opacity-50 text-amber-300 font-bold text-xs transition flex items-center justify-center gap-1.5"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-amber-400" />
+                    {isSaving ? '저장 중...' : '견적서 DB 저장'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConvertToBooking}
+                    disabled={isConverting || !calculatedQuote}
+                    className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-50 text-slate-950 font-bold text-xs shadow-md transition flex items-center justify-center gap-1.5"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    {isConverting ? '전환 중...' : '확정 예약 전환'}
+                  </button>
+                </div>
 
                 <div className="grid grid-cols-2 gap-2">
                   <button
@@ -513,3 +569,4 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
     </>
   );
 };
+
