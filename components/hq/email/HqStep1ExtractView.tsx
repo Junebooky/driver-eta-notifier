@@ -280,3 +280,4 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
     </div>
   );
 };
+

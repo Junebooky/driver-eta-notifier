@@ -66,3 +66,4 @@ if (slots.length !== 2 || slots[0].driver?.name !== '김태훈' || slots[1].driv
 console.log('✅ Test 4 Passed: 2-Vehicle slot dispatch confirmed.');
 
 console.log('\n🎉 ALL EMAIL 4-STEP WORKFLOW TESTS PASSED 100%!');
+

@@ -420,3 +420,4 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
     </div>
   );
 };
+

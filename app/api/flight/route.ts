@@ -273,88 +273,100 @@ async function fetchGimpoFlights(
     try {
       const ioCode = type === 'arrival' ? 'I' : 'O';
       const cleanFln = flightId.replace(/[^A-Za-z0-9]/g, '');
-      const endpoint = 'http://openapi.airport.co.kr/service/rest/FlightStatusList/getFlightStatusList';
-      const kacUrl = `${endpoint}?serviceKey=${encodeURIComponent(
-        kacApiKey
-      )}&schAirCode=GMP&schFln=${encodeURIComponent(cleanFln)}&schIOType=${ioCode}&_type=json`;
+      const defaultEndpoint = 'http://openapi.airport.co.kr/service/rest/FlightStatusList/getFlightStatusList';
+      const configuredEndpoint = process.env.KAC_FLIGHT_API_ENDPOINT;
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
+      const endpoints = configuredEndpoint && configuredEndpoint !== defaultEndpoint
+        ? [configuredEndpoint, defaultEndpoint]
+        : [defaultEndpoint];
 
-      const res = await fetch(kacUrl, { signal: controller.signal });
-      clearTimeout(timeoutId);
+      for (const endpoint of endpoints) {
+        try {
+          const kacUrl = `${endpoint}?serviceKey=${encodeURIComponent(
+            kacApiKey
+          )}&schAirCode=GMP&schFln=${encodeURIComponent(cleanFln)}&schIOType=${ioCode}&_type=json&type=json`;
 
-      if (res.ok) {
-        const json = await res.json().catch(() => null);
-        const header = json?.response?.header;
-        // Check if KAC returned valid normal service
-        if (header?.resultCode === '00' || header?.resultCode === 0) {
-          const rawItems = json?.response?.body?.items?.item;
-          const items = Array.isArray(rawItems) ? rawItems : rawItems ? [rawItems] : [];
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 3500);
 
-          if (items.length > 0) {
-            return items.map((it: any) => {
-              const isDomestic = it.line === '국내' || it.schLineType === 'D' || !['HND', 'KIX', 'TSA', 'SHA', 'PEK'].includes(it.arrivedEng);
-              const terminal = isDomestic ? '김포공항 국내선' : '김포공항 국제선';
-              const terminalId = isDomestic ? 'GMP_DOM' : 'GMP_INT';
-              const airline = it.airlineKorean || it.airlineEnglish || '항공사';
-              const airport = it.arrivedKor || it.airport || (isDomestic ? '제주' : '도쿄(하네다)');
-              const airportCode = it.arrivedEng || (isDomestic ? 'CJU' : 'HND');
+          const res = await fetch(kacUrl, { signal: controller.signal });
+          clearTimeout(timeoutId);
 
-              const schedRaw = it.std ? String(it.std).replace(/[^0-9]/g, '') : '';
-              const estRaw = it.etd ? String(it.etd).replace(/[^0-9]/g, '') : schedRaw;
+          if (res.ok) {
+            const json = await res.json().catch(() => null);
+            const header = json?.response?.header || json?.header;
+            // Check if KAC returned valid normal service
+            if (header?.resultCode === '00' || header?.resultCode === 0 || header?.resultCode === '200') {
+              const rawItems = json?.response?.body?.items?.item || json?.body?.items || json?.items;
+              const items = Array.isArray(rawItems) ? rawItems : rawItems ? [rawItems] : [];
 
-              const schedFormatted = schedRaw.length === 4 ? `${schedRaw.slice(0, 2)}:${schedRaw.slice(2, 4)}` : formatFlightTime(schedRaw);
-              const estFormatted = estRaw.length === 4 ? `${estRaw.slice(0, 2)}:${estRaw.slice(2, 4)}` : formatFlightTime(estRaw);
+              if (items.length > 0) {
+                return items.map((it: any) => {
+                  const isDomestic = it.line === '국내' || it.schLineType === 'D' || !['HND', 'KIX', 'TSA', 'SHA', 'PEK'].includes(it.arrivedEng);
+                  const terminal = isDomestic ? '김포공항 국내선' : '김포공항 국제선';
+                  const terminalId = isDomestic ? 'GMP_DOM' : 'GMP_INT';
+                  const airline = it.airlineKorean || it.airlineEnglish || '항공사';
+                  const airport = it.arrivedKor || it.airport || (isDomestic ? '제주' : '도쿄(하네다)');
+                  const airportCode = it.arrivedEng || (isDomestic ? 'CJU' : 'HND');
 
-              const diffMinutes = 0;
-              const statusText = `${estFormatted} (${it.rmkKor || '정상 ' + (type === 'arrival' ? '도착' : '출발')})`;
+                  const schedRaw = it.std ? String(it.std).replace(/[^0-9]/g, '') : '';
+                  const estRaw = it.etd ? String(it.etd).replace(/[^0-9]/g, '') : schedRaw;
 
-              const rawGate = it.gate ? String(it.gate).trim() : null;
-              const { arrivalLocationText, curbsideGate, recommendedParking } = resolveGimpoArrival(
-                terminal,
-                rawGate,
-                isDomestic
-              );
-              const { departureLocationText, suggestedDoor } = resolveGimpoDeparture(
-                terminal,
-                it.checkinRange || null,
-                isDomestic
-              );
+                  const schedFormatted = schedRaw.length === 4 ? `${schedRaw.slice(0, 2)}:${schedRaw.slice(2, 4)}` : formatFlightTime(schedRaw);
+                  const estFormatted = estRaw.length === 4 ? `${estRaw.slice(0, 2)}:${estRaw.slice(2, 4)}` : formatFlightTime(estRaw);
 
-              return {
-                flightId,
-                airline,
-                type,
-                airport,
-                airportCode,
-                airportKind: 'GMP',
-                airportName: '김포국제공항',
-                isDomestic,
-                scheduleTimeFormatted: schedFormatted,
-                estimatedTimeFormatted: estFormatted,
-                statusText,
-                diffMinutes,
-                terminal,
-                terminalId,
-                isTomorrow: false,
-                flightDate: today.formatted,
-                isMock: false,
-                dataSource: 'KAC 한국공항공사 실시간 API',
-                gateNumber: rawGate,
-                carousel: null,
-                exit: null,
-                exitNumber: null,
-                curbsideGate,
-                recommendedParking,
-                arrivalLocationText,
-                checkinRange: it.checkinRange || undefined,
-                suggestedDoor,
-                departureLocationText,
-                targetPreset: getFlightLocationPreset(terminal, type, 'GMP', isDomestic),
-              };
-            });
+                  const diffMinutes = 0;
+                  const statusText = `${estFormatted} (${it.rmkKor || '정상 ' + (type === 'arrival' ? '도착' : '출발')})`;
+
+                  const rawGate = it.gate ? String(it.gate).trim() : null;
+                  const { arrivalLocationText, curbsideGate, recommendedParking } = resolveGimpoArrival(
+                    terminal,
+                    rawGate,
+                    isDomestic
+                  );
+                  const { departureLocationText, suggestedDoor } = resolveGimpoDeparture(
+                    terminal,
+                    it.checkinRange || null,
+                    isDomestic
+                  );
+
+                  return {
+                    flightId,
+                    airline,
+                    type,
+                    airport,
+                    airportCode,
+                    airportKind: 'GMP',
+                    airportName: '김포국제공항',
+                    isDomestic,
+                    scheduleTimeFormatted: schedFormatted,
+                    estimatedTimeFormatted: estFormatted,
+                    statusText,
+                    diffMinutes,
+                    terminal,
+                    terminalId,
+                    isTomorrow: false,
+                    flightDate: today.formatted,
+                    isMock: false,
+                    dataSource: 'KAC 한국공항공사 실시간 API',
+                    gateNumber: rawGate,
+                    carousel: null,
+                    exit: null,
+                    exitNumber: null,
+                    curbsideGate,
+                    recommendedParking,
+                    arrivalLocationText,
+                    checkinRange: it.checkinRange || undefined,
+                    suggestedDoor,
+                    departureLocationText,
+                    targetPreset: getFlightLocationPreset(terminal, type, 'GMP', isDomestic),
+                  };
+                });
+              }
+            }
           }
+        } catch {
+          // Continue to next endpoint or fixture fallback
         }
       }
     } catch {
