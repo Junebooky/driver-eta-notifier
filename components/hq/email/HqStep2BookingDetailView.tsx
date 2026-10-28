@@ -17,9 +17,11 @@ import {
   Plus,
   Layers,
   Star,
+  AlertCircle,
+  Loader2,
 } from 'lucide-react';
 import { AvailableDriverItem } from './HqDriverSelectModal';
-import { ReferenceEmailItem } from './emailReferenceData';
+import { HqEmailSummary, HqEmailDetail, HqEmailExtractedDraft } from '@/types/emailHq';
 import { haptics } from '@/utils/haptics';
 
 export interface VehicleSlotAssignment {
@@ -29,25 +31,65 @@ export interface VehicleSlotAssignment {
   status: 'unassigned' | 'assigned';
 }
 
-interface HqStep2BookingDetailViewProps {
-  emailItem: ReferenceEmailItem;
+export interface HqStep2BookingDetailViewProps {
+  emailSummary: HqEmailSummary;
+  emailDetail?: HqEmailDetail | null;
+  extractedDraft?: HqEmailExtractedDraft | null;
   vehicleSlots: VehicleSlotAssignment[];
   onOpenDriverModal: (slotIndex: number) => void;
   onConfirmDispatch: () => void;
   onBackToStep1: () => void;
+  isDispatching?: boolean;
+  dispatchError?: string | null;
+  // Backward compatibility
+  emailItem?: any;
 }
 
 export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> = ({
-  emailItem,
+  emailSummary,
+  emailDetail,
+  extractedDraft,
   vehicleSlots,
   onOpenDriverModal,
   onConfirmDispatch,
   onBackToStep1,
+  isDispatching = false,
+  dispatchError = null,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'assign' | 'schedule' | 'history'>('assign');
   const [selectedLanguage, setSelectedLanguage] = useState<'any' | 'english'>('any');
 
+  // Customer & Contact Info derived safely
+  const customerName =
+    emailDetail?.from?.name || emailSummary?.from?.name || '고객사 미지정';
+  const customerContact =
+    extractedDraft?.passengerPhone ||
+    emailDetail?.from?.address ||
+    emailSummary?.from?.address ||
+    '연락처 미등록';
+  const bookingDate = extractedDraft?.pickupDate || '날짜 미지정';
+  const bookingTime = extractedDraft?.pickupTime || '시간 미지정';
+  const pickupLocation = extractedDraft?.pickupLocation || '출발지 미지정';
+  const dropoffLocation = extractedDraft?.dropoffLocation || '목적지 미지정';
+  const specialRequests = extractedDraft?.specialRequests || '특이사항 없음';
+
+  const passengerName = extractedDraft?.passengerName || '탑승객 미입력';
+  const passengerPhone = extractedDraft?.passengerPhone || '연락처 미입력';
+  const passengerCount = extractedDraft?.passengerCount ?? 1;
+  const flightNumber = extractedDraft?.flightNumber || '항공편 없음';
+
+  const bookingCode = extractedDraft?.id
+    ? `BK-${(extractedDraft.pickupDate || '20261028').replace(/-/g, '')}-${extractedDraft.id.slice(-3).toUpperCase()}`
+    : `BK-${(emailSummary?.id || 'REF01').slice(-6).toUpperCase()}`;
+
+  // Check if at least one driver is assigned
+  const hasAssignedDriver = vehicleSlots.some((slot) => slot.driver !== null);
+
   const handleConfirm = () => {
+    if (!hasAssignedDriver) {
+      haptics.errorAlert();
+      return;
+    }
     haptics.success();
     onConfirmDispatch();
   };
@@ -77,8 +119,12 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
             <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-[#1E60F3] border border-blue-200">
               신규
             </span>
-            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-              배차 필요
+            <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
+              hasAssignedDriver
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                : 'bg-amber-50 text-amber-700 border-amber-200'
+            }`}>
+              {hasAssignedDriver ? '기사 배정 진행중' : '배차 필요'}
             </span>
           </div>
         </div>
@@ -149,6 +195,17 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
         </button>
       </div>
 
+      {/* Dispatch Error Notification */}
+      {dispatchError && (
+        <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-2.5 text-rose-800 text-xs font-bold animate-in fade-in">
+          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+          <div className="flex-1">
+            <span className="font-extrabold block">배차 등록 오류</span>
+            <span className="font-normal text-rose-700">{dispatchError}</span>
+          </div>
+        </div>
+      )}
+
       {/* 3. Main 2-Column Split */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* ========================================================= */}
@@ -162,15 +219,17 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
             <div className="space-y-2 text-xs">
               <div className="flex items-center justify-between">
                 <span className="text-slate-400 font-medium">예약 번호</span>
-                <span className="font-bold text-slate-800">20261028-001</span>
+                <span className="font-mono font-bold text-slate-800">{bookingCode}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-400 font-medium">고객사</span>
-                <span className="font-extrabold text-slate-900">Global Events</span>
+                <span className="font-extrabold text-slate-900">{customerName}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-slate-400 font-medium">담당자</span>
-                <span className="font-bold text-slate-800">Sarah Kim (+82 10-1234-5678)</span>
+                <span className="text-slate-400 font-medium">담당자 / 연락처</span>
+                <span className="font-bold text-slate-800 truncate max-w-[200px]" title={customerContact}>
+                  {customerContact}
+                </span>
               </div>
             </div>
 
@@ -179,19 +238,23 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
             <div className="space-y-2 text-xs">
               <div className="flex items-center justify-between">
                 <span className="text-slate-400 font-medium">운행 날짜</span>
-                <span className="font-bold text-slate-900">2026. 10. 28. (수)</span>
+                <span className="font-bold text-slate-900">{bookingDate}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-400 font-medium">픽업 시간</span>
-                <span className="font-bold text-slate-900">09:00</span>
+                <span className="font-bold text-slate-900">{bookingTime}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-400 font-medium">픽업 위치</span>
-                <span className="font-bold text-[#1E60F3]">인천공항 T2</span>
+                <span className="font-bold text-[#1E60F3] truncate max-w-[180px]" title={pickupLocation}>
+                  {pickupLocation}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-400 font-medium">목적지</span>
-                <span className="font-bold text-slate-900">신라호텔</span>
+                <span className="font-bold text-slate-900 truncate max-w-[180px]" title={dropoffLocation}>
+                  {dropoffLocation}
+                </span>
               </div>
             </div>
 
@@ -200,7 +263,7 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
             <div className="text-xs">
               <span className="text-slate-400 font-medium block mb-1">요청 사항</span>
               <p className="font-bold text-slate-800 leading-snug">
-                VIP 게스트 3인, 미팅보드 요청
+                {specialRequests}
               </p>
             </div>
           </div>
@@ -246,32 +309,34 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
             <div className="space-y-2 text-xs pt-1">
               <div className="flex items-center justify-between">
                 <span className="text-slate-400 font-medium">탑승객 수</span>
-                <span className="font-bold text-slate-800">3명</span>
+                <span className="font-bold text-slate-800">{passengerCount}명</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-400 font-medium">탑승객명</span>
                 <span className="font-bold text-slate-800">
-                  Mr. Laurent / Ms. Emma / Mr. David
+                  {passengerName}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-400 font-medium">탑승객 연락처</span>
-                <span className="font-bold text-slate-800">+33 6 12 34 56 78</span>
+                <span className="font-bold text-slate-800">{passengerPhone}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-400 font-medium">항공편명</span>
-                <span className="font-bold text-blue-600">KE082 (선택)</span>
+                <span className="font-bold text-blue-600">{flightNumber}</span>
               </div>
             </div>
           </div>
         </div>
 
         {/* ========================================================= */}
-        {/* Right Sub-Column: 요청 차량 (2대)                         */}
+        {/* Right Sub-Column: 요청 차량 리스트                        */}
         {/* ========================================================= */}
         <div className="lg:col-span-7 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-black text-slate-900">요청 차량 (2대)</h3>
+            <h3 className="text-sm font-black text-slate-900">
+              요청 차량 ({vehicleSlots.length}대)
+            </h3>
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -324,10 +389,10 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
                       className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                         isAssigned
                           ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : 'bg-slate-100 text-slate-500'
+                          : 'bg-amber-50 text-amber-700 border border-amber-200'
                       }`}
                     >
-                      {isAssigned ? '배차됨' : '미배정'}
+                      {isAssigned ? '기사 지정됨' : '기사 미배정'}
                     </span>
                   </div>
 
@@ -355,7 +420,7 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5">
                                 <span className="text-xs font-extrabold text-slate-900 truncate">
-                                  {slot.driver.name}
+                                  {slot.driver.name} 기사
                                 </span>
                                 <div className="flex items-center text-amber-500 text-[11px] font-bold">
                                   <Star className="w-3 h-3 fill-amber-400" />
@@ -363,7 +428,7 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
                                 </div>
                               </div>
                               <div className="text-[10px] text-slate-400 truncate mt-0.5">
-                                {slot.driver.plate || '차량 등록됨'} · {slot.driver.residence}
+                                {slot.driver.plate || '차량 미지정'} · {slot.driver.residence}
                               </div>
                             </div>
                           </div>
@@ -381,13 +446,13 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
                           <button
                             type="button"
                             onClick={() => onOpenDriverModal(slot.slotIndex)}
-                            className="w-full py-2.5 px-3 rounded-xl border border-slate-300 hover:border-blue-400 hover:bg-blue-50/40 text-slate-700 hover:text-[#1E60F3] text-xs font-bold transition-all flex items-center justify-between cursor-pointer active:scale-98 shadow-2xs"
+                            className="w-full py-2.5 px-3 rounded-xl border border-blue-300 hover:border-blue-500 bg-blue-50/30 hover:bg-blue-50/60 text-[#1E60F3] text-xs font-extrabold transition-all flex items-center justify-between cursor-pointer active:scale-98 shadow-2xs"
                           >
-                            <span className="text-slate-500">기사 선택</span>
-                            <ChevronDown className="w-4 h-4 text-slate-400" />
+                            <span>가용 기사 선택</span>
+                            <ChevronDown className="w-4 h-4 text-blue-500" />
                           </button>
-                          <p className="text-[10px] text-slate-400">
-                            가용 기사 목록에서 전담 기사를 지정하세요.
+                          <p className="text-[10px] text-slate-500">
+                            * 배차 확정을 위해 가용 기사를 반드시 직접 지정해야 합니다.
                           </p>
                         </div>
                       )}
@@ -404,15 +469,33 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
             <span>배정 시 기사에게 실시간 모바일 Cockpit 알림이 전송됩니다.</span>
           </div>
 
+          {/* Driver Unassigned Warning */}
+          {!hasAssignedDriver && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs font-bold flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>배차를 확정하려면 1호차 가용 기사를 먼저 직접 선택해 주세요.</span>
+            </div>
+          )}
+
           {/* Big Confirm Dispatch Button */}
-          <div className="pt-3">
+          <div className="pt-2">
             <button
               type="button"
               onClick={handleConfirm}
-              className="w-full py-3.5 px-4 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-98 text-white text-sm font-black shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+              disabled={!hasAssignedDriver || isDispatching}
+              className="w-full py-3.5 px-4 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-98 text-white text-sm font-black shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>배차 확정</span>
+              {isDispatching ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-white" />
+                  <span>배차 확정 및 기사 알림 전송 중...</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>배차 확정 (서버 등록)</span>
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -420,4 +503,3 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
     </div>
   );
 };
-

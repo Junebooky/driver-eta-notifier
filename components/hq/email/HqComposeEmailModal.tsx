@@ -276,6 +276,7 @@ const HqComposeEmailModalContent: React.FC<HqComposeEmailModalProps> = ({
   const [isSending, setIsSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successToast, setSuccessToast] = useState<string | null>(null);
+  const [isConfirmedRealSend, setIsConfirmedRealSend] = useState(false);
 
   // Handle template insertion
   const handleApplyTemplate = (tmpl: (typeof EMAIL_TEMPLATES)[0]) => {
@@ -344,6 +345,11 @@ const HqComposeEmailModalContent: React.FC<HqComposeEmailModalProps> = ({
 
     if (!body.trim()) {
       setErrorMessage('이메일 본문 내용을 입력해주세요.');
+      return;
+    }
+
+    if (!isConfirmedRealSend) {
+      setErrorMessage('안전 발송 검증: 실제 수신자에게 이메일이 발송됨을 확인하고 아래 승인 체크박스에 체크해 주세요.');
       return;
     }
 
@@ -445,7 +451,7 @@ const HqComposeEmailModalContent: React.FC<HqComposeEmailModalProps> = ({
             <div className="flex-1 py-1 px-2.5 bg-slate-50 border border-slate-200/80 rounded-lg text-slate-700 font-medium text-xs flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-500" />
               <span className="font-bold text-slate-900">VIP LIMOUSINE KOREA 관제팀</span>
-              <span className="text-slate-400">&lt;gotoward8@naver.com&gt;</span>
+              <span className="text-slate-400">&lt;관제 연동 계정&gt;</span>
             </div>
           </div>
 
@@ -586,6 +592,24 @@ const HqComposeEmailModalContent: React.FC<HqComposeEmailModalProps> = ({
             />
           </div>
 
+          {/* Real Customer Send Safety Confirmation */}
+          <div className="p-3 bg-amber-50/80 border border-amber-200/90 rounded-xl">
+            <label className="flex items-start gap-2.5 text-xs text-amber-950 font-bold cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={isConfirmedRealSend}
+                onChange={(e) => setIsConfirmedRealSend(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded border-amber-300 text-[#1E60F3] focus:ring-[#1E60F3] cursor-pointer"
+              />
+              <div className="space-y-0.5">
+                <span>[실제 발송 관리자 승인] 실제 수신자에게 이메일이 즉시 전송됨을 확인했습니다.</span>
+                <p className="text-[10px] text-amber-800/80 font-normal">
+                  승인되지 않은 임의 발송이나 오발송을 방지하기 위해 관리자의 명시적 승인이 필요합니다.
+                </p>
+              </div>
+            </label>
+          </div>
+
           {/* Modal Actions */}
           <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
             <span className="text-[11px] text-slate-400 font-medium">
@@ -604,8 +628,8 @@ const HqComposeEmailModalContent: React.FC<HqComposeEmailModalProps> = ({
 
               <button
                 type="submit"
-                disabled={isSending}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition-all cursor-pointer disabled:opacity-50"
+                disabled={isSending || !isConfirmedRealSend}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSending ? (
                   <>

@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendEmailViaNaver, isNaverSmtpConfigured } from '@/services/naverSmtpService';
+import { requireHqAdmin } from '@/lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
+    // P0 Compliance: Require HQ Admin authentication before sending customer emails
+    const auth = await requireHqAdmin(req);
+    if (!auth.ok) {
+      return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
+    }
+
     if (!isNaverSmtpConfigured()) {
       return NextResponse.json(
         {

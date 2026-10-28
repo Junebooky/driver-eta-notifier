@@ -139,10 +139,10 @@ export async function fetchNaverInboxSummaries(limit: number = 30): Promise<{
   if (!isNaverImapConfigured()) {
     return {
       ok: false,
-      emails: getSyntheticSampleEmails(),
-      totalExists: 5,
+      emails: [],
+      totalExists: 0,
       lastSync: formatDisplayDate(new Date()),
-      error: '네이버 계정이 설정되지 않아 샘플 모드로 동작합니다.',
+      error: 'NAVER_USER 또는 NAVER_APP_PASSWORD 환경변수가 설정되지 않았습니다.',
     };
   }
 
@@ -217,10 +217,10 @@ export async function fetchNaverInboxSummaries(limit: number = 30): Promise<{
     console.error('Failed to fetch NAVER inbox summaries:', errorMsg);
     return {
       ok: false,
-      emails: getSyntheticSampleEmails(),
-      totalExists: 5,
+      emails: [],
+      totalExists: 0,
       lastSync: formatDisplayDate(new Date()),
-      error: `IMAP 동기화 오류: ${errorMsg}. 안전 모드(샘플)로 표시합니다.`,
+      error: `IMAP 동기화 오류: ${errorMsg}`,
     };
   }
 }
@@ -230,13 +230,7 @@ export async function fetchNaverInboxSummaries(limit: number = 30): Promise<{
  */
 export async function fetchNaverEmailDetail(uid: number): Promise<HqEmailDetail | null> {
   if (!isNaverImapConfigured()) {
-    const sample = getSyntheticSampleEmails().find((e) => e.uid === uid);
-    if (!sample) return null;
-    return {
-      ...sample,
-      bodyText: getSyntheticBodyText(uid),
-      bodyHtmlSanitized: `<div style="font-family: sans-serif; line-height: 1.6; color: #334155;">${getSyntheticBodyText(uid).replace(/\n/g, '<br/>')}</div>`,
-    };
+    return null;
   }
 
   const client = createImapClient();

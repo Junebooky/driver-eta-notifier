@@ -17,23 +17,31 @@ import {
   ChevronLeft,
 } from 'lucide-react';
 import { VehicleSlotAssignment } from './HqStep2BookingDetailView';
-import { ReferenceEmailItem } from './emailReferenceData';
+import { HqEmailSummary, HqEmailDetail, HqEmailExtractedDraft } from '@/types/emailHq';
 import { haptics } from '@/utils/haptics';
 
-interface HqStep4DispatchDoneViewProps {
-  emailItem: ReferenceEmailItem;
+export interface HqStep4DispatchDoneViewProps {
+  emailSummary: HqEmailSummary;
+  emailDetail?: HqEmailDetail | null;
+  extractedDraft?: HqEmailExtractedDraft | null;
   vehicleSlots: VehicleSlotAssignment[];
   onOpenDriverModal: (slotIndex: number) => void;
   onResetToNewBooking: () => void;
   onOpenCustomerMessage?: () => void;
+  dispatchedSchedule?: any;
+  // Backward compatibility
+  emailItem?: any;
 }
 
 export const HqStep4DispatchDoneView: React.FC<HqStep4DispatchDoneViewProps> = ({
-  emailItem,
+  emailSummary,
+  emailDetail,
+  extractedDraft,
   vehicleSlots,
   onOpenDriverModal,
   onResetToNewBooking,
   onOpenCustomerMessage,
+  dispatchedSchedule,
 }) => {
   const [driverAccepted, setDriverAccepted] = useState(false);
   const [driverRejected, setDriverRejected] = useState(false);
@@ -52,9 +60,22 @@ export const HqStep4DispatchDoneView: React.FC<HqStep4DispatchDoneViewProps> = (
 
   const handleOpenNavi = () => {
     haptics.lightTap();
-    // Safe TMAP or mock navigation feedback
-    const url = 'https://apis.openapi.sk.com/tmap/app/routes?appKey=live&name=조선팰리스서울';
+    const dest = extractedDraft?.dropoffLocation || '조선팰리스서울';
+    const url = `https://apis.openapi.sk.com/tmap/app/routes?appKey=live&name=${encodeURIComponent(dest)}`;
     window.open(url, '_blank');
+  };
+
+  const bookingDate = extractedDraft?.pickupDate || '오늘';
+  const bookingTime = extractedDraft?.pickupTime || '09:00';
+  const pickupLocation = extractedDraft?.pickupLocation || '출발지';
+  const dropoffLocation = extractedDraft?.dropoffLocation || '도착지';
+  const passengerName = extractedDraft?.passengerName || 'VIP 고객';
+  const passengerCount = extractedDraft?.passengerCount ?? 1;
+  const flightNumber = extractedDraft?.flightNumber;
+
+  const primarySlot = vehicleSlots[0] || {
+    vehicleModel: '의전 차량',
+    driver: null,
   };
 
   return (
@@ -117,7 +138,7 @@ export const HqStep4DispatchDoneView: React.FC<HqStep4DispatchDoneViewProps> = (
                 </span>
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-extrabold text-slate-900">예약 접수</span>
-                  <span className="text-slate-400 font-medium">10.26 10:24</span>
+                  <span className="text-slate-400 font-medium">{emailSummary.receivedAt || '접수 완료'}</span>
                 </div>
               </div>
 
@@ -128,7 +149,7 @@ export const HqStep4DispatchDoneView: React.FC<HqStep4DispatchDoneViewProps> = (
                 </span>
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-extrabold text-slate-900">배차 완료</span>
-                  <span className="text-slate-400 font-medium">10.26 11:10</span>
+                  <span className="text-slate-400 font-medium">관리자 배차 확정</span>
                 </div>
               </div>
 
@@ -138,8 +159,8 @@ export const HqStep4DispatchDoneView: React.FC<HqStep4DispatchDoneViewProps> = (
                   ✓
                 </span>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-extrabold text-slate-900">기사 확인</span>
-                  <span className="text-slate-400 font-medium">10.26 11:12</span>
+                  <span className="font-extrabold text-slate-900">기사 Cockpit 알림</span>
+                  <span className="text-emerald-600 font-bold">실시간 발송 완료</span>
                 </div>
               </div>
 
@@ -161,83 +182,54 @@ export const HqStep4DispatchDoneView: React.FC<HqStep4DispatchDoneViewProps> = (
             <h3 className="text-xs font-black text-slate-900">배정 차량 및 기사</h3>
 
             <div className="space-y-2.5">
-              {/* Vehicle 1 */}
-              <div className="p-3 bg-white rounded-xl border border-slate-200/90 shadow-2xs flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <span className="px-2 py-0.5 rounded-md bg-blue-50 text-[#1E60F3] text-[10px] font-black shrink-0">
-                    1호차
-                  </span>
-                  <div className="min-w-0">
-                    <div className="text-xs font-black text-slate-900 truncate">
-                      스프린터 319 CDI
-                    </div>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <img
-                        src="/images/driver_kim.png"
-                        alt="김태훈"
-                        className="w-5 h-5 rounded-full object-cover shrink-0"
-                      />
-                      <span className="text-xs font-bold text-slate-700">김태훈</span>
-                      <div className="flex items-center text-amber-500 text-[10px] font-bold">
-                        <Star className="w-2.5 h-2.5 fill-amber-400" />
-                        <span>4.9</span>
+              {vehicleSlots.map((slot, idx) => (
+                <div
+                  key={slot.slotIndex}
+                  className="p-3 bg-white rounded-xl border border-slate-200/90 shadow-2xs flex items-center justify-between gap-3"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="px-2 py-0.5 rounded-md bg-blue-50 text-[#1E60F3] text-[10px] font-black shrink-0">
+                      {idx + 1}호차
+                    </span>
+                    <div className="min-w-0">
+                      <div className="text-xs font-black text-slate-900 truncate">
+                        {slot.vehicleModel}
                       </div>
+                      {slot.driver ? (
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <img
+                            src={slot.driver.avatarUrl}
+                            alt={slot.driver.name}
+                            className="w-5 h-5 rounded-full object-cover shrink-0"
+                          />
+                          <span className="text-xs font-bold text-slate-700">
+                            {slot.driver.name}
+                          </span>
+                          <div className="flex items-center text-amber-500 text-[10px] font-bold">
+                            <Star className="w-2.5 h-2.5 fill-amber-400" />
+                            <span>{slot.driver.rating}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-[11px] text-slate-400">기사 미배정</div>
+                      )}
                     </div>
                   </div>
-                </div>
 
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200 text-right">
-                    알림 전송됨 10.26 11:11
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => onOpenDriverModal(0)}
-                    className="px-2 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 text-[11px] font-bold cursor-pointer"
-                  >
-                    변경
-                  </button>
-                </div>
-              </div>
-
-              {/* Vehicle 2 */}
-              <div className="p-3 bg-white rounded-xl border border-slate-200/90 shadow-2xs flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <span className="px-2 py-0.5 rounded-md bg-blue-50 text-[#1E60F3] text-[10px] font-black shrink-0">
-                    2호차
-                  </span>
-                  <div className="min-w-0">
-                    <div className="text-xs font-black text-slate-900 truncate">
-                      G90 LWB
-                    </div>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <img
-                        src="/images/driver_lee.png"
-                        alt="이준호"
-                        className="w-5 h-5 rounded-full object-cover shrink-0"
-                      />
-                      <span className="text-xs font-bold text-slate-700">이준호</span>
-                      <div className="flex items-center text-amber-500 text-[10px] font-bold">
-                        <Star className="w-2.5 h-2.5 fill-amber-400" />
-                        <span>4.8</span>
-                      </div>
-                    </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200 text-right">
+                      알림 전송됨
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => onOpenDriverModal(slot.slotIndex)}
+                      className="px-2 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 text-[11px] font-bold cursor-pointer"
+                    >
+                      변경
+                    </button>
                   </div>
                 </div>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">
-                    알림 전송됨
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => onOpenDriverModal(1)}
-                    className="px-2 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 text-[11px] font-bold cursor-pointer"
-                  >
-                    변경
-                  </button>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
 
@@ -302,11 +294,11 @@ export const HqStep4DispatchDoneView: React.FC<HqStep4DispatchDoneViewProps> = (
               <div className="p-4 flex-1 space-y-3.5 overflow-y-auto font-sans">
                 {/* Date & Flight Banner */}
                 <div className="flex items-center justify-between text-xs font-extrabold text-slate-900">
-                  <span>10월 28일 (화)</span>
+                  <span>{bookingDate}</span>
                   <div className="flex items-center gap-1 text-blue-600">
-                    <span>✈ KE082</span>
-                    <span className="text-slate-400 font-normal">|</span>
-                    <span>09:00</span>
+                    {flightNumber && <span>✈ {flightNumber}</span>}
+                    {flightNumber && <span className="text-slate-400 font-normal">|</span>}
+                    <span>{bookingTime}</span>
                   </div>
                 </div>
 
@@ -314,19 +306,19 @@ export const HqStep4DispatchDoneView: React.FC<HqStep4DispatchDoneViewProps> = (
                 <div className="p-3 bg-white rounded-xl border border-slate-200/90 shadow-2xs space-y-2">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="text-[11px] font-bold text-slate-900">
-                        인천공항 T2
+                      <div className="text-[11px] font-bold text-slate-900 truncate">
+                        {pickupLocation}
                       </div>
-                      <div className="text-[9px] text-slate-400">Incheon Airport</div>
+                      <div className="text-[9px] text-slate-400">출발 픽업지</div>
                     </div>
 
                     <ArrowRight className="w-4 h-4 text-slate-400 shrink-0 mt-1" />
 
                     <div className="min-w-0 text-right">
-                      <div className="text-[11px] font-bold text-slate-900">
-                        조선팰리스 서울
+                      <div className="text-[11px] font-bold text-slate-900 truncate">
+                        {dropoffLocation}
                       </div>
-                      <div className="text-[9px] text-slate-400">Josun Palace Seoul</div>
+                      <div className="text-[9px] text-slate-400">도착지</div>
                     </div>
                   </div>
                 </div>
@@ -336,25 +328,25 @@ export const HqStep4DispatchDoneView: React.FC<HqStep4DispatchDoneViewProps> = (
                   <div className="w-6 h-6 rounded-full bg-blue-50 text-[#1E60F3] flex items-center justify-center shrink-0">
                     <User className="w-3.5 h-3.5" />
                   </div>
-                  <span className="font-bold text-slate-800">
-                    Mr. Laurent (2명)
+                  <span className="font-bold text-slate-800 truncate">
+                    {passengerName} ({passengerCount}명)
                   </span>
                 </div>
 
                 {/* Vehicle Row */}
                 <div className="p-2.5 bg-white rounded-xl border border-slate-200/80 shadow-2xs flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
                     <img
                       src="/images/car_phone_carnival.png"
-                      alt="카니발 하이리무진"
+                      alt="배정 차량"
                       className="w-10 h-7 object-contain shrink-0"
                     />
-                    <div>
-                      <div className="text-[11px] font-black text-slate-900 leading-tight">
-                        카니발 하이리무진
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-black text-slate-900 leading-tight truncate">
+                        {primarySlot.vehicleModel}
                       </div>
-                      <div className="text-[10px] text-slate-400 font-medium">
-                        73로 2553
+                      <div className="text-[10px] text-slate-400 font-medium truncate">
+                        {primarySlot.driver?.plate || '차량 배정'} · {primarySlot.driver?.name || '담당기사'}
                       </div>
                     </div>
                   </div>
@@ -369,32 +361,32 @@ export const HqStep4DispatchDoneView: React.FC<HqStep4DispatchDoneViewProps> = (
                   <Compass className="w-3.5 h-3.5 text-[#1E60F3]" />
                   <span>내비게이션 열기</span>
                 </button>
-              </div>
 
-              {/* Mobile Phone Bottom Buttons */}
-              <div className="p-3 bg-white border-t border-slate-100 grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={handleDriverReject}
-                  className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    driverRejected
-                      ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                  }`}
-                >
-                  {driverRejected ? '거절됨' : '거절'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDriverAccept}
-                  className={`py-2 rounded-xl text-xs font-extrabold text-white transition-all cursor-pointer shadow-xs ${
-                    driverAccepted
-                      ? 'bg-emerald-600 hover:bg-emerald-700'
-                      : 'bg-[#1E60F3] hover:bg-blue-600'
-                  }`}
-                >
-                  {driverAccepted ? '수락 완료 ✓' : '수락'}
-                </button>
+                {/* Acceptance Action Buttons */}
+                <div className="grid grid-cols-2 gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={handleDriverReject}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      driverRejected
+                        ? 'bg-rose-50 text-rose-600 border border-rose-300'
+                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    {driverRejected ? '거절됨' : '거절'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDriverAccept}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      driverAccepted
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'bg-[#1E60F3] text-white hover:bg-blue-600 shadow-xs'
+                    }`}
+                  >
+                    {driverAccepted ? '수락 완료 ✓' : '수락'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -403,4 +395,3 @@ export const HqStep4DispatchDoneView: React.FC<HqStep4DispatchDoneViewProps> = (
     </div>
   );
 };
-

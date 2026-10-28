@@ -232,7 +232,7 @@ export const REFERENCE_EMAILS: ReferenceEmailItem[] = [
     summary: {
       id: 'em-ref-bl-004',
       uid: 104,
-      provider: 'naver',
+      provider: 'demo',
       from: {
         name: 'Beautiful Ltd.',
         address: 'booking@beautifulltd.co.kr',
@@ -252,7 +252,7 @@ export const REFERENCE_EMAILS: ReferenceEmailItem[] = [
     detail: {
       id: 'em-ref-bl-004',
       uid: 104,
-      provider: 'naver',
+      provider: 'demo',
       from: {
         name: 'Beautiful Ltd.',
         address: 'booking@beautifulltd.co.kr',
@@ -439,7 +439,7 @@ export const REFERENCE_EMAILS: ReferenceEmailItem[] = [
     summary: {
       id: 'em-ref-ta-007',
       uid: 107,
-      provider: 'naver',
+      provider: 'demo',
       from: {
         name: 'The Atelier',
         address: 'contact@theatelier.com',
@@ -459,7 +459,7 @@ export const REFERENCE_EMAILS: ReferenceEmailItem[] = [
     detail: {
       id: 'em-ref-ta-007',
       uid: 107,
-      provider: 'naver',
+      provider: 'demo',
       from: {
         name: 'The Atelier',
         address: 'contact@theatelier.com',
@@ -715,7 +715,7 @@ export const REFERENCE_EMAILS: ReferenceEmailItem[] = [
     summary: {
       id: 'em-ref-lc-011',
       uid: 111,
-      provider: 'naver',
+      provider: 'demo',
       from: {
         name: 'Lotte Corp',
         address: 'protocol@lotte.net',
@@ -735,7 +735,7 @@ export const REFERENCE_EMAILS: ReferenceEmailItem[] = [
     detail: {
       id: 'em-ref-lc-011',
       uid: 111,
-      provider: 'naver',
+      provider: 'demo',
       from: {
         name: 'Lotte Corp',
         address: 'protocol@lotte.net',
@@ -784,7 +784,7 @@ export const REFERENCE_EMAILS: ReferenceEmailItem[] = [
     summary: {
       id: 'em-ref-sm-012',
       uid: 112,
-      provider: 'naver',
+      provider: 'demo',
       from: {
         name: 'Simmtech HQ',
         address: 'admin@simmtech.com',
@@ -804,7 +804,7 @@ export const REFERENCE_EMAILS: ReferenceEmailItem[] = [
     detail: {
       id: 'em-ref-sm-012',
       uid: 112,
-      provider: 'naver',
+      provider: 'demo',
       from: {
         name: 'Simmtech HQ',
         address: 'admin@simmtech.com',

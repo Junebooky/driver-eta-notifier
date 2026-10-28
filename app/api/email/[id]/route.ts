@@ -29,7 +29,17 @@ export async function GET(
     const uid = parseInt(uidStr, 10);
 
     if (isNaN(uid)) {
-      return NextResponse.json({ ok: false, error: 'Invalid UID format' }, { status: 400 });
+      if (id.startsWith('em-ref-')) {
+        const { isDevAuthAllowed } = await import('@/lib/auth/serverAuth');
+        if (isDevAuthAllowed()) {
+          const { REFERENCE_EMAILS } = await import('@/components/hq/email/emailReferenceData');
+          const refItem = REFERENCE_EMAILS.find((r) => r.summary.id === id);
+          if (refItem) {
+            return NextResponse.json({ ok: true, email: refItem.detail, isDemo: true });
+          }
+        }
+      }
+      return NextResponse.json({ ok: false, error: '유효하지 않은 이메일 식별자입니다.' }, { status: 400 });
     }
 
     // Check server cache first for instant retrieval

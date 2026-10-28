@@ -30,16 +30,25 @@ export async function GET(req: NextRequest) {
     const forceRefresh = url.searchParams.get('refresh') === 'true';
     const mode = url.searchParams.get('mode');
 
-    // If explicit synthetic mode or not configured with real credentials, return safe synthetic candidate emails
-    if (mode === 'synthetic' || !isConfigured) {
-      const candidateEmails = await getInboxCandidateEmails();
+    // P0 Compliance: If not configured, strictly return unconfigured/disconnected state with empty email list (Never mix synthetic emails)
+    if (!isConfigured) {
       return NextResponse.json({
-        ok: true,
+        ok: false,
         isConfigured: false,
-        isSynthetic: true,
-        emails: candidateEmails,
-        totalCount: candidateEmails.length,
-        notice: 'HQ 이메일 인박스는 현재 승인된 테스트 모드로 동작 중입니다 (실제 편지함 접근 차단).',
+        syncStatus: 'disconnected',
+        status: {
+          ok: false,
+          totalMessages: 0,
+          unreadCount: 0,
+          accountEmail: '미연결',
+          server: 'imap.naver.com',
+          lastChecked: new Date().toISOString(),
+          error: 'NAVER_USER 또는 NAVER_APP_PASSWORD 환경 변수가 서버에 설정되지 않았습니다.',
+        },
+        emails: [],
+        totalCount: 0,
+        lastSync: null,
+        error: 'NAVER 이메일 계정이 연결되지 않았습니다. 관리자 환경변수 설정을 확인해 주세요.',
       });
     }
 
@@ -83,15 +92,17 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Fallback to synthetic candidate emails on error
-    const candidateEmails = await getInboxCandidateEmails();
-    return NextResponse.json({
-      ok: true,
-      isConfigured: false,
-      isSynthetic: true,
-      emails: candidateEmails,
-      totalCount: candidateEmails.length,
-      warning: errorMsg,
-    });
+    // P0 Compliance: Do not disguise errors with synthetic sample emails
+    return NextResponse.json(
+      {
+        ok: false,
+        isConfigured: isNaverImapConfigured(),
+        syncStatus: 'error',
+        emails: [],
+        totalCount: 0,
+        error: `NAVER IMAP 동기화 오류: ${errorMsg}`,
+      },
+      { status: 502 }
+    );
   }
 }

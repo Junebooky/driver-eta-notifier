@@ -1,13 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { extractBookingFromEmail } from '@/services/emailBookingGeminiService';
 import { extractBookingDraftFromEmail } from '@/services/emailIntakeService';
+import { requireHqAdmin } from '@/lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
+    // P0 Compliance: Require HQ Admin authentication before invoking AI extraction
+    const auth = await requireHqAdmin(request);
+    if (!auth.ok) {
+      return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
+    }
+
     const body = await request.json().catch(() => ({}));
-    const { emailId, subject, sender, bodyText } = body;
+    const emailId = body.emailId;
+    const subject = body.subject || body.emailSubject;
+    const sender = body.sender || body.emailFrom;
+    const bodyText = body.bodyText || body.emailText;
 
     if (!emailId) {
       return NextResponse.json({ ok: false, error: 'emailId is required' }, { status: 400 });

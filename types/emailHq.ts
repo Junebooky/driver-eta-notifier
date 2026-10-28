@@ -2,7 +2,7 @@
  * VIP LIMOUSINE KOREA - HQ Email & AI Booking Assistant Types
  */
 
-export type EmailProvider = 'naver' | 'gmail';
+export type EmailProvider = 'naver' | 'gmail' | 'demo';
 
 export type EmailCandidateClassification =
   | 'booking_candidate' // Positive booking/quote/itinerary request
