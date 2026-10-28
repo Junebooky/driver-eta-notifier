@@ -47,6 +47,7 @@ import {
 } from '@/utils/settlementStorage';
 import { ensureClientAuth } from '@/utils/cockpitClientAuth';
 import { HqPlaceSearchInput } from './HqPlaceSearchInput';
+import { TossDateRangePicker } from '@/components/common/TossDateRangePicker';
 import {
   cleanDriverIdentity,
   cleanVehicleIdentity,
@@ -265,8 +266,6 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
   // 2. Date Range State (Single Day vs Multiple Days)
   const [pickupDate, setPickupDate] = useState(() => getKstTodayDateStr());
   const [pickupEndDate, setPickupEndDate] = useState<string>(() => getKstTodayDateStr());
-  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
-  const datePickerRef = useRef<HTMLDivElement>(null);
 
   // 3. Pickup Time State
   const [pickupTimeOnly, setPickupTimeOnly] = useState('09:00');
@@ -329,9 +328,6 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
       const target = e.target as Node;
       if (customerDropdownRef.current && !customerDropdownRef.current.contains(target)) {
         setIsCustomerDropdownOpen(false);
-      }
-      if (datePickerRef.current && !datePickerRef.current.contains(target)) {
-        setIsDatePickerOpen(false);
       }
       if (timePickerRef.current && !timePickerRef.current.contains(target)) {
         setIsTimePickerOpen(false);
@@ -866,140 +862,17 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
           {/* 운행 날짜 * & 픽업 시간 * (2 Columns) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* 운행 날짜 */}
-            <div className="relative" ref={datePickerRef}>
-              <label className="block text-xs font-bold text-slate-800 mb-1.5">
-                운행 날짜 <span className="text-red-500 font-bold ml-0.5">*</span>
-              </label>
-
-              <div
-                role="button"
-                tabIndex={0}
-                onClick={() => {
-                  haptics.lightTap();
-                  setIsDatePickerOpen((prev) => !prev);
-                  setIsTimePickerOpen(false);
-                  setIsVehicleModelDropdownOpen(false);
-                }}
-                className="w-full h-12 bg-white border border-slate-200 hover:border-blue-400 focus:border-[#1E60F3] rounded-xl px-3.5 flex items-center gap-2.5 transition-all cursor-pointer shadow-2xs"
-              >
-                <Calendar className="w-5 h-5 text-slate-700 shrink-0" />
-                <span className="text-sm font-bold text-slate-900 truncate flex-1">
-                  {formatDateRangeDisplay(pickupDate, pickupEndDate)}
-                </span>
-              </div>
-
-              {/* Date Range Picker Popover */}
-              {isDatePickerOpen && (
-                <div className="absolute left-0 right-0 sm:right-auto sm:w-80 top-full mt-1.5 z-40 bg-white border border-slate-200 rounded-2xl shadow-2xl p-4 animate-in fade-in slide-in-from-top-2 duration-150 space-y-3">
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                    <span className="text-xs font-bold text-slate-900">운행 일정 선택</span>
-                    <button
-                      type="button"
-                      onClick={() => setIsDatePickerOpen(false)}
-                      className="p-1 text-slate-400 hover:text-slate-600 rounded-full"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  {/* Quick Range Chips */}
-                  <div className="flex flex-wrap gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const today = getKstTodayDateStr();
-                        setPickupDate(today);
-                        setPickupEndDate(today);
-                      }}
-                      className="px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 text-[#1E60F3] hover:bg-blue-100 transition-colors"
-                    >
-                      오늘
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const tmr = getKstTomorrowDateStr();
-                        setPickupDate(tmr);
-                        setPickupEndDate(tmr);
-                      }}
-                      className="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
-                    >
-                      내일
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPickupEndDate(addDaysToIso(pickupDate, 1));
-                      }}
-                      className="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
-                    >
-                      +1일 (1박2일)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPickupEndDate(addDaysToIso(pickupDate, 2));
-                      }}
-                      className="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
-                    >
-                      +2일 (2박3일)
-                    </button>
-                  </div>
-
-                  {/* Inputs for Start Date & End Date */}
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-500 mb-1">
-                        시작일
-                      </label>
-                      <input
-                        type="date"
-                        value={pickupDate}
-                        onChange={(e) => {
-                          const newStart = e.target.value;
-                          setPickupDate(newStart);
-                          if (pickupEndDate && pickupEndDate < newStart) {
-                            setPickupEndDate(newStart);
-                          }
-                        }}
-                        className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-500 mb-1">
-                        종료일
-                      </label>
-                      <input
-                        type="date"
-                        min={pickupDate}
-                        value={pickupEndDate || pickupDate}
-                        onChange={(e) => setPickupEndDate(e.target.value)}
-                        className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Summary Preview Box */}
-                  <div className="p-2.5 bg-blue-50/70 border border-blue-100 rounded-xl text-center">
-                    <span className="text-[11px] text-slate-500 block">표시될 일정</span>
-                    <span className="text-sm font-black text-[#1E60F3]">
-                      {formatDateRangeDisplay(pickupDate, pickupEndDate)}
-                    </span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      haptics.selection();
-                      setIsDatePickerOpen(false);
-                    }}
-                    className="w-full py-2 bg-[#1E60F3] text-white text-xs font-bold rounded-xl shadow-xs hover:bg-blue-600 transition-colors"
-                  >
-                    일정 적용
-                  </button>
-                </div>
-              )}
-            </div>
+            <TossDateRangePicker
+              label="운행 날짜"
+              required
+              startDate={pickupDate}
+              endDate={pickupEndDate}
+              onChangeRange={(start, end) => {
+                setPickupDate(start);
+                setPickupEndDate(end);
+              }}
+              heightClass="h-12"
+            />
 
             {/* 픽업 시간 */}
             <div className="relative" ref={timePickerRef}>
@@ -1013,7 +886,6 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                 onClick={() => {
                   haptics.lightTap();
                   setIsTimePickerOpen((prev) => !prev);
-                  setIsDatePickerOpen(false);
                   setIsVehicleModelDropdownOpen(false);
                 }}
                 className="w-full h-12 bg-white border border-slate-200 hover:border-blue-400 focus:border-[#1E60F3] rounded-xl px-3.5 flex items-center justify-between transition-all cursor-pointer shadow-2xs"
@@ -1139,7 +1011,6 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                 onClick={() => {
                   haptics.lightTap();
                   setIsVehicleModelDropdownOpen((prev) => !prev);
-                  setIsDatePickerOpen(false);
                   setIsTimePickerOpen(false);
                 }}
                 className="w-full h-12 bg-white border border-slate-200 hover:border-blue-400 focus:border-[#1E60F3] rounded-xl px-3.5 flex items-center justify-between transition-all cursor-pointer shadow-2xs"

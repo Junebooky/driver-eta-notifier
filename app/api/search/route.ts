@@ -734,59 +734,64 @@ export async function GET(req: NextRequest) {
         return (a.originalIndex ?? 0) - (b.originalIndex ?? 0);
       }
 
-      // 3순위: 일반 POI
-      const normA = a.name.replace(/\s+/g, '').toLowerCase();
-      const normB = b.name.replace(/\s+/g, '').toLowerCase();
-      const addrA = a.address.replace(/\s+/g, '').toLowerCase();
-      const addrB = b.address.replace(/\s+/g, '').toLowerCase();
+      // 3순위: 일반 POI (의전 차량 특화 랭킹: 호텔/호스피탈리티/주요 랜드마크 본관 최우선, ATM/버스정류소/공중화장실 강등)
+      const userWantsAtm = /atm|현금|은행|cd기/i.test(normKeyword);
+      const userWantsBus = /버스|정류장|정류소/i.test(normKeyword);
+      const userWantsParking = /주차|발렛/i.test(normKeyword);
 
-      const getTier = (normName: string, normAddr: string) => {
-        if (normName === normKeyword || normName.startsWith(normKeyword)) {
-          return 1;
+      const scorePoi = (p: TmapPoiItem, originalIndex: number): number => {
+        const norm = p.name.replace(/\s+/g, '').toLowerCase();
+        const biz = (p.lowerBizName || '').toLowerCase();
+
+        // 1) 비선호 부대시설 감점 (ATM, 버스정류장, 공중화장실 등)
+        const isAtm = !userWantsAtm && (/atm|현금인출기|365|cd기/i.test(norm) || biz === 'atm');
+        const isBus = !userWantsBus && (/버스정류장|정류소|정류장/i.test(norm) || biz.includes('정류'));
+        const isParking = !userWantsParking && (/주차장|gate|출차|입차/i.test(norm) || biz.includes('주차'));
+
+        if (isAtm) return 9000 + originalIndex;
+        if (isBus) return 8000 + originalIndex;
+        if (isParking) return 5000 + originalIndex;
+
+        let score = 0;
+
+        // 2) 검색어 완전 일치
+        if (norm === normKeyword) {
+          score -= 500;
         }
-        if (normName.includes(normKeyword)) {
-          return 2;
+        // 3) 검색어 첫 번째 핵심 단어로 시작 (예: '조선팰리스' 서울강남)
+        else if (tokens[0] && norm.startsWith(tokens[0])) {
+          score -= 300;
         }
-        if (tokens.every((t) => normName.includes(t)) || normAddr.includes(normKeyword)) {
-          return 3;
+
+        // 4) 검색어의 모든 토큰을 포함하고 있는지 (단어 순서와 무관하게 매칭)
+        const allTokensMatch =
+          tokens.length > 0 &&
+          tokens.every(
+            (t) => norm.includes(t) || (p.address && p.address.toLowerCase().includes(t))
+          );
+        if (allTokensMatch) {
+          score -= 200;
         }
-        return 4;
+
+        // 5) 호텔/리조트/컨벤션/주요 숙박 및 본관 시설 가산점
+        if (
+          /호텔|숙박|리조트|컨벤션|빌딩|터미널|호스피탈리티/.test(biz) ||
+          /(?:호텔|리조트|본관|타워)$/.test(norm)
+        ) {
+          score -= 100;
+        }
+
+        // 6) TMAP 원본 검색 순위 반영 (TMAP 엔진 자체의 유사도 점수 보존)
+        score += originalIndex * 10;
+
+        return score;
       };
 
-      const tierA = getTier(normA, addrA);
-      const tierB = getTier(normB, addrB);
+      const scoreA = scorePoi(a, a.originalIndex ?? 0);
+      const scoreB = scorePoi(b, b.originalIndex ?? 0);
 
-      if (tierA !== tierB) {
-        return tierA - tierB;
-      }
-
-      if (tierA === 1) {
-        const isAuxA = /(?:주차장|전기차충전소|정문|후문|부설)/.test(a.name);
-        const isAuxB = /(?:주차장|전기차충전소|정문|후문|부설)/.test(b.name);
-        if (!isAuxA && isAuxB) return -1;
-        if (isAuxA && !isAuxB) return 1;
-
-        if (a.originalIndex === 0 && !isAuxA) return -1;
-        if (b.originalIndex === 0 && !isAuxB) return 1;
-
-        const isExactA = normA === normKeyword;
-        const isExactB = normB === normKeyword;
-        if (isExactA && !isExactB && Math.abs((a.originalIndex ?? 0) - (b.originalIndex ?? 0)) < 5) return -1;
-        if (!isExactA && isExactB && Math.abs((a.originalIndex ?? 0) - (b.originalIndex ?? 0)) < 5) return 1;
-
-        if ((a.originalIndex ?? 0) !== (b.originalIndex ?? 0)) {
-          return (a.originalIndex ?? 0) - (b.originalIndex ?? 0);
-        }
-
-        const diffA = Math.abs(normA.length - normKeyword.length);
-        const diffB = Math.abs(normB.length - normKeyword.length);
-        if (diffA !== diffB) return diffA - diffB;
-      }
-
-      if (tierA === 2) {
-        const diffA = Math.abs(normA.length - normKeyword.length);
-        const diffB = Math.abs(normB.length - normKeyword.length);
-        if (diffA !== diffB) return diffA - diffB;
+      if (scoreA !== scoreB) {
+        return scoreA - scoreB;
       }
 
       return (a.originalIndex ?? 0) - (b.originalIndex ?? 0);

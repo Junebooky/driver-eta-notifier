@@ -151,3 +151,4 @@ console.log('\n[Test 4] State preservation test: background poll does NOT wipe u
 }
 
 console.log('\n✅ All Customer Message & Native SMS Scheme Tests Passed!\n');
+

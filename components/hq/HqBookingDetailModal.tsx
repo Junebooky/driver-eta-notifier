@@ -33,6 +33,7 @@ import {
 } from '@/utils/settlementStorage';
 import { INITIAL_HQ_CUSTOMERS } from '@/utils/customerHqData';
 import { HqPlaceSearchInput } from './HqPlaceSearchInput';
+import { TossDatePicker } from '@/components/common/TossDatePicker';
 import {
   cleanDriverIdentity,
   detectDispatchConflicts,
@@ -445,51 +446,47 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
         <div className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {/* Left Column: Editable Reservation & Passenger Info */}
-            <div className="space-y-3">
-              <h4 className="text-xs font-black text-slate-700 flex items-center justify-between">
+            <div className="space-y-3.5">
+              <h4 className="text-sm font-black text-slate-800 flex items-center justify-between">
                 <span>1. 예약 · 운행 일정 및 담당 승객</span>
                 {booking.groupTotalVehicles && booking.groupTotalVehicles > 1 && (
-                  <span className="text-[11px] font-bold text-[#1E60F3] bg-blue-50 px-2 py-0.5 rounded-md">
+                  <span className="text-xs font-bold text-[#1E60F3] bg-blue-50 px-2.5 py-1 rounded-lg">
                     복수 차량 {booking.groupVehicleIndex || 1}호차 / 총 {booking.groupTotalVehicles}대
                   </span>
                 )}
               </h4>
 
-              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2.5 text-xs">
+              <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-200/80 space-y-3.5">
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                    고객사 / 예약처 *
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    고객사 / 예약처 <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
                     placeholder="예: CHANEL Korea / 심텍 / 모건스탠리"
-                    className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-bold"
+                    className="w-full h-11 px-3.5 bg-white border border-slate-200 hover:border-blue-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 rounded-xl text-sm font-bold text-slate-900 shadow-2xs transition-all outline-none"
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <TossDatePicker
+                    label="운행 일자"
+                    required
+                    value={pickupDate}
+                    onChange={(newDate) => setPickupDate(newDate)}
+                    heightClass="h-11"
+                  />
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                      운행 일자 *
-                    </label>
-                    <input
-                      type="date"
-                      value={pickupDate}
-                      onChange={(e) => setPickupDate(e.target.value)}
-                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                      픽업 시간 *
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      픽업 시간 <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="time"
                       value={pickupTime}
                       onChange={(e) => setPickupTime(e.target.value)}
-                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-bold"
+                      className="w-full h-11 px-3.5 bg-white border border-slate-200 hover:border-blue-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 rounded-xl text-sm font-bold text-slate-900 shadow-2xs transition-all outline-none cursor-pointer"
                     />
                   </div>
                 </div>
@@ -500,7 +497,7 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                   value={pickupLocation}
                   onChange={(val) => setPickupLocation(val)}
                   placeholder="예: 인천국제공항 T2 / 조선팰리스 강남"
-                  heightClass="h-10"
+                  heightClass="h-11"
                   icon="mapPin"
                 />
 
@@ -510,13 +507,13 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                   value={destination}
                   onChange={(val) => setDestination(val)}
                   placeholder="예: 신라호텔 서울 / 코엑스"
-                  heightClass="h-10"
+                  heightClass="h-11"
                   icon="flag"
                 />
 
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
                       담당 승객명
                     </label>
                     <input
@@ -524,11 +521,11 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                       value={passengerName}
                       onChange={(e) => setPassengerName(e.target.value)}
                       placeholder="VIP 승객 성함"
-                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-bold"
+                      className="w-full h-11 px-3.5 bg-white border border-slate-200 hover:border-blue-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 rounded-xl text-sm font-bold text-slate-900 shadow-2xs transition-all outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
                       승객 연락처
                     </label>
                     <input
@@ -536,14 +533,14 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                       value={passengerPhone}
                       onChange={(e) => setPassengerPhone(e.target.value)}
                       placeholder="010-0000-0000"
-                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-medium"
+                      className="w-full h-11 px-3.5 bg-white border border-slate-200 hover:border-blue-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 rounded-xl text-sm font-medium text-slate-900 shadow-2xs transition-all outline-none"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
                       탑승 인원 (명)
                     </label>
                     <input
@@ -551,11 +548,11 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                       min={1}
                       value={passengerCount}
                       onChange={(e) => setPassengerCount(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-bold"
+                      className="w-full h-11 px-3.5 bg-white border border-slate-200 hover:border-blue-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 rounded-xl text-sm font-bold text-slate-900 shadow-2xs transition-all outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
                       항공편명 (선택)
                     </label>
                     <input
@@ -563,13 +560,13 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                       value={flightNumber}
                       onChange={(e) => setFlightNumber(e.target.value)}
                       placeholder="예: KE082"
-                      className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-mono font-bold"
+                      className="w-full h-11 px-3.5 bg-white border border-slate-200 hover:border-blue-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 rounded-xl text-sm font-mono font-bold text-slate-900 shadow-2xs transition-all outline-none"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
                     배차 특이사항 · 의전 메모
                   </label>
                   <textarea
@@ -577,7 +574,7 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     placeholder="피켓 영접, 수하물 개수, 차량 내 비품 요청 등"
-                    className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 font-medium"
+                    className="w-full p-3 bg-white border border-slate-200 hover:border-blue-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 rounded-xl text-sm font-medium text-slate-800 shadow-2xs transition-all outline-none"
                   />
                 </div>
               </div>
@@ -585,59 +582,59 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
 
             {/* Right Column: Representative Vehicle/Driver Assignment & Driver Cockpit Ack Status */}
             <div className="space-y-3.5">
-              <h4 className="text-xs font-black text-slate-700">
+              <h4 className="text-sm font-black text-slate-800">
                 2. 차량 · 기사 배정 및 기사 확인 현황
               </h4>
 
               {/* Driver Assignment & Ack Card */}
-              <div className="p-4 rounded-2xl border-2 border-blue-200/80 bg-blue-50/20 space-y-3">
+              <div className="p-4 rounded-2xl border-2 border-blue-200/80 bg-blue-50/20 space-y-3.5">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-2">
                     <User className="w-4 h-4 text-[#1E60F3]" />
-                    <span className="text-xs font-black text-slate-900">
+                    <span className="text-sm font-black text-slate-900">
                       기사 Cockpit 동기화 상태
                     </span>
                   </div>
 
                   {isNewBooking ? (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-800">
+                    <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-indigo-100 text-indigo-800">
                       신규 접수 작성 중
                     </span>
                   ) : isCancelled ? (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800">
+                    <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-100 text-rose-800">
                       배차 취소됨
                     </span>
                   ) : booking.driverAck === '확인완료' ? (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" />
+                    <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-800 flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
                       기사 확인완료 ({booking.driverAckTime || '기록됨'})
                     </span>
                   ) : booking.driverAck === '재확인 필요' ? (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-black bg-rose-100 text-rose-800">
+                    <span className="px-2.5 py-1 rounded-lg text-xs font-black bg-rose-100 text-rose-800">
                       변경됨 · 기사 재확인 대기 (v{booking.version || 2})
                     </span>
                   ) : booking.dispatchStatus === '미배정' ? (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-black bg-amber-100 text-amber-800">
+                    <span className="px-2.5 py-1 rounded-lg text-xs font-black bg-amber-100 text-amber-800">
                       배차 대기함 (미배정)
                     </span>
                   ) : (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
+                    <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 text-amber-800 flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5" />
                       발송 완료 · 기사 미확인
                     </span>
                   )}
                 </div>
 
-                <div className="space-y-2.5 text-xs pt-1">
+                <div className="space-y-3 pt-1">
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
                       담당 기사 선정 (대표님 확인)
                     </label>
                     <select
                       value={selectedDriverName}
                       onChange={(e) => handleSelectDriver(e.target.value)}
                       disabled={isCancelled}
-                      className="w-full px-2.5 py-2 rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                      className="w-full h-11 px-3.5 rounded-xl border border-slate-200 hover:border-blue-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 bg-white text-sm font-bold text-slate-900 shadow-2xs cursor-pointer outline-none"
                     >
                       <option value="">-- 기사 미배정 (배차 대기함) --</option>
                       {sortedDrivers.map(({ driver }) => (
@@ -650,7 +647,7 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
                       투입 차량 선정 (실제 보유 20대)
                     </label>
                     <select
@@ -660,7 +657,7 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                         setSelectedVehiclePlate(e.target.value);
                       }}
                       disabled={isCancelled}
-                      className="w-full px-2.5 py-2 rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                      className="w-full h-11 px-3.5 rounded-xl border border-slate-200 hover:border-blue-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 bg-white text-sm font-bold text-slate-900 shadow-2xs cursor-pointer outline-none"
                     >
                       <option value="">-- 차량 미배정 --</option>
                       {VIP_REAL_VEHICLES.map((v) => (
@@ -674,14 +671,14 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
 
                 {/* Live Schedule Conflict Warning */}
                 {modalConflicts.length > 0 && (
-                  <div className="p-2.5 rounded-xl bg-rose-100 border border-rose-300 text-[11px] text-rose-900 space-y-1.5">
+                  <div className="p-3 rounded-xl bg-rose-100 border border-rose-300 text-xs text-rose-900 space-y-1.5">
                     {modalConflicts.map((c, idx) => (
                       <div key={idx} className="flex items-start gap-1.5 font-bold">
-                        <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
+                        <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                         <span>{c.message}</span>
                       </div>
                     ))}
-                    <label className="flex items-center gap-1.5 pt-1 text-[10px] font-black text-rose-800 cursor-pointer">
+                    <label className="flex items-center gap-1.5 pt-1 text-xs font-black text-rose-800 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={allowConflictOverride}
@@ -694,17 +691,17 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                 )}
 
                 {!isCancelled && (
-                  <div className="space-y-2 pt-1">
+                  <div className="space-y-2.5 pt-1">
                     <button
                       type="button"
                       disabled={isSaving}
                       onClick={() => handleSaveOrPublish('published')}
-                      className="w-full py-2.5 px-4 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-[0.99] text-white text-xs font-black shadow-md shadow-blue-500/20 flex items-center justify-center gap-1.5 cursor-pointer transition-all disabled:opacity-50"
+                      className="w-full py-3 px-4 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-[0.99] text-white text-sm font-black shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50"
                     >
                       {isSaving ? (
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <RefreshCw className="w-4 h-4 animate-spin" />
                       ) : (
-                        <Send className="w-3.5 h-3.5" />
+                        <Send className="w-4 h-4" />
                       )}
                       <span>
                         {isAlreadyPublished
@@ -717,9 +714,9 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                       type="button"
                       disabled={isSaving}
                       onClick={() => handleSaveOrPublish('unassigned')}
-                      className="w-full py-2 px-3 rounded-xl border border-indigo-200 bg-white hover:bg-indigo-50 text-indigo-800 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all disabled:opacity-50"
+                      className="w-full py-2.5 px-3 rounded-xl border border-indigo-200 bg-white hover:bg-indigo-50 text-indigo-900 text-sm font-bold flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50"
                     >
-                      <PhoneCall className="w-3.5 h-3.5" />
+                      <PhoneCall className="w-4 h-4" />
                       <span>
                         {isNewBooking
                           ? '배차 대기함에 미배정 예약으로 등록 (사모님 접수)'
@@ -734,16 +731,16 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
               {!isNewBooking &&
                 !isCancelled &&
                 (booking.driverAck === '미확인' || booking.driverAck === '재확인 필요') && (
-                  <div className="p-3.5 rounded-2xl border border-rose-200 bg-rose-50/50 space-y-2">
+                  <div className="p-4 rounded-2xl border border-rose-200 bg-rose-50/50 space-y-2.5">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
                         <BellRing className="w-4 h-4 text-rose-600" />
-                        <span className="text-xs font-black text-rose-900">
+                        <span className="text-sm font-black text-rose-900">
                           기사 미확인 재알림 전송
                         </span>
                       </div>
                       {(booking.reminderCount || 0) > 0 && (
-                        <span className="px-2 py-0.5 rounded bg-violet-100 text-violet-800 text-[10px] font-extrabold">
+                        <span className="px-2.5 py-0.5 rounded-lg bg-violet-100 text-violet-800 text-xs font-extrabold">
                           누적 {booking.reminderCount}회
                         </span>
                       )}
@@ -779,9 +776,9 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                           setIsSaving(false);
                         }
                       }}
-                      className="w-full py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-extrabold transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                     >
-                      <Send className="w-3.5 h-3.5" />
+                      <Send className="w-4 h-4" />
                       <span>담당 기사 Cockpit에 확인 재알림 보내기</span>
                     </button>
                   </div>
@@ -789,25 +786,25 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
 
               {/* Customer Auto-Prepared Notification Card (Distinct from Brochure) */}
               {!isNewBooking && !isCancelled && onOpenCustomerMessage && (
-                <div className="p-3.5 rounded-2xl border border-indigo-200/90 bg-indigo-50/40 space-y-2.5">
+                <div className="p-4 rounded-2xl border border-indigo-200/90 bg-indigo-50/40 space-y-2.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
                       <MessageSquareText className="w-4 h-4 text-indigo-600" />
-                      <span className="text-xs font-black text-slate-900">
+                      <span className="text-sm font-black text-slate-900">
                         고객사 자동 안내 메시지 (문자·이메일)
                       </span>
                     </div>
                     {booking.pendingCustomerTrigger ? (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-indigo-600 text-white">
+                      <span className="px-2.5 py-1 rounded-lg text-xs font-extrabold bg-indigo-600 text-white">
                         자동 준비됨
                       </span>
                     ) : (booking.customerNotifications?.length || 0) > 0 ? (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                         발송 {booking.customerNotifications!.length}회
                       </span>
                     ) : null}
                   </div>
-                  <p className="text-[11px] text-slate-600 leading-snug">
+                  <p className="text-xs text-slate-600 leading-normal">
                     실제 확정 일정·기사 변경·픽업지 도착 상태를 반영한 짧은 안내문입니다 (관리자 확인 후 발송).
                   </p>
                   <button
@@ -816,25 +813,25 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                       onClose();
                       onOpenCustomerMessage(booking);
                     }}
-                    className="w-full py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-extrabold transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    <MessageSquareText className="w-3.5 h-3.5" />
+                    <MessageSquareText className="w-4 h-4" />
                     <span>안내 문자 · 이메일 확인 및 발송창 열기</span>
                   </button>
                 </div>
               )}
 
               {/* Customer Brochure Card */}
-              <div className="p-3.5 rounded-2xl border border-slate-200/90 bg-white space-y-2.5">
+              <div className="p-4 rounded-2xl border border-slate-200/90 bg-white space-y-2.5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
                     <Mail className="w-4 h-4 text-[#1E60F3]" />
-                    <span className="text-xs font-black text-slate-900">
+                    <span className="text-sm font-black text-slate-900">
                       고객사 안내자료 발송 기록
                     </span>
                   </div>
                   <span
-                    className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                    className={`px-2.5 py-0.5 rounded-lg text-xs font-bold ${
                       booking.customerBrochure === '발송됨'
                         ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                         : booking.customerBrochure === '재발송 필요'
@@ -849,21 +846,21 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                 <button
                   type="button"
                   onClick={handleSendCustomerBrochure}
-                  className="w-full py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <Send className="w-3.5 h-3.5" />
+                  <Send className="w-4 h-4" />
                   <span>고객사 기사·차량 프로필 발송 완료 처리</span>
                 </button>
               </div>
 
               {/* Dispatch Cancellation Box */}
               {!isNewBooking && !isCancelled && (
-                <div className="p-3.5 rounded-2xl border border-rose-200/80 bg-rose-50/30 space-y-2">
+                <div className="p-4 rounded-2xl border border-rose-200/80 bg-rose-50/30 space-y-2">
                   {!showCancelConfirm ? (
                     <button
                       type="button"
                       onClick={() => setShowCancelConfirm(true)}
-                      className="w-full py-2 rounded-xl border border-rose-200 bg-white hover:bg-rose-50 text-rose-600 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all"
+                      className="w-full py-2.5 rounded-xl border border-rose-200 bg-white hover:bg-rose-50 text-rose-600 text-sm font-bold flex items-center justify-center gap-2 cursor-pointer transition-all"
                     >
                       <Ban className="w-3.5 h-3.5" />
                       <span>이 배차/예약 취소 처리</span>

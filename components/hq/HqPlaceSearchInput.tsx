@@ -60,6 +60,7 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const isSelectionRef = useRef(false);
+  const isUserTypingRef = useRef(false);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -80,6 +81,11 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
   useEffect(() => {
     if (isSelectionRef.current) {
       isSelectionRef.current = false;
+      return;
+    }
+
+    // Do NOT open dropdown or auto-search on mount / prop assignment
+    if (!isUserTypingRef.current) {
       return;
     }
 
@@ -156,6 +162,7 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
     (poi: PoiResult) => {
       haptics.selection();
       isSelectionRef.current = true;
+      isUserTypingRef.current = false;
       onChange(poi.name);
       onSelectPoi?.(poi);
       setIsDropdownOpen(false);
@@ -195,6 +202,7 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
   const handleClear = () => {
     haptics.lightTap();
     isSelectionRef.current = true;
+    isUserTypingRef.current = false;
     onChange('');
     setSearchResults([]);
     setIsDropdownOpen(false);
@@ -225,11 +233,19 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
           type="text"
           value={value}
           disabled={disabled}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => {
+            isUserTypingRef.current = true;
+            onChange(e.target.value);
+          }}
           onFocus={() => {
-            if (searchResults.length > 0) {
+            if (isUserTypingRef.current && searchResults.length > 0) {
               setIsDropdownOpen(true);
             }
+          }}
+          onBlur={() => {
+            setTimeout(() => {
+              setIsDropdownOpen(false);
+            }, 200);
           }}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
