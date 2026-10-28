@@ -23,6 +23,9 @@ import { HqExpensesView } from '@/components/hq/expenses/HqExpensesView';
 import { HqEmailInboxView } from '@/components/hq/email/HqEmailInboxView';
 import { HqCustomersView } from '@/components/hq/customers/HqCustomersView';
 import { HqReportsView } from '@/components/hq/reports/HqReportsView';
+import { HqOperationsBoard } from '@/components/hq/operations/HqOperationsBoard';
+import { HqQuoteModal } from '@/components/hq/quotes/HqQuoteModal';
+import { VipChauffeurCardModal } from '@/components/cards/VipChauffeurCardModal';
 import { HqUnconfirmedDispatchesCard } from '@/components/hq/dispatch/HqUnconfirmedDispatchesCard';
 import { HqUnsentDraftsCard } from '@/components/hq/dispatch/HqUnsentDraftsCard';
 import { HqDriverAllocationDonutCard } from '@/components/hq/dispatch/HqDriverAllocationDonutCard';
@@ -80,6 +83,8 @@ function HqDashboardInner() {
   // Selected Booking for detail / vehicle-driver assignment / edit / cancel modal
   const [selectedBooking, setSelectedBooking] = useState<HqBooking | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isQuoteModalOpen, setIsQuoteModalOpen] = useState(false);
+  const [isChauffeurCardOpen, setIsChauffeurCardOpen] = useState(false);
 
   const fetchSharedBookings = useCallback(async (silent = false) => {
     if (!silent) setIsRefreshing(true);
@@ -462,6 +467,8 @@ function HqDashboardInner() {
           isRefreshing={isRefreshing}
           lastSyncedLabel={lastSyncedLabel}
           onOpenQuickPhoneBooking={handleOpenQuickPhoneBookingModal}
+          onOpenQuoteModal={() => setIsQuoteModalOpen(true)}
+          onOpenChauffeurCard={() => setIsChauffeurCardOpen(true)}
           onOpenNotifications={() => {
             setActiveTabOverride('dispatch');
             setActiveKpiFilter(null);
@@ -469,7 +476,11 @@ function HqDashboardInner() {
             setMobileDispatchSubView('list');
           }}
           title={
-            activeSidebarTab === 'driving_logs'
+            activeSidebarTab === 'operations'
+              ? '실시간 행사 운영 보드'
+              : activeSidebarTab === 'quotes'
+              ? '가격표 견적기 및 견적서 관리'
+              : activeSidebarTab === 'driving_logs'
               ? '운행일지 관리'
               : activeSidebarTab === 'expenses' || activeSidebarTab === 'receipts'
               ? '경비지출 · 영수증 검수'
@@ -482,7 +493,15 @@ function HqDashboardInner() {
               : '예약 · 배차 통합 관제'
           }
           subtitle={
-            activeSidebarTab === 'customers' ? (
+            activeSidebarTab === 'operations' ? (
+              <span className="text-slate-500 font-medium">
+                대표님 모바일·PC 다중 차량 5단계 운행 상태(준비·도착·탑승·이동·종료) 실시간 관제
+              </span>
+            ) : activeSidebarTab === 'quotes' ? (
+              <span className="text-slate-500 font-medium">
+                사모님 실시간 가격표 견적 산출 및 확정 견적 ➔ 배차 대기함 자동 전환
+              </span>
+            ) : activeSidebarTab === 'customers' ? (
               <span className="text-slate-500 font-medium">
                 주요 고객사의 담당자, 계약 단가, 청구 내역을 한눈에 확인하고 관리합니다.
               </span>
@@ -519,7 +538,35 @@ function HqDashboardInner() {
 
         {/* Scrollable Body */}
         <main className="flex-1 p-3.5 sm:p-5 lg:p-6 space-y-4 sm:space-y-5 overflow-y-auto">
-          {activeSidebarTab === 'driving_logs' ? (
+          {activeSidebarTab === 'operations' ? (
+            <HqOperationsBoard />
+          ) : activeSidebarTab === 'quotes' ? (
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center space-y-4 text-white">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center justify-center mx-auto">
+                <CalendarCheck className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-100">가격표 기반 실시간 견적기</h3>
+              <p className="text-xs text-slate-400 max-w-md mx-auto">
+                전화 응대 중 즉시 요금을 계산하고 고객사용 견적서 생성 및 대표님 배차 대기함으로 즉시 전환합니다.
+              </p>
+              <div className="flex justify-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsQuoteModalOpen(true)}
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs shadow-md transition"
+                >
+                  견적서 작성창 열기
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsChauffeurCardOpen(true)}
+                  className="px-4 py-2.5 rounded-xl border border-amber-500/30 bg-slate-800 hover:bg-slate-700 text-amber-300 font-semibold text-xs transition"
+                >
+                  VIP 의전 소개서 보기
+                </button>
+              </div>
+            </div>
+          ) : activeSidebarTab === 'driving_logs' ? (
             <HqDrivingLogsView initialSearchQuery={searchQuery} />
           ) : activeSidebarTab === 'expenses' || activeSidebarTab === 'receipts' ? (
             <HqExpensesView initialSearchQuery={searchQuery} />
@@ -880,6 +927,22 @@ function HqDashboardInner() {
         onClose={() => setIsDetailModalOpen(false)}
         onUpdateBooking={handleUpdateBooking}
         onSavedServer={() => fetchSharedBookings(true)}
+      />
+
+      {/* 5. Realtime Pricing Calculator & Quotation Modal */}
+      <HqQuoteModal
+        isOpen={isQuoteModalOpen}
+        onClose={() => setIsQuoteModalOpen(false)}
+        onBookingConverted={() => {
+          fetchSharedBookings(true);
+          setActiveTabOverride('dispatch');
+        }}
+      />
+
+      {/* 6. VIP Chauffeur & Vehicle Introduction Card Modal */}
+      <VipChauffeurCardModal
+        isOpen={isChauffeurCardOpen}
+        onClose={() => setIsChauffeurCardOpen(false)}
       />
     </div>
   );

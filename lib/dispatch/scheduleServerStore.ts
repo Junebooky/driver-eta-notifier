@@ -850,6 +850,10 @@ export async function upsertServerDispatchSchedule(
     passenger_note: encodeScheduleMeta(nextMeta),
     flight_number: input.flightNumber?.trim() || null,
     protocol_notes: input.notes?.trim() || null,
+    dispatch_status: effectiveDispatchStatus,
+    version: nextVersion,
+    last_ack_version: lastAckVersion,
+    last_ack_at: lastAckAt,
     status: dbStatus,
     updated_at: nowIso,
   };
@@ -925,6 +929,8 @@ export async function acknowledgeServerSchedule(params: {
     .from('schedules')
     .update({
       passenger_note: encodeScheduleMeta(nextMeta),
+      last_ack_version: ackVersion,
+      last_ack_at: nowIso,
       status: hydrated._meta.dispatchStatus === 'cancelled' ? 'cancelled' : 'confirmed',
       updated_at: nowIso,
     })
@@ -983,6 +989,8 @@ export async function cancelServerSchedule(params: {
     .from('schedules')
     .update({
       passenger_note: encodeScheduleMeta(nextMeta),
+      dispatch_status: 'cancelled',
+      version: nextVersion,
       status: 'cancelled',
       protocol_notes: mergedNotes,
       updated_at: nowIso,

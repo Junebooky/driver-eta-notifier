@@ -9,13 +9,25 @@ export interface HqFleetCardProps {
   vehicleClasses: HqVehicleClassStatus[];
   onViewAll?: () => void;
   onSelectClass?: (item: HqVehicleClassStatus) => void;
+  totalAvailableCount?: number;
+  totalInServiceCount?: number;
+  totalMaintenanceCount?: number;
+  totalFleetCount?: number;
 }
 
 export const HqFleetCard: React.FC<HqFleetCardProps> = ({
   vehicleClasses,
   onViewAll,
   onSelectClass,
+  totalAvailableCount,
+  totalInServiceCount,
+  totalMaintenanceCount,
+  totalFleetCount = 20,
 }) => {
+  const computedTotal = vehicleClasses.reduce((sum, v) => sum + v.totalCount, 0) || totalFleetCount;
+  const computedAvail = totalAvailableCount ?? vehicleClasses.reduce((sum, v) => sum + v.availableCount, 0);
+  const computedActive = totalInServiceCount ?? vehicleClasses.reduce((sum, v) => sum + v.activeCount, 0);
+  const computedMaint = totalMaintenanceCount ?? Math.max(0, computedTotal - computedAvail - computedActive);
   return (
     <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
       {/* Header */}
@@ -76,25 +88,27 @@ export const HqFleetCard: React.FC<HqFleetCardProps> = ({
         </div>
       </div>
 
-      {/* Status Summary Footer */}
+      {/* Status Summary Footer (Live Computed from Supabase active schedules & fleet) */}
       <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-slate-700">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-            <span className="text-[11px] text-slate-600">운행 중 15대</span>
+            <span className="text-[11px] text-slate-600">예약 가용 {computedAvail}대</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
-            <span className="text-[11px] text-slate-600">대기 중 4대</span>
+            <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+            <span className="text-[11px] text-slate-600">배정/운행 {computedActive}대</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
-            <span className="text-[11px] text-slate-600">정비 중 1대</span>
-          </div>
+          {computedMaint > 0 && (
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+              <span className="text-[11px] text-slate-600">정비/휴차 {computedMaint}대</span>
+            </div>
+          )}
         </div>
 
         <span className="text-[11px] font-bold text-slate-400">
-          총 20대 등록
+          총 {computedTotal}대 등록
         </span>
       </div>
     </div>

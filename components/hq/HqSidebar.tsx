@@ -14,6 +14,8 @@ import {
   BarChart3,
   Settings,
   Smartphone,
+  Activity,
+  Calculator,
   X,
 } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
@@ -48,6 +50,8 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
       badge: dispatchActionBadgeCount > 0 ? dispatchActionBadgeCount : undefined,
       badgeColor: 'bg-rose-500 text-white',
     },
+    { id: 'operations', label: '실시간 운영 보드', icon: Activity },
+    { id: 'quotes', label: '견적·가격표', icon: Calculator },
     { id: 'customers', label: '고객 관리', icon: Building2 },
     { id: 'emails', label: '고객 이메일', icon: Mail },
     { id: 'vehicles', label: '차량 관리', icon: Car },

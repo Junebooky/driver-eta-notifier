@@ -44,6 +44,10 @@ export interface ScheduleItem {
   last_ack_version?: number;
   last_ack_at?: string;
   isAcknowledged?: boolean;
+  operation_status?: 'ready' | 'arrived_pickup' | 'boarded' | 'in_transit' | 'completed';
+  operation_updated_at?: string;
+  operation_history?: any[];
+  source_quote_no?: string;
   // HQ Shared Reservation & Event Group Linkage
   booking_no?: string;
   customer_name?: string;

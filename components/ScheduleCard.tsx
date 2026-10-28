@@ -25,6 +25,36 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
   onEdit,
   onAcknowledge,
 }) => {
+  const [currentOpStatus, setCurrentOpStatus] = React.useState<string>(
+    item.operation_status || 'ready'
+  );
+  const [isUpdatingOp, setIsUpdatingOp] = React.useState(false);
+
+  const handleUpdateOpStatus = async (nextStatus: 'ready' | 'arrived_pickup' | 'boarded' | 'in_transit' | 'completed') => {
+    setIsUpdatingOp(true);
+    haptics.selection();
+    try {
+      const res = await fetch('/api/schedules/operation-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scheduleId: item.id,
+          status: nextStatus,
+          changedBy: item.driver_name || '윤태준',
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setCurrentOpStatus(nextStatus);
+        haptics.success();
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsUpdatingOp(false);
+    }
+  };
+
   const isDeparture =
     item.flightType === 'departure' ||
     (item.destination_name && (item.destination_name.includes('공항') || item.destination_name.toLowerCase().includes('airport'))) ||
@@ -388,6 +418,55 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
           </button>
         </div>
       </div>
+
+      {/* 5-Stage Live Operation Status Control (Visible when dispatch is confirmed) */}
+      {item.isAcknowledged && !isCancelled && (
+        <div className="mt-2.5 pt-2 border-t border-slate-100 flex flex-col gap-1.5">
+          <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium px-0.5">
+            <span>실시간 운행 단계</span>
+            <span className="font-bold text-[#1E60F3]">
+              {currentOpStatus === 'ready' && '1단계: 운행 준비'}
+              {currentOpStatus === 'arrived_pickup' && '2단계: 픽업지 도착'}
+              {currentOpStatus === 'boarded' && '3단계: 승객 탑승'}
+              {currentOpStatus === 'in_transit' && '4단계: 이동 중 (운행 중)'}
+              {currentOpStatus === 'completed' && '5단계: 운행 종료'}
+            </span>
+          </div>
+          <div className="grid grid-cols-5 gap-1">
+            {[
+              { key: 'ready', label: '1.준비' },
+              { key: 'arrived_pickup', label: '2.도착' },
+              { key: 'boarded', label: '3.탑승' },
+              { key: 'in_transit', label: '4.이동' },
+              { key: 'completed', label: '5.종료' },
+            ].map((stage) => {
+              const isActive = currentOpStatus === stage.key;
+              return (
+                <button
+                  key={stage.key}
+                  type="button"
+                  disabled={isUpdatingOp}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleUpdateOpStatus(stage.key as any);
+                  }}
+                  className={`py-1.5 px-0.5 text-[11px] font-bold rounded-lg transition-all text-center cursor-pointer ${
+                    isActive
+                      ? stage.key === 'completed'
+                        ? 'bg-slate-800 text-white shadow-xs'
+                        : stage.key === 'in_transit'
+                        ? 'bg-emerald-600 text-white shadow-xs animate-pulse'
+                        : 'bg-[#1E60F3] text-white shadow-xs'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                  }`}
+                >
+                  {stage.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
