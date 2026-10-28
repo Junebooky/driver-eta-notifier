@@ -46,6 +46,7 @@ import {
   upsertEventSettlementFromBookings,
 } from '@/utils/settlementStorage';
 import { ensureClientAuth } from '@/utils/cockpitClientAuth';
+import { HqPlaceSearchInput } from './HqPlaceSearchInput';
 import {
   cleanDriverIdentity,
   cleanVehicleIdentity,
@@ -1068,49 +1069,33 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
             </div>
           </div>
 
-          {/* 픽업 위치 * & 목적지 * (2 Columns) */}
+          {/* 픽업 위치 * & 목적지 * (2 Columns with TMAP Search) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* 픽업 위치 */}
-            <div>
-              <label className="block text-xs font-bold text-slate-800 mb-1.5">
-                픽업 위치 <span className="text-red-500 font-bold ml-0.5">*</span>
-              </label>
-
-              <div className="w-full h-12 bg-white border border-slate-200 hover:border-blue-400 focus-within:border-[#1E60F3] focus-within:ring-2 focus-within:ring-blue-100 rounded-xl px-3.5 flex items-center gap-2.5 transition-all shadow-2xs">
-                <MapPin className="w-5 h-5 text-slate-700 shrink-0" />
-                <input
-                  type="text"
-                  value={pickupLocation}
-                  onChange={(e) => {
-                    setPickupLocation(e.target.value);
-                    setErrorMsg(null);
-                  }}
-                  placeholder="위치 검색 또는 입력"
-                  className="w-full bg-transparent text-sm font-semibold text-slate-900 placeholder:text-slate-400 outline-none"
-                />
-              </div>
-            </div>
+            <HqPlaceSearchInput
+              label="픽업 위치"
+              required
+              value={pickupLocation}
+              onChange={(val) => {
+                setPickupLocation(val);
+                setErrorMsg(null);
+              }}
+              placeholder="위치 검색 또는 입력"
+              icon="mapPin"
+            />
 
             {/* 목적지 */}
-            <div>
-              <label className="block text-xs font-bold text-slate-800 mb-1.5">
-                목적지 <span className="text-red-500 font-bold ml-0.5">*</span>
-              </label>
-
-              <div className="w-full h-12 bg-white border border-slate-200 hover:border-blue-400 focus-within:border-[#1E60F3] focus-within:ring-2 focus-within:ring-blue-100 rounded-xl px-3.5 flex items-center gap-2.5 transition-all shadow-2xs">
-                <Flag className="w-5 h-5 text-slate-700 shrink-0" />
-                <input
-                  type="text"
-                  value={destination}
-                  onChange={(e) => {
-                    setDestination(e.target.value);
-                    setErrorMsg(null);
-                  }}
-                  placeholder="목적지 검색 또는 입력"
-                  className="w-full bg-transparent text-sm font-semibold text-slate-900 placeholder:text-slate-400 outline-none"
-                />
-              </div>
-            </div>
+            <HqPlaceSearchInput
+              label="목적지"
+              required
+              value={destination}
+              onChange={(val) => {
+                setDestination(val);
+                setErrorMsg(null);
+              }}
+              placeholder="목적지 검색 또는 입력"
+              icon="flag"
+            />
           </div>
 
           {/* 차량 대수 * & 차종 (선택) (2 Columns) */}

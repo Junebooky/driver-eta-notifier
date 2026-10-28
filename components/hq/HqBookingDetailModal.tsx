@@ -32,6 +32,7 @@ import {
   upsertEventSettlementFromBookings,
 } from '@/utils/settlementStorage';
 import { INITIAL_HQ_CUSTOMERS } from '@/utils/customerHqData';
+import { HqPlaceSearchInput } from './HqPlaceSearchInput';
 import {
   cleanDriverIdentity,
   detectDispatchConflicts,
@@ -493,31 +494,25 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                    출발지 (픽업 위치) *
-                  </label>
-                  <input
-                    type="text"
-                    value={pickupLocation}
-                    onChange={(e) => setPickupLocation(e.target.value)}
-                    placeholder="예: 인천국제공항 T2 / 조선팰리스 강남"
-                    className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-semibold"
-                  />
-                </div>
+                <HqPlaceSearchInput
+                  label="출발지 (픽업 위치)"
+                  required
+                  value={pickupLocation}
+                  onChange={(val) => setPickupLocation(val)}
+                  placeholder="예: 인천국제공항 T2 / 조선팰리스 강남"
+                  heightClass="h-10"
+                  icon="mapPin"
+                />
 
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                    도착지 (목적지) *
-                  </label>
-                  <input
-                    type="text"
-                    value={destination}
-                    onChange={(e) => setDestination(e.target.value)}
-                    placeholder="예: 신라호텔 서울 / 코엑스"
-                    className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-semibold"
-                  />
-                </div>
+                <HqPlaceSearchInput
+                  label="도착지 (목적지)"
+                  required
+                  value={destination}
+                  onChange={(val) => setDestination(val)}
+                  placeholder="예: 신라호텔 서울 / 코엑스"
+                  heightClass="h-10"
+                  icon="flag"
+                />
 
                 <div className="grid grid-cols-2 gap-2">
                   <div>

@@ -34,6 +34,7 @@ import {
 } from '@/utils/emailHqStorage';
 import { haptics } from '@/utils/haptics';
 import { HqComposeEmailModal } from './HqComposeEmailModal';
+import { HqPlaceSearchInput } from '../HqPlaceSearchInput';
 import { DEFAULT_DRIVER_PROFILES } from '@/utils/settlementCalculator';
 import { VIP_REAL_VEHICLES, stripManufacturerName } from '@/utils/vehicleData';
 import { getKstTodayDateStr, mapScheduleItemToHqBooking } from '@/utils/dispatchConflictDetector';
@@ -1172,29 +1173,25 @@ VIP LIMOUSINE KOREA 종합관제팀 드림`;
 
                 {/* 5. Pickup Location */}
                 <div className="col-span-2">
-                  <label className="block text-[10px] font-bold text-slate-500 mb-0.5 flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-emerald-600" />
-                    <span>출발지 (픽업 장소)</span>
-                  </label>
-                  <input
-                    type="text"
+                  <HqPlaceSearchInput
+                    label="출발지 (픽업 장소)"
                     value={activeDraft.pickupLocation}
-                    onChange={(e) => updateDraft({ pickupLocation: e.target.value })}
-                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:bg-white focus:ring-1 focus:ring-blue-500"
+                    onChange={(val) => updateDraft({ pickupLocation: val })}
+                    placeholder="위치 검색 또는 입력"
+                    heightClass="h-9"
+                    icon="mapPin"
                   />
                 </div>
 
                 {/* 6. Dropoff Location */}
                 <div className="col-span-2">
-                  <label className="block text-[10px] font-bold text-slate-500 mb-0.5 flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-rose-500" />
-                    <span>도착지 (목적지)</span>
-                  </label>
-                  <input
-                    type="text"
+                  <HqPlaceSearchInput
+                    label="도착지 (목적지)"
                     value={activeDraft.dropoffLocation}
-                    onChange={(e) => updateDraft({ dropoffLocation: e.target.value })}
-                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium focus:bg-white focus:ring-1 focus:ring-blue-500"
+                    onChange={(val) => updateDraft({ dropoffLocation: val })}
+                    placeholder="목적지 검색 또는 입력"
+                    heightClass="h-9"
+                    icon="flag"
                   />
                 </div>
 
