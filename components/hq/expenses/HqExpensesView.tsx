@@ -40,6 +40,7 @@ import {
 import { formatKRW } from '@/utils/expense';
 import { rotateImageDataUrl } from '@/utils/imageRotate';
 import { haptics } from '@/utils/haptics';
+import { checkDuplicateReceipt } from '@/utils/settlementCalculator';
 
 export interface HqExpensesViewProps {
   initialSearchQuery?: string;
@@ -674,12 +675,47 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
                 </button>
               </div>
 
-              {/* Sub-tab 1: 사진 (Photo Viewer) - Enlarged inspection view */}
+              {/* Sub-tab 1: 사진 (Photo Viewer) - Enlarged inspection view with compact floating controls */}
               {inspectorTab === 'photo' && (
                 <div>
-                  {/* Photo Container - Enlarged without toolbar */}
+                  {/* Duplicate Receipt Alert if detected */}
+                  {(() => {
+                    const dupCheck = checkDuplicateReceipt(selectedExpense, expenses);
+                    if (!dupCheck.isDuplicate) return null;
+                    return (
+                      <div className="mb-2.5 p-2.5 rounded-xl bg-rose-50 border border-rose-300 flex items-start gap-2 text-[11px] text-rose-800 font-bold">
+                        <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                        <span>[중복 청구 방지 경고] {dupCheck.reason}</span>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Photo Container - Enlarged without fixed toolbar */}
                   {selectedExpense.receiptUrl ? (
                     <div className="relative w-full h-[680px] lg:h-[760px] xl:h-[820px] bg-slate-900/5 rounded-2xl overflow-hidden border border-slate-200 flex items-center justify-center group shadow-2xs">
+                      {/* Compact Floating Overlay Controls (No fixed bar height taken) */}
+                      <div className="absolute top-2.5 right-2.5 z-20 flex items-center gap-1.5 opacity-90 hover:opacity-100 transition-opacity">
+                        <button
+                          type="button"
+                          onClick={() => handleRotateCurrentReceipt(90)}
+                          disabled={isRotating}
+                          className="px-2.5 py-1.5 rounded-lg bg-slate-900/75 hover:bg-slate-900 text-white text-[11px] font-bold flex items-center gap-1 shadow-sm backdrop-blur-xs cursor-pointer"
+                          title="90° 회전"
+                        >
+                          <RotateCw className="w-3 h-3" />
+                          <span>90°</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsReceiptZoomOpen(true)}
+                          className="px-2.5 py-1.5 rounded-lg bg-slate-900/75 hover:bg-slate-900 text-white text-[11px] font-bold flex items-center gap-1 shadow-sm backdrop-blur-xs cursor-pointer"
+                          title="원본 크게 확대"
+                        >
+                          <Maximize2 className="w-3 h-3" />
+                          <span>확대</span>
+                        </button>
+                      </div>
+
                       {/* Receipt Image - Maximum display area */}
                       <div
                         className="relative w-full h-full p-2 pb-16 flex items-center justify-center transition-transform duration-300"
@@ -731,6 +767,49 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
                       <span className="text-xs font-semibold">첨부된 영수증 사진 없음</span>
                     </div>
                   )}
+
+                  {/* Billable vs Company Direct Cost Classification Toggle */}
+                  <div className="mt-2.5 p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-2 text-xs">
+                    <span className="text-[11px] font-bold text-slate-700">
+                      정산 반영 구분 (중복 가산·차감 방지)
+                    </span>
+                    <div className="inline-flex bg-white border border-slate-200 rounded-lg p-0.5 text-[10px] font-bold">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updated = expenses.map((e) =>
+                            e.id === selectedExpense.id ? { ...e, billableToCustomer: true } : e
+                          );
+                          saveHqExpenses(updated);
+                          showToast('고객사 실비 재청구 대상으로 설정되었습니다.');
+                        }}
+                        className={`px-2 py-1 rounded-md cursor-pointer transition-colors ${
+                          selectedExpense.billableToCustomer !== false
+                            ? 'bg-[#1E60F3] text-white'
+                            : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                      >
+                        고객사 실비 청구
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updated = expenses.map((e) =>
+                            e.id === selectedExpense.id ? { ...e, billableToCustomer: false } : e
+                          );
+                          saveHqExpenses(updated);
+                          showToast('회사 자체 부담 직접비로 분류되었습니다.');
+                        }}
+                        className={`px-2 py-1 rounded-md cursor-pointer transition-colors ${
+                          selectedExpense.billableToCustomer === false
+                            ? 'bg-slate-800 text-white'
+                            : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                      >
+                        회사 부담 직접비
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
 

@@ -12,6 +12,7 @@ import { HqDrivingLogsView } from '@/components/hq/driving-logs/HqDrivingLogsVie
 import { HqExpensesView } from '@/components/hq/expenses/HqExpensesView';
 import { HqEmailInboxView } from '@/components/hq/email/HqEmailInboxView';
 import { HqCustomersView } from '@/components/hq/customers/HqCustomersView';
+import { HqReportsView } from '@/components/hq/reports/HqReportsView';
 import { HqUnconfirmedDispatchesCard } from '@/components/hq/dispatch/HqUnconfirmedDispatchesCard';
 import { HqUnsentDraftsCard } from '@/components/hq/dispatch/HqUnsentDraftsCard';
 import { HqDriverAllocationDonutCard } from '@/components/hq/dispatch/HqDriverAllocationDonutCard';
@@ -113,6 +114,7 @@ function HqDashboardInner() {
         destination: item.destination || '인천공항 T1',
         driverName: item.driverName || '-',
         driverPhone: item.driverPhone,
+        driverIsEnglishVerified: item.driverIsEnglishVerified,
         vehicleModel: item.vehicleModel || '차량 미지정',
         vehiclePlate: item.vehiclePlate || '미배정',
         dispatchStatus: item.dispatchStatus || (isDraft ? '미배정' : '배차 완료'),
@@ -125,6 +127,15 @@ function HqDashboardInner() {
         groupTotalVehicles: item.groupTotalVehicles,
         groupVehicleIndex: item.groupVehicleIndex,
         customerId: item.customerId,
+        orderingAgency: item.orderingAgency,
+        endBrand: item.endBrand,
+        eventName: item.eventName,
+        billingTarget: item.billingTarget,
+        billingTargetName: item.billingTargetName,
+        requestedLanguage: item.requestedLanguage,
+        languageOverrideConfirmed: item.languageOverrideConfirmed,
+        serviceMode: item.serviceMode,
+        appliedPricingSnapshot: item.appliedPricingSnapshot,
         notes: item.notes,
       };
     });
@@ -162,12 +173,18 @@ function HqDashboardInner() {
               ? '고객 이메일'
               : activeSidebarTab === 'customers'
               ? '고객 관리'
+              : activeSidebarTab === 'reports'
+              ? '정산 · 수익성 · 종합 리포트'
               : '예약·배차 관리'
           }
           subtitle={
             activeSidebarTab === 'customers' ? (
               <span className="text-slate-500 font-medium">
                 주요 고객사의 담당자, 예약 이력, 요청사항을 한눈에 확인하고 관리할 수 있습니다.
+              </span>
+            ) : activeSidebarTab === 'reports' ? (
+              <span className="text-slate-500 font-medium">
+                고객사 서비스 시간 기준 정산 · 기사 인건비 · 배차별 직접이익 분석 및 고객사 제출용 리포트
               </span>
             ) : activeSidebarTab === 'expenses' || activeSidebarTab === 'receipts' ? (
               <>
@@ -186,6 +203,8 @@ function HqDashboardInner() {
           searchPlaceholder={
             activeSidebarTab === 'customers'
               ? '고객명, 담당자명, 행사명으로 검색하세요...'
+              : activeSidebarTab === 'reports'
+              ? '고객사, 행사명, 대행사, 기사명, 차량 검색...'
               : activeSidebarTab === 'expenses' || activeSidebarTab === 'receipts'
               ? '기사명, 차량번호, 상호명 검색...'
               : '고객명, 예약번호, 기사명, 차량번호 검색...'
@@ -202,7 +221,13 @@ function HqDashboardInner() {
             <HqExpensesView initialSearchQuery={searchQuery} />
           ) : activeSidebarTab === 'customers' ? (
             /* Dedicated 고객 관리 View (New UI) */
-            <HqCustomersView initialSearchQuery={searchQuery} />
+            <HqCustomersView
+              initialSearchQuery={searchQuery}
+              onOpenSettlementReport={() => setActiveTabOverride('reports')}
+            />
+          ) : activeSidebarTab === 'reports' ? (
+            /* Dedicated 정산 · 기사 인건비 · 수익성 분석 · 종합 리포트 View */
+            <HqReportsView initialSearchQuery={searchQuery} />
           ) : (
             <>
               {/* Dedicated 고객 이메일 (AI) View - preserved in DOM for instant 0ms switching without refetching */}

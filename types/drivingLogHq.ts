@@ -41,4 +41,18 @@ export interface HqDrivingLog {
   notes: string;
   reviewHistory: HqDrivingLogReviewAudit[];
   isDriverSubmitted?: boolean;
+  // Customer Service Billing Times (vs Legal Duty ClockIn/ClockOut)
+  garageDepartureTime?: string;   // e.g. "08:00" (차고지 픽업)
+  customerServiceStart?: string;  // e.g. "09:00" (고객사 서비스 시작)
+  customerServiceEnd?: string;    // e.g. "21:50" (고객사 서비스 종료)
+  garageArrivalTime?: string;     // e.g. "22:30" (차고지 복귀)
+  customerServiceHours?: string;  // e.g. "12시간 50분"
+  customerServiceMinutes?: number;// e.g. 770
+  // Event & Customer linkage
+  eventId?: string;
+  eventName?: string;
+  customerId?: string;
+  bookingId?: string;
+  groupId?: string;
 }
+

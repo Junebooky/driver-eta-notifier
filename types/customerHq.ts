@@ -1,3 +1,5 @@
+import { CustomerContractTerms } from './settlementHq';
+
 export type CustomerTier = 'VIP' | '주요' | '일반';
 
 export interface CustomerContact {
@@ -29,6 +31,12 @@ export interface CustomerEventItem {
   passengerCount: number;
   timeRange: string;
   status?: 'upcoming' | 'ongoing' | 'completed';
+  orderingAgency?: string;
+  endBrand?: string;
+  billingTarget?: 'ordering_agency' | 'end_brand' | 'custom';
+  billingTargetName?: string;
+  groupId?: string;
+  settlementReportId?: string;
 }
 
 export interface CustomerTripItem {
@@ -67,6 +75,8 @@ export interface HqCustomer {
   department: string;
   preferences: string[];
   notes: string[];
+  contractTerms?: CustomerContractTerms;
+  associatedAgencies?: string[];
   nextEvent?: CustomerEventItem;
   recentTrip?: CustomerTripItem;
   recentRequests: CustomerRequestItem[];
@@ -75,3 +85,5 @@ export interface HqCustomer {
   tripsHistory: CustomerTripItem[];
   communications: CustomerCommunicationItem[];
 }
+export type { CustomerContractTerms };
+

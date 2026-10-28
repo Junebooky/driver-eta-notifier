@@ -14,14 +14,28 @@ import {
   Building2,
   Search,
   Users,
-  MapPin,
   X,
+  Globe,
+  AlertTriangle,
+  ShieldCheck,
 } from 'lucide-react';
 import { HqBooking } from '@/types/hq';
 import { haptics } from '@/utils/haptics';
 import { VIP_REAL_VEHICLES, stripManufacturerName } from '@/utils/vehicleData';
 import { INITIAL_HQ_CUSTOMERS } from '@/utils/customerHqData';
 import { HqCustomer } from '@/types/customerHq';
+import {
+  RequestedDriverLanguage,
+  ServiceIncludeMode,
+} from '@/types/settlementHq';
+import {
+  calculateDriverLaborCost,
+  createBookingPricingSnapshot,
+  DEFAULT_DRIVER_PROFILES,
+  getSortedDriversForLanguage,
+  resolveEffectivePricingTerms,
+} from '@/utils/settlementCalculator';
+import { formatKRW } from '@/utils/expense';
 
 export interface HqQuickDispatchProps {
   onCreateBooking: (
@@ -31,25 +45,6 @@ export interface HqQuickDispatchProps {
   onOpenGroupDispatchModal?: () => void;
   onOpenLoadBookingModal?: () => void;
 }
-
-// 7 Registered Real Fleet Drivers
-interface DriverOption {
-  id: string;
-  name: string;
-  phone: string;
-  defaultVehicleRaw: string;
-  plate: string;
-}
-
-const DRIVER_OPTIONS: DriverOption[] = [
-  { id: '윤태준', name: '윤태준 기사', phone: '010-8842-1920', defaultVehicleRaw: '현대 스타리아 리무진', plate: '116허 1514' },
-  { id: '김민수', name: '김민수 기사', phone: '010-3829-4821', defaultVehicleRaw: '벤츠 S560', plate: '01호 3343' },
-  { id: '이재훈', name: '이재훈 기사', phone: '010-9182-3746', defaultVehicleRaw: '기아 카니발 하이리무진', plate: '193호 5336' },
-  { id: '박서연', name: '박서연 기사', phone: '010-7281-9304', defaultVehicleRaw: '제네시스 G90 리무진', plate: '102부 4280' },
-  { id: '정태훈', name: '정태훈 기사', phone: '010-5542-1928', defaultVehicleRaw: '벤츠 스프린터 519 CDI', plate: '703서 2658' },
-  { id: '최영식', name: '최영식 기사', phone: '010-2341-9876', defaultVehicleRaw: '벤츠 스프린터 투어러 (319 CDI)', plate: '125호 9982' },
-  { id: '이준호', name: '이준호 기사', phone: '010-8831-2940', defaultVehicleRaw: '제네시스 GV80', plate: '203호 5947' },
-];
 
 // 20 Registered Real VIP Fleet Vehicles with manufacturer stripped for UI
 const VEHICLE_OPTIONS = VIP_REAL_VEHICLES.map((v) => ({
@@ -67,6 +62,9 @@ export interface VehicleAllocationItem {
   selectedDriver: string;
   selectedVehicleModel: string;
   selectedVehiclePlate: string;
+  requestedLanguage: RequestedDriverLanguage;
+  languageOverrideConfirmed: boolean;
+  serviceMode: ServiceIncludeMode;
   // Custom itinerary override for this specific vehicle
   hasCustomItinerary: boolean;
   customPickupTime: string;
@@ -75,12 +73,18 @@ export interface VehicleAllocationItem {
   customNotes: string;
 }
 
-const createInitialAllocation = (index: number): VehicleAllocationItem => ({
+const createInitialAllocation = (
+  index: number,
+  defaultLang: RequestedDriverLanguage = 'ko'
+): VehicleAllocationItem => ({
   id: `alloc-${Date.now()}-${index}`,
   vehicleIndex: index,
   selectedDriver: '',
   selectedVehicleModel: '',
   selectedVehiclePlate: '',
+  requestedLanguage: defaultLang,
+  languageOverrideConfirmed: false,
+  serviceMode: 'with_driver',
   hasCustomItinerary: false,
   customPickupTime: '',
   customPickupLocation: '',
@@ -97,20 +101,33 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
   const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
   const customerDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Agency / Brand / Billing Target (Compact expandable)
+  const [showAgencyFields, setShowAgencyFields] = useState(false);
+  const [orderingAgency, setOrderingAgency] = useState('');
+  const [endBrand, setEndBrand] = useState('');
+  const [billingTarget, setBillingTarget] = useState<'ordering_agency' | 'end_brand'>('end_brand');
+
   // 2. Common schedule fields (entered once)
   const [pickupTime, setPickupTime] = useState('2026.10.26 14:00');
   const [pickupLocation, setPickupLocation] = useState('');
   const [destination, setDestination] = useState('');
   const [groupEventTitle, setGroupEventTitle] = useState('');
   const [commonMemo, setCommonMemo] = useState('');
+  const [commonLanguage, setCommonLanguage] = useState<RequestedDriverLanguage>('ko');
 
   // 3. Multi-vehicle & driver allocations (defaults to 1 vehicle)
   const [allocations, setAllocations] = useState<VehicleAllocationItem[]>([
-    createInitialAllocation(1),
+    createInitialAllocation(1, 'ko'),
   ]);
 
   // 4. UI feedback
   const [notificationMsg, setNotificationMsg] = useState<string | null>(null);
+
+  // Selected customer object
+  const selectedCustomerObj = useMemo(() => {
+    if (!selectedCustomerId) return null;
+    return INITIAL_HQ_CUSTOMERS.find((c) => c.id === selectedCustomerId) || null;
+  }, [selectedCustomerId]);
 
   // Close customer dropdown on outside click
   useEffect(() => {
@@ -145,14 +162,13 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
     haptics.lightTap();
     setCustomerName(customer.name);
     setSelectedCustomerId(customer.id);
+    setEndBrand(customer.name);
     setIsCustomerDropdownOpen(false);
 
-    // Auto-populate pickup location if empty and next event exists
     if (!pickupLocation.trim() && customer.nextEvent?.location) {
       setPickupLocation(customer.nextEvent.location);
     }
 
-    // Auto-populate group event title if empty and event exists
     if (!groupEventTitle.trim()) {
       if (customer.nextEvent?.title) {
         setGroupEventTitle(customer.nextEvent.title);
@@ -160,13 +176,38 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
         setGroupEventTitle(`${customer.name} VIP 의전`);
       }
     }
+
+    // Auto-detect if customer prefers English-capable driver
+    const prefersEnglish = customer.preferences.some((p) => p.includes('영어'));
+    if (prefersEnglish) {
+      setCommonLanguage('en');
+      setAllocations((prev) =>
+        prev.map((a) => ({ ...a, requestedLanguage: 'en' }))
+      );
+    }
+  };
+
+  // Change common requested language
+  const handleCommonLanguageChange = (lang: RequestedDriverLanguage) => {
+    haptics.selection();
+    setCommonLanguage(lang);
+    setAllocations((prev) =>
+      prev.map((a) => ({
+        ...a,
+        requestedLanguage: lang,
+        languageOverrideConfirmed: false,
+      }))
+    );
   };
 
   // Add another vehicle allocation
   const handleAddVehicleAllocation = () => {
     haptics.selection();
     const nextIndex = allocations.length + 1;
-    setAllocations((prev) => [...prev, createInitialAllocation(nextIndex)]);
+    setAllocations((prev) => [
+      ...prev,
+      createInitialAllocation(nextIndex, commonLanguage),
+    ]);
   };
 
   // Remove vehicle allocation
@@ -194,15 +235,23 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
 
         // Auto-select matching vehicle if driver is selected
         if (field === 'selectedDriver') {
-          const drv = DRIVER_OPTIONS.find((d) => d.name === value || d.id === value);
+          const drv = DEFAULT_DRIVER_PROFILES.find(
+            (d) => `${d.name} 기사` === value || d.name === value || d.id === value
+          );
           if (drv) {
             return {
               ...item,
-              selectedDriver: drv.name,
-              selectedVehicleModel: drv.defaultVehicleRaw,
-              selectedVehiclePlate: drv.plate,
+              selectedDriver: `${drv.name} 기사`,
+              selectedVehicleModel: item.selectedVehicleModel || drv.defaultVehicleRaw,
+              selectedVehiclePlate: item.selectedVehiclePlate || drv.plate,
+              languageOverrideConfirmed: false,
             };
           }
+          return {
+            ...item,
+            selectedDriver: value,
+            languageOverrideConfirmed: false,
+          };
         }
 
         // Auto-extract plate if vehicle is selected
@@ -217,16 +266,42 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
           };
         }
 
+        // Clear driver if vehicle_only is selected
+        if (field === 'serviceMode' && value === 'vehicle_only') {
+          return {
+            ...item,
+            serviceMode: 'vehicle_only',
+            selectedDriver: '',
+            languageOverrideConfirmed: true,
+          };
+        }
+
         return { ...item, [field]: value };
       })
     );
   };
 
-  // Form submission (Supports single or multi-vehicle group dispatch)
+  // Form submission (Supports single or multi-vehicle group dispatch + language verification + pricing snapshot)
   const handleSubmit = (isDraft: boolean) => {
     if (!customerName.trim() && !isDraft) {
       alert('고객명을 입력하거나 고객 관리에서 선택해 주세요.');
       return;
+    }
+
+    // Check if any vehicle requesting 'en' has a non-English driver without admin confirmation
+    if (!isDraft) {
+      for (const alloc of allocations) {
+        if (alloc.serviceMode === 'with_driver' && alloc.requestedLanguage === 'en' && alloc.selectedDriver) {
+          const cleanName = alloc.selectedDriver.replace(/\s*기사$/, '').trim();
+          const drv = DEFAULT_DRIVER_PROFILES.find((d) => d.name === cleanName);
+          if (drv && !drv.isEnglishVerified && !alloc.languageOverrideConfirmed) {
+            alert(
+              `${alloc.vehicleIndex}호차: 영어 가능 기사가 요청되었으나 한국어 전용 기사(${drv.name})가 선택되었습니다.\n영어가 가능한 기사로 변경하거나 '관리자 예외 배정 확인'을 체크해 주세요.`
+            );
+            return;
+          }
+        }
+      }
     }
 
     const totalVehicles = allocations.length;
@@ -238,8 +313,9 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
 
     const createdBookings: Partial<HqBooking>[] = allocations.map((alloc, idx) => {
       const vehicleNum = idx + 1;
-      const matchedDriver = DRIVER_OPTIONS.find(
-        (d) => d.name === alloc.selectedDriver || d.id === alloc.selectedDriver
+      const cleanDriverName = alloc.selectedDriver.replace(/\s*기사$/, '').trim();
+      const matchedDriver = DEFAULT_DRIVER_PROFILES.find(
+        (d) => d.name === cleanDriverName || d.id === cleanDriverName
       );
       const matchedVehicle = VEHICLE_OPTIONS.find(
         (v) =>
@@ -282,19 +358,46 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
         .filter(Boolean)
         .join(' / ');
 
+      // Capture immutable pricing snapshot at dispatch time
+      const pricingSnapshot = createBookingPricingSnapshot({
+        vehicleModel: resolvedModel,
+        driverName: cleanDriverName,
+        serviceMode: alloc.serviceMode,
+        requestedLanguage: alloc.requestedLanguage,
+        customer: selectedCustomerObj,
+      });
+
       return {
         customerName: customerName.trim() || '신규 고객 예약',
         customerId: selectedCustomerId || undefined,
+        orderingAgency: orderingAgency.trim() || undefined,
+        endBrand: endBrand.trim() || customerName.trim() || undefined,
+        eventName: sharedGroupName,
+        billingTarget: orderingAgency.trim() ? billingTarget : 'end_brand',
+        billingTargetName:
+          orderingAgency.trim() && billingTarget === 'ordering_agency'
+            ? `${orderingAgency.trim()} 귀하`
+            : `${customerName.trim()} 귀하`,
         pickupTime: resolvedPickupTime,
         pickupDate: '2026. 10. 26',
         pickupLocation: resolvedPickupLoc,
         destination: resolvedDest,
-        driverName: alloc.selectedDriver || '-',
+        driverName:
+          alloc.serviceMode === 'vehicle_only'
+            ? '차량만 대여'
+            : alloc.selectedDriver || '-',
         driverPhone: matchedDriver?.phone,
+        driverIsEnglishVerified: matchedDriver?.isEnglishVerified,
         vehicleModel: resolvedModel,
         vehiclePlate: resolvedPlate,
-        dispatchStatus: isDraft || !alloc.selectedDriver ? '작성 중' : '배차 완료',
-        driverAck: isDraft || !alloc.selectedDriver ? '-' : '미확인',
+        dispatchStatus:
+          isDraft || (!alloc.selectedDriver && alloc.serviceMode === 'with_driver')
+            ? '작성 중'
+            : '배차 완료',
+        driverAck:
+          isDraft || (!alloc.selectedDriver && alloc.serviceMode === 'with_driver')
+            ? '-'
+            : '미확인',
         customerBrochure: '미발송',
         notes: combinedNotes || undefined,
         isToday: true,
@@ -304,12 +407,16 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
         groupName: isMultiVehicleGroup ? sharedGroupName : undefined,
         groupTotalVehicles: totalVehicles,
         groupVehicleIndex: vehicleNum,
+        // Language & Pricing Snapshot
+        requestedLanguage: alloc.requestedLanguage,
+        languageOverrideConfirmed: alloc.languageOverrideConfirmed,
+        serviceMode: alloc.serviceMode,
+        appliedPricingSnapshot: pricingSnapshot,
       };
     });
 
     haptics.successPulse();
 
-    // Call create handler (supports single or array)
     if (createdBookings.length === 1) {
       onCreateBooking(createdBookings[0], isDraft);
     } else {
@@ -319,8 +426,8 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
     if (isDraft) {
       setNotificationMsg(
         isMultiVehicleGroup
-          ? `총 ${totalVehicles}대 배차 초안이 임시저장되었습니다.`
-          : '배차 초안이 임시저장되었습니다.'
+          ? `총 ${totalVehicles}대 배차 초안 및 임시 단가 스냅샷이 저장되었습니다.`
+          : '배차 초안 및 단가 스냅샷이 저장되었습니다.'
       );
     } else {
       setNotificationMsg(
@@ -334,11 +441,14 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
       setNotificationMsg(null);
       setCustomerName('');
       setSelectedCustomerId(null);
+      setOrderingAgency('');
+      setEndBrand('');
       setPickupLocation('');
       setDestination('');
       setGroupEventTitle('');
       setCommonMemo('');
-      setAllocations([createInitialAllocation(1)]);
+      setCommonLanguage('ko');
+      setAllocations([createInitialAllocation(1, 'ko')]);
     }, 2800);
   };
 
@@ -356,7 +466,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                 빠른 배차 생성
               </h2>
               <p className="text-[11px] text-slate-400 font-medium">
-                단일 및 다중 차량 그룹 통합 배차
+                고객·행사 연동 및 언어 매칭 통합 배차
               </p>
             </div>
           </div>
@@ -490,6 +600,71 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
             </div>
           </div>
 
+          {/* Agency / End Brand Toggle (발주 대행사 · 최종 브랜드 · 청구처 구분) */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowAgencyFields((prev) => !prev)}
+              className="text-[11px] font-bold text-[#1E60F3] hover:underline flex items-center gap-1 cursor-pointer"
+            >
+              {showAgencyFields ? (
+                <>
+                  <ChevronUp className="w-3 h-3" />
+                  <span>대행사 발주 / 최종 브랜드 구분 접기</span>
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="w-3 h-3" />
+                  <span>+ 광고대행사 발주 · 최종 브랜드 · 실제 청구처 구분</span>
+                </>
+              )}
+            </button>
+
+            {showAgencyFields && (
+              <div className="mt-2 p-3 bg-slate-50/90 rounded-xl border border-slate-200/80 grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                    발주 고객사 (대행사)
+                  </label>
+                  <input
+                    type="text"
+                    value={orderingAgency}
+                    onChange={(e) => setOrderingAgency(e.target.value)}
+                    placeholder="예: 제일기획, 이노션"
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 text-xs font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                    최종 브랜드
+                  </label>
+                  <input
+                    type="text"
+                    value={endBrand || customerName}
+                    onChange={(e) => setEndBrand(e.target.value)}
+                    placeholder="예: CHANEL, Ferrari"
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 text-xs font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                    실제 청구 대상
+                  </label>
+                  <select
+                    value={billingTarget}
+                    onChange={(e) =>
+                      setBillingTarget(e.target.value as 'ordering_agency' | 'end_brand')
+                    }
+                    className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs font-bold cursor-pointer"
+                  >
+                    <option value="ordering_agency">발주 대행사 청구</option>
+                    <option value="end_brand">최종 브랜드 직접 청구</option>
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Row 2: 공통 픽업 위치 * | 공통 목적지 * */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -519,8 +694,37 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
             </div>
           </div>
 
-          {/* Row 3: 행사/그룹명 (선택) & 공통 메모 */}
+          {/* Row 3: 요청 기사 언어 * | 행사/프로젝트명 */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-[11px] font-bold text-slate-700 mb-1 flex items-center gap-1">
+                <Globe className="w-3 h-3 text-[#1E60F3]" />
+                <span>요청 기사 언어</span>
+              </label>
+              <div className="grid grid-cols-3 gap-1.5 bg-slate-100 p-1 rounded-lg">
+                {(
+                  [
+                    { id: 'ko', label: '한국어' },
+                    { id: 'en', label: '영어 가능' },
+                    { id: 'other', label: '기타/별도' },
+                  ] as const
+                ).map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => handleCommonLanguageChange(opt.id)}
+                    className={`py-1.5 px-2 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                      commonLanguage === opt.id
+                        ? 'bg-[#1E60F3] text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div>
               <label className="block text-[11px] font-bold text-slate-700 mb-1">
                 행사 / 프로젝트명 (선택)
@@ -533,21 +737,33 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 font-medium focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
+          </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-[11px] font-bold text-slate-700">공통 요청 메모</label>
-                <span className="text-[10px] text-slate-400 font-medium">{commonMemo.length}/100</span>
+          {/* English Request Surcharge Notice (No arbitrary surcharge) */}
+          {commonLanguage === 'en' && (
+            <div className="p-2.5 bg-blue-50/70 border border-blue-200/80 rounded-xl flex items-start gap-2 text-[11px] text-blue-800">
+              <ShieldCheck className="w-3.5 h-3.5 text-[#1E60F3] shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold">영어 가능 검증 기사 우선 매칭 활성화:</span>{' '}
+                영어 서비스 자격이 검증된 기사(윤태준, 김민수, 박서연, 최영식)가 우선 표시됩니다. 고객사 영어 할증 요금은 미정이므로 임의 가산하지 않습니다.
               </div>
-              <input
-                type="text"
-                maxLength={100}
-                value={commonMemo}
-                onChange={(e) => setCommonMemo(e.target.value)}
-                placeholder="공통 준비사항 및 특이사항 입력"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 font-medium focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
             </div>
+          )}
+
+          {/* Row 4: 공통 요청 메모 */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[11px] font-bold text-slate-700">공통 요청 메모</label>
+              <span className="text-[10px] text-slate-400 font-medium">{commonMemo.length}/100</span>
+            </div>
+            <input
+              type="text"
+              maxLength={100}
+              value={commonMemo}
+              onChange={(e) => setCommonMemo(e.target.value)}
+              placeholder="공통 준비사항 및 특이사항 입력"
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 font-medium focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
           </div>
 
           {/* 3. Section: 기사 & 차량 배정 (Multiple Allocations supported) */}
@@ -571,199 +787,345 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
 
             {/* List of Allocation Cards */}
             <div className="space-y-2.5">
-              {allocations.map((alloc, idx) => (
-                <div
-                  key={alloc.id}
-                  className="bg-slate-50/80 rounded-xl p-3 border border-slate-200/80 space-y-2.5 transition-all"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-black text-slate-800 flex items-center gap-1.5">
-                      <span className="w-4 h-4 rounded-full bg-[#1E60F3] text-white flex items-center justify-center text-[10px] font-black">
-                        {idx + 1}
+              {allocations.map((alloc, idx) => {
+                const sortedDrivers = getSortedDriversForLanguage(alloc.requestedLanguage);
+                const cleanSelectedDriver = alloc.selectedDriver.replace(/\s*기사$/, '').trim();
+                const selectedDriverObj = DEFAULT_DRIVER_PROFILES.find(
+                  (d) => d.name === cleanSelectedDriver
+                );
+                const hasLanguageMismatch =
+                  alloc.serviceMode === 'with_driver' &&
+                  alloc.requestedLanguage === 'en' &&
+                  selectedDriverObj &&
+                  !selectedDriverObj.isEnglishVerified;
+
+                // Live pricing preview for HQ admin
+                const previewPricing = resolveEffectivePricingTerms({
+                  vehicleModel:
+                    alloc.selectedVehicleModel || selectedDriverObj?.defaultVehicleRaw,
+                  serviceMode: alloc.serviceMode,
+                  customerContractTerms: selectedCustomerObj?.contractTerms,
+                });
+
+                const previewLabor = calculateDriverLaborCost({
+                  driverName: cleanSelectedDriver,
+                  vehicleModel:
+                    alloc.selectedVehicleModel || selectedDriverObj?.defaultVehicleRaw,
+                  serviceMode: alloc.serviceMode,
+                });
+
+                return (
+                  <div
+                    key={alloc.id}
+                    className="bg-slate-50/80 rounded-xl p-3 border border-slate-200/80 space-y-2.5 transition-all"
+                  >
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="text-[11px] font-black text-slate-800 flex items-center gap-1.5">
+                        <span className="w-4 h-4 rounded-full bg-[#1E60F3] text-white flex items-center justify-center text-[10px] font-black">
+                          {idx + 1}
+                        </span>
+                        <span>
+                          {idx === 0
+                            ? '1호차 (메인 차량)'
+                            : `${idx + 1}호차 추가 배차`}
+                        </span>
                       </span>
-                      <span>
-                        {idx === 0
-                          ? '1호차 (메인 차량)'
-                          : `${idx + 1}호차 추가 배차`}
-                      </span>
-                    </span>
 
-                    {allocations.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveVehicleAllocation(alloc.id)}
-                        className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                        title="차량 배정 삭제"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Driver & Vehicle Selectors */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                    {/* 기사 선택 */}
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                        기사 선택 <span className="text-[#1E60F3]">*</span>
-                      </label>
-                      <select
-                        value={alloc.selectedDriver}
-                        onChange={(e) =>
-                          handleUpdateAllocation(alloc.id, 'selectedDriver', e.target.value)
-                        }
-                        className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 font-bold text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                      >
-                        <option value="">기사 선택</option>
-                        {DRIVER_OPTIONS.map((d) => (
-                          <option key={d.id} value={d.name}>
-                            {d.name} ({stripManufacturerName(d.defaultVehicleRaw)} · {d.plate})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* 차량 선택: 제조사명 제거된 모델명 중심 표시 (Requirement 3 ②) */}
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                        차량 선택 (모델명 중심) <span className="text-[#1E60F3]">*</span>
-                      </label>
-                      <select
-                        value={alloc.selectedVehicleModel}
-                        onChange={(e) =>
-                          handleUpdateAllocation(
-                            alloc.id,
-                            'selectedVehicleModel',
-                            e.target.value
-                          )
-                        }
-                        className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 font-bold text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                      >
-                        <option value="">차량 선택</option>
-                        {VEHICLE_OPTIONS.map((v) => (
-                          <option key={v.id} value={v.modelRaw}>
-                            {v.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* 차량별 개별 일정 오버라이드 Accordion */}
-                  <div className="pt-1">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        handleUpdateAllocation(
-                          alloc.id,
-                          'hasCustomItinerary',
-                          !alloc.hasCustomItinerary
-                        )
-                      }
-                      className="text-[11px] font-bold text-[#1E60F3] hover:underline flex items-center gap-1 cursor-pointer"
-                    >
-                      {alloc.hasCustomItinerary ? (
-                        <>
-                          <ChevronUp className="w-3 h-3" />
-                          <span>개별 일정 접기 (공통 일정 사용)</span>
-                        </>
-                      ) : (
-                        <>
-                          <ChevronDown className="w-3 h-3" />
-                          <span>+ 이 차량의 픽업 시간·위치 개별 수정</span>
-                        </>
-                      )}
-                    </button>
-
-                    {/* Collapsed state indicator */}
-                    {!alloc.hasCustomItinerary && (
-                      <p className="text-[10px] text-slate-400 font-medium mt-0.5 truncate">
-                        공통 일정 적용: {pickupTime.slice(-5) || '14:00'} |{' '}
-                        {pickupLocation || '출발지'} → {destination || '도착지'}
-                      </p>
-                    )}
-
-                    {/* Expanded custom itinerary inputs */}
-                    {alloc.hasCustomItinerary && (
-                      <div className="mt-2 p-2.5 bg-white rounded-lg border border-slate-200/80 space-y-2 text-xs animate-in fade-in duration-150">
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
-                              개별 픽업 시간
-                            </label>
-                            <input
-                              type="text"
-                              value={alloc.customPickupTime}
-                              onChange={(e) =>
-                                handleUpdateAllocation(
-                                  alloc.id,
-                                  'customPickupTime',
-                                  e.target.value
-                                )
-                              }
-                              placeholder={pickupTime.slice(-5) || '14:00'}
-                              className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-slate-900 text-xs font-medium"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
-                              개별 픽업 위치
-                            </label>
-                            <input
-                              type="text"
-                              value={alloc.customPickupLocation}
-                              onChange={(e) =>
-                                handleUpdateAllocation(
-                                  alloc.id,
-                                  'customPickupLocation',
-                                  e.target.value
-                                )
-                              }
-                              placeholder={pickupLocation || '출발 위치'}
-                              className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-slate-900 text-xs font-medium"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
-                              개별 목적지
-                            </label>
-                            <input
-                              type="text"
-                              value={alloc.customDestination}
-                              onChange={(e) =>
-                                handleUpdateAllocation(
-                                  alloc.id,
-                                  'customDestination',
-                                  e.target.value
-                                )
-                              }
-                              placeholder={destination || '도착 위치'}
-                              className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-slate-900 text-xs font-medium"
-                            />
-                          </div>
+                      <div className="flex items-center gap-1.5">
+                        {/* Per-vehicle Service Mode: 기사 포함 vs 차량만 */}
+                        <div className="inline-flex bg-white border border-slate-200 rounded-lg p-0.5 text-[10px] font-bold">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleUpdateAllocation(alloc.id, 'serviceMode', 'with_driver')
+                            }
+                            className={`px-2 py-0.5 rounded-md cursor-pointer transition-colors ${
+                              alloc.serviceMode === 'with_driver'
+                                ? 'bg-[#1E60F3] text-white'
+                                : 'text-slate-500 hover:text-slate-800'
+                            }`}
+                          >
+                            기사 포함
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleUpdateAllocation(alloc.id, 'serviceMode', 'vehicle_only')
+                            }
+                            className={`px-2 py-0.5 rounded-md cursor-pointer transition-colors ${
+                              alloc.serviceMode === 'vehicle_only'
+                                ? 'bg-slate-800 text-white'
+                                : 'text-slate-500 hover:text-slate-800'
+                            }`}
+                          >
+                            차량만
+                          </button>
                         </div>
 
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
-                            차량별 탑승객 / 개별 요청
-                          </label>
-                          <input
-                            type="text"
-                            value={alloc.customNotes}
+                        {/* Per-vehicle Language selector when multiple vehicles exist */}
+                        {allocations.length > 1 && (
+                          <select
+                            value={alloc.requestedLanguage}
                             onChange={(e) =>
-                              handleUpdateAllocation(alloc.id, 'customNotes', e.target.value)
+                              handleUpdateAllocation(
+                                alloc.id,
+                                'requestedLanguage',
+                                e.target.value as RequestedDriverLanguage
+                              )
                             }
-                            placeholder="예: VIP 본인 탑승 / 수행원 3명 탑승"
-                            className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-slate-900 text-xs font-medium"
+                            className="px-1.5 py-0.5 bg-white border border-slate-200 rounded-md text-[10px] font-bold text-slate-700 cursor-pointer"
+                            title="차량별 요청 언어"
+                          >
+                            <option value="ko">한국어</option>
+                            <option value="en">영어 가능</option>
+                            <option value="other">기타 언어</option>
+                          </select>
+                        )}
+
+                        {allocations.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveVehicleAllocation(alloc.id)}
+                            className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            title="차량 배정 삭제"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Driver & Vehicle Selectors */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      {/* 기사 선택 (영어 가능 기사 우선 정렬) */}
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                          {alloc.serviceMode === 'vehicle_only'
+                            ? '기사 배정 (차량만 대여)'
+                            : alloc.requestedLanguage === 'en'
+                            ? '기사 선택 (영어 가능 우선)'
+                            : '기사 선택'}{' '}
+                          {alloc.serviceMode === 'with_driver' && (
+                            <span className="text-[#1E60F3]">*</span>
+                          )}
+                        </label>
+                        <select
+                          disabled={alloc.serviceMode === 'vehicle_only'}
+                          value={alloc.selectedDriver}
+                          onChange={(e) =>
+                            handleUpdateAllocation(alloc.id, 'selectedDriver', e.target.value)
+                          }
+                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 font-bold text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer disabled:bg-slate-100 disabled:text-slate-400"
+                        >
+                          <option value="">
+                            {alloc.serviceMode === 'vehicle_only'
+                              ? '기사 미배정 (차량만 대여)'
+                              : '기사 선택'}
+                          </option>
+                          {sortedDrivers.map(({ driver }) => (
+                            <option key={driver.id} value={`${driver.name} 기사`}>
+                              {driver.isEnglishVerified ? '[영어검증] ' : '[한국어] '}
+                              {driver.name} 기사 ({stripManufacturerName(driver.defaultVehicleRaw)} ·{' '}
+                              {driver.plate})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* 차량 선택: 제조사명 제거된 모델명 중심 표시 */}
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
+                          차량 선택 (모델명 중심) <span className="text-[#1E60F3]">*</span>
+                        </label>
+                        <select
+                          value={alloc.selectedVehicleModel}
+                          onChange={(e) =>
+                            handleUpdateAllocation(
+                              alloc.id,
+                              'selectedVehicleModel',
+                              e.target.value
+                            )
+                          }
+                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 font-bold text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                        >
+                          <option value="">차량 선택</option>
+                          {VEHICLE_OPTIONS.map((v) => (
+                            <option key={v.id} value={v.modelRaw}>
+                              {v.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Language Mismatch Warning & Admin Exception Confirmation */}
+                    {hasLanguageMismatch && (
+                      <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-300 text-[11px] text-amber-900 space-y-1.5">
+                        <div className="flex items-start gap-1.5 font-bold">
+                          <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                          <span>
+                            요청 언어(영어 가능) 미충족: {selectedDriverObj?.name} 기사는 한국어 서비스 전용입니다.
+                          </span>
+                        </div>
+                        <label className="flex items-center gap-1.5 cursor-pointer text-[10px] font-bold text-amber-800">
+                          <input
+                            type="checkbox"
+                            checked={alloc.languageOverrideConfirmed}
+                            onChange={(e) =>
+                              handleUpdateAllocation(
+                                alloc.id,
+                                'languageOverrideConfirmed',
+                                e.target.checked
+                              )
+                            }
+                            className="rounded border-amber-400 text-[#1E60F3]"
                           />
+                          <span>[관리자 확인] 요청 언어 불일치 예외 배정을 승인합니다.</span>
+                        </label>
+                      </div>
+                    )}
+
+                    {/* Live Preset / Contract Pricing Preview Chip (HQ Admin Only) */}
+                    {(alloc.selectedVehicleModel || selectedDriverObj) && (
+                      <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-white border border-slate-200/80 text-[10px]">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="px-1.5 py-0.2 rounded bg-blue-50 text-[#1E60F3] font-black border border-blue-100">
+                            {previewPricing.isTemporaryPreset ? '임시 단가(10h)' : '계약 단가'}
+                          </span>
+                          <span className="font-bold text-slate-700">
+                            청구:{' '}
+                            {previewPricing.hasContractTerms
+                              ? formatKRW(previewPricing.baseFare)
+                              : '요금 미등록(확인필요)'}
+                          </span>
+                        </div>
+                        <div className="text-slate-500 font-semibold">
+                          인건비:{' '}
+                          <strong className="text-slate-800">
+                            {alloc.serviceMode === 'vehicle_only'
+                              ? '₩0 (차량만)'
+                              : formatKRW(previewLabor.driverLaborCost)}
+                          </strong>
                         </div>
                       </div>
                     )}
+
+                    {/* 차량별 개별 일정 오버라이드 Accordion */}
+                    <div className="pt-0.5">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleUpdateAllocation(
+                            alloc.id,
+                            'hasCustomItinerary',
+                            !alloc.hasCustomItinerary
+                          )
+                        }
+                        className="text-[11px] font-bold text-[#1E60F3] hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        {alloc.hasCustomItinerary ? (
+                          <>
+                            <ChevronUp className="w-3 h-3" />
+                            <span>개별 일정 접기 (공통 일정 사용)</span>
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="w-3 h-3" />
+                            <span>+ 이 차량의 픽업 시간·위치 개별 수정</span>
+                          </>
+                        )}
+                      </button>
+
+                      {/* Collapsed state indicator */}
+                      {!alloc.hasCustomItinerary && (
+                        <p className="text-[10px] text-slate-400 font-medium mt-0.5 truncate">
+                          공통 일정 적용: {pickupTime.slice(-5) || '14:00'} |{' '}
+                          {pickupLocation || '출발지'} → {destination || '도착지'}
+                        </p>
+                      )}
+
+                      {/* Expanded custom itinerary inputs */}
+                      {alloc.hasCustomItinerary && (
+                        <div className="mt-2 p-2.5 bg-white rounded-lg border border-slate-200/80 space-y-2 text-xs animate-in fade-in duration-150">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                                개별 픽업 시간
+                              </label>
+                              <input
+                                type="text"
+                                value={alloc.customPickupTime}
+                                onChange={(e) =>
+                                  handleUpdateAllocation(
+                                    alloc.id,
+                                    'customPickupTime',
+                                    e.target.value
+                                  )
+                                }
+                                placeholder={pickupTime.slice(-5) || '14:00'}
+                                className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-slate-900 text-xs font-medium"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                                개별 픽업 위치
+                              </label>
+                              <input
+                                type="text"
+                                value={alloc.customPickupLocation}
+                                onChange={(e) =>
+                                  handleUpdateAllocation(
+                                    alloc.id,
+                                    'customPickupLocation',
+                                    e.target.value
+                                  )
+                                }
+                                placeholder={pickupLocation || '출발 위치'}
+                                className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-slate-900 text-xs font-medium"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                                개별 목적지
+                              </label>
+                              <input
+                                type="text"
+                                value={alloc.customDestination}
+                                onChange={(e) =>
+                                  handleUpdateAllocation(
+                                    alloc.id,
+                                    'customDestination',
+                                    e.target.value
+                                  )
+                                }
+                                placeholder={destination || '도착 위치'}
+                                className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-slate-900 text-xs font-medium"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                              차량별 탑승객 / 개별 요청
+                            </label>
+                            <input
+                              type="text"
+                              value={alloc.customNotes}
+                              onChange={(e) =>
+                                handleUpdateAllocation(alloc.id, 'customNotes', e.target.value)
+                              }
+                              placeholder="예: VIP 본인 탑승 / 수행원 3명 탑승"
+                              className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-slate-900 text-xs font-medium"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -771,7 +1133,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
           <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-200/80 flex items-start gap-2 text-[11px] text-slate-500 leading-relaxed">
             <Info className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
             <p>
-              배차 발송 시 각 기사님에게 본인 배정 일정만 Cockpit으로 개별 전달되며, 본사 관리자 화면에서는 하나의 그룹으로 묶여 통합 관리됩니다.
+              배차 발송 시 적용 단가가 스냅샷으로 보존되며, 각 기사님에게는 본인 일정만 전달됩니다. (고객사 단가 및 회사 수익 정보는 기사에게 비공개)
             </p>
           </div>
         </div>

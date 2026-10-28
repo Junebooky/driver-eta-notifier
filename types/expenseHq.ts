@@ -49,7 +49,16 @@ export interface HqExpenseRecord {
   reviewNotes?: string;
   reviewedAt?: string;
   reviewedBy?: string;
+  // Billing & Duplicate Prevention
+  billableToCustomer?: boolean;   // default true when status === '승인 완료'
+  eventId?: string;
+  eventName?: string;
+  bookingId?: string;
+  isDuplicateSuspicion?: boolean; // 중복 영수증 의심
+  duplicateReason?: string;
+  duplicateOfId?: string;
 }
+
 
 export interface HqExpenseKpiSummary {
   todayTotal: number;

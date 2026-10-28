@@ -46,10 +46,12 @@ import { formatKRW } from '@/utils/expense';
 export interface HqCustomersViewProps {
   initialSearchQuery?: string;
   onOpenBookingModal?: (customerName: string) => void;
+  onOpenSettlementReport?: (customerId?: string) => void;
 }
 
 export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
   initialSearchQuery = '',
+  onOpenSettlementReport,
 }) => {
   // Customers State
   const [customers, setCustomers] = useState<HqCustomer[]>(INITIAL_HQ_CUSTOMERS);
@@ -939,10 +941,23 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2.5">
                     <span className="text-xs text-slate-500 font-medium">
                       총 <strong className="text-slate-900">{customerExpenses.length}</strong>건
                     </span>
+                    {onOpenSettlementReport && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          haptics.lightTap();
+                          onOpenSettlementReport(selectedCustomer.id);
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-[#1E60F3] hover:bg-blue-600 text-white text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
+                      >
+                        <span>행사 종합 정산·수익성 리포트</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
 
