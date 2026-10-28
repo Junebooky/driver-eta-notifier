@@ -479,7 +479,7 @@ export default function HqCustomerMessageModal({
                         : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                     }`}
                   >
-                    {isPendingMatch && <Sparkles className="h-3 w-3 text-amber-300" />}
+                    {isPendingMatch && <Sparkles className="h-3 w-3 text-blue-200" />}
                     <span>{CUSTOMER_TRIGGER_LABELS[t]}</span>
                   </button>
                 );
@@ -510,8 +510,8 @@ export default function HqCustomerMessageModal({
           </div>
 
           {missingFieldsWarning && (
-            <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs font-bold text-amber-900">
-              <AlertCircle className="h-4 w-4 shrink-0 text-amber-600" />
+            <div className="flex items-center gap-2 rounded-xl border border-slate-300 bg-slate-100 px-3.5 py-2.5 text-xs font-bold text-slate-800">
+              <AlertCircle className="h-4 w-4 shrink-0 text-[#1E60F3]" />
               <span>{missingFieldsWarning} — 발송 전 내용을 반드시 확인해주세요.</span>
             </div>
           )}
@@ -636,8 +636,8 @@ export default function HqCustomerMessageModal({
                 feedback.type === 'success'
                   ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
                   : feedback.type === 'warning'
-                  ? 'border-amber-200 bg-amber-50 text-amber-900'
-                  : 'border-red-200 bg-red-50 text-red-700'
+                  ? 'border-slate-300 bg-slate-100 text-slate-800'
+                  : 'border-slate-700 bg-slate-900 text-white'
               }`}
             >
               {feedback.message}

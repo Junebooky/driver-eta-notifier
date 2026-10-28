@@ -412,7 +412,7 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                 : `${booking.customerName} 예약 · 배차 관리`}
             </h3>
             {booking.version && booking.version > 1 && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-100 text-[#1E60F3]">
                 v{booking.version}
               </span>
             )}
@@ -430,8 +430,8 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
 
         {/* Feedback Banners */}
         {errorMsg && (
-          <div className="mx-4 sm:mx-6 mt-3 p-3 rounded-xl bg-rose-50 border border-rose-300 text-xs font-bold text-rose-800 flex items-start gap-2 shrink-0">
-            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+          <div className="mx-4 sm:mx-6 mt-3 p-3 rounded-xl bg-slate-900 border border-slate-700 text-xs font-bold text-white flex items-start gap-2 shrink-0 shadow-xs">
+            <AlertTriangle className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
             <span>{errorMsg}</span>
           </div>
         )}
@@ -601,7 +601,7 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                       신규 접수 작성 중
                     </span>
                   ) : isCancelled ? (
-                    <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-100 text-rose-800">
+                    <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-200 text-slate-700">
                       배차 취소됨
                     </span>
                   ) : booking.driverAck === '확인완료' ? (
@@ -610,15 +610,15 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                       기사 확인완료 ({booking.driverAckTime || '기록됨'})
                     </span>
                   ) : booking.driverAck === '재확인 필요' ? (
-                    <span className="px-2.5 py-1 rounded-lg text-xs font-black bg-rose-100 text-rose-800">
+                    <span className="px-2.5 py-1 rounded-lg text-xs font-black bg-indigo-100 text-indigo-800">
                       변경됨 · 기사 재확인 대기 (v{booking.version || 2})
                     </span>
                   ) : booking.dispatchStatus === '미배정' ? (
-                    <span className="px-2.5 py-1 rounded-lg text-xs font-black bg-amber-100 text-amber-800">
+                    <span className="px-2.5 py-1 rounded-lg text-xs font-black bg-blue-100 text-[#1E60F3]">
                       배차 대기함 (미배정)
                     </span>
                   ) : (
-                    <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100 text-amber-800 flex items-center gap-1">
+                    <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1">
                       <Clock className="w-3.5 h-3.5" />
                       발송 완료 · 기사 미확인
                     </span>
@@ -671,19 +671,19 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
 
                 {/* Live Schedule Conflict Warning */}
                 {modalConflicts.length > 0 && (
-                  <div className="p-3 rounded-xl bg-rose-100 border border-rose-300 text-xs text-rose-900 space-y-1.5">
+                  <div className="p-3 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white space-y-1.5 shadow-sm">
                     {modalConflicts.map((c, idx) => (
                       <div key={idx} className="flex items-start gap-1.5 font-bold">
-                        <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                        <AlertTriangle className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
                         <span>{c.message}</span>
                       </div>
                     ))}
-                    <label className="flex items-center gap-1.5 pt-1 text-xs font-black text-rose-800 cursor-pointer">
+                    <label className="flex items-center gap-1.5 pt-1 text-xs font-bold text-slate-300 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={allowConflictOverride}
                         onChange={(e) => setAllowConflictOverride(e.target.checked)}
-                        className="rounded border-rose-400 text-rose-600"
+                        className="rounded border-slate-600 text-[#1E60F3] focus:ring-[#1E60F3]"
                       />
                       <span>일정 간격 중복을 확인했으며 예외 배차를 승인합니다.</span>
                     </label>
@@ -731,16 +731,16 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
               {!isNewBooking &&
                 !isCancelled &&
                 (booking.driverAck === '미확인' || booking.driverAck === '재확인 필요') && (
-                  <div className="p-4 rounded-2xl border border-rose-200 bg-rose-50/50 space-y-2.5">
+                  <div className="p-4 rounded-2xl border border-blue-200 bg-blue-50/40 space-y-2.5">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
-                        <BellRing className="w-4 h-4 text-rose-600" />
-                        <span className="text-sm font-black text-rose-900">
+                        <BellRing className="w-4 h-4 text-[#1E60F3]" />
+                        <span className="text-sm font-black text-slate-900">
                           기사 미확인 재알림 전송
                         </span>
                       </div>
                       {(booking.reminderCount || 0) > 0 && (
-                        <span className="px-2.5 py-0.5 rounded-lg bg-violet-100 text-violet-800 text-xs font-extrabold">
+                        <span className="px-2.5 py-0.5 rounded-lg bg-blue-100 text-[#1E60F3] text-xs font-extrabold">
                           누적 {booking.reminderCount}회
                         </span>
                       )}
@@ -776,7 +776,7 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                           setIsSaving(false);
                         }
                       }}
-                      className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-extrabold transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                      className="w-full py-2.5 rounded-xl bg-[#1E60F3] hover:bg-blue-600 text-white text-sm font-extrabold transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-xs"
                     >
                       <Send className="w-4 h-4" />
                       <span>담당 기사 Cockpit에 확인 재알림 보내기</span>
@@ -835,7 +835,7 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                       booking.customerBrochure === '발송됨'
                         ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                         : booking.customerBrochure === '재발송 필요'
-                        ? 'bg-rose-50 text-rose-600 border border-rose-200'
+                        ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
                         : 'bg-slate-100 text-slate-500'
                     }`}
                   >
@@ -855,26 +855,26 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
 
               {/* Dispatch Cancellation Box */}
               {!isNewBooking && !isCancelled && (
-                <div className="p-4 rounded-2xl border border-rose-200/80 bg-rose-50/30 space-y-2">
+                <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/70 space-y-2">
                   {!showCancelConfirm ? (
                     <button
                       type="button"
                       onClick={() => setShowCancelConfirm(true)}
-                      className="w-full py-2.5 rounded-xl border border-rose-200 bg-white hover:bg-rose-50 text-rose-600 text-sm font-bold flex items-center justify-center gap-2 cursor-pointer transition-all"
+                      className="w-full py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 text-sm font-bold flex items-center justify-center gap-2 cursor-pointer transition-all"
                     >
-                      <Ban className="w-3.5 h-3.5" />
+                      <Ban className="w-3.5 h-3.5 text-slate-500" />
                       <span>이 배차/예약 취소 처리</span>
                     </button>
                   ) : (
                     <div className="space-y-2">
-                      <label className="block text-[11px] font-black text-rose-800">
+                      <label className="block text-[11px] font-black text-slate-700">
                         취소 사유 입력 (담당 기사 Cockpit에도 즉시 취소 알림 표시)
                       </label>
                       <input
                         type="text"
                         value={cancelReason}
                         onChange={(e) => setCancelReason(e.target.value)}
-                        className="w-full px-2.5 py-1.5 bg-white border border-rose-300 rounded-lg text-xs font-semibold text-slate-900"
+                        className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-900"
                       />
                       <div className="flex items-center gap-2">
                         <button
@@ -888,7 +888,7 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                           type="button"
                           disabled={isSaving}
                           onClick={handleCancelDispatch}
-                          className="flex-1 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-black cursor-pointer disabled:opacity-50"
+                          className="flex-1 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-black cursor-pointer disabled:opacity-50"
                         >
                           배차 취소 확정
                         </button>

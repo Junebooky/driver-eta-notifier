@@ -48,7 +48,7 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
       label: '예약·배차 관리',
       icon: CalendarCheck,
       badge: dispatchActionBadgeCount > 0 ? dispatchActionBadgeCount : undefined,
-      badgeColor: 'bg-rose-500 text-white',
+      badgeColor: 'bg-[#1E60F3] text-white',
     },
     { id: 'operations', label: '실시간 운영 보드', icon: Activity },
     { id: 'quotes', label: '견적·가격표', icon: Calculator },

@@ -100,11 +100,20 @@
   z-index: 2;
 }
 
+.hq-responsive-table-wrapper thead th:first-child {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 3;
+  background: #F8FAFC;
+  box-shadow: 2px 0 8px -2px rgba(15, 23, 42, 0.08);
+}
+
 .hq-responsive-table-wrapper tbody th {
   position: sticky;
   inset-inline-start: 0;
   z-index: 1;
   background: #FFFFFF;
+  box-shadow: 2px 0 8px -2px rgba(15, 23, 42, 0.08);
 }
 
 .hq-responsive-table-wrapper tbody tr:hover th {

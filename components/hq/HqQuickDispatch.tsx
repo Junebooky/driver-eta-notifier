@@ -1260,17 +1260,17 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
 
         {/* Live Conflict Warning Banner if any */}
         {totalLiveConflicts > 0 && (
-          <div className="mt-3 p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs font-bold text-rose-800 space-y-1">
+          <div className="mt-3 p-3 rounded-xl bg-slate-900 border border-slate-700 text-xs font-bold text-white space-y-1 shadow-sm">
             <div className="flex items-center gap-1.5">
-              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
-              <span>기존 배차와 일정 충돌이 감지되었습니다 ({totalLiveConflicts}건)</span>
+              <AlertTriangle className="w-4 h-4 text-blue-400 shrink-0" />
+              <span>기존 배차와 일정 중복이 감지되었습니다 ({totalLiveConflicts}건)</span>
             </div>
-            <label className="flex items-center gap-2 pt-1 text-[11px] text-rose-700 cursor-pointer">
+            <label className="flex items-center gap-2 pt-1 text-[11px] text-slate-300 cursor-pointer">
               <input
                 type="checkbox"
                 checked={allowConflictOverride}
                 onChange={(e) => setAllowConflictOverride(e.target.checked)}
-                className="rounded border-rose-400 text-rose-600"
+                className="rounded border-slate-600 text-[#1E60F3] focus:ring-[#1E60F3]"
               />
               <span>일정 중복을 확인하였으며 예외 배정합니다.</span>
             </label>
@@ -1279,8 +1279,8 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
 
         {/* Error Banner */}
         {errorMsg && (
-          <div className="mt-3 p-3 rounded-xl bg-rose-50 border border-rose-300 flex items-start gap-2 text-xs font-bold text-rose-800">
-            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+          <div className="mt-3 p-3 rounded-xl bg-slate-900 border border-slate-700 flex items-start gap-2 text-xs font-bold text-white shadow-sm">
+            <AlertTriangle className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
             <span>{errorMsg}</span>
           </div>
         )}

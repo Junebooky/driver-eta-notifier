@@ -670,12 +670,12 @@ function HqDashboardInner() {
                 <>
                   {/* Sync Error Banner (if any) */}
                   {syncError && (
-                    <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs font-bold text-rose-800 flex items-center justify-between gap-2">
+                    <div className="p-3 rounded-xl bg-slate-900 border border-slate-700 text-xs font-bold text-white flex items-center justify-between gap-2 shadow-sm">
                       <span>서버 동기화 안내: {syncError}</span>
                       <button
                         type="button"
                         onClick={() => fetchSharedBookings(false)}
-                        className="px-2.5 py-1 rounded-lg bg-white border border-rose-200 text-rose-700 font-bold cursor-pointer"
+                        className="px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-600 hover:bg-slate-700 text-slate-200 font-bold cursor-pointer"
                       >
                         재시도
                       </button>
@@ -835,7 +835,7 @@ function HqDashboardInner() {
           <CalendarCheck className="w-4 h-4 mb-0.5" />
           <span>예약·배차</span>
           {operationalCounts.totalActionNeeded > 0 && (
-            <span className="absolute top-0.5 right-2 min-w-4 h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center">
+            <span className="absolute top-0.5 right-2 min-w-4 h-4 px-1 rounded-full bg-[#1E60F3] text-white text-[9px] font-black flex items-center justify-center">
               {operationalCounts.totalActionNeeded}
             </span>
           )}
@@ -872,7 +872,7 @@ function HqDashboardInner() {
           <Clock className="w-4 h-4 mb-0.5" />
           <span>미확인점검</span>
           {operationalCounts.unackedCount + operationalCounts.reconfirmCount > 0 && (
-            <span className="absolute top-0.5 right-2 min-w-4 h-4 px-1 rounded-full bg-amber-500 text-white text-[9px] font-black flex items-center justify-center">
+            <span className="absolute top-0.5 right-2 min-w-4 h-4 px-1 rounded-full bg-slate-900 text-white text-[9px] font-black flex items-center justify-center">
               {operationalCounts.unackedCount + operationalCounts.reconfirmCount}
             </span>
           )}
