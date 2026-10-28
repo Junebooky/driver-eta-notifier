@@ -4,15 +4,55 @@ import { evaluateDispatchEscalationAlerts } from './unackAlertEngine';
 import { generateCustomerNotificationDraft } from './customerMessageGenerator';
 import { matchHipassTransactions, parseHipassText } from './hipassReconciler';
 import { HqBooking } from '../types/hq';
+import { signCockpitSession } from '../lib/auth/serverAuth';
 
 const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:3000';
 
-async function api(path: string, options: RequestInit = {}) {
+const HQ_TOKEN = signCockpitSession({
+  userId: 'test_admin_hq_p3',
+  org: 'vip_limousine_korea',
+  role: 'hq_admin',
+  driverName: '본사 관리자',
+});
+
+const DRIVER_YOON_TOKEN = signCockpitSession({
+  userId: 'test_driver_yoon_p3',
+  org: 'vip_limousine_korea',
+  role: 'driver',
+  driverName: '윤태준',
+  vehicleNo: '4호차',
+  carNumber: '116허 1514',
+});
+
+const DRIVER_KIM_TOKEN = signCockpitSession({
+  userId: 'test_driver_kim',
+  org: 'vip_limousine_korea',
+  role: 'driver',
+  driverName: '김민수',
+  carNumber: '01호 3343',
+});
+
+const DRIVER_PARK_TOKEN = signCockpitSession({
+  userId: 'test_driver_park',
+  org: 'vip_limousine_korea',
+  role: 'driver',
+  driverName: '박서연',
+  carNumber: '102부 4280',
+});
+
+async function api(path: string, options: RequestInit = {}, token?: string | null) {
   const url = path.startsWith('http') ? path : `${BASE_URL}${path}`;
+  const authToken = token === undefined ? HQ_TOKEN : token;
+  const authHeaders: Record<string, string> = {};
+  if (authToken) {
+    authHeaders['Authorization'] = `Bearer ${authToken}`;
+  }
+
   const res = await fetch(url, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      ...authHeaders,
       ...(options.headers || {}),
     },
   });
@@ -232,7 +272,7 @@ async function runPhase3Tests() {
           version: 1,
           driverName: '김민수',
         }),
-      });
+      }, DRIVER_KIM_TOKEN);
       assert.strictEqual(ackRes.status, 200, `Ack API failed: ${JSON.stringify(ackRes.data)}`);
       assert.strictEqual(ackRes.data.schedule.isAcknowledged, true);
       assert.strictEqual(ackRes.data.schedule.reminder_count, 0, 'Active reminder_count must reset to 0 on driver ack');
@@ -281,7 +321,7 @@ async function runPhase3Tests() {
           version: 2,
           driverName: '윤태준',
         }),
-      });
+      }, DRIVER_YOON_TOKEN);
       assert.strictEqual(reAckRes.status, 200);
 
       const arriveRes = await api('/api/schedules/operation-status', {
@@ -291,7 +331,7 @@ async function runPhase3Tests() {
           status: 'arrived_pickup',
           changedBy: '윤태준',
         }),
-      });
+      }, DRIVER_YOON_TOKEN);
       assert.strictEqual(arriveRes.status, 200, `Operation status failed: ${JSON.stringify(arriveRes.data)}`);
 
       // Verify in Supabase that pendingCustomerTrigger became 'arrived_pickup'

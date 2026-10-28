@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { hydrateRawScheduleRow } from '@/lib/dispatch/scheduleServerStore';
 import { ReconciledHipassItem } from '@/utils/hipassReconciler';
+import { requireHqAdmin } from '@/lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,8 +25,13 @@ export interface ServerSyncedHipassToll {
   syncedAt: string;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const auth = await requireHqAdmin(req);
+    if (!auth.ok) {
+      return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
+    }
+
     const { data, error } = await supabaseAdmin
       .from('schedules')
       .select('*')
@@ -78,6 +84,11 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireHqAdmin(req);
+    if (!auth.ok) {
+      return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
+    }
+
     const body = await req.json().catch(() => ({}));
     const rawItems: ReconciledHipassItem[] = Array.isArray(body?.items) ? body.items : [];
     const syncedBy = typeof body?.syncedBy === 'string' && body.syncedBy.trim() ? body.syncedBy.trim() : '본사 정산팀';
@@ -195,3 +206,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }
+

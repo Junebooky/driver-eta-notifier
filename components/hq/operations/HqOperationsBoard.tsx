@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { OperationStatus } from '@/app/api/schedules/operation-status/route';
 import { CustomerNotificationTrigger } from '@/types/hq';
+import { ensureClientAuth } from '@/utils/cockpitClientAuth';
 
 export interface HqOperationsBoardProps {
   onOpenCustomerMessageForSchedule?: (
@@ -74,6 +75,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
   const fetchOperations = async () => {
     setIsLoading(true);
     try {
+      await ensureClientAuth('hq');
       const res = await fetch('/api/schedules/dispatch?onlyDispatched=true');
       const data = await res.json();
       if (data.ok && Array.isArray(data.schedules)) {

@@ -1043,11 +1043,11 @@ export async function acknowledgeServerSchedule(params: {
     return { error: '취소된 배차는 확인할 수 없습니다.', statusCode: 400 };
   }
 
-  // Guard 2: Block acknowledging outdated versions
+  // Guard 2: Block acknowledging outdated or future versions (Must match exact current version)
   const currentVersion = hydrated.version || 1;
-  if (typeof params.version === 'number' && params.version > 0 && params.version < currentVersion) {
+  if (typeof params.version === 'number' && params.version !== currentVersion) {
     return {
-      error: `최신 버전(v${currentVersion})의 배차가 아닙니다. 변경된 배차를 재확인해주세요.`,
+      error: `현재 버전(v${currentVersion})과 일치하지 않습니다. (요청 버전: v${params.version}) 최신 배차 정보를 확인해주세요.`,
       statusCode: 409,
     };
   }

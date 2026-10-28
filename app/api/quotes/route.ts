@@ -2,14 +2,21 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { calculateQuote } from '@/utils/quoteCalculator';
 import { HqQuoteItem, QuoteCalculationInput } from '@/types/quoteHq';
+import { requireHqAdmin } from '@/lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * GET: Retrieve explicitly saved quotes from cockpit.customers.
+ * Strictly restricted to HQ Admin.
  */
 export async function GET(req: Request) {
   try {
+    const auth = await requireHqAdmin(req);
+    if (!auth.ok) {
+      return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
+    }
+
     const { searchParams } = new URL(req.url);
     const customerId = searchParams.get('customerId');
 
@@ -47,14 +54,19 @@ export async function GET(req: Request) {
 }
 
 /**
- * POST: Explicitly SAVE a finalized quote to cockpit.customers.
- * Only called when the manager explicitly clicks [견적서 저장] or [확정 예약으로 전환].
- * Recalculates verified server-side totals to prevent blind reliance on client calculations.
+ * POST: Explicitly SAVE a finalized quote to cockpit.customers using atomic RPC.
+ * Strictly restricted to HQ Admin.
+ * Prevents race conditions and lost updates with row-level locks and advisory locks.
  */
 export async function POST(req: Request) {
   try {
-    const body: QuoteCalculationInput & { quoteNo?: string } = await req.json();
-    if (!body.customerName || !body.vehicleModel) {
+    const auth = await requireHqAdmin(req);
+    if (!auth.ok) {
+      return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
+    }
+
+    const body: QuoteCalculationInput & { quoteNo?: string; allowUpdate?: boolean } = await req.json();
+    if (!body.customerName?.trim() || !body.vehicleModel?.trim()) {
       return NextResponse.json({ ok: false, error: '고객사명과 차량 모델은 필수입니다.' }, { status: 400 });
     }
 
@@ -64,61 +76,35 @@ export async function POST(req: Request) {
       verifiedQuote.quoteNo = body.quoteNo;
     }
 
-    // 2. Identify or create customer
-    let targetCustomerId = body.customerId;
-    if (!targetCustomerId) {
-      const { data: existingCust } = await supabaseAdmin
-        .from('customers')
-        .select('id, quotes')
-        .ilike('name', body.customerName.trim())
-        .maybeSingle();
+    // 2. Execute atomic transactional quote save via Supabase RPC
+    const { data: rpcResult, error: rpcErr } = await supabaseAdmin.rpc('save_customer_quote_atomic', {
+      p_customer_id: body.customerId || null,
+      p_customer_name: body.customerName.trim(),
+      p_contact_person: body.contactPerson?.trim() || null,
+      p_phone: body.contactPhone?.trim() || null,
+      p_email: body.contactEmail?.trim() || null,
+      p_quote: verifiedQuote,
+      p_allow_update: body.allowUpdate ?? true,
+    });
 
-      if (existingCust) {
-        targetCustomerId = existingCust.id;
-      } else {
-        const newId = `cust-${Date.now().toString(36)}`;
-        await supabaseAdmin.from('customers').insert({
-          id: newId,
-          name: body.customerName.trim(),
-          contact_person: body.contactPerson || null,
-          phone: body.contactPhone || null,
-          email: body.contactEmail || null,
-          quotes: [verifiedQuote],
-        });
-        targetCustomerId = newId;
-      }
+    if (rpcErr) {
+      console.error('[Quotes POST API] RPC Error:', rpcErr);
+      const isDuplicate = rpcErr.message.includes('DUPLICATE_QUOTE_NO');
+      const isConverted = rpcErr.message.includes('QUOTE_ALREADY_CONVERTED');
+      return NextResponse.json(
+        { ok: false, error: rpcErr.message },
+        { status: isDuplicate || isConverted ? 409 : 400 }
+      );
     }
 
-    if (targetCustomerId) {
-      verifiedQuote.customerId = targetCustomerId;
-      // Fetch current quotes and append/replace quote with same quoteNo
-      const { data: custRow, error: fetchErr } = await supabaseAdmin
-        .from('customers')
-        .select('quotes')
-        .eq('id', targetCustomerId)
-        .maybeSingle();
-
-      if (fetchErr) {
-        return NextResponse.json({ ok: false, error: fetchErr.message }, { status: 500 });
-      }
-
-      const existingQuotes: HqQuoteItem[] = Array.isArray(custRow?.quotes) ? custRow.quotes : [];
-      const updatedQuotes = [verifiedQuote, ...existingQuotes.filter((q) => q.quoteNo !== verifiedQuote.quoteNo)];
-
-      const { error: updateErr } = await supabaseAdmin
-        .from('customers')
-        .update({ quotes: updatedQuotes, updated_at: new Date().toISOString() })
-        .eq('id', targetCustomerId);
-
-      if (updateErr) {
-        return NextResponse.json({ ok: false, error: updateErr.message }, { status: 500 });
-      }
-    }
+    const finalQuote = rpcResult?.quote || verifiedQuote;
+    const assignedCustomerId = rpcResult?.customer_id || finalQuote.customerId;
 
     return NextResponse.json({
       ok: true,
-      message: `견적서(${verifiedQuote.quoteNo})가 고객사(${body.customerName}) 정보에 안전하게 저장되었습니다.`,
-      quote: verifiedQuote,
+      message: `견적서(${finalQuote.quoteNo})가 고객사(${body.customerName})에 안전하게 원자적으로 저장되었습니다.`,
+      customerId: assignedCustomerId,
+      quote: finalQuote,
     });
   } catch (err: any) {
     console.error('[Quotes POST API] Error:', err);

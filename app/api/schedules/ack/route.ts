@@ -1,26 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { acknowledgeServerSchedule } from '@/lib/dispatch/scheduleServerStore';
+import { verifyServerAuth } from '@/lib/auth/serverAuth';
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await verifyServerAuth(req);
+    if (!auth.ok || !auth.session) {
+      return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
+    }
+
     const body = await req.json().catch(() => ({}));
-    const {
-      scheduleId,
-      version = 1,
-      driverId = 'driver_mobile',
-      driverName = '담당 기사',
-      deviceSummary = 'Driver Cockpit Mobile',
-    } = body;
+    const { scheduleId, version, deviceSummary = 'Driver Cockpit Mobile' } = body;
 
     if (!scheduleId) {
       return NextResponse.json({ ok: false, error: 'scheduleId is required' }, { status: 400 });
     }
 
+    // Role-based verified identity (Never trust client-supplied changedBy or driverName)
+    const verifiedDriverId = auth.session.role === 'driver'
+      ? auth.session.driverId || auth.session.userId
+      : body.driverId || 'hq_admin';
+
+    const verifiedDriverName = auth.session.role === 'driver'
+      ? auth.session.driverName || '담당 기사'
+      : body.driverName || '본사 관리자';
+
     const result = await acknowledgeServerSchedule({
       scheduleId,
-      version: Number(version),
-      driverId: String(driverId),
-      driverName: String(driverName),
+      version: version !== undefined ? Number(version) : undefined,
+      driverId: verifiedDriverId,
+      driverName: verifiedDriverName,
       deviceSummary: String(deviceSummary),
     });
 

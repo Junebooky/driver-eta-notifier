@@ -12,6 +12,7 @@ import { haptics } from '@/utils/haptics';
 import { ENABLE_DEV_FLEET_SWITCHER, FLEET_PRESET_DRIVERS } from '@/utils/constants';
 import { generateNameCandidates } from '@/utils/nameMatcher';
 import { parseVehicleDetails } from '@/components/ProfileModal';
+import { ensureClientAuth } from '@/utils/cockpitClientAuth';
 
 const THINKING_STEPS = [
   '🔍 배차 데이터베이스 동선 대조 중...',
@@ -190,6 +191,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
 
   const fetchCounts = useCallback(async () => {
     try {
+      await ensureClientAuth('driver', { driverName: profile.driverName, vehicleNo: profile.vehicleNo });
       const [schedRes, driverRes] = await Promise.all([
         fetch('/api/schedules?vehicle_no=all&include_cancelled=1', { cache: 'no-store' }),
         fetch('/api/driver?all=true', { cache: 'no-store' }),
@@ -269,6 +271,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
 
   const fetchSchedulesForVehicle = useCallback(async (vNo: string) => {
     try {
+      await ensureClientAuth('driver', { driverName: profile.driverName, vehicleNo: profile.vehicleNo });
       const res = await fetch(
         `/api/schedules?vehicle_no=${encodeURIComponent(vNo)}&include_cancelled=1`,
         { cache: 'no-store' }

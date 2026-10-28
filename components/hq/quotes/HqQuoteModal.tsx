@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { HqQuoteItem, QuoteCalculationInput } from '@/types/quoteHq';
 import { VipChauffeurCardModal } from '@/components/cards/VipChauffeurCardModal';
+import { ensureClientAuth } from '@/utils/cockpitClientAuth';
 
 interface HqQuoteModalProps {
   isOpen: boolean;
@@ -142,6 +143,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
     setErrorMessage(null);
     setSaveSuccess(null);
     try {
+      await ensureClientAuth('hq');
       const res = await fetch('/api/quotes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -185,6 +187,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
     setConversionSuccess(null);
 
     try {
+      await ensureClientAuth('hq');
       const res = await fetch('/api/quotes/convert-to-booking', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

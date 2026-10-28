@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { remindServerSchedule } from '@/lib/dispatch/scheduleServerStore';
+import { requireHqAdmin } from '@/lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireHqAdmin(req);
+    if (!auth.ok) {
+      return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
+    }
+
     const body = await req.json().catch(() => ({}));
     const { scheduleId, remindedBy, note } = body || {};
 
@@ -41,3 +47,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }
+

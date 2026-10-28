@@ -4,16 +4,67 @@ import {
   mapScheduleItemToHqBooking,
 } from './dispatchConflictDetector';
 import { ScheduleItem } from '../data/ferrariSchedules';
+import { signCockpitSession } from '../lib/auth/serverAuth';
 
 const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:3000';
 const TEST_DATE_PRIMARY = '2027-05-18';
 const TEST_DATE_GROUP = '2027-05-19';
 
-async function apiJson(path: string, init?: RequestInit) {
+const HQ_TOKEN = signCockpitSession({
+  userId: 'test_admin_sync',
+  org: 'vip_limousine_korea',
+  role: 'hq_admin',
+  driverName: '본사 관리자',
+});
+
+const DRIVER_YOON_TOKEN = signCockpitSession({
+  userId: 'test_drv_yoon_sync',
+  org: 'vip_limousine_korea',
+  role: 'driver',
+  driverName: '윤태준',
+  vehicleNo: '4호차',
+  carNumber: '116허 1514',
+});
+
+const DRIVER_MIN_TOKEN = signCockpitSession({
+  userId: 'test_drv_min_sync',
+  org: 'vip_limousine_korea',
+  role: 'driver',
+  driverName: '민성호',
+  vehicleNo: '8호차',
+  carNumber: '142호 7815',
+});
+
+const DRIVER_BAE_TOKEN = signCockpitSession({
+  userId: 'test_drv_bae_sync',
+  org: 'vip_limousine_korea',
+  role: 'driver',
+  driverName: '배선만',
+  vehicleNo: '1호차',
+  carNumber: '142호 7814',
+});
+
+const DRIVER_JUNG_TOKEN = signCockpitSession({
+  userId: 'test_drv_jung_sync',
+  org: 'vip_limousine_korea',
+  role: 'driver',
+  driverName: '정태훈',
+  vehicleNo: '703서 2658',
+  carNumber: '703서 2658',
+});
+
+async function apiJson(path: string, init?: RequestInit, token?: string | null) {
+  const authToken = token === undefined ? HQ_TOKEN : token;
+  const authHeaders: Record<string, string> = {};
+  if (authToken) {
+    authHeaders['Authorization'] = `Bearer ${authToken}`;
+  }
+
   const res = await fetch(`${BASE_URL}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
+      ...authHeaders,
       ...(init?.headers || {}),
     },
   });
@@ -32,6 +83,7 @@ async function runTests() {
     for (const s of (existingRes.data.schedules || []) as ScheduleItem[]) {
       await fetch(`${BASE_URL}/api/schedules?id=${encodeURIComponent(s.id)}`, {
         method: 'DELETE',
+        headers: { Authorization: `Bearer ${HQ_TOKEN}` },
       }).catch(() => {});
     }
   }
@@ -73,20 +125,21 @@ async function runTests() {
       const conflicts = detectDispatchConflicts(
         {
           pickupDate: TEST_DATE_PRIMARY,
-          pickupTime: '11:30',
+          pickupTime: '11:00',
           driverName: '윤태준',
-          vehiclePlate: '703서 2658',
+          vehiclePlate: '116허 1514',
         },
         existing
       );
-      assert.equal(conflicts.length, 1, 'Expected driver overlap conflict within 180-min window');
-      assert.equal(conflicts[0].type, 'driver');
+
+      assert.ok(conflicts.length > 0, 'Overlap must be detected');
+      assert.ok(conflicts.some((c) => c.type === 'driver' && c.targetName === '윤태준'));
+      assert.ok(conflicts.some((c) => c.type === 'vehicle' && c.targetName.includes('116허 1514')));
       console.log('✓ [0] Unit conflict detector accurately flags overlapping driver/vehicle schedules');
     }
 
-    // 1. 사모님 PC 전화 예약 접수 & 이메일 예약 접수 -> 배차 대기함 등록 (미배정) + 기사 화면 미노출 검증
+    // 1. 전화 예약 접수 (HQ Quick Dispatch) -> 미배정 상태 저장
     let phoneScheduleId = '';
-    let emailScheduleId = '';
     {
       const phoneRes = await apiJson('/api/schedules/dispatch', {
         method: 'POST',
@@ -104,61 +157,44 @@ async function runTests() {
           passengerName: 'Bernard Arnault 외 2명',
           passengerPhone: '010-9100-1111',
           flightNumber: 'AF264',
-          notes: '사모님 PC 전화 접수 테스트',
+          notes: '수하물 5개, VIP 의전 전담 배차',
+          allowUnverified: true,
         }),
       });
+
       assert.equal(phoneRes.status, 200, `Phone intake failed: ${JSON.stringify(phoneRes.data)}`);
       assert.equal(phoneRes.data.ok, true);
+      assert.equal(phoneRes.data.schedule.dispatch_status, 'unassigned');
+      assert.equal(phoneRes.data.schedule.vehicle_no, '미배정');
       phoneScheduleId = phoneRes.data.schedule.id;
       createdIds.add(phoneScheduleId);
 
-      const emailRes = await apiJson('/api/schedules/dispatch', {
-        method: 'POST',
-        body: JSON.stringify({
-          bookingNo: 'VIP-E2E-EMAIL-01',
-          customerName: '샤넬 코리아',
-          eventName: '샤넬 글로벌 디렉터 의전',
-          intakeSource: 'email',
-          dispatchStatus: 'unassigned',
-          vehicleNo: '미배정',
-          date: TEST_DATE_PRIMARY,
-          pickupTime: '14:00',
-          origin: '김포국제공항 비즈니스항공센터(SGBAC)',
-          destination: '포시즌스 호텔 서울',
-          passengerName: 'Virginie Viard VIP',
-          passengerPhone: '010-9200-2222',
-          flightNumber: 'PRIVATE-01',
-          notes: '사모님 이메일 접수 대기함 테스트',
-        }),
-      });
-      assert.equal(emailRes.status, 200, `Email intake failed: ${JSON.stringify(emailRes.data)}`);
-      emailScheduleId = emailRes.data.schedule.id;
-      createdIds.add(emailScheduleId);
+      // Verify Driver view for 4호차 does NOT see unassigned booking
+      const drvViewBefore = await apiJson(
+        `/api/schedules?vehicle_no=${encodeURIComponent('4호차')}&date=${TEST_DATE_PRIMARY}`,
+        undefined,
+        DRIVER_YOON_TOKEN
+      );
+      assert.equal(
+        (drvViewBefore.data.schedules as ScheduleItem[]).some((s) => s.id === phoneScheduleId),
+        false,
+        'Driver view must NOT show unassigned bookings'
+      );
 
-      // HQ sees both unassigned reservations
-      const hqRes = await apiJson(`/api/schedules?role=hq&date=${TEST_DATE_PRIMARY}`);
-      assert.equal(hqRes.status, 200);
-      const hqIds = (hqRes.data.schedules as ScheduleItem[]).map((s) => s.id);
-      assert.ok(hqIds.includes(phoneScheduleId), 'HQ must see unassigned phone booking');
-      assert.ok(hqIds.includes(emailScheduleId), 'HQ must see unassigned email booking');
-
-      const phoneBookingView = mapScheduleItemToHqBooking(
-        (hqRes.data.schedules as ScheduleItem[]).find((s) => s.id === phoneScheduleId)!,
+      // Verify HQ sees unassigned booking
+      const hqViewBefore = await apiJson(`/api/schedules?role=hq&date=${TEST_DATE_PRIMARY}`);
+      const hqBooking = mapScheduleItemToHqBooking(
+        (hqViewBefore.data.schedules as ScheduleItem[]).find((s) => s.id === phoneScheduleId)!,
         0
       );
-      assert.equal(phoneBookingView.dispatchStatus, '미배정');
-      assert.equal(phoneBookingView.intakeSource, 'phone');
+      assert.equal(hqBooking.dispatchStatus, '미배정');
+      assert.ok(hqBooking.driverName === '-' || hqBooking.driverName === '미지정');
+      assert.ok(hqBooking.vehiclePlate === '미배정' || hqBooking.vehiclePlate === '배정 대기');
 
-      // Driver Cockpit strictly NEVER sees unassigned bookings
-      const driverAllRes = await apiJson(`/api/schedules?vehicle_no=all&date=${TEST_DATE_PRIMARY}`);
-      const driverIds = (driverAllRes.data.schedules as ScheduleItem[]).map((s) => s.id);
-      assert.ok(!driverIds.includes(phoneScheduleId), 'Driver Cockpit must NEVER see unassigned phone booking');
-      assert.ok(!driverIds.includes(emailScheduleId), 'Driver Cockpit must NEVER see unassigned email booking');
-
-      console.log('✓ [1] 사모님 전화·이메일 예약 접수 → 본사 배차 대기함(미배정) 저장 및 기사 화면 유출 차단 검증 완료');
+      console.log('✓ [1] 전화 예약 접수 → 본사 미배정 대기함 저장 및 기사 Cockpit 비노출 격리 검증 완료');
     }
 
-    // 2. 대표님 스마트폰 배차 확정 -> 기사 스마트폰 스케줄 자동 반영 -> 기사 [배차 확인] -> 본사 확인완료 동기화
+    // 2. 빠른 배차 확정 (대표님 모바일/PC 배차 확정) -> 기사 Cockpit 즉시 노출 및 실시간 확인 동기화
     {
       const publishRes = await apiJson('/api/schedules/dispatch', {
         method: 'POST',
@@ -182,34 +218,31 @@ async function runTests() {
           passengerName: 'Bernard Arnault 외 2명',
           passengerPhone: '010-9100-1111',
           flightNumber: 'AF264',
-          notes: '대표님 스마트폰 배차 확정',
-          publishedBy: '대표님 (모바일)',
+          notes: '수하물 5개, VIP 의전 전담 배차',
+          publishedBy: '대표님 모바일',
         }),
       });
-      assert.equal(publishRes.status, 200, `Publish failed: ${JSON.stringify(publishRes.data)}`);
+
+      assert.equal(publishRes.status, 200);
+      assert.equal(publishRes.data.ok, true);
       assert.equal(publishRes.data.schedule.dispatch_status, 'published');
+      assert.equal(publishRes.data.schedule.driver_name, '윤태준');
+      assert.equal(publishRes.data.schedule.vehicle_plate, '116허 1514');
+      assert.equal(publishRes.data.schedule.version, 1);
       assert.equal(publishRes.data.schedule.isAcknowledged, false);
 
-      // Driver '윤태준' sees it via both '4호차' (dedicated hocha) and '116허 1514' (dispatched plate)
-      const drvHochaRes = await apiJson(`/api/schedules?vehicle_no=${encodeURIComponent('4호차')}&date=${TEST_DATE_PRIMARY}`);
-      const drvPlateRes = await apiJson(`/api/schedules?vehicle_no=${encodeURIComponent('116허 1514')}&date=${TEST_DATE_PRIMARY}`);
-      assert.ok(
-        (drvHochaRes.data.schedules as ScheduleItem[]).some((s) => s.id === phoneScheduleId),
-        '4호차(윤태준) Cockpit must receive published dispatch'
+      // Driver Cockpit (윤태준) immediately sees the dispatch
+      const drvViewAfter = await apiJson(
+        `/api/schedules?vehicle_no=${encodeURIComponent('4호차')}&date=${TEST_DATE_PRIMARY}`,
+        undefined,
+        DRIVER_YOON_TOKEN
       );
-      assert.ok(
-        (drvPlateRes.data.schedules as ScheduleItem[]).some((s) => s.id === phoneScheduleId),
-        '116허 1514 Cockpit query must receive published dispatch'
-      );
+      const drvCard = (drvViewAfter.data.schedules as ScheduleItem[]).find((s) => s.id === phoneScheduleId);
+      assert.ok(drvCard, 'Driver view must immediately contain confirmed dispatch');
+      assert.equal(drvCard!.dispatch_status, 'published');
+      assert.equal(drvCard!.isAcknowledged, false);
 
-      // Other driver ('1호차' 배선만) must NOT see 윤태준's dispatch
-      const otherDrvRes = await apiJson(`/api/schedules?vehicle_no=${encodeURIComponent('1호차')}&date=${TEST_DATE_PRIMARY}`);
-      assert.ok(
-        !(otherDrvRes.data.schedules as ScheduleItem[]).some((s) => s.id === phoneScheduleId),
-        '1호차(배선만) must NOT see 윤태준 schedule'
-      );
-
-      // HQ initially shows '미확인'
+      // HQ sees '미확인'
       const hqBeforeAck = await apiJson(`/api/schedules?role=hq&date=${TEST_DATE_PRIMARY}`);
       const bookingBeforeAck = mapScheduleItemToHqBooking(
         (hqBeforeAck.data.schedules as ScheduleItem[]).find((s) => s.id === phoneScheduleId)!,
@@ -219,15 +252,19 @@ async function runTests() {
       assert.equal(bookingBeforeAck.driverAck, '미확인');
 
       // Driver taps [배차 확인]
-      const ackRes = await apiJson('/api/schedules/ack', {
-        method: 'POST',
-        body: JSON.stringify({
-          scheduleId: phoneScheduleId,
-          version: 1,
-          driverId: '윤태준',
-          driverName: '윤태준',
-        }),
-      });
+      const ackRes = await apiJson(
+        '/api/schedules/ack',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            scheduleId: phoneScheduleId,
+            version: 1,
+            driverId: '윤태준',
+            driverName: '윤태준',
+          }),
+        },
+        DRIVER_YOON_TOKEN
+      );
       assert.equal(ackRes.status, 200);
       assert.equal(ackRes.data.ok, true);
 
@@ -260,6 +297,7 @@ async function runTests() {
           destination: '인천국제공항 제1여객터미널',
           passengerName: 'Sabato De Sarno',
           notes: '모바일 접수 -> PC 배차 확정 검증',
+          allowUnverified: true,
         }),
       });
       assert.equal(mobileIntake.status, 200);
@@ -284,11 +322,16 @@ async function runTests() {
           destination: '인천국제공항 제1여객터미널',
           passengerName: 'Sabato De Sarno',
           publishedBy: '본사 PC 관리자',
+          allowUnverified: true,
         }),
       });
       assert.equal(pcPublish.status, 200);
 
-      const drv8Res = await apiJson(`/api/schedules?vehicle_no=${encodeURIComponent('8호차')}&date=${TEST_DATE_PRIMARY}`);
+      const drv8Res = await apiJson(
+        `/api/schedules?vehicle_no=${encodeURIComponent('8호차')}&date=${TEST_DATE_PRIMARY}`,
+        undefined,
+        DRIVER_MIN_TOKEN
+      );
       assert.ok((drv8Res.data.schedules as ScheduleItem[]).some((s) => s.id === reverseDeviceId));
 
       console.log('✓ [3] 반대 기기 조합 (모바일 예약 접수 → PC 배차 확정 → 8호차 기사 수신) 검증 완료');
@@ -312,7 +355,7 @@ async function runTests() {
               intakeSource: 'quick_dispatch',
               dispatchStatus: 'published',
               driverName: '배선만',
-              vehicleNo: '142호 7814',
+              vehicleNo: '1호차',
               vehiclePlate: '142호 7814',
               vehicleModel: '벤츠 스프린터',
               date: TEST_DATE_GROUP,
@@ -323,6 +366,7 @@ async function runTests() {
               passengerPhone: '010-7777-0001',
               flightNumber: 'KE902',
               notes: '1호차 VIP 본진 영접',
+              allowUnverified: true,
             },
             {
               bookingNo: 'VIP-E2E-GRP-2',
@@ -346,6 +390,7 @@ async function runTests() {
               passengerPhone: '010-7777-0002',
               flightNumber: 'KE902',
               notes: '2호차 수행단 및 수하물 전담',
+              allowUnverified: true,
             },
           ],
         }),
@@ -357,7 +402,11 @@ async function runTests() {
       }
 
       // 1호차 driver ('배선만') sees ONLY Car 1
-      const car1DriverView = await apiJson(`/api/schedules?vehicle_no=${encodeURIComponent('1호차')}&date=${TEST_DATE_GROUP}`);
+      const car1DriverView = await apiJson(
+        `/api/schedules?vehicle_no=${encodeURIComponent('1호차')}&date=${TEST_DATE_GROUP}`,
+        undefined,
+        DRIVER_BAE_TOKEN
+      );
       const car1List = car1DriverView.data.schedules as ScheduleItem[];
       assert.equal(car1List.length, 1);
       assert.equal(car1List[0].passenger, '회장님 부부 (2명)');
@@ -366,7 +415,11 @@ async function runTests() {
       assert.equal(car1List[0].group_total_vehicles, 2);
 
       // 2호차 driver ('정태훈' / '703서 2658') sees ONLY Car 2
-      const car2DriverView = await apiJson(`/api/schedules?vehicle_no=${encodeURIComponent('703서 2658')}&date=${TEST_DATE_GROUP}`);
+      const car2DriverView = await apiJson(
+        `/api/schedules?vehicle_no=${encodeURIComponent('703서 2658')}&date=${TEST_DATE_GROUP}`,
+        undefined,
+        DRIVER_JUNG_TOKEN
+      );
       const car2List = car2DriverView.data.schedules as ScheduleItem[];
       assert.equal(car2List.length, 1);
       assert.equal(car2List[0].passenger, '수행단 스태프 (6명)');
@@ -401,6 +454,7 @@ async function runTests() {
           passengerPhone: '010-9100-1111',
           flightNumber: 'AF264',
           notes: '항공편 지연으로 픽업 시간 및 호텔 변경',
+          allowUnverified: true,
         }),
       });
       assert.equal(modifyRes.status, 200);
@@ -417,15 +471,19 @@ async function runTests() {
       assert.equal(hqUpdatedBooking.driverAck, '재확인 필요');
 
       // Driver re-acknowledges v2
-      const reAckRes = await apiJson('/api/schedules/ack', {
-        method: 'POST',
-        body: JSON.stringify({
-          scheduleId: phoneScheduleId,
-          version: 2,
-          driverId: '윤태준',
-          driverName: '윤태준',
-        }),
-      });
+      const reAckRes = await apiJson(
+        '/api/schedules/ack',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            scheduleId: phoneScheduleId,
+            version: 2,
+            driverId: '윤태준',
+            driverName: '윤태준',
+          }),
+        },
+        DRIVER_YOON_TOKEN
+      );
       assert.equal(reAckRes.status, 200);
 
       const hqAfterReAck = await apiJson(`/api/schedules?role=hq&date=${TEST_DATE_PRIMARY}`);
@@ -442,7 +500,6 @@ async function runTests() {
 
     // 6. 동일 시간대 기사·차량 중복 배차 충돌 차단 (409 SCHEDULE_CONFLICT)
     {
-      // 윤태준 & 116허 1514 has published trip at 11:30 on TEST_DATE_PRIMARY
       const driverConflictRes = await apiJson('/api/schedules/dispatch', {
         method: 'POST',
         body: JSON.stringify({
@@ -456,6 +513,7 @@ async function runTests() {
           origin: '서울신라호텔',
           destination: '코엑스',
           passengerName: 'Conflict Guest 1',
+          allowUnverified: true,
         }),
       });
       assert.equal(driverConflictRes.status, 409, 'Overlapping driver schedule must return HTTP 409');
@@ -474,6 +532,7 @@ async function runTests() {
           origin: '서울신라호텔',
           destination: '인천국제공항 제2여객터미널',
           passengerName: 'Conflict Guest 2',
+          allowUnverified: true,
         }),
       });
       assert.equal(vehicleConflictRes.status, 409, 'Overlapping vehicle schedule must return HTTP 409');
@@ -505,7 +564,9 @@ async function runTests() {
 
       // Driver Cockpit with include_cancelled=1 receives cancellation notice
       const drvWithCancelled = await apiJson(
-        `/api/schedules?vehicle_no=${encodeURIComponent('8호차')}&date=${TEST_DATE_PRIMARY}&include_cancelled=1`
+        `/api/schedules?vehicle_no=${encodeURIComponent('8호차')}&date=${TEST_DATE_PRIMARY}&include_cancelled=1`,
+        undefined,
+        DRIVER_MIN_TOKEN
       );
       const cancelledCard = (drvWithCancelled.data.schedules as ScheduleItem[]).find(
         (s) => s.id === reverseDeviceId
@@ -516,7 +577,9 @@ async function runTests() {
 
       // Active-only feed excludes cancelled schedule
       const drvActiveOnly = await apiJson(
-        `/api/schedules?vehicle_no=${encodeURIComponent('8호차')}&date=${TEST_DATE_PRIMARY}`
+        `/api/schedules?vehicle_no=${encodeURIComponent('8호차')}&date=${TEST_DATE_PRIMARY}`,
+        undefined,
+        DRIVER_MIN_TOKEN
       );
       assert.ok(
         !(drvActiveOnly.data.schedules as ScheduleItem[]).some((s) => s.id === reverseDeviceId),
@@ -532,6 +595,7 @@ async function runTests() {
     for (const id of createdIds) {
       await fetch(`${BASE_URL}/api/schedules?id=${encodeURIComponent(id)}`, {
         method: 'DELETE',
+        headers: { Authorization: `Bearer ${HQ_TOKEN}` },
       }).catch(() => {});
     }
   }

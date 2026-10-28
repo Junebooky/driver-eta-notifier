@@ -52,6 +52,7 @@ import {
   getKstTomorrowDateStr,
   mapScheduleItemToHqBooking,
 } from '@/utils/dispatchConflictDetector';
+import { ensureClientAuth } from '@/utils/cockpitClientAuth';
 import { DEFAULT_DRIVER_PROFILES } from '@/utils/settlementCalculator';
 import { stripManufacturerName } from '@/utils/vehicleData';
 import { evaluateDispatchEscalationAlerts, formatMinutesCountdown, parseKstPickupEpochMs } from '@/utils/unackAlertEngine';
@@ -115,6 +116,7 @@ function HqDashboardInner() {
   const fetchSharedBookings = useCallback(async (silent = false) => {
     if (!silent) setIsRefreshing(true);
     try {
+      await ensureClientAuth('hq');
       const res = await fetch('/api/schedules?role=hq', { cache: 'no-store' });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.error) {
@@ -153,7 +155,7 @@ function HqDashboardInner() {
       // Keep open modal synced if viewing an existing booking
       setSelectedBooking((prev) => {
         if (!prev || !prev.scheduleId) return prev;
-        const refreshed = annotated.find((b) => b.scheduleId === prev.scheduleId || b.id === prev.id);
+        const refreshed = annotated.find((b: HqBooking) => b.scheduleId === prev.scheduleId || b.id === prev.id);
         return refreshed || prev;
       });
     } catch (err: unknown) {

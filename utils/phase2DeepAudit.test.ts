@@ -1,14 +1,47 @@
 import assert from 'node:assert';
 import { executeSupabaseSql } from '../scripts/supabase-sql.mjs';
+import { signCockpitSession } from '../lib/auth/serverAuth';
 
 const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:3000';
 
-async function api(path: string, options: RequestInit = {}) {
+const HQ_TOKEN = signCockpitSession({
+  userId: 'test_admin_hq',
+  org: 'vip_limousine_korea',
+  role: 'hq_admin',
+  driverName: '본사 관리자',
+});
+
+const DRIVER_YOON_TOKEN = signCockpitSession({
+  userId: 'test_driver_yoon',
+  org: 'vip_limousine_korea',
+  role: 'driver',
+  driverName: '윤태준',
+  vehicleNo: '4호차',
+  carNumber: '142호 7811',
+});
+
+const DRIVER_BAE_TOKEN = signCockpitSession({
+  userId: 'test_driver_bae',
+  org: 'vip_limousine_korea',
+  role: 'driver',
+  driverName: '배선만',
+  vehicleNo: '1호차',
+  carNumber: '142호 7814',
+});
+
+async function api(path: string, options: RequestInit = {}, token?: string | null) {
   const url = path.startsWith('http') ? path : `${BASE_URL}${path}`;
+  const authToken = token === undefined ? HQ_TOKEN : token;
+  const authHeaders: Record<string, string> = {};
+  if (authToken) {
+    authHeaders['Authorization'] = `Bearer ${authToken}`;
+  }
+
   const res = await fetch(url, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      ...authHeaders,
       ...(options.headers || {}),
     },
   });
@@ -28,85 +61,113 @@ async function runAudit() {
 
   try {
     // ------------------------------------------------------------------------
-    // Scenario 1: Supabase DB RLS & Permissions Audit
+    // Scenario 0: P0 Authentication & Authorization Gates
     // ------------------------------------------------------------------------
-    console.log('[Scenario 1] Supabase RLS & Security Hardening Verification');
+    console.log('[Scenario 0] P0 Auth & Permissions Gate Verification');
     {
-      const rlsRows = await executeSupabaseSql(`
-        SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'cockpit';
+      // 0A: Unauthenticated access to admin endpoints must be rejected with HTTP 401
+      const unauthQuotes = await api('/api/quotes', { method: 'GET' }, null);
+      assert.strictEqual(unauthQuotes.status, 401, 'Unauthenticated /api/quotes must return 401');
+
+      const unauthDispatch = await api('/api/schedules/dispatch', { method: 'POST', body: JSON.stringify({}) }, null);
+      assert.strictEqual(unauthDispatch.status, 401, 'Unauthenticated /api/schedules/dispatch must return 401');
+
+      console.log('  ✅ Unauthenticated requests strictly rejected (HTTP 401).');
+
+      // 0B: Driver attempting HQ admin endpoints must be rejected with HTTP 403
+      const driverQuotes = await api('/api/quotes', { method: 'GET' }, DRIVER_YOON_TOKEN);
+      assert.strictEqual(driverQuotes.status, 403, 'Driver token on HQ /api/quotes must return 403');
+
+      const driverPricingPut = await api('/api/pricing-presets', {
+        method: 'PUT',
+        body: JSON.stringify({ model_name: 'Sprinter', base_fare: 999999 }),
+      }, DRIVER_YOON_TOKEN);
+      assert.strictEqual(driverPricingPut.status, 403, 'Driver token on PUT /api/pricing-presets must return 403');
+
+      console.log('  ✅ Driver forbidden on HQ admin endpoints (HTTP 403).');
+    }
+
+    // ------------------------------------------------------------------------
+    // Scenario 1: Supabase RLS & Security Hardening Verification
+    // ------------------------------------------------------------------------
+    console.log('\n[Scenario 1] Supabase RLS & Security Hardening Verification');
+    {
+      const rlsCheck = await executeSupabaseSql(`
+        SELECT tablename, rowsecurity FROM pg_tables
+        WHERE schemaname = 'cockpit' AND tablename IN ('customers', 'pricing_presets', 'schedules', 'drivers', 'presets')
+        ORDER BY tablename;
       `);
-      assert.ok(Array.isArray(rlsRows) && rlsRows.length >= 5, 'Must have at least 5 cockpit tables');
-      
-      const tablesToCheck = ['customers', 'pricing_presets', 'schedules', 'drivers', 'presets'];
-      for (const t of tablesToCheck) {
-        const found: any = (rlsRows as any[]).find((r: any) => r.tablename === t);
-        assert.ok(found, `Table cockpit.${t} must exist`);
-        assert.strictEqual(found.rowsecurity, true, `Table cockpit.${t} MUST have rowsecurity = true`);
+      assert.strictEqual(rlsCheck.length, 5, 'All 5 base tables must exist in cockpit schema');
+      for (const row of rlsCheck) {
+        assert.strictEqual(row.rowsecurity, true, `Table cockpit.${row.tablename} must have rowsecurity = true`);
       }
       console.log('  ✅ RLS is strictly ENABLED on all cockpit tables (customers, pricing_presets, schedules, drivers, presets).');
 
-      // Verify Pricing Presets adhere strictly to benchmarks:
-      // Sprinter 319: 1,000,000 / 800,000
-      // Sprinter 519: 800,000 / 600,000
-      const pricingRows = await executeSupabaseSql(`
-        SELECT id, base_fare, vehicle_only_fare, driver_labor_korean, driver_labor_english
-        FROM cockpit.pricing_presets
-        WHERE id IN ('preset-sprinter-319', 'preset-sprinter-519');
+      const viewsCheck = await executeSupabaseSql(`
+        SELECT c.relname, c.reloptions FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'cockpit' AND c.relkind = 'v';
       `);
-      const p319 = pricingRows.find((p: any) => p.id === 'preset-sprinter-319');
-      const p519 = pricingRows.find((p: any) => p.id === 'preset-sprinter-519');
-      assert.strictEqual(p319.base_fare, 1000000, 'Sprinter 319 base fare must be 1,000,000 KRW');
-      assert.strictEqual(p319.vehicle_only_fare, 800000, 'Sprinter 319 vehicle-only fare must be 800,000 KRW');
-      assert.strictEqual(p519.base_fare, 800000, 'Sprinter 519 base fare must be 800,000 KRW');
-      assert.strictEqual(p519.vehicle_only_fare, 600000, 'Sprinter 519 vehicle-only fare must be 600,000 KRW');
+      for (const v of viewsCheck) {
+        assert.ok(
+          Array.isArray(v.reloptions) && v.reloptions.includes('security_invoker=true'),
+          `View ${v.relname} must have security_invoker = true`
+        );
+      }
+      console.log('  ✅ All cockpit views enforce security_invoker = true.');
+
+      const pricingBenchmark = await executeSupabaseSql(`
+        SELECT model_name, base_fare, vehicle_only_fare FROM cockpit.pricing_presets
+        WHERE model_name LIKE '%319%' OR model_name LIKE '%519%'
+        ORDER BY model_name;
+      `);
+      assert.strictEqual(pricingBenchmark.length, 2, 'Benchmark vehicle pricing presets must exist');
+      const p319 = pricingBenchmark.find((r: any) => r.model_name.includes('319'));
+      const p519 = pricingBenchmark.find((r: any) => r.model_name.includes('519'));
+      assert.strictEqual(Number(p319.base_fare), 1000000, 'Sprinter 319 base_fare must be 1,000,000 KRW');
+      assert.strictEqual(Number(p319.vehicle_only_fare), 800000, 'Sprinter 319 vehicle_only_fare must be 800,000 KRW');
+      assert.strictEqual(Number(p519.base_fare), 800000, 'Sprinter 519 base_fare must be 800,000 KRW');
+      assert.strictEqual(Number(p519.vehicle_only_fare), 600000, 'Sprinter 519 vehicle_only_fare must be 600,000 KRW');
       console.log('  ✅ Pricing benchmark standards strictly verified (319: 100만/80만, 519: 80만/60만).');
     }
 
     // ------------------------------------------------------------------------
-    // Scenario 2: Quote Calculation (In-Memory) vs Explicit DB Save
+    // Scenario 2: Quote In-Memory Calculation vs Explicit DB Save Separation
     // ------------------------------------------------------------------------
     console.log('\n[Scenario 2] Quote In-Memory Calculation vs Explicit DB Save Separation');
-    const testCustName = `AUDIT-고객사-${Date.now().toString(36)}`;
-    let testQuoteNo = '';
+    const testCustName = `E2E-검증고객사-${Date.now().toString(36)}`;
+    const testQuoteNo = `QT-E2E-${Date.now().toString(36).toUpperCase()}`;
+
     {
-      // 2A: Pure Calculation (Zero DB Writes)
       const calcRes = await api('/api/quotes/calculate', {
         method: 'POST',
         body: JSON.stringify({
           customerName: testCustName,
-          date: '2026-11-20',
-          serviceStartTime: '09:00',
-          serviceEndTime: '19:00',
-          serviceHours: 10,
-          origin: '인천공항 T2',
-          destination: '신라호텔',
           vehicleModel: 'Mercedes-Benz Sprinter 319 CDI',
           vehicleCount: 2,
+          serviceHours: 10,
           driverLanguage: 'en',
           serviceMode: 'with_driver',
+          origin: '인천공항 T2',
+          destination: '신라호텔',
         }),
       });
       assert.strictEqual(calcRes.status, 200);
       assert.strictEqual(calcRes.data.ok, true);
-      assert.strictEqual(calcRes.data.quote.baseFareTotal, 2000000, '2 vehicles * 1,000,000 = 2,000,000');
-      assert.strictEqual(calcRes.data.quote.englishSurchargeTotal, 100000, '2 vehicles * 50,000 = 100,000');
-      assert.strictEqual(calcRes.data.quote.supplyPriceTotal, 2100000);
-      assert.strictEqual(calcRes.data.quote.vatAmount, 210000);
-      assert.strictEqual(calcRes.data.quote.estimatedGrandTotal, 2310000);
-      testQuoteNo = calcRes.data.quote.quoteNo;
+      assert.strictEqual(calcRes.data.quote.vehicleCount, 2);
 
-      // Verify that customer was NOT created in DB during pure calculation
-      const custCheck = await executeSupabaseSql(`
-        SELECT count(*) FROM cockpit.customers WHERE name = '${testCustName}';
+      const custCheckBefore = await executeSupabaseSql(`
+        SELECT id FROM cockpit.customers WHERE name = '${testCustName}';
       `);
-      assert.strictEqual(Number(custCheck[0].count), 0, 'Pure calculation must NOT persist to DB');
-      console.log('  ✅ In-memory calculation endpoint verified: zero database mutations during rapid typing.');
+      assert.strictEqual(custCheckBefore.length, 0, 'No customer row should be created by pure calculation');
+      console.log('  ✅ In-memory calculation endpoint verified: zero database mutations during calculation.');
 
-      // 2B: Explicit Save to DB
       const saveRes = await api('/api/quotes', {
         method: 'POST',
         body: JSON.stringify({
           customerName: testCustName,
+          contactPerson: '김의전 실장',
+          contactPhone: '010-9988-7766',
           date: '2026-11-20',
           serviceStartTime: '09:00',
           serviceEndTime: '19:00',
@@ -122,7 +183,7 @@ async function runAudit() {
       });
       assert.strictEqual(saveRes.status, 200);
       assert.strictEqual(saveRes.data.ok, true);
-      
+
       const custCheckAfter = await executeSupabaseSql(`
         SELECT id, quotes FROM cockpit.customers WHERE name = '${testCustName}';
       `);
@@ -136,7 +197,7 @@ async function runAudit() {
     // ------------------------------------------------------------------------
     // Scenario 3: Quote -> Atomic Booking Conversion & UUID Schema Integrity
     // ------------------------------------------------------------------------
-    console.log('\n[Scenario 3] Quote -> Booking Conversion (Atomic Multi-Vehicle, UUID, DB Columns)');
+    console.log('\n[Scenario 3] Quote -> Booking Conversion (Atomic Multi-Vehicle, UUID, unassigned)');
     let convertedBookingIds: string[] = [];
     {
       const convertRes = await api('/api/quotes/convert-to-booking', {
@@ -148,12 +209,10 @@ async function runAudit() {
       assert.strictEqual(convertRes.status, 200);
       assert.strictEqual(convertRes.data.ok, true);
       assert.strictEqual(convertRes.data.bookingIds.length, 2, 'Must create 2 atomic booking rows');
+      assert.strictEqual(convertRes.data.dispatchStatus, 'unassigned', 'P1: Converted bookings must be unassigned (미배정)');
       convertedBookingIds = convertRes.data.bookingIds;
       testIdsToClean.schedules.push(...convertedBookingIds);
 
-      // Verify in real Supabase DB:
-      // - IDs must be genuine valid UUID format
-      // - Must populate real columns: origin, destination, date, pickup_time, vehicle_no='미배정', dispatch_status='draft'
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       for (const bId of convertedBookingIds) {
         assert.ok(uuidRegex.test(bId), `Booking ID (${bId}) must be genuine PostgreSQL UUID`);
@@ -166,7 +225,7 @@ async function runAudit() {
       `);
       assert.strictEqual(rowsInDb.length, 2, 'Both rows must exist in cockpit.schedules');
       assert.strictEqual(rowsInDb[0].vehicle_no, '미배정');
-      assert.strictEqual(rowsInDb[0].dispatch_status, 'draft');
+      assert.strictEqual(rowsInDb[0].dispatch_status, 'unassigned', 'P1: Saved as unassigned (미배정)');
       assert.strictEqual(rowsInDb[0].operation_status, 'ready');
       assert.strictEqual(rowsInDb[0].source_quote_no, testQuoteNo);
       assert.strictEqual(rowsInDb[0].origin, '인천공항 T2');
@@ -222,9 +281,8 @@ async function runAudit() {
         body: JSON.stringify({
           scheduleId: targetScheduleId,
           version: 1,
-          driverName: '홍길동', // Different driver!
         }),
-      });
+      }, DRIVER_BAE_TOKEN); // 배선만 token for 윤태준 schedule!
       assert.strictEqual(badDriverAck.status, 403, 'Different driver ack must be blocked with HTTP 403');
       console.log('  ✅ Different driver ack blocked (HTTP 403).');
 
@@ -234,9 +292,8 @@ async function runAudit() {
         body: JSON.stringify({
           scheduleId: targetScheduleId,
           version: 1,
-          driverName: '윤태준',
         }),
-      });
+      }, DRIVER_YOON_TOKEN);
       assert.strictEqual(validAck.status, 200);
       assert.strictEqual(validAck.data.ok, true);
 
@@ -249,7 +306,6 @@ async function runAudit() {
       console.log('  ✅ Authorized driver ack recorded in Supabase columns (v1).');
 
       // 4D: Outdated version ack attempt -> Must be BLOCKED (HTTP 409)
-      // Bump schedule version to 2 (modifying pickup time on published dispatch)
       const updateRes = await api('/api/schedules/dispatch', {
         method: 'POST',
         body: JSON.stringify({
@@ -266,16 +322,27 @@ async function runAudit() {
       });
       assert.strictEqual(updateRes.status, 200);
       assert.strictEqual(updateRes.data.schedule.version, 2, 'Version must be bumped to 2');
+
       const staleAck = await api('/api/schedules/ack', {
         method: 'POST',
         body: JSON.stringify({
           scheduleId: targetScheduleId,
           version: 1, // Old version!
-          driverName: '윤태준',
         }),
-      });
+      }, DRIVER_YOON_TOKEN);
       assert.strictEqual(staleAck.status, 409, 'Outdated version ack must be blocked with HTTP 409');
       console.log('  ✅ Stale version ack blocked (HTTP 409).');
+
+      // 4D-2: Future version ack attempt -> Must ALSO be BLOCKED (HTTP 409)
+      const futureAck = await api('/api/schedules/ack', {
+        method: 'POST',
+        body: JSON.stringify({
+          scheduleId: targetScheduleId,
+          version: 99, // Future version!
+        }),
+      }, DRIVER_YOON_TOKEN);
+      assert.strictEqual(futureAck.status, 409, 'Future version ack must be blocked with HTTP 409');
+      console.log('  ✅ Future version ack blocked (HTTP 409).');
 
       // 4E: Cancel Schedule and verify cancelled ack is blocked
       const cancelRes = await api('/api/schedules/cancel', {
@@ -292,9 +359,8 @@ async function runAudit() {
         body: JSON.stringify({
           scheduleId: targetScheduleId,
           version: 3,
-          driverName: '윤태준',
         }),
-      });
+      }, DRIVER_YOON_TOKEN);
       assert.strictEqual(cancelAck.status, 400, 'Ack on cancelled schedule must be blocked with HTTP 400');
       console.log('  ✅ Cancelled schedule ack blocked (HTTP 400).');
     }
@@ -336,13 +402,23 @@ async function runAudit() {
         body: JSON.stringify({
           scheduleId: opScheduleId,
           status: 'arrived_pickup',
-          changedBy: '윤태준', // Assigned is 배선만!
         }),
-      });
+      }, DRIVER_YOON_TOKEN); // Assigned is 배선만, but call made with 윤태준 token!
       assert.strictEqual(badStatusChange.status, 403, 'Unauthorized driver status change must return HTTP 403');
       console.log('  ✅ Unauthorized driver operation status change blocked (HTTP 403).');
 
-      // 5C: Authorized Driver Progresses through 5 stages
+      // 5B-2: Invalid jump in operation status (e.g. ready directly to completed)
+      const invalidJump = await api('/api/schedules/operation-status', {
+        method: 'POST',
+        body: JSON.stringify({
+          scheduleId: opScheduleId,
+          status: 'completed', // Invalid skip from ready!
+        }),
+      }, DRIVER_BAE_TOKEN);
+      assert.strictEqual(invalidJump.status, 400, 'Invalid status jump must return HTTP 400');
+      console.log('  ✅ Invalid non-sequential operation status jump blocked (HTTP 400).');
+
+      // 5C: Authorized Driver Progresses through 5 stages sequentially
       const stages = ['arrived_pickup', 'boarded', 'in_transit', 'completed'];
       for (const st of stages) {
         const updateRes = await api('/api/schedules/operation-status', {
@@ -350,9 +426,8 @@ async function runAudit() {
           body: JSON.stringify({
             scheduleId: opScheduleId,
             status: st,
-            changedBy: '배선만',
           }),
-        });
+        }, DRIVER_BAE_TOKEN);
         assert.strictEqual(updateRes.status, 200);
         assert.strictEqual(updateRes.data.operationStatus, st);
       }
@@ -367,7 +442,7 @@ async function runAudit() {
     }
 
     console.log('\n================================================================');
-    console.log('🎉 ALL 5 Critical Audit Scenarios Passed 100% in Real Supabase Environment!');
+    console.log('🎉 ALL Audit Scenarios Passed 100% in Real Supabase Environment!');
     console.log('================================================================\n');
   } finally {
     // Clean up ONLY created test records

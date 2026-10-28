@@ -6,6 +6,7 @@ import {
   queryServerSchedules,
 } from '@/lib/dispatch/scheduleServerStore';
 import { ScheduleItem } from '@/data/ferrariSchedules';
+import { requireHqAdmin } from '@/lib/auth/serverAuth';
 
 function normalizePayloadItem(raw: Record<string, any>, rootBody: Record<string, any>): DispatchUpsertInput {
   return {
@@ -62,6 +63,11 @@ function normalizePayloadItem(raw: Record<string, any>, rootBody: Record<string,
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireHqAdmin(req);
+    if (!auth.ok) {
+      return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
+    }
+
     const body = await req.json().catch(() => ({}));
     const rawItems: Array<Record<string, any>> = Array.isArray(body.items) && body.items.length > 0
       ? body.items
@@ -134,6 +140,11 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
+    const auth = await requireHqAdmin(req);
+    if (!auth.ok) {
+      return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
+    }
+
     const { searchParams } = new URL(req.url);
     const date = searchParams.get('date');
     const onlyDispatched = searchParams.get('onlyDispatched') === 'true';

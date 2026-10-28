@@ -4,6 +4,7 @@ import {
   recordServerCustomerNotification,
 } from '@/lib/dispatch/scheduleServerStore';
 import { isNaverSmtpConfigured, sendEmailViaNaver } from '@/services/naverSmtpService';
+import { requireHqAdmin } from '@/lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,6 +12,11 @@ const VALID_TRIGGERS = new Set(['dispatch_confirmed', 'driver_changed', 'arrived
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = await requireHqAdmin(req);
+    if (!auth.ok) {
+      return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
+    }
+
     const payload = await req.json().catch(() => ({}));
     const {
       scheduleId,
@@ -182,3 +188,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }
+

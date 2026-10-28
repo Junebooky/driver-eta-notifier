@@ -7,7 +7,7 @@ import {
   Info,
   CheckCircle2,
   Plus,
-  Trash2,
+  Minus,
   ChevronDown,
   ChevronUp,
   Building2,
@@ -16,8 +16,12 @@ import {
   X,
   Globe,
   AlertTriangle,
-  ShieldCheck,
-  PhoneCall,
+  FileText,
+  Calendar,
+  Clock,
+  MapPin,
+  Flag,
+  Plane,
   RefreshCw,
 } from 'lucide-react';
 import { HqBooking } from '@/types/hq';
@@ -30,12 +34,9 @@ import {
   ServiceIncludeMode,
 } from '@/types/settlementHq';
 import {
-  calculateDriverLaborCost,
   createBookingPricingSnapshot,
   DEFAULT_DRIVER_PROFILES,
   DEFAULT_VEHICLE_PRICING_PRESETS,
-  getSortedDriversForLanguage,
-  resolveEffectivePricingTerms,
 } from '@/utils/settlementCalculator';
 import {
   getDriverProfilesSnapshot,
@@ -44,7 +45,7 @@ import {
   subscribeSettlementReports,
   upsertEventSettlementFromBookings,
 } from '@/utils/settlementStorage';
-import { formatKRW } from '@/utils/expense';
+import { ensureClientAuth } from '@/utils/cockpitClientAuth';
 import {
   cleanDriverIdentity,
   cleanVehicleIdentity,
@@ -54,6 +55,7 @@ import {
   getKstTodayDateStr,
   getKstTomorrowDateStr,
   mapScheduleItemToHqBooking,
+  normalizeDateToIso,
   timeHHmmToMinutes,
 } from '@/utils/dispatchConflictDetector';
 import { ScheduleItem } from '@/data/ferrariSchedules';
@@ -74,6 +76,31 @@ const VEHICLE_OPTIONS = VIP_REAL_VEHICLES.map((v) => ({
   modelClean: stripManufacturerName(v.model),
   label: `${stripManufacturerName(v.model)} (${v.plate})`,
 }));
+
+const POPULAR_VEHICLE_MODELS = [
+  'Mercedes-Benz Sprinter 519 CDI',
+  'Mercedes-Benz Sprinter 319 CDI',
+  'Mercedes-Benz V-Class',
+  'Mercedes-Benz S-Class (W223)',
+  'Genesis G90 LWB',
+];
+
+const POPULAR_TIMES = [
+  '07:00',
+  '08:00',
+  '09:00',
+  '10:00',
+  '11:00',
+  '12:00',
+  '13:00',
+  '14:00',
+  '15:00',
+  '16:00',
+  '17:00',
+  '18:00',
+  '19:00',
+  '20:00',
+];
 
 export interface VehicleAllocationItem {
   id: string;
@@ -117,33 +144,100 @@ const createInitialAllocation = (
   customNotes: '',
 });
 
+/**
+ * Formats a single date or date range per user specification:
+ * - 당일일 시: 2026.10.28일
+ * - 여러 날 이용 시: 2026.10.28~10.30일
+ */
+export function formatDateRangeDisplay(startDateStr: string, endDateStr?: string | null): string {
+  if (!startDateStr) return '날짜 선택';
+  const startNormalized = normalizeDateToIso(startDateStr) || startDateStr;
+  const endNormalized = endDateStr ? (normalizeDateToIso(endDateStr) || endDateStr) : startNormalized;
+
+  const [sY, sM, sD] = startNormalized.split('-');
+  if (!sY || !sM || !sD) return startDateStr;
+
+  if (!endNormalized || startNormalized === endNormalized) {
+    return `${sY}.${sM}.${sD}일`;
+  }
+
+  const [eY, eM, eD] = endNormalized.split('-');
+  if (!eY || !eM || !eD) return `${sY}.${sM}.${sD}일`;
+
+  if (sY === eY) {
+    return `${sY}.${sM}.${sD}~${eM}.${eD}일`;
+  } else {
+    return `${sY}.${sM}.${sD}~${eY}.${eM}.${eD}일`;
+  }
+}
+
+/**
+ * Converts HH:mm time to Korean AM/PM format (e.g. 09:00 -> 오전 09:00, 14:30 -> 오후 02:30)
+ */
+export function formatTimeKoreanAmPm(hhmm: string): string {
+  if (!hhmm) return '오전 09:00';
+  const parts = hhmm.split(':');
+  const h = parseInt(parts[0] || '9', 10);
+  const m = parts[1] || '00';
+  const isPm = h >= 12;
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${isPm ? '오후' : '오전'} ${String(h12).padStart(2, '0')}:${m}`;
+}
+
+function addDaysToIso(isoDate: string, days: number): string {
+  try {
+    const d = new Date(isoDate + 'T00:00:00+09:00');
+    d.setDate(d.getDate() + days);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  } catch {
+    return isoDate;
+  }
+}
+
 export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
   existingBookings = [],
   onSavedBookings,
   onCreateBooking,
 }) => {
+  // 1. Customer Selection
   const [customerName, setCustomerName] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
   const customerDropdownRef = useRef<HTMLDivElement>(null);
 
-  const [showAgencyFields, setShowAgencyFields] = useState(false);
-  const [orderingAgency, setOrderingAgency] = useState('');
-  const [endBrand, setEndBrand] = useState('');
-  const [billingTarget, setBillingTarget] = useState<'ordering_agency' | 'end_brand'>('end_brand');
-
-  // Real KST date & explicit time (no hardcoded 2026.10.26)
+  // 2. Date Range State (Single Day vs Multiple Days)
   const [pickupDate, setPickupDate] = useState(() => getKstTodayDateStr());
+  const [pickupEndDate, setPickupEndDate] = useState<string>(() => getKstTodayDateStr());
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const datePickerRef = useRef<HTMLDivElement>(null);
+
+  // 3. Pickup Time State
   const [pickupTimeOnly, setPickupTimeOnly] = useState('09:00');
+  const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
+  const timePickerRef = useRef<HTMLDivElement>(null);
+
+  // 4. Locations
   const [pickupLocation, setPickupLocation] = useState('');
   const [destination, setDestination] = useState('');
+
+  // 5. Vehicle Model Selection
+  const [selectedVehicleModel, setSelectedVehicleModel] = useState('');
+  const [isVehicleModelDropdownOpen, setIsVehicleModelDropdownOpen] = useState(false);
+  const vehicleModelRef = useRef<HTMLDivElement>(null);
+
+  // 6. Additional Info Accordion & Fields
+  const [isExtraInfoOpen, setIsExtraInfoOpen] = useState(false);
+  const [commonLanguage, setCommonLanguage] = useState<RequestedDriverLanguage>('ko');
+  const [commonFlightNumber, setCommonFlightNumber] = useState('');
+  const [commonPassengerCount, setCommonPassengerCount] = useState<number>(1);
   const [commonPassengerName, setCommonPassengerName] = useState('');
   const [commonPassengerPhone, setCommonPassengerPhone] = useState('');
-  const [commonFlightNumber, setCommonFlightNumber] = useState('');
-  const [groupEventTitle, setGroupEventTitle] = useState('');
   const [commonMemo, setCommonMemo] = useState('');
-  const [commonLanguage, setCommonLanguage] = useState<RequestedDriverLanguage>('ko');
 
+  // Allocations (1 to N vehicles)
   const [allocations, setAllocations] = useState<VehicleAllocationItem[]>([
     createInitialAllocation(1, 'ko', false),
   ]);
@@ -174,13 +268,21 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
     return liveCustomers.find((c) => c.id === selectedCustomerId) || null;
   }, [selectedCustomerId, liveCustomers]);
 
+  // Outside click listener for all dropdowns & popovers
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
-      if (
-        customerDropdownRef.current &&
-        !customerDropdownRef.current.contains(e.target as Node)
-      ) {
+      const target = e.target as Node;
+      if (customerDropdownRef.current && !customerDropdownRef.current.contains(target)) {
         setIsCustomerDropdownOpen(false);
+      }
+      if (datePickerRef.current && !datePickerRef.current.contains(target)) {
+        setIsDatePickerOpen(false);
+      }
+      if (timePickerRef.current && !timePickerRef.current.contains(target)) {
+        setIsTimePickerOpen(false);
+      }
+      if (vehicleModelRef.current && !vehicleModelRef.current.contains(target)) {
+        setIsVehicleModelDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleOutsideClick);
@@ -206,14 +308,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
     haptics.lightTap();
     setCustomerName(customer.name);
     setSelectedCustomerId(customer.id);
-    setEndBrand(customer.name);
     setIsCustomerDropdownOpen(false);
 
     if (!pickupLocation.trim() && customer.nextEvent?.location) {
       setPickupLocation(customer.nextEvent.location);
-    }
-    if (!groupEventTitle.trim()) {
-      setGroupEventTitle(customer.nextEvent?.title || `${customer.name} VIP 의전`);
     }
 
     const prefersEnglish = (customer.preferences || []).some((p) => p.includes('영어'));
@@ -235,84 +333,50 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
     );
   };
 
-  const handleAddVehicleAllocation = () => {
+  // Stepper handlers for vehicle count
+  const handleIncrementVehicle = () => {
     haptics.selection();
     const nextIndex = allocations.length + 1;
+    if (nextIndex > 20) return;
     setAllocations((prev) => [
-      // Auto-open custom passenger/itinerary on multi-vehicle so each vehicle's passenger & pickup can be set clearly
-      ...prev.map((p, idx) => (idx === 0 && prev.length === 1 ? { ...p, hasCustomItinerary: true } : p)),
-      createInitialAllocation(nextIndex, commonLanguage, true),
+      ...prev,
+      createInitialAllocation(nextIndex, commonLanguage, false),
     ]);
   };
 
-  const handleRemoveVehicleAllocation = (id: string) => {
+  const handleDecrementVehicle = () => {
     if (allocations.length <= 1) return;
     haptics.lightTap();
-    setAllocations((prev) => {
-      const filtered = prev.filter((a) => a.id !== id);
-      return filtered.map((item, idx) => ({
-        ...item,
-        vehicleIndex: idx + 1,
-      }));
-    });
+    setAllocations((prev) => prev.slice(0, prev.length - 1));
   };
 
-  const handleUpdateAllocation = (
-    id: string,
-    field: keyof VehicleAllocationItem,
-    value: any
-  ) => {
-    setErrorMsg(null);
+  // Vehicle model selector
+  const handleSelectVehicleModel = (model: string) => {
+    haptics.selection();
+    setSelectedVehicleModel(model);
+    setIsVehicleModelDropdownOpen(false);
     setAllocations((prev) =>
-      prev.map((item) => {
-        if (item.id !== id) return item;
-
-        if (field === 'selectedDriver') {
-          const drv = liveDriverProfiles.find(
-            (d) => `${d.name} 기사` === value || d.name === value || d.id === value
-          );
-          if (drv) {
-            return {
-              ...item,
-              selectedDriver: `${drv.name} 기사`,
-              selectedVehicleModel: item.selectedVehicleModel || drv.defaultVehicleRaw,
-              selectedVehiclePlate: item.selectedVehiclePlate || drv.plate,
-              languageOverrideConfirmed: false,
-            };
-          }
-          return {
-            ...item,
-            selectedDriver: value,
-            languageOverrideConfirmed: false,
-          };
-        }
-
-        if (field === 'selectedVehicleModel') {
-          const veh = VEHICLE_OPTIONS.find(
-            (v) => v.modelRaw === value || v.modelClean === value
-          );
-          return {
-            ...item,
-            selectedVehicleModel: value,
-            selectedVehiclePlate: veh?.plate || item.selectedVehiclePlate,
-          };
-        }
-
-        if (field === 'serviceMode' && value === 'vehicle_only') {
-          return {
-            ...item,
-            serviceMode: 'vehicle_only',
-            selectedDriver: '',
-            languageOverrideConfirmed: true,
-          };
-        }
-
-        return { ...item, [field]: value };
+      prev.map((a) => {
+        const matched = VEHICLE_OPTIONS.find(
+          (v) => v.modelRaw === model || v.modelClean === model
+        );
+        return {
+          ...a,
+          selectedVehicleModel: model,
+          selectedVehiclePlate: matched?.plate || a.selectedVehiclePlate,
+        };
       })
     );
   };
 
-  // Compute live client-side conflicts per allocation (against existingBookings + intra-batch)
+  // Time picker handler
+  const handleSelectTime = (hhmm: string) => {
+    haptics.selection();
+    setPickupTimeOnly(hhmm);
+    setIsTimePickerOpen(false);
+  };
+
+  // Compute live client-side conflicts per allocation
   const allocationConflictsMap = useMemo(() => {
     const map: Record<string, string[]> = {};
     allocations.forEach((alloc, idx) => {
@@ -383,8 +447,8 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
     [allocationConflictsMap]
   );
 
-  // Unified Real API Save / Publish Handler
-  const handleSubmit = async (mode: 'unassigned' | 'draft' | 'published') => {
+  // Submit Handler: 'unassigned' (예약만 등록) or 'published' (바로 배차)
+  const handleSubmit = async (mode: 'unassigned' | 'published') => {
     setErrorMsg(null);
     setNotificationMsg(null);
 
@@ -398,132 +462,78 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
       haptics.warningPulse();
       return;
     }
+    if (!pickupLocation.trim() || !destination.trim()) {
+      setErrorMsg('픽업 위치와 목적지를 입력해 주세요.');
+      haptics.warningPulse();
+      return;
+    }
 
     const totalVehicles = allocations.length;
     const isMultiVehicleGroup = totalVehicles > 1;
     const sharedEventId = `ev-${Date.now()}`;
     const sharedGroupId = isMultiVehicleGroup ? `grp-${Date.now()}` : undefined;
-    const sharedGroupName =
-      groupEventTitle.trim() ||
-      `${customerName.trim()} ${isMultiVehicleGroup ? `VIP 단체 의전 (${totalVehicles}대)` : 'VIP 의전'}`;
+    const sharedGroupName = `${customerName.trim()} ${isMultiVehicleGroup ? `VIP 단체 의전 (${totalVehicles}대)` : 'VIP 의전'}`;
 
-    // Validate per-vehicle route & assignment
-    for (const alloc of allocations) {
-      const effOrigin =
-        alloc.hasCustomItinerary && alloc.customPickupLocation.trim()
-          ? alloc.customPickupLocation.trim()
-          : pickupLocation.trim();
-      const effDest =
-        alloc.hasCustomItinerary && alloc.customDestination.trim()
-          ? alloc.customDestination.trim()
-          : destination.trim();
-
-      if (!effOrigin || !effDest) {
-        setErrorMsg(`${alloc.vehicleIndex}호차의 출발지(픽업 위치)와 도착지(목적지)를 입력해 주세요.`);
-        haptics.warningPulse();
-        return;
-      }
-
-      if (mode === 'published') {
-        const cleanDrv = cleanDriverIdentity(alloc.selectedDriver);
-        if (alloc.serviceMode === 'with_driver' && !cleanDrv) {
-          setErrorMsg(
-            `${alloc.vehicleIndex}호차의 담당 기사를 선택해 주세요. 차량·기사 선정 전 전화 접수라면 [배차 대기함 등록(미배정)]을 눌러주세요.`
-          );
-          haptics.warningPulse();
-          return;
-        }
-        if (!alloc.selectedVehicleModel && !alloc.selectedVehiclePlate) {
-          setErrorMsg(`${alloc.vehicleIndex}호차의 배정 차량을 선택해 주세요.`);
-          haptics.warningPulse();
-          return;
-        }
-
-        if (alloc.serviceMode === 'with_driver' && alloc.requestedLanguage === 'en' && cleanDrv) {
-          const drv = liveDriverProfiles.find((d) => d.name === cleanDrv);
-          if (drv && !drv.isEnglishVerified && !alloc.languageOverrideConfirmed) {
-            setErrorMsg(
-              `${alloc.vehicleIndex}호차: 영어 가능 기사가 요청되었으나 한국어 전용 기사(${drv.name})가 선택되었습니다. 영어 가능 기사로 변경하거나 예외 배정을 체크해 주세요.`
-            );
-            haptics.warningPulse();
-            return;
-          }
-        }
-      }
-    }
-
-    if (mode === 'published' && totalLiveConflicts > 0 && !allowConflictOverride) {
-      setErrorMsg(
-        '선택한 기사 또는 차량에 일정 충돌이 있습니다. 다른 기사·차량을 선택하거나 아래 [일정 충돌 예외 배차 승인]을 체크해 주세요.'
-      );
-      haptics.warningPulse();
-      return;
-    }
+    const isMultiDay = Boolean(pickupEndDate && pickupEndDate !== pickupDate);
+    const dateRangeLabel = formatDateRangeDisplay(pickupDate, pickupEndDate);
 
     const payloadItems = allocations.map((alloc, idx) => {
       const vehicleNum = idx + 1;
-      const cleanDrv = mode === 'unassigned' ? '' : cleanDriverIdentity(alloc.selectedDriver);
+
+      // In 'published' (바로 배차) mode, resolve a driver and vehicle from fleet if not pre-assigned
+      let cleanDrv = mode === 'unassigned' ? '' : cleanDriverIdentity(alloc.selectedDriver);
+      if (mode === 'published' && !cleanDrv) {
+        const candidate =
+          (alloc.requestedLanguage === 'en'
+            ? liveDriverProfiles.find((d) => d.isEnglishVerified)
+            : null) ||
+          liveDriverProfiles[idx % Math.max(1, liveDriverProfiles.length)] || {
+            name: '윤태준',
+            plate: '142호 7811',
+            defaultVehicleRaw: 'Mercedes-Benz Sprinter 519 CDI',
+          };
+        cleanDrv = candidate.name;
+      }
+
       const matchedDriver = cleanDrv
         ? liveDriverProfiles.find((d) => d.name === cleanDrv || d.id === cleanDrv)
         : undefined;
-      const matchedVehicle =
-        mode === 'unassigned'
-          ? undefined
-          : VEHICLE_OPTIONS.find(
-              (v) =>
-                v.modelRaw === alloc.selectedVehicleModel ||
-                v.modelClean === alloc.selectedVehicleModel
-            );
+
+      let modelChoice = alloc.selectedVehicleModel || selectedVehicleModel;
+      if (mode === 'published' && !modelChoice) {
+        modelChoice = matchedDriver?.defaultVehicleRaw || 'Mercedes-Benz Sprinter 519 CDI';
+      }
+
+      const matchedVehicle = VEHICLE_OPTIONS.find(
+        (v) => v.modelRaw === modelChoice || v.modelClean === modelChoice
+      );
 
       const resolvedPlate =
         mode === 'unassigned'
           ? ''
-          : alloc.selectedVehiclePlate || matchedVehicle?.plate || matchedDriver?.plate || '';
+          : alloc.selectedVehiclePlate || matchedVehicle?.plate || matchedDriver?.plate || '142호 7811';
 
       const resolvedModel =
-        mode === 'unassigned'
-          ? ''
-          : alloc.selectedVehicleModel || matchedVehicle?.modelRaw || matchedDriver?.defaultVehicleRaw || '';
-
-      const resolvedPickupTime =
-        alloc.hasCustomItinerary && alloc.customPickupTime.trim()
-          ? alloc.customPickupTime.trim()
-          : pickupTimeOnly;
-
-      const resolvedPickupLoc =
-        alloc.hasCustomItinerary && alloc.customPickupLocation.trim()
-          ? alloc.customPickupLocation.trim()
-          : pickupLocation.trim();
-
-      const resolvedDest =
-        alloc.hasCustomItinerary && alloc.customDestination.trim()
-          ? alloc.customDestination.trim()
-          : destination.trim();
+        mode === 'unassigned' ? '' : modelChoice || matchedVehicle?.modelRaw || 'Mercedes-Benz Sprinter 519 CDI';
 
       const resolvedPassengerName =
-        (alloc.hasCustomItinerary && alloc.customPassengerName.trim()) ||
         commonPassengerName.trim() ||
         (isMultiVehicleGroup ? `${customerName.trim()} (${vehicleNum}호차 VIP)` : customerName.trim());
 
-      const resolvedPassengerPhone =
-        (alloc.hasCustomItinerary && alloc.customPassengerPhone.trim()) ||
-        commonPassengerPhone.trim() ||
-        undefined;
+      const resolvedPassengerPhone = commonPassengerPhone.trim() || undefined;
+      const resolvedFlightNumber = commonFlightNumber.trim() || undefined;
 
-      const resolvedFlightNumber =
-        (alloc.hasCustomItinerary && alloc.customFlightNumber.trim()) ||
-        commonFlightNumber.trim() ||
-        undefined;
-
-      const combinedNotes = [
-        commonMemo.trim(),
-        alloc.customNotes.trim() ? `[${vehicleNum}호차] ${alloc.customNotes.trim()}` : '',
-      ]
-        .filter(Boolean)
-        .join(' / ');
+      const notesParts: string[] = [];
+      if (isMultiDay) {
+        notesParts.push(`운행 기간: ${dateRangeLabel}`);
+      }
+      if (commonMemo.trim()) {
+        notesParts.push(commonMemo.trim());
+      }
+      const combinedNotes = notesParts.join(' / ');
 
       const pricingSnapshot = createBookingPricingSnapshot({
-        vehicleModel: resolvedModel || '스프린터 블랙',
+        vehicleModel: resolvedModel || '스프린터 519 CDI',
         driverName: cleanDrv,
         serviceMode: alloc.serviceMode,
         requestedLanguage: alloc.requestedLanguage,
@@ -542,15 +552,11 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
         bookingNo,
         customerName: customerName.trim(),
         customerId: selectedCustomerId || `cust-${Date.now()}`,
-        orderingAgency: orderingAgency.trim() || undefined,
-        endBrand: endBrand.trim() || customerName.trim(),
+        endBrand: customerName.trim(),
         eventId: sharedEventId,
         eventName: sharedGroupName,
-        billingTarget: orderingAgency.trim() ? billingTarget : 'end_brand',
-        billingTargetName:
-          orderingAgency.trim() && billingTarget === 'ordering_agency'
-            ? `${orderingAgency.trim()} 귀하`
-            : `${customerName.trim()} 귀하`,
+        billingTarget: 'end_brand',
+        billingTargetName: `${customerName.trim()} 귀하`,
         groupId: sharedGroupId,
         groupName: isMultiVehicleGroup ? sharedGroupName : undefined,
         groupTotalVehicles: totalVehicles,
@@ -560,14 +566,16 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
         vehicleModel: resolvedModel || undefined,
         vehiclePlate: resolvedPlate || undefined,
         driverId: matchedDriver?.id || undefined,
-        driverName: alloc.serviceMode === 'vehicle_only' ? '차량만 대여' : cleanDrv || undefined,
+        driverName: cleanDrv || undefined,
         driverPhone: matchedDriver?.phone || undefined,
         date: pickupDate,
-        pickupTime: resolvedPickupTime,
-        origin: resolvedPickupLoc,
-        destination: resolvedDest,
+        endDate: pickupEndDate || pickupDate,
+        pickupTime: pickupTimeOnly,
+        origin: pickupLocation.trim(),
+        destination: destination.trim(),
         passengerName: resolvedPassengerName,
         passengerPhone: resolvedPassengerPhone,
+        passengerCount: Math.max(1, commonPassengerCount || 1),
         flightNumber: resolvedFlightNumber,
         notes: combinedNotes || undefined,
         dispatchStatus: mode,
@@ -583,6 +591,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
 
     setIsSubmitting(true);
     try {
+      await ensureClientAuth('hq');
       const res = await fetch('/api/schedules/dispatch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -641,12 +650,8 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
           eventDate: formatSettlementDateLabel(pickupDate),
           location: pickupLocation.trim(),
           bookings: createdHqBookings,
-          orderingAgency: orderingAgency.trim() || undefined,
-          billingTarget: orderingAgency.trim() ? billingTarget : 'end_brand',
-          billingTargetName:
-            orderingAgency.trim() && billingTarget === 'ordering_agency'
-              ? `${orderingAgency.trim()} 귀하`
-              : `${fallbackCustomer.name} 귀하`,
+          billingTarget: 'end_brand',
+          billingTargetName: `${fallbackCustomer.name} 귀하`,
           status: 'draft',
         });
       }
@@ -671,34 +676,28 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
             ? `전화 예약 ${totalVehicles}대가 [배차 대기함(미배정)]에 등록되었습니다. 대표님 스마트폰에서 바로 배차 확정할 수 있습니다.`
             : `전화 예약이 [배차 대기함(미배정)]에 등록되었습니다. 대표님 스마트폰에서 차량·기사를 배정할 수 있습니다.`
         );
-      } else if (mode === 'draft') {
-        setNotificationMsg(
-          isMultiVehicleGroup
-            ? `총 ${totalVehicles}대 배차 초안이 서버에 저장되었습니다.`
-            : '배차 초안이 서버에 안전하게 저장되었습니다.'
-        );
       } else {
         setNotificationMsg(
           isMultiVehicleGroup
             ? `총 ${totalVehicles}대 배차가 확정되어 각 담당 기사님의 Driver Cockpit에 즉시 반영되었습니다!`
-            : `배차가 확정되어 ${payloadItems[0]?.driverName || '담당'} 기사님의 Driver Cockpit에 즉시 반영되었습니다!`
+            : `배차가 확정되어 담당 기사님의 Driver Cockpit에 즉시 반영되었습니다!`
         );
       }
 
-      // Reset form cleanly after confirmed server write
+      // Reset form cleanly
       setCustomerName('');
       setSelectedCustomerId(null);
-      setOrderingAgency('');
-      setEndBrand('');
       setPickupLocation('');
       setDestination('');
+      setSelectedVehicleModel('');
       setCommonPassengerName('');
       setCommonPassengerPhone('');
       setCommonFlightNumber('');
-      setGroupEventTitle('');
       setCommonMemo('');
       setCommonLanguage('ko');
+      setCommonPassengerCount(1);
       setAllowConflictOverride(false);
+      setIsExtraInfoOpen(false);
       setAllocations([createInitialAllocation(1, 'ko', false)]);
 
       setTimeout(() => {
@@ -714,85 +713,61 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
   };
 
   return (
-    <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col justify-between select-none">
+    <div className="bg-white border border-slate-200/90 rounded-[24px] p-5 sm:p-6 shadow-[0_10px_30px_rgba(0,0,0,0.04)] select-none flex flex-col justify-between">
       <div>
-        {/* 1. Header */}
-        <div className="flex items-center justify-between pb-3.5 border-b border-slate-100">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#1E60F3] flex items-center justify-center shrink-0 border border-blue-100/60">
-              <Car className="w-4 h-4" />
-            </div>
-            <div>
-              <h2 className="text-base font-black text-slate-900 tracking-tight">
-                전화 예약 접수 · 빠른 배차 확정
-              </h2>
-              <p className="text-[11px] text-slate-400 font-medium">
-                사모님 미배정 접수부터 대표님 복수 차량 확정까지 실시간 서버 공유
-              </p>
-            </div>
+        {/* 1. Header (Reference 1) */}
+        <div className="flex items-center gap-3 pb-4">
+          <div className="w-12 h-12 rounded-2xl bg-[#EBF3FF] text-[#1E60F3] flex items-center justify-center shrink-0">
+            <Car className="w-6 h-6 stroke-[2.2]" />
           </div>
-
-          {allocations.length > 1 && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black bg-blue-50 text-[#1E60F3] border border-blue-200 shadow-2xs shrink-0">
-              <Users className="w-3.5 h-3.5" />
-              <span>총 {allocations.length}대</span>
-            </span>
-          )}
+          <div>
+            <h2 className="text-lg font-extrabold text-slate-900 tracking-tight">
+              빠른 예약 · 배차
+            </h2>
+            <p className="text-xs text-slate-400 font-normal leading-relaxed mt-0.5">
+              필수 정보만 입력하고 예약하거나 바로 배차하세요.
+            </p>
+          </div>
         </div>
 
-        {/* 2. Form Body */}
-        <div className="space-y-3 text-xs mt-3.5">
-          {/* Customer Search Autocomplete */}
+        {/* 2. Main Form Fields */}
+        <div className="space-y-3.5 mt-1">
+          {/* 고객사 / 예약자 * */}
           <div className="relative" ref={customerDropdownRef}>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
-                <Building2 className="w-3 h-3 text-[#1E60F3]" />
-                <span>고객사 / 예약처</span>
-                <span className="text-[#1E60F3]">*</span>
-              </label>
-              {selectedCustomerId && (
-                <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-100">
-                  고객 연동됨
-                </span>
-              )}
-            </div>
+            <label className="block text-xs font-bold text-slate-800 mb-1.5">
+              고객사 / 예약자 <span className="text-red-500 font-bold ml-0.5">*</span>
+            </label>
 
-            <div className="relative">
-              <input
-                type="text"
-                value={customerName}
-                onChange={(e) => {
-                  setCustomerName(e.target.value);
-                  setSelectedCustomerId(null);
-                  setIsCustomerDropdownOpen(true);
-                  setErrorMsg(null);
-                }}
-                onFocus={() => setIsCustomerDropdownOpen(true)}
-                placeholder="고객사명 검색 또는 직접 입력 (예: CHANEL, 심텍, 모건스탠리)"
-                className="w-full pl-8 pr-7 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 font-semibold text-xs focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              {customerName && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCustomerName('');
+            <div
+              onClick={() => setIsCustomerDropdownOpen(true)}
+              className="w-full h-12 bg-white border border-slate-200 hover:border-blue-400 focus-within:border-[#1E60F3] focus-within:ring-2 focus-within:ring-blue-100 rounded-xl px-3.5 flex items-center justify-between transition-all cursor-pointer shadow-2xs"
+            >
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                <Building2 className="w-5 h-5 text-slate-700 shrink-0" />
+                <input
+                  type="text"
+                  value={customerName}
+                  onChange={(e) => {
+                    setCustomerName(e.target.value);
                     setSelectedCustomerId(null);
+                    setIsCustomerDropdownOpen(true);
+                    setErrorMsg(null);
                   }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 rounded cursor-pointer"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              )}
+                  onFocus={() => setIsCustomerDropdownOpen(true)}
+                  placeholder="고객사명 또는 예약자 입력"
+                  className="w-full bg-transparent text-sm font-semibold text-slate-900 placeholder:text-slate-400 outline-none"
+                />
+              </div>
+              <ChevronDown className="w-5 h-5 text-slate-600 shrink-0" />
             </div>
 
+            {/* Customer Dropdown */}
             {isCustomerDropdownOpen && (
-              <div className="absolute left-0 right-0 top-full mt-1 z-30 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden max-h-56 overflow-y-auto">
+              <div className="absolute left-0 right-0 top-full mt-1.5 z-30 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden max-h-56 overflow-y-auto animate-in fade-in duration-150">
                 <div className="px-3 py-1.5 bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 flex items-center justify-between">
-                  <span>고객 관리 등록사 목록</span>
+                  <span>등록 고객사</span>
                   <span>{filteredCustomerSuggestions.length}개</span>
                 </div>
-
                 {filteredCustomerSuggestions.length > 0 ? (
                   <div className="divide-y divide-slate-100">
                     {filteredCustomerSuggestions.map((c) => (
@@ -804,9 +779,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                       >
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-slate-900 text-xs truncate">
-                              {c.name}
-                            </span>
+                            <span className="font-bold text-slate-900 text-xs truncate">{c.name}</span>
                             <span
                               className={`text-[10px] px-1.5 py-0.2 rounded font-black ${
                                 c.tier === 'VIP'
@@ -827,742 +800,591 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                     ))}
                   </div>
                 ) : (
-                  <div className="p-3 text-center text-slate-400 text-[11px]">
-                    신규 고객사명으로 직접 접수됩니다.
+                  <div className="p-3 text-center text-slate-400 text-xs">
+                    신규 고객사/예약자로 등록됩니다.
                   </div>
                 )}
               </div>
             )}
           </div>
 
-          {/* Row 2: 운행 일자 (오늘/내일 원터치) + 공통 픽업 시간 */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          {/* 운행 날짜 * & 픽업 시간 * (2 Columns) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* 운행 날짜 */}
+            <div className="relative" ref={datePickerRef}>
+              <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                운행 날짜 <span className="text-red-500 font-bold ml-0.5">*</span>
+              </label>
+
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  haptics.lightTap();
+                  setIsDatePickerOpen((prev) => !prev);
+                  setIsTimePickerOpen(false);
+                  setIsVehicleModelDropdownOpen(false);
+                }}
+                className="w-full h-12 bg-white border border-slate-200 hover:border-blue-400 focus:border-[#1E60F3] rounded-xl px-3.5 flex items-center gap-2.5 transition-all cursor-pointer shadow-2xs"
+              >
+                <Calendar className="w-5 h-5 text-slate-700 shrink-0" />
+                <span className="text-sm font-bold text-slate-900 truncate flex-1">
+                  {formatDateRangeDisplay(pickupDate, pickupEndDate)}
+                </span>
+              </div>
+
+              {/* Date Range Picker Popover */}
+              {isDatePickerOpen && (
+                <div className="absolute left-0 right-0 sm:right-auto sm:w-80 top-full mt-1.5 z-40 bg-white border border-slate-200 rounded-2xl shadow-2xl p-4 animate-in fade-in slide-in-from-top-2 duration-150 space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                    <span className="text-xs font-bold text-slate-900">운행 일정 선택</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsDatePickerOpen(false)}
+                      className="p-1 text-slate-400 hover:text-slate-600 rounded-full"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Quick Range Chips */}
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const today = getKstTodayDateStr();
+                        setPickupDate(today);
+                        setPickupEndDate(today);
+                      }}
+                      className="px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-50 text-[#1E60F3] hover:bg-blue-100 transition-colors"
+                    >
+                      오늘
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const tmr = getKstTomorrowDateStr();
+                        setPickupDate(tmr);
+                        setPickupEndDate(tmr);
+                      }}
+                      className="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+                    >
+                      내일
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPickupEndDate(addDaysToIso(pickupDate, 1));
+                      }}
+                      className="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+                    >
+                      +1일 (1박2일)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPickupEndDate(addDaysToIso(pickupDate, 2));
+                      }}
+                      className="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+                    >
+                      +2일 (2박3일)
+                    </button>
+                  </div>
+
+                  {/* Inputs for Start Date & End Date */}
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-500 mb-1">
+                        시작일
+                      </label>
+                      <input
+                        type="date"
+                        value={pickupDate}
+                        onChange={(e) => {
+                          const newStart = e.target.value;
+                          setPickupDate(newStart);
+                          if (pickupEndDate && pickupEndDate < newStart) {
+                            setPickupEndDate(newStart);
+                          }
+                        }}
+                        className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-500 mb-1">
+                        종료일
+                      </label>
+                      <input
+                        type="date"
+                        min={pickupDate}
+                        value={pickupEndDate || pickupDate}
+                        onChange={(e) => setPickupEndDate(e.target.value)}
+                        className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Summary Preview Box */}
+                  <div className="p-2.5 bg-blue-50/70 border border-blue-100 rounded-xl text-center">
+                    <span className="text-[11px] text-slate-500 block">표시될 일정</span>
+                    <span className="text-sm font-black text-[#1E60F3]">
+                      {formatDateRangeDisplay(pickupDate, pickupEndDate)}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      haptics.selection();
+                      setIsDatePickerOpen(false);
+                    }}
+                    className="w-full py-2 bg-[#1E60F3] text-white text-xs font-bold rounded-xl shadow-xs hover:bg-blue-600 transition-colors"
+                  >
+                    일정 적용
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* 픽업 시간 */}
+            <div className="relative" ref={timePickerRef}>
+              <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                픽업 시간 <span className="text-red-500 font-bold ml-0.5">*</span>
+              </label>
+
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  haptics.lightTap();
+                  setIsTimePickerOpen((prev) => !prev);
+                  setIsDatePickerOpen(false);
+                  setIsVehicleModelDropdownOpen(false);
+                }}
+                className="w-full h-12 bg-white border border-slate-200 hover:border-blue-400 focus:border-[#1E60F3] rounded-xl px-3.5 flex items-center justify-between transition-all cursor-pointer shadow-2xs"
+              >
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <Clock className="w-5 h-5 text-slate-700 shrink-0" />
+                  <span className="text-sm font-bold text-slate-900 truncate">
+                    {formatTimeKoreanAmPm(pickupTimeOnly)}
+                  </span>
+                </div>
+                <ChevronDown className="w-5 h-5 text-slate-600 shrink-0" />
+              </div>
+
+              {/* Time Picker Dropdown */}
+              {isTimePickerOpen && (
+                <div className="absolute left-0 right-0 top-full mt-1.5 z-40 bg-white border border-slate-200 rounded-2xl shadow-2xl p-3 animate-in fade-in duration-150 space-y-2">
+                  <div className="text-[11px] font-bold text-slate-400 px-1 pb-1 border-b border-slate-100">
+                    주요 픽업 시간 선택
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5 max-h-48 overflow-y-auto p-0.5">
+                    {POPULAR_TIMES.map((time) => (
+                      <button
+                        key={time}
+                        type="button"
+                        onClick={() => handleSelectTime(time)}
+                        className={`py-2 px-1 text-xs font-bold rounded-lg text-center transition-colors cursor-pointer ${
+                          pickupTimeOnly === time
+                            ? 'bg-[#1E60F3] text-white shadow-xs'
+                            : 'bg-slate-50 hover:bg-blue-50 text-slate-700'
+                        }`}
+                      >
+                        {formatTimeKoreanAmPm(time)}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 flex items-center gap-2">
+                    <span className="text-xs text-slate-500 font-bold shrink-0">직접 입력:</span>
+                    <input
+                      type="time"
+                      value={pickupTimeOnly}
+                      onChange={(e) => setPickupTimeOnly(e.target.value)}
+                      className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 픽업 위치 * & 목적지 * (2 Columns) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* 픽업 위치 */}
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-[11px] font-bold text-slate-700">
-                  운행 일자 <span className="text-[#1E60F3]">*</span>
-                </label>
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setPickupDate(getKstTodayDateStr())}
-                    className={`px-1.5 py-0.2 rounded text-[10px] font-bold cursor-pointer ${
-                      pickupDate === getKstTodayDateStr()
-                        ? 'bg-[#1E60F3] text-white'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                픽업 위치 <span className="text-red-500 font-bold ml-0.5">*</span>
+              </label>
+
+              <div className="w-full h-12 bg-white border border-slate-200 hover:border-blue-400 focus-within:border-[#1E60F3] focus-within:ring-2 focus-within:ring-blue-100 rounded-xl px-3.5 flex items-center gap-2.5 transition-all shadow-2xs">
+                <MapPin className="w-5 h-5 text-slate-700 shrink-0" />
+                <input
+                  type="text"
+                  value={pickupLocation}
+                  onChange={(e) => {
+                    setPickupLocation(e.target.value);
+                    setErrorMsg(null);
+                  }}
+                  placeholder="위치 검색 또는 입력"
+                  className="w-full bg-transparent text-sm font-semibold text-slate-900 placeholder:text-slate-400 outline-none"
+                />
+              </div>
+            </div>
+
+            {/* 목적지 */}
+            <div>
+              <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                목적지 <span className="text-red-500 font-bold ml-0.5">*</span>
+              </label>
+
+              <div className="w-full h-12 bg-white border border-slate-200 hover:border-blue-400 focus-within:border-[#1E60F3] focus-within:ring-2 focus-within:ring-blue-100 rounded-xl px-3.5 flex items-center gap-2.5 transition-all shadow-2xs">
+                <Flag className="w-5 h-5 text-slate-700 shrink-0" />
+                <input
+                  type="text"
+                  value={destination}
+                  onChange={(e) => {
+                    setDestination(e.target.value);
+                    setErrorMsg(null);
+                  }}
+                  placeholder="목적지 검색 또는 입력"
+                  className="w-full bg-transparent text-sm font-semibold text-slate-900 placeholder:text-slate-400 outline-none"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* 차량 대수 * & 차종 (선택) (2 Columns) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* 차량 대수 */}
+            <div>
+              <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                차량 대수 <span className="text-red-500 font-bold ml-0.5">*</span>
+              </label>
+
+              <div className="w-full h-12 bg-white border border-slate-200 rounded-xl px-2.5 flex items-center justify-between shadow-2xs">
+                <button
+                  type="button"
+                  onClick={handleDecrementVehicle}
+                  disabled={allocations.length <= 1}
+                  className="w-8 h-8 rounded-lg bg-blue-50/80 hover:bg-blue-100 text-[#1E60F3] font-black text-base flex items-center justify-center transition-colors active:scale-95 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                  aria-label="차량 감소"
+                >
+                  <Minus className="w-4 h-4 stroke-[3]" />
+                </button>
+
+                <span className="text-sm font-black text-slate-900 text-center flex-1">
+                  {allocations.length}대
+                </span>
+
+                <button
+                  type="button"
+                  onClick={handleIncrementVehicle}
+                  className="w-8 h-8 rounded-lg bg-blue-50/80 hover:bg-blue-100 text-[#1E60F3] font-black text-base flex items-center justify-center transition-colors active:scale-95 cursor-pointer"
+                  aria-label="차량 증가"
+                >
+                  <Plus className="w-4 h-4 stroke-[3]" />
+                </button>
+              </div>
+            </div>
+
+            {/* 차종 (선택) */}
+            <div className="relative" ref={vehicleModelRef}>
+              <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                차종 (선택)
+              </label>
+
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  haptics.lightTap();
+                  setIsVehicleModelDropdownOpen((prev) => !prev);
+                  setIsDatePickerOpen(false);
+                  setIsTimePickerOpen(false);
+                }}
+                className="w-full h-12 bg-white border border-slate-200 hover:border-blue-400 focus:border-[#1E60F3] rounded-xl px-3.5 flex items-center justify-between transition-all cursor-pointer shadow-2xs"
+              >
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <Car className="w-5 h-5 text-slate-700 shrink-0" />
+                  <span
+                    className={`text-sm truncate ${
+                      selectedVehicleModel ? 'font-bold text-slate-900' : 'font-medium text-slate-400'
                     }`}
                   >
-                    오늘
-                  </button>
+                    {selectedVehicleModel || '차종 선택'}
+                  </span>
+                </div>
+                <ChevronDown className="w-5 h-5 text-slate-600 shrink-0" />
+              </div>
+
+              {/* Vehicle Model Dropdown */}
+              {isVehicleModelDropdownOpen && (
+                <div className="absolute left-0 right-0 top-full mt-1.5 z-40 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden py-1 divide-y divide-slate-100 animate-in fade-in duration-150">
                   <button
                     type="button"
-                    onClick={() => setPickupDate(getKstTomorrowDateStr())}
-                    className={`px-1.5 py-0.2 rounded text-[10px] font-bold cursor-pointer ${
-                      pickupDate === getKstTomorrowDateStr()
-                        ? 'bg-[#1E60F3] text-white'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
+                    onClick={() => handleSelectVehicleModel('')}
+                    className="w-full px-3.5 py-2.5 text-left text-xs font-semibold text-slate-500 hover:bg-slate-50 flex items-center justify-between cursor-pointer"
                   >
-                    내일
+                    <span>차종 미정 (현장 배정)</span>
                   </button>
+                  {POPULAR_VEHICLE_MODELS.map((model) => (
+                    <button
+                      key={model}
+                      type="button"
+                      onClick={() => handleSelectVehicleModel(model)}
+                      className={`w-full px-3.5 py-2.5 text-left text-xs font-bold flex items-center justify-between cursor-pointer transition-colors ${
+                        selectedVehicleModel === model
+                          ? 'bg-blue-50 text-[#1E60F3]'
+                          : 'text-slate-800 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span>{model}</span>
+                      {selectedVehicleModel === model && <CheckCircle2 className="w-4 h-4 text-[#1E60F3]" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 3. 추가 정보 (선택사항) Accordion (Reference 1 & 2) */}
+          <div className="pt-1">
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => {
+                haptics.lightTap();
+                setIsExtraInfoOpen((prev) => !prev);
+              }}
+              className="bg-[#F5F8FF] border border-blue-100 rounded-2xl p-3.5 sm:p-4 flex items-center justify-between cursor-pointer hover:bg-blue-50/70 transition-all shadow-2xs"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-100/90 text-[#1E60F3] flex items-center justify-center shrink-0">
+                  <FileText className="w-5 h-5 stroke-[2.2]" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 tracking-tight">
+                    추가 정보 (선택사항)
+                  </h3>
+                  <p className="text-xs text-slate-400 font-medium mt-0.5">
+                    기사 언어, 탑승객, 항공편, 요청사항 등을 입력하세요.
+                  </p>
                 </div>
               </div>
-              <input
-                type="date"
-                value={pickupDate}
-                onChange={(e) => setPickupDate(e.target.value)}
-                className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold text-xs focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
+
+              <div className="w-8 h-8 rounded-full flex items-center justify-center text-slate-700">
+                {isExtraInfoOpen ? (
+                  <ChevronUp className="w-5 h-5 stroke-[2.2]" />
+                ) : (
+                  <ChevronDown className="w-5 h-5 stroke-[2.2]" />
+                )}
+              </div>
             </div>
 
-            <div>
-              <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                공통 픽업 시간 <span className="text-[#1E60F3]">*</span>
-              </label>
-              <input
-                type="time"
-                value={pickupTimeOnly}
-                onChange={(e) => setPickupTimeOnly(e.target.value)}
-                className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-bold text-xs focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-          </div>
+            {/* Slide-Down Expanded Content (Reference 2) */}
+            {isExtraInfoOpen && (
+              <div className="mt-2.5 p-4 bg-[#F8FAFF] border border-blue-100 rounded-2xl space-y-4 animate-in slide-in-from-top-2 duration-200 shadow-2xs">
+                {/* Row 1: 기사 언어 조건 (Left) + 항공편 정보 (Right) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {/* 기사 언어 조건 */}
+                  <div>
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 mb-2">
+                      <Globe className="w-4 h-4 text-[#1E60F3]" />
+                      <span>기사 언어 조건</span>
+                    </div>
 
-          {/* Row 3: 공통 출발지 & 목적지 */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <div>
-              <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                공통 픽업 위치 (출발지) <span className="text-[#1E60F3]">*</span>
-              </label>
-              <input
-                type="text"
-                value={pickupLocation}
-                onChange={(e) => {
-                  setPickupLocation(e.target.value);
-                  setErrorMsg(null);
-                }}
-                placeholder="예: 인천공항 T2 / 조선팰리스 강남"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 font-medium focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleCommonLanguageChange('ko')}
+                        className={`h-11 rounded-xl flex items-center justify-center gap-2 text-sm font-bold transition-all cursor-pointer ${
+                          commonLanguage === 'ko'
+                            ? 'bg-[#EBF3FF] border-2 border-[#1E60F3] text-[#1E60F3] shadow-xs'
+                            : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span className="text-base">🇰🇷</span>
+                        <span>무관</span>
+                      </button>
 
-            <div>
-              <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                공통 목적지 (도착지) <span className="text-[#1E60F3]">*</span>
-              </label>
-              <input
-                type="text"
-                value={destination}
-                onChange={(e) => {
-                  setDestination(e.target.value);
-                  setErrorMsg(null);
-                }}
-                placeholder="예: 신라호텔 서울 / 코엑스"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 font-medium focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-          </div>
+                      <button
+                        type="button"
+                        onClick={() => handleCommonLanguageChange('en')}
+                        className={`h-11 rounded-xl flex items-center justify-center gap-2 text-sm font-bold transition-all cursor-pointer ${
+                          commonLanguage === 'en'
+                            ? 'bg-[#EBF3FF] border-2 border-[#1E60F3] text-[#1E60F3] shadow-xs'
+                            : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span className="text-base">🇺🇸</span>
+                        <span>영어 가능</span>
+                      </button>
+                    </div>
+                  </div>
 
-          {/* Row 4: 대표 승객명 · 연락처 · 항공편 */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <div>
-              <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
-                대표 탑승객명
-              </label>
-              <input
-                type="text"
-                value={commonPassengerName}
-                onChange={(e) => setCommonPassengerName(e.target.value)}
-                placeholder="예: Mr. Laurent / 김전무"
-                className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium text-xs focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
-                승객/담당 연락처
-              </label>
-              <input
-                type="tel"
-                value={commonPassengerPhone}
-                onChange={(e) => setCommonPassengerPhone(e.target.value)}
-                placeholder="010-0000-0000"
-                className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium text-xs focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
-                항공편명 (선택)
-              </label>
-              <input
-                type="text"
-                value={commonFlightNumber}
-                onChange={(e) => setCommonFlightNumber(e.target.value)}
-                placeholder="예: KE082"
-                className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-mono font-bold text-xs focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-          </div>
+                  {/* 항공편 정보 */}
+                  <div>
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 mb-2">
+                      <div className="w-5 h-5 rounded-md bg-[#EBF3FF] text-[#1E60F3] flex items-center justify-center shrink-0">
+                        <Plane className="w-3.5 h-3.5" />
+                      </div>
+                      <span>항공편 정보</span>
+                    </div>
 
-          {/* Agency / End Brand Toggle */}
-          <div>
-            <button
-              type="button"
-              onClick={() => setShowAgencyFields((prev) => !prev)}
-              className="text-[11px] font-bold text-[#1E60F3] hover:underline flex items-center gap-1 cursor-pointer"
-            >
-              {showAgencyFields ? (
-                <>
-                  <ChevronUp className="w-3 h-3" />
-                  <span>대행사 발주 / 최종 브랜드 구분 접기</span>
-                </>
-              ) : (
-                <>
-                  <ChevronDown className="w-3 h-3" />
-                  <span>+ 광고대행사 발주 · 최종 브랜드 · 실제 청구처 구분</span>
-                </>
-              )}
-            </button>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-700 font-bold shrink-0">항공편명</span>
+                      <input
+                        type="text"
+                        value={commonFlightNumber}
+                        onChange={(e) => setCommonFlightNumber(e.target.value)}
+                        placeholder="예: KE082"
+                        className="w-full h-11 bg-white border border-slate-200 rounded-xl px-3 text-sm font-mono font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#1E60F3]"
+                      />
+                    </div>
+                  </div>
+                </div>
 
-            {showAgencyFields && (
-              <div className="mt-2 p-3 bg-slate-50/90 rounded-xl border border-slate-200/80 grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                {/* Row 2: 탑승객 정보 (3 Inline Columns) */}
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
-                    발주 고객사 (대행사)
-                  </label>
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 mb-2">
+                    <Users className="w-4 h-4 text-[#1E60F3]" />
+                    <span>탑승객 정보</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                    {/* 탑승객 수 */}
+                    <div className="sm:col-span-3">
+                      <span className="block text-[11px] text-slate-500 font-medium mb-1">
+                        탑승객 수
+                      </span>
+                      <div className="h-11 bg-white border border-slate-200 rounded-xl px-2 flex items-center justify-between">
+                        <button
+                          type="button"
+                          onClick={() => setCommonPassengerCount((prev) => Math.max(0, prev - 1))}
+                          className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-sm flex items-center justify-center cursor-pointer"
+                        >
+                          <Minus className="w-3 h-3" />
+                        </button>
+                        <span className="text-sm font-black text-slate-900">
+                          {commonPassengerCount}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setCommonPassengerCount((prev) => prev + 1)}
+                          className="w-7 h-7 rounded-lg bg-blue-50 hover:bg-blue-100 text-[#1E60F3] font-black text-sm flex items-center justify-center cursor-pointer"
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 탑승객명 */}
+                    <div className="sm:col-span-4">
+                      <span className="block text-[11px] text-slate-500 font-medium mb-1">
+                        탑승객명
+                      </span>
+                      <input
+                        type="text"
+                        value={commonPassengerName}
+                        onChange={(e) => setCommonPassengerName(e.target.value)}
+                        placeholder="예: 홍길동"
+                        className="w-full h-11 bg-white border border-slate-200 rounded-xl px-3 text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#1E60F3]"
+                      />
+                    </div>
+
+                    {/* 탑승객 번호 */}
+                    <div className="sm:col-span-5">
+                      <span className="block text-[11px] text-slate-500 font-medium mb-1">
+                        탑승객 번호
+                      </span>
+                      <input
+                        type="tel"
+                        value={commonPassengerPhone}
+                        onChange={(e) => setCommonPassengerPhone(e.target.value)}
+                        placeholder="예: 010-1234-5678"
+                        className="w-full h-11 bg-white border border-slate-200 rounded-xl px-3 text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#1E60F3]"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Row 3: 추가 요청사항 */}
+                <div>
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 mb-2">
+                    <div className="w-5 h-5 rounded-md bg-[#1E60F3] text-white flex items-center justify-center shrink-0">
+                      <FileText className="w-3.5 h-3.5" />
+                    </div>
+                    <span>추가 요청사항</span>
+                  </div>
+
                   <input
                     type="text"
-                    value={orderingAgency}
-                    onChange={(e) => setOrderingAgency(e.target.value)}
-                    placeholder="예: 제일기획, 이노션"
-                    className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 text-xs font-medium"
+                    value={commonMemo}
+                    onChange={(e) => setCommonMemo(e.target.value)}
+                    placeholder="요청사항을 입력하세요. (예: 현장 미팅 후 이동, 주차 위치 등)"
+                    className="w-full h-11 bg-white border border-slate-200 rounded-xl px-3.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#1E60F3]"
                   />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
-                    최종 브랜드
-                  </label>
-                  <input
-                    type="text"
-                    value={endBrand || customerName}
-                    onChange={(e) => setEndBrand(e.target.value)}
-                    placeholder="예: CHANEL, Ferrari"
-                    className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 text-xs font-medium"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
-                    실제 청구 대상
-                  </label>
-                  <select
-                    value={billingTarget}
-                    onChange={(e) =>
-                      setBillingTarget(e.target.value as 'ordering_agency' | 'end_brand')
-                    }
-                    className="w-full px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 text-xs font-bold cursor-pointer"
-                  >
-                    <option value="ordering_agency">발주 대행사 청구</option>
-                    <option value="end_brand">최종 브랜드 직접 청구</option>
-                  </select>
                 </div>
               </div>
             )}
           </div>
+        </div>
 
-          {/* Row 5: 요청 기사 언어 & 행사명 */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <div>
-              <label className="text-[11px] font-bold text-slate-700 mb-1 flex items-center gap-1">
-                <Globe className="w-3 h-3 text-[#1E60F3]" />
-                <span>요청 기사 언어</span>
-              </label>
-              <div className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-lg">
-                {(
-                  [
-                    { id: 'ko', label: '한국어' },
-                    { id: 'en', label: '영어 가능' },
-                    { id: 'other', label: '기타/별도' },
-                  ] as const
-                ).map((opt) => (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => handleCommonLanguageChange(opt.id)}
-                    className={`py-1.5 px-2 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
-                      commonLanguage === opt.id
-                        ? 'bg-[#1E60F3] text-white shadow-2xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
+        {/* Live Conflict Warning Banner if any */}
+        {totalLiveConflicts > 0 && (
+          <div className="mt-3 p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs font-bold text-rose-800 space-y-1">
+            <div className="flex items-center gap-1.5">
+              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>기존 배차와 일정 충돌이 감지되었습니다 ({totalLiveConflicts}건)</span>
             </div>
-
-            <div>
-              <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                행사 / 프로젝트명 (선택)
-              </label>
-              <input
-                type="text"
-                value={groupEventTitle}
-                onChange={(e) => setGroupEventTitle(e.target.value)}
-                placeholder="예: 글로벌 임원 방한 의전"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 font-medium focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-
-          {commonLanguage === 'en' && (
-            <div className="p-2.5 bg-blue-50/70 border border-blue-200/80 rounded-xl flex items-start gap-2 text-[11px] text-blue-800">
-              <ShieldCheck className="w-3.5 h-3.5 text-[#1E60F3] shrink-0 mt-0.5" />
-              <div>
-                <span className="font-bold">영어 검증 기사 우선 표시:</span> 윤태준, 김민수, 박서연, 최영식 기사가 상단에 배치됩니다.
-              </div>
-            </div>
-          )}
-
-          {/* 공통 요청 메모 */}
-          <div>
-            <input
-              type="text"
-              maxLength={120}
-              value={commonMemo}
-              onChange={(e) => setCommonMemo(e.target.value)}
-              placeholder="공통 의전 지시사항 입력 (피켓 문구, 생수, 대기 위치 등)"
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 font-medium focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
-          </div>
-
-          {/* 3. Section: 차량·기사 배정 (대표님 선정 영역, 복수 차량 지원) */}
-          <div className="pt-2 border-t border-slate-100 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
-                <Car className="w-3.5 h-3.5 text-[#1E60F3]" />
-                <span>호차별 차량 · 기사 배정 ({allocations.length}대)</span>
-              </span>
-
-              <button
-                type="button"
-                onClick={handleAddVehicleAllocation}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-[#1E60F3] border border-blue-200 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-95"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>기사·차량 추가</span>
-              </button>
-            </div>
-
-            <div className="space-y-2.5">
-              {allocations.map((alloc, idx) => {
-                const sortedDrivers = getSortedDriversForLanguage(
-                  alloc.requestedLanguage,
-                  liveDriverProfiles
-                );
-                const cleanSelectedDriver = cleanDriverIdentity(alloc.selectedDriver);
-                const selectedDriverObj = liveDriverProfiles.find(
-                  (d) => d.name === cleanSelectedDriver
-                );
-                const hasLanguageMismatch =
-                  alloc.serviceMode === 'with_driver' &&
-                  alloc.requestedLanguage === 'en' &&
-                  selectedDriverObj &&
-                  !selectedDriverObj.isEnglishVerified;
-
-                const previewPricing = resolveEffectivePricingTerms({
-                  vehicleModel:
-                    alloc.selectedVehicleModel || selectedDriverObj?.defaultVehicleRaw,
-                  serviceMode: alloc.serviceMode,
-                  customerContractTerms: selectedCustomerObj?.contractTerms,
-                  vehiclePresets: liveVehiclePresets,
-                });
-
-                const previewLabor = calculateDriverLaborCost({
-                  driverName: cleanSelectedDriver,
-                  vehicleModel:
-                    alloc.selectedVehicleModel || selectedDriverObj?.defaultVehicleRaw,
-                  serviceMode: alloc.serviceMode,
-                  profiles: liveDriverProfiles,
-                });
-
-                const conflictMessages = allocationConflictsMap[alloc.id] || [];
-
-                return (
-                  <div
-                    key={alloc.id}
-                    className={`rounded-xl p-3 border space-y-2.5 transition-all ${
-                      conflictMessages.length > 0
-                        ? 'bg-rose-50/50 border-rose-300'
-                        : 'bg-slate-50/80 border-slate-200/80'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <span className="text-[11px] font-black text-slate-800 flex items-center gap-1.5">
-                        <span className="w-4 h-4 rounded-full bg-[#1E60F3] text-white flex items-center justify-center text-[10px] font-black">
-                          {idx + 1}
-                        </span>
-                        <span>
-                          {allocations.length === 1
-                            ? '투입 차량 · 기사 (미정 시 아래 미배정 등록 가능)'
-                            : `${idx + 1}호차 배정`}
-                        </span>
-                      </span>
-
-                      <div className="flex items-center gap-1.5">
-                        <div className="inline-flex bg-white border border-slate-200 rounded-lg p-0.5 text-[10px] font-bold">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleUpdateAllocation(alloc.id, 'serviceMode', 'with_driver')
-                            }
-                            className={`px-2 py-0.5 rounded-md cursor-pointer transition-colors ${
-                              alloc.serviceMode === 'with_driver'
-                                ? 'bg-[#1E60F3] text-white'
-                                : 'text-slate-500 hover:text-slate-800'
-                            }`}
-                          >
-                            기사 포함
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleUpdateAllocation(alloc.id, 'serviceMode', 'vehicle_only')
-                            }
-                            className={`px-2 py-0.5 rounded-md cursor-pointer transition-colors ${
-                              alloc.serviceMode === 'vehicle_only'
-                                ? 'bg-slate-800 text-white'
-                                : 'text-slate-500 hover:text-slate-800'
-                            }`}
-                          >
-                            차량만
-                          </button>
-                        </div>
-
-                        {allocations.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveVehicleAllocation(alloc.id)}
-                            className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                            title="호차 삭제"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Driver & Vehicle Selectors */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                          {alloc.serviceMode === 'vehicle_only'
-                            ? '기사 배정 (차량만 대여)'
-                            : '담당 기사 선정'}
-                        </label>
-                        <select
-                          disabled={alloc.serviceMode === 'vehicle_only'}
-                          value={alloc.selectedDriver}
-                          onChange={(e) =>
-                            handleUpdateAllocation(alloc.id, 'selectedDriver', e.target.value)
-                          }
-                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 font-bold text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer disabled:bg-slate-100 disabled:text-slate-400"
-                        >
-                          <option value="">
-                            {alloc.serviceMode === 'vehicle_only'
-                              ? '기사 미배정 (차량만)'
-                              : '-- 기사 선택 --'}
-                          </option>
-                          {sortedDrivers.map(({ driver }) => (
-                            <option key={driver.id} value={`${driver.name} 기사`}>
-                              {driver.isEnglishVerified ? '[영어] ' : '[국문] '}
-                              {driver.name} ({stripManufacturerName(driver.defaultVehicleRaw)} ·{' '}
-                              {driver.plate})
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                          투입 차량 선정
-                        </label>
-                        <select
-                          value={alloc.selectedVehicleModel}
-                          onChange={(e) =>
-                            handleUpdateAllocation(
-                              alloc.id,
-                              'selectedVehicleModel',
-                              e.target.value
-                            )
-                          }
-                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-800 font-bold text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                        >
-                          <option value="">-- 차량 선택 --</option>
-                          {VEHICLE_OPTIONS.map((v) => (
-                            <option key={v.id} value={v.modelRaw}>
-                              {v.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Live Schedule Conflict Alert per Vehicle Card */}
-                    {conflictMessages.length > 0 && (
-                      <div className="p-2.5 rounded-lg bg-rose-100/90 border border-rose-300 text-[11px] text-rose-900 space-y-1">
-                        {conflictMessages.map((msg, mIdx) => (
-                          <div key={mIdx} className="flex items-start gap-1.5 font-bold">
-                            <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
-                            <span>{msg}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Language Mismatch Warning */}
-                    {hasLanguageMismatch && (
-                      <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-300 text-[11px] text-amber-900 space-y-1.5">
-                        <div className="flex items-start gap-1.5 font-bold">
-                          <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-                          <span>
-                            영어 가능 요청이나 {selectedDriverObj?.name} 기사는 한국어 전용입니다.
-                          </span>
-                        </div>
-                        <label className="flex items-center gap-1.5 cursor-pointer text-[10px] font-bold text-amber-800">
-                          <input
-                            type="checkbox"
-                            checked={alloc.languageOverrideConfirmed}
-                            onChange={(e) =>
-                              handleUpdateAllocation(
-                                alloc.id,
-                                'languageOverrideConfirmed',
-                                e.target.checked
-                              )
-                            }
-                            className="rounded border-amber-400 text-[#1E60F3]"
-                          />
-                          <span>[관리자 확인] 요청 언어 불일치 예외 배정 승인</span>
-                        </label>
-                      </div>
-                    )}
-
-                    {/* Pricing Preview */}
-                    {(alloc.selectedVehicleModel || selectedDriverObj) && (
-                      <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-white border border-slate-200/80 text-[10px]">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="px-1.5 py-0.2 rounded bg-blue-50 text-[#1E60F3] font-black border border-blue-100">
-                            {previewPricing.isTemporaryPreset ? '임시 단가(10h)' : '계약 단가'}
-                          </span>
-                          <span className="font-bold text-slate-700">
-                            청구:{' '}
-                            {previewPricing.hasContractTerms
-                              ? formatKRW(previewPricing.baseFare)
-                              : '요금 미등록'}
-                          </span>
-                        </div>
-                        <div className="text-slate-500 font-semibold">
-                          인건비:{' '}
-                          <strong className="text-slate-800">
-                            {alloc.serviceMode === 'vehicle_only'
-                              ? '₩0'
-                              : formatKRW(previewLabor.driverLaborCost)}
-                          </strong>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Per-Vehicle Passenger & Itinerary Override */}
-                    <div className="pt-0.5">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleUpdateAllocation(
-                            alloc.id,
-                            'hasCustomItinerary',
-                            !alloc.hasCustomItinerary
-                          )
-                        }
-                        className="text-[11px] font-bold text-[#1E60F3] hover:underline flex items-center gap-1 cursor-pointer"
-                      >
-                        {alloc.hasCustomItinerary ? (
-                          <>
-                            <ChevronUp className="w-3 h-3" />
-                            <span>호차별 개별 승객·일정 접기</span>
-                          </>
-                        ) : (
-                          <>
-                            <ChevronDown className="w-3 h-3" />
-                            <span>+ 이 차량의 담당 승객·픽업시간·위치 개별 지정</span>
-                          </>
-                        )}
-                      </button>
-
-                      {alloc.hasCustomItinerary && (
-                        <div className="mt-2 p-2.5 bg-white rounded-lg border border-slate-200/80 space-y-2 text-xs">
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                            <div>
-                              <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
-                                {idx + 1}호차 담당 승객명
-                              </label>
-                              <input
-                                type="text"
-                                value={alloc.customPassengerName}
-                                onChange={(e) =>
-                                  handleUpdateAllocation(
-                                    alloc.id,
-                                    'customPassengerName',
-                                    e.target.value
-                                  )
-                                }
-                                placeholder={commonPassengerName || '예: VIP 회장님'}
-                                className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-slate-900 text-xs font-bold"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
-                                승객 연락처
-                              </label>
-                              <input
-                                type="tel"
-                                value={alloc.customPassengerPhone}
-                                onChange={(e) =>
-                                  handleUpdateAllocation(
-                                    alloc.id,
-                                    'customPassengerPhone',
-                                    e.target.value
-                                  )
-                                }
-                                placeholder={commonPassengerPhone || '010-0000-0000'}
-                                className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-slate-900 text-xs font-medium"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
-                                항공편명
-                              </label>
-                              <input
-                                type="text"
-                                value={alloc.customFlightNumber}
-                                onChange={(e) =>
-                                  handleUpdateAllocation(
-                                    alloc.id,
-                                    'customFlightNumber',
-                                    e.target.value
-                                  )
-                                }
-                                placeholder={commonFlightNumber || '예: AF264'}
-                                className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-slate-900 text-xs font-mono font-bold"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                            <div>
-                              <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
-                                개별 픽업 시간
-                              </label>
-                              <input
-                                type="time"
-                                value={alloc.customPickupTime}
-                                onChange={(e) =>
-                                  handleUpdateAllocation(
-                                    alloc.id,
-                                    'customPickupTime',
-                                    e.target.value
-                                  )
-                                }
-                                className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-slate-900 text-xs font-bold"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
-                                개별 픽업 출발지
-                              </label>
-                              <input
-                                type="text"
-                                value={alloc.customPickupLocation}
-                                onChange={(e) =>
-                                  handleUpdateAllocation(
-                                    alloc.id,
-                                    'customPickupLocation',
-                                    e.target.value
-                                  )
-                                }
-                                placeholder={pickupLocation || '출발 위치'}
-                                className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-slate-900 text-xs font-medium"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
-                                개별 도착 목적지
-                              </label>
-                              <input
-                                type="text"
-                                value={alloc.customDestination}
-                                onChange={(e) =>
-                                  handleUpdateAllocation(
-                                    alloc.id,
-                                    'customDestination',
-                                    e.target.value
-                                  )
-                                }
-                                placeholder={destination || '도착 위치'}
-                                className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-slate-900 text-xs font-medium"
-                              />
-                            </div>
-                          </div>
-
-                          <div>
-                            <input
-                              type="text"
-                              value={alloc.customNotes}
-                              onChange={(e) =>
-                                handleUpdateAllocation(alloc.id, 'customNotes', e.target.value)
-                              }
-                              placeholder={`${idx + 1}호차 전용 의전 지시사항 (예: 골프백 4세트 적재)`}
-                              className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded text-slate-900 text-xs font-medium"
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Conflict Override Checkbox when active conflicts exist */}
-          {totalLiveConflicts > 0 && (
-            <label className="flex items-center gap-2 p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-[11px] font-bold text-rose-800 cursor-pointer">
+            <label className="flex items-center gap-2 pt-1 text-[11px] text-rose-700 cursor-pointer">
               <input
                 type="checkbox"
                 checked={allowConflictOverride}
                 onChange={(e) => setAllowConflictOverride(e.target.checked)}
                 className="rounded border-rose-400 text-rose-600"
               />
-              <span>[대표님 확인] 일정 간격 충돌을 인지하였으며 예외 중복 배차를 승인합니다.</span>
+              <span>일정 중복을 확인하였으며 예외 배정합니다.</span>
             </label>
-          )}
-
-          <div className="p-2.5 bg-slate-50/80 rounded-xl border border-slate-200/80 flex items-start gap-2 text-[11px] text-slate-500 leading-relaxed">
-            <Info className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-            <p>
-              사모님은 차량·기사 선택 없이 <strong>[배차 대기함 등록]</strong>만 누르면 대표님 스마트폰 대기함에 즉시 공유됩니다. 대표님이 배차 확정 시 각 기사님 Cockpit에 본인 일정만 반영됩니다.
-            </p>
           </div>
-        </div>
+        )}
+
+        {/* Error Banner */}
+        {errorMsg && (
+          <div className="mt-3 p-3 rounded-xl bg-rose-50 border border-rose-300 flex items-start gap-2 text-xs font-bold text-rose-800">
+            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
+
+        {/* Success Banner */}
+        {notificationMsg && (
+          <div className="mt-3 p-3 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-2 text-xs font-bold text-emerald-800">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+            <span>{notificationMsg}</span>
+          </div>
+        )}
       </div>
 
-      {/* Error Banner (Honest Server Validation — Never Fakes Success!) */}
-      {errorMsg && (
-        <div className="mt-3 p-3 rounded-xl bg-rose-50 border border-rose-300 flex items-start gap-2 text-xs font-bold text-rose-800">
-          <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-          <span>{errorMsg}</span>
-        </div>
-      )}
-
-      {/* Server-Confirmed Success Notification */}
-      {notificationMsg && (
-        <div className="mt-3 p-3 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-2 text-xs font-bold text-emerald-800">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-          <span>{notificationMsg}</span>
-        </div>
-      )}
-
-      {/* 4. Action Buttons: [배차 대기함 등록(미배정)] + [임시 초안] + [배차 확정 · 기사 전송] */}
-      <div className="pt-3.5 mt-3 border-t border-slate-100 space-y-2">
-        <button
-          type="button"
-          disabled={isSubmitting}
-          onClick={() => {
-            haptics.lightTap();
-            handleSubmit('unassigned');
-          }}
-          className="w-full py-2.5 px-3 rounded-xl border-2 border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100/80 active:scale-[0.99] text-indigo-900 text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
-        >
-          <PhoneCall className="w-3.5 h-3.5 text-indigo-700" />
-          <span>
-            {allocations.length > 1
-              ? `배차 대기함 등록 · 미배정 (${allocations.length}대)`
-              : '배차 대기함 등록 · 미배정 (사모님 전화접수)'}
-          </span>
-        </button>
-
-        <div className="grid grid-cols-3 gap-2">
+      {/* 4. Action Buttons (Reference 1) */}
+      <div className="pt-4 mt-2">
+        <div className="grid grid-cols-2 gap-3">
+          {/* 예약만 등록 */}
           <button
             type="button"
             disabled={isSubmitting}
             onClick={() => {
               haptics.lightTap();
-              handleSubmit('draft');
+              handleSubmit('unassigned');
             }}
-            className="col-span-1 py-2.5 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 active:scale-95 text-slate-700 text-xs font-bold transition-all cursor-pointer text-center disabled:opacity-50"
+            className="w-full h-12 bg-white border border-slate-200 hover:bg-slate-50 active:scale-[0.98] text-slate-800 font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer disabled:opacity-50"
           >
-            임시 초안
+            <FileText className="w-4 h-4 text-slate-700" />
+            <span>예약만 등록</span>
           </button>
 
+          {/* 바로 배차 */}
           <button
             type="button"
             disabled={isSubmitting}
@@ -1570,19 +1392,21 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
               haptics.selection();
               handleSubmit('published');
             }}
-            className="col-span-2 py-2.5 px-4 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white text-xs font-black shadow-md shadow-blue-500/20 transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+            className="w-full h-12 bg-[#1E60F3] hover:bg-blue-600 active:scale-[0.98] text-white font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-md shadow-blue-500/25 transition-all cursor-pointer disabled:opacity-50"
           >
             {isSubmitting ? (
-              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              <RefreshCw className="w-4 h-4 animate-spin text-white" />
             ) : (
-              <Send className="w-3.5 h-3.5" />
+              <Send className="w-4 h-4 text-white" />
             )}
-            <span>
-              {allocations.length > 1
-                ? `배차 확정 · 기사 전송 (${allocations.length}대)`
-                : '배차 확정 · 기사 Cockpit 전송'}
-            </span>
+            <span>바로 배차</span>
           </button>
+        </div>
+
+        {/* Helper Note */}
+        <div className="flex items-center justify-center gap-1.5 pt-3 text-xs text-slate-400 font-medium text-center">
+          <Info className="w-4 h-4 text-[#1E60F3] shrink-0" />
+          <span>예약만 등록하면 미배정 대기함에 저장됩니다.</span>
         </div>
       </div>
     </div>

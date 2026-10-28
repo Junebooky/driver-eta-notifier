@@ -1,11 +1,19 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { DEFAULT_VEHICLE_PRICING_PRESETS } from '@/utils/settlementCalculator';
+import { verifyServerAuth, requireHqAdmin } from '@/lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const auth = await verifyServerAuth(req);
+    if (!auth.ok || !auth.session) {
+      return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
+    }
+
+    const isHqAdmin = auth.session.role === 'hq_admin';
+
     const { data, error } = await supabaseAdmin
       .from('pricing_presets')
       .select('*')
@@ -13,18 +21,38 @@ export async function GET() {
 
     if (error) {
       console.warn('[PricingPresets API] Supabase query error, fallback to defaults:', error.message);
-      return NextResponse.json({ ok: true, presets: DEFAULT_VEHICLE_PRICING_PRESETS, source: 'fallback' });
+      const sanitizedPresets = isHqAdmin
+        ? DEFAULT_VEHICLE_PRICING_PRESETS
+        : DEFAULT_VEHICLE_PRICING_PRESETS.map((p) => {
+            const { driver_labor_korean, driver_labor_english, ...rest } = p as any;
+            return rest;
+          });
+      return NextResponse.json({ ok: true, presets: sanitizedPresets, source: 'fallback' });
     }
 
-    return NextResponse.json({ ok: true, presets: data || [], source: 'supabase' });
+    // Mask internal labor cost from non-HQ users (P0 Security)
+    const sanitizedRows = (data || []).map((row: any) => {
+      if (!isHqAdmin) {
+        const { driver_labor_korean, driver_labor_english, ...rest } = row;
+        return rest;
+      }
+      return row;
+    });
+
+    return NextResponse.json({ ok: true, presets: sanitizedRows, source: 'supabase' });
   } catch (err: any) {
     console.error('[PricingPresets API] Unexpected error:', err);
     return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
   }
 }
 
-export async function PUT(req: Request) {
+export async function PUT(req: NextRequest) {
   try {
+    const auth = await requireHqAdmin(req);
+    if (!auth.ok) {
+      return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
+    }
+
     const body = await req.json();
     const { id, model_name, base_fare, overtime_rate_per_hour, vehicle_only_fare, driver_labor_korean, driver_labor_english } = body;
 
@@ -57,4 +85,3 @@ export async function PUT(req: Request) {
     return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
   }
 }
-

@@ -1,23 +1,37 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
-import { cleanDriverIdentity } from '@/utils/dispatchConflictDetector';
 import { encodeScheduleMeta, hydrateRawScheduleRow } from '@/lib/dispatch/scheduleServerStore';
+import { verifyServerAuth, driverCanAccessSchedule } from '@/lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
 export type OperationStatus = 'ready' | 'arrived_pickup' | 'boarded' | 'in_transit' | 'completed';
 
-export async function POST(req: Request) {
+// Valid sequential transitions for drivers in operation lifecycle
+const VALID_NEXT_STATUSES: Record<OperationStatus, OperationStatus[]> = {
+  ready: ['arrived_pickup', 'boarded', 'in_transit'],
+  arrived_pickup: ['boarded', 'in_transit'],
+  boarded: ['in_transit', 'completed'],
+  in_transit: ['completed'],
+  completed: [], // terminal state
+};
+
+export async function POST(req: NextRequest) {
   try {
+    const auth = await verifyServerAuth(req);
+    if (!auth.ok || !auth.session) {
+      return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
+    }
+
     const body = await req.json();
-    const { scheduleId, status, changedBy, role, note } = body;
+    const { scheduleId, status, note } = body;
 
     if (!scheduleId || !status) {
       return NextResponse.json({ ok: false, error: 'scheduleId and status are required' }, { status: 400 });
     }
 
     const validStatuses: OperationStatus[] = ['ready', 'arrived_pickup', 'boarded', 'in_transit', 'completed'];
-    if (!validStatuses.includes(status)) {
+    if (!validStatuses.includes(status as OperationStatus)) {
       return NextResponse.json({ ok: false, error: `Invalid operation status: ${status}` }, { status: 400 });
     }
 
@@ -37,16 +51,33 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: '취소된 배차의 운행 상태는 변경할 수 없습니다.' }, { status: 400 });
     }
 
-    // Protection 2: Ensure only the assigned driver (or verified HQ admin) can update operation status
-    const isHqAdmin = role === 'hq' || changedBy === 'hq' || changedBy === '본사 관리자' || changedBy === '대표님';
-    const assignedDriver = cleanDriverIdentity(currentSchedule.driver_name);
-    const reqDriver = cleanDriverIdentity(changedBy);
+    // Protection 2: Server-verified Authorization (HQ Admin or assigned Driver ONLY)
+    const isHqAdmin = auth.session.role === 'hq_admin';
+    if (!isHqAdmin) {
+      const allowed = driverCanAccessSchedule(auth.session, currentSchedule);
+      if (!allowed) {
+        return NextResponse.json(
+          { ok: false, error: `본인에게 배정된 배차(${currentSchedule.driver_name})만 운행 상태를 변경할 수 있습니다.` },
+          { status: 403 }
+        );
+      }
 
-    if (!isHqAdmin && assignedDriver && reqDriver && assignedDriver !== reqDriver) {
-      return NextResponse.json(
-        { ok: false, error: `배정된 담당 기사(${currentSchedule.driver_name})만 운행 상태를 변경할 수 있습니다.` },
-        { status: 403 }
-      );
+      // Protection 3: Validate sequential operation status transition for drivers
+      const currentOpStatus = (currentSchedule.operation_status || 'ready') as OperationStatus;
+      if (currentOpStatus === status) {
+        // No-op or update note
+      } else {
+        const allowedNext = VALID_NEXT_STATUSES[currentOpStatus] || [];
+        if (!allowedNext.includes(status as OperationStatus)) {
+          return NextResponse.json(
+            {
+              ok: false,
+              error: `유효하지 않은 운행 상태 전환입니다. (현재: ${currentOpStatus} → 요청: ${status}). 순차적으로 진행해주세요.`,
+            },
+            { status: 400 }
+          );
+        }
+      }
     }
 
     const nowIso = new Date().toISOString();
@@ -54,11 +85,15 @@ export async function POST(req: Request) {
       ? currentSchedule.operation_history
       : [];
 
+    const verifiedActorName = isHqAdmin
+      ? '본사 관리자'
+      : auth.session.driverName || currentSchedule.driver_name || '담당 기사';
+
     const newHistoryEntry = {
       fromStatus: currentSchedule.operation_status || 'ready',
       toStatus: status,
       timestamp: nowIso,
-      changedBy: changedBy || currentSchedule.driver_name || '담당 기사',
+      changedBy: verifiedActorName,
       note: note || '',
     };
 
@@ -97,11 +132,10 @@ export async function POST(req: Request) {
     const { error: updateErr } = await supabaseAdmin
       .from('schedules')
       .update(updatePayload)
-      .eq('id', scheduleId)
-      .select()
-      .single();
+      .eq('id', scheduleId);
 
     if (updateErr) {
+      console.error('[OperationStatus API] Update error:', updateErr);
       return NextResponse.json({ ok: false, error: updateErr.message }, { status: 500 });
     }
 
@@ -109,9 +143,9 @@ export async function POST(req: Request) {
       ok: true,
       scheduleId,
       operationStatus: status,
-      operationUpdatedAt: nowIso,
-      operationHistory: updatedHistory,
-      pendingCustomerTrigger: nextMeta.pendingCustomerTrigger || null,
+      updatedAt: nowIso,
+      changedBy: verifiedActorName,
+      preparedCustomerAlert: shouldPrepareArrivalMsg,
     });
   } catch (err: any) {
     console.error('[OperationStatus API] Error:', err);
