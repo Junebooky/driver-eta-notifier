@@ -155,6 +155,24 @@ async function runFlightTests() {
   const resInvalid = await GET(reqInvalid);
   assert.strictEqual(resInvalid.status, 400, 'Short flight ID must return 400');
 
+  // Test 6e: Verify AF264 candidates exclude past dates (KST today and future only)
+  const reqAf = new NextRequest('http://localhost:3000/api/flight?flightId=AF264&type=arrival');
+  const resAf = await GET(reqAf);
+  const dataAf = await resAf.json();
+
+  if (resAf.status === 200 && Array.isArray(dataAf.candidates)) {
+    const todayKst = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date());
+    for (const cand of dataAf.candidates) {
+      if (cand.flightDate) {
+        assert.ok(
+          cand.flightDate >= todayKst,
+          `Candidate flight date ${cand.flightDate} must be >= today (${todayKst})`
+        );
+      }
+    }
+    console.log(`✅ AF264 past date filtering verified: all ${dataAf.candidates.length} candidates >= ${todayKst}.`);
+  }
+
   console.log('🎉 All P1 Flight Gimpo & Incheon Tests Passed 100%!\n');
 }
 

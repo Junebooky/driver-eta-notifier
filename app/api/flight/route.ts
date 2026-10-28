@@ -124,7 +124,19 @@ async function fetchIncheonFlights(
       }
     }
 
-    return items.map((bestItem: any) => {
+    // Strictly filter out past flights before today (KST)
+    const upcomingItems = items.filter((it: any) => {
+      const dtStr = it.estimatedDateTime || it.scheduleDateTime || '';
+      if (dtStr.length >= 8) {
+        const itemYmd = dtStr.slice(0, 8);
+        if (itemYmd < today.yyyymmdd) return false;
+      }
+      return true;
+    });
+
+    if (upcomingItems.length === 0) return [];
+
+    return upcomingItems.map((bestItem: any) => {
       const isTomorrow = Boolean(
         (bestItem.scheduleDateTime && bestItem.scheduleDateTime.startsWith(tomorrow.yyyymmdd)) ||
         (bestItem.estimatedDateTime && bestItem.estimatedDateTime.startsWith(tomorrow.yyyymmdd))
@@ -549,11 +561,19 @@ export async function GET(req: NextRequest) {
 
     const allCandidates = [...incheonFlights, ...gimpoFlights];
 
-    if (allCandidates.length === 0) {
+    // Strictly filter out past flights before today (KST)
+    const validCandidates = allCandidates.filter((f) => {
+      if (f.flightDate && f.flightDate < today.formatted) {
+        return false;
+      }
+      return true;
+    });
+
+    if (validCandidates.length === 0) {
       return NextResponse.json(
         {
           success: false,
-          message: `입력하신 편명 [${flightId}]의 ${
+          message: `입력하신 편명 [${flightId}]의 오늘 이후 ${
             type === 'arrival' ? '입국(도착)' : '출국(출발)'
           } 운항 정보를 인천공항 및 김포공항에서 찾을 수 없습니다. 편명 또는 탭(입국/출국) 설정을 확인해 주세요.`,
         },
@@ -561,28 +581,46 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // Deduplicate and sort chronologically (today first, then upcoming dates)
+    const seenKeys = new Set<string>();
+    const uniqueCandidates = validCandidates.filter((c) => {
+      const key = `${c.flightId}_${c.airportKind}_${c.terminalId}_${c.flightDate}_${c.scheduleTimeFormatted}`;
+      if (seenKeys.has(key)) return false;
+      seenKeys.add(key);
+      return true;
+    });
+
+    uniqueCandidates.sort((a, b) => {
+      const dateA = a.flightDate || '';
+      const dateB = b.flightDate || '';
+      if (dateA !== dateB) return dateA.localeCompare(dateB);
+      const timeA = a.scheduleTimeFormatted || '';
+      const timeB = b.scheduleTimeFormatted || '';
+      return timeA.localeCompare(timeB);
+    });
+
     // 3. Select best primary flight:
     // Prefer today's active flights closest to now
-    let bestFlight = allCandidates[0];
-    const todayActive = allCandidates.filter((f) => !f.isTomorrow);
+    let bestFlight = uniqueCandidates[0];
+    const todayActive = uniqueCandidates.filter((f) => f.flightDate === today.formatted);
 
     if (todayActive.length > 0) {
       bestFlight = todayActive[0];
     } else {
-      bestFlight = allCandidates[0];
+      bestFlight = uniqueCandidates[0];
     }
 
     // Cache result
     flightCache.set(cacheKey, {
       flight: bestFlight,
-      candidates: allCandidates,
+      candidates: uniqueCandidates,
       timestamp: Date.now(),
     });
 
     return NextResponse.json({
       success: true,
       flight: bestFlight,
-      candidates: allCandidates,
+      candidates: uniqueCandidates,
       cached: false,
     });
   } catch (error: any) {

@@ -10,7 +10,6 @@ import {
   Copy,
   AlertCircle,
   RefreshCw,
-  Navigation,
 } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 import {
@@ -22,11 +21,25 @@ import {
 
 const LAST_FLIGHT_SEARCH_KEY = 'cockpit_last_flight_search_v1';
 
+function formatCandidateDateText(flightDate?: string): string {
+  if (!flightDate) return '';
+  const parts = flightDate.split('-');
+  if (parts.length === 3) {
+    const month = parseInt(parts[1], 10);
+    const day = parseInt(parts[2], 10);
+    const dt = new Date(`${flightDate}T12:00:00+09:00`);
+    const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+    const dayName = !isNaN(dt.getDay()) ? `(${dayNames[dt.getDay()]})` : '';
+    return `${month}.${day}${dayName}`;
+  }
+  return flightDate;
+}
+
 interface FlightModalProps {
   isOpen: boolean;
   onClose: () => void;
   profile: DriverProfile;
-  onSelectDestination: (preset: LocationPreset) => void;
+  onSelectDestination?: (preset: LocationPreset) => void;
   initialFlightId?: string;
   initialType?: FlightType;
 }
@@ -120,7 +133,10 @@ export const FlightModal: React.FC<FlightModalProps> = ({
       }
 
       setFlight(data.flight);
-      const candList: FlightInfo[] = Array.isArray(data.candidates) ? data.candidates : [data.flight];
+      const rawCands: FlightInfo[] = Array.isArray(data.candidates) ? data.candidates : [data.flight];
+      // Filter out any flight dates earlier than today (KST)
+      const todayFormatted = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date());
+      const candList = rawCands.filter((c) => !c.flightDate || c.flightDate >= todayFormatted);
       setCandidates(candList);
 
       // Save search term and type into localStorage for session persistence
@@ -184,13 +200,7 @@ export const FlightModal: React.FC<FlightModalProps> = ({
     window.location.href = 'kakaotalk://';
   };
 
-  // Connect destination preset to Navigation
-  const handleConnectNavigation = () => {
-    if (!flight) return;
-    haptics.success();
-    onSelectDestination(flight.targetPreset);
-    onClose();
-  };
+
 
   if (!isOpen) return null;
 
@@ -363,26 +373,26 @@ export const FlightModal: React.FC<FlightModalProps> = ({
                               : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
                           }`}
                         >
-                          <div className="flex items-center gap-1.5">
-                            <span
-                              className={`px-1.5 py-0.5 rounded text-[10px] font-black ${
-                                cand.airportKind === 'GMP'
-                                  ? 'bg-indigo-100 text-indigo-700'
-                                  : 'bg-blue-100 text-[#1E60F3]'
-                              }`}
-                            >
-                              {cand.airportKind === 'GMP' ? '김포' : '인천'} {cand.terminal}
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-xs font-bold text-slate-600 tracking-tight shrink-0">
+                              {formatCandidateDateText(cand.flightDate)}
                             </span>
-                            <span className="font-extrabold">{cand.flightId}</span>
-                            <span className="text-slate-500 font-normal">({cand.airport})</span>
+                            <span className="font-extrabold text-slate-900 shrink-0">{cand.flightId}</span>
+                            <span className="text-slate-500 font-normal truncate">({cand.airport})</span>
                           </div>
-                          <div className="text-right">
-                            <span className="font-bold">
+                          <div className="text-right shrink-0 ml-2">
+                            <span className="font-bold text-slate-900">
                               {cand.estimatedTimeFormatted || cand.scheduleTimeFormatted}
                             </span>
-                            <span className="text-[10px] text-slate-500 ml-1">
-                              ({cand.statusText.split(' ')[1] || '운항'})
-                            </span>
+                            {(() => {
+                              const match = cand.statusText?.match(/\((.*?)\)/);
+                              const shortStatus = match ? match[1].split(' ')[0] : '운항';
+                              return (
+                                <span className="text-[11px] text-slate-500 ml-1 font-medium">
+                                  ({shortStatus})
+                                </span>
+                              );
+                            })()}
                           </div>
                         </button>
                       );
@@ -654,35 +664,28 @@ export const FlightModal: React.FC<FlightModalProps> = ({
           )}
         </div>
 
-        {/* Footer Actions: [내비 목적지 설정] + [확인] + [카톡] */}
+        {/* Footer Actions: [확인] + [카톡] */}
         {flight && (
           <div className="p-3.5 bg-white border-t border-slate-100 shrink-0">
             <div className="flex gap-2">
-              {/* Navigation Connection Action */}
+              {/* Confirm Action */}
               <button
                 type="button"
-                onClick={handleConnectNavigation}
-                className="flex-1 h-12 bg-[#1E60F3] hover:bg-[#1650D6] active:scale-98 text-white font-bold rounded-2xl text-xs sm:text-sm flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-md shadow-blue-500/20"
-                title={`${flight.targetPreset.name} (으)로 내비 목적지 설정`}
+                onClick={() => {
+                  haptics.lightTap();
+                  onClose();
+                }}
+                className="flex-1 h-12 bg-[#1E60F3] hover:bg-[#1650D6] active:scale-98 text-white font-bold rounded-2xl text-sm flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-md shadow-blue-500/20"
               >
-                <Navigation className="w-4 h-4 text-white shrink-0" />
-                <span>내비 목적지로 설정</span>
-              </button>
-
-              {/* Confirm / Close */}
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 h-12 border border-slate-200 bg-slate-50 hover:bg-slate-100 active:scale-98 text-slate-700 font-bold rounded-2xl text-xs sm:text-sm flex items-center justify-center cursor-pointer transition-all shrink-0"
-              >
-                닫기
+                <Check className="w-4 h-4 text-white stroke-[2.5]" />
+                <span>확인</span>
               </button>
 
               {/* KakaoTalk Direct Action */}
               <button
                 type="button"
                 onClick={handleOpenKakaoTalk}
-                className="w-14 h-12 bg-[#FEE500] hover:bg-[#FDD835] active:scale-95 text-[#191919] rounded-2xl font-black text-xs flex items-center justify-center gap-1 cursor-pointer transition-all shadow-2xs shrink-0"
+                className="w-16 h-12 bg-[#FEE500] hover:bg-[#FDD835] active:scale-95 text-[#191919] rounded-2xl font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-2xs shrink-0"
                 title="단톡방 보고서 복사 및 카카오톡 실행"
               >
                 <svg className="w-3.5 h-3.5 fill-[#191919] shrink-0" viewBox="0 0 24 24">
