@@ -50,10 +50,17 @@ export async function GET(req: NextRequest) {
       if (error || !data || data.length === 0) {
         return NextResponse.json({ drivers: Object.values(DRIVER_DEFAULTS), fallback: true });
       }
-      const enriched = data.map((d: any) => ({
-        ...d,
-        passenger_name: d.passenger_name ?? null,
-      }));
+      const enriched = data
+        .filter(
+          (d: any) =>
+            d.vehicle_no &&
+            d.vehicle_no !== '미배정' &&
+            d.vehicle_no !== 'unassigned'
+        )
+        .map((d: any) => ({
+          ...d,
+          passenger_name: d.passenger_name ?? null,
+        }));
       return NextResponse.json({ drivers: enriched, fallback: false });
     }
 

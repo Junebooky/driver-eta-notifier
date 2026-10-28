@@ -9,6 +9,7 @@ import {
   RefreshCw,
   Mail,
   Layers,
+  AlertTriangle,
 } from 'lucide-react';
 import { HqKpiMetric } from '@/types/hq';
 import { haptics } from '@/utils/haptics';
@@ -24,31 +25,42 @@ export const HqKpiTiles: React.FC<HqKpiTilesProps> = ({
   activeFilter,
   onSelectMetric,
 }) => {
-  const getIcon = (type: HqKpiMetric['iconType']) => {
-    switch (type) {
+  const getIcon = (m: HqKpiMetric) => {
+    const colorClass =
+      m.urgencyLevel === 'urgent' && m.count > 0
+        ? 'text-rose-600'
+        : m.urgencyLevel === 'warning' && m.count > 0
+        ? 'text-amber-600'
+        : 'text-[#1E60F3]';
+
+    switch (m.iconType) {
       case 'calendar':
-        return <Calendar className="w-4 h-4 text-[#1E60F3]" />;
+        return <Calendar className={`w-4 h-4 ${colorClass}`} />;
       case 'users':
-        return <Users className="w-4 h-4 text-[#1E60F3]" />;
+        return <Users className={`w-4 h-4 ${colorClass}`} />;
       case 'document':
-        return <FileText className="w-4 h-4 text-[#1E60F3]" />;
+        return <FileText className={`w-4 h-4 ${colorClass}`} />;
       case 'send':
-        return <Send className="w-4 h-4 text-[#1E60F3]" />;
+        return <Send className={`w-4 h-4 ${colorClass}`} />;
       case 'refresh':
-        return <RefreshCw className="w-4 h-4 text-[#1E60F3]" />;
+        return <RefreshCw className={`w-4 h-4 ${colorClass}`} />;
+      case 'clipboard':
+        return <AlertTriangle className={`w-4 h-4 ${colorClass}`} />;
       case 'mail':
-        return <Mail className="w-4 h-4 text-[#1E60F3]" />;
+        return <Mail className={`w-4 h-4 ${colorClass}`} />;
       case 'group':
-        return <Layers className="w-4 h-4 text-[#1E60F3]" />;
+        return <Layers className={`w-4 h-4 ${colorClass}`} />;
       default:
-        return <Calendar className="w-4 h-4 text-[#1E60F3]" />;
+        return <Calendar className={`w-4 h-4 ${colorClass}`} />;
     }
   };
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 w-full">
+    <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-2.5 sm:gap-3 w-full">
       {metrics.map((m) => {
         const isSelected = activeFilter === m.id;
+        const isUrgentActive = m.urgencyLevel === 'urgent' && m.count > 0;
+        const isWarningActive = m.urgencyLevel === 'warning' && m.count > 0;
 
         return (
           <div
@@ -66,15 +78,27 @@ export const HqKpiTiles: React.FC<HqKpiTilesProps> = ({
                 onSelectMetric(m.id);
               }
             }}
-            className={`p-4 rounded-2xl border transition-all text-left cursor-pointer group active:scale-[0.98] flex items-center gap-3.5 bg-white shadow-xs ${
+            className={`p-3 sm:p-4 rounded-2xl border transition-all text-left cursor-pointer group active:scale-[0.98] flex items-center gap-3 bg-white shadow-xs ${
               isSelected
                 ? 'border-[#1E60F3] ring-2 ring-blue-100 bg-blue-50/30'
+                : isUrgentActive
+                ? 'border-rose-300 bg-rose-50/20 hover:border-rose-400'
+                : isWarningActive
+                ? 'border-amber-200 hover:border-amber-400'
                 : 'border-slate-200/80 hover:border-blue-400 hover:shadow-sm'
             }`}
           >
-            {/* Circular Blue Icon */}
-            <div className="w-10 h-10 rounded-full bg-blue-50/90 text-[#1E60F3] flex items-center justify-center shrink-0 border border-blue-100/60 shadow-2xs">
-              {getIcon(m.iconType)}
+            {/* Circular Icon */}
+            <div
+              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shrink-0 border shadow-2xs ${
+                isUrgentActive
+                  ? 'bg-rose-50 border-rose-200'
+                  : isWarningActive
+                  ? 'bg-amber-50 border-amber-200'
+                  : 'bg-blue-50/90 border-blue-100/60'
+              }`}
+            >
+              {getIcon(m)}
             </div>
 
             {/* Metric Labels */}
@@ -83,7 +107,15 @@ export const HqKpiTiles: React.FC<HqKpiTilesProps> = ({
                 {m.title}
               </span>
               <div className="flex items-baseline gap-0.5 mt-0.5 leading-tight">
-                <span className="text-xl font-black text-slate-900 tracking-tight">
+                <span
+                  className={`text-lg sm:text-xl font-black tracking-tight ${
+                    isUrgentActive
+                      ? 'text-rose-600'
+                      : isWarningActive
+                      ? 'text-amber-700'
+                      : 'text-slate-900'
+                  }`}
+                >
                   {m.count}
                 </span>
                 <span className="text-xs font-black text-slate-900">건</span>

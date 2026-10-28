@@ -28,12 +28,15 @@ export interface ScheduleItem {
   waypoints?: LocationPreset[];
   adminWaypoints?: LocationPreset[];
   isAdminRoute?: boolean;
-  // Dispatch Lifecycle & Acknowledgment (Issue #25)
+  // Dispatch Lifecycle & Acknowledgment (Issue #25 & HQ-Driver Sync)
   org_id?: string;
   driver_id?: string;
   driver_name?: string;
+  driver_phone?: string;
   vehicle_id?: string;
-  dispatch_status?: 'draft' | 'published' | 'cancelled';
+  vehicle_model?: string;
+  vehicle_plate?: string;
+  dispatch_status?: 'unassigned' | 'draft' | 'published' | 'cancelled';
   version?: number;
   place_verified?: boolean;
   published_at?: string;
@@ -41,6 +44,30 @@ export interface ScheduleItem {
   last_ack_version?: number;
   last_ack_at?: string;
   isAcknowledged?: boolean;
+  // HQ Shared Reservation & Event Group Linkage
+  booking_no?: string;
+  customer_name?: string;
+  customer_id?: string;
+  ordering_agency?: string;
+  end_brand?: string;
+  event_id?: string;
+  event_name?: string;
+  billing_target?: 'ordering_agency' | 'end_brand' | 'custom';
+  billing_target_name?: string;
+  group_id?: string;
+  group_name?: string;
+  group_total_vehicles?: number;
+  group_vehicle_index?: number;
+  passenger_count?: number;
+  intake_source?: 'phone' | 'email' | 'quick_dispatch' | 'manual' | 'seed';
+  customer_brochure?: '미생성' | '미발송' | '발송됨' | '재발송 필요' | '실패';
+  requested_language?: 'ko' | 'en' | 'other';
+  language_override_confirmed?: boolean;
+  service_mode?: 'with_driver' | 'vehicle_only';
+  applied_pricing_snapshot?: Record<string, unknown>;
+  cancel_reason?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 /**

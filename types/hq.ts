@@ -50,6 +50,22 @@ export interface HqBooking {
   languageOverrideConfirmed?: boolean;
   serviceMode?: ServiceIncludeMode;
   appliedPricingSnapshot?: AppliedPricingSnapshot;
+  // Shared Server Schedule & Lifecycle Sync (HQ <-> Driver Cockpit)
+  scheduleId?: string;
+  vehicleNoKey?: string;
+  intakeSource?: 'phone' | 'email' | 'quick_dispatch' | 'manual' | 'seed';
+  flightNumber?: string;
+  version?: number;
+  lastAckVersion?: number;
+  lastAckAt?: string;
+  publishedAt?: string;
+  publishedBy?: string;
+  placeVerified?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  cancelReason?: string;
+  hasConflict?: boolean;
+  conflictMessages?: string[];
 }
 
 

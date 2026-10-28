@@ -1,57 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase/server';
+import { cancelServerSchedule } from '@/lib/dispatch/scheduleServerStore';
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { scheduleId, reason = '고객 요청 취소', cancelledBy = 'HQ_MANAGER' } = body;
+    const {
+      scheduleId,
+      reason = '고객 요청 취소',
+      cancelledBy = '본사 관리자',
+    } = body;
 
     if (!scheduleId) {
-      return NextResponse.json({ error: 'scheduleId is required' }, { status: 400 });
+      return NextResponse.json({ ok: false, error: 'scheduleId is required' }, { status: 400 });
     }
 
-    const nowIso = new Date().toISOString();
+    const result = await cancelServerSchedule({
+      scheduleId,
+      reason,
+      cancelledBy,
+    });
 
-    // Fetch existing schedule to bump version
-    const { data: existing, error: fetchError } = await supabaseAdmin
-      .from('schedules')
-      .select('version')
-      .eq('id', scheduleId)
-      .single();
-
-    if (fetchError || !existing) {
-      return NextResponse.json({ error: 'Schedule not found' }, { status: 404 });
-    }
-
-    const nextVersion = (existing.version || 1) + 1;
-
-    const { data: updated, error: updateError } = await supabaseAdmin
-      .from('schedules')
-      .update({
-        dispatch_status: 'cancelled',
-        status: 'cancelled',
-        version: nextVersion,
-        protocol_notes: `[배차 취소 사유: ${reason} (처리자: ${cancelledBy})]`,
-        updated_at: nowIso,
-      })
-      .eq('id', scheduleId)
-      .select('*')
-      .single();
-
-    if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 500 });
+    if (result.error) {
+      return NextResponse.json(
+        { ok: false, error: result.error },
+        { status: result.statusCode || 400 }
+      );
     }
 
     return NextResponse.json({
       ok: true,
       scheduleId,
-      version: nextVersion,
+      version: result.version,
       dispatchStatus: 'cancelled',
-      cancelledAt: nowIso,
-      schedule: updated,
+      cancelledAt: result.cancelledAt,
+      schedule: result.schedule,
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }

@@ -31,22 +31,26 @@ import {
   getEmailSettings,
   saveEmailSettings,
   setEmailStatusOverride,
-  convertDraftToHqBooking,
 } from '@/utils/emailHqStorage';
 import { haptics } from '@/utils/haptics';
 import { HqComposeEmailModal } from './HqComposeEmailModal';
+import { DEFAULT_DRIVER_PROFILES } from '@/utils/settlementCalculator';
+import { VIP_REAL_VEHICLES, stripManufacturerName } from '@/utils/vehicleData';
+import { getKstTodayDateStr, mapScheduleItemToHqBooking } from '@/utils/dispatchConflictDetector';
 
 export interface HqEmailInboxViewProps {
   onCreateBooking?: (booking: HqBooking) => void;
+  onSavedServer?: () => Promise<void> | void;
 }
 
-const AVAILABLE_DRIVERS = [
-  { name: '윤태준', phone: '010-8842-1920', vehicle: '현대 스타리아 리무진', plate: '116허 1514', available: true },
-  { name: '김민수', phone: '010-3829-4821', vehicle: '벤츠 S560', plate: '01호 3343', available: true },
-  { name: '이재훈', phone: '010-9182-3746', vehicle: '기아 카니발 하이리무진', plate: '193호 5336', available: true },
-  { name: '박서연', phone: '010-7281-9304', vehicle: '제네시스 G90 리무진', plate: '102부 4280', available: true },
-  { name: '정태훈', phone: '010-5542-1928', vehicle: '벤츠 스프린터 519 CDI', plate: '703서 2658', available: true },
-];
+const AVAILABLE_DRIVERS = DEFAULT_DRIVER_PROFILES.map((d) => ({
+  id: d.id,
+  name: d.name,
+  phone: d.phone,
+  vehicle: d.defaultVehicleRaw,
+  plate: d.plate,
+  isEnglishVerified: d.isEnglishVerified,
+}));
 
 // Module-level client cache container to eliminate tab-switch latency and provide 0ms instant display
 interface ClientEmailStore {
@@ -87,7 +91,7 @@ function setStoreEmailDetail(id: string, detail: HqEmailDetail) {
   clientEmailStore.detailMap.set(id, detail);
 }
 
-export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({ onCreateBooking }) => {
+export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({ onCreateBooking, onSavedServer }) => {
   // Sync email drafts from external store (SSR and hydration safe)
   const storedDrafts = useSyncExternalStore(
     subscribeEmailStorage,
@@ -449,7 +453,7 @@ VIP LIMOUSINE KOREA 종합관제팀 드림`;
   const handleCreateManualDraft = () => {
     if (!selectedEmailId) return;
     const target = emails.find((e) => e.id === selectedEmailId);
-    const today = new Date().toISOString().split('T')[0];
+    const today = getKstTodayDateStr();
     const blankDraft: HqEmailExtractedDraft = {
       id: `draft_${Date.now()}`,
       emailId: selectedEmailId,
@@ -458,9 +462,9 @@ VIP LIMOUSINE KOREA 종합관제팀 드림`;
       passengerCount: 1,
       luggageCount: 1,
       pickupDate: today,
-      pickupTime: '14:00',
-      pickupLocation: '인천국제공항 제2여객터미널',
-      dropoffLocation: '서울 시청 / 신라호텔',
+      pickupTime: '09:00',
+      pickupLocation: '',
+      dropoffLocation: '',
       flightNumber: '',
       requestedVehicleClass: '카니발 하이리무진',
       specialRequests: '',
@@ -480,7 +484,7 @@ VIP LIMOUSINE KOREA 종합관제팀 드림`;
     showToast('수동 배차 초안이 생성되었습니다. 우측에서 정보를 입력해주세요.');
   };
 
-  // Handle Save Draft
+  // Handle Save Draft (Local email draft workspace)
   const handleSaveDraft = () => {
     if (!activeDraft) return;
     haptics.selection();
@@ -489,28 +493,90 @@ VIP LIMOUSINE KOREA 종합관제팀 드림`;
     showToast('예약 초안이 안전하게 저장되었습니다.');
   };
 
-  // Handle Publish & Dispatch Booking
-  const handlePublishBooking = () => {
+  // Persist Email Booking to Shared Server Dispatch Storage ('unassigned' intake OR 'published' confirmation)
+  const handlePersistEmailBooking = async (mode: 'unassigned' | 'published') => {
     if (!activeDraft) return;
-    haptics.success();
 
-    const result = convertDraftToHqBooking(activeDraft);
-    if (!result.success || !result.booking) {
-      alert(result.error || '필수 배차 정보를 모두 입력해주세요.');
+    if (!activeDraft.pickupDate || !activeDraft.pickupTime || !activeDraft.pickupLocation?.trim() || !activeDraft.dropoffLocation?.trim()) {
+      alert('운행 일자, 픽업 시간, 출발지, 도착지 정보를 모두 확인해주세요.');
       return;
     }
 
-    // Call parent handler to insert into live HQ Bookings state
-    if (onCreateBooking) {
-      onCreateBooking(result.booking);
+    if (mode === 'published' && (!activeDraft.assignedDriver || !activeDraft.assignedVehiclePlate)) {
+      alert('즉시 배차 확정을 위해 담당 기사와 배차 차량을 선택해주세요.\n사모님이 먼저 예약만 접수하시려면 [배차 대기함 등록(미배정)] 버튼을 눌러주세요.');
+      return;
     }
 
-    // Update draft status
-    const updatedDraft = { ...activeDraft, status: 'published' as const };
-    saveEmailDraft(updatedDraft);
-    setDraftEdits(null);
+    const matchedDriver = activeDraft.assignedDriver
+      ? AVAILABLE_DRIVERS.find((d) => d.name === activeDraft.assignedDriver)
+      : undefined;
+    const matchedVehicle = activeDraft.assignedVehiclePlate
+      ? VIP_REAL_VEHICLES.find((v) => v.plate === activeDraft.assignedVehiclePlate)
+      : undefined;
 
-    showToast(`예약 [${result.booking.bookingNo}]이(가) 배차 목록에 성공적으로 등록되었습니다!`);
+    const inferredCustomer =
+      emailDetail?.from.name?.trim() ||
+      activeDraft.passengerName?.trim() ||
+      '이메일 예약 고객';
+
+    try {
+      const res = await fetch('/api/schedules/dispatch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerName: inferredCustomer,
+          intakeSource: 'email',
+          date: activeDraft.pickupDate,
+          pickupTime: activeDraft.pickupTime,
+          origin: activeDraft.pickupLocation.trim(),
+          destination: activeDraft.dropoffLocation.trim(),
+          passengerName: activeDraft.passengerName?.trim() || inferredCustomer,
+          passengerPhone: activeDraft.passengerPhone?.trim() || undefined,
+          passengerCount: activeDraft.passengerCount || 1,
+          flightNumber: activeDraft.flightNumber?.trim() || undefined,
+          notes: activeDraft.specialRequests?.trim() || `[이메일 접수] ${emailDetail?.subject || ''}`.trim(),
+          driverId: mode === 'published' ? matchedDriver?.id : undefined,
+          driverName: mode === 'published' ? activeDraft.assignedDriver : undefined,
+          driverPhone: mode === 'published' ? matchedDriver?.phone : undefined,
+          vehicleNo: mode === 'published' ? activeDraft.assignedVehiclePlate : undefined,
+          vehiclePlate: mode === 'published' ? activeDraft.assignedVehiclePlate : undefined,
+          vehicleModel: mode === 'published' ? matchedVehicle?.model || activeDraft.assignedVehicle : undefined,
+          dispatchStatus: mode,
+          allowUnverified: true,
+          publishedBy: mode === 'unassigned' ? '사모님(이메일접수)' : '대표님(배차확정)',
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok || !data.schedule) {
+        alert(data.error || '서버 배차 등록에 실패했습니다. 일정 충돌 또는 입력값을 확인해주세요.');
+        haptics.errorAlert();
+        return;
+      }
+
+      const savedBooking = mapScheduleItemToHqBooking(data.schedule, 0);
+      haptics.success();
+
+      const updatedDraft = { ...activeDraft, status: 'published' as const };
+      saveEmailDraft(updatedDraft);
+      setDraftEdits(null);
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('vip_hq_schedules_updated'));
+      }
+      await onSavedServer?.();
+      onCreateBooking?.(savedBooking);
+
+      showToast(
+        mode === 'unassigned'
+          ? `이메일 예약 [${savedBooking.bookingNo}]이 배차 대기함(미배정)에 공유 등록되었습니다!`
+          : `이메일 예약 [${savedBooking.bookingNo}]이 배차 확정되어 ${activeDraft.assignedDriver} 기사님 Cockpit에 전송되었습니다!`
+      );
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : '네트워크 오류';
+      alert(`서버 저장 중 오류가 발생했습니다: ${msg}`);
+      haptics.errorAlert();
+    }
   };
 
   // Toggle Auto AI Candidate Analysis
@@ -1199,14 +1265,11 @@ VIP LIMOUSINE KOREA 종합관제팀 드림`;
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 text-xs font-black text-[#0B1E48]">
                     <User className="w-4 h-4 text-[#1E60F3]" />
-                    <span>배차 수동 지정 (관리자 전용)</span>
+                    <span>차량 · 기사 배정 (선택 시 즉시 배차 / 미선택 시 대기함 등록)</span>
                   </div>
-                  <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-md">
-                    AI 자동 배차 불가 규약
-                  </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                   <div>
                     <label className="block text-[10px] font-bold text-slate-700 mb-0.5">담당 기사 선택</label>
                     <select
@@ -1221,71 +1284,93 @@ VIP LIMOUSINE KOREA 종합관제팀 드림`;
                       }}
                       className="w-full px-2 py-1.5 bg-white border border-blue-300 rounded-lg text-slate-900 font-bold focus:ring-2 focus:ring-blue-500"
                     >
-                      <option value="">-- 기사 선택 (미배정) --</option>
+                      <option value="">-- 미배정 (배차 대기함 등록) --</option>
                       {AVAILABLE_DRIVERS.map((d) => (
                         <option key={d.name} value={d.name}>
-                          {d.name} 기사 ({d.plate} · {d.vehicle})
+                          {d.isEnglishVerified ? '[영어] ' : '[국문] '}
+                          {d.name} 기사 ({d.plate} · {stripManufacturerName(d.vehicle)})
                         </option>
                       ))}
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-700 mb-0.5">배차 차량 번호</label>
-                    <input
-                      type="text"
+                    <label className="block text-[10px] font-bold text-slate-700 mb-0.5">투입 차량 선택</label>
+                    <select
                       value={activeDraft.assignedVehiclePlate || ''}
-                      onChange={(e) => updateDraft({ assignedVehiclePlate: e.target.value })}
-                      placeholder="예: 116허 1514"
+                      onChange={(e) => {
+                        const veh = VIP_REAL_VEHICLES.find((v) => v.plate === e.target.value);
+                        updateDraft({
+                          assignedVehiclePlate: e.target.value || null,
+                          assignedVehicle: veh?.model || activeDraft.assignedVehicle,
+                        });
+                      }}
                       className="w-full px-2 py-1.5 bg-white border border-blue-300 rounded-lg text-slate-900 font-bold focus:ring-2 focus:ring-blue-500"
-                    />
+                    >
+                      <option value="">-- 차량 미선정 --</option>
+                      {VIP_REAL_VEHICLES.map((v) => (
+                        <option key={v.id} value={v.plate}>
+                          {v.plate} · {stripManufacturerName(v.model)}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 
                 <p className="text-[10px] text-slate-500 leading-tight">
-                  * 본사 승인 전에는 기사에게 일정 통보 및 브로셔가 발송되지 않습니다.
+                  * 사모님은 차량·기사 선택 없이 <strong>[배차 대기함 등록(미배정)]</strong>을 누르면 대표님 스마트폰 대기함에 바로 공유됩니다.
                 </p>
               </div>
 
               {/* Action Buttons */}
-              <div className="pt-2 flex items-center justify-between gap-2 border-t border-slate-100">
+              <div className="pt-2 space-y-2 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => handleTriggerAiAnalysis()}
-                  disabled={isAnalyzingAi}
-                  className="flex items-center gap-1 px-2.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                  onClick={() => handlePersistEmailBooking('unassigned')}
+                  className="w-full py-2 px-3 rounded-xl border-2 border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100 text-indigo-900 text-xs font-black transition-all cursor-pointer"
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                  <span>AI 재분석</span>
+                  배차 대기함 등록 · 미배정 (사모님 이메일 접수)
                 </button>
 
-                <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                <div className="flex items-center justify-between gap-1.5 flex-wrap">
                   <button
                     type="button"
-                    onClick={handleSendBookingNotificationEmail}
-                    className="flex items-center gap-1 px-2.5 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#1E60F3] border border-blue-200 text-xs font-bold transition-all cursor-pointer"
-                    title="고객에게 배차 확정 안내 메일을 작성하여 발송합니다."
+                    onClick={() => handleTriggerAiAnalysis()}
+                    disabled={isAnalyzingAi}
+                    className="flex items-center gap-1 px-2.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
                   >
-                    <Mail className="w-3.5 h-3.5" />
-                    <span>고객 안내 발송</span>
+                    <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                    <span>AI 재분석</span>
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={handleSaveDraft}
-                    className="px-3 py-2 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all cursor-pointer"
-                  >
-                    초안 저장
-                  </button>
+                  <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                    <button
+                      type="button"
+                      onClick={handleSendBookingNotificationEmail}
+                      className="flex items-center gap-1 px-2.5 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#1E60F3] border border-blue-200 text-xs font-bold transition-all cursor-pointer"
+                      title="고객에게 배차 확정 안내 메일을 작성하여 발송합니다."
+                    >
+                      <Mail className="w-3.5 h-3.5" />
+                      <span>고객 안내</span>
+                    </button>
 
-                  <button
-                    type="button"
-                    onClick={handlePublishBooking}
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white text-xs font-bold shadow-md transition-all cursor-pointer"
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>배차 등록 전송</span>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveDraft}
+                      className="px-2.5 py-2 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all cursor-pointer"
+                    >
+                      초안 저장
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handlePersistEmailBooking('published')}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white text-xs font-black shadow-md transition-all cursor-pointer"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>배차 확정 · 기사 전송</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

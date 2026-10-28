@@ -191,7 +191,7 @@ export interface DbScheduleRow {
   driver_id?: string | null;
   driver_name?: string | null;
   vehicle_id?: string | null;
-  dispatch_status?: 'draft' | 'published' | 'cancelled';
+  dispatch_status?: 'unassigned' | 'draft' | 'published' | 'cancelled';
   version?: number;
   place_verified?: boolean;
   published_at?: string | null;

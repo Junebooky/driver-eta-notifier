@@ -9,7 +9,7 @@ import { EditScheduleModal } from '@/components/EditScheduleModal';
 import { ScheduleFormModal } from '@/components/ScheduleFormModal';
 import { Camera, Send, AlertCircle, Sparkles, RefreshCw, Bot, Copy, Check, X, Plus, CalendarPlus } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
-import { ENABLE_DEV_FLEET_SWITCHER } from '@/utils/constants';
+import { ENABLE_DEV_FLEET_SWITCHER, FLEET_PRESET_DRIVERS } from '@/utils/constants';
 import { generateNameCandidates } from '@/utils/nameMatcher';
 import { parseVehicleDetails } from '@/components/ProfileModal';
 
@@ -191,8 +191,8 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
   const fetchCounts = useCallback(async () => {
     try {
       const [schedRes, driverRes] = await Promise.all([
-        fetch('/api/schedules?vehicle_no=all'),
-        fetch('/api/driver?all=true'),
+        fetch('/api/schedules?vehicle_no=all&include_cancelled=1', { cache: 'no-store' }),
+        fetch('/api/driver?all=true', { cache: 'no-store' }),
       ]);
 
       const vehicleSet = new Set<string>(['1호차', '2호차', '4호차', '8호차']);
@@ -207,14 +207,31 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
         all: 0,
       };
 
+      const isValidVehicleTab = (val?: string | null) => {
+        if (!val) return false;
+        const t = val.trim();
+        return Boolean(t && t !== '미배정' && t !== 'unassigned');
+      };
+
       if (schedRes.ok) {
         const data = await schedRes.json();
         if (data.schedules) {
           counts.all = data.schedules.length;
           data.schedules.forEach((s: ScheduleItem) => {
-            const v = s.vehicle_no || '4호차';
+            const v = (s.vehicle_no || '').trim();
+            if (!isValidVehicleTab(v)) return;
             vehicleSet.add(v);
             counts[v] = (counts[v] || 0) + 1;
+
+            // Also attribute to dedicated Fleet Hocha if dispatched by plate/driver name (e.g., '윤태준' -> '4호차')
+            if (s.driver_name) {
+              const matchedHocha = FLEET_PRESET_DRIVERS.find(
+                (p) => p.driverName === s.driver_name && p.vehicleNo !== v
+              );
+              if (matchedHocha) {
+                counts[matchedHocha.vehicleNo] = (counts[matchedHocha.vehicleNo] || 0) + 1;
+              }
+            }
           });
         }
       }
@@ -223,7 +240,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
         const dData = await driverRes.json();
         if (Array.isArray(dData.drivers)) {
           dData.drivers.forEach((d: any) => {
-            if (d.vehicle_no) {
+            if (isValidVehicleTab(d.vehicle_no)) {
               vehicleSet.add(d.vehicle_no);
               if (counts[d.vehicle_no] === undefined) {
                 counts[d.vehicle_no] = 0;
@@ -234,6 +251,10 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
       }
 
       const sortedVehicles = Array.from(vehicleSet).sort((a, b) => {
+        const isHochaA = a.endsWith('호차');
+        const isHochaB = b.endsWith('호차');
+        if (isHochaA && !isHochaB) return -1;
+        if (!isHochaA && isHochaB) return 1;
         const numA = parseInt(a.replace(/\D/g, ''), 10) || 999;
         const numB = parseInt(b.replace(/\D/g, ''), 10) || 999;
         return numA - numB;
@@ -248,17 +269,18 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
 
   const fetchSchedulesForVehicle = useCallback(async (vNo: string) => {
     try {
-      const res = await fetch(`/api/schedules?vehicle_no=${encodeURIComponent(vNo)}`);
+      const res = await fetch(
+        `/api/schedules?vehicle_no=${encodeURIComponent(vNo)}&include_cancelled=1`,
+        { cache: 'no-store' }
+      );
       if (res.ok) {
         const data = await res.json();
         if (data.schedules) {
           setSchedules(sortSchedulesChronologically(data.schedules));
           if (vNo === 'all') {
             setScheduleTitle('전체 호차 통합 관제 배차표');
-          } else if (vNo.includes('4')) {
-            setScheduleTitle('4호차 페라리 VIP 의전 배차표');
           } else {
-            setScheduleTitle(`${vNo} VIP 의전 배차표`);
+            setScheduleTitle(`${vNo} 확정 의전 배차 스케줄`);
           }
         }
       }
@@ -272,15 +294,33 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
   }, [fetchCounts]);
 
   useEffect(() => {
-    if (!ENABLE_DEV_FLEET_SWITCHER) {
-      // Production Rule: Strictly locked to driver's own vehicle
-      const lockV = profile.vehicleNo?.match(/(\d+호차)/)?.[1] || '4호차';
-      setSelectedVehicleFilter(lockV);
-      fetchSchedulesForVehicle(lockV);
-    } else {
-      fetchSchedulesForVehicle(selectedVehicleFilter);
+    const activeTargetVehicle = !ENABLE_DEV_FLEET_SWITCHER
+      ? profile.vehicleNo?.match(/(\d+호차)/)?.[1] || profile.carNumber || '4호차'
+      : selectedVehicleFilter;
+
+    if (!ENABLE_DEV_FLEET_SWITCHER && selectedVehicleFilter !== activeTargetVehicle) {
+      setSelectedVehicleFilter(activeTargetVehicle);
     }
-  }, [selectedVehicleFilter, profile.vehicleNo, fetchSchedulesForVehicle]);
+    fetchSchedulesForVehicle(activeTargetVehicle);
+
+    const syncDriverSchedules = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      fetchSchedulesForVehicle(activeTargetVehicle);
+      fetchCounts();
+    };
+
+    const intervalId = window.setInterval(syncDriverSchedules, 8000);
+    window.addEventListener('focus', syncDriverSchedules);
+    document.addEventListener('visibilitychange', syncDriverSchedules);
+    window.addEventListener('vip_hq_schedules_updated', syncDriverSchedules);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', syncDriverSchedules);
+      document.removeEventListener('visibilitychange', syncDriverSchedules);
+      window.removeEventListener('vip_hq_schedules_updated', syncDriverSchedules);
+    };
+  }, [selectedVehicleFilter, profile.vehicleNo, profile.carNumber, fetchSchedulesForVehicle, fetchCounts]);
 
   // Copilot Thinking & Typewriter States
   const [thinkingStep, setThinkingStep] = useState<number | null>(null);
@@ -740,18 +780,20 @@ ${scheduleItemsFormatted}`.trim();
   // Driver Acknowledgment handler
   const handleAcknowledgeSchedule = async (item: ScheduleItem) => {
     try {
+      const resolvedDriverName = item.driver_name || profile.driverName || '기사님';
       const res = await fetch('/api/schedules/ack', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           scheduleId: item.id,
           version: item.version || 1,
-          driverId: profile.driverName || 'driver_4',
-          driverName: profile.driverName || '기사님',
+          driverId: item.driver_id || resolvedDriverName,
+          driverName: resolvedDriverName,
         }),
       });
       const data = await res.json();
       if (res.ok && (data.ok || data.success)) {
+        const ackedAt = new Date().toISOString();
         setSchedules((prev) =>
           prev.map((s) =>
             s.id === item.id
@@ -759,11 +801,14 @@ ${scheduleItemsFormatted}`.trim();
                   ...s,
                   isAcknowledged: true,
                   last_ack_version: item.version || 1,
-                  last_ack_at: new Date().toISOString(),
+                  last_ack_at: ackedAt,
                 }
               : s
           )
         );
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('vip_hq_schedules_updated'));
+        }
         haptics.success();
       } else {
         console.error('Failed to acknowledge schedule:', data);
@@ -847,7 +892,7 @@ ${scheduleItemsFormatted}`.trim();
                     onSwitchVehicle(v.id);
                   }
                 }}
-                className={`flex-1 py-1.5 px-1 rounded-xl text-sm font-black flex items-center justify-center gap-1 transition-all cursor-pointer ${isSelected
+                className={`shrink-0 whitespace-nowrap py-1.5 px-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-1 transition-all cursor-pointer ${isSelected
                   ? 'bg-white text-slate-900 shadow-sm border border-slate-200/90 scale-100'
                   : 'text-slate-500 hover:text-slate-800'
                   }`}

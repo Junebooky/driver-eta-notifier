@@ -5,6 +5,7 @@
 
 import { HqEmailExtractedDraft, EmailAiStatus } from '@/types/emailHq';
 import { HqBooking } from '@/types/hq';
+import { getKstTodayDateStr } from '@/utils/dispatchConflictDetector';
 
 export const HQ_EMAIL_DRAFTS_STORAGE_KEY = 'vip_hq_email_drafts';
 export const HQ_EMAIL_SETTINGS_STORAGE_KEY = 'vip_hq_email_settings';
@@ -185,7 +186,7 @@ export function convertDraftToHqBooking(draft: HqEmailExtractedDraft): {
       : draft.passengerName.includes('구글')
         ? '구글 클라우드'
         : 'VIP 고객',
-    pickupDate: draft.pickupDate || new Date().toISOString().slice(0, 10),
+    pickupDate: draft.pickupDate || getKstTodayDateStr(),
     pickupTime: draft.pickupTime || '14:00',
     pickupLocation: draft.pickupLocation,
     destination: draft.dropoffLocation,
