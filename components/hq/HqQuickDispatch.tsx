@@ -287,6 +287,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
   const vehicleModelRef = useRef<HTMLDivElement>(null);
 
   // 6. Additional Info Accordion & Fields
+  // Extra Info Accordion Open/Closed State (default collapsed per Reference 1)
   const [isExtraInfoOpen, setIsExtraInfoOpen] = useState(false);
   const [commonLanguage, setCommonLanguage] = useState<RequestedDriverLanguage>('ko');
   const [commonFlightNumber, setCommonFlightNumber] = useState('');
@@ -771,7 +772,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
   };
 
   return (
-    <div className="bg-white border border-slate-200/90 rounded-[24px] p-5 sm:p-6 shadow-[0_10px_30px_rgba(0,0,0,0.04)] select-none flex flex-col justify-between">
+    <div className="@container bg-white border border-slate-200/90 rounded-[24px] p-5 sm:p-6 shadow-[0_10px_30px_rgba(0,0,0,0.04)] select-none flex flex-col justify-between">
       <div>
         {/* 1. Header (Reference 1) */}
         <div className="flex items-center gap-3 pb-4">
@@ -1237,7 +1238,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                 </div>
               </div>
             ) : (
-              <div className="bg-[#FAFBFD] border border-blue-100/90 rounded-3xl p-4 sm:p-5 shadow-2xs space-y-3.5 animate-in slide-in-from-top-2 duration-200">
+              <div className="@container bg-[#FAFBFD] border border-blue-100/90 rounded-3xl p-4 sm:p-5 shadow-2xs space-y-3.5 animate-in slide-in-from-top-2 duration-200">
                 {/* Accordion Header */}
                 <div
                   role="button"
@@ -1268,7 +1269,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                 </div>
 
                 {/* Row 1: Sub-Card 1 (기사 언어 조건) & Sub-Card 2 (항공편 정보) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
+                <div className="grid grid-cols-1 @[540px]:grid-cols-2 gap-3 sm:gap-3.5">
                   {/* Sub-Card 1: 기사 언어 조건 */}
                   <div className="bg-[#F4F8FC] border border-[#E2EEF9] rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
                     <div className="flex items-center gap-2">
@@ -1276,35 +1277,35 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                       <span className="text-sm font-bold text-slate-800">기사 언어 조건</span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 mt-3">
+                    <div className="grid grid-cols-2 gap-2.5 mt-3">
                       <button
                         type="button"
                         onClick={() => handleCommonLanguageChange("ko")}
-                        className={`h-14 rounded-2xl flex items-center justify-center gap-2.5 px-3 transition-all cursor-pointer ${
+                        className={`h-14 rounded-2xl flex items-center justify-center gap-2 px-2.5 transition-all cursor-pointer ${
                           commonLanguage === "ko"
                             ? "bg-[#EAF2FF] border-2 border-[#1E60F3] text-[#1E60F3] shadow-xs"
                             : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
                         }`}
                       >
-                        <span className="w-7 h-7 rounded-full overflow-hidden shrink-0 flex items-center justify-center bg-white shadow-2xs border border-slate-200/60 text-lg">
+                        <span className="w-6 h-6 rounded-full overflow-hidden shrink-0 flex items-center justify-center bg-white shadow-2xs border border-slate-200/60 text-base">
                           🇰🇷
                         </span>
-                        <span className="text-sm sm:text-base font-bold">무관</span>
+                        <span className="text-xs @[400px]:text-sm font-bold whitespace-nowrap">무관</span>
                       </button>
 
                       <button
                         type="button"
                         onClick={() => handleCommonLanguageChange("en")}
-                        className={`h-14 rounded-2xl flex items-center justify-center gap-2.5 px-3 transition-all cursor-pointer ${
+                        className={`h-14 rounded-2xl flex items-center justify-center gap-2 px-2.5 transition-all cursor-pointer ${
                           commonLanguage === "en"
                             ? "bg-[#EAF2FF] border-2 border-[#1E60F3] text-[#1E60F3] shadow-xs"
                             : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
                         }`}
                       >
-                        <span className="w-7 h-7 rounded-full overflow-hidden shrink-0 flex items-center justify-center bg-white shadow-2xs border border-slate-200/60 text-lg">
+                        <span className="w-6 h-6 rounded-full overflow-hidden shrink-0 flex items-center justify-center bg-white shadow-2xs border border-slate-200/60 text-base">
                           🇺🇸
                         </span>
-                        <span className="text-sm sm:text-base font-bold">영어 가능</span>
+                        <span className="text-xs @[400px]:text-sm font-bold whitespace-nowrap">영어 가능</span>
                       </button>
                     </div>
                   </div>
@@ -1338,9 +1339,9 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                     <span className="text-sm font-bold text-slate-800">탑승객 정보</span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                  <div className="grid grid-cols-1 @[520px]:grid-cols-12 gap-3 items-end">
                     {/* 탑승객 수 (Aligned at bottom with input heights) */}
-                    <div className="sm:col-span-4">
+                    <div className="@[520px]:col-span-4">
                       <div className="h-14 bg-white border border-slate-200 rounded-2xl px-4 flex items-center justify-between shadow-2xs">
                         <span className="text-sm font-bold text-slate-800">탑승객 수</span>
                         <div className="flex items-center gap-1.5 bg-[#F1F6FD] rounded-xl px-2 py-1">
@@ -1365,35 +1366,36 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                       </div>
                     </div>
 
-                    {/* 탑승객명 */}
-                    <div className="sm:col-span-4">
-                      <label className="block text-xs font-bold text-slate-700 mb-1.5">탑승객명</label>
-                      <input
-                        type="text"
-                        value={commonPassengerName}
-                        onChange={(e) => setCommonPassengerName(e.target.value)}
-                        placeholder="예: 홍길동"
-                        className="w-full h-14 bg-white border border-slate-200 rounded-2xl px-4 text-sm font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 transition-all"
-                      />
-                    </div>
+                    {/* 탑승객명 & 탑승객 번호 */}
+                    <div className="grid grid-cols-2 gap-2.5 @[520px]:contents">
+                      <div className="@[520px]:col-span-4">
+                        <label className="block text-xs font-bold text-slate-700 mb-1.5">탑승객명</label>
+                        <input
+                          type="text"
+                          value={commonPassengerName}
+                          onChange={(e) => setCommonPassengerName(e.target.value)}
+                          placeholder="예: 홍길동"
+                          className="w-full h-14 bg-white border border-slate-200 rounded-2xl px-4 text-sm font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 transition-all"
+                        />
+                      </div>
 
-                    {/* 탑승객 번호 */}
-                    <div className="sm:col-span-4">
-                      <label className="block text-xs font-bold text-slate-700 mb-1.5">탑승객 번호</label>
-                      <input
-                        type="tel"
-                        value={commonPassengerPhone}
-                        onChange={(e) => setCommonPassengerPhone(e.target.value)}
-                        placeholder="예: 010-1234-5678"
-                        className="w-full h-14 bg-white border border-slate-200 rounded-2xl px-4 text-sm font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 transition-all"
-                      />
+                      <div className="@[520px]:col-span-4">
+                        <label className="block text-xs font-bold text-slate-700 mb-1.5">탑승객 번호</label>
+                        <input
+                          type="tel"
+                          value={commonPassengerPhone}
+                          onChange={(e) => setCommonPassengerPhone(e.target.value)}
+                          placeholder="예: 010-1234-5678"
+                          className="w-full h-14 bg-white border border-slate-200 rounded-2xl px-4 text-sm font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 transition-all"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Row 3: Sub-Card 4 (추가 요청사항) */}
                 <div className="bg-[#F4F8FC] border border-[#E2EEF9] rounded-2xl p-4 sm:p-5">
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                  <div className="flex flex-col @[520px]:flex-row @[520px]:items-center gap-2.5 @[520px]:gap-4">
                     <div className="flex items-center gap-2.5 shrink-0">
                       <BrandFilledNoteIcon className="w-8 h-8" />
                       <span className="text-sm font-bold text-slate-800 whitespace-nowrap">
