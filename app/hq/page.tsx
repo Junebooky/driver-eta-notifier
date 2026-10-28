@@ -26,6 +26,7 @@ import { HqExpensesView } from '@/components/hq/expenses/HqExpensesView';
 import { HqEmailInboxView } from '@/components/hq/email/HqEmailInboxView';
 import { HqCustomersView } from '@/components/hq/customers/HqCustomersView';
 import { HqReportsView } from '@/components/hq/reports/HqReportsView';
+import { HqDriversView } from '@/components/hq/drivers/HqDriversView';
 import { HqOperationsBoard } from '@/components/hq/operations/HqOperationsBoard';
 import { HqQuoteModal } from '@/components/hq/quotes/HqQuoteModal';
 import { VipChauffeurCardModal } from '@/components/cards/VipChauffeurCardModal';
@@ -556,7 +557,9 @@ function HqDashboardInner() {
                         ? '고객 관리'
                         : activeSidebarTab === 'reports'
                           ? '정산 · 수익성 · 종합 리포트'
-                          : '예약 · 배차 통합 관제'
+                          : activeSidebarTab === 'drivers'
+                            ? '기사 관리'
+                            : '예약 · 배차 통합 관제'
           }
           subtitle={
             activeSidebarTab === 'operations' ? (
@@ -574,6 +577,10 @@ function HqDashboardInner() {
             ) : activeSidebarTab === 'reports' ? (
               <span className="text-slate-500 font-medium">
                 고객사 서비스 시간 기준 정산 · 기사 인건비 · 배차별 직접이익 분석 및 리포트
+              </span>
+            ) : activeSidebarTab === 'drivers' ? (
+              <span className="text-slate-500 font-medium">
+                기사 정보를 관리하고, 프로필과 운행 일정을 확인할 수 있습니다.
               </span>
             ) : activeSidebarTab === 'expenses' || activeSidebarTab === 'receipts' ? (
               <>
@@ -596,7 +603,9 @@ function HqDashboardInner() {
               ? '고객명, 담당자명, 행사명으로 검색하세요...'
               : activeSidebarTab === 'reports'
                 ? '고객사, 행사명, 대행사, 기사명, 차량 검색...'
-                : activeSidebarTab === 'expenses' || activeSidebarTab === 'receipts'
+                : activeSidebarTab === 'drivers'
+                  ? '기사명, 연락처, 거주지 검색...'
+                  : activeSidebarTab === 'expenses' || activeSidebarTab === 'receipts'
                   ? '기사명, 차량번호, 상호명 검색...'
                   : '고객사, 승객명, 예약번호, 기사명, 차량번호 검색...'
           }
@@ -652,6 +661,8 @@ function HqDashboardInner() {
             />
           ) : activeSidebarTab === 'reports' ? (
             <HqReportsView initialSearchQuery={searchQuery} />
+          ) : activeSidebarTab === 'drivers' ? (
+            <HqDriversView initialSearchQuery={searchQuery} />
           ) : (
             <>
               {/* Dedicated 고객 이메일 View - kept mounted for instant switching */}
