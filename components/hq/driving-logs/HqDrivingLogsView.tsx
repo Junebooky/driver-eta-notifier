@@ -15,15 +15,20 @@ import { HqDrivingLogsKpi } from './HqDrivingLogsKpi';
 import { HqDrivingLogsFilterBar } from './HqDrivingLogsFilterBar';
 import { HqDrivingLogsTable } from './HqDrivingLogsTable';
 import { HqDrivingLogDetailPanel } from './HqDrivingLogDetailPanel';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, CreditCard } from 'lucide-react';
+import { HqBooking } from '@/types/hq';
+import HqHipassImportModal from '../expenses/HqHipassImportModal';
 
 export interface HqDrivingLogsViewProps {
   initialSearchQuery?: string;
+  bookings?: HqBooking[];
 }
 
 export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
   initialSearchQuery = '',
+  bookings = [],
 }) => {
+  const [isHipassModalOpen, setIsHipassModalOpen] = useState(false);
   // Master logs list via useSyncExternalStore (SSR and Hydration safe)
   const logs = useSyncExternalStore(
     subscribeHqDrivingLogs,
@@ -162,6 +167,22 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
 
   return (
     <div className="space-y-5">
+      {/* Hi-Pass Auto-Link Strip */}
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-emerald-200/80 bg-emerald-50/60 px-4 py-3">
+        <div className="text-xs text-slate-700">
+          <span className="font-extrabold text-emerald-900">하이패스 통행료 자동 연결:</span>{' '}
+          차량별 하이패스 CSV·엑셀 내역을 불러오면 해당 날짜 운행일지의 지출 합계와 경비 내역에 자동 반영됩니다.
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsHipassModalOpen(true)}
+          className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 text-xs font-extrabold text-white shadow-xs cursor-pointer"
+        >
+          <CreditCard className="w-3.5 h-3.5" />
+          <span>하이패스 통행료 가져오기</span>
+        </button>
+      </div>
+
       {/* 1. Top 4 KPI Metric Cards */}
       <HqDrivingLogsKpi
         todaySubmittedCount={kpiCounts.totalToday}
@@ -238,6 +259,17 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
           />
         </div>
       </div>
+
+      <HqHipassImportModal
+        isOpen={isHipassModalOpen}
+        bookings={bookings}
+        onClose={() => setIsHipassModalOpen(false)}
+        onImported={(summary) => {
+          showToast(
+            `하이패스 통행료 ${summary.addedCount}건(₩${summary.totalAmount.toLocaleString()})이 운행일지·경비에 연결되었습니다.`
+          );
+        }}
+      />
 
       {/* Floating Toast Notification */}
       {toastMessage && (

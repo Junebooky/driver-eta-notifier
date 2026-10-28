@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect, useCallback, Suspense } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, Suspense, useSyncExternalStore } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   AlertTriangle,
@@ -11,6 +11,9 @@ import {
   Building2,
   PhoneCall,
   CheckCircle2,
+  BellRing,
+  MessageSquareText,
+  ShieldAlert,
 } from 'lucide-react';
 import { HqSidebar } from '@/components/hq/HqSidebar';
 import { HqHeader } from '@/components/hq/HqHeader';
@@ -29,7 +32,10 @@ import { VipChauffeurCardModal } from '@/components/cards/VipChauffeurCardModal'
 import { HqUnconfirmedDispatchesCard } from '@/components/hq/dispatch/HqUnconfirmedDispatchesCard';
 import { HqUnsentDraftsCard } from '@/components/hq/dispatch/HqUnsentDraftsCard';
 import { HqDriverAllocationDonutCard } from '@/components/hq/dispatch/HqDriverAllocationDonutCard';
+import HqDispatchAlertDrawer from '@/components/hq/dispatch/HqDispatchAlertDrawer';
+import HqCustomerMessageModal from '@/components/hq/messages/HqCustomerMessageModal';
 import {
+  CustomerNotificationTrigger,
   HqBooking,
   HqDriverAllocationStats,
   HqKpiMetric,
@@ -48,6 +54,9 @@ import {
 } from '@/utils/dispatchConflictDetector';
 import { DEFAULT_DRIVER_PROFILES } from '@/utils/settlementCalculator';
 import { stripManufacturerName } from '@/utils/vehicleData';
+import { evaluateDispatchEscalationAlerts, formatMinutesCountdown, parseKstPickupEpochMs } from '@/utils/unackAlertEngine';
+import { getHqCustomersSnapshot, subscribeSettlementReports } from '@/utils/settlementStorage';
+import { INITIAL_HQ_CUSTOMERS } from '@/utils/customerHqData';
 
 function formatElapsedWait(isoStr?: string): { label: string; isUrgent: boolean } {
   if (!isoStr) return { label: '확인 대기', isUrgent: true };
@@ -85,6 +94,23 @@ function HqDashboardInner() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isQuoteModalOpen, setIsQuoteModalOpen] = useState(false);
   const [isChauffeurCardOpen, setIsChauffeurCardOpen] = useState(false);
+  const [isAlertDrawerOpen, setIsAlertDrawerOpen] = useState(false);
+  const [customerMsgTarget, setCustomerMsgTarget] = useState<{
+    booking: HqBooking;
+    trigger?: CustomerNotificationTrigger;
+  } | null>(null);
+  const [nowTick, setNowTick] = useState<number>(() => Date.now());
+
+  const liveCustomers = useSyncExternalStore(
+    subscribeSettlementReports,
+    getHqCustomersSnapshot,
+    () => INITIAL_HQ_CUSTOMERS
+  );
+
+  useEffect(() => {
+    const t = setInterval(() => setNowTick(Date.now()), 30000);
+    return () => clearInterval(t);
+  }, []);
 
   const fetchSharedBookings = useCallback(async (silent = false) => {
     if (!silent) setIsRefreshing(true);
@@ -263,7 +289,34 @@ function HqDashboardInner() {
     [operationalCounts]
   );
 
-  // Live Unconfirmed Dispatches Card Data
+  // Auto-Tracked Unacknowledged Escalation & Customer Notification Alerts
+  const escalationSummary = useMemo(
+    () => evaluateDispatchEscalationAlerts(bookings, nowTick),
+    [bookings, nowTick]
+  );
+
+  const handleSendDriverReminder = useCallback(
+    async (scheduleId: string) => {
+      try {
+        const res = await fetch('/api/schedules/remind', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ scheduleId, remindedBy: '본사 관제' }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || !json.ok) {
+          return { ok: false, error: json.error || '재알림 전송 실패' };
+        }
+        await fetchSharedBookings(true);
+        return { ok: true, reminderCount: json.reminderCount };
+      } catch (err: any) {
+        return { ok: false, error: err?.message || '네트워크 오류' };
+      }
+    },
+    [fetchSharedBookings]
+  );
+
+  // Live Unconfirmed Dispatches Card Data (Sorted by pickup imminence!)
   const liveUnconfirmedItems: HqUnconfirmedDispatchItem[] = useMemo(() => {
     return bookings
       .filter(
@@ -271,21 +324,34 @@ function HqDashboardInner() {
           b.dispatchStatus !== '취소' &&
           (b.driverAck === '미확인' || b.driverAck === '재확인 필요')
       )
+      .sort((a, b) => {
+        const msA = parseKstPickupEpochMs(a.pickupDate, a.pickupTime) ?? Number.MAX_SAFE_INTEGER;
+        const msB = parseKstPickupEpochMs(b.pickupDate, b.pickupTime) ?? Number.MAX_SAFE_INTEGER;
+        return msA - msB;
+      })
       .slice(0, 6)
       .map((b) => {
         const wait = formatElapsedWait(b.publishedAt || b.updatedAt);
+        const pMs = parseKstPickupEpochMs(b.pickupDate, b.pickupTime);
+        const minsLeft = pMs !== null ? Math.round((pMs - nowTick) / 60000) : null;
+        const isCritical = minsLeft !== null && minsLeft <= 60 && minsLeft >= -720;
         return {
           id: b.id,
+          scheduleId: b.scheduleId || b.id,
           pickupTime: `${b.pickupDate.slice(5)} ${b.pickupTime}`,
+          pickupCountdownLabel: minsLeft !== null ? formatMinutesCountdown(minsLeft) : undefined,
           customerName: b.customerName,
           driverName: b.driverName,
+          driverPhone: b.driverPhone,
           vehicleModel: stripManufacturerName(b.vehicleModel),
           destination: b.destination,
           waitingTime: b.driverAck === '재확인 필요' ? `재확인(v${b.version})` : wait.label,
-          isUrgent: b.driverAck === '재확인 필요' || wait.isUrgent,
+          isUrgent: isCritical || b.driverAck === '재확인 필요' || wait.isUrgent,
+          severity: isCritical ? 'critical' : b.driverAck === '재확인 필요' ? 'urgent' : 'warning',
+          reminderCount: b.reminderCount || 0,
         };
       });
-  }, [bookings]);
+  }, [bookings, nowTick]);
 
   // Live Unassigned Queue & Drafts Card Data
   const liveUnsentItems: HqUnsentDraftItem[] = useMemo(() => {
@@ -461,7 +527,10 @@ function HqDashboardInner() {
         <HqHeader
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
-          unreadAlertsCount={operationalCounts.totalActionNeeded}
+          unreadAlertsCount={Math.max(
+            operationalCounts.totalActionNeeded,
+            escalationSummary.alerts.length
+          )}
           onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
           onRefresh={() => fetchSharedBookings(false)}
           isRefreshing={isRefreshing}
@@ -469,12 +538,7 @@ function HqDashboardInner() {
           onOpenQuickPhoneBooking={handleOpenQuickPhoneBookingModal}
           onOpenQuoteModal={() => setIsQuoteModalOpen(true)}
           onOpenChauffeurCard={() => setIsChauffeurCardOpen(true)}
-          onOpenNotifications={() => {
-            setActiveTabOverride('dispatch');
-            setActiveKpiFilter(null);
-            setActiveDispatchTab('action');
-            setMobileDispatchSubView('list');
-          }}
+          onOpenNotifications={() => setIsAlertDrawerOpen(true)}
           title={
             activeSidebarTab === 'operations'
               ? '실시간 행사 운영 보드'
@@ -539,7 +603,16 @@ function HqDashboardInner() {
         {/* Scrollable Body */}
         <main className="flex-1 p-3.5 sm:p-5 lg:p-6 space-y-4 sm:space-y-5 overflow-y-auto">
           {activeSidebarTab === 'operations' ? (
-            <HqOperationsBoard />
+            <HqOperationsBoard
+              onOpenCustomerMessageForSchedule={(scheduleId, trigger) => {
+                const found = bookings.find(
+                  (b) => b.scheduleId === scheduleId || b.id === scheduleId
+                );
+                if (found) {
+                  setCustomerMsgTarget({ booking: found, trigger });
+                }
+              }}
+            />
           ) : activeSidebarTab === 'quotes' ? (
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center space-y-4 text-white">
               <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center justify-center mx-auto">
@@ -567,9 +640,9 @@ function HqDashboardInner() {
               </div>
             </div>
           ) : activeSidebarTab === 'driving_logs' ? (
-            <HqDrivingLogsView initialSearchQuery={searchQuery} />
+            <HqDrivingLogsView initialSearchQuery={searchQuery} bookings={bookings} />
           ) : activeSidebarTab === 'expenses' || activeSidebarTab === 'receipts' ? (
-            <HqExpensesView initialSearchQuery={searchQuery} />
+            <HqExpensesView initialSearchQuery={searchQuery} bookings={bookings} />
           ) : activeSidebarTab === 'customers' ? (
             <HqCustomersView
               initialSearchQuery={searchQuery}
@@ -607,24 +680,80 @@ function HqDashboardInner() {
                     </div>
                   )}
 
-                  {/* Omission & Schedule Conflict Real-Time Alert Strip */}
-                  {operationalCounts.totalActionNeeded > 0 ? (
-                    <div className="p-3.5 rounded-2xl bg-gradient-to-r from-[#0B1E48] via-[#102A63] to-[#163880] text-white shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  {/* Omission, Imminent Unacknowledged Escalation & Customer Message Strip */}
+                  {operationalCounts.totalActionNeeded > 0 ||
+                  escalationSummary.pendingCustomerMsgCount > 0 ? (
+                    <div
+                      className={`p-3.5 rounded-2xl text-white shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                        escalationSummary.criticalCount > 0
+                          ? 'bg-gradient-to-r from-rose-900 via-red-800 to-rose-900 ring-2 ring-rose-400/50'
+                          : 'bg-gradient-to-r from-[#0B1E48] via-[#102A63] to-[#163880]'
+                      }`}
+                    >
                       <div className="flex items-start sm:items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-xl bg-amber-400/20 border border-amber-300/40 flex items-center justify-center shrink-0">
-                          <AlertTriangle className="w-4 h-4 text-amber-300" />
+                        <div
+                          className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                            escalationSummary.criticalCount > 0
+                              ? 'bg-white/20 border border-white/40 animate-pulse'
+                              : 'bg-amber-400/20 border border-amber-300/40'
+                          }`}
+                        >
+                          {escalationSummary.criticalCount > 0 ? (
+                            <ShieldAlert className="w-4 h-4 text-white" />
+                          ) : (
+                            <AlertTriangle className="w-4 h-4 text-amber-300" />
+                          )}
                         </div>
                         <div>
-                          <div className="text-xs sm:text-sm font-black tracking-tight">
-                            배차 전달 누락 방지 점검 · 확인 필요 항목 {operationalCounts.totalActionNeeded}건
+                          <div className="text-xs sm:text-sm font-black tracking-tight flex items-center gap-2 flex-wrap">
+                            <span>
+                              {escalationSummary.criticalCount > 0
+                                ? `초긴급 픽업 임박 미확인·누락 경보 ${escalationSummary.criticalCount}건!`
+                                : `배차 전달 누락 방지 점검 · 확인 필요 ${
+                                    operationalCounts.totalActionNeeded +
+                                    escalationSummary.pendingCustomerMsgCount
+                                  }건`}
+                            </span>
                           </div>
-                          <p className="text-[11px] text-blue-200 font-medium mt-0.5">
-                            클릭하면 해당 항목만 즉시 필터링하여 배차 확정 또는 기사 확인을 독려할 수 있습니다.
+                          <p className="text-[11px] text-white/80 font-medium mt-0.5">
+                            {escalationSummary.criticalCount > 0
+                              ? '픽업 60분 이내인데 기사가 아직 배차를 확인하지 않았거나 미배정 상태입니다. 즉시 경보 센터에서 재알림·전화 확인하세요.'
+                              : '미확인 배차 자동 추적 및 고객사 안내 메시지 발송 대기를 실시간으로 관리합니다.'}
                           </p>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-1.5 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => setIsAlertDrawerOpen(true)}
+                          className="px-3 py-1.5 rounded-xl bg-white text-slate-950 hover:bg-slate-100 text-xs font-black cursor-pointer transition-all flex items-center gap-1 shadow-xs"
+                        >
+                          <BellRing className="w-3.5 h-3.5 text-rose-600" />
+                          <span>자동 추적 경보 센터 ({escalationSummary.alerts.length})</span>
+                        </button>
+                        {escalationSummary.pendingCustomerMsgCount > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const firstPending = bookings.find(
+                                (b) => b.dispatchStatus !== '취소' && Boolean(b.pendingCustomerTrigger)
+                              );
+                              if (firstPending) {
+                                setCustomerMsgTarget({
+                                  booking: firstPending,
+                                  trigger: firstPending.pendingCustomerTrigger || 'dispatch_confirmed',
+                                });
+                              } else {
+                                setIsAlertDrawerOpen(true);
+                              }
+                            }}
+                            className="px-2.5 py-1.5 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white text-xs font-black cursor-pointer transition-all flex items-center gap-1"
+                          >
+                            <MessageSquareText className="w-3.5 h-3.5" />
+                            <span>고객 안내 준비됨 {escalationSummary.pendingCustomerMsgCount}건</span>
+                          </button>
+                        )}
                         {operationalCounts.unassignedCount > 0 && (
                           <button
                             type="button"
@@ -755,6 +884,15 @@ function HqDashboardInner() {
                           setSelectedBooking(booking);
                           setIsDetailModalOpen(true);
                         }}
+                        onOpenCustomerMessage={(booking) => {
+                          setCustomerMsgTarget({
+                            booking,
+                            trigger: booking.pendingCustomerTrigger || undefined,
+                          });
+                        }}
+                        onRemindDriver={async (booking) => {
+                          await handleSendDriverReminder(booking.scheduleId || booking.id);
+                        }}
                       />
                     </div>
 
@@ -777,17 +915,16 @@ function HqDashboardInner() {
                   >
                     <HqUnconfirmedDispatchesCard
                       items={liveUnconfirmedItems}
-                      onViewAll={() => {
-                        setActiveKpiFilter('kpi_sent_unacknowledged');
-                        setActiveDispatchTab('all');
-                        setMobileDispatchSubView('list');
-                      }}
+                      onViewAll={() => setIsAlertDrawerOpen(true)}
                       onSelectItem={(item) => {
                         const target = bookings.find((b) => b.id === item.id);
                         if (target) {
                           setSelectedBooking(target);
                           setIsDetailModalOpen(true);
                         }
+                      }}
+                      onRemindItem={async (item) => {
+                        await handleSendDriverReminder(item.scheduleId || item.id);
                       }}
                     />
 
@@ -927,6 +1064,51 @@ function HqDashboardInner() {
         onClose={() => setIsDetailModalOpen(false)}
         onUpdateBooking={handleUpdateBooking}
         onSavedServer={() => fetchSharedBookings(true)}
+        onOpenCustomerMessage={(booking) => {
+          setCustomerMsgTarget({
+            booking,
+            trigger: booking.pendingCustomerTrigger || undefined,
+          });
+        }}
+      />
+
+      {/* 4-B. Unacknowledged Dispatch Escalation & Omission Alert Drawer */}
+      <HqDispatchAlertDrawer
+        isOpen={isAlertDrawerOpen}
+        onClose={() => setIsAlertDrawerOpen(false)}
+        alerts={escalationSummary.alerts}
+        onSendReminder={handleSendDriverReminder}
+        onOpenBookingDetail={(bookingId) => {
+          const found = bookings.find((b) => b.id === bookingId || b.scheduleId === bookingId);
+          if (found) {
+            setSelectedBooking(found);
+            setIsDetailModalOpen(true);
+          }
+        }}
+        onOpenCustomerMessage={(bookingId, trigger) => {
+          const found = bookings.find((b) => b.id === bookingId || b.scheduleId === bookingId);
+          if (found) {
+            setCustomerMsgTarget({ booking: found, trigger });
+          }
+        }}
+      />
+
+      {/* 4-C. Customer Auto-Prepared Notification Review & Send Modal */}
+      <HqCustomerMessageModal
+        isOpen={Boolean(customerMsgTarget)}
+        booking={
+          customerMsgTarget
+            ? bookings.find(
+                (b) =>
+                  b.id === customerMsgTarget.booking.id ||
+                  (b.scheduleId && b.scheduleId === customerMsgTarget.booking.scheduleId)
+              ) || customerMsgTarget.booking
+            : null
+        }
+        customers={liveCustomers}
+        initialTrigger={customerMsgTarget?.trigger}
+        onClose={() => setCustomerMsgTarget(null)}
+        onSentSuccess={() => fetchSharedBookings(true)}
       />
 
       {/* 5. Realtime Pricing Calculator & Quotation Modal */}

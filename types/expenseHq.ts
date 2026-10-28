@@ -59,6 +59,11 @@ export interface HqExpenseRecord {
   isDuplicateSuspicion?: boolean; // 중복 영수증 의심
   duplicateReason?: string;
   duplicateOfId?: string;
+  // Hi-Pass Auto-Reconciliation Metadata
+  hipassTxKey?: string;
+  hipassEntrance?: string;
+  hipassExit?: string;
+  hipassCardNo?: string;
 }
 
 

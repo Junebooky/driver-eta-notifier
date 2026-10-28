@@ -14,8 +14,17 @@ import {
   History,
   X,
   ShieldAlert,
+  MessageSquareText,
 } from 'lucide-react';
 import { OperationStatus } from '@/app/api/schedules/operation-status/route';
+import { CustomerNotificationTrigger } from '@/types/hq';
+
+export interface HqOperationsBoardProps {
+  onOpenCustomerMessageForSchedule?: (
+    scheduleId: string,
+    trigger?: CustomerNotificationTrigger
+  ) => void;
+}
 
 interface ScheduleOperationItem {
   id: string;
@@ -33,6 +42,7 @@ interface ScheduleOperationItem {
   dropoffLocation: string;
   operationStatus: OperationStatus;
   operationUpdatedAt?: string;
+  pendingCustomerTrigger?: CustomerNotificationTrigger | null;
   operationHistory?: Array<{
     fromStatus: string;
     toStatus: string;
@@ -54,7 +64,9 @@ const STATUS_LABELS: Record<OperationStatus, { label: string; badgeClass: string
   completed: { label: '운행 종료', badgeClass: 'bg-slate-800 text-slate-400 border-slate-700', step: 5 },
 };
 
-export const HqOperationsBoard: React.FC = () => {
+export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
+  onOpenCustomerMessageForSchedule,
+}) => {
   const [schedules, setSchedules] = useState<ScheduleOperationItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState<ScheduleOperationItem | null>(null);
@@ -81,6 +93,7 @@ export const HqOperationsBoard: React.FC = () => {
           dropoffLocation: s.destination_name || s.destination || s.dropoff_location || s.dropoffLocation || '목적지',
           operationStatus: (s.operation_status || s.operationStatus || 'ready') as OperationStatus,
           operationUpdatedAt: s.operation_updated_at || s.operationUpdatedAt,
+          pendingCustomerTrigger: s.pending_customer_trigger ?? null,
           operationHistory: s.operation_history || s.operationHistory || [],
           groupId: s.group_id || s.groupId,
           groupName: s.group_name || s.groupName,
@@ -248,6 +261,23 @@ export const HqOperationsBoard: React.FC = () => {
                             {alert.message}
                           </div>
                         )}
+
+                        {/* Customer Arrival Message Quick Button */}
+                        {onOpenCustomerMessageForSchedule &&
+                          (item.operationStatus === 'arrived_pickup' ||
+                            item.pendingCustomerTrigger === 'arrived_pickup') && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenCustomerMessageForSchedule(item.id, 'arrived_pickup');
+                              }}
+                              className="px-2.5 py-1 rounded-lg text-xs font-extrabold flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm cursor-pointer"
+                            >
+                              <MessageSquareText className="w-3.5 h-3.5" />
+                              도착 안내 발송
+                            </button>
+                          )}
 
                         {/* 5-Step Status Pill */}
                         <div className="flex items-center gap-2">

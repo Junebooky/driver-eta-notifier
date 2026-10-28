@@ -239,3 +239,15 @@
     flex-shrink: 0;
   }
 }
+
+/* Native modal dialog scroll containment (modern-web-guidance: dialog & prevent-page-scroll-under-modal-dialog) */
+dialog:modal {
+  overscroll-behavior: contain;
+}
+
+dialog::backdrop {
+  overflow: hidden;
+  overscroll-behavior: contain;
+  background-color: rgba(15, 23, 42, 0.62);
+  backdrop-filter: blur(3px);
+}

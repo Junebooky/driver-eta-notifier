@@ -1,5 +1,6 @@
 import { HqExpenseRecord, HqExpenseStatus, HqExpenseKpiSummary } from '@/types/expenseHq';
 import { ExpenseItem, EXPENSE_CATEGORIES, PAYMENT_METHODS } from '@/utils/expense';
+import type { ReconciledHipassItem } from '@/utils/hipassReconciler';
 
 export const HQ_EXPENSES_STORAGE_KEY = 'cockpit_hq_expenses_v2';
 export const HQ_EXPENSE_UPDATE_EVENT = 'cockpit_hq_expense_updated';
@@ -772,4 +773,238 @@ export const exportExpensesToCsv = (expenses: HqExpenseRecord[]): string => {
   ]);
 
   return [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+};
+
+/**
+ * Imports confirmed Hi-Pass toll rows into HQ Expenses & Driving Logs with strict duplicate prevention.
+ */
+export const importReconciledHipassTolls = (
+  items: ReconciledHipassItem[],
+  reviewer: string = '하이패스 자동정산'
+): {
+  addedCount: number;
+  skippedDuplicates: number;
+  totalAmount: number;
+  updatedLogsCount: number;
+  records: HqExpenseRecord[];
+} => {
+  if (!items || items.length === 0) {
+    return { addedCount: 0, skippedDuplicates: 0, totalAmount: 0, updatedLogsCount: 0, records: [] };
+  }
+
+  const existing = getHqExpenses();
+  const existingTxKeys = new Set(existing.map((e) => e.hipassTxKey).filter(Boolean));
+
+  const now = new Date();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const mins = String(now.getMinutes()).padStart(2, '0');
+  const submittedAt = `${m}/${d} ${hours}:${mins}`;
+  const submittedDate = `${now.getFullYear()}. ${m}. ${d}`;
+
+  let skippedDuplicates = 0;
+  let totalAmount = 0;
+  const newRecords: HqExpenseRecord[] = [];
+
+  items.forEach((item, idx) => {
+    if (!item.hipassTxKey || item.amount <= 0) return;
+
+    const sameNaturalToll = existing.some(
+      (e) =>
+        e.category === 'toll' &&
+        e.rawDate === item.rawDate &&
+        e.time === item.time &&
+        e.amount === item.amount &&
+        e.vehiclePlate.replace(/\s+/g, '') === (item.resolvedPlate || item.vehiclePlateRaw).replace(/\s+/g, '')
+    );
+
+    if (existingTxKeys.has(item.hipassTxKey) || sameNaturalToll) {
+      skippedDuplicates++;
+      return;
+    }
+
+    existingTxKeys.add(item.hipassTxKey);
+    totalAmount += item.amount;
+
+    const resolvedCustomer =
+      item.matchedCustomerName
+        ? { customerName: item.matchedCustomerName, customerId: item.matchedCustomerId }
+        : resolveCustomerForExpense({
+            driverName: item.resolvedDriverName,
+            vehiclePlate: item.resolvedPlate || item.vehiclePlateRaw,
+            rawDate: item.rawDate,
+            time: item.time,
+          });
+
+    const routeDesc = `${item.entrance} ➔ ${item.exit}`;
+    const bookingBadge = item.matchedBookingNo ? ` (${item.matchedBookingNo})` : '';
+
+    newRecords.push({
+      id: `hq-hipass-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
+      no: existing.length + newRecords.length + 1,
+      submittedAt,
+      submittedDate,
+      rawDate: item.rawDate,
+      time: item.time,
+      driverName: item.resolvedDriverName || '미지정 기사',
+      vehicleModel: item.resolvedModel || '법인 차량',
+      vehiclePlate: item.resolvedPlate || item.vehiclePlateRaw,
+      customerName: resolvedCustomer.customerName,
+      customerId: resolvedCustomer.customerId,
+      bookingId: item.matchedScheduleId,
+      drivingLogId: item.matchedDrivingLogId,
+      billableToCustomer: true,
+      hipassTxKey: item.hipassTxKey,
+      hipassEntrance: item.entrance,
+      hipassExit: item.exit,
+      hipassCardNo: item.cardNo,
+      category: 'toll',
+      categoryLabel: '통행료',
+      merchant: item.merchantLabel || `하이패스 (${routeDesc})`,
+      address: `${item.roadType || '고속도로'} ${routeDesc}`,
+      amount: item.amount,
+      paymentMethod: 'company_card',
+      paymentMethodLabel: '하이패스 카드',
+      status: '승인 완료',
+      hasReceiptImage: false,
+      memo: `[하이패스 자동정산] ${routeDesc} 통행료${bookingBadge}`,
+      ocrExtracted: true,
+      ocrSummary: `하이패스 ${routeDesc} ${item.amount.toLocaleString()}원 내역 자동 대조 완료`,
+      ocrDetails: {
+        merchantName: item.merchantLabel || `하이패스 (${routeDesc})`,
+        paymentTime: `${item.rawDate} ${item.time}`,
+        cardName: '법인 하이패스 카드',
+        cardNumber: item.cardNo,
+        approvalNo: item.approvalNo,
+        supplyAmount: Math.round(item.amount / 1.1),
+        vat: item.amount - Math.round(item.amount / 1.1),
+        total: item.amount,
+      },
+      reviewNotes: item.matchedScheduleId
+        ? `배차(${item.matchedBookingNo || item.matchedScheduleId.slice(0, 8)}) 및 운행일지 자동 연결 완료`
+        : '차량번호 기준 통행료 자동 등록 완료',
+      reviewedAt: submittedAt,
+      reviewedBy: reviewer,
+    });
+  });
+
+  if (newRecords.length === 0) {
+    return { addedCount: 0, skippedDuplicates, totalAmount: 0, updatedLogsCount: 0, records: [] };
+  }
+
+  const updatedExpenses = [...newRecords, ...existing];
+  saveHqExpenses(updatedExpenses);
+
+  let updatedLogsCount = 0;
+  if (typeof window !== 'undefined') {
+    try {
+      const rawLogs = localStorage.getItem('cockpit_submitted_driving_logs_v1');
+      if (rawLogs) {
+        const parsedLogs = JSON.parse(rawLogs);
+        if (Array.isArray(parsedLogs)) {
+          const syncedLogs = parsedLogs.map((log) => {
+            const matchedNewItems = newRecords.filter(
+              (rec) =>
+                (rec.drivingLogId && rec.drivingLogId === log.id) ||
+                (rec.bookingId && log.bookingId && rec.bookingId === log.bookingId) ||
+                (rec.rawDate === log.rawDate &&
+                  rec.vehiclePlate.replace(/\s+/g, '') === String(log.vehiclePlate || '').replace(/\s+/g, ''))
+            );
+
+            if (matchedNewItems.length === 0) return log;
+
+            updatedLogsCount++;
+            const addedAmt = matchedNewItems.reduce((s, r) => s + r.amount, 0);
+            const prevAudit = Array.isArray(log.reviewHistory) ? log.reviewHistory : [];
+
+            return {
+              ...log,
+              expenseAmount: (Number(log.expenseAmount) || 0) + addedAmt,
+              expenseCount: (Number(log.expenseCount) || 0) + matchedNewItems.length,
+              reviewHistory: [
+                ...prevAudit,
+                {
+                  id: `audit-hp-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+                  time: submittedAt,
+                  message: `하이패스 통행료 ${matchedNewItems.length}건(${addedAmt.toLocaleString()}원)이 자동 연결되었습니다.`,
+                  actor: reviewer,
+                  actionType: 'approved',
+                },
+              ],
+            };
+          });
+
+          if (updatedLogsCount > 0) {
+            localStorage.setItem('cockpit_submitted_driving_logs_v1', JSON.stringify(syncedLogs));
+            window.dispatchEvent(new CustomEvent('cockpit_driving_log_updated'));
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to sync driving logs with Hi-Pass tolls:', err);
+    }
+  }
+
+  return {
+    addedCount: newRecords.length,
+    skippedDuplicates,
+    totalAmount,
+    updatedLogsCount,
+    records: newRecords,
+  };
+};
+
+/**
+ * Hydrates Hi-Pass tolls persisted in Supabase `cockpit.schedules.driving_log` into local HQ Expense view
+ * so PC & Mobile share reconciled tolls without duplicates.
+ */
+export const mergeServerHipassTollsIntoExpenses = (
+  serverTolls: Array<{
+    hipassTxKey: string;
+    scheduleId: string;
+    bookingNo: string;
+    customerName: string;
+    customerId?: string;
+    driverName: string;
+    vehiclePlate: string;
+    vehicleModel: string;
+    rawDate: string;
+    time: string;
+    entrance: string;
+    exit: string;
+    amount: number;
+    cardNo?: string;
+    approvalNo?: string;
+    syncedAt: string;
+  }>
+): number => {
+  if (!serverTolls || serverTolls.length === 0) return 0;
+
+  const mapped: ReconciledHipassItem[] = serverTolls.map((t, idx) => ({
+    rowIndex: idx + 1,
+    hipassTxKey: t.hipassTxKey,
+    rawDate: t.rawDate,
+    time: t.time,
+    vehiclePlateRaw: t.vehiclePlate,
+    entrance: t.entrance,
+    exit: t.exit,
+    amount: t.amount,
+    cardNo: t.cardNo,
+    approvalNo: t.approvalNo,
+    merchantLabel: `하이패스 (${t.entrance}→${t.exit})`,
+    matchStatus: 'matched',
+    matchStatusLabel: '배차 연결됨',
+    resolvedPlate: t.vehiclePlate,
+    resolvedModel: t.vehicleModel,
+    resolvedDriverName: t.driverName,
+    matchedScheduleId: t.scheduleId,
+    matchedBookingNo: t.bookingNo,
+    matchedCustomerName: t.customerName,
+    matchedCustomerId: t.customerId,
+    isDuplicate: false,
+  }));
+
+  const res = importReconciledHipassTolls(mapped, 'Supabase 하이패스 동기화');
+  return res.addedCount;
 };

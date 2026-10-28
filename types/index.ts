@@ -202,6 +202,8 @@ export interface DbScheduleRow {
   operation_updated_at?: string | null;
   operation_history?: any[];
   source_quote_no?: string | null;
+  schedule_meta?: Record<string, any> | null;
+  driving_log?: Record<string, any> | null;
   created_at?: string;
   updated_at?: string;
 }

@@ -87,6 +87,7 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
       item.version > 1 &&
       (!item.last_ack_version || item.last_ack_version < item.version)
   );
+  const hasHqReminder = Boolean(!isCancelled && !item.isAcknowledged && (item.reminder_count || 0) > 0);
   const isGroupDispatch = Boolean(item.group_total_vehicles && item.group_total_vehicles > 1);
   const hasDistinctCustomerOrEvent = Boolean(
     (item.customer_name && item.customer_name !== item.passenger) || item.event_name
@@ -97,11 +98,22 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
       className={`w-full rounded-2xl p-4 border shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-md transition-all space-y-3.5 relative overflow-hidden ${
         isCancelled
           ? 'bg-rose-50/30 border-rose-200/90 opacity-90'
+          : hasHqReminder
+          ? 'bg-white border-rose-400 ring-2 ring-rose-200/80'
           : isStaleAck
           ? 'bg-white border-amber-300 ring-1 ring-amber-200/60'
           : 'bg-white border-slate-200/80'
       }`}
     >
+      {/* HQ Urgent Reminder Banner */}
+      {hasHqReminder && (
+        <div className="flex items-center justify-between gap-2 rounded-xl bg-rose-600 px-3 py-2 text-xs font-extrabold text-white shadow-xs">
+          <div className="flex items-center gap-1.5">
+            <AlertTriangle className="w-4 h-4 shrink-0 animate-pulse" />
+            <span>본사 긴급 배차 확인 요청 수신 ({item.reminder_count}회) — 즉시 아래 [배차 확인]을 눌러주세요!</span>
+          </div>
+        </div>
+      )}
       {/* Top Header: Date, Unified Pickup Time Badge, Status Badges & Edit Button */}
       <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
         <div className="flex items-center gap-1.5 min-w-0 flex-wrap">

@@ -1089,6 +1089,36 @@ ${scheduleItemsFormatted}`.trim();
             })}
           </div>
 
+          {/* Sticky Unacknowledged Dispatch Warning Banner for Driver */}
+          {(() => {
+            const unackedList = filteredSchedules.filter(
+              (s) =>
+                !s.isAcknowledged &&
+                s.dispatch_status !== 'cancelled' &&
+                s.status !== 'cancelled'
+            );
+            if (unackedList.length === 0) return null;
+            const remindedCount = unackedList.filter((s) => (s.reminder_count || 0) > 0).length;
+            return (
+              <div
+                className={`rounded-2xl p-3.5 text-xs font-bold flex items-center justify-between gap-2 shadow-sm ${
+                  remindedCount > 0
+                    ? 'bg-rose-600 text-white ring-2 ring-rose-300'
+                    : 'bg-amber-50 text-amber-900 border border-amber-300'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>
+                    {remindedCount > 0
+                      ? `본사 긴급 확인 요청 포함 미확인 배차가 ${unackedList.length}건 있습니다. 각 카드의 [배차 확인] 버튼을 눌러주세요!`
+                      : `아직 확인하지 않은 신규·변경 배차가 ${unackedList.length}건 있습니다. 내용을 확인 후 [배차 확인]을 눌러주세요.`}
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Schedule Cards List */}
           <div className="space-y-3">
             {filteredSchedules.map((item, itemIdx) => (

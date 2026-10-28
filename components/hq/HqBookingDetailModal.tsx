@@ -12,6 +12,8 @@ import {
   PhoneCall,
   RefreshCw,
   Clock,
+  BellRing,
+  MessageSquareText,
 } from 'lucide-react';
 import { HqBooking } from '@/types/hq';
 import { haptics } from '@/utils/haptics';
@@ -47,6 +49,7 @@ export interface HqBookingDetailModalProps {
   onClose: () => void;
   onUpdateBooking: (updated: HqBooking) => void;
   onSavedServer?: () => Promise<void> | void;
+  onOpenCustomerMessage?: (booking: HqBooking) => void;
 }
 
 export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
@@ -56,6 +59,7 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
   onClose,
   onUpdateBooking,
   onSavedServer,
+  onOpenCustomerMessage,
 }) => {
   const liveDriverProfiles = useSyncExternalStore(
     subscribeSettlementReports,
@@ -730,6 +734,100 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                   </div>
                 )}
               </div>
+
+              {/* Driver Reminder Quick Card (when unacknowledged) */}
+              {!isNewBooking &&
+                !isCancelled &&
+                (booking.driverAck === '미확인' || booking.driverAck === '재확인 필요') && (
+                  <div className="p-3.5 rounded-2xl border border-rose-200 bg-rose-50/50 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <BellRing className="w-4 h-4 text-rose-600" />
+                        <span className="text-xs font-black text-rose-900">
+                          기사 미확인 재알림 전송
+                        </span>
+                      </div>
+                      {(booking.reminderCount || 0) > 0 && (
+                        <span className="px-2 py-0.5 rounded bg-violet-100 text-violet-800 text-[10px] font-extrabold">
+                          누적 {booking.reminderCount}회
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isSaving}
+                      onClick={async () => {
+                        if (!booking.scheduleId && !booking.id) return;
+                        setIsSaving(true);
+                        setErrorMsg(null);
+                        try {
+                          const res = await fetch('/api/schedules/remind', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              scheduleId: booking.scheduleId || booking.id,
+                              remindedBy: '본사 상세모달',
+                            }),
+                          });
+                          const json = await res.json();
+                          if (!res.ok || !json.ok) {
+                            setErrorMsg(json.error || '재알림 전송에 실패했습니다.');
+                          } else {
+                            setNotice(
+                              `담당 기사 Cockpit에 즉시 재확인 알림을 보냈습니다 (누적 ${json.reminderCount}회).`
+                            );
+                            await onSavedServer?.();
+                          }
+                        } catch {
+                          setErrorMsg('재알림 전송 중 네트워크 오류가 발생했습니다.');
+                        } finally {
+                          setIsSaving(false);
+                        }
+                      }}
+                      className="w-full py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>담당 기사 Cockpit에 확인 재알림 보내기</span>
+                    </button>
+                  </div>
+                )}
+
+              {/* Customer Auto-Prepared Notification Card (Distinct from Brochure) */}
+              {!isNewBooking && !isCancelled && onOpenCustomerMessage && (
+                <div className="p-3.5 rounded-2xl border border-indigo-200/90 bg-indigo-50/40 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <MessageSquareText className="w-4 h-4 text-indigo-600" />
+                      <span className="text-xs font-black text-slate-900">
+                        고객사 자동 안내 메시지 (문자·이메일)
+                      </span>
+                    </div>
+                    {booking.pendingCustomerTrigger ? (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-indigo-600 text-white">
+                        자동 준비됨
+                      </span>
+                    ) : (booking.customerNotifications?.length || 0) > 0 ? (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        발송 {booking.customerNotifications!.length}회
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-snug">
+                    실제 확정 일정·기사 변경·픽업지 도착 상태를 반영한 짧은 안내문입니다 (관리자 확인 후 발송).
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenCustomerMessage(booking);
+                    }}
+                    className="w-full py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <MessageSquareText className="w-3.5 h-3.5" />
+                    <span>안내 문자 · 이메일 확인 및 발송창 열기</span>
+                  </button>
+                </div>
+              )}
 
               {/* Customer Brochure Card */}
               <div className="p-3.5 rounded-2xl border border-slate-200/90 bg-white space-y-2.5">

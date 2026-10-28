@@ -15,6 +15,8 @@ import {
   PhoneCall,
   Mail,
   Ban,
+  MessageSquareText,
+  Send,
 } from 'lucide-react';
 import { HqBooking } from '@/types/hq';
 import { haptics } from '@/utils/haptics';
@@ -32,6 +34,8 @@ export interface HqDispatchTableProps {
   onViewBooking: (booking: HqBooking) => void;
   onAssignDriver?: (booking: HqBooking) => void;
   onResendBrochure?: (booking: HqBooking) => void;
+  onOpenCustomerMessage?: (booking: HqBooking) => void;
+  onRemindDriver?: (booking: HqBooking) => void;
 }
 
 export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
@@ -41,6 +45,8 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
   onSelectTab,
   onOpenNewBooking,
   onViewBooking,
+  onOpenCustomerMessage,
+  onRemindDriver,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -533,30 +539,83 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                             </span>
                           )}
                         </div>
-                      ) : b.driverAck === '미확인' ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-700 font-bold text-[11px]">
-                          <Clock className="w-3 h-3 shrink-0" />
-                          <span>기사 미확인</span>
-                        </span>
-                      ) : b.driverAck === '재확인 필요' ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 font-extrabold text-[11px]">
-                          <AlertCircle className="w-3 h-3 text-rose-600" />
-                          <span>재확인 대기 (v{b.version || 2})</span>
-                        </span>
+                      ) : b.driverAck === '미확인' || b.driverAck === '재확인 필요' ? (
+                        <div className="flex flex-col items-end sm:items-start gap-1">
+                          {b.driverAck === '미확인' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-700 font-bold text-[11px]">
+                              <Clock className="w-3 h-3 shrink-0" />
+                              <span>기사 미확인</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 font-extrabold text-[11px]">
+                              <AlertCircle className="w-3 h-3 text-rose-600" />
+                              <span>재확인 대기 (v{b.version || 2})</span>
+                            </span>
+                          )}
+                          <div className="flex items-center gap-1">
+                            {(b.reminderCount || 0) > 0 && (
+                              <span className="text-[10px] font-bold text-violet-700">
+                                재알림 {b.reminderCount}회
+                              </span>
+                            )}
+                            {onRemindDriver && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  haptics.mediumTap();
+                                  onRemindDriver(b);
+                                }}
+                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-extrabold cursor-pointer"
+                                title="담당 기사 Cockpit에 즉시 확인 요청 알림 전송"
+                              >
+                                <Send className="w-2.5 h-2.5" />
+                                <span>재알림</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
                       ) : (
                         <span className="text-slate-300 font-normal">-</span>
                       )}
                     </td>
 
-                    {/* Col 9: 고객 안내자료 */}
+                    {/* Col 9: 고객 안내 (소개서 + 자동 안내 문자·메일) */}
                     <td className="py-3 px-3 whitespace-nowrap">
-                      {b.customerBrochure === '발송됨' ? (
-                        <span className="text-emerald-700 font-bold text-[11px]">발송됨</span>
-                      ) : b.customerBrochure === '재발송 필요' ? (
-                        <span className="text-rose-600 font-bold text-[11px]">재발송 필요</span>
-                      ) : (
-                        <span className="text-slate-400 font-medium text-[11px]">미발송</span>
-                      )}
+                      <div className="flex flex-col items-end sm:items-start gap-1">
+                        {onOpenCustomerMessage && !isCancelled && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              haptics.lightTap();
+                              onOpenCustomerMessage(b);
+                            }}
+                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-extrabold cursor-pointer transition-all ${
+                              b.pendingCustomerTrigger
+                                ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-2xs'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
+                            }`}
+                            title="배차 확정 / 기사 변경 / 픽업지 도착 고객사 안내 문자·이메일 확인 및 발송"
+                          >
+                            <MessageSquareText className="w-3 h-3" />
+                            <span>
+                              {b.pendingCustomerTrigger
+                                ? b.pendingCustomerTrigger === 'arrived_pickup'
+                                  ? '도착안내 준비됨'
+                                  : b.pendingCustomerTrigger === 'driver_changed'
+                                  ? '변경안내 준비됨'
+                                  : '확정안내 준비됨'
+                                : (b.customerNotifications?.length || 0) > 0
+                                ? `안내발송(${b.customerNotifications!.length})`
+                                : '안내메시지'}
+                            </span>
+                          </button>
+                        )}
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          프로필: {b.customerBrochure}
+                        </span>
+                      </div>
                     </td>
                   </tr>
                 );

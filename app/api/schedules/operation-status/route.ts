@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
-import { cleanDriverIdentity, cleanVehicleIdentity } from '@/utils/dispatchConflictDetector';
+import { cleanDriverIdentity } from '@/utils/dispatchConflictDetector';
+import { encodeScheduleMeta, hydrateRawScheduleRow } from '@/lib/dispatch/scheduleServerStore';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,7 +24,7 @@ export async function POST(req: Request) {
     // 1. Fetch current schedule to verify authorization and lifecycle state
     const { data: currentSchedule, error: fetchErr } = await supabaseAdmin
       .from('schedules')
-      .select('id, operation_status, operation_history, driver_name, vehicle_no, vehicle_plate, dispatch_status, status')
+      .select('*')
       .eq('id', scheduleId)
       .maybeSingle();
 
@@ -63,15 +64,39 @@ export async function POST(req: Request) {
 
     const updatedHistory = [...existingHistory, newHistoryEntry];
 
+    // Auto-prepare customer arrival message draft when transitioning to 'arrived_pickup' (never auto-sends)
+    const hydrated = hydrateRawScheduleRow(currentSchedule);
+    const shouldPrepareArrivalMsg =
+      status === 'arrived_pickup' && currentSchedule.operation_status !== 'arrived_pickup';
+
+    const nextMeta = shouldPrepareArrivalMsg
+      ? {
+          ...hydrated._meta,
+          pendingCustomerTrigger: 'arrived_pickup' as const,
+          pendingCustomerTriggeredAt: nowIso,
+        }
+      : hydrated._meta;
+
+    const updatePayload: Record<string, any> = {
+      operation_status: status,
+      operation_updated_at: nowIso,
+      operation_history: updatedHistory,
+      updated_at: nowIso,
+    };
+
+    if (shouldPrepareArrivalMsg) {
+      updatePayload.schedule_meta = nextMeta;
+      updatePayload.passenger_note = encodeScheduleMeta(nextMeta);
+    }
+
+    if (status === 'completed') {
+      updatePayload.status = 'completed';
+    }
+
     // 2. Update schedule in Supabase
-    const { data: updated, error: updateErr } = await supabaseAdmin
+    const { error: updateErr } = await supabaseAdmin
       .from('schedules')
-      .update({
-        operation_status: status,
-        operation_updated_at: nowIso,
-        operation_history: updatedHistory,
-        updated_at: nowIso,
-      })
+      .update(updatePayload)
       .eq('id', scheduleId)
       .select()
       .single();
@@ -86,6 +111,7 @@ export async function POST(req: Request) {
       operationStatus: status,
       operationUpdatedAt: nowIso,
       operationHistory: updatedHistory,
+      pendingCustomerTrigger: nextMeta.pendingCustomerTrigger || null,
     });
   } catch (err: any) {
     console.error('[OperationStatus API] Error:', err);

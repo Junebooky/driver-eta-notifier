@@ -8,6 +8,22 @@ export type DispatchStatus = '미배정' | '배차 완료' | '운행 중' | '운
 export type DriverAckStatus = '미확인' | '확인완료' | '재확인 필요' | '-';
 export type CustomerBrochureStatus = '미생성' | '미발송' | '발송됨' | '재발송 필요' | '실패';
 
+export type CustomerNotificationTrigger = 'dispatch_confirmed' | 'driver_changed' | 'arrived_pickup';
+
+export interface CustomerNotificationRecord {
+  id: string;
+  trigger: CustomerNotificationTrigger;
+  channel: 'email' | 'sms';
+  language: 'ko' | 'en';
+  recipient: string;
+  subject?: string;
+  body: string;
+  deliveryMethod: 'smtp' | 'manual_copy' | 'sms_app';
+  sentAt: string;
+  sentBy: string;
+  scheduleVersion?: number;
+}
+
 export interface HqBooking {
   id: string;
   bookingNo: string;
@@ -66,6 +82,18 @@ export interface HqBooking {
   cancelReason?: string;
   hasConflict?: boolean;
   conflictMessages?: string[];
+  // Operation Status & Escalation / Customer Notification Tracking
+  operationStatus?: 'ready' | 'arrived_pickup' | 'boarded' | 'in_transit' | 'completed';
+  operationUpdatedAt?: string;
+  reminderCount?: number;
+  lastRemindedAt?: string;
+  previousDriverName?: string;
+  previousDriverPhone?: string;
+  previousVehiclePlate?: string;
+  previousVehicleModel?: string;
+  pendingCustomerTrigger?: CustomerNotificationTrigger | null;
+  pendingCustomerTriggeredAt?: string;
+  customerNotifications?: CustomerNotificationRecord[];
 }
 
 
@@ -82,12 +110,17 @@ export interface HqKpiMetric {
 
 export interface HqUnconfirmedDispatchItem {
   id: string;
+  scheduleId?: string;
   pickupTime: string;
   customerName: string;
   driverName: string;
+  driverPhone?: string;
   vehicleModel: string;
   destination: string;
   waitingTime: string;
+  pickupCountdownLabel?: string;
+  severity?: 'critical' | 'urgent' | 'warning' | 'watch';
+  reminderCount?: number;
   isUrgent?: boolean;
 }
 

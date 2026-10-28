@@ -58,6 +58,34 @@ export interface HqScheduleMeta {
     deviceSummary: string;
     acknowledgedAt: string;
   }>;
+  reminderCount?: number;
+  lastRemindedAt?: string | null;
+  lastReminderNote?: string | null;
+  reminderHistory?: Array<{
+    remindedAt: string;
+    remindedBy: string;
+    note?: string;
+    version: number;
+  }>;
+  previousDriverName?: string | null;
+  previousDriverPhone?: string | null;
+  previousVehiclePlate?: string | null;
+  previousVehicleModel?: string | null;
+  pendingCustomerTrigger?: 'dispatch_confirmed' | 'driver_changed' | 'arrived_pickup' | null;
+  pendingCustomerTriggeredAt?: string | null;
+  customerNotifications?: Array<{
+    id: string;
+    trigger: 'dispatch_confirmed' | 'driver_changed' | 'arrived_pickup';
+    channel: 'email' | 'sms';
+    language: 'ko' | 'en';
+    recipient: string;
+    subject?: string;
+    body: string;
+    deliveryMethod: 'smtp' | 'manual_copy' | 'sms_app';
+    sentAt: string;
+    sentBy: string;
+    scheduleVersion?: number;
+  }>;
   rawPassengerNote?: string | null;
 }
 
@@ -132,7 +160,15 @@ function formatDateLabel(dateStr: string): string {
  * Hydrates a raw `cockpit.schedules` row into a full `DbScheduleRow` with decoded lifecycle metadata.
  */
 export function hydrateRawScheduleRow(raw: Record<string, any>): DbScheduleRow & { _meta: HqScheduleMeta } {
-  const meta = decodeScheduleMeta(raw.passenger_note, raw.status, raw.vehicle_no);
+  const decoded = decodeScheduleMeta(raw.passenger_note, raw.status, raw.vehicle_no);
+  const jsonbMeta =
+    raw.schedule_meta && typeof raw.schedule_meta === 'object' && !Array.isArray(raw.schedule_meta)
+      ? (raw.schedule_meta as Partial<HqScheduleMeta>)
+      : {};
+  const meta: HqScheduleMeta = {
+    ...decoded,
+    ...jsonbMeta,
+  };
 
   const version = typeof raw.version === 'number' ? raw.version : meta.version;
   const lastAckVersion =
@@ -177,6 +213,8 @@ export function hydrateRawScheduleRow(raw: Record<string, any>): DbScheduleRow &
     operation_updated_at: raw.operation_updated_at || null,
     operation_history: Array.isArray(raw.operation_history) ? raw.operation_history : [],
     source_quote_no: raw.source_quote_no || null,
+    schedule_meta: raw.schedule_meta || null,
+    driving_log: raw.driving_log || null,
     created_at: raw.created_at,
     updated_at: raw.updated_at,
     _meta: {
@@ -280,6 +318,19 @@ export function mapHydratedRowToScheduleItem(rawRow: Record<string, any>): Sched
     service_mode: meta.serviceMode,
     applied_pricing_snapshot: meta.appliedPricingSnapshot,
     cancel_reason: meta.cancelReason || undefined,
+    reminder_count: meta.reminderCount || 0,
+    last_reminded_at: meta.lastRemindedAt || undefined,
+    last_reminder_note: meta.lastReminderNote || undefined,
+    previous_driver_name: meta.previousDriverName || undefined,
+    previous_driver_phone: meta.previousDriverPhone || undefined,
+    previous_vehicle_plate: meta.previousVehiclePlate || undefined,
+    previous_vehicle_model: meta.previousVehicleModel || undefined,
+    pending_customer_trigger: meta.pendingCustomerTrigger ?? null,
+    pending_customer_triggered_at: meta.pendingCustomerTriggeredAt || undefined,
+    customer_notifications: meta.customerNotifications || [],
+    hipass_tolls: Array.isArray(row.driving_log?.hipass_tolls)
+      ? row.driving_log.hipass_tolls
+      : undefined,
     operation_status: row.operation_status || 'ready',
     operation_updated_at: row.operation_updated_at || undefined,
     operation_history: row.operation_history || [],
@@ -755,11 +806,23 @@ export async function upsertServerDispatchSchedule(
   let lastAckVersion = 0;
   let lastAckAt: string | null = null;
   let ackHistory = existingHydrated?._meta.ackHistory || [];
+  let previousDriverName: string | null = existingHydrated?._meta.previousDriverName ?? null;
+  let previousDriverPhone: string | null = existingHydrated?._meta.previousDriverPhone ?? null;
+  let previousVehiclePlate: string | null = existingHydrated?._meta.previousVehiclePlate ?? null;
+  let previousVehicleModel: string | null = existingHydrated?._meta.previousVehicleModel ?? null;
+  let pendingCustomerTrigger: HqScheduleMeta['pendingCustomerTrigger'] =
+    existingHydrated?._meta.pendingCustomerTrigger ?? null;
+  let pendingCustomerTriggeredAt: string | null =
+    existingHydrated?._meta.pendingCustomerTriggeredAt ?? null;
+  let reminderCount = existingHydrated?._meta.reminderCount || 0;
+  let lastRemindedAt: string | null = existingHydrated?._meta.lastRemindedAt ?? null;
+  let lastReminderNote: string | null = existingHydrated?._meta.lastReminderNote ?? null;
 
   if (existingHydrated) {
     const prevMeta = existingHydrated._meta;
     const wasPublished = prevMeta.dispatchStatus === 'published';
-    const driverChanged = cleanDriverIdentity(prevMeta.driverName) !== cleanDrv;
+    const prevDriverClean = cleanDriverIdentity(prevMeta.driverName || existingHydrated.driver_name);
+    const driverChanged = prevDriverClean !== cleanDrv;
     const plateChanged = cleanVehicleIdentity(prevMeta.vehiclePlate) !== cleanVehicleIdentity(resolvedPlate);
     const itineraryChanged =
       existingHydrated.date !== isoDate ||
@@ -773,15 +836,49 @@ export async function upsertServerDispatchSchedule(
       nextVersion = wasPublished ? (prevMeta.version || 1) + 1 : 1;
       lastAckVersion = 0;
       lastAckAt = null;
+      reminderCount = 0;
+      lastRemindedAt = null;
+      lastReminderNote = null;
+      if (wasPublished && prevDriverClean) {
+        previousDriverName = prevDriverClean;
+        previousDriverPhone = prevMeta.driverPhone || null;
+        previousVehiclePlate = prevMeta.vehiclePlate || null;
+        previousVehicleModel = prevMeta.vehicleModel || null;
+      }
     } else if (wasPublished && (plateChanged || itineraryChanged || effectiveDispatchStatus === 'published')) {
       nextVersion = (prevMeta.version || 1) + (plateChanged || itineraryChanged ? 1 : 0);
       lastAckVersion = prevMeta.lastAckVersion || 0;
       lastAckAt = prevMeta.lastAckAt || null;
+      if (plateChanged || itineraryChanged) {
+        reminderCount = 0;
+        lastRemindedAt = null;
+        lastReminderNote = null;
+      }
+      if (plateChanged && prevMeta.vehiclePlate) {
+        previousDriverName = prevDriverClean || previousDriverName;
+        previousDriverPhone = prevMeta.driverPhone || previousDriverPhone;
+        previousVehiclePlate = prevMeta.vehiclePlate;
+        previousVehicleModel = prevMeta.vehicleModel || null;
+      }
     } else {
       nextVersion = prevMeta.version || 1;
       lastAckVersion = prevMeta.lastAckVersion || 0;
       lastAckAt = prevMeta.lastAckAt || null;
     }
+
+    // Auto-prepare customer notification draft (never auto-sends; awaits admin confirmation)
+    if (effectiveDispatchStatus === 'published') {
+      if (!wasPublished) {
+        pendingCustomerTrigger = 'dispatch_confirmed';
+        pendingCustomerTriggeredAt = nowIso;
+      } else if (driverChanged || plateChanged) {
+        pendingCustomerTrigger = 'driver_changed';
+        pendingCustomerTriggeredAt = nowIso;
+      }
+    }
+  } else if (effectiveDispatchStatus === 'published') {
+    pendingCustomerTrigger = 'dispatch_confirmed';
+    pendingCustomerTriggeredAt = nowIso;
   }
 
   const bookingNo =
@@ -836,6 +933,15 @@ export async function upsertServerDispatchSchedule(
     lastAckVersion,
     lastAckAt,
     ackHistory,
+    reminderCount,
+    lastRemindedAt,
+    lastReminderNote,
+    previousDriverName,
+    previousDriverPhone,
+    previousVehiclePlate,
+    previousVehicleModel,
+    pendingCustomerTrigger,
+    pendingCustomerTriggeredAt,
   };
 
   const dbStatus =
@@ -869,6 +975,7 @@ export async function upsertServerDispatchSchedule(
       'VIP 승객',
     passenger_count: input.passengerCount || existingHydrated?.passenger_count || 1,
     passenger_note: encodeScheduleMeta(nextMeta),
+    schedule_meta: nextMeta,
     flight_number: input.flightNumber?.trim() || null,
     protocol_notes: input.notes?.trim() || null,
     driver_name: cleanDrv || input.driverName || null,
@@ -963,6 +1070,9 @@ export async function acknowledgeServerSchedule(params: {
     ...hydrated._meta,
     lastAckVersion: ackVersion,
     lastAckAt: nowIso,
+    reminderCount: 0,
+    lastRemindedAt: null,
+    lastReminderNote: null,
     ackHistory: [
       ...prevHistory,
       {
@@ -979,6 +1089,7 @@ export async function acknowledgeServerSchedule(params: {
     .from('schedules')
     .update({
       passenger_note: encodeScheduleMeta(nextMeta),
+      schedule_meta: nextMeta,
       last_ack_version: ackVersion,
       last_ack_at: nowIso,
       status: hydrated._meta.dispatchStatus === 'cancelled' ? 'cancelled' : 'confirmed',
@@ -1028,6 +1139,7 @@ export async function cancelServerSchedule(params: {
     dispatchStatus: 'cancelled',
     version: nextVersion,
     cancelReason: reason,
+    pendingCustomerTrigger: null,
   };
 
   const cancelNote = `[배차 취소 사유: ${reason} (${cancelledBy})]`;
@@ -1039,6 +1151,7 @@ export async function cancelServerSchedule(params: {
     .from('schedules')
     .update({
       passenger_note: encodeScheduleMeta(nextMeta),
+      schedule_meta: nextMeta,
       dispatch_status: 'cancelled',
       version: nextVersion,
       status: 'cancelled',
@@ -1057,5 +1170,209 @@ export async function cancelServerSchedule(params: {
     schedule: mapHydratedRowToScheduleItem(updated),
     version: nextVersion,
     cancelledAt: nowIso,
+  };
+}
+
+/**
+ * Sends / records an HQ unacknowledged dispatch reminder to the assigned driver in `cockpit.schedules`.
+ */
+export async function remindServerSchedule(params: {
+  scheduleId: string;
+  remindedBy?: string;
+  note?: string;
+}): Promise<{
+  schedule?: ScheduleItem;
+  reminderCount?: number;
+  remindedAt?: string;
+  error?: string;
+  statusCode?: number;
+}> {
+  const { data: raw, error: fetchErr } = await supabaseAdmin
+    .from('schedules')
+    .select('*')
+    .eq('id', params.scheduleId)
+    .maybeSingle();
+
+  if (fetchErr || !raw) {
+    return { error: '해당 배차 일정을 찾을 수 없습니다.', statusCode: 404 };
+  }
+
+  const hydrated = hydrateRawScheduleRow(raw);
+
+  if (hydrated.dispatch_status === 'cancelled' || hydrated.status === 'cancelled') {
+    return { error: '취소된 배차에는 확인 요청 알림을 보낼 수 없습니다.', statusCode: 400 };
+  }
+
+  if (hydrated.dispatch_status !== 'published') {
+    return { error: '아직 배차 확정되지 않은 예약(미배정)입니다. 먼저 기사와 차량을 배정해주세요.', statusCode: 400 };
+  }
+
+  const currentVersion = hydrated.version || 1;
+  const lastAckVer = hydrated.last_ack_version || 0;
+  if (lastAckVer >= currentVersion) {
+    return { error: '담당 기사가 이미 최신 배차를 확인 완료했습니다.', statusCode: 409 };
+  }
+
+  const nowIso = new Date().toISOString();
+  const nextCount = (hydrated._meta.reminderCount || 0) + 1;
+  const remindedBy = params.remindedBy || '본사 관제';
+  const prevReminderHistory = hydrated._meta.reminderHistory || [];
+
+  const nextMeta: HqScheduleMeta = {
+    ...hydrated._meta,
+    reminderCount: nextCount,
+    lastRemindedAt: nowIso,
+    lastReminderNote: params.note || null,
+    reminderHistory: [
+      ...prevReminderHistory,
+      {
+        remindedAt: nowIso,
+        remindedBy,
+        note: params.note,
+        version: currentVersion,
+      },
+    ],
+  };
+
+  const { data: updated, error: updateErr } = await supabaseAdmin
+    .from('schedules')
+    .update({
+      passenger_note: encodeScheduleMeta(nextMeta),
+      schedule_meta: nextMeta,
+      updated_at: nowIso,
+    })
+    .eq('id', params.scheduleId)
+    .select('*')
+    .single();
+
+  if (updateErr) {
+    return { error: updateErr.message, statusCode: 500 };
+  }
+
+  return {
+    schedule: mapHydratedRowToScheduleItem(updated),
+    reminderCount: nextCount,
+    remindedAt: nowIso,
+  };
+}
+
+/**
+ * Records an admin-confirmed customer notification (Email / SMS) or dismisses a pending trigger in `cockpit.schedules`.
+ */
+export async function recordServerCustomerNotification(params: {
+  scheduleId: string;
+  trigger: 'dispatch_confirmed' | 'driver_changed' | 'arrived_pickup';
+  channel: 'email' | 'sms';
+  language: 'ko' | 'en';
+  recipient: string;
+  subject?: string;
+  body: string;
+  deliveryMethod: 'smtp' | 'manual_copy' | 'sms_app';
+  sentBy?: string;
+}): Promise<{
+  schedule?: ScheduleItem;
+  record?: NonNullable<HqScheduleMeta['customerNotifications']>[number];
+  error?: string;
+  statusCode?: number;
+}> {
+  const { data: raw, error: fetchErr } = await supabaseAdmin
+    .from('schedules')
+    .select('*')
+    .eq('id', params.scheduleId)
+    .maybeSingle();
+
+  if (fetchErr || !raw) {
+    return { error: '해당 배차 일정을 찾을 수 없습니다.', statusCode: 404 };
+  }
+
+  const hydrated = hydrateRawScheduleRow(raw);
+  const nowIso = new Date().toISOString();
+
+  const record = {
+    id: `cnotif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    trigger: params.trigger,
+    channel: params.channel,
+    language: params.language,
+    recipient: params.recipient.trim(),
+    subject: params.subject?.trim(),
+    body: params.body,
+    deliveryMethod: params.deliveryMethod,
+    sentAt: nowIso,
+    sentBy: params.sentBy || '본사 관리자',
+    scheduleVersion: hydrated.version || 1,
+  };
+
+  const prevList = hydrated._meta.customerNotifications || [];
+  const shouldClearPending =
+    hydrated._meta.pendingCustomerTrigger === params.trigger || !hydrated._meta.pendingCustomerTrigger;
+
+  const nextMeta: HqScheduleMeta = {
+    ...hydrated._meta,
+    pendingCustomerTrigger: shouldClearPending ? null : hydrated._meta.pendingCustomerTrigger,
+    customerNotifications: [record, ...prevList].slice(0, 30),
+  };
+
+  const { data: updated, error: updateErr } = await supabaseAdmin
+    .from('schedules')
+    .update({
+      passenger_note: encodeScheduleMeta(nextMeta),
+      schedule_meta: nextMeta,
+      updated_at: nowIso,
+    })
+    .eq('id', params.scheduleId)
+    .select('*')
+    .single();
+
+  if (updateErr) {
+    return { error: updateErr.message, statusCode: 500 };
+  }
+
+  return {
+    schedule: mapHydratedRowToScheduleItem(updated),
+    record,
+  };
+}
+
+/**
+ * Clears `pendingCustomerTrigger` when HQ admin explicitly dismisses the pending customer notification draft.
+ */
+export async function dismissPendingCustomerNotification(params: {
+  scheduleId: string;
+}): Promise<{ schedule?: ScheduleItem; error?: string; statusCode?: number }> {
+  const { data: raw, error: fetchErr } = await supabaseAdmin
+    .from('schedules')
+    .select('*')
+    .eq('id', params.scheduleId)
+    .maybeSingle();
+
+  if (fetchErr || !raw) {
+    return { error: '해당 배차 일정을 찾을 수 없습니다.', statusCode: 404 };
+  }
+
+  const hydrated = hydrateRawScheduleRow(raw);
+  const nowIso = new Date().toISOString();
+
+  const nextMeta: HqScheduleMeta = {
+    ...hydrated._meta,
+    pendingCustomerTrigger: null,
+  };
+
+  const { data: updated, error: updateErr } = await supabaseAdmin
+    .from('schedules')
+    .update({
+      passenger_note: encodeScheduleMeta(nextMeta),
+      schedule_meta: nextMeta,
+      updated_at: nowIso,
+    })
+    .eq('id', params.scheduleId)
+    .select('*')
+    .single();
+
+  if (updateErr) {
+    return { error: updateErr.message, statusCode: 500 };
+  }
+
+  return {
+    schedule: mapHydratedRowToScheduleItem(updated),
   };
 }

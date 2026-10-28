@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useSyncExternalStore } from 'react';
+import React, { useState, useMemo, useEffect, useSyncExternalStore } from 'react';
 import Image from 'next/image';
 import {
   Receipt,
@@ -36,19 +36,41 @@ import {
   updateHqExpenseStatus,
   saveHqExpenses,
   exportExpensesToCsv,
+  mergeServerHipassTollsIntoExpenses,
 } from '@/utils/expenseHqStorage';
 import { formatKRW } from '@/utils/expense';
 import { rotateImageDataUrl } from '@/utils/imageRotate';
 import { haptics } from '@/utils/haptics';
 import { checkDuplicateReceipt } from '@/utils/settlementCalculator';
+import { HqBooking } from '@/types/hq';
+import HqHipassImportModal from './HqHipassImportModal';
 
 export interface HqExpensesViewProps {
   initialSearchQuery?: string;
+  bookings?: HqBooking[];
 }
 
 export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
   initialSearchQuery = '',
+  bookings = [],
 }) => {
+  const [isHipassModalOpen, setIsHipassModalOpen] = useState(false);
+
+  // Hydrate server-synced Hi-Pass tolls from Supabase `cockpit.schedules.driving_log` across PC & Mobile
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/expenses/hipass-sync')
+      .then((r) => r.json())
+      .then((json) => {
+        if (!cancelled && json?.ok && Array.isArray(json.tolls) && json.tolls.length > 0) {
+          mergeServerHipassTollsIntoExpenses(json.tolls);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   // Live master expenses list via useSyncExternalStore (SSR and Hydration safe)
   const expenses = useSyncExternalStore(
     subscribeHqExpenses,
@@ -357,7 +379,19 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              haptics.lightTap();
+              setIsHipassModalOpen(true);
+            }}
+            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer"
+          >
+            <CreditCard className="w-3.5 h-3.5" />
+            <span>하이패스 통행료 자동 정산</span>
+          </button>
+
           <button
             type="button"
             onClick={handleExportCsv}
@@ -1058,6 +1092,18 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Hi-Pass Toll Auto-Reconciliation Modal */}
+      <HqHipassImportModal
+        isOpen={isHipassModalOpen}
+        bookings={bookings}
+        onClose={() => setIsHipassModalOpen(false)}
+        onImported={(summary) => {
+          showToast(
+            `하이패스 통행료 ${summary.addedCount}건(₩${summary.totalAmount.toLocaleString()}) 정산 연결 완료`
+          );
+        }}
+      />
 
       {/* Floating Toast Notification */}
       {toastMessage && (

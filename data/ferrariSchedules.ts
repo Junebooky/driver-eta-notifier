@@ -70,6 +70,40 @@ export interface ScheduleItem {
   service_mode?: 'with_driver' | 'vehicle_only';
   applied_pricing_snapshot?: Record<string, unknown>;
   cancel_reason?: string;
+  reminder_count?: number;
+  last_reminded_at?: string;
+  last_reminder_note?: string;
+  previous_driver_name?: string;
+  previous_driver_phone?: string;
+  previous_vehicle_plate?: string;
+  previous_vehicle_model?: string;
+  pending_customer_trigger?: 'dispatch_confirmed' | 'driver_changed' | 'arrived_pickup' | null;
+  pending_customer_triggered_at?: string;
+  customer_notifications?: Array<{
+    id: string;
+    trigger: 'dispatch_confirmed' | 'driver_changed' | 'arrived_pickup';
+    channel: 'email' | 'sms';
+    language: 'ko' | 'en';
+    recipient: string;
+    subject?: string;
+    body: string;
+    deliveryMethod: 'smtp' | 'manual_copy' | 'sms_app';
+    sentAt: string;
+    sentBy: string;
+    scheduleVersion?: number;
+  }>;
+  hipass_tolls?: Array<{
+    hipassTxKey: string;
+    rawDate: string;
+    time: string;
+    vehiclePlate: string;
+    entrance: string;
+    exit: string;
+    amount: number;
+    cardNo?: string;
+    approvalNo?: string;
+    syncedAt: string;
+  }>;
   created_at?: string;
   updated_at?: string;
 }

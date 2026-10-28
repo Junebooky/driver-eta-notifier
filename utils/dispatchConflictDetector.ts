@@ -457,5 +457,16 @@ export function mapScheduleItemToHqBooking(
     createdAt: item.created_at,
     updatedAt: item.updated_at,
     cancelReason: item.cancel_reason,
+    operationStatus: item.operation_status || 'ready',
+    operationUpdatedAt: item.operation_updated_at,
+    reminderCount: item.reminder_count || 0,
+    lastRemindedAt: item.last_reminded_at,
+    previousDriverName: item.previous_driver_name,
+    previousDriverPhone: item.previous_driver_phone,
+    previousVehiclePlate: item.previous_vehicle_plate,
+    previousVehicleModel: item.previous_vehicle_model,
+    pendingCustomerTrigger: item.pending_customer_trigger ?? null,
+    pendingCustomerTriggeredAt: item.pending_customer_triggered_at,
+    customerNotifications: item.customer_notifications || [],
   };
 }

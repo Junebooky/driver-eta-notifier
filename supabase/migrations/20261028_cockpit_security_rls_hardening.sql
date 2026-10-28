@@ -88,3 +88,4 @@ SET
   overtime_rate_per_hour = 0,
   updated_at = NOW()
 WHERE category != 'sprinter';
+
