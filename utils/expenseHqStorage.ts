@@ -864,11 +864,15 @@ export const importReconciledHipassTolls = (
       merchant: item.merchantLabel || `하이패스 (${routeDesc})`,
       address: `${item.roadType || '고속도로'} ${routeDesc}`,
       amount: item.amount,
-      paymentMethod: 'company_card',
-      paymentMethodLabel: '하이패스 카드',
+      paymentMethod: item.paymentMethod || 'company_card',
+      paymentMethodLabel:
+        item.paymentMethod === 'driver_personal' ? '기사 개인 선납 (환급 대상)' : '법인 하이패스 카드',
       status: '승인 완료',
       hasReceiptImage: false,
-      memo: `[하이패스 자동정산] ${routeDesc} 통행료${bookingBadge}`,
+      memo:
+        item.paymentMethod === 'driver_personal'
+          ? `[하이패스 기사개인선납 · 환급대상] ${routeDesc} 통행료${bookingBadge}`
+          : `[하이패스 자동정산] ${routeDesc} 통행료${bookingBadge}`,
       ocrExtracted: true,
       ocrSummary: `하이패스 ${routeDesc} ${item.amount.toLocaleString()}원 내역 자동 대조 완료`,
       ocrDetails: {

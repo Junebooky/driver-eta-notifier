@@ -87,14 +87,29 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
             )}
           </div>
 
-          {/* Subtitle: Real-time Distance & Traffic provider in separated vertical hierarchy */}
+          {/* Subtitle: Real-time Distance, Estimated Toll & Traffic provider in separated vertical hierarchy */}
           {routeEstimate && (
             <div className="mt-1.5 space-y-0.5">
-              <div className="text-sm text-slate-500 font-normal">
-                이동 거리:{' '}
-                <span className="text-slate-900 font-bold">
-                  {routeEstimate.isUnavailable ? '-' : `${routeEstimate.distanceKm} km`}
-                </span>
+              <div className="flex flex-wrap items-center gap-x-2 text-sm text-slate-500 font-normal">
+                <div>
+                  이동 거리:{' '}
+                  <span className="text-slate-900 font-bold">
+                    {routeEstimate.isUnavailable ? '-' : `${routeEstimate.distanceKm} km`}
+                  </span>
+                </div>
+                {typeof routeEstimate.estimatedTollWon === 'number' && (
+                  <>
+                    <span className="text-slate-300">·</span>
+                    <div>
+                      예상 통행료:{' '}
+                      <span className="text-slate-900 font-bold">
+                        {routeEstimate.estimatedTollWon > 0
+                          ? `₩${routeEstimate.estimatedTollWon.toLocaleString()}`
+                          : '0원 (무료)'}
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
               <div className="text-[11px] font-medium text-slate-400 whitespace-nowrap tracking-tight">
                 ({routeEstimate.trafficSummary || '실시간 교통 반영'})

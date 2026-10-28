@@ -168,9 +168,9 @@ export default function HqHipassImportModal({
     const time2 = b2?.pickupTime || '14:20';
 
     const sampleCsv = [
-      '거래일시,차량번호,카드번호,입구영업소,출구영업소,통행금액,승인번호',
-      `${date1} ${time1},${plate1},9410-****-****-1514,서울영업소,인천공항영업소,"6,600",HP-DEMO-101`,
-      `${date2} ${time2},${plate2},9410-****-****-2658,동서울영업소,남양주영업소,"3,200",HP-DEMO-102`,
+      '거래일시,차량번호,카드번호,입구영업소,출구영업소,통행금액,결제구분,승인번호',
+      `${date1} ${time1},${plate1},9410-****-****-1514,서울영업소,인천공항영업소,"6,600",법인카드,HP-DEMO-101`,
+      `${date2} ${time2},${plate2},9410-****-****-2658,동서울영업소,남양주영업소,"3,200",기사개인선납,HP-DEMO-102`,
     ].join('\n');
 
     runParseAndMatch(sampleCsv, true);
@@ -209,6 +209,21 @@ export default function HqHipassImportModal({
       else next.add(txKey);
       return next;
     });
+  };
+
+  const togglePaymentMethod = (txKey: string) => {
+    setReconciledItems((prev) =>
+      prev.map((it) => {
+        if (it.hipassTxKey !== txKey) return it;
+        const nextMethod = it.paymentMethod === 'driver_personal' ? 'company_card' : 'driver_personal';
+        return {
+          ...it,
+          paymentMethod: nextMethod,
+          paymentMethodLabel:
+            nextMethod === 'driver_personal' ? '기사 개인 선납 (환급 대상)' : '법인 하이패스 카드',
+        };
+      })
+    );
   };
 
   const stats = useMemo(() => {
@@ -376,9 +391,9 @@ export default function HqHipassImportModal({
                 <button
                   type="button"
                   onClick={handleLoadDemoSample}
-                  className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] font-bold text-amber-900 hover:bg-amber-100 cursor-pointer"
+                  className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50/70 px-3 py-2 text-[11px] font-bold text-[#1E60F3] hover:bg-blue-100/70 cursor-pointer"
                 >
-                  <Sparkles className="h-3.5 w-3.5 text-amber-600" />
+                  <Sparkles className="h-3.5 w-3.5 text-[#1E60F3]" />
                   [TEST/DEMO] 샘플 불러오기
                 </button>
               </div>
@@ -390,7 +405,7 @@ export default function HqHipassImportModal({
                   2. 또는 엑셀(Excel) 하이패스 표 그대로 복사·붙여넣기
                 </label>
                 {isDemoData && (
-                  <span className="rounded bg-amber-100 border border-amber-300 px-2 py-0.5 text-[10px] font-extrabold text-amber-900">
+                  <span className="rounded bg-blue-50 border border-blue-200 px-2 py-0.5 text-[10px] font-extrabold text-[#1E60F3]">
                     [TEST/DEMO] 테스트용 샘플 데이터
                   </span>
                 )}
@@ -408,7 +423,7 @@ export default function HqHipassImportModal({
           </div>
 
           {parseErrors.length > 0 && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs font-semibold text-amber-900">
+            <div className="rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-xs font-semibold text-slate-800">
               {parseErrors.map((err, i) => (
                 <div key={i}>• {err}</div>
               ))}
@@ -420,7 +435,7 @@ export default function HqHipassImportModal({
               className={`flex items-center gap-2 rounded-xl border px-4 py-3 text-xs font-bold ${
                 resultBanner.ok
                   ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
-                  : 'border-red-200 bg-red-50 text-red-700'
+                  : 'border-slate-300 bg-slate-100 text-slate-800'
               }`}
             >
               <CheckCircle2 className="h-4 w-4 shrink-0" />
@@ -436,7 +451,7 @@ export default function HqHipassImportModal({
                   <span className="text-slate-800">인식 건수: {stats.total}건</span>
                   <span className="text-emerald-700">배차·일지 자동매칭: {stats.matchedCount}건</span>
                   {stats.ambiguousCount > 0 && (
-                    <span className="text-amber-700">배차 선택 필요: {stats.ambiguousCount}건</span>
+                    <span className="text-indigo-700">배차 선택 필요: {stats.ambiguousCount}건</span>
                   )}
                   {stats.duplicateCount > 0 && (
                     <span className="text-slate-500">중복 자동제외: {stats.duplicateCount}건</span>
@@ -455,6 +470,7 @@ export default function HqHipassImportModal({
                       <th className="px-3 py-2.5">통행일시</th>
                       <th className="px-3 py-2.5">차량 · 담당기사</th>
                       <th className="px-3 py-2.5">영업소 구간</th>
+                      <th className="px-3 py-2.5">결제 주체</th>
                       <th className="px-3 py-2.5 text-right">통행료</th>
                       <th className="px-3 py-2.5">배차 · 운행일지 자동 연결 결과</th>
                     </tr>
@@ -489,6 +505,20 @@ export default function HqHipassImportModal({
                           <td className="px-3 py-2.5 font-medium text-slate-800">
                             {item.entrance} ➔ {item.exit}
                           </td>
+                          <td className="px-3 py-2.5 whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => togglePaymentMethod(item.hipassTxKey)}
+                              className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-extrabold cursor-pointer transition-colors ${
+                                item.paymentMethod === 'driver_personal'
+                                  ? 'bg-indigo-100 text-indigo-700 border border-indigo-200'
+                                  : 'bg-slate-100 text-slate-700 border border-slate-200'
+                              }`}
+                              title="클릭하여 결제 주체 전환 (법인 카드 ↔ 기사 개인 선납 환급)"
+                            >
+                              {item.paymentMethod === 'driver_personal' ? '기사 개인 (환급)' : '법인 카드'}
+                            </button>
+                          </td>
                           <td className="px-3 py-2.5 text-right font-extrabold text-slate-900 whitespace-nowrap">
                             ₩{item.amount.toLocaleString()}
                           </td>
@@ -507,7 +537,7 @@ export default function HqHipassImportModal({
                               </div>
                             ) : item.matchStatus === 'ambiguous' && item.candidateSchedules ? (
                               <div className="space-y-1">
-                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700">
+                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700">
                                   <AlertTriangle className="h-3 w-3" />
                                   {item.matchStatusLabel}
                                 </span>
@@ -516,7 +546,7 @@ export default function HqHipassImportModal({
                                   onChange={(e) =>
                                     handleSelectCandidateSchedule(item.hipassTxKey, e.target.value)
                                   }
-                                  className="block w-full rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-bold text-slate-800"
+                                  className="block w-full rounded border border-indigo-200 bg-indigo-50/50 px-2 py-1 text-[11px] font-bold text-slate-800"
                                 >
                                   <option value="">연결할 배차 선택...</option>
                                   {item.candidateSchedules.map((cand) => (

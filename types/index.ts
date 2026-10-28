@@ -72,6 +72,7 @@ export interface RouteEstimate {
   durationMinutes: number;
   etaFormatted: string;
   trafficSummary?: string;
+  estimatedTollWon?: number | null; // TMAP totalFare in KRW (null if unavailable or mock)
   isMock: boolean;
   isFallback?: boolean;
   fallbackNotice?: string;
@@ -112,16 +113,24 @@ export interface FlightInfo {
   flightId: string;              // e.g. 'KE012'
   airline: string;               // e.g. '대한항공'
   type: FlightType;              // 'arrival' | 'departure'
-  airport: string;               // e.g. '로스앤젤레스'
-  airportCode: string;           // e.g. 'LAX'
+  airport: string;               // e.g. '로스앤젤레스' or '제주'
+  airportCode: string;           // e.g. 'LAX' or 'CJU'
+  airportKind?: 'ICN' | 'GMP';   // 'ICN' = Incheon, 'GMP' = Gimpo
+  airportName?: string;          // '인천국제공항' | '김포국제공항'
+  isDomestic?: boolean;          // true for domestic routes (Gimpo domestic)
   scheduleTimeFormatted: string; // e.g. '04:40'
   estimatedTimeFormatted: string;// e.g. '04:25'
   statusText: string;            // e.g. '04:25 (조기 도착 -15분)' or '12:40 (정상 출발)'
   diffMinutes: number;           // difference in minutes
-  terminal: string;              // '제1여객터미널' | '제2여객터미널'
-  terminalId: string;            // 'P01' | 'P02' | 'P03'
+  terminal: string;              // '제1여객터미널' | '제2여객터미널' | '국내선' | '국제선'
+  terminalId: string;            // 'P01' | 'P02' | 'P03' | 'GMP_DOM' | 'GMP_INT'
   isTomorrow?: boolean;          // true if flight is tomorrow (+1 day lookahead)
   flightDate?: string;           // 'YYYY-MM-DD'
+  // Data transparency & authenticity flags:
+  isMock?: boolean;              // true when fixture test data is used
+  dataSource?: string;           // e.g. 'IIAC 실시간 API' | 'KAC 실시간 API' | 'GMP 테스트 픽스처'
+  fixtureNotice?: string;        // explanation if fixture is returned
+  candidates?: FlightInfo[];     // list of candidates if multiple matches exist
   // Arrival specific:
   gateNumber?: string | null;           // e.g. '249'
   carousel?: string | null;             // e.g. '5'

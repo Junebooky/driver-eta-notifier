@@ -23,6 +23,8 @@ export interface ParsedHipassRow {
   approvalNo?: string;
   roadType?: string;
   merchantLabel: string;
+  paymentMethod?: 'company_card' | 'driver_personal';
+  paymentMethodLabel?: string;
 }
 
 export type HipassMatchStatus = 'matched' | 'ambiguous' | 'vehicle_only' | 'unmatched';
@@ -49,6 +51,8 @@ export interface ReconciledHipassItem extends ParsedHipassRow {
   }>;
   isDuplicate: boolean;
   duplicateReason?: string;
+  paymentMethod?: 'company_card' | 'driver_personal';
+  paymentMethodLabel?: string;
 }
 
 /**
@@ -140,6 +144,7 @@ export function parseHipassText(rawText: string): {
     cardNo?: number;
     approvalNo?: number;
     roadType?: number;
+    payer?: number;
   } = {};
 
   for (let i = 0; i < Math.min(lines.length, 8); i++) {
@@ -183,6 +188,8 @@ export function parseHipassText(rawText: string): {
           colMap.approvalNo = idx;
         } else if (/도로구분|기관|도로명/.test(col)) {
           colMap.roadType = idx;
+        } else if (/카드구분|결제구분|결제주체|지불자|법인개인|구분|payer|cardtype/.test(col)) {
+          colMap.payer = idx;
         }
       });
       break;
@@ -233,6 +240,10 @@ export function parseHipassText(rawText: string): {
       (colMap.approvalNo !== undefined ? cols[colMap.approvalNo] : '')?.trim() || undefined;
     const roadType =
       (colMap.roadType !== undefined ? cols[colMap.roadType] : '')?.trim() || undefined;
+    const payerRaw = (colMap.payer !== undefined ? cols[colMap.payer] : '')?.trim() || '';
+    const isPersonal = /개인|기사|선납|personal|driver/i.test(payerRaw);
+    const paymentMethod: 'company_card' | 'driver_personal' = isPersonal ? 'driver_personal' : 'company_card';
+    const paymentMethodLabel = isPersonal ? '기사 개인 선납 (환급 대상)' : '법인 하이패스 카드';
 
     if (!rawDate || amount <= 0) {
       skippedCount++;
@@ -267,6 +278,8 @@ export function parseHipassText(rawText: string): {
       approvalNo,
       roadType,
       merchantLabel,
+      paymentMethod,
+      paymentMethodLabel,
     });
   }
 

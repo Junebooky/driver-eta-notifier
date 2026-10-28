@@ -7,6 +7,7 @@ interface CacheEntry {
     durationMinutes: number;
     etaFormatted: string;
     trafficSummary: string;
+    estimatedTollWon: number | null;
     isMock: boolean;
     isFallback?: boolean;
     isCached: boolean;
@@ -81,6 +82,7 @@ async function handleRouteCalculation(
     return NextResponse.json({
       ...fallbackData,
       trafficSummary: '원활 (모의 데이터)',
+      estimatedTollWon: null,
       isMock: true,
       isFallback: false,
       isCached: false,
@@ -171,6 +173,11 @@ async function handleRouteCalculation(
       ? Math.round((totalDistanceMeters / 1000) * 10) / 10
       : 0;
 
+    // Parse TMAP estimated toll fee (totalFare in KRW)
+    const rawTotalFare = data?.features?.[0]?.properties?.totalFare;
+    const estimatedTollWon =
+      typeof rawTotalFare === 'number' && rawTotalFare >= 0 ? rawTotalFare : null;
+
     const etaTime = new Date(nowTimestamp + durationMinutes * 60 * 1000);
     const hours = String(etaTime.getHours()).padStart(2, '0');
     const minutes = String(etaTime.getMinutes()).padStart(2, '0');
@@ -181,6 +188,7 @@ async function handleRouteCalculation(
       durationMinutes,
       etaFormatted,
       trafficSummary: '실시간 교통 반영 (TMAP)',
+      estimatedTollWon,
       isMock: false,
       isFallback: false,
       isCached: false,
