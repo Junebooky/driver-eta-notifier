@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchNaverEmailDetail } from '@/services/naverImapService';
 import { HqEmailDetail } from '@/types/emailHq';
+import { requireHqAdmin } from '@/lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,6 +13,12 @@ export async function GET(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    // P0 Compliance: Require HQ Admin authentication before accessing email details
+    const auth = await requireHqAdmin(request);
+    if (!auth.ok) {
+      return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
+    }
+
     const { id } = await context.params;
     if (!id) {
       return NextResponse.json({ ok: false, error: 'Email ID is required' }, { status: 400 });

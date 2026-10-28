@@ -5,6 +5,7 @@ import {
   isNaverImapConfigured,
 } from '@/services/naverImapService';
 import { getInboxCandidateEmails } from '@/services/emailIntakeService';
+import { requireHqAdmin } from '@/lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +19,12 @@ const CACHE_TTL_MS = 60 * 1000;
 
 export async function GET(req: NextRequest) {
   try {
+    // P0 Compliance: Require HQ Admin authentication before accessing company inbox
+    const auth = await requireHqAdmin(req);
+    if (!auth.ok) {
+      return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
+    }
+
     const isConfigured = isNaverImapConfigured();
     const url = new URL(req.url);
     const forceRefresh = url.searchParams.get('refresh') === 'true';

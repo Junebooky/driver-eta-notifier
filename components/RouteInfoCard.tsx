@@ -100,11 +100,11 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
                 {typeof routeEstimate.estimatedTollWon === 'number' && (
                   <>
                     <span className="text-slate-300">·</span>
-                    <div>
+                    <div title="TMAP 1종(승용·소형) 추천 경로 기준 통행료 예상치">
                       예상 통행료:{' '}
                       <span className="text-slate-900 font-bold">
                         {routeEstimate.estimatedTollWon > 0
-                          ? `₩${routeEstimate.estimatedTollWon.toLocaleString()}`
+                          ? `₩${routeEstimate.estimatedTollWon.toLocaleString()} (1종 예상)`
                           : '0원 (무료)'}
                       </span>
                     </div>
@@ -112,7 +112,7 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
                 )}
               </div>
               <div className="text-[11px] font-medium text-slate-400 whitespace-nowrap tracking-tight">
-                ({routeEstimate.trafficSummary || '실시간 교통 반영'})
+                ({routeEstimate.trafficSummary || '실시간 교통 반영'} · 실제 요금은 하이패스 정산 확정)
               </div>
             </div>
           )}

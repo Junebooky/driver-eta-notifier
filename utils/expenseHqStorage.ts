@@ -1,6 +1,7 @@
 import { HqExpenseRecord, HqExpenseStatus, HqExpenseKpiSummary } from '@/types/expenseHq';
 import { ExpenseItem, EXPENSE_CATEGORIES, PAYMENT_METHODS } from '@/utils/expense';
 import type { ReconciledHipassItem } from '@/utils/hipassReconciler';
+import { maskHipassCardNo } from '@/utils/hipassReconciler';
 
 export const HQ_EXPENSES_STORAGE_KEY = 'cockpit_hq_expenses_v2';
 export const HQ_EXPENSE_UPDATE_EVENT = 'cockpit_hq_expense_updated';
@@ -858,7 +859,7 @@ export const importReconciledHipassTolls = (
       hipassTxKey: item.hipassTxKey,
       hipassEntrance: item.entrance,
       hipassExit: item.exit,
-      hipassCardNo: item.cardNo,
+      hipassCardNo: maskHipassCardNo(item.cardNo),
       category: 'toll',
       categoryLabel: '통행료',
       merchant: item.merchantLabel || `하이패스 (${routeDesc})`,
@@ -867,7 +868,7 @@ export const importReconciledHipassTolls = (
       paymentMethod: item.paymentMethod || 'company_card',
       paymentMethodLabel:
         item.paymentMethod === 'driver_personal' ? '기사 개인 선납 (환급 대상)' : '법인 하이패스 카드',
-      status: '승인 완료',
+      status: item.matchedScheduleId ? '승인 완료' : '검수 대기',
       hasReceiptImage: false,
       memo:
         item.paymentMethod === 'driver_personal'

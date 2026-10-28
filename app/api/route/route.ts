@@ -114,6 +114,7 @@ async function handleRouteCalculation(
       resCoordType: string;
       searchOption: number;
       trafficInfo: string;
+      carType: number;
       passList?: string;
     } = {
       startX: startLng,
@@ -124,6 +125,7 @@ async function handleRouteCalculation(
       resCoordType: 'WGS84GEO',
       searchOption: 0, // 0: Recommended optimal traffic route
       trafficInfo: 'Y', // Real-time traffic inclusion
+      carType: 1, // 1: 승용차 / 소형 (1종 고속도로 통행료 기준)
     };
 
     if (passList) {

@@ -171,8 +171,25 @@ export async function POST(req: NextRequest) {
       return res;
     }
 
-    // 4. Driver Login (Verified against cockpit.drivers table)
+    // 4. Driver Login (Verified against cockpit.drivers table and production PIN)
     if (role === 'driver') {
+      if (!isDev) {
+        const configuredPin = process.env.DRIVER_LOGIN_PIN;
+        const providedPin = (body.pin || body.password || body.secret || '').trim();
+        if (!configuredPin) {
+          return NextResponse.json(
+            { ok: false, error: '서버에 기사 인증 PIN(DRIVER_LOGIN_PIN)이 설정되지 않아 로그인이 차단되었습니다.' },
+            { status: 500 }
+          );
+        }
+        if (!providedPin || providedPin !== configuredPin.trim()) {
+          return NextResponse.json(
+            { ok: false, error: '기사 전용 인증 번호(PIN)가 올바르지 않거나 입력되지 않았습니다.' },
+            { status: 403 }
+          );
+        }
+      }
+
       if (!driverName?.trim() && !vehicleNo?.trim()) {
         return NextResponse.json(
           { ok: false, error: '기사 성함 또는 차량번호가 필요합니다.' },

@@ -135,7 +135,8 @@ export default function HqHipassImportModal({
 
     const initialSelection = new Set<string>();
     matched.forEach((item) => {
-      if (!item.isDuplicate && item.amount > 0) {
+      // P0 Compliance: Only auto-select clearly matched items. Unmatched and ambiguous require manual review.
+      if (!item.isDuplicate && item.amount > 0 && item.matchStatus === 'matched') {
         initialSelection.add(item.hipassTxKey);
       }
     });
@@ -146,7 +147,7 @@ export default function HqHipassImportModal({
     const file = e.target.files?.[0];
     if (!file) return;
     const buffer = await file.arrayBuffer();
-    const decoded = decodeHipassFileBuffer(buffer);
+    const decoded = decodeHipassFileBuffer(buffer, file.name);
     runParseAndMatch(decoded, false);
     e.target.value = '';
   };
@@ -253,10 +254,7 @@ export default function HqHipassImportModal({
     setSubmitting(true);
     setResultBanner(null);
     try {
-      // 1. Update HQ Expenses & Driving Logs locally
-      const localRes = importReconciledHipassTolls(itemsToImport);
-
-      // 2. Sync matched schedule tolls to Supabase `cockpit.schedules.driving_log`
+      // P0 Compliance: Atomic sync - Verify server synchronization BEFORE modifying local client storage
       let syncedScheduleCount = 0;
       const scheduleLinkedItems = itemsToImport.filter((i) => Boolean(i.matchedScheduleId));
       if (scheduleLinkedItems.length > 0) {
@@ -269,14 +267,18 @@ export default function HqHipassImportModal({
           }),
         });
         const apiJson = await apiRes.json().catch(() => ({}));
-        if (apiRes.ok && apiJson.ok) {
-          syncedScheduleCount = apiJson.syncedScheduleCount || 0;
+        if (!apiRes.ok || !apiJson.ok) {
+          throw new Error(apiJson?.error || `서버 동기화 실패 (HTTP ${apiRes.status}). 로컬 데이터는 보존되었습니다.`);
         }
+        syncedScheduleCount = apiJson.syncedScheduleCount || 0;
       }
+
+      // Step 2: ONLY after server success, update local HQ Expenses & Driving Logs
+      const localRes = importReconciledHipassTolls(itemsToImport);
 
       setResultBanner({
         ok: true,
-        message: `통행료 ${localRes.addedCount}건(총 ₩${localRes.totalAmount.toLocaleString()})이 경비지출에 등록되었으며, Supabase 배차 ${syncedScheduleCount}건 및 운행일지 ${localRes.updatedLogsCount}건에 자동 연결되었습니다.`,
+        message: `통행료 ${localRes.addedCount}건(총 ₩${localRes.totalAmount.toLocaleString()})이 경비지출에 안전하게 등록되었으며, Supabase 배차 ${syncedScheduleCount}건 및 운행일지 ${localRes.updatedLogsCount}건에 원자적으로 동기화되었습니다.`,
       });
 
       // Mark imported items as duplicate in current preview to prevent double-clicking
@@ -365,10 +367,10 @@ export default function HqHipassImportModal({
               <div>
                 <div className="flex items-center gap-2 text-xs font-extrabold text-slate-800 mb-1">
                   <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
-                  1. 하이패스 CSV 파일 업로드
+                  1. 하이패스 엑셀(XLSX) / CSV 파일 업로드
                 </div>
                 <p className="text-[11px] text-slate-500 leading-relaxed">
-                  포함 컬럼: 거래일시(통행일시), 차량번호, 입구영업소, 출구영업소, 통행금액(이용금액)
+                  지원 형식: .xlsx, .xls, .csv, .tsv (도로공사 및 카드사 명세서 자동 호환)
                 </p>
               </div>
 
@@ -376,7 +378,7 @@ export default function HqHipassImportModal({
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".csv,.txt,.tsv"
+                  accept=".xlsx,.xls,.csv,.txt,.tsv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                   onChange={handleFileUpload}
                   className="hidden"
                 />
@@ -386,7 +388,7 @@ export default function HqHipassImportModal({
                   className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3.5 py-2 text-xs font-bold text-white hover:bg-slate-800 cursor-pointer"
                 >
                   <Upload className="h-3.5 w-3.5" />
-                  CSV 내역 파일 선택
+                  파일 선택 (.xlsx / .csv)
                 </button>
                 <button
                   type="button"

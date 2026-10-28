@@ -2,6 +2,7 @@ import { HqBooking } from '@/types/hq';
 import { HqDrivingLog } from '@/types/drivingLogHq';
 import { HqExpenseRecord } from '@/types/expenseHq';
 import { VIP_REAL_VEHICLES, stripManufacturerName } from '@/utils/vehicleData';
+import * as XLSX from 'xlsx';
 import {
   cleanDriverIdentity,
   cleanVehicleIdentity,
@@ -9,6 +10,30 @@ import {
   normalizeTimeHHmm,
   timeHHmmToMinutes,
 } from '@/utils/dispatchConflictDetector';
+
+/**
+ * Masks Hi-Pass card numbers to protect PII and prevent storing raw card numbers.
+ * Example: 9410-1234-5678-1514 -> 9410-****-****-1514
+ */
+export function maskHipassCardNo(raw?: string | null): string | undefined {
+  if (!raw) return undefined;
+  const clean = raw.trim();
+  if (!clean) return undefined;
+  if (clean.includes('*')) return clean;
+
+  const digits = clean.replace(/[^0-9]/g, '');
+  if (digits.length >= 14) {
+    const first4 = digits.slice(0, 4);
+    const last4 = digits.slice(-4);
+    return `${first4}-****-****-${last4}`;
+  }
+  if (digits.length >= 8) {
+    const first4 = digits.slice(0, 4);
+    const last4 = digits.slice(-4);
+    return `${first4}-****-${last4}`;
+  }
+  return '****-****-****-' + (digits.length > 0 ? digits.slice(-4) : '****');
+}
 
 export interface ParsedHipassRow {
   rowIndex: number;
@@ -91,10 +116,30 @@ function parseAmountKRW(raw?: string): number {
 }
 
 /**
- * Decodes ArrayBuffer from CSV upload supporting both UTF-8 and Korean EUC-KR/CP949
- * (hipass.co.kr and Korean card companies frequently export EUC-KR CSVs).
+ * Decodes ArrayBuffer from CSV, TSV or real Excel (.xlsx / .xls) upload.
+ * Supports UTF-8, Korean EUC-KR/CP949, and binary Excel workbooks.
  */
-export function decodeHipassFileBuffer(buffer: ArrayBuffer): string {
+export function decodeHipassFileBuffer(buffer: ArrayBuffer, fileName?: string): string {
+  const bytes = new Uint8Array(buffer);
+
+  // Check Excel binary signatures: PK (0x50, 0x4B) for xlsx, or 0xD0, 0xCF for legacy xls
+  const isExcel =
+    (fileName && (fileName.endsWith('.xlsx') || fileName.endsWith('.xls'))) ||
+    (bytes[0] === 0x50 && bytes[1] === 0x4b) ||
+    (bytes[0] === 0xd0 && bytes[1] === 0xcf);
+
+  if (isExcel) {
+    try {
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      const sheetName = workbook.SheetNames[0];
+      if (sheetName && workbook.Sheets[sheetName]) {
+        return XLSX.utils.sheet_to_csv(workbook.Sheets[sheetName]);
+      }
+    } catch (err) {
+      console.warn('Failed to parse as Excel workbook, trying text decoders:', err);
+    }
+  }
+
   try {
     const utf8 = new TextDecoder('utf-8', { fatal: true }).decode(buffer);
     return utf8.replace(/^\uFEFF/, '');
@@ -235,7 +280,8 @@ export function parseHipassText(rawText: string): {
     const entrance = (colMap.entrance !== undefined ? cols[colMap.entrance] : '')?.trim() || '';
     const exit = (colMap.exit !== undefined ? cols[colMap.exit] : '')?.trim() || '';
     const merchantRaw = (colMap.merchant !== undefined ? cols[colMap.merchant] : '')?.trim() || '';
-    const cardNo = (colMap.cardNo !== undefined ? cols[colMap.cardNo] : '')?.trim() || undefined;
+    const rawCardNo = (colMap.cardNo !== undefined ? cols[colMap.cardNo] : '')?.trim() || undefined;
+    const cardNo = rawCardNo ? maskHipassCardNo(rawCardNo) : undefined;
     const approvalNo =
       (colMap.approvalNo !== undefined ? cols[colMap.approvalNo] : '')?.trim() || undefined;
     const roadType =

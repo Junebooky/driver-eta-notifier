@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { hydrateRawScheduleRow } from '@/lib/dispatch/scheduleServerStore';
-import { ReconciledHipassItem } from '@/utils/hipassReconciler';
+import { ReconciledHipassItem, maskHipassCardNo } from '@/utils/hipassReconciler';
 import { requireHqAdmin } from '@/lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
           entrance: String(item.entrance || '입구미상'),
           exit: String(item.exit || '출구미상'),
           amount: Number(item.amount) || 0,
-          cardNo: item.cardNo,
+          cardNo: maskHipassCardNo(item.cardNo),
           approvalNo: item.approvalNo,
           syncedAt: String(item.syncedAt || hydrated.updated_at || new Date().toISOString()),
         });
@@ -156,7 +156,7 @@ export async function POST(req: NextRequest) {
           entrance: item.entrance,
           exit: item.exit,
           amount: Number(item.amount) || 0,
-          cardNo: item.cardNo,
+          cardNo: maskHipassCardNo(item.cardNo),
           approvalNo: item.approvalNo,
           syncedAt: nowIso,
           syncedBy,

@@ -267,9 +267,10 @@ async function fetchGimpoFlights(
   tomorrow: { yyyymmdd: string; formatted: string },
   nowMs: number
 ): Promise<FlightInfo[]> {
-  const kacApiKey = process.env.KAC_FLIGHT_API_KEY || process.env.INCHEON_AIRPORT_API_KEY;
+  // P0 Compliance: Strictly use KAC_FLIGHT_API_KEY. Never fallback to Incheon Airport key.
+  const kacApiKey = process.env.KAC_FLIGHT_API_KEY;
 
-  if (kacApiKey) {
+  if (kacApiKey && kacApiKey.trim().length > 0) {
     try {
       const ioCode = type === 'arrival' ? 'I' : 'O';
       const cleanFln = flightId.replace(/[^A-Za-z0-9]/g, '');
@@ -283,7 +284,7 @@ async function fetchGimpoFlights(
       for (const endpoint of endpoints) {
         try {
           const kacUrl = `${endpoint}?serviceKey=${encodeURIComponent(
-            kacApiKey
+            kacApiKey.trim()
           )}&schAirCode=GMP&schFln=${encodeURIComponent(cleanFln)}&schIOType=${ioCode}&_type=json&type=json`;
 
           const controller = new AbortController();
@@ -302,12 +303,12 @@ async function fetchGimpoFlights(
 
               if (items.length > 0) {
                 return items.map((it: any) => {
-                  const isDomestic = it.line === '국내' || it.schLineType === 'D' || !['HND', 'KIX', 'TSA', 'SHA', 'PEK'].includes(it.arrivedEng);
+                  const isDomestic = it.line === '국내' || it.schLineType === 'D';
                   const terminal = isDomestic ? '김포공항 국내선' : '김포공항 국제선';
                   const terminalId = isDomestic ? 'GMP_DOM' : 'GMP_INT';
                   const airline = it.airlineKorean || it.airlineEnglish || '항공사';
-                  const airport = it.arrivedKor || it.airport || (isDomestic ? '제주' : '도쿄(하네다)');
-                  const airportCode = it.arrivedEng || (isDomestic ? 'CJU' : 'HND');
+                  const airport = it.arrivedKor || it.boardingKor || it.airport || (isDomestic ? '국내 공항' : '국제 공항');
+                  const airportCode = it.arrivedEng || it.boardingEng || '';
 
                   const schedRaw = it.std ? String(it.std).replace(/[^0-9]/g, '') : '';
                   const estRaw = it.etd ? String(it.etd).replace(/[^0-9]/g, '') : schedRaw;
@@ -315,10 +316,20 @@ async function fetchGimpoFlights(
                   const schedFormatted = schedRaw.length === 4 ? `${schedRaw.slice(0, 2)}:${schedRaw.slice(2, 4)}` : formatFlightTime(schedRaw);
                   const estFormatted = estRaw.length === 4 ? `${estRaw.slice(0, 2)}:${estRaw.slice(2, 4)}` : formatFlightTime(estRaw);
 
-                  const diffMinutes = 0;
-                  const statusText = `${estFormatted} (${it.rmkKor || '정상 ' + (type === 'arrival' ? '도착' : '출발')})`;
+                  let diffMinutes = 0;
+                  if (schedRaw.length === 4 && estRaw.length === 4) {
+                    const sh = parseInt(schedRaw.slice(0, 2), 10);
+                    const sm = parseInt(schedRaw.slice(2, 4), 10);
+                    const eh = parseInt(estRaw.slice(0, 2), 10);
+                    const em = parseInt(estRaw.slice(2, 4), 10);
+                    diffMinutes = (eh * 60 + em) - (sh * 60 + sm);
+                  }
 
-                  const rawGate = it.gate ? String(it.gate).trim() : null;
+                  const remark = it.rmkKor ? String(it.rmkKor).trim() : '';
+                  const statusDesc = remark || (diffMinutes > 10 ? `지연(+${diffMinutes}분)` : (type === 'arrival' ? '정상 도착' : '정상 출발'));
+                  const statusText = `${estFormatted} (${statusDesc})`;
+
+                  const rawGate = it.gate && String(it.gate).trim() !== '' ? String(it.gate).trim() : null;
                   const { arrivalLocationText, curbsideGate, recommendedParking } = resolveGimpoArrival(
                     terminal,
                     rawGate,
@@ -366,16 +377,26 @@ async function fetchGimpoFlights(
             }
           }
         } catch {
-          // Continue to next endpoint or fixture fallback
+          // Continue to next endpoint
         }
       }
     } catch {
-      // Ignore network timeout on KAC and proceed to fixture check
+      // Ignore network timeout
     }
   }
 
-  // 2. High-fidelity Gimpo test fixture matching
-  // (Ensures Gimpo airport inquiries function reliably before KAC approval)
+  // P0 Compliance: Strictly forbid fabricating fake flights in production environments.
+  // Test fixture is allowed ONLY during unit tests (NODE_ENV === 'test') or local dev with DEV_AUTH_ENABLED=true.
+  const isLocalDevOrTest =
+    process.env.NODE_ENV === 'test' ||
+    (process.env.DEV_AUTH_ENABLED === 'true' && process.env.VERCEL !== '1');
+
+  if (!isLocalDevOrTest) {
+    // In production or preview: If live KAC data is unavailable or key pending, do not generate fake mock flights!
+    return [];
+  }
+
+  // 2. High-fidelity Gimpo test fixture matching for local developer testing
   const cleanId = flightId.replace(/\s+/g, '').toUpperCase();
   const matchedFixture = GIMPO_KNOWN_FIXTURES[cleanId];
 
