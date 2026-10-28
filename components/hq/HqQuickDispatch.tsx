@@ -197,6 +197,64 @@ function addDaysToIso(isoDate: string, days: number): string {
   }
 }
 
+// Brand Filled Icons with #1E60F3 (Non-transparent, filled with brand UI color)
+function BrandFilledCarIcon({ className = 'w-6 h-6' }: { className?: string }) {
+  return (
+    <svg className={`${className} text-[#1E60F3] shrink-0`} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z" />
+    </svg>
+  );
+}
+
+function BrandFilledDocumentIcon({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg className={`${className} text-[#1E60F3] shrink-0`} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
+    </svg>
+  );
+}
+
+function BrandFilledGlobeIcon({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg className={`${className} shrink-0`} viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="10" fill="#1E60F3" />
+      <path
+        d="M2.5 12h19M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
+        stroke="#FFFFFF"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function BrandFilledPlaneIcon({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg className={`${className} text-[#1E60F3] shrink-0`} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" />
+    </svg>
+  );
+}
+
+function BrandFilledUsersIcon({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg className={`${className} text-[#1E60F3] shrink-0`} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" />
+    </svg>
+  );
+}
+
+function BrandFilledNoteIcon({ className = 'w-8 h-8' }: { className?: string }) {
+  return (
+    <div className={`${className} rounded-xl bg-[#1E60F3] text-white flex items-center justify-center shrink-0 shadow-2xs`}>
+      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" />
+      </svg>
+    </div>
+  );
+}
+
 export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
   existingBookings = [],
   onSavedBookings,
@@ -718,7 +776,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
         {/* 1. Header (Reference 1) */}
         <div className="flex items-center gap-3 pb-4">
           <div className="w-12 h-12 rounded-2xl bg-[#EBF3FF] text-[#1E60F3] flex items-center justify-center shrink-0">
-            <Car className="w-6 h-6 stroke-[2.2]" />
+            <BrandFilledCarIcon className="w-6 h-6" />
           </div>
           <div>
             <h2 className="text-lg font-extrabold text-slate-900 tracking-tight">
@@ -1150,181 +1208,206 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
 
           {/* 3. 추가 정보 (선택사항) Accordion (Reference 1 & 2) */}
           <div className="pt-1">
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={() => {
-                haptics.lightTap();
-                setIsExtraInfoOpen((prev) => !prev);
-              }}
-              className="bg-[#F5F8FF] border border-blue-100 rounded-2xl p-3.5 sm:p-4 flex items-center justify-between cursor-pointer hover:bg-blue-50/70 transition-all shadow-2xs"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-100/90 text-[#1E60F3] flex items-center justify-center shrink-0">
-                  <FileText className="w-5 h-5 stroke-[2.2]" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 tracking-tight">
-                    추가 정보 (선택사항)
-                  </h3>
-                  <p className="text-xs text-slate-400 font-medium mt-0.5">
-                    기사 언어, 탑승객, 항공편, 요청사항 등을 입력하세요.
-                  </p>
-                </div>
-              </div>
-
-              <div className="w-8 h-8 rounded-full flex items-center justify-center text-slate-700">
-                {isExtraInfoOpen ? (
-                  <ChevronUp className="w-5 h-5 stroke-[2.2]" />
-                ) : (
-                  <ChevronDown className="w-5 h-5 stroke-[2.2]" />
-                )}
-              </div>
-            </div>
-
-            {/* Slide-Down Expanded Content (Reference 2) */}
-            {isExtraInfoOpen && (
-              <div className="mt-2.5 p-4 bg-[#F8FAFF] border border-blue-100 rounded-2xl space-y-4 animate-in slide-in-from-top-2 duration-200 shadow-2xs">
-                {/* Row 1: 기사 언어 조건 (Left) + 항공편 정보 (Right) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                  {/* 기사 언어 조건 */}
+            {!isExtraInfoOpen ? (
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  haptics.lightTap();
+                  setIsExtraInfoOpen(true);
+                }}
+                className="bg-[#F5F8FF] border border-blue-100 rounded-2xl p-3.5 sm:p-4 flex items-center justify-between cursor-pointer hover:bg-blue-50/70 transition-all shadow-2xs"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-2xl bg-[#EAF2FF] text-[#1E60F3] flex items-center justify-center shrink-0">
+                    <BrandFilledDocumentIcon className="w-5 h-5" />
+                  </div>
                   <div>
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 mb-2">
-                      <Globe className="w-4 h-4 text-[#1E60F3]" />
-                      <span>기사 언어 조건</span>
+                    <h3 className="text-sm font-bold text-slate-900 tracking-tight">
+                      추가 정보 (선택사항)
+                    </h3>
+                    <p className="text-xs text-slate-400 font-medium mt-0.5">
+                      기사 언어, 탑승객, 항공편, 요청사항 등을 입력하세요.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-slate-700">
+                  <ChevronDown className="w-5 h-5 stroke-[2.2]" />
+                </div>
+              </div>
+            ) : (
+              <div className="bg-[#FAFBFD] border border-blue-100/90 rounded-3xl p-4 sm:p-5 shadow-2xs space-y-3.5 animate-in slide-in-from-top-2 duration-200">
+                {/* Accordion Header */}
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    haptics.lightTap();
+                    setIsExtraInfoOpen(false);
+                  }}
+                  className="flex items-center justify-between cursor-pointer select-none pb-0.5"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-2xl bg-[#EAF2FF] text-[#1E60F3] flex items-center justify-center shrink-0">
+                      <BrandFilledDocumentIcon className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">
+                        추가 정보 (선택사항)
+                      </h3>
+                      <p className="text-xs text-slate-400 font-normal mt-0.5">
+                        언어, 탑승객, 항공편, 요청사항 등을 입력하세요.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-slate-800 hover:bg-slate-100/80 transition-colors">
+                    <ChevronUp className="w-5 h-5 stroke-[2.5]" />
+                  </div>
+                </div>
+
+                {/* Row 1: Sub-Card 1 (기사 언어 조건) & Sub-Card 2 (항공편 정보) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
+                  {/* Sub-Card 1: 기사 언어 조건 */}
+                  <div className="bg-[#F4F8FC] border border-[#E2EEF9] rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+                    <div className="flex items-center gap-2">
+                      <BrandFilledGlobeIcon className="w-5 h-5" />
+                      <span className="text-sm font-bold text-slate-800">기사 언어 조건</span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-3 mt-3">
                       <button
                         type="button"
-                        onClick={() => handleCommonLanguageChange('ko')}
-                        className={`h-11 rounded-xl flex items-center justify-center gap-2 text-sm font-bold transition-all cursor-pointer ${
-                          commonLanguage === 'ko'
-                            ? 'bg-[#EBF3FF] border-2 border-[#1E60F3] text-[#1E60F3] shadow-xs'
-                            : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+                        onClick={() => handleCommonLanguageChange("ko")}
+                        className={`h-14 rounded-2xl flex items-center justify-center gap-2.5 px-3 transition-all cursor-pointer ${
+                          commonLanguage === "ko"
+                            ? "bg-[#EAF2FF] border-2 border-[#1E60F3] text-[#1E60F3] shadow-xs"
+                            : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
                         }`}
                       >
-                        <span className="text-base">🇰🇷</span>
-                        <span>무관</span>
+                        <span className="w-7 h-7 rounded-full overflow-hidden shrink-0 flex items-center justify-center bg-white shadow-2xs border border-slate-200/60 text-lg">
+                          🇰🇷
+                        </span>
+                        <span className="text-sm sm:text-base font-bold">무관</span>
                       </button>
 
                       <button
                         type="button"
-                        onClick={() => handleCommonLanguageChange('en')}
-                        className={`h-11 rounded-xl flex items-center justify-center gap-2 text-sm font-bold transition-all cursor-pointer ${
-                          commonLanguage === 'en'
-                            ? 'bg-[#EBF3FF] border-2 border-[#1E60F3] text-[#1E60F3] shadow-xs'
-                            : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+                        onClick={() => handleCommonLanguageChange("en")}
+                        className={`h-14 rounded-2xl flex items-center justify-center gap-2.5 px-3 transition-all cursor-pointer ${
+                          commonLanguage === "en"
+                            ? "bg-[#EAF2FF] border-2 border-[#1E60F3] text-[#1E60F3] shadow-xs"
+                            : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
                         }`}
                       >
-                        <span className="text-base">🇺🇸</span>
-                        <span>영어 가능</span>
+                        <span className="w-7 h-7 rounded-full overflow-hidden shrink-0 flex items-center justify-center bg-white shadow-2xs border border-slate-200/60 text-lg">
+                          🇺🇸
+                        </span>
+                        <span className="text-sm sm:text-base font-bold">영어 가능</span>
                       </button>
                     </div>
                   </div>
 
-                  {/* 항공편 정보 */}
-                  <div>
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 mb-2">
-                      <div className="w-5 h-5 rounded-md bg-[#EBF3FF] text-[#1E60F3] flex items-center justify-center shrink-0">
-                        <Plane className="w-3.5 h-3.5" />
+                  {/* Sub-Card 2: 항공편 정보 */}
+                  <div className="bg-[#F4F8FC] border border-[#E2EEF9] rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-[#E2EDFE] flex items-center justify-center text-[#1E60F3] shrink-0">
+                        <BrandFilledPlaneIcon className="w-4 h-4" />
                       </div>
-                      <span>항공편 정보</span>
+                      <span className="text-sm font-bold text-slate-800">항공편 정보</span>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-700 font-bold shrink-0">항공편명</span>
+                    <div className="mt-3 flex items-center gap-3">
+                      <span className="text-sm font-bold text-slate-700 whitespace-nowrap">항공편명</span>
                       <input
                         type="text"
                         value={commonFlightNumber}
                         onChange={(e) => setCommonFlightNumber(e.target.value)}
                         placeholder="예: KE082"
-                        className="w-full h-11 bg-white border border-slate-200 rounded-xl px-3 text-sm font-mono font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#1E60F3]"
+                        className="w-full h-14 bg-white border border-slate-200 rounded-2xl px-4 text-sm font-mono font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 transition-all"
                       />
                     </div>
                   </div>
                 </div>
 
-                {/* Row 2: 탑승객 정보 (3 Inline Columns) */}
-                <div>
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 mb-2">
-                    <Users className="w-4 h-4 text-[#1E60F3]" />
-                    <span>탑승객 정보</span>
+                {/* Row 2: Sub-Card 3 (탑승객 정보) */}
+                <div className="bg-[#F4F8FC] border border-[#E2EEF9] rounded-2xl p-4 sm:p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <BrandFilledUsersIcon className="w-5 h-5" />
+                    <span className="text-sm font-bold text-slate-800">탑승객 정보</span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-                    {/* 탑승객 수 */}
-                    <div className="sm:col-span-3">
-                      <span className="block text-[11px] text-slate-500 font-medium mb-1">
-                        탑승객 수
-                      </span>
-                      <div className="h-11 bg-white border border-slate-200 rounded-xl px-2 flex items-center justify-between">
-                        <button
-                          type="button"
-                          onClick={() => setCommonPassengerCount((prev) => Math.max(0, prev - 1))}
-                          className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-sm flex items-center justify-center cursor-pointer"
-                        >
-                          <Minus className="w-3 h-3" />
-                        </button>
-                        <span className="text-sm font-black text-slate-900">
-                          {commonPassengerCount}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setCommonPassengerCount((prev) => prev + 1)}
-                          className="w-7 h-7 rounded-lg bg-blue-50 hover:bg-blue-100 text-[#1E60F3] font-black text-sm flex items-center justify-center cursor-pointer"
-                        >
-                          <Plus className="w-3 h-3" />
-                        </button>
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                    {/* 탑승객 수 (Aligned at bottom with input heights) */}
+                    <div className="sm:col-span-4">
+                      <div className="h-14 bg-white border border-slate-200 rounded-2xl px-4 flex items-center justify-between shadow-2xs">
+                        <span className="text-sm font-bold text-slate-800">탑승객 수</span>
+                        <div className="flex items-center gap-1.5 bg-[#F1F6FD] rounded-xl px-2 py-1">
+                          <button
+                            type="button"
+                            onClick={() => setCommonPassengerCount((prev) => Math.max(0, prev - 1))}
+                            className="w-7 h-7 rounded-lg bg-white hover:bg-slate-100 text-slate-600 font-bold flex items-center justify-center cursor-pointer shadow-2xs transition-colors"
+                          >
+                            <Minus className="w-3.5 h-3.5 stroke-[2.5]" />
+                          </button>
+                          <span className="text-sm font-black text-slate-900 px-2 min-w-5 text-center">
+                            {commonPassengerCount}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setCommonPassengerCount((prev) => prev + 1)}
+                            className="w-7 h-7 rounded-lg bg-[#1E60F3] hover:bg-blue-600 text-white font-bold flex items-center justify-center cursor-pointer shadow-2xs transition-colors"
+                          >
+                            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                          </button>
+                        </div>
                       </div>
                     </div>
 
                     {/* 탑승객명 */}
                     <div className="sm:col-span-4">
-                      <span className="block text-[11px] text-slate-500 font-medium mb-1">
-                        탑승객명
-                      </span>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">탑승객명</label>
                       <input
                         type="text"
                         value={commonPassengerName}
                         onChange={(e) => setCommonPassengerName(e.target.value)}
                         placeholder="예: 홍길동"
-                        className="w-full h-11 bg-white border border-slate-200 rounded-xl px-3 text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#1E60F3]"
+                        className="w-full h-14 bg-white border border-slate-200 rounded-2xl px-4 text-sm font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 transition-all"
                       />
                     </div>
 
                     {/* 탑승객 번호 */}
-                    <div className="sm:col-span-5">
-                      <span className="block text-[11px] text-slate-500 font-medium mb-1">
-                        탑승객 번호
-                      </span>
+                    <div className="sm:col-span-4">
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">탑승객 번호</label>
                       <input
                         type="tel"
                         value={commonPassengerPhone}
                         onChange={(e) => setCommonPassengerPhone(e.target.value)}
                         placeholder="예: 010-1234-5678"
-                        className="w-full h-11 bg-white border border-slate-200 rounded-xl px-3 text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#1E60F3]"
+                        className="w-full h-14 bg-white border border-slate-200 rounded-2xl px-4 text-sm font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 transition-all"
                       />
                     </div>
                   </div>
                 </div>
 
-                {/* Row 3: 추가 요청사항 */}
-                <div>
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 mb-2">
-                    <div className="w-5 h-5 rounded-md bg-[#1E60F3] text-white flex items-center justify-center shrink-0">
-                      <FileText className="w-3.5 h-3.5" />
+                {/* Row 3: Sub-Card 4 (추가 요청사항) */}
+                <div className="bg-[#F4F8FC] border border-[#E2EEF9] rounded-2xl p-4 sm:p-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                    <div className="flex items-center gap-2.5 shrink-0">
+                      <BrandFilledNoteIcon className="w-8 h-8" />
+                      <span className="text-sm font-bold text-slate-800 whitespace-nowrap">
+                        추가 요청사항
+                      </span>
                     </div>
-                    <span>추가 요청사항</span>
+                    <input
+                      type="text"
+                      value={commonMemo}
+                      onChange={(e) => setCommonMemo(e.target.value)}
+                      placeholder="요청사항을 입력하세요. (예: 현장 미팅 후 이동, 주차 위치 등)"
+                      className="w-full h-14 bg-white border border-slate-200 rounded-2xl px-4 text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 transition-all"
+                    />
                   </div>
-
-                  <input
-                    type="text"
-                    value={commonMemo}
-                    onChange={(e) => setCommonMemo(e.target.value)}
-                    placeholder="요청사항을 입력하세요. (예: 현장 미팅 후 이동, 주차 위치 등)"
-                    className="w-full h-11 bg-white border border-slate-200 rounded-xl px-3.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#1E60F3]"
-                  />
                 </div>
               </div>
             )}
