@@ -36,9 +36,9 @@ import {
 import { HqStep4DispatchDoneView } from './HqStep4DispatchDoneView';
 import {
   HqDriverSelectModal,
-  SAMPLE_AVAILABLE_DRIVERS,
   AvailableDriverItem,
 } from './HqDriverSelectModal';
+import { useHqDrivers } from '@/utils/useHqDrivers';
 import { HqComposeEmailModal } from './HqComposeEmailModal';
 import { HqEmailWorkflowStepper, WorkflowStepId } from './HqEmailWorkflowStepper';
 import { parseVehicleSlotsFromRequestedClass } from '@/utils/vehicleSlotParser';
@@ -69,7 +69,10 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
   const searchParams = useSearchParams();
   const urlStep = searchParams?.get('step') as EmailWorkflowStep | null;
   const urlDriverModal = searchParams?.get('driverModal') === 'true';
-  const urlDriverLang = searchParams?.get('lang') === 'english' ? 'english' : 'any';
+  const urlDriverLang =
+    searchParams?.get('lang') === 'english' || searchParams?.get('driverLang') === 'english'
+      ? 'english'
+      : 'any';
   const urlDemo = searchParams?.get('demo') === 'true';
 
   // 1. Live Inbox State
@@ -147,7 +150,10 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
   const [statusFilter, setStatusFilter] = useState<'all' | 'unprocessed' | 'reviewing' | 'completed'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // 7. Workflow Step state ('step1_extract' | 'step2_booking_detail' | 'step4_dispatch_done')
+  // 7. Real Supabase drivers
+  const { drivers: hqDrivers } = useHqDrivers();
+
+  // 8. Workflow Step state ('step1_extract' | 'step2_booking_detail' | 'step4_dispatch_done')
   const [workflowStep, setWorkflowStep] = useState<EmailWorkflowStep>(() => {
     if (urlStep === 'step2_booking_detail' || urlStep === 'step4_dispatch_done') {
       return urlStep;
@@ -155,24 +161,8 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
     return 'step1_extract';
   });
 
-  // 8. Vehicle Slot assignments (for Step 2 and Step 4) - Dynamically linked to AI draft!
+  // 9. Vehicle Slot assignments (for Step 2 and Step 4) - Dynamically linked to AI draft!
   const [vehicleSlots, setVehicleSlots] = useState<VehicleSlotAssignment[]>(() => {
-    if (urlStep === 'step4_dispatch_done') {
-      return [
-        {
-          slotIndex: 0,
-          vehicleModel: '스프린터 319 CDI',
-          driver: SAMPLE_AVAILABLE_DRIVERS[0],
-          status: 'assigned',
-        },
-        {
-          slotIndex: 1,
-          vehicleModel: 'G90 LWB',
-          driver: SAMPLE_AVAILABLE_DRIVERS[1],
-          status: 'assigned',
-        },
-      ];
-    }
     // Check initial draft if demo or existing
     if (urlDemo && REFERENCE_EMAILS[0]?.extractedDraft?.requestedVehicleClass) {
       return parseVehicleSlotsFromRequestedClass(REFERENCE_EMAILS[0].extractedDraft.requestedVehicleClass);
@@ -474,13 +464,18 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
   };
 
   // Handle selecting driver from Step 3 modal
-  const handleSelectDriverFromModal = (driver: AvailableDriverItem) => {
+  const handleSelectDriverFromModal = (driver: AvailableDriverItem | any) => {
     setVehicleSlots((prev) => {
       const next = [...prev];
       if (next[activeSlotIndex]) {
         next[activeSlotIndex] = {
           ...next[activeSlotIndex],
-          driver,
+          driver: {
+            ...driver,
+            rating: driver.rating ?? 0,
+            avatarUrl: driver.avatarUrl || '',
+            recentTrips: driver.recentTrips || [],
+          },
           status: 'assigned',
         };
       }
@@ -1175,8 +1170,9 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
         targetVehicleName={vehicleSlots[activeSlotIndex]?.vehicleModel || '차량 미지정'}
         targetDate={currentDraft?.pickupDate || '2026. 10. 28. (수)'}
         targetTime={currentDraft?.pickupTime || '09:00'}
-        initialDriverId={vehicleSlots[activeSlotIndex]?.driver?.id || (activeSlotIndex === 0 ? 'drv-kim' : 'drv-lee')}
+        initialDriverId={vehicleSlots[activeSlotIndex]?.driver?.id || ''}
         requiredLanguage={requiredDriverLanguage}
+        drivers={hqDrivers}
       />
 
       {/* Compose / Customer Notification Email Modal */}

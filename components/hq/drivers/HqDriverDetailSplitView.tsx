@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Users,
   ChevronLeft,
@@ -8,70 +8,156 @@ import {
   Phone,
   MessageSquare,
   Star,
-  Calendar,
-  Clock,
-  MapPin,
   Plane,
   Edit2,
   Check,
   ArrowLeft,
-  Sparkles,
+  Loader2,
+  Calendar,
 } from 'lucide-react';
-import { DriverItem, SAMPLE_DRIVERS, DriverScheduleItem } from './driverData';
+import { HqDriverSummary, DriverScheduleItem } from '@/types/driverHq';
+import { useHqDrivers } from '@/utils/useHqDrivers';
 import { haptics } from '@/utils/haptics';
 
 interface HqDriverDetailSplitViewProps {
   selectedDriverId: string;
   onSelectDriver: (driverId: string) => void;
   onBackToTable: () => void;
+  drivers?: HqDriverSummary[];
+  counts?: {
+    total: number;
+    employed: number;
+    freelance: number;
+    englishCount: number;
+  };
+  isLoading?: boolean;
+  onUpdateDriver?: (id: string, updates: Record<string, any>) => Promise<boolean>;
 }
 
 export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = ({
   selectedDriverId,
   onSelectDriver,
   onBackToTable,
+  drivers: propDrivers,
+  counts: propCounts,
+  isLoading: propIsLoading,
+  onUpdateDriver: propOnUpdateDriver,
 }) => {
+  const hookState = useHqDrivers();
+  const drivers = propDrivers ?? hookState.drivers;
+  const counts = propCounts ?? hookState.counts;
+  const isLoading = propIsLoading ?? hookState.isLoading;
+  const updateDriver = propOnUpdateDriver ?? hookState.updateDriver;
+
   const [filterAffiliation, setFilterAffiliation] = useState<'all' | 'employed' | 'freelance'>('all');
   const [isEditingMemo, setIsEditingMemo] = useState(false);
-  const [memos, setMemos] = useState<Record<string, string>>({});
+  const [isSavingMemo, setIsSavingMemo] = useState(false);
+  const [memoDraft, setMemoDraft] = useState('');
+  const [weekOffset, setWeekOffset] = useState<number>(0);
 
   // Active Driver
-  const activeDriver =
-    SAMPLE_DRIVERS.find((d) => d.id === selectedDriverId) || SAMPLE_DRIVERS[0];
+  const activeDriver = useMemo(() => {
+    return drivers.find((d) => d.id === selectedDriverId) || drivers[0] || null;
+  }, [drivers, selectedDriverId]);
 
-  const currentMemo = memos[activeDriver.id] ?? activeDriver.memo;
+  // Sync memo draft when active driver changes
+  const currentMemo = activeDriver?.memo || '';
 
-  const handleSaveMemo = (newMemo: string) => {
-    setMemos((prev) => ({ ...prev, [activeDriver.id]: newMemo }));
-    setIsEditingMemo(false);
-    haptics.success();
+  const handleStartEditMemo = () => {
+    setMemoDraft(currentMemo);
+    setIsEditingMemo(true);
+  };
+
+  const handleSaveMemo = async () => {
+    if (!activeDriver) return;
+    setIsSavingMemo(true);
+    try {
+      const ok = await updateDriver(activeDriver.id, { memo: memoDraft });
+      if (ok) {
+        setIsEditingMemo(false);
+        haptics.success();
+      } else {
+        alert('메모 저장에 실패했습니다.');
+      }
+    } finally {
+      setIsSavingMemo(false);
+    }
   };
 
   // Filtered driver list for left column
-  const filteredDrivers = SAMPLE_DRIVERS.filter((d) => {
-    if (filterAffiliation === 'all') return true;
-    return d.affiliationType === filterAffiliation;
-  });
+  const filteredDrivers = useMemo(() => {
+    return drivers.filter((d) => {
+      if (filterAffiliation === 'all') return true;
+      return d.affiliationType === filterAffiliation;
+    });
+  }, [drivers, filterAffiliation]);
 
-  const counts = {
-    total: SAMPLE_DRIVERS.length,
-    employed: SAMPLE_DRIVERS.filter((d) => d.affiliationType === 'employed').length,
-    freelance: SAMPLE_DRIVERS.filter((d) => d.affiliationType === 'freelance').length,
-  };
+  // Compute 7 days for the displayed week based on weekOffset (Reference date: 2026-10-28)
+  const weekInfo = useMemo(() => {
+    const baseDate = new Date('2026-10-28T00:00:00+09:00');
+    // Shift by weekOffset weeks
+    baseDate.setDate(baseDate.getDate() + weekOffset * 7);
 
-  // Days of current week (2026. 10. 26 ~ 11. 01)
-  const weekDays = [
-    { dayIndex: 0, dateNum: '26', dayName: '월', fullDate: '2026-10-26' },
-    { dayIndex: 1, dateNum: '27', dayName: '화', fullDate: '2026-10-27' },
-    { dayIndex: 2, dateNum: '28', dayName: '수', fullDate: '2026-10-28', isToday: true },
-    { dayIndex: 3, dateNum: '29', dayName: '목', fullDate: '2026-10-29' },
-    { dayIndex: 4, dateNum: '30', dayName: '금', fullDate: '2026-10-30' },
-    { dayIndex: 5, dateNum: '31', dayName: '토', fullDate: '2026-10-31' },
-    { dayIndex: 6, dateNum: '1', dayName: '일', fullDate: '2026-11-01' },
-  ];
+    // Find Monday of this week (day 1)
+    const currentDayOfWeek = (baseDate.getDay() + 6) % 7; // 0 = Mon, 6 = Sun
+    const monday = new Date(baseDate);
+    monday.setDate(monday.getDate() - currentDayOfWeek);
+
+    const dayNames = ['월', '화', '수', '목', '금', '토', '일'];
+    const days = [];
+
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(d.getDate() + i);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const fullDate = `${yyyy}-${mm}-${dd}`;
+      const isToday = fullDate === '2026-10-28';
+
+      days.push({
+        dayIndex: i,
+        dateNum: String(d.getDate()),
+        dayName: dayNames[i],
+        fullDate,
+        isToday,
+      });
+    }
+
+    const startLabel = `${days[0].fullDate.replace(/-/g, '. ')}.(${days[0].dayName})`;
+    const endLabel = `${days[6].fullDate.slice(5).replace(/-/g, '. ')}.(${days[6].dayName})`;
+    const weekLabel = `${startLabel} ~ ${endLabel}`;
+
+    return { days, weekLabel };
+  }, [weekOffset]);
 
   // Hourly slots from 06:00 to 20:00 (every 2 hours)
   const timeHours = [6, 8, 10, 12, 14, 16, 18, 20];
+
+  if (isLoading && drivers.length === 0) {
+    return (
+      <div className="py-24 text-center bg-white rounded-2xl border border-slate-200">
+        <Loader2 className="w-8 h-8 mx-auto text-[#1E60F3] animate-spin mb-3" />
+        <p className="font-bold text-slate-600">기사 상세 정보를 불러오는 중...</p>
+      </div>
+    );
+  }
+
+  if (!activeDriver) {
+    return (
+      <div className="py-24 text-center bg-white rounded-2xl border border-slate-200">
+        <Users className="w-8 h-8 mx-auto text-slate-300 mb-2" />
+        <p className="font-bold text-slate-600">선택 가능한 기사가 없습니다.</p>
+        <button
+          type="button"
+          onClick={onBackToTable}
+          className="mt-4 px-4 py-2 rounded-xl bg-[#1E60F3] text-white text-xs font-bold"
+        >
+          목록으로 돌아가기
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">
@@ -141,7 +227,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                   : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900'
               }`}
             >
-              프리랜서 {counts.freelance}
+              프리 {counts.freelance}
             </button>
           </div>
 
@@ -164,14 +250,20 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
-                    <img
-                      src={driver.avatarUrl}
-                      alt={driver.name}
-                      onError={(e) => {
-                        (e.target as HTMLElement).style.display = 'none';
-                      }}
-                      className="w-9 h-9 rounded-full object-cover border border-slate-200 shrink-0"
-                    />
+                    {driver.avatarUrl ? (
+                      <img
+                        src={driver.avatarUrl}
+                        alt={driver.name}
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }}
+                        className="w-9 h-9 rounded-full object-cover border border-slate-200 shrink-0"
+                      />
+                    ) : (
+                      <div className="w-9 h-9 rounded-full bg-blue-50 text-[#1E60F3] border border-blue-100 font-black text-xs flex items-center justify-center shrink-0">
+                        {driver.name.slice(0, 1)}
+                      </div>
+                    )}
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
@@ -184,22 +276,26 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                         </span>
 
                         {driver.affiliationType === 'employed' ? (
-                          <span className="px-1.5 py-0.2 rounded bg-blue-100 text-[#1E60F3] text-[9.5px] font-black">
+                          <span className="px-1.5 py-0.2 rounded bg-blue-100 text-[#1E60F3] text-[9.5px] font-black shrink-0">
                             소속
                           </span>
                         ) : (
-                          <span className="px-1.5 py-0.2 rounded bg-sky-100 text-sky-700 text-[9.5px] font-black">
-                            프리랜서
+                          <span className="px-1.5 py-0.2 rounded bg-sky-100 text-sky-700 text-[9.5px] font-black shrink-0">
+                            프리
                           </span>
                         )}
                       </div>
 
                       <div className="flex items-center justify-between text-[10.5px] text-slate-400 mt-1">
-                        <div className="flex items-center gap-1 text-amber-500 font-bold">
-                          <Star className="w-2.5 h-2.5 fill-amber-400 shrink-0" />
-                          <span>{driver.rating.toFixed(1)}</span>
-                        </div>
-                        <span className="font-mono">{driver.phone}</span>
+                        {driver.rating !== undefined && driver.rating !== null ? (
+                          <div className="flex items-center gap-1 text-amber-500 font-bold">
+                            <Star className="w-2.5 h-2.5 fill-amber-400 shrink-0" />
+                            <span>{driver.rating.toFixed(1)}</span>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 font-bold">-</span>
+                        )}
+                        <span className="font-mono truncate ml-1">{driver.phone || '-'}</span>
                       </div>
                     </div>
                   </div>
@@ -224,14 +320,20 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
 
           {/* Driver Profile Header Card */}
           <div className="flex items-start gap-4 p-3 bg-slate-50/70 rounded-2xl border border-slate-100">
-            <img
-              src={activeDriver.avatarUrl}
-              alt={activeDriver.name}
-              onError={(e) => {
-                (e.target as HTMLElement).style.display = 'none';
-              }}
-              className="w-16 h-16 rounded-2xl object-cover border-2 border-white shadow-xs shrink-0"
-            />
+            {activeDriver.avatarUrl ? (
+              <img
+                src={activeDriver.avatarUrl}
+                alt={activeDriver.name}
+                onError={(e) => {
+                  (e.target as HTMLElement).style.display = 'none';
+                }}
+                className="w-16 h-16 rounded-2xl object-cover border-2 border-white shadow-xs shrink-0"
+              />
+            ) : (
+              <div className="w-16 h-16 rounded-2xl bg-blue-50 text-[#1E60F3] border-2 border-blue-100 font-black text-xl flex items-center justify-center shadow-xs shrink-0">
+                {activeDriver.name.slice(0, 1)}
+              </div>
+            )}
 
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
@@ -249,19 +351,25 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                 )}
               </div>
 
-              {/* Rating and review count */}
+              {/* Rating and badges */}
               <div className="flex items-center gap-1.5 mt-1 text-xs">
-                <div className="flex items-center gap-1 text-amber-500 font-extrabold">
-                  <Star className="w-3.5 h-3.5 fill-amber-400 shrink-0" />
-                  <span>{activeDriver.rating.toFixed(1)}</span>
-                </div>
-                <span className="text-slate-400 font-medium">
-                  ({activeDriver.reviewCount}건)
-                </span>
+                {activeDriver.rating !== undefined && activeDriver.rating !== null ? (
+                  <div className="flex items-center gap-1 text-amber-500 font-extrabold">
+                    <Star className="w-3.5 h-3.5 fill-amber-400 shrink-0" />
+                    <span>{activeDriver.rating.toFixed(1)}</span>
+                    {activeDriver.reviewCount !== undefined && (
+                      <span className="text-slate-400 font-medium">({activeDriver.reviewCount}건)</span>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-slate-400 font-semibold text-xs">평점 없음</span>
+                )}
                 <span className="text-slate-300">•</span>
                 <div className="flex items-center gap-1 text-sm">
                   {activeDriver.flags.map((flag, idx) => (
-                    <span key={idx}>{flag}</span>
+                    <span key={idx} title={flag === '🇺🇸' ? '영어 가능' : '한국어'}>
+                      {flag}
+                    </span>
                   ))}
                 </div>
               </div>
@@ -275,24 +383,28 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
               className="flex-1 py-2 px-3 rounded-xl bg-blue-50/70 hover:bg-blue-100 border border-blue-200/80 text-[#1E60F3] text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
             >
               <Phone className="w-3.5 h-3.5" />
-              <span className="font-mono">{activeDriver.phone}</span>
+              <span className="font-mono">{activeDriver.phone || '연락처 미등록'}</span>
             </a>
 
-            <a
-              href={`tel:${activeDriver.phone}`}
-              className="w-9 h-9 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 flex items-center justify-center transition-all cursor-pointer shadow-2xs"
-              title="전화 걸기"
-            >
-              <Phone className="w-3.5 h-3.5" />
-            </a>
+            {activeDriver.phone && (
+              <>
+                <a
+                  href={`tel:${activeDriver.phone}`}
+                  className="w-9 h-9 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 flex items-center justify-center transition-all cursor-pointer shadow-2xs"
+                  title="전화 걸기"
+                >
+                  <Phone className="w-3.5 h-3.5" />
+                </a>
 
-            <a
-              href={`sms:${activeDriver.phone}`}
-              className="w-9 h-9 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 flex items-center justify-center transition-all cursor-pointer shadow-2xs"
-              title="문자 발송"
-            >
-              <MessageSquare className="w-3.5 h-3.5" />
-            </a>
+                <a
+                  href={`sms:${activeDriver.phone}`}
+                  className="w-9 h-9 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 flex items-center justify-center transition-all cursor-pointer shadow-2xs"
+                  title="문자 발송"
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                </a>
+              </>
+            )}
           </div>
 
           {/* Profile Details List */}
@@ -307,7 +419,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
             <div className="flex items-center justify-between">
               <span className="text-slate-400 font-semibold">생년월일</span>
               <span className="font-mono font-bold text-slate-700">
-                {activeDriver.birthDate}
+                {activeDriver.birthDate || '미등록'}
               </span>
             </div>
 
@@ -321,27 +433,32 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
             <div className="flex items-center justify-between">
               <span className="text-slate-400 font-semibold">언어 가능</span>
               <div className="flex items-center gap-1.5 font-bold text-slate-800">
-                {activeDriver.languages.map((lang, idx) => (
-                  <span key={idx} className="flex items-center gap-1">
-                    <span>{activeDriver.flags[idx] || '🌐'}</span>
-                    <span>{lang}</span>
+                {activeDriver.englishAvailable ? (
+                  <span className="flex items-center gap-1 text-[#1E60F3] bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 font-black">
+                    <span>🇺🇸</span>
+                    <span>영어 가능</span>
                   </span>
-                ))}
+                ) : (
+                  <span className="flex items-center gap-1 text-slate-700">
+                    <span>🇰🇷</span>
+                    <span>한국어</span>
+                  </span>
+                )}
               </div>
             </div>
 
             <div className="flex items-center justify-between">
-              <span className="text-slate-400 font-semibold">가입일</span>
+              <span className="text-slate-400 font-semibold">가입/등록일</span>
               <span className="font-mono font-bold text-slate-700">
-                {activeDriver.joinedDate}
+                {activeDriver.joinedDate || '미등록'}
               </span>
             </div>
 
-            {activeDriver.plate && (
+            {activeDriver.vehicleModel && activeDriver.vehicleModel !== '차량 미지정' && (
               <div className="flex items-center justify-between pt-1 border-t border-slate-200/60">
                 <span className="text-slate-400 font-semibold">배정 차량</span>
                 <span className="font-bold text-slate-800">
-                  {activeDriver.vehicleModel} ({activeDriver.plate})
+                  {activeDriver.vehicleModel} ({activeDriver.carNumber || activeDriver.vehicleNo})
                 </span>
               </div>
             )}
@@ -350,53 +467,72 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
           {/* Card: 최근 운행일 */}
           <div className="space-y-1.5">
             <h4 className="text-xs font-black text-slate-900">최근 운행일</h4>
-            <div className="p-3 bg-blue-50/40 rounded-xl border border-blue-100 flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-blue-100 text-[#1E60F3] flex items-center justify-center shrink-0">
-                <Plane className="w-3.5 h-3.5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-[11px] font-mono font-extrabold text-[#1E60F3]">
-                  {activeDriver.recentTripDate}
+            {activeDriver.recentTripDate ? (
+              <div className="p-3 bg-blue-50/40 rounded-xl border border-blue-100 flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-blue-100 text-[#1E60F3] flex items-center justify-center shrink-0">
+                  <Plane className="w-3.5 h-3.5" />
                 </div>
-                <div className="text-xs font-black text-slate-800 truncate mt-0.5">
-                  {activeDriver.recentTripRoute}
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] font-mono font-extrabold text-[#1E60F3]">
+                    {activeDriver.recentTripDate}
+                  </div>
+                  <div className="text-xs font-black text-slate-800 truncate mt-0.5">
+                    {activeDriver.recentTripRoute || '운행 일정 완료'}
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-400 font-medium">
+                배정된 운행 이력이 없습니다.
+              </div>
+            )}
           </div>
 
-          {/* Card: 메모 (Editable) */}
+          {/* Card: 메모 (Editable and Persisted to DB) */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <h4 className="text-xs font-black text-slate-900">메모</h4>
-              <button
-                type="button"
-                onClick={() => setIsEditingMemo(!isEditingMemo)}
-                className="px-2 py-0.5 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-[11px] font-bold text-slate-600 cursor-pointer flex items-center gap-1 shadow-2xs"
-              >
-                <Edit2 className="w-3 h-3 text-slate-400" />
-                <span>{isEditingMemo ? '취소' : '수정'}</span>
-              </button>
+              <h4 className="text-xs font-black text-slate-900">관리자 메모</h4>
+              {!isEditingMemo ? (
+                <button
+                  type="button"
+                  onClick={handleStartEditMemo}
+                  className="px-2 py-0.5 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-[11px] font-bold text-slate-600 cursor-pointer flex items-center gap-1 shadow-2xs"
+                >
+                  <Edit2 className="w-3 h-3 text-slate-400" />
+                  <span>수정</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsEditingMemo(false)}
+                  className="px-2 py-0.5 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-[11px] font-bold text-slate-600 cursor-pointer shadow-2xs"
+                >
+                  취소
+                </button>
+              )}
             </div>
 
             {isEditingMemo ? (
               <div className="space-y-2">
                 <textarea
-                  defaultValue={currentMemo}
-                  id="driver-memo-input"
+                  value={memoDraft}
+                  onChange={(e) => setMemoDraft(e.target.value)}
                   rows={3}
+                  placeholder="기사 특이사항, 의전 스타일, 비고 등..."
                   className="w-full p-2.5 text-xs font-medium text-slate-800 bg-white border border-blue-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs leading-relaxed"
                 />
                 <button
                   type="button"
-                  onClick={() => {
-                    const el = document.getElementById('driver-memo-input') as HTMLTextAreaElement;
-                    if (el) handleSaveMemo(el.value);
-                  }}
-                  className="w-full py-1.5 rounded-lg bg-[#1E60F3] text-white text-xs font-bold shadow-2xs hover:bg-blue-600 transition-colors cursor-pointer flex items-center justify-center gap-1"
+                  onClick={handleSaveMemo}
+                  disabled={isSavingMemo}
+                  className="w-full py-1.5 rounded-lg bg-[#1E60F3] text-white text-xs font-bold shadow-2xs hover:bg-blue-600 disabled:opacity-50 transition-colors cursor-pointer flex items-center justify-center gap-1"
                 >
-                  <Check className="w-3.5 h-3.5" />
-                  <span>저장 완료</span>
+                  {isSavingMemo ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Check className="w-3.5 h-3.5" />
+                  )}
+                  <span>{isSavingMemo ? '저장 중...' : '저장 완료'}</span>
                 </button>
               </div>
             ) : (
@@ -422,16 +558,18 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
               <div className="flex items-center gap-1 text-xs font-bold text-slate-700">
                 <button
                   type="button"
+                  onClick={() => setWeekOffset((w) => w - 1)}
                   className="w-6 h-6 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 cursor-pointer"
                   title="이전 주"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />
                 </button>
                 <span className="font-mono font-extrabold text-[11px] text-slate-800">
-                  2026. 10. 26.(월) ~ 11. 01.(일)
+                  {weekInfo.weekLabel}
                 </span>
                 <button
                   type="button"
+                  onClick={() => setWeekOffset((w) => w + 1)}
                   className="w-6 h-6 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 cursor-pointer"
                   title="다음 주"
                 >
@@ -439,12 +577,15 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                 </button>
               </div>
 
-              <button
-                type="button"
-                className="px-2.5 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold cursor-pointer transition-colors"
-              >
-                오늘
-              </button>
+              {weekOffset !== 0 && (
+                <button
+                  type="button"
+                  onClick={() => setWeekOffset(0)}
+                  className="px-2.5 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold cursor-pointer transition-colors"
+                >
+                  오늘
+                </button>
+              )}
             </div>
           </div>
 
@@ -458,7 +599,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
               </div>
 
               {/* 7 Day Header Columns */}
-              {weekDays.map((day) => (
+              {weekInfo.days.map((day) => (
                 <div
                   key={day.fullDate}
                   className={`py-2 px-1 text-center transition-colors ${
@@ -491,10 +632,14 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                 </div>
 
                 {/* 7 Day Columns with Schedule Cards */}
-                {weekDays.map((day) => {
-                  const daySchedules = activeDriver.schedules.filter(
-                    (sch) => sch.dayIndex === day.dayIndex
-                  );
+                {weekInfo.days.map((day) => {
+                  // Match real schedule by dateStr if available, or dayIndex
+                  const daySchedules = activeDriver.schedules.filter((sch) => {
+                    if (sch.dateStr) {
+                      return sch.dateStr === day.fullDate;
+                    }
+                    return sch.dayIndex === day.dayIndex;
+                  });
 
                   return (
                     <div
@@ -512,8 +657,8 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                       {daySchedules.map((sch) => {
                         const isAirport = sch.type === 'airport';
                         const isEvent = sch.type === 'event';
-                        const topPct = ((sch.startHour - 6) / 16) * 100;
-                        const heightPct = (sch.durationHours / 16) * 100;
+                        const topPct = Math.max(0, Math.min(95, ((sch.startHour - 6) / 16) * 100));
+                        const heightPct = Math.max(8, Math.min(50, (sch.durationHours / 16) * 100));
 
                         return (
                           <div
@@ -533,10 +678,10 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                             <div className="min-w-0 flex-1 flex flex-col justify-between">
                               <div>
                                 <div className="text-[9.5px] font-extrabold text-blue-900 font-mono tracking-tight leading-tight">
-                                  {sch.type === 'meeting' ? '미팅' : `${sch.startTime} - ${sch.endTime}`}
+                                  {sch.startTime} - {sch.endTime}
                                 </div>
                                 <div className="text-[10px] font-black text-slate-900 leading-tight mt-0.5 line-clamp-2">
-                                  {sch.type === 'meeting' ? '19:00 - 21:00' : sch.route}
+                                  {sch.route}
                                 </div>
                               </div>
                               <div className="text-[9px] font-bold text-blue-600/90 leading-tight mt-0.5 truncate">

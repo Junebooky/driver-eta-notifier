@@ -27,20 +27,26 @@ export interface HqDriverSummary {
   phone: string; // cockpit.drivers.phone
   vehicleNo: string; // cockpit.drivers.vehicle_no
   carNumber: string; // cockpit.drivers.car_number
+  plate?: string; // alias for carNumber
   vehicleModel: string; // cockpit.drivers.vehicle_model or '차량 미지정'
   englishAvailable: boolean; // cockpit.drivers.english_available
   affiliationType: 'employed' | 'freelance'; // driver_meta.affiliation
   affiliationLabel: string; // '소속' | '프리랜서'
+  affiliation?: string; // alias for affiliationLabel
   residence: string; // driver_meta.residence || '미입력'
   careerYears?: number; // driver_meta.career_years
   avatarUrl?: string; // driver_meta.avatar_url || ''
   memo: string; // driver_meta.memo || ''
+  birthDate?: string;
+  joinedDate?: string;
   rating?: number; // ONLY if real DB rating exists, otherwise omitted
   reviewCount?: number;
   recentTripDate?: string | null; // Calculated from real schedules
   recentTripRoute?: string | null;
+  recentTrips?: { date: string; route: string }[];
   flags: string[]; // ['🇰🇷'] + (englishAvailable ? ['🇺🇸'] : [])
   languages: ('ko' | 'en' | string)[];
+  languageLabels?: string[];
   isAvailable: boolean;
   schedules: DriverScheduleItem[];
   createdAt: string;
@@ -118,10 +124,22 @@ export function mapDbDriverToHqSummary(
 
   const languages: ('ko' | 'en' | string)[] = ['ko'];
   const flags: string[] = ['🇰🇷'];
+  const languageLabels: string[] = ['한국어'];
   if (isEnglish) {
     languages.push('en');
     flags.push('🇺🇸');
+    languageLabels.push('영어');
   }
+
+  const recentTrips = driverSchedules.slice(0, 3).map((s: any) => ({
+    date: s.date ? String(s.date).slice(5, 10).replace('-', '.') : '',
+    route: `${s.origin || '출발'} ➔ ${s.destination || '도착'}`,
+  }));
+
+  const birthDate = meta.birth_date || '미등록';
+  const joinedDate = dbDriver.created_at
+    ? String(dbDriver.created_at).slice(0, 10).replace(/-/g, '. ') + '.'
+    : '미등록';
 
   return {
     id: dbDriver.id, // Real UUID from DB
@@ -129,21 +147,27 @@ export function mapDbDriverToHqSummary(
     phone: dbDriver.phone || '연락처 미등록',
     vehicleNo: dbDriver.vehicle_no || '미지정',
     carNumber: dbDriver.car_number || '차량 미등록',
+    plate: dbDriver.car_number || '',
     vehicleModel: dbDriver.vehicle_model || '차량 미지정',
     englishAvailable: isEnglish,
     affiliationType,
     affiliationLabel,
+    affiliation: affiliationLabel,
     residence: meta.residence || '미입력',
     careerYears: meta.career_years !== undefined ? Number(meta.career_years) : undefined,
     avatarUrl: meta.avatar_url || '',
     memo: meta.memo || '',
+    birthDate,
+    joinedDate,
     // Strict adherence to real DB integrity: NO fabricated ratings
     rating: meta.rating !== undefined ? Number(meta.rating) : undefined,
     reviewCount: meta.review_count !== undefined ? Number(meta.review_count) : undefined,
     recentTripDate,
     recentTripRoute,
+    recentTrips,
     flags,
     languages,
+    languageLabels,
     isAvailable: dbDriver.vehicle_status !== 'maintenance' && dbDriver.vehicle_status !== 'unavailable',
     schedules: mappedSchedules,
     createdAt: dbDriver.created_at || new Date().toISOString(),

@@ -11,40 +11,51 @@ import {
   MoreHorizontal,
   ChevronLeft,
   ChevronRight,
-  Filter,
+  Loader2,
 } from 'lucide-react';
-import { DriverItem, SAMPLE_DRIVERS } from './driverData';
+import { HqDriverSummary } from '@/types/driverHq';
+import { useHqDrivers } from '@/utils/useHqDrivers';
 import { haptics } from '@/utils/haptics';
 
 interface HqDriversTableViewProps {
   onSelectDriver: (driverId: string) => void;
   initialSearchQuery?: string;
   onOpenAddDriver?: () => void;
+  drivers?: HqDriverSummary[];
+  counts?: {
+    total: number;
+    employed: number;
+    freelance: number;
+    englishCount: number;
+  };
+  isLoading?: boolean;
 }
 
 export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
   onSelectDriver,
   initialSearchQuery = '',
   onOpenAddDriver,
+  drivers: propDrivers,
+  counts: propCounts,
+  isLoading: propIsLoading,
 }) => {
+  // If not passed from parent, use the custom hook
+  const hookState = useHqDrivers();
+  const drivers = propDrivers ?? hookState.drivers;
+  const counts = propCounts ?? hookState.counts;
+  const isLoading = propIsLoading ?? hookState.isLoading;
+
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [affiliationFilter, setAffiliationFilter] = useState<'all' | 'employed' | 'freelance'>('all');
   const [residenceFilter, setResidenceFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'vacation'>('all');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const pageSize = 10;
 
-  // KPI Counts
-  const counts = useMemo(() => {
-    const total = SAMPLE_DRIVERS.length;
-    const employed = SAMPLE_DRIVERS.filter((d) => d.affiliationType === 'employed').length;
-    const freelance = SAMPLE_DRIVERS.filter((d) => d.affiliationType === 'freelance').length;
-    return { total, employed, freelance };
-  }, []);
-
   // Filtered List
   const filteredDrivers = useMemo(() => {
-    return SAMPLE_DRIVERS.filter((driver) => {
+    return drivers.filter((driver) => {
       // Affiliation filter
       if (affiliationFilter !== 'all' && driver.affiliationType !== affiliationFilter) {
         return false;
@@ -57,6 +68,10 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
         }
       }
 
+      // Status filter
+      if (statusFilter === 'active' && !driver.isAvailable) return false;
+      if (statusFilter === 'vacation' && driver.isAvailable) return false;
+
       // Search query
       if (searchQuery.trim()) {
         const q = searchQuery.trim().toLowerCase();
@@ -64,13 +79,15 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
           driver.name.toLowerCase().includes(q) ||
           driver.phone.toLowerCase().includes(q) ||
           driver.residence.toLowerCase().includes(q) ||
-          driver.affiliationLabel.toLowerCase().includes(q);
+          driver.affiliationLabel.toLowerCase().includes(q) ||
+          (driver.vehicleModel && driver.vehicleModel.toLowerCase().includes(q)) ||
+          (driver.carNumber && driver.carNumber.toLowerCase().includes(q));
         if (!matches) return false;
       }
 
       return true;
     });
-  }, [affiliationFilter, residenceFilter, searchQuery]);
+  }, [drivers, affiliationFilter, residenceFilter, statusFilter, searchQuery]);
 
   // Pagination
   const totalPages = Math.max(1, Math.ceil(filteredDrivers.length / pageSize));
@@ -123,7 +140,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
           <div>
             <h1 className="text-xl font-black text-slate-900 tracking-tight">기사 관리</h1>
             <p className="text-xs text-slate-500 font-medium mt-0.5">
-              기사 정보를 관리하고, 프로필과 운행 일정을 확인할 수 있습니다.
+              실제 등록된 기사 정보를 조회하고, 상세 프로필과 운행 일정을 관리할 수 있습니다.
             </p>
           </div>
         </div>
@@ -139,7 +156,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                 setSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
-              placeholder="기사명, 연락처, 거주지 검색..."
+              placeholder="기사명, 연락처, 차종, 거주지..."
               className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1E60F3] focus:bg-white transition-all shadow-2xs"
             />
           </div>
@@ -214,11 +231,16 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
           {/* Status Dropdown */}
           <div className="relative">
             <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value as any);
+                setCurrentPage(1);
+              }}
               className="appearance-none bg-white border border-slate-200 rounded-xl px-3.5 py-1.5 pr-8 text-xs font-bold text-slate-700 hover:border-slate-300 focus:outline-none focus:ring-1 focus:ring-[#1E60F3] cursor-pointer shadow-2xs"
             >
-              <option value="all">전체</option>
+              <option value="all">운행 상태 전체</option>
               <option value="active">운행 가능</option>
-              <option value="vacation">휴무</option>
+              <option value="vacation">휴무/점검</option>
             </select>
             <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
@@ -268,7 +290,14 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700">
-            {paginatedDrivers.length === 0 ? (
+            {isLoading ? (
+              <tr>
+                <td colSpan={9} className="py-16 text-center text-slate-400">
+                  <Loader2 className="w-8 h-8 mx-auto text-[#1E60F3] animate-spin mb-3" />
+                  <p className="font-bold text-slate-600">실시간 기사 데이터 동기화 중...</p>
+                </td>
+              </tr>
+            ) : paginatedDrivers.length === 0 ? (
               <tr>
                 <td colSpan={9} className="py-12 text-center text-slate-400">
                   <Users className="w-8 h-8 mx-auto text-slate-300 mb-2" />
@@ -295,21 +324,33 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                       />
                     </td>
 
-                    {/* Driver Name with Avatar */}
+                    {/* Driver Name with Avatar or Fallback Circle */}
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-3">
-                        <img
-                          src={driver.avatarUrl}
-                          alt={driver.name}
-                          onError={(e) => {
-                            // Fallback if image not found
-                            (e.target as HTMLElement).style.display = 'none';
-                          }}
-                          className="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0"
-                        />
-                        <span className="font-extrabold text-slate-900 group-hover:text-[#1E60F3] transition-colors">
-                          {driver.name}
-                        </span>
+                        {driver.avatarUrl ? (
+                          <img
+                            src={driver.avatarUrl}
+                            alt={driver.name}
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.display = 'none';
+                            }}
+                            className="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-blue-50 text-[#1E60F3] border border-blue-100 font-black text-xs flex items-center justify-center shrink-0">
+                            {driver.name.slice(0, 1)}
+                          </div>
+                        )}
+                        <div>
+                          <div className="font-extrabold text-slate-900 group-hover:text-[#1E60F3] transition-colors">
+                            {driver.name}
+                          </div>
+                          {driver.vehicleModel && driver.vehicleModel !== '차량 미지정' && (
+                            <div className="text-[10.5px] text-slate-400 font-semibold truncate max-w-[140px]">
+                              {driver.vehicleModel}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </td>
 
@@ -328,7 +369,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
 
                     {/* Contact Phone */}
                     <td className="py-3 px-4 font-mono font-bold text-slate-800">
-                      {driver.phone}
+                      {driver.phone || '-'}
                     </td>
 
                     {/* Residence */}
@@ -340,22 +381,30 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-1.5 text-sm">
                         {driver.flags.map((flag, idx) => (
-                          <span key={idx}>{flag}</span>
+                          <span key={idx} title={flag === '🇺🇸' ? '영어 가능' : '한국어'}>
+                            {flag}
+                          </span>
                         ))}
                       </div>
                     </td>
 
-                    {/* Rating */}
+                    {/* Rating (Real only; no fabricated ratings) */}
                     <td className="py-3 px-4">
-                      <div className="flex items-center gap-1 text-amber-500 font-extrabold text-xs">
-                        <Star className="w-3.5 h-3.5 fill-amber-400 shrink-0" />
-                        <span>{driver.rating.toFixed(1)}</span>
-                      </div>
+                      {driver.rating !== undefined && driver.rating !== null ? (
+                        <div className="flex items-center gap-1 text-amber-500 font-extrabold text-xs">
+                          <Star className="w-3.5 h-3.5 fill-amber-400 shrink-0" />
+                          <span>{driver.rating.toFixed(1)}</span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-400 font-bold text-xs">-</span>
+                      )}
                     </td>
 
                     {/* Recent Trip Date */}
                     <td className="py-3 px-4 font-mono text-slate-600">
-                      {driver.recentTripDate}
+                      {driver.recentTripDate || (
+                        <span className="text-slate-400 font-normal text-[11px]">이력 없음</span>
+                      )}
                     </td>
 
                     {/* Actions */}
@@ -425,12 +474,9 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
 
         {/* Page size indicator */}
         <div className="flex items-center gap-1.5 text-slate-500 font-semibold">
-          <select className="bg-transparent border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-700 cursor-pointer">
-            <option>10개씩 보기</option>
-          </select>
+          <span className="text-slate-600 font-bold">10개씩 보기</span>
         </div>
       </div>
     </div>
   );
 };
-
