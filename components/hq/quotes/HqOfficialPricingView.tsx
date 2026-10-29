@@ -18,7 +18,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { OfficialPriceCard, OfficialPriceRule } from '@/types/officialPricingHq';
-import { STANDARD_VEHICLE_SKU_MAPPINGS } from '@/lib/pricing/officialPricingService';
+import { STANDARD_VEHICLE_SKU_MAPPINGS } from '@/lib/pricing/officialPricingSkus';
 
 interface HqOfficialPricingViewProps {
   onOpenQuoteModal: () => void;

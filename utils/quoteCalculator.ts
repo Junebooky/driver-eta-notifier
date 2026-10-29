@@ -4,9 +4,11 @@ import { normalizeDateToIso, normalizeTimeHHmm } from '@/utils/dispatchConflictD
 import { DEFAULT_VEHICLE_PRICING_PRESETS, findVehiclePricingPreset } from '@/utils/settlementCalculator';
 import {
   calculateOfficialTariffQuote,
+} from '@/lib/pricing/officialPricingService';
+import {
   resolveVehicleProductSku,
   OFFICIAL_TARIFF_VERSION,
-} from '@/lib/pricing/officialPricingService';
+} from '@/lib/pricing/officialPricingSkus';
 import { OfficialServiceCategory } from '@/types/officialPricingHq';
 
 export function generateQuoteNumber(dateStr: string, index: number = 1): string {
@@ -52,7 +54,19 @@ export async function calculateQuote(input: QuoteCalculationInput): Promise<HqQu
       let resolvedSku = input.vehicleProductCode;
       if (!resolvedSku) {
         const skuRes = resolveVehicleProductSku(input.vehicleModel);
-        if (skuRes.code) resolvedSku = skuRes.code;
+        if (skuRes.isAmbiguous) {
+          throw new Error(
+            skuRes.notes ||
+              `[${input.vehicleModel}] 모델은 세부 트림(최고급/일반/셔틀/하이리무진 등) 확인이 필요합니다. 관리자 수동 선택을 진행해 주세요.`
+          );
+        }
+        if (skuRes.code) {
+          resolvedSku = skuRes.code;
+        } else {
+          throw new Error(
+            `[${input.vehicleModel}] 차종에 해당하는 2026 공식 상품 SKU를 찾을 수 없습니다. 공식 요금표에서 상품을 지정해 주세요.`
+          );
+        }
       }
 
       // If we have a valid 2026 SKU code, calculate using 2026 official calculation
@@ -141,8 +155,10 @@ export async function calculateQuote(input: QuoteCalculationInput): Promise<HqQu
           updatedAt: nowIso,
         };
       }
-    } catch (err) {
-      console.warn('[QuoteCalculator] Notice falling back from 2026 official pricing to legacy:', err);
+    } catch (err: any) {
+      // P0 Review Requirement 4: Strictly forbid silent fallback to legacy pricing when official tariff is requested!
+      console.error('[QuoteCalculator] 2026 official pricing calculation error:', err);
+      throw new Error(`2026 공식 요금 산출 실패: ${err?.message || err}`);
     }
   }
 

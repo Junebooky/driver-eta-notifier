@@ -1,10 +1,13 @@
 import {
-  resolveVehicleProductSku,
   calculateOfficialTariffQuote,
+} from '@/lib/pricing/officialPricingService';
+import {
+  resolveVehicleProductSku,
   STANDARD_VEHICLE_SKU_MAPPINGS,
   OFFICIAL_TARIFF_VERSION,
-} from '@/lib/pricing/officialPricingService';
+} from '@/lib/pricing/officialPricingSkus';
 import { calculateQuote } from '@/utils/quoteCalculator';
+import { requireHqAdmin, signCockpitSession } from '@/lib/auth/serverAuth';
 import assert from 'node:assert';
 
 async function runOfficialPricingTests() {
@@ -171,7 +174,82 @@ async function runOfficialPricingTests() {
   assert.strictEqual(quoteItem.appliedPricingSnapshot?.vehicleProductCode, 'genesis_g90_donghaeng');
   console.log('✓ Snapshot immutability verified.');
 
-  console.log('\n>>> ALL 7 OFFICIAL PRICING TESTS PASSED! <<<');
+  // Test 8: P0-3 Strict Disambiguation (Plain models must NOT auto-infer high trim)
+  console.log('8. Testing ambiguous SKU resolution (Plain models must return isAmbiguous: true)...');
+  const ambiguousCarnival = resolveVehicleProductSku('카니발');
+  assert.strictEqual(ambiguousCarnival.isAmbiguous, true);
+  assert.strictEqual(ambiguousCarnival.code, null);
+
+  const ambiguous519 = resolveVehicleProductSku('스프린터 519');
+  assert.strictEqual(ambiguous519.isAmbiguous, true);
+  assert.strictEqual(ambiguous519.code, null);
+
+  const ambiguous319 = resolveVehicleProductSku('스프린터 319');
+  assert.strictEqual(ambiguous319.isAmbiguous, true);
+  assert.strictEqual(ambiguous319.code, null);
+
+  const ambiguousG90 = resolveVehicleProductSku('제네시스 G90');
+  assert.strictEqual(ambiguousG90.isAmbiguous, true);
+  assert.strictEqual(ambiguousG90.code, null);
+
+  const ambiguousStaria = resolveVehicleProductSku('스타리아');
+  assert.strictEqual(ambiguousStaria.isAmbiguous, true);
+  assert.strictEqual(ambiguousStaria.code, null);
+  console.log('✓ Ambiguous trim detection verified (Zero over-inference).');
+
+  // Test 9: P0-4 Forbid silent legacy fallback on official quote calculation
+  console.log('9. Testing rejection of silent legacy fallback when official tariff is requested...');
+  let didThrowOnAmbiguous = false;
+  try {
+    await calculateQuote({
+      customerName: '테스트고객',
+      date: '2026-11-01',
+      origin: '서울 강남',
+      destination: '인천공항 T2',
+      vehicleModel: '카니발', // Ambiguous! Must throw, not silently fall back to legacy 10h presets
+      tariffVersion: OFFICIAL_TARIFF_VERSION,
+    });
+  } catch (err: any) {
+    didThrowOnAmbiguous = true;
+    assert(err.message.includes('2026 공식 요금 산출 실패'));
+    assert(err.message.includes('구분이 필요합니다') || err.message.includes('세부 트림'));
+  }
+  assert.strictEqual(didThrowOnAmbiguous, true, 'calculateQuote must throw on ambiguous SKU rather than silently falling back');
+  console.log('✓ Silent legacy fallback strictly forbidden and verified.');
+
+  // Test 10: P0-1 Draft quarantine verification in calculation result
+  console.log('10. Testing unapproved draft tariff quarantine status in calculation result...');
+  const draftQuote = await calculateOfficialTariffQuote({
+    tariffVersion: OFFICIAL_TARIFF_VERSION,
+    serviceCategory: 'daily_metro',
+    vehicleProductCode: 'sprinter_519_premium',
+    vehicleCount: 1,
+  });
+  assert.strictEqual(draftQuote.publicationStatus, 'draft');
+  assert.strictEqual(draftQuote.isDraftPreview, true);
+  console.log('✓ Draft publication status quarantine verified.');
+
+  // Test 11: P0-6 Driver token unauthorized access to HQ Admin endpoints (403 Forbidden)
+  console.log('11. Testing HQ Admin authorization enforcement (rejecting driver tokens with 403)...');
+  const driverToken = signCockpitSession({
+    userId: 'driver-test-user-id',
+    org: 'vip_limousine_korea',
+    role: 'driver',
+    driverName: '김기사',
+    vehicleNo: '1호차',
+  });
+  const mockReq = new Request('http://localhost:3000/api/hq/drivers', {
+    headers: {
+      Authorization: `Bearer ${driverToken}`,
+    },
+  });
+  const authRes = await requireHqAdmin(mockReq);
+  assert.strictEqual(authRes.ok, false);
+  assert.strictEqual(authRes.statusCode, 403);
+  assert(authRes.error?.includes('403 Forbidden'));
+  console.log('✓ Driver account access to HQ Admin rejected with 403 Forbidden.');
+
+  console.log('\n>>> ALL 11 OFFICIAL PRICING & SECURITY TESTS PASSED! <<<');
 }
 
 runOfficialPricingTests().catch((err) => {

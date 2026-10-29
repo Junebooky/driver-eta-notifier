@@ -21,63 +21,80 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'quoteNo가 필요합니다.' }, { status: 400 });
     }
 
-    // 1. Fetch or load target quote from DB if not fully provided
-    let targetQuote: HqQuoteItem | null = providedQuote || null;
-    let targetCustomerId: string | null = targetQuote?.customerId || null;
+    // 1. Authoritative DB Lookup: Fetch saved quote strictly from DB
+    let dbQuote: HqQuoteItem | null = null;
+    let targetCustomerId: string | null = null;
 
-    if (!targetQuote || !targetCustomerId) {
-      const { data: customers } = await supabaseAdmin
-        .from('customers')
-        .select('id, quotes');
+    const { data: customers, error: dbErr } = await supabaseAdmin
+      .from('customers')
+      .select('id, quotes');
 
-      for (const cust of customers || []) {
-        if (Array.isArray(cust.quotes)) {
-          const match = cust.quotes.find((q: any) => q.quoteNo === quoteNo);
-          if (match) {
-            targetQuote = match;
-            targetCustomerId = cust.id;
-            break;
-          }
+    if (dbErr) {
+      return NextResponse.json({ ok: false, error: dbErr.message }, { status: 500 });
+    }
+
+    for (const cust of customers || []) {
+      if (Array.isArray(cust.quotes)) {
+        const match = cust.quotes.find((q: any) => q.quoteNo === quoteNo);
+        if (match) {
+          dbQuote = match;
+          targetCustomerId = cust.id;
+          break;
         }
       }
     }
 
-    if (!targetQuote || !targetCustomerId) {
+    if (!dbQuote || !targetCustomerId) {
       return NextResponse.json(
-        { ok: false, error: `고객사 견적서(${quoteNo})를 찾을 수 없습니다.` },
+        { ok: false, error: `고객사 견적서(${quoteNo})를 DB에서 찾을 수 없습니다.` },
         { status: 404 }
       );
     }
 
-    // 2. Server-side Quote Verification (Preserve immutable snapshot if present, otherwise recalculate)
-    let verifiedQuote: HqQuoteItem;
-    if (targetQuote.appliedPricingSnapshot && targetQuote.tariffVersion) {
-      // Snapshot immutability: past locked quotes preserve their exact historic numbers
-      verifiedQuote = { ...targetQuote };
-    } else {
-      verifiedQuote = await calculateQuote({
-        customerId: targetCustomerId,
-        customerName: targetQuote.customerName,
-        contactPerson: targetQuote.contactPerson,
-        contactPhone: targetQuote.contactPhone,
-        date: targetQuote.date,
-        serviceStartTime: targetQuote.serviceStartTime,
-        serviceEndTime: targetQuote.serviceEndTime,
-        serviceHours: targetQuote.serviceHours,
-        origin: targetQuote.origin,
-        destination: targetQuote.destination,
-        vehicleModel: targetQuote.vehicleModel,
-        vehicleCount: targetQuote.vehicleCount,
-        driverLanguage: targetQuote.driverLanguage,
-        serviceMode: targetQuote.serviceMode,
-        notes: targetQuote.notes,
-        tariffVersion: targetQuote.tariffVersion,
-        vehicleProductCode: targetQuote.vehicleProductCode,
-        serviceCategory: targetQuote.serviceCategory as any,
-      });
-      verifiedQuote.quoteNo = targetQuote.quoteNo;
-      verifiedQuote.customerId = targetCustomerId;
+    // P0-1 & P0-5: Check status - reject already converted quotes
+    if (dbQuote.status === 'converted') {
+      return NextResponse.json(
+        { ok: false, error: `견적서(${quoteNo})는 이미 예약으로 전환 완료되었습니다.` },
+        { status: 409 }
+      );
     }
+
+    // P0-1: Block conversion if 2026 tariff status is unapproved (draft)
+    if (dbQuote.tariffVersion === 'vlk_2026_initial') {
+      const pubStatus = dbQuote.appliedPricingSnapshot?.publicationStatus;
+      if (pubStatus !== 'approved') {
+        return NextResponse.json(
+          {
+            ok: false,
+            error:
+              '2026년도 공식 요율표는 현재 미승인(draft) 상태로 관리자 시뮬레이션 미리보기 전용입니다. 공식 승인(approved) 전에는 실예약 전환이 차단됩니다.',
+            isDraftPreview: true,
+          },
+          { status: 403 }
+        );
+      }
+    }
+
+    // P0-5: Client snapshot tampering check - reject mismatched client snapshot
+    if (providedQuote) {
+      const priceMismatch =
+        (providedQuote.supplyPriceTotal !== undefined && providedQuote.supplyPriceTotal !== dbQuote.supplyPriceTotal) ||
+        (providedQuote.estimatedGrandTotal !== undefined && providedQuote.estimatedGrandTotal !== dbQuote.estimatedGrandTotal) ||
+        (providedQuote.vehicleProductCode && providedQuote.vehicleProductCode !== dbQuote.vehicleProductCode);
+
+      if (priceMismatch) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: '클라이언트 전달 견적 금액/상품이 DB 저장 원본 견적서와 일치하지 않습니다 (위변조 또는 불일치 방지).',
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    // 2. Authoritative verified quote from DB
+    const verifiedQuote: HqQuoteItem = { ...dbQuote, customerId: targetCustomerId };
 
     // 3. Prepare Vehicle Schedules Array for Atomic RPC Conversion
     const count = Math.max(1, verifiedQuote.vehicleCount || 1);

@@ -5,8 +5,8 @@ import { mapDbDriverToHqSummary, HqDriverSummary } from '@/types/driverHq';
 
 export async function GET(req: NextRequest) {
   try {
-    // 1. Authenticate (Maintains local dev auto-auth compatibility)
-    const auth = await verifyServerAuth(req);
+    // 1. Strictly require HQ Admin authorization (Prevent driver accounts from accessing full driver roster)
+    const auth = await requireHqAdmin(req);
     if (!auth.ok || !auth.session) {
       return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
     }

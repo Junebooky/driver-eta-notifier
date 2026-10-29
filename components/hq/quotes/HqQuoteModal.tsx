@@ -21,7 +21,10 @@ import {
 } from 'lucide-react';
 import { HqQuoteItem, QuoteCalculationInput } from '@/types/quoteHq';
 import { OfficialServiceCategory } from '@/types/officialPricingHq';
-import { STANDARD_VEHICLE_SKU_MAPPINGS, OFFICIAL_TARIFF_VERSION } from '@/lib/pricing/officialPricingService';
+import {
+  STANDARD_VEHICLE_SKU_MAPPINGS,
+  OFFICIAL_TARIFF_VERSION,
+} from '@/lib/pricing/officialPricingSkus';
 import { VipChauffeurCardModal } from '@/components/cards/VipChauffeurCardModal';
 import { ensureClientAuth } from '@/utils/cockpitClientAuth';
 
@@ -173,9 +176,20 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
   const currentSku = STANDARD_VEHICLE_SKU_MAPPINGS.find((m) => m.vehicleProductCode === vehicleProductCode);
   const isBusSku = currentSku?.tier === 'bus' || calculatedQuote?.quoteRequired === true;
 
+  // P0-1: Quarantine unapproved 'draft' tariff
+  const isDraftTariff =
+    calculatedQuote?.tariffVersion === OFFICIAL_TARIFF_VERSION &&
+    calculatedQuote?.appliedPricingSnapshot?.publicationStatus !== 'approved';
+
   // Explicit Save Quote to DB
   const handleSaveQuote = async () => {
     if (!calculatedQuote) return;
+    if (isDraftTariff) {
+      setErrorMessage(
+        '2026 공식 요율표는 현재 미승인(draft) 상태로 관리자 시뮬레이션 전용입니다. 공식 승인(approved) 전에는 고객 견적서 DB 저장이 제한됩니다.'
+      );
+      return;
+    }
     setIsSaving(true);
     setErrorMessage(null);
     setSaveSuccess(null);
@@ -200,6 +214,8 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
           serviceCategory,
           vehicleCount: Number(vehicleCount),
           driverLanguage: englishOption === 'fluent_upgrade' ? 'en' : 'ko',
+          englishOption,
+          excessKm: Number(excessKm) || 0,
           serviceMode,
           notes,
           quoteNo: calculatedQuote.quoteNo,
@@ -222,6 +238,12 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
   // Convert quote to live booking in cockpit.schedules
   const handleConvertToBooking = async () => {
     if (!calculatedQuote) return;
+    if (isDraftTariff) {
+      setErrorMessage(
+        '2026 공식 요율표는 현재 미승인(draft) 상태로 관리자 시뮬레이션 전용입니다. 공식 승인(approved) 전에는 확정 예약 전환이 차단됩니다.'
+      );
+      return;
+    }
     if (calculatedQuote.quoteRequired) {
       setErrorMessage('대형 버스는 유선 상담을 거친 후 단가 확정 시 예약으로 전환할 수 있습니다.');
       return;
@@ -661,6 +683,21 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                   </div>
                 )}
 
+                {/* P0-1: Quarantine unapproved 'draft' tariff banner */}
+                {isDraftTariff && (
+                  <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-300 text-xs flex items-start gap-2.5">
+                    <ShieldAlert className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
+                    <div>
+                      <span className="font-bold block text-amber-300">
+                        [2026 공식 요율 초안 - 관리자 시뮬레이션 전용]
+                      </span>
+                      <span className="text-[11px] text-amber-200/80 leading-relaxed block mt-0.5">
+                        본 요율표는 승인(approved) 전 상태(draft)이므로 실제 고객사 견적서 DB 저장 및 확정 예약 전환이 안전하게 제한됩니다.
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Feedback / Error Alerts */}
                 {errorMessage && (
                   <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-lg text-rose-300 text-xs flex items-center gap-2">
@@ -690,18 +727,25 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                   <button
                     type="button"
                     onClick={handleSaveQuote}
-                    disabled={isSaving || !calculatedQuote}
-                    className="w-full py-2.5 px-3 rounded-xl border border-amber-500/50 bg-amber-500/10 hover:bg-amber-500/20 disabled:opacity-50 text-amber-300 font-bold text-xs transition flex items-center justify-center gap-1.5"
+                    disabled={isSaving || !calculatedQuote || isDraftTariff}
+                    title={
+                      isDraftTariff
+                        ? '2026 공식 요율표가 미승인(draft) 상태이므로 고객 견적서 저장이 차단됩니다.'
+                        : undefined
+                    }
+                    className="w-full py-2.5 px-3 rounded-xl border border-amber-500/50 bg-amber-500/10 hover:bg-amber-500/20 disabled:opacity-40 disabled:cursor-not-allowed text-amber-300 font-bold text-xs transition flex items-center justify-center gap-1.5"
                   >
                     <FileText className="w-3.5 h-3.5 text-amber-400" />
-                    {isSaving ? '저장 중...' : '견적서 DB 저장'}
+                    {isSaving ? '저장 중...' : isDraftTariff ? 'DB 저장 (초안 잠김)' : '견적서 DB 저장'}
                   </button>
                   <button
                     type="button"
                     onClick={handleConvertToBooking}
-                    disabled={isConverting || !calculatedQuote || calculatedQuote.quoteRequired}
+                    disabled={isConverting || !calculatedQuote || calculatedQuote.quoteRequired || isDraftTariff}
                     title={
-                      calculatedQuote?.quoteRequired
+                      isDraftTariff
+                        ? '2026 공식 요율표가 미승인(draft) 상태이므로 확정 예약 전환이 차단됩니다.'
+                        : calculatedQuote?.quoteRequired
                         ? '대형 버스는 관리자 상담 후 단가 입력 시 예약으로 전환할 수 있습니다.'
                         : undefined
                     }
@@ -710,6 +754,8 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                     <CheckCircle2 className="w-3.5 h-3.5" />
                     {isConverting
                       ? '전환 중...'
+                      : isDraftTariff
+                      ? '예약 전환 (초안 차단)'
                       : calculatedQuote?.quoteRequired
                       ? '상담 필수 (전환 잠김)'
                       : '확정 예약 전환'}

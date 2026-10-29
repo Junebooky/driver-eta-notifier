@@ -7,6 +7,8 @@
  * - Dynamic SKU-based resolution.
  */
 
+export type OfficialPublicationStatus = 'draft' | 'approved' | 'archived';
+
 export type OfficialTariffVersion = 'vlk_2026_initial' | 'legacy';
 
 export type OfficialServiceCategory =
@@ -30,7 +32,7 @@ export interface OfficialPriceCard {
   airportIncheonKrw: number | null;
   quoteRequired: boolean;      // true for 22/28/45-seater buses
   vatExcluded: boolean;        // true (all official rates VAT exclusive)
-  publicationStatus: 'draft' | 'published' | 'archived';
+  publicationStatus: OfficialPublicationStatus;
   sourceLabel: string;
   notes: string | null;
 }
@@ -90,7 +92,8 @@ export interface OfficialQuoteLineItem {
 
 export interface OfficialQuoteCalculationResult {
   tariffVersion: string;
-  publicationStatus: 'draft' | 'published';
+  publicationStatus: OfficialPublicationStatus;
+  isDraftPreview?: boolean;
   pricingSource: 'official_2026';
   serviceCategory: OfficialServiceCategory;
   serviceCategoryLabel: string;

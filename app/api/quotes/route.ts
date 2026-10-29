@@ -76,6 +76,22 @@ export async function POST(req: Request) {
       verifiedQuote.quoteNo = body.quoteNo;
     }
 
+    // P0 Review Requirement 1: Block quote save for unapproved 'draft' tariff
+    if (verifiedQuote.tariffVersion === 'vlk_2026_initial') {
+      const pubStatus = verifiedQuote.appliedPricingSnapshot?.publicationStatus;
+      if (pubStatus !== 'approved') {
+        return NextResponse.json(
+          {
+            ok: false,
+            error:
+              '2026년도 공식 요율표는 현재 미승인(draft) 상태로 관리자 시뮬레이션 미리보기 전용입니다. 공식 승인(approved) 전에는 고객 견적서 DB 저장이 제한됩니다.',
+            isDraftPreview: true,
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     // 2. Execute atomic transactional quote save via Supabase RPC
     const { data: rpcResult, error: rpcErr } = await supabaseAdmin.rpc('save_customer_quote_atomic', {
       p_customer_id: body.customerId || null,
