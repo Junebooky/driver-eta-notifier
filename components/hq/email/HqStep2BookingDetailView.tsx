@@ -23,11 +23,12 @@ import {
   UserCheck,
   BookmarkCheck,
 } from 'lucide-react';
-import { AvailableDriverItem } from './HqDriverSelectModal';
+import { AvailableDriverItem, driverSupportsEnglish } from './HqDriverSelectModal';
 import { HqEmailSummary, HqEmailDetail, HqEmailExtractedDraft } from '@/types/emailHq';
 import { haptics } from '@/utils/haptics';
 import { HqPlaceSearchInput, PoiResult } from '@/components/hq/HqPlaceSearchInput';
 import { saveContactToCrm } from '@/utils/crmCustomerSync';
+import { getVehicleImageForModel, STANDARD_FLEET_MODELS } from '@/utils/vehicleSlotParser';
 
 export interface VehicleSlotAssignment {
   slotIndex: number;
@@ -41,10 +42,11 @@ export interface HqStep2BookingDetailViewProps {
   emailDetail?: HqEmailDetail | null;
   extractedDraft?: HqEmailExtractedDraft | null;
   vehicleSlots: VehicleSlotAssignment[];
-  onOpenDriverModal: (slotIndex: number) => void;
+  onOpenDriverModal: (slotIndex: number, requiredLanguage?: 'any' | 'english') => void;
   onConfirmDispatch: () => void;
   onBackToStep1: () => void;
   onUpdateDraft?: (updated: HqEmailExtractedDraft) => void;
+  onUpdateVehicleSlots?: (slots: VehicleSlotAssignment[]) => void;
   isDispatching?: boolean;
   dispatchError?: string | null;
   // Backward compatibility
@@ -60,12 +62,57 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
   onConfirmDispatch,
   onBackToStep1,
   onUpdateDraft,
+  onUpdateVehicleSlots,
   isDispatching = false,
   dispatchError = null,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'assign' | 'schedule' | 'history'>('assign');
-  const [selectedLanguage, setSelectedLanguage] = useState<'any' | 'english'>('any');
+  const [selectedLanguage, setSelectedLanguage] = useState<'any' | 'english'>(() => {
+    const sr = extractedDraft?.specialRequests || '';
+    if (/영어|english|외국인/i.test(sr)) return 'english';
+    return 'any';
+  });
   const [crmSavedNotice, setCrmSavedNotice] = useState<string | null>(null);
+
+  // Auto-sync language if draft specialRequests updates
+  React.useEffect(() => {
+    const sr = extractedDraft?.specialRequests || '';
+    if (/영어|english|외국인/i.test(sr)) {
+      setSelectedLanguage('english');
+    }
+  }, [extractedDraft?.specialRequests]);
+
+  // Vehicle slot manipulation handlers
+  const handleAddVehicleSlot = () => {
+    haptics.lightTap();
+    const next: VehicleSlotAssignment[] = [
+      ...vehicleSlots,
+      {
+        slotIndex: vehicleSlots.length,
+        vehicleModel: '차량 미지정',
+        driver: null,
+        status: 'unassigned',
+      },
+    ];
+    onUpdateVehicleSlots?.(next);
+  };
+
+  const handleRemoveVehicleSlot = (indexToRemove: number) => {
+    if (vehicleSlots.length <= 1) return;
+    haptics.lightTap();
+    const next = vehicleSlots
+      .filter((_, idx) => idx !== indexToRemove)
+      .map((slot, idx) => ({ ...slot, slotIndex: idx }));
+    onUpdateVehicleSlots?.(next);
+  };
+
+  const handleUpdateSlotModel = (index: number, newModel: string) => {
+    const next = [...vehicleSlots];
+    if (next[index]) {
+      next[index] = { ...next[index], vehicleModel: newModel };
+      onUpdateVehicleSlots?.(next);
+    }
+  };
 
   // Disambiguated Customer & Contact Entities
   const companyName = extractedDraft?.companyName || '미등록 고객사';
@@ -505,9 +552,11 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
               </button>
               <button
                 type="button"
-                className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1"
+                onClick={handleAddVehicleSlot}
+                className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1 active:scale-95 shadow-2xs"
+                title="요청 차량 슬롯 추가"
               >
-                <Plus className="w-3 h-3" />
+                <Plus className="w-3 h-3 text-[#1E60F3]" />
                 <span>차량 추가</span>
               </button>
             </div>
@@ -517,15 +566,18 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
           <div className="space-y-3.5">
             {vehicleSlots.map((slot, idx) => {
               const isAssigned = Boolean(slot.driver);
-              const vehicleImg =
-                idx === 0 ? '/images/car_sprinter.png' : '/images/car_g90.png';
+              const isEnglishCapable = driverSupportsEnglish(slot.driver);
+              const isLanguageMismatch = selectedLanguage === 'english' && isAssigned && !isEnglishCapable;
+              const vehicleImg = getVehicleImageForModel(slot.vehicleModel);
 
               return (
                 <div
                   key={slot.slotIndex}
                   className={`rounded-2xl border p-4 transition-all ${
                     isAssigned
-                      ? 'border-blue-300 bg-blue-50/20 shadow-xs'
+                      ? isLanguageMismatch
+                        ? 'border-amber-300 bg-amber-50/20 shadow-xs'
+                        : 'border-blue-300 bg-blue-50/20 shadow-xs'
                       : 'border-slate-200/90 bg-white shadow-2xs'
                   }`}
                 >
@@ -535,23 +587,49 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
                       <span className="w-5 h-5 rounded-full bg-blue-600 text-white font-black text-xs flex items-center justify-center shrink-0">
                         {idx + 1}
                       </span>
-                      <div className="flex items-center gap-1.5 cursor-pointer">
-                        <span className="text-xs font-black text-slate-900">
-                          {slot.vehicleModel}
-                        </span>
-                        <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                      {/* Vehicle Model Selector */}
+                      <div className="relative inline-flex items-center">
+                        <select
+                          value={slot.vehicleModel}
+                          onChange={(e) => handleUpdateSlotModel(idx, e.target.value)}
+                          className="text-xs font-black text-slate-900 bg-slate-50 hover:bg-white border border-slate-200 rounded-lg px-2 py-1 pr-6 hover:border-slate-300 focus:outline-hidden focus:border-[#1E60F3] cursor-pointer appearance-none shadow-2xs transition-colors"
+                        >
+                          {STANDARD_FLEET_MODELS.map((model) => (
+                            <option key={model} value={model}>
+                              {model}
+                            </option>
+                          ))}
+                          {!STANDARD_FLEET_MODELS.includes(slot.vehicleModel as any) && (
+                            <option value={slot.vehicleModel}>{slot.vehicleModel}</option>
+                          )}
+                        </select>
+                        <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-1.5 pointer-events-none" />
                       </div>
                     </div>
 
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        isAssigned
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : 'bg-amber-50 text-amber-700 border border-amber-200'
-                      }`}
-                    >
-                      {isAssigned ? '기사 지정됨' : '기사 미배정'}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          isAssigned
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : 'bg-amber-50 text-amber-700 border border-amber-200'
+                        }`}
+                      >
+                        {isAssigned ? '기사 지정됨' : '기사 미배정'}
+                      </span>
+
+                      {/* Remove slot button if multiple slots exist */}
+                      {vehicleSlots.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveVehicleSlot(idx)}
+                          className="w-6 h-6 rounded-lg border border-slate-200 hover:bg-rose-50 hover:border-rose-200 text-slate-400 hover:text-rose-600 transition-colors flex items-center justify-center cursor-pointer active:scale-95"
+                          title="차량 슬롯 삭제"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Body: Vehicle Image + Driver Selector */}
@@ -576,7 +654,7 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
                               className="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0"
                             />
                             <div className="min-w-0">
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="text-xs font-extrabold text-slate-900 truncate">
                                   {slot.driver.name} 기사
                                 </span>
@@ -584,17 +662,27 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
                                   <Star className="w-3 h-3 fill-amber-400" />
                                   <span>{slot.driver.rating}</span>
                                 </div>
+                                {isEnglishCapable && (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-[#1E60F3] border border-blue-200">
+                                    🇺🇸 영어 가능
+                                  </span>
+                                )}
                               </div>
                               <div className="text-[10px] text-slate-400 truncate mt-0.5">
                                 {slot.driver.plate || '차량 미지정'} · {slot.driver.residence}
                               </div>
+                              {isLanguageMismatch && (
+                                <div className="text-[10px] text-amber-700 font-bold mt-0.5">
+                                  ⚠️ 영어 불가 기사 (재배정 권장)
+                                </div>
+                              )}
                             </div>
                           </div>
 
                           <button
                             type="button"
-                            onClick={() => onOpenDriverModal(slot.slotIndex)}
-                            className="px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all cursor-pointer shrink-0"
+                            onClick={() => onOpenDriverModal(slot.slotIndex, selectedLanguage)}
+                            className="px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all cursor-pointer shrink-0 active:scale-95 shadow-2xs"
                           >
                             변경
                           </button>
@@ -603,14 +691,16 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
                         <div className="space-y-1.5">
                           <button
                             type="button"
-                            onClick={() => onOpenDriverModal(slot.slotIndex)}
+                            onClick={() => onOpenDriverModal(slot.slotIndex, selectedLanguage)}
                             className="w-full py-2.5 px-3 rounded-xl border border-blue-300 hover:border-blue-500 bg-blue-50/30 hover:bg-blue-50/60 text-[#1E60F3] text-xs font-extrabold transition-all flex items-center justify-between cursor-pointer active:scale-98 shadow-2xs"
                           >
-                            <span>가용 기사 선택</span>
+                            <span>
+                              {selectedLanguage === 'english' ? '🇺🇸 영어 가능 기사 선택' : '가용 기사 선택'}
+                            </span>
                             <ChevronDown className="w-4 h-4 text-blue-500" />
                           </button>
                           <p className="text-[10px] text-slate-500">
-                            * 배차 확정을 위해 가용 기사를 반드시 직접 지정해야 합니다.
+                            * 배차 확정을 위해 {selectedLanguage === 'english' ? '영어 가능 ' : ''}가용 기사를 반드시 직접 지정해야 합니다.
                           </p>
                         </div>
                       )}

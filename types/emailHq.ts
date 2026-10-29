@@ -23,6 +23,32 @@ export type EmailTripType =
   | 'modification'    // Change to existing booking
   | 'cancellation';   // Cancellation request
 
+export interface AvailableDriverItem {
+  id: string;
+  name: string;
+  rating: number;
+  reviewCount: number;
+  flags: string[];
+  languages: string[];
+  languageCodes?: ('ko' | 'en')[];
+  affiliation: string;
+  careerYears: number;
+  residence: string;
+  avatarUrl: string;
+  recentTrips: { date: string; route: string }[];
+  isAvailable: boolean;
+  phone?: string;
+  plate?: string;
+  vehicleModel?: string;
+}
+
+export interface VehicleSlotAssignment {
+  slotIndex: number;
+  vehicleModel: string;
+  driver: AvailableDriverItem | null;
+  status: 'unassigned' | 'assigned';
+}
+
 export interface HqGroupTripItem {
   id: string;
   passengerName: string;

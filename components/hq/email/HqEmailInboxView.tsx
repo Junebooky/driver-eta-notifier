@@ -40,6 +40,8 @@ import {
   AvailableDriverItem,
 } from './HqDriverSelectModal';
 import { HqComposeEmailModal } from './HqComposeEmailModal';
+import { HqEmailWorkflowStepper, WorkflowStepId } from './HqEmailWorkflowStepper';
+import { parseVehicleSlotsFromRequestedClass } from '@/utils/vehicleSlotParser';
 import { mapScheduleItemToHqBooking, getKstTodayDateStr } from '@/utils/dispatchConflictDetector';
 import { saveEmailDraft, getEmailDraft, deleteEmailDraft } from '@/utils/emailHqStorage';
 
@@ -67,6 +69,7 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
   const searchParams = useSearchParams();
   const urlStep = searchParams?.get('step') as EmailWorkflowStep | null;
   const urlDriverModal = searchParams?.get('driverModal') === 'true';
+  const urlDriverLang = searchParams?.get('lang') === 'english' ? 'english' : 'any';
   const urlDemo = searchParams?.get('demo') === 'true';
 
   // 1. Live Inbox State
@@ -152,7 +155,7 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
     return 'step1_extract';
   });
 
-  // 8. Vehicle Slot assignments (for Step 2 and Step 4)
+  // 8. Vehicle Slot assignments (for Step 2 and Step 4) - Dynamically linked to AI draft!
   const [vehicleSlots, setVehicleSlots] = useState<VehicleSlotAssignment[]>(() => {
     if (urlStep === 'step4_dispatch_done') {
       return [
@@ -170,25 +173,26 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
         },
       ];
     }
+    // Check initial draft if demo or existing
+    if (urlDemo && REFERENCE_EMAILS[0]?.extractedDraft?.requestedVehicleClass) {
+      return parseVehicleSlotsFromRequestedClass(REFERENCE_EMAILS[0].extractedDraft.requestedVehicleClass);
+    }
+    // Strictly NO dummy fallback ([319 CDI, G90 LWB])!
+    // Initialize empty/unassigned default slot
     return [
       {
         slotIndex: 0,
-        vehicleModel: '스프린터 319 CDI',
-        driver: null,
-        status: 'unassigned',
-      },
-      {
-        slotIndex: 1,
-        vehicleModel: 'G90 LWB',
+        vehicleModel: '차량 미지정',
         driver: null,
         status: 'unassigned',
       },
     ];
   });
 
-  // 9. Driver Selection Modal (Step 3)
+  // 9. Driver Selection Modal (Step 3) & Language Condition Filtering
   const [isDriverModalOpen, setIsDriverModalOpen] = useState<boolean>(urlDriverModal);
   const [activeSlotIndex, setActiveSlotIndex] = useState<number>(0);
+  const [requiredDriverLanguage, setRequiredDriverLanguage] = useState<'any' | 'english'>(urlDriverLang);
 
   // 10. Compose Modal
   const [isComposeOpen, setIsComposeOpen] = useState<boolean>(false);
@@ -382,6 +386,13 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
     return draftsByEmailId[selectedEmailId] || currentDetail?.extractedDraft || null;
   }, [draftsByEmailId, currentDetail, selectedEmailId]);
 
+  // Sync vehicle slots whenever email changes or workflow moves to step2 if slots are uninitialized
+  useEffect(() => {
+    if (workflowStep === 'step2_booking_detail' && vehicleSlots.length === 1 && vehicleSlots[0].vehicleModel === '차량 미지정' && currentDraft?.requestedVehicleClass) {
+      setVehicleSlots(parseVehicleSlotsFromRequestedClass(currentDraft.requestedVehicleClass));
+    }
+  }, [workflowStep, currentDraft?.requestedVehicleClass]);
+
   // Derived KPI counts
   const counts = useMemo(() => {
     const total = emails.length;
@@ -437,12 +448,28 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
     setSelectedEmailId(emailId);
     setWorkflowStep('step1_extract');
     setDispatchError(null);
+
+    // Sync vehicle slots dynamically from draft of selected email (no dummy default!)
+    const targetDraft = draftsByEmailId[emailId];
+    if (targetDraft?.requestedVehicleClass) {
+      setVehicleSlots(parseVehicleSlotsFromRequestedClass(targetDraft.requestedVehicleClass));
+    } else {
+      setVehicleSlots([
+        {
+          slotIndex: 0,
+          vehicleModel: '차량 미지정',
+          driver: null,
+          status: 'unassigned',
+        },
+      ]);
+    }
   };
 
-  // Open Step 3 Driver Modal for a specific vehicle slot
-  const handleOpenDriverModal = (slotIndex: number) => {
+  // Open Step 3 Driver Modal for a specific vehicle slot with optional language condition
+  const handleOpenDriverModal = (slotIndex: number, requiredLanguage: 'any' | 'english' = 'any') => {
     haptics.lightTap();
     setActiveSlotIndex(slotIndex);
+    setRequiredDriverLanguage(requiredLanguage);
     setIsDriverModalOpen(true);
   };
 
@@ -533,6 +560,11 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
         [currentSummary.id]: extracted,
       }));
       saveEmailDraft(extracted);
+
+      // Dynamically initialize vehicle slots based on AI extracted vehicle request (NO dummy vehicles!)
+      const newSlots = parseVehicleSlotsFromRequestedClass(extracted.requestedVehicleClass);
+      setVehicleSlots(newSlots);
+
       const metricsText = data.metrics?.totalMs ? ` (${(data.metrics.totalMs / 1000).toFixed(1)}초)` : '';
       showToast(`Gemini AI가 이메일에서 예약 정보를 성공적으로 추출했습니다${metricsText}.`);
     } catch (err: any) {
@@ -715,6 +747,44 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
     haptics.lightTap();
     setWorkflowStep('step1_extract');
     setDispatchError(null);
+    if (currentDraft?.requestedVehicleClass) {
+      setVehicleSlots(parseVehicleSlotsFromRequestedClass(currentDraft.requestedVehicleClass));
+    }
+  };
+
+  // Proceed from Step 1 to Step 2 Booking Detail (Register booking)
+  const handleProceedToBooking = () => {
+    haptics.success();
+    // Synchronize vehicle slots dynamically from current draft (STRICT: no dummy vehicles!)
+    const targetSlots = parseVehicleSlotsFromRequestedClass(currentDraft?.requestedVehicleClass);
+    setVehicleSlots(targetSlots);
+    setWorkflowStep('step2_booking_detail');
+  };
+
+  // 5-Step Workflow: 1: 이메일 확인, 2: AI 추출, 3: 정보 검토/수정, 4: 예약 등록, 5: 차량/기사 배정
+  const calculatedCurrentStep: WorkflowStepId = useMemo(() => {
+    if (workflowStep === 'step4_dispatch_done') return 5;
+    if (workflowStep === 'step2_booking_detail') return 5;
+    if (isExtractingAi) return 2;
+    if (currentDraft) return 3;
+    return 1;
+  }, [workflowStep, isExtractingAi, currentDraft]);
+
+  const handleStepperStepClick = (targetStep: WorkflowStepId) => {
+    haptics.selection();
+    if (targetStep === 1) {
+      setWorkflowStep('step1_extract');
+    } else if (targetStep === 2) {
+      if (!currentDraft && !isExtractingAi) {
+        handleExtractWithAi();
+      }
+    } else if (targetStep === 3) {
+      setWorkflowStep('step1_extract');
+    } else if (targetStep === 4 || targetStep === 5) {
+      if (currentDraft) {
+        handleProceedToBooking();
+      }
+    }
   };
 
   // Open Compose Modal
@@ -1023,7 +1093,19 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
         {/* ========================================================= */}
         {/* Dynamic Right Column: Sequential Multi-Step Workflow Card */}
         {/* ========================================================= */}
-        <div className="flex-1 min-w-0 w-full">
+        <div className="flex-1 min-w-0 w-full space-y-4">
+          {currentSummary && (
+            <div className="rounded-2xl border border-slate-200/90 overflow-hidden shadow-xs">
+              <HqEmailWorkflowStepper
+                currentStep={calculatedCurrentStep}
+                isExtractingAi={isExtractingAi}
+                hasDraft={Boolean(currentDraft)}
+                isDispatchDone={workflowStep === 'step4_dispatch_done'}
+                onStepClick={handleStepperStepClick}
+              />
+            </div>
+          )}
+
           {!currentSummary ? (
             <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-12 text-center text-slate-400 space-y-3">
               <Mail className="w-10 h-10 mx-auto text-slate-300" />
@@ -1035,7 +1117,7 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
               </p>
             </div>
           ) : (
-            <>
+            <div key={workflowStep} className="animate-step-slide">
               {workflowStep === 'step1_extract' && (
                 <HqStep1ExtractView
                   emailSummary={currentSummary}
@@ -1044,7 +1126,7 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                   isLoadingDetail={isLoadingDetail}
                   isExtractingAi={isExtractingAi}
                   onExtractWithAi={handleExtractWithAi}
-                  onProceedToBooking={() => setWorkflowStep('step2_booking_detail')}
+                  onProceedToBooking={handleProceedToBooking}
                   onSaveModifiedDraft={() => {
                     showToast('수정된 예약 초안이 저장되었습니다.');
                   }}
@@ -1062,6 +1144,7 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                   onConfirmDispatch={handleConfirmDispatch}
                   onBackToStep1={() => setWorkflowStep('step1_extract')}
                   onUpdateDraft={handleUpdateDraft}
+                  onUpdateVehicleSlots={setVehicleSlots}
                   isDispatching={isDispatching}
                   dispatchError={dispatchError}
                 />
@@ -1079,7 +1162,7 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                   dispatchedSchedule={dispatchedSchedule}
                 />
               )}
-            </>
+            </div>
           )}
         </div>
       </div>
@@ -1089,10 +1172,11 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
         isOpen={isDriverModalOpen}
         onClose={() => setIsDriverModalOpen(false)}
         onSelectDriver={handleSelectDriverFromModal}
-        targetVehicleName={vehicleSlots[activeSlotIndex]?.vehicleModel || '스프린터 319 CDI'}
+        targetVehicleName={vehicleSlots[activeSlotIndex]?.vehicleModel || '차량 미지정'}
         targetDate={currentDraft?.pickupDate || '2026. 10. 28. (수)'}
         targetTime={currentDraft?.pickupTime || '09:00'}
         initialDriverId={vehicleSlots[activeSlotIndex]?.driver?.id || (activeSlotIndex === 0 ? 'drv-kim' : 'drv-lee')}
+        requiredLanguage={requiredDriverLanguage}
       />
 
       {/* Compose / Customer Notification Email Modal */}

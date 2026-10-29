@@ -83,7 +83,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
   const pickupDate = extractedDraft?.pickupDate || '날짜 미지정';
   const pickupTime = extractedDraft?.pickupTime || '시간 미지정';
   const flightNumber = extractedDraft?.flightNumber || '';
-  const requestedVehicleClass = extractedDraft?.requestedVehicleClass || '카니발 하이리무진';
+  const requestedVehicleClass = extractedDraft?.requestedVehicleClass || '차량 미지정';
   const specialRequests = extractedDraft?.specialRequests || '';
 
   // Handle explicit CRM Save (Requires verified company and contact)

@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { X, Calendar, Clock, Star, Check, Globe } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Calendar, Clock, Star, Check, Globe, AlertCircle } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 export interface AvailableDriverItem {
@@ -10,7 +10,8 @@ export interface AvailableDriverItem {
   rating: number;
   reviewCount: number;
   flags: string[];
-  languages: string[];
+  languages: ('ko' | 'en' | 'ja' | string)[];
+  languageLabels?: string[];
   affiliation: string;
   careerYears: number;
   residence: string;
@@ -22,6 +23,13 @@ export interface AvailableDriverItem {
   vehicleModel?: string;
 }
 
+export function driverSupportsEnglish(driver?: AvailableDriverItem | null): boolean {
+  if (!driver || !driver.languages) return false;
+  return driver.languages.some(
+    (l) => l.toLowerCase() === 'en' || l.includes('영어') || l.toLowerCase() === 'english'
+  );
+}
+
 export const SAMPLE_AVAILABLE_DRIVERS: AvailableDriverItem[] = [
   {
     id: 'drv-kim',
@@ -29,7 +37,8 @@ export const SAMPLE_AVAILABLE_DRIVERS: AvailableDriverItem[] = [
     rating: 4.9,
     reviewCount: 128,
     flags: ['🇰🇷', '🇺🇸'],
-    languages: ['한국어', '영어'],
+    languages: ['ko', 'en'],
+    languageLabels: ['한국어', '영어'],
     affiliation: 'VIP Limousine Korea',
     careerYears: 8,
     residence: '서울 (강남)',
@@ -50,7 +59,8 @@ export const SAMPLE_AVAILABLE_DRIVERS: AvailableDriverItem[] = [
     rating: 4.8,
     reviewCount: 96,
     flags: ['🇰🇷'],
-    languages: ['한국어'],
+    languages: ['ko'],
+    languageLabels: ['한국어'],
     affiliation: 'VIP Limousine Korea',
     careerYears: 6,
     residence: '서울 (서초)',
@@ -70,7 +80,8 @@ export const SAMPLE_AVAILABLE_DRIVERS: AvailableDriverItem[] = [
     rating: 4.8,
     reviewCount: 84,
     flags: ['🇰🇷', '🌐'],
-    languages: ['한국어', '일본어'],
+    languages: ['ko', 'ja'],
+    languageLabels: ['한국어', '일본어'],
     affiliation: 'VIP Limousine Korea',
     careerYears: 5,
     residence: '경기 (성남)',
@@ -90,7 +101,8 @@ export const SAMPLE_AVAILABLE_DRIVERS: AvailableDriverItem[] = [
     rating: 4.7,
     reviewCount: 72,
     flags: ['🇰🇷'],
-    languages: ['한국어'],
+    languages: ['ko'],
+    languageLabels: ['한국어'],
     affiliation: 'VIP Limousine Korea',
     careerYears: 7,
     residence: '서울 (송파)',
@@ -107,7 +119,8 @@ export const SAMPLE_AVAILABLE_DRIVERS: AvailableDriverItem[] = [
     rating: 4.6,
     reviewCount: 58,
     flags: ['🇰🇷', '🇺🇸'],
-    languages: ['한국어', '영어'],
+    languages: ['ko', 'en'],
+    languageLabels: ['한국어', '영어'],
     affiliation: 'VIP Limousine Korea',
     careerYears: 4,
     residence: '서울 (마포)',
@@ -120,7 +133,7 @@ export const SAMPLE_AVAILABLE_DRIVERS: AvailableDriverItem[] = [
   },
 ];
 
-interface HqDriverSelectModalProps {
+export interface HqDriverSelectModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectDriver: (driver: AvailableDriverItem) => void;
@@ -128,27 +141,38 @@ interface HqDriverSelectModalProps {
   targetDate?: string;
   targetTime?: string;
   initialDriverId?: string;
+  requiredLanguage?: 'any' | 'english';
 }
 
 export const HqDriverSelectModal: React.FC<HqDriverSelectModalProps> = ({
   isOpen,
   onClose,
   onSelectDriver,
-  targetVehicleName = '스프린터 319 CDI',
+  targetVehicleName = '차량 미지정',
   targetDate = '2026. 10. 28. (수)',
   targetTime = '09:00',
   initialDriverId = 'drv-kim',
+  requiredLanguage = 'any',
 }) => {
   const [selectedDriverId, setSelectedDriverId] = useState<string>(initialDriverId);
-  const [languageFilter, setLanguageFilter] = useState<'all' | 'en' | 'ko'>('all');
+  const [languageFilter, setLanguageFilter] = useState<'all' | 'en' | 'ko'>(
+    requiredLanguage === 'english' ? 'en' : 'all'
+  );
   const [onlyAvailable, setOnlyAvailable] = useState<boolean>(true);
+
+  // Sync filter if requiredLanguage changes
+  useEffect(() => {
+    if (requiredLanguage === 'english') {
+      setLanguageFilter('en');
+    }
+  }, [requiredLanguage, isOpen]);
 
   if (!isOpen) return null;
 
   const filteredDrivers = SAMPLE_AVAILABLE_DRIVERS.filter((d) => {
     if (onlyAvailable && !d.isAvailable) return false;
-    if (languageFilter === 'en' && !d.languages.includes('영어')) return false;
-    if (languageFilter === 'ko' && !d.languages.includes('한국어')) return false;
+    if (languageFilter === 'en' && !driverSupportsEnglish(d)) return false;
+    if (languageFilter === 'ko' && !d.languages.includes('ko') && !d.languages.includes('한국어')) return false;
     return true;
   });
 
@@ -260,61 +284,93 @@ export const HqDriverSelectModal: React.FC<HqDriverSelectModalProps> = ({
 
           {/* Column 2: Driver List (md:col-span-5) */}
           <div className="md:col-span-5 p-3 overflow-y-auto space-y-2 bg-white max-h-[520px]">
-            {filteredDrivers.map((driver) => {
-              const isSelected = activeDriver?.id === driver.id;
-              return (
-                <div
-                  key={driver.id}
-                  onClick={() => {
-                    setSelectedDriverId(driver.id);
-                    haptics.lightTap();
-                  }}
-                  className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
-                    isSelected
-                      ? 'border-[#1E60F3] bg-blue-50/70 shadow-xs'
-                      : 'border-slate-200 hover:bg-slate-50/80'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <img
-                      src={driver.avatarUrl}
-                      alt={driver.name}
-                      className="w-11 h-11 rounded-full object-cover border border-slate-200 shadow-2xs shrink-0"
-                    />
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-extrabold text-slate-900">{driver.name}</span>
-                        <div className="flex items-center gap-0.5 text-xs font-bold text-amber-500">
-                          <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                          <span>{driver.rating.toFixed(1)}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1.5 mt-0.5 text-xs text-slate-500">
-                        <span>{driver.flags.join(' ')}</span>
-                        <span className="text-slate-300">·</span>
-                        <span>{driver.affiliation}</span>
-                      </div>
-                    </div>
-                  </div>
-
+            {filteredDrivers.length === 0 ? (
+              <div className="py-12 px-4 text-center bg-slate-50/80 rounded-2xl border border-slate-200/90 space-y-2 animate-in fade-in">
+                <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto">
+                  <AlertCircle className="w-5 h-5" />
+                </div>
+                <h4 className="text-sm font-extrabold text-slate-800">
+                  {languageFilter === 'en' ? '영어 가능 기사 없음' : '가용 기사 없음'}
+                </h4>
+                <p className="text-xs text-slate-500 max-w-xs mx-auto leading-relaxed">
+                  {languageFilter === 'en'
+                    ? "선택하신 조건(영어 필수)을 충족하는 가용 기사가 없습니다. 언어 조건을 '전체(무관)'으로 변경해 보세요."
+                    : '현재 조건에 맞는 가용 기사가 없습니다. 운행 일자나 필터를 변경해 주세요.'}
+                </p>
+                {languageFilter === 'en' && (
                   <button
                     type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
+                    onClick={() => setLanguageFilter('all')}
+                    className="mt-2 px-3 py-1.5 rounded-lg bg-[#1E60F3] hover:bg-blue-600 text-white text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                  >
+                    기사 전체 보기 (무관)
+                  </button>
+                )}
+              </div>
+            ) : (
+              filteredDrivers.map((driver) => {
+                const isSelected = activeDriver?.id === driver.id;
+                const isEnglish = driverSupportsEnglish(driver);
+
+                return (
+                  <div
+                    key={driver.id}
+                    onClick={() => {
                       setSelectedDriverId(driver.id);
                       haptics.lightTap();
                     }}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
                       isSelected
-                        ? 'bg-[#1E60F3] text-white shadow-xs'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                        ? 'border-[#1E60F3] bg-blue-50/70 shadow-xs'
+                        : 'border-slate-200 hover:bg-slate-50/80'
                     }`}
                   >
-                    {isSelected ? '선택됨' : '선택'}
-                  </button>
-                </div>
-              );
-            })}
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <img
+                        src={driver.avatarUrl}
+                        alt={driver.name}
+                        className="w-11 h-11 rounded-full object-cover border border-slate-200 shadow-2xs shrink-0"
+                      />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-sm font-extrabold text-slate-900">{driver.name}</span>
+                          <div className="flex items-center gap-0.5 text-xs font-bold text-amber-500">
+                            <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                            <span>{driver.rating.toFixed(1)}</span>
+                          </div>
+                          {isEnglish && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-blue-50 text-[#1E60F3] border border-blue-200">
+                              🇺🇸 영어 가능
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-0.5 text-xs text-slate-500">
+                          <span>{driver.flags.join(' ')}</span>
+                          <span className="text-slate-300">·</span>
+                          <span>{driver.affiliation}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedDriverId(driver.id);
+                        haptics.lightTap();
+                      }}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#1E60F3] text-white shadow-xs'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      {isSelected ? '선택됨' : '선택'}
+                    </button>
+                  </div>
+                );
+              })
+            )}
           </div>
 
           {/* Column 3: Selected Driver Profile Card (md:col-span-4) */}
@@ -336,15 +392,17 @@ export const HqDriverSelectModal: React.FC<HqDriverSelectModalProps> = ({
                         {activeDriver.rating.toFixed(1)} ({activeDriver.reviewCount}건)
                       </span>
                     </div>
-                    <div className="flex items-center gap-1 mt-1">
-                      {activeDriver.languages.map((lang) => (
-                        <span
-                          key={lang}
-                          className="px-1.5 py-0.5 bg-blue-100/80 text-[#1E60F3] text-[10px] font-extrabold rounded-md"
-                        >
-                          {lang}
+                    <div className="flex items-center gap-1 mt-1 flex-wrap">
+                      {(activeDriver.languages.includes('ko') || activeDriver.languages.includes('한국어')) && (
+                        <span className="px-1.5 py-0.5 bg-slate-100 text-slate-700 text-[10px] font-extrabold rounded-md">
+                          🇰🇷 한국어
                         </span>
-                      ))}
+                      )}
+                      {driverSupportsEnglish(activeDriver) && (
+                        <span className="px-1.5 py-0.5 bg-blue-50 text-[#1E60F3] border border-blue-200 text-[10px] font-black rounded-md">
+                          🇺🇸 영어 가능
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>

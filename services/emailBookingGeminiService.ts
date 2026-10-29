@@ -244,13 +244,13 @@ ${cleanBody}
    - "pickupTime": HH:MM (24-hour format).
 5. FLIGHT & VEHICLE:
    - "flightNumber": e.g. "KE082", "AF264". If not an airport trip, return "".
-   - "requestedVehicleClass": e.g. "카니발 하이리무진", "벤츠 스프린터", "제네시스 G90".
-   - "specialRequests": VIP requests, picket board text, water/amenities. Do not create luggage field.
+   - "requestedVehicleClass": Vehicle model and quantity if mentioned (e.g. "스타리아 리무진 1대", "카니발 2대", "스프린터 1대, G90 1대"). If unspecified or unclear, return "".
+   - "specialRequests": VIP requests, picket board text, water/amenities, driver language preferences (e.g. "영어 가능 기사님 희망"). Do not create luggage field.
 6. MANDATORY HUMAN DISPATCH:
    - "assignedDriver": null (AI must never assign drivers).
    - "assignedVehicle": null (AI must never assign vehicles).`;
 
-  const modelName = process.env.GEMINI_BOOKING_MODEL || 'gemini-3.8-flash';
+  const modelName = process.env.GEMINI_BOOKING_MODEL || 'gemini-3.5-flash-lite';
 
   const tStart = Date.now();
   try {
@@ -262,8 +262,8 @@ ${cleanBody}
       responseSchema: BOOKING_RESPONSE_SCHEMA,
     };
 
-    // Low thinking level optimization for gemini-3.8-flash (50%+ latency reduction)
-    if (modelName.includes('3.8') || modelName.includes('thinking')) {
+    // Low thinking level optimization for Flash-Lite / 3.8 models (50%+ latency reduction)
+    if (modelName.includes('flash') || modelName.includes('thinking')) {
       genConfig.thinkingConfig = {
         thinkingLevel: 'low',
       };
@@ -299,6 +299,11 @@ ${cleanBody}
       return s;
     };
 
+    // Clean vehicle class and fix typos (e.g. CDOI -> CDI)
+    const cleanVehicleClass = (val: unknown): string => {
+      return String(val || '').replace(/CDOI/gi, 'CDI').trim();
+    };
+
     const draft: HqEmailExtractedDraft = {
       id: `draft-${emailId}`,
       emailId,
@@ -324,7 +329,7 @@ ${cleanBody}
       dropoffDetailNotes: String(parsed.dropoffDetailNotes || ''),
       isDropoffPoiConfirmed: false,
       flightNumber: String(parsed.flightNumber || ''),
-      requestedVehicleClass: String(parsed.requestedVehicleClass || ''),
+      requestedVehicleClass: cleanVehicleClass(parsed.requestedVehicleClass),
       specialRequests: String(parsed.specialRequests || ''),
       tripType: (['single', 'group', 'modification', 'cancellation'].includes(String(parsed.tripType))
         ? parsed.tripType
