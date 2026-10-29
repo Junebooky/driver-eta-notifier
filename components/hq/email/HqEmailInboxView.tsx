@@ -539,24 +539,60 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
       return;
     }
 
-    // Dynamic Draft Values (No Hardcoded Global Events / Mock Strings)
+    // Dynamic Draft Values - Strict Validation (No Arbitrary Defaults or allowUnverified Bypass)
     const draft = currentDraft;
-    const today = getKstTodayDateStr();
-
-    const pickupDate = draft?.pickupDate || today;
-    const pickupTime = draft?.pickupTime || '09:00';
-    const origin = draft?.pickupLocation?.trim();
-    const destination = draft?.dropoffLocation?.trim();
-
-    if (!origin || !destination) {
-      setDispatchError('출발지(픽업 위치)와 목적지는 필수 입력 항목입니다. Step 1에서 AI 추출을 진행하거나 수정 후 등록해 주세요.');
+    if (!draft) {
+      setDispatchError('예약 정보가 없습니다. 먼저 이메일 AI 추출 또는 수동 입력을 진행해 주세요.');
       haptics.errorAlert();
       return;
     }
 
-    // TMAP POI candidate confirmation enforcement (Issue #33)
-    if (!draft?.isPickupPoiConfirmed || !draft?.isDropoffPoiConfirmed) {
-      setDispatchError('출발지 및 목적지의 TMAP 위치 후보를 직접 클릭하여 확정해야 배차를 최종 등록할 수 있습니다.');
+    const pickupDate = draft.pickupDate?.trim();
+    if (!pickupDate) {
+      setDispatchError('운행 일자가 지정되지 않았습니다. 예약 일자를 먼저 확인/입력해 주세요.');
+      haptics.errorAlert();
+      return;
+    }
+
+    const pickupTime = draft.pickupTime?.trim();
+    if (!pickupTime) {
+      setDispatchError('픽업 시간이 지정되지 않았습니다. 픽업 시간을 먼저 확인/입력해 주세요.');
+      haptics.errorAlert();
+      return;
+    }
+
+    const passengerName = draft.passengerName?.trim();
+    if (!passengerName) {
+      setDispatchError('탑승객명이 지정되지 않았습니다. 탑승객명을 먼저 확인/입력해 주세요.');
+      haptics.errorAlert();
+      return;
+    }
+
+    const origin = draft.pickupLocation?.trim();
+    const destination = draft.dropoffLocation?.trim();
+    if (!origin || !destination) {
+      setDispatchError('출발지(픽업 위치)와 목적지는 필수 입력 항목입니다.');
+      haptics.errorAlert();
+      return;
+    }
+
+    // TMAP POI candidate confirmation enforcement with coordinates (Issue #33)
+    if (
+      !draft.isPickupPoiConfirmed ||
+      typeof draft.pickupLat !== 'number' ||
+      typeof draft.pickupLng !== 'number'
+    ) {
+      setDispatchError('출발지의 TMAP 위치 후보를 직접 클릭하여 좌표를 확정해야 배차를 최종 등록할 수 있습니다.');
+      haptics.errorAlert();
+      return;
+    }
+
+    if (
+      !draft.isDropoffPoiConfirmed ||
+      typeof draft.dropoffLat !== 'number' ||
+      typeof draft.dropoffLng !== 'number'
+    ) {
+      setDispatchError('목적지의 TMAP 위치 후보를 직접 클릭하여 좌표를 확정해야 배차를 최종 등록할 수 있습니다.');
       haptics.errorAlert();
       return;
     }
@@ -566,26 +602,34 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
 
     try {
       // Disambiguate passenger phone: NEVER allow an email address!
-      const rawPassengerPhone = draft?.passengerPhone?.trim() || '';
+      const rawPassengerPhone = draft.passengerPhone?.trim() || '';
       const safePassengerPhone = rawPassengerPhone.includes('@') ? '' : rawPassengerPhone;
 
       const bookingPayload = {
-        customerName: draft?.companyName || '미등록 고객사',
-        contactName: draft?.contactName || '',
-        contactPhone: draft?.contactPhone || '',
-        contactEmail: draft?.contactEmail || '',
-        clientId: draft?.clientId || null,
-        contactId: draft?.contactId || null,
+        customerName: draft.companyName?.trim() || '미등록 고객사',
+        contactName: draft.contactName?.trim() || '',
+        contactPhone: draft.contactPhone?.trim() || '',
+        contactEmail: draft.contactEmail?.trim() || '',
+        clientId: draft.clientId || null,
+        contactId: draft.contactId || null,
         intakeSource: 'email',
         date: pickupDate,
         pickupTime: pickupTime,
-        origin,
-        destination,
-        passengerName: draft?.passengerName || 'VIP 탑승객',
+        origin: origin,
+        originAddress: origin,
+        originLat: draft.pickupLat,
+        originLng: draft.pickupLng,
+        destination: destination,
+        destinationAddress: destination,
+        destinationLat: draft.dropoffLat,
+        destinationLng: draft.dropoffLng,
+        placeVerified: true,
+        allowUnverified: false, // STRICTLY FALSE: Unverified dispatches are blocked!
+        passengerName: passengerName,
         passengerPhone: safePassengerPhone,
-        passengerCount: draft?.passengerCount || 1,
-        flightNumber: draft?.flightNumber || '',
-        notes: draft?.specialRequests || `이메일 접수 (편명: ${draft?.flightNumber || '미지정'})`,
+        passengerCount: typeof draft.passengerCount === 'number' && draft.passengerCount > 0 ? draft.passengerCount : 1,
+        flightNumber: draft.flightNumber?.trim() || '',
+        notes: draft.specialRequests || `이메일 접수 (편명: ${draft.flightNumber || '미지정'})`,
         driverId: primaryDriver.id,
         driverName: primaryDriver.name,
         driverPhone: primaryDriver.phone,
@@ -593,7 +637,6 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
         vehiclePlate: primaryDriver.plate,
         vehicleModel: assignedSlots[0].vehicleModel,
         dispatchStatus: 'published',
-        allowUnverified: true,
         publishedBy: '대표/관리자 (이메일 배차 확정)',
       };
 

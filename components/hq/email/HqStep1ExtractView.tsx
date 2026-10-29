@@ -86,32 +86,46 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
   const requestedVehicleClass = extractedDraft?.requestedVehicleClass || '카니발 하이리무진';
   const specialRequests = extractedDraft?.specialRequests || '';
 
-  // Handle explicit CRM Save
+  // Handle explicit CRM Save (Requires verified company and contact)
   const handleSaveToCrm = () => {
     if (!extractedDraft) return;
+
+    const cleanCompany = (extractedDraft.companyName || '').trim();
+    const cleanContact = (extractedDraft.contactName || '').trim();
+
+    if (!cleanCompany || cleanCompany === '확인 필요') {
+      haptics.errorAlert();
+      setCrmSavedNotice('고객사명이 확인되지 않았습니다. 원문 확인 후 고객사명을 먼저 입력한 후 저장해 주세요.');
+      return;
+    }
+
+    if (!cleanContact || cleanContact === '확인 필요') {
+      haptics.errorAlert();
+      setCrmSavedNotice('예약 담당자명이 확인되지 않았습니다. 원문 확인 후 담당자명을 먼저 입력한 후 저장해 주세요.');
+      return;
+    }
+
     haptics.success();
-
-    const targetCompany = companyName || fromName || '신규 고객사';
-    const targetContact = contactName || fromName || '예약 담당자';
-
     const result = saveContactToCrm({
-      companyName: targetCompany,
-      contactName: targetContact,
-      contactPhone,
-      contactEmail,
-      notes: `이메일 접수 예약 연동 (제목: ${subject})`,
+      companyName: cleanCompany,
+      contactName: cleanContact,
+      contactPhone: extractedDraft.contactPhone || '',
+      contactEmail: extractedDraft.contactEmail || '',
+      notes: `이메일 접수 예약 수동 연동 (제목: ${subject})`,
       sourceDraftId: extractedDraft.id,
     });
 
     setCrmSavedNotice(result.message);
 
-    const updated: HqEmailExtractedDraft = {
-      ...extractedDraft,
-      clientId: result.clientId,
-      contactId: result.contactId,
-      isSavedToCrm: true,
-    };
-    onUpdateDraft?.(updated);
+    if (result.success) {
+      const updated: HqEmailExtractedDraft = {
+        ...extractedDraft,
+        clientId: result.clientId,
+        contactId: result.contactId,
+        isSavedToCrm: true,
+      };
+      onUpdateDraft?.(updated);
+    }
 
     setTimeout(() => {
       setCrmSavedNotice(null);

@@ -139,7 +139,9 @@ export interface SaveContactToCrmResult {
 
 /**
  * Explicitly save or link contact and company into CRM
- * Triggered strictly by administrator action
+ * Triggered strictly by administrator action ('고객 관리에 저장')
+ * NOTE: Currently managed via client-side storage with cross-tab broadcast.
+ * Does not write to production DB/RLS tables without explicit database migration approval.
  */
 export function saveContactToCrm(params: SaveContactToCrmParams): SaveContactToCrmResult {
   const {
@@ -153,8 +155,34 @@ export function saveContactToCrm(params: SaveContactToCrmParams): SaveContactToC
     sourceDraftId,
   } = params;
 
-  const companyName = (rawCompany || '').trim() || '미등록 고객사';
-  const contactName = (rawContact || '').trim() || '담당자 미지정';
+  const companyName = (rawCompany || '').trim();
+  const contactName = (rawContact || '').trim();
+
+  if (!companyName || companyName === '확인 필요' || companyName === '미등록 고객사') {
+    return {
+      success: false,
+      clientId: '',
+      contactId: '',
+      isNewCustomer: false,
+      isNewContact: false,
+      companyName: '',
+      contactName: '',
+      message: '고객사명이 명시되지 않았습니다. 원문 확인 후 고객사명을 먼저 입력해 주세요.',
+    };
+  }
+
+  if (!contactName || contactName === '확인 필요' || contactName === '담당자 미지정') {
+    return {
+      success: false,
+      clientId: '',
+      contactId: '',
+      isNewCustomer: false,
+      isNewContact: false,
+      companyName,
+      contactName: '',
+      message: '예약 담당자명이 명시되지 않았습니다. 원문 확인 후 담당자명을 먼저 입력해 주세요.',
+    };
+  }
 
   const customers = [...getStoredCustomers()];
   const { companyMatch, contactMatch } = findCustomerMatch(companyName, contactEmail, contactPhone);

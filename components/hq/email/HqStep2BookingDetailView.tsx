@@ -99,14 +99,30 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
   // Check if at least one driver is assigned
   const hasAssignedDriver = vehicleSlots.some((slot) => slot.driver !== null);
 
-  // Handle Save To CRM (#21)
+  // Handle Save To CRM (#21) - Requires verified company & contact
   const handleSaveToCrm = () => {
     if (!extractedDraft) return;
+
+    const cleanCompany = (extractedDraft.companyName || '').trim();
+    const cleanContact = (extractedDraft.contactName || '').trim();
+
+    if (!cleanCompany || cleanCompany === '확인 필요' || cleanCompany === '미등록 고객사') {
+      haptics.errorAlert();
+      setCrmSavedNotice('고객사명이 확인되지 않았습니다. 원문 확인 후 고객사명을 먼저 입력해 주세요.');
+      return;
+    }
+
+    if (!cleanContact || cleanContact === '확인 필요' || cleanContact === '담당자 미지정') {
+      haptics.errorAlert();
+      setCrmSavedNotice('예약 담당자명이 확인되지 않았습니다. 원문 확인 후 담당자명을 먼저 입력해 주세요.');
+      return;
+    }
+
     haptics.success();
 
     const result = saveContactToCrm({
-      companyName,
-      contactName,
+      companyName: cleanCompany,
+      contactName: cleanContact,
       contactPhone: extractedDraft.contactPhone || '',
       contactEmail: extractedDraft.contactEmail || '',
       notes: `예약 상세 화면에서 CRM 수동 저장 (예약번호: ${bookingCode})`,
@@ -115,13 +131,15 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
 
     setCrmSavedNotice(result.message);
 
-    const updated: HqEmailExtractedDraft = {
-      ...extractedDraft,
-      clientId: result.clientId,
-      contactId: result.contactId,
-      isSavedToCrm: true,
-    };
-    onUpdateDraft?.(updated);
+    if (result.success) {
+      const updated: HqEmailExtractedDraft = {
+        ...extractedDraft,
+        clientId: result.clientId,
+        contactId: result.contactId,
+        isSavedToCrm: true,
+      };
+      onUpdateDraft?.(updated);
+    }
 
     setTimeout(() => {
       setCrmSavedNotice(null);

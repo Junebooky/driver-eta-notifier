@@ -85,6 +85,32 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
+
+      // Server-side guard for email intake (Issue #33 P0 audit)
+      if (cand.intakeSource === 'email' && cand.dispatchStatus === 'published') {
+        if (
+          !cand.placeVerified ||
+          typeof cand.originLat !== 'number' ||
+          typeof cand.originLng !== 'number' ||
+          typeof cand.destinationLat !== 'number' ||
+          typeof cand.destinationLng !== 'number'
+        ) {
+          return NextResponse.json(
+            {
+              ok: false,
+              code: 'UNVERIFIED_COORDINATES_BLOCKED',
+              error: '출발지 및 목적지의 TMAP 위치 좌표가 확정되지 않았습니다. POI 후보를 선택해 좌표를 확정해 주세요.',
+            },
+            { status: 400 }
+          );
+        }
+        if (cand.passengerPhone && cand.passengerPhone.includes('@')) {
+          return NextResponse.json(
+            { ok: false, error: '승객 전화번호에 이메일 주소가 포함될 수 없습니다.' },
+            { status: 400 }
+          );
+        }
+      }
     }
 
     // Server-side Driver & Vehicle Schedule Conflict Guard

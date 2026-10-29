@@ -1,6 +1,9 @@
 import assert from 'node:assert';
 import test from 'node:test';
-import { getDeterministicBookingDraft } from '@/services/emailBookingGeminiService';
+import {
+  getDeterministicBookingDraft,
+  extractBookingFromEmail,
+} from '@/services/emailBookingGeminiService';
 import {
   saveContactToCrm,
   findCustomerMatch,
@@ -186,3 +189,55 @@ test('TMAP POI Candidate Confirmation Logic', () => {
   assert.strictEqual(typeof draftConfirmed.pickupLat, 'number');
   assert.strictEqual(typeof draftConfirmed.dropoffLng, 'number');
 });
+
+test('Honest AI Failure: extractBookingFromEmail returns ok: false and clean empty draft without fake fallback', async () => {
+  const origKey = process.env.GEMINI_API_KEY;
+  try {
+    delete process.env.GEMINI_API_KEY;
+    const result = await extractBookingFromEmail({
+      emailId: 'blind-qa-001',
+      subject: 'Random subject with no fake fallback',
+      sender: 'someone@example.com',
+      bodyText: 'Please pick up someone at 10:00.',
+    });
+
+    assert.strictEqual(result.ok, false, 'Must report ok: false on missing key or error');
+    assert.strictEqual(result.draft.companyName, '', 'Must not invent fake company');
+    assert.strictEqual(result.draft.contactName, '', 'Must not invent fake contact');
+    assert.strictEqual(result.draft.passengerName, '', 'Must not invent fake passenger');
+    assert.strictEqual(result.draft.confidence, 0, 'Confidence must be 0 for empty draft');
+    assert.ok(result.error?.includes('GEMINI_API_KEY'), 'Error must mention missing key');
+  } finally {
+    if (origKey) process.env.GEMINI_API_KEY = origKey;
+  }
+});
+
+test('CRM Validation: saveContactToCrm rejects unverified or empty company/contact names', () => {
+  // Empty company
+  const emptyComp = saveContactToCrm({
+    companyName: '   ',
+    contactName: '홍길동',
+    contactEmail: 'hong@test.com',
+  });
+  assert.strictEqual(emptyComp.success, false);
+  assert.ok(emptyComp.message.includes('고객사명'));
+
+  // '확인 필요' company
+  const unverifiedComp = saveContactToCrm({
+    companyName: '확인 필요',
+    contactName: '홍길동',
+    contactEmail: 'hong@test.com',
+  });
+  assert.strictEqual(unverifiedComp.success, false);
+
+  // Empty contact
+  const emptyContact = saveContactToCrm({
+    companyName: 'Valid Company',
+    contactName: '',
+    contactEmail: 'contact@valid.com',
+  });
+  assert.strictEqual(emptyContact.success, false);
+  assert.ok(emptyContact.message.includes('담당자명'));
+});
+
+
