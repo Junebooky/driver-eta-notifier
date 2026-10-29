@@ -4,9 +4,19 @@ import { verifyServerAuth } from '@/lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
 
+const ALLOWED_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'application/pdf',
+];
+const MAX_RECEIPT_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+
 /**
  * GET: Securely serve receipt image only to authorized drivers and HQ admins.
- * Rejects unauthenticated or cross-tenant access.
+ * Requires expenseId to verify ownership against cockpit.expenses.
+ * Rejects unauthenticated, unauthorized, or cross-tenant access.
  */
 export async function GET(req: NextRequest) {
   try {
@@ -16,12 +26,82 @@ export async function GET(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url);
-    const storagePath = searchParams.get('path');
+    const expenseId = searchParams.get('expenseId');
+    const requestedPath = searchParams.get('path');
+
+    if (!expenseId && !requestedPath) {
+      return NextResponse.json(
+        { ok: false, error: '영수증 조회를 위해 expenseId 또는 path 파라미터가 필요합니다.' },
+        { status: 400 }
+      );
+    }
+
+    let storagePath = requestedPath;
+
+    // Verify ownership via cockpit.expenses
+    if (expenseId) {
+      const { data: expenseRow, error: expErr } = await supabaseAdmin
+        .from('expenses')
+        .select('id, driver_id, organization_id, receipt_storage_path')
+        .eq('id', expenseId)
+        .maybeSingle();
+
+      if (expErr) {
+        return NextResponse.json(
+          { ok: false, error: `경비 정보 조회 실패: ${expErr.message}` },
+          { status: 500 }
+        );
+      }
+
+      if (!expenseRow) {
+        return NextResponse.json(
+          { ok: false, error: '해당 경비 레코드를 찾을 수 없습니다.' },
+          { status: 404 }
+        );
+      }
+
+      // 1. Organization boundary
+      if (expenseRow.organization_id !== auth.session.org) {
+        return NextResponse.json(
+          { ok: false, error: '다른 조직의 영수증에 접근할 수 없습니다. (403 Forbidden)' },
+          { status: 403 }
+        );
+      }
+
+      // 2. Driver boundary
+      if (auth.session.role === 'driver') {
+        const myDriverId = auth.session.driverId || auth.session.userId;
+        if (expenseRow.driver_id !== myDriverId) {
+          return NextResponse.json(
+            { ok: false, error: '해당 영수증에 대한 접근 권한이 없습니다. (403 Forbidden)' },
+            { status: 403 }
+          );
+        }
+      }
+
+      // Use the verified storage path from the DB
+      storagePath = expenseRow.receipt_storage_path;
+    }
 
     if (!storagePath) {
       return NextResponse.json(
-        { ok: false, error: '영수증 파일 경로(path)가 필요합니다.' },
+        { ok: false, error: '등록된 영수증 파일 경로가 없습니다.' },
+        { status: 404 }
+      );
+    }
+
+    // Path traversal and prefix validation
+    if (storagePath.includes('..') || storagePath.startsWith('/')) {
+      return NextResponse.json(
+        { ok: false, error: '유효하지 않은 영수증 파일 경로입니다.' },
         { status: 400 }
+      );
+    }
+
+    if (!storagePath.startsWith(`${auth.session.org}/`)) {
+      return NextResponse.json(
+        { ok: false, error: '소속 조직 경로가 아닌 영수증 파일입니다. (403 Forbidden)' },
+        { status: 403 }
       );
     }
 
@@ -31,9 +111,8 @@ export async function GET(req: NextRequest) {
       .download(storagePath);
 
     if (error || !data) {
-      // In development or if file is mock/not uploaded, return 404 cleanly
       return NextResponse.json(
-        { ok: false, error: '영수증 파일을 찾을 수 없습니다.' },
+        { ok: false, error: '영수증 파일을 스토리지에서 찾을 수 없습니다.' },
         { status: 404 }
       );
     }
@@ -58,7 +137,8 @@ export async function GET(req: NextRequest) {
 
 /**
  * POST: Securely upload receipt image to private Supabase Storage bucket.
- * Generates an isolated path per organization and date.
+ * Enforces strict MIME type, file size limit (10MB), and organization path.
+ * Zero simulated mock responses on real storage errors.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -83,31 +163,46 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // MIME type validation
+    const mimeType = file.type || 'image/jpeg';
+    if (!ALLOWED_MIME_TYPES.includes(mimeType)) {
+      return NextResponse.json(
+        { ok: false, error: `지원하지 않는 파일 형식입니다 (${mimeType}). JPEG, PNG, WEBP, HEIC, PDF만 지원합니다.` },
+        { status: 400 }
+      );
+    }
+
+    // File size validation (10MB)
+    if (file.size > MAX_RECEIPT_SIZE_BYTES) {
+      return NextResponse.json(
+        { ok: false, error: '영수증 파일 크기는 10MB 이하여야 합니다.' },
+        { status: 400 }
+      );
+    }
+
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
     const ext = file.name.split('.').pop() || 'jpg';
     const uniqueId = `rec_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    const storagePath = `org_001/${year}/${month}/${uniqueId}.${ext}`;
+    const storagePath = `${auth.session.org}/${year}/${month}/${uniqueId}.${ext}`;
 
     const buffer = Buffer.from(await file.arrayBuffer());
 
     const { error: uploadError } = await supabaseAdmin.storage
       .from('receipts')
       .upload(storagePath, buffer, {
-        contentType: file.type || 'image/jpeg',
+        contentType: mimeType,
         upsert: false,
       });
 
+    // Zero simulated fallback on error: Strictly report actual failure
     if (uploadError) {
-      console.warn('[Receipt Upload] Storage bucket note/error:', uploadError.message);
-      // Even if physical bucket is not yet provisioned in dev/test, return valid path
-      return NextResponse.json({
-        ok: true,
-        storagePath,
-        simulated: true,
-        message: '영수증 경로가 발급되었습니다.',
-      });
+      console.error('[Receipt Upload] Storage Error:', uploadError.message);
+      return NextResponse.json(
+        { ok: false, error: `영수증 스토리지 저장 실패: ${uploadError.message}` },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({

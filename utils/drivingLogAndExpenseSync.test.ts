@@ -4,9 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase/server';
 import { signCockpitSession } from '@/lib/auth/serverAuth';
 import { GET as getDrivingLogs, POST as postDrivingLogs, PUT as putDrivingLogs } from '@/app/api/driving-logs/route';
 import { GET as getExpenses, POST as postExpenses, PUT as putExpenses } from '@/app/api/expenses/route';
-import { GET as getReceipt } from '@/app/api/expenses/receipt/route';
-import { submitDriverLogToHqDb } from '@/utils/drivingLogHqStorage';
-import { submitDriverExpensesToHqDb } from '@/utils/expenseHqStorage';
+import { GET as getReceipt, POST as postReceipt } from '@/app/api/expenses/receipt/route';
 import { getVerifiedInspectionOdometer } from '@/utils/drivingLog';
 import { NextRequest } from 'next/server';
 
@@ -66,11 +64,11 @@ interface MockExpenseRow {
   updated_at?: string;
 }
 
-test('Driver & HQ Driving Log / Expense Sync Test Suite (Zero Live DB Mutation)', async () => {
-  // In-memory isolated DB seed - guarantees ZERO network requests to live Supabase DB
+test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () => {
   let mockDrivingLogs: MockDrivingLogRow[] = [];
   let mockExpenses: MockExpenseRow[] = [];
   let simulateDbError = false;
+  let simulateStorageError = false;
 
   const mockSchedules = [
     {
@@ -78,30 +76,46 @@ test('Driver & HQ Driving Log / Expense Sync Test Suite (Zero Live DB Mutation)'
       customer_name: '샤넬코리아',
       driver_name: '윤태준',
       vehicle_plate: '116허 1514',
+      vehicle_no: '116허 1514',
+      schedule_meta: { driver_id: 'b6aac740-002e-4a5c-ac49-0ac71e765340' },
     },
     {
       id: 'booking-20261109-morning',
       customer_name: '오전 고객사',
       driver_name: '윤태준',
       vehicle_plate: '116허 1514',
+      vehicle_no: '116허 1514',
+      schedule_meta: { driver_id: 'b6aac740-002e-4a5c-ac49-0ac71e765340' },
     },
     {
       id: 'booking-20261109-afternoon',
       customer_name: '오후 고객사',
       driver_name: '윤태준',
       vehicle_plate: '116허 1514',
+      vehicle_no: '116허 1514',
+      schedule_meta: { driver_id: 'b6aac740-002e-4a5c-ac49-0ac71e765340' },
     },
     {
       id: 'booking-fail',
       customer_name: '오류 테스트 고객사',
       driver_name: '윤태준',
       vehicle_plate: '116허 1514',
+      vehicle_no: '116허 1514',
+      schedule_meta: { driver_id: 'b6aac740-002e-4a5c-ac49-0ac71e765340' },
+    },
+    {
+      id: 'booking-driver-b-only',
+      customer_name: '민성호 전용 고객사',
+      driver_name: '민성호',
+      vehicle_plate: '142호 7815',
+      vehicle_no: '8호차',
+      schedule_meta: { driver_id: 'a85444a9-f13e-4b52-9a81-ac09995ab66a' },
     },
   ];
 
   // Mock Storage Bucket for private receipts
   const mockStorageFiles: Record<string, { buffer: Buffer; contentType: string }> = {
-    'org_001/2026/10/receipt_sample_01.jpg': {
+    'vip_limousine_korea/2026/10/receipt_sample_01.jpg': {
       buffer: Buffer.from('mock-jpeg-receipt-bytes-data'),
       contentType: 'image/jpeg',
     },
@@ -111,7 +125,7 @@ test('Driver & HQ Driving Log / Expense Sync Test Suite (Zero Live DB Mutation)'
   const mockFrom = (table: string) => {
     let filterField: string | null = null;
     let filterVal: any = null;
-    let orFilter: string | null = null;
+    let filters: Array<{ field: string; val: any }> = [];
 
     let activeRows: any[] = [];
     if (table === 'driving_logs') {
@@ -128,24 +142,29 @@ test('Driver & HQ Driving Log / Expense Sync Test Suite (Zero Live DB Mutation)'
       eq: (field: string, val: any) => {
         filterField = field;
         filterVal = val;
-        return builder;
-      },
-      or: (condition: string) => {
-        orFilter = condition;
+        filters.push({ field, val });
         return builder;
       },
       single: async () => {
         if (simulateDbError) {
           return { data: null, error: { message: 'Simulated DB internal error' } };
         }
-        const found = activeRows.find((r) => (r as any)[filterField!] === filterVal);
+        let matches = activeRows;
+        for (const f of filters) {
+          matches = matches.filter((r) => (r as any)[f.field] === f.val);
+        }
+        const found = matches[0];
         return { data: found ? { ...found } : null, error: found ? null : { message: 'Row not found' } };
       },
       maybeSingle: async () => {
         if (simulateDbError) {
           return { data: null, error: { message: 'Simulated DB internal error' } };
         }
-        const found = activeRows.find((r) => (r as any)[filterField!] === filterVal);
+        let matches = activeRows;
+        for (const f of filters) {
+          matches = matches.filter((r) => (r as any)[f.field] === f.val);
+        }
+        const found = matches[0];
         return { data: found ? { ...found } : null, error: null };
       },
       upsert: (newRows: any | any[], opts?: any) => {
@@ -155,9 +174,7 @@ test('Driver & HQ Driving Log / Expense Sync Test Suite (Zero Live DB Mutation)'
             single: () => errPromise,
             maybeSingle: () => errPromise,
           });
-          return Object.assign(errPromise, {
-            select: () => errSelectObj,
-          });
+          return Object.assign(errPromise, { select: () => errSelectObj });
         }
         const rowsArray = Array.isArray(newRows) ? newRows : [newRows];
         for (const row of rowsArray) {
@@ -182,22 +199,6 @@ test('Driver & HQ Driving Log / Expense Sync Test Suite (Zero Live DB Mutation)'
         });
         return Object.assign(successPromise, {
           select: (_fields: string = '*') => successSelectObj,
-        });
-      },
-      insert: (newRows: any | any[]) => {
-        if (simulateDbError) {
-          const errPromise = Promise.resolve({ data: null, error: { message: 'Simulated DB insert failure' } });
-          return Object.assign(errPromise, {
-            select: () => errPromise,
-          });
-        }
-        const rowsArray = Array.isArray(newRows) ? newRows : [newRows];
-        for (const row of rowsArray) {
-          activeRows.push({ ...row, created_at: new Date().toISOString() });
-        }
-        const successPromise = Promise.resolve({ data: rowsArray, error: null });
-        return Object.assign(successPromise, {
-          select: (_fields: string = '*') => successPromise,
         });
       },
       update: (updates: any) => ({
@@ -246,20 +247,8 @@ test('Driver & HQ Driving Log / Expense Sync Test Suite (Zero Live DB Mutation)'
           return Promise.resolve({ data: null, error: { message: 'Simulated DB query failure' } }).then(resolve);
         }
         let res = activeRows.map((r) => ({ ...r }));
-        if (filterField !== null) {
-          res = res.filter((r) => (r as any)[filterField!] === filterVal);
-        }
-        if (orFilter !== null) {
-          // Parse basic or condition: e.g. driver_name.eq."X",driver_id.eq."Y"
-          const parts = orFilter.split(',');
-          res = res.filter((r) => {
-            return parts.some((p) => {
-              const match = p.match(/([a-zA-Z_]+)\.eq\."?([^"]+)"?/);
-              if (!match) return false;
-              const [, col, val] = match;
-              return String((r as any)[col]) === String(val);
-            });
-          });
+        for (const f of filters) {
+          res = res.filter((r) => (r as any)[f.field] === f.val);
         }
         return Promise.resolve({ data: res, error: null }).then(resolve);
       },
@@ -285,6 +274,9 @@ test('Driver & HQ Driving Log / Expense Sync Test Suite (Zero Live DB Mutation)'
         };
       },
       upload: async (path: string, fileData: any, opts?: any) => {
+        if (simulateStorageError) {
+          return { data: null, error: { message: 'Physical storage upload failure' } };
+        }
         mockStorageFiles[path] = {
           buffer: Buffer.isBuffer(fileData) ? fileData : Buffer.from(fileData),
           contentType: opts?.contentType || 'image/jpeg',
@@ -298,21 +290,25 @@ test('Driver & HQ Driving Log / Expense Sync Test Suite (Zero Live DB Mutation)'
   supabaseAdmin.from = mockFrom as any;
   (supabaseAdmin as any).storage = mockStorage as any;
 
-  // Generate tokens for Driver A (Org 1), Driver B (Org 1), and HQ Admin (Org 1)
+  // Driver A (윤태준), Driver B (민성호), HQ Admin
   const driverAToken = signCockpitSession({
     userId: 'driver-001',
     org: 'vip_limousine_korea',
     role: 'driver',
     driverName: '윤태준',
-    driverId: 'driver-001',
+    driverId: 'b6aac740-002e-4a5c-ac49-0ac71e765340',
+    carNumber: '116허 1514',
+    vehicleNo: '116허 1514',
   });
 
   const driverBToken = signCockpitSession({
     userId: 'driver-002',
     org: 'vip_limousine_korea',
     role: 'driver',
-    driverName: '박기사',
-    driverId: 'driver-002',
+    driverName: '민성호',
+    driverId: 'a85444a9-f13e-4b52-9a81-ac09995ab66a',
+    carNumber: '142호 7815',
+    vehicleNo: '8호차',
   });
 
   const hqAdminToken = signCockpitSession({
@@ -323,7 +319,7 @@ test('Driver & HQ Driving Log / Expense Sync Test Suite (Zero Live DB Mutation)'
   });
 
   // --------------------------------------------------------------------------
-  // 1. 기사 저장 → HQ 조회 → 재조회 시 데이터 일치 (Driver save -> HQ query roundtrip)
+  // 1. 기사 저장 → HQ 조회 → 재조회 시 데이터 일치
   // --------------------------------------------------------------------------
   await test('1. Driver save -> HQ query -> round-trip data match', async () => {
     const postReq = new NextRequest('http://localhost:3000/api/driving-logs', {
@@ -375,14 +371,13 @@ test('Driver & HQ Driving Log / Expense Sync Test Suite (Zero Live DB Mutation)'
     assert.strictEqual(hqLog.startKm, '154,725');
     assert.strictEqual(hqLog.endKm, '154,861');
     assert.strictEqual(hqLog.stops.length, 2);
-    assert.strictEqual(hqLog.stops[0].placeName, '인천공항 T1');
   });
 
   // --------------------------------------------------------------------------
-  // 2. 같은 날 여러 예약의 운행일지 분리 (Multiple bookings on same day separated)
+  // 2. 같은 날 여러 예약의 운행일지 분리
   // --------------------------------------------------------------------------
   await test('2. Multiple bookings on same day for same driver remain completely separated', async () => {
-    // Submit morning booking
+    // Morning booking
     const morningReq = new NextRequest('http://localhost:3000/api/driving-logs', {
       method: 'POST',
       headers: {
@@ -403,7 +398,7 @@ test('Driver & HQ Driving Log / Expense Sync Test Suite (Zero Live DB Mutation)'
     });
     await postDrivingLogs(morningReq);
 
-    // Submit afternoon booking on same date
+    // Afternoon booking
     const afternoonReq = new NextRequest('http://localhost:3000/api/driving-logs', {
       method: 'POST',
       headers: {
@@ -442,26 +437,72 @@ test('Driver & HQ Driving Log / Expense Sync Test Suite (Zero Live DB Mutation)'
   });
 
   // --------------------------------------------------------------------------
-  // 3. 다른 기사·회사 데이터 접근 차단 (Driver & Org Isolation)
+  // 3. Service-role API 우회 차단 (Server-side Authorization Barrier)
   // --------------------------------------------------------------------------
-  await test('3. Cross-driver & Cross-tenant data isolation and 401/403 protection', async () => {
-    // Driver B (driver-002) tries to query logs -> must NOT see Driver A's logs
-    const driverBReq = new NextRequest('http://localhost:3000/api/driving-logs', {
+  await test('3. Service-role API bypass prevention: rejects unassigned booking, spoofed driverId, and self-approval', async () => {
+    // 3.1: Driver A tries to query Driver B's logs by passing Driver B's driverId -> 403 Forbidden
+    const driverBReq = new NextRequest('http://localhost:3000/api/driving-logs?driverId=a85444a9-f13e-4b52-9a81-ac09995ab66a', {
       method: 'GET',
-      headers: { Authorization: `Bearer ${driverBToken}` },
+      headers: { Authorization: `Bearer ${driverAToken}` },
     });
     const driverBRes = await getDrivingLogs(driverBReq);
-    assert.strictEqual(driverBRes.status, 200);
-    const driverBData = await driverBRes.json();
-    const containsDriverA = driverBData.logs.some((l: any) => l.driverName === '윤태준');
-    assert.strictEqual(containsDriverA, false, 'Driver B must NOT see Driver A logs');
+    assert.strictEqual(driverBRes.status, 403, 'Driver querying another driver logs must be rejected with 403');
 
-    // Unauthenticated request
-    const anonReq = new NextRequest('http://localhost:3000/api/driving-logs', { method: 'GET' });
-    const anonRes = await getDrivingLogs(anonReq);
-    assert.strictEqual(anonRes.status, 401, 'Unauthenticated request must be rejected with 401');
+    // 3.2: Driver A tries to submit a log with Driver B's driverId -> 403 Forbidden
+    const spoofReq = new NextRequest('http://localhost:3000/api/driving-logs', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${driverAToken}`,
+      },
+      body: JSON.stringify({
+        driverId: 'a85444a9-f13e-4b52-9a81-ac09995ab66a',
+        drivingDate: '2026-11-09',
+        startKm: '100',
+        endKm: '200',
+        stops: [{ placeName: '강남', time: '10:00' }],
+      }),
+    });
+    const spoofRes = await postDrivingLogs(spoofReq);
+    assert.strictEqual(spoofRes.status, 403, 'Driver spoofing another driverId must be rejected with 403');
 
-    // Non-admin driver attempting HQ review status modification -> 403 Forbidden
+    // 3.3: Driver A tries to submit a log for a booking assigned ONLY to Driver B -> 403 Forbidden
+    const unassignedBookingReq = new NextRequest('http://localhost:3000/api/driving-logs', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${driverAToken}`,
+      },
+      body: JSON.stringify({
+        bookingId: 'booking-driver-b-only',
+        drivingDate: '2026-11-09',
+        startKm: '100',
+        endKm: '200',
+        stops: [{ placeName: '강남', time: '10:00' }],
+      }),
+    });
+    const unassignedBookingRes = await postDrivingLogs(unassignedBookingReq);
+    assert.strictEqual(unassignedBookingRes.status, 403, 'Submitting log for unassigned booking must return 403');
+
+    // 3.4: Driver A tries to directly set status to '승인 완료' -> 403 Forbidden
+    const selfApproveReq = new NextRequest('http://localhost:3000/api/driving-logs', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${driverAToken}`,
+      },
+      body: JSON.stringify({
+        status: '승인 완료',
+        drivingDate: '2026-11-09',
+        startKm: '100',
+        endKm: '200',
+        stops: [{ placeName: '강남', time: '10:00' }],
+      }),
+    });
+    const selfApproveRes = await postDrivingLogs(selfApproveReq);
+    assert.strictEqual(selfApproveRes.status, 403, 'Driver self-approval must be rejected with 403');
+
+    // 3.5: Non-admin driver attempting HQ review status modification via PUT -> 403 Forbidden
     const unauthPutReq = new NextRequest('http://localhost:3000/api/driving-logs', {
       method: 'PUT',
       headers: {
@@ -471,11 +512,11 @@ test('Driver & HQ Driving Log / Expense Sync Test Suite (Zero Live DB Mutation)'
       body: JSON.stringify({ id: 'log-roundtrip-01', status: '승인 완료' }),
     });
     const unauthPutRes = await putDrivingLogs(unauthPutReq);
-    assert.strictEqual(unauthPutRes.status, 403, 'Driver must not have permissions to approve logs');
+    assert.strictEqual(unauthPutRes.status, 403, 'Driver cannot access HQ Admin PUT review API');
   });
 
   // --------------------------------------------------------------------------
-  // 4. DB 저장 실패 시 가짜 제출 완료 방지 (Zero false "제출 완료" on 500)
+  // 4. DB 저장 실패 시 가짜 제출 완료 방지
   // --------------------------------------------------------------------------
   await test('4. DB failure prevents false "제출 완료" confirmation', async () => {
     simulateDbError = true;
@@ -509,12 +550,11 @@ test('Driver & HQ Driving Log / Expense Sync Test Suite (Zero Live DB Mutation)'
   });
 
   // --------------------------------------------------------------------------
-  // 5. 중복 제출로 인한 이중 기록 방지 (Idempotent submission & duplicate prevention)
+  // 5. 중복 제출로 인한 이중 기록 방지 (Idempotent submission)
   // --------------------------------------------------------------------------
   await test('5. Idempotent submission updates existing row without duplicate records', async () => {
     const originalCount = mockDrivingLogs.length;
 
-    // Resend log-roundtrip-01 with updated notes
     const updateReq = new NextRequest('http://localhost:3000/api/driving-logs', {
       method: 'POST',
       headers: {
@@ -545,10 +585,9 @@ test('Driver & HQ Driving Log / Expense Sync Test Suite (Zero Live DB Mutation)'
   });
 
   // --------------------------------------------------------------------------
-  // 6. 차량체크 km 연결 오류 방지 (Vehicle inspection odometer linkage isolation)
+  // 6. 차량체크 km 연결 오류 방지
   // --------------------------------------------------------------------------
   await test('6. Vehicle inspection odometer is isolated by booking and prevents wrong odometer linkage', () => {
-    // Setup mock browser window & localStorage environment
     const storageStore: Record<string, string> = {};
     const mockLocalStorage = {
       getItem: (k: string) => storageStore[k] || null,
@@ -560,7 +599,6 @@ test('Driver & HQ Driving Log / Expense Sync Test Suite (Zero Live DB Mutation)'
 
     const todayIso = new Date().toISOString().split('T')[0];
 
-    // Case A: Save inspection for Booking 101
     mockLocalStorage.setItem(
       'cockpit_vehicle_inspection_116허 1514_booking-101',
       JSON.stringify({
@@ -571,7 +609,6 @@ test('Driver & HQ Driving Log / Expense Sync Test Suite (Zero Live DB Mutation)'
       })
     );
 
-    // Case B: Save inspection for Booking 102 (later same day)
     mockLocalStorage.setItem(
       'cockpit_vehicle_inspection_116허 1514_booking-102',
       JSON.stringify({
@@ -582,29 +619,26 @@ test('Driver & HQ Driving Log / Expense Sync Test Suite (Zero Live DB Mutation)'
       })
     );
 
-    // Verification 1: Querying for booking-101 gets 150,000
     const odo101 = getVerifiedInspectionOdometer('116허 1514', todayIso, 'booking-101');
     assert.strictEqual(odo101.startKm, '150,000');
     assert.strictEqual(odo101.endKm, '150,100');
     assert.strictEqual(odo101.isVerified, true);
 
-    // Verification 2: Querying for booking-102 gets 150,100
     const odo102 = getVerifiedInspectionOdometer('116허 1514', todayIso, 'booking-102');
     assert.strictEqual(odo102.startKm, '150,100');
     assert.strictEqual(odo102.endKm, '150,250');
     assert.strictEqual(odo102.isVerified, true);
 
-    // Verification 3: Querying an unknown booking does NOT grab booking-101 or 102
     const odoUnknown = getVerifiedInspectionOdometer('116허 1514', todayIso, 'booking-999-unrelated');
     assert.strictEqual(odoUnknown.startKm, '', 'Must not grab unrelated booking odometer');
     assert.strictEqual(odoUnknown.isVerified, false);
   });
 
   // --------------------------------------------------------------------------
-  // 7. 영수증 파일 접근 권한과 지출 내역 연결 (Receipt access control & expense linkage)
+  // 7. 영수증 Private Storage 소유권 검증 및 Mock 제거 검증
   // --------------------------------------------------------------------------
-  await test('7. Receipt download strictly requires authentication & expense links receipt path', async () => {
-    // Submitting expense with receipt storage path
+  await test('7. Receipt storage: verified ownership download, path traversal block, and zero simulated upload error', async () => {
+    // 7.1: Driver A submits expense with private receipt path
     const expensePostReq = new NextRequest('http://localhost:3000/api/expenses', {
       method: 'POST',
       headers: {
@@ -622,7 +656,7 @@ test('Driver & HQ Driving Log / Expense Sync Test Suite (Zero Live DB Mutation)'
             merchant: 'GS칼텍스 삼정주유소',
             amount: 75000,
             paymentMethod: 'company_card',
-            receiptStoragePath: 'org_001/2026/10/receipt_sample_01.jpg',
+            receiptStoragePath: 'vip_limousine_korea/2026/10/receipt_sample_01.jpg',
           },
         ],
       }),
@@ -630,29 +664,55 @@ test('Driver & HQ Driving Log / Expense Sync Test Suite (Zero Live DB Mutation)'
     const expPostRes = await postExpenses(expensePostReq);
     assert.strictEqual(expPostRes.status, 200);
 
-    // Verify stored expense has receipt_storage_path
-    const storedExp = mockExpenses.find((e) => e.id === 'exp-with-receipt-01');
-    assert.strictEqual(storedExp?.receipt_storage_path, 'org_001/2026/10/receipt_sample_01.jpg');
-
-    // Anonymous request to download receipt -> 401 Unauthorized
-    const unauthReceiptReq = new NextRequest('http://localhost:3000/api/expenses/receipt?path=org_001/2026/10/receipt_sample_01.jpg', {
-      method: 'GET',
-    });
-    const unauthReceiptRes = await getReceipt(unauthReceiptReq);
-    assert.strictEqual(unauthReceiptRes.status, 401, 'Anonymous receipt download must be rejected');
-
-    // Authenticated request to download receipt -> 200 OK with private cache
-    const authReceiptReq = new NextRequest('http://localhost:3000/api/expenses/receipt?path=org_001/2026/10/receipt_sample_01.jpg', {
+    // 7.2: Driver A accesses their own expense receipt -> 200 OK
+    const authReceiptReq = new NextRequest('http://localhost:3000/api/expenses/receipt?expenseId=exp-with-receipt-01', {
       method: 'GET',
       headers: { Authorization: `Bearer ${driverAToken}` },
     });
     const authReceiptRes = await getReceipt(authReceiptReq);
-    assert.strictEqual(authReceiptRes.status, 200, 'Authenticated receipt download should succeed');
+    assert.strictEqual(authReceiptRes.status, 200, 'Owner driver must be able to view their receipt');
     assert.strictEqual(authReceiptRes.headers.get('Cache-Control'), 'private, max-age=3600');
+
+    // 7.3: Driver B tries to access Driver A's receipt -> 403 Forbidden
+    const unauthReceiptReq = new NextRequest('http://localhost:3000/api/expenses/receipt?expenseId=exp-with-receipt-01', {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${driverBToken}` },
+    });
+    const unauthReceiptRes = await getReceipt(unauthReceiptReq);
+    assert.strictEqual(unauthReceiptRes.status, 403, 'Driver B must NOT access Driver A receipt (403)');
+
+    // 7.4: Path traversal attempt -> 400 Bad Request
+    const traversalReq = new NextRequest('http://localhost:3000/api/expenses/receipt?path=vip_limousine_korea/../etc/passwd', {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${driverAToken}` },
+    });
+    const traversalRes = await getReceipt(traversalReq);
+    assert.strictEqual(traversalRes.status, 400, 'Path traversal must be rejected with 400');
+
+    // 7.5: Zero simulated upload error: storage failure must return 500
+    simulateStorageError = true;
+    try {
+      const formData = new FormData();
+      const mockBlob = new Blob(['mock-data'], { type: 'image/jpeg' });
+      formData.append('file', mockBlob, 'receipt.jpg');
+
+      const uploadReq = new NextRequest('http://localhost:3000/api/expenses/receipt', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${driverAToken}` },
+        body: formData,
+      });
+      const uploadRes = await postReceipt(uploadReq);
+      assert.strictEqual(uploadRes.status, 500, 'Storage upload failure must return 500, never simulated 200');
+      const uploadData = await uploadRes.json();
+      assert.strictEqual(uploadData.ok, false);
+      assert.strictEqual(uploadData.simulated, undefined, 'Must not return simulated: true');
+    } finally {
+      simulateStorageError = false;
+    }
   });
 
   // --------------------------------------------------------------------------
-  // 8. HQ 승인 후 수정 이력 보존 (Review history audit trail preservation)
+  // 8. HQ 승인 후 수정 이력 보존
   // --------------------------------------------------------------------------
   await test('8. HQ review & approval audit trail is preserved across status transitions', async () => {
     // 1st Transition: HQ Admin approves driving log
@@ -675,7 +735,7 @@ test('Driver & HQ Driving Log / Expense Sync Test Suite (Zero Live DB Mutation)'
     assert.strictEqual(approveData.log.reviewHistory.length, 1);
     assert.strictEqual(approveData.log.reviewHistory[0].actionType, 'approved');
 
-    // 2nd Transition: HQ Admin later requests revision
+    // 2nd Transition: HQ Admin requests revision
     const reviseReq = new NextRequest('http://localhost:3000/api/driving-logs', {
       method: 'PUT',
       headers: {

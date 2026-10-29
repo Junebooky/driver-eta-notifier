@@ -81,20 +81,30 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const bookingId = searchParams.get('bookingId');
-    const driverId = searchParams.get('driverId');
+    const requestedDriverId = searchParams.get('driverId');
     const date = searchParams.get('date');
     const status = searchParams.get('status');
 
-    // Multi-tenant & Driver Isolation: Drivers can strictly see their own records
-    let query = supabaseAdmin.from('driving_logs').select('*');
+    // Organization-level isolation: Always enforce current session's organization
+    let query = supabaseAdmin
+      .from('driving_logs')
+      .select('*')
+      .eq('organization_id', auth.session.org);
 
     if (auth.session.role === 'driver') {
-      const driverIdent = auth.session.driverName || auth.session.userId;
-      query = query.or(`driver_name.eq."${driverIdent}",driver_id.eq."${auth.session.driverId || auth.session.userId}"`);
+      const myDriverId = auth.session.driverId || auth.session.userId;
+      // Reject if driver attempts to query another driver's ID
+      if (requestedDriverId && requestedDriverId !== myDriverId) {
+        return NextResponse.json(
+          { ok: false, error: '다른 기사의 운행일지 목록을 조회할 수 없습니다. (403 Forbidden)' },
+          { status: 403 }
+        );
+      }
+      query = query.eq('driver_id', myDriverId);
     } else {
-      // HQ Admin can optionally filter by driverId or other params
-      if (driverId) {
-        query = query.or(`driver_id.eq."${driverId}",driver_name.eq."${driverId}"`);
+      // HQ Admin can optionally filter by driverId
+      if (requestedDriverId) {
+        query = query.eq('driver_id', requestedDriverId);
       }
     }
 
@@ -114,7 +124,6 @@ export async function GET(req: NextRequest) {
 
     if (error) {
       console.warn('[DrivingLogs GET] DB Query note/error:', error.message);
-      // If table is not yet migrated, fall back gracefully to empty set or schedules scan
       return NextResponse.json({
         ok: true,
         logs: [],
@@ -139,7 +148,7 @@ export async function GET(req: NextRequest) {
 
 /**
  * POST: Create or submit a driving log
- * Validates inputs and guarantees that DB failures strictly prevent false "제출 완료" state.
+ * Validates inputs and strictly enforces driver identity, organization, and schedule assignment.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -177,19 +186,69 @@ export async function POST(req: NextRequest) {
       status = '검토 대기',
     } = body;
 
-    // Driver authorization: Drivers cannot submit logs on behalf of other drivers
-    const effectiveDriverName = (driverName || auth.session.driverName || '윤태준').trim();
+    // 1. Role & Identity Enforcement
+    const effectiveDriverId = auth.session.driverId || auth.session.userId;
+    const effectiveDriverName = (auth.session.driverName || driverName || '윤태준').trim();
+
     if (auth.session.role === 'driver') {
-      const sessionDriverName = (auth.session.driverName || '').trim();
-      if (sessionDriverName && effectiveDriverName !== sessionDriverName) {
+      // Driver cannot submit on behalf of another driverId
+      if (driverId && driverId !== effectiveDriverId) {
         return NextResponse.json(
-          { ok: false, error: '다른 기사의 운행일지를 대리 작성할 수 없습니다. (403 Forbidden)' },
+          { ok: false, error: '다른 기사의 식별자(driverId)로 운행일지를 작성할 수 없습니다. (403 Forbidden)' },
+          { status: 403 }
+        );
+      }
+      // Driver cannot self-approve or reject
+      if (status && status !== 'draft' && status !== '검토 대기' && status !== 'submitted') {
+        return NextResponse.json(
+          { ok: false, error: '기사는 승인 완료 또는 반려 상태를 직접 지정할 수 없습니다. (403 Forbidden)' },
           { status: 403 }
         );
       }
     }
 
-    // Validation for submission
+    // 2. Ownership verification when updating existing log
+    if (id && !id.startsWith('driver-sub-')) {
+      const { data: existingLog, error: existErr } = await supabaseAdmin
+        .from('driving_logs')
+        .select('id, driver_id, organization_id, status')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (existErr) {
+        return NextResponse.json(
+          { ok: false, error: `기존 운행일지 검증 실패: ${existErr.message}` },
+          { status: 500 }
+        );
+      }
+
+      if (existingLog) {
+        // Must belong to same organization
+        if (existingLog.organization_id !== auth.session.org) {
+          return NextResponse.json(
+            { ok: false, error: '다른 조직의 운행일지를 수정할 수 없습니다. (403 Forbidden)' },
+            { status: 403 }
+          );
+        }
+        // Driver can only edit their own records
+        if (auth.session.role === 'driver') {
+          if (existingLog.driver_id !== effectiveDriverId) {
+            return NextResponse.json(
+              { ok: false, error: '다른 기사의 운행일지를 수정할 권한이 없습니다. (403 Forbidden)' },
+              { status: 403 }
+            );
+          }
+          if (existingLog.status === '승인 완료' || existingLog.status === '검토 중') {
+            return NextResponse.json(
+              { ok: false, error: '이미 승인되었거나 검토 중인 운행일지는 수정할 수 없습니다. (403 Forbidden)' },
+              { status: 403 }
+            );
+          }
+        }
+      }
+    }
+
+    // 3. Validation for submission
     const isSubmitting = status === '검토 대기' || status === 'submitted';
     const startKmNum = formatOdoNum(startKm);
     const endKmNum = formatOdoNum(endKm);
@@ -221,11 +280,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Verify bookingId if supplied: must exist in schedules
+    // 4. Verify bookingId and driver schedule assignment
     if (bookingId) {
       const { data: scheduleRow, error: schedErr } = await supabaseAdmin
         .from('schedules')
-        .select('id, customer_name, driver_name, vehicle_no, vehicle_plate')
+        .select('id, customer_name, driver_name, vehicle_no, vehicle_plate, schedule_meta')
         .eq('id', bookingId)
         .maybeSingle();
 
@@ -242,15 +301,31 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
+
+      // If requester is a driver, verify that this booking is assigned to them
+      if (auth.session.role === 'driver') {
+        const schedMetaDriverId = scheduleRow.schedule_meta?.driver_id;
+        const isAssigned =
+          (schedMetaDriverId && schedMetaDriverId === effectiveDriverId) ||
+          (scheduleRow.driver_name && scheduleRow.driver_name === auth.session.driverName) ||
+          (scheduleRow.vehicle_plate && scheduleRow.vehicle_plate === auth.session.carNumber);
+
+        if (!isAssigned) {
+          return NextResponse.json(
+            { ok: false, error: '본인에게 배정되지 않은 예약에 대한 운행일지를 작성할 수 없습니다. (403 Forbidden)' },
+            { status: 403 }
+          );
+        }
+      }
     }
 
     const calculatedDist = endKmNum > startKmNum ? endKmNum - startKmNum : formatOdoNum(distanceKm);
     const nowIso = new Date().toISOString();
 
     const insertPayload: Record<string, any> = {
-      organization_id: '00000000-0000-0000-0000-000000000001',
+      organization_id: auth.session.org,
       booking_id: bookingId || null,
-      driver_id: driverId || auth.session.driverId || auth.session.userId,
+      driver_id: effectiveDriverId,
       driver_name: effectiveDriverName,
       vehicle_id: vehicleId || auth.session.vehicleNo || '1호차',
       vehicle_plate: vehiclePlate || auth.session.carNumber || '',
@@ -297,7 +372,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // If linked to a booking, also sync the driving_log metadata on cockpit.schedules
+    // If linked to a booking, sync the driving_log metadata on cockpit.schedules
     if (bookingId) {
       await supabaseAdmin
         .from('schedules')
@@ -333,7 +408,7 @@ export async function POST(req: NextRequest) {
 /**
  * PUT: HQ Admin Review & Status Mutation
  * Requires HQ Admin authentication.
- * Records immutable audit history with actor and timestamp.
+ * Verifies organization ownership and records immutable audit history.
  */
 export async function PUT(req: NextRequest) {
   try {
@@ -352,7 +427,7 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    // Fetch existing row to preserve review history
+    // Fetch existing row to verify organization ownership and preserve review history
     const { data: existing, error: findErr } = await supabaseAdmin
       .from('driving_logs')
       .select('*')
@@ -370,6 +445,14 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json(
         { ok: false, error: `해당 운행일지(${id})를 찾을 수 없습니다.` },
         { status: 404 }
+      );
+    }
+
+    // Enforce organization boundary
+    if (existing.organization_id !== auth.session.org) {
+      return NextResponse.json(
+        { ok: false, error: '해당 조직의 운행일지를 수정할 권한이 없습니다. (403 Forbidden)' },
+        { status: 403 }
       );
     }
 

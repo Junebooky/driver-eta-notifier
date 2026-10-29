@@ -69,6 +69,7 @@ export interface HqExpenseRecord {
   driverId?: string;
   vehicleId?: string;
   receiptStoragePath?: string;
+  auditHistory?: any[];
 }
 
 

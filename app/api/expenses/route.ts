@@ -58,25 +58,20 @@ export function mapDbRowToExpenseRecord(row: any, index: number = 1): HqExpenseR
     amount: Number(row.amount) || 0,
     paymentMethod: (row.payment_method as PaymentMethod) || 'company_card',
     paymentMethodLabel: row.payment_method_label || getPaymentMethodLabel(row.payment_method),
-    status: (row.status as HqExpenseStatus) || '검수 대기',
-    receiptUrl: row.receipt_storage_path ? `/api/expenses/receipt?path=${encodeURIComponent(row.receipt_storage_path)}` : undefined,
-    receiptStoragePath: row.receipt_storage_path || undefined,
-    hasReceiptImage: Boolean(row.has_receipt_image || row.receipt_storage_path),
     memo: row.memo || undefined,
+    status: (row.status as HqExpenseStatus) || '검수 대기',
+    hasReceiptImage: Boolean(row.has_receipt_image || row.receipt_storage_path),
+    receiptStoragePath: row.receipt_storage_path || undefined,
     ocrExtracted: Boolean(row.ocr_extracted),
     ocrSummary: row.ocr_summary || undefined,
     ocrDetails: row.ocr_details || undefined,
-    reviewNotes: row.review_notes || undefined,
-    reviewedAt: row.reviewed_at ? new Date(row.reviewed_at).toLocaleString('ko-KR') : undefined,
-    reviewedBy: row.reviewed_by || undefined,
-    billableToCustomer: Boolean(row.billable_to_customer ?? true),
-    bookingId: row.booking_id || undefined,
-    drivingLogId: row.driving_log_id || undefined,
     hipassTxKey: row.hipass_tx_key || undefined,
     hipassEntrance: row.hipass_entrance || undefined,
     hipassExit: row.hipass_exit || undefined,
     hipassCardNo: row.hipass_card_no || undefined,
-    organizationId: row.organization_id || undefined,
+    billableToCustomer: Boolean(row.billable_to_customer ?? true),
+    auditHistory: Array.isArray(row.audit_history) ? row.audit_history : [],
+    bookingId: row.booking_id || undefined,
     driverId: row.driver_id || undefined,
     vehicleId: row.vehicle_id || undefined,
   };
@@ -97,20 +92,30 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const bookingId = searchParams.get('bookingId');
     const drivingLogId = searchParams.get('drivingLogId');
-    const driverId = searchParams.get('driverId');
+    const requestedDriverId = searchParams.get('driverId');
     const date = searchParams.get('date');
     const status = searchParams.get('status');
     const category = searchParams.get('category');
 
-    let query = supabaseAdmin.from('expenses').select('*');
+    // Organization-level isolation: Always filter by session organization
+    let query = supabaseAdmin
+      .from('expenses')
+      .select('*')
+      .eq('organization_id', auth.session.org);
 
     // Multi-tenant & Driver Isolation: Drivers only see their own expenses
     if (auth.session.role === 'driver') {
-      const driverIdent = auth.session.driverName || auth.session.userId;
-      query = query.or(`driver_name.eq."${driverIdent}",driver_id.eq."${auth.session.driverId || auth.session.userId}"`);
+      const myDriverId = auth.session.driverId || auth.session.userId;
+      if (requestedDriverId && requestedDriverId !== myDriverId) {
+        return NextResponse.json(
+          { ok: false, error: '다른 기사의 경비 목록을 조회할 권한이 없습니다. (403 Forbidden)' },
+          { status: 403 }
+        );
+      }
+      query = query.eq('driver_id', myDriverId);
     } else {
-      if (driverId) {
-        query = query.or(`driver_id.eq."${driverId}",driver_name.eq."${driverId}"`);
+      if (requestedDriverId) {
+        query = query.eq('driver_id', requestedDriverId);
       }
     }
 
@@ -162,7 +167,7 @@ export async function GET(req: NextRequest) {
 
 /**
  * POST: Submit expenses (single or batch)
- * Validates mandatory fields and guarantees that DB failures strictly prevent false "제출 완료" state.
+ * Validates mandatory fields and strictly verifies driver identity, organization, and schedule assignment.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -181,6 +186,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const effectiveDriverId = auth.session.driverId || auth.session.userId;
     const nowIso = new Date().toISOString();
     const rowsToInsert: Record<string, any>[] = [];
 
@@ -207,32 +213,102 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const driverName = (item.driverName || auth.session.driverName || '윤태준').trim();
-      // Driver authorization: Drivers cannot submit expenses for someone else
+      // Role & Identity Enforcement
       if (auth.session.role === 'driver') {
-        const sessionDriverName = (auth.session.driverName || '').trim();
-        if (sessionDriverName && driverName !== sessionDriverName) {
+        if (item.driverId && item.driverId !== effectiveDriverId) {
           return NextResponse.json(
-            { ok: false, error: '다른 기사의 경비를 대리 제출할 수 없습니다. (403 Forbidden)' },
+            { ok: false, error: '다른 기사의 식별자로 경비를 대리 제출할 수 없습니다. (403 Forbidden)' },
+            { status: 403 }
+          );
+        }
+        if (item.status && item.status !== 'draft' && item.status !== '검수 대기' && item.status !== 'submitted') {
+          return NextResponse.json(
+            { ok: false, error: '기사는 승인 완료 상태를 직접 지정할 수 없습니다. (403 Forbidden)' },
             { status: 403 }
           );
         }
       }
 
-      // Priority linking to bookingId; if not confirmed or empty, keep null (never connect to wrong booking!)
+      // Ownership verification when updating an existing expense
+      if (item.id && !String(item.id).startsWith('demo-') && !String(item.id).startsWith('hq-exp-')) {
+        const { data: existingExp, error: existErr } = await supabaseAdmin
+          .from('expenses')
+          .select('id, driver_id, organization_id, status')
+          .eq('id', item.id)
+          .maybeSingle();
+
+        if (existErr) {
+          return NextResponse.json(
+            { ok: false, error: `기존 경비 검증 실패: ${existErr.message}` },
+            { status: 500 }
+          );
+        }
+
+        if (existingExp) {
+          if (existingExp.organization_id !== auth.session.org) {
+            return NextResponse.json(
+              { ok: false, error: '다른 조직의 경비 레코드를 수정할 수 없습니다. (403 Forbidden)' },
+              { status: 403 }
+            );
+          }
+          if (auth.session.role === 'driver') {
+            if (existingExp.driver_id !== effectiveDriverId) {
+              return NextResponse.json(
+                { ok: false, error: '다른 기사의 경비 레코드를 수정할 권한이 없습니다. (403 Forbidden)' },
+                { status: 403 }
+              );
+            }
+            if (existingExp.status === '승인 완료' || existingExp.status === '검토 중') {
+              return NextResponse.json(
+                { ok: false, error: '이미 승인되었거나 검토 중인 경비는 수정할 수 없습니다. (403 Forbidden)' },
+                { status: 403 }
+              );
+            }
+          }
+        }
+      }
+
+      // Priority linking to bookingId with assignment verification
       let validatedBookingId: string | null = null;
       if (item.bookingId) {
-        const { data: scheduleRow } = await supabaseAdmin
+        const { data: scheduleRow, error: schedErr } = await supabaseAdmin
           .from('schedules')
-          .select('id, customer_id, customer_name')
+          .select('id, customer_id, customer_name, driver_name, vehicle_plate, schedule_meta')
           .eq('id', item.bookingId)
           .maybeSingle();
 
-        if (scheduleRow) {
-          validatedBookingId = scheduleRow.id;
-          item.customerId = item.customerId || scheduleRow.customer_id;
-          item.customerName = item.customerName || scheduleRow.customer_name;
+        if (schedErr) {
+          return NextResponse.json(
+            { ok: false, error: `예약 정보 DB 조회 실패: ${schedErr.message}` },
+            { status: 500 }
+          );
         }
+
+        if (!scheduleRow) {
+          return NextResponse.json(
+            { ok: false, error: `연결 대상 예약(bookingId: ${item.bookingId})을 찾을 수 없습니다.` },
+            { status: 400 }
+          );
+        }
+
+        if (auth.session.role === 'driver') {
+          const schedMetaDriverId = scheduleRow.schedule_meta?.driver_id;
+          const isAssigned =
+            (schedMetaDriverId && schedMetaDriverId === effectiveDriverId) ||
+            (scheduleRow.driver_name && scheduleRow.driver_name === auth.session.driverName) ||
+            (scheduleRow.vehicle_plate && scheduleRow.vehicle_plate === auth.session.carNumber);
+
+          if (!isAssigned) {
+            return NextResponse.json(
+              { ok: false, error: '본인에게 배정되지 않은 예약에 대한 경비를 제출할 수 없습니다. (403 Forbidden)' },
+              { status: 403 }
+            );
+          }
+        }
+
+        validatedBookingId = scheduleRow.id;
+        item.customerId = item.customerId || scheduleRow.customer_id;
+        item.customerName = item.customerName || scheduleRow.customer_name;
       }
 
       const category = item.category || 'other';
@@ -241,11 +317,11 @@ export async function POST(req: NextRequest) {
       const paymentMethodLabel = item.paymentMethodLabel || getPaymentMethodLabel(paymentMethod);
 
       const record: Record<string, any> = {
-        organization_id: '00000000-0000-0000-0000-000000000001',
+        organization_id: auth.session.org,
         booking_id: validatedBookingId,
         driving_log_id: item.drivingLogId || null,
-        driver_id: item.driverId || auth.session.driverId || auth.session.userId,
-        driver_name: driverName,
+        driver_id: effectiveDriverId,
+        driver_name: auth.session.driverName || item.driverName || '윤태준',
         vehicle_id: item.vehicleId || auth.session.vehicleNo || '1호차',
         vehicle_plate: item.vehiclePlate || auth.session.carNumber || '',
         vehicle_model: item.vehicleModel || '법인 차량',
@@ -318,9 +394,9 @@ export async function POST(req: NextRequest) {
 }
 
 /**
- * PUT: HQ Admin Review & Status Mutation
+ * PUT: HQ Admin Expense Review & Status Mutation
  * Requires HQ Admin authentication.
- * Records audit trail with reviewer name and timestamp.
+ * Verifies organization ownership and records audit history.
  */
 export async function PUT(req: NextRequest) {
   try {
@@ -330,7 +406,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { id, status, reviewNotes } = body;
+    const { id, status, reviewNotes, billableToCustomer } = body;
 
     if (!id) {
       return NextResponse.json(
@@ -339,7 +415,6 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    // Fetch existing row to preserve audit history
     const { data: existing, error: findErr } = await supabaseAdmin
       .from('expenses')
       .select('*')
@@ -355,8 +430,16 @@ export async function PUT(req: NextRequest) {
 
     if (!existing) {
       return NextResponse.json(
-        { ok: false, error: `해당 경비 내역(${id})을 찾을 수 없습니다.` },
+        { ok: false, error: `해당 경비 레코드(${id})를 찾을 수 없습니다.` },
         { status: 404 }
+      );
+    }
+
+    // Verify organization ownership
+    if (existing.organization_id !== auth.session.org) {
+      return NextResponse.json(
+        { ok: false, error: '해당 조직의 경비 레코드를 수정할 권한이 없습니다. (403 Forbidden)' },
+        { status: 403 }
       );
     }
 
@@ -364,24 +447,44 @@ export async function PUT(req: NextRequest) {
     const actor = auth.session.displayName || auth.session.driverName || '본사 관리자';
     const prevHistory = Array.isArray(existing.audit_history) ? existing.audit_history : [];
 
+    let actionType: 'approved' | 'revision_requested' | 'rejected' | 'update' = 'approved';
+    let auditMessage = `관리자(${actor})가 ${status || '정보 수정'} 처리했습니다.`;
+
+    if (status === '보완 필요') {
+      actionType = 'revision_requested';
+      auditMessage = reviewNotes ? `보완 요청: ${reviewNotes}` : '추가 증빙 확인이 필요합니다.';
+    } else if (status === '반려') {
+      actionType = 'rejected';
+      auditMessage = reviewNotes ? `반려 사유: ${reviewNotes}` : '관리자에 의해 반려되었습니다.';
+    } else if (status === '승인 완료') {
+      actionType = 'approved';
+      auditMessage = reviewNotes ? `승인 완료: ${reviewNotes}` : '검토 후 승인 완료되었습니다.';
+    } else {
+      actionType = 'update';
+    }
+
     const newAuditEntry = {
       id: `audit-${Date.now()}`,
       time: new Date().toLocaleString('ko-KR'),
-      message: `관리자(${actor})가 상태를 [${status}]로 변경했습니다.${reviewNotes ? ` (사유: ${reviewNotes})` : ''}`,
+      message: auditMessage,
       actor,
-      actionType: status === '승인 완료' ? 'approved' : status === '반려' ? 'rejected' : 'review',
+      actionType,
     };
 
     const updatePayload: Record<string, any> = {
-      status,
-      reviewed_at: nowIso,
-      reviewed_by: actor,
       audit_history: [newAuditEntry, ...prevHistory],
       updated_at: nowIso,
     };
 
-    if (reviewNotes !== undefined) {
-      updatePayload.review_notes = reviewNotes;
+    if (status) {
+      updatePayload.status = status;
+      updatePayload.reviewed_at = nowIso;
+      updatePayload.reviewed_by = actor;
+      if (reviewNotes !== undefined) updatePayload.review_notes = reviewNotes;
+    }
+
+    if (typeof billableToCustomer === 'boolean') {
+      updatePayload.billable_to_customer = billableToCustomer;
     }
 
     const { data: updatedRow, error: updateErr } = await supabaseAdmin

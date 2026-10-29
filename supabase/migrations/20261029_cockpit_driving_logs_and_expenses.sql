@@ -1,6 +1,6 @@
 -- ==============================================================================
 -- [PROPOSAL / 승인 대기] 20261029_cockpit_driving_logs_and_expenses.sql
--- VIP Limousine Korea - Cockpit Driving Logs & Expenses Real DB Schema
+-- VIP Limousine Korea - Cockpit Driving Logs & Expenses Real DB Schema (v2 - Hardened)
 --
 -- ⚠️ IMPORTANT NOTICE:
 -- DO NOT EXECUTE DIRECTLY ON PRODUCTION / SHARED DATABASE WITHOUT EXPLICIT OWNER APPROVAL.
@@ -15,13 +15,13 @@ CREATE SCHEMA IF NOT EXISTS cockpit;
 -- ==============================================================================
 -- 2. TABLE: cockpit.driving_logs
 -- Dedicated table for driver-submitted and HQ-reviewed daily/booking driving logs.
--- Supports multiple bookings per driver per day without collision.
+-- Uses verified UUID driver_id and text organization_id matching app_metadata.
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS cockpit.driving_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  organization_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001',
+  organization_id TEXT NOT NULL DEFAULT 'vip_limousine_korea',
   booking_id UUID REFERENCES cockpit.schedules(id) ON DELETE SET NULL,
-  driver_id TEXT,
+  driver_id UUID REFERENCES cockpit.drivers(id) ON DELETE SET NULL,
   driver_name TEXT NOT NULL,
   vehicle_id TEXT,
   vehicle_plate TEXT,
@@ -83,14 +83,13 @@ ON cockpit.driving_logs (status);
 -- 3. TABLE: cockpit.expenses
 -- Dedicated table for business expenses (fuel, toll, parking, meal, etc.)
 -- Links to booking_id (priority) or stays unassigned if not confirmed.
--- Never exposes raw public receipt URLs or localStorage blobs.
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS cockpit.expenses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  organization_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001',
+  organization_id TEXT NOT NULL DEFAULT 'vip_limousine_korea',
   booking_id UUID REFERENCES cockpit.schedules(id) ON DELETE SET NULL,
   driving_log_id UUID REFERENCES cockpit.driving_logs(id) ON DELETE SET NULL,
-  driver_id TEXT,
+  driver_id UUID REFERENCES cockpit.drivers(id) ON DELETE SET NULL,
   driver_name TEXT NOT NULL,
   vehicle_id TEXT,
   vehicle_plate TEXT,
@@ -98,6 +97,7 @@ CREATE TABLE IF NOT EXISTS cockpit.expenses (
   customer_id TEXT,
   customer_name TEXT,
   event_id TEXT,
+  event_name TEXT,
 
   -- Expense Specifics
   expense_date DATE NOT NULL,
@@ -157,67 +157,238 @@ ON cockpit.expenses (hipass_tx_key)
 WHERE hipass_tx_key IS NOT NULL;
 
 -- ==============================================================================
--- 4. ROW LEVEL SECURITY (RLS) POLICIES
+-- 4. STORAGE BUCKET SPECIFICATION (Private receipts bucket)
+-- ==============================================================================
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'receipts',
+  'receipts',
+  false,
+  10485760, -- 10MB limit
+  ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'application/pdf']
+)
+ON CONFLICT (id) DO UPDATE SET
+  public = false,
+  file_size_limit = 10485760,
+  allowed_mime_types = ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'application/pdf'];
+
+-- ==============================================================================
+-- 5. ROW LEVEL SECURITY (RLS) POLICIES
+-- Strictly uses app_metadata.cockpit_role, app_metadata.org, and driver_id UUID.
+-- ZERO name-matching OR conditions allowed.
 -- ==============================================================================
 ALTER TABLE cockpit.driving_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cockpit.expenses ENABLE ROW LEVEL SECURITY;
 
--- Driving logs: Drivers can only access their own logs; HQ admin has full access for their org
+-- ------------------------------------------------------------------------------
+-- Driving Logs Policies
+-- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS p_driving_logs_service_role ON cockpit.driving_logs;
+CREATE POLICY p_driving_logs_service_role ON cockpit.driving_logs
+FOR ALL TO service_role USING (true) WITH CHECK (true);
+
 DROP POLICY IF EXISTS p_driving_logs_select ON cockpit.driving_logs;
 CREATE POLICY p_driving_logs_select ON cockpit.driving_logs
-FOR SELECT USING (
-  (auth.role() = 'service_role') OR
-  (auth.jwt() ->> 'role' = 'hq_admin' AND (auth.jwt() ->> 'org_id')::uuid = organization_id) OR
-  (auth.jwt() ->> 'role' = 'driver' AND (auth.jwt() ->> 'user_id' = driver_id OR auth.jwt() ->> 'driver_name' = driver_name))
+FOR SELECT TO authenticated USING (
+  (
+    ((auth.jwt() -> 'app_metadata'::text) ->> 'org'::text) = organization_id
+    AND ((auth.jwt() -> 'app_metadata'::text) ->> 'cockpit_role'::text) = 'hq_admin'::text
+  )
+  OR
+  (
+    ((auth.jwt() -> 'app_metadata'::text) ->> 'org'::text) = organization_id
+    AND ((auth.jwt() -> 'app_metadata'::text) ->> 'cockpit_role'::text) = 'driver'::text
+    AND driver_id = (((auth.jwt() -> 'app_metadata'::text) ->> 'driver_id'::text)::uuid)
+  )
 );
 
 DROP POLICY IF EXISTS p_driving_logs_insert ON cockpit.driving_logs;
 CREATE POLICY p_driving_logs_insert ON cockpit.driving_logs
-FOR INSERT WITH CHECK (
-  (auth.role() = 'service_role') OR
-  (auth.jwt() ->> 'role' = 'hq_admin' AND (auth.jwt() ->> 'org_id')::uuid = organization_id) OR
-  (auth.jwt() ->> 'role' = 'driver' AND (auth.jwt() ->> 'user_id' = driver_id OR auth.jwt() ->> 'driver_name' = driver_name))
+FOR INSERT TO authenticated WITH CHECK (
+  (
+    ((auth.jwt() -> 'app_metadata'::text) ->> 'org'::text) = organization_id
+    AND ((auth.jwt() -> 'app_metadata'::text) ->> 'cockpit_role'::text) = 'hq_admin'::text
+  )
+  OR
+  (
+    ((auth.jwt() -> 'app_metadata'::text) ->> 'org'::text) = organization_id
+    AND ((auth.jwt() -> 'app_metadata'::text) ->> 'cockpit_role'::text) = 'driver'::text
+    AND driver_id = (((auth.jwt() -> 'app_metadata'::text) ->> 'driver_id'::text)::uuid)
+    AND status IN ('draft', '검토 대기')
+  )
 );
 
 DROP POLICY IF EXISTS p_driving_logs_update ON cockpit.driving_logs;
 CREATE POLICY p_driving_logs_update ON cockpit.driving_logs
-FOR UPDATE USING (
-  (auth.role() = 'service_role') OR
-  (auth.jwt() ->> 'role' = 'hq_admin' AND (auth.jwt() ->> 'org_id')::uuid = organization_id) OR
-  (auth.jwt() ->> 'role' = 'driver' AND (auth.jwt() ->> 'user_id' = driver_id OR auth.jwt() ->> 'driver_name' = driver_name) AND status = 'draft')
+FOR UPDATE TO authenticated
+USING (
+  (
+    ((auth.jwt() -> 'app_metadata'::text) ->> 'org'::text) = organization_id
+    AND ((auth.jwt() -> 'app_metadata'::text) ->> 'cockpit_role'::text) = 'hq_admin'::text
+  )
+  OR
+  (
+    ((auth.jwt() -> 'app_metadata'::text) ->> 'org'::text) = organization_id
+    AND ((auth.jwt() -> 'app_metadata'::text) ->> 'cockpit_role'::text) = 'driver'::text
+    AND driver_id = (((auth.jwt() -> 'app_metadata'::text) ->> 'driver_id'::text)::uuid)
+    AND status IN ('draft', '보완 필요')
+  )
+)
+WITH CHECK (
+  (
+    ((auth.jwt() -> 'app_metadata'::text) ->> 'org'::text) = organization_id
+    AND ((auth.jwt() -> 'app_metadata'::text) ->> 'cockpit_role'::text) = 'hq_admin'::text
+  )
+  OR
+  (
+    ((auth.jwt() -> 'app_metadata'::text) ->> 'org'::text) = organization_id
+    AND ((auth.jwt() -> 'app_metadata'::text) ->> 'cockpit_role'::text) = 'driver'::text
+    AND driver_id = (((auth.jwt() -> 'app_metadata'::text) ->> 'driver_id'::text)::uuid)
+    AND status IN ('draft', '검토 대기')
+  )
 );
 
--- Expenses: Drivers can only access their own expenses; HQ admin has full access for their org
+DROP POLICY IF EXISTS p_driving_logs_delete ON cockpit.driving_logs;
+CREATE POLICY p_driving_logs_delete ON cockpit.driving_logs
+FOR DELETE TO authenticated USING (
+  (
+    ((auth.jwt() -> 'app_metadata'::text) ->> 'org'::text) = organization_id
+    AND ((auth.jwt() -> 'app_metadata'::text) ->> 'cockpit_role'::text) = 'hq_admin'::text
+  )
+  OR
+  (
+    ((auth.jwt() -> 'app_metadata'::text) ->> 'org'::text) = organization_id
+    AND ((auth.jwt() -> 'app_metadata'::text) ->> 'cockpit_role'::text) = 'driver'::text
+    AND driver_id = (((auth.jwt() -> 'app_metadata'::text) ->> 'driver_id'::text)::uuid)
+    AND status = 'draft'
+  )
+);
+
+-- ------------------------------------------------------------------------------
+-- Expenses Policies
+-- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS p_expenses_service_role ON cockpit.expenses;
+CREATE POLICY p_expenses_service_role ON cockpit.expenses
+FOR ALL TO service_role USING (true) WITH CHECK (true);
+
 DROP POLICY IF EXISTS p_expenses_select ON cockpit.expenses;
 CREATE POLICY p_expenses_select ON cockpit.expenses
-FOR SELECT USING (
-  (auth.role() = 'service_role') OR
-  (auth.jwt() ->> 'role' = 'hq_admin' AND (auth.jwt() ->> 'org_id')::uuid = organization_id) OR
-  (auth.jwt() ->> 'role' = 'driver' AND (auth.jwt() ->> 'user_id' = driver_id OR auth.jwt() ->> 'driver_name' = driver_name))
+FOR SELECT TO authenticated USING (
+  (
+    ((auth.jwt() -> 'app_metadata'::text) ->> 'org'::text) = organization_id
+    AND ((auth.jwt() -> 'app_metadata'::text) ->> 'cockpit_role'::text) = 'hq_admin'::text
+  )
+  OR
+  (
+    ((auth.jwt() -> 'app_metadata'::text) ->> 'org'::text) = organization_id
+    AND ((auth.jwt() -> 'app_metadata'::text) ->> 'cockpit_role'::text) = 'driver'::text
+    AND driver_id = (((auth.jwt() -> 'app_metadata'::text) ->> 'driver_id'::text)::uuid)
+  )
 );
 
 DROP POLICY IF EXISTS p_expenses_insert ON cockpit.expenses;
 CREATE POLICY p_expenses_insert ON cockpit.expenses
-FOR INSERT WITH CHECK (
-  (auth.role() = 'service_role') OR
-  (auth.jwt() ->> 'role' = 'hq_admin' AND (auth.jwt() ->> 'org_id')::uuid = organization_id) OR
-  (auth.jwt() ->> 'role' = 'driver' AND (auth.jwt() ->> 'user_id' = driver_id OR auth.jwt() ->> 'driver_name' = driver_name))
+FOR INSERT TO authenticated WITH CHECK (
+  (
+    ((auth.jwt() -> 'app_metadata'::text) ->> 'org'::text) = organization_id
+    AND ((auth.jwt() -> 'app_metadata'::text) ->> 'cockpit_role'::text) = 'hq_admin'::text
+  )
+  OR
+  (
+    ((auth.jwt() -> 'app_metadata'::text) ->> 'org'::text) = organization_id
+    AND ((auth.jwt() -> 'app_metadata'::text) ->> 'cockpit_role'::text) = 'driver'::text
+    AND driver_id = (((auth.jwt() -> 'app_metadata'::text) ->> 'driver_id'::text)::uuid)
+    AND status IN ('draft', '검수 대기')
+  )
 );
 
 DROP POLICY IF EXISTS p_expenses_update ON cockpit.expenses;
 CREATE POLICY p_expenses_update ON cockpit.expenses
-FOR UPDATE USING (
-  (auth.role() = 'service_role') OR
-  (auth.jwt() ->> 'role' = 'hq_admin' AND (auth.jwt() ->> 'org_id')::uuid = organization_id) OR
-  (auth.jwt() ->> 'role' = 'driver' AND (auth.jwt() ->> 'user_id' = driver_id OR auth.jwt() ->> 'driver_name' = driver_name) AND status = 'draft')
+FOR UPDATE TO authenticated
+USING (
+  (
+    ((auth.jwt() -> 'app_metadata'::text) ->> 'org'::text) = organization_id
+    AND ((auth.jwt() -> 'app_metadata'::text) ->> 'cockpit_role'::text) = 'hq_admin'::text
+  )
+  OR
+  (
+    ((auth.jwt() -> 'app_metadata'::text) ->> 'org'::text) = organization_id
+    AND ((auth.jwt() -> 'app_metadata'::text) ->> 'cockpit_role'::text) = 'driver'::text
+    AND driver_id = (((auth.jwt() -> 'app_metadata'::text) ->> 'driver_id'::text)::uuid)
+    AND status IN ('draft', '보완 필요')
+  )
+)
+WITH CHECK (
+  (
+    ((auth.jwt() -> 'app_metadata'::text) ->> 'org'::text) = organization_id
+    AND ((auth.jwt() -> 'app_metadata'::text) ->> 'cockpit_role'::text) = 'hq_admin'::text
+  )
+  OR
+  (
+    ((auth.jwt() -> 'app_metadata'::text) ->> 'org'::text) = organization_id
+    AND ((auth.jwt() -> 'app_metadata'::text) ->> 'cockpit_role'::text) = 'driver'::text
+    AND driver_id = (((auth.jwt() -> 'app_metadata'::text) ->> 'driver_id'::text)::uuid)
+    AND status IN ('draft', '검수 대기')
+  )
+);
+
+DROP POLICY IF EXISTS p_expenses_delete ON cockpit.expenses;
+CREATE POLICY p_expenses_delete ON cockpit.expenses
+FOR DELETE TO authenticated USING (
+  (
+    ((auth.jwt() -> 'app_metadata'::text) ->> 'org'::text) = organization_id
+    AND ((auth.jwt() -> 'app_metadata'::text) ->> 'cockpit_role'::text) = 'hq_admin'::text
+  )
+  OR
+  (
+    ((auth.jwt() -> 'app_metadata'::text) ->> 'org'::text) = organization_id
+    AND ((auth.jwt() -> 'app_metadata'::text) ->> 'cockpit_role'::text) = 'driver'::text
+    AND driver_id = (((auth.jwt() -> 'app_metadata'::text) ->> 'driver_id'::text)::uuid)
+    AND status = 'draft'
+  )
+);
+
+-- ------------------------------------------------------------------------------
+-- Storage Objects Policies for 'receipts' Bucket
+-- ------------------------------------------------------------------------------
+DROP POLICY IF EXISTS p_storage_receipts_select ON storage.objects;
+CREATE POLICY p_storage_receipts_select ON storage.objects
+FOR SELECT TO authenticated USING (
+  bucket_id = 'receipts'
+  AND (
+    ((auth.jwt() -> 'app_metadata'::text) ->> 'cockpit_role'::text) = 'hq_admin'::text
+    OR
+    (name LIKE (((auth.jwt() -> 'app_metadata'::text) ->> 'org'::text) || '/%'))
+  )
+);
+
+DROP POLICY IF EXISTS p_storage_receipts_insert ON storage.objects;
+CREATE POLICY p_storage_receipts_insert ON storage.objects
+FOR INSERT TO authenticated WITH CHECK (
+  bucket_id = 'receipts'
+  AND (name LIKE (((auth.jwt() -> 'app_metadata'::text) ->> 'org'::text) || '/%'))
 );
 
 COMMIT;
 
 -- ==============================================================================
--- 5. DATA PRESERVATION & COMPATIBILITY VERIFICATION PLAN:
--- 1. Zero alteration to existing `cockpit.schedules`, `cockpit.drivers`, or `cockpit.customers`.
--- 2. New tables use foreign keys with ON DELETE SET NULL to prevent cascading data loss.
--- 3. Backward compatibility: Existing `schedules.driving_log` JSONB column remains intact.
--- 4. Storage security: Receipt files stored under private bucket path; zero public URLs.
+-- 6. APPLICATION & ROLLBACK (RECOVERY) SPECIFICATION
+-- ==============================================================================
+-- [적용 순서 (Application Sequence)]
+-- 1. storage.buckets 내 'receipts' 비공개 버킷 레코드 생성 (public = false)
+-- 2. cockpit.driving_logs 생성 (외래키 ON DELETE SET NULL로 schedules, drivers 종속성 무해)
+-- 3. cockpit.expenses 생성 (외래키 ON DELETE SET NULL로 schedules, drivers, driving_logs 종속성 무해)
+-- 4. RLS 활성화 및 app_metadata 기반 정책 8개 등록
+--
+-- [단계적 schedules 매핑 계획 (Phased Schedules Mapping)]
+-- - 현재 cockpit.schedules는 driver_name, vehicle_no 기준 매핑이 유지되고 있습니다.
+-- - 본 마이그레이션 적용 후에도 booking_id는 ON DELETE SET NULL 외래키이므로 기존 schedules 테이블에 무영향입니다.
+-- - 차후 cockpit.schedules에 driver_id UUID 컬럼 추가 시 1:1 안전 승격이 가능합니다.
+--
+-- [롤백 순서 (Rollback Sequence)]
+-- 1. DROP POLICY IF EXISTS p_storage_receipts_insert ON storage.objects;
+-- 2. DROP POLICY IF EXISTS p_storage_receipts_select ON storage.objects;
+-- 3. DROP TABLE IF EXISTS cockpit.expenses CASCADE;
+-- 4. DROP TABLE IF EXISTS cockpit.driving_logs CASCADE;
+-- 5. DELETE FROM storage.buckets WHERE id = 'receipts';
 -- ==============================================================================
