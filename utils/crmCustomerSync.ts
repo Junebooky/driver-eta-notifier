@@ -1,17 +1,120 @@
 /**
  * VIP LIMOUSINE KOREA - Minimal CRM Integration Utility (Issue #33 & CRM #21)
  * Manages companies (clients) and multiple contact persons with duplicate checking
- * Triggered explicitly by administrator click on '고객 관리에 저장'
+ * Synchronized with live Supabase `cockpit.customers` DB table.
  */
 
 import { HqCustomer, CustomerContact } from '@/types/customerHq';
 import { INITIAL_HQ_CUSTOMERS } from '@/utils/customerHqData';
+import { ensureClientAuth } from '@/utils/cockpitClientAuth';
 
 export const CRM_CUSTOMERS_STORAGE_KEY = 'vip_hq_customers_state';
 export const CRM_CUSTOMERS_UPDATE_EVENT = 'vip_hq_customers_updated';
 
 // In-memory cache for SSR & client synchronization
 let inMemoryCustomers: HqCustomer[] | null = null;
+
+/**
+ * Fetch authoritative customer list directly from Supabase DB via /api/hq/customers
+ */
+export async function fetchHqCustomersFromDb(): Promise<HqCustomer[]> {
+  try {
+    await ensureClientAuth('hq');
+    const res = await fetch('/api/hq/customers');
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.ok && Array.isArray(data.customers) && data.customers.length > 0) {
+      saveStoredCustomers(data.customers);
+      return data.customers;
+    }
+  } catch (err) {
+    console.warn('[CRM] Failed to fetch customers from live DB, falling back to local storage:', err);
+  }
+  return getStoredCustomers();
+}
+
+/**
+ * Persist or link contact to Supabase DB via /api/hq/customers
+ */
+export async function saveContactToCrmDb(params: SaveContactToCrmParams): Promise<SaveContactToCrmResult> {
+  try {
+    await ensureClientAuth('hq');
+    const res = await fetch('/api/hq/customers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.ok) {
+      // Re-sync after successful DB write
+      fetchHqCustomersFromDb().catch(() => {});
+      return {
+        success: true,
+        clientId: data.clientId,
+        contactId: data.contactId,
+        isNewCustomer: data.isNewCustomer,
+        isNewContact: data.isNewContact,
+        companyName: data.companyName,
+        contactName: data.contactName,
+        message: data.message,
+      };
+    }
+    return {
+      success: false,
+      clientId: '',
+      contactId: '',
+      isNewCustomer: false,
+      isNewContact: false,
+      companyName: params.companyName,
+      contactName: params.contactName,
+      message: data.message || data.error || 'DB 저장에 실패했습니다.',
+    };
+  } catch (err: any) {
+    console.error('[CRM] DB save contact error:', err);
+    return {
+      success: false,
+      clientId: '',
+      contactId: '',
+      isNewCustomer: false,
+      isNewContact: false,
+      companyName: params.companyName,
+      contactName: params.contactName,
+      message: err.message || '네트워크 오류가 발생했습니다.',
+    };
+  }
+}
+
+/**
+ * Update customer details in Supabase DB via /api/hq/customers
+ */
+export async function updateHqCustomerInDb(customer: HqCustomer): Promise<boolean> {
+  try {
+    await ensureClientAuth('hq');
+    const res = await fetch('/api/hq/customers', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: customer.id,
+        name: customer.name,
+        tier: customer.tier,
+        isFavorite: customer.isFavorite,
+        notes: customer.notes,
+        contacts: customer.contacts,
+        phone: customer.mainPhone,
+        email: customer.mainEmail,
+        contactPerson: customer.primaryContactName,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.ok) {
+      fetchHqCustomersFromDb().catch(() => {});
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.error('[CRM] DB update customer error:', err);
+    return false;
+  }
+}
 
 export function getStoredCustomers(): HqCustomer[] {
   if (typeof window === 'undefined') {
@@ -229,6 +332,13 @@ export function saveContactToCrm(params: SaveContactToCrmParams): SaveContactToC
     customers[existingCompIndex] = updatedCompany;
     saveStoredCustomers(customers);
 
+    // Persist to Supabase cockpit.customers DB
+    if (typeof window !== 'undefined') {
+      saveContactToCrmDb(params).catch((err) => {
+        console.warn('[CRM] Background DB sync warning:', err);
+      });
+    }
+
     return {
       success: true,
       clientId: companyMatch.id,
@@ -288,6 +398,13 @@ export function saveContactToCrm(params: SaveContactToCrmParams): SaveContactToC
 
   customers.unshift(newCustomer);
   saveStoredCustomers(customers);
+
+  // Persist to Supabase cockpit.customers DB
+  if (typeof window !== 'undefined') {
+    saveContactToCrmDb(params).catch((err) => {
+      console.warn('[CRM] Background DB sync warning:', err);
+    });
+  }
 
   return {
     success: true,

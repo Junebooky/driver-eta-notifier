@@ -276,3 +276,4 @@ export function resolveVehicleProductSku(modelInput: string): {
     notes: '2026 공식 요금표 SKU와 일치하는 상품이 없어 관리자 확인이 필요합니다.',
   };
 }
+

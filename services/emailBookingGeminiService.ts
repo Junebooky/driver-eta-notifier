@@ -38,26 +38,38 @@ export function cleanEmailBodyForAi(raw: string): string {
   if (!raw) return '';
   let text = raw;
 
-  // Remove HTML markup if present
+  // 1. Remove HTML markup, comments, styles, and scripts while preserving text
   if (text.includes('<') && text.includes('>')) {
     text = text
       .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
       .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/<head\b[^<]*(?:(?!<\/head>)<[^<]*)*<\/head>/gi, '')
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/<br\s*[\/]?>/gi, '\n')
+      .replace(/<\/p>/gi, '\n\n')
+      .replace(/<\/div>/gi, '\n')
       .replace(/<[^>]+>/g, ' ');
   }
 
-  // Normalize linebreaks and remove multi-space clutter
+  // 2. Decode common HTML entities
   text = text
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'");
+
+  // 3. Clean up excessive repeated quotation prefixes (e.g. `> > > >`) without removing text
+  text = text
+    .replace(/^([ \t]*>[ \t]*){3,}/gm, '> ')
     .replace(/\r\n/g, '\n')
     .replace(/[ \t]+/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
-  // Protect against overly long thread histories (keep first 4000 characters)
-  if (text.length > 4000) {
-    text = text.slice(0, 4000);
-  }
-
+  // Item 1: text.slice(0, 4000) removed!
+  // Preserves bottom-of-email signatures, postscripts, schedule changes, and multiple waypoints.
   return text;
 }
 
@@ -92,6 +104,21 @@ const BOOKING_RESPONSE_SCHEMA = {
         properties: {
           time: { type: Type.STRING },
           location: { type: Type.STRING },
+          notes: { type: Type.STRING },
+        },
+      },
+    },
+    groupTrips: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          id: { type: Type.STRING },
+          passengerName: { type: Type.STRING },
+          pickupLocation: { type: Type.STRING },
+          dropoffLocation: { type: Type.STRING },
+          pickupTime: { type: Type.STRING },
+          vehicleClass: { type: Type.STRING },
           notes: { type: Type.STRING },
         },
       },
@@ -251,6 +278,7 @@ ${cleanBody}
    - "dropoffLocation": Final destination clean name for TMAP search.
    - "dropoffDetailNotes": Floor, building, dropoff zone details.
    - "waypoints": If the client email contains a multi-stop daily schedule/itinerary (e.g. Incheon T1 10:00 -> Josun Palace 11:30 -> Seongsu 13:00 -> Myeongdong 15:30 -> Shilla 17:00 -> Josun Palace 18:30), extract EVERY stop in chronological order with "time" (HH:MM) and "location" (clean place name). If the email is for a simple 1-leg trip (single departure to destination), "waypoints" can be empty or omitted.
+   - "groupTrips": If the email contains multiple distinct vehicle dispatches or passenger sub-schedules for a group or event (e.g. Car 1: Mr. Kim, Incheon -> Conrad 10:00; Car 2: Mr. Lee, Gimpo -> Josun Palace 11:00), extract each sub-trip into "groupTrips" with passengerName, pickupLocation, dropoffLocation, pickupTime, vehicleClass, and notes. Also set "tripType": "group".
 4. DATE & TIME:
    - "pickupDate": YYYY-MM-DD format.
    - "pickupTime": HH:MM (24-hour format).
@@ -355,7 +383,17 @@ ${cleanBody}
             notes: wp.notes ? String(wp.notes) : undefined,
           }))
         : undefined,
-      groupTrips: Array.isArray(parsed.groupTrips) ? (parsed.groupTrips as any) : undefined,
+      groupTrips: Array.isArray(parsed.groupTrips) && parsed.groupTrips.length > 0
+        ? parsed.groupTrips.map((gt: any, idx: number) => ({
+            id: String(gt.id || `gt-${idx + 1}`),
+            passengerName: String(gt.passengerName || ''),
+            pickupLocation: String(gt.pickupLocation || ''),
+            dropoffLocation: String(gt.dropoffLocation || ''),
+            pickupTime: String(gt.pickupTime || ''),
+            vehicleClass: gt.vehicleClass ? cleanVehicleClass(gt.vehicleClass) : undefined,
+            notes: gt.notes ? String(gt.notes) : undefined,
+          }))
+        : undefined,
       confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0.85,
       warnings: Array.isArray(parsed.warnings) ? parsed.warnings.map(String) : [],
       assignedDriver: null,

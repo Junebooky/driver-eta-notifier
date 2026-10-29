@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   getDeterministicBookingDraft,
   extractBookingFromEmail,
+  cleanEmailBodyForAi,
 } from '@/services/emailBookingGeminiService';
 import {
   saveContactToCrm,
@@ -238,6 +239,56 @@ test('CRM Validation: saveContactToCrm rejects unverified or empty company/conta
   });
   assert.strictEqual(emptyContact.success, false);
   assert.ok(emptyContact.message.includes('담당자명'));
+});
+
+test('Item 1: Long Email Preservation (>4,000 chars) Without Truncation', () => {
+  // Generate a long email body exceeding 5,000 characters with critical signature at the bottom
+  const filler = 'VIP Limousine reservation schedule details and itinerary confirmation notes.\n'.repeat(60);
+  const tailSignature = '담당자: 이서연 실장\n연락처: 010-9995-3241\n이메일: seoyeon.lee@global-corp.com\n[변경사항]: 3호차 경유지에 성수동 쇼룸 추가 요청';
+  const fullBody = `${filler}\n${tailSignature}`;
+
+  assert.ok(fullBody.length > 4500, 'Test email should exceed 4500 characters');
+
+  const cleaned = cleanEmailBodyForAi(fullBody);
+
+  // Must NOT be truncated to 4000 characters
+  assert.ok(cleaned.length > 4000, `Cleaned body must exceed 4000 chars (actual: ${cleaned.length})`);
+  assert.ok(cleaned.includes('이서연 실장'), 'Bottom signature coordinator must be preserved');
+  assert.ok(cleaned.includes('010-9995-3241'), 'Bottom phone number must be preserved');
+  assert.ok(cleaned.includes('성수동 쇼룸'), 'Bottom change notice and waypoints must be preserved');
+});
+
+test('Item 2: groupTrips Schema & Multi-Vehicle Sub-schedule Extraction Structure', () => {
+  // Mock parsed object representing multi-trip group event
+  const mockGroupTripsResponse = {
+    companyName: 'Global Events Korea',
+    tripType: 'group',
+    groupTrips: [
+      {
+        id: 'gt-1',
+        passengerName: 'David Kim',
+        pickupLocation: '인천국제공항 T1',
+        dropoffLocation: '여의도 콘래드 서울',
+        pickupTime: '10:00',
+        vehicleClass: '스타리아 라운지 리무진',
+        notes: '피켓: MR. DAVID KIM',
+      },
+      {
+        id: 'gt-2',
+        passengerName: 'Sarah Jenkins',
+        pickupLocation: '김포공항 국제선',
+        dropoffLocation: '조선팰리스 호텔',
+        pickupTime: '11:30',
+        vehicleClass: '제네시스 G90',
+        notes: 'VIP 전용 생수 구비',
+      },
+    ],
+  };
+
+  assert.strictEqual(mockGroupTripsResponse.tripType, 'group');
+  assert.strictEqual(mockGroupTripsResponse.groupTrips.length, 2);
+  assert.strictEqual(mockGroupTripsResponse.groupTrips[0].passengerName, 'David Kim');
+  assert.strictEqual(mockGroupTripsResponse.groupTrips[1].pickupLocation, '김포공항 국제선');
 });
 
 

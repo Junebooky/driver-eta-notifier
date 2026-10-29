@@ -30,7 +30,14 @@ import {
 } from 'lucide-react';
 import { HqCustomer } from '@/types/customerHq';
 import { INITIAL_HQ_CUSTOMERS } from '@/utils/customerHqData';
-import { getStoredCustomers, CRM_CUSTOMERS_UPDATE_EVENT } from '@/utils/crmCustomerSync';
+import {
+  getStoredCustomers,
+  saveStoredCustomers,
+  fetchHqCustomersFromDb,
+  saveContactToCrmDb,
+  updateHqCustomerInDb,
+  CRM_CUSTOMERS_UPDATE_EVENT,
+} from '@/utils/crmCustomerSync';
 import { CustomerBrandLogo } from './CustomerBrandLogo';
 import { HqCustomerRegisterModal } from './HqCustomerRegisterModal';
 import { HqCustomerEditModal } from './HqCustomerEditModal';
@@ -54,15 +61,20 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
   initialSearchQuery = '',
   onOpenSettlementReport,
 }) => {
-  // Customers State
+  // Customers State (Synchronized with live cockpit.customers DB)
   const [customers, setCustomers] = useState<HqCustomer[]>(() => getStoredCustomers());
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>(
     INITIAL_HQ_CUSTOMERS[0]?.id || ''
   );
 
-  // Sync stored customers when updated from email intake or other tabs
+  // Sync stored customers when updated from email intake or other tabs, and fetch fresh from DB
   useEffect(() => {
-    setCustomers(getStoredCustomers());
+    fetchHqCustomersFromDb().then((dbCustomers) => {
+      if (dbCustomers && dbCustomers.length > 0) {
+        setCustomers(dbCustomers);
+      }
+    });
+
     const handleUpdate = () => {
       setCustomers(getStoredCustomers());
     };
@@ -252,16 +264,36 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
   const handleToggleFavorite = (customerId: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
     haptics.selection();
-    setCustomers((prev) =>
-      prev.map((c) =>
+    setCustomers((prev) => {
+      const next = prev.map((c) =>
         c.id === customerId ? { ...c, isFavorite: !c.isFavorite } : c
-      )
-    );
+      );
+      saveStoredCustomers(next);
+      const target = next.find((c) => c.id === customerId);
+      if (target) {
+        updateHqCustomerInDb(target).catch(() => {});
+      }
+      return next;
+    });
   };
 
   // Add new customer handler
   const handleRegisterCustomer = (newCustomer: HqCustomer) => {
-    setCustomers((prev) => [newCustomer, ...prev]);
+    setCustomers((prev) => {
+      const next = [newCustomer, ...prev];
+      saveStoredCustomers(next);
+      return next;
+    });
+    // Persist new customer to Supabase DB
+    saveContactToCrmDb({
+      companyName: newCustomer.name,
+      contactName: newCustomer.primaryContactName || newCustomer.contacts[0]?.name || '담당자',
+      contactPhone: newCustomer.mainPhone || newCustomer.contacts[0]?.phone || '',
+      contactEmail: newCustomer.mainEmail || newCustomer.contacts[0]?.email || '',
+      department: newCustomer.department,
+      notes: newCustomer.notes?.[0] || '',
+    }).catch(() => {});
+
     setSelectedCustomerId(newCustomer.id);
     setCurrentPage(1);
     haptics.success();
@@ -269,7 +301,12 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
 
   // Update customer handler
   const handleUpdateCustomer = (updated: HqCustomer) => {
-    setCustomers((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+    setCustomers((prev) => {
+      const next = prev.map((c) => (c.id === updated.id ? updated : c));
+      saveStoredCustomers(next);
+      return next;
+    });
+    updateHqCustomerInDb(updated).catch(() => {});
   };
 
   return (
