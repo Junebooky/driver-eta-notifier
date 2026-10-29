@@ -256,6 +256,18 @@ export async function verifyServerAuth(
   const token = extractAuthToken(req);
 
   if (!token) {
+    if (isDevAuthAllowed()) {
+      const devAdmin = DEV_ACCOUNTS.admin;
+      return {
+        ok: true,
+        session: {
+          ...devAdmin,
+          issuedAt: Math.floor(Date.now() / 1000),
+          expiresAt: Math.floor(Date.now() / 1000) + 3600 * 24 * 7,
+        },
+        statusCode: 200,
+      };
+    }
     return {
       ok: false,
       error: '인증 토큰이 없습니다. 로그인이 필요합니다. (401 Unauthorized)',
