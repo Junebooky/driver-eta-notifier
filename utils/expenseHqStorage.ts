@@ -1013,3 +1013,117 @@ export const mergeServerHipassTollsIntoExpenses = (
   const res = importReconciledHipassTolls(mapped, 'Supabase 하이패스 동기화');
   return res.addedCount;
 };
+
+export interface FetchHqExpensesResult {
+  ok: boolean;
+  expenses: HqExpenseRecord[];
+  error?: string;
+}
+
+export interface SubmitDriverExpensesResult {
+  ok: boolean;
+  count: number;
+  totalAmount: number;
+  expenses?: HqExpenseRecord[];
+  error?: string;
+}
+
+/**
+ * Fetch authoritative business expenses directly from Supabase DB via /api/expenses
+ */
+export async function fetchHqExpensesFromDb(): Promise<FetchHqExpensesResult> {
+  try {
+    const res = await fetch('/api/expenses');
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.ok && Array.isArray(data.expenses)) {
+      if (data.expenses.length > 0) {
+        saveHqExpenses(data.expenses);
+      }
+      return { ok: true, expenses: data.expenses };
+    }
+    return { ok: false, expenses: [], error: data.error || `서버 응답 오류 (${res.status})` };
+  } catch (err: any) {
+    return { ok: false, expenses: [], error: err.message || '네트워크 오류' };
+  }
+}
+
+/**
+ * Submits driver expense items to Supabase DB via /api/expenses
+ */
+export async function submitDriverExpensesToHqDb(
+  items: ExpenseItem[],
+  driverName: string = '윤태준',
+  vehiclePlate: string = '116허 1514',
+  vehicleModel: string = '현대 스타리아 리무진',
+  bookingId?: string
+): Promise<SubmitDriverExpensesResult> {
+  if (!items || items.length === 0) {
+    return { ok: false, count: 0, totalAmount: 0, error: '제출할 항목이 없습니다.' };
+  }
+
+  try {
+    const payloadItems = items.map((item) => ({
+      ...item,
+      bookingId: item.bookingId || bookingId || null,
+      driverName,
+      vehiclePlate,
+      vehicleModel,
+    }));
+
+    const res = await fetch('/api/expenses', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: payloadItems }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.ok && Array.isArray(data.expenses)) {
+      submitDriverExpensesToHq(items, driverName, vehiclePlate, vehicleModel);
+      return {
+        ok: true,
+        count: data.count || data.expenses.length,
+        totalAmount: data.totalAmount || 0,
+        expenses: data.expenses,
+      };
+    }
+    return {
+      ok: false,
+      count: 0,
+      totalAmount: 0,
+      error: data.error || '경비를 서버에 저장하지 못했습니다.',
+    };
+  } catch (err: any) {
+    return {
+      ok: false,
+      count: 0,
+      totalAmount: 0,
+      error: err.message || '네트워크 연결 오류',
+    };
+  }
+}
+
+/**
+ * Update expense status in Supabase DB via /api/expenses
+ */
+export async function updateHqExpenseStatusDb(
+  expenseId: string,
+  newStatus: HqExpenseStatus,
+  reviewNotes?: string,
+  actor: string = '본사 관리자'
+): Promise<boolean> {
+  try {
+    const res = await fetch('/api/expenses', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: expenseId, status: newStatus, reviewNotes }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.ok) {
+      updateHqExpenseStatus(expenseId, newStatus, reviewNotes, actor);
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}

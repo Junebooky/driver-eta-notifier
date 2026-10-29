@@ -1036,3 +1036,106 @@ export const exportDrivingLogsToCsv = (logs: HqDrivingLog[]) => {
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 };
+
+export interface FetchHqDrivingLogsResult {
+  ok: boolean;
+  logs: HqDrivingLog[];
+  error?: string;
+}
+
+export interface SubmitDriverLogResult {
+  ok: boolean;
+  log?: HqDrivingLog;
+  error?: string;
+}
+
+/**
+ * Fetch authoritative driving logs directly from Supabase DB via /api/driving-logs
+ */
+export async function fetchHqDrivingLogsFromDb(): Promise<FetchHqDrivingLogsResult> {
+  try {
+    const res = await fetch('/api/driving-logs');
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.ok && Array.isArray(data.logs)) {
+      if (data.logs.length > 0) {
+        saveHqDrivingLogs(data.logs);
+      }
+      return { ok: true, logs: data.logs };
+    }
+    return { ok: false, logs: [], error: data.error || `서버 응답 오류 (${res.status})` };
+  } catch (err: any) {
+    return { ok: false, logs: [], error: err.message || '네트워크 오류' };
+  }
+}
+
+/**
+ * Submits driving log to Supabase DB via /api/driving-logs
+ */
+export async function submitDriverLogToHqDb(newLog: Partial<HqDrivingLog>): Promise<SubmitDriverLogResult> {
+  try {
+    const res = await fetch('/api/driving-logs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newLog),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.ok && data.log) {
+      submitDriverLogToHq(data.log);
+      return { ok: true, log: data.log };
+    }
+    return { ok: false, error: data.error || '운행일지를 서버에 저장하지 못했습니다.' };
+  } catch (err: any) {
+    return { ok: false, error: err.message || '네트워크 연결 오류' };
+  }
+}
+
+/**
+ * Update driving log status in Supabase DB via /api/driving-logs
+ */
+export async function updateHqDrivingLogStatusDb(
+  logId: string,
+  newStatus: HqDrivingLogStatus,
+  reason?: string,
+  actor: string = '본사 관리자'
+): Promise<boolean> {
+  try {
+    const res = await fetch('/api/driving-logs', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: logId, status: newStatus, reviewNotes: reason }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.ok) {
+      updateHqDrivingLogStatus(logId, newStatus, reason, actor);
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Update driving log field patch in Supabase DB via /api/driving-logs
+ */
+export async function updateHqDrivingLogDb(
+  logId: string,
+  patch: Partial<HqDrivingLog>,
+  actor: string = '본사 관리자'
+): Promise<boolean> {
+  try {
+    const res = await fetch('/api/driving-logs', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: logId, patch }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.ok) {
+      updateHqDrivingLog(logId, patch, actor);
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}

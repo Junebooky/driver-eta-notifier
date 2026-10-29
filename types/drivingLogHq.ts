@@ -54,5 +54,9 @@ export interface HqDrivingLog {
   customerId?: string;
   bookingId?: string;
   groupId?: string;
+  // Multi-tenant & Resource linkage (Supabase cockpit.driving_logs)
+  organizationId?: string;
+  driverId?: string;
+  vehicleId?: string;
 }
 

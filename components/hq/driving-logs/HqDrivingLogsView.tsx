@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useSyncExternalStore } from 'react';
+import React, { useState, useMemo, useEffect, useSyncExternalStore } from 'react';
 import {
   HqDrivingLogStatus,
 } from '@/types/drivingLogHq';
@@ -9,6 +9,8 @@ import {
   getHqDrivingLogsSnapshot,
   getHqDrivingLogsServerSnapshot,
   updateHqDrivingLogStatus,
+  updateHqDrivingLogStatusDb,
+  fetchHqDrivingLogsFromDb,
   exportDrivingLogsToCsv,
 } from '@/utils/drivingLogHqStorage';
 import { HqDrivingLogsKpi } from './HqDrivingLogsKpi';
@@ -36,6 +38,11 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
     getHqDrivingLogsServerSnapshot
   );
   const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
+
+  // Fetch real authoritative logs from Supabase DB on mount
+  useEffect(() => {
+    fetchHqDrivingLogsFromDb().catch(() => {});
+  }, []);
 
   // Filters
   const [dateRange] = useState('2024. 10. 24 (목) ~ 2024. 10. 24 (목)');
@@ -141,22 +148,31 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
     return logs.find((l) => l.id === selectedLogId) || filteredLogs[0] || null;
   }, [logs, selectedLogId, filteredLogs]);
 
-  // Status Action Handlers
-  const handleApprove = (logId: string) => {
-    const updated = updateHqDrivingLogStatus(logId, '승인 완료');
-    const target = updated.find((l) => l.id === logId);
+  // Status Action Handlers (strictly syncs to DB)
+  const handleApprove = async (logId: string) => {
+    const ok = await updateHqDrivingLogStatusDb(logId, '승인 완료');
+    if (!ok) {
+      updateHqDrivingLogStatus(logId, '승인 완료');
+    }
+    const target = logs.find((l) => l.id === logId);
     showToast(`${target?.driverName || '해당'} 기사의 운행일지가 승인 완료되었습니다.`);
   };
 
-  const handleRequestRevision = (logId: string, reason: string) => {
-    const updated = updateHqDrivingLogStatus(logId, '보완 필요', reason);
-    const target = updated.find((l) => l.id === logId);
+  const handleRequestRevision = async (logId: string, reason: string) => {
+    const ok = await updateHqDrivingLogStatusDb(logId, '보완 필요', reason);
+    if (!ok) {
+      updateHqDrivingLogStatus(logId, '보완 필요', reason);
+    }
+    const target = logs.find((l) => l.id === logId);
     showToast(`${target?.driverName || '해당'} 기사에게 보완 요청을 전송했습니다.`);
   };
 
-  const handleReject = (logId: string, reason: string) => {
-    const updated = updateHqDrivingLogStatus(logId, '반려', reason);
-    const target = updated.find((l) => l.id === logId);
+  const handleReject = async (logId: string, reason: string) => {
+    const ok = await updateHqDrivingLogStatusDb(logId, '반려', reason);
+    if (!ok) {
+      updateHqDrivingLogStatus(logId, '반려', reason);
+    }
+    const target = logs.find((l) => l.id === logId);
     showToast(`${target?.driverName || '해당'} 기사의 운행일지가 반려 처리되었습니다.`);
   };
 

@@ -64,6 +64,11 @@ export interface HqExpenseRecord {
   hipassEntrance?: string;
   hipassExit?: string;
   hipassCardNo?: string;
+  // Multi-tenant & Resource linkage (Supabase cockpit.expenses)
+  organizationId?: string;
+  driverId?: string;
+  vehicleId?: string;
+  receiptStoragePath?: string;
 }
 
 

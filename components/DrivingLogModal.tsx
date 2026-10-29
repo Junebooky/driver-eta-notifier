@@ -39,13 +39,15 @@ import {
 import Link from 'next/link';
 import { AddScheduleModal } from './AddScheduleModal';
 import { haptics } from '@/utils/haptics';
-import { submitDriverLogToHq } from '@/utils/drivingLogHqStorage';
+import { submitDriverLogToHq, submitDriverLogToHqDb } from '@/utils/drivingLogHqStorage';
+import { HqDrivingLog } from '@/types/drivingLogHq';
 import { getHqExpenses } from '@/utils/expenseHqStorage';
 
 interface DrivingLogModalProps {
   isOpen: boolean;
   onClose: () => void;
   driverProfile: DriverProfile;
+  bookingId?: string;
   onOpenLocationSearch?: () => void;
   selectedLocationFromMap?: { name: string; address?: string } | null;
 }
@@ -53,13 +55,16 @@ interface DrivingLogModalProps {
 const DrivingLogModalContent: React.FC<{
   onClose: () => void;
   driverProfile: DriverProfile;
+  bookingId?: string;
   onOpenLocationSearch?: () => void;
   selectedLocationFromMap?: { name: string; address?: string } | null;
-}> = ({ onClose, driverProfile, onOpenLocationSearch, selectedLocationFromMap }) => {
+}> = ({ onClose, driverProfile, bookingId, onOpenLocationSearch, selectedLocationFromMap }) => {
   const scrollContainerRef = useRef<HTMLElement>(null);
 
-  // Master driving log state initialized purely
-  const [logData, setLogData] = useState<DrivingLogData>(() => loadDrivingLogDraft(driverProfile));
+  // Master driving log state initialized purely (booking-aware)
+  const [logData, setLogData] = useState<DrivingLogData>(() =>
+    loadDrivingLogDraft(driverProfile, undefined, undefined, bookingId)
+  );
 
   // Auto-scroll to top when modal mounts
   useEffect(() => {
@@ -211,9 +216,13 @@ const DrivingLogModalContent: React.FC<{
     }
   };
 
+  const [isSubmittingLog, setIsSubmittingLog] = useState(false);
+
   // Submit Driving Log to HQ Operations system
-  const handleSubmitLog = () => {
-    haptics.success();
+  const handleSubmitLog = async () => {
+    if (isSubmittingLog) return;
+    setIsSubmittingLog(true);
+    haptics.selection();
 
     // Map stops ensuring complete route details are passed
     const stopsMapped = logData.stops.map((s) => ({
@@ -225,37 +234,52 @@ const DrivingLogModalContent: React.FC<{
     }));
 
     // Calculate current expenses for this driver
-    const currentDriverName = logData.driverName || '윤태준';
-    const currentVehiclePlate = logData.carNumber || '116허 1514';
+    const currentDriverName = logData.driverName || driverProfile.driverName || '윤태준';
+    const currentVehiclePlate = logData.carNumber || driverProfile.plateNumber || '116허 1514';
     const currentHqExpenses = getHqExpenses().filter(
       (e) => e.driverName === currentDriverName || (Boolean(currentVehiclePlate) && e.vehiclePlate === currentVehiclePlate)
     );
     const calculatedExpenseAmount = currentHqExpenses.reduce((sum, e) => sum + e.amount, 0);
     const calculatedExpenseCount = currentHqExpenses.length;
 
-    // Submit to shared HQ management store
-    submitDriverLogToHq({
-      id: `driver-sub-${Date.now()}`,
-      driverName: currentDriverName,
-      customerName: logData.clientName || '인터코스',
-      vehicleModel: currentVehiclePlate,
-      vehiclePlate: currentVehiclePlate,
-      clockIn: logData.clockIn || '06:40',
-      clockOut: logData.clockOut || '21:50',
-      totalDutyHours: logData.totalDutyHours || '15시간 10분',
-      startKm: logData.startKm || '154,725',
-      endKm: logData.endKm || '154,861',
-      distanceKm: logData.distanceKm || '136 km',
-      expenseAmount: calculatedExpenseAmount,
-      expenseCount: calculatedExpenseCount,
-      stops: stopsMapped,
-      notes: logData.notes || '',
-      status: '검토 대기',
-      rawDate: logData.rawDate,
-    });
+    try {
+      const payload: Partial<HqDrivingLog> = {
+        driverName: currentDriverName,
+        customerName: logData.clientName || '인터코스',
+        vehicleModel: driverProfile.carModel || currentVehiclePlate,
+        vehiclePlate: currentVehiclePlate,
+        clockIn: logData.clockIn || '06:40',
+        clockOut: logData.clockOut || '21:50',
+        totalDutyHours: logData.totalDutyHours || '15시간 10분',
+        startKm: logData.startKm || '154,725',
+        endKm: logData.endKm || '154,861',
+        distanceKm: logData.distanceKm || '136 km',
+        expenseAmount: calculatedExpenseAmount,
+        expenseCount: calculatedExpenseCount,
+        stops: stopsMapped,
+        notes: logData.notes || '',
+        status: '검토 대기',
+        drivingDate: logData.rawDate,
+        rawDate: logData.rawDate,
+        bookingId: logData.bookingId || bookingId,
+        driverId: logData.driverId,
+        vehicleId: logData.vehicleId,
+      };
 
-    saveDrivingLogDraft({ ...logData, status: 'draft' });
-    setIsPreviewSubmitModalOpen(true);
+      const res = await submitDriverLogToHqDb(payload);
+      if (!res.ok) {
+        alert(`운행일지 제출 실패: ${res.error || '서버 저장에 실패했습니다.'}`);
+        return;
+      }
+
+      haptics.success();
+      saveDrivingLogDraft({ ...logData, status: 'submitted' });
+      setIsPreviewSubmitModalOpen(true);
+    } catch (err: any) {
+      alert(`운행일지 제출 중 오류: ${err.message}`);
+    } finally {
+      setIsSubmittingLog(false);
+    }
   };
 
   // Toggle reference demo fixture vs clean real report
@@ -1029,6 +1053,7 @@ export const DrivingLogModal: React.FC<DrivingLogModalProps> = ({
   isOpen,
   onClose,
   driverProfile,
+  bookingId,
   onOpenLocationSearch,
   selectedLocationFromMap,
 }) => {
@@ -1046,9 +1071,10 @@ export const DrivingLogModal: React.FC<DrivingLogModalProps> = ({
 
   return (
     <DrivingLogModalContent
-      key={`${driverProfile.vehicleNo || 'default'}-${isOpen}`}
+      key={`${driverProfile.vehicleNo || 'default'}-${bookingId || 'none'}-${isOpen}`}
       onClose={onClose}
       driverProfile={driverProfile}
+      bookingId={bookingId}
       onOpenLocationSearch={onOpenLocationSearch}
       selectedLocationFromMap={selectedLocationFromMap}
     />

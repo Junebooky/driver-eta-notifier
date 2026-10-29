@@ -21,7 +21,7 @@ import {
   Send,
   Loader2,
 } from 'lucide-react';
-import { submitDriverExpensesToHq } from '@/utils/expenseHqStorage';
+import { submitDriverExpensesToHq, submitDriverExpensesToHqDb } from '@/utils/expenseHqStorage';
 import {
   ExpenseItem,
   ExpenseSortOption,
@@ -40,13 +40,20 @@ import {
 import { AddExpenseModal, renderCategoryIcon } from './AddExpenseModal';
 import { autoEnsureUprightReceipt } from '@/utils/imageRotate';
 import { haptics } from '@/utils/haptics';
+import { DriverProfile } from '@/types';
 
 interface ExpenseModalProps {
   isOpen: boolean;
   onClose: () => void;
+  driverProfile?: DriverProfile;
+  bookingId?: string;
 }
 
-const ExpenseModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+const ExpenseModalContent: React.FC<{
+  onClose: () => void;
+  driverProfile?: DriverProfile;
+  bookingId?: string;
+}> = ({ onClose, driverProfile, bookingId }) => {
   const scrollContainerRef = useRef<HTMLElement>(null);
   const quickFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -156,37 +163,53 @@ const ExpenseModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) => 
     showToast('지출 내역이 삭제되었습니다.');
   };
 
-  // Submit all currently displayed items to HQ Dashboard
-  const handleSubmitAllToHq = () => {
+  // Submit all currently displayed items to HQ Dashboard via DB API
+  const handleSubmitAllToHq = async () => {
     if (displayedItems.length === 0 || isSubmittingToHq) return;
-    haptics.success();
     setIsSubmittingToHq(true);
+    haptics.selection();
 
-    const result = submitDriverExpensesToHq(
-      displayedItems,
-      '윤태준',
-      '116허 1514',
-      '현대 스타리아 리무진'
-    );
+    const targetDriverName = driverProfile?.driverName || '윤태준';
+    const targetPlate = driverProfile?.plateNumber || driverProfile?.carNumber || '116허 1514';
+    const targetModel = driverProfile?.carModel || '현대 스타리아 리무진';
 
-    const nowIso = new Date().toISOString();
-    const updated = expenseList.map((item) => {
-      if (displayedItems.some((d) => d.id === item.id)) {
-        return {
-          ...item,
-          hqStatus: '검수 대기' as const,
-          submittedToHqAt: nowIso,
-        };
+    try {
+      const result = await submitDriverExpensesToHqDb(
+        displayedItems,
+        targetDriverName,
+        targetPlate,
+        targetModel,
+        bookingId
+      );
+
+      if (!result.ok) {
+        alert(`경비 제출 실패: ${result.error || '서버 저장에 실패했습니다.'}`);
+        return;
       }
-      return item;
-    });
 
-    updateExpenseList(updated, isDemoMode);
-    setIsSubmittingToHq(false);
-    setHqSubmitSuccessToast(
-      `본사(HQ) 대시보드로 ${result.count}건 (총 ${formatKRW(result.totalAmount)})이 성공적으로 전송되었습니다!`
-    );
-    setTimeout(() => setHqSubmitSuccessToast(null), 4000);
+      haptics.success();
+      const nowIso = new Date().toISOString();
+      const updated = expenseList.map((item) => {
+        if (displayedItems.some((d) => d.id === item.id)) {
+          return {
+            ...item,
+            hqStatus: '검수 대기' as const,
+            submittedToHqAt: nowIso,
+          };
+        }
+        return item;
+      });
+
+      updateExpenseList(updated, isDemoMode);
+      setHqSubmitSuccessToast(
+        `본사(HQ) 대시보드로 ${result.count}건 (총 ${formatKRW(result.totalAmount)})이 성공적으로 전송되었습니다!`
+      );
+      setTimeout(() => setHqSubmitSuccessToast(null), 4000);
+    } catch (err: any) {
+      alert(`경비 제출 중 오류: ${err.message}`);
+    } finally {
+      setIsSubmittingToHq(false);
+    }
   };
 
   // Quick photo upload from top action card (Forces upright vertical orientation)
@@ -890,7 +913,12 @@ const ExpenseModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) => 
   );
 };
 
-export const ExpenseModal: React.FC<ExpenseModalProps> = ({ isOpen, onClose }) => {
+export const ExpenseModal: React.FC<ExpenseModalProps> = ({
+  isOpen,
+  onClose,
+  driverProfile,
+  bookingId,
+}) => {
   useEffect(() => {
     if (!isOpen) return;
     const origOverflow = document.body.style.overflow;
@@ -902,5 +930,11 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({ isOpen, onClose }) =
 
   if (!isOpen) return null;
 
-  return <ExpenseModalContent onClose={onClose} />;
+  return (
+    <ExpenseModalContent
+      onClose={onClose}
+      driverProfile={driverProfile}
+      bookingId={bookingId}
+    />
+  );
 };

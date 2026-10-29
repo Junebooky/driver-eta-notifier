@@ -34,6 +34,8 @@ import {
   getHqExpensesServerSnapshot,
   getHqExpenseKpiSummary,
   updateHqExpenseStatus,
+  updateHqExpenseStatusDb,
+  fetchHqExpensesFromDb,
   saveHqExpenses,
   exportExpensesToCsv,
   mergeServerHipassTollsIntoExpenses,
@@ -56,9 +58,11 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
 }) => {
   const [isHipassModalOpen, setIsHipassModalOpen] = useState(false);
 
-  // Hydrate server-synced Hi-Pass tolls from Supabase `cockpit.schedules.driving_log` across PC & Mobile
+  // Hydrate server-synced expenses & Hi-Pass tolls from Supabase DB
   useEffect(() => {
     let cancelled = false;
+    fetchHqExpensesFromDb().catch(() => {});
+
     fetch('/api/expenses/hipass-sync')
       .then((r) => r.json())
       .then((json) => {
@@ -155,19 +159,25 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
     });
   }, [expenses, searchQuery, selectedCategory, selectedStatus]);
 
-  // Handle Review Status Change
-  const handleUpdateStatus = (newStatus: HqExpenseStatus) => {
+  // Handle Review Status Change (strictly syncs to DB)
+  const handleUpdateStatus = async (newStatus: HqExpenseStatus) => {
     if (!selectedExpense) return;
     haptics.success();
-    const updated = updateHqExpenseStatus(
+    const ok = await updateHqExpenseStatusDb(
       selectedExpense.id,
       newStatus,
       currentReviewNotes.trim() || undefined,
       '본사 관리자'
     );
-    if (updated) {
-      showToast(`${selectedExpense.driverName} 기사님의 경비 상태가 '${newStatus}'(으)로 변경되었습니다.`);
+    if (!ok) {
+      updateHqExpenseStatus(
+        selectedExpense.id,
+        newStatus,
+        currentReviewNotes.trim() || undefined,
+        '본사 관리자'
+      );
     }
+    showToast(`${selectedExpense.driverName} 기사님의 경비 상태가 '${newStatus}'(으)로 변경되었습니다.`);
   };
 
   // Rotate receipt 90 degrees

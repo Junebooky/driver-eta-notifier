@@ -42,8 +42,12 @@ export interface DrivingLogData {
   // Special notes
   notes: string;
   savedAt?: string;
-  status: 'draft';           // Kept as 'draft' until authenticated HQ backend is ready
+  status: 'draft' | 'submitted';
   isDemoFixture?: boolean;   // True when populated with reference sample data
+  bookingId?: string;
+  driverId?: string;
+  vehicleId?: string;
+  organizationId?: string;
 }
 
 export const DRIVING_LOG_STORAGE_PREFIX = 'cockpit_driving_log_report_';
@@ -235,11 +239,13 @@ export const calculateDrivingDistance = (
 };
 
 /**
- * Check if today's vehicle inspection has verified odometer records for this specific vehicle
+ * Check if today's vehicle inspection has verified odometer records for this specific vehicle and booking.
+ * Strictly avoids grabbing odometer readings from another booking simply because vehicle or date matches.
  */
 export const getVerifiedInspectionOdometer = (
   vehicleNo?: string,
-  targetDateIso: string = formatIsoDate()
+  targetDateIso: string = formatIsoDate(),
+  bookingId?: string
 ): { startKm: string; endKm: string; isVerified: boolean } => {
   if (typeof window === 'undefined' || !vehicleNo) {
     return { startKm: '', endKm: '', isVerified: false };
@@ -247,8 +253,15 @@ export const getVerifiedInspectionOdometer = (
 
   try {
     const cleanNo = vehicleNo.match(/(\d+호차)/)?.[1] || vehicleNo.trim();
-    const storageKey = `cockpit_vehicle_inspection_${cleanNo}`;
-    const raw = localStorage.getItem(storageKey);
+    // 1. Check booking-specific key first
+    let raw: string | null = null;
+    if (bookingId) {
+      raw = localStorage.getItem(`cockpit_vehicle_inspection_${cleanNo}_${bookingId}`);
+    }
+    // 2. If no booking-specific key, check general key
+    if (!raw) {
+      raw = localStorage.getItem(`cockpit_vehicle_inspection_${cleanNo}`);
+    }
     if (!raw) return { startKm: '', endKm: '', isVerified: false };
 
     const parsed = JSON.parse(raw);
@@ -259,8 +272,27 @@ export const getVerifiedInspectionOdometer = (
       return { startKm: '', endKm: '', isVerified: false };
     }
 
-    const startKm = parsed.pickupOdo ? formatOdometer(parsed.pickupOdo) : '';
-    const endKm = parsed.returnOdo ? formatOdometer(parsed.returnOdo) : '';
+    // Strict booking match: If the inspection is bound to a different booking, do NOT grab it!
+    if (bookingId && parsed.bookingId && parsed.bookingId !== bookingId) {
+      return { startKm: '', endKm: '', isVerified: false };
+    }
+
+    // If caller requests a specific booking, but the inspection is bound to another booking, reject
+    if (!bookingId && parsed.bookingId) {
+      // Unassigned log shouldn't grab a booking-bound odometer
+      return { startKm: '', endKm: '', isVerified: false };
+    }
+
+    const startKm = parsed.pickupOdo
+      ? formatOdometer(parsed.pickupOdo)
+      : parsed.startKm
+      ? formatOdometer(parsed.startKm)
+      : '';
+    const endKm = parsed.returnOdo
+      ? formatOdometer(parsed.returnOdo)
+      : parsed.endKm
+      ? formatOdometer(parsed.endKm)
+      : '';
 
     return {
       startKm,
@@ -323,7 +355,8 @@ export const createReferenceDemoFixture = (driverProfile?: DriverProfile): Drivi
 export const loadDrivingLogDraft = (
   driverProfile: DriverProfile,
   reportId?: string,
-  dateIso: string = formatIsoDate()
+  dateIso: string = formatIsoDate(),
+  bookingId?: string
 ): DrivingLogData => {
   // Check if a specific draft exists
   if (typeof window !== 'undefined' && reportId) {
@@ -350,8 +383,8 @@ export const loadDrivingLogDraft = (
   const clientName = driverProfile.clientName || '';
   const passengerCount = driverProfile.passengerCount || '';
 
-  // Check verified vehicle inspection odometer for today
-  const verifiedOdo = getVerifiedInspectionOdometer(driverProfile.vehicleNo, dateIso);
+  // Check verified vehicle inspection odometer for today (booking-aware)
+  const verifiedOdo = getVerifiedInspectionOdometer(driverProfile.vehicleNo, dateIso, bookingId);
   const startKm = verifiedOdo.startKm || '';
   const endKm = verifiedOdo.endKm || '';
   const { formatted: distanceFormatted } = calculateDrivingDistance(startKm, endKm);
@@ -376,6 +409,9 @@ export const loadDrivingLogDraft = (
     notes: '',
     status: 'draft',
     isDemoFixture: false,
+    bookingId,
+    driverId: driverProfile.driverId,
+    vehicleId: driverProfile.vehicleNo,
   };
 };
 

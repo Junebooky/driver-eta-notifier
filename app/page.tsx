@@ -668,6 +668,7 @@ export default function Home() {
   const [waypointInsertIndex, setWaypointInsertIndex] = useState<number | null>(null);
   const [adminWaypoints, setAdminWaypoints] = useState<LocationPreset[]>([]);
   const [isAdminRoute, setIsAdminRoute] = useState(false);
+  const [activeBookingId, setActiveBookingId] = useState<string | undefined>(undefined);
   const isRouteRestoredRef = useRef(false);
 
   const [activeTab, setActiveTab] = useState<'drive' | 'schedule'>('drive');
@@ -1182,6 +1183,7 @@ export default function Home() {
     (originPreset: LocationPreset, destinationPreset: LocationPreset, schedule?: ScheduleItem) => {
       setOrigin(originPreset);
       setDestination(destinationPreset);
+      if (schedule?.id) setActiveBookingId(String(schedule.id));
       const isSchedAdmin = Boolean(schedule?.isAdminRoute);
       const schedAdminWps = schedule?.adminWaypoints || schedule?.waypoints || [];
       setIsAdminRoute(isSchedAdmin);
@@ -1196,6 +1198,7 @@ export default function Home() {
 
   const handleNavigateForSchedule = useCallback(
     (schedule: ScheduleItem) => {
+      if (schedule?.id) setActiveBookingId(String(schedule.id));
       const { originPreset, destinationPreset, adminWaypoints: rawAdminWps, isAdminRoute: rawIsAdmin } = scheduleToPresets(schedule);
       const isSchedAdmin = Boolean(rawIsAdmin);
       const schedAdminWps: LocationPreset[] = rawAdminWps || [];
@@ -1228,6 +1231,7 @@ export default function Home() {
 
   const handleOpenPredictionForSchedule = useCallback(
     (schedule: ScheduleItem) => {
+      if (schedule?.id) setActiveBookingId(String(schedule.id));
       const { originPreset, destinationPreset } = scheduleToPresets(schedule);
       setOrigin(originPreset);
       setDestination(destinationPreset);
@@ -1721,6 +1725,7 @@ export default function Home() {
         profile={profile}
         profilePlateNumber={profile.plateNumber}
         initialMode={inspectionInitialMode}
+        bookingId={activeBookingId}
       />
 
       {/* Standalone Location Search & Preset Modal */}
@@ -1770,6 +1775,7 @@ export default function Home() {
         isOpen={isDrivingLogOpen}
         onClose={() => setIsDrivingLogOpen(false)}
         driverProfile={profile}
+        bookingId={activeBookingId}
         onOpenLocationSearch={() => {
           setIsSelectingForSchedule(true);
           setIsLocationSearchOpen(true);
@@ -1781,6 +1787,8 @@ export default function Home() {
       <ExpenseModal
         isOpen={isExpenseOpen}
         onClose={() => setIsExpenseOpen(false)}
+        driverProfile={profile}
+        bookingId={activeBookingId}
       />
 
       {/* Field Tips (현장 팁) Modal */}

@@ -9,6 +9,7 @@ export interface HomeLocation {
 
 export interface DriverProfile {
   id?: string;             // e.g. 'driver_4'
+  driverId?: string;       // alias for id
   vehicleNo: string;       // e.g. '4호차'
   carNumber?: string;      // e.g. '142호 7811'
   carNumberFront?: string; // e.g. '142호'

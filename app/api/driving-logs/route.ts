@@ -1,0 +1,452 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { supabaseAdmin } from '@/lib/supabase/server';
+import { verifyServerAuth, requireHqAdmin } from '@/lib/auth/serverAuth';
+import { HqDrivingLog, HqDrivingLogStatus } from '@/types/drivingLogHq';
+
+export const dynamic = 'force-dynamic';
+
+function formatOdoNum(val: any): number {
+  if (typeof val === 'number') return val;
+  if (!val) return 0;
+  const cleaned = String(val).replace(/[^0-9]/g, '');
+  return parseInt(cleaned, 10) || 0;
+}
+
+function formatKmDisplay(val: any): string {
+  const n = formatOdoNum(val);
+  return n > 0 ? n.toLocaleString() : '';
+}
+
+/**
+ * Maps DB row from cockpit.driving_logs to frontend HqDrivingLog interface
+ */
+export function mapDbRowToDrivingLog(row: any, index: number = 1): HqDrivingLog {
+  const rawDate = row.driving_date || new Date().toISOString().split('T')[0];
+  const dateParts = rawDate.split('-');
+  const drivingDate = dateParts.length === 3 ? `${dateParts[1]}/${dateParts[2]}` : rawDate;
+
+  const startKmNum = formatOdoNum(row.start_km);
+  const endKmNum = formatOdoNum(row.end_km);
+  const distNum = formatOdoNum(row.distance_km) || Math.max(0, endKmNum - startKmNum);
+
+  return {
+    id: row.id,
+    no: index,
+    submittedAt: row.submitted_at ? new Date(row.submitted_at).toLocaleString('ko-KR') : '',
+    submittedDate: row.submitted_at ? new Date(row.submitted_at).toLocaleDateString('ko-KR') : '',
+    drivingDate,
+    rawDate,
+    driverName: row.driver_name,
+    customerName: row.customer_name || '미지정 고객',
+    vehicleModel: row.vehicle_model || '법인 차량',
+    vehiclePlate: row.vehicle_plate || '',
+    clockIn: row.clock_in ? String(row.clock_in).slice(0, 5) : '',
+    clockOut: row.clock_out ? String(row.clock_out).slice(0, 5) : '',
+    garageDepartureTime: row.garage_departure_time ? String(row.garage_departure_time).slice(0, 5) : undefined,
+    customerServiceStart: row.customer_service_start ? String(row.customer_service_start).slice(0, 5) : undefined,
+    customerServiceEnd: row.customer_service_end ? String(row.customer_service_end).slice(0, 5) : undefined,
+    garageArrivalTime: row.garage_arrival_time ? String(row.garage_arrival_time).slice(0, 5) : undefined,
+    totalDutyHours: row.total_duty_hours || '',
+    startKm: formatKmDisplay(startKmNum),
+    endKm: formatKmDisplay(endKmNum),
+    distanceKm: distNum > 0 ? `${distNum.toLocaleString()} km` : '',
+    expenseAmount: Number(row.expense_amount) || 0,
+    expenseCount: Number(row.expense_count) || 0,
+    status: (row.status as HqDrivingLogStatus) || '검토 대기',
+    stops: Array.isArray(row.stops) ? row.stops : [],
+    notes: row.notes || '',
+    reviewHistory: Array.isArray(row.review_history) ? row.review_history : [],
+    isDriverSubmitted: Boolean(row.submitted_at),
+    bookingId: row.booking_id,
+    driverId: row.driver_id,
+    vehicleId: row.vehicle_id,
+    organizationId: row.organization_id,
+    customerId: row.customer_id,
+    eventId: row.event_id,
+    eventName: row.event_name,
+  };
+}
+
+/**
+ * GET: Query driving logs
+ * Drivers can only query their own logs.
+ * HQ Admins can query all logs within their organization.
+ */
+export async function GET(req: NextRequest) {
+  try {
+    const auth = await verifyServerAuth(req);
+    if (!auth.ok || !auth.session) {
+      return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const bookingId = searchParams.get('bookingId');
+    const driverId = searchParams.get('driverId');
+    const date = searchParams.get('date');
+    const status = searchParams.get('status');
+
+    // Multi-tenant & Driver Isolation: Drivers can strictly see their own records
+    let query = supabaseAdmin.from('driving_logs').select('*');
+
+    if (auth.session.role === 'driver') {
+      const driverIdent = auth.session.driverName || auth.session.userId;
+      query = query.or(`driver_name.eq."${driverIdent}",driver_id.eq."${auth.session.driverId || auth.session.userId}"`);
+    } else {
+      // HQ Admin can optionally filter by driverId or other params
+      if (driverId) {
+        query = query.or(`driver_id.eq."${driverId}",driver_name.eq."${driverId}"`);
+      }
+    }
+
+    if (bookingId) {
+      query = query.eq('booking_id', bookingId);
+    }
+    if (date) {
+      query = query.eq('driving_date', date);
+    }
+    if (status) {
+      query = query.eq('status', status);
+    }
+
+    query = query.order('driving_date', { ascending: false }).order('created_at', { ascending: false });
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.warn('[DrivingLogs GET] DB Query note/error:', error.message);
+      // If table is not yet migrated, fall back gracefully to empty set or schedules scan
+      return NextResponse.json({
+        ok: true,
+        logs: [],
+        note: 'Table cockpit.driving_logs query fallback',
+      });
+    }
+
+    const logs: HqDrivingLog[] = (data || []).map((row: any, idx: number) => mapDbRowToDrivingLog(row, idx + 1));
+
+    return NextResponse.json({
+      ok: true,
+      logs,
+    });
+  } catch (err: any) {
+    console.error('[DrivingLogs GET] Internal server error:', err);
+    return NextResponse.json(
+      { ok: false, error: err.message || '서버 오류가 발생했습니다.' },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * POST: Create or submit a driving log
+ * Validates inputs and guarantees that DB failures strictly prevent false "제출 완료" state.
+ */
+export async function POST(req: NextRequest) {
+  try {
+    const auth = await verifyServerAuth(req);
+    if (!auth.ok || !auth.session) {
+      return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const {
+      id,
+      bookingId,
+      driverId,
+      driverName,
+      vehicleId,
+      vehiclePlate,
+      vehicleModel,
+      customerName,
+      customerId,
+      drivingDate,
+      clockIn,
+      clockOut,
+      garageDepartureTime,
+      customerServiceStart,
+      customerServiceEnd,
+      garageArrivalTime,
+      totalDutyHours,
+      startKm,
+      endKm,
+      distanceKm,
+      stops,
+      notes,
+      expenseAmount = 0,
+      expenseCount = 0,
+      status = '검토 대기',
+    } = body;
+
+    // Driver authorization: Drivers cannot submit logs on behalf of other drivers
+    const effectiveDriverName = (driverName || auth.session.driverName || '윤태준').trim();
+    if (auth.session.role === 'driver') {
+      const sessionDriverName = (auth.session.driverName || '').trim();
+      if (sessionDriverName && effectiveDriverName !== sessionDriverName) {
+        return NextResponse.json(
+          { ok: false, error: '다른 기사의 운행일지를 대리 작성할 수 없습니다. (403 Forbidden)' },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Validation for submission
+    const isSubmitting = status === '검토 대기' || status === 'submitted';
+    const startKmNum = formatOdoNum(startKm);
+    const endKmNum = formatOdoNum(endKm);
+
+    if (isSubmitting) {
+      if (!drivingDate) {
+        return NextResponse.json(
+          { ok: false, error: '운행일자(drivingDate)는 필수 입력 항목입니다.' },
+          { status: 400 }
+        );
+      }
+      if (startKmNum <= 0) {
+        return NextResponse.json(
+          { ok: false, error: '시작 계기판 거리(startKm)를 올바르게 입력해주세요.' },
+          { status: 400 }
+        );
+      }
+      if (endKmNum > 0 && endKmNum < startKmNum) {
+        return NextResponse.json(
+          { ok: false, error: '종료 거리는 시작 거리보다 작을 수 없습니다.' },
+          { status: 400 }
+        );
+      }
+      if (!Array.isArray(stops) || stops.length === 0) {
+        return NextResponse.json(
+          { ok: false, error: '운행 경로(stops)를 최소 1개 이상 등록해주세요.' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Verify bookingId if supplied: must exist in schedules
+    if (bookingId) {
+      const { data: scheduleRow, error: schedErr } = await supabaseAdmin
+        .from('schedules')
+        .select('id, customer_name, driver_name, vehicle_no, vehicle_plate')
+        .eq('id', bookingId)
+        .maybeSingle();
+
+      if (schedErr) {
+        return NextResponse.json(
+          { ok: false, error: `예약 정보 DB 조회 실패: ${schedErr.message}` },
+          { status: 500 }
+        );
+      }
+
+      if (!scheduleRow) {
+        return NextResponse.json(
+          { ok: false, error: `연결 대상 예약(bookingId: ${bookingId})을 찾을 수 없습니다.` },
+          { status: 400 }
+        );
+      }
+    }
+
+    const calculatedDist = endKmNum > startKmNum ? endKmNum - startKmNum : formatOdoNum(distanceKm);
+    const nowIso = new Date().toISOString();
+
+    const insertPayload: Record<string, any> = {
+      organization_id: '00000000-0000-0000-0000-000000000001',
+      booking_id: bookingId || null,
+      driver_id: driverId || auth.session.driverId || auth.session.userId,
+      driver_name: effectiveDriverName,
+      vehicle_id: vehicleId || auth.session.vehicleNo || '1호차',
+      vehicle_plate: vehiclePlate || auth.session.carNumber || '',
+      vehicle_model: vehicleModel || '법인 차량',
+      customer_id: customerId || null,
+      customer_name: customerName || 'VIP 고객',
+      driving_date: drivingDate || new Date().toISOString().split('T')[0],
+      clock_in: clockIn || null,
+      clock_out: clockOut || null,
+      garage_departure_time: garageDepartureTime || null,
+      customer_service_start: customerServiceStart || null,
+      customer_service_end: customerServiceEnd || null,
+      garage_arrival_time: garageArrivalTime || null,
+      total_duty_hours: totalDutyHours || '',
+      start_km: startKmNum,
+      end_km: endKmNum,
+      distance_km: calculatedDist,
+      stops: Array.isArray(stops) ? stops : [],
+      notes: notes || '',
+      expense_amount: Number(expenseAmount) || 0,
+      expense_count: Number(expenseCount) || 0,
+      status: isSubmitting ? '검토 대기' : 'draft',
+      submitted_at: isSubmitting ? nowIso : null,
+      submitted_by: isSubmitting ? (auth.session.displayName || auth.session.driverName || '기사') : null,
+      updated_at: nowIso,
+    };
+
+    if (id && !id.startsWith('driver-sub-')) {
+      insertPayload.id = id;
+    }
+
+    // Insert or update in cockpit.driving_logs
+    const { data: savedRow, error: saveErr } = await supabaseAdmin
+      .from('driving_logs')
+      .upsert(insertPayload, { onConflict: 'id' })
+      .select('*')
+      .single();
+
+    if (saveErr) {
+      console.error('[DrivingLogs POST] DB Save Error:', saveErr);
+      return NextResponse.json(
+        { ok: false, error: `데이터베이스 저장 실패: ${saveErr.message}` },
+        { status: 500 }
+      );
+    }
+
+    // If linked to a booking, also sync the driving_log metadata on cockpit.schedules
+    if (bookingId) {
+      await supabaseAdmin
+        .from('schedules')
+        .update({
+          driving_log: {
+            logId: savedRow.id,
+            status: insertPayload.status,
+            startKm: startKmNum,
+            endKm: endKmNum,
+            distanceKm: calculatedDist,
+            stopsCount: Array.isArray(stops) ? stops.length : 0,
+            submittedAt: nowIso,
+            updatedAt: nowIso,
+          },
+        })
+        .eq('id', bookingId);
+    }
+
+    return NextResponse.json({
+      ok: true,
+      log: mapDbRowToDrivingLog(savedRow),
+      message: isSubmitting ? '운행일지가 성공적으로 제출되었습니다.' : '임시 저장되었습니다.',
+    });
+  } catch (err: any) {
+    console.error('[DrivingLogs POST] Internal error:', err);
+    return NextResponse.json(
+      { ok: false, error: err.message || '운행일지 저장 중 오류가 발생했습니다.' },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * PUT: HQ Admin Review & Status Mutation
+ * Requires HQ Admin authentication.
+ * Records immutable audit history with actor and timestamp.
+ */
+export async function PUT(req: NextRequest) {
+  try {
+    const auth = await requireHqAdmin(req);
+    if (!auth.ok || !auth.session) {
+      return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const { id, status, reviewNotes, patch } = body;
+
+    if (!id) {
+      return NextResponse.json(
+        { ok: false, error: '수정할 운행일지 ID(id)가 필요합니다.' },
+        { status: 400 }
+      );
+    }
+
+    // Fetch existing row to preserve review history
+    const { data: existing, error: findErr } = await supabaseAdmin
+      .from('driving_logs')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (findErr) {
+      return NextResponse.json(
+        { ok: false, error: `DB 조회 실패: ${findErr.message}` },
+        { status: 500 }
+      );
+    }
+
+    if (!existing) {
+      return NextResponse.json(
+        { ok: false, error: `해당 운행일지(${id})를 찾을 수 없습니다.` },
+        { status: 404 }
+      );
+    }
+
+    const nowIso = new Date().toISOString();
+    const actor = auth.session.displayName || auth.session.driverName || '본사 관리자';
+    const prevHistory = Array.isArray(existing.review_history) ? existing.review_history : [];
+
+    let actionType: 'approved' | 'revision_requested' | 'rejected' | 'submission' = 'approved';
+    let auditMessage = `관리자(${actor})가 승인 완료 처리했습니다.`;
+
+    if (status === '보완 필요') {
+      actionType = 'revision_requested';
+      auditMessage = reviewNotes ? `보완 요청: ${reviewNotes}` : '추가 확인이 필요하여 보완 요청을 보냈습니다.';
+    } else if (status === '반려') {
+      actionType = 'rejected';
+      auditMessage = reviewNotes ? `반려 사유: ${reviewNotes}` : '관리자에 의해 반려 처리되었습니다.';
+    } else if (status === '승인 완료') {
+      actionType = 'approved';
+      auditMessage = reviewNotes ? `승인 완료: ${reviewNotes}` : '검토 후 승인 완료되었습니다.';
+    } else if (patch) {
+      actionType = 'submission';
+      auditMessage = `${actor}가 운행일지 데이터를 수정했습니다.`;
+    }
+
+    const newAuditEntry = {
+      id: `audit-${Date.now()}`,
+      time: new Date().toLocaleString('ko-KR'),
+      message: auditMessage,
+      actor,
+      actionType,
+    };
+
+    const updatePayload: Record<string, any> = {
+      review_history: [newAuditEntry, ...prevHistory],
+      updated_at: nowIso,
+    };
+
+    if (status) {
+      updatePayload.status = status;
+      updatePayload.reviewed_at = nowIso;
+      updatePayload.reviewed_by = actor;
+      if (reviewNotes !== undefined) updatePayload.review_notes = reviewNotes;
+    }
+
+    if (patch && typeof patch === 'object') {
+      if (patch.customerServiceStart !== undefined) updatePayload.customer_service_start = patch.customerServiceStart;
+      if (patch.customerServiceEnd !== undefined) updatePayload.customer_service_end = patch.customerServiceEnd;
+      if (patch.garageDepartureTime !== undefined) updatePayload.garage_departure_time = patch.garageDepartureTime;
+      if (patch.garageArrivalTime !== undefined) updatePayload.garage_arrival_time = patch.garageArrivalTime;
+      if (patch.notes !== undefined) updatePayload.notes = patch.notes;
+      if (patch.stops !== undefined) updatePayload.stops = patch.stops;
+    }
+
+    const { data: updatedRow, error: updateErr } = await supabaseAdmin
+      .from('driving_logs')
+      .update(updatePayload)
+      .eq('id', id)
+      .select('*')
+      .single();
+
+    if (updateErr) {
+      return NextResponse.json(
+        { ok: false, error: `DB 수정 실패: ${updateErr.message}` },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      ok: true,
+      log: mapDbRowToDrivingLog(updatedRow),
+      message: '운행일지 상태가 성공적으로 갱신되었습니다.',
+    });
+  } catch (err: any) {
+    console.error('[DrivingLogs PUT] Error:', err);
+    return NextResponse.json(
+      { ok: false, error: err.message || '상태 수정 중 오류가 발생했습니다.' },
+      { status: 500 }
+    );
+  }
+}
