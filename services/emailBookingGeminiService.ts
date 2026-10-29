@@ -3,7 +3,7 @@
  * Implements Stage 3 structured draft extraction per Issue #33
  */
 
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Type } from '@google/genai';
 import { HqEmailExtractedDraft, EmailTripType } from '@/types/emailHq';
 
 export interface ExtractBookingParams {
@@ -20,7 +20,75 @@ export interface ExtractBookingResult {
   draft: HqEmailExtractedDraft;
   rawJson?: string;
   error?: string;
+  metrics?: {
+    totalMs: number;
+    geminiMs: number;
+    modelUsed: string;
+    inputTokens: number;
+    outputTokens: number;
+    thoughtsTokens: number;
+  };
 }
+
+/**
+ * Strips HTML noise, style blocks, and excessive whitespace while preserving
+ * critical body text, signatures, phone numbers, and location details.
+ */
+export function cleanEmailBodyForAi(raw: string): string {
+  if (!raw) return '';
+  let text = raw;
+
+  // Remove HTML markup if present
+  if (text.includes('<') && text.includes('>')) {
+    text = text
+      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/<[^>]+>/g, ' ');
+  }
+
+  // Normalize linebreaks and remove multi-space clutter
+  text = text
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  // Protect against overly long thread histories (keep first 4000 characters)
+  if (text.length > 4000) {
+    text = text.slice(0, 4000);
+  }
+
+  return text;
+}
+
+/**
+ * Structured schema to force exact JSON fields at decode time
+ */
+const BOOKING_RESPONSE_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    companyName: { type: Type.STRING },
+    contactName: { type: Type.STRING },
+    contactPhone: { type: Type.STRING },
+    contactEmail: { type: Type.STRING },
+    contactSource: { type: Type.STRING, enum: ['body', 'signature', 'from', 'reply-to'] },
+    passengerName: { type: Type.STRING },
+    passengerPhone: { type: Type.STRING },
+    passengerCount: { type: Type.INTEGER },
+    pickupDate: { type: Type.STRING },
+    pickupTime: { type: Type.STRING },
+    pickupLocation: { type: Type.STRING },
+    pickupDetailNotes: { type: Type.STRING },
+    dropoffLocation: { type: Type.STRING },
+    dropoffDetailNotes: { type: Type.STRING },
+    flightNumber: { type: Type.STRING },
+    requestedVehicleClass: { type: Type.STRING },
+    specialRequests: { type: Type.STRING },
+    tripType: { type: Type.STRING, enum: ['single', 'group', 'modification', 'cancellation'] },
+    confidence: { type: Type.NUMBER },
+    warnings: { type: Type.ARRAY, items: { type: Type.STRING } },
+  },
+};
 
 /**
  * Creates an empty, unpopulated draft without fabricating any data
@@ -138,102 +206,77 @@ export async function extractBookingFromEmail(
   const kstTime = new Date(now.getTime() + (kstOffset + now.getTimezoneOffset()) * 60000);
   const todayKst = kstTime.toISOString().slice(0, 10);
 
-  const prompt = `You are an expert AI reservation assistant for VIP LIMOUSINE KOREA (대한민국 프리미엄 의전 리무진 운영 본사).
-Analyze the incoming client email below and extract structured VIP limousine reservation booking details.
+  const cleanBody = cleanEmailBodyForAi(bodyText);
+
+  const prompt = `You are an expert AI reservation assistant for VIP LIMOUSINE KOREA.
+Extract structured VIP limousine reservation booking details from the incoming client email.
 
 [REFERENCE CURRENT DATE (KST)]
 Today is ${todayKst} (YYYY-MM-DD, Asia/Seoul).
-Use this reference date when interpreting relative date expressions in the email (e.g. "오늘" -> ${todayKst}, "내일" -> next day, "모레" -> two days later, "이번 주 금요일" -> corresponding YYYY-MM-DD). If no year is specified (e.g. "10월 30일"), assume the current year (${todayKst.slice(0, 4)}).
+Interpret relative dates based on this reference: "오늘" -> ${todayKst}, "내일" -> next day, "모레" -> two days later, "이번 주 금요일" -> corresponding YYYY-MM-DD. If year is omitted (e.g. "10월 30일"), assume ${todayKst.slice(0, 4)}.
 
-[INCOMING EMAIL METADATA]
-- Email Subject: "${subject}"
-- Sender Email (From header): "${sender}"
-- Sender Display Name (From header): "${senderName || ''}"
+[EMAIL METADATA]
+- Subject: "${subject}"
+- From: "${sender}" (${senderName || ''})
 - Reply-To: "${replyTo || ''}"
 
-[EMAIL BODY TEXT]
-${bodyText}
+[EMAIL BODY]
+${cleanBody}
 
-[STRICT EXTRACTION & DISAMBIGUATION RULES]
-1. ZERO HALLUCINATION: Only extract facts explicitly stated or directly inferred from the text.
+[EXTRACTION RULES]
+1. ZERO HALLUCINATION: If a field is not explicitly mentioned or clearly inferred, return empty string "".
 2. DISAMBIGUATE ENTITIES:
-   - "companyName": Name of the requesting company/client organization (e.g., Ferrari Korea, Chanel, Simmtech, Global Events). If not explicitly mentioned, return "".
-   - "contactName": Name of the person making, requesting, or coordinating the reservation (from body, signature, or sign-off).
-   - "contactPhone": Phone number of the reservation coordinator. MUST BE A VALID PHONE NUMBER ONLY (e.g. 010-xxxx-xxxx, +82-10-xxxx-xxxx). NEVER PUT AN EMAIL ADDRESS HERE! If missing, return "".
-   - "contactEmail": Email address of the reservation coordinator (from body or signature). If not explicitly in body/signature, return "".
-   - "contactSource": Where the coordinator info was found: "body", "signature", "from", or "reply-to".
-   - "passengerName": Name of the actual VIP/guest/passenger riding in the vehicle. Distinguish from contact coordinator!
-   - "passengerPhone": Phone number of the actual passenger. MUST BE A VALID PHONE NUMBER ONLY. NEVER PUT AN EMAIL ADDRESS HERE! If missing, return "".
+   - "companyName": Requesting client/company (e.g. Ferrari Korea, Simmtech, Chanel, Global Events). If not mentioned, return "".
+   - "contactName": Person coordinating/booking the trip (from body, signature, or sign-off).
+   - "contactPhone": Coordinator's phone only. MUST NEVER CONTAIN AN EMAIL ADDRESS!
+   - "contactEmail": Coordinator's email address.
+   - "contactSource": "body" | "signature" | "from" | "reply-to".
+   - "passengerName": Actual VIP guest riding in the car. Distinguish from coordinator!
+   - "passengerPhone": Actual VIP passenger phone only. MUST NEVER CONTAIN AN EMAIL ADDRESS!
    - "passengerCount": Number of passengers (integer, default 1).
 3. LOCATIONS FOR TMAP POI SEARCH:
-   - "pickupLocation": Primary place name suitable for TMAP POI search (e.g. "인천공항 제2여객터미널", "김포공항 국제선", "조선팰리스 서울강남", "신라호텔", "인제스피디움"). Do not append detailed floor/gate here so TMAP search succeeds cleanly.
-   - "pickupDetailNotes": Gate, floor, terminal, or meeting notes (e.g. "3층 출국장 7번 게이트 앞", "로비 1층 드롭오프 존", "VIP 게이트").
-   - "dropoffLocation": Primary destination place name suitable for TMAP POI search.
-   - "dropoffDetailNotes": Gate, floor, building, or specific dropoff notes.
+   - "pickupLocation": Clean name for TMAP search (e.g. "인천공항 제2여객터미널", "김포공항 국제선", "조선팰리스 서울강남", "신라호텔"). Do not include gate/floor here.
+   - "pickupDetailNotes": Floor, gate, terminal details (e.g. "3층 출국장 7번 게이트 앞", "로비 1층").
+   - "dropoffLocation": Clean name for TMAP search.
+   - "dropoffDetailNotes": Floor, building, dropoff zone details.
 4. DATE & TIME:
-   - "pickupDate": YYYY-MM-DD
-   - "pickupTime": HH:MM (24-hour format)
-5. VEHICLE & FLIGHT:
-   - "flightNumber": e.g. "KE082", "AF264", etc. If absent or not an airport transfer, return "".
-   - "requestedVehicleClass": Typical: "카니발 하이리무진", "벤츠 스프린터", "제네시스 G90", "스타리아 리무진".
-   - "specialRequests": Any special notes, baggage mentions, picket board requests, etc.
-   - NOTE: Do NOT include any separate "luggageCount" property in your output. Mention luggage only in specialRequests if present.
-6. TRIP TYPE:
-   - "single": Normal single vehicle transfer
-   - "group": Multiple vehicles or multiple passengers requested at different times/locations (fill "groupTrips" array)
-   - "modification": Customer asking to change an existing booking (e.g. flight delay, time shift)
-   - "cancellation": Customer requesting cancellation (Never cancel automatically, add a warning)
-7. MANDATORY HUMAN DISPATCH:
-   - "assignedDriver" MUST ALWAYS BE null.
-   - "assignedVehicle" MUST ALWAYS BE null.
-   - "assignedVehiclePlate" MUST ALWAYS BE null.
-   (Vehicles and drivers must NEVER be automatically assigned by AI under any circumstances).
+   - "pickupDate": YYYY-MM-DD format.
+   - "pickupTime": HH:MM (24-hour format).
+5. FLIGHT & VEHICLE:
+   - "flightNumber": e.g. "KE082", "AF264". If not an airport trip, return "".
+   - "requestedVehicleClass": e.g. "카니발 하이리무진", "벤츠 스프린터", "제네시스 G90".
+   - "specialRequests": VIP requests, picket board text, water/amenities. Do not create luggage field.
+6. MANDATORY HUMAN DISPATCH:
+   - "assignedDriver": null (AI must never assign drivers).
+   - "assignedVehicle": null (AI must never assign vehicles).`;
 
-Return strictly a valid JSON object matching this schema (no markdown formatting, no comments):
-{
-  "companyName": string,
-  "contactName": string,
-  "contactPhone": string,
-  "contactEmail": string,
-  "contactSource": "body" | "signature" | "from" | "reply-to",
-  "passengerName": string,
-  "passengerPhone": string,
-  "passengerCount": number,
-  "pickupDate": string,
-  "pickupTime": string,
-  "pickupLocation": string,
-  "pickupDetailNotes": string,
-  "dropoffLocation": string,
-  "dropoffDetailNotes": string,
-  "flightNumber": string,
-  "requestedVehicleClass": string,
-  "specialRequests": string,
-  "tripType": "single" | "group" | "modification" | "cancellation",
-  "groupTrips": [
-    {
-      "id": string,
-      "passengerName": string,
-      "pickupLocation": string,
-      "dropoffLocation": string,
-      "pickupTime": string,
-      "vehicleClass": string,
-      "notes": string
-    }
-  ],
-  "confidence": number,
-  "warnings": string[]
-}`;
+  const modelName = process.env.GEMINI_BOOKING_MODEL || 'gemini-3.8-flash';
 
+  const tStart = Date.now();
   try {
     const ai = new GoogleGenAI({ apiKey });
+
+    const genConfig: any = {
+      temperature: 0.1,
+      responseMimeType: 'application/json',
+      responseSchema: BOOKING_RESPONSE_SCHEMA,
+    };
+
+    // Low thinking level optimization for gemini-3.8-flash (50%+ latency reduction)
+    if (modelName.includes('3.8') || modelName.includes('thinking')) {
+      genConfig.thinkingConfig = {
+        thinkingLevel: 'low',
+      };
+    }
+
+    const tGeminiStart = Date.now();
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: modelName,
       contents: [prompt],
-      config: {
-        temperature: 0.1,
-        responseMimeType: 'application/json',
-      },
+      config: genConfig,
     });
+    const geminiMs = Date.now() - tGeminiStart;
+    const totalMs = Date.now() - tStart;
 
     const rawText = response.text?.trim() || '{}';
     let parsed: Record<string, unknown> = {};
@@ -296,10 +339,23 @@ Return strictly a valid JSON object matching this schema (no markdown formatting
       updatedAt: new Date().toISOString(),
     };
 
+    const usage = response.usageMetadata;
+    const inputTokens = usage?.promptTokenCount || 0;
+    const outputTokens = usage?.candidatesTokenCount || 0;
+    const thoughtsTokens = (usage as any)?.thoughtsTokenCount || 0;
+
     return {
       ok: true,
       draft,
       rawJson: rawText,
+      metrics: {
+        totalMs,
+        geminiMs,
+        modelUsed: modelName,
+        inputTokens,
+        outputTokens,
+        thoughtsTokens,
+      },
     };
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);

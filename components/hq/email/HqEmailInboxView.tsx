@@ -533,7 +533,8 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
         [currentSummary.id]: extracted,
       }));
       saveEmailDraft(extracted);
-      showToast('Gemini AI가 이메일에서 예약 정보를 성공적으로 추출했습니다.');
+      const metricsText = data.metrics?.totalMs ? ` (${(data.metrics.totalMs / 1000).toFixed(1)}초)` : '';
+      showToast(`Gemini AI가 이메일에서 예약 정보를 성공적으로 추출했습니다${metricsText}.`);
     } catch (err: any) {
       showToast(`AI 추출 실패: ${err.message}`);
       haptics.errorAlert();
