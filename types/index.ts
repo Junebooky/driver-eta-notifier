@@ -26,6 +26,8 @@ export interface DriverProfile {
   targetChatRoom?: string; // e.g. 'VIP 의전 단톡방'
   homeLocation?: HomeLocation | null;
   plateNumber?: string;    // e.g. '142호 7811' (alias for carNumber)
+  clientName?: string;     // e.g. '인터코스'
+  passengerCount?: string; // e.g. '9명'
 }
 
 
@@ -70,10 +72,13 @@ export interface RouteEstimate {
   durationMinutes: number;
   etaFormatted: string;
   trafficSummary?: string;
+  estimatedTollWon?: number | null; // TMAP totalFare in KRW (null if unavailable or mock)
   isMock: boolean;
   isFallback?: boolean;
   fallbackNotice?: string;
   isCached?: boolean;
+  isUnavailable?: boolean;
+  error?: string;
 }
 
 export type FuelCode = 'D047' | 'B027' | 'B034';
@@ -108,16 +113,24 @@ export interface FlightInfo {
   flightId: string;              // e.g. 'KE012'
   airline: string;               // e.g. '대한항공'
   type: FlightType;              // 'arrival' | 'departure'
-  airport: string;               // e.g. '로스앤젤레스'
-  airportCode: string;           // e.g. 'LAX'
+  airport: string;               // e.g. '로스앤젤레스' or '제주'
+  airportCode: string;           // e.g. 'LAX' or 'CJU'
+  airportKind?: 'ICN' | 'GMP';   // 'ICN' = Incheon, 'GMP' = Gimpo
+  airportName?: string;          // '인천국제공항' | '김포국제공항'
+  isDomestic?: boolean;          // true for domestic routes (Gimpo domestic)
   scheduleTimeFormatted: string; // e.g. '04:40'
   estimatedTimeFormatted: string;// e.g. '04:25'
   statusText: string;            // e.g. '04:25 (조기 도착 -15분)' or '12:40 (정상 출발)'
   diffMinutes: number;           // difference in minutes
-  terminal: string;              // '제1여객터미널' | '제2여객터미널'
-  terminalId: string;            // 'P01' | 'P02' | 'P03'
+  terminal: string;              // '제1여객터미널' | '제2여객터미널' | '국내선' | '국제선'
+  terminalId: string;            // 'P01' | 'P02' | 'P03' | 'GMP_DOM' | 'GMP_INT'
   isTomorrow?: boolean;          // true if flight is tomorrow (+1 day lookahead)
   flightDate?: string;           // 'YYYY-MM-DD'
+  // Data transparency & authenticity flags:
+  isMock?: boolean;              // true when fixture test data is used
+  dataSource?: string;           // e.g. 'IIAC 실시간 API' | 'KAC 실시간 API' | 'GMP 테스트 픽스처'
+  fixtureNotice?: string;        // explanation if fixture is returned
+  candidates?: FlightInfo[];     // list of candidates if multiple matches exist
   // Arrival specific:
   gateNumber?: string | null;           // e.g. '249'
   carousel?: string | null;             // e.g. '5'
@@ -177,11 +190,69 @@ export interface DbScheduleRow {
   destination_lng?: number | null;
   passenger_name?: string | null;
   passenger_count?: number;
+  passenger_phone?: string | null;
   passenger_note?: string | null;
   flight_number?: string | null;
   flight_type?: string | null;
   protocol_notes?: string | null;
   status: string;
+  org_id?: string;
+  driver_id?: string | null;
+  driver_name?: string | null;
+  vehicle_id?: string | null;
+  dispatch_status?: 'unassigned' | 'draft' | 'published' | 'cancelled';
+  version?: number;
+  place_verified?: boolean;
+  published_at?: string | null;
+  published_by?: string | null;
+  last_ack_version?: number;
+  last_ack_at?: string | null;
+  operation_status?: 'ready' | 'arrived_pickup' | 'boarded' | 'in_transit' | 'completed';
+  operation_updated_at?: string | null;
+  operation_history?: any[];
+  source_quote_no?: string | null;
+  schedule_meta?: Record<string, any> | null;
+  driving_log?: Record<string, any> | null;
   created_at?: string;
   updated_at?: string;
 }
+
+export interface DbDispatchAcknowledgmentRow {
+  id: string;
+  schedule_id: string;
+  version: number;
+  driver_id: string;
+  driver_name: string;
+  acknowledged_at: string;
+  device_summary?: string | null;
+  created_at?: string;
+}
+
+export interface DbOrgPlaceRow {
+  id: string;
+  org_id: string;
+  name: string;
+  aliases: string[];
+  road_address: string;
+  lat: number;
+  lng: number;
+  entry_gate_notes?: string | null;
+  verified_by?: string | null;
+  verified_at?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface OrgPlace {
+  id: string;
+  orgId: string;
+  name: string;
+  aliases: string[];
+  roadAddress: string;
+  lat: number;
+  lng: number;
+  entryGateNotes?: string;
+  verifiedBy?: string;
+  verifiedAt?: string;
+}
+

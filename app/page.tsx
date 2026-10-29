@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import Link from 'next/link';
 import { useDriverProfile, getOrCreateDeviceUuid, getStoredVehicleProfile } from '@/hooks/useDriverProfile';
 import { useLocation } from '@/hooks/useLocation';
 import { Header } from '@/components/Header';
@@ -20,6 +21,11 @@ import { FlightModal } from '@/components/FlightModal';
 import { VehicleInspectionModal } from '@/components/VehicleInspectionModal';
 import { LocationSearchModal, SelectedLocationData } from '@/components/LocationSearchModal';
 import { RoadviewModal } from '@/components/RoadviewModal';
+import { DrivingLogModal } from '@/components/DrivingLogModal';
+import { ExpenseModal } from '@/components/ExpenseModal';
+import { FieldTipModal } from '@/components/FieldTipModal';
+import { DriverFieldKnowledgeModal } from '@/components/knowledge/DriverFieldKnowledgeModal';
+import { getFieldTipsCount } from '@/utils/fieldTipData';
 import { ScheduleTab } from '@/components/ScheduleTab';
 import { Navigation, Calendar } from 'lucide-react';
 import { ScheduleItem, scheduleToPresets } from '@/data/ferrariSchedules';
@@ -103,10 +109,45 @@ export default function Home() {
   // Roadview Modal State
   const [isRoadviewModalOpen, setIsRoadviewModalOpen] = useState(false);
 
+  // Driving Log (운행일지) & Expense (경비지출) Modals State
+  const [isDrivingLogOpen, setIsDrivingLogOpen] = useState(false);
+  const [isExpenseOpen, setIsExpenseOpen] = useState(false);
+
+  // Field Tips (현장 팁) Modal State
+  const [isFieldTipModalOpen, setIsFieldTipModalOpen] = useState(false);
+
+  // Field Knowledge (현장 지식) Read-Only Driver Modal State
+  const [isFieldKnowledgeOpen, setIsFieldKnowledgeOpen] = useState(false);
+
+  // VIP Assignment Capability & Isolated Preview Gate State (Issue #14)
+  const [isVipAssigned, setIsVipAssigned] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('vip') === '0' || params.get('standard') === '1') return false;
+      if (params.get('vip') === '1' || params.get('preview') === 'vip') return true;
+      const stored = localStorage.getItem('cockpit_vip_preview_enabled');
+      if (stored !== null) return stored === 'true';
+    }
+    return true;
+  });
+
+  // Map search callback state for Driving Log 일정 추가
+  const [isSelectingForSchedule, setIsSelectingForSchedule] = useState(false);
+  const [selectedLocationForSchedule, setSelectedLocationForSchedule] = useState<{
+    name: string;
+    address?: string;
+  } | null>(null);
+
   // Active vehicle identifier (e.g. '4호차', '1호차')
   const currentVehicleNo = useMemo(() => {
     return profile.vehicleNo?.match(/(\d+호차)/)?.[1] || '4호차';
   }, [profile.vehicleNo]);
+
+  // Active Field Tips Count for current location (Defaults to origin or 조선팰리스 강남)
+  const currentFieldTipsCount = useMemo(() => {
+    const targetPlace = origin?.name || '조선팰리스 강남';
+    return getFieldTipsCount(targetPlace);
+  }, [origin?.name]);
 
   // Fetch Presets with Vehicle Isolation (Common Master + Vehicle's Custom Presets)
   const fetchPresetsForVehicle = useCallback(async (vNo: string) => {
@@ -631,6 +672,7 @@ export default function Home() {
 
   const [activeTab, setActiveTab] = useState<'drive' | 'schedule'>('drive');
   const [reportMode, setReportMode] = useState<ReportMode>('DEPARTURE');
+  const [activeDisplayedReportText, setActiveDisplayedReportText] = useState<string>('');
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isOnboarding, setIsOnboarding] = useState(false);
   const [onboardingStage, setOnboardingStage] = useState<'splash' | 'sheet' | null>(null);
@@ -761,18 +803,17 @@ export default function Home() {
           isCached: Boolean(data.isCached),
         });
       } catch (err: any) {
-        console.warn('Falling back to haversine estimate (timeout or network):', err?.message);
-        const validWaypoints = (waypoints || []).filter(
-          (w) => w && typeof w.lat === 'number' && typeof w.lng === 'number' && (w.lat !== 0 || w.lng !== 0)
-        );
-        const fallback = calculateHaversineEstimate(
-          start.lat,
-          start.lng,
-          end.lat,
-          end.lng,
-          validWaypoints.map((w) => ({ lat: w.lat, lng: w.lng }))
-        );
-        setRouteEstimate(fallback);
+        console.warn('TMAP Route API call failed or timed out:', err?.message);
+        setRouteEstimate({
+          distanceKm: 0,
+          durationMinutes: 0,
+          etaFormatted: '--:--',
+          trafficSummary: 'TMAP 경로 조회 불가',
+          isMock: false,
+          isFallback: false,
+          isUnavailable: true,
+          error: 'TMAP 실시간 경로를 불러올 수 없습니다.',
+        });
       } finally {
         clearTimeout(timeoutId);
         setIsLoadingRoute(false);
@@ -781,32 +822,51 @@ export default function Home() {
     []
   );
 
-  // Fetch AI Prediction for future departure time (Isolated simulation only) with 3.5s timeout guard
+  // Fetch AI Prediction for future departure time (Strictly Genuine TMAP Prediction) with 8s timeout guard
   const fetchPrediction = useCallback(
-    async (targetDate: Date, start: LocationPreset, end: LocationPreset) => {
+    async (targetDate: Date, start: LocationPreset, end: LocationPreset, currentWaypoints?: LocationPreset[]) => {
       setIsLoadingPrediction(true);
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
       try {
+        const validWaypoints = (currentWaypoints || []).filter(
+          (w) => w && typeof w.lat === 'number' && typeof w.lng === 'number' && (w.lat !== 0 || w.lng !== 0)
+        );
         const res = await fetch('/api/route/prediction', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             departure: { name: start.shortName || start.name, lat: start.lat, lng: start.lng },
             destination: { name: end.shortName || end.name, lat: end.lat, lng: end.lng },
+            waypoints: validWaypoints.map((w) => ({ name: w.name, lat: w.lat, lng: w.lng })),
             predictionTime: targetDate.toISOString(),
           }),
-          signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal
-            ? AbortSignal.timeout(3500)
-            : controller.signal,
+          signal: controller.signal,
         });
         if (!res.ok) {
-          throw new Error(`Prediction API error ${res.status}`);
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData?.error || `Prediction API error ${res.status}`);
         }
         const data: PredictionResult = await res.json();
         setPredictionResult(data);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.warn('Prediction fetch error (timeout or network):', err);
+        const isAbort = err instanceof Error && err.name === 'AbortError';
+        const errorMsg = err instanceof Error ? err.message : '예측 정보를 불러올 수 없습니다.';
+        setPredictionResult({
+          baseDurationMinutes: null,
+          predictedDurationMinutes: null,
+          predictedDistanceKm: null,
+          departureTimeIso: targetDate.toISOString(),
+          departureTimeFormatted: '--:--',
+          arrivalTimeFormatted: null,
+          trafficSummary: 'TMAP 예측 불가',
+          isMock: false,
+          isFallback: false,
+          isUnavailable: true,
+          error: isAbort ? '요청 시간이 초과되었습니다.' : errorMsg,
+          timeline: [],
+        });
       } finally {
         clearTimeout(timeoutId);
         setIsLoadingPrediction(false);
@@ -867,7 +927,11 @@ export default function Home() {
     setIsTimePickerOpen(false);
     setIsPredictionSheetOpen(true);
     if (origin && destination) {
-      fetchPrediction(date, origin, destination);
+      const effectiveWaypoints =
+        isAdminRoute && adminWaypoints.length > 0
+          ? adminWaypoints
+          : waypoints.filter((w) => w && w.lat && w.lng && (w.lat !== 0 || w.lng !== 0));
+      fetchPrediction(date, origin, destination, effectiveWaypoints);
     }
   };
 
@@ -979,6 +1043,18 @@ export default function Home() {
 
   // Handler for selecting location from standalone LocationSearchModal
   const handleSelectLocationFromSearch = (loc: SelectedLocationData) => {
+    // Route back to Driving Log 일정 추가 if requested from AddScheduleModal
+    if (isSelectingForSchedule) {
+      setSelectedLocationForSchedule({
+        name: loc.name || loc.shortName,
+        address: loc.address,
+      });
+      setIsSelectingForSchedule(false);
+      setIsLocationSearchOpen(false);
+      haptics.selection();
+      return;
+    }
+
     // [태스크 4] 검색 모달 내 경로 패키지 거점 선택 시 원터치 일괄 로드
     if (loc.isPackage && loc.packageData) {
       setOrigin(loc.packageData.origin);
@@ -1181,12 +1257,15 @@ export default function Home() {
     []
   );
 
-  // Real-time dynamic report text generated from current state
-  const reportPreviewText = useMemo(() => {
-    const effectiveWaypoints = isAdminRoute && adminWaypoints.length > 0
+  // Resolved effective waypoints considering admin and user inputs
+  const effectiveWaypoints = useMemo(() => {
+    return isAdminRoute && adminWaypoints.length > 0
       ? adminWaypoints
       : (waypoints && waypoints.length > 0 ? waypoints : []);
+  }, [isAdminRoute, adminWaypoints, waypoints]);
 
+  // Real-time dynamic report text generated from current state
+  const reportPreviewText = useMemo(() => {
     return generateReportText({
       mode: reportMode,
       profile,
@@ -1197,7 +1276,7 @@ export default function Home() {
       distanceKm: routeEstimate?.distanceKm,
       durationMinutes: routeEstimate?.durationMinutes,
     });
-  }, [reportMode, profile, origin, destination, isAdminRoute, adminWaypoints, waypoints, routeEstimate]);
+  }, [reportMode, profile, origin, destination, effectiveWaypoints, routeEstimate]);
 
   // Pre-initialization & Onboarding Splash Gate: completely blocks dashboard FOUC on initial mount
   if (!isInitialized || (isOnboarding && onboardingStage === 'splash')) {
@@ -1242,17 +1321,25 @@ export default function Home() {
 
         {/* Admin Mode Active Banner */}
         {isAdmin && (
-          <div className="px-4 py-2 bg-blue-600 text-white text-sm font-bold flex items-center justify-between shadow-sm animate-fade-in">
+          <div className="px-4 py-2 bg-blue-600 text-white text-xs font-bold flex items-center justify-between shadow-sm animate-fade-in">
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-blue-300 animate-ping" />
-              관리자 모드 활성화 (전사 공통 거점 등록·삭제 가능)
+              관리자 모드 활성화
             </span>
-            <button
-              onClick={() => handleToggleAdmin(false)}
-              className="px-2 py-0.5 rounded bg-white/20 hover:bg-white/30 text-[11px] font-extrabold cursor-pointer"
-            >
-              종료
-            </button>
+            <div className="flex items-center gap-1.5">
+              <Link
+                href="/hq"
+                className="px-2 py-0.5 rounded bg-white text-[#1E60F3] hover:bg-blue-50 text-[11px] font-extrabold cursor-pointer transition-colors shadow-2xs"
+              >
+                HQ 대시보드 ➔
+              </Link>
+              <button
+                onClick={() => handleToggleAdmin(false)}
+                className="px-2 py-0.5 rounded bg-white/20 hover:bg-white/30 text-[11px] font-extrabold cursor-pointer"
+              >
+                종료
+              </button>
+            </div>
           </div>
         )}
 
@@ -1344,16 +1431,27 @@ export default function Home() {
               onOpenGasModal={() => setIsGasModalOpen(true)}
               onOpenPresetModal={handleOpenAddModal}
               onSaveRouteAsPreset={handleSaveRouteAsPreset}
+              onSetCurrentLocation={requestGpsLocation}
+              onOpenFieldTips={() => {
+                haptics.selection();
+                setIsFieldTipModalOpen(true);
+              }}
+              fieldTipsCount={currentFieldTipsCount}
+              isLocatingGps={isLocating}
             />
 
-            {/* 2. Standalone 5-Column Quick Action Bar */}
+            {/* 2. Standalone 7-Button Quick Action Bar (4 Top / 3 Centered) */}
             <QuickActionBar
+              isVipEnabled={isVipAssigned}
+              onOpenDrivingLogModal={() => setIsDrivingLogOpen(true)}
+              onOpenExpenseModal={() => setIsExpenseOpen(true)}
               onOpenInspectionModal={() => setIsInspectionModalOpen(true)}
               onOpenPresetModal={handleOpenAddModal}
               onOpenAddModal={handleOpenAddModal}
               onOpenGasModal={() => setIsGasModalOpen(true)}
               onOpenFlightModal={() => setIsFlightModalOpen(true)}
               onOpenRoadviewModal={() => setIsRoadviewModalOpen(true)}
+              onOpenFieldKnowledgeModal={() => setIsFieldKnowledgeOpen(true)}
             />
 
             {/* 3. Route Estimation & ETA Status (Strictly Real-time TMAP) */}
@@ -1375,11 +1473,19 @@ export default function Home() {
               onOpenTimePicker={() => setIsTimePickerOpen(true)}
             />
 
-            {/* 4. Report Template Selector */}
+            {/* 4. Report Template Selector with Globe English Translation */}
             <ReportTemplateSelector
               currentMode={reportMode}
               onSelectMode={(mode) => setReportMode(mode)}
               reportPreviewText={reportPreviewText}
+              profile={profile}
+              origin={origin}
+              destination={destination}
+              waypoints={effectiveWaypoints}
+              etaFormatted={routeEstimate?.etaFormatted}
+              onActiveReportTextChange={(text) => {
+                setActiveDisplayedReportText(text);
+              }}
             />
 
             {/* 5. 1-Sec Fast Pass & Kakao Share Action Panel */}
@@ -1391,7 +1497,7 @@ export default function Home() {
               adminWaypoints={adminWaypoints}
               isAdminRoute={isAdminRoute}
               routeEstimate={routeEstimate}
-              reportText={reportPreviewText}
+              reportText={activeDisplayedReportText || reportPreviewText}
               targetChatRoom={profile.targetChatRoom}
               profile={profile}
             />
@@ -1657,6 +1763,46 @@ export default function Home() {
         currentDestination={destination}
         presets={presets}
         homeLocation={profile.homeLocation}
+      />
+
+      {/* Driving Log (운행일지) Full-Screen Mobile Modal */}
+      <DrivingLogModal
+        isOpen={isDrivingLogOpen}
+        onClose={() => setIsDrivingLogOpen(false)}
+        driverProfile={profile}
+        onOpenLocationSearch={() => {
+          setIsSelectingForSchedule(true);
+          setIsLocationSearchOpen(true);
+        }}
+        selectedLocationFromMap={selectedLocationForSchedule}
+      />
+
+      {/* Expense (경비지출) Modal Shell */}
+      <ExpenseModal
+        isOpen={isExpenseOpen}
+        onClose={() => setIsExpenseOpen(false)}
+      />
+
+      {/* Field Tips (현장 팁) Modal */}
+      <FieldTipModal
+        isOpen={isFieldTipModalOpen}
+        onClose={() => setIsFieldTipModalOpen(false)}
+        currentPlaceName={origin?.name || '조선팰리스 강남'}
+        currentAddress={origin?.address || '서울 강남구 테헤란로 231'}
+        originPlaceName={origin?.name}
+        originAddress={origin?.address}
+        destinationPlaceName={destination?.name}
+        destinationAddress={destination?.address}
+        onOpenRoadview={() => {
+          setIsFieldTipModalOpen(false);
+          setIsRoadviewModalOpen(true);
+        }}
+      />
+
+      {/* Field Knowledge (현장 지식) Read-Only Driver Modal */}
+      <DriverFieldKnowledgeModal
+        isOpen={isFieldKnowledgeOpen}
+        onClose={() => setIsFieldKnowledgeOpen(false)}
       />
 
     </main>

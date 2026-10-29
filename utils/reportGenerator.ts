@@ -1,4 +1,4 @@
-import { DriverProfile, LocationPreset, ReportMode } from '@/types';
+import type { DriverProfile, LocationPreset, ReportMode } from '@/types';
 
 export interface GenerateReportParams {
   profile: DriverProfile;
