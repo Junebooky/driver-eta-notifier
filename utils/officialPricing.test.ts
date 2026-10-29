@@ -8,10 +8,209 @@ import {
 } from '@/lib/pricing/officialPricingSkus';
 import { calculateQuote } from '@/utils/quoteCalculator';
 import { requireHqAdmin, signCockpitSession } from '@/lib/auth/serverAuth';
+import { supabaseAdmin } from '@/lib/supabase/server';
 import assert from 'node:assert';
 
 async function runOfficialPricingTests() {
   console.log('--- [VLK 2026 Official Pricing Suite] ---');
+
+  if (!process.env.COCKPIT_AUTH_SECRET && !process.env.AUTH_SECRET) {
+    process.env.COCKPIT_AUTH_SECRET = 'test-cockpit-auth-secret-key-32chars-minimum!';
+  }
+
+  // If live Supabase service key is not configured (e.g. CI quality gate),
+  // mock the query layer with non-sensitive synthetic test fixtures.
+  const originalFrom = supabaseAdmin.from;
+  try {
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.log('[CI Test Mode] Using in-memory mock for official pricing tables.');
+    const mockCards = [
+      {
+        id: 'card-mock-519',
+        tariff_year: 2026,
+        tariff_version: OFFICIAL_TARIFF_VERSION,
+        vehicle_product_code: 'sprinter_519_premium',
+        vehicle_product_label: '벤츠 스프린터 리무진 519 최고급형',
+        capacity_note: '9·11·12인승',
+        daily_base_hours: 9,
+        airport_base_hours: 3,
+        daily_metro_krw: 1000000,
+        daily_regional_krw: 1200000,
+        airport_gimpo_krw: 400000,
+        airport_incheon_krw: 500000,
+        quote_required: false,
+        publication_status: 'draft',
+      },
+      {
+        id: 'card-mock-s560',
+        tariff_year: 2026,
+        tariff_version: OFFICIAL_TARIFF_VERSION,
+        vehicle_product_code: 'benz_s560',
+        vehicle_product_label: '벤츠 S560',
+        capacity_note: '세단',
+        daily_base_hours: 9,
+        airport_base_hours: 3,
+        daily_metro_krw: 900000,
+        daily_regional_krw: 1100000,
+        airport_gimpo_krw: 350000,
+        airport_incheon_krw: 450000,
+        quote_required: false,
+        publication_status: 'draft',
+      },
+      {
+        id: 'card-mock-carnival',
+        tariff_year: 2026,
+        tariff_version: OFFICIAL_TARIFF_VERSION,
+        vehicle_product_code: 'kia_carnival_hi_limo',
+        vehicle_product_label: '카니발 하이리무진',
+        capacity_note: '7인승',
+        daily_base_hours: 9,
+        airport_base_hours: 3,
+        daily_metro_krw: 600000,
+        daily_regional_krw: 800000,
+        airport_gimpo_krw: 250000,
+        airport_incheon_krw: 300000,
+        quote_required: false,
+        publication_status: 'draft',
+      },
+      {
+        id: 'card-mock-staria',
+        tariff_year: 2026,
+        tariff_version: OFFICIAL_TARIFF_VERSION,
+        vehicle_product_code: 'hyundai_staria_lounge_limo',
+        vehicle_product_label: '스타리아 라운지 리무진',
+        capacity_note: '7·9인승',
+        daily_base_hours: 9,
+        airport_base_hours: 3,
+        daily_metro_krw: 550000,
+        daily_regional_krw: 750000,
+        airport_gimpo_krw: 230000,
+        airport_incheon_krw: 280000,
+        quote_required: false,
+        publication_status: 'draft',
+      },
+      {
+        id: 'card-mock-g90',
+        tariff_year: 2026,
+        tariff_version: OFFICIAL_TARIFF_VERSION,
+        vehicle_product_code: 'genesis_g90_donghaeng',
+        vehicle_product_label: '제네시스 G90 리무진 (동행)',
+        capacity_note: '동행 의전',
+        daily_base_hours: 9,
+        airport_base_hours: 3,
+        daily_metro_krw: 850000,
+        daily_regional_krw: 1050000,
+        airport_gimpo_krw: 320000,
+        airport_incheon_krw: 420000,
+        quote_required: false,
+        publication_status: 'draft',
+      },
+      {
+        id: 'card-mock-bus22',
+        tariff_year: 2026,
+        tariff_version: OFFICIAL_TARIFF_VERSION,
+        vehicle_product_code: 'bus_premium_22',
+        vehicle_product_label: '22인승 프리미엄 버스',
+        capacity_note: '22인승',
+        daily_base_hours: 9,
+        airport_base_hours: 3,
+        daily_metro_krw: null,
+        daily_regional_krw: null,
+        airport_gimpo_krw: null,
+        airport_incheon_krw: null,
+        quote_required: true,
+        publication_status: 'draft',
+      },
+      {
+        id: 'card-mock-bus28',
+        tariff_year: 2026,
+        tariff_version: OFFICIAL_TARIFF_VERSION,
+        vehicle_product_code: 'bus_limo_28',
+        vehicle_product_label: '28인승 우등 리무진 버스',
+        capacity_note: '28인승',
+        daily_base_hours: 9,
+        airport_base_hours: 3,
+        daily_metro_krw: null,
+        daily_regional_krw: null,
+        airport_gimpo_krw: null,
+        airport_incheon_krw: null,
+        quote_required: true,
+        publication_status: 'draft',
+      },
+      {
+        id: 'card-mock-bus45',
+        tariff_year: 2026,
+        tariff_version: OFFICIAL_TARIFF_VERSION,
+        vehicle_product_code: 'bus_45',
+        vehicle_product_label: '45인승 대형 버스',
+        capacity_note: '45인승',
+        daily_base_hours: 9,
+        airport_base_hours: 3,
+        daily_metro_krw: null,
+        daily_regional_krw: null,
+        airport_gimpo_krw: null,
+        airport_incheon_krw: null,
+        quote_required: true,
+        publication_status: 'draft',
+      },
+    ];
+
+    const mockRules = [
+      {
+        id: 'rule-mock-overtime',
+        tariff_version: OFFICIAL_TARIFF_VERSION,
+        service_type: 'daily',
+        rule_code: 'overtime_rates',
+        rule_data: {
+          standard_hourly_krw: {
+            sprinter: 80000,
+            other_vehicles: 50000,
+          },
+          night_hourly_krw: {
+            sprinter: 120000,
+            other_vehicles: 80000,
+          },
+        },
+        publication_status: 'draft',
+      },
+      {
+        id: 'rule-mock-english',
+        tariff_version: OFFICIAL_TARIFF_VERSION,
+        service_type: 'daily',
+        rule_code: 'daily_fluent_english',
+        rule_data: {
+          surcharge_krw: 100000,
+        },
+        publication_status: 'draft',
+      },
+      {
+        id: 'rule-mock-distance',
+        tariff_version: OFFICIAL_TARIFF_VERSION,
+        service_type: 'daily',
+        rule_code: 'daily_distance',
+        rule_data: {
+          excess_km_charge_krw: 2000,
+        },
+        publication_status: 'draft',
+      },
+    ];
+
+    supabaseAdmin.from = ((table: string) => {
+      return {
+        select: (_cols?: string) => ({
+          eq: (_col: string, _val: any) => {
+            if (table === 'official_price_cards') {
+              return Promise.resolve({ data: mockCards, error: null });
+            }
+            if (table === 'official_price_rules') {
+              return Promise.resolve({ data: mockRules, error: null });
+            }
+            return Promise.resolve({ data: [], error: null });
+          },
+        }),
+      };
+    }) as any;
+  }
 
   // Test 1: Distinct SKU Resolution
   console.log('1. Testing distinct SKU code resolution...');
@@ -250,6 +449,9 @@ async function runOfficialPricingTests() {
   console.log('✓ Driver account access to HQ Admin rejected with 403 Forbidden.');
 
   console.log('\n>>> ALL 11 OFFICIAL PRICING & SECURITY TESTS PASSED! <<<');
+  } finally {
+    supabaseAdmin.from = originalFrom;
+  }
 }
 
 runOfficialPricingTests().catch((err) => {
