@@ -27,6 +27,7 @@ import { HqEmailInboxView } from '@/components/hq/email/HqEmailInboxView';
 import { HqCustomersView } from '@/components/hq/customers/HqCustomersView';
 import { HqReportsView } from '@/components/hq/reports/HqReportsView';
 import { HqDriversView } from '@/components/hq/drivers/HqDriversView';
+import { HqFieldKnowledgeView } from '@/components/hq/knowledge/HqFieldKnowledgeView';
 import { HqOperationsBoard } from '@/components/hq/operations/HqOperationsBoard';
 import { HqQuoteModal } from '@/components/hq/quotes/HqQuoteModal';
 import { VipChauffeurCardModal } from '@/components/cards/VipChauffeurCardModal';
@@ -547,19 +548,21 @@ function HqDashboardInner() {
               ? '실시간 행사 운영 보드'
               : activeSidebarTab === 'quotes'
                 ? '가격표 견적기 및 견적서 관리'
-                : activeSidebarTab === 'driving_logs'
-                  ? '운행일지 관리'
-                  : activeSidebarTab === 'expenses' || activeSidebarTab === 'receipts'
-                    ? '경비지출 · 영수증 검수'
-                    : activeSidebarTab === 'emails'
-                      ? '고객 이메일 · 예약 접수'
-                      : activeSidebarTab === 'customers'
-                        ? '고객 관리'
-                        : activeSidebarTab === 'reports'
-                          ? '정산 · 수익성 · 종합 리포트'
-                          : activeSidebarTab === 'drivers'
-                            ? '기사 관리'
-                            : '예약 · 배차 통합 관제'
+                : activeSidebarTab === 'field_knowledge'
+                  ? '현장 지식'
+                  : activeSidebarTab === 'driving_logs'
+                    ? '운행일지 관리'
+                    : activeSidebarTab === 'expenses' || activeSidebarTab === 'receipts'
+                      ? '경비지출 · 영수증 검수'
+                      : activeSidebarTab === 'emails'
+                        ? '고객 이메일 · 예약 접수'
+                        : activeSidebarTab === 'customers'
+                          ? '고객 관리'
+                          : activeSidebarTab === 'reports'
+                            ? '정산 · 수익성 · 종합 리포트'
+                            : activeSidebarTab === 'drivers'
+                              ? '기사 관리'
+                              : '예약 · 배차 통합 관제'
           }
           subtitle={
             activeSidebarTab === 'operations' ? (
@@ -569,6 +572,10 @@ function HqDashboardInner() {
             ) : activeSidebarTab === 'quotes' ? (
               <span className="text-slate-500 font-medium">
                 사모님 실시간 가격표 견적 산출 및 확정 견적 ➔ 배차 대기함 자동 전환
+              </span>
+            ) : activeSidebarTab === 'field_knowledge' ? (
+              <span className="text-slate-500 font-medium">
+                VIP 의전 현장 특이사항, 호텔·공항 진입 동선 및 거점 정보를 관리하고 기사 앱에 실시간 공유합니다.
               </span>
             ) : activeSidebarTab === 'customers' ? (
               <span className="text-slate-500 font-medium">
@@ -599,15 +606,17 @@ function HqDashboardInner() {
             )
           }
           searchPlaceholder={
-            activeSidebarTab === 'customers'
-              ? '고객명, 담당자명, 행사명으로 검색하세요...'
-              : activeSidebarTab === 'reports'
-                ? '고객사, 행사명, 대행사, 기사명, 차량 검색...'
-                : activeSidebarTab === 'drivers'
-                  ? '기사명, 연락처, 거주지 검색...'
-                  : activeSidebarTab === 'expenses' || activeSidebarTab === 'receipts'
-                  ? '기사명, 차량번호, 상호명 검색...'
-                  : '고객사, 승객명, 예약번호, 기사명, 차량번호 검색...'
+            activeSidebarTab === 'field_knowledge'
+              ? '검색어를 입력하세요...'
+              : activeSidebarTab === 'customers'
+                ? '고객명, 담당자명, 행사명으로 검색하세요...'
+                : activeSidebarTab === 'reports'
+                  ? '고객사, 행사명, 대행사, 기사명, 차량 검색...'
+                  : activeSidebarTab === 'drivers'
+                    ? '기사명, 연락처, 거주지 검색...'
+                    : activeSidebarTab === 'expenses' || activeSidebarTab === 'receipts'
+                    ? '기사명, 차량번호, 상호명 검색...'
+                    : '고객사, 승객명, 예약번호, 기사명, 차량번호 검색...'
           }
         />
 
@@ -650,6 +659,8 @@ function HqDashboardInner() {
                 </button>
               </div>
             </div>
+          ) : activeSidebarTab === 'field_knowledge' ? (
+            <HqFieldKnowledgeView initialSearchQuery={searchQuery} />
           ) : activeSidebarTab === 'driving_logs' ? (
             <HqDrivingLogsView initialSearchQuery={searchQuery} bookings={bookings} />
           ) : activeSidebarTab === 'expenses' || activeSidebarTab === 'receipts' ? (

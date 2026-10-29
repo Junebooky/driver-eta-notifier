@@ -11,6 +11,7 @@ import {
   Users,
   FileSpreadsheet,
   Receipt,
+  BookOpen,
   BarChart3,
   Settings,
   Smartphone,
@@ -58,6 +59,7 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
     { id: 'drivers', label: '기사 관리', icon: Users },
     { id: 'driving_logs', label: '운행일지 관리', icon: FileSpreadsheet },
     { id: 'expenses', label: '경비지출', icon: Receipt },
+    { id: 'field_knowledge', label: '현장 지식', icon: BookOpen },
     { id: 'reports', label: '보고서·통계', icon: BarChart3 },
     { id: 'settings', label: '설정·권한', icon: Settings },
   ];

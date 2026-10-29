@@ -24,6 +24,7 @@ import { RoadviewModal } from '@/components/RoadviewModal';
 import { DrivingLogModal } from '@/components/DrivingLogModal';
 import { ExpenseModal } from '@/components/ExpenseModal';
 import { FieldTipModal } from '@/components/FieldTipModal';
+import { DriverFieldKnowledgeModal } from '@/components/knowledge/DriverFieldKnowledgeModal';
 import { getFieldTipsCount } from '@/utils/fieldTipData';
 import { ScheduleTab } from '@/components/ScheduleTab';
 import { Navigation, Calendar } from 'lucide-react';
@@ -114,6 +115,9 @@ export default function Home() {
 
   // Field Tips (현장 팁) Modal State
   const [isFieldTipModalOpen, setIsFieldTipModalOpen] = useState(false);
+
+  // Field Knowledge (현장 지식) Read-Only Driver Modal State
+  const [isFieldKnowledgeOpen, setIsFieldKnowledgeOpen] = useState(false);
 
   // VIP Assignment Capability & Isolated Preview Gate State (Issue #14)
   const [isVipAssigned, setIsVipAssigned] = useState(() => {
@@ -1447,6 +1451,7 @@ export default function Home() {
               onOpenGasModal={() => setIsGasModalOpen(true)}
               onOpenFlightModal={() => setIsFlightModalOpen(true)}
               onOpenRoadviewModal={() => setIsRoadviewModalOpen(true)}
+              onOpenFieldKnowledgeModal={() => setIsFieldKnowledgeOpen(true)}
             />
 
             {/* 3. Route Estimation & ETA Status (Strictly Real-time TMAP) */}
@@ -1792,6 +1797,12 @@ export default function Home() {
           setIsFieldTipModalOpen(false);
           setIsRoadviewModalOpen(true);
         }}
+      />
+
+      {/* Field Knowledge (현장 지식) Read-Only Driver Modal */}
+      <DriverFieldKnowledgeModal
+        isOpen={isFieldKnowledgeOpen}
+        onClose={() => setIsFieldKnowledgeOpen(false)}
       />
 
     </main>

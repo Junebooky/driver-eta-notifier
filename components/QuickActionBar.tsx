@@ -9,6 +9,7 @@ import {
   Plane,
   Eye,
   MapPinPlus,
+  BookOpen,
 } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
@@ -22,6 +23,7 @@ interface QuickActionBarProps {
   onOpenGasModal?: () => void;
   onOpenFlightModal?: () => void;
   onOpenRoadviewModal?: () => void;
+  onOpenFieldKnowledgeModal?: () => void;
 }
 
 export const QuickActionBar: React.FC<QuickActionBarProps> = ({
@@ -34,6 +36,7 @@ export const QuickActionBar: React.FC<QuickActionBarProps> = ({
   onOpenGasModal,
   onOpenFlightModal,
   onOpenRoadviewModal,
+  onOpenFieldKnowledgeModal,
 }) => {
   // 1. VIP KOREA Mode: 7 Buttons in Responsive 4 Top / 3 Centered Arrangement
   if (isVipEnabled) {
@@ -148,8 +151,8 @@ export const QuickActionBar: React.FC<QuickActionBarProps> = ({
             </div>
           </div>
 
-          {/* Row 2: 3 Buttons Centered (주유, 항공편, 로드뷰) */}
-          <div className="grid grid-cols-3 max-w-[75%] mx-auto w-full gap-1.5 sm:gap-2">
+          {/* Row 2: 4 Buttons (주유, 항공편, 로드뷰, 현장지식) */}
+          <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
             {/* 5. 주유 */}
             <div
               role="button"
@@ -224,16 +227,41 @@ export const QuickActionBar: React.FC<QuickActionBarProps> = ({
                 로드뷰
               </span>
             </div>
+
+            {/* 8. 현장지식 */}
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => {
+                haptics.lightTap();
+                onOpenFieldKnowledgeModal?.();
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onOpenFieldKnowledgeModal?.();
+                }
+              }}
+              className="flex flex-col items-center cursor-pointer group"
+              title="주요 거점 진입로 및 현장 지식 가이드"
+            >
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white border border-slate-200/90 shadow-2xs flex items-center justify-center text-slate-700 hover:border-[#1E60F3] hover:text-[#1E60F3] hover:bg-blue-50/50 hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 group-hover:border-[#1E60F3] group-hover:text-[#1E60F3] group-hover:bg-blue-50/50 group-hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] group-hover:-translate-y-0.5">
+                <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2]" />
+              </div>
+              <span className="mt-1.5 text-xs font-medium text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors truncate w-full">
+                현장지식
+              </span>
+            </div>
           </div>
         </div>
       </div>
     );
   }
 
-  // 2. Standard Cockpit Mode (Unaffiliated users): Classic 5-Button Row
+  // 2. Standard Cockpit Mode (Unaffiliated users): 6-Button Row
   return (
     <div className="w-full bg-white border border-slate-100/80 rounded-2xl p-3.5 sm:p-4 shadow-[0_8px_25px_rgba(30,96,243,0.06)] select-none">
-      <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
+      <div className="grid grid-cols-6 gap-1.5 sm:gap-2">
         {/* 1. 차량체크 */}
         <div
           role="button"
@@ -361,6 +389,31 @@ export const QuickActionBar: React.FC<QuickActionBarProps> = ({
           </div>
           <span className="mt-1.5 text-xs font-medium text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors truncate w-full">
             로드뷰
+          </span>
+        </div>
+
+        {/* 6. 현장지식 */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            haptics.lightTap();
+            onOpenFieldKnowledgeModal?.();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onOpenFieldKnowledgeModal?.();
+            }
+          }}
+          className="flex flex-col items-center cursor-pointer group"
+          title="주요 거점 진입로 및 현장 지식 가이드"
+        >
+          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white border border-slate-200/90 shadow-2xs flex items-center justify-center text-slate-700 hover:border-[#1E60F3] hover:text-[#1E60F3] hover:bg-blue-50/50 hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 group-hover:border-[#1E60F3] group-hover:text-[#1E60F3] group-hover:bg-blue-50/50 group-hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] group-hover:-translate-y-0.5">
+            <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2]" />
+          </div>
+          <span className="mt-1.5 text-xs font-medium text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors truncate w-full">
+            현장지식
           </span>
         </div>
       </div>
