@@ -14,22 +14,38 @@ export const CRM_CUSTOMERS_UPDATE_EVENT = 'vip_hq_customers_updated';
 // In-memory cache for SSR & client synchronization
 let inMemoryCustomers: HqCustomer[] | null = null;
 
+export interface FetchHqCustomersResult {
+  ok: boolean;
+  customers: HqCustomer[];
+  error?: string;
+}
+
 /**
- * Fetch authoritative customer list directly from Supabase DB via /api/hq/customers
+ * Fetch authoritative customer list directly from Supabase DB via /api/hq/customers.
+ * Single Source of Truth: Does NOT fake local storage as real DB when DB returns empty or errors.
  */
-export async function fetchHqCustomersFromDb(): Promise<HqCustomer[]> {
+export async function fetchHqCustomersFromDb(): Promise<FetchHqCustomersResult> {
   try {
     await ensureClientAuth('hq');
     const res = await fetch('/api/hq/customers');
     const data = await res.json().catch(() => ({}));
-    if (res.ok && data.ok && Array.isArray(data.customers) && data.customers.length > 0) {
+    if (res.ok && data.ok && Array.isArray(data.customers)) {
       saveStoredCustomers(data.customers);
-      return data.customers;
+      return { ok: true, customers: data.customers };
     }
-  } catch (err) {
-    console.warn('[CRM] Failed to fetch customers from live DB, falling back to local storage:', err);
+    return {
+      ok: false,
+      customers: [],
+      error: data.error || `서버 응답 오류 (${res.status})`,
+    };
+  } catch (err: any) {
+    console.error('[CRM] Failed to fetch customers from live DB:', err);
+    return {
+      ok: false,
+      customers: [],
+      error: err.message || '네트워크 연결 오류',
+    };
   }
-  return getStoredCustomers();
 }
 
 /**
@@ -44,15 +60,15 @@ export async function saveContactToCrmDb(params: SaveContactToCrmParams): Promis
       body: JSON.stringify(params),
     });
     const data = await res.json().catch(() => ({}));
-    if (res.ok && data.ok) {
+    if (res.ok && data.ok && data.success) {
       // Re-sync after successful DB write
       fetchHqCustomersFromDb().catch(() => {});
       return {
         success: true,
         clientId: data.clientId,
         contactId: data.contactId,
-        isNewCustomer: data.isNewCustomer,
-        isNewContact: data.isNewContact,
+        isNewCustomer: Boolean(data.isNewCustomer),
+        isNewContact: Boolean(data.isNewContact),
         companyName: data.companyName,
         contactName: data.contactName,
         message: data.message,
@@ -66,7 +82,7 @@ export async function saveContactToCrmDb(params: SaveContactToCrmParams): Promis
       isNewContact: false,
       companyName: params.companyName,
       contactName: params.contactName,
-      message: data.message || data.error || 'DB 저장에 실패했습니다.',
+      message: data.message || data.error || '고객 관리에 저장하지 못했습니다.',
     };
   } catch (err: any) {
     console.error('[CRM] DB save contact error:', err);
@@ -78,7 +94,7 @@ export async function saveContactToCrmDb(params: SaveContactToCrmParams): Promis
       isNewContact: false,
       companyName: params.companyName,
       contactName: params.contactName,
-      message: err.message || '네트워크 오류가 발생했습니다.',
+      message: err.message || '네트워크 오류로 고객 관리에 저장하지 못했습니다.',
     };
   }
 }
@@ -243,10 +259,19 @@ export interface SaveContactToCrmResult {
 /**
  * Explicitly save or link contact and company into CRM
  * Triggered strictly by administrator action ('고객 관리에 저장')
- * NOTE: Currently managed via client-side storage with cross-tab broadcast.
- * Does not write to production DB/RLS tables without explicit database migration approval.
+ * Awaits server-confirmed IDs from /api/hq/customers DB endpoint.
  */
-export function saveContactToCrm(params: SaveContactToCrmParams): SaveContactToCrmResult {
+export async function saveContactToCrm(params: SaveContactToCrmParams): Promise<SaveContactToCrmResult> {
+  if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
+    return saveContactToCrmDb(params);
+  }
+  return saveContactToCrmLocal(params);
+}
+
+/**
+ * Pure local in-memory/localStorage save utility for offline or unit-test environments
+ */
+export function saveContactToCrmLocal(params: SaveContactToCrmParams): SaveContactToCrmResult {
   const {
     companyName: rawCompany,
     contactName: rawContact,

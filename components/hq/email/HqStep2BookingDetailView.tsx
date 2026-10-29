@@ -72,6 +72,7 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
     if (/영어|english|외국인/i.test(sr)) return 'english';
     return 'any';
   });
+  const [isSavingCrm, setIsSavingCrm] = useState(false);
   const [crmSavedNotice, setCrmSavedNotice] = useState<string | null>(null);
 
   // Auto-sync language if draft specialRequests updates
@@ -146,9 +147,9 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
   // Check if at least one driver is assigned
   const hasAssignedDriver = vehicleSlots.some((slot) => slot.driver !== null);
 
-  // Handle Save To CRM (#21) - Requires verified company & contact
-  const handleSaveToCrm = () => {
-    if (!extractedDraft) return;
+  // Handle Save To CRM (#21) - Requires verified company & contact (Awaits server DB confirmation)
+  const handleSaveToCrm = async () => {
+    if (!extractedDraft || isSavingCrm) return;
 
     const cleanCompany = (extractedDraft.companyName || '').trim();
     const cleanContact = (extractedDraft.contactName || '').trim();
@@ -165,32 +166,40 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
       return;
     }
 
-    haptics.success();
+    try {
+      setIsSavingCrm(true);
+      const result = await saveContactToCrm({
+        companyName: cleanCompany,
+        contactName: cleanContact,
+        contactPhone: extractedDraft.contactPhone || '',
+        contactEmail: extractedDraft.contactEmail || '',
+        notes: `예약 상세 화면에서 CRM 수동 저장 (예약번호: ${bookingCode})`,
+        sourceDraftId: extractedDraft.id,
+      });
 
-    const result = saveContactToCrm({
-      companyName: cleanCompany,
-      contactName: cleanContact,
-      contactPhone: extractedDraft.contactPhone || '',
-      contactEmail: extractedDraft.contactEmail || '',
-      notes: `예약 상세 화면에서 CRM 수동 저장 (예약번호: ${bookingCode})`,
-      sourceDraftId: extractedDraft.id,
-    });
-
-    setCrmSavedNotice(result.message);
-
-    if (result.success) {
-      const updated: HqEmailExtractedDraft = {
-        ...extractedDraft,
-        clientId: result.clientId,
-        contactId: result.contactId,
-        isSavedToCrm: true,
-      };
-      onUpdateDraft?.(updated);
+      if (result.success) {
+        haptics.success();
+        setCrmSavedNotice(result.message);
+        const updated: HqEmailExtractedDraft = {
+          ...extractedDraft,
+          clientId: result.clientId,
+          contactId: result.contactId,
+          isSavedToCrm: true,
+        };
+        onUpdateDraft?.(updated);
+      } else {
+        haptics.errorAlert();
+        setCrmSavedNotice(result.message || '고객 관리에 저장하지 못했습니다.');
+      }
+    } catch (err: any) {
+      haptics.errorAlert();
+      setCrmSavedNotice(err.message || '고객 관리에 저장 중 오류가 발생했습니다.');
+    } finally {
+      setIsSavingCrm(false);
+      setTimeout(() => {
+        setCrmSavedNotice(null);
+      }, 4500);
     }
-
-    setTimeout(() => {
-      setCrmSavedNotice(null);
-    }, 4500);
   };
 
   const handleSelectPickupPoi = (poi: PoiResult) => {
@@ -359,15 +368,24 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
               <button
                 type="button"
                 onClick={handleSaveToCrm}
-                className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border transition-colors cursor-pointer flex items-center gap-1 ${
+                disabled={extractedDraft?.isSavedToCrm || isSavingCrm}
+                className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border transition-colors flex items-center gap-1 ${
                   extractedDraft?.isSavedToCrm
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
-                    : 'bg-blue-50 text-[#1E60F3] border-blue-200 hover:bg-blue-100'
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-300 cursor-default'
+                    : isSavingCrm
+                    ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                    : 'bg-blue-50 text-[#1E60F3] border-blue-200 hover:bg-blue-100 cursor-pointer'
                 }`}
                 title="고객 관리에 회사 및 담당자 정보를 저장하거나 연결합니다"
               >
                 <BookmarkCheck className="w-3 h-3" />
-                <span>{extractedDraft?.isSavedToCrm ? '고객 관리 연결됨' : '고객 관리에 저장'}</span>
+                <span>
+                  {isSavingCrm
+                    ? '저장 중...'
+                    : extractedDraft?.isSavedToCrm
+                    ? '고객 관리 연결됨'
+                    : '고객 관리에 저장'}
+                </span>
               </button>
             </div>
 

@@ -26,3 +26,4 @@ WHERE pricing_preset ? 'contacts'
 -- 3. Add index on customer name for rapid deduplication lookup
 CREATE INDEX IF NOT EXISTS idx_customers_name_lower
   ON cockpit.customers (lower(name));
+

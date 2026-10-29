@@ -71,7 +71,7 @@ test('Zero Email Contamination in Phone Fields', () => {
   assert.ok(!genericDraft.contactPhone.includes('@'), 'Must not contain @');
 });
 
-test('CRM Integration (#21): Manual Save, Duplicate Prevention, and Contact Linking', () => {
+test('CRM Integration (#21): Manual Save, Duplicate Prevention, and Contact Linking', async () => {
   // Reset test storage to clean sample
   saveStoredCustomers([...INITIAL_HQ_CUSTOMERS]);
 
@@ -84,7 +84,7 @@ test('CRM Integration (#21): Manual Save, Duplicate Prevention, and Contact Link
   assert.ok(existingMatch.companyMatch !== null, 'CHANEL must be found');
   assert.ok(existingMatch.contactMatch !== null, 'Marie Dupont must be found');
 
-  const saveExistingResult = saveContactToCrm({
+  const saveExistingResult = await saveContactToCrm({
     companyName: 'CHANEL',
     contactName: 'Marie Dupont',
     contactEmail: 'marie.dupont@chanel.com',
@@ -101,7 +101,7 @@ test('CRM Integration (#21): Manual Save, Duplicate Prevention, and Contact Link
   assert.strictEqual(getStoredCustomers().length, beforeCount);
 
   // 3. Existing Company (CHANEL), but NEW Contact Person (e.g. Pierre Dubois)
-  const saveNewContactResult = saveContactToCrm({
+  const saveNewContactResult = await saveContactToCrm({
     companyName: 'CHANEL',
     contactName: 'Pierre Dubois',
     contactEmail: 'pierre.dubois@chanel.com',
@@ -119,7 +119,7 @@ test('CRM Integration (#21): Manual Save, Duplicate Prevention, and Contact Link
   assert.ok(chanelCompany?.contacts.some((ct) => ct.name === 'Pierre Dubois'));
 
   // 4. Completely Brand New Client Company & Contact (Ferrari Korea)
-  const saveNewCompanyResult = saveContactToCrm({
+  const saveNewCompanyResult = await saveContactToCrm({
     companyName: 'Ferrari Korea Test Client',
     contactName: '홍길동 매니저',
     contactEmail: 'hong.gd@ferrari-test.kr',
@@ -213,9 +213,9 @@ test('Honest AI Failure: extractBookingFromEmail returns ok: false and clean emp
   }
 });
 
-test('CRM Validation: saveContactToCrm rejects unverified or empty company/contact names', () => {
+test('CRM Validation: saveContactToCrm rejects unverified or empty company/contact names', async () => {
   // Empty company
-  const emptyComp = saveContactToCrm({
+  const emptyComp = await saveContactToCrm({
     companyName: '   ',
     contactName: '홍길동',
     contactEmail: 'hong@test.com',
@@ -224,7 +224,7 @@ test('CRM Validation: saveContactToCrm rejects unverified or empty company/conta
   assert.ok(emptyComp.message.includes('고객사명'));
 
   // '확인 필요' company
-  const unverifiedComp = saveContactToCrm({
+  const unverifiedComp = await saveContactToCrm({
     companyName: '확인 필요',
     contactName: '홍길동',
     contactEmail: 'hong@test.com',
@@ -232,7 +232,7 @@ test('CRM Validation: saveContactToCrm rejects unverified or empty company/conta
   assert.strictEqual(unverifiedComp.success, false);
 
   // Empty contact
-  const emptyContact = saveContactToCrm({
+  const emptyContact = await saveContactToCrm({
     companyName: 'Valid Company',
     contactName: '',
     contactEmail: 'contact@valid.com',

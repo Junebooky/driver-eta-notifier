@@ -16,8 +16,22 @@ function normalizeCompanyName(name: string): string {
     .trim();
 }
 
+function getBrandVisualMeta(id: string, name: string): { logoType: any; logoBg: string; logoColor: string } {
+  const norm = normalizeCompanyName(name);
+  if (norm.includes('chanel')) return { logoType: 'chanel', logoBg: '#000000', logoColor: '#FFFFFF' };
+  if (norm.includes('intercos')) return { logoType: 'intercos', logoBg: '#E60028', logoColor: '#FFFFFF' };
+  if (norm.includes('bmw')) return { logoType: 'bmw', logoBg: '#0066B1', logoColor: '#FFFFFF' };
+  if (norm.includes('netflix')) return { logoType: 'netflix', logoBg: '#E50914', logoColor: '#FFFFFF' };
+  if (norm.includes('ferrari')) return { logoType: 'ferrari', logoBg: '#FF2800', logoColor: '#FFFFFF' };
+  if (norm.includes('shinsegae')) return { logoType: 'shinsegae', logoBg: '#B31B1B', logoColor: '#FFFFFF' };
+  if (norm.includes('samsung')) return { logoType: 'samsung', logoBg: '#1428A0', logoColor: '#FFFFFF' };
+  if (norm.includes('hyundai')) return { logoType: 'hyundai', logoBg: '#002C5F', logoColor: '#FFFFFF' };
+  return { logoType: 'default', logoBg: '#1E60F3', logoColor: '#FFFFFF' };
+}
+
 /**
- * GET: Retrieve real customer list from cockpit.customers merged with CRM rich profile metadata.
+ * GET: Retrieve real customer list strictly from cockpit.customers DB.
+ * Single Source of Truth: Never mixes unpersisted demo fixture data unless ?demo=true is explicitly passed.
  */
 export async function GET(req: NextRequest) {
   try {
@@ -26,6 +40,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
     }
 
+    const { searchParams } = new URL(req.url);
+    const isDemoRequested = searchParams.get('demo') === 'true';
+
+    // Explicit isolated demo mode check (Development fixture preview only)
+    if (isDemoRequested) {
+      return NextResponse.json({ ok: true, isDemo: true, customers: INITIAL_HQ_CUSTOMERS });
+    }
+
+    // Single authoritative query to cockpit.customers
     const { data: dbRows, error: dbErr } = await supabaseAdmin
       .from('customers')
       .select('*')
@@ -33,26 +56,19 @@ export async function GET(req: NextRequest) {
 
     if (dbErr) {
       console.error('[HQ Customers GET] DB error:', dbErr);
-      return NextResponse.json({ ok: false, error: dbErr.message }, { status: 500 });
+      return NextResponse.json({ ok: false, error: dbErr.message, customers: [] }, { status: 500 });
     }
 
-    // Map and merge DB rows with INITIAL_HQ_CUSTOMERS profiles
-    const customerMap = new Map<string, HqCustomer>();
-
-    // Seed with initial rich profiles
-    for (const initCust of INITIAL_HQ_CUSTOMERS) {
-      customerMap.set(initCust.id, { ...initCust });
+    if (!dbRows || dbRows.length === 0) {
+      return NextResponse.json({ ok: true, customers: [] });
     }
 
-    for (const row of dbRows || []) {
-      const existing = customerMap.get(row.id);
+    const customers: HqCustomer[] = dbRows.map((row: any) => {
       const preset = (row.pricing_preset as Record<string, any>) || {};
       const presetContacts: CustomerContact[] = Array.isArray(preset.contacts) ? preset.contacts : [];
 
-      let mergedContacts: CustomerContact[] = existing ? [...existing.contacts] : [];
-      if (presetContacts.length > 0) {
-        mergedContacts = presetContacts;
-      } else if (mergedContacts.length === 0 && row.contact_person) {
+      let mergedContacts: CustomerContact[] = presetContacts;
+      if (mergedContacts.length === 0 && row.contact_person) {
         mergedContacts = [
           {
             id: `c-${row.id}-1`,
@@ -65,34 +81,33 @@ export async function GET(req: NextRequest) {
         ];
       }
 
-      const mergedCustomer: HqCustomer = {
+      const visual = getBrandVisualMeta(row.id, row.name);
+
+      return {
         id: row.id,
-        name: row.name || existing?.name || '고객사',
-        tier: preset.tier || existing?.tier || '일반',
-        isFavorite: preset.isFavorite ?? existing?.isFavorite ?? false,
-        logoType: existing?.logoType || 'default',
-        logoBg: existing?.logoBg || '#1E60F3',
-        logoColor: existing?.logoColor || '#FFFFFF',
-        primaryContactName: row.contact_person || existing?.primaryContactName || mergedContacts[0]?.name || '',
+        name: row.name || '고객사',
+        tier: preset.tier || '일반',
+        isFavorite: Boolean(preset.isFavorite),
+        logoType: visual.logoType,
+        logoBg: visual.logoBg,
+        logoColor: visual.logoColor,
+        primaryContactName: row.contact_person || mergedContacts[0]?.name || '',
         contactCountExtra: Math.max(0, mergedContacts.length - 1),
-        recentSnippet: preset.recentSnippet || existing?.recentSnippet || 'DB 고객사 연동',
-        nextEventDate: existing?.nextEventDate,
-        mainPhone: row.phone || existing?.mainPhone || '',
-        mainEmail: row.email || existing?.mainEmail || '',
-        department: existing?.department || '의전예약',
-        preferences: Array.isArray(preset.preferences) ? preset.preferences : existing?.preferences || [],
-        notes: Array.isArray(preset.notes) ? preset.notes : existing?.notes || [],
+        recentSnippet: preset.recentSnippet || (row.quotes && row.quotes.length > 0 ? `견적서 ${row.quotes.length}건 등록됨` : '등록된 고객사'),
+        nextEventDate: preset.nextEventDate,
+        mainPhone: row.phone || '',
+        mainEmail: row.email || '',
+        department: preset.department || '의전예약',
+        preferences: Array.isArray(preset.preferences) ? preset.preferences : [],
+        notes: Array.isArray(preset.notes) ? preset.notes : [],
         contacts: mergedContacts,
-        recentRequests: existing?.recentRequests || [],
-        eventsHistory: existing?.eventsHistory || [],
-        tripsHistory: existing?.tripsHistory || [],
-        communications: existing?.communications || [],
+        recentRequests: Array.isArray(preset.recentRequests) ? preset.recentRequests : [],
+        eventsHistory: Array.isArray(preset.eventsHistory) ? preset.eventsHistory : [],
+        tripsHistory: Array.isArray(preset.tripsHistory) ? preset.tripsHistory : [],
+        communications: Array.isArray(preset.communications) ? preset.communications : [],
       };
+    });
 
-      customerMap.set(row.id, mergedCustomer);
-    }
-
-    const customers = Array.from(customerMap.values());
     return NextResponse.json({ ok: true, customers });
   } catch (err: any) {
     console.error('[HQ Customers GET] Unhandled error:', err);

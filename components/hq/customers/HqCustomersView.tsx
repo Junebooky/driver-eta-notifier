@@ -61,19 +61,36 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
   initialSearchQuery = '',
   onOpenSettlementReport,
 }) => {
-  // Customers State (Synchronized with live cockpit.customers DB)
+  // Customers State (Strictly synchronized with live cockpit.customers DB)
   const [customers, setCustomers] = useState<HqCustomer[]>(() => getStoredCustomers());
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>(
     INITIAL_HQ_CUSTOMERS[0]?.id || ''
   );
+  const [isLoadingDb, setIsLoadingDb] = useState(false);
+  const [dbErrorMessage, setDbErrorMessage] = useState<string | null>(null);
+
+  const loadAuthoritativeCustomers = async () => {
+    setIsLoadingDb(true);
+    setDbErrorMessage(null);
+    const res = await fetchHqCustomersFromDb();
+    if (res.ok) {
+      setCustomers(res.customers);
+      if (res.customers.length > 0) {
+        setSelectedCustomerId((prev) =>
+          res.customers.some((c) => c.id === prev) ? prev : res.customers[0].id
+        );
+      } else {
+        setSelectedCustomerId('');
+      }
+    } else {
+      setDbErrorMessage(res.error || '고객사 데이터를 불러오지 못했습니다.');
+    }
+    setIsLoadingDb(false);
+  };
 
   // Sync stored customers when updated from email intake or other tabs, and fetch fresh from DB
   useEffect(() => {
-    fetchHqCustomersFromDb().then((dbCustomers) => {
-      if (dbCustomers && dbCustomers.length > 0) {
-        setCustomers(dbCustomers);
-      }
-    });
+    loadAuthoritativeCustomers();
 
     const handleUpdate = () => {
       setCustomers(getStoredCustomers());
