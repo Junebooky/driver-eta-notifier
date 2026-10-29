@@ -197,7 +197,7 @@ export async function extractBookingDraftFromEmail(
     id: `cost-${Date.now()}`,
     emailId,
     messageId: email.messageId,
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3.8-flash',
     inputTokens,
     outputTokens,
     estimatedCostUsd: Number(costUsd.toFixed(6)),

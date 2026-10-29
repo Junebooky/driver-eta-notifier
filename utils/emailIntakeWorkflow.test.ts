@@ -57,7 +57,7 @@ describe('Phase 4: Selective Email Intake, Deduplication, and Cost Logging', () 
 
     // Cost Log verification
     assert.ok(draft.costLog);
-    assert.equal(draft.costLog.model, 'gemini-2.5-flash');
+    assert.equal(draft.costLog.model, 'gemini-3.8-flash');
     assert.equal(draft.costLog.status, 'success');
     assert.ok(draft.costLog.inputTokens > 0);
     assert.ok(draft.costLog.estimatedCostUsd > 0);

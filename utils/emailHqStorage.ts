@@ -76,18 +76,54 @@ export function getAllEmailDrafts(): Record<string, HqEmailExtractedDraft> {
 }
 
 /**
- * Get single draft by email ID
+ * Get single draft by email ID (Filters out false-success or empty/failed drafts per Issue #33 P0)
  */
 export function getEmailDraft(emailId: string): HqEmailExtractedDraft | null {
   const drafts = getAllEmailDrafts();
-  return drafts[emailId] || null;
+  const draft = drafts[emailId];
+  if (!draft) return null;
+
+  // Invalidate false-success or empty drafts (Issue #33 P0)
+  if (
+    draft.confidence === 0 ||
+    (!draft.pickupLocation && !draft.dropoffLocation && !draft.passengerName)
+  ) {
+    return null;
+  }
+
+  return draft;
 }
 
 /**
- * Save draft to localStorage and notify subscribers
+ * Delete single draft from localStorage
+ */
+export function deleteEmailDraft(emailId: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const drafts = getAllEmailDrafts();
+    if (drafts[emailId]) {
+      delete drafts[emailId];
+      localStorage.setItem(HQ_EMAIL_DRAFTS_STORAGE_KEY, JSON.stringify(drafts));
+      window.dispatchEvent(new CustomEvent(HQ_EMAIL_UPDATE_EVENT, { detail: { emailId } }));
+    }
+  } catch (err) {
+    console.error('Failed to delete email draft:', err);
+  }
+}
+
+/**
+ * Save draft to localStorage and notify subscribers (Strictly rejects empty/failed drafts)
  */
 export function saveEmailDraft(draft: HqEmailExtractedDraft): void {
   if (typeof window === 'undefined') return;
+  // Guard: Never save empty or failed drafts into localStorage
+  if (
+    draft.confidence === 0 ||
+    (!draft.pickupLocation && !draft.dropoffLocation && !draft.passengerName)
+  ) {
+    return;
+  }
+
   try {
     const drafts = getAllEmailDrafts();
     drafts[draft.emailId] = {

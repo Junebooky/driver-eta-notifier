@@ -133,8 +133,17 @@ export async function extractBookingFromEmail(
     };
   }
 
+  const now = new Date();
+  const kstOffset = 9 * 60; // KST is UTC+9
+  const kstTime = new Date(now.getTime() + (kstOffset + now.getTimezoneOffset()) * 60000);
+  const todayKst = kstTime.toISOString().slice(0, 10);
+
   const prompt = `You are an expert AI reservation assistant for VIP LIMOUSINE KOREA (대한민국 프리미엄 의전 리무진 운영 본사).
 Analyze the incoming client email below and extract structured VIP limousine reservation booking details.
+
+[REFERENCE CURRENT DATE (KST)]
+Today is ${todayKst} (YYYY-MM-DD, Asia/Seoul).
+Use this reference date when interpreting relative date expressions in the email (e.g. "오늘" -> ${todayKst}, "내일" -> next day, "모레" -> two days later, "이번 주 금요일" -> corresponding YYYY-MM-DD). If no year is specified (e.g. "10월 30일"), assume the current year (${todayKst.slice(0, 4)}).
 
 [INCOMING EMAIL METADATA]
 - Email Subject: "${subject}"
@@ -218,7 +227,7 @@ Return strictly a valid JSON object matching this schema (no markdown formatting
   try {
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.8-flash',
       contents: [prompt],
       config: {
         temperature: 0.1,

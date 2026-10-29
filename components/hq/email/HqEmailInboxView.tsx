@@ -41,7 +41,7 @@ import {
 } from './HqDriverSelectModal';
 import { HqComposeEmailModal } from './HqComposeEmailModal';
 import { mapScheduleItemToHqBooking, getKstTodayDateStr } from '@/utils/dispatchConflictDetector';
-import { saveEmailDraft, getEmailDraft } from '@/utils/emailHqStorage';
+import { saveEmailDraft, getEmailDraft, deleteEmailDraft } from '@/utils/emailHqStorage';
 
 export interface HqEmailInboxViewProps {
   onCreateBooking?: (booking: HqBooking) => void;
@@ -474,18 +474,36 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
   }, [currentSummary]);
 
   // =========================================================
-  // On-Demand AI Extraction Trigger
+  // On-Demand AI Extraction Trigger (Strict Body Validation)
   // =========================================================
   const handleExtractWithAi = async () => {
     if (!currentSummary) return;
+
+    // 1. Ensure bodyText is fully loaded before allowing AI extraction
+    let emailBody = currentDetail?.bodyText;
+    if (!emailBody && !isLoadingDetail) {
+      try {
+        const detailRes = await fetch(`/api/email/${encodeURIComponent(currentSummary.id)}`);
+        const detailData = await detailRes.json();
+        if (detailData.ok && detailData.email?.bodyText) {
+          emailBody = detailData.email.bodyText;
+          setEmailDetails((prev) => ({ ...prev, [currentSummary.id]: detailData.email }));
+        }
+      } catch {}
+    }
+
+    if (!emailBody?.trim()) {
+      showToast('이메일 본문이 아직 로드되지 않았습니다. 본문이 화면에 표시된 후 다시 시도해 주세요.');
+      haptics.errorAlert();
+      return;
+    }
+
     haptics.mediumTap();
     setIsExtractingAi(true);
 
     try {
-      const emailBody =
-        currentDetail?.bodyText ||
-        currentSummary.preview ||
-        currentSummary.subject;
+      // Invalidate any previous false-success or empty draft
+      deleteEmailDraft(currentSummary.id);
 
       const res = await fetch('/api/email/extract-booking', {
         method: 'POST',
@@ -505,6 +523,10 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
         throw new Error(data.error || 'Gemini AI 예약 정보 추출에 실패했습니다.');
       }
 
+      if (data.draft.confidence === 0) {
+        throw new Error(data.error || 'Gemini AI가 유효한 예약 정보를 감지하지 못했습니다. 수동 입력을 진행해 주세요.');
+      }
+
       const extracted: HqEmailExtractedDraft = data.draft;
       setDraftsByEmailId((prev) => ({
         ...prev,
@@ -513,7 +535,8 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
       saveEmailDraft(extracted);
       showToast('Gemini AI가 이메일에서 예약 정보를 성공적으로 추출했습니다.');
     } catch (err: any) {
-      showToast(`AI 추출 오류: ${err.message}`);
+      showToast(`AI 추출 실패: ${err.message}`);
+      haptics.errorAlert();
     } finally {
       setIsExtractingAi(false);
     }
