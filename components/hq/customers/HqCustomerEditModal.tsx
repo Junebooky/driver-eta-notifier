@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Heart, FileText, Check } from 'lucide-react';
+import { X, Heart, FileText, Check, Loader2 } from 'lucide-react';
 import { HqCustomer } from '@/types/customerHq';
 import { haptics } from '@/utils/haptics';
 
@@ -10,7 +10,7 @@ interface HqCustomerEditModalProps {
   onClose: () => void;
   customer: HqCustomer;
   mode: 'preferences' | 'notes';
-  onSave: (updatedCustomer: HqCustomer) => void;
+  onSave: (updatedCustomer: HqCustomer) => Promise<boolean> | void;
 }
 
 export const HqCustomerEditModal: React.FC<HqCustomerEditModalProps> = ({
@@ -22,26 +22,37 @@ export const HqCustomerEditModal: React.FC<HqCustomerEditModalProps> = ({
 }) => {
   const [preferencesText, setPreferencesText] = useState(customer.preferences.join(', '));
   const [notesText, setNotesText] = useState(customer.notes.join('\n'));
+  const [isSaving, setIsSaving] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSaving(true);
+    let updatedCustomer: HqCustomer;
     if (mode === 'preferences') {
       const updatedPrefs = preferencesText
         .split(',')
         .map((p) => p.trim())
         .filter(Boolean);
-      onSave({ ...customer, preferences: updatedPrefs });
+      updatedCustomer = { ...customer, preferences: updatedPrefs };
     } else {
       const updatedNotes = notesText
         .split('\n')
         .map((n) => n.trim())
         .filter(Boolean);
-      onSave({ ...customer, notes: updatedNotes });
+      updatedCustomer = { ...customer, notes: updatedNotes };
     }
-    haptics.success();
-    onClose();
+
+    try {
+      const result = await onSave(updatedCustomer);
+      if (result !== false) {
+        haptics.success();
+        onClose();
+      }
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -111,10 +122,20 @@ export const HqCustomerEditModal: React.FC<HqCustomerEditModalProps> = ({
             </button>
             <button
               type="submit"
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#1E60F3] hover:bg-blue-600 text-white text-xs font-bold shadow-sm cursor-pointer transition-all"
+              disabled={isSaving}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#1E60F3] hover:bg-blue-600 disabled:bg-blue-400 text-white text-xs font-bold shadow-sm cursor-pointer disabled:cursor-not-allowed transition-all"
             >
-              <Check className="w-3.5 h-3.5" />
-              <span>저장 완료</span>
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>저장 중...</span>
+                </>
+              ) : (
+                <>
+                  <Check className="w-3.5 h-3.5" />
+                  <span>저장 완료</span>
+                </>
+              )}
             </button>
           </div>
         </form>

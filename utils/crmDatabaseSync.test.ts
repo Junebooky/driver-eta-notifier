@@ -219,7 +219,23 @@ test('Item 3: Isolated Mock CRM DB Synchronization & Deduplication (Zero Live DB
     assert.strictEqual(createdCompany?.name, '테스트글로벌파트너스');
     assert.strictEqual(createdCompany?.contact_person, '김민수');
 
-    // 5. Verify live DB was NEVER mutated (only in-memory mockRows modified)
+    // 5. Verify ?demo=true in production is rejected with 403 Forbidden
+    const prevEnv = process.env.NODE_ENV;
+    try {
+      (process.env as any).NODE_ENV = 'production';
+      const demoReq = new NextRequest('http://localhost:3000/api/hq/customers?demo=true', {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+        },
+      });
+      const demoRes = await GET(demoReq);
+      assert.strictEqual(demoRes.status, 403, 'Demo mode must be blocked in production');
+    } finally {
+      (process.env as any).NODE_ENV = prevEnv;
+    }
+
+    // 6. Verify live DB was NEVER mutated (only in-memory mockRows modified)
     console.log('✓ Mock test passed with zero live DB mutations.');
   } finally {
     // Restore original supabaseAdmin.from

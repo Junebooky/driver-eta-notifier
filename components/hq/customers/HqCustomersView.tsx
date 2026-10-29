@@ -27,9 +27,9 @@ import {
   Eye,
   X,
   Building2,
+  Loader2,
 } from 'lucide-react';
 import { HqCustomer } from '@/types/customerHq';
-import { INITIAL_HQ_CUSTOMERS } from '@/utils/customerHqData';
 import {
   getStoredCustomers,
   saveStoredCustomers,
@@ -61,13 +61,12 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
   initialSearchQuery = '',
   onOpenSettlementReport,
 }) => {
-  // Customers State (Strictly synchronized with live cockpit.customers DB)
-  const [customers, setCustomers] = useState<HqCustomer[]>(() => getStoredCustomers());
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string>(
-    INITIAL_HQ_CUSTOMERS[0]?.id || ''
-  );
-  const [isLoadingDb, setIsLoadingDb] = useState(false);
+  // Customers State (Strictly synchronized with live cockpit.customers DB, never flashing demo fixtures)
+  const [customers, setCustomers] = useState<HqCustomer[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
+  const [isLoadingDb, setIsLoadingDb] = useState(true);
   const [dbErrorMessage, setDbErrorMessage] = useState<string | null>(null);
+  const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
 
   const loadAuthoritativeCustomers = async () => {
     setIsLoadingDb(true);
@@ -278,52 +277,95 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
   }, [filteredCustomers, currentPage]);
 
   // Toggle favorite status
-  const handleToggleFavorite = (customerId: string, e?: React.MouseEvent) => {
+  // Toggle favorite status - strictly awaits DB update
+  const handleToggleFavorite = async (customerId: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    haptics.selection();
-    setCustomers((prev) => {
-      const next = prev.map((c) =>
-        c.id === customerId ? { ...c, isFavorite: !c.isFavorite } : c
-      );
-      saveStoredCustomers(next);
-      const target = next.find((c) => c.id === customerId);
-      if (target) {
-        updateHqCustomerInDb(target).catch(() => {});
+    const currentTarget = customers.find((c) => c.id === customerId);
+    if (!currentTarget || isTogglingFavorite) return;
+
+    setIsTogglingFavorite(true);
+    const updated = { ...currentTarget, isFavorite: !currentTarget.isFavorite };
+
+    try {
+      const ok = await updateHqCustomerInDb(updated);
+      if (ok) {
+        haptics.selection();
+        setCustomers((prev) => {
+          const next = prev.map((c) => (c.id === customerId ? updated : c));
+          saveStoredCustomers(next);
+          return next;
+        });
+      } else {
+        alert('즐겨찾기 상태를 DB에 저장하지 못했습니다.');
       }
-      return next;
-    });
+    } catch (err: any) {
+      alert(`즐겨찾기 변경 오류: ${err.message}`);
+    } finally {
+      setIsTogglingFavorite(false);
+    }
   };
 
-  // Add new customer handler
-  const handleRegisterCustomer = (newCustomer: HqCustomer) => {
-    setCustomers((prev) => {
-      const next = [newCustomer, ...prev];
-      saveStoredCustomers(next);
-      return next;
-    });
-    // Persist new customer to Supabase DB
-    saveContactToCrmDb({
-      companyName: newCustomer.name,
-      contactName: newCustomer.primaryContactName || newCustomer.contacts[0]?.name || '담당자',
-      contactPhone: newCustomer.mainPhone || newCustomer.contacts[0]?.phone || '',
-      contactEmail: newCustomer.mainEmail || newCustomer.contacts[0]?.email || '',
-      department: newCustomer.department,
-      notes: newCustomer.notes?.[0] || '',
-    }).catch(() => {});
+  // Add new customer handler - strictly awaits DB insertion and binds server-confirmed row/ID
+  const handleRegisterCustomer = async (newCustomerDraft: HqCustomer): Promise<boolean> => {
+    setIsLoadingDb(true);
+    setDbErrorMessage(null);
 
-    setSelectedCustomerId(newCustomer.id);
-    setCurrentPage(1);
-    haptics.success();
+    try {
+      const res = await saveContactToCrmDb({
+        companyName: newCustomerDraft.name,
+        contactName: newCustomerDraft.primaryContactName || newCustomerDraft.contacts[0]?.name || '담당자',
+        contactPhone: newCustomerDraft.mainPhone || newCustomerDraft.contacts[0]?.phone || '',
+        contactEmail: newCustomerDraft.mainEmail || newCustomerDraft.contacts[0]?.email || '',
+        department: newCustomerDraft.department,
+        notes: newCustomerDraft.notes?.[0] || '',
+      });
+
+      if (!res.success || !res.clientId) {
+        alert(`고객사 등록 실패: ${res.message || '서버 저장에 실패했습니다.'}`);
+        return false;
+      }
+
+      // Re-fetch authoritative customer list from DB to bind confirmed server row
+      const refreshRes = await fetchHqCustomersFromDb();
+      if (refreshRes.ok) {
+        setCustomers(refreshRes.customers);
+        setSelectedCustomerId(res.clientId);
+        setCurrentPage(1);
+        haptics.success();
+        return true;
+      } else {
+        alert(`고객사는 등록되었으나 목록을 갱신하지 못했습니다: ${refreshRes.error}`);
+        return false;
+      }
+    } catch (err: any) {
+      alert(`고객사 등록 중 네트워크 오류가 발생했습니다: ${err.message}`);
+      return false;
+    } finally {
+      setIsLoadingDb(false);
+    }
   };
 
-  // Update customer handler
-  const handleUpdateCustomer = (updated: HqCustomer) => {
-    setCustomers((prev) => {
-      const next = prev.map((c) => (c.id === updated.id ? updated : c));
-      saveStoredCustomers(next);
-      return next;
-    });
-    updateHqCustomerInDb(updated).catch(() => {});
+  // Update customer handler - strictly awaits DB update
+  const handleUpdateCustomer = async (updated: HqCustomer): Promise<boolean> => {
+    setIsLoadingDb(true);
+    try {
+      const ok = await updateHqCustomerInDb(updated);
+      if (!ok) {
+        alert('고객사 정보를 DB에 저장하지 못했습니다.');
+        return false;
+      }
+      setCustomers((prev) => {
+        const next = prev.map((c) => (c.id === updated.id ? updated : c));
+        saveStoredCustomers(next);
+        return next;
+      });
+      return true;
+    } catch (err: any) {
+      alert(`고객사 정보 저장 중 오류가 발생했습니다: ${err.message}`);
+      return false;
+    } finally {
+      setIsLoadingDb(false);
+    }
   };
 
   return (
@@ -396,7 +438,26 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
 
           {/* Customer Cards List */}
           <div className="flex-1 divide-y divide-slate-100 overflow-y-auto max-h-[610px]">
-            {paginatedCustomers.length === 0 ? (
+            {isLoadingDb && customers.length === 0 ? (
+              <div className="p-12 text-center text-slate-400">
+                <Loader2 className="w-8 h-8 mx-auto mb-2 text-[#1E60F3] animate-spin" />
+                <p className="text-xs font-bold text-slate-700">실시간 고객사 데이터를 불러오는 중...</p>
+                <p className="text-[11px] text-slate-400 mt-1">Supabase DB에서 최신 데이터를 동기화하고 있습니다.</p>
+              </div>
+            ) : dbErrorMessage ? (
+              <div className="p-12 text-center text-rose-500">
+                <AlertCircle className="w-8 h-8 mx-auto mb-2 text-rose-400" />
+                <p className="text-xs font-bold text-rose-700">고객사 데이터를 불러오지 못했습니다.</p>
+                <p className="text-[11px] text-rose-400 mt-1">{dbErrorMessage}</p>
+                <button
+                  type="button"
+                  onClick={loadAuthoritativeCustomers}
+                  className="mt-3 px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold cursor-pointer transition-colors"
+                >
+                  다시 시도
+                </button>
+              </div>
+            ) : paginatedCustomers.length === 0 ? (
               <div className="p-12 text-center text-slate-400">
                 <Users className="w-8 h-8 mx-auto mb-2 text-slate-300" />
                 <p className="text-xs font-bold text-slate-600">검색된 고객사가 없습니다.</p>
@@ -1353,8 +1414,17 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
           </div>
         ) : (
           <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/80 p-12 text-center text-slate-400">
-            <Users className="w-10 h-10 mx-auto mb-2 text-slate-300" />
-            <p className="text-sm font-bold text-slate-700">고객사를 선택해주세요</p>
+            {isLoadingDb ? (
+              <>
+                <Loader2 className="w-10 h-10 mx-auto mb-2 text-[#1E60F3] animate-spin" />
+                <p className="text-sm font-bold text-slate-700">고객사 정보를 불러오는 중입니다...</p>
+              </>
+            ) : (
+              <>
+                <Users className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+                <p className="text-sm font-bold text-slate-700">고객사를 선택해주세요</p>
+              </>
+            )}
           </div>
         )}
       </div>

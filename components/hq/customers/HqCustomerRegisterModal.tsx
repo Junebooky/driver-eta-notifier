@@ -1,14 +1,14 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Building2, User, Plus } from 'lucide-react';
+import { X, Building2, User, Plus, Loader2 } from 'lucide-react';
 import { HqCustomer, CustomerTier } from '@/types/customerHq';
 import { haptics } from '@/utils/haptics';
 
 interface HqCustomerRegisterModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onRegisterCustomer: (newCustomer: HqCustomer) => void;
+  onRegisterCustomer: (newCustomer: HqCustomer) => Promise<boolean> | void;
 }
 
 export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = ({
@@ -27,75 +27,83 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
   const [nextEventDate, setNextEventDate] = useState('2024. 11. 30');
   const [preferencesInput, setPreferencesInput] = useState('S클래스 선호, 영어 가능 기사, 정시 출발 필수');
   const [notesInput, setNotesInput] = useState('VIP 동선 보안 민감\n행사 전담 차량 사전 점검 필수');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       alert('고객사명을 입력해주세요.');
       return;
     }
 
-    const prefList = preferencesInput
-      .split(',')
-      .map((p) => p.trim())
-      .filter(Boolean);
+    setIsSubmitting(true);
+    try {
+      const prefList = preferencesInput
+        .split(',')
+        .map((p) => p.trim())
+        .filter(Boolean);
 
-    const noteList = notesInput
-      .split('\n')
-      .map((n) => n.trim())
-      .filter(Boolean);
+      const noteList = notesInput
+        .split('\n')
+        .map((n) => n.trim())
+        .filter(Boolean);
 
-    const newCust: HqCustomer = {
-      id: `cust-${Date.now()}`,
-      name: name.trim(),
-      tier,
-      isFavorite: false,
-      logoType: 'default',
-      primaryContactName: contactName.trim() || '담당자',
-      contactCountExtra: 0,
-      recentSnippet: nextEventTitle.trim() || '신규 고객사 등록',
-      nextEventDate: nextEventDate.trim() || '2024. 11. 30',
-      mainPhone: contactPhone.trim() || '010-0000-0000',
-      mainEmail: contactEmail.trim() || 'vip@company.com',
-      department: department.trim() || 'VIP 의전팀',
-      preferences: prefList.length > 0 ? prefList : ['정시 출발 필수', '금연 차량'],
-      notes: noteList.length > 0 ? noteList : ['신규 등록 고객사'],
-      nextEvent: nextEventTitle.trim()
-        ? {
-            id: `ev-${Date.now()}`,
-            title: nextEventTitle.trim(),
-            date: nextEventDate.trim(),
-            dDay: 'D-30',
-            location: '서울 시내 주요 호텔',
-            vehiclesRequired: 'S클래스 1대',
-            passengerCount: 2,
-            timeRange: '09:00 - 18:00',
-            status: 'upcoming',
-          }
-        : undefined,
-      recentRequests: [],
-      contacts: contactName.trim()
-        ? [
-            {
-              id: `c-${Date.now()}`,
-              name: contactName.trim(),
-              role: contactRole.trim(),
-              phone: contactPhone.trim(),
-              email: contactEmail.trim(),
-              isPrimary: true,
-            },
-          ]
-        : [],
-      eventsHistory: [],
-      tripsHistory: [],
-      communications: [],
-    };
+      const newCust: HqCustomer = {
+        id: `cust-${Date.now()}`,
+        name: name.trim(),
+        tier,
+        isFavorite: false,
+        logoType: 'default',
+        primaryContactName: contactName.trim() || '담당자',
+        contactCountExtra: 0,
+        recentSnippet: nextEventTitle.trim() || '신규 고객사 등록',
+        nextEventDate: nextEventDate.trim() || '2024. 11. 30',
+        mainPhone: contactPhone.trim() || '010-0000-0000',
+        mainEmail: contactEmail.trim() || 'vip@company.com',
+        department: department.trim() || 'VIP 의전팀',
+        preferences: prefList.length > 0 ? prefList : ['정시 출발 필수', '금연 차량'],
+        notes: noteList.length > 0 ? noteList : ['신규 등록 고객사'],
+        nextEvent: nextEventTitle.trim()
+          ? {
+              id: `ev-${Date.now()}`,
+              title: nextEventTitle.trim(),
+              date: nextEventDate.trim(),
+              dDay: 'D-30',
+              location: '서울 시내 주요 호텔',
+              vehiclesRequired: 'S클래스 1대',
+              passengerCount: 2,
+              timeRange: '09:00 - 18:00',
+              status: 'upcoming',
+            }
+          : undefined,
+        recentRequests: [],
+        contacts: contactName.trim()
+          ? [
+              {
+                id: `c-${Date.now()}`,
+                name: contactName.trim(),
+                role: contactRole.trim(),
+                phone: contactPhone.trim(),
+                email: contactEmail.trim(),
+                isPrimary: true,
+              },
+            ]
+          : [],
+        eventsHistory: [],
+        tripsHistory: [],
+        communications: [],
+      };
 
-    haptics.success();
-    onRegisterCustomer(newCust);
-    onClose();
+      const result = await onRegisterCustomer(newCust);
+      if (result !== false) {
+        haptics.success();
+        onClose();
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -287,10 +295,20 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
             </button>
             <button
               type="submit"
-              className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white text-xs font-bold shadow-md shadow-blue-500/20 cursor-pointer transition-all"
+              disabled={isSubmitting}
+              className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#1E60F3] hover:bg-blue-600 disabled:bg-blue-400 active:scale-95 text-white text-xs font-bold shadow-md shadow-blue-500/20 cursor-pointer disabled:cursor-not-allowed transition-all"
             >
-              <Plus className="w-4 h-4" />
-              <span>고객사 등록 완료</span>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>등록 중...</span>
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4" />
+                  <span>고객사 등록 완료</span>
+                </>
+              )}
             </button>
           </div>
         </form>

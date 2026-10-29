@@ -134,29 +134,23 @@ export async function updateHqCustomerInDb(customer: HqCustomer): Promise<boolea
 
 export function getStoredCustomers(): HqCustomer[] {
   if (typeof window === 'undefined') {
-    if (!inMemoryCustomers) {
-      inMemoryCustomers = [...INITIAL_HQ_CUSTOMERS];
-    }
-    return inMemoryCustomers;
+    return inMemoryCustomers || [];
   }
 
   try {
     const raw = localStorage.getItem(CRM_CUSTOMERS_STORAGE_KEY);
     if (!raw) {
-      inMemoryCustomers = [...INITIAL_HQ_CUSTOMERS];
-      localStorage.setItem(CRM_CUSTOMERS_STORAGE_KEY, JSON.stringify(inMemoryCustomers));
-      return inMemoryCustomers;
+      return inMemoryCustomers || [];
     }
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) {
+    if (Array.isArray(parsed)) {
       inMemoryCustomers = parsed;
       return inMemoryCustomers;
     }
-    inMemoryCustomers = [...INITIAL_HQ_CUSTOMERS];
-    return inMemoryCustomers;
+    return inMemoryCustomers || [];
   } catch (err) {
-    console.warn('[CRM] Failed to parse stored customers, falling back to initial data:', err);
-    return inMemoryCustomers || INITIAL_HQ_CUSTOMERS;
+    console.warn('[CRM] Failed to parse stored customers:', err);
+    return inMemoryCustomers || [];
   }
 }
 

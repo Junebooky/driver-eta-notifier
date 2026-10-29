@@ -43,8 +43,14 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const isDemoRequested = searchParams.get('demo') === 'true';
 
-    // Explicit isolated demo mode check (Development fixture preview only)
+    // Explicit isolated demo mode check (Strictly limited to local development preview only)
     if (isDemoRequested) {
+      if (process.env.NODE_ENV === 'production') {
+        return NextResponse.json(
+          { ok: false, error: '데모 모드는 프로덕션 환경에서 지원되지 않습니다.' },
+          { status: 403 }
+        );
+      }
       return NextResponse.json({ ok: true, isDemo: true, customers: INITIAL_HQ_CUSTOMERS });
     }
 
@@ -210,13 +216,18 @@ export async function POST(req: NextRequest) {
     // =========================================================================
     if (matchedCompanyRow) {
       const preset = (matchedCompanyRow.pricing_preset as Record<string, any>) || {};
-      const initCust = INITIAL_HQ_CUSTOMERS.find(
-        (c) => c.id === matchedCompanyRow.id || normalizeCompanyName(c.name) === normalizeCompanyName(matchedCompanyRow.name)
-      );
-      const existingContacts: CustomerContact[] =
-        Array.isArray(preset.contacts) && preset.contacts.length > 0
-          ? preset.contacts
-          : initCust?.contacts || [];
+      // Single Source of Truth: Read existing contacts strictly from DB row only (never fallback to demo fixtures)
+      const existingContacts: CustomerContact[] = Array.isArray(preset.contacts) ? [...preset.contacts] : [];
+      if (existingContacts.length === 0 && matchedCompanyRow.contact_person) {
+        existingContacts.push({
+          id: `c-${matchedCompanyRow.id}-primary`,
+          name: matchedCompanyRow.contact_person,
+          role: '예약 담당자',
+          phone: matchedCompanyRow.phone || cleanPhone,
+          email: matchedCompanyRow.email || cleanEmail,
+          isPrimary: true,
+        });
+      }
 
       // If contact match was not already found, search contacts
       if (!matchedContact) {
