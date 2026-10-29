@@ -71,3 +71,4 @@ COMMIT;
 -- 3. Ensure vehicle conflict detection continues using `schedules.vehicle_no` / `schedules.vehicle_plate`.
 -- 4. Ensure driver conflict detection uses `schedules.driver_id` instead of loose vehicle matching.
 -- ==============================================================================
+

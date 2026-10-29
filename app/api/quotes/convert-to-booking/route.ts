@@ -49,26 +49,35 @@ export async function POST(req: Request) {
       );
     }
 
-    // 2. Server-side Quote Verification (Never blindly trust client pricing numbers)
-    const verifiedQuote = await calculateQuote({
-      customerId: targetCustomerId,
-      customerName: targetQuote.customerName,
-      contactPerson: targetQuote.contactPerson,
-      contactPhone: targetQuote.contactPhone,
-      date: targetQuote.date,
-      serviceStartTime: targetQuote.serviceStartTime,
-      serviceEndTime: targetQuote.serviceEndTime,
-      serviceHours: targetQuote.serviceHours,
-      origin: targetQuote.origin,
-      destination: targetQuote.destination,
-      vehicleModel: targetQuote.vehicleModel,
-      vehicleCount: targetQuote.vehicleCount,
-      driverLanguage: targetQuote.driverLanguage,
-      serviceMode: targetQuote.serviceMode,
-      notes: targetQuote.notes,
-    });
-    verifiedQuote.quoteNo = targetQuote.quoteNo;
-    verifiedQuote.customerId = targetCustomerId;
+    // 2. Server-side Quote Verification (Preserve immutable snapshot if present, otherwise recalculate)
+    let verifiedQuote: HqQuoteItem;
+    if (targetQuote.appliedPricingSnapshot && targetQuote.tariffVersion) {
+      // Snapshot immutability: past locked quotes preserve their exact historic numbers
+      verifiedQuote = { ...targetQuote };
+    } else {
+      verifiedQuote = await calculateQuote({
+        customerId: targetCustomerId,
+        customerName: targetQuote.customerName,
+        contactPerson: targetQuote.contactPerson,
+        contactPhone: targetQuote.contactPhone,
+        date: targetQuote.date,
+        serviceStartTime: targetQuote.serviceStartTime,
+        serviceEndTime: targetQuote.serviceEndTime,
+        serviceHours: targetQuote.serviceHours,
+        origin: targetQuote.origin,
+        destination: targetQuote.destination,
+        vehicleModel: targetQuote.vehicleModel,
+        vehicleCount: targetQuote.vehicleCount,
+        driverLanguage: targetQuote.driverLanguage,
+        serviceMode: targetQuote.serviceMode,
+        notes: targetQuote.notes,
+        tariffVersion: targetQuote.tariffVersion,
+        vehicleProductCode: targetQuote.vehicleProductCode,
+        serviceCategory: targetQuote.serviceCategory as any,
+      });
+      verifiedQuote.quoteNo = targetQuote.quoteNo;
+      verifiedQuote.customerId = targetCustomerId;
+    }
 
     // 3. Prepare Vehicle Schedules Array for Atomic RPC Conversion
     const count = Math.max(1, verifiedQuote.vehicleCount || 1);

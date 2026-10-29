@@ -30,6 +30,7 @@ import { HqDriversView } from '@/components/hq/drivers/HqDriversView';
 import { HqFieldKnowledgeView } from '@/components/hq/knowledge/HqFieldKnowledgeView';
 import { HqOperationsBoard } from '@/components/hq/operations/HqOperationsBoard';
 import { HqQuoteModal } from '@/components/hq/quotes/HqQuoteModal';
+import { HqOfficialPricingView } from '@/components/hq/quotes/HqOfficialPricingView';
 import { VipChauffeurCardModal } from '@/components/cards/VipChauffeurCardModal';
 import { HqUnconfirmedDispatchesCard } from '@/components/hq/dispatch/HqUnconfirmedDispatchesCard';
 import { HqUnsentDraftsCard } from '@/components/hq/dispatch/HqUnsentDraftsCard';
@@ -95,7 +96,7 @@ function HqDashboardInner() {
   // Selected Booking for detail / vehicle-driver assignment / edit / cancel modal
   const [selectedBooking, setSelectedBooking] = useState<HqBooking | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  const [isQuoteModalOpen, setIsQuoteModalOpen] = useState(false);
+  const [isQuoteModalOpen, setIsQuoteModalOpen] = useState(() => searchParams.get('quoteModal') === 'true');
   const [isChauffeurCardOpen, setIsChauffeurCardOpen] = useState(false);
   const [isAlertDrawerOpen, setIsAlertDrawerOpen] = useState(false);
   const [customerMsgTarget, setCustomerMsgTarget] = useState<{
@@ -634,31 +635,10 @@ function HqDashboardInner() {
               }}
             />
           ) : activeSidebarTab === 'quotes' ? (
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center space-y-4 text-white">
-              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center justify-center mx-auto">
-                <CalendarCheck className="w-6 h-6" />
-              </div>
-              <h3 className="text-lg font-bold text-slate-100">가격표 기반 실시간 견적기</h3>
-              <p className="text-xs text-slate-400 max-w-md mx-auto">
-                전화 응대 중 즉시 요금을 계산하고 고객사용 견적서 생성 및 대표님 배차 대기함으로 즉시 전환합니다.
-              </p>
-              <div className="flex justify-center gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsQuoteModalOpen(true)}
-                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs shadow-md transition"
-                >
-                  견적서 작성창 열기
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsChauffeurCardOpen(true)}
-                  className="px-4 py-2.5 rounded-xl border border-amber-500/30 bg-slate-800 hover:bg-slate-700 text-amber-300 font-semibold text-xs transition"
-                >
-                  VIP 의전 소개서 보기
-                </button>
-              </div>
-            </div>
+            <HqOfficialPricingView
+              onOpenQuoteModal={() => setIsQuoteModalOpen(true)}
+              onOpenChauffeurCard={() => setIsChauffeurCardOpen(true)}
+            />
           ) : activeSidebarTab === 'field_knowledge' ? (
             <HqFieldKnowledgeView initialSearchQuery={searchQuery} />
           ) : activeSidebarTab === 'driving_logs' ? (

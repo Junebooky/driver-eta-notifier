@@ -2,6 +2,12 @@ import { HqQuoteItem, QuoteCalculationInput } from '@/types/quoteHq';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { normalizeDateToIso, normalizeTimeHHmm } from '@/utils/dispatchConflictDetector';
 import { DEFAULT_VEHICLE_PRICING_PRESETS, findVehiclePricingPreset } from '@/utils/settlementCalculator';
+import {
+  calculateOfficialTariffQuote,
+  resolveVehicleProductSku,
+  OFFICIAL_TARIFF_VERSION,
+} from '@/lib/pricing/officialPricingService';
+import { OfficialServiceCategory } from '@/types/officialPricingHq';
 
 export function generateQuoteNumber(dateStr: string, index: number = 1): string {
   const iso = normalizeDateToIso(dateStr) || new Date().toISOString().slice(0, 10);
@@ -17,19 +23,7 @@ export async function calculateQuote(input: QuoteCalculationInput): Promise<HqQu
   const driverLanguage = input.driverLanguage || 'ko';
   const serviceMode = input.serviceMode || 'with_driver';
 
-  // 1. Fetch pricing presets from Supabase (or fallback to defaults)
-  let presets: any[] = [];
-  try {
-    const { data } = await supabaseAdmin
-      .from('pricing_presets')
-      .select('*')
-      .eq('is_active', true);
-    if (data && data.length > 0) presets = data;
-  } catch (err) {
-    console.warn('[QuoteCalculator] Notice loading pricing_presets:', err);
-  }
-
-  // 2. Fetch customer contract terms if customerId provided
+  // 1. Fetch customer contract terms if customerId provided
   let customerContract: any = null;
   if (input.customerId) {
     try {
@@ -46,7 +40,124 @@ export async function calculateQuote(input: QuoteCalculationInput): Promise<HqQu
     }
   }
 
-  // 3. Resolve base rate & overtime rate per vehicle
+  // 2. Check if 2026 Official Tariff should be applied
+  // Applied if explicitly requested via tariffVersion, or if vehicleProductCode is given, or if serviceCategory is given
+  const isOfficialRequested =
+    input.tariffVersion === OFFICIAL_TARIFF_VERSION ||
+    Boolean(input.vehicleProductCode) ||
+    Boolean(input.serviceCategory);
+
+  if (isOfficialRequested) {
+    try {
+      let resolvedSku = input.vehicleProductCode;
+      if (!resolvedSku) {
+        const skuRes = resolveVehicleProductSku(input.vehicleModel);
+        if (skuRes.code) resolvedSku = skuRes.code;
+      }
+
+      // If we have a valid 2026 SKU code, calculate using 2026 official calculation
+      if (resolvedSku) {
+        // Infer or determine service category
+        let serviceCategory: OfficialServiceCategory = input.serviceCategory || 'daily_metro';
+        if (!input.serviceCategory) {
+          const combinedLoc = `${input.origin || ''} ${input.destination || ''}`;
+          const isAirport = /인천|김포|ICN|GMP|공항|airport/i.test(combinedLoc);
+          const isShortHours = (input.serviceHours || 10) <= 4;
+
+          if (isAirport && isShortHours) {
+            serviceCategory = /김포|GMP/i.test(combinedLoc) ? 'airport_gimpo' : 'airport_incheon';
+          } else if (/강원|충청|경상|전라|부산|대구|광주|대전|울산|제주/i.test(combinedLoc)) {
+            serviceCategory = 'daily_regional';
+          } else {
+            serviceCategory = 'daily_metro';
+          }
+        }
+
+        const officialResult = await calculateOfficialTariffQuote({
+          tariffVersion: OFFICIAL_TARIFF_VERSION,
+          serviceCategory,
+          vehicleProductCode: resolvedSku,
+          vehicleCount,
+          serviceHours: input.serviceHours,
+          nightHours: input.nightHours,
+          excessKm: input.excessKm,
+          englishOption: input.englishOption || (driverLanguage === 'en' ? 'fluent_upgrade' : 'basic_included'),
+          airportMeetAndGreet: input.airportMeetAndGreet,
+          customBaseRateOverride: customerContract?.baseRatePerVehicle,
+        });
+
+        const nowIso = new Date().toISOString();
+        const quoteNo = generateQuoteNumber(date, Math.floor(Math.random() * 800) + 100);
+
+        return {
+          quoteNo,
+          customerId: input.customerId,
+          customerName: input.customerName,
+          contactPerson: input.contactPerson,
+          contactPhone: input.contactPhone,
+          contactEmail: input.contactEmail,
+          date,
+          serviceStartTime: startTime,
+          serviceEndTime: endTime,
+          serviceHours: officialResult.serviceHours,
+          origin: input.origin,
+          destination: input.destination,
+          vehicleModel: officialResult.vehicleProductLabel,
+          vehicleProductCode: officialResult.vehicleProductCode,
+          vehicleCategory: resolvedSku.includes('sprinter')
+            ? 'sprinter'
+            : resolvedSku.includes('genesis')
+            ? 'genesis'
+            : resolvedSku.includes('bus')
+            ? 'bus'
+            : 'van',
+          vehicleCount,
+          driverLanguage,
+          serviceMode,
+          serviceCategory,
+          baseRatePerVehicle: officialResult.baseRatePerVehicle,
+          baseFareTotal: officialResult.baseFareTotal,
+          overtimeHours: Math.max(0, officialResult.serviceHours - officialResult.baseHours),
+          overtimeHourlyRate: 0, // variable by night/day
+          isOvertimeRateConfirmed: true,
+          overtimeFareTotal: officialResult.standardOvertimeTotal + officialResult.nightOvertimeTotal,
+          englishSurchargePerVehicle:
+            officialResult.fluentEnglishUpgradeTotal > 0
+              ? Math.round(officialResult.fluentEnglishUpgradeTotal / vehicleCount)
+              : 0,
+          englishSurchargeTotal: officialResult.fluentEnglishUpgradeTotal,
+          excessDistanceTotal: officialResult.excessDistanceTotal,
+          nightOvertimeTotal: officialResult.nightOvertimeTotal,
+          supplyPriceTotal: officialResult.supplyPriceTotal,
+          vatAmount: officialResult.vatAmount,
+          estimatedGrandTotal: officialResult.estimatedGrandTotal,
+          quoteRequired: officialResult.quoteRequired,
+          tariffVersion: officialResult.tariffVersion,
+          pricingSource: 'official_2026',
+          appliedPricingSnapshot: officialResult as any,
+          notes: input.notes,
+          status: 'draft',
+          createdAt: nowIso,
+          updatedAt: nowIso,
+        };
+      }
+    } catch (err) {
+      console.warn('[QuoteCalculator] Notice falling back from 2026 official pricing to legacy:', err);
+    }
+  }
+
+  // 3. Legacy Calculation (Preserved for non-2026 or fallback requests)
+  let presets: any[] = [];
+  try {
+    const { data } = await supabaseAdmin
+      .from('pricing_presets')
+      .select('*')
+      .eq('is_active', true);
+    if (data && data.length > 0) presets = data;
+  } catch (err) {
+    console.warn('[QuoteCalculator] Notice loading pricing_presets:', err);
+  }
+
   const fallbackPreset = findVehiclePricingPreset(input.vehicleModel, DEFAULT_VEHICLE_PRICING_PRESETS) || DEFAULT_VEHICLE_PRICING_PRESETS[0];
   const normModel = (input.vehicleModel || '').toUpperCase().replace(/\s+/g, '');
   const matchedFromSupabase = presets.find((p) => {
@@ -66,7 +177,6 @@ export async function calculateQuote(input: QuoteCalculationInput): Promise<HqQu
       ? (matchedPreset.vehicle_only_fare ?? matchedPreset.vehicleOnlyFare ?? matchedPreset.vehicleOnlyRate ?? 600000)
       : (matchedPreset.base_fare ?? matchedPreset.baseFare10h ?? matchedPreset.withDriverRate ?? 800000);
 
-  // If customer contract overrides base rate:
   if (customerContract?.baseRatePerVehicle) {
     baseRatePerVehicle = customerContract.baseRatePerVehicle;
   }
@@ -75,7 +185,6 @@ export async function calculateQuote(input: QuoteCalculationInput): Promise<HqQu
   const requestedHours = Math.max(1, input.serviceHours || baseHours);
   const overtimeHours = Math.max(0, requestedHours - baseHours);
 
-  // Overtime rate: check customer contract first, then preset
   let hourlyOvertimeRate = 0;
   let isOvertimeRateConfirmed = false;
 
@@ -90,8 +199,6 @@ export async function calculateQuote(input: QuoteCalculationInput): Promise<HqQu
   const overtimeFarePerVehicle = isOvertimeRateConfirmed ? overtimeHours * hourlyOvertimeRate : 0;
   const overtimeFareTotal = overtimeFarePerVehicle * vehicleCount;
 
-  // English chauffeur premium:
-  // e.g. Sprinter standard 150k vs English 200k (+50,000원 per vehicle)
   let englishSurchargePerVehicle = 0;
   if (serviceMode === 'with_driver' && driverLanguage === 'en') {
     const koRate = matchedPreset.driver_labor_korean || 150000;
@@ -139,6 +246,8 @@ export async function calculateQuote(input: QuoteCalculationInput): Promise<HqQu
     estimatedGrandTotal,
     notes: input.notes,
     status: 'draft',
+    pricingSource: customerContract ? 'customer_contract' : 'preset',
+    tariffVersion: 'legacy',
     createdAt: nowIso,
     updatedAt: nowIso,
   };
