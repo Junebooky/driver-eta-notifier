@@ -37,6 +37,7 @@ import {
   saveContactToCrmDb,
   updateHqCustomerInDb,
   CRM_CUSTOMERS_UPDATE_EVENT,
+  CRM_CUSTOMERS_STORAGE_KEY,
 } from '@/utils/crmCustomerSync';
 import { CustomerBrandLogo } from './CustomerBrandLogo';
 import { HqCustomerRegisterModal } from './HqCustomerRegisterModal';
@@ -68,24 +69,34 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
   const [dbErrorMessage, setDbErrorMessage] = useState<string | null>(null);
   const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
 
-  const loadAuthoritativeCustomers = async () => {
+  const isFetchingRef = React.useRef(false);
+
+  const loadAuthoritativeCustomers = React.useCallback(async () => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
     setIsLoadingDb(true);
     setDbErrorMessage(null);
-    const res = await fetchHqCustomersFromDb();
-    if (res.ok) {
-      setCustomers(res.customers);
-      if (res.customers.length > 0) {
-        setSelectedCustomerId((prev) =>
-          res.customers.some((c) => c.id === prev) ? prev : res.customers[0].id
-        );
+    try {
+      const res = await fetchHqCustomersFromDb();
+      if (res.ok) {
+        setCustomers(res.customers);
+        if (res.customers.length > 0) {
+          setSelectedCustomerId((prev) =>
+            res.customers.some((c) => c.id === prev) ? prev : res.customers[0].id
+          );
+        } else {
+          setSelectedCustomerId('');
+        }
       } else {
-        setSelectedCustomerId('');
+        setDbErrorMessage(res.error || '고객사 데이터를 불러오지 못했습니다.');
       }
-    } else {
-      setDbErrorMessage(res.error || '고객사 데이터를 불러오지 못했습니다.');
+    } catch (err: any) {
+      setDbErrorMessage(err.message || '고객사 데이터를 불러오지 못했습니다.');
+    } finally {
+      setIsLoadingDb(false);
+      isFetchingRef.current = false;
     }
-    setIsLoadingDb(false);
-  };
+  }, []);
 
   // Sync stored customers when updated from email intake or other tabs, and fetch fresh from DB
   useEffect(() => {
@@ -94,13 +105,20 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
     const handleUpdate = () => {
       loadAuthoritativeCustomers();
     };
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === CRM_CUSTOMERS_STORAGE_KEY) {
+        loadAuthoritativeCustomers();
+      }
+    };
+
     window.addEventListener(CRM_CUSTOMERS_UPDATE_EVENT, handleUpdate);
-    window.addEventListener('storage', handleUpdate);
+    window.addEventListener('storage', handleStorage);
     return () => {
       window.removeEventListener(CRM_CUSTOMERS_UPDATE_EVENT, handleUpdate);
-      window.removeEventListener('storage', handleUpdate);
+      window.removeEventListener('storage', handleStorage);
     };
-  }, []);
+  }, [loadAuthoritativeCustomers]);
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
@@ -292,7 +310,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
         haptics.selection();
         setCustomers((prev) => {
           const next = prev.map((c) => (c.id === customerId ? updated : c));
-          saveStoredCustomers(next);
+          saveStoredCustomers(next, false);
           return next;
         });
       } else {
@@ -362,7 +380,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
       }
       setCustomers((prev) => {
         const next = prev.map((c) => (c.id === updated.id ? updated : c));
-        saveStoredCustomers(next);
+        saveStoredCustomers(next, false);
         return next;
       });
       return true;

@@ -30,7 +30,7 @@ export async function fetchHqCustomersFromDb(): Promise<FetchHqCustomersResult> 
     const res = await fetch('/api/hq/customers');
     const data = await res.json().catch(() => ({}));
     if (res.ok && data.ok && Array.isArray(data.customers)) {
-      saveStoredCustomers(data.customers);
+      saveStoredCustomers(data.customers, false);
       return { ok: true, customers: data.customers };
     }
     return {
@@ -61,8 +61,9 @@ export async function saveContactToCrmDb(params: SaveContactToCrmParams): Promis
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok && data.ok && data.success) {
-      // Re-sync after successful DB write
-      fetchHqCustomersFromDb().catch(() => {});
+      // Re-sync local cache after successful DB write without self-triggering loop
+      await fetchHqCustomersFromDb().catch(() => {});
+      broadcastCrmCustomersUpdate();
       return {
         success: true,
         clientId: data.clientId,
@@ -126,7 +127,8 @@ export async function updateHqCustomerInDb(customer: HqCustomer): Promise<boolea
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok && data.ok) {
-      fetchHqCustomersFromDb().catch(() => {});
+      await fetchHqCustomersFromDb().catch(() => {});
+      broadcastCrmCustomersUpdate();
       return true;
     }
     return false;
@@ -158,12 +160,19 @@ export function getStoredCustomers(): HqCustomer[] {
   }
 }
 
-export function saveStoredCustomers(customers: HqCustomer[]): void {
+export function broadcastCrmCustomersUpdate(): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(CRM_CUSTOMERS_UPDATE_EVENT));
+}
+
+export function saveStoredCustomers(customers: HqCustomer[], broadcast: boolean = false): void {
   inMemoryCustomers = customers;
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(CRM_CUSTOMERS_STORAGE_KEY, JSON.stringify(customers));
-    window.dispatchEvent(new CustomEvent(CRM_CUSTOMERS_UPDATE_EVENT, { detail: { count: customers.length } }));
+    if (broadcast) {
+      window.dispatchEvent(new CustomEvent(CRM_CUSTOMERS_UPDATE_EVENT, { detail: { count: customers.length } }));
+    }
   } catch (err) {
     console.error('[CRM] Failed to save customers to storage:', err);
   }
@@ -363,7 +372,7 @@ export function saveContactToCrmLocal(params: SaveContactToCrmParams): SaveConta
     };
 
     customers[existingCompIndex] = updatedCompany;
-    saveStoredCustomers(customers);
+    saveStoredCustomers(customers, true);
 
     // Persist to Supabase cockpit.customers DB
     if (typeof window !== 'undefined') {
@@ -432,7 +441,7 @@ export function saveContactToCrmLocal(params: SaveContactToCrmParams): SaveConta
   };
 
   customers.unshift(newCustomer);
-  saveStoredCustomers(customers);
+  saveStoredCustomers(customers, true);
 
   // Persist to Supabase cockpit.customers DB
   if (typeof window !== 'undefined') {

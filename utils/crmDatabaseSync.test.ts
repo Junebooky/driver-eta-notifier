@@ -366,6 +366,76 @@ test('CRM Full Round-Trip & Quality Gate Test Suite (Zero Live DB Mutation)', as
       simulateDbError = false;
     }
 
+    // =========================================================================
+    // 7. Infinite API Loop Prevention: Read Fetch & Storage Silent Mode
+    // =========================================================================
+    let eventDispatchedCount = 0;
+    const fakeListener = () => { eventDispatchedCount++; };
+
+    // Simulate browser window EventTarget
+    const originalWindow = (global as any).window;
+    const originalLocalStorage = (global as any).localStorage;
+
+    try {
+      const mockStorage: Record<string, string> = {};
+      const eventListeners: Record<string, Function[]> = {};
+
+      (global as any).window = {
+        addEventListener: (event: string, fn: Function) => {
+          if (!eventListeners[event]) eventListeners[event] = [];
+          eventListeners[event].push(fn);
+        },
+        removeEventListener: (event: string, fn: Function) => {
+          if (eventListeners[event]) {
+            eventListeners[event] = eventListeners[event].filter((f) => f !== fn);
+          }
+        },
+        dispatchEvent: (customEvent: any) => {
+          const fns = eventListeners[customEvent.type] || [];
+          fns.forEach((f) => f(customEvent));
+          return true;
+        },
+      };
+
+      (global as any).localStorage = {
+        getItem: (k: string) => mockStorage[k] || null,
+        setItem: (k: string, v: string) => { mockStorage[k] = v; },
+        removeItem: (k: string) => { delete mockStorage[k]; },
+      };
+
+      (global as any).CustomEvent = class {
+        type: string;
+        detail: any;
+        constructor(type: string, opts?: any) {
+          this.type = type;
+          this.detail = opts?.detail;
+        }
+      };
+
+      const { saveStoredCustomers, CRM_CUSTOMERS_UPDATE_EVENT } = await import('@/utils/crmCustomerSync');
+      (global as any).window.addEventListener(CRM_CUSTOMERS_UPDATE_EVENT, fakeListener);
+
+      // Default (broadcast: false) must NEVER dispatch event
+      eventDispatchedCount = 0;
+      saveStoredCustomers([savedBulgari as any]);
+      assert.strictEqual(eventDispatchedCount, 0, 'saveStoredCustomers by default must not emit broadcast event');
+
+      // Explicit broadcast=false must NEVER dispatch event
+      eventDispatchedCount = 0;
+      saveStoredCustomers([savedBulgari as any], false);
+      assert.strictEqual(eventDispatchedCount, 0, 'saveStoredCustomers with broadcast=false must not emit broadcast event');
+
+      // Explicit broadcast=true MUST dispatch event
+      eventDispatchedCount = 0;
+      saveStoredCustomers([savedBulgari as any], true);
+      assert.strictEqual(eventDispatchedCount, 1, 'saveStoredCustomers with broadcast=true must emit exactly 1 event');
+
+      console.log('✓ Infinite API Loop Prevention: Storage silent mode verified.');
+    } finally {
+      (global as any).window = originalWindow;
+      (global as any).localStorage = originalLocalStorage;
+    }
+
     console.log('✓ All CRM round-trip, full-field persistence, and failure scenario tests passed (0 live DB mutations).');
   } finally {
     // Restore original supabaseAdmin.from
