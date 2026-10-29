@@ -387,3 +387,4 @@ export const HqOfficialPricingView: React.FC<HqOfficialPricingViewProps> = ({
     </div>
   );
 };
+

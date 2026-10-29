@@ -525,3 +525,4 @@ export async function calculateOfficialTariffQuote(
     snapshotTimestamp: new Date().toISOString(),
   };
 }
+

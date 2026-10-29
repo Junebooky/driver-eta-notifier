@@ -42,3 +42,4 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: err.message || '서버 오류' }, { status: 500 });
   }
 }
+

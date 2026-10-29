@@ -407,58 +407,92 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
                 <span className="font-bold text-slate-900">{bookingTime}</span>
               </div>
 
-              {/* 픽업 위치 (TMAP 후보 검색 및 선택) */}
-              <div className="pt-1">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-slate-400 font-medium">픽업 위치</span>
-                  {pickupDetailNotes && (
-                    <span className="text-[10px] text-slate-400">[{pickupDetailNotes}]</span>
-                  )}
+              {/* 운행 경로: 다중 목적지 vs 단일 구간 */}
+              {extractedDraft?.waypoints && extractedDraft.waypoints.length > 2 ? (
+                <div className="pt-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-slate-400 font-bold flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5 text-[#1E60F3]" />
+                      <span>운행 경로 (여러 목적지)</span>
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-blue-50 text-[#1E60F3] font-extrabold text-[10px] border border-blue-200/50">
+                      {extractedDraft.waypoints.length}개 구간
+                    </span>
+                  </div>
+                  <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
+                    {extractedDraft.waypoints.map((wp, idx) => (
+                      <div key={wp.id} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-200/70 text-xs">
+                        <span className="w-5 h-5 rounded-full bg-[#1E60F3] text-white font-extrabold text-[10px] flex items-center justify-center shrink-0 shadow-2xs">
+                          {idx + 1}
+                        </span>
+                        {wp.time && (
+                          <span className="text-slate-500 font-bold shrink-0 text-[11px] px-1.5 py-0.5 bg-white rounded border border-slate-200">
+                            {wp.time}
+                          </span>
+                        )}
+                        <span className="font-bold text-slate-900 truncate flex-1">
+                          {wp.location}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <HqPlaceSearchInput
-                  value={pickupLocation}
-                  onChange={(val) => {
-                    if (!extractedDraft) return;
-                    onUpdateDraft?.({
-                      ...extractedDraft,
-                      pickupLocation: val,
-                      isPickupPoiConfirmed: false,
-                    });
-                  }}
-                  onSelectPoi={handleSelectPickupPoi}
-                  autoSearch={true}
-                  isConfirmed={isPickupPoiConfirmed}
-                  placeholder="TMAP 출발지 검색 및 후보 선택"
-                  heightClass="h-9"
-                />
-              </div>
+              ) : (
+                <>
+                  {/* 픽업 위치 (TMAP 후보 검색 및 선택) */}
+                  <div className="pt-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-slate-400 font-medium">픽업 위치</span>
+                      {pickupDetailNotes && (
+                        <span className="text-[10px] text-slate-400">[{pickupDetailNotes}]</span>
+                      )}
+                    </div>
+                    <HqPlaceSearchInput
+                      value={pickupLocation}
+                      onChange={(val) => {
+                        if (!extractedDraft) return;
+                        onUpdateDraft?.({
+                          ...extractedDraft,
+                          pickupLocation: val,
+                          isPickupPoiConfirmed: false,
+                        });
+                      }}
+                      onSelectPoi={handleSelectPickupPoi}
+                      autoSearch={true}
+                      isConfirmed={isPickupPoiConfirmed}
+                      placeholder="TMAP 출발지 검색 및 후보 선택"
+                      heightClass="h-9"
+                    />
+                  </div>
 
-              {/* 목적지 (TMAP 후보 검색 및 선택) */}
-              <div className="pt-1">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-slate-400 font-medium">목적지</span>
-                  {dropoffDetailNotes && (
-                    <span className="text-[10px] text-slate-400">[{dropoffDetailNotes}]</span>
-                  )}
-                </div>
-                <HqPlaceSearchInput
-                  value={dropoffLocation}
-                  onChange={(val) => {
-                    if (!extractedDraft) return;
-                    onUpdateDraft?.({
-                      ...extractedDraft,
-                      dropoffLocation: val,
-                      isDropoffPoiConfirmed: false,
-                    });
-                  }}
-                  onSelectPoi={handleSelectDropoffPoi}
-                  autoSearch={true}
-                  isConfirmed={isDropoffPoiConfirmed}
-                  icon="flag"
-                  placeholder="TMAP 목적지 검색 및 후보 선택"
-                  heightClass="h-9"
-                />
-              </div>
+                  {/* 목적지 (TMAP 후보 검색 및 선택) */}
+                  <div className="pt-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-slate-400 font-medium">목적지</span>
+                      {dropoffDetailNotes && (
+                        <span className="text-[10px] text-slate-400">[{dropoffDetailNotes}]</span>
+                      )}
+                    </div>
+                    <HqPlaceSearchInput
+                      value={dropoffLocation}
+                      onChange={(val) => {
+                        if (!extractedDraft) return;
+                        onUpdateDraft?.({
+                          ...extractedDraft,
+                          dropoffLocation: val,
+                          isDropoffPoiConfirmed: false,
+                        });
+                      }}
+                      onSelectPoi={handleSelectDropoffPoi}
+                      autoSearch={true}
+                      isConfirmed={isDropoffPoiConfirmed}
+                      icon="flag"
+                      placeholder="TMAP 목적지 검색 및 후보 선택"
+                      heightClass="h-9"
+                    />
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="h-px bg-slate-200 my-2" />

@@ -69,6 +69,7 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
   const searchParams = useSearchParams();
   const urlStep = searchParams?.get('step') as EmailWorkflowStep | null;
   const urlDriverModal = searchParams?.get('driverModal') === 'true';
+  const urlEmailId = searchParams?.get('emailId');
   const urlDriverLang =
     searchParams?.get('lang') === 'english' || searchParams?.get('driverLang') === 'english'
       ? 'english'
@@ -106,6 +107,7 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
 
   // 3. Current Selected Email
   const [selectedEmailId, setSelectedEmailId] = useState<string | null>(() => {
+    if (urlEmailId) return urlEmailId;
     if (urlDemo) {
       return REFERENCE_EMAILS[0]?.summary.id || null;
     }

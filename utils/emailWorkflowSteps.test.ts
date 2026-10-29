@@ -4,24 +4,24 @@ import { mapDbDriverToHqSummary, HqDriverSummary } from '@/types/driverHq';
 
 console.log('🧪 Starting Email 4-Step Workflow & Reference Data Test Suite...');
 
-// Test 1: Verify 12 Reference Emails and Status Categories
-console.log('\n[Test 1] Verify 12 Reference Emails and Status Breakdown...');
-if (REFERENCE_EMAILS.length !== 12) {
-  throw new Error(`Expected 12 reference emails, got ${REFERENCE_EMAILS.length}`);
+// Test 1: Verify 13 Reference Emails and Status Categories
+console.log('\n[Test 1] Verify 13 Reference Emails and Status Breakdown...');
+if (REFERENCE_EMAILS.length !== 13) {
+  throw new Error(`Expected 13 reference emails, got ${REFERENCE_EMAILS.length}`);
 }
 
 const unprocessed = REFERENCE_EMAILS.filter((e) => e.statusCategory === 'unprocessed');
 const reviewing = REFERENCE_EMAILS.filter((e) => e.statusCategory === 'reviewing');
 const completed = REFERENCE_EMAILS.filter((e) => e.statusCategory === 'completed');
 
-console.log(`- 미처리: ${unprocessed.length}건 (Expected: 5)`);
+console.log(`- 미처리: ${unprocessed.length}건 (Expected: 6)`);
 console.log(`- 검토중: ${reviewing.length}건 (Expected: 3)`);
 console.log(`- 예약완료: ${completed.length}건 (Expected: 4)`);
 
-if (unprocessed.length !== 5 || reviewing.length !== 3 || completed.length !== 4) {
+if (unprocessed.length !== 6 || reviewing.length !== 3 || completed.length !== 4) {
   throw new Error('Status category count mismatch against reference UI specification!');
 }
-console.log('✅ Test 1 Passed: 12 Reference emails correctly distributed (5/3/4).');
+console.log('✅ Test 1 Passed: 13 Reference emails correctly distributed (6/3/4).');
 
 // Test 2: Verify Step 1 (AI Extracted Data for Global Events)
 console.log('\n[Test 2] Verify Step 1 Extracted Booking Fields for Global Events...');
@@ -96,6 +96,23 @@ if (slots.length !== 2 || slots[0].driver?.name !== '김민수' || slots[1].driv
   throw new Error('Multi-vehicle slot assignment structure verification failed');
 }
 console.log('✅ Test 4 Passed: 2-Vehicle slot dispatch confirmed.');
+
+// Test 5: Verify Multi-Destination Waypoint Itinerary Extraction for ABC Korea
+console.log('\n[Test 5] Verify Multi-Destination Waypoint Itinerary for ABC Korea...');
+const abcEmail = REFERENCE_EMAILS.find((e) => e.summary.from.name === '이서연' || e.summary.subject.includes('ABC코리아'));
+if (!abcEmail) throw new Error('ABC Korea reference email missing!');
+
+const abcDraft = abcEmail.extractedDraft;
+if (!abcDraft.waypoints || abcDraft.waypoints.length !== 6) {
+  throw new Error(`Expected 6 waypoints for ABC Korea, got ${abcDraft.waypoints?.length}`);
+}
+if (abcDraft.waypoints[0].location !== '인천공항 제1터미널 (T1)' || abcDraft.waypoints[0].time !== '10:00') {
+  throw new Error(`First stop mismatch: ${JSON.stringify(abcDraft.waypoints[0])}`);
+}
+if (abcDraft.waypoints[5].location !== '조선팰리스 호텔' || abcDraft.waypoints[5].time !== '18:30') {
+  throw new Error(`Final stop mismatch: ${JSON.stringify(abcDraft.waypoints[5])}`);
+}
+console.log('✅ Test 5 Passed: Multi-destination 6-stop itinerary verified for ABC Korea.');
 
 console.log('\n🎉 ALL EMAIL 4-STEP WORKFLOW TESTS PASSED 100%!');
 

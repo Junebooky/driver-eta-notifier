@@ -85,6 +85,17 @@ const BOOKING_RESPONSE_SCHEMA = {
     requestedVehicleClass: { type: Type.STRING },
     specialRequests: { type: Type.STRING },
     tripType: { type: Type.STRING, enum: ['single', 'group', 'modification', 'cancellation'] },
+    waypoints: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          time: { type: Type.STRING },
+          location: { type: Type.STRING },
+          notes: { type: Type.STRING },
+        },
+      },
+    },
     confidence: { type: Type.NUMBER },
     warnings: { type: Type.ARRAY, items: { type: Type.STRING } },
   },
@@ -234,11 +245,12 @@ ${cleanBody}
    - "passengerName": Actual VIP guest riding in the car. Distinguish from coordinator!
    - "passengerPhone": Actual VIP passenger phone only. MUST NEVER CONTAIN AN EMAIL ADDRESS!
    - "passengerCount": Number of passengers (integer, default 1).
-3. LOCATIONS FOR TMAP POI SEARCH:
-   - "pickupLocation": Clean name for TMAP search (e.g. "인천공항 제2여객터미널", "김포공항 국제선", "조선팰리스 서울강남", "신라호텔"). Do not include gate/floor here.
+3. LOCATIONS FOR TMAP POI SEARCH & ITINERARY:
+   - "pickupLocation": Initial departure location clean name for TMAP search (e.g. "인천공항 제1터미널 (T1)", "김포공항 국제선", "조선팰리스 호텔", "신라호텔"). Do not include gate/floor here.
    - "pickupDetailNotes": Floor, gate, terminal details (e.g. "3층 출국장 7번 게이트 앞", "로비 1층").
-   - "dropoffLocation": Clean name for TMAP search.
+   - "dropoffLocation": Final destination clean name for TMAP search.
    - "dropoffDetailNotes": Floor, building, dropoff zone details.
+   - "waypoints": If the client email contains a multi-stop daily schedule/itinerary (e.g. Incheon T1 10:00 -> Josun Palace 11:30 -> Seongsu 13:00 -> Myeongdong 15:30 -> Shilla 17:00 -> Josun Palace 18:30), extract EVERY stop in chronological order with "time" (HH:MM) and "location" (clean place name). If the email is for a simple 1-leg trip (single departure to destination), "waypoints" can be empty or omitted.
 4. DATE & TIME:
    - "pickupDate": YYYY-MM-DD format.
    - "pickupTime": HH:MM (24-hour format).
@@ -334,6 +346,15 @@ ${cleanBody}
       tripType: (['single', 'group', 'modification', 'cancellation'].includes(String(parsed.tripType))
         ? parsed.tripType
         : 'single') as EmailTripType,
+      waypoints: Array.isArray(parsed.waypoints) && parsed.waypoints.length > 1
+        ? parsed.waypoints.map((wp: any, idx: number) => ({
+            id: `wp-${idx + 1}`,
+            order: idx + 1,
+            time: String(wp.time || ''),
+            location: String(wp.location || ''),
+            notes: wp.notes ? String(wp.notes) : undefined,
+          }))
+        : undefined,
       groupTrips: Array.isArray(parsed.groupTrips) ? (parsed.groupTrips as any) : undefined,
       confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0.85,
       warnings: Array.isArray(parsed.warnings) ? parsed.warnings.map(String) : [],

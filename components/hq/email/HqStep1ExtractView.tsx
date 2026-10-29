@@ -22,8 +22,12 @@ import {
   Phone,
   Mail,
   BookmarkCheck,
+  GripVertical,
+  Plus,
+  X,
+  RotateCcw,
 } from 'lucide-react';
-import { HqEmailSummary, HqEmailDetail, HqEmailExtractedDraft } from '@/types/emailHq';
+import { HqEmailSummary, HqEmailDetail, HqEmailExtractedDraft, RouteWaypointItem } from '@/types/emailHq';
 import { haptics } from '@/utils/haptics';
 import { HqPlaceSearchInput, PoiResult } from '@/components/hq/HqPlaceSearchInput';
 import { saveContactToCrm } from '@/utils/crmCustomerSync';
@@ -60,6 +64,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
   // Editing mode toggle
   const [isEditing, setIsEditing] = useState(false);
   const [crmSavedNotice, setCrmSavedNotice] = useState<string | null>(null);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   // Field values with safe fallbacks
   const companyName = extractedDraft?.companyName || '';
@@ -85,6 +90,145 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
   const flightNumber = extractedDraft?.flightNumber || '';
   const requestedVehicleClass = extractedDraft?.requestedVehicleClass || '차량 미지정';
   const specialRequests = extractedDraft?.specialRequests || '';
+
+  // Multi-destination waypoints check
+  const waypoints: RouteWaypointItem[] = extractedDraft?.waypoints || [];
+  const hasMultipleWaypoints = waypoints.length > 2;
+
+  // Add a new waypoint in multi-destination mode
+  const handleAddWaypoint = () => {
+    if (!extractedDraft) return;
+    haptics.lightTap();
+    const currentWps = extractedDraft.waypoints && extractedDraft.waypoints.length > 0
+      ? [...extractedDraft.waypoints]
+      : [
+          { id: 'wp-1', order: 1, time: pickupTime !== '시간 미지정' ? pickupTime : '10:00', location: pickupLocation || '' },
+          { id: 'wp-2', order: 2, time: '', location: dropoffLocation || '' },
+        ];
+    
+    const nextIdx = currentWps.length + 1;
+    const newWp: RouteWaypointItem = {
+      id: `wp-${Date.now()}-${nextIdx}`,
+      order: nextIdx,
+      time: '',
+      location: '',
+    };
+    const nextWps = [...currentWps, newWp];
+    onUpdateDraft?.({
+      ...extractedDraft,
+      waypoints: nextWps,
+      dropoffLocation: nextWps[nextWps.length - 1].location || extractedDraft.dropoffLocation,
+    });
+  };
+
+  // Remove a waypoint
+  const handleRemoveWaypoint = (wpId: string) => {
+    if (!extractedDraft || !extractedDraft.waypoints || extractedDraft.waypoints.length <= 2) return;
+    haptics.lightTap();
+    const filtered = extractedDraft.waypoints.filter((w) => w.id !== wpId);
+    const reordered = filtered.map((w, idx) => ({ ...w, order: idx + 1 }));
+    const isStillMulti = reordered.length > 2;
+    onUpdateDraft?.({
+      ...extractedDraft,
+      waypoints: isStillMulti ? reordered : undefined,
+      pickupLocation: reordered[0]?.location || extractedDraft.pickupLocation,
+      pickupTime: reordered[0]?.time || extractedDraft.pickupTime,
+      dropoffLocation: reordered[reordered.length - 1]?.location || extractedDraft.dropoffLocation,
+    });
+  };
+
+  // Update waypoint time
+  const handleUpdateWaypointTime = (wpId: string, newTime: string) => {
+    if (!extractedDraft || !extractedDraft.waypoints) return;
+    const updated = extractedDraft.waypoints.map((w) => (w.id === wpId ? { ...w, time: newTime } : w));
+    onUpdateDraft?.({
+      ...extractedDraft,
+      waypoints: updated,
+      pickupTime: updated[0]?.id === wpId && newTime ? newTime : extractedDraft.pickupTime,
+    });
+  };
+
+  // Update waypoint location
+  const handleUpdateWaypointLocation = (wpId: string, newLoc: string) => {
+    if (!extractedDraft || !extractedDraft.waypoints) return;
+    const updated = extractedDraft.waypoints.map((w) => (w.id === wpId ? { ...w, location: newLoc } : w));
+    const isFirst = updated[0]?.id === wpId;
+    const isLast = updated[updated.length - 1]?.id === wpId;
+    onUpdateDraft?.({
+      ...extractedDraft,
+      waypoints: updated,
+      pickupLocation: isFirst ? newLoc : extractedDraft.pickupLocation,
+      dropoffLocation: isLast ? newLoc : extractedDraft.dropoffLocation,
+    });
+  };
+
+  // Convert single leg (pickup/dropoff) to multi-destination itinerary
+  const handleConvertToMultiDestination = () => {
+    if (!extractedDraft) return;
+    haptics.lightTap();
+    const newWaypoints: RouteWaypointItem[] = [
+      {
+        id: 'wp-1',
+        order: 1,
+        time: pickupTime !== '시간 미지정' ? pickupTime : '10:00',
+        location: pickupLocation || '인천공항 제1터미널 (T1)',
+        isPoiConfirmed: isPickupPoiConfirmed,
+      },
+      {
+        id: 'wp-2',
+        order: 2,
+        time: '12:00',
+        location: '중간 경유지 입력',
+      },
+      {
+        id: 'wp-3',
+        order: 3,
+        time: '14:00',
+        location: dropoffLocation || '최종 목적지 입력',
+        isPoiConfirmed: isDropoffPoiConfirmed,
+      },
+    ];
+    onUpdateDraft?.({
+      ...extractedDraft,
+      waypoints: newWaypoints,
+    });
+  };
+
+  // Reset multi-destination to single leg
+  const handleResetToSingleLeg = () => {
+    if (!extractedDraft) return;
+    haptics.lightTap();
+    onUpdateDraft?.({
+      ...extractedDraft,
+      waypoints: undefined,
+    });
+  };
+
+  // HTML5 Drag and Drop handlers for Waypoint reordering
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === targetIndex || !extractedDraft?.waypoints) return;
+    const items = [...extractedDraft.waypoints];
+    const [draggedItem] = items.splice(draggedIndex, 1);
+    items.splice(targetIndex, 0, draggedItem);
+    const reordered = items.map((it, idx) => ({ ...it, order: idx + 1 }));
+    setDraggedIndex(targetIndex);
+    onUpdateDraft?.({
+      ...extractedDraft,
+      waypoints: reordered,
+      pickupLocation: reordered[0]?.location || extractedDraft.pickupLocation,
+      pickupTime: reordered[0]?.time || extractedDraft.pickupTime,
+      dropoffLocation: reordered[reordered.length - 1]?.location || extractedDraft.dropoffLocation,
+    });
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+  };
 
   // Handle explicit CRM Save (Requires verified company and contact)
   const handleSaveToCrm = () => {
@@ -354,69 +498,180 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                   <Calendar className="w-3.5 h-3.5 text-slate-400" />
                   <span>운행 일시</span>
                 </div>
-                <div className="font-extrabold text-slate-900 text-right">
-                  {pickupDate} {pickupTime}
+                <div className="font-extrabold text-slate-900 text-right flex items-center gap-2 justify-end">
+                  <span>{pickupDate}</span>
+                  <span className="inline-flex items-center gap-1 text-slate-700 font-bold">
+                    <Clock className="w-3.5 h-3.5 text-slate-400" />
+                    <span>{pickupTime}</span>
+                  </span>
                 </div>
               </div>
 
-              {/* 픽업 위치 (TMAP POI 후보 연동) */}
-              <div className="py-3">
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center gap-2 text-slate-500 font-semibold w-28">
-                    <MapPin className="w-3.5 h-3.5 text-[#1E60F3]" />
-                    <span>픽업 위치</span>
-                  </div>
-                  <span className="text-[11px] text-slate-400 font-medium">
-                    {pickupDetailNotes && `[${pickupDetailNotes}]`}
-                  </span>
-                </div>
-                <HqPlaceSearchInput
-                  value={pickupLocation}
-                  onChange={(val) => {
-                    if (!extractedDraft) return;
-                    onUpdateDraft?.({
-                      ...extractedDraft,
-                      pickupLocation: val,
-                      isPickupPoiConfirmed: false,
-                    });
-                  }}
-                  onSelectPoi={handleSelectPickupPoi}
-                  autoSearch={true}
-                  isConfirmed={isPickupPoiConfirmed}
-                  placeholder="TMAP 출발지 검색 및 후보 선택"
-                  heightClass="h-10"
-                />
-              </div>
+              {/* ========================================================= */}
+              {/* 운행 경로: 다중 목적지 vs 단일 구간 (사용자 지시 조건부 UI) */}
+              {/* ========================================================= */}
+              {hasMultipleWaypoints ? (
+                /* 다중 목적지 UI (사용자 참조 이미지와 100% 일치) */
+                <div className="py-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <MapPin className="w-4 h-4 text-[#1E60F3] shrink-0" />
+                      <span className="font-extrabold text-slate-900 text-xs whitespace-nowrap">
+                        운행 경로 (여러 목적지)
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full bg-blue-50 text-[#1E60F3] text-[11px] font-extrabold border border-blue-100 shrink-0">
+                        {waypoints.length}개
+                      </span>
+                    </div>
 
-              {/* 목적지 (TMAP POI 후보 연동) */}
-              <div className="py-3">
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center gap-2 text-slate-500 font-semibold w-28">
-                    <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                    <span>목적지</span>
+                    <button
+                      type="button"
+                      onClick={handleAddWaypoint}
+                      className="flex items-center gap-1 text-[11px] font-extrabold text-[#1E60F3] hover:text-blue-700 bg-blue-50/80 hover:bg-blue-100 px-2.5 py-1 rounded-lg border border-blue-200/60 transition-colors cursor-pointer shrink-0 whitespace-nowrap"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>목적지 추가</span>
+                    </button>
                   </div>
-                  <span className="text-[11px] text-slate-400 font-medium">
-                    {dropoffDetailNotes && `[${dropoffDetailNotes}]`}
-                  </span>
+
+                  {/* Waypoint Rows */}
+                  <div className="space-y-1.5">
+                    {waypoints.map((wp, index) => (
+                      <div
+                        key={wp.id}
+                        draggable
+                        onDragStart={() => handleDragStart(index)}
+                        onDragOver={(e) => handleDragOver(e, index)}
+                        onDragEnd={handleDragEnd}
+                        className={`flex items-center gap-1.5 group transition-all ${
+                          draggedIndex === index ? 'opacity-40' : 'opacity-100'
+                        }`}
+                      >
+                        {/* Drag handle (6 dots ⋮⋮) */}
+                        <div
+                          className="text-slate-300 group-hover:text-slate-500 cursor-grab px-0.5 shrink-0 flex items-center"
+                          title="드래그하여 순서 변경"
+                        >
+                          <GripVertical className="w-3.5 h-3.5" />
+                        </div>
+
+                        {/* Number circle badge */}
+                        <div className="w-5 h-5 rounded-full bg-[#1E60F3] text-white font-extrabold text-[11px] flex items-center justify-center shrink-0 shadow-2xs">
+                          {index + 1}
+                        </div>
+
+                        {/* Time input pill */}
+                        <div className="flex items-center gap-1 px-1.5 py-1 rounded-lg border border-slate-200 bg-white shadow-2xs shrink-0 focus-within:border-blue-400">
+                          <Clock className="w-3 h-3 text-slate-400 shrink-0" />
+                          <input
+                            type="text"
+                            value={wp.time || ''}
+                            onChange={(e) => handleUpdateWaypointTime(wp.id, e.target.value)}
+                            placeholder="10:00"
+                            className="w-11 text-[11px] font-semibold text-slate-800 bg-transparent outline-none"
+                          />
+                        </div>
+
+                        {/* Location text input */}
+                        <div className="flex-1 min-w-0">
+                          <input
+                            type="text"
+                            value={wp.location}
+                            onChange={(e) => handleUpdateWaypointLocation(wp.id, e.target.value)}
+                            placeholder={`목적지 ${index + 1} 입력`}
+                            className="w-full px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none shadow-2xs transition-all"
+                          />
+                        </div>
+
+                        {/* Delete button (✕) */}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveWaypoint(wp.id)}
+                          disabled={waypoints.length <= 2}
+                          className="p-1 text-slate-300 hover:text-slate-600 disabled:opacity-20 disabled:hover:text-slate-300 transition-colors cursor-pointer shrink-0"
+                          title={waypoints.length <= 2 ? '최소 2개(출발/도착) 이상의 장소가 필요합니다' : '목적지 삭제'}
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <HqPlaceSearchInput
-                  value={dropoffLocation}
-                  onChange={(val) => {
-                    if (!extractedDraft) return;
-                    onUpdateDraft?.({
-                      ...extractedDraft,
-                      dropoffLocation: val,
-                      isDropoffPoiConfirmed: false,
-                    });
-                  }}
-                  onSelectPoi={handleSelectDropoffPoi}
-                  autoSearch={true}
-                  isConfirmed={isDropoffPoiConfirmed}
-                  icon="flag"
-                  placeholder="TMAP 도착지 검색 및 후보 선택"
-                  heightClass="h-10"
-                />
-              </div>
+              ) : (
+                /* 단일 구간 UI (장소 이동 1개일 때 기존 UI 100% 보존) */
+                <>
+                  {/* 픽업 위치 (TMAP POI 후보 연동) */}
+                  <div className="py-3">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2 text-slate-500 font-semibold w-28">
+                        <MapPin className="w-3.5 h-3.5 text-[#1E60F3]" />
+                        <span>픽업 위치</span>
+                      </div>
+                      <span className="text-[11px] text-slate-400 font-medium">
+                        {pickupDetailNotes && `[${pickupDetailNotes}]`}
+                      </span>
+                    </div>
+                    <HqPlaceSearchInput
+                      value={pickupLocation}
+                      onChange={(val) => {
+                        if (!extractedDraft) return;
+                        onUpdateDraft?.({
+                          ...extractedDraft,
+                          pickupLocation: val,
+                          isPickupPoiConfirmed: false,
+                        });
+                      }}
+                      onSelectPoi={handleSelectPickupPoi}
+                      autoSearch={true}
+                      isConfirmed={isPickupPoiConfirmed}
+                      placeholder="TMAP 출발지 검색 및 후보 선택"
+                      heightClass="h-10"
+                    />
+                  </div>
+
+                  {/* 목적지 (TMAP POI 후보 연동) */}
+                  <div className="py-3">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2 text-slate-500 font-semibold w-28">
+                        <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                        <span>목적지</span>
+                      </div>
+                      <span className="text-[11px] text-slate-400 font-medium">
+                        {dropoffDetailNotes && `[${dropoffDetailNotes}]`}
+                      </span>
+                    </div>
+                    <HqPlaceSearchInput
+                      value={dropoffLocation}
+                      onChange={(val) => {
+                        if (!extractedDraft) return;
+                        onUpdateDraft?.({
+                          ...extractedDraft,
+                          dropoffLocation: val,
+                          isDropoffPoiConfirmed: false,
+                        });
+                      }}
+                      onSelectPoi={handleSelectDropoffPoi}
+                      autoSearch={true}
+                      isConfirmed={isDropoffPoiConfirmed}
+                      icon="flag"
+                      placeholder="TMAP 도착지 검색 및 후보 선택"
+                      heightClass="h-10"
+                    />
+
+                    {/* 여러 목적지 / 경유지 추가 버튼 */}
+                    <div className="mt-2 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={handleConvertToMultiDestination}
+                        className="text-[11px] font-bold text-[#1E60F3] hover:text-blue-700 flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50/70 hover:bg-blue-100 transition-colors cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>목적지 추가 (여러 목적지 모드)</span>
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
 
               {/* 항공편명 */}
               <div className="py-2.5 flex items-center justify-between">
@@ -436,20 +691,32 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                   <span>요청 차종</span>
                 </div>
                 <div className="flex items-center gap-1.5 justify-end flex-wrap">
-                  <span className="px-2 py-0.5 rounded-md bg-blue-50 text-[#1E60F3] border border-blue-200 text-[11px] font-bold">
+                  <span className="px-2.5 py-1 rounded-md bg-blue-50 text-[#1E60F3] border border-blue-200 text-xs font-extrabold shadow-2xs">
                     {requestedVehicleClass}
                   </span>
                 </div>
               </div>
 
-              {/* 특이사항 */}
-              <div className="py-2.5 flex items-start justify-between">
-                <div className="flex items-center gap-2 text-slate-500 font-semibold w-28 shrink-0">
+              {/* 특이사항 (텍스트에어리어 박스 UI) */}
+              <div className="py-3 flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2 text-slate-500 font-semibold w-28 shrink-0 mt-2">
                   <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
                   <span>특이사항</span>
                 </div>
-                <div className="font-bold text-slate-800 text-right leading-snug">
-                  {specialRequests || '특이사항 없음'}
+                <div className="flex-1">
+                  <textarea
+                    value={specialRequests}
+                    onChange={(e) => {
+                      if (!extractedDraft) return;
+                      onUpdateDraft?.({
+                        ...extractedDraft,
+                        specialRequests: e.target.value,
+                      });
+                    }}
+                    rows={2}
+                    className="w-full p-2.5 text-xs text-slate-800 bg-white border border-slate-200 rounded-xl outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 resize-none leading-relaxed shadow-2xs"
+                    placeholder="특이사항 입력 (예: 기사 배정 시 차량번호 안내 요청)"
+                  />
                 </div>
               </div>
             </div>

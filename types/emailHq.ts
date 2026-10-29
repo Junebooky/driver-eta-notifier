@@ -49,6 +49,17 @@ export interface VehicleSlotAssignment {
   status: 'unassigned' | 'assigned';
 }
 
+export interface RouteWaypointItem {
+  id: string;
+  order: number;
+  time?: string; // HH:MM (e.g. "10:00")
+  location: string; // e.g. "인천공항 제1터미널 (T1)"
+  lat?: number;
+  lng?: number;
+  isPoiConfirmed?: boolean;
+  notes?: string;
+}
+
 export interface HqGroupTripItem {
   id: string;
   passengerName: string;
@@ -96,6 +107,9 @@ export interface HqEmailExtractedDraft {
   dropoffLat?: number;
   dropoffLng?: number;
   isDropoffPoiConfirmed?: boolean;
+
+  // Multiple destinations / itinerary waypoints (when schedule visits multiple locations in a day)
+  waypoints?: RouteWaypointItem[];
 
   flightNumber: string;
   requestedVehicleClass: string;
