@@ -4,7 +4,7 @@
  * Synchronized with live Supabase `cockpit.customers` DB table.
  */
 
-import { HqCustomer, CustomerContact } from '@/types/customerHq';
+import { HqCustomer, CustomerContact, CustomerTier } from '@/types/customerHq';
 import { INITIAL_HQ_CUSTOMERS } from '@/utils/customerHqData';
 import { ensureClientAuth } from '@/utils/cockpitClientAuth';
 
@@ -113,8 +113,12 @@ export async function updateHqCustomerInDb(customer: HqCustomer): Promise<boolea
         name: customer.name,
         tier: customer.tier,
         isFavorite: customer.isFavorite,
+        preferences: customer.preferences,
         notes: customer.notes,
         contacts: customer.contacts,
+        department: customer.department,
+        nextEvent: customer.nextEvent,
+        recentSnippet: customer.recentSnippet,
         phone: customer.mainPhone,
         email: customer.mainEmail,
         contactPerson: customer.primaryContactName,
@@ -236,6 +240,11 @@ export interface SaveContactToCrmParams {
   role?: string;
   department?: string;
   notes?: string;
+  notesList?: string[];
+  tier?: CustomerTier;
+  preferences?: string[];
+  isFavorite?: boolean;
+  nextEvent?: HqCustomer['nextEvent'];
   sourceDraftId?: string;
 }
 
@@ -274,6 +283,11 @@ export function saveContactToCrmLocal(params: SaveContactToCrmParams): SaveConta
     role = '예약 담당자',
     department = '의전예약',
     notes = '',
+    notesList,
+    tier = '주요',
+    preferences = [],
+    isFavorite = false,
+    nextEvent,
     sourceDraftId,
   } = params;
 
@@ -387,19 +401,21 @@ export function saveContactToCrmLocal(params: SaveContactToCrmParams): SaveConta
   const newCustomer: HqCustomer = {
     id: newCompanyId,
     name: companyName,
-    tier: '일반',
-    isFavorite: false,
+    tier,
+    isFavorite,
     logoType: 'default',
     logoBg: '#1E60F3',
     logoColor: '#FFFFFF',
     primaryContactName: contactName,
     contactCountExtra: 0,
-    recentSnippet: `이메일 예약 접수 (${sourceDraftId || '신규'})`,
+    recentSnippet: nextEvent?.title || `이메일 예약 접수 (${sourceDraftId || '신규'})`,
+    nextEventDate: nextEvent?.date,
+    nextEvent,
     mainPhone: cleanPhone,
     mainEmail: contactEmail,
     department: department || '의전예약',
-    preferences: ['의전 리무진', '정시 배차'],
-    notes: notes ? [notes] : [`이메일 예약을 통한 신규 등록 (${new Date().toLocaleDateString('ko-KR')})`],
+    preferences: preferences.length > 0 ? preferences : ['의전 리무진', '정시 배차'],
+    notes: notesList && notesList.length > 0 ? notesList : notes ? [notes] : [`이메일 예약을 통한 신규 등록 (${new Date().toLocaleDateString('ko-KR')})`],
     recentRequests: [],
     contacts: [newContact],
     eventsHistory: [],

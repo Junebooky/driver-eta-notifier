@@ -59,12 +59,12 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
         primaryContactName: contactName.trim() || '담당자',
         contactCountExtra: 0,
         recentSnippet: nextEventTitle.trim() || '신규 고객사 등록',
-        nextEventDate: nextEventDate.trim() || '2024. 11. 30',
-        mainPhone: contactPhone.trim() || '010-0000-0000',
-        mainEmail: contactEmail.trim() || 'vip@company.com',
-        department: department.trim() || 'VIP 의전팀',
-        preferences: prefList.length > 0 ? prefList : ['정시 출발 필수', '금연 차량'],
-        notes: noteList.length > 0 ? noteList : ['신규 등록 고객사'],
+        nextEventDate: nextEventDate.trim() || undefined,
+        mainPhone: contactPhone.trim(),
+        mainEmail: contactEmail.trim(),
+        department: department.trim() || '의전예약',
+        preferences: prefList,
+        notes: noteList,
         nextEvent: nextEventTitle.trim()
           ? {
               id: `ev-${Date.now()}`,

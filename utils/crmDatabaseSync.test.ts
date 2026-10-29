@@ -21,9 +21,9 @@ if (!process.env.COCKPIT_AUTH_SECRET) {
   process.env.COCKPIT_AUTH_SECRET = 'mock-test-auth-secret-key-for-crm-test-32chars';
 }
 
-test('Item 3: Isolated Mock CRM DB Synchronization & Deduplication (Zero Live DB Mutation)', async () => {
+test('CRM Full Round-Trip & Quality Gate Test Suite (Zero Live DB Mutation)', async () => {
   // In-memory isolated DB seed - guarantees ZERO network requests to live Supabase DB
-  const mockRows: MockCustomerRow[] = [
+  let mockRows: MockCustomerRow[] = [
     {
       id: 'cust-chanel',
       name: 'CHANEL',
@@ -32,6 +32,10 @@ test('Item 3: Isolated Mock CRM DB Synchronization & Deduplication (Zero Live DB
       email: 'marie.dupont@chanel.com',
       pricing_preset: {
         tier: 'VIP',
+        isFavorite: true,
+        department: 'Executive Protocol',
+        preferences: ['블랙 세단 선호', '정시 도착 필수'],
+        notes: ['기존 CHANEL VIP 의전 계정'],
         contacts: [
           {
             id: 'c-chanel-1',
@@ -52,21 +56,17 @@ test('Item 3: Isolated Mock CRM DB Synchronization & Deduplication (Zero Live DB
       phone: '010-2222-3333',
       email: 'jihoon.park@intercos.com',
       pricing_preset: {
-        tier: 'VVIP',
-        contacts: [
-          {
-            id: 'c-intercos-1',
-            name: '박지훈',
-            phone: '010-2222-3333',
-            email: 'jihoon.park@intercos.com',
-            isPrimary: true,
-            role: '의전 팀장',
-            department: 'Corporate Protocol',
-          },
-        ],
+        tier: '주요',
+        isFavorite: false,
+        department: 'Corporate Protocol',
+        preferences: [],
+        notes: [],
+        contacts: [],
       },
     },
   ];
+
+  let simulateDbError = false;
 
   // Save original from handler
   const originalFrom = supabaseAdmin.from.bind(supabaseAdmin);
@@ -85,11 +85,24 @@ test('Item 3: Isolated Mock CRM DB Synchronization & Deduplication (Zero Live DB
         return builder;
       },
       single: async () => {
+        if (simulateDbError) {
+          return { data: null, error: { message: 'Simulated DB internal error' } };
+        }
         const found = mockRows.find((r) => (r as any)[filterField!] === filterVal);
         return { data: found ? { ...found } : null, error: found ? null : { message: 'Row not found' } };
       },
+      maybeSingle: async () => {
+        if (simulateDbError) {
+          return { data: null, error: { message: 'Simulated DB internal error' } };
+        }
+        const found = mockRows.find((r) => (r as any)[filterField!] === filterVal);
+        return { data: found ? { ...found } : null, error: null };
+      },
       update: (updates: any) => ({
         eq: async (field: string, val: any) => {
+          if (simulateDbError) {
+            return { data: null, error: { message: 'Simulated DB update failure' } };
+          }
           const idx = mockRows.findIndex((r) => (r as any)[field] === val);
           if (idx >= 0) {
             mockRows[idx] = { ...mockRows[idx], ...updates, updated_at: new Date().toISOString() };
@@ -99,6 +112,9 @@ test('Item 3: Isolated Mock CRM DB Synchronization & Deduplication (Zero Live DB
         },
       }),
       insert: async (newRow: any) => {
+        if (simulateDbError) {
+          return { data: null, error: { message: 'Simulated DB insert failure' } };
+        }
         mockRows.push({ ...newRow, created_at: new Date().toISOString() });
         return { data: newRow, error: null };
       },
@@ -112,6 +128,9 @@ test('Item 3: Isolated Mock CRM DB Synchronization & Deduplication (Zero Live DB
         },
       }),
       then: (resolve: any, _reject: any) => {
+        if (simulateDbError) {
+          return Promise.resolve({ data: null, error: { message: 'Simulated DB query failure' } }).then(resolve);
+        }
         let res = mockRows.map((r) => ({ ...r }));
         if (filterField !== null) {
           res = res.filter((r) => (r as any)[filterField!] === filterVal);
@@ -133,30 +152,132 @@ test('Item 3: Isolated Mock CRM DB Synchronization & Deduplication (Zero Live DB
       role: 'hq_admin',
     });
 
-    const makeReq = (method: string, body?: any) => {
-      return new NextRequest('http://localhost:3000/api/hq/customers', {
+    const driverToken = signCockpitSession({
+      userId: 'driver-test-user',
+      org: 'vip_limousine_korea',
+      role: 'driver',
+    });
+
+    const makeReq = (method: string, body?: any, token: string = adminToken, query: string = '') => {
+      const url = `http://localhost:3000/api/hq/customers${query ? `?${query}` : ''}`;
+      return new NextRequest(url, {
         method,
         headers: {
-          Authorization: `Bearer ${adminToken}`,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
           'Content-Type': 'application/json',
         },
         body: body ? JSON.stringify(body) : undefined,
       });
     };
 
-    // 1. GET: Fetch existing customers strictly from in-memory DB
-    const getRes = await GET(makeReq('GET'));
-    const getData = await getRes.json();
-    assert.strictEqual(getRes.status, 200);
-    assert.strictEqual(getData.ok, true);
-    assert.ok(Array.isArray(getData.customers), 'Customers must be an array');
-    assert.strictEqual(getData.customers.length, 2, 'Must return exactly 2 seeded in-memory customers');
+    // =========================================================================
+    // 1. Full Round-Trip Verification: Register New Customer with ALL Fields
+    // =========================================================================
+    const registerPayload = {
+      companyName: '불가리 코리아',
+      tier: 'VIP' as const,
+      department: '글로벌 이벤트 총괄',
+      contactName: '이지은',
+      role: '수석 매니저',
+      contactPhone: '010-3333-7777',
+      contactEmail: 'jieun.lee@bulgari.com',
+      preferences: ['스프린터 519 선호', '영어 유창 기사', '정시 피켓팅'],
+      notesList: ['VIP 프라이빗 주얼리 쇼 의전', '보안 의전 필수'],
+      nextEvent: {
+        id: 'ev-bulgari-1',
+        title: '2026 하이 주얼리 트렁크쇼',
+        date: '2026-11-15',
+        dDay: 'D-17',
+        location: '신라호텔 영빈관',
+        vehiclesRequired: '스프린터 2대',
+        passengerCount: 6,
+        timeRange: '10:00 - 20:00',
+        status: 'upcoming' as const,
+      },
+      isFavorite: true,
+    };
 
-    const chanel = getData.customers.find((c: any) => c.name.toUpperCase() === 'CHANEL');
-    assert.ok(chanel, 'CHANEL must exist in in-memory customers');
-    assert.strictEqual(chanel.primaryContactName, 'Marie Dupont');
+    const registerRes = await POST(makeReq('POST', registerPayload));
+    const registerData = await registerRes.json();
+    assert.strictEqual(registerRes.status, 200);
+    assert.strictEqual(registerData.ok, true);
+    assert.strictEqual(registerData.isNewCustomer, true);
+    assert.strictEqual(registerData.isNewContact, true);
+    assert.ok(registerData.clientId.startsWith('cust-'));
+    assert.ok(registerData.contactId.startsWith('c-'));
 
-    // 2. POST: Deduplication test - linking existing contact to CHANEL
+    // Re-query via GET to verify complete round-trip fidelity
+    const getAfterRegister = await GET(makeReq('GET'));
+    const getRegisterData = await getAfterRegister.json();
+    assert.strictEqual(getAfterRegister.status, 200);
+    const savedBulgari = getRegisterData.customers.find((c: any) => c.name === '불가리 코리아');
+    assert.ok(savedBulgari, 'Bulgari Korea must exist after registration');
+    assert.strictEqual(savedBulgari.tier, 'VIP', 'Tier must match 100%');
+    assert.strictEqual(savedBulgari.isFavorite, true, 'isFavorite must match 100%');
+    assert.strictEqual(savedBulgari.department, '글로벌 이벤트 총괄', 'Department must match 100%');
+    assert.strictEqual(savedBulgari.primaryContactName, '이지은', 'Contact name must match 100%');
+    assert.strictEqual(savedBulgari.mainPhone, '010-3333-7777', 'Main phone must match 100%');
+    assert.strictEqual(savedBulgari.mainEmail, 'jieun.lee@bulgari.com', 'Main email must match 100%');
+    assert.deepStrictEqual(savedBulgari.preferences, ['스프린터 519 선호', '영어 유창 기사', '정시 피켓팅'], 'Preferences must match 100%');
+    assert.deepStrictEqual(savedBulgari.notes, ['VIP 프라이빗 주얼리 쇼 의전', '보안 의전 필수'], 'Notes must match 100%');
+    assert.strictEqual(savedBulgari.nextEvent?.title, '2026 하이 주얼리 트렁크쇼', 'NextEvent must match 100%');
+    assert.strictEqual(savedBulgari.contacts[0].role, '수석 매니저', 'Contact role must match 100%');
+
+    // Verify NO fake fallback values were injected
+    assert.notStrictEqual(savedBulgari.mainPhone, '010-0000-0000', 'Must not have fake phone fallback');
+    assert.notStrictEqual(savedBulgari.mainEmail, 'vip@company.com', 'Must not have fake email fallback');
+
+    // =========================================================================
+    // 2. Full Round-Trip Verification: Update Customer (Preferences, Notes, Tier)
+    // =========================================================================
+    const updatePayload = {
+      id: savedBulgari.id,
+      name: '불가리 코리아 (업데이트)',
+      tier: '일반' as const,
+      isFavorite: false,
+      preferences: ['G90 의전 선호', '생수 에비앙 준비'],
+      notes: ['수정된 의전 지침: 공항 게이트 B 대기'],
+      department: '리테일 마케팅',
+      phone: '02-2056-0000',
+      email: 'contact@bulgari.kr',
+      contactPerson: '김태희',
+    };
+
+    const putRes = await PUT(makeReq('PUT', updatePayload));
+    const putData = await putRes.json();
+    assert.strictEqual(putRes.status, 200);
+    assert.strictEqual(putData.ok, true);
+
+    // Re-query via GET to verify PUT updates were persisted in DB
+    const getAfterUpdate = await GET(makeReq('GET'));
+    const getUpdateData = await getAfterUpdate.json();
+    const updatedBulgari = getUpdateData.customers.find((c: any) => c.id === savedBulgari.id);
+    assert.ok(updatedBulgari, 'Updated customer must exist');
+    assert.strictEqual(updatedBulgari.name, '불가리 코리아 (업데이트)');
+    assert.strictEqual(updatedBulgari.tier, '일반');
+    assert.strictEqual(updatedBulgari.isFavorite, false);
+    assert.deepStrictEqual(updatedBulgari.preferences, ['G90 의전 선호', '생수 에비앙 준비'], 'Preferences update must persist in DB');
+    assert.deepStrictEqual(updatedBulgari.notes, ['수정된 의전 지침: 공항 게이트 B 대기'], 'Notes update must persist in DB');
+    assert.strictEqual(updatedBulgari.department, '리테일 마케팅');
+    assert.strictEqual(updatedBulgari.mainPhone, '02-2056-0000');
+    assert.strictEqual(updatedBulgari.mainEmail, 'contact@bulgari.kr');
+
+    // =========================================================================
+    // 3. Favorite Toggle Round-Trip
+    // =========================================================================
+    const toggleTrue = await PUT(makeReq('PUT', { id: savedBulgari.id, isFavorite: true }));
+    assert.strictEqual(toggleTrue.status, 200);
+    const getFavTrue = await (await GET(makeReq('GET'))).json();
+    assert.strictEqual(getFavTrue.customers.find((c: any) => c.id === savedBulgari.id)?.isFavorite, true);
+
+    const toggleFalse = await PUT(makeReq('PUT', { id: savedBulgari.id, isFavorite: false }));
+    assert.strictEqual(toggleFalse.status, 200);
+    const getFavFalse = await (await GET(makeReq('GET'))).json();
+    assert.strictEqual(getFavFalse.customers.find((c: any) => c.id === savedBulgari.id)?.isFavorite, false);
+
+    // =========================================================================
+    // 4. Contact Linking & Deduplication (CHANEL)
+    // =========================================================================
     const existingContactPost = await POST(
       makeReq('POST', {
         companyName: 'CHANEL',
@@ -167,76 +288,85 @@ test('Item 3: Isolated Mock CRM DB Synchronization & Deduplication (Zero Live DB
     );
     const existingData = await existingContactPost.json();
     assert.strictEqual(existingContactPost.status, 200);
-    assert.strictEqual(existingData.ok, true);
+    assert.strictEqual(existingData.isNewCustomer, false);
+    assert.strictEqual(existingData.isNewContact, false, 'Duplicate contact must be linked without recreation');
     assert.strictEqual(existingData.clientId, 'cust-chanel');
     assert.strictEqual(existingData.contactId, 'c-chanel-1');
-    assert.strictEqual(existingData.isNewCustomer, false, 'Must recognize existing customer');
-    assert.strictEqual(existingData.isNewContact, false, 'Must recognize existing contact (deduplication)');
 
-    // 3. POST: Adding a NEW contact to existing CHANEL company
+    // Add NEW contact to CHANEL
     const newContactPost = await POST(
       makeReq('POST', {
         companyName: 'CHANEL',
-        contactName: 'Pierre Dubois',
-        contactEmail: 'pierre.dubois@chanel.com',
-        contactPhone: '010-8888-9999',
-        role: 'VIP 의전 팀장',
-        department: 'Global Events',
+        contactName: 'Chloe Bernard',
+        contactEmail: 'chloe.bernard@chanel.com',
+        contactPhone: '010-9999-1234',
+        role: '의전 매니저',
       })
     );
     const newContactData = await newContactPost.json();
     assert.strictEqual(newContactPost.status, 200);
-    assert.strictEqual(newContactData.ok, true);
+    assert.strictEqual(newContactData.isNewCustomer, false);
+    assert.strictEqual(newContactData.isNewContact, true);
     assert.strictEqual(newContactData.clientId, 'cust-chanel');
-    assert.strictEqual(newContactData.isNewCustomer, false, 'Must match existing CHANEL');
-    assert.strictEqual(newContactData.isNewContact, true, 'Must detect new contact');
-    assert.ok(newContactData.contactId.startsWith('c-'), 'Must generate contact ID');
 
-    // Verify in-memory state updated
-    const updatedChanelRow = mockRows.find((r) => r.id === 'cust-chanel');
-    assert.strictEqual(updatedChanelRow?.pricing_preset.contacts.length, 2);
+    // =========================================================================
+    // 5. Failure Path Tests: 401 Unauthorized, 403 Forbidden, 400 Bad Request
+    // =========================================================================
+    // 5-A: 401 Unauthorized (Missing token)
+    const noTokenReq = makeReq('GET', undefined, '');
+    const noTokenRes = await GET(noTokenReq);
+    assert.strictEqual(noTokenRes.status, 401, 'Request without token must be rejected with 401');
 
-    // 4. POST: Registering a completely NEW company & contact
-    const newCompanyPost = await POST(
-      makeReq('POST', {
-        companyName: '테스트글로벌파트너스',
-        contactName: '김민수',
-        contactEmail: 'minsu@test-partner.com',
-        contactPhone: '010-7777-6666',
-        notes: '이메일 AI 예약 테스트 고객사',
-      })
-    );
-    const newCompData = await newCompanyPost.json();
-    assert.strictEqual(newCompanyPost.status, 200);
-    assert.strictEqual(newCompData.ok, true);
-    assert.strictEqual(newCompData.isNewCustomer, true, 'Must be recognized as new customer');
-    assert.strictEqual(newCompData.isNewContact, true, 'Must be recognized as new contact');
-    assert.ok(newCompData.clientId.startsWith('cust-'), 'Must generate customer ID');
+    // 5-B: 403 Forbidden (Driver role token attempting HQ Admin endpoint)
+    const driverReq = makeReq('GET', undefined, driverToken);
+    const driverRes = await GET(driverReq);
+    assert.strictEqual(driverRes.status, 403, 'Driver accessing HQ Admin must be rejected with 403');
 
-    // Verify persisted in mockRows
-    assert.strictEqual(mockRows.length, 3, 'mockRows must now have 3 companies');
-    const createdCompany = mockRows.find((r) => r.id === newCompData.clientId);
-    assert.strictEqual(createdCompany?.name, '테스트글로벌파트너스');
-    assert.strictEqual(createdCompany?.contact_person, '김민수');
+    // 5-C: 400 Bad Request (Missing company name)
+    const badReqNoCompany = await POST(makeReq('POST', { companyName: '', contactName: '홍길동' }));
+    assert.strictEqual(badReqNoCompany.status, 400);
 
-    // 5. Verify ?demo=true in production is rejected with 403 Forbidden
+    // 5-D: 400 Bad Request (Missing contact name)
+    const badReqNoContact = await POST(makeReq('POST', { companyName: '유효한 회사', contactName: '' }));
+    assert.strictEqual(badReqNoContact.status, 400);
+
+    // 5-E: 400 Bad Request on PUT (Missing customer ID)
+    const badPutNoId = await PUT(makeReq('PUT', { name: '새 이름' }));
+    assert.strictEqual(badPutNoId.status, 400);
+
+    // 5-F: 404 Not Found on PUT (Nonexistent customer ID)
+    const notFoundPut = await PUT(makeReq('PUT', { id: 'cust-nonexistent-999999', name: '새 이름' }));
+    assert.strictEqual(notFoundPut.status, 404);
+
+    // 5-G: 403 Forbidden on ?demo=true in production environment
     const prevEnv = process.env.NODE_ENV;
     try {
       (process.env as any).NODE_ENV = 'production';
-      const demoReq = new NextRequest('http://localhost:3000/api/hq/customers?demo=true', {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${adminToken}`,
-        },
-      });
+      const demoReq = makeReq('GET', undefined, adminToken, 'demo=true');
       const demoRes = await GET(demoReq);
       assert.strictEqual(demoRes.status, 403, 'Demo mode must be blocked in production');
     } finally {
       (process.env as any).NODE_ENV = prevEnv;
     }
 
-    // 6. Verify live DB was NEVER mutated (only in-memory mockRows modified)
-    console.log('✓ Mock test passed with zero live DB mutations.');
+    // =========================================================================
+    // 6. DB 500 Failure Simulation Test
+    // =========================================================================
+    simulateDbError = true;
+    try {
+      const dbErrGet = await GET(makeReq('GET'));
+      assert.strictEqual(dbErrGet.status, 500, 'Database failure on GET must return 500 status');
+
+      const dbErrPost = await POST(makeReq('POST', { companyName: '에러테스트', contactName: '테스터' }));
+      assert.strictEqual(dbErrPost.status, 500, 'Database failure on POST must return 500 status');
+
+      const dbErrPut = await PUT(makeReq('PUT', { id: 'cust-chanel', tier: 'VIP' }));
+      assert.strictEqual(dbErrPut.status, 500, 'Database failure on PUT must return 500 status');
+    } finally {
+      simulateDbError = false;
+    }
+
+    console.log('✓ All CRM round-trip, full-field persistence, and failure scenario tests passed (0 live DB mutations).');
   } finally {
     // Restore original supabaseAdmin.from
     supabaseAdmin.from = originalFrom;

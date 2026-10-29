@@ -92,7 +92,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
     loadAuthoritativeCustomers();
 
     const handleUpdate = () => {
-      setCustomers(getStoredCustomers());
+      loadAuthoritativeCustomers();
     };
     window.addEventListener(CRM_CUSTOMERS_UPDATE_EVENT, handleUpdate);
     window.addEventListener('storage', handleUpdate);
@@ -316,8 +316,14 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
         contactName: newCustomerDraft.primaryContactName || newCustomerDraft.contacts[0]?.name || '담당자',
         contactPhone: newCustomerDraft.mainPhone || newCustomerDraft.contacts[0]?.phone || '',
         contactEmail: newCustomerDraft.mainEmail || newCustomerDraft.contacts[0]?.email || '',
+        role: newCustomerDraft.contacts[0]?.role || '담당자',
         department: newCustomerDraft.department,
         notes: newCustomerDraft.notes?.[0] || '',
+        notesList: newCustomerDraft.notes,
+        tier: newCustomerDraft.tier,
+        preferences: newCustomerDraft.preferences,
+        isFavorite: newCustomerDraft.isFavorite,
+        nextEvent: newCustomerDraft.nextEvent,
       });
 
       if (!res.success || !res.clientId) {

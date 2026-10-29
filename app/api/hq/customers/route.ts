@@ -100,7 +100,8 @@ export async function GET(req: NextRequest) {
         primaryContactName: row.contact_person || mergedContacts[0]?.name || '',
         contactCountExtra: Math.max(0, mergedContacts.length - 1),
         recentSnippet: preset.recentSnippet || (row.quotes && row.quotes.length > 0 ? `견적서 ${row.quotes.length}건 등록됨` : '등록된 고객사'),
-        nextEventDate: preset.nextEventDate,
+        nextEventDate: preset.nextEventDate || preset.nextEvent?.date,
+        nextEvent: preset.nextEvent || undefined,
         mainPhone: row.phone || '',
         mainEmail: row.email || '',
         department: preset.department || '의전예약',
@@ -140,6 +141,11 @@ export async function POST(req: NextRequest) {
       role = '예약 담당자',
       department = '의전예약',
       notes = '',
+      notesList,
+      tier,
+      preferences,
+      isFavorite,
+      nextEvent,
       sourceDraftId,
     } = body;
 
@@ -283,14 +289,26 @@ export async function POST(req: NextRequest) {
       };
 
       const updatedContacts = [...existingContacts, newContact];
-      const updatedNotes = notes
+      const updatedNotes = Array.isArray(notesList) && notesList.length > 0
+        ? notesList
+        : notes
         ? [notes, ...(Array.isArray(preset.notes) ? preset.notes : [])]
         : Array.isArray(preset.notes) ? preset.notes : [];
 
+      const updatedPreferences = Array.isArray(preferences) && preferences.length > 0
+        ? preferences
+        : Array.isArray(preset.preferences) ? preset.preferences : [];
+
       const updatedPreset = {
         ...preset,
+        tier: tier !== undefined ? tier : preset.tier || '주요',
+        isFavorite: isFavorite !== undefined ? Boolean(isFavorite) : Boolean(preset.isFavorite),
+        department: department !== undefined ? department : preset.department || '의전예약',
+        preferences: updatedPreferences,
         contacts: updatedContacts,
         notes: updatedNotes,
+        nextEvent: nextEvent !== undefined ? nextEvent : preset.nextEvent,
+        recentSnippet: nextEvent?.title || preset.recentSnippet,
       };
 
       const { error: updateErr } = await supabaseAdmin
@@ -338,11 +356,23 @@ export async function POST(req: NextRequest) {
       isPrimary: true,
     };
 
+    const finalNotes = Array.isArray(notesList) && notesList.length > 0
+      ? notesList
+      : notes ? [notes] : [`신규 등록 (${new Date().toLocaleDateString('ko-KR')})`];
+
+    const finalPreferences = Array.isArray(preferences)
+      ? preferences
+      : [];
+
     const newPreset = {
-      tier: '일반',
+      tier: tier || '주요',
+      isFavorite: Boolean(isFavorite),
+      department: department || '의전예약',
+      preferences: finalPreferences,
       contacts: [newContact],
-      notes: notes ? [notes] : [`이메일 예약을 통한 신규 등록 (${new Date().toLocaleDateString('ko-KR')})`],
-      recentSnippet: `이메일 예약 접수 (${sourceDraftId || '신규'})`,
+      notes: finalNotes,
+      nextEvent: nextEvent || undefined,
+      recentSnippet: nextEvent?.title || (sourceDraftId ? `이메일 예약 접수 (${sourceDraftId})` : `신규 등록 (${new Date().toLocaleDateString('ko-KR')})`),
     };
 
     const { error: insertErr } = await supabaseAdmin.from('customers').insert({
@@ -390,7 +420,21 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { id, tier, isFavorite, notes, contacts, name, phone, email, contactPerson } = body;
+    const {
+      id,
+      tier,
+      isFavorite,
+      preferences,
+      notes,
+      contacts,
+      department,
+      nextEvent,
+      recentSnippet,
+      name,
+      phone,
+      email,
+      contactPerson,
+    } = body;
 
     if (!id) {
       return NextResponse.json({ ok: false, error: '고객사 ID(id)가 필요합니다.' }, { status: 400 });
@@ -402,7 +446,12 @@ export async function PUT(req: NextRequest) {
       .eq('id', id)
       .maybeSingle();
 
-    if (findErr || !existing) {
+    if (findErr) {
+      console.error('[HQ Customers PUT] Find error:', findErr);
+      return NextResponse.json({ ok: false, error: findErr.message }, { status: 500 });
+    }
+
+    if (!existing) {
       return NextResponse.json({ ok: false, error: '해당 고객사를 찾을 수 없습니다.' }, { status: 404 });
     }
 
@@ -411,8 +460,12 @@ export async function PUT(req: NextRequest) {
       ...currentPreset,
       tier: tier !== undefined ? tier : currentPreset.tier,
       isFavorite: isFavorite !== undefined ? isFavorite : currentPreset.isFavorite,
+      preferences: preferences !== undefined ? preferences : currentPreset.preferences,
       notes: notes !== undefined ? notes : currentPreset.notes,
       contacts: contacts !== undefined ? contacts : currentPreset.contacts,
+      department: department !== undefined ? department : currentPreset.department,
+      nextEvent: nextEvent !== undefined ? nextEvent : currentPreset.nextEvent,
+      recentSnippet: recentSnippet !== undefined ? recentSnippet : currentPreset.recentSnippet,
     };
 
     const { error: updateErr } = await supabaseAdmin

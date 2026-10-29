@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "tsx utils/crmDatabaseSync.test.ts && tsx utils/emailContactDisambiguationAndCrm.test.ts && tsx utils/emailWorkflowSteps.test.ts && tsx utils/vehicleSlotParser.test.ts && tsx utils/hipassSyncAndMasking.test.ts && tsx utils/dispatchWorkflow.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.23.0",
@@ -30,6 +31,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }
