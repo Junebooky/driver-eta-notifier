@@ -5,6 +5,11 @@ import { HqDrivingLog, HqDrivingLogStatus } from '@/types/drivingLogHq';
 
 export const dynamic = 'force-dynamic';
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+export function isValidUuid(val: any): boolean {
+  return typeof val === 'string' && UUID_REGEX.test(val);
+}
+
 function formatOdoNum(val: any): number {
   if (typeof val === 'number') return val;
   if (!val) return 0;
@@ -123,12 +128,11 @@ export async function GET(req: NextRequest) {
     const { data, error } = await query;
 
     if (error) {
-      console.warn('[DrivingLogs GET] DB Query note/error:', error.message);
-      return NextResponse.json({
-        ok: true,
-        logs: [],
-        note: 'Table cockpit.driving_logs query fallback',
-      });
+      console.error('[DrivingLogs GET] DB Query error:', error.message);
+      return NextResponse.json(
+        { ok: false, error: `운행일지 목록 조회 실패: ${error.message}` },
+        { status: 500 }
+      );
     }
 
     const logs: HqDrivingLog[] = (data || []).map((row: any, idx: number) => mapDbRowToDrivingLog(row, idx + 1));
@@ -208,7 +212,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Ownership verification when updating existing log
-    if (id && !id.startsWith('driver-sub-')) {
+    if (id && isValidUuid(id)) {
       const { data: existingLog, error: existErr } = await supabaseAdmin
         .from('driving_logs')
         .select('id, driver_id, organization_id, status')
@@ -284,7 +288,7 @@ export async function POST(req: NextRequest) {
     if (bookingId) {
       const { data: scheduleRow, error: schedErr } = await supabaseAdmin
         .from('schedules')
-        .select('id, customer_name, driver_name, vehicle_no, vehicle_plate, schedule_meta')
+        .select('id, customer_name, driver_name, driver_id, vehicle_no, vehicle_plate, schedule_meta')
         .eq('id', bookingId)
         .maybeSingle();
 
@@ -302,17 +306,12 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // If requester is a driver, verify that this booking is assigned to them
+      // If requester is a driver, verify that this booking is strictly assigned to their driver_id
       if (auth.session.role === 'driver') {
-        const schedMetaDriverId = scheduleRow.schedule_meta?.driver_id;
-        const isAssigned =
-          (schedMetaDriverId && schedMetaDriverId === effectiveDriverId) ||
-          (scheduleRow.driver_name && scheduleRow.driver_name === auth.session.driverName) ||
-          (scheduleRow.vehicle_plate && scheduleRow.vehicle_plate === auth.session.carNumber);
-
-        if (!isAssigned) {
+        const schedMetaDriverId = scheduleRow.schedule_meta?.driver_id || scheduleRow.driver_id;
+        if (!schedMetaDriverId || schedMetaDriverId !== effectiveDriverId) {
           return NextResponse.json(
-            { ok: false, error: '본인에게 배정되지 않은 예약에 대한 운행일지를 작성할 수 없습니다. (403 Forbidden)' },
+            { ok: false, error: '본인에게 배정되지 않았거나 기사 식별자(UUID)가 확정되지 않은 예약입니다. (403 Forbidden)' },
             { status: 403 }
           );
         }
@@ -323,6 +322,7 @@ export async function POST(req: NextRequest) {
     const nowIso = new Date().toISOString();
 
     const insertPayload: Record<string, any> = {
+      id: id && isValidUuid(id) ? id : crypto.randomUUID(),
       organization_id: auth.session.org,
       booking_id: bookingId || null,
       driver_id: effectiveDriverId,
@@ -352,10 +352,6 @@ export async function POST(req: NextRequest) {
       submitted_by: isSubmitting ? (auth.session.displayName || auth.session.driverName || '기사') : null,
       updated_at: nowIso,
     };
-
-    if (id && !id.startsWith('driver-sub-')) {
-      insertPayload.id = id;
-    }
 
     // Insert or update in cockpit.driving_logs
     const { data: savedRow, error: saveErr } = await supabaseAdmin

@@ -120,6 +120,7 @@ async function runDevAuthEnvironmentTests() {
 
     const scheduleA = {
       id: 'sch_yoon_001',
+      driver_id: 'drv_yoon_01',
       driver_name: '윤기사',
       vehicle_no: '7호차',
       car_number: '서울31가7777',
@@ -128,6 +129,7 @@ async function runDevAuthEnvironmentTests() {
 
     const scheduleB = {
       id: 'sch_park_002',
+      driver_id: 'drv_park_02',
       driver_name: '박기사',
       vehicle_no: '8호차',
       car_number: '서울32나8888',
@@ -136,9 +138,20 @@ async function runDevAuthEnvironmentTests() {
 
     const unassignedSchedule = {
       id: 'sch_unassigned_003',
+      driver_id: null,
       driver_name: '',
       vehicle_no: '미배정',
       dispatch_status: 'unassigned',
+    };
+
+    // Loose matching bypass test: matching name but different/missing driver_id
+    const spoofedNameSchedule = {
+      id: 'sch_spoofed_004',
+      driver_id: 'drv_other_99',
+      driver_name: '윤기사', // Same name, but foreign driver_id
+      vehicle_no: '7호차',
+      car_number: '서울31가7777',
+      dispatch_status: 'confirmed',
     };
 
     // HQ Admin can access all
@@ -150,6 +163,7 @@ async function runDevAuthEnvironmentTests() {
     assert.strictEqual(driverCanAccessSchedule(driverASession!, scheduleA), true, 'Driver A must access Driver A schedule');
     assert.strictEqual(driverCanAccessSchedule(driverASession!, scheduleB), false, 'Driver A CANNOT access Driver B schedule');
     assert.strictEqual(driverCanAccessSchedule(driverASession!, unassignedSchedule), false, 'Driver A CANNOT access unassigned schedule');
+    assert.strictEqual(driverCanAccessSchedule(driverASession!, spoofedNameSchedule), false, 'Driver A CANNOT access schedule with matching name but mismatched driver_id');
 
     // Driver B access check
     assert.strictEqual(driverCanAccessSchedule(driverBSession!, scheduleB), true, 'Driver B must access Driver B schedule');

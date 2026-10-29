@@ -6,6 +6,11 @@ import { ExpenseCategoryKey, PaymentMethod, EXPENSE_CATEGORIES } from '@/utils/e
 
 export const dynamic = 'force-dynamic';
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+export function isValidUuid(val: any): boolean {
+  return typeof val === 'string' && UUID_REGEX.test(val);
+}
+
 function getCategoryLabel(category: string): string {
   const cat = (EXPENSE_CATEGORIES as any)[category];
   return cat ? cat.label : category || '기타';
@@ -140,12 +145,11 @@ export async function GET(req: NextRequest) {
     const { data, error } = await query;
 
     if (error) {
-      console.warn('[Expenses GET] DB Query note/error:', error.message);
-      return NextResponse.json({
-        ok: true,
-        expenses: [],
-        note: 'Table cockpit.expenses query fallback',
-      });
+      console.error('[Expenses GET] DB Query error:', error.message);
+      return NextResponse.json(
+        { ok: false, error: `경비 목록 조회 실패: ${error.message}` },
+        { status: 500 }
+      );
     }
 
     const expenses: HqExpenseRecord[] = (data || []).map((row: any, idx: number) =>
@@ -230,7 +234,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Ownership verification when updating an existing expense
-      if (item.id && !String(item.id).startsWith('demo-') && !String(item.id).startsWith('hq-exp-')) {
+      if (item.id && isValidUuid(item.id)) {
         const { data: existingExp, error: existErr } = await supabaseAdmin
           .from('expenses')
           .select('id, driver_id, organization_id, status')
@@ -273,7 +277,7 @@ export async function POST(req: NextRequest) {
       if (item.bookingId) {
         const { data: scheduleRow, error: schedErr } = await supabaseAdmin
           .from('schedules')
-          .select('id, customer_id, customer_name, driver_name, vehicle_plate, schedule_meta')
+          .select('id, customer_id, customer_name, driver_name, driver_id, vehicle_plate, schedule_meta')
           .eq('id', item.bookingId)
           .maybeSingle();
 
@@ -292,15 +296,10 @@ export async function POST(req: NextRequest) {
         }
 
         if (auth.session.role === 'driver') {
-          const schedMetaDriverId = scheduleRow.schedule_meta?.driver_id;
-          const isAssigned =
-            (schedMetaDriverId && schedMetaDriverId === effectiveDriverId) ||
-            (scheduleRow.driver_name && scheduleRow.driver_name === auth.session.driverName) ||
-            (scheduleRow.vehicle_plate && scheduleRow.vehicle_plate === auth.session.carNumber);
-
-          if (!isAssigned) {
+          const schedMetaDriverId = scheduleRow.schedule_meta?.driver_id || scheduleRow.driver_id;
+          if (!schedMetaDriverId || schedMetaDriverId !== effectiveDriverId) {
             return NextResponse.json(
-              { ok: false, error: '본인에게 배정되지 않은 예약에 대한 경비를 제출할 수 없습니다. (403 Forbidden)' },
+              { ok: false, error: '본인에게 배정되지 않았거나 기사 식별자(UUID)가 확정되지 않은 예약입니다. (403 Forbidden)' },
               { status: 403 }
             );
           }
@@ -317,6 +316,7 @@ export async function POST(req: NextRequest) {
       const paymentMethodLabel = item.paymentMethodLabel || getPaymentMethodLabel(paymentMethod);
 
       const record: Record<string, any> = {
+        id: item.id && isValidUuid(item.id) ? item.id : crypto.randomUUID(),
         organization_id: auth.session.org,
         booking_id: validatedBookingId,
         driving_log_id: item.drivingLogId || null,
@@ -352,10 +352,6 @@ export async function POST(req: NextRequest) {
         submitted_by: auth.session.displayName || auth.session.driverName || '기사',
         updated_at: nowIso,
       };
-
-      if (item.id && !String(item.id).startsWith('demo-') && !String(item.id).startsWith('hq-exp-')) {
-        record.id = item.id;
-      }
 
       rowsToInsert.push(record);
     }

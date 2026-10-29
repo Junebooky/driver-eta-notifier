@@ -57,11 +57,20 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
   bookings = [],
 }) => {
   const [isHipassModalOpen, setIsHipassModalOpen] = useState(false);
+  const [dbError, setDbError] = useState<string | null>(null);
 
   // Hydrate server-synced expenses & Hi-Pass tolls from Supabase DB
   useEffect(() => {
     let cancelled = false;
-    fetchHqExpensesFromDb().catch(() => {});
+    fetchHqExpensesFromDb().then((result) => {
+      if (!cancelled) {
+        if (!result.ok && result.error) {
+          setDbError(result.error);
+        } else {
+          setDbError(null);
+        }
+      }
+    });
 
     fetch('/api/expenses/hipass-sync')
       .then((r) => r.json())
@@ -412,6 +421,28 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* DB Connection / Query Failure Banner */}
+      {dbError && (
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-rose-800 shadow-xs">
+          <div className="flex items-center gap-2.5 text-xs font-semibold">
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            <span>경비지출 실시간 DB 조회 실패: {dbError}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setDbError(null);
+              fetchHqExpensesFromDb().then((result) => {
+                if (!result.ok && result.error) setDbError(result.error);
+              });
+            }}
+            className="text-xs font-bold text-rose-700 bg-white border border-rose-200 px-3 py-1.5 rounded-xl hover:bg-rose-100 transition shrink-0 cursor-pointer"
+          >
+            다시 시도
+          </button>
+        </div>
+      )}
 
       {/* 2. Top 4 KPI Metric Tiles */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">

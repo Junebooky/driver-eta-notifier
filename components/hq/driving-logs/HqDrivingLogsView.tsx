@@ -17,7 +17,7 @@ import { HqDrivingLogsKpi } from './HqDrivingLogsKpi';
 import { HqDrivingLogsFilterBar } from './HqDrivingLogsFilterBar';
 import { HqDrivingLogsTable } from './HqDrivingLogsTable';
 import { HqDrivingLogDetailPanel } from './HqDrivingLogDetailPanel';
-import { CheckCircle2, CreditCard } from 'lucide-react';
+import { CheckCircle2, CreditCard, AlertCircle } from 'lucide-react';
 import { HqBooking } from '@/types/hq';
 import HqHipassImportModal from '../expenses/HqHipassImportModal';
 
@@ -38,10 +38,17 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
     getHqDrivingLogsServerSnapshot
   );
   const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
+  const [dbError, setDbError] = useState<string | null>(null);
 
   // Fetch real authoritative logs from Supabase DB on mount
   useEffect(() => {
-    fetchHqDrivingLogsFromDb().catch(() => {});
+    fetchHqDrivingLogsFromDb().then((result) => {
+      if (!result.ok && result.error) {
+        setDbError(result.error);
+      } else {
+        setDbError(null);
+      }
+    });
   }, []);
 
   // Filters
@@ -183,6 +190,28 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
 
   return (
     <div className="space-y-5">
+      {/* DB Connection / Query Failure Banner */}
+      {dbError && (
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-rose-800 shadow-xs">
+          <div className="flex items-center gap-2.5 text-xs font-semibold">
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            <span>운행일지 실시간 DB 조회 실패: {dbError}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setDbError(null);
+              fetchHqDrivingLogsFromDb().then((result) => {
+                if (!result.ok && result.error) setDbError(result.error);
+              });
+            }}
+            className="text-xs font-bold text-rose-700 bg-white border border-rose-200 px-3 py-1.5 rounded-xl hover:bg-rose-100 transition shrink-0 cursor-pointer"
+          >
+            다시 시도
+          </button>
+        </div>
+      )}
+
       {/* Hi-Pass Auto-Link Strip */}
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-emerald-200/80 bg-emerald-50/60 px-4 py-3">
         <div className="text-xs text-slate-700">

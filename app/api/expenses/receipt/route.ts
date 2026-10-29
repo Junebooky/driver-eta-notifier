@@ -27,61 +27,56 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const expenseId = searchParams.get('expenseId');
-    const requestedPath = searchParams.get('path');
 
-    if (!expenseId && !requestedPath) {
+    // Strict validation: Path-only access is strictly forbidden to prevent IDOR / cross-driver leaks
+    if (!expenseId) {
       return NextResponse.json(
-        { ok: false, error: '영수증 조회를 위해 expenseId 또는 path 파라미터가 필요합니다.' },
+        { ok: false, error: '영수증 조회를 위해 expenseId 파라미터가 반드시 필요합니다. (path 파라미터 단독 조회 불가)' },
         { status: 400 }
       );
     }
 
-    let storagePath = requestedPath;
-
     // Verify ownership via cockpit.expenses
-    if (expenseId) {
-      const { data: expenseRow, error: expErr } = await supabaseAdmin
-        .from('expenses')
-        .select('id, driver_id, organization_id, receipt_storage_path')
-        .eq('id', expenseId)
-        .maybeSingle();
+    const { data: expenseRow, error: expErr } = await supabaseAdmin
+      .from('expenses')
+      .select('id, driver_id, organization_id, receipt_storage_path')
+      .eq('id', expenseId)
+      .maybeSingle();
 
-      if (expErr) {
-        return NextResponse.json(
-          { ok: false, error: `경비 정보 조회 실패: ${expErr.message}` },
-          { status: 500 }
-        );
-      }
+    if (expErr) {
+      return NextResponse.json(
+        { ok: false, error: `경비 정보 조회 실패: ${expErr.message}` },
+        { status: 500 }
+      );
+    }
 
-      if (!expenseRow) {
-        return NextResponse.json(
-          { ok: false, error: '해당 경비 레코드를 찾을 수 없습니다.' },
-          { status: 404 }
-        );
-      }
+    if (!expenseRow) {
+      return NextResponse.json(
+        { ok: false, error: '해당 경비 레코드를 찾을 수 없습니다.' },
+        { status: 404 }
+      );
+    }
 
-      // 1. Organization boundary
-      if (expenseRow.organization_id !== auth.session.org) {
+    // 1. Organization boundary
+    if (expenseRow.organization_id !== auth.session.org) {
+      return NextResponse.json(
+        { ok: false, error: '다른 조직의 영수증에 접근할 수 없습니다. (403 Forbidden)' },
+        { status: 403 }
+      );
+    }
+
+    // 2. Driver boundary (Driver can only access receipts of their own expenses)
+    const effectiveDriverId = auth.session.driverId || auth.session.userId;
+    if (auth.session.role === 'driver') {
+      if (expenseRow.driver_id !== effectiveDriverId) {
         return NextResponse.json(
-          { ok: false, error: '다른 조직의 영수증에 접근할 수 없습니다. (403 Forbidden)' },
+          { ok: false, error: '해당 영수증에 대한 접근 권한이 없습니다. (403 Forbidden)' },
           { status: 403 }
         );
       }
-
-      // 2. Driver boundary
-      if (auth.session.role === 'driver') {
-        const myDriverId = auth.session.driverId || auth.session.userId;
-        if (expenseRow.driver_id !== myDriverId) {
-          return NextResponse.json(
-            { ok: false, error: '해당 영수증에 대한 접근 권한이 없습니다. (403 Forbidden)' },
-            { status: 403 }
-          );
-        }
-      }
-
-      // Use the verified storage path from the DB
-      storagePath = expenseRow.receipt_storage_path;
     }
+
+    const storagePath = expenseRow.receipt_storage_path;
 
     if (!storagePath) {
       return NextResponse.json(
@@ -103,6 +98,16 @@ export async function GET(req: NextRequest) {
         { ok: false, error: '소속 조직 경로가 아닌 영수증 파일입니다. (403 Forbidden)' },
         { status: 403 }
       );
+    }
+
+    // Same-org cross-driver defense-in-depth: if requester is driver, storagePath must include their driverId
+    if (auth.session.role === 'driver') {
+      if (!storagePath.startsWith(`${auth.session.org}/${effectiveDriverId}/`)) {
+        return NextResponse.json(
+          { ok: false, error: '다른 기사의 스토리지 경로에 접근할 수 없습니다. (403 Forbidden)' },
+          { status: 403 }
+        );
+      }
     }
 
     // Download from Supabase private storage bucket 'receipts'
@@ -180,12 +185,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const effectiveDriverId = auth.session.driverId || auth.session.userId;
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
     const ext = file.name.split('.').pop() || 'jpg';
     const uniqueId = `rec_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    const storagePath = `${auth.session.org}/${year}/${month}/${uniqueId}.${ext}`;
+    const storagePath = `${auth.session.org}/${effectiveDriverId}/${year}/${month}/${uniqueId}.${ext}`;
 
     const buffer = Buffer.from(await file.arrayBuffer());
 

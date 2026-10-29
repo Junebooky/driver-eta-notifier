@@ -350,15 +350,27 @@ FOR DELETE TO authenticated USING (
 
 -- ------------------------------------------------------------------------------
 -- Storage Objects Policies for 'receipts' Bucket
+-- Strict multi-tenant and driver-level path isolation:
+-- HQ Admin: Access all receipts within their organization (name LIKE '<org>/%')
+-- Driver: Strictly restricted to their own driver_id path (name LIKE '<org>/<driver_id>/%')
 -- ------------------------------------------------------------------------------
 DROP POLICY IF EXISTS p_storage_receipts_select ON storage.objects;
 CREATE POLICY p_storage_receipts_select ON storage.objects
 FOR SELECT TO authenticated USING (
   bucket_id = 'receipts'
   AND (
-    ((auth.jwt() -> 'app_metadata'::text) ->> 'cockpit_role'::text) = 'hq_admin'::text
+    (
+      ((auth.jwt() -> 'app_metadata'::text) ->> 'cockpit_role'::text) = 'hq_admin'::text
+      AND name LIKE (((auth.jwt() -> 'app_metadata'::text) ->> 'org'::text) || '/%')
+    )
     OR
-    (name LIKE (((auth.jwt() -> 'app_metadata'::text) ->> 'org'::text) || '/%'))
+    (
+      ((auth.jwt() -> 'app_metadata'::text) ->> 'cockpit_role'::text) = 'driver'::text
+      AND name LIKE (
+        ((auth.jwt() -> 'app_metadata'::text) ->> 'org'::text) || '/' ||
+        ((auth.jwt() -> 'app_metadata'::text) ->> 'driver_id'::text) || '/%'
+      )
+    )
   )
 );
 
@@ -366,7 +378,20 @@ DROP POLICY IF EXISTS p_storage_receipts_insert ON storage.objects;
 CREATE POLICY p_storage_receipts_insert ON storage.objects
 FOR INSERT TO authenticated WITH CHECK (
   bucket_id = 'receipts'
-  AND (name LIKE (((auth.jwt() -> 'app_metadata'::text) ->> 'org'::text) || '/%'))
+  AND (
+    (
+      ((auth.jwt() -> 'app_metadata'::text) ->> 'cockpit_role'::text) = 'hq_admin'::text
+      AND name LIKE (((auth.jwt() -> 'app_metadata'::text) ->> 'org'::text) || '/%')
+    )
+    OR
+    (
+      ((auth.jwt() -> 'app_metadata'::text) ->> 'cockpit_role'::text) = 'driver'::text
+      AND name LIKE (
+        ((auth.jwt() -> 'app_metadata'::text) ->> 'org'::text) || '/' ||
+        ((auth.jwt() -> 'app_metadata'::text) ->> 'driver_id'::text) || '/%'
+      )
+    )
+  )
 );
 
 COMMIT;

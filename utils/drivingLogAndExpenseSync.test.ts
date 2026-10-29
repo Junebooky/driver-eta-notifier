@@ -70,54 +70,99 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
   let simulateDbError = false;
   let simulateStorageError = false;
 
+  const DRIVER_A_UUID = 'b6aac740-002e-4a5c-ac49-0ac71e765340';
+  const DRIVER_B_UUID = 'a85444a9-f13e-4b52-9a81-ac09995ab66a';
+  const HQ_ADMIN_UUID = 'c7bbd951-113f-4c63-bd92-bd10006bc77b';
+
+  const BOOKING_CHANEL_UUID = '11111111-1111-4111-8111-111111111111';
+  const BOOKING_MORNING_UUID = '22222222-2222-4222-8222-222222222222';
+  const BOOKING_AFTERNOON_UUID = '33333333-3333-4333-8333-333333333333';
+  const BOOKING_FAIL_UUID = '44444444-4444-4444-8444-444444444444';
+  const BOOKING_DRIVER_B_ONLY_UUID = '55555555-5555-4555-8555-555555555555';
+  const BOOKING_SPOOFED_NAME_UUID = '66666666-6666-4666-8666-666666666666';
+
+  const LOG_ROUNDTRIP_UUID = 'aaaaaaa1-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const LOG_MORNING_UUID = 'aaaaaaa2-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const LOG_AFTERNOON_UUID = 'aaaaaaa3-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const LOG_FAIL_UUID = 'aaaaaaa4-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+  const EXPENSE_RECEIPT_UUID = 'bbbbbbb1-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const RECEIPT_STORAGE_PATH = `vip_limousine_korea/${DRIVER_A_UUID}/2026/10/receipt_sample_01.jpg`;
+
   const mockSchedules = [
     {
-      id: 'booking-chanel-001',
+      id: BOOKING_CHANEL_UUID,
       customer_name: '샤넬코리아',
       driver_name: '윤태준',
       vehicle_plate: '116허 1514',
       vehicle_no: '116허 1514',
-      schedule_meta: { driver_id: 'b6aac740-002e-4a5c-ac49-0ac71e765340' },
+      schedule_meta: { driver_id: DRIVER_A_UUID },
     },
     {
-      id: 'booking-20261109-morning',
+      id: BOOKING_MORNING_UUID,
       customer_name: '오전 고객사',
       driver_name: '윤태준',
       vehicle_plate: '116허 1514',
       vehicle_no: '116허 1514',
-      schedule_meta: { driver_id: 'b6aac740-002e-4a5c-ac49-0ac71e765340' },
+      schedule_meta: { driver_id: DRIVER_A_UUID },
     },
     {
-      id: 'booking-20261109-afternoon',
+      id: BOOKING_AFTERNOON_UUID,
       customer_name: '오후 고객사',
       driver_name: '윤태준',
       vehicle_plate: '116허 1514',
       vehicle_no: '116허 1514',
-      schedule_meta: { driver_id: 'b6aac740-002e-4a5c-ac49-0ac71e765340' },
+      schedule_meta: { driver_id: DRIVER_A_UUID },
     },
     {
-      id: 'booking-fail',
+      id: BOOKING_FAIL_UUID,
       customer_name: '오류 테스트 고객사',
       driver_name: '윤태준',
       vehicle_plate: '116허 1514',
       vehicle_no: '116허 1514',
-      schedule_meta: { driver_id: 'b6aac740-002e-4a5c-ac49-0ac71e765340' },
+      schedule_meta: { driver_id: DRIVER_A_UUID },
     },
     {
-      id: 'booking-driver-b-only',
+      id: BOOKING_DRIVER_B_ONLY_UUID,
       customer_name: '민성호 전용 고객사',
       driver_name: '민성호',
       vehicle_plate: '142호 7815',
       vehicle_no: '8호차',
-      schedule_meta: { driver_id: 'a85444a9-f13e-4b52-9a81-ac09995ab66a' },
+      schedule_meta: { driver_id: DRIVER_B_UUID },
+    },
+    {
+      id: BOOKING_SPOOFED_NAME_UUID,
+      customer_name: '이름만 일치하는 타인 예약 (Loose Match Bypass Attack)',
+      driver_name: '윤태준', // Same driver name
+      vehicle_plate: '116허 1514', // Same vehicle plate
+      vehicle_no: '116허 1514',
+      schedule_meta: { driver_id: DRIVER_B_UUID }, // Assigned to Driver B's UUID!
     },
   ];
 
-  // Mock Storage Bucket for private receipts
+  // Mock Storage Bucket for private receipts with driver-level isolation
   const mockStorageFiles: Record<string, { buffer: Buffer; contentType: string }> = {
-    'vip_limousine_korea/2026/10/receipt_sample_01.jpg': {
+    [RECEIPT_STORAGE_PATH]: {
       buffer: Buffer.from('mock-jpeg-receipt-bytes-data'),
       contentType: 'image/jpeg',
+    },
+  };
+
+  // Mock Supabase Auth for JWT verification testing (Item 1)
+  const mockJwtUsers: Record<string, any> = {
+    'jwt.attacker.escalate': {
+      user: {
+        id: '99999999-9999-4999-8999-999999999999',
+        user_metadata: { cockpit_role: 'hq_admin', org: 'vip_limousine_korea' }, // Attacker manipulated user_metadata!
+        app_metadata: { cockpit_role: 'driver', org: 'vip_limousine_korea', driver_id: DRIVER_A_UUID },
+      },
+    },
+    'jwt.untrusted.org': {
+      user: {
+        id: '88888888-8888-4888-8888-888888888888',
+        user_metadata: { org: 'vip_limousine_korea' },
+        app_metadata: { org: 'foreign_org' },
+      },
     },
   };
 
@@ -289,30 +334,39 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
   // Monkey-patch supabaseAdmin for mock execution
   supabaseAdmin.from = mockFrom as any;
   (supabaseAdmin as any).storage = mockStorage as any;
+  (supabaseAdmin as any).auth = {
+    getUser: async (token: string) => {
+      const match = mockJwtUsers[token];
+      if (match) {
+        return { data: match, error: null };
+      }
+      return { data: { user: null }, error: { message: 'Invalid JWT' } };
+    },
+  };
 
   // Driver A (윤태준), Driver B (민성호), HQ Admin
   const driverAToken = signCockpitSession({
-    userId: 'driver-001',
+    userId: DRIVER_A_UUID,
     org: 'vip_limousine_korea',
     role: 'driver',
     driverName: '윤태준',
-    driverId: 'b6aac740-002e-4a5c-ac49-0ac71e765340',
+    driverId: DRIVER_A_UUID,
     carNumber: '116허 1514',
     vehicleNo: '116허 1514',
   });
 
   const driverBToken = signCockpitSession({
-    userId: 'driver-002',
+    userId: DRIVER_B_UUID,
     org: 'vip_limousine_korea',
     role: 'driver',
     driverName: '민성호',
-    driverId: 'a85444a9-f13e-4b52-9a81-ac09995ab66a',
+    driverId: DRIVER_B_UUID,
     carNumber: '142호 7815',
     vehicleNo: '8호차',
   });
 
   const hqAdminToken = signCockpitSession({
-    userId: 'hq-admin-01',
+    userId: HQ_ADMIN_UUID,
     org: 'vip_limousine_korea',
     role: 'hq_admin',
     driverName: '관리자',
@@ -329,8 +383,8 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
         Authorization: `Bearer ${driverAToken}`,
       },
       body: JSON.stringify({
-        id: 'log-roundtrip-01',
-        bookingId: 'booking-chanel-001',
+        id: LOG_ROUNDTRIP_UUID,
+        bookingId: BOOKING_CHANEL_UUID,
         driverName: '윤태준',
         vehiclePlate: '116허 1514',
         vehicleModel: '스타리아 리무진',
@@ -356,7 +410,7 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
     assert.strictEqual(postData.log.status, '검토 대기');
 
     // HQ Admin queries the logs
-    const getReq = new NextRequest('http://localhost:3000/api/driving-logs?bookingId=booking-chanel-001', {
+    const getReq = new NextRequest(`http://localhost:3000/api/driving-logs?bookingId=${BOOKING_CHANEL_UUID}`, {
       method: 'GET',
       headers: { Authorization: `Bearer ${hqAdminToken}` },
     });
@@ -385,8 +439,8 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
         Authorization: `Bearer ${driverAToken}`,
       },
       body: JSON.stringify({
-        id: 'log-same-day-morning',
-        bookingId: 'booking-20261109-morning',
+        id: LOG_MORNING_UUID,
+        bookingId: BOOKING_MORNING_UUID,
         driverName: '윤태준',
         vehiclePlate: '116허 1514',
         drivingDate: '2026-11-09',
@@ -406,8 +460,8 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
         Authorization: `Bearer ${driverAToken}`,
       },
       body: JSON.stringify({
-        id: 'log-same-day-afternoon',
-        bookingId: 'booking-20261109-afternoon',
+        id: LOG_AFTERNOON_UUID,
+        bookingId: BOOKING_AFTERNOON_UUID,
         driverName: '윤태준',
         vehiclePlate: '116허 1514',
         drivingDate: '2026-11-09',
@@ -426,8 +480,8 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
     });
     const getRes = await getDrivingLogs(getReq);
     const getData = await getRes.json();
-    const morningLog = getData.logs.find((l: any) => l.bookingId === 'booking-20261109-morning');
-    const afternoonLog = getData.logs.find((l: any) => l.bookingId === 'booking-20261109-afternoon');
+    const morningLog = getData.logs.find((l: any) => l.bookingId === BOOKING_MORNING_UUID);
+    const afternoonLog = getData.logs.find((l: any) => l.bookingId === BOOKING_AFTERNOON_UUID);
 
     assert.ok(morningLog, 'Morning booking driving log must exist');
     assert.ok(afternoonLog, 'Afternoon booking driving log must exist');
@@ -441,7 +495,7 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
   // --------------------------------------------------------------------------
   await test('3. Service-role API bypass prevention: rejects unassigned booking, spoofed driverId, and self-approval', async () => {
     // 3.1: Driver A tries to query Driver B's logs by passing Driver B's driverId -> 403 Forbidden
-    const driverBReq = new NextRequest('http://localhost:3000/api/driving-logs?driverId=a85444a9-f13e-4b52-9a81-ac09995ab66a', {
+    const driverBReq = new NextRequest(`http://localhost:3000/api/driving-logs?driverId=${DRIVER_B_UUID}`, {
       method: 'GET',
       headers: { Authorization: `Bearer ${driverAToken}` },
     });
@@ -456,7 +510,7 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
         Authorization: `Bearer ${driverAToken}`,
       },
       body: JSON.stringify({
-        driverId: 'a85444a9-f13e-4b52-9a81-ac09995ab66a',
+        driverId: DRIVER_B_UUID,
         drivingDate: '2026-11-09',
         startKm: '100',
         endKm: '200',
@@ -474,7 +528,7 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
         Authorization: `Bearer ${driverAToken}`,
       },
       body: JSON.stringify({
-        bookingId: 'booking-driver-b-only',
+        bookingId: BOOKING_DRIVER_B_ONLY_UUID,
         drivingDate: '2026-11-09',
         startKm: '100',
         endKm: '200',
@@ -509,7 +563,7 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
         'Content-Type': 'application/json',
         Authorization: `Bearer ${driverAToken}`,
       },
-      body: JSON.stringify({ id: 'log-roundtrip-01', status: '승인 완료' }),
+      body: JSON.stringify({ id: LOG_ROUNDTRIP_UUID, status: '승인 완료' }),
     });
     const unauthPutRes = await putDrivingLogs(unauthPutReq);
     assert.strictEqual(unauthPutRes.status, 403, 'Driver cannot access HQ Admin PUT review API');
@@ -528,8 +582,8 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
           Authorization: `Bearer ${driverAToken}`,
         },
         body: JSON.stringify({
-          id: 'log-fail-simulation',
-          bookingId: 'booking-fail',
+          id: LOG_FAIL_UUID,
+          bookingId: BOOKING_FAIL_UUID,
           driverName: '윤태준',
           vehiclePlate: '116허 1514',
           drivingDate: '2026-11-09',
@@ -562,8 +616,8 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
         Authorization: `Bearer ${driverAToken}`,
       },
       body: JSON.stringify({
-        id: 'log-roundtrip-01',
-        bookingId: 'booking-chanel-001',
+        id: LOG_ROUNDTRIP_UUID,
+        bookingId: BOOKING_CHANEL_UUID,
         driverName: '윤태준',
         vehiclePlate: '116허 1514',
         drivingDate: '2026-11-09',
@@ -580,7 +634,7 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
     const postUpdateCount = mockDrivingLogs.length;
     assert.strictEqual(postUpdateCount, originalCount, 'Row count must NOT increase on duplicate ID submission');
 
-    const updated = mockDrivingLogs.find((l) => l.id === 'log-roundtrip-01');
+    const updated = mockDrivingLogs.find((l) => l.id === LOG_ROUNDTRIP_UUID);
     assert.ok(updated?.notes?.includes('(재제출)'), 'Existing row must be safely updated');
   });
 
@@ -648,15 +702,15 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
       body: JSON.stringify({
         items: [
           {
-            id: 'exp-with-receipt-01',
-            bookingId: 'booking-chanel-001',
+            id: EXPENSE_RECEIPT_UUID,
+            bookingId: BOOKING_CHANEL_UUID,
             date: '2026-10-24',
             time: '12:30',
             category: 'gas',
             merchant: 'GS칼텍스 삼정주유소',
             amount: 75000,
             paymentMethod: 'company_card',
-            receiptStoragePath: 'vip_limousine_korea/2026/10/receipt_sample_01.jpg',
+            receiptStoragePath: RECEIPT_STORAGE_PATH,
           },
         ],
       }),
@@ -665,7 +719,7 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
     assert.strictEqual(expPostRes.status, 200);
 
     // 7.2: Driver A accesses their own expense receipt -> 200 OK
-    const authReceiptReq = new NextRequest('http://localhost:3000/api/expenses/receipt?expenseId=exp-with-receipt-01', {
+    const authReceiptReq = new NextRequest(`http://localhost:3000/api/expenses/receipt?expenseId=${EXPENSE_RECEIPT_UUID}`, {
       method: 'GET',
       headers: { Authorization: `Bearer ${driverAToken}` },
     });
@@ -674,14 +728,14 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
     assert.strictEqual(authReceiptRes.headers.get('Cache-Control'), 'private, max-age=3600');
 
     // 7.3: Driver B tries to access Driver A's receipt -> 403 Forbidden
-    const unauthReceiptReq = new NextRequest('http://localhost:3000/api/expenses/receipt?expenseId=exp-with-receipt-01', {
+    const unauthReceiptReq = new NextRequest(`http://localhost:3000/api/expenses/receipt?expenseId=${EXPENSE_RECEIPT_UUID}`, {
       method: 'GET',
       headers: { Authorization: `Bearer ${driverBToken}` },
     });
     const unauthReceiptRes = await getReceipt(unauthReceiptReq);
     assert.strictEqual(unauthReceiptRes.status, 403, 'Driver B must NOT access Driver A receipt (403)');
 
-    // 7.4: Path traversal attempt -> 400 Bad Request
+    // 7.4: Path traversal attempt with expenseId -> 400 Bad Request
     const traversalReq = new NextRequest('http://localhost:3000/api/expenses/receipt?path=vip_limousine_korea/../etc/passwd', {
       method: 'GET',
       headers: { Authorization: `Bearer ${driverAToken}` },
@@ -723,7 +777,7 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
         Authorization: `Bearer ${hqAdminToken}`,
       },
       body: JSON.stringify({
-        id: 'log-roundtrip-01',
+        id: LOG_ROUNDTRIP_UUID,
         status: '승인 완료',
         reviewNotes: '모든 증빙 확인 및 운행거리 일치',
       }),
@@ -743,7 +797,7 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
         Authorization: `Bearer ${hqAdminToken}`,
       },
       body: JSON.stringify({
-        id: 'log-roundtrip-01',
+        id: LOG_ROUNDTRIP_UUID,
         status: '보완 필요',
         reviewNotes: '영수증 1건 추가 제출 요청',
       }),
@@ -755,5 +809,195 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
     assert.strictEqual(reviseData.log.reviewHistory.length, 2, 'History must append without overwriting previous history');
     assert.strictEqual(reviseData.log.reviewHistory[0].actionType, 'revision_requested');
     assert.strictEqual(reviseData.log.reviewHistory[1].actionType, 'approved');
+  });
+
+  // --------------------------------------------------------------------------
+  // 9. [Item 1] JWT user_metadata privilege escalation vulnerability defense
+  // --------------------------------------------------------------------------
+  await test('9. Attacker manipulating user_metadata.cockpit_role: "hq_admin" strictly rejected with 403 on HQ endpoints', async () => {
+    // Attacker token has user_metadata: { cockpit_role: 'hq_admin' } but app_metadata: { cockpit_role: 'driver' }
+    const attackerPutReq = new NextRequest('http://localhost:3000/api/driving-logs', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer jwt.attacker.escalate',
+      },
+      body: JSON.stringify({
+        id: LOG_ROUNDTRIP_UUID,
+        status: '승인 완료',
+      }),
+    });
+    const attackerPutRes = await putDrivingLogs(attackerPutReq);
+    assert.strictEqual(attackerPutRes.status, 403, 'Privilege escalation via user_metadata MUST return 403 Forbidden');
+
+    const attackerExpPutReq = new NextRequest('http://localhost:3000/api/expenses', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer jwt.attacker.escalate',
+      },
+      body: JSON.stringify({
+        id: EXPENSE_RECEIPT_UUID,
+        status: '승인 완료',
+      }),
+    });
+    const attackerExpPutRes = await putExpenses(attackerExpPutReq);
+    assert.strictEqual(attackerExpPutRes.status, 403, 'Privilege escalation on expenses PUT MUST return 403 Forbidden');
+
+    // Attacker attempting cross-organization spoofing via user_metadata
+    const evilOrgReq = new NextRequest('http://localhost:3000/api/driving-logs', {
+      method: 'GET',
+      headers: { Authorization: 'Bearer jwt.untrusted.org' },
+    });
+    const evilOrgRes = await getDrivingLogs(evilOrgReq);
+    assert.strictEqual(evilOrgRes.status, 401, 'Untrusted org in app_metadata MUST return 401 Unauthorized');
+  });
+
+  // --------------------------------------------------------------------------
+  // 10. [Item 2] Receipt storage path-only & cross-driver bypass defense
+  // --------------------------------------------------------------------------
+  await test('10. Receipt security: path-only request rejected with 400, same-org cross-driver strictly blocked', async () => {
+    // 10.1: Path parameter only (without expenseId) -> strictly rejected with 400
+    const pathOnlyReq = new NextRequest(`http://localhost:3000/api/expenses/receipt?path=${encodeURIComponent(RECEIPT_STORAGE_PATH)}`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${driverAToken}` },
+    });
+    const pathOnlyRes = await getReceipt(pathOnlyReq);
+    assert.strictEqual(pathOnlyRes.status, 400, 'Path-only request without expenseId must return 400 Bad Request');
+    const pathOnlyData = await pathOnlyRes.json();
+    assert.strictEqual(pathOnlyData.ok, false);
+    assert.ok(pathOnlyData.error.includes('expenseId'), 'Error must specify that expenseId is strictly required');
+
+    // 10.2: Uploading receipt creates path prefixed with ${org}/${driverId}/...
+    const formData = new FormData();
+    const mockBlob = new Blob(['mock-receipt-data-bytes'], { type: 'image/jpeg' });
+    formData.append('file', mockBlob, 'my_receipt.jpg');
+
+    const uploadReq = new NextRequest('http://localhost:3000/api/expenses/receipt', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${driverAToken}` },
+      body: formData,
+    });
+    const uploadRes = await postReceipt(uploadReq);
+    assert.strictEqual(uploadRes.status, 200);
+    const uploadData = await uploadRes.json();
+    assert.ok(uploadData.storagePath.startsWith(`vip_limousine_korea/${DRIVER_A_UUID}/`),
+      `Uploaded storagePath (${uploadData.storagePath}) MUST start with org/driverId prefix`);
+  });
+
+  // --------------------------------------------------------------------------
+  // 11. [Item 3] Loose driver_name matching bypass prevention
+  // --------------------------------------------------------------------------
+  await test('11. Loose name matching bypass prevention: matching driver_name with foreign driver_id UUID strictly rejected', async () => {
+    // Driver A attempts to submit a driving log for a schedule with matching name "윤태준" but foreign driver_id (Driver B's UUID)
+    const spoofSchedLogReq = new NextRequest('http://localhost:3000/api/driving-logs', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${driverAToken}`,
+      },
+      body: JSON.stringify({
+        bookingId: BOOKING_SPOOFED_NAME_UUID,
+        drivingDate: '2026-11-09',
+        startKm: '100',
+        endKm: '200',
+        stops: [{ placeName: '강남', time: '10:00' }],
+      }),
+    });
+    const spoofSchedLogRes = await postDrivingLogs(spoofSchedLogReq);
+    assert.strictEqual(spoofSchedLogRes.status, 403, 'Schedule with matching driver_name but different driver_id UUID MUST return 403');
+
+    // Driver A attempts to submit an expense for the same loosely matched schedule
+    const spoofSchedExpReq = new NextRequest('http://localhost:3000/api/expenses', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${driverAToken}`,
+      },
+      body: JSON.stringify({
+        items: [
+          {
+            bookingId: BOOKING_SPOOFED_NAME_UUID,
+            date: '2026-11-09',
+            category: 'gas',
+            merchant: '주유소',
+            amount: 50000,
+          },
+        ],
+      }),
+    });
+    const spoofSchedExpRes = await postExpenses(spoofSchedExpReq);
+    assert.strictEqual(spoofSchedExpRes.status, 403, 'Expense with matching driver_name but different driver_id UUID MUST return 403');
+  });
+
+  // --------------------------------------------------------------------------
+  // 12. [Item 4] Honest DB failure: GET APIs return 500 (never disguised { ok: true, logs: [] })
+  // --------------------------------------------------------------------------
+  await test('12. Honest DB failure: GET /api/driving-logs and GET /api/expenses return 500 on DB error (zero fake success)', async () => {
+    simulateDbError = true;
+    try {
+      const getLogsReq = new NextRequest('http://localhost:3000/api/driving-logs', {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${hqAdminToken}` },
+      });
+      const getLogsRes = await getDrivingLogs(getLogsReq);
+      assert.strictEqual(getLogsRes.status, 500, 'GET /api/driving-logs must return 500 on DB query failure');
+      const logsData = await getLogsRes.json();
+      assert.strictEqual(logsData.ok, false);
+      assert.ok(logsData.error, 'Error message must be present');
+
+      const getExpensesReq = new NextRequest('http://localhost:3000/api/expenses', {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${hqAdminToken}` },
+      });
+      const getExpensesRes = await getExpenses(getExpensesReq);
+      assert.strictEqual(getExpensesRes.status, 500, 'GET /api/expenses must return 500 on DB query failure');
+      const expensesData = await getExpensesRes.json();
+      assert.strictEqual(expensesData.ok, false);
+      assert.ok(expensesData.error, 'Error message must be present');
+    } finally {
+      simulateDbError = false;
+    }
+  });
+
+  // --------------------------------------------------------------------------
+  // 13. [Item 5] Real PostgreSQL RFC 4122 UUID v4 enforcement across all tables
+  // --------------------------------------------------------------------------
+  await test('13. Real PostgreSQL RFC 4122 UUID v4 formatting across all records and responses', async () => {
+    const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+    // Check driving log row
+    const drivingLog = mockDrivingLogs.find((l) => l.id === LOG_ROUNDTRIP_UUID);
+    assert.ok(drivingLog, 'Driving log must be present');
+    assert.match(drivingLog.id, UUID_V4_REGEX, 'Driving log ID must be a valid UUID v4');
+    assert.match(drivingLog.driver_id!, UUID_V4_REGEX, 'driver_id must be a valid UUID v4');
+    assert.match(drivingLog.booking_id!, UUID_V4_REGEX, 'booking_id must be a valid UUID v4');
+
+    // Check expense row
+    const expense = mockExpenses.find((e) => e.id === EXPENSE_RECEIPT_UUID);
+    assert.ok(expense, 'Expense must be present');
+    assert.match(expense.id, UUID_V4_REGEX, 'Expense ID must be a valid UUID v4');
+    assert.match(expense.driver_id!, UUID_V4_REGEX, 'Expense driver_id must be a valid UUID v4');
+    assert.match(expense.booking_id!, UUID_V4_REGEX, 'Expense booking_id must be a valid UUID v4');
+
+    // Auto-generate UUID when temporary non-UUID is passed
+    const autoUuidReq = new NextRequest('http://localhost:3000/api/driving-logs', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${driverAToken}`,
+      },
+      body: JSON.stringify({
+        id: 'driver-sub-temp-12345', // Frontend temporary ID
+        drivingDate: '2026-11-09',
+        startKm: '100',
+        endKm: '200',
+        stops: [{ placeName: '강남', time: '10:00' }],
+      }),
+    });
+    const autoUuidRes = await postDrivingLogs(autoUuidReq);
+    assert.strictEqual(autoUuidRes.status, 200);
+    const autoUuidData = await autoUuidRes.json();
+    assert.match(autoUuidData.log.id, UUID_V4_REGEX, 'Server MUST assign an RFC 4122 UUID v4 when temporary ID is passed');
   });
 });

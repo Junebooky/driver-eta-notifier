@@ -182,10 +182,11 @@ export async function parseAndVerifyToken(token: string): Promise<CockpitAuthSes
       if (error || !data.user) {
         return null;
       }
+      // Security: Strictly enforce app_metadata for authorization claims (role, org, driver_id).
+      // End-users can mutate user_metadata via client SDK, so user_metadata MUST NEVER be trusted for RBAC.
       const appMeta = data.user.app_metadata || {};
-      const userMeta = data.user.user_metadata || {};
-      const org = appMeta.org || userMeta.org;
-      const role = appMeta.cockpit_role || userMeta.cockpit_role || 'driver';
+      const org = appMeta.org;
+      const role = appMeta.cockpit_role === 'hq_admin' ? 'hq_admin' : 'driver';
 
       if (org !== 'vip_limousine_korea') {
         return null;
@@ -194,11 +195,11 @@ export async function parseAndVerifyToken(token: string): Promise<CockpitAuthSes
       return {
         userId: data.user.id,
         org: 'vip_limousine_korea',
-        role: role === 'hq_admin' ? 'hq_admin' : 'driver',
-        driverId: appMeta.driver_id || userMeta.driver_id,
-        driverName: appMeta.driver_name || userMeta.driver_name,
-        vehicleNo: appMeta.vehicle_no || userMeta.vehicle_no,
-        carNumber: appMeta.car_number || userMeta.car_number,
+        role,
+        driverId: appMeta.driver_id,
+        driverName: appMeta.driver_name,
+        vehicleNo: appMeta.vehicle_no,
+        carNumber: appMeta.car_number,
         issuedAt: Math.floor(Date.now() / 1000),
         expiresAt: Math.floor(Date.now() / 1000) + 3600 * 24,
       };
@@ -310,7 +311,8 @@ export async function requireHqAdmin(req: Request | NextRequest): Promise<AuthVe
 
 /**
  * Validates whether the authenticated driver is permitted to view or mutate a schedule row.
- * Drivers can only access schedules specifically assigned to their name, vehicle, or ID.
+ * Drivers can only access schedules strictly assigned to their immutable driver_id UUID.
+ * Loose matching by driver_name or vehicle_plate is strictly eliminated.
  */
 export function driverCanAccessSchedule(
   session: CockpitAuthSession,
@@ -328,20 +330,12 @@ export function driverCanAccessSchedule(
     return false;
   }
 
-  const sDriverName = cleanDriverIdentity(schedule.driver_name);
-  const sDriverId = schedule.driver_id;
-  const sVehiclePlate = cleanVehicleIdentity(schedule.vehicle_plate || schedule.car_number);
-  const sVehicleNo = cleanVehicleIdentity(schedule.vehicle_no);
+  const sDriverId = schedule.driver_id || schedule.schedule_meta?.driver_id;
+  const sessionDriverId = session.driverId || session.userId;
 
-  const sessionDriverName = cleanDriverIdentity(session.driverName);
-  const sessionDriverId = session.driverId;
-  const sessionVehicleNo = cleanVehicleIdentity(session.vehicleNo);
-  const sessionCarNumber = cleanVehicleIdentity(session.carNumber);
-
-  if (sessionDriverName && sDriverName && sessionDriverName === sDriverName) return true;
-  if (sessionDriverId && sDriverId && sessionDriverId === sDriverId) return true;
-  if (sessionCarNumber && sVehiclePlate && sessionCarNumber === sVehiclePlate) return true;
-  if (sessionVehicleNo && sVehicleNo && sessionVehicleNo === sVehicleNo) return true;
+  if (sessionDriverId && sDriverId && sessionDriverId === sDriverId) {
+    return true;
+  }
 
   return false;
 }
