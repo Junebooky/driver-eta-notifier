@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Sparkles,
   Paperclip,
@@ -17,9 +17,16 @@ import {
   MessageSquare,
   Building2,
   RefreshCw,
+  UserCheck,
+  CheckCircle2,
+  Phone,
+  Mail,
+  BookmarkCheck,
 } from 'lucide-react';
 import { HqEmailSummary, HqEmailDetail, HqEmailExtractedDraft } from '@/types/emailHq';
 import { haptics } from '@/utils/haptics';
+import { HqPlaceSearchInput, PoiResult } from '@/components/hq/HqPlaceSearchInput';
+import { saveContactToCrm } from '@/utils/crmCustomerSync';
 
 interface HqStep1ExtractViewProps {
   emailSummary: HqEmailSummary;
@@ -30,6 +37,7 @@ interface HqStep1ExtractViewProps {
   onExtractWithAi: () => void;
   onProceedToBooking: () => void;
   onSaveModifiedDraft?: () => void;
+  onUpdateDraft?: (updated: HqEmailExtractedDraft) => void;
 }
 
 export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
@@ -41,12 +49,98 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
   onExtractWithAi,
   onProceedToBooking,
   onSaveModifiedDraft,
+  onUpdateDraft,
 }) => {
   const subject = emailDetail?.subject || emailSummary.subject;
   const fromName = emailDetail?.from?.name || emailSummary.from.name;
   const fromAddress = emailDetail?.from?.address || emailSummary.from.address;
   const toList = emailDetail?.to || emailSummary.to;
   const bodyText = emailDetail?.bodyText || emailSummary.preview || '(본문 내용 없음)';
+
+  // Editing mode toggle
+  const [isEditing, setIsEditing] = useState(false);
+  const [crmSavedNotice, setCrmSavedNotice] = useState<string | null>(null);
+
+  // Field values with safe fallbacks
+  const companyName = extractedDraft?.companyName || '';
+  const contactName = extractedDraft?.contactName || '';
+  const contactPhone = extractedDraft?.contactPhone || '';
+  const contactEmail = extractedDraft?.contactEmail || fromAddress;
+  const contactSource = extractedDraft?.contactSource || 'from';
+
+  const passengerName = extractedDraft?.passengerName || '';
+  const passengerPhone = extractedDraft?.passengerPhone || '';
+  const passengerCount = extractedDraft?.passengerCount ?? 1;
+
+  const pickupLocation = extractedDraft?.pickupLocation || '';
+  const pickupDetailNotes = extractedDraft?.pickupDetailNotes || '';
+  const isPickupPoiConfirmed = Boolean(extractedDraft?.isPickupPoiConfirmed);
+
+  const dropoffLocation = extractedDraft?.dropoffLocation || '';
+  const dropoffDetailNotes = extractedDraft?.dropoffDetailNotes || '';
+  const isDropoffPoiConfirmed = Boolean(extractedDraft?.isDropoffPoiConfirmed);
+
+  const pickupDate = extractedDraft?.pickupDate || '날짜 미지정';
+  const pickupTime = extractedDraft?.pickupTime || '시간 미지정';
+  const flightNumber = extractedDraft?.flightNumber || '';
+  const requestedVehicleClass = extractedDraft?.requestedVehicleClass || '카니발 하이리무진';
+  const specialRequests = extractedDraft?.specialRequests || '';
+
+  // Handle explicit CRM Save
+  const handleSaveToCrm = () => {
+    if (!extractedDraft) return;
+    haptics.success();
+
+    const targetCompany = companyName || fromName || '신규 고객사';
+    const targetContact = contactName || fromName || '예약 담당자';
+
+    const result = saveContactToCrm({
+      companyName: targetCompany,
+      contactName: targetContact,
+      contactPhone,
+      contactEmail,
+      notes: `이메일 접수 예약 연동 (제목: ${subject})`,
+      sourceDraftId: extractedDraft.id,
+    });
+
+    setCrmSavedNotice(result.message);
+
+    const updated: HqEmailExtractedDraft = {
+      ...extractedDraft,
+      clientId: result.clientId,
+      contactId: result.contactId,
+      isSavedToCrm: true,
+    };
+    onUpdateDraft?.(updated);
+
+    setTimeout(() => {
+      setCrmSavedNotice(null);
+    }, 4500);
+  };
+
+  const handleSelectPickupPoi = (poi: PoiResult) => {
+    if (!extractedDraft) return;
+    const updated: HqEmailExtractedDraft = {
+      ...extractedDraft,
+      pickupLocation: poi.name,
+      pickupLat: poi.lat,
+      pickupLng: poi.lng,
+      isPickupPoiConfirmed: true,
+    };
+    onUpdateDraft?.(updated);
+  };
+
+  const handleSelectDropoffPoi = (poi: PoiResult) => {
+    if (!extractedDraft) return;
+    const updated: HqEmailExtractedDraft = {
+      ...extractedDraft,
+      dropoffLocation: poi.name,
+      dropoffLat: poi.lat,
+      dropoffLng: poi.lng,
+      isDropoffPoiConfirmed: true,
+    };
+    onUpdateDraft?.(updated);
+  };
 
   const handleRegisterClick = () => {
     haptics.success();
@@ -55,6 +149,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
 
   const handleSaveClick = () => {
     haptics.lightTap();
+    setIsEditing(!isEditing);
     onSaveModifiedDraft?.();
   };
 
@@ -151,7 +246,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                     AI가 추출한 예약 정보
                   </h3>
                   <p className="text-[10px] text-slate-400 font-medium">
-                    Gemini AI 실시간 구조화 완료
+                    Gemini AI 원문 근거 구조화 완료 (수하물 제외)
                   </p>
                 </div>
               </div>
@@ -168,72 +263,145 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
               </button>
             </div>
 
+            {/* CRM Save Feedback Toast */}
+            {crmSavedNotice && (
+              <div className="mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{crmSavedNotice}</span>
+              </div>
+            )}
+
             {/* Key-Value Extracted Table */}
             <div className="mt-4 divide-y divide-slate-100 text-xs">
-              {/* 고객사 */}
-              <div className="py-2.5 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-slate-500 font-semibold w-28">
+              {/* 고객사 & CRM 연동 */}
+              <div className="py-2.5 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-slate-500 font-semibold w-28 shrink-0">
                   <Building2 className="w-3.5 h-3.5 text-slate-400" />
                   <span>고객사</span>
                 </div>
-                <div className="font-extrabold text-slate-900 text-right">
-                  {extractedDraft.passengerName || fromName}
+                <div className="flex items-center gap-2 justify-end flex-1 min-w-0">
+                  <span className="font-extrabold text-slate-900 truncate">
+                    {companyName || '미지정 (확인 필요)'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleSaveToCrm}
+                    className={`px-2 py-1 rounded-lg text-[10px] font-extrabold border transition-colors cursor-pointer shrink-0 flex items-center gap-1 ${
+                      extractedDraft.isSavedToCrm
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                        : 'bg-blue-50 text-[#1E60F3] border-blue-200 hover:bg-blue-100'
+                    }`}
+                    title="고객 관리에 회사 및 담당자 정보를 저장하거나 연결합니다"
+                  >
+                    <BookmarkCheck className="w-3 h-3" />
+                    <span>{extractedDraft.isSavedToCrm ? '고객 관리 연결됨' : '고객 관리에 저장'}</span>
+                  </button>
                 </div>
               </div>
 
-              {/* 운행 날짜 */}
-              <div className="py-2.5 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-slate-500 font-semibold w-28">
-                  <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                  <span>운행 날짜</span>
+              {/* 예약 담당자 (발신자와 구분) */}
+              <div className="py-2.5 flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2 text-slate-500 font-semibold w-28 shrink-0 mt-0.5">
+                  <UserCheck className="w-3.5 h-3.5 text-slate-400" />
+                  <span>예약 담당자</span>
                 </div>
-                <div className="font-extrabold text-slate-900 text-right">
-                  {extractedDraft.pickupDate || '날짜 미지정'}
-                </div>
-              </div>
-
-              {/* 픽업 시간 */}
-              <div className="py-2.5 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-slate-500 font-semibold w-28">
-                  <Clock className="w-3.5 h-3.5 text-slate-400" />
-                  <span>픽업 시간</span>
-                </div>
-                <div className="font-extrabold text-slate-900 text-right">
-                  {extractedDraft.pickupTime || '09:00'}
+                <div className="text-right flex-1 min-w-0">
+                  <div className="font-extrabold text-slate-900">
+                    {contactName || '미지정 (확인 필요)'}
+                    <span className="text-[10px] text-slate-400 font-normal ml-1.5">
+                      ({contactSource === 'signature' ? '서명' : contactSource === 'body' ? '본문' : '발신 헤더'})
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-0.5 space-x-1.5 truncate">
+                    {contactPhone && <span>📞 {contactPhone}</span>}
+                    {contactEmail && <span>✉️ {contactEmail}</span>}
+                  </div>
                 </div>
               </div>
 
-              {/* 픽업 위치 */}
-              <div className="py-2.5 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-slate-500 font-semibold w-28">
-                  <MapPin className="w-3.5 h-3.5 text-[#1E60F3]" />
-                  <span>픽업 위치</span>
-                </div>
-                <div className="font-extrabold text-slate-900 text-right">
-                  {extractedDraft.pickupLocation || '출발지 미지정'}
-                </div>
-              </div>
-
-              {/* 목적지 */}
-              <div className="py-2.5 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-slate-500 font-semibold w-28">
-                  <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                  <span>목적지</span>
-                </div>
-                <div className="font-extrabold text-slate-900 text-right">
-                  {extractedDraft.dropoffLocation || '도착지 미지정'}
-                </div>
-              </div>
-
-              {/* 탑승객 수 */}
+              {/* 탑승객 (담당자와 구분) */}
               <div className="py-2.5 flex items-center justify-between">
                 <div className="flex items-center gap-2 text-slate-500 font-semibold w-28">
                   <Users className="w-3.5 h-3.5 text-slate-400" />
-                  <span>탑승객 수</span>
+                  <span>탑승객 / 연락처</span>
                 </div>
                 <div className="font-extrabold text-slate-900 text-right">
-                  {extractedDraft.passengerCount}명
+                  <span>{passengerName || '승객 미지정'}</span>
+                  <span className="text-slate-400 font-normal ml-1">({passengerCount}명)</span>
+                  {passengerPhone && (
+                    <span className="block text-[11px] text-slate-500 font-medium">{passengerPhone}</span>
+                  )}
                 </div>
+              </div>
+
+              {/* 운행 날짜 & 시간 */}
+              <div className="py-2.5 flex items-center justify-between">
+                <div className="flex items-center gap-2 text-slate-500 font-semibold w-28">
+                  <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                  <span>운행 일시</span>
+                </div>
+                <div className="font-extrabold text-slate-900 text-right">
+                  {pickupDate} {pickupTime}
+                </div>
+              </div>
+
+              {/* 픽업 위치 (TMAP POI 후보 연동) */}
+              <div className="py-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-2 text-slate-500 font-semibold w-28">
+                    <MapPin className="w-3.5 h-3.5 text-[#1E60F3]" />
+                    <span>픽업 위치</span>
+                  </div>
+                  <span className="text-[11px] text-slate-400 font-medium">
+                    {pickupDetailNotes && `[${pickupDetailNotes}]`}
+                  </span>
+                </div>
+                <HqPlaceSearchInput
+                  value={pickupLocation}
+                  onChange={(val) => {
+                    if (!extractedDraft) return;
+                    onUpdateDraft?.({
+                      ...extractedDraft,
+                      pickupLocation: val,
+                      isPickupPoiConfirmed: false,
+                    });
+                  }}
+                  onSelectPoi={handleSelectPickupPoi}
+                  autoSearch={true}
+                  isConfirmed={isPickupPoiConfirmed}
+                  placeholder="TMAP 출발지 검색 및 후보 선택"
+                  heightClass="h-10"
+                />
+              </div>
+
+              {/* 목적지 (TMAP POI 후보 연동) */}
+              <div className="py-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-2 text-slate-500 font-semibold w-28">
+                    <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                    <span>목적지</span>
+                  </div>
+                  <span className="text-[11px] text-slate-400 font-medium">
+                    {dropoffDetailNotes && `[${dropoffDetailNotes}]`}
+                  </span>
+                </div>
+                <HqPlaceSearchInput
+                  value={dropoffLocation}
+                  onChange={(val) => {
+                    if (!extractedDraft) return;
+                    onUpdateDraft?.({
+                      ...extractedDraft,
+                      dropoffLocation: val,
+                      isDropoffPoiConfirmed: false,
+                    });
+                  }}
+                  onSelectPoi={handleSelectDropoffPoi}
+                  autoSearch={true}
+                  isConfirmed={isDropoffPoiConfirmed}
+                  icon="flag"
+                  placeholder="TMAP 도착지 검색 및 후보 선택"
+                  heightClass="h-10"
+                />
               </div>
 
               {/* 항공편명 */}
@@ -243,7 +411,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                   <span>항공편명</span>
                 </div>
                 <div className="font-extrabold text-blue-600 text-right">
-                  {extractedDraft.flightNumber || '정보 없음'}
+                  {flightNumber || '정보 없음'}
                 </div>
               </div>
 
@@ -255,7 +423,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                 </div>
                 <div className="flex items-center gap-1.5 justify-end flex-wrap">
                   <span className="px-2 py-0.5 rounded-md bg-blue-50 text-[#1E60F3] border border-blue-200 text-[11px] font-bold">
-                    {extractedDraft.requestedVehicleClass || '스프린터 / 의전 세단'}
+                    {requestedVehicleClass}
                   </span>
                 </div>
               </div>
@@ -267,7 +435,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                   <span>특이사항</span>
                 </div>
                 <div className="font-bold text-slate-800 text-right leading-snug">
-                  {extractedDraft.specialRequests || '특이사항 없음'}
+                  {specialRequests || '특이사항 없음'}
                 </div>
               </div>
             </div>
@@ -282,7 +450,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
               AI 예약 정보 추출 대기 중
             </h4>
             <p className="text-xs text-slate-500 max-w-sm leading-relaxed">
-              Gemini AI 모델이 본문 내용을 분석하여 고객사명, 픽업 날짜/시간, 출발·도착지, 승객 정보 등을 안전하게 자동 구조화합니다.
+              Gemini AI 모델이 본문 내용을 분석하여 고객사명, 담당자 연락처, 픽업 일시, TMAP 장소 후보 등을 안전하게 자동 구조화합니다.
             </p>
             <button
               type="button"
@@ -299,12 +467,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
           </div>
         )}
 
-        {/* Big Sparkle Icon Accent in lower corner */}
-        <div className="absolute right-6 bottom-20 pointer-events-none opacity-20">
-          <Sparkles className="w-16 h-16 text-blue-500" />
-        </div>
-
-        {/* Action Buttons (Enabled when draft is extracted) */}
+        {/* Action Buttons */}
         {extractedDraft && (
           <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3 z-10">
             <button

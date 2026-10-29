@@ -67,29 +67,77 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
   const searchParams = useSearchParams();
   const urlStep = searchParams?.get('step') as EmailWorkflowStep | null;
   const urlDriverModal = searchParams?.get('driverModal') === 'true';
+  const urlDemo = searchParams?.get('demo') === 'true';
 
   // 1. Live Inbox State
-  const [emails, setEmails] = useState<HqEmailSummary[]>([]);
-  const [isLoadingInbox, setIsLoadingInbox] = useState<boolean>(true);
+  const [emails, setEmails] = useState<HqEmailSummary[]>(() => {
+    if (urlDemo) {
+      return REFERENCE_EMAILS.map((e) => e.summary);
+    }
+    return [];
+  });
+  const [isLoadingInbox, setIsLoadingInbox] = useState<boolean>(!urlDemo);
   const [inboxError, setInboxError] = useState<string | null>(null);
-  const [imapState, setImapState] = useState<ImapConnectionState>({
-    isConfigured: false,
-    syncStatus: 'syncing',
-    totalCount: 0,
+  const [imapState, setImapState] = useState<ImapConnectionState>(() => {
+    if (urlDemo) {
+      return {
+        isConfigured: true,
+        syncStatus: 'connected',
+        totalCount: REFERENCE_EMAILS.length,
+        accountEmail: 'demo@viplimousine.kr (데모 모드)',
+        lastSync: '데모 샘플',
+      };
+    }
+    return {
+      isConfigured: false,
+      syncStatus: 'syncing',
+      totalCount: 0,
+    };
   });
 
   // 2. Demo Mode Toggle (Only explicitly active in local development)
-  const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
+  const [isDemoMode, setIsDemoMode] = useState<boolean>(urlDemo);
 
   // 3. Current Selected Email
-  const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null);
+  const [selectedEmailId, setSelectedEmailId] = useState<string | null>(() => {
+    if (urlDemo) {
+      return REFERENCE_EMAILS[0]?.summary.id || null;
+    }
+    return null;
+  });
 
   // 4. Email Detail Cache (Read-Only)
-  const [emailDetails, setEmailDetails] = useState<Record<string, HqEmailDetail>>({});
+  const [emailDetails, setEmailDetails] = useState<Record<string, HqEmailDetail>>(() => {
+    if (urlDemo) {
+      const initialDetails: Record<string, HqEmailDetail> = {};
+      for (const item of REFERENCE_EMAILS) {
+        initialDetails[item.summary.id] = {
+          ...item.summary,
+          bodyText: item.detail.bodyText,
+          to: item.detail.to,
+          headers: item.detail.headers,
+          extractedDraft: item.extractedDraft,
+        };
+      }
+      return initialDetails;
+    }
+    return {};
+  });
   const [isLoadingDetail, setIsLoadingDetail] = useState<boolean>(false);
 
   // 5. AI Extracted Drafts per Email
-  const [draftsByEmailId, setDraftsByEmailId] = useState<Record<string, HqEmailExtractedDraft>>({});
+  const [draftsByEmailId, setDraftsByEmailId] = useState<Record<string, HqEmailExtractedDraft>>(() => {
+    if (urlDemo) {
+      const initialDrafts: Record<string, HqEmailExtractedDraft> = {};
+      for (const item of REFERENCE_EMAILS) {
+        if (item.extractedDraft) {
+          initialDrafts[item.summary.id] = item.extractedDraft;
+        }
+      }
+      return initialDrafts;
+    }
+    return {};
+  });
   const [isExtractingAi, setIsExtractingAi] = useState<boolean>(false);
 
   // 6. Filter tabs ('all' | 'unprocessed' | 'reviewing' | 'completed')
@@ -415,6 +463,16 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
     showToast(`${driver.name} 기사님이 ${vehicleSlots[activeSlotIndex]?.vehicleModel || '차량'}에 배정되었습니다.`);
   };
 
+  // Update draft helper
+  const handleUpdateDraft = useCallback((updated: HqEmailExtractedDraft) => {
+    if (!currentSummary) return;
+    setDraftsByEmailId((prev) => ({
+      ...prev,
+      [currentSummary.id]: updated,
+    }));
+    saveEmailDraft(updated);
+  }, [currentSummary]);
+
   // =========================================================
   // On-Demand AI Extraction Trigger
   // =========================================================
@@ -435,7 +493,8 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
         body: JSON.stringify({
           emailText: emailBody,
           emailSubject: currentSummary.subject,
-          emailFrom: currentSummary.from.name || currentSummary.from.address,
+          emailFrom: currentSummary.from.address,
+          senderName: currentSummary.from.name,
           emailId: currentSummary.id,
         }),
       });
@@ -495,19 +554,35 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
       return;
     }
 
+    // TMAP POI candidate confirmation enforcement (Issue #33)
+    if (!draft?.isPickupPoiConfirmed || !draft?.isDropoffPoiConfirmed) {
+      setDispatchError('출발지 및 목적지의 TMAP 위치 후보를 직접 클릭하여 확정해야 배차를 최종 등록할 수 있습니다.');
+      haptics.errorAlert();
+      return;
+    }
+
     setIsDispatching(true);
     setDispatchError(null);
 
     try {
+      // Disambiguate passenger phone: NEVER allow an email address!
+      const rawPassengerPhone = draft?.passengerPhone?.trim() || '';
+      const safePassengerPhone = rawPassengerPhone.includes('@') ? '' : rawPassengerPhone;
+
       const bookingPayload = {
-        customerName: currentDetail?.from?.name || currentSummary.from.name || '미등록 고객사',
+        customerName: draft?.companyName || '미등록 고객사',
+        contactName: draft?.contactName || '',
+        contactPhone: draft?.contactPhone || '',
+        contactEmail: draft?.contactEmail || '',
+        clientId: draft?.clientId || null,
+        contactId: draft?.contactId || null,
         intakeSource: 'email',
         date: pickupDate,
         pickupTime: pickupTime,
         origin,
         destination,
-        passengerName: draft?.passengerName || currentSummary.from.name,
-        passengerPhone: draft?.passengerPhone || currentSummary.from.address,
+        passengerName: draft?.passengerName || 'VIP 탑승객',
+        passengerPhone: safePassengerPhone,
         passengerCount: draft?.passengerCount || 1,
         flightNumber: draft?.flightNumber || '',
         notes: draft?.specialRequests || `이메일 접수 (편명: ${draft?.flightNumber || '미지정'})`,
@@ -519,7 +594,7 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
         vehicleModel: assignedSlots[0].vehicleModel,
         dispatchStatus: 'published',
         allowUnverified: true,
-        publishedBy: '본사 관리자 (이메일 배차 확정)',
+        publishedBy: '대표/관리자 (이메일 배차 확정)',
       };
 
       const res = await fetch('/api/schedules/dispatch', {
@@ -906,6 +981,7 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                   onSaveModifiedDraft={() => {
                     showToast('수정된 예약 초안이 저장되었습니다.');
                   }}
+                  onUpdateDraft={handleUpdateDraft}
                 />
               )}
 
@@ -918,6 +994,7 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                   onOpenDriverModal={handleOpenDriverModal}
                   onConfirmDispatch={handleConfirmDispatch}
                   onBackToStep1={() => setWorkflowStep('step1_extract')}
+                  onUpdateDraft={handleUpdateDraft}
                   isDispatching={isDispatching}
                   dispatchError={dispatchError}
                 />

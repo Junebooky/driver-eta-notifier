@@ -181,11 +181,7 @@ export function convertDraftToHqBooking(draft: HqEmailExtractedDraft): {
     id: `booking-${Date.now()}`,
     bookingNo,
     no: 99,
-    customerName: draft.passengerName.includes('모건스탠리')
-      ? '모건스탠리 아시아'
-      : draft.passengerName.includes('구글')
-        ? '구글 클라우드'
-        : 'VIP 고객',
+    customerName: draft.companyName || 'VIP 고객',
     pickupDate: draft.pickupDate || getKstTodayDateStr(),
     pickupTime: draft.pickupTime || '14:00',
     pickupLocation: draft.pickupLocation,
@@ -199,7 +195,7 @@ export function convertDraftToHqBooking(draft: HqEmailExtractedDraft): {
     customerBrochure: '미발송',
     passengerCount: draft.passengerCount || 1,
     passengerName: draft.passengerName,
-    passengerPhone: draft.passengerPhone || '010-0000-0000',
+    passengerPhone: draft.passengerPhone || '',
     notes: draft.specialRequests,
     isToday: true,
     isDispatchTarget: true,

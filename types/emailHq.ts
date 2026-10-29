@@ -37,14 +37,40 @@ export interface HqGroupTripItem {
 export interface HqEmailExtractedDraft {
   id: string;
   emailId: string;
+
+  // Raw Email Header Info
+  senderName?: string;
+  senderEmail?: string;
+  replyTo?: string;
+
+  // Client Organization & Reservation Coordinator (Contact Entity)
+  companyName?: string;
+  contactName?: string;
+  contactPhone?: string; // Strictly phone number or empty, NEVER email
+  contactEmail?: string;
+  contactSource?: 'body' | 'signature' | 'from' | 'reply-to';
+  contactConfidence?: number;
+
+  // Actual Passenger Entity (Riding in the vehicle)
   passengerName: string;
-  passengerPhone: string;
+  passengerPhone: string; // Strictly phone number or empty, NEVER email
   passengerCount: number;
-  luggageCount: number;
+
+  // Schedule & Route with POI Confirmation
   pickupDate: string; // YYYY-MM-DD
   pickupTime: string; // HH:MM
   pickupLocation: string;
+  pickupDetailNotes?: string; // Gate, floor, terminal notes
+  pickupLat?: number;
+  pickupLng?: number;
+  isPickupPoiConfirmed?: boolean;
+
   dropoffLocation: string;
+  dropoffDetailNotes?: string;
+  dropoffLat?: number;
+  dropoffLng?: number;
+  isDropoffPoiConfirmed?: boolean;
+
   flightNumber: string;
   requestedVehicleClass: string;
   specialRequests: string;
@@ -52,6 +78,11 @@ export interface HqEmailExtractedDraft {
   groupTrips?: HqGroupTripItem[];
   confidence: number; // 0 to 1
   warnings: string[];
+
+  // CRM Linkage (#21)
+  clientId?: string | null;
+  contactId?: string | null;
+  isSavedToCrm?: boolean;
   
   // Mandatory manual assignment by administrator
   assignedDriver: string | null;
@@ -62,6 +93,9 @@ export interface HqEmailExtractedDraft {
   status: 'draft' | 'saved' | 'published';
   updatedAt: string;
   associatedBookingId?: string | null;
+
+  // Legacy optional compatibility (excluded from new reservation UI)
+  luggageCount?: number;
 }
 
 export interface HqEmailSummary {

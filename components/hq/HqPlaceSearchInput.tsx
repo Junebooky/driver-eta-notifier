@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { MapPin, Flag, Loader2, X, Navigation } from 'lucide-react';
+import { MapPin, Flag, Loader2, X, Navigation, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 export interface PoiResult {
@@ -25,7 +25,7 @@ export function sanitizeSearchQuery(query: string): string {
 // In-memory instant cache for TMAP POI searches
 const placeSearchCache = new Map<string, PoiResult[]>();
 
-interface HqPlaceSearchInputProps {
+export interface HqPlaceSearchInputProps {
   label?: string;
   required?: boolean;
   value: string;
@@ -36,6 +36,9 @@ interface HqPlaceSearchInputProps {
   containerClassName?: string;
   heightClass?: string;
   disabled?: boolean;
+  autoSearch?: boolean; // When true, runs search and expands candidates for AI-extracted values
+  isConfirmed?: boolean;
+  onConfirmStateChange?: (confirmed: boolean) => void;
 }
 
 export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
@@ -49,6 +52,9 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
   containerClassName = '',
   heightClass = 'h-12',
   disabled = false,
+  autoSearch = false,
+  isConfirmed = false,
+  onConfirmStateChange,
 }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
@@ -84,8 +90,8 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
       return;
     }
 
-    // Do NOT open dropdown or auto-search on mount / prop assignment
-    if (!isUserTypingRef.current) {
+    // Allow search if user is typing OR if autoSearch is enabled and value is not confirmed
+    if (!isUserTypingRef.current && !autoSearch) {
       return;
     }
 
@@ -107,7 +113,9 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
     if (placeSearchCache.has(cleanQuery)) {
       const cached = placeSearchCache.get(cleanQuery)!;
       setSearchResults(cached);
-      setIsDropdownOpen(cached.length > 0);
+      if (!isConfirmed) {
+        setIsDropdownOpen(cached.length > 0);
+      }
       setIsSearching(false);
       return;
     }
@@ -133,7 +141,9 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
           const pois: PoiResult[] = data.pois || [];
           placeSearchCache.set(cleanQuery, pois);
           setSearchResults(pois);
-          setIsDropdownOpen(pois.length > 0);
+          if (!isConfirmed) {
+            setIsDropdownOpen(pois.length > 0);
+          }
           if (pois.length === 0) {
             setSearchError('추천 검색 결과가 없습니다.');
           }
@@ -156,7 +166,7 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
         abortControllerRef.current.abort();
       }
     };
-  }, [value]);
+  }, [value, autoSearch, isConfirmed]);
 
   const handleSelectPoi = useCallback(
     (poi: PoiResult) => {
@@ -165,11 +175,12 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
       isUserTypingRef.current = false;
       onChange(poi.name);
       onSelectPoi?.(poi);
+      onConfirmStateChange?.(true);
       setIsDropdownOpen(false);
       setSearchResults([]);
       setHighlightedIndex(-1);
     },
-    [onChange, onSelectPoi]
+    [onChange, onSelectPoi, onConfirmStateChange]
   );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -204,6 +215,7 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
     isSelectionRef.current = true;
     isUserTypingRef.current = false;
     onChange('');
+    onConfirmStateChange?.(false);
     setSearchResults([]);
     setIsDropdownOpen(false);
     inputRef.current?.focus();
@@ -212,20 +224,37 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
   return (
     <div className={`relative ${containerClassName}`} ref={containerRef}>
       {label && (
-        <label className="block text-xs font-bold text-slate-800 mb-1.5">
-          {label} {required && <span className="text-red-500 font-bold ml-0.5">*</span>}
-        </label>
+        <div className="flex items-center justify-between mb-1.5">
+          <label className="block text-xs font-bold text-slate-800">
+            {label} {required && <span className="text-red-500 font-bold ml-0.5">*</span>}
+          </label>
+          {value && value.trim().length >= 2 && (
+            isConfirmed ? (
+              <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                <span>TMAP 좌표 확정</span>
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 animate-pulse">
+                <AlertTriangle className="w-3 h-3 text-amber-600" />
+                <span>후보 선택 필요</span>
+              </span>
+            )
+          )}
+        </div>
       )}
 
       <div
-        className={`w-full ${heightClass} bg-white border border-slate-200 hover:border-blue-400 focus-within:border-[#1E60F3] focus-within:ring-2 focus-within:ring-blue-100 rounded-xl px-3.5 flex items-center gap-2.5 transition-all shadow-2xs ${
+        className={`w-full ${heightClass} bg-white border ${
+          isConfirmed ? 'border-slate-200 hover:border-blue-400' : value ? 'border-amber-300 ring-1 ring-amber-100' : 'border-slate-200 hover:border-blue-400'
+        } focus-within:border-[#1E60F3] focus-within:ring-2 focus-within:ring-blue-100 rounded-xl px-3.5 flex items-center gap-2.5 transition-all shadow-2xs ${
           disabled ? 'opacity-60 pointer-events-none' : ''
         }`}
       >
         {icon === 'mapPin' ? (
-          <MapPin className="w-5 h-5 text-slate-700 shrink-0" />
+          <MapPin className={`w-5 h-5 shrink-0 ${isConfirmed ? 'text-[#1E60F3]' : 'text-slate-700'}`} />
         ) : (
-          <Flag className="w-5 h-5 text-slate-700 shrink-0" />
+          <Flag className={`w-5 h-5 shrink-0 ${isConfirmed ? 'text-[#1E60F3]' : 'text-slate-700'}`} />
         )}
 
         <input
@@ -235,17 +264,13 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
           disabled={disabled}
           onChange={(e) => {
             isUserTypingRef.current = true;
+            onConfirmStateChange?.(false);
             onChange(e.target.value);
           }}
           onFocus={() => {
-            if (isUserTypingRef.current && searchResults.length > 0) {
+            if (searchResults.length > 0) {
               setIsDropdownOpen(true);
             }
-          }}
-          onBlur={() => {
-            setTimeout(() => {
-              setIsDropdownOpen(false);
-            }, 200);
           }}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
@@ -274,9 +299,9 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
           <div className="px-3 py-1.5 bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-500 flex items-center justify-between">
             <span className="flex items-center gap-1.5">
               <Navigation className="w-3 h-3 text-[#1E60F3]" />
-              <span>TMAP 실시간 장소 검색</span>
+              <span>TMAP 실시간 장소 검색 (후보 선택 시 좌표 확정)</span>
             </span>
-            <span>{searchResults.length}건</span>
+            <span className="text-blue-600 font-extrabold">{searchResults.length}건</span>
           </div>
 
           {searchResults.map((poi, index) => {
@@ -314,4 +339,3 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
     </div>
   );
 };
-

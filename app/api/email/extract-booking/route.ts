@@ -17,6 +17,8 @@ export async function POST(request: NextRequest) {
     const emailId = body.emailId;
     const subject = body.subject || body.emailSubject;
     const sender = body.sender || body.emailFrom;
+    const senderName = body.senderName || '';
+    const replyTo = body.replyTo || '';
     const bodyText = body.bodyText || body.emailText;
 
     if (!emailId) {
@@ -28,6 +30,8 @@ export async function POST(request: NextRequest) {
         emailId,
         subject,
         sender: sender || '',
+        senderName,
+        replyTo,
         bodyText,
       });
       return NextResponse.json(result);

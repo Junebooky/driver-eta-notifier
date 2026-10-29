@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useSyncExternalStore } from 'react';
+import React, { useState, useMemo, useEffect, useSyncExternalStore } from 'react';
 import Image from 'next/image';
 import {
   Search,
@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { HqCustomer } from '@/types/customerHq';
 import { INITIAL_HQ_CUSTOMERS } from '@/utils/customerHqData';
+import { getStoredCustomers, CRM_CUSTOMERS_UPDATE_EVENT } from '@/utils/crmCustomerSync';
 import { CustomerBrandLogo } from './CustomerBrandLogo';
 import { HqCustomerRegisterModal } from './HqCustomerRegisterModal';
 import { HqCustomerEditModal } from './HqCustomerEditModal';
@@ -54,10 +55,24 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
   onOpenSettlementReport,
 }) => {
   // Customers State
-  const [customers, setCustomers] = useState<HqCustomer[]>(INITIAL_HQ_CUSTOMERS);
+  const [customers, setCustomers] = useState<HqCustomer[]>(() => getStoredCustomers());
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>(
     INITIAL_HQ_CUSTOMERS[0]?.id || ''
   );
+
+  // Sync stored customers when updated from email intake or other tabs
+  useEffect(() => {
+    setCustomers(getStoredCustomers());
+    const handleUpdate = () => {
+      setCustomers(getStoredCustomers());
+    };
+    window.addEventListener(CRM_CUSTOMERS_UPDATE_EVENT, handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    return () => {
+      window.removeEventListener(CRM_CUSTOMERS_UPDATE_EVENT, handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, []);
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);

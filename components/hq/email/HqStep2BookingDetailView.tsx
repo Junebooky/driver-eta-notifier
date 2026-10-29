@@ -19,10 +19,15 @@ import {
   Star,
   AlertCircle,
   Loader2,
+  Building2,
+  UserCheck,
+  BookmarkCheck,
 } from 'lucide-react';
 import { AvailableDriverItem } from './HqDriverSelectModal';
 import { HqEmailSummary, HqEmailDetail, HqEmailExtractedDraft } from '@/types/emailHq';
 import { haptics } from '@/utils/haptics';
+import { HqPlaceSearchInput, PoiResult } from '@/components/hq/HqPlaceSearchInput';
+import { saveContactToCrm } from '@/utils/crmCustomerSync';
 
 export interface VehicleSlotAssignment {
   slotIndex: number;
@@ -39,6 +44,7 @@ export interface HqStep2BookingDetailViewProps {
   onOpenDriverModal: (slotIndex: number) => void;
   onConfirmDispatch: () => void;
   onBackToStep1: () => void;
+  onUpdateDraft?: (updated: HqEmailExtractedDraft) => void;
   isDispatching?: boolean;
   dispatchError?: string | null;
   // Backward compatibility
@@ -53,28 +59,36 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
   onOpenDriverModal,
   onConfirmDispatch,
   onBackToStep1,
+  onUpdateDraft,
   isDispatching = false,
   dispatchError = null,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'assign' | 'schedule' | 'history'>('assign');
   const [selectedLanguage, setSelectedLanguage] = useState<'any' | 'english'>('any');
+  const [crmSavedNotice, setCrmSavedNotice] = useState<string | null>(null);
 
-  // Customer & Contact Info derived safely
-  const customerName =
-    emailDetail?.from?.name || emailSummary?.from?.name || '고객사 미지정';
-  const customerContact =
-    extractedDraft?.passengerPhone ||
-    emailDetail?.from?.address ||
-    emailSummary?.from?.address ||
-    '연락처 미등록';
+  // Disambiguated Customer & Contact Entities
+  const companyName = extractedDraft?.companyName || '미등록 고객사';
+  const contactName = extractedDraft?.contactName || '담당자 미지정';
+  const contactPhone = extractedDraft?.contactPhone || '연락처 미등록';
+  const contactEmail = extractedDraft?.contactEmail || emailSummary?.from?.address || '이메일 미등록';
+  const contactSource = extractedDraft?.contactSource || 'from';
+
   const bookingDate = extractedDraft?.pickupDate || '날짜 미지정';
   const bookingTime = extractedDraft?.pickupTime || '시간 미지정';
-  const pickupLocation = extractedDraft?.pickupLocation || '출발지 미지정';
-  const dropoffLocation = extractedDraft?.dropoffLocation || '목적지 미지정';
+
+  const pickupLocation = extractedDraft?.pickupLocation || '';
+  const pickupDetailNotes = extractedDraft?.pickupDetailNotes || '';
+  const isPickupPoiConfirmed = Boolean(extractedDraft?.isPickupPoiConfirmed);
+
+  const dropoffLocation = extractedDraft?.dropoffLocation || '';
+  const dropoffDetailNotes = extractedDraft?.dropoffDetailNotes || '';
+  const isDropoffPoiConfirmed = Boolean(extractedDraft?.isDropoffPoiConfirmed);
+
   const specialRequests = extractedDraft?.specialRequests || '특이사항 없음';
 
   const passengerName = extractedDraft?.passengerName || '탑승객 미입력';
-  const passengerPhone = extractedDraft?.passengerPhone || '연락처 미입력';
+  const passengerPhone = extractedDraft?.passengerPhone || '연락처 미입력'; // Strictly phone or empty, NEVER email!
   const passengerCount = extractedDraft?.passengerCount ?? 1;
   const flightNumber = extractedDraft?.flightNumber || '항공편 없음';
 
@@ -84,6 +98,59 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
 
   // Check if at least one driver is assigned
   const hasAssignedDriver = vehicleSlots.some((slot) => slot.driver !== null);
+
+  // Handle Save To CRM (#21)
+  const handleSaveToCrm = () => {
+    if (!extractedDraft) return;
+    haptics.success();
+
+    const result = saveContactToCrm({
+      companyName,
+      contactName,
+      contactPhone: extractedDraft.contactPhone || '',
+      contactEmail: extractedDraft.contactEmail || '',
+      notes: `예약 상세 화면에서 CRM 수동 저장 (예약번호: ${bookingCode})`,
+      sourceDraftId: extractedDraft.id,
+    });
+
+    setCrmSavedNotice(result.message);
+
+    const updated: HqEmailExtractedDraft = {
+      ...extractedDraft,
+      clientId: result.clientId,
+      contactId: result.contactId,
+      isSavedToCrm: true,
+    };
+    onUpdateDraft?.(updated);
+
+    setTimeout(() => {
+      setCrmSavedNotice(null);
+    }, 4500);
+  };
+
+  const handleSelectPickupPoi = (poi: PoiResult) => {
+    if (!extractedDraft) return;
+    const updated: HqEmailExtractedDraft = {
+      ...extractedDraft,
+      pickupLocation: poi.name,
+      pickupLat: poi.lat,
+      pickupLng: poi.lng,
+      isPickupPoiConfirmed: true,
+    };
+    onUpdateDraft?.(updated);
+  };
+
+  const handleSelectDropoffPoi = (poi: PoiResult) => {
+    if (!extractedDraft) return;
+    const updated: HqEmailExtractedDraft = {
+      ...extractedDraft,
+      dropoffLocation: poi.name,
+      dropoffLat: poi.lat,
+      dropoffLng: poi.lng,
+      isDropoffPoiConfirmed: true,
+    };
+    onUpdateDraft?.(updated);
+  };
 
   const handleConfirm = () => {
     if (!hasAssignedDriver) {
@@ -195,6 +262,14 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
         </button>
       </div>
 
+      {/* CRM Notice Feedback */}
+      {crmSavedNotice && (
+        <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2.5 text-emerald-800 text-xs font-bold animate-in fade-in">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>{crmSavedNotice}</span>
+        </div>
+      )}
+
       {/* Dispatch Error Notification */}
       {dispatchError && (
         <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-2.5 text-rose-800 text-xs font-bold animate-in fade-in">
@@ -214,7 +289,22 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
         <div className="lg:col-span-5 space-y-4">
           {/* Card 1: 기본 정보 */}
           <div className="bg-slate-50/70 rounded-2xl border border-slate-200/80 p-4 space-y-3">
-            <h3 className="text-xs font-black text-slate-900">기본 정보</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-black text-slate-900">기본 정보</h3>
+              <button
+                type="button"
+                onClick={handleSaveToCrm}
+                className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border transition-colors cursor-pointer flex items-center gap-1 ${
+                  extractedDraft?.isSavedToCrm
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                    : 'bg-blue-50 text-[#1E60F3] border-blue-200 hover:bg-blue-100'
+                }`}
+                title="고객 관리에 회사 및 담당자 정보를 저장하거나 연결합니다"
+              >
+                <BookmarkCheck className="w-3 h-3" />
+                <span>{extractedDraft?.isSavedToCrm ? '고객 관리 연결됨' : '고객 관리에 저장'}</span>
+              </button>
+            </div>
 
             <div className="space-y-2 text-xs">
               <div className="flex items-center justify-between">
@@ -223,13 +313,20 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-400 font-medium">고객사</span>
-                <span className="font-extrabold text-slate-900">{customerName}</span>
+                <span className="font-extrabold text-slate-900">{companyName}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-slate-400 font-medium">담당자 / 연락처</span>
-                <span className="font-bold text-slate-800 truncate max-w-[200px]" title={customerContact}>
-                  {customerContact}
-                </span>
+                <span className="text-slate-400 font-medium">예약 담당자</span>
+                <div className="text-right">
+                  <span className="font-bold text-slate-800">{contactName}</span>
+                  <span className="text-[10px] text-slate-400 font-normal ml-1">
+                    ({contactSource === 'signature' ? '서명' : contactSource === 'body' ? '본문' : '발신 헤더'})
+                  </span>
+                  <div className="text-[10px] text-slate-500">
+                    {contactPhone && <span>📞 {contactPhone} </span>}
+                    {contactEmail && <span>✉️ {contactEmail}</span>}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -244,17 +341,58 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
                 <span className="text-slate-400 font-medium">픽업 시간</span>
                 <span className="font-bold text-slate-900">{bookingTime}</span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400 font-medium">픽업 위치</span>
-                <span className="font-bold text-[#1E60F3] truncate max-w-[180px]" title={pickupLocation}>
-                  {pickupLocation}
-                </span>
+
+              {/* 픽업 위치 (TMAP 후보 검색 및 선택) */}
+              <div className="pt-1">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-slate-400 font-medium">픽업 위치</span>
+                  {pickupDetailNotes && (
+                    <span className="text-[10px] text-slate-400">[{pickupDetailNotes}]</span>
+                  )}
+                </div>
+                <HqPlaceSearchInput
+                  value={pickupLocation}
+                  onChange={(val) => {
+                    if (!extractedDraft) return;
+                    onUpdateDraft?.({
+                      ...extractedDraft,
+                      pickupLocation: val,
+                      isPickupPoiConfirmed: false,
+                    });
+                  }}
+                  onSelectPoi={handleSelectPickupPoi}
+                  autoSearch={true}
+                  isConfirmed={isPickupPoiConfirmed}
+                  placeholder="TMAP 출발지 검색 및 후보 선택"
+                  heightClass="h-9"
+                />
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400 font-medium">목적지</span>
-                <span className="font-bold text-slate-900 truncate max-w-[180px]" title={dropoffLocation}>
-                  {dropoffLocation}
-                </span>
+
+              {/* 목적지 (TMAP 후보 검색 및 선택) */}
+              <div className="pt-1">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-slate-400 font-medium">목적지</span>
+                  {dropoffDetailNotes && (
+                    <span className="text-[10px] text-slate-400">[{dropoffDetailNotes}]</span>
+                  )}
+                </div>
+                <HqPlaceSearchInput
+                  value={dropoffLocation}
+                  onChange={(val) => {
+                    if (!extractedDraft) return;
+                    onUpdateDraft?.({
+                      ...extractedDraft,
+                      dropoffLocation: val,
+                      isDropoffPoiConfirmed: false,
+                    });
+                  }}
+                  onSelectPoi={handleSelectDropoffPoi}
+                  autoSearch={true}
+                  isConfirmed={isDropoffPoiConfirmed}
+                  icon="flag"
+                  placeholder="TMAP 목적지 검색 및 후보 선택"
+                  heightClass="h-9"
+                />
               </div>
             </div>
 
@@ -319,7 +457,9 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-400 font-medium">탑승객 연락처</span>
-                <span className="font-bold text-slate-800">{passengerPhone}</span>
+                <span className="font-bold text-slate-800">
+                  {passengerPhone || '연락처 미입력'}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-400 font-medium">항공편명</span>
