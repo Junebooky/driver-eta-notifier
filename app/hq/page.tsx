@@ -37,6 +37,7 @@ import { HqUnsentDraftsCard } from '@/components/hq/dispatch/HqUnsentDraftsCard'
 import { HqDriverAllocationDonutCard } from '@/components/hq/dispatch/HqDriverAllocationDonutCard';
 import HqDispatchAlertDrawer from '@/components/hq/dispatch/HqDispatchAlertDrawer';
 import HqCustomerMessageModal from '@/components/hq/messages/HqCustomerMessageModal';
+import { HqAdminLoginModal } from '@/components/hq/auth/HqAdminLoginModal';
 import {
   CustomerNotificationTrigger,
   HqBooking,
@@ -96,6 +97,7 @@ function HqDashboardInner() {
   // Selected Booking for detail / vehicle-driver assignment / edit / cancel modal
   const [selectedBooking, setSelectedBooking] = useState<HqBooking | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isAdminLoginOpen, setIsAdminLoginOpen] = useState(false);
   const [isQuoteModalOpen, setIsQuoteModalOpen] = useState(() => searchParams.get('quoteModal') === 'true');
   const [isChauffeurCardOpen, setIsChauffeurCardOpen] = useState(false);
   const [isAlertDrawerOpen, setIsAlertDrawerOpen] = useState(false);
@@ -543,6 +545,7 @@ function HqDashboardInner() {
           onOpenQuickPhoneBooking={handleOpenQuickPhoneBookingModal}
           onOpenQuoteModal={() => setIsQuoteModalOpen(true)}
           onOpenChauffeurCard={() => setIsChauffeurCardOpen(true)}
+          onOpenAdminLogin={() => setIsAdminLoginOpen(true)}
           onOpenNotifications={() => setIsAlertDrawerOpen(true)}
           title={
             activeSidebarTab === 'operations'
@@ -978,6 +981,16 @@ function HqDashboardInner() {
       <VipChauffeurCardModal
         isOpen={isChauffeurCardOpen}
         onClose={() => setIsChauffeurCardOpen(false)}
+      />
+
+      {/* 7. HQ Admin Login Modal (for Preview and Production Auth) */}
+      <HqAdminLoginModal
+        isOpen={isAdminLoginOpen}
+        onClose={() => setIsAdminLoginOpen(false)}
+        onLoginSuccess={() => {
+          setIsAdminLoginOpen(false);
+          fetchSharedBookings(true);
+        }}
       />
     </div>
   );

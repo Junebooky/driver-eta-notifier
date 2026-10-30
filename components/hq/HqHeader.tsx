@@ -17,6 +17,7 @@ export interface HqHeaderProps {
   onOpenQuickPhoneBooking?: () => void;
   onOpenQuoteModal?: () => void;
   onOpenChauffeurCard?: () => void;
+  onOpenAdminLogin?: () => void;
   lastSyncedLabel?: string;
   title?: string;
   subtitle?: React.ReactNode;
@@ -34,6 +35,7 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
   onOpenQuickPhoneBooking,
   onOpenQuoteModal,
   onOpenChauffeurCard,
+  onOpenAdminLogin,
   lastSyncedLabel,
   title = '예약·배차 관리',
   subtitle,
@@ -188,7 +190,17 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
           <DevAuthSwitcher />
 
           {/* Admin Profile Pill */}
-          <div className="hidden sm:flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl border border-slate-200/70 bg-white hover:bg-slate-50 transition-all shadow-2xs">
+          <button
+            type="button"
+            onClick={() => {
+              if (onOpenAdminLogin) {
+                haptics.lightTap();
+                onOpenAdminLogin();
+              }
+            }}
+            className="hidden sm:flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl border border-slate-200/70 bg-white hover:bg-slate-50 transition-all shadow-2xs cursor-pointer active:scale-98"
+            title="본사 관제 세션 (클릭하여 관리자 로그인)"
+          >
             <div className="w-7 h-7 rounded-lg bg-[#1E60F3] text-white flex items-center justify-center text-xs font-black shrink-0">
               V
             </div>
@@ -197,7 +209,7 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
               <div className="text-[10px] text-slate-400 font-medium leading-none">PC · 모바일 연동</div>
             </div>
             <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0 hidden lg:block" />
-          </div>
+          </button>
         </div>
       </div>
 

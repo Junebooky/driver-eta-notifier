@@ -12,12 +12,16 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  ShieldAlert,
+  AlertTriangle,
+  Key,
+  RefreshCw,
 } from 'lucide-react';
 import { HqDriverSummary } from '@/types/driverHq';
 import { useHqDrivers } from '@/utils/useHqDrivers';
 import { haptics } from '@/utils/haptics';
 
-interface HqDriversTableViewProps {
+export interface HqDriversTableViewProps {
   onSelectDriver: (driverId: string) => void;
   initialSearchQuery?: string;
   onOpenAddDriver?: () => void;
@@ -29,6 +33,10 @@ interface HqDriversTableViewProps {
     englishCount: number;
   };
   isLoading?: boolean;
+  error?: string | null;
+  statusCode?: number | null;
+  onRetry?: () => void;
+  onOpenLogin?: () => void;
 }
 
 export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
@@ -38,12 +46,19 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
   drivers: propDrivers,
   counts: propCounts,
   isLoading: propIsLoading,
+  error: propError,
+  statusCode: propStatusCode,
+  onRetry: propOnRetry,
+  onOpenLogin,
 }) => {
   // If not passed from parent, use the custom hook
   const hookState = useHqDrivers();
   const drivers = propDrivers ?? hookState.drivers;
   const counts = propCounts ?? hookState.counts;
   const isLoading = propIsLoading ?? hookState.isLoading;
+  const error = propError ?? hookState.error;
+  const statusCode = propStatusCode ?? hookState.statusCode;
+  const onRetry = propOnRetry ?? hookState.refetch;
 
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [affiliationFilter, setAffiliationFilter] = useState<'all' | 'employed' | 'freelance'>('all');
@@ -297,11 +312,89 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                   <p className="font-bold text-slate-600">실시간 기사 데이터 동기화 중...</p>
                 </td>
               </tr>
+            ) : error ? (
+              statusCode === 401 || statusCode === 403 ? (
+                <tr>
+                  <td colSpan={9} className="py-12 px-4 text-center">
+                    <div className="max-w-md mx-auto p-6 bg-amber-50/80 border border-amber-200/90 rounded-3xl space-y-3 shadow-sm">
+                      <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mx-auto shadow-xs">
+                        <ShieldAlert className="w-6 h-6 text-amber-600" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-black text-slate-900 mb-1">
+                          본사 관리자(HQ Admin) 인증이 필요합니다
+                        </h4>
+                        <p className="text-xs text-slate-600 leading-relaxed">
+                          기사 명단 및 차량 배정 정보는 본사 관리자 전용 데이터입니다.
+                          <br />
+                          로그인 세션이 만료되었거나 인증되지 않았습니다. (HTTP {statusCode || 401})
+                        </p>
+                      </div>
+                      <div className="pt-2 flex items-center justify-center gap-2">
+                        {onOpenLogin && (
+                          <button
+                            type="button"
+                            onClick={onOpenLogin}
+                            className="px-4 py-2 bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white rounded-xl text-xs font-black shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+                          >
+                            <Key className="w-3.5 h-3.5" />
+                            <span>관리자 로그인하기</span>
+                          </button>
+                        )}
+                        {onRetry && (
+                          <button
+                            type="button"
+                            onClick={onRetry}
+                            className="px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                          >
+                            다시 시도
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                <tr>
+                  <td colSpan={9} className="py-12 px-4 text-center">
+                    <div className="max-w-md mx-auto p-6 bg-rose-50/80 border border-rose-200/90 rounded-3xl space-y-3 shadow-sm">
+                      <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center mx-auto shadow-xs">
+                        <AlertTriangle className="w-6 h-6 text-rose-600" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-black text-slate-900 mb-1">
+                          기사 목록을 불러오지 못했습니다
+                        </h4>
+                        <p className="text-xs text-rose-700 font-mono mb-1">{error}</p>
+                        <p className="text-[11px] text-slate-500">
+                          데이터베이스 연결 또는 서버 통신 상태를 확인해주세요. (HTTP {statusCode || 500})
+                        </p>
+                      </div>
+                      <div className="pt-2 flex items-center justify-center gap-2">
+                        {onRetry && (
+                          <button
+                            type="button"
+                            onClick={onRetry}
+                            className="px-4 py-2 bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white rounded-xl text-xs font-black shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" />
+                            <span>다시 시도</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              )
             ) : paginatedDrivers.length === 0 ? (
               <tr>
                 <td colSpan={9} className="py-12 text-center text-slate-400">
                   <Users className="w-8 h-8 mx-auto text-slate-300 mb-2" />
-                  <p className="font-bold text-slate-600">검색 조건에 일치하는 기사가 없습니다.</p>
+                  <p className="font-bold text-slate-600">
+                    {drivers.length === 0
+                      ? '등록된 기사가 없습니다.'
+                      : '검색 조건에 일치하는 기사가 없습니다.'}
+                  </p>
                 </td>
               </tr>
             ) : (
@@ -428,9 +521,22 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
 
       {/* 4. Table Footer (Pagination & Count) */}
       <div className="p-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs bg-white">
-        <span className="font-bold text-slate-500">
-          총 <span className="font-extrabold text-slate-900">{filteredDrivers.length}명</span>
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="font-bold text-slate-500">
+            총 <span className="font-extrabold text-slate-900">{filteredDrivers.length}명</span>
+          </span>
+          {error ? (
+            <span className="text-[11px] text-rose-600 font-bold flex items-center gap-1.5 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse shrink-0"></span>
+              <span>동기화 실패 (HTTP {statusCode || 500})</span>
+            </span>
+          ) : (
+            <span className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1.5 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+              <span>실시간 DB 동기화 완료 ({drivers.length}명)</span>
+            </span>
+          )}
+        </div>
 
         {/* Pagination buttons */}
         <div className="flex items-center gap-1">

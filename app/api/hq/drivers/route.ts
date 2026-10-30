@@ -89,6 +89,39 @@ export async function POST(req: NextRequest) {
     const cleanName = name.trim();
     const cleanPhone = phone ? String(phone).trim() : '';
 
+    // Duplicate driver detection: Prevent unintentional multiple records for the same driver
+    const orFilter = cleanPhone
+      ? `driver_name.eq.${cleanName},phone.eq.${cleanPhone}`
+      : `driver_name.eq.${cleanName}`;
+
+    const { data: existingMatches, error: matchError } = await supabaseAdmin
+      .from('drivers')
+      .select('id, driver_name, phone, vehicle_no, car_number, vehicle_model, created_at')
+      .or(orFilter);
+
+    if (!matchError && existingMatches && existingMatches.length > 0) {
+      if (!body.allowDuplicate) {
+        return NextResponse.json(
+          {
+            ok: false,
+            isDuplicate: true,
+            error: `동일한 성함 또는 연락처로 등록된 기사가 이미 ${existingMatches.length}건 존재합니다. 기존 계정을 확인해주세요.`,
+            duplicateCount: existingMatches.length,
+            existingDrivers: existingMatches.map((d) => ({
+              id: d.id,
+              name: d.driver_name,
+              phone: d.phone,
+              vehicleNo: d.vehicle_no,
+              carNumber: d.car_number,
+              vehicleModel: d.vehicle_model,
+              createdAt: d.created_at,
+            })),
+          },
+          { status: 409 }
+        );
+      }
+    }
+
     // Handle vehicle_no uniqueness constraint safely:
     // If vehicleNo is supplied, use it; otherwise generate a clean surrogate identifier
     const assignedVehicleNo = vehicleNo && String(vehicleNo).trim()
