@@ -87,7 +87,7 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
   const LOG_FAIL_UUID = 'aaaaaaa4-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
   const EXPENSE_RECEIPT_UUID = 'bbbbbbb1-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
-  const RECEIPT_STORAGE_PATH = `vip_limousine_korea/${DRIVER_A_UUID}/2026/10/receipt_sample_01.jpg`;
+  const RECEIPT_STORAGE_PATH = `vip_limousine_korea/expenses/receipts/${DRIVER_A_UUID}/2026/10/receipt_sample_01.jpg`;
 
   const mockSchedules = [
     {
@@ -881,8 +881,8 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
     const uploadRes = await postReceipt(uploadReq);
     assert.strictEqual(uploadRes.status, 200);
     const uploadData = await uploadRes.json();
-    assert.ok(uploadData.storagePath.startsWith(`vip_limousine_korea/${DRIVER_A_UUID}/`),
-      `Uploaded storagePath (${uploadData.storagePath}) MUST start with org/driverId prefix`);
+    assert.ok(uploadData.storagePath.startsWith(`vip_limousine_korea/expenses/receipts/${DRIVER_A_UUID}/`),
+      `Uploaded storagePath (${uploadData.storagePath}) MUST start with org/expenses/receipts/driverId prefix`);
   });
 
   // --------------------------------------------------------------------------

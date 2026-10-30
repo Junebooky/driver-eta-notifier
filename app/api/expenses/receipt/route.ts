@@ -102,7 +102,9 @@ export async function GET(req: NextRequest) {
 
     // Same-org cross-driver defense-in-depth: if requester is driver, storagePath must include their driverId
     if (auth.session.role === 'driver') {
-      if (!storagePath.startsWith(`${auth.session.org}/${effectiveDriverId}/`)) {
+      const allowedDriverPrefix = `${auth.session.org}/expenses/receipts/${effectiveDriverId}/`;
+      const legacyDriverPrefix = `${auth.session.org}/${effectiveDriverId}/`;
+      if (!storagePath.startsWith(allowedDriverPrefix) && !storagePath.startsWith(legacyDriverPrefix)) {
         return NextResponse.json(
           { ok: false, error: '다른 기사의 스토리지 경로에 접근할 수 없습니다. (403 Forbidden)' },
           { status: 403 }
@@ -110,9 +112,9 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Download from Supabase private storage bucket 'receipts'
+    // Download from Supabase private storage bucket 'cockpit-assets'
     const { data, error } = await supabaseAdmin.storage
-      .from('receipts')
+      .from('cockpit-assets')
       .download(storagePath);
 
     if (error || !data) {
@@ -191,12 +193,12 @@ export async function POST(req: NextRequest) {
     const month = String(now.getMonth() + 1).padStart(2, '0');
     const ext = file.name.split('.').pop() || 'jpg';
     const uniqueId = `rec_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    const storagePath = `${auth.session.org}/${effectiveDriverId}/${year}/${month}/${uniqueId}.${ext}`;
+    const storagePath = `${auth.session.org}/expenses/receipts/${effectiveDriverId}/${year}/${month}/${uniqueId}.${ext}`;
 
     const buffer = Buffer.from(await file.arrayBuffer());
 
     const { error: uploadError } = await supabaseAdmin.storage
-      .from('receipts')
+      .from('cockpit-assets')
       .upload(storagePath, buffer, {
         contentType: mimeType,
         upsert: false,

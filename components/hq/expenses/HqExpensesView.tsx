@@ -79,7 +79,7 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
           mergeServerHipassTollsIntoExpenses(json.tolls);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
     return () => {
       cancelled = true;
     };
@@ -466,11 +466,10 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
             haptics.selection();
             setSelectedStatus(selectedStatus === '검수 대기' ? '전체' : '검수 대기');
           }}
-          className={`border rounded-2xl p-4 shadow-xs cursor-pointer transition-all ${
-            selectedStatus === '검수 대기'
+          className={`border rounded-2xl p-4 shadow-xs cursor-pointer transition-all ${selectedStatus === '검수 대기'
               ? 'bg-amber-50/70 border-amber-300 ring-2 ring-amber-400/20'
               : 'bg-white border-slate-200/80 hover:border-amber-300'
-          }`}
+            }`}
         >
           <div className="flex items-center justify-between text-xs text-amber-700 font-bold mb-1">
             <span>검수 대기</span>
@@ -490,11 +489,10 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
             haptics.selection();
             setSelectedStatus(selectedStatus === '승인 완료' ? '전체' : '승인 완료');
           }}
-          className={`border rounded-2xl p-4 shadow-xs cursor-pointer transition-all ${
-            selectedStatus === '승인 완료'
+          className={`border rounded-2xl p-4 shadow-xs cursor-pointer transition-all ${selectedStatus === '승인 완료'
               ? 'bg-emerald-50/70 border-emerald-300 ring-2 ring-emerald-400/20'
               : 'bg-white border-slate-200/80 hover:border-emerald-300'
-          }`}
+            }`}
         >
           <div className="flex items-center justify-between text-xs text-emerald-700 font-bold mb-1">
             <span>승인 완료</span>
@@ -514,11 +512,10 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
             haptics.selection();
             setSelectedStatus(selectedStatus === '금액 확인' ? '전체' : '금액 확인');
           }}
-          className={`border rounded-2xl p-4 shadow-xs cursor-pointer transition-all ${
-            selectedStatus === '금액 확인'
+          className={`border rounded-2xl p-4 shadow-xs cursor-pointer transition-all ${selectedStatus === '금액 확인'
               ? 'bg-rose-50/70 border-rose-300 ring-2 ring-rose-400/20'
               : 'bg-white border-slate-200/80 hover:border-rose-300'
-          }`}
+            }`}
         >
           <div className="flex items-center justify-between text-xs text-rose-700 font-bold mb-1">
             <span>확인 필요 / 반려</span>
@@ -546,11 +543,10 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
                   haptics.selection();
                   setSelectedStatus(status);
                 }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                  selectedStatus === status
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${selectedStatus === status
                     ? 'bg-[#1E60F3] text-white shadow-xs'
                     : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
-                }`}
+                  }`}
               >
                 {status}
               </button>
@@ -590,11 +586,10 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
                 haptics.selection();
                 setSelectedCategory(cat);
               }}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                selectedCategory === cat
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${selectedCategory === cat
                   ? 'bg-slate-900 text-white shadow-2xs'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
+                }`}
             >
               {cat}
             </button>
@@ -642,11 +637,10 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
                         setSelectedExpenseId(item.id);
                         setRotationAngle(0);
                       }}
-                      className={`cursor-pointer transition-colors ${
-                        isSelected
+                      className={`cursor-pointer transition-colors ${isSelected
                           ? 'bg-blue-50/80 font-bold'
                           : 'hover:bg-slate-50/80'
-                      }`}
+                        }`}
                     >
                       <td className="py-3 px-3 text-slate-400 text-center font-semibold text-[11px]">
                         {item.no}
@@ -719,11 +713,10 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
                     haptics.selection();
                     setInspectorTab('photo');
                   }}
-                  className={`pb-2.5 text-xs font-bold transition-all relative cursor-pointer ${
-                    inspectorTab === 'photo'
+                  className={`pb-2.5 text-xs font-bold transition-all relative cursor-pointer ${inspectorTab === 'photo'
                       ? 'text-[#1E60F3] font-black'
                       : 'text-slate-400 hover:text-slate-700'
-                  }`}
+                    }`}
                 >
                   <span>사진</span>
                   {inspectorTab === 'photo' && (
@@ -737,11 +730,10 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
                     haptics.selection();
                     setInspectorTab('details');
                   }}
-                  className={`pb-2.5 text-xs font-bold transition-all relative cursor-pointer ${
-                    inspectorTab === 'details'
+                  className={`pb-2.5 text-xs font-bold transition-all relative cursor-pointer ${inspectorTab === 'details'
                       ? 'text-[#1E60F3] font-black'
                       : 'text-slate-400 hover:text-slate-700'
-                  }`}
+                    }`}
                 >
                   <span>영수증 정보</span>
                   {inspectorTab === 'details' && (
@@ -858,11 +850,10 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
                           saveHqExpenses(updated);
                           showToast('고객사 실비 재청구 대상으로 설정되었습니다.');
                         }}
-                        className={`px-2 py-1 rounded-md cursor-pointer transition-colors ${
-                          selectedExpense.billableToCustomer !== false
+                        className={`px-2 py-1 rounded-md cursor-pointer transition-colors ${selectedExpense.billableToCustomer !== false
                             ? 'bg-[#1E60F3] text-white'
                             : 'text-slate-500 hover:text-slate-800'
-                        }`}
+                          }`}
                       >
                         고객사 실비 청구
                       </button>
@@ -875,11 +866,10 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
                           saveHqExpenses(updated);
                           showToast('회사 자체 부담 직접비로 분류되었습니다.');
                         }}
-                        className={`px-2 py-1 rounded-md cursor-pointer transition-colors ${
-                          selectedExpense.billableToCustomer === false
+                        className={`px-2 py-1 rounded-md cursor-pointer transition-colors ${selectedExpense.billableToCustomer === false
                             ? 'bg-slate-800 text-white'
                             : 'text-slate-500 hover:text-slate-800'
-                        }`}
+                          }`}
                       >
                         회사 부담 직접비
                       </button>

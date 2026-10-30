@@ -157,20 +157,12 @@ ON cockpit.expenses (hipass_tx_key)
 WHERE hipass_tx_key IS NOT NULL;
 
 -- ==============================================================================
--- 4. STORAGE BUCKET SPECIFICATION (Private receipts bucket)
+-- 4. STORAGE SPECIFICATION (Unified 'cockpit-assets' bucket)
+-- Note: 'cockpit-assets' bucket pre-exists in Supabase project (15MB limit, private).
+-- ZERO new buckets created to prevent multi-tenant bucket proliferation.
+-- Receipts are strictly organized under:
+-- cockpit-assets/vip_limousine_korea/expenses/receipts/{driver_uuid}/{yyyy}/{mm}/...
 -- ==============================================================================
-INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-VALUES (
-  'receipts',
-  'receipts',
-  false,
-  10485760, -- 10MB limit
-  ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'application/pdf']
-)
-ON CONFLICT (id) DO UPDATE SET
-  public = false,
-  file_size_limit = 10485760,
-  allowed_mime_types = ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'application/pdf'];
 
 -- ==============================================================================
 -- 5. ROW LEVEL SECURITY (RLS) POLICIES
@@ -349,15 +341,15 @@ FOR DELETE TO authenticated USING (
 );
 
 -- ------------------------------------------------------------------------------
--- Storage Objects Policies for 'receipts' Bucket
+-- Storage Objects Policies for 'cockpit-assets' Bucket
 -- Strict multi-tenant and driver-level path isolation:
--- HQ Admin: Access all receipts within their organization (name LIKE '<org>/%')
--- Driver: Strictly restricted to their own driver_id path (name LIKE '<org>/<driver_id>/%')
+-- HQ Admin: Access all assets within their organization (name LIKE '<org>/%')
+-- Driver: Strictly restricted to their own driver_id receipt path (name LIKE '<org>/expenses/receipts/<driver_id>/%')
 -- ------------------------------------------------------------------------------
-DROP POLICY IF EXISTS p_storage_receipts_select ON storage.objects;
-CREATE POLICY p_storage_receipts_select ON storage.objects
+DROP POLICY IF EXISTS p_storage_cockpit_assets_select ON storage.objects;
+CREATE POLICY p_storage_cockpit_assets_select ON storage.objects
 FOR SELECT TO authenticated USING (
-  bucket_id = 'receipts'
+  bucket_id = 'cockpit-assets'
   AND (
     (
       ((auth.jwt() -> 'app_metadata'::text) ->> 'cockpit_role'::text) = 'hq_admin'::text
@@ -366,18 +358,25 @@ FOR SELECT TO authenticated USING (
     OR
     (
       ((auth.jwt() -> 'app_metadata'::text) ->> 'cockpit_role'::text) = 'driver'::text
-      AND name LIKE (
-        ((auth.jwt() -> 'app_metadata'::text) ->> 'org'::text) || '/' ||
-        ((auth.jwt() -> 'app_metadata'::text) ->> 'driver_id'::text) || '/%'
+      AND (
+        name LIKE (
+          ((auth.jwt() -> 'app_metadata'::text) ->> 'org'::text) || '/expenses/receipts/' ||
+          ((auth.jwt() -> 'app_metadata'::text) ->> 'driver_id'::text) || '/%'
+        )
+        OR
+        name LIKE (
+          ((auth.jwt() -> 'app_metadata'::text) ->> 'org'::text) || '/drivers/profiles/' ||
+          ((auth.jwt() -> 'app_metadata'::text) ->> 'driver_id'::text) || '/%'
+        )
       )
     )
   )
 );
 
-DROP POLICY IF EXISTS p_storage_receipts_insert ON storage.objects;
-CREATE POLICY p_storage_receipts_insert ON storage.objects
+DROP POLICY IF EXISTS p_storage_cockpit_assets_insert ON storage.objects;
+CREATE POLICY p_storage_cockpit_assets_insert ON storage.objects
 FOR INSERT TO authenticated WITH CHECK (
-  bucket_id = 'receipts'
+  bucket_id = 'cockpit-assets'
   AND (
     (
       ((auth.jwt() -> 'app_metadata'::text) ->> 'cockpit_role'::text) = 'hq_admin'::text
@@ -387,7 +386,7 @@ FOR INSERT TO authenticated WITH CHECK (
     (
       ((auth.jwt() -> 'app_metadata'::text) ->> 'cockpit_role'::text) = 'driver'::text
       AND name LIKE (
-        ((auth.jwt() -> 'app_metadata'::text) ->> 'org'::text) || '/' ||
+        ((auth.jwt() -> 'app_metadata'::text) ->> 'org'::text) || '/expenses/receipts/' ||
         ((auth.jwt() -> 'app_metadata'::text) ->> 'driver_id'::text) || '/%'
       )
     )
@@ -400,10 +399,10 @@ COMMIT;
 -- 6. APPLICATION & ROLLBACK (RECOVERY) SPECIFICATION
 -- ==============================================================================
 -- [적용 순서 (Application Sequence)]
--- 1. storage.buckets 내 'receipts' 비공개 버킷 레코드 생성 (public = false)
+-- 1. 기존 비공개 버킷 'cockpit-assets' 내 19개 말단 폴더 구조 확인
 -- 2. cockpit.driving_logs 생성 (외래키 ON DELETE SET NULL로 schedules, drivers 종속성 무해)
 -- 3. cockpit.expenses 생성 (외래키 ON DELETE SET NULL로 schedules, drivers, driving_logs 종속성 무해)
--- 4. RLS 활성화 및 app_metadata 기반 정책 8개 등록
+-- 4. RLS 활성화 및 app_metadata 기반 정책 등록
 --
 -- [단계적 schedules 매핑 계획 (Phased Schedules Mapping)]
 -- - 현재 cockpit.schedules는 driver_name, vehicle_no 기준 매핑이 유지되고 있습니다.
@@ -411,9 +410,8 @@ COMMIT;
 -- - 차후 cockpit.schedules에 driver_id UUID 컬럼 추가 시 1:1 안전 승격이 가능합니다.
 --
 -- [롤백 순서 (Rollback Sequence)]
--- 1. DROP POLICY IF EXISTS p_storage_receipts_insert ON storage.objects;
--- 2. DROP POLICY IF EXISTS p_storage_receipts_select ON storage.objects;
+-- 1. DROP POLICY IF EXISTS p_storage_cockpit_assets_insert ON storage.objects;
+-- 2. DROP POLICY IF EXISTS p_storage_cockpit_assets_select ON storage.objects;
 -- 3. DROP TABLE IF EXISTS cockpit.expenses CASCADE;
 -- 4. DROP TABLE IF EXISTS cockpit.driving_logs CASCADE;
--- 5. DELETE FROM storage.buckets WHERE id = 'receipts';
 -- ==============================================================================
