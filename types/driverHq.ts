@@ -99,9 +99,10 @@ export function mapDbDriverToHqSummary(
     const dStr = s.date ? String(s.date).slice(0, 10) : '';
     const dayOfWeek = dStr ? (new Date(dStr + 'T00:00:00+09:00').getDay() + 6) % 7 : 0;
     const startStr = s.pickup_time ? String(s.pickup_time).slice(0, 5) : '09:00';
-    const endStr = s.end_time ? String(s.end_time).slice(0, 5) : '12:00';
+    const hasEndTime = Boolean(s.end_time);
+    const endStr = hasEndTime ? String(s.end_time).slice(0, 5) : '';
     const startHour = parseInt(startStr.split(':')[0], 10) || 9;
-    const endHour = parseInt(endStr.split(':')[0], 10) || (startHour + 3);
+    const endHour = hasEndTime ? (parseInt(endStr.split(':')[0], 10) || (startHour + 2)) : (startHour + 2);
     const durationHours = Math.max(1, endHour - startHour);
 
     const isAirport = /공항|airport|T1|T2|KE|AF|OZ/i.test(`${s.origin} ${s.destination} ${s.flight_number}`);
@@ -112,10 +113,10 @@ export function mapDbDriverToHqSummary(
       dayIndex: dayOfWeek,
       dateStr: dStr,
       startTime: startStr,
-      endTime: endStr,
+      endTime: endStr || '종료 미확정',
       startHour,
       durationHours,
-      title: `${startStr} - ${endStr}`,
+      title: hasEndTime ? `${startStr} - ${endStr}` : `${startStr} (종료 미확정)`,
       route: `${s.origin || '출발지'} ➔ ${s.destination || '도착지'}`,
       detail: s.flight_number || s.passenger_name || 'VIP 운행',
       type: isAirport ? 'airport' : isMeeting ? 'meeting' : 'general',

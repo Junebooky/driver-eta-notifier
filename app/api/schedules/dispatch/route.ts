@@ -33,7 +33,9 @@ function normalizePayloadItem(raw: Record<string, any>, rootBody: Record<string,
     driverName: raw.driverName,
     driverPhone: raw.driverPhone,
     date: raw.date || raw.pickupDate || '',
+    endDate: raw.endDate || raw.pickupEndDate || raw.date || raw.pickupDate || '',
     pickupTime: raw.pickupTime || '',
+    endTime: raw.endTime || raw.pickupEndTime || '',
     timeDisplay: raw.timeDisplay,
     origin: raw.origin || raw.pickupLocation || '',
     originAddress: raw.originAddress,
@@ -113,21 +115,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Server-side Driver & Vehicle Schedule Conflict Guard
-    const allowConflictOverride = candidates.every((c) => c.allowConflictOverride === true);
-    if (!allowConflictOverride) {
-      const conflicts = await checkServerDispatchConflicts(candidates);
-      if (conflicts.length > 0) {
-        return NextResponse.json(
-          {
-            ok: false,
-            code: 'SCHEDULE_CONFLICT',
-            error: conflicts[0].message,
-            conflicts,
-          },
-          { status: 409 }
-        );
-      }
+    // P0 Strict Server-side Driver & Vehicle Schedule Conflict Guard (Zero arbitrary bypass)
+    const conflicts = await checkServerDispatchConflicts(candidates);
+    if (conflicts.length > 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: 'SCHEDULE_CONFLICT',
+          error: conflicts[0].message,
+          conflicts,
+        },
+        { status: 409 }
+      );
     }
 
     const savedSchedules: ScheduleItem[] = [];

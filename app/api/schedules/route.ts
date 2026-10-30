@@ -5,6 +5,8 @@ import {
   mapHydratedRowToScheduleItem,
   queryServerSchedules,
   upsertServerDispatchSchedule,
+  checkServerDispatchConflicts,
+  DispatchUpsertInput,
 } from '@/lib/dispatch/scheduleServerStore';
 import { ScheduleItem } from '@/data/ferrariSchedules';
 import { DbScheduleRow } from '@/types';
@@ -93,14 +95,21 @@ export async function POST(req: NextRequest) {
       dispatch_status = 'published',
       place_verified,
       allow_unverified = true,
+      end_date,
+      endDate,
+      end_time,
+      endTime,
     } = body;
 
-    const result = await upsertServerDispatchSchedule({
+    const candInput: DispatchUpsertInput = {
       vehicleNo: vehicle_no,
+      vehiclePlate: body.vehicle_plate || body.vehiclePlate,
       driverId: driver_id,
       driverName: driver_name,
       date,
+      endDate: end_date || endDate || date,
       pickupTime: pickup_time || time_display,
+      endTime: end_time || endTime,
       timeDisplay: time_display,
       origin,
       originAddress: origin_address,
@@ -118,7 +127,24 @@ export async function POST(req: NextRequest) {
       dispatchStatus: dispatch_status,
       placeVerified: place_verified,
       allowUnverified: allow_unverified,
-    });
+    };
+
+    if (dispatch_status === 'published') {
+      const conflicts = await checkServerDispatchConflicts([candInput]);
+      if (conflicts.length > 0) {
+        return NextResponse.json(
+          {
+            ok: false,
+            code: 'SCHEDULE_CONFLICT',
+            error: conflicts[0].message,
+            conflicts,
+          },
+          { status: 409 }
+        );
+      }
+    }
+
+    const result = await upsertServerDispatchSchedule(candInput);
 
     if (result.error) {
       return NextResponse.json({ error: result.error }, { status: result.statusCode || 400 });
@@ -190,15 +216,23 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ schedule: mapHydratedRowToScheduleItem(completedRow), fallback: false });
     }
 
-    const result = await upsertServerDispatchSchedule({
+    const effectiveDispatchStatus = dispatch_status || hydrated.dispatch_status || 'published';
+    const effectiveDate = date || hydrated.date;
+    const effectiveEndDate = body.end_date || body.endDate || hydrated.end_date || effectiveDate;
+    const effectivePickupTime = pickup_time || time_display || hydrated.pickup_time;
+    const effectiveEndTime = body.end_time || body.endTime || hydrated.end_time;
+
+    const candInput: DispatchUpsertInput = {
       scheduleId: id,
       vehicleNo: vehicle_no ?? hydrated.vehicle_no,
       vehiclePlate: vehicle_plate ?? hydrated._meta.vehiclePlate ?? undefined,
       vehicleModel: vehicle_model ?? hydrated._meta.vehicleModel ?? undefined,
       driverId: driver_id !== undefined ? driver_id : hydrated.driver_id ?? undefined,
       driverName: driver_name !== undefined ? driver_name : hydrated.driver_name ?? undefined,
-      date: date || hydrated.date,
-      pickupTime: pickup_time || time_display || hydrated.pickup_time,
+      date: effectiveDate,
+      endDate: effectiveEndDate,
+      pickupTime: effectivePickupTime,
+      endTime: effectiveEndTime,
       timeDisplay: time_display || hydrated.time_display,
       origin: origin || hydrated.origin,
       destination: destination || hydrated.destination,
@@ -206,9 +240,21 @@ export async function PUT(req: NextRequest) {
       passengerPhone: passenger_phone !== undefined ? passenger_phone : hydrated.passenger_phone ?? undefined,
       flightNumber: flight_number !== undefined ? flight_number : hydrated.flight_number ?? undefined,
       notes: protocol_notes !== undefined ? protocol_notes : hydrated.protocol_notes ?? undefined,
-      dispatchStatus: dispatch_status || hydrated.dispatch_status || 'published',
+      dispatchStatus: effectiveDispatchStatus,
       allowUnverified: true,
-    });
+    };
+
+    if (effectiveDispatchStatus === 'published') {
+      const conflicts = await checkServerDispatchConflicts([candInput]);
+      if (conflicts.length > 0) {
+        return NextResponse.json(
+          { ok: false, code: 'SCHEDULE_CONFLICT', error: conflicts[0].message, conflicts },
+          { status: 409 }
+        );
+      }
+    }
+
+    const result = await upsertServerDispatchSchedule(candInput);
 
     if (result.error) {
       return NextResponse.json({ error: result.error }, { status: result.statusCode || 400 });

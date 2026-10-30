@@ -23,6 +23,29 @@
 
 export type VehicleCategoryKey = 'sprinter' | 'staria' | 'carnival' | 'genesis' | 's_class';
 
+/**
+ * 4 High-Level UI Categories requested by user/A01 (Issue #10):
+ * - sedan: 4 vehicles (G90 series 3 + S560 1)
+ * - suv: 1 vehicle (GV80)
+ * - van: 6 vehicles (Staria 4 + Carnival 2)
+ * - sprinter: 9 vehicles (Sprinter 319 / 519)
+ */
+export type VehicleUiCategoryKey = 'all' | 'sedan' | 'suv' | 'van' | 'sprinter';
+
+export interface VehicleChargingPortSpec {
+  status: 'unverified' | 'confirmed' | 'none';
+  usbA?: number;
+  usbC?: number;
+  cigar12v?: number;
+  ac220v?: boolean;
+  notes?: string;
+}
+
+export interface VehicleChargingSpecs {
+  front: VehicleChargingPortSpec; // 앞자리 (운전석·조수석)
+  rear: VehicleChargingPortSpec;  // 뒷자리 (승객석)
+}
+
 export interface VipRealVehicle {
   id: string;
   uuid: string; // Immutable RFC 4122 UUID for DB and Storage asset path mapping
@@ -38,6 +61,56 @@ export interface VipRealVehicle {
   status: '운행 중' | '차고지 대기' | '정비 중';
   defaultDriver?: string;
   fuelType: '디젤' | '가솔린' | '하이브리드';
+  year?: string;
+  color?: string;
+  adminMemo?: string;
+  chargingSpecs?: VehicleChargingSpecs;
+}
+
+/**
+ * Maps a vehicle to one of the 4 strict UI categories:
+ * - sedan (4)
+ * - suv (1)
+ * - van (6)
+ * - sprinter (9)
+ */
+export function mapVehicleToUiCategory(v: { category: VehicleCategoryKey; model?: string }): 'sedan' | 'suv' | 'van' | 'sprinter' {
+  if (v.category === 'sprinter') return 'sprinter';
+  if (v.category === 'genesis' && (v.model?.includes('GV80') || false)) return 'suv';
+  if (v.category === 'staria' || v.category === 'carnival') return 'van';
+  if (v.category === 's_class' || v.category === 'genesis') return 'sedan';
+  return 'van';
+}
+
+/**
+ * Formats front or rear charging specs into clear readable text.
+ * Strictly avoids guessing numbers: if unverified, returns "미확인 (관리자 확인 필요)".
+ */
+export function formatChargingPortSummary(spec?: VehicleChargingPortSpec | null): string {
+  if (!spec || spec.status === 'unverified') {
+    return '미확인 (관리자 확인 필요)';
+  }
+  if (spec.status === 'none') {
+    return '없음 (확인됨)';
+  }
+  const parts: string[] = [];
+  const usbTotal = (spec.usbA || 0) + (spec.usbC || 0);
+  if (spec.usbA && spec.usbC) {
+    parts.push(`USB 단자 ${usbTotal}개 (A타입 ${spec.usbA} / C타입 ${spec.usbC})`);
+  } else if (usbTotal > 0) {
+    parts.push(`USB 단자 ${usbTotal}개`);
+  }
+  if (spec.cigar12v && spec.cigar12v > 0) {
+    parts.push(`12V 시거잭 ${spec.cigar12v}개`);
+  }
+  if (spec.ac220v) {
+    parts.push('220V 콘센트');
+  }
+  if (parts.length === 0) {
+    return spec.notes || '확인됨';
+  }
+  const summary = parts.join(' + ');
+  return spec.notes ? `${summary} (${spec.notes})` : summary;
 }
 
 /**
@@ -272,6 +345,19 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     capacity: '7인승',
     status: '운행 중',
     fuelType: '가솔린',
+    chargingSpecs: {
+      front: {
+        status: 'confirmed',
+        usbA: 3,
+        notes: 'USB 포트 3개',
+      },
+      rear: {
+        status: 'confirmed',
+        cigar12v: 1,
+        ac220v: true,
+        notes: '12V 시거잭 1개 + 220V 인버터 콘센트',
+      },
+    },
   },
 
   // 6. [기아 카니발 하이리무진] 1대
@@ -289,6 +375,19 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     capacity: '7인승',
     status: '운행 중',
     fuelType: '가솔린',
+    chargingSpecs: {
+      front: {
+        status: 'confirmed',
+        usbA: 3,
+        notes: 'USB 포트 3개',
+      },
+      rear: {
+        status: 'confirmed',
+        cigar12v: 1,
+        ac220v: true,
+        notes: '12V 시거잭 1개 + 220V 인버터 콘센트',
+      },
+    },
   },
 
   // 7. [제네시스 GV80] 1대

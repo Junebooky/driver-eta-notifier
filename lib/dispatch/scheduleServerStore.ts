@@ -10,6 +10,7 @@ import {
   resolveKnownPlaceCoords,
   timeHHmmToMinutes,
 } from '@/utils/dispatchConflictDetector';
+import { isDateTimeIntervalOverlapping, DEFAULT_TURNAROUND_BUFFER_MINUTES } from '@/utils/availabilityEngine';
 import { findVipVehicle } from '@/utils/vehicleData';
 import { FLEET_PRESET_DRIVERS } from '@/utils/constants';
 
@@ -181,6 +182,8 @@ export function hydrateRawScheduleRow(raw: Record<string, any>): DbScheduleRow &
     vehicle_no: raw.vehicle_no,
     date: raw.date,
     pickup_time: raw.pickup_time,
+    end_date: raw.end_date ?? (jsonbMeta as any)?.endDate ?? null,
+    end_time: raw.end_time ?? (jsonbMeta as any)?.endTime ?? null,
     time_display: raw.time_display,
     origin: raw.origin,
     origin_address: raw.origin_address,
@@ -527,7 +530,9 @@ export interface DispatchUpsertInput {
   driverName?: string;
   driverPhone?: string;
   date: string;
+  endDate?: string;
   pickupTime: string;
+  endTime?: string;
   timeDisplay?: string;
   origin: string;
   originAddress?: string;
@@ -565,32 +570,67 @@ export interface ServerConflictDetail {
 }
 
 /**
- * Checks existing active schedules on the same date in Supabase for driver or vehicle overlap.
+ * Checks existing active schedules in Supabase for driver or vehicle overlap.
+ * Uses interval-based collision detection [start_at, end_at + buffer) supporting
+ * multi-day rentals, cross-midnight trips, and turn-around buffers.
  */
 export async function checkServerDispatchConflicts(
-  candidates: DispatchUpsertInput[]
+  candidates: DispatchUpsertInput[],
+  injectedExistingRows?: Array<DbScheduleRow & { _meta: HqScheduleMeta }>
 ): Promise<ServerConflictDetail[]> {
-  const dates = Array.from(
-    new Set(candidates.map((c) => normalizeDateToIso(c.date)).filter(Boolean))
+  const publishedCandidates = candidates.filter(
+    (c) => (c.dispatchStatus || 'published') === 'published'
   );
-  if (dates.length === 0) return [];
+  if (publishedCandidates.length === 0) return [];
 
-  const { data } = await supabaseAdmin
-    .from('schedules')
-    .select('*')
-    .in('date', dates);
+  // Determine global time span covering all candidates to query relevant active DB schedules
+  const startDates = publishedCandidates.map((c) => normalizeDateToIso(c.date)).filter(Boolean).sort();
+  const endDates = publishedCandidates.map((c) => normalizeDateToIso(c.endDate || c.date)).filter(Boolean).sort().reverse();
+  if (startDates.length === 0) return [];
 
-  const existingRows = (data || []).map((r: Record<string, any>) => hydrateRawScheduleRow(r));
+  const minStartIso = startDates[0];
+  const maxEndIso = endDates[0];
+
+  let rawRows: any[] = [];
+  if (injectedExistingRows) {
+    rawRows = injectedExistingRows;
+  } else {
+    // Fetch active schedules that could possibly overlap with [minStartIso, maxEndIso]
+    const { data, error } = await supabaseAdmin
+      .from('schedules')
+      .select('*')
+      .neq('dispatch_status', 'cancelled')
+      .neq('status', 'cancelled');
+
+    if (error && typeof process !== 'undefined' && process.env.NODE_ENV !== 'test') {
+      console.error('[checkServerDispatchConflicts] Fail-closed: DB error querying schedules:', error);
+      throw new Error(`배차 충돌 검사 실패 (DB 조회 오류: ${error.message})`);
+    }
+    rawRows = data || [];
+  }
+
+  const existingRows = rawRows
+    .map((r: Record<string, any>) =>
+      '_meta' in r ? (r as DbScheduleRow & { _meta: HqScheduleMeta }) : hydrateRawScheduleRow(r)
+    )
+    .filter((ex) => {
+      const exStart = normalizeDateToIso(ex.date);
+      const exEnd = normalizeDateToIso(ex.end_date) || exStart;
+      return exEnd >= minStartIso && exStart <= maxEndIso;
+    });
+
   const conflicts: ServerConflictDetail[] = [];
 
-  // 1. Check against existing DB schedules
-  for (const cand of candidates) {
-    const ds = cand.dispatchStatus || 'published';
-    if (ds !== 'published') continue;
+  // 1. Check candidates against existing DB schedules
+  for (const cand of publishedCandidates) {
+    const candStartDate = normalizeDateToIso(cand.date);
+    const candEndDate = normalizeDateToIso(cand.endDate || cand.date);
+    const candStartMin = timeHHmmToMinutes(cand.pickupTime);
+    if (!candStartDate || candStartMin === null) continue;
 
-    const candDate = normalizeDateToIso(cand.date);
-    const candMin = timeHHmmToMinutes(cand.pickupTime);
-    if (!candDate || candMin === null) continue;
+    const candEndMin = cand.endTime
+      ? (timeHHmmToMinutes(cand.endTime) ?? 1140)
+      : (candStartMin + 600); // 10h if unspecified for candidate
 
     const candDriver = cleanDriverIdentity(cand.driverName);
     const candPlate = cleanVehicleIdentity(cand.vehiclePlate || cand.vehicleNo);
@@ -598,16 +638,28 @@ export async function checkServerDispatchConflicts(
     for (const ex of existingRows) {
       if (cand.scheduleId && ex.id === cand.scheduleId) continue;
       if (ex.dispatch_status !== 'published') continue;
-      if (ex.date !== candDate) continue;
 
-      const exMin = timeHHmmToMinutes(ex.pickup_time);
-      if (exMin === null) continue;
+      const exStartDate = normalizeDateToIso(ex.date);
+      const exEndDate = normalizeDateToIso(ex.end_date) || exStartDate;
+      const exStartMin = timeHHmmToMinutes(ex.pickup_time);
+      if (exStartMin === null) continue;
 
-      const diff = Math.abs(candMin - exMin);
-      if (diff >= DEFAULT_CONFLICT_WINDOW_MINUTES) continue;
+      const hasRealEndTime = Boolean(ex.end_time);
+      const exEndMin = hasRealEndTime
+        ? (timeHHmmToMinutes(ex.end_time) ?? 1140)
+        : (23 * 60 + 59); // Conservative coverage if end time was not specified
+
+      const isOverlap = isDateTimeIntervalOverlapping(
+        { startDate: candStartDate, startTime: candStartMin, endDate: candEndDate, endTime: candEndMin },
+        { startDate: exStartDate, startTime: exStartMin, endDate: exEndDate, endTime: exEndMin },
+        DEFAULT_TURNAROUND_BUFFER_MINUTES
+      );
+
+      if (!isOverlap) continue;
 
       const exDriver = cleanDriverIdentity(ex.driver_name);
       const exPlate = cleanVehicleIdentity(ex._meta.vehiclePlate || ex.vehicle_no);
+      const exTimeLabel = `${exStartDate} ${ex.pickup_time.slice(0, 5)} ~ ${exEndDate} ${hasRealEndTime ? ex.end_time!.slice(0, 5) : '종료 미확정'}`;
 
       if (candDriver && exDriver && candDriver === exDriver) {
         conflicts.push({
@@ -617,7 +669,7 @@ export async function checkServerDispatchConflicts(
           conflictingCustomer: ex._meta.customerName || ex.passenger_name || '기존 고객',
           conflictingTime: ex.pickup_time.slice(0, 5),
           conflictingRoute: `${ex.origin} → ${ex.destination}`,
-          message: `${candDriver} 기사는 ${candDate} ${ex.pickup_time.slice(0, 5)} (${ex._meta.customerName || ex.passenger_name}: ${ex.origin}→${ex.destination}) 배차와 일정이 겹칩니다.`,
+          message: `${candDriver} 기사는 ${exTimeLabel} (${ex._meta.customerName || ex.passenger_name}: ${ex.origin}→${ex.destination}) 배차와 일정이 겹칩니다.`,
         });
       }
 
@@ -630,29 +682,32 @@ export async function checkServerDispatchConflicts(
           conflictingCustomer: ex._meta.customerName || ex.passenger_name || '기존 고객',
           conflictingTime: ex.pickup_time.slice(0, 5),
           conflictingRoute: `${ex.origin} → ${ex.destination}`,
-          message: `${vehLabel} 차량은 ${candDate} ${ex.pickup_time.slice(0, 5)} (${ex._meta.customerName || ex.passenger_name}: ${ex.origin}→${ex.destination}) 배차와 일정이 겹칩니다.`,
+          message: `${vehLabel} 차량은 ${exTimeLabel} (${ex._meta.customerName || ex.passenger_name}: ${ex.origin}→${ex.destination}) 배차와 일정이 겹칩니다.`,
         });
       }
     }
   }
 
   // 2. Check intra-batch conflicts (e.g. assigning same driver or vehicle twice in a multi-vehicle event)
-  for (let i = 0; i < candidates.length; i++) {
-    for (let j = i + 1; j < candidates.length; j++) {
-      const a = candidates[i];
-      const b = candidates[j];
-      if ((a.dispatchStatus || 'published') !== 'published' || (b.dispatchStatus || 'published') !== 'published') {
-        continue;
-      }
-      const dateA = normalizeDateToIso(a.date);
-      const dateB = normalizeDateToIso(b.date);
-      if (!dateA || dateA !== dateB) continue;
+  for (let i = 0; i < publishedCandidates.length; i++) {
+    for (let j = i + 1; j < publishedCandidates.length; j++) {
+      const a = publishedCandidates[i];
+      const b = publishedCandidates[j];
 
-      const minA = timeHHmmToMinutes(a.pickupTime);
-      const minB = timeHHmmToMinutes(b.pickupTime);
-      if (minA === null || minB === null || Math.abs(minA - minB) >= DEFAULT_CONFLICT_WINDOW_MINUTES) {
-        continue;
-      }
+      const startMinA = timeHHmmToMinutes(a.pickupTime);
+      const startMinB = timeHHmmToMinutes(b.pickupTime);
+      if (startMinA === null || startMinB === null) continue;
+
+      const endMinA = a.endTime ? (timeHHmmToMinutes(a.endTime) ?? 1140) : (startMinA + 600);
+      const endMinB = b.endTime ? (timeHHmmToMinutes(b.endTime) ?? 1140) : (startMinB + 600);
+
+      const isBatchOverlap = isDateTimeIntervalOverlapping(
+        { startDate: a.date, startTime: startMinA, endDate: a.endDate, endTime: endMinA },
+        { startDate: b.date, startTime: startMinB, endDate: b.endDate, endTime: endMinB },
+        DEFAULT_TURNAROUND_BUFFER_MINUTES
+      );
+
+      if (!isBatchOverlap) continue;
 
       const drvA = cleanDriverIdentity(a.driverName);
       const drvB = cleanDriverIdentity(b.driverName);
@@ -958,7 +1013,9 @@ export async function upsertServerDispatchSchedule(
   const dbPayload: Record<string, any> = {
     vehicle_no: targetVehicleNo,
     date: isoDate,
+    end_date: input.endDate ? (normalizeDateToIso(input.endDate) || isoDate) : isoDate,
     pickup_time: formattedPickupTime,
+    end_time: input.endTime ? (normalizeTimeHHmm(input.endTime) ? `${normalizeTimeHHmm(input.endTime)}:00` : null) : null,
     time_display: resolvedTimeDisplay,
     origin: input.origin.trim(),
     origin_address: originResolved.address || null,

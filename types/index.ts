@@ -180,6 +180,8 @@ export interface DbScheduleRow {
   vehicle_no: string;
   date: string;
   pickup_time: string;
+  end_date?: string | null;
+  end_time?: string | null;
   time_display: string;
   origin: string;
   origin_address?: string | null;

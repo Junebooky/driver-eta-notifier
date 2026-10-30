@@ -20,6 +20,7 @@ import { HqDriverSummary, DriverScheduleItem } from '@/types/driverHq';
 import { useHqDrivers } from '@/utils/useHqDrivers';
 import { haptics } from '@/utils/haptics';
 import { HqDriverAssetManagerModal } from './HqDriverAssetManagerModal';
+import { getKstTodayDateStr } from '@/utils/dispatchConflictDetector';
 
 interface HqDriverDetailSplitViewProps {
   selectedDriverId: string;
@@ -95,28 +96,30 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
     });
   }, [drivers, filterAffiliation]);
 
-  // Compute 7 days for the displayed week based on weekOffset (Reference date: 2026-10-28)
+  // Compute 7 days for the displayed week based on weekOffset (Dynamic KST reference date)
   const weekInfo = useMemo(() => {
-    const baseDate = new Date('2026-10-28T00:00:00+09:00');
+    const todayKst = getKstTodayDateStr();
+    const [ty, tm, td] = todayKst.split('-').map((n) => parseInt(n, 10));
+    const baseDate = new Date(Date.UTC(ty, tm - 1, td));
     // Shift by weekOffset weeks
-    baseDate.setDate(baseDate.getDate() + weekOffset * 7);
+    baseDate.setUTCDate(baseDate.getUTCDate() + weekOffset * 7);
 
-    // Find Monday of this week (day 1)
-    const currentDayOfWeek = (baseDate.getDay() + 6) % 7; // 0 = Mon, 6 = Sun
+    // Find Monday of this week (day 1, where 0 = Mon, 6 = Sun)
+    const currentDayOfWeek = (baseDate.getUTCDay() + 6) % 7;
     const monday = new Date(baseDate);
-    monday.setDate(monday.getDate() - currentDayOfWeek);
+    monday.setUTCDate(monday.getUTCDate() - currentDayOfWeek);
 
     const dayNames = ['월', '화', '수', '목', '금', '토', '일'];
     const days = [];
 
     for (let i = 0; i < 7; i++) {
       const d = new Date(monday);
-      d.setDate(d.getDate() + i);
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const dd = String(d.getDate()).padStart(2, '0');
+      d.setUTCDate(d.getUTCDate() + i);
+      const yyyy = d.getUTCFullYear();
+      const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(d.getUTCDate()).padStart(2, '0');
       const fullDate = `${yyyy}-${mm}-${dd}`;
-      const isToday = fullDate === '2026-10-28';
+      const isToday = fullDate === todayKst;
 
       days.push({
         dayIndex: i,

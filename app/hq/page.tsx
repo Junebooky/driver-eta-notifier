@@ -27,6 +27,7 @@ import { HqEmailInboxView } from '@/components/hq/email/HqEmailInboxView';
 import { HqCustomersView } from '@/components/hq/customers/HqCustomersView';
 import { HqReportsView } from '@/components/hq/reports/HqReportsView';
 import { HqDriversView } from '@/components/hq/drivers/HqDriversView';
+import { HqVehicleManagementView } from '@/components/hq/vehicles/HqVehicleManagementView';
 import { HqFieldKnowledgeView } from '@/components/hq/knowledge/HqFieldKnowledgeView';
 import { HqOperationsBoard } from '@/components/hq/operations/HqOperationsBoard';
 import { HqQuoteModal } from '@/components/hq/quotes/HqQuoteModal';
@@ -564,9 +565,11 @@ function HqDashboardInner() {
                           ? '고객 관리'
                           : activeSidebarTab === 'reports'
                             ? '정산 · 수익성 · 종합 리포트'
-                            : activeSidebarTab === 'drivers'
-                              ? '기사 관리'
-                              : '예약 · 배차 통합 관제'
+                            : activeSidebarTab === 'vehicles'
+                              ? '차량 관리'
+                              : activeSidebarTab === 'drivers'
+                                ? '기사 관리'
+                                : '예약 · 배차 통합 관제'
           }
           subtitle={
             activeSidebarTab === 'operations' ? (
@@ -588,6 +591,10 @@ function HqDashboardInner() {
             ) : activeSidebarTab === 'reports' ? (
               <span className="text-slate-500 font-medium">
                 고객사 서비스 시간 기준 정산 · 기사 인건비 · 배차별 직접이익 분석 및 리포트
+              </span>
+            ) : activeSidebarTab === 'vehicles' ? (
+              <span className="text-slate-500 font-medium">
+                보유 차량 20대 실시간 운영 현황 · 일정별 예약 가용성 및 좌석별 전자기기 충전 사양 관리
               </span>
             ) : activeSidebarTab === 'drivers' ? (
               <span className="text-slate-500 font-medium">
@@ -616,11 +623,13 @@ function HqDashboardInner() {
                 ? '고객명, 담당자명, 행사명으로 검색하세요...'
                 : activeSidebarTab === 'reports'
                   ? '고객사, 행사명, 대행사, 기사명, 차량 검색...'
-                  : activeSidebarTab === 'drivers'
-                    ? '기사명, 연락처, 거주지 검색...'
-                    : activeSidebarTab === 'expenses' || activeSidebarTab === 'receipts'
-                    ? '기사명, 차량번호, 상호명 검색...'
-                    : '고객사, 승객명, 예약번호, 기사명, 차량번호 검색...'
+                  : activeSidebarTab === 'vehicles'
+                    ? '차량번호, 차종, 기사명 검색...'
+                    : activeSidebarTab === 'drivers'
+                      ? '기사명, 연락처, 거주지 검색...'
+                      : activeSidebarTab === 'expenses' || activeSidebarTab === 'receipts'
+                      ? '기사명, 차량번호, 상호명 검색...'
+                      : '고객사, 승객명, 예약번호, 기사명, 차량번호 검색...'
           }
         />
 
@@ -657,6 +666,8 @@ function HqDashboardInner() {
             <HqReportsView initialSearchQuery={searchQuery} />
           ) : activeSidebarTab === 'drivers' ? (
             <HqDriversView initialSearchQuery={searchQuery} />
+          ) : activeSidebarTab === 'vehicles' ? (
+            <HqVehicleManagementView initialSearchQuery={searchQuery} />
           ) : (
             <>
               {/* Dedicated 고객 이메일 View - kept mounted for instant switching */}
