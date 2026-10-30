@@ -116,7 +116,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             FLEET_PRESET_DRIVERS.forEach((d) => presetMap.set(d.vehicleNo, d));
 
             data.drivers.forEach((d: any) => {
-              if (!d.vehicle_no) return;
+              if (!d.vehicle_no || d.vehicle_no === '미배정' || d.vehicle_no === 'unassigned') return;
               const hochaOnly = d.vehicle_no.match(/(\d+)호차/)?.[1] || d.vehicle_no.replace(/\D/g, '') || '';
               const carDetails = parseVehicleDetails(d.car_number);
               const presetObj: FleetPresetDriver = {

@@ -5,6 +5,8 @@ export interface ScheduleItem {
   vehicle_no?: string;
   date: string;
   dateLabel: string;
+  end_date?: string;
+  end_time?: string;
   pickup_time: string;
   dropoff_time: string | null;
   time_display: string;
@@ -12,8 +14,9 @@ export interface ScheduleItem {
   origin_address: string;
   destination_name: string;
   destination_address: string;
-  status: 'confirmed' | 'pending' | 'completed';
+  status: 'confirmed' | 'pending' | 'completed' | 'cancelled';
   passenger: string;
+  passenger_phone?: string;
   flight?: string;
   flightType?: 'arrival' | 'departure';
   notes?: string;
@@ -27,6 +30,84 @@ export interface ScheduleItem {
   waypoints?: LocationPreset[];
   adminWaypoints?: LocationPreset[];
   isAdminRoute?: boolean;
+  // Dispatch Lifecycle & Acknowledgment (Issue #25 & HQ-Driver Sync)
+  org_id?: string;
+  driver_id?: string;
+  driver_name?: string;
+  driver_phone?: string;
+  vehicle_id?: string;
+  vehicle_model?: string;
+  vehicle_plate?: string;
+  dispatch_status?: 'unassigned' | 'draft' | 'published' | 'cancelled';
+  version?: number;
+  place_verified?: boolean;
+  published_at?: string;
+  published_by?: string;
+  last_ack_version?: number;
+  last_ack_at?: string;
+  isAcknowledged?: boolean;
+  operation_status?: 'ready' | 'arrived_pickup' | 'boarded' | 'in_transit' | 'completed';
+  operation_updated_at?: string;
+  operation_history?: any[];
+  source_quote_no?: string;
+  // HQ Shared Reservation & Event Group Linkage
+  booking_no?: string;
+  customer_name?: string;
+  customer_id?: string;
+  ordering_agency?: string;
+  end_brand?: string;
+  event_id?: string;
+  event_name?: string;
+  billing_target?: 'ordering_agency' | 'end_brand' | 'custom';
+  billing_target_name?: string;
+  group_id?: string;
+  group_name?: string;
+  group_total_vehicles?: number;
+  group_vehicle_index?: number;
+  passenger_count?: number;
+  intake_source?: 'phone' | 'email' | 'quick_dispatch' | 'manual' | 'seed';
+  customer_brochure?: '미생성' | '미발송' | '발송됨' | '재발송 필요' | '실패';
+  requested_language?: 'ko' | 'en' | 'other';
+  language_override_confirmed?: boolean;
+  service_mode?: 'with_driver' | 'vehicle_only';
+  applied_pricing_snapshot?: Record<string, unknown>;
+  cancel_reason?: string;
+  reminder_count?: number;
+  last_reminded_at?: string;
+  last_reminder_note?: string;
+  previous_driver_name?: string;
+  previous_driver_phone?: string;
+  previous_vehicle_plate?: string;
+  previous_vehicle_model?: string;
+  pending_customer_trigger?: 'dispatch_confirmed' | 'driver_changed' | 'arrived_pickup' | null;
+  pending_customer_triggered_at?: string;
+  customer_notifications?: Array<{
+    id: string;
+    trigger: 'dispatch_confirmed' | 'driver_changed' | 'arrived_pickup';
+    channel: 'email' | 'sms';
+    language: 'ko' | 'en';
+    recipient: string;
+    subject?: string;
+    body: string;
+    deliveryMethod: 'smtp' | 'manual_copy' | 'sms_app';
+    sentAt: string;
+    sentBy: string;
+    scheduleVersion?: number;
+  }>;
+  hipass_tolls?: Array<{
+    hipassTxKey: string;
+    rawDate: string;
+    time: string;
+    vehiclePlate: string;
+    entrance: string;
+    exit: string;
+    amount: number;
+    cardNo?: string;
+    approvalNo?: string;
+    syncedAt: string;
+  }>;
+  created_at?: string;
+  updated_at?: string;
 }
 
 /**

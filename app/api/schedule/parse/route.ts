@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { searchTmapPoi, ResolvedPlaceLocation } from '@/services/tmapService';
+import { matchPlaceInMemory, DEFAULT_VERIFIED_PLACES } from '@/services/placeResolutionService';
+import { DbScheduleRow } from '@/types';
 
 interface ParseScheduleRequestBody {
   imageBase64: string;
@@ -28,18 +30,20 @@ interface ParsedScheduleRaw {
   flight_no?: string | null;
   notes?: string | null;
   origin_address?: string | null;
-  origin_lat?: number;
-  origin_lng?: number;
+  origin_lat?: number | null;
+  origin_lng?: number | null;
   destination_address?: string | null;
-  destination_lat?: number;
-  destination_lng?: number;
+  destination_lat?: number | null;
+  destination_lng?: number | null;
 }
 
 interface ResolvedLocation {
   name: string;
   address: string | null;
-  lat: number;
-  lng: number;
+  lat: number | null;
+  lng: number | null;
+  isVerified?: boolean;
+  needsConfirmation?: boolean;
 }
 
 // 1. Preset matching helper
@@ -111,10 +115,23 @@ async function resolveScheduleLocation(
 ): Promise<ResolvedLocation> {
   const cleanName = (placeName || '').trim();
   if (!cleanName) {
-    return { name: '', address: null, lat: 37.5042, lng: 127.0425 };
+    return { name: '', address: null, lat: null, lng: null, isVerified: false, needsConfirmation: true };
   }
 
-  // [1순위] 로컬/DB 마스터 프리셋(cockpit_presets) 명칭 대조
+  // [1순위] Org Place Memory 명칭 및 별칭 대조 (조선팰리스, 심텍 본사, 신라호텔 등)
+  const memoryMatch = matchPlaceInMemory(cleanName, DEFAULT_VERIFIED_PLACES);
+  if (memoryMatch) {
+    return {
+      name: memoryMatch.name,
+      address: memoryMatch.road_address,
+      lat: memoryMatch.lat,
+      lng: memoryMatch.lng,
+      isVerified: true,
+      needsConfirmation: false,
+    };
+  }
+
+  // [2순위] 로컬/DB 마스터 프리셋(cockpit_presets) 명칭 대조
   const presetMatch = resolvePresetCoordinates(cleanName, presets);
   if (presetMatch && presetMatch.address && presetMatch.address.trim().length > 0) {
     return {
@@ -122,10 +139,12 @@ async function resolveScheduleLocation(
       address: presetMatch.address,
       lat: presetMatch.lat,
       lng: presetMatch.lng,
+      isVerified: true,
+      needsConfirmation: false,
     };
   }
 
-  // [2순위] 비고란(notes / remark)에 기재된 영문/한글 주소 확인
+  // [3순위] 비고란(notes / remark)에 기재된 영문/한글 주소 확인
   let remarkAddress: string | null = null;
   if (notes) {
     // 한글 주소 패턴 매칭 (시/도 + 구/군 + 로/길 + 번지)
@@ -144,44 +163,37 @@ async function resolveScheduleLocation(
     }
   }
 
-  // [3순위] 여전히 정규 도로명 주소가 없다면 searchTmapPoi(placeName) 호출하여 도로명 주소와 위경도 좌표 취득
+  // [4순위] TMAP 통합 POI 검색 API 자동 호출 및 좌표 취득
   let poiResult: ResolvedPlaceLocation | null = null;
   if (cache.has(cleanName)) {
     poiResult = cache.get(cleanName)!;
   } else {
     poiResult = await searchTmapPoi(cleanName);
-    // 만약 거점명으로 검색되지 않고 2순위 비고란 주소가 존재한다면 비고 주소로도 POI 재검색 시도
     if (!poiResult && remarkAddress) {
       poiResult = await searchTmapPoi(remarkAddress);
     }
     cache.set(cleanName, poiResult);
   }
 
-  if (poiResult) {
+  if (poiResult && poiResult.lat && poiResult.lng) {
     return {
       name: cleanName,
       address: poiResult.roadAddress || remarkAddress || null,
       lat: poiResult.lat,
       lng: poiResult.lng,
+      isVerified: true,
+      needsConfirmation: false,
     };
   }
 
-  // 2순위에서 주소를 추출했으나 TMAP 검색이 불가했던 경우
-  if (remarkAddress) {
-    return {
-      name: cleanName,
-      address: remarkAddress,
-      lat: presetMatch?.lat || 37.5042,
-      lng: presetMatch?.lng || 127.0425,
-    };
-  }
-
-  // 최종 폴백: 프리셋 기본 좌표 (강남 테헤란로 등)
+  // [5순위] 미확인 장소: 절대 임의 기본 좌표(37.5042, 127.0425)를 조작하지 않고 null로 보존하여 관리자 검증 유도
   return {
-    name: presetMatch?.name || cleanName,
-    address: presetMatch?.address || null,
-    lat: presetMatch?.lat || 37.5042,
-    lng: presetMatch?.lng || 127.0425,
+    name: cleanName,
+    address: remarkAddress || null,
+    lat: null,
+    lng: null,
+    isVerified: false,
+    needsConfirmation: true,
   };
 }
 
@@ -465,8 +477,16 @@ export async function POST(req: NextRequest) {
       const timeKey = s.pickup_time.slice(0, 5);
       const existingId = existingMap.get(`${s.date}_${timeKey}`);
 
-      const row: any = {
+      const isOriginVerified = Boolean(s.origin_lat != null && s.origin_lng != null);
+      const isDestVerified = Boolean(s.destination_lat != null && s.destination_lng != null);
+      const placeVerified = isOriginVerified && isDestVerified;
+
+      // P3 Invariant: All parsed schedules from AI/PDF/Image are strictly DRAFT
+      // They are NEVER published directly to mobile driver schedules.
+      const row: Partial<DbScheduleRow> = {
         vehicle_no: targetVehicleNo,
+        driver_id: profile?.driverName || null,
+        driver_name: driverName || null,
         date: s.date,
         pickup_time: pickupTimeFormatted,
         time_display: timeDisplay,
@@ -479,9 +499,13 @@ export async function POST(req: NextRequest) {
         destination_address: s.destination_address || null,
         destination_lat: s.destination_lat,
         destination_lng: s.destination_lng,
-        passenger_name: s.passenger_name || profile?.passengerName || 'VIP 고객님',
+        passenger_name: s.passenger_name || profile?.passengerName || null, // No fabricated 'VIP 고객님'
+        passenger_phone: null,
         flight_number: s.flight_no || null,
         protocol_notes: s.notes || null,
+        dispatch_status: 'draft', // DRAFT ONLY
+        version: 1,
+        place_verified: placeVerified,
         status: 'scheduled',
         updated_at: new Date().toISOString(),
       };
@@ -526,13 +550,13 @@ export async function POST(req: NextRequest) {
       .map((s) => {
         const dateLabel = formatBriefingDate(s.date);
         const flightPart = s.flight_no ? ` (항공편: ${s.flight_no})` : '';
-        return `• ${dateLabel} ${s.pickup_time}\n  출발: ${s.origin_name}\n  도착: ${s.destination_name}\n  승객: ${s.passenger_name || profile?.passengerName || 'VIP 승객'}${flightPart}`;
+        return `• ${dateLabel} ${s.pickup_time}\n  출발: ${s.origin_name}\n  도착: ${s.destination_name}\n  승객: ${s.passenger_name || profile?.passengerName || '미지정'}${flightPart}`;
       })
       .join('\n\n');
 
     const summary = enrichedSchedules.length > 0
-      ? `📋 배차 일정 동기화 완료
-${driverName} 기사님(${targetVehicleNo} · ${plateNo})의 의전 일정 총 ${enrichedSchedules.length}건이 정리되었습니다.
+      ? `📋 배차 일정 초안 추출 완료
+${driverName} 기사님(${targetVehicleNo} · ${plateNo})의 의전 일정 총 ${enrichedSchedules.length}건이 초안(Draft)으로 등록되었습니다. 본사 관리자 검증 후 정식 배차 발송됩니다.
 
 ${scheduleItemsFormatted}`.trim()
       : `기사님, 배차표에서 ${driverName} 기사님(${targetVehicleNo} · ${plateNo})의 배차 일정이 발견되지 않았습니다. 프로필 정보나 배차표 이미지를 다시 한번 확인해 주시기 바랍니다.`;
@@ -542,6 +566,8 @@ ${scheduleItemsFormatted}`.trim()
       matchedDriver: parsedResult.matchedDriver || `${driverName} (${targetVehicleNo})`,
       count: insertedCount,
       schedules: enrichedSchedules,
+      isDraft: true,
+      dispatchStatus: 'draft',
       summary,
     });
   } catch (err: any) {
