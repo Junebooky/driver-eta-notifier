@@ -5,7 +5,7 @@ import { signCockpitSession } from '@/lib/auth/serverAuth';
 import { GET as getDrivingLogs, POST as postDrivingLogs, PUT as putDrivingLogs } from '@/app/api/driving-logs/route';
 import { GET as getExpenses, POST as postExpenses, PUT as putExpenses } from '@/app/api/expenses/route';
 import { GET as getReceipt, POST as postReceipt } from '@/app/api/expenses/receipt/route';
-import { getVerifiedInspectionOdometer } from '@/utils/drivingLog';
+import { getVerifiedInspectionOdometer, formatIsoDate } from '@/utils/drivingLog';
 import { NextRequest } from 'next/server';
 
 // Ensure test environment auth secret
@@ -651,7 +651,7 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
     (global as any).window = {};
     (global as any).localStorage = mockLocalStorage;
 
-    const todayIso = new Date().toISOString().split('T')[0];
+    const todayIso = formatIsoDate();
 
     mockLocalStorage.setItem(
       'cockpit_vehicle_inspection_116허 1514_booking-101',
