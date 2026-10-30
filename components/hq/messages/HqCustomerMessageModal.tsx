@@ -379,9 +379,7 @@ export default function HqCustomerMessageModal({
     }
   };
 
-  const cleanSmsHref = useMemo(() => {
-    return formatSmsAppUrl(recipientPhone, smsBody);
-  }, [recipientPhone, smsBody]);
+  const cleanSmsHref = formatSmsAppUrl(recipientPhone, smsBody);
 
   const handleOpenSmsAppClick = async (e: React.MouseEvent<HTMLAnchorElement>) => {
     const cleanDigits = recipientPhone.replace(/[^0-9+]/g, '');

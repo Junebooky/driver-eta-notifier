@@ -22,6 +22,14 @@ DO $$ DECLARE c record; BEGIN
   LOOP EXECUTE format('ALTER TABLE cockpit.schedules DROP CONSTRAINT %I', c.conname); END LOOP;
 END $$;
 
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint WHERE conrelid='cockpit.schedules'::regclass AND conname='schedules_driver_id_fkey') THEN
+    ALTER TABLE cockpit.schedules ADD CONSTRAINT schedules_driver_id_fkey FOREIGN KEY(driver_id) REFERENCES cockpit.drivers(id) NOT VALID;
+  END IF;
+END $$;
+GRANT USAGE ON SCHEMA cockpit TO service_role;
+GRANT SELECT ON cockpit.drivers TO service_role;
+
 CREATE TABLE IF NOT EXISTS cockpit.fleet_vehicle_operations (
   vehicle_id uuid PRIMARY KEY,
   organization_id text NOT NULL CHECK (organization_id = 'vip_limousine_korea'),
@@ -68,7 +76,7 @@ $$;
 
 CREATE OR REPLACE FUNCTION cockpit.guard_dispatch_schedule()
 RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path = '' AS $$
-DECLARE s cockpit.schedules; changed boolean;
+DECLARE s cockpit.schedules; changed boolean; driver_json jsonb; w jsonb; unavailable_start timestamptz; unavailable_end timestamptz;
 BEGIN
   PERFORM pg_catalog.pg_advisory_xact_lock(748201, 10);
   IF NOT cockpit.dispatch_is_active(NEW) THEN RETURN NEW; END IF;
@@ -87,6 +95,34 @@ BEGIN
   END IF;
   IF coalesce(NEW.schedule_meta->>'serviceMode','with_driver') <> 'vehicle_only' AND NEW.driver_id IS NULL THEN
     RAISE EXCEPTION 'VERIFIED_DRIVER_ID_REQUIRED' USING ERRCODE = '23514';
+  END IF;
+  IF coalesce(NEW.schedule_meta->>'serviceMode','with_driver') <> 'vehicle_only' THEN
+    SELECT to_jsonb(d) INTO driver_json FROM cockpit.drivers d WHERE d.id=NEW.driver_id FOR SHARE;
+    IF NOT FOUND THEN RAISE EXCEPTION 'VERIFIED_DRIVER_REQUIRED' USING ERRCODE='23514'; END IF;
+    IF driver_json->'driver_meta'->>'status' = 'inactive' THEN
+      RAISE EXCEPTION 'DRIVER_UNAVAILABLE' USING ERRCODE='23P01';
+    END IF;
+    IF NEW.schedule_meta->>'requestedLanguage' = 'en' AND coalesce((driver_json->>'english_available')::boolean,false)=false
+      AND coalesce((NEW.schedule_meta->>'languageOverrideConfirmed')::boolean,false)=false THEN
+      RAISE EXCEPTION 'DRIVER_LANGUAGE_NOT_VERIFIED' USING ERRCODE='23514';
+    END IF;
+    IF nullif(driver_json->>'driver_name','') IS NOT NULL THEN
+      NEW.driver_name := driver_json->>'driver_name';
+      NEW.schedule_meta := jsonb_set(coalesce(NEW.schedule_meta,'{}'::jsonb),'{driverName}',to_jsonb(NEW.driver_name));
+    END IF;
+    FOR w IN SELECT value FROM jsonb_array_elements(coalesce(nullif(driver_json->'unavailable_windows','null'::jsonb),'[]'::jsonb)) LOOP
+      IF w->>'start_at' IS NOT NULL AND w->>'end_at' IS NOT NULL THEN
+        unavailable_start := (w->>'start_at')::timestamptz;
+        unavailable_end := (w->>'end_at')::timestamptz;
+      ELSE
+        unavailable_start := ((coalesce(w->>'startDate',w->>'start_date'))::date + coalesce(w->>'startTime',w->>'start_time','00:00')::time) AT TIME ZONE 'Asia/Seoul';
+        unavailable_end := ((coalesce(w->>'endDate',w->>'end_date',w->>'startDate',w->>'start_date'))::date + coalesce(w->>'endTime',w->>'end_time','23:59')::time) AT TIME ZONE 'Asia/Seoul';
+      END IF;
+      IF unavailable_start IS NULL OR unavailable_end IS NULL OR unavailable_end <= unavailable_start
+        OR (unavailable_start < cockpit.dispatch_end(NEW) AND cockpit.dispatch_start(NEW) < unavailable_end) THEN
+        RAISE EXCEPTION 'DRIVER_UNAVAILABLE_WINDOW' USING ERRCODE='23P01';
+      END IF;
+    END LOOP;
   END IF;
   IF EXISTS (SELECT 1 FROM cockpit.fleet_vehicle_operations o WHERE o.vehicle_id = NEW.vehicle_id AND o.status = '정비 중') THEN
     RAISE EXCEPTION 'VEHICLE_MAINTENANCE' USING ERRCODE = '23P01';

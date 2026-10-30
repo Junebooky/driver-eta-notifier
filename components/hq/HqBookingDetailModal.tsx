@@ -145,47 +145,18 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
     setErrorMsg(null);
   }, [booking, isOpen]);
 
-  const sortedDrivers = useMemo(
-    () => getSortedDriversForLanguage(booking?.requestedLanguage || 'ko', liveDriverProfiles),
-    [booking?.requestedLanguage, liveDriverProfiles]
-  );
-
-  // Live conflict check in modal
-  const matchedDriver = useMemo(
-    () => liveDriverProfiles.find((d) => d.name === selectedDriverName),
-    [liveDriverProfiles, selectedDriverName]
-  );
-
   const modalConflicts = useMemo(() => {
-    if (!booking || !isOpen) return [];
-    return detectDispatchConflicts(
-      {
-        id: booking.id,
-        scheduleId: booking.scheduleId,
-        pickupDate,
-        pickupTime,
-        endDate: booking.endDate,
-        endTime: booking.endTime,
-        driverName: selectedDriverName,
-        driverId: matchedDriver?.id || booking.driverId,
-        vehiclePlate: selectedVehiclePlate,
-        vehicleId: booking.vehicleId,
-        serviceMode: booking.serviceMode,
-      },
-      existingBookings
-    );
-  }, [booking, isOpen, pickupDate, pickupTime, selectedDriverName, matchedDriver?.id, selectedVehiclePlate, existingBookings]);
+    if (!booking || !isOpen || !fleet.data) return [];
+    const messages: { message: string }[] = [];
+    const vehicle = fleet.data.vehicles.find(v => v.plate === selectedVehiclePlate);
+    const driver = fleet.data.drivers.find(d => d.id === selectedDriverId);
+    if (vehicle && !vehicle.isAvailable) messages.push({ message: vehicle.unavailabilityReason || '선택 기간에 차량 예약이 있습니다.' });
+    if (booking.serviceMode !== 'vehicle_only' && driver && !driver.isAvailable) messages.push({ message: driver.unavailabilityReason || '선택 기간에 기사 배차가 있습니다.' });
+    return messages;
+  }, [booking, isOpen, fleet.data, selectedVehiclePlate, selectedDriverId]);
+
 
   if (!isOpen || !booking) return null;
-
-  const handleSelectDriver = (drvName: string) => {
-    setErrorMsg(null);
-    setSelectedDriverName(drvName);
-    const matched = liveDriverProfiles.find((d) => d.name === drvName);
-    if (matched && !selectedVehiclePlate) {
-      setSelectedVehiclePlate(matched.plate);
-    }
-  };
 
   // Persist reservation (unassigned) or confirmed dispatch (published) to real API
   const handleSaveOrPublish = async (targetStatus: 'unassigned' | 'published') => {

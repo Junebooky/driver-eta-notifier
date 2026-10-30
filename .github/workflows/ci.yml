@@ -40,6 +40,12 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ci-placeholder'
         run: npm run build
 
+      - name: Production HTTP Smoke
+        run: npm run test:http
+
+      - name: Dependency Audit
+        run: npm audit --audit-level=high
+
   dispatch-database:
     name: Postgres atomic dispatch and permissions
     runs-on: ubuntu-latest

@@ -859,7 +859,7 @@ async function prepareServerDispatchSchedule(
   const requestedStatus = input.dispatchStatus || 'published';
 
   // Determine effective dispatch status
-  let effectiveDispatchStatus: HqScheduleMeta['dispatchStatus'] = requestedStatus;
+  const effectiveDispatchStatus: HqScheduleMeta['dispatchStatus'] = requestedStatus;
   if (requestedStatus === 'published') {
     const needsDriver = input.serviceMode !== 'vehicle_only';
     if ((needsDriver && (!cleanDrv || !input.driverId)) || (!cleanPlt && !input.vehicleNo)) {
@@ -951,7 +951,7 @@ async function prepareServerDispatchSchedule(
   let nextVersion = 1;
   let lastAckVersion = 0;
   let lastAckAt: string | null = null;
-  let ackHistory = existingHydrated?._meta.ackHistory || [];
+  const ackHistory = existingHydrated?._meta.ackHistory || [];
   let previousDriverName: string | null = existingHydrated?._meta.previousDriverName ?? null;
   let previousDriverPhone: string | null = existingHydrated?._meta.previousDriverPhone ?? null;
   let previousVehiclePlate: string | null = existingHydrated?._meta.previousVehiclePlate ?? null;

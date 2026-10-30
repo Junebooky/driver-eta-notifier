@@ -18,7 +18,7 @@ async function main() {
     END $$;
     CREATE SCHEMA cockpit;
     GRANT USAGE ON SCHEMA cockpit TO service_role, anon, authenticated;
-    CREATE TABLE cockpit.drivers (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_no text UNIQUE);
+    CREATE TABLE cockpit.drivers (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_no text UNIQUE, driver_name text, english_available boolean, unavailable_windows jsonb DEFAULT '[]'::jsonb);
     CREATE TABLE cockpit.schedules (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_no text REFERENCES cockpit.drivers(vehicle_no),
       date date NOT NULL, pickup_time time NOT NULL, end_date date, end_time time,
@@ -41,8 +41,12 @@ async function main() {
       end_date: '2026-12-02', end_time: '12:00', dispatch_status: 'published', status: 'scheduled',
       schedule_meta: { serviceMode: 'with_driver', privateField: 'retained' }, updated_at: new Date().toISOString(), ...patch,
     }, expected_updated_at: null as string | null, is_update: false });
-    const commit = (client: Client, items: ReturnType<typeof envelope>[], key = randomUUID(), fingerprint = JSON.stringify(items)) =>
-      client.query('SELECT cockpit.commit_dispatch_batch($1::jsonb,$2,$3,$4) result', [JSON.stringify(items),key,'vip_limousine_korea',fingerprint]);
+    const commit = async (client: Client, items: ReturnType<typeof envelope>[], key = randomUUID(), fingerprint = JSON.stringify(items)) => {
+      for (const id of new Set(items.map(item => item.row.driver_id).filter(Boolean))) {
+        await admin.query('INSERT INTO cockpit.drivers(id) VALUES($1) ON CONFLICT(id) DO NOTHING',[id]);
+      }
+      return client.query('SELECT cockpit.commit_dispatch_batch($1::jsonb,$2,$3,$4) result', [JSON.stringify(items),key,'vip_limousine_korea',fingerprint]);
+    };
     const count = async () => Number((await admin.query('SELECT count(*) FROM cockpit.schedules')).rows[0].count);
     const initialCount = await count();
     // Separate DB connections simulate different Vercel instances; only one can commit.
@@ -83,8 +87,27 @@ async function main() {
     await commit(b,[envelope({date:'2026-12-03',pickup_time:'00:30',end_date:'2026-12-03',end_time:'02:00'})]);
     await assert.rejects(commit(a,[envelope({end_time:null})]), { code:'23514' });
     console.log('PASS KST midnight buffer, half-open boundary and missing end time');
+    await admin.query('DELETE FROM cockpit.schedules');
+    await commit(a,[envelope(),envelope({vehicle_id:randomUUID(),vehicle_no:'200가 0002',vehicle_plate:'200가 0002',driver_id:randomUUID()})]);
+    assert.equal(await count(),2);
+    console.log('PASS same-name drivers with different UUIDs do not conflict');
+    await admin.query('DELETE FROM cockpit.schedules');
+    await commit(a,[envelope({schedule_meta:{serviceMode:'vehicle_only'},driver_id:null}),envelope({vehicle_id:randomUUID(),vehicle_no:'200가 0002',vehicle_plate:'200가 0002'})]);
+    assert.equal(await count(),2);
+    console.log('PASS vehicle-only bookings do not consume a chauffeur');
+    await admin.query('DELETE FROM cockpit.schedules');
+    // Legacy records predate validation; a missing end is preserved as an open hold.
+    await admin.query('ALTER TABLE cockpit.schedules DISABLE TRIGGER guard_dispatch_schedule');
+    const legacy = envelope({end_time:null}).row;
+    await admin.query('INSERT INTO cockpit.drivers(id) VALUES($1) ON CONFLICT(id) DO NOTHING',[legacy.driver_id]);
+    await admin.query(`INSERT INTO cockpit.schedules(id,vehicle_no,vehicle_plate,vehicle_id,driver_id,driver_name,date,pickup_time,end_date,end_time,org_id,dispatch_status)
+      VALUES($1,$2,$3,$4,$5,'동일이름','2026-12-01','22:00','2026-12-01',NULL,'vip_limousine_korea','published')`,[legacy.id,legacy.vehicle_no,legacy.vehicle_plate,legacy.vehicle_id,legacy.driver_id]);
+    await admin.query('ALTER TABLE cockpit.schedules ENABLE TRIGGER guard_dispatch_schedule');
+    await assert.rejects(commit(a,[envelope({date:'2026-12-10',end_date:'2026-12-10'})]),{code:'23P01'});
+    assert.equal(await count(),1);
+    console.log('PASS legacy unknown end remains an open hold without rewriting the record');
     await admin.query('SET ROLE authenticated');
-    await assert.rejects(commit(admin,[envelope()]), { code:'42501' });
+    await assert.rejects(admin.query('SELECT cockpit.commit_dispatch_batch($1::jsonb,$2,$3,$4)',[JSON.stringify([envelope()]),randomUUID(),'vip_limousine_korea','forbidden']), { code:'42501' });
     await assert.rejects(admin.query('SELECT * FROM cockpit.fleet_vehicle_operations'), { code:'42501' });
     await admin.query('RESET ROLE');
     console.log('PASS authenticated role denied RPC and private state');

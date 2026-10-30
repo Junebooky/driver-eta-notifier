@@ -430,78 +430,21 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
     setIsTimePickerOpen(false);
   };
 
-  // Compute live client-side conflicts per allocation
   const allocationConflictsMap = useMemo(() => {
     const map: Record<string, string[]> = {};
-    allocations.forEach((alloc, idx) => {
-      const effTime =
-        alloc.hasCustomItinerary && alloc.customPickupTime.trim()
-          ? alloc.customPickupTime.trim()
-          : pickupTimeOnly;
-      const cleanDrv = cleanDriverIdentity(alloc.selectedDriver);
-      const vehObj = VEHICLE_OPTIONS.find(
-        (v) => v.modelRaw === alloc.selectedVehicleModel || v.modelClean === alloc.selectedVehicleModel
-      );
-      const matchedDrv = liveDriverProfiles.find((d) => d.name === cleanDrv);
-      const effPlate = alloc.selectedVehiclePlate || vehObj?.plate || matchedDrv?.plate || '';
-
-      const msgs: string[] = [];
-
-      // 1. Existing DB schedule conflicts
-      const dbConflicts = detectDispatchConflicts(
-        {
-          pickupDate,
-          pickupTime: effTime,
-          driverName: cleanDrv,
-          driverId: matchedDrv?.id,
-          vehiclePlate: effPlate,
-          vehicleId: (vehObj as any)?.uuid,
-        },
-        existingBookings
-      );
-      dbConflicts.forEach((c) => msgs.push(c.message));
-
-      // 2. Intra-group duplicate driver / vehicle check
-      for (let j = 0; j < allocations.length; j++) {
-        if (j === idx) continue;
-        const other = allocations[j];
-        const otherTime =
-          other.hasCustomItinerary && other.customPickupTime.trim()
-            ? other.customPickupTime.trim()
-            : pickupTimeOnly;
-        const m1 = timeHHmmToMinutes(effTime);
-        const m2 = timeHHmmToMinutes(otherTime);
-        if (m1 === null || m2 === null || Math.abs(m1 - m2) >= DEFAULT_CONFLICT_WINDOW_MINUTES) {
-          continue;
-        }
-        const otherDrv = cleanDriverIdentity(other.selectedDriver);
-        const otherVehObj = VEHICLE_OPTIONS.find(
-          (v) => v.modelRaw === other.selectedVehicleModel || v.modelClean === other.selectedVehicleModel
-        );
-        const otherMatchedDrv = liveDriverProfiles.find((d) => d.name === otherDrv);
-        const otherPlate = other.selectedVehiclePlate || otherVehObj?.plate || otherMatchedDrv?.plate || '';
-
-        if (cleanDrv && otherDrv && cleanDrv === otherDrv) {
-          msgs.push(`[행사 내 기사 중복] ${j + 1}호차에도 ${cleanDrv} 기사가 선택되어 있습니다.`);
-        }
-        if (
-          cleanVehicleIdentity(effPlate) &&
-          cleanVehicleIdentity(otherPlate) &&
-          cleanVehicleIdentity(effPlate) === cleanVehicleIdentity(otherPlate)
-        ) {
-          msgs.push(`[행사 내 차량 중복] ${j + 1}호차에도 동일 차량(${effPlate})이 선택되어 있습니다.`);
-        }
-      }
-
-      map[alloc.id] = msgs;
-    });
+    for (const allocation of allocations) {
+      const messages: string[] = [];
+      const vehicle = fleet.data?.vehicles.find(v => v.plate === allocation.selectedVehiclePlate);
+      const driver = fleet.data?.drivers.find(d => d.id === allocation.selectedDriver);
+      if (vehicle && !vehicle.isAvailable) messages.push(vehicle.unavailabilityReason || '선택 기간에 차량 예약이 있습니다.');
+      if (allocation.serviceMode !== 'vehicle_only' && driver && !driver.isAvailable) messages.push(driver.unavailabilityReason || '선택 기간에 기사 배차가 있습니다.');
+      if (allocation.selectedVehiclePlate && allocations.some(a => a.id !== allocation.id && a.selectedVehiclePlate === allocation.selectedVehiclePlate)) messages.push('동일 차량이 여러 행에 선택되어 있습니다.');
+      if (allocation.serviceMode !== 'vehicle_only' && allocation.selectedDriver && allocations.some(a => a.id !== allocation.id && a.serviceMode !== 'vehicle_only' && a.selectedDriver === allocation.selectedDriver)) messages.push('동일 기사가 여러 행에 선택되어 있습니다.');
+      map[allocation.id] = messages;
+    }
     return map;
-  }, [allocations, pickupDate, pickupTimeOnly, existingBookings, liveDriverProfiles]);
-
-  const totalLiveConflicts = useMemo(
-    () => Object.values(allocationConflictsMap).reduce((acc, arr) => acc + arr.length, 0),
-    [allocationConflictsMap]
-  );
+  }, [allocations, fleet.data]);
+  const totalLiveConflicts = Object.values(allocationConflictsMap).reduce((sum, messages) => sum + messages.length, 0);
 
   // Submit Handler: 'unassigned' (예약만 등록) or 'published' (바로 배차)
   const handleSubmit = async (mode: 'unassigned' | 'published') => {
@@ -525,6 +468,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
     }
 
     if (mode === 'published') {
+      if (totalLiveConflicts > 0) { setErrorMsg('선택 기간의 기사·차량 충돌을 먼저 해결해 주세요.'); return; }
       const error = validateDispatchInterval({ date: pickupDate, pickupTime: pickupTimeOnly, endDate: pickupEndDate || pickupDate, endTime, dispatchStatus: mode });
       if (error) { setErrorMsg(error); return; }
       if (!fleet.data) { setErrorMsg(fleet.error || '선택한 기간의 가용성 확인이 필요합니다.'); return; }
@@ -1276,7 +1220,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
               <span>기존 배차와 일정 중복이 감지되었습니다 ({totalLiveConflicts}건)</span>
             </div>
             <p className="pt-1 text-[11px] text-amber-300 font-semibold">
-              기존 일정과 겹쳐 '바로 배차'가 비활성화되었습니다. 일정을 변경하거나 '예약만 등록'을 이용해 주세요.
+              기존 일정과 겹쳐 바로 배차가 비활성화되었습니다. 일정을 변경하거나 예약만 등록을 이용해 주세요.
             </p>
           </div>
         )}
@@ -1318,7 +1262,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
           {/* 바로 배차 */}
           <button
             type="button"
-            disabled={isSubmitting || !fleet.data || Boolean(fleet.error)}
+            disabled={isSubmitting || !fleet.data || Boolean(fleet.error) || totalLiveConflicts > 0}
             onClick={() => {
               haptics.selection();
               handleSubmit('published');

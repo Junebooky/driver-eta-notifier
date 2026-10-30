@@ -65,8 +65,8 @@ interface MockExpenseRow {
 }
 
 test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () => {
-  let mockDrivingLogs: MockDrivingLogRow[] = [];
-  let mockExpenses: MockExpenseRow[] = [];
+  const mockDrivingLogs: MockDrivingLogRow[] = [];
+  const mockExpenses: MockExpenseRow[] = [];
   let simulateDbError = false;
   let simulateStorageError = false;
 
@@ -170,7 +170,7 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
   const mockFrom = (table: string) => {
     let filterField: string | null = null;
     let filterVal: any = null;
-    let filters: Array<{ field: string; val: any }> = [];
+    const filters: Array<{ field: string; val: any }> = [];
 
     let activeRows: any[] = [];
     if (table === 'driving_logs') {

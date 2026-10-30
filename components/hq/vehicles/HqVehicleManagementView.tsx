@@ -61,6 +61,7 @@ export type AvailabilityDayStatus =
 // Helper to get thumbnail image matching the mockup
 function getVehicleThumb(v: VipRealVehicle): string {
   if (v.plateShort === '5336') return '/images/thumb_carnival.jpg';
+  if (v.category === 's_class') return '/images/vehicle_photo_pending.svg';
   if (v.category === 'carnival') return '/images/thumb_carnival.jpg';
   if (v.category === 'staria') return '/images/thumb_staria.jpg';
   if (v.category === 'sprinter') return '/images/thumb_sprinter.jpg';
@@ -71,6 +72,7 @@ function getVehicleThumb(v: VipRealVehicle): string {
 // Helper to get Hero image matching the mockup
 function getVehicleHero(v: VipRealVehicle): string {
   if (v.plateShort === '5336') return '/images/carnival_hero.jpg';
+  if (v.category === 's_class') return '/images/vehicle_photo_pending.svg';
   if (v.category === 'carnival') return '/images/thumb_carnival.jpg';
   if (v.category === 'staria') return '/images/thumb_staria.jpg';
   if (v.category === 'sprinter') return '/images/thumb_sprinter.jpg';
@@ -205,7 +207,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
     return VIP_REAL_VEHICLES.map((v) => {
       const uiCategory = mapVehicleToUiCategory(v);
       const effectiveStatus = statusOverrides[v.id] || '확인 필요';
-      // 연식/색상 추정 금지: 오직 확인된 값만 노출 (5336은 디자인 시안 기준 2023년/오로라 블랙 펄, 그 외는 '미확인')
+      // 연식과 색상은 확인된 값만 표시합니다.
       const year = v.year || '미확인';
       const color =
         serverColors[v.id] ||
@@ -273,7 +275,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
   const handleOpenEdit = () => {
     if (!selectedVehicle) return;
     setEditStatus(selectedVehicle.effectiveStatus);
-    setEditMemo(memos[selectedVehicle.id] || selectedVehicle.adminMemo || '');
+    setEditMemo(memos[selectedVehicle.id] || '');
     setEditColor(selectedVehicle.color === '미확인' ? '' : selectedVehicle.color);
     setSaveEditError(null);
     setIsEditModalOpen(true);

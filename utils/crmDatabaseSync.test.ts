@@ -23,7 +23,7 @@ if (!process.env.COCKPIT_AUTH_SECRET) {
 
 test('CRM Full Round-Trip & Quality Gate Test Suite (Zero Live DB Mutation)', async () => {
   // In-memory isolated DB seed - guarantees ZERO network requests to live Supabase DB
-  let mockRows: MockCustomerRow[] = [
+  const mockRows: MockCustomerRow[] = [
     {
       id: 'cust-chanel',
       name: 'CHANEL',

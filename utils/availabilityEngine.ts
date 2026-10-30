@@ -140,9 +140,15 @@ export async function checkFleetAvailability(
   }
   let schedules = options?.injectedSchedules;
   if (schedules === undefined) {
-    const { data, error } = await supabaseAdmin.from('schedules').select('*');
-    if (error || !data) throw new Error('가용성 DB 스케줄을 조회할 수 없습니다.');
-    schedules = data;
+    schedules = [];
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error } = await supabaseAdmin.from('schedules').select('*')
+        .lte('date', shiftIsoDate(endDate, 1)).order('id').range(offset, offset + 999);
+      if (error || !data) throw new Error('가용성 DB 스케줄을 조회할 수 없습니다.');
+      schedules.push(...data);
+      if (data.length < 1000) break;
+      if (offset >= 199000) throw new Error('가용성 조회 범위를 줄여 주세요.');
+    }
   }
   const operations = options?.injectedOperations ?? (options?.injectedSchedules !== undefined ? [] : await readFleetOperations());
   const activeSchedules = schedules.filter(s => {
@@ -187,10 +193,19 @@ export async function checkFleetAvailability(
       return same && overlaps(s);
     });
     const qualified = query.requiredLanguage !== 'en' || p.english_available === true;
+    const unavailable = Array.isArray(p.unavailable_windows) && p.unavailable_windows.some((w: any) => {
+      if (w.start_at && w.end_at) {
+        const from = Date.parse(w.start_at); const until = Date.parse(w.end_at);
+        return !Number.isFinite(from) || !Number.isFinite(until) || from < end && start < until;
+      }
+      return scheduleOverlapsInterval({ startDate: w.startDate || w.start_date || '', pickupTime: w.startTime || w.start_time || '00:00',
+        endDate: w.endDate || w.end_date, endTime: w.endTime || w.end_time }, query, 0);
+    });
+    const rosterBlocked = p.driver_meta?.status === 'inactive';
     return { id: p.id, name: p.driver_name, phone: p.phone || '', plate: p.car_number || '', model: p.vehicle_model || '',
-      isAvailable: !conflicting && qualified, isEnglishVerified: p.english_available === true,
+      isAvailable: !conflicting && qualified && !unavailable && !rosterBlocked, isEnglishVerified: p.english_available === true,
       languageLabel: p.english_available ? '영어 가능' : '무관',
-      unavailabilityReason: conflicting ? '기존 배차와 충돌' : !qualified ? '영어 가능 여부 확인 필요' : undefined,
+      unavailabilityReason: conflicting ? '기존 배차와 충돌' : unavailable || rosterBlocked ? '휴무·이용 불가 기간 (기사 확인 필요)' : !qualified ? '영어 가능 여부 확인 필요' : undefined,
     };
   });
   // 5. Aggregate category counts
