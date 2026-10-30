@@ -9,7 +9,9 @@ interface NaviDrivingLogConfirmModalProps {
   originName?: string;
   destinationName: string;
   destinationAddress?: string;
+  departureTime?: string;
   etaText?: string;
+  isLoadingFreshEta?: boolean;
   naviProvider?: 'tmap' | 'kakao' | 'naver';
   onConfirm: (addToLog: boolean) => void;
 }
@@ -20,7 +22,9 @@ export const NaviDrivingLogConfirmModal: React.FC<NaviDrivingLogConfirmModalProp
   originName,
   destinationName,
   destinationAddress,
+  departureTime,
   etaText,
+  isLoadingFreshEta = false,
   naviProvider = 'tmap',
   onConfirm,
 }) => {
@@ -45,7 +49,7 @@ export const NaviDrivingLogConfirmModal: React.FC<NaviDrivingLogConfirmModalProp
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
+            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition cursor-pointer"
             aria-label="닫기"
           >
             <X className="w-5 h-5" />
@@ -56,7 +60,7 @@ export const NaviDrivingLogConfirmModal: React.FC<NaviDrivingLogConfirmModalProp
         <div className="my-4 text-center">
           <p className="text-lg font-bold text-amber-300">이 경로를 운행일지에 추가할까요?</p>
           <p className="text-xs text-slate-400 mt-1">
-            출발 시각과 목적지가 오늘자 운행일지 경유지 목록에 기록됩니다.
+            출발 시각({departureTime || '지금'})과 목적지가 오늘자 운행일지 경유지 목록에 기록됩니다.
           </p>
         </div>
 
@@ -65,19 +69,24 @@ export const NaviDrivingLogConfirmModal: React.FC<NaviDrivingLogConfirmModalProp
           <div className="flex items-start gap-2.5">
             <div className="w-2 h-2 rounded-full bg-slate-400 mt-1.5 shrink-0" />
             <div className="min-w-0 flex-1">
-              <span className="text-xs text-slate-400">출발지</span>
+              <span className="text-xs text-slate-400">출발지 {departureTime ? `(${departureTime} 출발)` : ''}</span>
               <p className="font-medium text-slate-200 truncate">{originName || '현재 위치'}</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 pl-1">
             <ArrowRight className="w-3.5 h-3.5 text-slate-500" />
-            {etaText && (
+            {isLoadingFreshEta ? (
+              <span className="inline-flex items-center gap-1 text-xs text-blue-400 font-semibold bg-blue-500/10 px-2 py-0.5 rounded animate-pulse">
+                <Clock className="w-3 h-3" />
+                최신 교통정보 조회 중...
+              </span>
+            ) : etaText ? (
               <span className="inline-flex items-center gap-1 text-xs text-amber-400 font-semibold bg-amber-400/10 px-2 py-0.5 rounded">
                 <Clock className="w-3 h-3" />
-                예상 {etaText}
+                {etaText}
               </span>
-            )}
+            ) : null}
           </div>
 
           <div className="flex items-start gap-2.5">
@@ -100,14 +109,14 @@ export const NaviDrivingLogConfirmModal: React.FC<NaviDrivingLogConfirmModalProp
           <button
             type="button"
             onClick={() => onConfirm(false)}
-            className="w-full py-3 px-3 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-slate-800 text-slate-300 font-semibold text-sm transition text-center"
+            className="w-full py-3 px-3 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-slate-800 text-slate-300 font-semibold text-sm transition text-center cursor-pointer active:scale-98"
           >
             아니요 (내비만 실행)
           </button>
           <button
             type="button"
             onClick={() => onConfirm(true)}
-            className="w-full py-3 px-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-sm shadow-lg shadow-blue-500/25 transition text-center flex items-center justify-center gap-1.5"
+            className="w-full py-3 px-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-sm shadow-lg shadow-blue-500/25 transition text-center flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
           >
             <BookOpen className="w-4 h-4" />
             추가하기

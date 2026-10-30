@@ -17,7 +17,7 @@ import { HqDrivingLogsKpi } from './HqDrivingLogsKpi';
 import { HqDrivingLogsFilterBar } from './HqDrivingLogsFilterBar';
 import { HqDrivingLogsTable } from './HqDrivingLogsTable';
 import { HqDrivingLogDetailPanel } from './HqDrivingLogDetailPanel';
-import { CheckCircle2, CreditCard, AlertCircle } from 'lucide-react';
+import { CheckCircle2, CreditCard, AlertCircle, RotateCw } from 'lucide-react';
 import { HqBooking } from '@/types/hq';
 import HqHipassImportModal from '../expenses/HqHipassImportModal';
 
@@ -39,16 +39,29 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
   );
   const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
   const [dbError, setDbError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Fetch real authoritative logs from Supabase DB on mount
-  useEffect(() => {
-    fetchHqDrivingLogsFromDb().then((result) => {
+  // Fetch real authoritative logs from Supabase DB on mount and periodic interval
+  const handleRefreshLogs = async () => {
+    setIsRefreshing(true);
+    try {
+      const result = await fetchHqDrivingLogsFromDb();
       if (!result.ok && result.error) {
         setDbError(result.error);
       } else {
         setDbError(null);
       }
-    });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    handleRefreshLogs();
+    const intervalId = setInterval(() => {
+      fetchHqDrivingLogsFromDb();
+    }, 20000);
+    return () => clearInterval(intervalId);
   }, []);
 
   // Filters
@@ -87,6 +100,7 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
 
   // Dynamic KPI counts
   const kpiCounts = useMemo(() => {
+    const inProgressDrafts = logs.filter((l) => l.status === 'draft').length;
     const pending = logs.filter((l) => l.status === '검토 대기').length;
     const approved = logs.filter((l) => l.status === '승인 완료').length;
     const revision = logs.filter((l) => l.status === '보완 필요').length;
@@ -94,6 +108,7 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
 
     return {
       totalToday,
+      inProgressDrafts,
       pending,
       approved,
       revision,
@@ -211,6 +226,31 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
           </button>
         </div>
       )}
+
+      {/* Real-time Status & Manual Refresh Bar */}
+      <div className="flex items-center justify-between px-1">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-slate-600">
+            실시간 연동 운행일지 ({logs.length}건)
+          </span>
+          {kpiCounts.inProgressDrafts > 0 && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+              진행 중 초안 {kpiCounts.inProgressDrafts}건
+            </span>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={handleRefreshLogs}
+          disabled={isRefreshing}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 shadow-2xs transition active:scale-95 cursor-pointer disabled:opacity-50"
+          title="Supabase 실시간 운행일지 새로고침"
+        >
+          <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-[#1E60F3]' : 'text-slate-500'}`} />
+          <span>새로고침</span>
+        </button>
+      </div>
 
       {/* Hi-Pass Auto-Link Strip */}
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-emerald-200/80 bg-emerald-50/60 px-4 py-3">

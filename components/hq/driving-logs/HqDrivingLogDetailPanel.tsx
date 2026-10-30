@@ -78,6 +78,12 @@ export const HqDrivingLogDetailPanel: React.FC<HqDrivingLogDetailPanelProps> = (
 
         {/* Status Badge */}
         <div>
+          {log.status === 'draft' && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border border-amber-300 bg-amber-50 text-amber-700">
+              <Clock className="w-3.5 h-3.5 stroke-[2.2]" />
+              <span>진행 중 (초안)</span>
+            </span>
+          )}
           {log.status === '검토 대기' && (
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border border-amber-300 bg-amber-50 text-amber-700">
               <Clock className="w-3.5 h-3.5 stroke-[2.2]" />
@@ -205,8 +211,8 @@ export const HqDrivingLogDetailPanel: React.FC<HqDrivingLogDetailPanelProps> = (
                   <div className="flex-1 min-w-0 pb-3">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-baseline gap-2.5 min-w-0">
-                        <span className="font-bold text-slate-800 shrink-0 tabular-nums w-11">
-                          {stop.time}
+                        <span className="font-bold text-slate-800 shrink-0 tabular-nums min-w-11">
+                          {stop.time || (stop.departureTime ? `출발 ${stop.departureTime}` : '-')}
                         </span>
                         <span className="font-semibold text-slate-800 truncate" title={stop.place}>
                           {stop.place}

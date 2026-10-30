@@ -139,6 +139,7 @@ export const HqDrivingLogsFilterBar: React.FC<HqDrivingLogsFilterBarProps> = ({
               className="appearance-none pl-3 pr-8 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200/90 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-[#1E60F3] cursor-pointer transition-all shadow-2xs"
             >
               <option value="전체">상태 전체</option>
+              <option value="draft">진행 중 (초안)</option>
               <option value="검토 대기">검토 대기</option>
               <option value="검토 중">검토 중</option>
               <option value="승인 완료">승인 완료</option>

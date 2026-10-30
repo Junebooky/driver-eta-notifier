@@ -1,11 +1,20 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { NaviProvider, LocationPreset, RouteEstimate, DriverProfile } from '@/types';
-import { launchNavigationApp, calculateHaversineEstimate } from '@/utils/navigation';
-import { generateVipReportText, copyAndLaunchKakaoTalk } from '@/utils/kakao';
-import { addNavigationRouteToDrivingLog } from '@/utils/drivingLogNaviSync';
+import { NaviProvider, LocationPreset, RouteEstimate, DriverProfile, ReportMode } from '@/types';
+import { launchNavigationApp } from '@/utils/navigation';
 import { NaviDrivingLogConfirmModal } from '@/components/NaviDrivingLogConfirmModal';
+import { FreshEtaActionSheet } from '@/components/FreshEtaActionSheet';
+import {
+  executeFreshEtaAction,
+  captureActionSnapshot,
+  fetchFreshEtaRoute,
+  FreshEtaRouteResult,
+  FreshEtaSnapshot,
+  formatKstTimeHHMM,
+  copyTextSafely,
+  FreshEtaActionResult,
+} from '@/utils/freshEtaActionPipeline';
 import { Zap, Navigation, X } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
@@ -21,6 +30,10 @@ interface ActionPanelProps {
   reportText: string;
   targetChatRoom?: string;
   profile?: DriverProfile;
+  bookingId?: string;
+  reportMode?: ReportMode;
+  language?: 'ko' | 'en';
+  onFreshActionResult?: (result: FreshEtaActionResult) => void;
 }
 
 const NAVI_DISPLAY_NAMES: Record<NaviProvider, string> = {
@@ -53,11 +66,23 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   reportText,
   targetChatRoom,
   profile,
+  bookingId,
+  reportMode = 'DEPARTURE',
+  language = 'ko',
+  onFreshActionResult,
 }) => {
   const [isTmapAssistOpen, setIsTmapAssistOpen] = useState(false);
   const [isNaviConfirmOpen, setIsNaviConfirmOpen] = useState(false);
   const [copiedWpIndex, setCopiedWpIndex] = useState<number | null>(null);
   const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Fresh ETA states
+  const [freshRouteResult, setFreshRouteResult] = useState<FreshEtaRouteResult | null>(null);
+  const [freshSnapshot, setFreshSnapshot] = useState<FreshEtaSnapshot | null>(null);
+  const [isLoadingFreshEta, setIsLoadingFreshEta] = useState(false);
+  const [isKakaoSheetOpen, setIsKakaoSheetOpen] = useState(false);
+  const [kakaoSheetReportText, setKakaoSheetReportText] = useState('');
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Background scroll lock when Tmap assist modal is active
   useEffect(() => {
@@ -97,44 +122,41 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   }));
 
   /**
-   * 1-Second Fast Pass Action (Prompts Driving Log Confirmation + Clipboard Copy + Navi Launch)
+   * 1-Second Fast Pass Action (Prompts Driving Log Confirmation + Fresh ETA Recalculation)
    */
   const handleFastPassAction = async () => {
-    // Confirmation pulse haptic feedback for primary fast pass action
     haptics.successPulse();
 
-    // 1. TOP-LEVEL SYNCHRONOUS CLIPBOARD COPY (Mandatory for Safari User Gesture Security)
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(reportText);
-      } else {
-        const textArea = document.createElement('textarea');
-        textArea.value = reportText;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-      }
-    } catch (err) {
-      console.warn('Clipboard write failed:', err);
-    }
-
-    // 2. Open confirmation modal for Driving Log sync
+    // Capture snapshot at exact instant of click
+    const snapshot = captureActionSnapshot({
+      origin,
+      destination,
+      waypoints,
+      adminWaypoints,
+      isAdminRoute,
+      defaultNavi,
+      reportMode,
+      language,
+      bookingId,
+      driverProfile: profile,
+    });
+    setFreshSnapshot(snapshot);
     setIsNaviConfirmOpen(true);
+    setIsLoadingFreshEta(true);
+
+    // Fetch fresh ETA in background to populate confirm modal
+    try {
+      const freshRes = await fetchFreshEtaRoute(snapshot);
+      setFreshRouteResult(freshRes);
+    } catch {
+      // Fallback handled safely
+    } finally {
+      setIsLoadingFreshEta(false);
+    }
   };
 
   const handleConfirmNavigation = async (addToLog: boolean) => {
     setIsNaviConfirmOpen(false);
-
-    // If driver confirmed to add route to driving log
-    if (addToLog && destination) {
-      addNavigationRouteToDrivingLog({
-        originName: origin?.shortName || origin?.name,
-        destinationName: destination.shortName || destination.name,
-        destinationAddress: destination.address,
-        driverProfile: profile,
-      });
-    }
 
     // Multi-waypoint TMAP check: TMAP cannot receive external waypoints via deep link
     if (activeWaypointsList.length > 0 && defaultNavi === 'tmap') {
@@ -142,13 +164,40 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
       return;
     }
 
-    // Direct launch navigation app
-    await launchNavigationApp(
+    const snapshot = freshSnapshot || captureActionSnapshot({
+      origin,
+      destination,
+      waypoints,
+      adminWaypoints,
+      isAdminRoute,
       defaultNavi,
-      targetNavi,
-      undefined, // Start navigation directly from driver's smartphone GPS
-      naviWaypoints
-    );
+      reportMode,
+      language,
+      bookingId,
+      driverProfile: profile,
+    });
+
+    const result = await executeFreshEtaAction({
+      actionType: addToLog ? 'navi_with_log' : 'navi_only',
+      origin: snapshot.origin,
+      destination: snapshot.destination,
+      waypoints: snapshot.waypoints,
+      adminWaypoints: snapshot.adminWaypoints,
+      isAdminRoute: snapshot.isAdminRoute,
+      defaultNavi: snapshot.defaultNavi,
+      reportMode: snapshot.reportMode,
+      language: snapshot.language,
+      bookingId: snapshot.bookingId,
+      driverProfile: snapshot.driverProfile,
+      clickedAt: snapshot.clickedAt,
+    });
+
+    onFreshActionResult?.(result);
+
+    if (addToLog) {
+      setToastMessage('운행 안내가 시작되었습니다. (운행일지 초안 등록)');
+      setTimeout(() => setToastMessage(null), 2500);
+    }
   };
 
   /**
@@ -178,13 +227,51 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   };
 
   /**
-   * Pure Text Copy & KakaoTalk App Launch Pipeline
-   * Copies formatted text and immediately invokes kakaotalk:// URL scheme
+   * Fresh ETA KakaoTalk App Launch Pipeline
+   * Recalculates ETA, formats report in current language & mode, copies and launches KakaoTalk
    */
   const handleKakaoReportAction = async () => {
     haptics.lightTap();
 
-    await copyAndLaunchKakaoTalk(reportText);
+    const snapshot = captureActionSnapshot({
+      origin,
+      destination,
+      waypoints,
+      adminWaypoints,
+      isAdminRoute,
+      defaultNavi,
+      reportMode,
+      language,
+      bookingId,
+      driverProfile: profile,
+    });
+
+    const result = await executeFreshEtaAction({
+      actionType: 'kakao_share',
+      origin: snapshot.origin,
+      destination: snapshot.destination,
+      waypoints: snapshot.waypoints,
+      adminWaypoints: snapshot.adminWaypoints,
+      isAdminRoute: snapshot.isAdminRoute,
+      defaultNavi: snapshot.defaultNavi,
+      reportMode: snapshot.reportMode,
+      language: snapshot.language,
+      bookingId: snapshot.bookingId,
+      driverProfile: snapshot.driverProfile,
+      clickedAt: snapshot.clickedAt,
+    });
+
+    onFreshActionResult?.(result);
+
+    if (result.requiresGestureFallback || !result.clipboardSuccess) {
+      setKakaoSheetReportText(result.reportText);
+      setFreshRouteResult(result.routeResult);
+      setFreshSnapshot(snapshot);
+      setIsKakaoSheetOpen(true);
+    } else {
+      setToastMessage('최신 보고문이 복사되었습니다. 카카오톡으로 이동합니다.');
+      setTimeout(() => setToastMessage(null), 2500);
+    }
   };
 
   return (
@@ -374,14 +461,45 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
       {/* Navigation -> Driving Log Linkage Confirmation Modal */}
       <NaviDrivingLogConfirmModal
         isOpen={isNaviConfirmOpen}
-        onClose={() => setIsNaviConfirmOpen(false)}
+        onClose={() => {
+          setIsNaviConfirmOpen(false);
+          setIsLoadingFreshEta(false);
+        }}
         originName={origin?.shortName || origin?.name}
         destinationName={destination?.shortName || destination?.name}
         destinationAddress={destination?.address}
-        etaText={routeEstimate ? `${routeEstimate.durationMinutes}분 (${routeEstimate.distanceKm}km)` : undefined}
+        departureTime={freshSnapshot?.departureTimeFormatted}
+        etaText={
+          freshRouteResult?.etaFormatted && freshRouteResult.etaFormatted !== '--:--'
+            ? `예상 ${freshRouteResult.durationMinutes}분 (${freshRouteResult.etaFormatted} 도착)`
+            : routeEstimate?.etaFormatted
+            ? `예상 ${routeEstimate.durationMinutes}분 (${routeEstimate.etaFormatted} 도착)`
+            : undefined
+        }
+        isLoadingFreshEta={isLoadingFreshEta}
         naviProvider={defaultNavi}
         onConfirm={handleConfirmNavigation}
       />
+
+      {/* Mobile Gesture Fallback Action Sheet for KakaoTalk Report */}
+      <FreshEtaActionSheet
+        isOpen={isKakaoSheetOpen}
+        onClose={() => setIsKakaoSheetOpen(false)}
+        reportText={kakaoSheetReportText || reportText}
+        originName={origin?.shortName || origin?.name}
+        destinationName={destination?.shortName || destination?.name}
+        departureTimeText={freshSnapshot?.departureTimeFormatted}
+        etaFormatted={freshRouteResult?.etaFormatted}
+        durationMinutes={freshRouteResult?.durationMinutes}
+        isKakaoAction={true}
+      />
+
+      {/* Floating Status Toast */}
+      {toastMessage && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-slate-900/90 text-white px-4 py-2 rounded-xl text-xs font-semibold shadow-lg backdrop-blur-xs animate-in fade-in">
+          {toastMessage}
+        </div>
+      )}
     </div>
   );
 };

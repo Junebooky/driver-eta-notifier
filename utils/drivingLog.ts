@@ -9,12 +9,22 @@ import { DriverProfile } from '@/types';
 
 export interface RouteStopItem {
   id: string;
-  time: string;       // e.g. "07:00", "08:50"
+  time: string;       // e.g. "07:00", "08:50", or "" (arrival time NOT fabricated)
   place: string;      // e.g. "차고지", "메리어트 호텔"
   address?: string;   // e.g. "서울 강남구 봉은사로 120"
-  memo?: string;      // e.g. "고객 미팅, 식사, 대기 등"
+  memo?: string;      // e.g. "[출발 10:05] ..."
   lat?: number;
   lng?: number;
+  // Structured action event metadata (Issue #35)
+  departureTime?: string;         // e.g. "10:05" (click time in KST)
+  departureTimestamp?: string;    // ISO timestamp
+  predictedEta?: string;          // e.g. "10:48"
+  predictedDurationMinutes?: number; // e.g. 43
+  estimatedAt?: string;           // ISO timestamp
+  calculationSource?: string;     // e.g. "tmap_fresh"
+  routeFingerprint?: string;
+  actionIdempotencyKey?: string;
+  isDraftNavigation?: boolean;
 }
 
 export interface DrivingLogData {
@@ -390,7 +400,7 @@ export const loadDrivingLogDraft = (
   const { formatted: distanceFormatted } = calculateDrivingDistance(startKm, endKm);
 
   return {
-    reportId: reportId || `report_${Date.now()}`,
+    reportId: reportId || (bookingId ? `report_${bookingId}` : `report_${Date.now()}`),
     assignmentId: `ASSIGN-${dateIso.replace(/-/g, '')}-${Date.now().toString().slice(-4)}`,
     date: formatKoreanDate(new Date()),
     rawDate: dateIso,
@@ -432,7 +442,7 @@ export const saveDrivingLogDraft = (data: DrivingLogData): boolean => {
 
     // Update index of drafts
     const rawIndex = localStorage.getItem(DRIVING_LOG_INDEX_KEY);
-    const index: Array<{ reportId: string; date: string; clientName: string; updatedAt: string }> =
+    const index: Array<{ reportId: string; date: string; clientName: string; bookingId?: string; updatedAt: string }> =
       rawIndex ? JSON.parse(rawIndex) : [];
 
     const existingIdx = index.findIndex((item) => item.reportId === data.reportId);
@@ -440,6 +450,7 @@ export const saveDrivingLogDraft = (data: DrivingLogData): boolean => {
       reportId: data.reportId,
       date: data.rawDate,
       clientName: data.clientName || '미지정',
+      bookingId: data.bookingId,
       updatedAt: new Date().toISOString(),
     };
 

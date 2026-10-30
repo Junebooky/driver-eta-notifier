@@ -321,8 +321,46 @@ export async function POST(req: NextRequest) {
     const calculatedDist = endKmNum > startKmNum ? endKmNum - startKmNum : formatOdoNum(distanceKm);
     const nowIso = new Date().toISOString();
 
+    // Idempotent draft resolution: Reuse existing draft ID for the same booking + driver
+    let targetRowId = id && isValidUuid(id) ? id : null;
+    let existingDraftStops: any[] = [];
+    if (!targetRowId && bookingId) {
+      const { data: existingDraft } = await supabaseAdmin
+        .from('driving_logs')
+        .select('id, stops')
+        .eq('organization_id', auth.session.org)
+        .eq('booking_id', bookingId)
+        .eq('driver_id', effectiveDriverId)
+        .eq('status', 'draft')
+        .maybeSingle();
+
+      if (existingDraft?.id) {
+        targetRowId = existingDraft.id;
+        if (Array.isArray(existingDraft.stops)) {
+          existingDraftStops = existingDraft.stops;
+        }
+      }
+    }
+    if (!targetRowId) {
+      targetRowId = crypto.randomUUID();
+    }
+
+    // Merge stops deduplicating by id or actionIdempotencyKey
+    const incomingStops = Array.isArray(stops) ? stops : [];
+    const mergedStops = [...existingDraftStops];
+    for (const stop of incomingStops) {
+      const exists = mergedStops.some(
+        (m) =>
+          (m.id && stop.id && m.id === stop.id) ||
+          (m.actionIdempotencyKey && stop.actionIdempotencyKey && m.actionIdempotencyKey === stop.actionIdempotencyKey)
+      );
+      if (!exists) {
+        mergedStops.push(stop);
+      }
+    }
+
     const insertPayload: Record<string, any> = {
-      id: id && isValidUuid(id) ? id : crypto.randomUUID(),
+      id: targetRowId,
       organization_id: auth.session.org,
       booking_id: bookingId || null,
       driver_id: effectiveDriverId,
@@ -343,7 +381,7 @@ export async function POST(req: NextRequest) {
       start_km: startKmNum,
       end_km: endKmNum,
       distance_km: calculatedDist,
-      stops: Array.isArray(stops) ? stops : [],
+      stops: mergedStops.length > 0 ? mergedStops : incomingStops,
       notes: notes || '',
       expense_amount: Number(expenseAmount) || 0,
       expense_count: Number(expenseCount) || 0,

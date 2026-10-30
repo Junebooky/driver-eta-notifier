@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx utils/crmDatabaseSync.test.ts && tsx utils/emailContactDisambiguationAndCrm.test.ts && tsx utils/emailWorkflowSteps.test.ts && tsx utils/vehicleSlotParser.test.ts && tsx utils/hipassSyncAndMasking.test.ts && tsx utils/dispatchWorkflow.test.ts && tsx utils/officialPricing.test.ts && tsx utils/drivingLogAndExpenseSync.test.ts"
+    "test": "tsx utils/crmDatabaseSync.test.ts && tsx utils/emailContactDisambiguationAndCrm.test.ts && tsx utils/emailWorkflowSteps.test.ts && tsx utils/vehicleSlotParser.test.ts && tsx utils/hipassSyncAndMasking.test.ts && tsx utils/dispatchWorkflow.test.ts && tsx utils/officialPricing.test.ts && tsx utils/drivingLogAndExpenseSync.test.ts && tsx utils/freshEtaAndNaviSync.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.23.0",

@@ -60,6 +60,13 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
   // Render Status Badge matching Image 1
   const renderStatusBadge = (status: HqDrivingLogStatus) => {
     switch (status) {
+      case 'draft':
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border border-amber-300 bg-amber-50 text-amber-700">
+            <Clock className="w-3 h-3 stroke-[2.2]" />
+            <span>진행 중 (초안)</span>
+          </span>
+        );
       case '검토 대기':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border border-blue-200 bg-blue-50/70 text-[#1E60F3]">

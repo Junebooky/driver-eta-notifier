@@ -10,6 +10,8 @@ import {
   getReportVehicleNo,
   lookupApprovedAlias,
 } from '@/utils/locationTranslation';
+import { executeFreshEtaAction, copyTextSafely } from '@/utils/freshEtaActionPipeline';
+import { FreshEtaActionSheet } from '@/components/FreshEtaActionSheet';
 
 interface ReportTemplateSelectorProps {
   currentMode: ReportMode;
@@ -23,6 +25,7 @@ interface ReportTemplateSelectorProps {
   etaFormatted?: string;
   // Real-time synchronization with ActionPanel / parent state
   onActiveReportTextChange?: (text: string, language: 'ko' | 'en') => void;
+  onFreshEtaCalculated?: (freshEta: string) => void;
 }
 
 interface PlaceCacheEntry {
@@ -40,9 +43,14 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
   waypoints = [],
   etaFormatted,
   onActiveReportTextChange,
+  onFreshEtaCalculated,
 }) => {
   const [copySuccess, setCopySuccess] = useState(false);
   const [language, setLanguage] = useState<'ko' | 'en'>('ko');
+  const [isCopyingFresh, setIsCopyingFresh] = useState(false);
+  const [isFreshSheetOpen, setIsFreshSheetOpen] = useState(false);
+  const [freshSheetText, setFreshSheetText] = useState('');
+  const [freshEtaClock, setFreshEtaClock] = useState<string | null>(null);
   const [isTranslating, setIsTranslating] = useState(false);
 
   // Cached English place translations with key validation to prevent displaying old places
@@ -99,12 +107,13 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
           : destination?.shortName || destination?.name || 'Destination');
     }
 
+    const effectiveEta = freshEtaClock || etaFormatted;
     return generateEnglishReportText({
       vehicleNo: vNo,
       originEn,
       destinationEn: destEn,
       waypointsEn: cachedWaypoints,
-      etaFormatted,
+      etaFormatted: effectiveEta,
       mode: currentMode,
     });
   }, [
@@ -116,6 +125,7 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
     currentDestKey,
     destination,
     cachedWaypoints,
+    freshEtaClock,
     etaFormatted,
     currentMode,
   ]);
@@ -216,14 +226,59 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
     }
   };
 
-  // Minimal Header Copy Action (copies whichever language is currently displayed)
-  const handleCopyMinimal = () => {
+  // Minimal Header Copy Action (computes fresh ETA at instant of click, formats in active language, and copies)
+  const handleCopyMinimal = async () => {
     haptics.success();
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(displayedReportText);
+    setIsCopyingFresh(true);
+
+    const originPreset: LocationPreset =
+      typeof origin === 'string'
+        ? { id: 'orig', name: origin, shortName: origin, lat: 37.5042, lng: 127.0425, category: 'CUSTOM' }
+        : origin || { id: 'orig', name: '현 위치', shortName: '현 위치', lat: 37.5042, lng: 127.0425, category: 'CUSTOM' };
+
+    const destPreset: LocationPreset =
+      typeof destination === 'string'
+        ? { id: 'dest', name: destination, shortName: destination, lat: 37.4495, lng: 126.4512, category: 'CUSTOM' }
+        : destination || { id: 'dest', name: '목적지', shortName: '목적지', lat: 37.4495, lng: 126.4512, category: 'CUSTOM' };
+
+    const wpPresets: LocationPreset[] = (waypoints || []).map((w, idx) =>
+      typeof w === 'string'
+        ? { id: `wp_${idx}`, name: w, shortName: w, lat: 0, lng: 0, category: 'CUSTOM' }
+        : w
+    );
+
+    try {
+      const result = await executeFreshEtaAction({
+        actionType: 'copy_report',
+        origin: originPreset,
+        destination: destPreset,
+        waypoints: wpPresets,
+        reportMode: currentMode,
+        language,
+        driverProfile: profile,
+        clickedAt: new Date(),
+      });
+
+      if (result.routeResult.etaFormatted && result.routeResult.etaFormatted !== '--:--') {
+        setFreshEtaClock(result.routeResult.etaFormatted);
+        onFreshEtaCalculated?.(result.routeResult.etaFormatted);
+      }
+
+      if (result.requiresGestureFallback || !result.clipboardSuccess) {
+        setFreshSheetText(result.reportText);
+        setIsFreshSheetOpen(true);
+      } else {
+        setCopySuccess(true);
+        setTimeout(() => setCopySuccess(false), 1500);
+      }
+    } catch {
+      // Fallback: copy current displayed text
+      await copyTextSafely(displayedReportText);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 1500);
+    } finally {
+      setIsCopyingFresh(false);
     }
-    setCopySuccess(true);
-    setTimeout(() => setCopySuccess(false), 1500);
   };
 
   return (
@@ -352,6 +407,17 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
           {displayedReportText}
         </div>
       </div>
+
+      {/* Mobile Gesture Fallback Action Sheet for Report Copy */}
+      <FreshEtaActionSheet
+        isOpen={isFreshSheetOpen}
+        onClose={() => setIsFreshSheetOpen(false)}
+        reportText={freshSheetText || displayedReportText}
+        originName={typeof origin === 'string' ? origin : origin?.shortName || origin?.name || '현 위치'}
+        destinationName={typeof destination === 'string' ? destination : destination?.shortName || destination?.name || '목적지'}
+        etaFormatted={freshEtaClock || etaFormatted}
+        isKakaoAction={false}
+      />
     </div>
   );
 };

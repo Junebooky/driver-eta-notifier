@@ -36,6 +36,13 @@ import { FLEET_PRESET_DRIVERS, getPresetPassengerName } from '@/utils/constants'
 import { generateReportText } from '@/utils/reportGenerator';
 import { calculateHaversineEstimate, getEtaString, launchNavigationApp } from '@/utils/navigation';
 import { haptics } from '@/utils/haptics';
+import { NaviDrivingLogConfirmModal } from '@/components/NaviDrivingLogConfirmModal';
+import {
+  captureActionSnapshot,
+  fetchFreshEtaRoute,
+  executeFreshEtaAction,
+  FreshEtaRouteResult,
+} from '@/utils/freshEtaActionPipeline';
 
 export const getPresetsStorageKey = (vehicleNo?: string) => {
   const v = vehicleNo?.match(/(\d+호차)/)?.[1] || (vehicleNo ? vehicleNo.trim() : '4호차');
@@ -673,7 +680,12 @@ export default function Home() {
 
   const [activeTab, setActiveTab] = useState<'drive' | 'schedule'>('drive');
   const [reportMode, setReportMode] = useState<ReportMode>('DEPARTURE');
+  const [activeLanguage, setActiveLanguage] = useState<'ko' | 'en'>('ko');
   const [activeDisplayedReportText, setActiveDisplayedReportText] = useState<string>('');
+  const [isScheduleNaviConfirmOpen, setIsScheduleNaviConfirmOpen] = useState(false);
+  const [scheduleNaviFreshResult, setScheduleNaviFreshResult] = useState<FreshEtaRouteResult | null>(null);
+  const [isScheduleNaviLoading, setIsScheduleNaviLoading] = useState(false);
+  const [scheduleNaviSnapshot, setScheduleNaviSnapshot] = useState<any>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isOnboarding, setIsOnboarding] = useState(false);
   const [onboardingStage, setOnboardingStage] = useState<'splash' | 'sheet' | null>(null);
@@ -1197,7 +1209,7 @@ export default function Home() {
   );
 
   const handleNavigateForSchedule = useCallback(
-    (schedule: ScheduleItem) => {
+    async (schedule: ScheduleItem) => {
       if (schedule?.id) setActiveBookingId(String(schedule.id));
       const { originPreset, destinationPreset, adminWaypoints: rawAdminWps, isAdminRoute: rawIsAdmin } = scheduleToPresets(schedule);
       const isSchedAdmin = Boolean(rawIsAdmin);
@@ -1209,25 +1221,69 @@ export default function Home() {
       setWaypoints([]);
       fetchRouteEstimate(originPreset, destinationPreset, isSchedAdmin ? schedAdminWps : []);
 
-      let naviWaypoints: Array<{ name: string; lat: number; lng: number }> = [];
-      if (isSchedAdmin) {
-        // Admin Route Sequence: Driver Realtime GPS ➔ Official Origin ➔ Admin Waypoints ➔ Destination
-        naviWaypoints = [
-          { name: originPreset.shortName || originPreset.name, lat: originPreset.lat, lng: originPreset.lng },
-          ...schedAdminWps.map((w) => ({ name: w.shortName || w.name, lat: w.lat, lng: w.lng })),
-        ];
-      }
+      // Switch to Drive tab and open unified navigation confirm flow with fresh ETA recalculation
+      setActiveTab('drive');
+      setIsScheduleNaviConfirmOpen(true);
+      setIsScheduleNaviLoading(true);
 
-      launchNavigationApp(
-        profile.defaultNavi,
-        { name: destinationPreset.name, lat: destinationPreset.lat, lng: destinationPreset.lng },
-        undefined, // Realtime GPS starting point
-        naviWaypoints
-      );
+      const snapshot = captureActionSnapshot({
+        origin: originPreset,
+        destination: destinationPreset,
+        waypoints: [],
+        adminWaypoints: schedAdminWps,
+        isAdminRoute: isSchedAdmin,
+        defaultNavi: profile.defaultNavi,
+        reportMode: 'DEPARTURE',
+        language: activeLanguage,
+        bookingId: String(schedule.id),
+        driverProfile: profile,
+      });
+      setScheduleNaviSnapshot(snapshot);
+
+      try {
+        const freshRes = await fetchFreshEtaRoute(snapshot);
+        setScheduleNaviFreshResult(freshRes);
+      } catch {
+        // Safe fallback handled gracefully
+      } finally {
+        setIsScheduleNaviLoading(false);
+      }
       haptics.heavyTap();
     },
-    [profile.defaultNavi, setOrigin, setDestination, fetchRouteEstimate]
+    [profile, activeLanguage, setOrigin, setDestination, fetchRouteEstimate]
   );
+
+  const handleConfirmScheduleNavigation = async (addToLog: boolean) => {
+    setIsScheduleNaviConfirmOpen(false);
+
+    const snapshot = scheduleNaviSnapshot || captureActionSnapshot({
+      origin,
+      destination,
+      waypoints,
+      adminWaypoints,
+      isAdminRoute,
+      defaultNavi: profile.defaultNavi,
+      reportMode: 'DEPARTURE',
+      language: activeLanguage,
+      bookingId: activeBookingId,
+      driverProfile: profile,
+    });
+
+    await executeFreshEtaAction({
+      actionType: addToLog ? 'navi_with_log' : 'navi_only',
+      origin: snapshot.origin,
+      destination: snapshot.destination,
+      waypoints: snapshot.waypoints,
+      adminWaypoints: snapshot.adminWaypoints,
+      isAdminRoute: snapshot.isAdminRoute,
+      defaultNavi: snapshot.defaultNavi,
+      reportMode: snapshot.reportMode,
+      language: snapshot.language,
+      bookingId: snapshot.bookingId,
+      driverProfile: snapshot.driverProfile,
+      clickedAt: snapshot.clickedAt,
+    });
+  };
 
   const handleOpenPredictionForSchedule = useCallback(
     (schedule: ScheduleItem) => {
@@ -1487,8 +1543,12 @@ export default function Home() {
               destination={destination}
               waypoints={effectiveWaypoints}
               etaFormatted={routeEstimate?.etaFormatted}
-              onActiveReportTextChange={(text) => {
+              onActiveReportTextChange={(text, lang) => {
                 setActiveDisplayedReportText(text);
+                if (lang) setActiveLanguage(lang);
+              }}
+              onFreshEtaCalculated={(freshEta) => {
+                setRouteEstimate((prev) => ({ ...prev, etaFormatted: freshEta }));
               }}
             />
 
@@ -1504,6 +1564,19 @@ export default function Home() {
               reportText={activeDisplayedReportText || reportPreviewText}
               targetChatRoom={profile.targetChatRoom}
               profile={profile}
+              bookingId={activeBookingId}
+              reportMode={reportMode}
+              language={activeLanguage}
+              onFreshActionResult={(result) => {
+                if (result.routeResult.etaFormatted && result.routeResult.etaFormatted !== '--:--') {
+                  setRouteEstimate((prev) => ({
+                    ...prev,
+                    distanceKm: result.routeResult.distanceKm || prev.distanceKm,
+                    durationMinutes: result.routeResult.durationMinutes || prev.durationMinutes,
+                    etaFormatted: result.routeResult.etaFormatted,
+                  }));
+                }
+              }}
             />
           </div>
         ) : (
@@ -1811,6 +1884,29 @@ export default function Home() {
       <DriverFieldKnowledgeModal
         isOpen={isFieldKnowledgeOpen}
         onClose={() => setIsFieldKnowledgeOpen(false)}
+      />
+
+      {/* Schedule Card Navigation Driving Log Confirmation Modal */}
+      <NaviDrivingLogConfirmModal
+        isOpen={isScheduleNaviConfirmOpen}
+        onClose={() => {
+          setIsScheduleNaviConfirmOpen(false);
+          setIsScheduleNaviLoading(false);
+        }}
+        originName={origin?.shortName || origin?.name}
+        destinationName={destination?.shortName || destination?.name}
+        destinationAddress={destination?.address}
+        departureTime={scheduleNaviSnapshot?.departureTimeFormatted}
+        etaText={
+          scheduleNaviFreshResult?.etaFormatted && scheduleNaviFreshResult.etaFormatted !== '--:--'
+            ? `예상 ${scheduleNaviFreshResult.durationMinutes}분 (${scheduleNaviFreshResult.etaFormatted} 도착)`
+            : routeEstimate?.etaFormatted
+            ? `예상 ${routeEstimate.durationMinutes}분 (${routeEstimate.etaFormatted} 도착)`
+            : undefined
+        }
+        isLoadingFreshEta={isScheduleNaviLoading}
+        naviProvider={profile.defaultNavi}
+        onConfirm={handleConfirmScheduleNavigation}
       />
 
     </main>

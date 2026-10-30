@@ -1,4 +1,4 @@
-export type HqDrivingLogStatus = '검토 대기' | '검토 중' | '승인 완료' | '보완 필요' | '반려';
+export type HqDrivingLogStatus = '검토 대기' | '검토 중' | '승인 완료' | '보완 필요' | '반려' | 'draft';
 
 export interface HqDrivingLogStop {
   id: string;
@@ -7,6 +7,15 @@ export interface HqDrivingLogStop {
   note?: string; // e.g. "고객 픽업", "고객 이동", "업무 미팅 대기", "고객 하차"
   address?: string;
   passenger?: string;
+  departureTime?: string;
+  departureTimestamp?: string;
+  predictedEta?: string;
+  predictedDurationMinutes?: number;
+  estimatedAt?: string;
+  calculationSource?: string;
+  routeFingerprint?: string;
+  actionIdempotencyKey?: string;
+  isDraftNavigation?: boolean;
 }
 
 export interface HqDrivingLogReviewAudit {
