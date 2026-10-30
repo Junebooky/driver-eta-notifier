@@ -604,7 +604,9 @@ export const saveHqDrivingLogs = (logs: HqDrivingLog[]): void => {
   if (typeof window !== 'undefined') {
     try {
       localStorage.setItem(HQ_DRIVING_LOGS_STORAGE_KEY, JSON.stringify(logs));
-      window.dispatchEvent(new CustomEvent(HQ_LOGS_UPDATE_EVENT, { detail: { count: logs.length } }));
+      if (typeof window.dispatchEvent === 'function') {
+        window.dispatchEvent(new CustomEvent(HQ_LOGS_UPDATE_EVENT, { detail: { count: logs.length } }));
+      }
     } catch (e) {
       console.warn('Failed to save HQ driving logs to localStorage:', e);
     }
@@ -619,9 +621,16 @@ export const getHqDrivingLogs = (): HqDrivingLog[] => {
 
   try {
     const raw = localStorage.getItem(HQ_DRIVING_LOGS_STORAGE_KEY);
-    let logs: HqDrivingLog[] = raw ? JSON.parse(raw) : [];
-    if (!Array.isArray(logs) || logs.length === 0) {
+    let logs: HqDrivingLog[];
+    if (raw === null) {
       logs = [...INITIAL_HQ_DRIVING_LOGS];
+    } else {
+      try {
+        const parsed = JSON.parse(raw);
+        logs = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        logs = [];
+      }
     }
 
     // Connect and dynamically aggregate expenses from HQ expenses storage
@@ -657,13 +666,14 @@ export const getHqDrivingLogs = (): HqDrivingLog[] => {
       return log;
     });
 
-    // 2. If '윤태준' has submitted legacy expenses (without bookingId) but does not yet have a legacy driving log row, automatically create one
-    const yoonExpenses = hqExpenses.filter(
-      (e) => !e.bookingId && (e.driverName === '윤태준' || e.vehiclePlate === '116허 1514')
-    );
-    const hasYoonLog = logs.some((l) => !l.bookingId && l.driverName === '윤태준');
+    // 2. If uninitialized local storage (raw === null) and '윤태준' has submitted legacy expenses, populate initial row
+    if (raw === null) {
+      const yoonExpenses = hqExpenses.filter(
+        (e) => !e.bookingId && (e.driverName === '윤태준' || e.vehiclePlate === '116허 1514')
+      );
+      const hasYoonLog = logs.some((l) => !l.bookingId && l.driverName === '윤태준');
 
-    if (yoonExpenses.length > 0 && !hasYoonLog) {
+      if (yoonExpenses.length > 0 && !hasYoonLog) {
       const yoonTotal = yoonExpenses.reduce((sum, e) => sum + e.amount, 0);
       const firstExp = yoonExpenses[0];
 
@@ -715,6 +725,7 @@ export const getHqDrivingLogs = (): HqDrivingLog[] => {
         no: idx + 1,
       }));
       isModified = true;
+      }
     }
 
     if (isModified || !raw) {
@@ -1057,9 +1068,7 @@ export async function fetchHqDrivingLogsFromDb(): Promise<FetchHqDrivingLogsResu
     const res = await fetch('/api/driving-logs');
     const data = await res.json().catch(() => ({}));
     if (res.ok && data.ok && Array.isArray(data.logs)) {
-      if (data.logs.length > 0) {
-        saveHqDrivingLogs(data.logs);
-      }
+      saveHqDrivingLogs(data.logs);
       return { ok: true, logs: data.logs };
     }
     return { ok: false, logs: [], error: data.error || `서버 응답 오류 (${res.status})` };

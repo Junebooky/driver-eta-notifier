@@ -14,6 +14,8 @@ import {
   formatKstTimeHHMM,
   calculateDynamicEtaFormatted,
   OUTBOX_STORAGE_KEY,
+  flushNavigationOutboxQueue,
+  NavigationOutboxItem,
 } from './freshEtaActionPipeline';
 import { LocationPreset, DriverProfile } from '@/types';
 import {
@@ -25,6 +27,7 @@ import {
   getHqDrivingLogs,
   saveHqDrivingLogs,
   submitDriverLogToHq,
+  fetchHqDrivingLogsFromDb,
   HQ_DRIVING_LOGS_STORAGE_KEY,
 } from './drivingLogHqStorage';
 import { mapDbRowToDrivingLog } from '@/app/api/driving-logs/route';
@@ -485,4 +488,179 @@ test('7. HQ In-Progress Draft vs Submitted Log Distinction', async () => {
   const mappedSubmitted = mapDbRowToDrivingLog(submittedRow, 2);
   assert.equal(mappedSubmitted.status, '검토 대기');
   assert.equal(mappedSubmitted.isDriverSubmitted, true);
+});
+
+test('8. Zero fabricated ETA: No 45-min fallback, No fake 7:30 PM, Honest failure states', async () => {
+  const clickTime = new Date('2026-10-30T01:30:00.000Z'); // 10:30 KST
+  const snapshot = captureActionSnapshot({
+    origin: mockOrigin,
+    destination: mockDestination,
+    reportMode: 'DEPARTURE',
+    language: 'en',
+    driverProfile: undefined, // Empty profile test
+    clickedAt: clickTime,
+  });
+
+  const originalFetch = (global as any).fetch;
+  // Route API returns 0 duration / error
+  (global as any).fetch = async () => ({
+    ok: true,
+    json: async () => ({ durationMinutes: 0, distanceKm: 0, isFresh: false }),
+  });
+
+  try {
+    const route = await fetchFreshEtaRoute(snapshot);
+    // Must be 0 and --:--, NEVER fallback to 45!
+    assert.equal(route.durationMinutes, 0);
+    assert.equal(route.etaFormatted, '--:--');
+    assert.equal(route.isFresh, false);
+    assert.equal(route.isUnavailable, true);
+
+    // English report must NOT fabricate '7:30 PM'
+    const enText = buildFreshReportText({
+      snapshot,
+      etaFormatted: route.etaFormatted,
+      durationMinutes: route.durationMinutes,
+      distanceKm: route.distanceKm,
+    });
+    assert.doesNotMatch(enText, /7:30 PM/);
+    assert.match(enText, /Pending Confirmation/);
+    assert.match(enText, /Vehicle Pending/);
+
+    // Korean report with empty profile
+    const krSnapshot = captureActionSnapshot({
+      origin: mockOrigin,
+      destination: mockDestination,
+      reportMode: 'DEPARTURE',
+      language: 'ko',
+      driverProfile: undefined,
+      clickedAt: clickTime,
+    });
+    const krText = buildFreshReportText({
+      snapshot: krSnapshot,
+      etaFormatted: route.etaFormatted,
+      durationMinutes: route.durationMinutes,
+      distanceKm: route.distanceKm,
+    });
+    assert.match(krText, /담당 기사/);
+    assert.match(krText, /차량 미지정/);
+    assert.match(krText, /도착 미정/);
+    assert.doesNotMatch(krText, /142호 7811/);
+    assert.doesNotMatch(krText, /윤태준/);
+  } finally {
+    (global as any).fetch = originalFetch;
+  }
+});
+
+test('9. Outbox Queue Consumption Worker Flushes on Reconnect', async () => {
+  mockStorage.clear();
+  const rawOutboxItem: NavigationOutboxItem = {
+    id: 'action_drv1_book1_fingerprint_100',
+    bookingId: 'book-100',
+    driverId: 'drv-100',
+    payload: {
+      bookingId: 'book-100',
+      driverId: 'drv-100',
+      driverName: '테스트기사',
+      vehiclePlate: '116허 1514',
+      customerName: '테스트고객',
+      drivingDate: '2026-10-30',
+      stops: [{ id: 'stop-1', time: '', place: '인천공항 T1' }],
+      status: 'draft',
+    },
+    createdAt: new Date().toISOString(),
+    status: 'server_sync_pending',
+    retryCount: 1,
+  };
+
+  mockStorage.setItem(OUTBOX_STORAGE_KEY, JSON.stringify([rawOutboxItem]));
+
+  const originalFetch = (global as any).fetch;
+  let syncedCalls = 0;
+  (global as any).fetch = async (url: string, init?: any) => {
+    if (url.includes('/api/driving-logs')) {
+      syncedCalls++;
+      return {
+        ok: true,
+        json: async () => ({ ok: true, log: { id: 'log-synced-100' } }),
+      };
+    }
+    return { ok: false };
+  };
+
+  try {
+    const result = await flushNavigationOutboxQueue();
+    assert.equal(result.total, 1);
+    assert.equal(result.synced, 1);
+    assert.equal(result.failed, 0);
+    assert.equal(syncedCalls, 1);
+
+    // Queue must now be empty
+    const remainingRaw = mockStorage.getItem(OUTBOX_STORAGE_KEY);
+    const remaining = JSON.parse(remainingRaw || '[]');
+    assert.equal(remaining.length, 0, 'Outbox queue should be completely purged after successful flush');
+  } finally {
+    (global as any).fetch = originalFetch;
+  }
+});
+
+test('10. HQ Screen 0-Record State Honesty (No Fake Mock Fallback when DB has 0 logs)', async () => {
+  mockStorage.clear();
+
+  const originalFetch = (global as any).fetch;
+  // DB query returns 0 logs
+  (global as any).fetch = async (url: string) => {
+    if (url.includes('/api/driving-logs')) {
+      return {
+        ok: true,
+        json: async () => ({ ok: true, logs: [] }),
+      };
+    }
+    return { ok: false };
+  };
+
+  try {
+    const dbRes = await fetchHqDrivingLogsFromDb();
+    assert.equal(dbRes.ok, true);
+    assert.equal(dbRes.logs.length, 0);
+
+    // getHqDrivingLogs MUST return 0 logs, NEVER fall back to 18 mock logs!
+    const hqLogs = getHqDrivingLogs();
+    assert.equal(hqLogs.length, 0, 'HQ driving logs must honestly reflect 0 logs from server');
+  } finally {
+    (global as any).fetch = originalFetch;
+  }
+});
+
+test('11. Driver & Booking Isolation in Idempotency Keys', () => {
+  const clickTime = new Date('2026-10-30T01:40:00.000Z');
+
+  const snap1 = captureActionSnapshot({
+    origin: mockOrigin,
+    destination: mockDestination,
+    bookingId: 'booking-AAA',
+    driverProfile: { ...mockDriverProfile, driverId: 'driver-1' },
+    clickedAt: clickTime,
+  });
+
+  const snap2 = captureActionSnapshot({
+    origin: mockOrigin,
+    destination: mockDestination,
+    bookingId: 'booking-BBB',
+    driverProfile: { ...mockDriverProfile, driverId: 'driver-1' },
+    clickedAt: clickTime,
+  });
+
+  const snap3 = captureActionSnapshot({
+    origin: mockOrigin,
+    destination: mockDestination,
+    bookingId: 'booking-AAA',
+    driverProfile: { ...mockDriverProfile, driverId: 'driver-2' },
+    clickedAt: clickTime,
+  });
+
+  // Different bookings must NOT share idempotency keys
+  assert.notEqual(snap1.idempotencyKey, snap2.idempotencyKey);
+  // Different drivers must NOT share idempotency keys
+  assert.notEqual(snap1.idempotencyKey, snap3.idempotencyKey);
 });

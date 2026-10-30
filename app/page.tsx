@@ -41,6 +41,7 @@ import {
   captureActionSnapshot,
   fetchFreshEtaRoute,
   executeFreshEtaAction,
+  syncNavigationRouteToDrivingLog,
   FreshEtaRouteResult,
 } from '@/utils/freshEtaActionPipeline';
 
@@ -1269,20 +1270,35 @@ export default function Home() {
       driverProfile: profile,
     });
 
-    await executeFreshEtaAction({
-      actionType: addToLog ? 'navi_with_log' : 'navi_only',
-      origin: snapshot.origin,
-      destination: snapshot.destination,
-      waypoints: snapshot.waypoints,
-      adminWaypoints: snapshot.adminWaypoints,
-      isAdminRoute: snapshot.isAdminRoute,
-      defaultNavi: snapshot.defaultNavi,
-      reportMode: snapshot.reportMode,
-      language: snapshot.language,
-      bookingId: snapshot.bookingId,
-      driverProfile: snapshot.driverProfile,
-      clickedAt: snapshot.clickedAt,
-    });
+    const routeRes: FreshEtaRouteResult = scheduleNaviFreshResult || {
+      durationMinutes: 0,
+      distanceKm: 0,
+      etaFormatted: '--:--',
+      departureTimeFormatted: snapshot.departureTimeFormatted,
+      computedAt: snapshot.clickedAt.toISOString(),
+      source: 'unverified',
+      isFresh: false,
+      routeFingerprint: `${origin.lat},${origin.lng}->${destination.lat},${destination.lng}`,
+    };
+
+    if (addToLog) {
+      syncNavigationRouteToDrivingLog({ snapshot, routeResult: routeRes });
+    }
+
+    try {
+      await launchNavigationApp(
+        snapshot.defaultNavi,
+        {
+          name: snapshot.destination.shortName || snapshot.destination.name,
+          lat: snapshot.destination.lat,
+          lng: snapshot.destination.lng,
+        },
+        undefined,
+        []
+      );
+    } catch (naviErr: any) {
+      console.warn('[ScheduleNavi] Launch error:', naviErr?.message);
+    }
   };
 
   const handleOpenPredictionForSchedule = useCallback(

@@ -9,6 +9,8 @@ import {
   executeFreshEtaAction,
   captureActionSnapshot,
   fetchFreshEtaRoute,
+  syncNavigationRouteToDrivingLog,
+  buildFreshReportText,
   FreshEtaRouteResult,
   FreshEtaSnapshot,
   formatKstTimeHHMM,
@@ -158,12 +160,6 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   const handleConfirmNavigation = async (addToLog: boolean) => {
     setIsNaviConfirmOpen(false);
 
-    // Multi-waypoint TMAP check: TMAP cannot receive external waypoints via deep link
-    if (activeWaypointsList.length > 0 && defaultNavi === 'tmap') {
-      setIsTmapAssistOpen(true);
-      return;
-    }
-
     const snapshot = freshSnapshot || captureActionSnapshot({
       origin,
       destination,
@@ -177,27 +173,79 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
       driverProfile: profile,
     });
 
-    const result = await executeFreshEtaAction({
-      actionType: addToLog ? 'navi_with_log' : 'navi_only',
-      origin: snapshot.origin,
-      destination: snapshot.destination,
-      waypoints: snapshot.waypoints,
-      adminWaypoints: snapshot.adminWaypoints,
-      isAdminRoute: snapshot.isAdminRoute,
-      defaultNavi: snapshot.defaultNavi,
-      reportMode: snapshot.reportMode,
-      language: snapshot.language,
-      bookingId: snapshot.bookingId,
-      driverProfile: snapshot.driverProfile,
-      clickedAt: snapshot.clickedAt,
-    });
+    const routeRes: FreshEtaRouteResult = freshRouteResult || {
+      durationMinutes: 0,
+      distanceKm: 0,
+      etaFormatted: '--:--',
+      departureTimeFormatted: snapshot.departureTimeFormatted,
+      computedAt: snapshot.clickedAt.toISOString(),
+      source: 'unverified',
+      isFresh: false,
+      routeFingerprint: `${origin.lat},${origin.lng}->${destination.lat},${destination.lng}`,
+    };
 
-    onFreshActionResult?.(result);
-
+    // 1. If driver selected "추가하고 안내 시작", record to driving log draft IMMEDIATELY
+    // This MUST occur before any early return (including Tmap waypoint assist)
     if (addToLog) {
+      syncNavigationRouteToDrivingLog({ snapshot, routeResult: routeRes });
       setToastMessage('운행 안내가 시작되었습니다. (운행일지 초안 등록)');
       setTimeout(() => setToastMessage(null), 2500);
     }
+
+    // 2. Multi-waypoint TMAP check: TMAP cannot receive external waypoints via deep link
+    if (activeWaypointsList.length > 0 && defaultNavi === 'tmap') {
+      setIsTmapAssistOpen(true);
+      return;
+    }
+
+    // 3. Launch Navigation app IMMEDIATELY with user gesture (0ms delay!)
+    try {
+      const activeWaypoints: LocationPreset[] = snapshot.isAdminRoute
+        ? [
+            { ...snapshot.origin, name: snapshot.origin.shortName || snapshot.origin.name },
+            ...(snapshot.adminWaypoints || []).map((w) => ({ ...w, name: w.shortName || w.name })),
+          ]
+        : snapshot.waypoints;
+
+      const naviWaypoints = activeWaypoints.slice(0, 5).map((w) => ({
+        name: w.shortName || w.name,
+        lat: w.lat,
+        lng: w.lng,
+        address: w.address,
+      }));
+
+      await launchNavigationApp(
+        snapshot.defaultNavi,
+        {
+          name: snapshot.destination.shortName || snapshot.destination.name,
+          lat: snapshot.destination.lat,
+          lng: snapshot.destination.lng,
+        },
+        undefined,
+        naviWaypoints
+      );
+    } catch (naviErr: any) {
+      console.warn('[ActionPanel] Navigation launch error:', naviErr?.message);
+    }
+
+    // 4. Report action result to callback with precomputed route
+    const reportText = buildFreshReportText({
+      snapshot,
+      etaFormatted: routeRes.etaFormatted,
+      durationMinutes: routeRes.durationMinutes,
+      distanceKm: routeRes.distanceKm,
+    });
+
+    onFreshActionResult?.({
+      success: true,
+      actionType: addToLog ? 'navi_with_log' : 'navi_only',
+      snapshot,
+      routeResult: routeRes,
+      reportText,
+      clipboardSuccess: false,
+      appLaunchSuccess: true,
+      requiresGestureFallback: false,
+    });
   };
 
   /**

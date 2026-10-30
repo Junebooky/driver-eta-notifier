@@ -1,22 +1,28 @@
-import { RouteStopItem } from '@/utils/drivingLog';
-import { DriverProfile, LocationPreset } from '@/types';
 import {
-  syncNavigationRouteToDrivingLog,
-  captureActionSnapshot,
-  formatKstTimeHHMM,
-  FreshEtaRouteResult,
-} from '@/utils/freshEtaActionPipeline';
+  RouteStopItem,
+  DrivingLogData,
+  DRIVING_LOG_INDEX_KEY,
+  DRIVING_LOG_STORAGE_PREFIX,
+  loadDrivingLogDraft,
+  saveDrivingLogDraft,
+  formatIsoDate,
+} from '@/utils/drivingLog';
+import { DriverProfile } from '@/types';
+import { formatKstTimeHHMM } from '@/utils/freshEtaActionPipeline';
 
 /**
- * Appends a planned route stop to active driving log draft in KST.
- * Backward-compatible wrapper delegating to authoritative freshEtaActionPipeline.
- *
- * Records navigation launch as departure time, NEVER fabricating arrival time.
+ * Legacy synchronous wrapper for older callers/tests.
+ * Writes to local driving log draft without fabricated 45m fallbacks,
+ * without fake coordinates, and without fake tmap_fresh calculationSource.
  */
 export function addNavigationRouteToDrivingLog(params: {
   originName?: string;
+  originLat?: number;
+  originLng?: number;
   destinationName: string;
   destinationAddress?: string;
+  destinationLat?: number;
+  destinationLng?: number;
   driverProfile?: DriverProfile;
   bookingId?: string;
   predictedEta?: string;
@@ -25,54 +31,88 @@ export function addNavigationRouteToDrivingLog(params: {
 }): { success: boolean; isDuplicate: boolean; stop?: RouteStopItem } {
   if (typeof window === 'undefined') return { success: false, isDuplicate: false };
 
-  const originPreset: LocationPreset = {
-    id: 'orig',
-    name: params.originName || '현재 위치',
-    shortName: params.originName || '현재 위치',
-    lat: 37.5042,
-    lng: 127.0425,
-    category: 'CUSTOM',
-  };
-
-  const destPreset: LocationPreset = {
-    id: 'dest',
-    name: params.destinationName,
-    shortName: params.destinationName,
-    address: params.destinationAddress,
-    lat: 37.4495,
-    lng: 126.4512,
-    category: 'CUSTOM',
-  };
-
   const clickedAt = new Date();
-  const snapshot = captureActionSnapshot({
-    origin: originPreset,
-    destination: destPreset,
-    bookingId: params.bookingId,
-    driverProfile: params.driverProfile,
-    clickedAt,
-  });
+  const departureTimeFormatted = formatKstTimeHHMM(clickedAt);
+  const todayIso = formatIsoDate(clickedAt);
 
-  const routeResult: FreshEtaRouteResult = {
-    durationMinutes: params.durationMinutes || 45,
-    distanceKm: 0,
-    etaFormatted: params.predictedEta || '--:--',
-    departureTimeFormatted: formatKstTimeHHMM(clickedAt),
-    computedAt: clickedAt.toISOString(),
-    source: params.calculationSource || 'tmap_fresh',
-    isFresh: true,
-    routeFingerprint: `${originPreset.lat},${originPreset.lng}->${destPreset.lat},${destPreset.lng}`,
+  const defaultProfile: DriverProfile = params.driverProfile || {
+    driverName: '담당 기사',
+    vehicleNo: '차량 미지정',
+    carNumber: '차량 미지정',
+    phone: '',
+    defaultNavi: 'tmap',
   };
 
-  // Synchronously execute local draft write and fire async DB sync
-  let result: { success: boolean; isDuplicate: boolean; stop?: RouteStopItem } = {
-    success: false,
-    isDuplicate: false,
+  const rawIndex = localStorage.getItem(DRIVING_LOG_INDEX_KEY);
+  const indexList: Array<{ reportId: string; date: string; bookingId?: string }> = rawIndex
+    ? JSON.parse(rawIndex)
+    : [];
+
+  let targetReportId: string | null = null;
+  if (params.bookingId) {
+    const match = indexList.find((item) => item.bookingId === params.bookingId);
+    if (match) targetReportId = match.reportId;
+  }
+  if (!targetReportId) {
+    const matchDate = indexList.find((item) => item.date === todayIso && !item.bookingId);
+    if (matchDate) targetReportId = matchDate.reportId;
+  }
+
+  let activeLog: DrivingLogData | null = null;
+  if (targetReportId) {
+    const stored = localStorage.getItem(`${DRIVING_LOG_STORAGE_PREFIX}${targetReportId}`);
+    if (stored) {
+      try {
+        activeLog = JSON.parse(stored);
+      } catch {
+        activeLog = null;
+      }
+    }
+  }
+
+  if (!activeLog) {
+    activeLog = loadDrivingLogDraft(defaultProfile, undefined, todayIso, params.bookingId);
+  }
+
+  const stops = activeLog.stops || [];
+  const destName = params.destinationName.trim().toLowerCase();
+  const lastStop = stops.length > 0 ? stops[stops.length - 1] : null;
+
+  if (
+    lastStop &&
+    lastStop.place.trim().toLowerCase() === destName &&
+    lastStop.departureTime === departureTimeFormatted
+  ) {
+    return { success: true, isDuplicate: true, stop: lastStop };
+  }
+
+  const originDisplay = params.originName || '현 위치';
+  const duration = Number(params.durationMinutes);
+  const hasValidDuration = Number.isFinite(duration) && duration > 0;
+  const etaText = params.predictedEta && params.predictedEta !== '--:--' ? `, ETA ${params.predictedEta}` : '';
+  const durText = hasValidDuration ? ` (예측 소요 ${duration}분${etaText})` : '';
+
+  const newStop: RouteStopItem = {
+    id: `stop-nav-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    time: '',
+    place: params.destinationName,
+    address: params.destinationAddress,
+    memo: `[출발 ${departureTimeFormatted}] ${originDisplay} ➔ ${params.destinationName}${durText}`,
+    lat: params.destinationLat,
+    lng: params.destinationLng,
+    departureTime: departureTimeFormatted,
+    departureTimestamp: clickedAt.toISOString(),
+    predictedEta: params.predictedEta && params.predictedEta !== '--:--' ? params.predictedEta : undefined,
+    predictedDurationMinutes: hasValidDuration ? duration : undefined,
+    calculationSource: params.calculationSource || 'driver_action',
+    isDraftNavigation: true,
   };
 
-  syncNavigationRouteToDrivingLog({ snapshot, routeResult }).then((res) => {
-    result = res;
-  });
+  activeLog.stops = [...stops, newStop];
+  activeLog.bookingId = params.bookingId || activeLog.bookingId;
+  activeLog.status = 'draft';
 
-  return result;
+  saveDrivingLogDraft(activeLog);
+
+  return { success: true, isDuplicate: false, stop: newStop };
 }
