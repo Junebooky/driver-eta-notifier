@@ -29,6 +29,21 @@
     animation: fadeIn 0.2s ease-out forwards;
   }
 
+  @keyframes stepSlideIn {
+    from {
+      opacity: 0;
+      transform: translateX(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .animate-step-slide {
+    animation: stepSlideIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
   @keyframes reasoningShimmer {
     0% {
       background-position: 150% 0;
@@ -78,4 +93,185 @@
 ::-webkit-scrollbar-thumb {
   background: #CBD5E1;
   border-radius: 4px;
+}
+
+/* Container-query responsive data table (HQ Reservations & Dispatches) */
+.hq-responsive-table-wrapper {
+  overflow: auto;
+  max-inline-size: 100%;
+  max-block-size: min(680px, 78dvh);
+  container-type: inline-size;
+}
+
+.hq-responsive-table-wrapper table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+}
+
+.hq-responsive-table-wrapper thead {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+}
+
+.hq-responsive-table-wrapper thead th:first-child {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 3;
+  background: #F8FAFC;
+  box-shadow: 2px 0 8px -2px rgba(15, 23, 42, 0.08);
+}
+
+.hq-responsive-table-wrapper tbody th {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+  background: #FFFFFF;
+  box-shadow: 2px 0 8px -2px rgba(15, 23, 42, 0.08);
+}
+
+.hq-responsive-table-wrapper tbody tr:hover th {
+  background: #F8FAFC;
+}
+
+@container (width < 580px) {
+  .hq-responsive-table-wrapper table,
+  .hq-responsive-table-wrapper thead,
+  .hq-responsive-table-wrapper tbody,
+  .hq-responsive-table-wrapper tr,
+  .hq-responsive-table-wrapper th,
+  .hq-responsive-table-wrapper td {
+    display: block;
+    min-width: 0 !important;
+    width: 100%;
+  }
+
+  .hq-responsive-table-wrapper thead {
+    /* Hide column header from layout and screen readers in stacked card mode */
+    display: none;
+  }
+
+  .hq-responsive-table-wrapper tbody tr {
+    margin-block-end: 0.75rem;
+    border: 1px solid #E2E8F0;
+    border-radius: 1rem;
+    background: #FFFFFF;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+    overflow: hidden;
+  }
+
+  .hq-responsive-table-wrapper tbody th {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 2;
+    background: #F8FAFC;
+    border-block-end: 1px solid #F1F5F9;
+    padding: 0.75rem 0.875rem !important;
+  }
+
+  .hq-responsive-table-wrapper tbody td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.5rem 0.875rem !important;
+    border-block-end: 1px solid #F8FAFC;
+    white-space: normal !important;
+    max-width: none !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    word-break: keep-all;
+    text-align: right;
+  }
+
+  .hq-responsive-table-wrapper tbody td > * {
+    max-width: 72% !important;
+    margin-inline-start: auto;
+  }
+
+  .hq-responsive-table-wrapper tbody td:last-child {
+    border-block-end: none;
+    padding-block-end: 0.75rem !important;
+  }
+
+  .hq-responsive-table-wrapper table {
+    --label-2: "운행 일시";
+    --label-3: "담당 기사";
+    --label-4: "배정 차량";
+    --label-5: "픽업 출발지";
+    --label-6: "도착 목적지";
+    --label-7: "배차 상태";
+    --label-8: "기사 확인";
+    --label-9: "안내자료";
+  }
+
+  .hq-responsive-table-wrapper td:nth-child(2)::before {
+    content: var(--label-2);
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748B;
+    flex-shrink: 0;
+  }
+  .hq-responsive-table-wrapper td:nth-child(3)::before {
+    content: var(--label-3);
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748B;
+    flex-shrink: 0;
+  }
+  .hq-responsive-table-wrapper td:nth-child(4)::before {
+    content: var(--label-4);
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748B;
+    flex-shrink: 0;
+  }
+  .hq-responsive-table-wrapper td:nth-child(5)::before {
+    content: var(--label-5);
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748B;
+    flex-shrink: 0;
+  }
+  .hq-responsive-table-wrapper td:nth-child(6)::before {
+    content: var(--label-6);
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748B;
+    flex-shrink: 0;
+  }
+  .hq-responsive-table-wrapper td:nth-child(7)::before {
+    content: var(--label-7);
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748B;
+    flex-shrink: 0;
+  }
+  .hq-responsive-table-wrapper td:nth-child(8)::before {
+    content: var(--label-8);
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748B;
+    flex-shrink: 0;
+  }
+  .hq-responsive-table-wrapper td:nth-child(9)::before {
+    content: var(--label-9);
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748B;
+    flex-shrink: 0;
+  }
+}
+
+/* Native modal dialog scroll containment (modern-web-guidance: dialog & prevent-page-scroll-under-modal-dialog) */
+dialog:modal {
+  overscroll-behavior: contain;
+}
+
+dialog::backdrop {
+  overflow: hidden;
+  overscroll-behavior: contain;
+  background-color: rgba(15, 23, 42, 0.62);
+  backdrop-filter: blur(3px);
 }

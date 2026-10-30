@@ -4,6 +4,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { NaviProvider, LocationPreset, RouteEstimate, DriverProfile } from '@/types';
 import { launchNavigationApp, calculateHaversineEstimate } from '@/utils/navigation';
 import { generateVipReportText, copyAndLaunchKakaoTalk } from '@/utils/kakao';
+import { addNavigationRouteToDrivingLog } from '@/utils/drivingLogNaviSync';
+import { NaviDrivingLogConfirmModal } from '@/components/NaviDrivingLogConfirmModal';
 import { Zap, Navigation, X } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
@@ -50,8 +52,10 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   routeEstimate,
   reportText,
   targetChatRoom,
+  profile,
 }) => {
   const [isTmapAssistOpen, setIsTmapAssistOpen] = useState(false);
+  const [isNaviConfirmOpen, setIsNaviConfirmOpen] = useState(false);
   const [copiedWpIndex, setCopiedWpIndex] = useState<number | null>(null);
   const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -93,7 +97,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
   }));
 
   /**
-   * 1-Second Fast Pass Action (Synchronous Clipboard Copy on Safari User Activation + Navi Launch + Haptics)
+   * 1-Second Fast Pass Action (Prompts Driving Log Confirmation + Clipboard Copy + Navi Launch)
    */
   const handleFastPassAction = async () => {
     // Confirmation pulse haptic feedback for primary fast pass action
@@ -115,13 +119,30 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
       console.warn('Clipboard write failed:', err);
     }
 
-    // 2. Multi-waypoint TMAP check: TMAP cannot receive external waypoints via deep link
+    // 2. Open confirmation modal for Driving Log sync
+    setIsNaviConfirmOpen(true);
+  };
+
+  const handleConfirmNavigation = async (addToLog: boolean) => {
+    setIsNaviConfirmOpen(false);
+
+    // If driver confirmed to add route to driving log
+    if (addToLog && destination) {
+      addNavigationRouteToDrivingLog({
+        originName: origin?.shortName || origin?.name,
+        destinationName: destination.shortName || destination.name,
+        destinationAddress: destination.address,
+        driverProfile: profile,
+      });
+    }
+
+    // Multi-waypoint TMAP check: TMAP cannot receive external waypoints via deep link
     if (activeWaypointsList.length > 0 && defaultNavi === 'tmap') {
       setIsTmapAssistOpen(true);
       return;
     }
 
-    // 3. Direct launch for Naver, Kakao, or Tmap without waypoints
+    // Direct launch navigation app
     await launchNavigationApp(
       defaultNavi,
       targetNavi,
@@ -349,6 +370,18 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
           </div>
         </div>
       )}
+
+      {/* Navigation -> Driving Log Linkage Confirmation Modal */}
+      <NaviDrivingLogConfirmModal
+        isOpen={isNaviConfirmOpen}
+        onClose={() => setIsNaviConfirmOpen(false)}
+        originName={origin?.shortName || origin?.name}
+        destinationName={destination?.shortName || destination?.name}
+        destinationAddress={destination?.address}
+        etaText={routeEstimate ? `${routeEstimate.durationMinutes}분 (${routeEstimate.distanceKm}km)` : undefined}
+        naviProvider={defaultNavi}
+        onConfirm={handleConfirmNavigation}
+      />
     </div>
   );
 };
