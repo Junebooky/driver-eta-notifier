@@ -38,6 +38,7 @@ interface VehicleInspectionModalProps {
   profile: DriverProfile;
   profilePlateNumber?: string;
   initialMode?: 'pickup' | 'daily' | 'return' | 'receipt';
+  bookingId?: string;
 }
 
 const DAMAGE_PART_CHIPS = [
@@ -78,6 +79,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
   profile,
   profilePlateNumber,
   initialMode = 'pickup',
+  bookingId,
 }) => {
   const normalizedInitialMode = initialMode === 'receipt' ? 'pickup' : (initialMode || 'pickup');
   const [activeTab, setActiveTab] = useState<'pickup' | 'daily' | 'return'>(normalizedInitialMode);
@@ -228,12 +230,16 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
       keyLocation,
       // Initial Data snapshot for return calculation
       initialData: currentInitialData,
+      bookingId: bookingId || overrides?.bookingId,
       savedAt: new Date().toISOString(),
       ...overrides,
     };
 
     try {
       localStorage.setItem(currentKey, JSON.stringify(payload));
+      if (bookingId) {
+        localStorage.setItem(`${currentKey}_${bookingId}`, JSON.stringify(payload));
+      }
     } catch (err) {
       if (err instanceof DOMException && (err.name === 'QuotaExceededError' || err.code === 22)) {
         try {

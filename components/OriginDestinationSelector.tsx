@@ -2,7 +2,7 @@
 
 import React, { useState, useRef } from 'react';
 import { LocationPreset } from '@/types';
-import { ArrowLeftRight, Search } from 'lucide-react';
+import { ArrowLeftRight, Search, Navigation, Loader2, Lightbulb, Bookmark } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 export interface OriginDestinationSelectorProps {
@@ -26,6 +26,10 @@ export interface OriginDestinationSelectorProps {
   onOpenGasModal?: () => void;
   onOpenPresetModal?: () => void;
   onSaveRouteAsPreset?: () => void;
+  onSetCurrentLocation?: () => void;
+  onOpenFieldTips?: () => void;
+  fieldTipsCount?: number;
+  isLocatingGps?: boolean;
 }
 
 export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps> = ({
@@ -45,6 +49,10 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
   onSwap,
   onOpenSearchModal,
   onSaveRouteAsPreset,
+  onSetCurrentLocation,
+  onOpenFieldTips,
+  fieldTipsCount = 3,
+  isLocatingGps = false,
 }) => {
   const [isAccordionOpen, setIsAccordionOpen] = useState(false);
   const [copiedWaypointIndex, setCopiedWaypointIndex] = useState<number | null>(null);
@@ -91,16 +99,41 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
             title="출발지 검색 및 변경"
           >
             <div className="flex items-center justify-between w-full">
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
-                출발지
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
+                  출발지
+                </span>
+                {onSetCurrentLocation && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      haptics.lightTap();
+                      onSetCurrentLocation();
+                    }}
+                    disabled={isLocatingGps}
+                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 hover:bg-blue-100 text-[#1E60F3] border border-blue-200/80 active:scale-95 transition-all cursor-pointer shadow-2xs"
+                    title="현재 위치(GPS)를 출발지로 설정"
+                  >
+                    {isLocatingGps ? (
+                      <Loader2 className="w-2.5 h-2.5 animate-spin text-[#1E60F3]" />
+                    ) : (
+                      <Navigation className="w-2.5 h-2.5 fill-[#1E60F3]" />
+                    )}
+                    <span>현위치</span>
+                  </button>
+                )}
+              </div>
               <span className="text-[10px] text-slate-400 font-medium flex items-center gap-0.5">
                 <Search className="w-3 h-3 text-slate-400" />
               </span>
             </div>
             <div className="flex items-baseline gap-2 min-w-0 mt-0.5">
-              <span className="text-sm sm:text-base font-bold text-slate-900 shrink-0 truncate max-w-[55%]">
+              <span className="text-sm sm:text-base font-bold text-slate-900 shrink-0 truncate max-w-[55%] flex items-center gap-1">
                 {origin.shortName || origin.name}
+                {(origin.id === 'gps_current' || origin.shortName === '현위치' || origin.name === '현위치') && (
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" title="실시간 GPS 현위치" />
+                )}
               </span>
               <span className="text-xs text-slate-400 truncate">
                 {origin.address || origin.name}
@@ -253,19 +286,44 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
             title="출발지 검색 및 변경"
           >
             <div className="flex items-center justify-between w-full">
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
-                출발지
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
+                  출발지
+                </span>
+                {onSetCurrentLocation && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      haptics.lightTap();
+                      onSetCurrentLocation();
+                    }}
+                    disabled={isLocatingGps}
+                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 hover:bg-blue-100 text-[#1E60F3] border border-blue-200/80 active:scale-95 transition-all cursor-pointer shadow-2xs"
+                    title="현재 위치(GPS)를 출발지로 설정"
+                  >
+                    {isLocatingGps ? (
+                      <Loader2 className="w-2.5 h-2.5 animate-spin text-[#1E60F3]" />
+                    ) : (
+                      <Navigation className="w-2.5 h-2.5 fill-[#1E60F3]" />
+                    )}
+                    <span>현위치</span>
+                  </button>
+                )}
+              </div>
               <span className="text-[10px] text-slate-400 font-medium flex items-center gap-0.5 group-hover:text-slate-600">
                 <Search className="w-3 h-3 text-slate-400" />
               </span>
             </div>
             <div
-              className={`text-base font-bold truncate mt-1 w-full ${selectionTarget === 'origin' ? 'text-slate-900' : 'text-slate-700'
+              className={`text-base font-bold truncate mt-1 w-full flex items-center gap-1 ${selectionTarget === 'origin' ? 'text-slate-900' : 'text-slate-700'
                 }`}
               title={origin.name}
             >
-              {origin.shortName}
+              <span className="truncate">{origin.shortName}</span>
+              {(origin.id === 'gps_current' || origin.shortName === '현위치' || origin.name === '현위치') && (
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" title="실시간 GPS 현위치" />
+              )}
             </div>
             <div
               className={`text-[11px] truncate mt-0.5 font-normal w-full ${selectionTarget === 'origin' ? 'text-slate-500' : 'text-slate-400'
@@ -420,23 +478,43 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
           </span>
         </div>
 
-        {onSaveRouteAsPreset && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              haptics.mediumTap();
-              onSaveRouteAsPreset();
-            }}
-            className="w-8 h-8 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-50 active:scale-95 transition-all shrink-0 cursor-pointer"
-            title="현재 경로를 거점으로 저장"
-            aria-label="현재 경로를 거점으로 저장"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-            </svg>
-          </button>
-        )}
+        {/* Action Buttons: [💡 현장 팁 3] and [🔖] */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {onOpenFieldTips && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                haptics.selection();
+                onOpenFieldTips();
+              }}
+              className="h-8 px-3 rounded-xl bg-white border border-[#1E60F3] shadow-2xs flex items-center gap-1.5 text-[#1E60F3] hover:bg-blue-50/60 active:scale-95 transition-all cursor-pointer"
+              title="현장 팁 보기"
+              aria-label="현장 팁 보기"
+            >
+              <Lightbulb className="w-3.5 h-3.5 fill-[#1E60F3] text-[#1E60F3]" />
+              <span className="text-xs font-black tracking-tight">
+                현장 팁 {fieldTipsCount}
+              </span>
+            </button>
+          )}
+
+          {onSaveRouteAsPreset && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                haptics.mediumTap();
+                onSaveRouteAsPreset();
+              }}
+              className="w-8 h-8 rounded-xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-50 active:scale-95 transition-all cursor-pointer"
+              title="현재 경로를 거점으로 저장"
+              aria-label="현재 경로를 거점으로 저장"
+            >
+              <Bookmark className="w-4 h-4 text-slate-600" />
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
