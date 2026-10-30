@@ -147,12 +147,12 @@ export function decodeScheduleMeta(
 
 function formatDateLabel(dateStr: string): string {
   try {
-    const d = new Date(dateStr + 'T00:00:00+09:00');
+    const d = new Date(dateStr + 'T00:00:00Z');
     if (isNaN(d.getTime())) return dateStr;
-    const month = d.getMonth() + 1;
-    const day = d.getDate();
+    const month = d.getUTCMonth() + 1;
+    const day = d.getUTCDate();
     const days = ['일', '월', '화', '수', '목', '금', '토'];
-    const dayOfWeek = days[d.getDay()];
+    const dayOfWeek = days[d.getUTCDay()];
     return `${month}월 ${day}일 (${dayOfWeek})`;
   } catch {
     return dateStr;
@@ -1051,12 +1051,12 @@ async function prepareServerDispatchSchedule(
     groupVehicleIndex: input.groupVehicleIndex ?? existingHydrated?._meta.groupVehicleIndex,
     intakeSource: input.intakeSource || existingHydrated?._meta.intakeSource || 'quick_dispatch',
     dispatchStatus: effectiveDispatchStatus,
-    driverId: input.driverId ?? existingHydrated?._meta.driverId ?? null,
+    driverId: input.serviceMode === 'vehicle_only' ? null : input.driverId ?? existingHydrated?._meta.driverId ?? null,
     driverName:
       input.serviceMode === 'vehicle_only'
         ? '차량만 대여'
         : cleanDrv || null,
-    driverPhone: input.driverPhone ?? existingHydrated?._meta.driverPhone ?? null,
+    driverPhone: input.serviceMode === 'vehicle_only' ? null : input.driverPhone ?? existingHydrated?._meta.driverPhone ?? null,
     vehicleId: input.vehicleId || matchedVeh?.uuid || existingHydrated?._meta.vehicleId || null,
     vehicleModel: resolvedModel || null,
     vehiclePlate: resolvedPlate || null,
@@ -1132,8 +1132,8 @@ async function prepareServerDispatchSchedule(
     schedule_meta: nextMeta,
     flight_number: input.flightNumber?.trim() || null,
     protocol_notes: input.notes?.trim() || null,
-    driver_name: cleanDrv || input.driverName || null,
-    driver_phone: input.driverPhone || null,
+    driver_name: input.serviceMode === 'vehicle_only' ? null : cleanDrv || input.driverName || null,
+    driver_phone: input.serviceMode === 'vehicle_only' ? null : input.driverPhone || null,
     vehicle_plate: resolvedPlate || null,
     vehicle_model: resolvedModel || null,
     dispatch_status: effectiveDispatchStatus,

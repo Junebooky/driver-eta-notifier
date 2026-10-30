@@ -319,6 +319,7 @@ export function driverCanAccessSchedule(
 ): boolean {
   if (session.role === 'hq_admin') return true;
   if (session.role !== 'driver') return false;
+  if (schedule.schedule_meta?.serviceMode === 'vehicle_only') return false;
 
   // Unassigned bookings are invisible and untouchable by drivers
   if (

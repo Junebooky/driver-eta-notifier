@@ -66,6 +66,13 @@ test('batch saves issue one RPC, preserve metadata, and never compensate with se
   try {
     const success=await atomicUpsertServerDispatchBatch([candidate],undefined,'retry-key');
     assert.equal(success.ok,true,success.error); assert.equal(calls,1);
+    supabaseAdmin.rpc = (async (_name: string,args: Record<string,unknown>) => {
+      const items=args.p_items as {row:Record<string,unknown>}[];
+      assert.equal(items[0].row.driver_id,null);
+      assert.equal((items[0].row.schedule_meta as Record<string,unknown>).driverId,null);
+      return {data:items.map(i=>i.row),error:null};
+    }) as unknown as typeof original;
+    assert.equal((await atomicUpsertServerDispatchBatch([{...candidate,serviceMode:'vehicle_only'}])).ok,true);
     supabaseAdmin.rpc = (async()=>({data:null,error:{code:'PGRST202',message:'missing RPC'}})) as unknown as typeof original;
     const missing=await atomicUpsertServerDispatchBatch([candidate]); assert.equal(missing.ok,false); assert.equal(missing.statusCode,503);
     supabaseAdmin.rpc = (async()=>({data:null,error:{code:'23P01',message:'conflict'}})) as unknown as typeof original;

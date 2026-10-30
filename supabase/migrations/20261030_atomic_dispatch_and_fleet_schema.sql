@@ -28,7 +28,8 @@ DO $$ BEGIN
   END IF;
 END $$;
 GRANT USAGE ON SCHEMA cockpit TO service_role;
-GRANT SELECT ON cockpit.drivers TO service_role;
+-- Row-level FOR SHARE requires UPDATE privilege as well as SELECT. Clients receive neither.
+GRANT SELECT, UPDATE ON cockpit.drivers TO service_role;
 
 CREATE TABLE IF NOT EXISTS cockpit.fleet_vehicle_operations (
   vehicle_id uuid PRIMARY KEY,

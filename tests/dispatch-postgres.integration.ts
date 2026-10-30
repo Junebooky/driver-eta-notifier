@@ -51,7 +51,7 @@ async function main() {
     const initialCount = await count();
     // Separate DB connections simulate different Vercel instances; only one can commit.
     const concurrent = await Promise.allSettled([commit(a,[envelope()]),commit(b,[envelope()])]);
-    assert.equal(concurrent.filter(r=>r.status==='fulfilled').length,1);
+    assert.equal(concurrent.filter(r=>r.status==='fulfilled').length,1,concurrent.filter(r=>r.status==='rejected').map(r=>(r as PromiseRejectedResult).reason.message).join('; '));
     const failure = concurrent.find(r=>r.status==='rejected') as PromiseRejectedResult;
     assert.equal(failure.reason.code,'23P01');
     assert.equal(await count(),initialCount+1);
@@ -111,6 +111,7 @@ async function main() {
     await assert.rejects(admin.query('SELECT * FROM cockpit.fleet_vehicle_operations'), { code:'42501' });
     await admin.query('RESET ROLE');
     console.log('PASS authenticated role denied RPC and private state');
+    await admin.query('DELETE FROM cockpit.schedules');
     // State persists across independent clients and changes availability guard.
     await a.query(`INSERT INTO cockpit.fleet_vehicle_operations(vehicle_id,organization_id,plate,status,memo,color,updated_by)
       VALUES($1,'vip_limousine_korea','400가 0004','정비 중','검사 대기','검정','test-admin')`,[vehicle]);
