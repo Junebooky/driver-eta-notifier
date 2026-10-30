@@ -97,7 +97,6 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
 
   const [selectedDriverName, setSelectedDriverName] = useState('');
   const [selectedVehiclePlate, setSelectedVehiclePlate] = useState('');
-  const [allowConflictOverride, setAllowConflictOverride] = useState(false);
 
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [cancelReason, setCancelReason] = useState('고객 요청 일정 취소');
@@ -132,7 +131,6 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
     setSelectedVehiclePlate(
       booking.vehiclePlate && booking.vehiclePlate !== '미배정' ? booking.vehiclePlate : ''
     );
-    setAllowConflictOverride(false);
     setShowCancelConfirm(false);
     setNotice(null);
     setErrorMsg(null);
@@ -203,8 +201,8 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
         setErrorMsg('배정할 차량을 선택해 주세요.');
         return;
       }
-      if (modalConflicts.length > 0 && !allowConflictOverride) {
-        setErrorMsg(modalConflicts[0].message);
+      if (modalConflicts.length > 0) {
+        setErrorMsg(`[배차 중복 불가] ${modalConflicts[0].message}`);
         return;
       }
     }
@@ -271,6 +269,8 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
           driverPhone: matchedDriver?.phone || booking.driverPhone,
           date: pickupDate,
           pickupTime,
+          endDate: booking.endDate || pickupDate,
+          endTime: booking.endTime || (targetStatus === 'published' ? '18:00' : undefined),
           origin: pickupLocation.trim(),
           destination: destination.trim(),
           passengerName: passengerName.trim() || customerName.trim(),
@@ -290,7 +290,6 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
           serviceMode: booking.serviceMode || 'with_driver',
           appliedPricingSnapshot: pricingSnapshot,
           allowUnverified: true,
-          allowConflictOverride,
           publishedBy: targetStatus === 'unassigned' ? '사모님(예약접수)' : '대표님(배차확정)',
         }),
       });
@@ -695,19 +694,13 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                   <div className="p-3 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white space-y-1.5 shadow-sm">
                     {modalConflicts.map((c, idx) => (
                       <div key={idx} className="flex items-start gap-1.5 font-bold">
-                        <AlertTriangle className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+                        <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
                         <span>{c.message}</span>
                       </div>
                     ))}
-                    <label className="flex items-center gap-1.5 pt-1 text-xs font-bold text-slate-300 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={allowConflictOverride}
-                        onChange={(e) => setAllowConflictOverride(e.target.checked)}
-                        className="rounded border-slate-600 text-[#1E60F3] focus:ring-[#1E60F3]"
-                      />
-                      <span>일정 간격 중복을 확인했으며 예외 배차를 승인합니다.</span>
-                    </label>
+                    <div className="pt-1 text-[11px] text-amber-300 font-semibold">
+                      기존 배차와 일정이 중복되어 배차 확정이 차단되었습니다. 일정을 변경하거나 담당 기사·차량을 재지정해 주세요.
+                    </div>
                   </div>
                 )}
 
@@ -715,7 +708,7 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                   <div className="space-y-2.5 pt-1">
                     <button
                       type="button"
-                      disabled={isSaving}
+                      disabled={isSaving || modalConflicts.length > 0}
                       onClick={() => handleSaveOrPublish('published')}
                       className="w-full py-3 px-4 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-[0.99] text-white text-sm font-black shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50"
                     >

@@ -24,6 +24,7 @@ import {
   Clock,
   Sparkles,
   AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 import {
   VIP_REAL_VEHICLES,
@@ -76,22 +77,6 @@ function getVehicleHero(v: VipRealVehicle): string {
   return '/images/thumb_g90.jpg';
 }
 
-// 3 detail thumbnails under '차량 이미지'
-function getVehicleDetailImages(v: VipRealVehicle): string[] {
-  if (v.plateShort === '5336') {
-    return [
-      '/images/carnival_detail_1.jpg',
-      '/images/carnival_detail_2.jpg',
-      '/images/carnival_detail_3.jpg',
-    ];
-  }
-  return [
-    getVehicleThumb(v),
-    getVehicleHero(v),
-    getVehicleThumb(v),
-  ];
-}
-
 // Specific vehicle tips strictly following verified real data
 // ONLY 193호 5336 has verified specs from user-provided cockpit mockup.
 // All other 19 vehicles must remain "미확인 (관리자 확인 필요)" to prevent false operational assurances.
@@ -99,10 +84,10 @@ function getVehicleTips(v: VipRealVehicle) {
   if (v.plateShort === '5336') {
     return {
       isVerified: true,
-      frontCharging: 'USB-C 2개, USB-A 1개',
-      rearCharging: '차량용 시가잭 1개, 220V 1개',
-      fuelTip: '가득 주유 시 약 700km 주행 가능합니다.',
-      powerTip: '3열 좌측에 220V 단자가 있습니다.',
+      frontCharging: 'USB 총 3개 (상세 규격 미확인)',
+      rearCharging: '시거잭 + 220V 콘센트 (수량·위치 현장 확인 필요)',
+      fuelTip: '휘발유 (가득 주유 시 주행거리 미확인)',
+      powerTip: '220V 전원 사용 가능 (상세 위치 현장 확인 필요)',
     };
   }
   return {
@@ -133,32 +118,23 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
   // 3. Tab State inside Detail View
   const [activeDetailTab, setActiveDetailTab] = useState<'info' | 'calendar' | 'tips' | 'memo'>('info');
 
-  // 4. Overrides (Status, Color, Year, Memo) persisted locally
-  const [statusOverrides, setStatusOverrides] = useState<Record<string, '대기 중' | '운행 중' | '정비 중'>>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const stored = localStorage.getItem('vip_vehicle_status_overrides');
-        if (stored) return JSON.parse(stored);
-      } catch (_) {}
-    }
-    return {
-      'veh-cn-5336': '대기 중',
-      'veh-st-7665': '운행 중',
-      'veh-sp-9982': '대기 중',
-      'veh-gn-8839': '대기 중',
-      'veh-gn-5947': '정비 중',
-    };
-  });
+  // 4. Overrides (Status, Color, Year, Memo) synced with server store
+  const [statusOverrides, setStatusOverrides] = useState<Record<string, '대기 중' | '운행 중' | '정비 중'>>({});
+  const [memos, setMemos] = useState<Record<string, string>>({});
+  const [serverColors, setServerColors] = useState<Record<string, string>>({});
 
-  const [memos, setMemos] = useState<Record<string, string>>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const stored = localStorage.getItem('vip_vehicle_admin_memos');
-        if (stored) return JSON.parse(stored);
-      } catch (_) {}
-    }
-    return {};
-  });
+  useEffect(() => {
+    fetch('/api/fleet/status')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.ok) {
+          if (data.statuses) setStatusOverrides(data.statuses);
+          if (data.memos) setMemos(data.memos);
+          if (data.colors) setServerColors(data.colors);
+        }
+      })
+      .catch((err) => console.warn('Notice fetching /api/fleet/status:', err));
+  }, []);
 
   // 5. Fail-Closed Real Availability State
   const [fleetResult, setFleetResult] = useState<FleetAvailabilityResult | null>(null);
@@ -213,30 +189,26 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
   // 6. Modals State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
-  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
-  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [copiedToast, setCopiedToast] = useState(false);
 
   // Edit Modal Form State
   const [editStatus, setEditStatus] = useState<'대기 중' | '운행 중' | '정비 중'>('대기 중');
   const [editMemo, setEditMemo] = useState('');
   const [editColor, setEditColor] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [saveEditError, setSaveEditError] = useState<string | null>(null);
 
-  // Enriched vehicles with category, fuel normalization, and overrides
+  // Enriched vehicles with category, fuel normalization, and verified attributes
   const enrichedVehicles = useMemo(() => {
     return VIP_REAL_VEHICLES.map((v) => {
       const uiCategory = mapVehicleToUiCategory(v);
       const effectiveStatus = statusOverrides[v.id] || (v.status === '운행 중' ? '운행 중' : v.status === '정비 중' ? '정비 중' : '대기 중');
-      const year = v.year || (v.plateShort === '5336' ? '2023년' : '2023년');
+      // 연식/색상 추정 금지: 오직 확인된 값만 노출 (5336은 디자인 시안 기준 2023년/오로라 블랙 펄, 그 외는 '미확인')
+      const year = v.year || (v.plateShort === '5336' ? '2023년' : '미확인');
       const color =
+        serverColors[v.id] ||
         v.color ||
-        (v.plateShort === '5336'
-          ? '오로라 블랙 펄'
-          : v.brand === '벤츠'
-          ? '옵시디언 블랙'
-          : v.brand === '현대'
-          ? '크리미 화이트'
-          : '우유니 화이트');
+        (v.plateShort === '5336' ? '오로라 블랙 펄' : '미확인');
       const fuel = v.fuelType === '디젤' ? '경유' : '휘발유';
       return {
         ...v,
@@ -247,7 +219,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
         fuelDisplay: fuel,
       };
     });
-  }, [statusOverrides]);
+  }, [statusOverrides, serverColors]);
 
   // Filtered vehicles for Center Column
   const filteredVehicles = useMemo(() => {
@@ -300,28 +272,53 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
     if (!selectedVehicle) return;
     setEditStatus(selectedVehicle.effectiveStatus);
     setEditMemo(memos[selectedVehicle.id] || selectedVehicle.adminMemo || '');
-    setEditColor(selectedVehicle.color);
+    setEditColor(selectedVehicle.color === '미확인' ? '' : selectedVehicle.color);
+    setSaveEditError(null);
     setIsEditModalOpen(true);
   };
 
-  // Save Edit
-  const handleSaveEdit = () => {
+  // Save Edit - Persists to Server API and syncs state
+  const handleSaveEdit = async () => {
     if (!selectedVehicle) return;
-    const newStatuses = { ...statusOverrides, [selectedVehicle.id]: editStatus };
-    const newMemos = { ...memos, [selectedVehicle.id]: editMemo };
-    setStatusOverrides(newStatuses);
-    setMemos(newMemos);
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('vip_vehicle_status_overrides', JSON.stringify(newStatuses));
-        localStorage.setItem('vip_vehicle_admin_memos', JSON.stringify(newMemos));
-      } catch (_) {}
+    setIsSavingEdit(true);
+    setSaveEditError(null);
+
+    try {
+      const res = await fetch('/api/fleet/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vehicleId: selectedVehicle.id,
+          plate: selectedVehicle.plate,
+          status: editStatus,
+          memo: editMemo,
+          color: editColor || undefined,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || '서버 상태 저장에 실패했습니다.');
+      }
+
+      const newStatuses = { ...statusOverrides, [selectedVehicle.id]: editStatus };
+      const newMemos = { ...memos, [selectedVehicle.id]: editMemo };
+      const newColors = { ...serverColors, [selectedVehicle.id]: editColor || '미확인' };
+      setStatusOverrides(newStatuses);
+      setMemos(newMemos);
+      setServerColors(newColors);
+      setIsEditModalOpen(false);
+      haptics.success();
+    } catch (err: any) {
+      console.error('Error saving vehicle status to server:', err);
+      setSaveEditError(err.message || '저장 실패');
+      haptics.errorAlert();
+    } finally {
+      setIsSavingEdit(false);
     }
-    setIsEditModalOpen(false);
-    haptics.success();
   };
 
-  // Fail-Closed Day Status Resolver: calculates exact status for a specific vehicle on a given date
+  // Fail-Closed Day Status Resolver: calculates exact status for a specific vehicle on a given date (Point 3)
   const getVehicleDayStatus = useCallback(
     (v: VipRealVehicle, targetDateIso: string): { status: AvailabilityDayStatus; detail?: string } => {
       // 1. Fail-closed: while loading or error
@@ -332,7 +329,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
         return { status: '확인 불가', detail: availabilityError || '서버 오류' };
       }
 
-      // 2. Local maintenance override or data
+      // 2. Server/local maintenance override or data
       const isMaint = statusOverrides[v.id] === '정비 중' || v.status === '정비 중';
       if (isMaint) {
         return { status: '정비 중', detail: '차량 정비/점검' };
@@ -366,7 +363,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
         }
       }
 
-      // 4. Check fleetResult from API
+      // 4. Check fleetResult from API with exact per-day activeSchedules match
       if (fleetResult) {
         const detail = fleetResult.vehicles?.find((vd: any) => {
           const vdPlate = cleanVehicleIdentity(vd.plate);
@@ -382,20 +379,27 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
           return { status: '정비 중', detail: '정비 중' };
         }
 
-        if (!detail.isAvailable || detail.requestedIntervalStatus === 'booked') {
-          const isToday = targetDateIso === getKstTodayDateStr();
-          const inTransit =
-            isToday &&
-            (detail.currentStatus === 'in_service' ||
-              statusOverrides[v.id] === '운행 중' ||
-              v.status === '운행 중');
-          return {
-            status: inTransit ? '운행 중' : '예약 있음',
-            detail:
-              detail.conflictingTrip?.customerName ||
-              detail.unavailabilityReason ||
-              '예약 배차 일정 있음',
-          };
+        // Check if this vehicle has an active schedule overlapping targetDateIso specifically
+        if (detail.activeSchedules && detail.activeSchedules.length > 0) {
+          const daySchedule = detail.activeSchedules.find((s) => {
+            const sStart = normalizeDateToIso(s.startDate);
+            const sEnd = normalizeDateToIso(s.endDate) || sStart;
+            return targetDateIso >= sStart && targetDateIso <= sEnd;
+          });
+
+          if (daySchedule) {
+            const isToday = targetDateIso === getKstTodayDateStr();
+            const inTransit =
+              isToday &&
+              (daySchedule.operationStatus === 'in_transit' ||
+                daySchedule.operationStatus === 'boarded' ||
+                statusOverrides[v.id] === '운행 중' ||
+                v.status === '운행 중');
+            return {
+              status: inTransit ? '운행 중' : '예약 있음',
+              detail: `${daySchedule.customerName || '고객사'} (${daySchedule.pickupTime})`,
+            };
+          }
         }
 
         return { status: '예약 가능' };
@@ -465,9 +469,6 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
     return getVehicleTips(selectedVehicle);
   }, [selectedVehicle]);
 
-  const detailImages = useMemo(() => {
-    return getVehicleDetailImages(selectedVehicle);
-  }, [selectedVehicle]);
 
   // Category counts
   const categoryCounts = useMemo(() => {
@@ -963,43 +964,6 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                       <span className="text-slate-400 font-medium">색상</span>
                       <span className="font-bold text-slate-800">{selectedVehicle.color}</span>
                     </div>
-
-                    {/* 차량 이미지 3 Thumbnails + 더보기 */}
-                    <div className="pt-2 border-t border-slate-100">
-                      <span className="text-slate-400 font-medium text-[11px] block mb-1.5">
-                        차량 이미지
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        {detailImages.map((imgUrl, idx) => (
-                          <div
-                            key={idx}
-                            onClick={() => {
-                              setSelectedImageIndex(idx);
-                              setIsImageModalOpen(true);
-                            }}
-                            className="relative w-11 h-11 rounded-lg overflow-hidden border border-slate-200 cursor-pointer hover:opacity-85 transition-opacity bg-slate-100 shrink-0"
-                          >
-                            <Image
-                              src={imgUrl}
-                              alt="차량 이미지"
-                              fill
-                              className="object-cover"
-                            />
-                          </div>
-                        ))}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedImageIndex(0);
-                            setIsImageModalOpen(true);
-                          }}
-                          className="w-11 h-11 rounded-lg border border-dashed border-slate-300 text-slate-400 hover:text-slate-600 hover:border-slate-400 flex flex-col items-center justify-center text-[9px] font-bold cursor-pointer shrink-0"
-                        >
-                          <Plus className="w-3 h-3 mb-0.5" />
-                          <span>더보기</span>
-                        </button>
-                      </div>
-                    </div>
                   </div>
                 </div>
 
@@ -1196,22 +1160,30 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                   className="w-full p-2.5 border border-slate-300 rounded-xl focus:outline-none focus:border-[#1E60F3]"
                 />
               </div>
+              {saveEditError && (
+                <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-bold">
+                  {saveEditError}
+                </div>
+              )}
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
               <button
                 type="button"
+                disabled={isSavingEdit}
                 onClick={() => setIsEditModalOpen(false)}
-                className="px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+                className="px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer disabled:opacity-50"
               >
                 취소
               </button>
               <button
                 type="button"
+                disabled={isSavingEdit}
                 onClick={handleSaveEdit}
-                className="px-4 py-2 text-xs font-bold bg-[#1E60F3] hover:bg-blue-700 text-white rounded-xl cursor-pointer shadow-xs"
+                className="px-4 py-2 text-xs font-bold bg-[#1E60F3] hover:bg-blue-700 text-white rounded-xl cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
               >
-                저장하기
+                {isSavingEdit && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                <span>저장하기</span>
               </button>
             </div>
           </div>
@@ -1306,51 +1278,6 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
               >
                 닫기
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ============================================================== */}
-      {/* MODAL 3: 차량 이미지 갤러리 Modal (차량 이미지 더보기)           */}
-      {/* ============================================================== */}
-      {isImageModalOpen && selectedVehicle && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-4 space-y-3 shadow-2xl">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-              <h3 className="text-sm font-black text-slate-900">
-                {selectedVehicle.model} 상세 갤러리
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsImageModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="relative w-full h-64 rounded-xl overflow-hidden bg-slate-900 border border-slate-200">
-              <Image
-                src={detailImages[selectedImageIndex] || detailImages[0]}
-                alt="차량 상세 사진"
-                fill
-                className="object-contain"
-              />
-            </div>
-
-            <div className="flex items-center justify-center gap-2 pt-1">
-              {detailImages.map((img, idx) => (
-                <div
-                  key={idx}
-                  onClick={() => setSelectedImageIndex(idx)}
-                  className={`relative w-14 h-14 rounded-lg overflow-hidden border-2 cursor-pointer transition-all ${
-                    selectedImageIndex === idx ? 'border-[#1E60F3]' : 'border-transparent opacity-60'
-                  }`}
-                >
-                  <Image src={img} alt="썸네일" fill className="object-cover" />
-                </div>
-              ))}
             </div>
           </div>
         </div>

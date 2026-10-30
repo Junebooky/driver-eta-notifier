@@ -47,6 +47,17 @@ export interface AvailabilityQuery {
   excludeScheduleId?: string; // When editing an existing schedule
 }
 
+export interface VehicleScheduleSummary {
+  scheduleId: string;
+  startDate: string;
+  pickupTime: string;
+  endDate: string;
+  endTime?: string;
+  customerName?: string;
+  route?: string;
+  operationStatus?: string;
+}
+
 export interface AvailableVehicleItem {
   id: string;
   uuid?: string;
@@ -65,6 +76,7 @@ export interface AvailableVehicleItem {
     route: string;
     timeSpan: string;
   };
+  activeSchedules?: VehicleScheduleSummary[];
   defaultDriverName?: string;
   defaultDriverPhone?: string;
   isEnglishVerified?: boolean;
@@ -247,11 +259,34 @@ export async function checkFleetAvailability(
 
     // Schedule conflict check with UUID + plate support
     const cleanPlate = cleanVehicleIdentity(v.plate);
+
+    // Extract all schedules assigned to this vehicle
+    const vSchedules: VehicleScheduleSummary[] = activeSchedules
+      .filter((s) => {
+        if (v.uuid && s.vehicle_id) return v.uuid === s.vehicle_id;
+        const sPlate = cleanVehicleIdentity(s.vehicle_plate || s.vehicle_no);
+        return Boolean(sPlate && cleanPlate && sPlate === cleanPlate);
+      })
+      .map((s) => ({
+        scheduleId: s.id,
+        startDate: normalizeDateToIso(s.date) || s.date,
+        pickupTime: s.pickup_time?.slice(0, 5) || '09:00',
+        endDate: normalizeDateToIso(s.end_date) || normalizeDateToIso(s.date) || s.date,
+        endTime: s.end_time?.slice(0, 5) || undefined,
+        customerName: s.customer_name || s.passenger_name || '고객사',
+        route: `${s.origin || ''} → ${s.destination || ''}`,
+        operationStatus: s.operation_status || s.status,
+      }));
+
     const conflicting = activeSchedules.find((s) => {
-      const matchVehicleId = Boolean(v.uuid && s.vehicle_id && v.uuid === s.vehicle_id);
-      const sPlate = cleanVehicleIdentity(s.vehicle_plate || s.vehicle_no);
-      const matchPlate = sPlate === cleanPlate;
-      if (!matchVehicleId && !matchPlate) return false;
+      let matchVehicle = false;
+      if (v.uuid && s.vehicle_id) {
+        matchVehicle = v.uuid === s.vehicle_id;
+      } else if (cleanPlate) {
+        const sPlate = cleanVehicleIdentity(s.vehicle_plate || s.vehicle_no);
+        matchVehicle = Boolean(sPlate && sPlate === cleanPlate);
+      }
+      if (!matchVehicle) return false;
 
       const sStartDate = normalizeDateToIso(s.date);
       const sEndDate = normalizeDateToIso(s.end_date) || sStartDate;
@@ -294,6 +329,7 @@ export async function checkFleetAvailability(
           route: `${conflicting.origin} → ${conflicting.destination}`,
           timeSpan: `${conflicting.date} ${sStart} ~ ${conflicting.end_date || conflicting.date} ${sEnd}`,
         },
+        activeSchedules: vSchedules,
         defaultDriverName: driverName,
         defaultDriverPhone: driverPhone,
         isEnglishVerified: isEnglish,
@@ -312,6 +348,7 @@ export async function checkFleetAvailability(
       isAvailable: true,
       currentStatus: 'available',
       requestedIntervalStatus: 'available',
+      activeSchedules: vSchedules,
       defaultDriverName: driverName,
       defaultDriverPhone: driverPhone,
       isEnglishVerified: isEnglish,
@@ -336,9 +373,15 @@ export async function checkFleetAvailability(
       }
 
       const sDriver = cleanDriverIdentity(s.driver_name);
-      const matchDriverId = Boolean(p.id && s.driver_id && p.id === s.driver_id);
-      const matchDriverName = Boolean(sDriver && sDriver === cleanDrv);
-      if (!matchDriverId && !matchDriverName) return false;
+      let isDriverMatch = false;
+      if (p.id && s.driver_id) {
+        // Both have UUID: compare ONLY by UUID (same name with different UUID is NOT a conflict)
+        isDriverMatch = p.id === s.driver_id;
+      } else if (cleanDrv && sDriver) {
+        // Legacy fallback: at least one lacks UUID, compare by normalized name
+        isDriverMatch = cleanDrv === sDriver;
+      }
+      if (!isDriverMatch) return false;
 
       const sStartDate = normalizeDateToIso(s.date);
       const sEndDate = normalizeDateToIso(s.end_date) || sStartDate;

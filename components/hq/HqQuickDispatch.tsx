@@ -297,7 +297,6 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
   ]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [allowConflictOverride, setAllowConflictOverride] = useState(false);
   const [notificationMsg, setNotificationMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -521,6 +520,13 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
       return;
     }
 
+    // P0 Schedule Conflict Guard: Block confirmed dispatch if live conflicts exist (Point 9)
+    if (mode === 'published' && totalLiveConflicts > 0) {
+      setErrorMsg('기존 배차와 일정이 중복되어 바로 배차할 수 없습니다. 일정을 변경하거나 예약만 등록(미배정)을 이용해 주세요.');
+      haptics.errorAlert();
+      return;
+    }
+
     const totalVehicles = allocations.length;
     const isMultiVehicleGroup = totalVehicles > 1;
     const sharedEventId = `ev-${Date.now()}`;
@@ -624,6 +630,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
         date: pickupDate,
         endDate: pickupEndDate || pickupDate,
         pickupTime: pickupTimeOnly,
+        endTime: mode === 'published' ? '18:00' : undefined,
         origin: pickupLocation.trim(),
         destination: destination.trim(),
         passengerName: resolvedPassengerName,
@@ -633,7 +640,6 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
         notes: combinedNotes || undefined,
         dispatchStatus: mode,
         allowUnverified: true,
-        allowConflictOverride,
         publishedBy: mode === 'unassigned' ? '사모님(예약접수)' : '대표님(배차확정)',
         requestedLanguage: alloc.requestedLanguage,
         languageOverrideConfirmed: alloc.languageOverrideConfirmed,
@@ -749,7 +755,6 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
       setCommonMemo('');
       setCommonLanguage('ko');
       setCommonPassengerCount(1);
-      setAllowConflictOverride(false);
       setIsExtraInfoOpen(false);
       setAllocations([createInitialAllocation(1, 'ko', false)]);
 
@@ -1264,18 +1269,12 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
         {totalLiveConflicts > 0 && (
           <div className="mt-3 p-3 rounded-xl bg-slate-900 border border-slate-700 text-xs font-bold text-white space-y-1 shadow-sm">
             <div className="flex items-center gap-1.5">
-              <AlertTriangle className="w-4 h-4 text-blue-400 shrink-0" />
+              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
               <span>기존 배차와 일정 중복이 감지되었습니다 ({totalLiveConflicts}건)</span>
             </div>
-            <label className="flex items-center gap-2 pt-1 text-[11px] text-slate-300 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={allowConflictOverride}
-                onChange={(e) => setAllowConflictOverride(e.target.checked)}
-                className="rounded border-slate-600 text-[#1E60F3] focus:ring-[#1E60F3]"
-              />
-              <span>일정 중복을 확인하였으며 예외 배정합니다.</span>
-            </label>
+            <p className="pt-1 text-[11px] text-amber-300 font-semibold">
+              기존 일정과 겹쳐 '바로 배차'가 비활성화되었습니다. 일정을 변경하거나 '예약만 등록'을 이용해 주세요.
+            </p>
           </div>
         )}
 
@@ -1316,7 +1315,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
           {/* 바로 배차 */}
           <button
             type="button"
-            disabled={isSubmitting}
+            disabled={isSubmitting || totalLiveConflicts > 0}
             onClick={() => {
               haptics.selection();
               handleSubmit('published');

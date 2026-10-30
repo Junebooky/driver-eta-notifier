@@ -370,15 +370,11 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     chargingSpecs: {
       front: {
         status: 'confirmed',
-        usbA: 1,
-        usbC: 2,
-        notes: 'USB-C 2개, USB-A 1개',
+        notes: 'USB 총 3개 (상세 규격 미확인)',
       },
       rear: {
         status: 'confirmed',
-        cigar12v: 1,
-        ac220v: true,
-        notes: '12V 차량용 시가잭 1개, 220V 1개',
+        notes: '시거잭 + 220V 콘센트 (수량·위치 현장 확인 필요)',
       },
     },
   },

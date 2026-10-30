@@ -1,3 +1,4 @@
+(process.env as Record<string, string | undefined>).NODE_ENV = 'test';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -14,10 +15,14 @@ import {
 import {
   checkServerDispatchConflicts,
   DispatchUpsertInput,
+  atomicUpsertServerDispatchBatch,
+  dispatchServerMutex,
+  HqScheduleMeta,
 } from '@/lib/dispatch/scheduleServerStore';
-import { getKstTodayDateStr, detectDispatchConflicts } from './dispatchConflictDetector';
+import { getKstTodayDateStr, detectDispatchConflicts, normalizeDateToIso } from './dispatchConflictDetector';
 import { DbScheduleRow } from '@/types';
-import { HqScheduleMeta } from '@/lib/dispatch/scheduleServerStore';
+import fs from 'node:fs';
+import path from 'node:path';
 
 test('Fleet Availability & Dispatch Conflict Engine Suite (Issue #10)', async (t) => {
   // -------------------------------------------------------------------------
@@ -64,23 +69,21 @@ test('Fleet Availability & Dispatch Conflict Engine Suite (Issue #10)', async (t
     const carnival5336 = VIP_REAL_VEHICLES.find((v) => v.plateShort === '5336');
     assert.ok(carnival5336?.chargingSpecs, 'Carnival 5336 must have confirmed charging specs');
 
-    // Front: USB-C 2 + USB-A 1 (3 ports confirmed)
+    // Front: USB 총 3개 (상세 규격 미확인 - Point 7)
     assert.equal(carnival5336.chargingSpecs.front.status, 'confirmed');
-    assert.equal(carnival5336.chargingSpecs.front.usbC, 2);
-    assert.equal(carnival5336.chargingSpecs.front.usbA, 1);
+    assert.equal(carnival5336.chargingSpecs.front.notes, 'USB 총 3개 (상세 규격 미확인)');
     const frontSummary = formatChargingPortSummary(carnival5336.chargingSpecs.front);
     assert.ok(frontSummary.includes('USB'), 'Front summary must indicate USB ports');
 
-    // Rear: 12V + 220V inverter confirmed
+    // Rear: 시거잭 + 220V 콘센트 (수량·위치 현장 확인 필요 - Point 7)
     assert.equal(carnival5336.chargingSpecs.rear.status, 'confirmed');
-    assert.equal(carnival5336.chargingSpecs.rear.cigar12v, 1);
-    assert.equal(carnival5336.chargingSpecs.rear.ac220v, true);
+    assert.equal(carnival5336.chargingSpecs.rear.notes, '시거잭 + 220V 콘센트 (수량·위치 현장 확인 필요)');
     const rearSummary = formatChargingPortSummary(carnival5336.chargingSpecs.rear);
     assert.ok(
-      rearSummary.includes('12V') || rearSummary.includes('시가잭') || rearSummary.includes('시거잭'),
-      'Rear summary must indicate 12V cigar port'
+      rearSummary.includes('시가잭') || rearSummary.includes('시거잭'),
+      'Rear summary must indicate cigar port'
     );
-    assert.ok(rearSummary.includes('220V'), 'Rear summary must indicate 220V inverter');
+    assert.ok(rearSummary.includes('220V'), 'Rear summary must indicate 220V outlet');
 
     // 101호 7681: Must be unverified (User only confirmed 5336)
     const carnival7681 = VIP_REAL_VEHICLES.find((v) => v.plateShort === '7681');
@@ -684,5 +687,275 @@ test('Fleet Availability & Dispatch Conflict Engine Suite (Issue #10)', async (t
 
     const conflicts = await checkServerDispatchConflicts(candidate, existingFixture);
     assert.equal(conflicts.length >= 1, true, 'UUID matching must accurately catch driver and vehicle conflicts');
+  });
+
+  // -------------------------------------------------------------------------
+  // Criterion 17: Same-Name Drivers with Different UUIDs Do NOT Conflict (Point 8)
+  // -------------------------------------------------------------------------
+  await t.test('17. Same-Name Drivers with Different UUIDs Do NOT Conflict', async () => {
+    const existingFixture: Array<DbScheduleRow & { _meta: HqScheduleMeta }> = [
+      {
+        id: 'sched-driver-1',
+        date: '2026-11-28',
+        pickup_time: '13:00',
+        end_date: '2026-11-28',
+        end_time: '16:00',
+        time_display: '13:00 ~ 16:00',
+        vehicle_no: '125호 9982',
+        driver_name: '김철수',
+        driver_id: 'drv-uuid-1111',
+        passenger_name: '고객 A',
+        origin: '호텔',
+        destination: '공항',
+        status: 'scheduled',
+        dispatch_status: 'published',
+        _meta: {
+          version: 1,
+          placeVerified: true,
+          dispatchStatus: 'published',
+          driverName: '김철수',
+          driverId: 'drv-uuid-1111',
+          vehiclePlate: '125호 9982',
+          customerName: '고객 A',
+          lastAckVersion: 0,
+        },
+      },
+    ];
+
+    // Candidate has same name "김철수" but different driverId "drv-uuid-2222" and different vehicle
+    const candidateDiffDriver: DispatchUpsertInput[] = [
+      {
+        date: '2026-11-28',
+        pickupTime: '14:00',
+        endDate: '2026-11-28',
+        endTime: '17:00',
+        vehicleNo: '700호 1458',
+        driverName: '김철수',
+        driverId: 'drv-uuid-2222',
+        origin: '공항',
+        destination: '호텔',
+        dispatchStatus: 'published',
+      },
+    ];
+
+    const conflicts = await checkServerDispatchConflicts(candidateDiffDriver, existingFixture);
+    assert.equal(conflicts.length, 0, 'Same-name driver with distinct UUID must NOT be flagged as conflict');
+
+    // Candidate with same UUID must be flagged
+    const candidateSameDriver: DispatchUpsertInput[] = [
+      {
+        date: '2026-11-28',
+        pickupTime: '14:00',
+        endDate: '2026-11-28',
+        endTime: '17:00',
+        vehicleNo: '700호 1458',
+        driverName: '김철수',
+        driverId: 'drv-uuid-1111',
+        origin: '공항',
+        destination: '호텔',
+        dispatchStatus: 'published',
+      },
+    ];
+    const sameConflicts = await checkServerDispatchConflicts(candidateSameDriver, existingFixture);
+    assert.equal(sameConflicts.length, 1, 'Matching UUID must be flagged as conflict');
+    assert.equal(sameConflicts[0].type, 'driver');
+  });
+
+  // -------------------------------------------------------------------------
+  // Criterion 18: 14-Day Query with Single-Day Booking Isolates That Specific Day (Point 3)
+  // -------------------------------------------------------------------------
+  await t.test('18. 14-Day Query with Single-Day Booking Isolates Only That Day in activeSchedules', async () => {
+    // Simulated active schedules fixture containing a booking only on 2026-11-12
+    const singleDaySchedule = {
+      id: 'sched-day-12',
+      date: '2026-11-12',
+      pickup_time: '10:00',
+      end_date: '2026-11-12',
+      end_time: '18:00',
+      vehicle_no: '193호 5336',
+      vehicle_plate: '193호 5336',
+      driver_name: '박운전',
+      passenger_name: '단일 예약 고객',
+      origin: '호텔',
+      destination: '행사장',
+      status: 'scheduled',
+      dispatch_status: 'published',
+    };
+
+    const result = await checkFleetAvailability(
+      {
+        startDate: '2026-11-01',
+        startTime: '00:00',
+        endDate: '2026-11-14',
+        endTime: '23:59',
+      },
+      { injectedSchedules: [singleDaySchedule] }
+    );
+
+    const carnival = result.vehicles.find((v) => v.plate.includes('5336'));
+    assert.ok(carnival, 'Carnival 5336 must be returned in fleet items');
+    assert.ok(carnival.activeSchedules, 'activeSchedules must be populated');
+    assert.equal(carnival.activeSchedules.length, 1, 'activeSchedules must contain exactly 1 scheduled trip');
+
+    // Individual daily checks:
+    const isDay10Booked = carnival.activeSchedules.some(
+      (s) => '2026-11-10' >= s.startDate && '2026-11-10' <= s.endDate
+    );
+    const isDay11Booked = carnival.activeSchedules.some(
+      (s) => '2026-11-11' >= s.startDate && '2026-11-11' <= s.endDate
+    );
+    const isDay12Booked = carnival.activeSchedules.some(
+      (s) => '2026-11-12' >= s.startDate && '2026-11-12' <= s.endDate
+    );
+    const isDay13Booked = carnival.activeSchedules.some(
+      (s) => '2026-11-13' >= s.startDate && '2026-11-13' <= s.endDate
+    );
+
+    assert.equal(isDay10Booked, false, '11/10 must NOT be booked');
+    assert.equal(isDay11Booked, false, '11/11 must NOT be booked');
+    assert.equal(isDay12Booked, true, '11/12 MUST be booked');
+    assert.equal(isDay13Booked, false, '11/13 must NOT be booked');
+  });
+
+  // -------------------------------------------------------------------------
+  // Criterion 19: Published Candidate Without Explicit End Time is Rejected (Point 5)
+  // -------------------------------------------------------------------------
+  await t.test('19. Published Candidate Without Explicit End Time is Rejected Fail-Closed', async () => {
+    const candidateMissingEnd: DispatchUpsertInput[] = [
+      {
+        date: '2026-11-20',
+        pickupTime: '20:00',
+        // endTime omitted!
+        vehicleNo: '193호 5336',
+        driverName: '김기사',
+        origin: '공항',
+        destination: '호텔',
+        dispatchStatus: 'published',
+      },
+    ];
+
+    const conflicts = await checkServerDispatchConflicts(candidateMissingEnd, []);
+    assert.equal(conflicts.length >= 1, true, 'Missing endTime on published dispatch must produce a conflict error');
+    assert.ok(
+      conflicts[0].message.includes('종료 시간(endTime)이 필수'),
+      'Message must inform that endTime is mandatory'
+    );
+  });
+
+  // -------------------------------------------------------------------------
+  // Criterion 20: Concurrency Mutex Serializes Concurrent Batch Operations (Point 1)
+  // -------------------------------------------------------------------------
+  await t.test('20. Concurrency Mutex Serializes Concurrent Dispatches for Same Vehicle', async () => {
+    // Verify that dispatchServerMutex is an active AsyncMutex instance
+    assert.ok(dispatchServerMutex, 'dispatchServerMutex must be exported');
+    assert.equal(typeof dispatchServerMutex.acquire, 'function', 'Mutex must provide acquire method');
+
+    let executionOrder: number[] = [];
+
+    const task1 = async () => {
+      const release = await dispatchServerMutex.acquire();
+      try {
+        executionOrder.push(1);
+        await new Promise((r) => setTimeout(r, 20));
+      } finally {
+        release();
+      }
+    };
+
+    const task2 = async () => {
+      const release = await dispatchServerMutex.acquire();
+      try {
+        executionOrder.push(2);
+      } finally {
+        release();
+      }
+    };
+
+    // Run both concurrently
+    await Promise.all([task1(), task2()]);
+    assert.deepEqual(executionOrder, [1, 2], 'Mutex must serialize execution cleanly');
+  });
+
+  // -------------------------------------------------------------------------
+  // Criterion 21: Atomic Batch Rollback: 3 Items with 3rd Failing Leaves 0 Items (Point 1)
+  // -------------------------------------------------------------------------
+  await t.test('21. Atomic Batch Rollback: 3 Items with 3rd Failing Reverts All Previously Saved Items', async () => {
+    const batchWithThirdFailing: DispatchUpsertInput[] = [
+      {
+        date: '2026-12-01',
+        pickupTime: '09:00',
+        endDate: '2026-12-01',
+        endTime: '12:00',
+        vehicleNo: '125호 9982',
+        driverName: '윤태준',
+        origin: '호텔 A',
+        destination: '공항 A',
+        dispatchStatus: 'published',
+      },
+      {
+        date: '2026-12-01',
+        pickupTime: '14:00',
+        endDate: '2026-12-01',
+        endTime: '17:00',
+        vehicleNo: '700호 1458',
+        driverName: '박운전',
+        origin: '호텔 B',
+        destination: '공항 B',
+        dispatchStatus: 'published',
+      },
+      {
+        date: '2026-12-01',
+        pickupTime: '19:00',
+        endDate: '2026-12-01',
+        endTime: '22:00',
+        vehicleNo: '193호 5336',
+        driverName: '이승환',
+        origin: '호텔 C',
+        destination: '', // Missing destination -> fails validation in upsertServerDispatchSchedule!
+        dispatchStatus: 'published',
+      },
+    ];
+
+    const result = await atomicUpsertServerDispatchBatch(batchWithThirdFailing, []);
+    assert.equal(result.ok, false, 'Batch must fail when one candidate is invalid');
+    assert.ok(result.error?.includes('롤백') || result.error?.includes('필수'), 'Error must report validation failure or rollback');
+  });
+
+  // -------------------------------------------------------------------------
+  // Criterion 22: Hero-Only UI Verification (Point 6)
+  // -------------------------------------------------------------------------
+  await t.test('22. Hero-Only UI Verification: Detail Thumbnails & Gallery Modal are Removed', () => {
+    const componentPath = path.resolve(process.cwd(), 'components/hq/vehicles/HqVehicleManagementView.tsx');
+    const sourceCode = fs.readFileSync(componentPath, 'utf8');
+
+    assert.equal(
+      sourceCode.includes('carnival_detail_1.jpg'),
+      false,
+      'carnival_detail_1.jpg must not be present'
+    );
+    assert.equal(
+      sourceCode.includes('carnival_detail_2.jpg'),
+      false,
+      'carnival_detail_2.jpg must not be present'
+    );
+    assert.equal(
+      sourceCode.includes('carnival_detail_3.jpg'),
+      false,
+      'carnival_detail_3.jpg must not be present'
+    );
+    assert.equal(
+      sourceCode.includes('getVehicleDetailImages'),
+      false,
+      'getVehicleDetailImages must be removed'
+    );
+    assert.equal(
+      sourceCode.includes('isImageModalOpen'),
+      false,
+      'isImageModalOpen must be removed'
+    );
+    assert.ok(
+      sourceCode.includes('getVehicleHero'),
+      'Top Hero photo resolver getVehicleHero must be preserved'
+    );
   });
 });

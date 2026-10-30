@@ -4,9 +4,11 @@ import {
   DispatchUpsertInput,
   upsertServerDispatchSchedule,
   queryServerSchedules,
+  atomicUpsertServerDispatchBatch,
 } from '@/lib/dispatch/scheduleServerStore';
 import { ScheduleItem } from '@/data/ferrariSchedules';
 import { requireHqAdmin } from '@/lib/auth/serverAuth';
+import { timeHHmmToMinutes, normalizeDateToIso } from '@/utils/dispatchConflictDetector';
 
 function normalizePayloadItem(raw: Record<string, any>, rootBody: Record<string, any>): DispatchUpsertInput {
   return {
@@ -53,7 +55,6 @@ function normalizePayloadItem(raw: Record<string, any>, rootBody: Record<string,
     dispatchStatus: raw.dispatchStatus || rootBody.dispatchStatus || 'published',
     placeVerified: raw.placeVerified,
     allowUnverified: raw.allowUnverified ?? rootBody.allowUnverified ?? false,
-    allowConflictOverride: raw.allowConflictOverride ?? rootBody.allowConflictOverride ?? false,
     publishedBy: raw.publishedBy || rootBody.publishedBy || '대표님/관리자',
     customerBrochure: raw.customerBrochure,
     requestedLanguage: raw.requestedLanguage,
@@ -88,6 +89,47 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      // Mandatory explicit endTime validation for published dispatch (Point 5)
+      if (cand.dispatchStatus === 'published') {
+        if (!cand.endTime || !cand.endTime.trim()) {
+          return NextResponse.json(
+            {
+              ok: false,
+              code: 'END_TIME_REQUIRED_FOR_PUBLISHED_DISPATCH',
+              error: '배차 확정(published)을 위해서는 명시적인 운행 종료 시간(endTime: HH:mm)이 필수입니다. 종료 시간을 입력해 주세요.',
+            },
+            { status: 400 }
+          );
+        }
+
+        const startMin = timeHHmmToMinutes(cand.pickupTime);
+        const endMin = timeHHmmToMinutes(cand.endTime);
+        const candStartDate = normalizeDateToIso(cand.date);
+        const candEndDate = normalizeDateToIso(cand.endDate || cand.date);
+
+        if (startMin === null || endMin === null) {
+          return NextResponse.json(
+            {
+              ok: false,
+              code: 'INVALID_TIME_FORMAT',
+              error: '유효한 시간(HH:mm) 형식을 입력해 주세요.',
+            },
+            { status: 400 }
+          );
+        }
+
+        if (candStartDate === candEndDate && endMin <= startMin) {
+          return NextResponse.json(
+            {
+              ok: false,
+              code: 'INVALID_TIME_INTERVAL',
+              error: '종료 시간은 출발(픽업) 시간보다 이후여야 합니다.',
+            },
+            { status: 400 }
+          );
+        }
+      }
+
       // Server-side guard for email intake (Issue #33 P0 audit)
       if (cand.intakeSource === 'email' && cand.dispatchStatus === 'published') {
         if (
@@ -115,36 +157,31 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // P0 Strict Server-side Driver & Vehicle Schedule Conflict Guard (Zero arbitrary bypass)
-    const conflicts = await checkServerDispatchConflicts(candidates);
-    if (conflicts.length > 0) {
-      return NextResponse.json(
-        {
-          ok: false,
-          code: 'SCHEDULE_CONFLICT',
-          error: conflicts[0].message,
-          conflicts,
-        },
-        { status: 409 }
-      );
-    }
-
-    const savedSchedules: ScheduleItem[] = [];
-    for (const cand of candidates) {
-      const result = await upsertServerDispatchSchedule(cand);
-      if (result.error || !result.schedule) {
+    // P0 Concurrency Mutex & Atomic Batch Upsert Guard with All-or-Nothing Rollback (Point 1)
+    const batchResult = await atomicUpsertServerDispatchBatch(candidates);
+    if (!batchResult.ok) {
+      if (batchResult.conflicts && batchResult.conflicts.length > 0) {
         return NextResponse.json(
           {
             ok: false,
-            code: result.error?.includes('미확인 장소') ? 'UNRESOLVED_PLACE_GUARD' : 'DISPATCH_SAVE_FAILED',
-            error: result.error || '배차 저장에 실패했습니다.',
+            code: 'SCHEDULE_CONFLICT',
+            error: batchResult.error || batchResult.conflicts[0].message,
+            conflicts: batchResult.conflicts,
           },
-          { status: result.statusCode || 400 }
+          { status: 409 }
         );
       }
-      savedSchedules.push(result.schedule);
+      return NextResponse.json(
+        {
+          ok: false,
+          code: batchResult.error?.includes('미확인 장소') ? 'UNRESOLVED_PLACE_GUARD' : 'DISPATCH_SAVE_FAILED',
+          error: batchResult.error || '배차 저장에 실패했습니다.',
+        },
+        { status: batchResult.statusCode || 400 }
+      );
     }
 
+    const savedSchedules = batchResult.schedules || [];
     const primary = savedSchedules[0];
     const nowIso = new Date().toISOString();
 
