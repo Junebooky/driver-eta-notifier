@@ -92,25 +92,57 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
   const requestedVehicleClass = extractedDraft?.requestedVehicleClass || '차량 미지정';
   const specialRequests = extractedDraft?.specialRequests || '';
 
-  // Multi-destination waypoints check
+  // Multi-destination waypoints check & Multi-day grouping
   const waypoints: RouteWaypointItem[] = extractedDraft?.waypoints || [];
   const hasMultipleWaypoints = waypoints.length > 2;
+
+  // Extract unique dates for multi-day itineraries
+  const waypointDates = waypoints
+    .map((w) => (w.date || (pickupDate !== '날짜 미지정' ? pickupDate : '')).trim())
+    .filter(Boolean);
+  const uniqueDates = Array.from(new Set(waypointDates));
+  const hasMultipleDates = uniqueDates.length > 1;
+
+  // Count stops per date
+  const dateStopCounts = waypoints.reduce<Record<string, number>>((acc, w) => {
+    const d = (w.date || (pickupDate !== '날짜 미지정' ? pickupDate : '')).trim();
+    if (d) acc[d] = (acc[d] || 0) + 1;
+    return acc;
+  }, {});
+
+  // Date formatting helper for dividers and badges
+  const formatWaypointDate = (dateStr: string, dayIndex?: number): string => {
+    if (!dateStr || dateStr === '날짜 미지정') return '날짜 미지정';
+    const clean = dateStr.replace(/\s*\([^)]*\)/g, '').trim();
+    const daySuffix = dayIndex ? ` [${dayIndex}일차]` : '';
+    const m = clean.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (m) {
+      const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+      const days = ['일', '월', '화', '수', '목', '금', '토'];
+      const dow = days[d.getDay()];
+      return `${clean} (${dow})${daySuffix}`;
+    }
+    return `${dateStr}${daySuffix}`;
+  };
 
   // Add a new waypoint in multi-destination mode
   const handleAddWaypoint = () => {
     if (!extractedDraft) return;
     haptics.lightTap();
+    const fallbackDate = pickupDate !== '날짜 미지정' ? pickupDate : '';
     const currentWps = extractedDraft.waypoints && extractedDraft.waypoints.length > 0
       ? [...extractedDraft.waypoints]
       : [
-          { id: 'wp-1', order: 1, time: pickupTime !== '시간 미지정' ? pickupTime : '10:00', location: pickupLocation || '' },
-          { id: 'wp-2', order: 2, time: '', location: dropoffLocation || '' },
+          { id: 'wp-1', order: 1, date: fallbackDate, time: pickupTime !== '시간 미지정' ? pickupTime : '10:00', location: pickupLocation || '' },
+          { id: 'wp-2', order: 2, date: fallbackDate, time: '', location: dropoffLocation || '' },
         ];
     
     const nextIdx = currentWps.length + 1;
+    const lastDate = currentWps[currentWps.length - 1]?.date || fallbackDate;
     const newWp: RouteWaypointItem = {
       id: `wp-${Date.now()}-${nextIdx}`,
       order: nextIdx,
+      date: lastDate,
       time: '',
       location: '',
     };
@@ -134,7 +166,20 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
       waypoints: isStillMulti ? reordered : undefined,
       pickupLocation: reordered[0]?.location || extractedDraft.pickupLocation,
       pickupTime: reordered[0]?.time || extractedDraft.pickupTime,
+      pickupDate: reordered[0]?.date || extractedDraft.pickupDate,
       dropoffLocation: reordered[reordered.length - 1]?.location || extractedDraft.dropoffLocation,
+    });
+  };
+
+  // Update waypoint date
+  const handleUpdateWaypointDate = (wpId: string, newDate: string) => {
+    if (!extractedDraft || !extractedDraft.waypoints) return;
+    const updated = extractedDraft.waypoints.map((w) => (w.id === wpId ? { ...w, date: newDate } : w));
+    const isFirst = updated[0]?.id === wpId;
+    onUpdateDraft?.({
+      ...extractedDraft,
+      waypoints: updated,
+      pickupDate: isFirst && newDate ? newDate : extractedDraft.pickupDate,
     });
   };
 
@@ -167,10 +212,12 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
   const handleConvertToMultiDestination = () => {
     if (!extractedDraft) return;
     haptics.lightTap();
+    const fallbackDate = pickupDate !== '날짜 미지정' ? pickupDate : '';
     const newWaypoints: RouteWaypointItem[] = [
       {
         id: 'wp-1',
         order: 1,
+        date: fallbackDate,
         time: pickupTime !== '시간 미지정' ? pickupTime : '10:00',
         location: pickupLocation || '인천공항 제1터미널 (T1)',
         isPoiConfirmed: isPickupPoiConfirmed,
@@ -178,12 +225,14 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
       {
         id: 'wp-2',
         order: 2,
+        date: fallbackDate,
         time: '12:00',
         location: '중간 경유지 입력',
       },
       {
         id: 'wp-3',
         order: 3,
+        date: fallbackDate,
         time: '14:00',
         location: dropoffLocation || '최종 목적지 입력',
         isPoiConfirmed: isDropoffPoiConfirmed,
@@ -518,7 +567,18 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                   <span>운행 일시</span>
                 </div>
                 <div className="font-extrabold text-slate-900 text-right flex items-center gap-2 justify-end">
-                  <span>{pickupDate}</span>
+                  {hasMultipleDates ? (
+                    <>
+                      <span className="px-1.5 py-0.5 rounded bg-blue-50 text-[#1E60F3] text-[10px] font-black border border-blue-200/60">
+                        {uniqueDates.length}일간 일정
+                      </span>
+                      <span>
+                        {uniqueDates[0]} ~ {uniqueDates[uniqueDates.length - 1]}
+                      </span>
+                    </>
+                  ) : (
+                    <span>{pickupDate}</span>
+                  )}
                   <span className="inline-flex items-center gap-1 text-slate-700 font-bold">
                     <Clock className="w-3.5 h-3.5 text-slate-400" />
                     <span>{pickupTime}</span>
@@ -541,6 +601,11 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                       <span className="px-2 py-0.5 rounded-full bg-blue-50 text-[#1E60F3] text-[11px] font-extrabold border border-blue-100 shrink-0">
                         {waypoints.length}개
                       </span>
+                      {hasMultipleDates && (
+                        <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[10px] font-black border border-indigo-100 shrink-0">
+                          {uniqueDates.length}일간 순회
+                        </span>
+                      )}
                     </div>
 
                     <button
@@ -553,67 +618,104 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                     </button>
                   </div>
 
-                  {/* Waypoint Rows */}
+                  {/* Waypoint Rows with Intermediate Date Separators */}
                   <div className="space-y-1.5">
-                    {waypoints.map((wp, index) => (
-                      <div
-                        key={wp.id}
-                        draggable
-                        onDragStart={() => handleDragStart(index)}
-                        onDragOver={(e) => handleDragOver(e, index)}
-                        onDragEnd={handleDragEnd}
-                        className={`flex items-center gap-1.5 group transition-all ${
-                          draggedIndex === index ? 'opacity-40' : 'opacity-100'
-                        }`}
-                      >
-                        {/* Drag handle (6 dots ⋮⋮) */}
-                        <div
-                          className="text-slate-300 group-hover:text-slate-500 cursor-grab px-0.5 shrink-0 flex items-center"
-                          title="드래그하여 순서 변경"
-                        >
-                          <GripVertical className="w-3.5 h-3.5" />
-                        </div>
+                    {waypoints.map((wp, index) => {
+                      const currentDate = (wp.date || (pickupDate !== '날짜 미지정' ? pickupDate : '')).trim();
+                      const prevDate = index > 0 ? (waypoints[index - 1].date || (pickupDate !== '날짜 미지정' ? pickupDate : '')).trim() : null;
+                      const isDateChanged = index === 0 ? Boolean(currentDate) : Boolean(currentDate && currentDate !== prevDate);
+                      const dayIdx = uniqueDates.indexOf(currentDate) >= 0 ? uniqueDates.indexOf(currentDate) + 1 : undefined;
 
-                        {/* Number circle badge */}
-                        <div className="w-5 h-5 rounded-full bg-[#1E60F3] text-white font-extrabold text-[11px] flex items-center justify-center shrink-0 shadow-2xs">
-                          {index + 1}
-                        </div>
+                      return (
+                        <React.Fragment key={wp.id}>
+                          {/* Intermediate Date Divider (중간 날짜구분 헤더) */}
+                          {isDateChanged && (
+                            <div className={`flex items-center gap-2 ${index === 0 ? 'pt-1 pb-1.5' : 'pt-3.5 pb-1.5'} px-0.5`}>
+                              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-50/90 border border-blue-200/80 text-[#1E60F3] text-[11px] font-black tracking-tight shadow-2xs shrink-0">
+                                <Calendar className="w-3.5 h-3.5 text-[#1E60F3]" />
+                                <span>{formatWaypointDate(currentDate, hasMultipleDates ? dayIdx : undefined)}</span>
+                              </div>
+                              <div className="flex-1 h-px bg-gradient-to-r from-blue-200/80 via-slate-200 to-transparent" />
+                              <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-200/60 shrink-0">
+                                {dateStopCounts[currentDate] || 1}개 목적지
+                              </span>
+                            </div>
+                          )}
 
-                        {/* Time input pill */}
-                        <div className="flex items-center gap-1 px-1.5 py-1 rounded-lg border border-slate-200 bg-white shadow-2xs shrink-0 focus-within:border-blue-400">
-                          <Clock className="w-3 h-3 text-slate-400 shrink-0" />
-                          <input
-                            type="text"
-                            value={wp.time || ''}
-                            onChange={(e) => handleUpdateWaypointTime(wp.id, e.target.value)}
-                            placeholder="10:00"
-                            className="w-11 text-[11px] font-semibold text-slate-800 bg-transparent outline-none"
-                          />
-                        </div>
+                          <div
+                            draggable
+                            onDragStart={() => handleDragStart(index)}
+                            onDragOver={(e) => handleDragOver(e, index)}
+                            onDragEnd={handleDragEnd}
+                            className={`flex items-center gap-1.5 group transition-all ${
+                              draggedIndex === index ? 'opacity-40' : 'opacity-100'
+                            }`}
+                          >
+                            {/* Drag handle (6 dots ⋮⋮) */}
+                            <div
+                              className="text-slate-300 group-hover:text-slate-500 cursor-grab px-0.5 shrink-0 flex items-center"
+                              title="드래그하여 순서 변경"
+                            >
+                              <GripVertical className="w-3.5 h-3.5" />
+                            </div>
 
-                        {/* Location text input */}
-                        <div className="flex-1 min-w-0">
-                          <input
-                            type="text"
-                            value={wp.location}
-                            onChange={(e) => handleUpdateWaypointLocation(wp.id, e.target.value)}
-                            placeholder={`목적지 ${index + 1} 입력`}
-                            className="w-full px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none shadow-2xs transition-all"
-                          />
-                        </div>
+                            {/* Number circle badge */}
+                            <div className="w-5 h-5 rounded-full bg-[#1E60F3] text-white font-extrabold text-[11px] flex items-center justify-center shrink-0 shadow-2xs">
+                              {index + 1}
+                            </div>
 
-                        {/* Delete button (✕) */}
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveWaypoint(wp.id)}
-                          disabled={waypoints.length <= 2}
-                          className="p-1 text-slate-300 hover:text-slate-600 disabled:opacity-20 disabled:hover:text-slate-300 transition-colors cursor-pointer shrink-0"
-                          title={waypoints.length <= 2 ? '최소 2개(출발/도착) 이상의 장소가 필요합니다' : '목적지 삭제'}
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
+                            {/* Date input pill */}
+                            <div
+                              className="flex items-center gap-1 px-1.5 py-1 rounded-lg border border-slate-200 bg-white shadow-2xs shrink-0 focus-within:border-blue-400"
+                              title="경유지 날짜 (YYYY-MM-DD)"
+                            >
+                              <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
+                              <input
+                                type="text"
+                                value={wp.date || (index === 0 && pickupDate !== '날짜 미지정' ? pickupDate : '')}
+                                onChange={(e) => handleUpdateWaypointDate(wp.id, e.target.value)}
+                                placeholder="YYYY-MM-DD"
+                                className="w-[74px] text-[11px] font-semibold text-slate-800 bg-transparent outline-none"
+                              />
+                            </div>
+
+                            {/* Time input pill */}
+                            <div className="flex items-center gap-1 px-1.5 py-1 rounded-lg border border-slate-200 bg-white shadow-2xs shrink-0 focus-within:border-blue-400">
+                              <Clock className="w-3 h-3 text-slate-400 shrink-0" />
+                              <input
+                                type="text"
+                                value={wp.time || ''}
+                                onChange={(e) => handleUpdateWaypointTime(wp.id, e.target.value)}
+                                placeholder="10:00"
+                                className="w-11 text-[11px] font-semibold text-slate-800 bg-transparent outline-none"
+                              />
+                            </div>
+
+                            {/* Location text input */}
+                            <div className="flex-1 min-w-0">
+                              <input
+                                type="text"
+                                value={wp.location}
+                                onChange={(e) => handleUpdateWaypointLocation(wp.id, e.target.value)}
+                                placeholder={`목적지 ${index + 1} 입력`}
+                                className="w-full px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none shadow-2xs transition-all"
+                              />
+                            </div>
+
+                            {/* Delete button (✕) */}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveWaypoint(wp.id)}
+                              disabled={waypoints.length <= 2}
+                              className="p-1 text-slate-300 hover:text-slate-600 disabled:opacity-20 disabled:hover:text-slate-300 transition-colors cursor-pointer shrink-0"
+                              title={waypoints.length <= 2 ? '최소 2개(출발/도착) 이상의 장소가 필요합니다' : '목적지 삭제'}
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </React.Fragment>
+                      );
+                    })}
                   </div>
                 </div>
               ) : (

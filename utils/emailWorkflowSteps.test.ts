@@ -112,7 +112,38 @@ if (abcDraft.waypoints[0].location !== '인천공항 제1터미널 (T1)' || abcD
 if (abcDraft.waypoints[5].location !== '조선팰리스 호텔' || abcDraft.waypoints[5].time !== '18:30') {
   throw new Error(`Final stop mismatch: ${JSON.stringify(abcDraft.waypoints[5])}`);
 }
+if (abcDraft.waypoints[0].date !== '2026-11-09') {
+  throw new Error(`Waypoint date missing or mismatch: ${abcDraft.waypoints[0].date}`);
+}
 console.log('✅ Test 5 Passed: Multi-destination 6-stop itinerary verified for ABC Korea.');
+
+// Test 6: Verify Multi-Day Intermediate Date Separation & Waypoint Date Grouping
+console.log('\n[Test 6] Verify Multi-Day Intermediate Date Separation & Waypoint Date Grouping...');
+const multiDayWaypoints = [
+  { id: 'wp-1', order: 1, date: '2026-10-28', time: '10:00', location: '인천공항 제1터미널' },
+  { id: 'wp-2', order: 2, date: '2026-10-28', time: '12:00', location: '조선팰리스 호텔' },
+  { id: 'wp-3', order: 3, date: '2026-10-29', time: '09:00', location: '조선팰리스 호텔' },
+  { id: 'wp-4', order: 4, date: '2026-10-29', time: '11:00', location: '성수동 쇼룸' },
+  { id: 'wp-5', order: 5, date: '2026-10-30', time: '14:00', location: '인천공항 제1터미널' },
+];
+
+const uniqueDates = Array.from(new Set(multiDayWaypoints.map((w) => w.date)));
+if (uniqueDates.length !== 3 || uniqueDates[0] !== '2026-10-28' || uniqueDates[2] !== '2026-10-30') {
+  throw new Error(`Unique dates calculation failed: ${JSON.stringify(uniqueDates)}`);
+}
+
+// Verify intermediate date change points (Day 1 -> Day 2 at index 2, Day 2 -> Day 3 at index 4)
+const dateChangeIndices = multiDayWaypoints
+  .map((w, idx) => {
+    const prev = idx > 0 ? multiDayWaypoints[idx - 1].date : null;
+    return idx === 0 || w.date !== prev ? idx : -1;
+  })
+  .filter((idx) => idx !== -1);
+
+if (dateChangeIndices.length !== 3 || dateChangeIndices[0] !== 0 || dateChangeIndices[1] !== 2 || dateChangeIndices[2] !== 4) {
+  throw new Error(`Date change indices mismatch: expected [0, 2, 4], got ${JSON.stringify(dateChangeIndices)}`);
+}
+console.log('✅ Test 6 Passed: Multi-day intermediate date change points and grouping verified.');
 
 console.log('\n🎉 ALL EMAIL 4-STEP WORKFLOW TESTS PASSED 100%!');
 

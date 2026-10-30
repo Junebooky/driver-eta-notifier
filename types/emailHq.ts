@@ -52,6 +52,7 @@ export interface VehicleSlotAssignment {
 export interface RouteWaypointItem {
   id: string;
   order: number;
+  date?: string; // YYYY-MM-DD or MM/DD (e.g. "2026-10-28")
   time?: string; // HH:MM (e.g. "10:00")
   location: string; // e.g. "인천공항 제1터미널 (T1)"
   lat?: number;

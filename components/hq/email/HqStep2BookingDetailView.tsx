@@ -433,26 +433,68 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
                       <MapPin className="w-3.5 h-3.5 text-[#1E60F3]" />
                       <span>운행 경로 (여러 목적지)</span>
                     </span>
-                    <span className="px-2 py-0.5 rounded-full bg-blue-50 text-[#1E60F3] font-extrabold text-[10px] border border-blue-200/50">
-                      {extractedDraft.waypoints.length}개 구간
-                    </span>
-                  </div>
-                  <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
-                    {extractedDraft.waypoints.map((wp, idx) => (
-                      <div key={wp.id} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-200/70 text-xs">
-                        <span className="w-5 h-5 rounded-full bg-[#1E60F3] text-white font-extrabold text-[10px] flex items-center justify-center shrink-0 shadow-2xs">
-                          {idx + 1}
-                        </span>
-                        {wp.time && (
-                          <span className="text-slate-500 font-bold shrink-0 text-[11px] px-1.5 py-0.5 bg-white rounded border border-slate-200">
-                            {wp.time}
+                    <div className="flex items-center gap-1.5">
+                      {(() => {
+                        const uniqueWpDates = Array.from(
+                          new Set(extractedDraft.waypoints.map((w) => (w.date || bookingDate || '').trim()).filter(Boolean))
+                        );
+                        return uniqueWpDates.length > 1 ? (
+                          <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-extrabold text-[10px] border border-indigo-200/50">
+                            {uniqueWpDates.length}일간 순회
                           </span>
-                        )}
-                        <span className="font-bold text-slate-900 truncate flex-1">
-                          {wp.location}
-                        </span>
-                      </div>
-                    ))}
+                        ) : null;
+                      })()}
+                      <span className="px-2 py-0.5 rounded-full bg-blue-50 text-[#1E60F3] font-extrabold text-[10px] border border-blue-200/50">
+                        {extractedDraft.waypoints.length}개 구간
+                      </span>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
+                    {(() => {
+                      const uniqueWpDates = Array.from(
+                        new Set(extractedDraft.waypoints.map((w) => (w.date || bookingDate || '').trim()).filter(Boolean))
+                      );
+                      const hasMultiDays = uniqueWpDates.length > 1;
+
+                      return extractedDraft.waypoints.map((wp, idx) => {
+                        const curDate = (wp.date || bookingDate || '').trim();
+                        const prevDate = idx > 0 ? (extractedDraft.waypoints![idx - 1].date || bookingDate || '').trim() : null;
+                        const isDateChanged = idx === 0 ? Boolean(curDate) : Boolean(curDate && curDate !== prevDate);
+                        const dayIdx = uniqueWpDates.indexOf(curDate) >= 0 ? uniqueWpDates.indexOf(curDate) + 1 : undefined;
+
+                        return (
+                          <React.Fragment key={wp.id}>
+                            {isDateChanged && (
+                              <div className={`flex items-center gap-1.5 ${idx === 0 ? 'pb-1' : 'pt-2.5 pb-1'}`}>
+                                <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 border border-blue-100 text-[#1E60F3] text-[10px] font-black">
+                                  <Calendar className="w-3 h-3 text-[#1E60F3]" />
+                                  <span>{curDate} {hasMultiDays && dayIdx ? `[${dayIdx}일차]` : ''}</span>
+                                </div>
+                                <div className="flex-1 h-px bg-slate-200" />
+                              </div>
+                            )}
+                            <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-200/70 text-xs">
+                              <span className="w-5 h-5 rounded-full bg-[#1E60F3] text-white font-extrabold text-[10px] flex items-center justify-center shrink-0 shadow-2xs">
+                                {idx + 1}
+                              </span>
+                              {wp.date && hasMultiDays && (
+                                <span className="text-slate-500 font-bold shrink-0 text-[10px] px-1.5 py-0.5 bg-white rounded border border-slate-200">
+                                  {wp.date}
+                                </span>
+                              )}
+                              {wp.time && (
+                                <span className="text-slate-500 font-bold shrink-0 text-[11px] px-1.5 py-0.5 bg-white rounded border border-slate-200">
+                                  {wp.time}
+                                </span>
+                              )}
+                              <span className="font-bold text-slate-900 truncate flex-1">
+                                {wp.location}
+                              </span>
+                            </div>
+                          </React.Fragment>
+                        );
+                      });
+                    })()}
                   </div>
                 </div>
               ) : (

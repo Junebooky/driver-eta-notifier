@@ -102,6 +102,7 @@ const BOOKING_RESPONSE_SCHEMA = {
       items: {
         type: Type.OBJECT,
         properties: {
+          date: { type: Type.STRING },
           time: { type: Type.STRING },
           location: { type: Type.STRING },
           notes: { type: Type.STRING },
@@ -277,10 +278,18 @@ ${cleanBody}
    - "pickupDetailNotes": Floor, gate, terminal details (e.g. "3층 출국장 7번 게이트 앞", "로비 1층").
    - "dropoffLocation": Final destination clean name for TMAP search.
    - "dropoffDetailNotes": Floor, building, dropoff zone details.
-   - "waypoints": If the client email contains a multi-stop daily schedule/itinerary (e.g. Incheon T1 10:00 -> Josun Palace 11:30 -> Seongsu 13:00 -> Myeongdong 15:30 -> Shilla 17:00 -> Josun Palace 18:30), extract EVERY stop in chronological order with "time" (HH:MM) and "location" (clean place name). If the email is for a simple 1-leg trip (single departure to destination), "waypoints" can be empty or omitted.
+   - "waypoints": If the client email contains a multi-stop daily schedule or multi-day itinerary (e.g. 1-day multi-stop or 2~5 day itinerary with intermediate dates), extract EVERY stop in chronological order with:
+     * "date": Exact date for this specific stop in YYYY-MM-DD format (e.g. "2026-10-28", "2026-10-29").
+       CRITICAL FOR MULTI-DAY ITINERARIES:
+       - Always extract the exact date for each waypoint stop. If the email separates stops by days (e.g. "10/28", "10/29", "Day 1", "Day 2", "1일차", "2일차", "다음날"), explicitly assign the corresponding "date" (YYYY-MM-DD) to every stop.
+       - If all stops are on the same single day, set "date" to the pickupDate for all waypoints.
+     * "time": Stop time (HH:MM 24h format, e.g. "10:00").
+     * "location": Clean place or landmark name for TMAP search (do not include floor/gate).
+     * "notes": Optional floor, gate, or stop note.
+     If the email is for a simple 1-leg trip (single departure to destination), "waypoints" can be empty or omitted.
    - "groupTrips": If the email contains multiple distinct vehicle dispatches or passenger sub-schedules for a group or event (e.g. Car 1: Mr. Kim, Incheon -> Conrad 10:00; Car 2: Mr. Lee, Gimpo -> Josun Palace 11:00), extract each sub-trip into "groupTrips" with passengerName, pickupLocation, dropoffLocation, pickupTime, vehicleClass, and notes. Also set "tripType": "group".
 4. DATE & TIME:
-   - "pickupDate": YYYY-MM-DD format.
+   - "pickupDate": Primary departure date in YYYY-MM-DD format. (For multi-day trips, this is the first day).
    - "pickupTime": HH:MM (24-hour format).
 5. FLIGHT & VEHICLE:
    - "flightNumber": e.g. "KE082", "AF264". If not an airport trip, return "".
@@ -375,13 +384,30 @@ ${cleanBody}
         ? parsed.tripType
         : 'single') as EmailTripType,
       waypoints: Array.isArray(parsed.waypoints) && parsed.waypoints.length > 1
-        ? parsed.waypoints.map((wp: any, idx: number) => ({
-            id: `wp-${idx + 1}`,
-            order: idx + 1,
-            time: String(wp.time || ''),
-            location: String(wp.location || ''),
-            notes: wp.notes ? String(wp.notes) : undefined,
-          }))
+        ? (() => {
+            let lastDate = String(parsed.pickupDate || '');
+            return parsed.waypoints.map((wp: any, idx: number) => {
+              let wpDate = wp.date ? String(wp.date).trim() : '';
+              if (wpDate) {
+                const mdMatch = wpDate.match(/^(\d{1,2})[/-](\d{1,2})$/);
+                if (mdMatch) {
+                  const year = lastDate ? lastDate.slice(0, 4) : todayKst.slice(0, 4);
+                  wpDate = `${year}-${mdMatch[1].padStart(2, '0')}-${mdMatch[2].padStart(2, '0')}`;
+                }
+                lastDate = wpDate;
+              } else if (lastDate) {
+                wpDate = lastDate;
+              }
+              return {
+                id: `wp-${idx + 1}`,
+                order: idx + 1,
+                date: wpDate || undefined,
+                time: String(wp.time || ''),
+                location: String(wp.location || ''),
+                notes: wp.notes ? String(wp.notes) : undefined,
+              };
+            });
+          })()
         : undefined,
       groupTrips: Array.isArray(parsed.groupTrips) && parsed.groupTrips.length > 0
         ? parsed.groupTrips.map((gt: any, idx: number) => ({
