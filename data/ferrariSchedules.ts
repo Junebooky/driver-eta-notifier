@@ -5,6 +5,8 @@ export interface ScheduleItem {
   vehicle_no?: string;
   date: string;
   dateLabel: string;
+  end_date?: string;
+  end_time?: string;
   pickup_time: string;
   dropoff_time: string | null;
   time_display: string;

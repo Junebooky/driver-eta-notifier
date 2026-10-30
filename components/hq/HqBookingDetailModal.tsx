@@ -144,6 +144,11 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
   );
 
   // Live conflict check in modal
+  const matchedDriver = useMemo(
+    () => liveDriverProfiles.find((d) => d.name === selectedDriverName),
+    [liveDriverProfiles, selectedDriverName]
+  );
+
   const modalConflicts = useMemo(() => {
     if (!booking || !isOpen) return [];
     return detectDispatchConflicts(
@@ -152,12 +157,17 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
         scheduleId: booking.scheduleId,
         pickupDate,
         pickupTime,
+        endDate: booking.endDate,
+        endTime: booking.endTime,
         driverName: selectedDriverName,
+        driverId: matchedDriver?.id || booking.driverId,
         vehiclePlate: selectedVehiclePlate,
+        vehicleId: booking.vehicleId,
+        serviceMode: booking.serviceMode,
       },
       existingBookings
     );
-  }, [booking, isOpen, pickupDate, pickupTime, selectedDriverName, selectedVehiclePlate, existingBookings]);
+  }, [booking, isOpen, pickupDate, pickupTime, selectedDriverName, matchedDriver?.id, selectedVehiclePlate, existingBookings]);
 
   if (!isOpen || !booking) return null;
 

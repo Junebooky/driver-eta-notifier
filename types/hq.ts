@@ -31,6 +31,8 @@ export interface HqBooking {
   customerName: string;
   pickupTime: string;
   pickupDate: string;
+  endDate?: string;
+  endTime?: string;
   pickupLocation: string;
   destination: string;
   driverName: string;

@@ -93,24 +93,29 @@ export function formatChargingPortSummary(spec?: VehicleChargingPortSpec | null)
   if (spec.status === 'none') {
     return '없음 (확인됨)';
   }
+  if (spec.notes) {
+    return spec.notes;
+  }
   const parts: string[] = [];
-  const usbTotal = (spec.usbA || 0) + (spec.usbC || 0);
-  if (spec.usbA && spec.usbC) {
-    parts.push(`USB 단자 ${usbTotal}개 (A타입 ${spec.usbA} / C타입 ${spec.usbC})`);
-  } else if (usbTotal > 0) {
-    parts.push(`USB 단자 ${usbTotal}개`);
+  const usbParts: string[] = [];
+  if (spec.usbC && spec.usbC > 0) usbParts.push(`USB-C ${spec.usbC}개`);
+  if (spec.usbA && spec.usbA > 0) usbParts.push(`USB-A ${spec.usbA}개`);
+  if (usbParts.length > 0) {
+    parts.push(usbParts.join(', '));
+  } else {
+    const usbTotal = (spec.usbA || 0) + (spec.usbC || 0);
+    if (usbTotal > 0) parts.push(`USB 단자 ${usbTotal}개`);
   }
   if (spec.cigar12v && spec.cigar12v > 0) {
-    parts.push(`12V 시거잭 ${spec.cigar12v}개`);
+    parts.push(`차량용 시가잭 ${spec.cigar12v}개`);
   }
   if (spec.ac220v) {
-    parts.push('220V 콘센트');
+    parts.push('220V 1개');
   }
   if (parts.length === 0) {
-    return spec.notes || '확인됨';
+    return '확인됨';
   }
-  const summary = parts.join(' + ');
-  return spec.notes ? `${summary} (${spec.notes})` : summary;
+  return parts.join(', ');
 }
 
 /**
@@ -330,7 +335,7 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     fuelType: '디젤',
   },
 
-  // 5. [기아 카니발 리무진] 1대
+  // 5. [기아 카니발 리무진] 1대 (충전 스펙 미확인 - 관리자 현장 확인 필요)
   {
     id: 'veh-cn-7681',
     uuid: 'e0f7c22a-0001-4c12-8800-000000007681',
@@ -345,22 +350,9 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     capacity: '7인승',
     status: '운행 중',
     fuelType: '가솔린',
-    chargingSpecs: {
-      front: {
-        status: 'confirmed',
-        usbA: 3,
-        notes: 'USB 포트 3개',
-      },
-      rear: {
-        status: 'confirmed',
-        cigar12v: 1,
-        ac220v: true,
-        notes: '12V 시거잭 1개 + 220V 인버터 콘센트',
-      },
-    },
   },
 
-  // 6. [기아 카니발 하이리무진] 1대
+  // 6. [기아 카니발 하이리무진] 1대 (사용자 스크린샷 193호 5336 확인 완료)
   {
     id: 'veh-cn-5336',
     uuid: 'e0f7c22a-0001-4c12-8800-000000005336',
@@ -378,14 +370,15 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     chargingSpecs: {
       front: {
         status: 'confirmed',
-        usbA: 3,
-        notes: 'USB 포트 3개',
+        usbA: 1,
+        usbC: 2,
+        notes: 'USB-C 2개, USB-A 1개',
       },
       rear: {
         status: 'confirmed',
         cigar12v: 1,
         ac220v: true,
-        notes: '12V 시거잭 1개 + 220V 인버터 콘센트',
+        notes: '12V 차량용 시가잭 1개, 220V 1개',
       },
     },
   },

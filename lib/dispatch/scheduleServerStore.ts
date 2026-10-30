@@ -591,11 +591,22 @@ export async function checkServerDispatchConflicts(
   const minStartIso = startDates[0];
   const maxEndIso = endDates[0];
 
+  // Helper to shift ISO date by N days
+  const shiftIsoDate = (iso: string, days: number): string => {
+    const [y, m, d] = iso.split('-').map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d + days));
+    return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}-${String(dt.getUTCDate()).padStart(2, '0')}`;
+  };
+
+  // Expand query window by 1 day on both sides to catch cross-midnight turnaround buffer collisions (e.g. 23:30 -> 00:10 next day)
+  const expandedMinStartIso = shiftIsoDate(minStartIso, -1);
+  const expandedMaxEndIso = shiftIsoDate(maxEndIso, 1);
+
   let rawRows: any[] = [];
   if (injectedExistingRows) {
     rawRows = injectedExistingRows;
   } else {
-    // Fetch active schedules that could possibly overlap with [minStartIso, maxEndIso]
+    // Fetch active schedules that could possibly overlap with [expandedMinStartIso, expandedMaxEndIso]
     const { data, error } = await supabaseAdmin
       .from('schedules')
       .select('*')
@@ -616,7 +627,7 @@ export async function checkServerDispatchConflicts(
     .filter((ex) => {
       const exStart = normalizeDateToIso(ex.date);
       const exEnd = normalizeDateToIso(ex.end_date) || exStart;
-      return exEnd >= minStartIso && exStart <= maxEndIso;
+      return exEnd >= expandedMinStartIso && exStart <= expandedMaxEndIso;
     });
 
   const conflicts: ServerConflictDetail[] = [];
@@ -634,6 +645,10 @@ export async function checkServerDispatchConflicts(
 
     const candDriver = cleanDriverIdentity(cand.driverName);
     const candPlate = cleanVehicleIdentity(cand.vehiclePlate || cand.vehicleNo);
+    const isCandVehicleOnly =
+      cand.serviceMode === 'vehicle_only' ||
+      cand.driverName === '기사 미배정' ||
+      cand.driverName === '자차 운행';
 
     for (const ex of existingRows) {
       if (cand.scheduleId && ex.id === cand.scheduleId) continue;
@@ -658,22 +673,39 @@ export async function checkServerDispatchConflicts(
       if (!isOverlap) continue;
 
       const exDriver = cleanDriverIdentity(ex.driver_name);
-      const exPlate = cleanVehicleIdentity(ex._meta.vehiclePlate || ex.vehicle_no);
-      const exTimeLabel = `${exStartDate} ${ex.pickup_time.slice(0, 5)} ~ ${exEndDate} ${hasRealEndTime ? ex.end_time!.slice(0, 5) : '종료 미확정'}`;
+      const exPlate = cleanVehicleIdentity(ex._meta?.vehiclePlate || ex.vehicle_no);
+      const isExVehicleOnly =
+        ex._meta?.serviceMode === 'vehicle_only' ||
+        ex.driver_name === '기사 미배정' ||
+        ex.driver_name === '자차 운행';
 
-      if (candDriver && exDriver && candDriver === exDriver) {
+      const exTimeLabel = `${exStartDate} ${ex.pickup_time.slice(0, 5)} ~ ${exEndDate} ${hasRealEndTime ? ex.end_time!.slice(0, 5) : '종료 미확정 (확인 필요)'}`;
+
+      // Driver Conflict (Skipped if either candidate or existing is vehicle-only)
+      const matchDriverId = Boolean(cand.driverId && ex.driver_id && cand.driverId === ex.driver_id);
+      const matchDriverName = Boolean(candDriver && exDriver && candDriver === exDriver);
+      const isDriverConflict = !isCandVehicleOnly && !isExVehicleOnly && (matchDriverId || matchDriverName);
+
+      if (isDriverConflict) {
         conflicts.push({
           type: 'driver',
-          target: candDriver,
+          target: cand.driverName || candDriver,
           conflictingScheduleId: ex.id,
           conflictingCustomer: ex._meta.customerName || ex.passenger_name || '기존 고객',
           conflictingTime: ex.pickup_time.slice(0, 5),
           conflictingRoute: `${ex.origin} → ${ex.destination}`,
-          message: `${candDriver} 기사는 ${exTimeLabel} (${ex._meta.customerName || ex.passenger_name}: ${ex.origin}→${ex.destination}) 배차와 일정이 겹칩니다.`,
+          message: hasRealEndTime
+            ? `${candDriver} 기사는 ${exTimeLabel} (${ex._meta.customerName || ex.passenger_name}: ${ex.origin}→${ex.destination}) 배차와 일정이 겹칩니다.`
+            : `[일정 충돌 주의] ${candDriver} 기사의 기존 배차(${exTimeLabel}) 종료 시간이 미확정 상태입니다. 중복 배차 방지를 위해 종료 시간을 먼저 확인해 주세요.`,
         });
       }
 
-      if (candPlate && exPlate && candPlate === exPlate) {
+      // Vehicle Conflict (Checked via Vehicle UUID or Plate)
+      const matchVehicleId = Boolean(cand.vehicleId && ex.vehicle_id && cand.vehicleId === ex.vehicle_id);
+      const matchVehiclePlate = Boolean(candPlate && exPlate && candPlate === exPlate);
+      const isVehicleConflict = matchVehicleId || matchVehiclePlate;
+
+      if (isVehicleConflict) {
         const vehLabel = cand.vehiclePlate || cand.vehicleNo || candPlate;
         conflicts.push({
           type: 'vehicle',
@@ -682,7 +714,9 @@ export async function checkServerDispatchConflicts(
           conflictingCustomer: ex._meta.customerName || ex.passenger_name || '기존 고객',
           conflictingTime: ex.pickup_time.slice(0, 5),
           conflictingRoute: `${ex.origin} → ${ex.destination}`,
-          message: `${vehLabel} 차량은 ${exTimeLabel} (${ex._meta.customerName || ex.passenger_name}: ${ex.origin}→${ex.destination}) 배차와 일정이 겹칩니다.`,
+          message: hasRealEndTime
+            ? `${vehLabel} 차량은 ${exTimeLabel} (${ex._meta.customerName || ex.passenger_name}: ${ex.origin}→${ex.destination}) 배차와 일정이 겹칩니다.`
+            : `[일정 충돌 주의] ${vehLabel} 차량의 기존 배차(${exTimeLabel}) 종료 시간이 미확정 상태입니다. 중복 배차 방지를 위해 종료 시간을 먼저 확인해 주세요.`,
         });
       }
     }
@@ -709,23 +743,34 @@ export async function checkServerDispatchConflicts(
 
       if (!isBatchOverlap) continue;
 
+      const isAVehicleOnly =
+        a.serviceMode === 'vehicle_only' || a.driverName === '기사 미배정' || a.driverName === '자차 운행';
+      const isBVehicleOnly =
+        b.serviceMode === 'vehicle_only' || b.driverName === '기사 미배정' || b.driverName === '자차 운행';
+
       const drvA = cleanDriverIdentity(a.driverName);
       const drvB = cleanDriverIdentity(b.driverName);
-      if (drvA && drvB && drvA === drvB) {
+      const matchDriverId = Boolean(a.driverId && b.driverId && a.driverId === b.driverId);
+      const matchDriverName = Boolean(drvA && drvB && drvA === drvB);
+
+      if (!isAVehicleOnly && !isBVehicleOnly && (matchDriverId || matchDriverName)) {
         conflicts.push({
           type: 'driver',
-          target: drvA,
+          target: a.driverName || drvA,
           conflictingScheduleId: 'intra-batch',
           conflictingCustomer: b.customerName || '동일 행사 타 호차',
           conflictingTime: normalizeTimeHHmm(b.pickupTime),
           conflictingRoute: `${b.origin} → ${b.destination}`,
-          message: `복수 차량 배차 내 ${i + 1}호차와 ${j + 1}호차에 동일 기사(${drvA})가 중복 선택되었습니다.`,
+          message: `복수 차량 배차 내 ${i + 1}호차와 ${j + 1}호차에 동일 기사(${a.driverName || drvA})가 중복 선택되었습니다.`,
         });
       }
 
       const pltA = cleanVehicleIdentity(a.vehiclePlate || a.vehicleNo);
       const pltB = cleanVehicleIdentity(b.vehiclePlate || b.vehicleNo);
-      if (pltA && pltB && pltA === pltB) {
+      const matchVehicleId = Boolean(a.vehicleId && b.vehicleId && a.vehicleId === b.vehicleId);
+      const matchVehiclePlate = Boolean(pltA && pltB && pltA === pltB);
+
+      if (matchVehicleId || matchVehiclePlate) {
         const label = a.vehiclePlate || a.vehicleNo || pltA;
         conflicts.push({
           type: 'vehicle',

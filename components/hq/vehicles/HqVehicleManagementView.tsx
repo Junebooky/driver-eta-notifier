@@ -31,18 +31,35 @@ import {
   VehicleUiCategoryKey,
   mapVehicleToUiCategory,
 } from '@/utils/vehicleData';
-import { getKstTodayDateStr } from '@/utils/dispatchConflictDetector';
+import {
+  getKstTodayDateStr,
+  normalizeDateToIso,
+  cleanVehicleIdentity,
+  isBookingActiveForConflict,
+} from '@/utils/dispatchConflictDetector';
+import { HqBooking } from '@/types/hq';
+import { FleetAvailabilityResult } from '@/utils/availabilityEngine';
 import { haptics } from '@/utils/haptics';
 
 export interface HqVehicleManagementViewProps {
   initialSearchQuery?: string;
+  bookings?: HqBooking[];
 }
 
 export type FuelTypeFilter = 'all' | '휘발유' | '경유' | '하이브리드';
+export type AvailabilityDayStatus =
+  | '예약 가능'
+  | '예약 있음'
+  | '운행 중'
+  | '정비 중'
+  | '확인 중...'
+  | '확인 불가'
+  | '미확인';
 
 // Helper to get thumbnail image matching the mockup
 function getVehicleThumb(v: VipRealVehicle): string {
-  if (v.plateShort === '5336' || v.plateShort === '7681') return '/images/thumb_carnival.jpg';
+  if (v.plateShort === '5336') return '/images/thumb_carnival.jpg';
+  if (v.category === 'carnival') return '/images/thumb_carnival.jpg';
   if (v.category === 'staria') return '/images/thumb_staria.jpg';
   if (v.category === 'sprinter') return '/images/thumb_sprinter.jpg';
   if (v.category === 'genesis' && v.model.includes('GV80')) return '/images/thumb_gv80.jpg';
@@ -51,7 +68,8 @@ function getVehicleThumb(v: VipRealVehicle): string {
 
 // Helper to get Hero image matching the mockup
 function getVehicleHero(v: VipRealVehicle): string {
-  if (v.plateShort === '5336' || v.plateShort === '7681') return '/images/carnival_hero.jpg';
+  if (v.plateShort === '5336') return '/images/carnival_hero.jpg';
+  if (v.category === 'carnival') return '/images/thumb_carnival.jpg';
   if (v.category === 'staria') return '/images/thumb_staria.jpg';
   if (v.category === 'sprinter') return '/images/thumb_sprinter.jpg';
   if (v.category === 'genesis' && v.model.includes('GV80')) return '/images/thumb_gv80.jpg';
@@ -60,7 +78,7 @@ function getVehicleHero(v: VipRealVehicle): string {
 
 // 3 detail thumbnails under '차량 이미지'
 function getVehicleDetailImages(v: VipRealVehicle): string[] {
-  if (v.plateShort === '5336' || v.category === 'carnival') {
+  if (v.plateShort === '5336') {
     return [
       '/images/carnival_detail_1.jpg',
       '/images/carnival_detail_2.jpg',
@@ -70,54 +88,35 @@ function getVehicleDetailImages(v: VipRealVehicle): string[] {
   return [
     getVehicleThumb(v),
     getVehicleHero(v),
-    '/images/carnival_detail_3.jpg',
+    getVehicleThumb(v),
   ];
 }
 
-// Specific vehicle tips matching mockup
+// Specific vehicle tips strictly following verified real data
+// ONLY 193호 5336 has verified specs from user-provided cockpit mockup.
+// All other 19 vehicles must remain "미확인 (관리자 확인 필요)" to prevent false operational assurances.
 function getVehicleTips(v: VipRealVehicle) {
-  if (v.plateShort === '5336' || v.category === 'carnival') {
+  if (v.plateShort === '5336') {
     return {
+      isVerified: true,
       frontCharging: 'USB-C 2개, USB-A 1개',
       rearCharging: '차량용 시가잭 1개, 220V 1개',
       fuelTip: '가득 주유 시 약 700km 주행 가능합니다.',
       powerTip: '3열 좌측에 220V 단자가 있습니다.',
     };
   }
-  if (v.category === 'sprinter') {
-    return {
-      frontCharging: 'USB-A 1개, 12V 시가잭 1개',
-      rearCharging: '차량용 시가잭 1개, 220V 1개',
-      fuelTip: '가득 주유 시 약 850km 주행 가능합니다. (요소수 잔여량 점검 필수)',
-      powerTip: '승객석 상단 및 사이드월에 220V 인버터 콘센트가 지원됩니다.',
-    };
-  }
-  if (v.category === 'staria') {
-    return {
-      frontCharging: 'USB-A 1개, USB-C 1개',
-      rearCharging: 'USB-C 2개, 220V 인버터 1개',
-      fuelTip: '가득 주유 시 약 750km 주행 가능합니다.',
-      powerTip: '2열 콘솔 하단에 220V 인버터 단자가 위치합니다.',
-    };
-  }
-  if (v.category === 'genesis' && v.model.includes('GV80')) {
-    return {
-      frontCharging: '스마트폰 무선 충전 패드, USB-C 2개',
-      rearCharging: 'USB-C 2개, 220V 콘센트 1개',
-      fuelTip: '가득 주유 시 약 650km 주행 가능합니다.',
-      powerTip: '트렁크 및 2열 센터 콘솔에 전원 단자가 지원됩니다.',
-    };
-  }
   return {
-    frontCharging: '스마트폰 무선 충전 패드, USB-C 2개',
-    rearCharging: 'VIP 좌석 전용 무선 충전 패드, USB-C 2개',
-    fuelTip: '고급 휘발유 권장, 완충 시 약 600km 주행 가능합니다.',
-    powerTip: 'VIP 센터 암레스트 내부에 고속 충전 단자가 지원됩니다.',
+    isVerified: false,
+    frontCharging: '미확인 (관리자 확인 필요)',
+    rearCharging: '미확인 (관리자 확인 필요)',
+    fuelTip: '연료 잔여량 및 주행거리 미확인 (관리자 확인 필요)',
+    powerTip: '220V 인버터 유무 미확인 (관리자 확인 필요)',
   };
 }
 
 export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = ({
   initialSearchQuery = '',
+  bookings,
 }) => {
   // 1. Filter States
   const [selectedCategory, setSelectedCategory] = useState<VehicleUiCategoryKey>('all');
@@ -161,7 +160,57 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
     return {};
   });
 
-  // 5. Modals State
+  // 5. Fail-Closed Real Availability State
+  const [fleetResult, setFleetResult] = useState<FleetAvailabilityResult | null>(null);
+  const [availabilityState, setAvailabilityState] = useState<'loading' | 'success' | 'error'>('loading');
+  const [availabilityError, setAvailabilityError] = useState<string | null>(null);
+  const activeAbortRef = React.useRef<AbortController | null>(null);
+
+  const fetchAvailability = useCallback(async () => {
+    if (activeAbortRef.current) {
+      activeAbortRef.current.abort();
+    }
+    const controller = new AbortController();
+    activeAbortRef.current = controller;
+
+    setAvailabilityState('loading');
+    setAvailabilityError(null);
+
+    const todayIso = getKstTodayDateStr();
+    const [ty, tm, td] = todayIso.split('-').map(Number);
+    const endDt = new Date(Date.UTC(ty, tm - 1, td + 14));
+    const endIso = `${endDt.getUTCFullYear()}-${String(endDt.getUTCMonth() + 1).padStart(2, '0')}-${String(endDt.getUTCDate()).padStart(2, '0')}`;
+
+    try {
+      const res = await fetch(
+        `/api/fleet/availability?startDate=${todayIso}&endDate=${endIso}&startTime=00:00&endTime=23:59`,
+        { signal: controller.signal, cache: 'no-store' }
+      );
+      if (!res.ok) {
+        throw new Error(`서버 응답 에러 (${res.status})`);
+      }
+      const data = await res.json();
+      if (!data.ok) {
+        throw new Error(data.error || '가용성 조회 실패');
+      }
+      setFleetResult(data);
+      setAvailabilityState('success');
+    } catch (err: any) {
+      if (err.name === 'AbortError') return;
+      console.error('Fleet availability fetch error:', err);
+      setAvailabilityState('error');
+      setAvailabilityError(err.message || '가용성 서버 조회 실패');
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAvailability();
+    return () => {
+      if (activeAbortRef.current) activeAbortRef.current.abort();
+    };
+  }, [fetchAvailability]);
+
+  // 6. Modals State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
@@ -272,7 +321,93 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
     haptics.success();
   };
 
-  // 5 Days Strip computation starting from today (or mock date 11/09)
+  // Fail-Closed Day Status Resolver: calculates exact status for a specific vehicle on a given date
+  const getVehicleDayStatus = useCallback(
+    (v: VipRealVehicle, targetDateIso: string): { status: AvailabilityDayStatus; detail?: string } => {
+      // 1. Fail-closed: while loading or error
+      if (availabilityState === 'loading') {
+        return { status: '확인 중...', detail: '가용성 서버 조회 중' };
+      }
+      if (availabilityState === 'error') {
+        return { status: '확인 불가', detail: availabilityError || '서버 오류' };
+      }
+
+      // 2. Local maintenance override or data
+      const isMaint = statusOverrides[v.id] === '정비 중' || v.status === '정비 중';
+      if (isMaint) {
+        return { status: '정비 중', detail: '차량 정비/점검' };
+      }
+
+      // 3. Live bookings prop cross-check if provided
+      if (bookings && bookings.length > 0) {
+        const cleanPlate = cleanVehicleIdentity(v.plate);
+        const booked = bookings.find((b) => {
+          if (!isBookingActiveForConflict(b)) return false;
+          const bPlate = cleanVehicleIdentity(b.vehiclePlate || b.vehicleNoKey);
+          const matchPlate = Boolean(bPlate && cleanPlate && bPlate === cleanPlate);
+          const matchId = Boolean(v.uuid && b.vehicleId && v.uuid === b.vehicleId);
+          if (!matchPlate && !matchId) return false;
+          const bStart = normalizeDateToIso(b.pickupDate);
+          const bEnd = normalizeDateToIso(b.endDate) || bStart;
+          return targetDateIso >= bStart && targetDateIso <= bEnd;
+        });
+
+        if (booked) {
+          const isToday = targetDateIso === getKstTodayDateStr();
+          const inTransit =
+            isToday &&
+            (booked.operationStatus === 'in_transit' ||
+              booked.operationStatus === 'boarded' ||
+              statusOverrides[v.id] === '운행 중');
+          return {
+            status: inTransit ? '운행 중' : '예약 있음',
+            detail: `${booked.customerName} (${booked.pickupTime})`,
+          };
+        }
+      }
+
+      // 4. Check fleetResult from API
+      if (fleetResult) {
+        const detail = fleetResult.vehicles?.find((vd: any) => {
+          const vdPlate = cleanVehicleIdentity(vd.plate);
+          const vPlate = cleanVehicleIdentity(v.plate);
+          return (v.uuid && vd.uuid === v.uuid) || (vdPlate && vPlate && vdPlate === vPlate);
+        });
+
+        if (!detail) {
+          return { status: '미확인', detail: '차량 등록 정보 미확인' };
+        }
+
+        if (detail.currentStatus === 'maintenance' || detail.requestedIntervalStatus === 'maintenance') {
+          return { status: '정비 중', detail: '정비 중' };
+        }
+
+        if (!detail.isAvailable || detail.requestedIntervalStatus === 'booked') {
+          const isToday = targetDateIso === getKstTodayDateStr();
+          const inTransit =
+            isToday &&
+            (detail.currentStatus === 'in_service' ||
+              statusOverrides[v.id] === '운행 중' ||
+              v.status === '운행 중');
+          return {
+            status: inTransit ? '운행 중' : '예약 있음',
+            detail:
+              detail.conflictingTrip?.customerName ||
+              detail.unavailabilityReason ||
+              '예약 배차 일정 있음',
+          };
+        }
+
+        return { status: '예약 가능' };
+      }
+
+      // Default fallback: Fail-closed
+      return { status: '확인 불가', detail: '가용성 데이터 부재' };
+    },
+    [availabilityState, availabilityError, statusOverrides, bookings, fleetResult]
+  );
+
+  // 5 Days Strip computation starting from today with real fail-closed statuses
   const fiveDays = useMemo(() => {
     const todayIso = getKstTodayDateStr();
     const [ty, tm, td] = todayIso.split('-').map(Number);
@@ -282,23 +417,49 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
     for (let i = 0; i < 5; i++) {
       const cur = new Date(base);
       cur.setUTCDate(base.getUTCDate() + i);
+      const curIso = `${cur.getUTCFullYear()}-${String(cur.getUTCMonth() + 1).padStart(2, '0')}-${String(cur.getUTCDate()).padStart(2, '0')}`;
       const mm = String(cur.getUTCMonth() + 1).padStart(2, '0');
       const dd = String(cur.getUTCDate()).padStart(2, '0');
       const dayOfWeek = dayLabels[cur.getUTCDay()];
-      // Mock statuses matching the screenshot progression
-      let statusLabel: '예약 있음' | '예약 가능' | '운행 중' = '예약 가능';
-      if (i === 0) statusLabel = '예약 있음';
-      else if (i === 3) statusLabel = '운행 중';
-      else statusLabel = '예약 가능';
+      const dayRes = getVehicleDayStatus(selectedVehicle, curIso);
 
       days.push({
+        iso: curIso,
         label: `${mm}/${dd}`,
         dayOfWeek: `(${dayOfWeek})`,
-        status: statusLabel,
+        status: dayRes.status,
+        detail: dayRes.detail,
       });
     }
     return days;
-  }, []);
+  }, [selectedVehicle, getVehicleDayStatus]);
+
+  // 14 Days computation for Calendar Modal
+  const fourteenDays = useMemo(() => {
+    const todayIso = getKstTodayDateStr();
+    const [ty, tm, td] = todayIso.split('-').map(Number);
+    const base = new Date(Date.UTC(ty, tm - 1, td));
+    const dayLabels = ['일', '월', '화', '수', '목', '금', '토'];
+    const days = [];
+    for (let i = 0; i < 14; i++) {
+      const cur = new Date(base);
+      cur.setUTCDate(base.getUTCDate() + i);
+      const curIso = `${cur.getUTCFullYear()}-${String(cur.getUTCMonth() + 1).padStart(2, '0')}-${String(cur.getUTCDate()).padStart(2, '0')}`;
+      const mm = String(cur.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(cur.getUTCDate()).padStart(2, '0');
+      const dayOfWeek = dayLabels[cur.getUTCDay()];
+      const dayRes = getVehicleDayStatus(selectedVehicle, curIso);
+
+      days.push({
+        iso: curIso,
+        label: `${mm}/${dd}`,
+        dayOfWeek,
+        status: dayRes.status,
+        detail: dayRes.detail,
+      });
+    }
+    return days;
+  }, [selectedVehicle, getVehicleDayStatus]);
 
   const tips = useMemo(() => {
     return getVehicleTips(selectedVehicle);
@@ -865,33 +1026,53 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
 
                     {/* 5-Day Strip */}
                     <div className="grid grid-cols-5 gap-1.5 text-center pt-1">
-                      {fiveDays.map((d, idx) => (
-                        <div key={idx} className="space-y-1">
-                          <div className="text-[10px] font-bold text-slate-600 leading-tight">
-                            <div>{d.label}</div>
-                            <div className="text-[9px] text-slate-400">{d.dayOfWeek}</div>
+                      {fiveDays.map((d, idx) => {
+                        const badgeStyle =
+                          d.status === '예약 있음'
+                            ? 'bg-rose-50 text-rose-600 border-rose-200'
+                            : d.status === '운행 중'
+                            ? 'bg-blue-50 text-[#1E60F3] border-blue-200'
+                            : d.status === '정비 중'
+                            ? 'bg-amber-50 text-amber-700 border-amber-200'
+                            : d.status === '확인 중...'
+                            ? 'bg-slate-100 text-slate-500 border-slate-200 animate-pulse'
+                            : d.status === '확인 불가'
+                            ? 'bg-rose-100 text-rose-700 border-rose-300'
+                            : d.status === '미확인'
+                            ? 'bg-slate-100 text-slate-600 border-slate-300'
+                            : 'bg-emerald-50 text-emerald-600 border-emerald-200';
+
+                        return (
+                          <div key={idx} className="space-y-1">
+                            <div className="text-[10px] font-bold text-slate-600 leading-tight">
+                              <div>{d.label}</div>
+                              <div className="text-[9px] text-slate-400">{d.dayOfWeek}</div>
+                            </div>
+                            <div
+                              className={`text-[9px] font-bold py-0.5 rounded border transition-colors ${badgeStyle}`}
+                              title={d.detail || d.status}
+                            >
+                              {d.status}
+                            </div>
                           </div>
-                          <div
-                            className={`text-[9px] font-bold py-0.5 rounded border ${
-                              d.status === '예약 있음'
-                                ? 'bg-rose-50 text-rose-600 border-rose-200'
-                                : d.status === '운행 중'
-                                ? 'bg-blue-50 text-[#1E60F3] border-blue-200'
-                                : 'bg-emerald-50 text-emerald-600 border-emerald-200'
-                            }`}
-                          >
-                            {d.status}
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
 
                   {/* Card 2: 💡 차량 꿀팁 */}
                   <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs space-y-3">
-                    <div className="flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-[#1E60F3]" />
-                      <h3 className="text-xs font-black text-slate-900">차량 꿀팁</h3>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-[#1E60F3]" />
+                        <h3 className="text-xs font-black text-slate-900">차량 꿀팁</h3>
+                      </div>
+                      {!tips.isVerified && (
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+                          <AlertTriangle className="w-2.5 h-2.5" />
+                          현장 실차 확인 필요
+                        </span>
+                      )}
                     </div>
 
                     <div className="space-y-2.5 text-xs">
@@ -900,7 +1081,9 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                         <Plug className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
                         <div>
                           <div className="font-black text-slate-800 text-[11px]">앞자리 충전단자</div>
-                          <div className="text-[11px] text-slate-500 font-medium">{tips.frontCharging}</div>
+                          <div className={`text-[11px] font-medium ${tips.isVerified ? 'text-slate-500' : 'text-slate-400 italic'}`}>
+                            {tips.frontCharging}
+                          </div>
                         </div>
                       </div>
 
@@ -909,7 +1092,9 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                         <Plug className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
                         <div>
                           <div className="font-black text-slate-800 text-[11px]">뒷자리 충전단자</div>
-                          <div className="text-[11px] text-slate-500 font-medium">{tips.rearCharging}</div>
+                          <div className={`text-[11px] font-medium ${tips.isVerified ? 'text-slate-500' : 'text-slate-400 italic'}`}>
+                            {tips.rearCharging}
+                          </div>
                         </div>
                       </div>
 
@@ -920,7 +1105,9 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                           <div className="font-black text-slate-800 text-[11px]">
                             연료: {selectedVehicle.fuelDisplay}
                           </div>
-                          <div className="text-[11px] text-slate-500 font-medium">{tips.fuelTip}</div>
+                          <div className={`text-[11px] font-medium ${tips.isVerified ? 'text-slate-500' : 'text-slate-400 italic'}`}>
+                            {tips.fuelTip}
+                          </div>
                         </div>
                       </div>
 
@@ -929,7 +1116,9 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                         <Zap className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
                         <div>
                           <div className="font-black text-slate-800 text-[11px]">220V 전원 사용 가능</div>
-                          <div className="text-[11px] text-slate-500 font-medium">{tips.powerTip}</div>
+                          <div className={`text-[11px] font-medium ${tips.isVerified ? 'text-slate-500' : 'text-slate-400 italic'}`}>
+                            {tips.powerTip}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1062,26 +1251,46 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                     {dw}
                   </div>
                 ))}
-                {Array.from({ length: 14 }).map((_, i) => {
-                  const dNum = 9 + i;
-                  const isBooked = i === 0 || i === 7;
-                  const isInTransit = i === 3 || i === 10;
+                {fourteenDays.map((d, i) => {
+                  const badgeClass =
+                    d.status === '예약 있음'
+                      ? 'bg-rose-50 text-rose-600 border-rose-200'
+                      : d.status === '운행 중'
+                      ? 'bg-blue-50 text-[#1E60F3] border-blue-200'
+                      : d.status === '정비 중'
+                      ? 'bg-amber-50 text-amber-700 border-amber-200'
+                      : d.status === '확인 중...'
+                      ? 'bg-slate-100 text-slate-500 border-slate-200 animate-pulse'
+                      : d.status === '확인 불가'
+                      ? 'bg-rose-100 text-rose-700 border-rose-300'
+                      : d.status === '미확인'
+                      ? 'bg-slate-100 text-slate-600 border-slate-300'
+                      : 'bg-emerald-50 text-emerald-600 border-emerald-200';
+
+                  const label =
+                    d.status === '확인 중...'
+                      ? '조회중'
+                      : d.status === '확인 불가'
+                      ? '오류'
+                      : d.status === '예약 있음'
+                      ? '예약있음'
+                      : d.status === '운행 중'
+                      ? '운행중'
+                      : d.status === '정비 중'
+                      ? '정비중'
+                      : d.status === '미확인'
+                      ? '미확인'
+                      : '가능';
+
                   return (
                     <div
                       key={i}
                       className="p-2 rounded-xl border border-slate-100 bg-slate-50/60 flex flex-col items-center gap-1"
+                      title={d.detail || d.status}
                     >
-                      <span className="text-[11px] font-black text-slate-700">11/{dNum}</span>
-                      <span
-                        className={`text-[8px] font-bold px-1 py-0.2 rounded ${
-                          isBooked
-                            ? 'bg-rose-50 text-rose-600 border border-rose-200'
-                            : isInTransit
-                            ? 'bg-blue-50 text-[#1E60F3] border border-blue-200'
-                            : 'bg-emerald-50 text-emerald-600 border border-emerald-200'
-                        }`}
-                      >
-                        {isBooked ? '예약있음' : isInTransit ? '운행중' : '가능'}
+                      <span className="text-[11px] font-black text-slate-700">{d.label}</span>
+                      <span className={`text-[8px] font-bold px-1 py-0.2 rounded border ${badgeClass}`}>
+                        {label}
                       </span>
                     </div>
                   );

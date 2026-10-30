@@ -15,7 +15,7 @@ import {
   checkServerDispatchConflicts,
   DispatchUpsertInput,
 } from '@/lib/dispatch/scheduleServerStore';
-import { getKstTodayDateStr } from './dispatchConflictDetector';
+import { getKstTodayDateStr, detectDispatchConflicts } from './dispatchConflictDetector';
 import { DbScheduleRow } from '@/types';
 import { HqScheduleMeta } from '@/lib/dispatch/scheduleServerStore';
 
@@ -60,24 +60,37 @@ test('Fleet Availability & Dispatch Conflict Engine Suite (Issue #10)', async (t
   // Criterion 2: Carnival Charging Specification & Unverified Status
   // -------------------------------------------------------------------------
   await t.test('2. Carnival Charging Specification & Front/Rear Separation', () => {
-    const carnival7681 = VIP_REAL_VEHICLES.find((v) => v.plateShort === '7681');
-    assert.ok(carnival7681?.chargingSpecs, 'Carnival 7681 must have charging specs');
+    // 193호 5336: Confirmed Specs from User Screenshot
+    const carnival5336 = VIP_REAL_VEHICLES.find((v) => v.plateShort === '5336');
+    assert.ok(carnival5336?.chargingSpecs, 'Carnival 5336 must have confirmed charging specs');
 
-    // Front: 3 USB ports confirmed
-    assert.equal(carnival7681.chargingSpecs.front.status, 'confirmed');
-    assert.equal(carnival7681.chargingSpecs.front.usbA, 3);
-    const frontSummary = formatChargingPortSummary(carnival7681.chargingSpecs.front);
+    // Front: USB-C 2 + USB-A 1 (3 ports confirmed)
+    assert.equal(carnival5336.chargingSpecs.front.status, 'confirmed');
+    assert.equal(carnival5336.chargingSpecs.front.usbC, 2);
+    assert.equal(carnival5336.chargingSpecs.front.usbA, 1);
+    const frontSummary = formatChargingPortSummary(carnival5336.chargingSpecs.front);
     assert.ok(frontSummary.includes('USB'), 'Front summary must indicate USB ports');
 
     // Rear: 12V + 220V inverter confirmed
-    assert.equal(carnival7681.chargingSpecs.rear.status, 'confirmed');
-    assert.equal(carnival7681.chargingSpecs.rear.cigar12v, 1);
-    assert.equal(carnival7681.chargingSpecs.rear.ac220v, true);
-    const rearSummary = formatChargingPortSummary(carnival7681.chargingSpecs.rear);
-    assert.ok(rearSummary.includes('12V'), 'Rear summary must indicate 12V cigar port');
+    assert.equal(carnival5336.chargingSpecs.rear.status, 'confirmed');
+    assert.equal(carnival5336.chargingSpecs.rear.cigar12v, 1);
+    assert.equal(carnival5336.chargingSpecs.rear.ac220v, true);
+    const rearSummary = formatChargingPortSummary(carnival5336.chargingSpecs.rear);
+    assert.ok(
+      rearSummary.includes('12V') || rearSummary.includes('시가잭') || rearSummary.includes('시거잭'),
+      'Rear summary must indicate 12V cigar port'
+    );
     assert.ok(rearSummary.includes('220V'), 'Rear summary must indicate 220V inverter');
 
-    // Unverified vehicle (e.g. Sprinter 9982 or unverified)
+    // 101호 7681: Must be unverified (User only confirmed 5336)
+    const carnival7681 = VIP_REAL_VEHICLES.find((v) => v.plateShort === '7681');
+    assert.equal(carnival7681?.chargingSpecs, undefined, 'Carnival 7681 must NOT have confirmed charging specs');
+    const unverifiedCarnivalSummary = formatChargingPortSummary(
+      (carnival7681 as any)?.chargingSpecs?.front
+    );
+    assert.equal(unverifiedCarnivalSummary, '미확인 (관리자 확인 필요)', 'Carnival 7681 must be marked as unverified');
+
+    // Other unverified vehicle (e.g. Sprinter 9982)
     const sprinter9982 = VIP_REAL_VEHICLES.find((v) => v.plateShort === '9982');
     const unverifiedSummary = formatChargingPortSummary(sprinter9982?.chargingSpecs?.front);
     assert.equal(unverifiedSummary, '미확인 (관리자 확인 필요)', 'Unverified vehicle must never guess port counts');
@@ -388,5 +401,288 @@ test('Fleet Availability & Dispatch Conflict Engine Suite (Issue #10)', async (t
     assert.equal(stripManufacturerName('기아 카니발 하이리무진'), '카니발 하이리무진');
     assert.equal(stripManufacturerName('제네시스 G90L'), 'G90L');
     assert.equal(stripManufacturerName('메르세데스-벤츠 S 560'), 'S 560');
+  });
+
+  // -------------------------------------------------------------------------
+  // Criterion 12: 20:00 Pickup Rollover & Missing End Time Bug Fix (Item 2)
+  // -------------------------------------------------------------------------
+  await t.test('12. 20:00 Pickup Rollover (1800m) Never Returns NaN or Bypasses Conflict', () => {
+    // 20:00 (1200 min) + 600 min default duration = 1800 min.
+    // In old code, 1800 min converted to 30:00 producing NaN / Invalid Date.
+    const ms1800 = parseKstDateTimeToMs('2026-11-05', 1800);
+    assert.equal(isNaN(ms1800), false, '1800m must roll over cleanly into next day 06:00 without NaN');
+
+    // Format back to KST ISO to verify next day 06:00
+    const kstIso = new Date(ms1800 + 9 * 60 * 60 * 1000).toISOString();
+    assert.ok(kstIso.startsWith('2026-11-06T06:00'), '1800 min from 2026-11-05 00:00 must be 2026-11-06 06:00');
+
+    // A booking at 20:00 without explicit end time must overlap with a 23:00 booking on the same date
+    const overlaps = isDateTimeIntervalOverlapping(
+      { startDate: '2026-11-05', startTime: '20:00', endTime: '' },
+      { startDate: '2026-11-05', startTime: '23:00', endTime: '23:50' },
+      60
+    );
+    assert.equal(overlaps, true, '20:00 trip with missing end time must conflict with 23:00 trip');
+  });
+
+  // -------------------------------------------------------------------------
+  // Criterion 13: Pre-filter 1-Day Window Expansion & Cross-Midnight Buffer (Item 4)
+  // -------------------------------------------------------------------------
+  await t.test('13. Pre-filter 1-Day Window Expansion Catches Cross-Midnight Turnaround Collision', async () => {
+    // Booking A: 2026-11-05 21:00 ~ 23:30 (Ends 23:30, 60m buffer extends to 00:30 next day)
+    const existingFixture: Array<DbScheduleRow & { _meta: HqScheduleMeta }> = [
+      {
+        id: 'sched-late-1',
+        date: '2026-11-05',
+        pickup_time: '21:00',
+        end_date: '2026-11-05',
+        end_time: '23:30',
+        time_display: '21:00 ~ 23:30',
+        vehicle_no: '125호 9982',
+        driver_name: '박운전',
+        passenger_name: '야간 VIP',
+        origin: '인천공항',
+        destination: '강남 호텔',
+        status: 'scheduled',
+        dispatch_status: 'published',
+        _meta: {
+          version: 1,
+          placeVerified: true,
+          dispatchStatus: 'published',
+          driverName: '박운전',
+          vehiclePlate: '125호 9982',
+          customerName: '야간 VIP',
+          lastAckVersion: 0,
+        },
+      },
+    ];
+
+    // Candidate B on NEXT DAY: 2026-11-06 00:10 ~ 02:00 (Gap between 23:30 and 00:10 is 40m < 60m buffer)
+    const candidateNextDay: DispatchUpsertInput[] = [
+      {
+        date: '2026-11-06',
+        pickupTime: '00:10',
+        endDate: '2026-11-06',
+        endTime: '02:00',
+        vehicleNo: '125호 9982',
+        driverName: '박운전',
+        origin: '강남 호텔',
+        destination: '김포공항',
+        dispatchStatus: 'published',
+      },
+    ];
+
+    // If pre-filter only queried [2026-11-06, 2026-11-06], Booking A on 2026-11-05 was missed.
+    // With 1-day expansion [2026-11-05, 2026-11-07], it must be caught!
+    const serverConflicts = await checkServerDispatchConflicts(candidateNextDay, existingFixture);
+    assert.equal(serverConflicts.length >= 1, true, 'Server must detect cross-midnight buffer collision');
+
+    // Client detectDispatchConflicts must also catch this cross-midnight collision
+    const clientConflicts = detectDispatchConflicts(
+      {
+        pickupDate: '2026-11-06',
+        pickupTime: '00:10',
+        endDate: '2026-11-06',
+        endTime: '02:00',
+        vehiclePlate: '125호 9982',
+        driverName: '박운전',
+      },
+      [
+        {
+          id: 'sched-late-1',
+          bookingNo: '#261105-001',
+          no: 1,
+          customerName: '야간 VIP',
+          pickupDate: '2026-11-05',
+          pickupTime: '21:00',
+          endDate: '2026-11-05',
+          endTime: '23:30',
+          pickupLocation: '인천공항',
+          destination: '강남 호텔',
+          driverName: '박운전',
+          vehiclePlate: '125호 9982',
+          vehicleModel: '벤츠 스프린터',
+          dispatchStatus: '배차 완료',
+          driverAck: '확인완료',
+          customerBrochure: '발송됨',
+        },
+      ]
+    );
+    assert.equal(clientConflicts.length >= 1, true, 'Client detectDispatchConflicts must detect cross-midnight conflict');
+  });
+
+  // -------------------------------------------------------------------------
+  // Criterion 14: NULL / Missing End Time Warning Message Tagging (Item 5)
+  // -------------------------------------------------------------------------
+  await t.test('14. Unconfirmed End Time Emits Warning Notice in Conflict Message', async () => {
+    const existingFixture: Array<DbScheduleRow & { _meta: HqScheduleMeta }> = [
+      {
+        id: 'sched-null-end',
+        date: '2026-11-18',
+        pickup_time: '14:00',
+        end_date: null,
+        end_time: null, // Missing end time!
+        time_display: '14:00',
+        vehicle_no: '125호 9982',
+        driver_name: '정승환',
+        passenger_name: '고객 C',
+        origin: '호텔',
+        destination: '공항',
+        status: 'scheduled',
+        dispatch_status: 'published',
+        _meta: {
+          version: 1,
+          placeVerified: true,
+          dispatchStatus: 'published',
+          driverName: '정승환',
+          vehiclePlate: '125호 9982',
+          customerName: '고객 C',
+          lastAckVersion: 0,
+        },
+      },
+    ];
+
+    const candidate: DispatchUpsertInput[] = [
+      {
+        date: '2026-11-18',
+        pickupTime: '16:00',
+        endDate: '2026-11-18',
+        endTime: '18:00',
+        vehicleNo: '125호 9982',
+        driverName: '정승환',
+        origin: '공항',
+        destination: '호텔',
+        dispatchStatus: 'published',
+      },
+    ];
+
+    const conflicts = await checkServerDispatchConflicts(candidate, existingFixture);
+    assert.equal(conflicts.length >= 1, true, 'Conflict must be reported');
+    assert.ok(
+      conflicts[0].message.includes('종료 시간이 미확정') || conflicts[0].message.includes('일정 충돌 주의'),
+      'Message must warn dispatcher about unconfirmed end time'
+    );
+  });
+
+  // -------------------------------------------------------------------------
+  // Criterion 15: ServiceMode vehicle_only Skips Driver Conflict (Item 6)
+  // -------------------------------------------------------------------------
+  await t.test('15. ServiceMode vehicle_only Skips Driver Conflict But Enforces Vehicle Conflict', async () => {
+    const existingFixture: Array<DbScheduleRow & { _meta: HqScheduleMeta }> = [
+      {
+        id: 'sched-vo-1',
+        date: '2026-11-25',
+        pickup_time: '10:00',
+        end_date: '2026-11-25',
+        end_time: '14:00',
+        time_display: '10:00 ~ 14:00',
+        vehicle_no: '104호 3124',
+        driver_name: '차량만 대여',
+        passenger_name: '자차 렌탈 고객',
+        origin: '차고지',
+        destination: '행사장',
+        status: 'scheduled',
+        dispatch_status: 'published',
+        _meta: {
+          version: 1,
+          placeVerified: true,
+          dispatchStatus: 'published',
+          serviceMode: 'vehicle_only',
+          vehiclePlate: '104호 3124',
+          customerName: '자차 렌탈 고객',
+          lastAckVersion: 0,
+        },
+      },
+    ];
+
+    // Candidate 1: Same time, vehicle-only, different vehicle -> Zero conflict
+    const candidateDiffVeh: DispatchUpsertInput[] = [
+      {
+        date: '2026-11-25',
+        pickupTime: '11:00',
+        endDate: '2026-11-25',
+        endTime: '13:00',
+        vehicleNo: '125호 9982',
+        driverName: '기사 미배정',
+        serviceMode: 'vehicle_only',
+        origin: '차고지',
+        destination: '호텔',
+        dispatchStatus: 'published',
+      },
+    ];
+    const diffConflicts = await checkServerDispatchConflicts(candidateDiffVeh, existingFixture);
+    assert.equal(diffConflicts.length, 0, 'Different vehicle in vehicle_only mode must have 0 conflicts');
+
+    // Candidate 2: Same vehicle (104호 3124) -> Must flag vehicle conflict!
+    const candidateSameVeh: DispatchUpsertInput[] = [
+      {
+        date: '2026-11-25',
+        pickupTime: '11:00',
+        endDate: '2026-11-25',
+        endTime: '13:00',
+        vehicleNo: '104호 3124',
+        driverName: '윤태준',
+        origin: '차고지',
+        destination: '호텔',
+        dispatchStatus: 'published',
+      },
+    ];
+    const sameVehConflicts = await checkServerDispatchConflicts(candidateSameVeh, existingFixture);
+    assert.equal(sameVehConflicts.length, 1, 'Must detect vehicle conflict on 104호 3124');
+    assert.equal(sameVehConflicts[0].type, 'vehicle');
+  });
+
+  // -------------------------------------------------------------------------
+  // Criterion 16: UUID-based Driver & Vehicle Conflict Matching (Item 8)
+  // -------------------------------------------------------------------------
+  await t.test('16. UUID-based Driver and Vehicle Conflict Resolution', async () => {
+    const existingFixture: Array<DbScheduleRow & { _meta: HqScheduleMeta }> = [
+      {
+        id: 'sched-uuid-match',
+        date: '2026-11-28',
+        pickup_time: '13:00',
+        end_date: '2026-11-28',
+        end_time: '16:00',
+        time_display: '13:00 ~ 16:00',
+        vehicle_no: '125호 9982',
+        vehicle_id: 'veh-sp-9982-uuid',
+        driver_name: '김기사',
+        driver_id: 'drv-uuid-777',
+        passenger_name: 'VIP UUID',
+        origin: '공항',
+        destination: '호텔',
+        status: 'scheduled',
+        dispatch_status: 'published',
+        _meta: {
+          version: 1,
+          placeVerified: true,
+          dispatchStatus: 'published',
+          driverName: '김기사',
+          driverId: 'drv-uuid-777',
+          vehiclePlate: '125호 9982',
+          vehicleId: 'veh-sp-9982-uuid',
+          customerName: 'VIP UUID',
+          lastAckVersion: 0,
+        },
+      },
+    ];
+
+    // Candidate passes matching UUIDs
+    const candidate: DispatchUpsertInput[] = [
+      {
+        date: '2026-11-28',
+        pickupTime: '14:00',
+        endDate: '2026-11-28',
+        endTime: '17:00',
+        vehicleId: 'veh-sp-9982-uuid',
+        driverId: 'drv-uuid-777',
+        origin: '호텔',
+        destination: '공항',
+        dispatchStatus: 'published',
+      },
+    ];
+
+    const conflicts = await checkServerDispatchConflicts(candidate, existingFixture);
+    assert.equal(conflicts.length >= 1, true, 'UUID matching must accurately catch driver and vehicle conflicts');
   });
 });

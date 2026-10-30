@@ -667,7 +667,7 @@ function HqDashboardInner() {
           ) : activeSidebarTab === 'drivers' ? (
             <HqDriversView initialSearchQuery={searchQuery} />
           ) : activeSidebarTab === 'vehicles' ? (
-            <HqVehicleManagementView initialSearchQuery={searchQuery} />
+            <HqVehicleManagementView initialSearchQuery={searchQuery} bookings={bookings} />
           ) : (
             <>
               {/* Dedicated 고객 이메일 View - kept mounted for instant switching */}

@@ -450,7 +450,9 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
           pickupDate,
           pickupTime: effTime,
           driverName: cleanDrv,
+          driverId: matchedDrv?.id,
           vehiclePlate: effPlate,
+          vehicleId: (vehObj as any)?.uuid,
         },
         existingBookings
       );

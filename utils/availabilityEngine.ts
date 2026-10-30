@@ -21,7 +21,18 @@ import {
   normalizeDateToIso,
   normalizeTimeHHmm,
   timeHHmmToMinutes,
+  shiftIsoDate,
+  parseKstDateTimeToMs,
+  isDateTimeOverlapping,
+  isDateTimeIntervalOverlapping,
 } from '@/utils/dispatchConflictDetector';
+
+export {
+  shiftIsoDate,
+  parseKstDateTimeToMs,
+  isDateTimeOverlapping,
+  isDateTimeIntervalOverlapping,
+};
 import { HqVehicleClassStatus } from '@/types/hq';
 
 export const DEFAULT_TURNAROUND_BUFFER_MINUTES = 60;
@@ -97,80 +108,6 @@ export interface FleetAvailabilityResult {
   drivers: AvailableDriverItem[];
 }
 
-/**
- * Parses a KST date and time into Unix epoch milliseconds.
- * Fully timezone-aware (Asia/Seoul, UTC+9) and handles midnight & month transitions cleanly.
- */
-export function parseKstDateTimeToMs(dateStr: string, timeStrOrMin: string | number): number {
-  const isoDate = normalizeDateToIso(dateStr);
-  if (!isoDate) return NaN;
-  let hh = 0;
-  let mm = 0;
-  if (typeof timeStrOrMin === 'number') {
-    hh = Math.floor(timeStrOrMin / 60);
-    mm = timeStrOrMin % 60;
-  } else {
-    const hhmm = normalizeTimeHHmm(timeStrOrMin);
-    if (hhmm) {
-      const [h, m] = hhmm.split(':').map((n) => parseInt(n, 10));
-      hh = h || 0;
-      mm = m || 0;
-    }
-  }
-  const timePadded = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00+09:00`;
-  return new Date(`${isoDate}T${timePadded}`).getTime();
-}
-
-/**
- * Checks if two date-time intervals overlap (with turnaround buffer and overnight support).
- * Uses exact Unix epoch milliseconds to prevent timezone drift, month boundary errors, and leap year bugs.
- */
-export function isDateTimeOverlapping(
-  startA: { date: string; minutes: number },
-  endA: { date: string; minutes: number },
-  startB: { date: string; minutes: number },
-  endB: { date: string; minutes: number },
-  bufferMinutes: number = DEFAULT_TURNAROUND_BUFFER_MINUTES
-): boolean {
-  const aStart = parseKstDateTimeToMs(startA.date, startA.minutes);
-  const aEnd = parseKstDateTimeToMs(endA.date, endA.minutes);
-  const bStart = parseKstDateTimeToMs(startB.date, startB.minutes);
-  const bEnd = parseKstDateTimeToMs(endB.date, endB.minutes);
-
-  if (isNaN(aStart) || isNaN(aEnd) || isNaN(bStart) || isNaN(bEnd)) return false;
-
-  const bufMs = bufferMinutes * 60 * 1000;
-  return bStart < aEnd + bufMs && aStart < bEnd + bufMs;
-}
-
-/**
- * Range-based interval overlap checker taking explicit start and end dates/times.
- */
-export function isDateTimeIntervalOverlapping(
-  tripA: { startDate: string; startTime: string | number; endDate?: string; endTime: string | number },
-  tripB: { startDate: string; startTime: string | number; endDate?: string; endTime: string | number },
-  bufferMinutes: number = DEFAULT_TURNAROUND_BUFFER_MINUTES
-): boolean {
-  const aStart = parseKstDateTimeToMs(tripA.startDate, tripA.startTime);
-  const aEndEffective =
-    tripA.endTime === '' || tripA.endTime === undefined || tripA.endTime === null
-      ? '23:59'
-      : tripA.endTime;
-  const aEnd = parseKstDateTimeToMs(tripA.endDate || tripA.startDate, aEndEffective);
-
-  const bStart = parseKstDateTimeToMs(tripB.startDate, tripB.startTime);
-  const bEndEffective =
-    tripB.endTime === '' || tripB.endTime === undefined || tripB.endTime === null
-      ? '23:59'
-      : tripB.endTime;
-  const bEnd = parseKstDateTimeToMs(tripB.endDate || tripB.startDate, bEndEffective);
-
-  if (isNaN(aStart) || isNaN(aEnd) || isNaN(bStart) || isNaN(bEnd)) return false;
-
-  const bufMs = bufferMinutes * 60 * 1000;
-  return bStart < aEnd + bufMs && aStart < bEnd + bufMs;
-}
-
 function isTestRuntime(): boolean {
   return typeof process !== 'undefined' && (process.env.NODE_ENV === 'test' || Boolean(process.env.npm_lifecycle_event?.includes('test')));
 }
@@ -216,13 +153,18 @@ export async function checkFleetAvailability(
     }
   }
 
+  // Expand window by 1 day on both sides to catch cross-midnight turnaround buffer collisions (e.g. 23:30 -> 00:10 next day)
+  const expandedStartIso = shiftIsoDate(reqStartIso, -1);
+  const expandedEndIso = shiftIsoDate(reqEndIso, 1);
+
   // 2. Fetch active schedules overlapping the query date window (or injected)
   let activeSchedules: any[] = [];
   if (options?.injectedSchedules) {
     activeSchedules = options.injectedSchedules.filter((s: any) => {
       if (query.excludeScheduleId && s.id === query.excludeScheduleId) return false;
       const sEndDate = normalizeDateToIso(s.end_date) || normalizeDateToIso(s.date);
-      return sEndDate >= reqStartIso && normalizeDateToIso(s.date) <= reqEndIso;
+      const sStartDate = normalizeDateToIso(s.date);
+      return sEndDate >= expandedStartIso && sStartDate <= expandedEndIso;
     });
   } else {
     try {
@@ -241,7 +183,8 @@ export async function checkFleetAvailability(
         activeSchedules = schedData.filter((s: any) => {
           if (query.excludeScheduleId && s.id === query.excludeScheduleId) return false;
           const sEndDate = normalizeDateToIso(s.end_date) || normalizeDateToIso(s.date);
-          return sEndDate >= reqStartIso && normalizeDateToIso(s.date) <= reqEndIso;
+          const sStartDate = normalizeDateToIso(s.date);
+          return sEndDate >= expandedStartIso && sStartDate <= expandedEndIso;
         });
       }
     } catch (err: any) {
@@ -302,11 +245,13 @@ export async function checkFleetAvailability(
       };
     }
 
-    // Schedule conflict check
+    // Schedule conflict check with UUID + plate support
     const cleanPlate = cleanVehicleIdentity(v.plate);
     const conflicting = activeSchedules.find((s) => {
+      const matchVehicleId = Boolean(v.uuid && s.vehicle_id && v.uuid === s.vehicle_id);
       const sPlate = cleanVehicleIdentity(s.vehicle_plate || s.vehicle_no);
-      if (sPlate !== cleanPlate) return false;
+      const matchPlate = sPlate === cleanPlate;
+      if (!matchVehicleId && !matchPlate) return false;
 
       const sStartDate = normalizeDateToIso(s.date);
       const sEndDate = normalizeDateToIso(s.end_date) || sStartDate;
@@ -380,8 +325,20 @@ export async function checkFleetAvailability(
     const cleanDrv = cleanDriverIdentity(p.name);
 
     const conflicting = activeSchedules.find((s) => {
+      // Skip driver conflict if schedule is vehicle-only or driver is unassigned
+      if (
+        s.service_mode === 'vehicle_only' ||
+        s.driver_name === '기사 미배정' ||
+        s.driver_name === '자차 운행' ||
+        s._meta?.serviceMode === 'vehicle_only'
+      ) {
+        return false;
+      }
+
       const sDriver = cleanDriverIdentity(s.driver_name);
-      if (sDriver !== cleanDrv) return false;
+      const matchDriverId = Boolean(p.id && s.driver_id && p.id === s.driver_id);
+      const matchDriverName = Boolean(sDriver && sDriver === cleanDrv);
+      if (!matchDriverId && !matchDriverName) return false;
 
       const sStartDate = normalizeDateToIso(s.date);
       const sEndDate = normalizeDateToIso(s.end_date) || sStartDate;

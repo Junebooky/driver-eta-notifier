@@ -94,6 +94,110 @@ export function timeHHmmToMinutes(raw?: string | null): number | null {
   return h * 60 + m;
 }
 
+/**
+ * Shifts an ISO YYYY-MM-DD date by N days in UTC.
+ */
+export function shiftIsoDate(isoDate: string, days: number): string {
+  const [y, m, d] = isoDate.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + days));
+  const yyyy = dt.getUTCFullYear();
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getUTCDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+/**
+ * Parses a KST date and time into Unix epoch milliseconds.
+ * Fully timezone-aware (Asia/Seoul, UTC+9) and handles midnight rollover & month transitions cleanly.
+ * Automatically rolls over when minutes >= 1440 or hh >= 24, preventing Invalid Date / NaN bugs.
+ */
+export function parseKstDateTimeToMs(dateStr: string, timeStrOrMin: string | number): number {
+  const isoDate = normalizeDateToIso(dateStr);
+  if (!isoDate) return NaN;
+  let hh = 0;
+  let mm = 0;
+  let addDays = 0;
+
+  if (typeof timeStrOrMin === 'number') {
+    if (isNaN(timeStrOrMin) || timeStrOrMin < 0) return NaN;
+    if (timeStrOrMin >= 1440) {
+      addDays = Math.floor(timeStrOrMin / 1440);
+      const rem = timeStrOrMin % 1440;
+      hh = Math.floor(rem / 60);
+      mm = rem % 60;
+    } else {
+      hh = Math.floor(timeStrOrMin / 60);
+      mm = timeStrOrMin % 60;
+    }
+  } else {
+    const hhmm = normalizeTimeHHmm(timeStrOrMin);
+    if (hhmm) {
+      const [h, m] = hhmm.split(':').map((n) => parseInt(n, 10));
+      hh = h || 0;
+      mm = m || 0;
+    }
+  }
+
+  if (hh >= 24) {
+    addDays += Math.floor(hh / 24);
+    hh = hh % 24;
+  }
+
+  const finalIsoDate = addDays > 0 ? shiftIsoDate(isoDate, addDays) : isoDate;
+  const timePadded = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00+09:00`;
+  return new Date(`${finalIsoDate}T${timePadded}`).getTime();
+}
+
+/**
+ * Checks if two date-time intervals overlap (with turnaround buffer and overnight support).
+ * Uses exact Unix epoch milliseconds to prevent timezone drift, month boundary errors, and leap year bugs.
+ */
+export function isDateTimeOverlapping(
+  startA: { date: string; minutes: number },
+  endA: { date: string; minutes: number },
+  startB: { date: string; minutes: number },
+  endB: { date: string; minutes: number },
+  bufferMinutes: number = 60
+): boolean {
+  const aStart = parseKstDateTimeToMs(startA.date, startA.minutes);
+  const aEnd = parseKstDateTimeToMs(endA.date, endA.minutes);
+  const bStart = parseKstDateTimeToMs(startB.date, startB.minutes);
+  const bEnd = parseKstDateTimeToMs(endB.date, endB.minutes);
+
+  if (isNaN(aStart) || isNaN(aEnd) || isNaN(bStart) || isNaN(bEnd)) return false;
+
+  const bufMs = bufferMinutes * 60 * 1000;
+  return bStart < aEnd + bufMs && aStart < bEnd + bufMs;
+}
+
+/**
+ * Range-based interval overlap checker taking explicit start and end dates/times.
+ */
+export function isDateTimeIntervalOverlapping(
+  tripA: { startDate: string; startTime: string | number; endDate?: string; endTime: string | number },
+  tripB: { startDate: string; startTime: string | number; endDate?: string; endTime: string | number },
+  bufferMinutes: number = 60
+): boolean {
+  const aStart = parseKstDateTimeToMs(tripA.startDate, tripA.startTime);
+  const aEndEffective =
+    tripA.endTime === '' || tripA.endTime === undefined || tripA.endTime === null
+      ? '23:59'
+      : tripA.endTime;
+  const aEnd = parseKstDateTimeToMs(tripA.endDate || tripA.startDate, aEndEffective);
+
+  const bStart = parseKstDateTimeToMs(tripB.startDate, tripB.startTime);
+  const bEndEffective =
+    tripB.endTime === '' || tripB.endTime === undefined || tripB.endTime === null
+      ? '23:59'
+      : tripB.endTime;
+  const bEnd = parseKstDateTimeToMs(tripB.endDate || tripB.startDate, bEndEffective);
+
+  if (isNaN(aStart) || isNaN(aEnd) || isNaN(bStart) || isNaN(bEnd)) return false;
+
+  const bufMs = bufferMinutes * 60 * 1000;
+  return bStart < aEnd + bufMs && aStart < bEnd + bufMs;
+}
+
 export function formatShortAckTime(isoStr?: string | null): string | undefined {
   if (!isoStr) return undefined;
   try {
@@ -208,7 +312,7 @@ export interface DispatchConflictItem {
   message: string;
 }
 
-export const DEFAULT_CONFLICT_WINDOW_MINUTES = 180;
+export const DEFAULT_CONFLICT_WINDOW_MINUTES = 60; // 60 minutes default VIP turnaround buffer
 
 export function isBookingActiveForConflict(booking: {
   dispatchStatus?: string;
@@ -221,27 +325,46 @@ export function isBookingActiveForConflict(booking: {
   );
 }
 
+export interface DispatchConflictCandidate {
+  id?: string;
+  scheduleId?: string;
+  pickupDate: string;
+  pickupTime: string;
+  endDate?: string;
+  endTime?: string;
+  driverName?: string | null;
+  driverId?: string;
+  vehiclePlate?: string | null;
+  vehicleNoKey?: string | null;
+  vehicleId?: string;
+  serviceMode?: string;
+}
+
 export function detectDispatchConflicts(
-  candidate: {
-    id?: string;
-    scheduleId?: string;
-    pickupDate: string;
-    pickupTime: string;
-    driverName?: string | null;
-    vehiclePlate?: string | null;
-    vehicleNoKey?: string | null;
-  },
+  candidate: DispatchConflictCandidate,
   existingBookings: HqBooking[],
   windowMinutes: number = DEFAULT_CONFLICT_WINDOW_MINUTES
 ): DispatchConflictItem[] {
   const candDate = normalizeDateToIso(candidate.pickupDate);
-  const candMinutes = timeHHmmToMinutes(candidate.pickupTime);
+  const candTime = normalizeTimeHHmm(candidate.pickupTime);
   const candDriver = cleanDriverIdentity(candidate.driverName);
   const candPlate = cleanVehicleIdentity(candidate.vehiclePlate);
   const candVehNo = cleanVehicleIdentity(candidate.vehicleNoKey);
+  const isCandVehicleOnly =
+    candidate.serviceMode === 'vehicle_only' ||
+    candDriver === '기사 미배정' ||
+    candDriver === '자차 운행' ||
+    candDriver === '차량만 대여';
 
-  if (!candDate || candMinutes === null) return [];
-  if (!candDriver && !candPlate && !candVehNo) return [];
+  if (!candDate || !candTime) return [];
+  if (!candDriver && !candPlate && !candVehNo && !candidate.driverId && !candidate.vehicleId) return [];
+
+  const candInterval = {
+    startDate: candDate,
+    startTime: candTime,
+    endDate: candidate.endDate ? normalizeDateToIso(candidate.endDate) : undefined,
+    endTime: candidate.endTime ? normalizeTimeHHmm(candidate.endTime) : '',
+  };
 
   const conflicts: DispatchConflictItem[] = [];
 
@@ -249,49 +372,84 @@ export function detectDispatchConflicts(
     if (candidate.id && existing.id === candidate.id) continue;
     if (candidate.scheduleId && existing.scheduleId && existing.scheduleId === candidate.scheduleId) continue;
     if (candidate.scheduleId && existing.id === candidate.scheduleId) continue;
+    if (candidate.id && existing.scheduleId && existing.scheduleId === candidate.id) continue;
     if (!isBookingActiveForConflict(existing)) continue;
 
-    const exDate = normalizeDateToIso(existing.pickupDate);
-    if (exDate !== candDate) continue;
+    const exStartDate = normalizeDateToIso(existing.pickupDate);
+    const exStartTime = normalizeTimeHHmm(existing.pickupTime);
+    if (!exStartDate || !exStartTime) continue;
 
-    const exMinutes = timeHHmmToMinutes(existing.pickupTime);
-    if (exMinutes === null) continue;
+    const exEndDate = normalizeDateToIso(existing.endDate) || exStartDate;
+    const exEndTime = existing.endTime ? normalizeTimeHHmm(existing.endTime) : '';
+    const hasRealEndTime = Boolean(exEndTime);
 
-    const diff = Math.abs(candMinutes - exMinutes);
-    if (diff >= windowMinutes) continue;
+    const exInterval = {
+      startDate: exStartDate,
+      startTime: exStartTime,
+      endDate: exEndDate,
+      endTime: exEndTime,
+    };
+
+    const isOverlap = isDateTimeIntervalOverlapping(candInterval, exInterval, windowMinutes);
+    if (!isOverlap) continue;
+
+    const candMs = parseKstDateTimeToMs(candDate, candTime);
+    const exMs = parseKstDateTimeToMs(exStartDate, exStartTime);
+    const diff = isNaN(candMs) || isNaN(exMs) ? 0 : Math.round(Math.abs(candMs - exMs) / (60 * 1000));
 
     const exDriver = cleanDriverIdentity(existing.driverName);
     const exPlate = cleanVehicleIdentity(existing.vehiclePlate);
     const exVehNo = cleanVehicleIdentity(existing.vehicleNoKey);
+    const isExVehicleOnly =
+      existing.serviceMode === 'vehicle_only' ||
+      exDriver === '기사 미배정' ||
+      exDriver === '자차 운행' ||
+      exDriver === '차량만 대여';
 
-    if (candDriver && exDriver && candDriver === exDriver) {
+    const exTimeLabel = `${exStartDate} ${exStartTime} ~ ${exEndDate} ${hasRealEndTime ? exEndTime : '종료 미확정'}`;
+
+    // 1. Driver Conflict Check (Skipped if either candidate or existing is vehicle_only)
+    const matchDriverId = Boolean(candidate.driverId && existing.driverId && candidate.driverId === existing.driverId);
+    const matchDriverName = Boolean(candDriver && exDriver && candDriver === exDriver);
+    const isDriverConflict = !isCandVehicleOnly && !isExVehicleOnly && (matchDriverId || matchDriverName);
+
+    if (isDriverConflict) {
+      const drvLabel = candDriver || existing.driverName || '해당 기사';
       conflicts.push({
         type: 'driver',
-        targetName: candDriver,
+        targetName: drvLabel,
         conflictingBookingId: existing.id,
         conflictingBookingNo: existing.bookingNo,
         conflictingCustomerName: existing.customerName,
         conflictingPickupTime: existing.pickupTime,
         conflictingRoute: `${existing.pickupLocation} → ${existing.destination}`,
         timeDiffMinutes: diff,
-        message: `[기사 중복] ${candDriver} 기사는 ${candDate} ${existing.pickupTime} (${existing.customerName}: ${existing.pickupLocation}→${existing.destination}) 일정과 ${diff === 0 ? '동일 시각' : `${diff}분 간격`}으로 충돌합니다.`,
+        message: hasRealEndTime
+          ? `[기사 중복] ${drvLabel} 기사는 ${exTimeLabel} (${existing.customerName}: ${existing.pickupLocation}→${existing.destination}) 일정과 배차 시간이 겹칩니다.`
+          : `[일정 충돌 주의] ${drvLabel} 기사의 기존 배차(${exTimeLabel}) 종료 시간이 미확정 상태입니다. 중복 배차 방지를 위해 종료 시간을 먼저 확인해 주세요.`,
       });
     }
 
-    const samePlate = candPlate && exPlate && candPlate === exPlate;
-    const sameVehNo = !samePlate && candVehNo && exVehNo && candVehNo === exVehNo;
-    if (samePlate || sameVehNo) {
-      const label = existing.vehiclePlate || existing.vehicleNoKey || candidate.vehiclePlate || '';
+    // 2. Vehicle Conflict Check
+    const matchVehicleId = Boolean(candidate.vehicleId && existing.vehicleId && candidate.vehicleId === existing.vehicleId);
+    const samePlate = Boolean(candPlate && exPlate && candPlate === exPlate);
+    const sameVehNo = Boolean(!samePlate && candVehNo && exVehNo && candVehNo === exVehNo);
+    const isVehicleConflict = matchVehicleId || samePlate || sameVehNo;
+
+    if (isVehicleConflict) {
+      const vehLabel = existing.vehiclePlate || existing.vehicleNoKey || candidate.vehiclePlate || candidate.vehicleNoKey || '해당 차량';
       conflicts.push({
         type: 'vehicle',
-        targetName: label,
+        targetName: vehLabel,
         conflictingBookingId: existing.id,
         conflictingBookingNo: existing.bookingNo,
         conflictingCustomerName: existing.customerName,
         conflictingPickupTime: existing.pickupTime,
         conflictingRoute: `${existing.pickupLocation} → ${existing.destination}`,
         timeDiffMinutes: diff,
-        message: `[차량 중복] ${label} 차량은 ${candDate} ${existing.pickupTime} (${existing.customerName}: ${existing.pickupLocation}→${existing.destination}) 일정과 ${diff === 0 ? '동일 시각' : `${diff}분 간격`}으로 충돌합니다.`,
+        message: hasRealEndTime
+          ? `[차량 중복] ${vehLabel} 차량은 ${exTimeLabel} (${existing.customerName}: ${existing.pickupLocation}→${existing.destination}) 일정과 배차 시간이 겹칩니다.`
+          : `[일정 충돌 주의] ${vehLabel} 차량의 기존 배차(${exTimeLabel}) 종료 시간이 미확정 상태입니다. 중복 배차 방지를 위해 종료 시간을 먼저 확인해 주세요.`,
       });
     }
   }
@@ -314,9 +472,14 @@ export function annotateBookingsWithConflicts(bookings: HqBooking[]): HqBooking[
         scheduleId: b.scheduleId,
         pickupDate: b.pickupDate,
         pickupTime: b.pickupTime,
+        endDate: b.endDate,
+        endTime: b.endTime,
         driverName: b.driverName,
+        driverId: b.driverId,
         vehiclePlate: b.vehiclePlate,
         vehicleNoKey: b.vehicleNoKey,
+        vehicleId: b.vehicleId,
+        serviceMode: b.serviceMode,
       },
       bookings
     );
@@ -417,12 +580,16 @@ export function mapScheduleItemToHqBooking(
     billingTargetName: item.billing_target_name,
     pickupDate: dateIso,
     pickupTime: normalizeTimeHHmm(item.pickup_time) || normalizeTimeHHmm(item.time_display),
+    endDate: normalizeDateToIso(item.end_date) || dateIso,
+    endTime: normalizeTimeHHmm(item.end_time) || '',
     pickupLocation: item.origin_name,
     destination: item.destination_name,
     driverName: resolvedDriverName,
+    driverId: item.driver_id,
     driverPhone: item.driver_phone,
     vehicleModel: resolvedModel,
     vehiclePlate: resolvedPlate,
+    vehicleId: item.vehicle_id,
     dispatchStatus,
     driverAck,
     driverAckTime: formatShortAckTime(item.last_ack_at),
