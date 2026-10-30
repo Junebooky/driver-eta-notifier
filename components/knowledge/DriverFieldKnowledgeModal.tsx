@@ -113,15 +113,26 @@ export const DriverFieldKnowledgeModal: React.FC<DriverFieldKnowledgeModalProps>
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-0 sm:p-4 overflow-hidden animate-in fade-in duration-200">
-      <div className="bg-white w-full h-full sm:h-[90vh] sm:max-w-md sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden relative">
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs select-none overscroll-contain animate-in fade-in duration-200"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          haptics.lightTap();
+          onClose();
+        }
+      }}
+    >
+      <div
+        className="w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[85dvh] h-[85dvh] sm:h-[620px] sm:max-h-[82vh] animate-in slide-in-from-bottom-6 sm:animate-scale-up duration-300 relative"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* ========================================================================= */}
         {/* DETAIL VIEW (Reference 2 Screen B - Strictly Read-Only for Drivers)        */}
         {/* ========================================================================= */}
         {activeItem ? (
           <div className="flex-1 flex flex-col overflow-y-auto">
             {/* Top Cover Image with Floating Back / Close buttons */}
-            <div className="relative w-full h-64 bg-slate-900 shrink-0">
+            <div className="relative w-full h-44 sm:h-48 bg-slate-900 shrink-0">
               <img
                 src={activeItem.imageUrl}
                 alt={activeItem.title}
@@ -413,6 +424,9 @@ export const DriverFieldKnowledgeModal: React.FC<DriverFieldKnowledgeModalProps>
           /* LIST VIEW (Reference 2 Screen A - Driver Mobile Card Grid)                 */
           /* ========================================================================= */
           <div className="flex-1 flex flex-col overflow-hidden">
+            {/* Top Handle for mobile bottom sheet */}
+            <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mt-2.5 mb-0 shrink-0 sm:hidden" />
+
             {/* Top Header */}
             <div className="p-4 pb-2 border-b border-slate-100 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">

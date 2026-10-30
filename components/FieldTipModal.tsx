@@ -187,7 +187,7 @@ export const FieldTipModal: React.FC<FieldTipModalProps> = ({
       }}
     >
       <div
-        className="w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[92dvh] h-[92dvh] sm:h-auto sm:max-h-[88vh] animate-in slide-in-from-bottom-8 duration-300 relative"
+        className="w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[85dvh] h-[85dvh] sm:h-auto sm:max-h-[82vh] animate-in slide-in-from-bottom-8 duration-300 relative"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Handle */}
