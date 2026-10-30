@@ -5,6 +5,7 @@ import { DriverProfile, NaviProvider } from '@/types';
 import { Car, ChevronDown, Settings } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 import { openNaviAppMain } from '@/utils/navigation';
+import { DevAuthSwitcher } from '@/components/DevAuthSwitcher';
 
 interface HeaderProps {
   profile: DriverProfile;
@@ -201,6 +202,9 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <span>N</span>
           </button>
+
+          {/* Local Dev Test Account Switcher */}
+          <DevAuthSwitcher />
 
           {/* Admin / Settings Gear Button */}
           {onOpenAdminModal && (

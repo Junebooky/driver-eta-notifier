@@ -6,19 +6,24 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "tsx utils/crmDatabaseSync.test.ts && tsx utils/emailContactDisambiguationAndCrm.test.ts && tsx utils/emailWorkflowSteps.test.ts && tsx utils/vehicleSlotParser.test.ts && tsx utils/hipassSyncAndMasking.test.ts && tsx utils/dispatchWorkflow.test.ts && tsx utils/officialPricing.test.ts && tsx utils/drivingLogAndExpenseSync.test.ts && tsx utils/freshEtaAndNaviSync.test.ts && tsx utils/driverVehicleInfoAssets.test.ts && tsx utils/driverAuthAndDuplicate.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.23.0",
     "@supabase/supabase-js": "^2.116.0",
+    "imapflow": "^2.9.1",
     "lucide-react": "^1.47.0",
+    "mailparser": "^3.12.4",
     "next": "16.3.5",
     "proj4": "^2.22.0",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/mailparser": "^3.9.0",
     "@types/node": "^20",
     "@types/proj4": "^2.5.6",
     "@types/react": "^19",
@@ -26,6 +31,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }

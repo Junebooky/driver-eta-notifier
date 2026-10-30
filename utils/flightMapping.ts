@@ -335,9 +335,110 @@ export function getCurbsideGate(terminal: string, exit?: string | null): string 
 }
 
 /**
- * Constructs precision LocationPreset for navigation destination
+ * Resolves Gimpo Airport arrival gate, exit, and recommended parking
  */
-export function getFlightLocationPreset(terminal: string, type: FlightType): LocationPreset {
+export function resolveGimpoArrival(
+  terminal: string,
+  gateNumber?: string | null,
+  isDomestic = true
+): {
+  arrivalLocationText: string;
+  curbsideGate: string;
+  recommendedParking: string;
+} {
+  const gateText = gateNumber && gateNumber.trim() ? `${gateNumber.trim()}번 게이트` : '확인 필요';
+  const termName = isDomestic ? '김포공항 국내선' : '김포공항 국제선';
+  const arrivalLocationText = `${termName} 1층 입국장 (도착 게이트 ${gateText})`;
+  const curbsideGate = isDomestic
+    ? '외부 1층 국내선 순환버스·승차장 방면'
+    : '외부 1층 국제선 버스·승차장 방면';
+  const recommendedParking = isDomestic
+    ? '국내선 제1·제2 지상/지하 주차장'
+    : '국제선 지하/지상 주차장';
+
+  return { arrivalLocationText, curbsideGate, recommendedParking };
+}
+
+/**
+ * Resolves Gimpo Airport departure location and suggested drop door
+ */
+export function resolveGimpoDeparture(
+  terminal: string,
+  checkinRange?: string | null,
+  isDomestic = true
+): {
+  departureLocationText: string;
+  suggestedDoor: string;
+} {
+  const termName = isDomestic ? '김포공항 국내선' : '김포공항 국제선';
+  const counterText = checkinRange && checkinRange.trim() ? ` (체크인 ${checkinRange.trim()})` : '';
+  const suggestedDoor = isDomestic ? '국내선 2층 출발 2~3번 도어 앞' : '국제선 2층 출발 1~2번 도어 앞';
+  const departureLocationText = `${termName} 2층 출발층${counterText} / ${suggestedDoor}`;
+
+  return { departureLocationText, suggestedDoor };
+}
+
+/**
+ * Constructs precision LocationPreset for navigation destination (supports ICN & GMP)
+ */
+export function getFlightLocationPreset(
+  terminal: string,
+  type: FlightType,
+  airportKind?: 'ICN' | 'GMP',
+  isDomestic = false
+): LocationPreset {
+  const isGmp = airportKind === 'GMP' || terminal.includes('김포') || terminal.includes('국내선') || isDomestic;
+
+  // Gimpo Airport Presets
+  if (isGmp) {
+    const isDom = isDomestic || terminal.includes('국내');
+    if (isDom) {
+      if (type === 'departure') {
+        return {
+          id: 'custom_flight_gmp_dom_dep',
+          name: '김포국제공항 국내선 2층 출국장 (하차)',
+          shortName: '김포공항 국내선 출국',
+          lat: 37.5587,
+          lng: 126.8031,
+          category: 'AIRPORT',
+          address: '서울 강서구 하늘길 112 (국내선 2층 출국장)',
+        };
+      }
+      return {
+        id: 'custom_flight_gmp_dom_arr',
+        name: '김포국제공항 국내선 1층 입국장 (영접)',
+        shortName: '김포공항 국내선 입국',
+        lat: 37.5594,
+        lng: 126.8035,
+        category: 'AIRPORT',
+        address: '서울 강서구 하늘길 112 (국내선 1층 입국장)',
+      };
+    } else {
+      // Gimpo International
+      if (type === 'departure') {
+        return {
+          id: 'custom_flight_gmp_int_dep',
+          name: '김포국제공항 국제선 2층 출국장 (하차)',
+          shortName: '김포공항 국제선 출국',
+          lat: 37.5645,
+          lng: 126.7972,
+          category: 'AIRPORT',
+          address: '서울 강서구 하늘길 38 (국제선 2층 출국장)',
+        };
+      }
+      return {
+        id: 'custom_flight_gmp_int_arr',
+        name: '김포국제공항 국제선 1층 입국장 (영접)',
+        shortName: '김포공항 국제선 입국',
+        lat: 37.5641,
+        lng: 126.7978,
+        category: 'AIRPORT',
+        address: '서울 강서구 하늘길 38 (국제선 1층 입국장)',
+      };
+    }
+  }
+
+  // Incheon Airport Presets
   const isT2 = terminal.includes('2');
 
   if (isT2) {
@@ -406,12 +507,15 @@ export function formatFlightReport(profile: DriverProfile, flight: FlightInfo): 
     lines.push(`• 담당승객: ${passengerName}`);
   }
 
+  const airportCode = flight.airportKind === 'GMP' ? 'GMP' : 'ICN';
+  const airportKorean = flight.airportKind === 'GMP' ? '김포공항' : '인천공항';
+
   if (flight.type === 'arrival') {
-    lines.push(`• 항공편명: ${flight.flightId} (${flight.airport} ➔ ICN)`);
+    lines.push(`• 항공편명: ${flight.flightId} (${flight.airport} ➔ ${airportCode})`);
     lines.push(`• 예상착륙: ${flight.statusText}`);
     lines.push(`• 입국게이트: ${flight.arrivalLocationText}`);
   } else {
-    lines.push(`• 샌딩대상: ${flight.flightId} (ICN ➔ ${flight.airport})`);
+    lines.push(`• 샌딩대상: ${flight.flightId} (${airportCode} ➔ ${flight.airport})`);
     lines.push(`• 예상출발: ${flight.statusText}`);
     lines.push(`• 하차위치: ${flight.departureLocationText}`);
   }
