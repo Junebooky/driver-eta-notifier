@@ -3,6 +3,7 @@ import { requireHqAdmin } from '@/lib/auth/serverAuth';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import {
   BUCKET_NAME,
+  checkDriverAssetDbReady,
   createSignedAssetUrl,
   getDriverProfileStoragePath,
   getDriverVehicleInfoStoragePath,
@@ -25,6 +26,20 @@ export async function POST(req: NextRequest) {
     const auth = await requireHqAdmin(req);
     if (!auth.ok || !auth.session) {
       return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
+    }
+
+    // Pre-flight check: ensure DB mapping tables exist
+    const dbCheck = await checkDriverAssetDbReady();
+    if (!dbCheck.isReady) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: 'DB 자산 매핑 마이그레이션이 적용되지 않았습니다. 오너의 승인 및 마이그레이션 적용 후 업로드가 가능합니다.',
+          code: 'MIGRATION_PENDING',
+          details: dbCheck.reason,
+        },
+        { status: 503 }
+      );
     }
 
     const formData = await req.formData();
@@ -79,39 +94,84 @@ export async function POST(req: NextRequest) {
     const ext = normalizeExtension(originalFileName, mimeType);
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+    const uploadTs = Date.now();
 
     let storagePath: string;
     let savedAsset: any;
 
     if (assetType === 'profile') {
-      storagePath = getDriverProfileStoragePath(driverId, ext, org);
+      let nextVersion = 1;
+      try {
+        const { data: latest } = await supabaseAdmin
+          .from('driver_profile_assets')
+          .select('version')
+          .eq('organization_id', org)
+          .eq('driver_id', driverId)
+          .order('version', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-      // Upload to Supabase Storage bucket 'cockpit-assets'
-      const { error: uploadErr } = await supabaseAdmin.storage
+        if (latest?.version) {
+          nextVersion = latest.version + 1;
+        }
+      } catch {
+        // Fallback version 1
+      }
+
+      storagePath = getDriverProfileStoragePath(driverId, ext, org, {
+        version: nextVersion,
+        timestamp: uploadTs,
+      });
+
+      // Upload to Supabase Storage bucket 'cockpit-assets' (immutable versioned path)
+      const { data: uploadData, error: uploadErr } = await supabaseAdmin.storage
         .from(BUCKET_NAME)
         .upload(storagePath, buffer, {
           contentType: mimeType,
-          upsert: true,
+          upsert: false,
         });
 
-      if (uploadErr) {
-        console.warn('[Profile Upload] Supabase Storage upload error:', uploadErr.message);
+      if (uploadErr || !uploadData) {
+        console.error('[Profile Upload] Supabase Storage upload error:', uploadErr?.message);
+        return NextResponse.json(
+          {
+            ok: false,
+            error: `스토리지 업로드 실패: ${uploadErr?.message || '스토리지 응답 없음'}`,
+          },
+          { status: 500 }
+        );
       }
 
-      savedAsset = await saveDriverProfileAsset({
-        organizationId: org,
-        driverId,
-        driverName,
-        filePath: storagePath,
-        fileName: originalFileName,
-        fileSize: file.size,
-        mimeType,
-        width,
-        height,
-        version: 1,
-        status: 'active',
-        uploadedBy: auth.session.displayName || '본사 관리자',
-      });
+      try {
+        savedAsset = await saveDriverProfileAsset({
+          organizationId: org,
+          driverId,
+          driverName,
+          filePath: storagePath,
+          fileName: originalFileName,
+          fileSize: file.size,
+          mimeType,
+          width,
+          height,
+          version: nextVersion,
+          status: 'active',
+          uploadedBy: auth.session.displayName || '본사 관리자',
+        });
+      } catch (dbErr: any) {
+        // Orphan cleanup: delete uploaded storage file since DB mapping failed
+        try {
+          await supabaseAdmin.storage.from(BUCKET_NAME).remove([storagePath]);
+        } catch (cleanErr: any) {
+          console.error('[Profile Orphan Cleanup Failed]', cleanErr);
+        }
+        return NextResponse.json(
+          {
+            ok: false,
+            error: `DB 저장 실패: ${dbErr?.message || '데이터베이스 오류'}. 업로드 파일은 롤백되었습니다.`,
+          },
+          { status: 500 }
+        );
+      }
     } else {
       // Info asset
       if (!variant || (variant !== 'pc' && variant !== 'mobile')) {
@@ -122,42 +182,89 @@ export async function POST(req: NextRequest) {
       }
 
       const effVehicle = resolveVehicleEntity(vehicleIdParam || vehiclePlate || '', vehicleModel || undefined);
-      storagePath = getDriverVehicleInfoStoragePath(driverId, effVehicle.uuid, variant, ext, org);
 
-      // Upload to Supabase Storage bucket 'cockpit-assets'
-      const { error: uploadErr } = await supabaseAdmin.storage
+      let nextVersion = 1;
+      try {
+        const { data: latest } = await supabaseAdmin
+          .from('driver_vehicle_info_assets')
+          .select('version')
+          .eq('organization_id', org)
+          .eq('driver_id', driverId)
+          .eq('vehicle_id', effVehicle.uuid)
+          .eq('variant', variant)
+          .order('version', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (latest?.version) {
+          nextVersion = latest.version + 1;
+        }
+      } catch {
+        // Fallback version 1
+      }
+
+      storagePath = getDriverVehicleInfoStoragePath(driverId, effVehicle.uuid, variant, ext, org, {
+        version: nextVersion,
+        timestamp: uploadTs,
+      });
+
+      // Upload to Supabase Storage bucket 'cockpit-assets' (immutable versioned path)
+      const { data: uploadData, error: uploadErr } = await supabaseAdmin.storage
         .from(BUCKET_NAME)
         .upload(storagePath, buffer, {
           contentType: mimeType,
-          upsert: true,
+          upsert: false,
         });
 
-      if (uploadErr) {
-        console.warn('[Info Upload] Supabase Storage upload error:', uploadErr.message);
+      if (uploadErr || !uploadData) {
+        console.error('[Info Upload] Supabase Storage upload error:', uploadErr?.message);
+        return NextResponse.json(
+          {
+            ok: false,
+            error: `스토리지 업로드 실패: ${uploadErr?.message || '스토리지 응답 없음'}`,
+          },
+          { status: 500 }
+        );
       }
 
-      savedAsset = await saveDriverVehicleInfoAsset({
-        organizationId: org,
-        driverId,
-        driverName,
-        vehicleId: effVehicle.uuid,
-        vehiclePlate: effVehicle.plate,
-        vehicleModel: effVehicle.model,
-        variant,
-        filePath: storagePath,
-        fileName: originalFileName,
-        fileSize: file.size,
-        mimeType,
-        width,
-        height,
-        version: 1,
-        status: 'active',
-        uploadedBy: auth.session.displayName || '본사 관리자',
-      });
+      try {
+        savedAsset = await saveDriverVehicleInfoAsset({
+          organizationId: org,
+          driverId,
+          driverName,
+          vehicleId: effVehicle.uuid,
+          vehiclePlate: effVehicle.plate,
+          vehicleModel: effVehicle.model,
+          variant,
+          filePath: storagePath,
+          fileName: originalFileName,
+          fileSize: file.size,
+          mimeType,
+          width,
+          height,
+          version: nextVersion,
+          status: 'active',
+          uploadedBy: auth.session.displayName || '본사 관리자',
+        });
+      } catch (dbErr: any) {
+        // Orphan cleanup: delete uploaded storage file since DB mapping failed
+        try {
+          await supabaseAdmin.storage.from(BUCKET_NAME).remove([storagePath]);
+        } catch (cleanErr: any) {
+          console.error('[Info Orphan Cleanup Failed]', cleanErr);
+        }
+        return NextResponse.json(
+          {
+            ok: false,
+            error: `DB 저장 실패: ${dbErr?.message || '데이터베이스 오류'}. 업로드 파일은 롤백되었습니다.`,
+          },
+          { status: 500 }
+        );
+      }
     }
 
     const signedUrl = await createSignedAssetUrl(storagePath);
-    savedAsset.signedUrl = signedUrl;
+    savedAsset.signedUrl = signedUrl || undefined;
 
     return NextResponse.json({
       ok: true,

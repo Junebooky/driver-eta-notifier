@@ -6,7 +6,7 @@ import {
 
 export type DispatchStatus = '미배정' | '배차 완료' | '운행 중' | '운행 완료' | '취소' | '작성 중' | '재확인 필요';
 export type DriverAckStatus = '미확인' | '확인완료' | '재확인 필요' | '-';
-export type CustomerBrochureStatus = '미생성' | '미발송' | '발송됨' | '재발송 필요' | '실패';
+export type CustomerBrochureStatus = '미생성' | '미발송' | '준비완료' | '발송됨' | '재발송 필요' | '실패';
 
 export type CustomerNotificationTrigger = 'dispatch_confirmed' | 'driver_changed' | 'arrived_pickup';
 

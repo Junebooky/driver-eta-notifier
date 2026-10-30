@@ -72,6 +72,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const isPreparedOnly =
+      payload.status === 'prepared' ||
+      payload.isPreparationOnly === true ||
+      channel === 'download';
+    const brochureStatus = isPreparedOnly ? '준비완료' : '발송됨';
+    const snapshotStatus = isPreparedOnly ? ('prepared' as const) : ('sent' as const);
+
     const now = new Date().toISOString();
     const snapshot = {
       bookingId,
@@ -88,8 +95,8 @@ export async function POST(req: NextRequest) {
       dispatchedAt: now,
       dispatchedBy: auth.session.displayName || '본사 관리자',
       channel: channel as any,
-      recipient: recipient.trim() || '고객사 담당자',
-      status: 'sent' as const,
+      recipient: recipient.trim() || (isPreparedOnly ? '본사 다운로드' : '고객사 담당자'),
+      status: snapshotStatus,
     };
 
     const logRecord = await recordInfoDispatchLog({
@@ -104,7 +111,7 @@ export async function POST(req: NextRequest) {
       pcInfoAssetId: bundle.pcInfo?.id || null,
       mobileInfoAssetId: bundle.mobileInfo?.id || null,
       channel: channel as any,
-      recipient: recipient.trim() || '고객사 담당자',
+      recipient: recipient.trim() || (isPreparedOnly ? '본사 다운로드' : '고객사 담당자'),
       dispatchedBy: auth.session.displayName || '본사 관리자',
       dispatchedAt: now,
       snapshot,
@@ -125,7 +132,7 @@ export async function POST(req: NextRequest) {
         .update({
           schedule_meta: {
             ...existingMeta,
-            customer_brochure: '발송됨',
+            customer_brochure: brochureStatus,
             customer_brochure_snapshot: snapshot,
             customer_brochure_dispatched_at: now,
           },
@@ -140,7 +147,10 @@ export async function POST(req: NextRequest) {
       ok: true,
       log: logRecord,
       snapshot,
-      message: '고객사 기사·차량 Info 안내자료 발송 기록이 보존되었습니다.',
+      brochureStatus,
+      message: isPreparedOnly
+        ? '고객사 안내자료 준비완료 상태가 기록되었습니다.'
+        : '고객사 기사·차량 Info 안내자료 발송 기록이 보존되었습니다.',
     });
   } catch (err: any) {
     return NextResponse.json(

@@ -37,7 +37,7 @@ test('Driver Auth & Duplicate Registration Protection Suite', async (t) => {
 
   await t.test('2. HQ Admin Session Issuance & Token Verification', async () => {
     // Generate valid HQ Admin session
-    process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-secret-key-32-chars-long-minimum-length-req!';
+    process.env.COCKPIT_AUTH_SECRET = 'test-secret-key-32-chars-long-minimum-length-req!';
     
     const token = await signCockpitSession({
       role: 'hq_admin',
@@ -62,29 +62,28 @@ test('Driver Auth & Duplicate Registration Protection Suite', async (t) => {
     assert.equal(tamperedResult, null, 'Tampered token must return null');
   });
 
-  await t.test('3. Preview Fallback Secret Guard', () => {
-    const PREVIEW_FALLBACK = 'vip_limo_hq_2026';
-
-    // In preview environment, fallback secret is used when HQ_ADMIN_SECRET is missing
+  await t.test('3. Strict Fail-Closed Secret Guard (Zero Hardcoded Fallbacks in Preview/Prod)', () => {
+    // 3A. In both preview and production, missing HQ_ADMIN_SECRET must fail closed (empty secret -> 500 error)
     delete process.env.HQ_ADMIN_SECRET;
     delete process.env.COCKPIT_AUTH_SECRET;
     process.env.VERCEL_ENV = 'preview';
 
-    const secretInPreview =
-      process.env.HQ_ADMIN_SECRET ||
-      process.env.COCKPIT_AUTH_SECRET ||
-      (process.env.VERCEL_ENV === 'preview' ? PREVIEW_FALLBACK : '');
+    const secretInPreview = (process.env.HQ_ADMIN_SECRET || '').trim();
+    assert.equal(secretInPreview, '', 'Preview environment must fail closed without hardcoded fallback');
 
-    assert.equal(secretInPreview, PREVIEW_FALLBACK, 'Preview environment must allow preview fallback secret');
-
-    // In production environment, fallback secret is NOT used
     process.env.VERCEL_ENV = 'production';
-    const secretInProd =
-      process.env.HQ_ADMIN_SECRET ||
-      process.env.COCKPIT_AUTH_SECRET ||
-      (process.env.VERCEL_ENV === 'preview' ? PREVIEW_FALLBACK : '');
+    const secretInProd = (process.env.HQ_ADMIN_SECRET || '').trim();
+    assert.equal(secretInProd, '', 'Production environment must fail closed without hardcoded fallback');
 
-    assert.equal(secretInProd, '', 'Production environment must NEVER use preview fallback secret');
+    // 3B. getAuthSecret() must NOT use SUPABASE_SERVICE_ROLE_KEY as signing secret
+    delete process.env.COCKPIT_AUTH_SECRET;
+    delete process.env.SESSION_SECRET;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'supabase-service-role-key-never-use-for-hmac';
+    delete process.env.DEV_AUTH_ENABLED;
+    (process.env as any).NODE_ENV = 'production';
+
+    const signingSecret = getAuthSecret();
+    assert.equal(signingSecret, null, 'getAuthSecret must never use SUPABASE_SERVICE_ROLE_KEY as HMAC signing fallback');
   });
 
   await t.test('4. Duplicate Driver Detection & Disambiguation Logic (Isolated Model)', () => {

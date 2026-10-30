@@ -35,8 +35,7 @@ export function isDevAuthAllowed(): boolean {
 export function getAuthSecret(): string | null {
   const configured =
     process.env.COCKPIT_AUTH_SECRET ||
-    process.env.SESSION_SECRET ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY;
+    process.env.SESSION_SECRET;
 
   if (configured && configured.trim().length > 0) {
     return configured.trim();

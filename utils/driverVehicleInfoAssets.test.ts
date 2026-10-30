@@ -4,6 +4,8 @@ import {
   BUCKET_NAME,
   DEFAULT_ORG,
   MAX_ASSET_SIZE_BYTES,
+  checkDriverAssetDbReady,
+  createSignedAssetUrl,
   getDriverProfileStoragePath,
   getDriverVehicleInfoStoragePath,
   normalizeExtension,
@@ -196,6 +198,25 @@ test('Driver & Vehicle Info Assets Suite', async (t) => {
     assert.notEqual(pathPC1, pathPC2, 'Different drivers and vehicles must have distinct paths');
     assert.match(pathPC1, /^vip_limousine_korea\/drivers\/info\/11111111-1111-4111-8111-111111111111\/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\/pc\.png$/);
     assert.match(pathMobile1, /^vip_limousine_korea\/drivers\/info\/11111111-1111-4111-8111-111111111111\/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa\/mobile\.png$/);
+
+    // Versioned immutable storage paths
+    const versionedProfilePath = getDriverProfileStoragePath(driver1, 'png', DEFAULT_ORG, {
+      version: 2,
+      timestamp: 1793255311000,
+    });
+    assert.equal(
+      versionedProfilePath,
+      'vip_limousine_korea/drivers/profiles/11111111-1111-4111-8111-111111111111/profile_v2_1793255311000.png'
+    );
+
+    const versionedInfoPath = getDriverVehicleInfoStoragePath(driver1, vehicle1, 'pc', 'png', DEFAULT_ORG, {
+      version: 3,
+      timestamp: 1793255311000,
+    });
+    assert.equal(
+      versionedInfoPath,
+      'vip_limousine_korea/drivers/info/11111111-1111-4111-8111-111111111111/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/pc_v3_1793255311000.png'
+    );
   });
 
   await t.test('5. Dispatch gatekeeping: Unassigned and Unregistered Info block sending', async () => {
@@ -389,6 +410,112 @@ test('Driver & Vehicle Info Assets Suite', async (t) => {
     const customUuid2 = getDeterministicVehicleUuid(customPlate);
     assert.equal(customUuid1, customUuid2, 'Ad-hoc vehicle UUID must be deterministic');
     assert.match(customUuid1, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  });
+
+  await t.test('9. Fail-Closed DB Guard (Zero in-memory fallback in preview/prod)', async () => {
+    const originalEnv = process.env.NODE_ENV;
+    try {
+      // Simulate production / preview runtime where test bypass is forbidden
+      (process.env as any).NODE_ENV = 'production';
+
+      await assert.rejects(
+        async () => {
+          await saveDriverProfileAsset({
+            organizationId: DEFAULT_ORG,
+            driverId: 'fail-closed-driver-uuid',
+            filePath: 'fail-closed-path.png',
+            fileName: 'fail.png',
+            fileSize: 1000,
+            mimeType: 'image/png',
+            version: 1,
+            status: 'active',
+            uploadedBy: '본사 관리자',
+          });
+        },
+        /실패|error|table|relation|connection|Invalid API key/i,
+        'Must reject with DB error in production, never mask with in-memory map'
+      );
+    } finally {
+      (process.env as any).NODE_ENV = originalEnv;
+    }
+  });
+
+  await t.test('10. Signed URL Honesty: returns null instead of fake fallback in non-test env', async () => {
+    const originalEnv = process.env.NODE_ENV;
+    try {
+      (process.env as any).NODE_ENV = 'production';
+      const signed = await createSignedAssetUrl('non-existent-path/file.png');
+      assert.equal(signed, null, 'Must return null honestly when signed URL cannot be created in production');
+    } finally {
+      (process.env as any).NODE_ENV = originalEnv;
+    }
+  });
+
+  await t.test('11. Customer Brochure Status Distinction: Prepared vs Sent', async () => {
+    const bookingId = 'sch-brochure-status-test-001';
+    const driverId = 'b6aac740-002e-4a5c-ac49-0ac71e765340';
+    const plate = '116허 1514';
+    const veh = resolveVehicleEntity(plate);
+
+    // 1. Prepared status (downloaded / staged for dispatch)
+    const prepLog = await recordInfoDispatchLog({
+      organizationId: DEFAULT_ORG,
+      bookingId,
+      driverId,
+      driverName: '윤태준',
+      vehicleId: veh.uuid,
+      vehiclePlate: veh.plate,
+      vehicleModel: veh.model,
+      channel: 'download',
+      recipient: '본사 다운로드',
+      dispatchedBy: '본사 관리자',
+      snapshot: {
+        bookingId,
+        driverId,
+        driverName: '윤태준',
+        vehicleId: veh.uuid,
+        vehiclePlate: veh.plate,
+        vehicleModel: veh.model,
+        dispatchedAt: new Date().toISOString(),
+        dispatchedBy: '본사 관리자',
+        channel: 'download',
+        recipient: '본사 다운로드',
+        status: 'prepared',
+      },
+    });
+
+    assert.equal(prepLog.snapshot.status, 'prepared');
+    assert.equal(prepLog.snapshot.channel, 'download');
+
+    // 2. Sent status (delivered to customer)
+    const sentLog = await recordInfoDispatchLog({
+      organizationId: DEFAULT_ORG,
+      bookingId,
+      driverId,
+      driverName: '윤태준',
+      vehicleId: veh.uuid,
+      vehiclePlate: veh.plate,
+      vehicleModel: veh.model,
+      channel: 'email',
+      recipient: 'vip.client@company.com',
+      dispatchedBy: '본사 관리자',
+      snapshot: {
+        bookingId,
+        driverId,
+        driverName: '윤태준',
+        vehicleId: veh.uuid,
+        vehiclePlate: veh.plate,
+        vehicleModel: veh.model,
+        dispatchedAt: new Date().toISOString(),
+        dispatchedBy: '본사 관리자',
+        channel: 'email',
+        recipient: 'vip.client@company.com',
+        status: 'sent',
+      },
+    });
+
+    assert.equal(sentLog.snapshot.status, 'sent');
+    assert.equal(sentLog.snapshot.channel, 'email');
   });
 });
 

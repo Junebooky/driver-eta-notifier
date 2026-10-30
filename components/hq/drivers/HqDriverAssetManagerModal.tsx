@@ -47,6 +47,8 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
   const [selectedVehiclePlate, setSelectedVehiclePlate] = useState<string>(initialVehiclePlate || '');
 
   const [bundle, setBundle] = useState<DriverVehicleAssetBundle | null>(null);
+  const [isDbReady, setIsDbReady] = useState<boolean>(true);
+  const [dbNotice, setDbNotice] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState<'profile' | 'pc' | 'mobile' | null>(null);
   const [statusMessage, setStatusMessage] = useState<{
@@ -95,6 +97,13 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
       const json = await res.json();
       if (res.ok && json.ok) {
         setBundle(json.bundle);
+        if (json.isDbReady === false) {
+          setIsDbReady(false);
+          setDbNotice(json.dbReason || 'DB 자산 매핑 마이그레이션 적용 대기 중 (오너 승인 대기)');
+        } else {
+          setIsDbReady(true);
+          setDbNotice(null);
+        }
       } else {
         setStatusMessage({ type: 'error', text: json.error || '자료 조회 실패' });
       }
@@ -120,6 +129,15 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
     variant?: 'pc' | 'mobile'
   ) => {
     if (!activeDriver?.id) return;
+
+    if (!isDbReady) {
+      setStatusMessage({
+        type: 'warning',
+        text: 'DB 마이그레이션 적용 대기 중입니다 (읽기 전용 검수 모드). 오너 승인 후 업로드가 가능합니다.',
+      });
+      haptics.warningPulse();
+      return;
+    }
 
     // Read image dimensions
     let width: number | undefined;
@@ -197,6 +215,12 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
   // Delete Handler
   const handleDeleteAsset = async (type: 'profile' | 'info', variant?: 'pc' | 'mobile') => {
     if (!activeDriver?.id) return;
+
+    if (!isDbReady) {
+      alert('DB 마이그레이션 적용 대기 중입니다 (읽기 전용 검수 모드).');
+      return;
+    }
+
     if (!confirm(`${type === 'profile' ? '프로필 사진' : `${variant?.toUpperCase()} 안내자료`}를 삭제(보관)하시겠습니까?`)) {
       return;
     }
@@ -293,6 +317,28 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
           </div>
         </div>
 
+        {/* DB Migration Pending Warning Banner */}
+        {!isDbReady && (
+          <div className="mx-4 mt-3 p-3.5 bg-amber-50 border border-amber-300 rounded-xl flex items-start gap-3 text-xs text-amber-950 shadow-2xs shrink-0">
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="font-black text-amber-950">
+                  DB 자산 매핑 마이그레이션 적용 대기 중 (오너 승인 대기)
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200 text-amber-900 border border-amber-300">
+                  읽기 전용 검수 모드
+                </span>
+              </div>
+              <p className="text-amber-800 leading-relaxed">
+                {dbNotice || 'Supabase DB에 자산 매핑 테이블(`driver_profile_assets`, `driver_vehicle_info_assets`)이 아직 마이그레이션되지 않았습니다.'}
+                <br />
+                운영 환경 안정성을 위해 오너 승인 후 실 DB 마이그레이션이 적용되며, 마이그레이션 전까지 신규 이미지 업로드 및 수정은 안전하게 비활성화됩니다.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Notification Status Banner */}
         {statusMessage && (
           <div
@@ -383,16 +429,26 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                 />
                 <button
                   type="button"
-                  disabled={isUploading === 'profile'}
+                  disabled={!isDbReady || isUploading === 'profile'}
                   onClick={() => profileInputRef.current?.click()}
-                  className="px-3 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#1E60F3] text-xs font-extrabold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                  className={`px-3 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                    !isDbReady
+                      ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
+                      : 'bg-blue-50 hover:bg-blue-100 text-[#1E60F3] disabled:opacity-50'
+                  }`}
                 >
                   {isUploading === 'profile' ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   ) : (
                     <Upload className="w-3.5 h-3.5" />
                   )}
-                  <span>{bundle?.profile ? '사진 교체' : '프로필 업로드'}</span>
+                  <span>
+                    {!isDbReady
+                      ? '업로드 대기 (DB 미반영)'
+                      : bundle?.profile
+                      ? '사진 교체'
+                      : '프로필 업로드'}
+                  </span>
                 </button>
 
                 {bundle?.profile && (
@@ -514,16 +570,26 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                   />
                   <button
                     type="button"
-                    disabled={isUploading === 'pc'}
+                    disabled={!isDbReady || isUploading === 'pc'}
                     onClick={() => pcInputRef.current?.click()}
-                    className="flex-1 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-[#1E60F3] text-xs font-extrabold flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-extrabold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+                      !isDbReady
+                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
+                        : 'bg-blue-50 hover:bg-blue-100 text-[#1E60F3] disabled:opacity-50'
+                    }`}
                   >
                     {isUploading === 'pc' ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     ) : (
                       <Upload className="w-3.5 h-3.5" />
                     )}
-                    <span>{bundle?.pcInfo ? 'PC 이미지 교체' : 'PC 이미지 업로드'}</span>
+                    <span>
+                      {!isDbReady
+                        ? '업로드 대기 (DB 미반영)'
+                        : bundle?.pcInfo
+                        ? 'PC 이미지 교체'
+                        : 'PC 이미지 업로드'}
+                    </span>
                   </button>
 
                   {bundle?.pcInfo && (
@@ -612,16 +678,26 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                   />
                   <button
                     type="button"
-                    disabled={isUploading === 'mobile'}
+                    disabled={!isDbReady || isUploading === 'mobile'}
                     onClick={() => mobileInputRef.current?.click()}
-                    className="flex-1 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-[#1E60F3] text-xs font-extrabold flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-extrabold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+                      !isDbReady
+                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
+                        : 'bg-blue-50 hover:bg-blue-100 text-[#1E60F3] disabled:opacity-50'
+                    }`}
                   >
                     {isUploading === 'mobile' ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     ) : (
                       <Upload className="w-3.5 h-3.5" />
                     )}
-                    <span>{bundle?.mobileInfo ? '모바일 이미지 교체' : '모바일 이미지 업로드'}</span>
+                    <span>
+                      {!isDbReady
+                        ? '업로드 대기 (DB 미반영)'
+                        : bundle?.mobileInfo
+                        ? '모바일 이미지 교체'
+                        : '모바일 이미지 업로드'}
+                    </span>
                   </button>
 
                   {bundle?.mobileInfo && (

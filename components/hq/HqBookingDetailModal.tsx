@@ -256,8 +256,8 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
             targetStatus === 'unassigned' && !selectedDriverName
               ? undefined
               : booking.serviceMode === 'vehicle_only'
-              ? '차량만 대여'
-              : selectedDriverName,
+                ? '차량만 대여'
+                : selectedDriverName,
           driverPhone: matchedDriver?.phone || booking.driverPhone,
           date: pickupDate,
           pickupTime,
@@ -271,8 +271,8 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
           dispatchStatus: targetStatus,
           customerBrochure:
             !isNewBooking &&
-            booking.dispatchStatus === '배차 완료' &&
-            cleanDriverIdentity(booking.driverName) !== selectedDriverName
+              booking.dispatchStatus === '배차 완료' &&
+              cleanDriverIdentity(booking.driverName) !== selectedDriverName
               ? '재발송 필요'
               : booking.customerBrochure,
           requestedLanguage: booking.requestedLanguage || 'ko',
@@ -366,11 +366,11 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
       const updatedBooking = data.schedule
         ? mapScheduleItemToHqBooking(data.schedule, booking.no - 1)
         : {
-            ...booking,
-            dispatchStatus: '취소' as const,
-            driverAck: '-' as const,
-            cancelReason: cancelReason.trim(),
-          };
+          ...booking,
+          dispatchStatus: '취소' as const,
+          driverAck: '-' as const,
+          cancelReason: cancelReason.trim(),
+        };
 
       haptics.warningPulse();
       onUpdateBooking(updatedBooking);
@@ -845,9 +845,11 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                     className={`px-2.5 py-0.5 rounded-lg text-xs font-bold ${
                       booking.customerBrochure === '발송됨'
                         ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                        : booking.customerBrochure === '재발송 필요'
-                        ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                        : 'bg-slate-100 text-slate-500'
+                        : booking.customerBrochure === '준비완료'
+                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                          : booking.customerBrochure === '재발송 필요'
+                            ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                            : 'bg-slate-100 text-slate-500'
                     }`}
                   >
                     {booking.customerBrochure || '미발송'}

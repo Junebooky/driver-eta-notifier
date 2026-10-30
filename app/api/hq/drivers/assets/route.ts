@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireHqAdmin, verifyServerAuth } from '@/lib/auth/serverAuth';
 import {
+  checkDriverAssetDbReady,
   deleteDriverProfileAsset,
   deleteDriverVehicleInfoAsset,
   getDriverProfileAsset,
@@ -21,6 +22,8 @@ export async function GET(req: NextRequest) {
     if (!auth.ok || !auth.session) {
       return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
     }
+
+    const dbCheck = await checkDriverAssetDbReady();
 
     const { searchParams } = new URL(req.url);
     const driverId = searchParams.get('driverId');
@@ -51,7 +54,12 @@ export async function GET(req: NextRequest) {
 
     if (type === 'profile') {
       const profile = await getDriverProfileAsset(driverId, org);
-      return NextResponse.json({ ok: true, profile });
+      return NextResponse.json({
+        ok: true,
+        isDbReady: dbCheck.isReady,
+        dbReason: dbCheck.reason,
+        profile,
+      });
     }
 
     const resolvedVehicle = vehicleIdParam || vehiclePlate
@@ -67,13 +75,24 @@ export async function GET(req: NextRequest) {
       }
       if (variant) {
         const info = await getDriverVehicleInfoAsset(driverId, resolvedVehicle.uuid, variant, org);
-        return NextResponse.json({ ok: true, info });
+        return NextResponse.json({
+          ok: true,
+          isDbReady: dbCheck.isReady,
+          dbReason: dbCheck.reason,
+          info,
+        });
       }
       const [pcInfo, mobileInfo] = await Promise.all([
         getDriverVehicleInfoAsset(driverId, resolvedVehicle.uuid, 'pc', org),
         getDriverVehicleInfoAsset(driverId, resolvedVehicle.uuid, 'mobile', org),
       ]);
-      return NextResponse.json({ ok: true, pcInfo, mobileInfo });
+      return NextResponse.json({
+        ok: true,
+        isDbReady: dbCheck.isReady,
+        dbReason: dbCheck.reason,
+        pcInfo,
+        mobileInfo,
+      });
     }
 
     // Default: 'bundle'
@@ -81,6 +100,8 @@ export async function GET(req: NextRequest) {
       const profile = await getDriverProfileAsset(driverId, org);
       return NextResponse.json({
         ok: true,
+        isDbReady: dbCheck.isReady,
+        dbReason: dbCheck.reason,
         bundle: {
           driverId,
           driverName: profile?.driverName || '',
@@ -97,7 +118,12 @@ export async function GET(req: NextRequest) {
     }
 
     const bundle = await getDriverVehicleBundle(driverId, resolvedVehicle.uuid, undefined, org);
-    return NextResponse.json({ ok: true, bundle });
+    return NextResponse.json({
+      ok: true,
+      isDbReady: dbCheck.isReady,
+      dbReason: dbCheck.reason,
+      bundle,
+    });
   } catch (err: any) {
     return NextResponse.json(
       { ok: false, error: err?.message || '자료 조회 중 오류가 발생했습니다.' },

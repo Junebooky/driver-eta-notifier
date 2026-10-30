@@ -18,6 +18,18 @@ import { submitDriverLogToHq } from '@/utils/drivingLogHqStorage';
 
 export const OUTBOX_STORAGE_KEY = 'cockpit_driving_log_outbox_v1';
 
+export interface NavigationOutboxItem {
+  id: string; // idempotencyKey
+  bookingId?: string;
+  driverId?: string;
+  payload: any;
+  createdAt: string;
+  status: 'local_draft' | 'server_sync_pending' | 'server_synced';
+  retryCount: number;
+  lastAttemptAt?: string;
+  error?: string;
+}
+
 export interface FreshEtaSnapshot {
   clickedAt: Date;
   departureTimeFormatted: string; // KST HH:mm
@@ -115,9 +127,12 @@ export function captureActionSnapshot(params: {
 }): FreshEtaSnapshot {
   const clickedAt = params.clickedAt || new Date();
   const departureTimeFormatted = formatKstTimeHHMM(clickedAt);
-  const destName = params.destination.shortName || params.destination.name;
+  const destName = (params.destination.shortName || params.destination.name || 'destination').trim().toLowerCase();
+  const driverKey = (params.driverProfile?.driverId || params.driverProfile?.driverName || 'driver').trim().toLowerCase();
+  const bookingKey = (params.bookingId || 'standalone').trim().toLowerCase();
   const minuteBucket = Math.floor(clickedAt.getTime() / 60000);
-  const idempotencyKey = `action_${params.bookingId || 'standalone'}_${destName}_${minuteBucket}`;
+  const routeFingerprint = `${params.origin.lat.toFixed(4)},${params.origin.lng.toFixed(4)}->${params.destination.lat.toFixed(4)},${params.destination.lng.toFixed(4)}`;
+  const idempotencyKey = `action_${driverKey}_${bookingKey}_${routeFingerprint}_${minuteBucket}`;
 
   return {
     clickedAt,
@@ -179,9 +194,14 @@ export async function fetchFreshEtaRoute(snapshot: FreshEtaSnapshot): Promise<Fr
     }
 
     const data = await res.json();
-    const durationMinutes = Number(data.durationMinutes) || 45;
+    const rawDuration = Number(data.durationMinutes);
+    const isValidDuration = Number.isFinite(rawDuration) && rawDuration > 0;
+    const durationMinutes = isValidDuration ? rawDuration : 0;
     const distanceKm = Number(data.distanceKm) || 0;
-    const etaFormatted = calculateDynamicEtaFormatted(durationMinutes, clickedAt);
+    const etaFormatted = isValidDuration
+      ? calculateDynamicEtaFormatted(durationMinutes, clickedAt)
+      : '--:--';
+    const isFresh = Boolean(isValidDuration && data.isFresh !== false && !data.isCached && !data.isMock);
 
     return {
       durationMinutes,
@@ -190,10 +210,11 @@ export async function fetchFreshEtaRoute(snapshot: FreshEtaSnapshot): Promise<Fr
       departureTimeFormatted,
       computedAt: data.computedAt || new Date().toISOString(),
       source: data.source || (data.isMock ? 'haversine_mock' : 'tmap_fresh'),
-      isFresh: Boolean(data.isFresh !== false && !data.isCached && !data.isMock),
+      isFresh,
       routeFingerprint: data.routeFingerprint || `${origin.lat},${origin.lng}->${destination.lat},${destination.lng}`,
-      trafficSummary: data.trafficSummary || '실시간 교통 반영',
+      trafficSummary: data.trafficSummary || (isValidDuration ? '실시간 교통 반영' : '경로 정보 없음'),
       estimatedTollWon: data.estimatedTollWon ?? null,
+      isUnavailable: !isValidDuration,
     };
   } catch (err: any) {
     clearTimeout(timeoutId);
@@ -226,8 +247,11 @@ export function buildFreshReportText(params: {
   const { snapshot, etaFormatted } = params;
   const { origin, destination, waypoints, driverProfile, reportMode, language, departureTimeFormatted } = snapshot;
 
+  const hasValidEta = Boolean(etaFormatted && etaFormatted !== '--:--');
+
   if (language === 'en') {
-    const vehicleNo = getReportVehicleNo(driverProfile);
+    const rawVehicle = driverProfile?.carNumber || driverProfile?.plateNumber || (driverProfile?.vehicleNo && driverProfile.vehicleNo !== '차량 미지정' ? driverProfile.vehicleNo : '');
+    const vehicleNo = rawVehicle ? getReportVehicleNo(driverProfile) : 'Vehicle Pending';
     const originEn = lookupApprovedAlias({ name: origin.name, shortName: origin.shortName, id: origin.id }) || origin.shortName || origin.name;
     const destEn = lookupApprovedAlias({ name: destination.name, shortName: destination.shortName, id: destination.id }) || destination.shortName || destination.name;
     const waypointsEn = (waypoints || []).map(
@@ -235,18 +259,18 @@ export function buildFreshReportText(params: {
     );
 
     return generateEnglishReportText({
-      vehicleNo,
+      vehicleNo: vehicleNo || 'Vehicle Pending',
       originEn,
       destinationEn: destEn,
       waypointsEn,
-      etaFormatted: etaFormatted !== '--:--' ? etaFormatted : '7:30 PM',
+      etaFormatted: hasValidEta ? etaFormatted : 'Pending Confirmation',
       mode: reportMode,
     });
   }
 
-  // Korean Report Template
-  const carNumber = driverProfile?.carNumber || driverProfile?.plateNumber || '142호 7811';
-  const driverName = driverProfile?.driverName || '윤태준';
+  // Korean Report Template (No hardcoded 윤태준 / 142호 7811 fallback)
+  const carNumber = driverProfile?.carNumber || driverProfile?.plateNumber || driverProfile?.vehicleNo || '차량 미지정';
+  const driverName = driverProfile?.driverName || '담당 기사';
   const passengerName = driverProfile?.clientName || driverProfile?.passengerName || undefined;
 
   return generateVipReportText({
@@ -258,7 +282,7 @@ export function buildFreshReportText(params: {
     waypoints: waypoints.map((w) => w.shortName || w.name),
     distanceKm: params.distanceKm,
     durationMinutes: params.durationMinutes,
-    etaFormatted: etaFormatted !== '--:--' ? etaFormatted : '도착 미정',
+    etaFormatted: hasValidEta ? etaFormatted : '도착 미정',
     mode: reportMode,
     departureTimeText: reportMode === 'DEPARTURE' ? departureTimeFormatted : undefined,
   });
@@ -285,10 +309,10 @@ export async function syncNavigationRouteToDrivingLog(params: {
   try {
     const todayIso = formatIsoDate(snapshot.clickedAt);
     const defaultProfile: DriverProfile = driverProfile || {
-      driverName: '윤태준',
-      vehicleNo: '4호차',
-      carNumber: '142호 7811',
-      phone: '010-8842-1920',
+      driverName: '담당 기사',
+      vehicleNo: '차량 미지정',
+      carNumber: '차량 미지정',
+      phone: '',
       defaultNavi: 'tmap',
     };
 
@@ -377,11 +401,12 @@ export async function syncNavigationRouteToDrivingLog(params: {
     // 5. Append to Outbox for resilient offline retry
     try {
       const rawOutbox = localStorage.getItem(OUTBOX_STORAGE_KEY);
-      const outboxList: Array<{ id: string; payload: any; createdAt: string }> = rawOutbox
-        ? JSON.parse(rawOutbox)
-        : [];
-      outboxList.push({
+      const outboxList: NavigationOutboxItem[] = rawOutbox ? JSON.parse(rawOutbox) : [];
+      const existingIdx = outboxList.findIndex((item) => item.id === idempotencyKey);
+      const outboxItem: NavigationOutboxItem = {
         id: idempotencyKey,
+        bookingId: activeLog.bookingId,
+        driverId: activeLog.driverId,
         payload: {
           id: activeLog.reportId.startsWith('report_') && activeLog.reportId.length === 43 ? activeLog.reportId.slice(7) : undefined,
           bookingId: activeLog.bookingId,
@@ -400,11 +425,22 @@ export async function syncNavigationRouteToDrivingLog(params: {
           status: 'draft',
         },
         createdAt: new Date().toISOString(),
-      });
+        status: 'server_sync_pending',
+        retryCount: 0,
+      };
+
+      if (existingIdx >= 0) {
+        outboxList[existingIdx] = outboxItem;
+      } else {
+        outboxList.push(outboxItem);
+      }
       localStorage.setItem(OUTBOX_STORAGE_KEY, JSON.stringify(outboxList.slice(-20)));
     } catch (e) {
       console.warn('[FreshEtaActionPipeline] Failed to write outbox entry:', e);
     }
+
+    // Register auto-sync listeners on online / visibilitychange
+    registerOutboxAutoSync();
 
     // 6. Asynchronous sync to Supabase /api/driving-logs (Non-blocking: Failure NEVER blocks navi)
     fetch('/api/driving-logs', {
@@ -433,6 +469,8 @@ export async function syncNavigationRouteToDrivingLog(params: {
           if (data?.ok && data?.log) {
             // Also notify HQ storage snapshot so HQ view updates
             submitDriverLogToHq(data.log);
+            // On successful sync, purge from outbox queue
+            markOutboxItemSynced(idempotencyKey);
           }
         }
       })
@@ -444,6 +482,125 @@ export async function syncNavigationRouteToDrivingLog(params: {
   } catch (err: any) {
     console.warn('[FreshEtaActionPipeline] Local driving log sync error:', err?.message);
     return { success: false, isDuplicate: false, error: err?.message || '운행일지 기록 실패' };
+  }
+}
+
+/**
+ * Mark an outbox item as synced and remove it from the outbox storage
+ */
+export function markOutboxItemSynced(id: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const rawOutbox = localStorage.getItem(OUTBOX_STORAGE_KEY);
+    if (!rawOutbox) return;
+    const outboxList: NavigationOutboxItem[] = JSON.parse(rawOutbox);
+    const filtered = outboxList.filter((item) => item.id !== id);
+    localStorage.setItem(OUTBOX_STORAGE_KEY, JSON.stringify(filtered));
+  } catch (e) {
+    console.warn('[FreshEtaActionPipeline] Failed to update outbox after sync:', e);
+  }
+}
+
+/**
+ * Flush all pending outbox entries to /api/driving-logs
+ * Executed on app reconnect, page visibility change, or background worker
+ */
+export async function flushNavigationOutboxQueue(): Promise<{
+  total: number;
+  synced: number;
+  failed: number;
+}> {
+  if (typeof window === 'undefined') {
+    return { total: 0, synced: 0, failed: 0 };
+  }
+
+  try {
+    const rawOutbox = localStorage.getItem(OUTBOX_STORAGE_KEY);
+    if (!rawOutbox) return { total: 0, synced: 0, failed: 0 };
+
+    const outboxList: NavigationOutboxItem[] = JSON.parse(rawOutbox);
+    if (!Array.isArray(outboxList) || outboxList.length === 0) {
+      return { total: 0, synced: 0, failed: 0 };
+    }
+
+    const remaining: NavigationOutboxItem[] = [];
+    let synced = 0;
+    let failed = 0;
+
+    for (const item of outboxList) {
+      if (item.status === 'server_synced') {
+        synced++;
+        continue;
+      }
+
+      try {
+        const res = await fetch('/api/driving-logs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(item.payload),
+        });
+
+        if (res.ok) {
+          const data = await res.json().catch(() => ({}));
+          if (data?.ok) {
+            synced++;
+            if (data.log) {
+              submitDriverLogToHq(data.log);
+            }
+            continue; // Successfully synced, removed from remaining
+          }
+        }
+
+        if (res.status >= 400 && res.status < 500) {
+          // Client validation rejection, discard
+          failed++;
+          continue;
+        }
+
+        failed++;
+        remaining.push({
+          ...item,
+          status: 'server_sync_pending',
+          retryCount: (item.retryCount || 0) + 1,
+          lastAttemptAt: new Date().toISOString(),
+          error: `HTTP ${res.status}`,
+        });
+      } catch (err: any) {
+        failed++;
+        remaining.push({
+          ...item,
+          status: 'server_sync_pending',
+          retryCount: (item.retryCount || 0) + 1,
+          lastAttemptAt: new Date().toISOString(),
+          error: err?.message || 'Network error',
+        });
+      }
+    }
+
+    localStorage.setItem(OUTBOX_STORAGE_KEY, JSON.stringify(remaining));
+    return { total: outboxList.length, synced, failed };
+  } catch (err) {
+    console.warn('[FreshEtaActionPipeline] Error flushing outbox queue:', err);
+    return { total: 0, synced: 0, failed: 0 };
+  }
+}
+
+let hasRegisteredOutboxListeners = false;
+export function registerOutboxAutoSync(): void {
+  if (typeof window === 'undefined' || hasRegisteredOutboxListeners) return;
+  hasRegisteredOutboxListeners = true;
+
+  if (typeof window.addEventListener === 'function') {
+    window.addEventListener('online', () => {
+      flushNavigationOutboxQueue().catch(() => {});
+    });
+  }
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        flushNavigationOutboxQueue().catch(() => {});
+      }
+    });
   }
 }
 
@@ -495,12 +652,13 @@ export async function executeFreshEtaAction(params: {
   bookingId?: string;
   driverProfile?: DriverProfile;
   clickedAt?: Date;
+  precomputedRouteResult?: FreshEtaRouteResult;
 }): Promise<FreshEtaActionResult> {
   // 1. Capture snapshot at instant of click
   const snapshot = captureActionSnapshot(params);
 
-  // 2. Fetch fresh ETA from API bypassing cache
-  const routeResult = await fetchFreshEtaRoute(snapshot);
+  // 2. Fetch fresh ETA from API bypassing cache, or reuse precomputed result
+  const routeResult = params.precomputedRouteResult || await fetchFreshEtaRoute(snapshot);
 
   // 3. Re-generate report text in target language & mode with fresh ETA
   const reportText = buildFreshReportText({

@@ -158,12 +158,12 @@ export const HqAdminLoginModal: React.FC<HqAdminLoginModalProps> = ({
 
           {/* Environment notice */}
           <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 text-[11px] text-slate-500 space-y-1 leading-relaxed">
-            <p className="font-semibold text-slate-700">📌 인증 안내</p>
+            <p className="font-semibold text-slate-700">📌 본사 관리자 인증</p>
             <p>
               기사 명단 조회, 신규 기사 등록 및 차량별 안내자료(Info) 관리는 본사 관리자(HQ Admin) 권한이 필요합니다.
             </p>
             <p className="text-slate-400">
-              * Vercel Preview 검수 환경: 기본 관리자 키(<code className="font-mono text-slate-600 bg-slate-200/60 px-1 py-0.5 rounded">vip_limo_hq_2026</code>)로 인증할 수 있습니다.
+              * 서버 환경 변수(HQ_ADMIN_SECRET)로 구성된 전용 관리자 비밀키를 입력해주세요.
             </p>
           </div>
 

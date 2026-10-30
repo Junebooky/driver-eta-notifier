@@ -22,10 +22,57 @@ export const ALLOWED_MIME_TYPES = new Set<string>([
   'application/pdf',
 ]);
 
-// In-memory fallback stores for local testing / mock runtime
+// In-memory fallback stores strictly for unit testing / mock runtime
 const inMemoryProfiles = new Map<string, DriverProfileAsset>(); // key: `${org}:${driverId}`
 const inMemoryInfos = new Map<string, DriverVehicleInfoAsset>(); // key: `${org}:${driverId}:${vehicleId}:${variant}`
 const inMemoryDispatchLogs: DriverInfoDispatchLog[] = [];
+
+/**
+ * Detects whether the current execution runtime is an isolated local unit test.
+ * Strictly forbidden and returns false in Vercel Preview, Production, or NODE_ENV=production.
+ */
+export function isAssetTestRuntime(): boolean {
+  if (process.env.NODE_ENV === 'production') return false;
+  if (process.env.VERCEL === '1') return false;
+  if (process.env.VERCEL_ENV === 'preview' || process.env.VERCEL_ENV === 'production') return false;
+  if (process.env.NODE_ENV === 'test') return true;
+  if (process.argv.some((arg) => arg.includes('.test.') || arg.includes('test'))) return true;
+  return false;
+}
+
+/**
+ * Checks if the underlying Supabase database tables for driver/vehicle assets are migrated and ready.
+ */
+export async function checkDriverAssetDbReady(): Promise<{ isReady: boolean; reason?: string }> {
+  if (isAssetTestRuntime()) {
+    return { isReady: true };
+  }
+
+  try {
+    const { error } = await supabaseAdmin
+      .from('driver_profile_assets')
+      .select('id')
+      .limit(1);
+
+    if (error) {
+      if (
+        error.code === '42P01' ||
+        error.message?.includes('does not exist') ||
+        error.message?.includes('relation')
+      ) {
+        return {
+          isReady: false,
+          reason: 'driver_profile_assets 테이블이 생성되지 않았습니다. (마이그레이션 적용 대기)',
+        };
+      }
+      return { isReady: false, reason: error.message || '데이터베이스 연결 실패' };
+    }
+
+    return { isReady: true };
+  } catch (err: any) {
+    return { isReady: false, reason: err?.message || 'DB 연결 확인 중 예외 발생' };
+  }
+}
 
 /**
  * Normalizes file extension safely.
@@ -44,29 +91,41 @@ export function normalizeExtension(fileName: string, mimeType?: string): string 
 
 /**
  * Builds canonical Storage path for Driver Profile.
- * Path pattern: vip_limousine_korea/drivers/profiles/{driver_uuid}/profile.<ext>
+ * Path pattern: vip_limousine_korea/drivers/profiles/{driver_uuid}/profile_v{version}_{timestamp}.<ext>
+ * Or fallback legacy path if version options omitted: .../profile.<ext>
  */
 export function getDriverProfileStoragePath(
   driverId: string,
   ext: string,
-  org: string = DEFAULT_ORG
+  org: string = DEFAULT_ORG,
+  options?: { version?: number; timestamp?: number }
 ): string {
   const safeExt = ext.replace(/^\./, '').toLowerCase();
+  if (options?.version) {
+    const ts = options.timestamp || Date.now();
+    return `${org}/drivers/profiles/${driverId}/profile_v${options.version}_${ts}.${safeExt}`;
+  }
   return `${org}/drivers/profiles/${driverId}/profile.${safeExt}`;
 }
 
 /**
  * Builds canonical Storage path for Driver × Vehicle Info.
- * Path pattern: vip_limousine_korea/drivers/info/{driver_uuid}/{vehicle_uuid}/{variant}.<ext>
+ * Path pattern: vip_limousine_korea/drivers/info/{driver_uuid}/{vehicle_uuid}/{variant}_v{version}_{timestamp}.<ext>
+ * Or fallback legacy path if version options omitted: .../{variant}.<ext>
  */
 export function getDriverVehicleInfoStoragePath(
   driverId: string,
   vehicleId: string,
   variant: 'pc' | 'mobile',
   ext: string,
-  org: string = DEFAULT_ORG
+  org: string = DEFAULT_ORG,
+  options?: { version?: number; timestamp?: number }
 ): string {
   const safeExt = ext.replace(/^\./, '').toLowerCase();
+  if (options?.version) {
+    const ts = options.timestamp || Date.now();
+    return `${org}/drivers/info/${driverId}/${vehicleId}/${variant}_v${options.version}_${ts}.${safeExt}`;
+  }
   return `${org}/drivers/info/${driverId}/${vehicleId}/${variant}.${safeExt}`;
 }
 
@@ -139,7 +198,10 @@ export function validateAssetUpload(params: {
 /**
  * Generates an expiring signed URL from Supabase Storage.
  */
-export async function createSignedAssetUrl(filePath: string, expiresInSeconds: number = 3600): Promise<string> {
+export async function createSignedAssetUrl(
+  filePath: string,
+  expiresInSeconds: number = 3600
+): Promise<string | null> {
   try {
     const { data, error } = await supabaseAdmin.storage
       .from(BUCKET_NAME)
@@ -149,11 +211,16 @@ export async function createSignedAssetUrl(filePath: string, expiresInSeconds: n
       return data.signedUrl;
     }
   } catch {
-    // Ignore and fallback
+    // Ignore and proceed to environment check
   }
 
-  // Fallback direct preview URL path
-  return `/api/hq/drivers/assets/preview?path=${encodeURIComponent(filePath)}`;
+  // Only allow test fallback in isolated unit test environment
+  if (isAssetTestRuntime()) {
+    return `/api/hq/drivers/assets/preview?path=${encodeURIComponent(filePath)}`;
+  }
+
+  // In production / preview, return null honestly if signed URL cannot be created
+  return null;
 }
 
 // -----------------------------------------------------------------------------
@@ -164,6 +231,14 @@ export async function getDriverProfileAsset(
   driverId: string,
   org: string = DEFAULT_ORG
 ): Promise<DriverProfileAsset | null> {
+  const isTestEnv = isAssetTestRuntime();
+
+  if (isTestEnv && !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    const memKey = `${org}:${driverId}`;
+    const found = inMemoryProfiles.get(memKey);
+    return found && found.status === 'active' ? { ...found } : null;
+  }
+
   try {
     const { data, error } = await supabaseAdmin
       .from('driver_profile_assets')
@@ -171,6 +246,8 @@ export async function getDriverProfileAsset(
       .eq('organization_id', org)
       .eq('driver_id', driverId)
       .eq('status', 'active')
+      .order('version', { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     if (!error && data) {
@@ -188,40 +265,64 @@ export async function getDriverProfileAsset(
         version: data.version || 1,
         status: data.status,
         uploadedBy: data.uploaded_by,
-        signedUrl,
+        signedUrl: signedUrl || undefined,
         createdAt: data.created_at,
         updatedAt: data.updated_at,
       };
     }
   } catch {
-    // DB table might not exist yet before migration
+    // DB query failed or table not migrated yet
   }
 
-  // Fallback to in-memory store
-  const memKey = `${org}:${driverId}`;
-  const found = inMemoryProfiles.get(memKey);
-  if (found && found.status === 'active') {
-    return { ...found };
-  }
   return null;
 }
 
 export async function saveDriverProfileAsset(
   asset: Omit<DriverProfileAsset, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }
 ): Promise<DriverProfileAsset> {
+  const isTestEnv = isAssetTestRuntime();
   const org = asset.organizationId || DEFAULT_ORG;
   const now = new Date().toISOString();
   const id = asset.id || crypto.randomUUID();
 
+  // Pure unit test bypass when no live Supabase service role key is present
+  if (isTestEnv && !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    const signedUrl = await createSignedAssetUrl(asset.filePath);
+    const saved: DriverProfileAsset = {
+      id,
+      organizationId: org,
+      driverId: asset.driverId,
+      driverName: asset.driverName,
+      filePath: asset.filePath,
+      fileName: asset.fileName,
+      fileSize: asset.fileSize,
+      mimeType: asset.mimeType,
+      width: asset.width,
+      height: asset.height,
+      version: asset.version || 1,
+      status: 'active',
+      uploadedBy: asset.uploadedBy || '본사 관리자',
+      signedUrl: signedUrl || undefined,
+      createdAt: now,
+      updatedAt: now,
+    };
+    inMemoryProfiles.set(`${org}:${asset.driverId}`, saved);
+    return saved;
+  }
+
   // Try DB persistence
   try {
     // Archive any previous active profile for this driver
-    await supabaseAdmin
+    const { error: archiveError } = await supabaseAdmin
       .from('driver_profile_assets')
       .update({ status: 'archived', updated_at: now })
       .eq('organization_id', org)
       .eq('driver_id', asset.driverId)
       .eq('status', 'active');
+
+    if (archiveError && !isTestEnv) {
+      throw new Error(`이전 프로필 보관 처리 실패: ${archiveError.message}`);
+    }
 
     const { data, error } = await supabaseAdmin
       .from('driver_profile_assets')
@@ -242,12 +343,17 @@ export async function saveDriverProfileAsset(
       .select('*')
       .single();
 
-    if (!error && data) {
+    if (error) {
+      if (!isTestEnv) {
+        throw new Error(`프로필 DB 저장 실패: ${error.message} (code: ${error.code})`);
+      }
+    } else if (data) {
       const signedUrl = await createSignedAssetUrl(data.file_path);
       const saved: DriverProfileAsset = {
         id: data.id,
         organizationId: data.organization_id,
         driverId: data.driver_id,
+        driverName: asset.driverName,
         filePath: data.file_path,
         fileName: data.file_name,
         fileSize: data.file_size,
@@ -257,53 +363,48 @@ export async function saveDriverProfileAsset(
         version: data.version,
         status: data.status,
         uploadedBy: data.uploaded_by,
-        signedUrl,
+        signedUrl: signedUrl || undefined,
         createdAt: data.created_at,
         updatedAt: data.updated_at,
       };
-      inMemoryProfiles.set(`${org}:${asset.driverId}`, saved);
       return saved;
     }
-  } catch {
-    // Fallback if table not ready
+  } catch (err: any) {
+    if (!isTestEnv) {
+      throw err;
+    }
   }
 
-  const saved: DriverProfileAsset = {
-    id,
-    organizationId: org,
-    driverId: asset.driverId,
-    filePath: asset.filePath,
-    fileName: asset.fileName,
-    fileSize: asset.fileSize,
-    mimeType: asset.mimeType,
-    width: asset.width,
-    height: asset.height,
-    version: asset.version || 1,
-    status: 'active',
-    uploadedBy: asset.uploadedBy || '본사 관리자',
-    signedUrl: await createSignedAssetUrl(asset.filePath),
-    createdAt: now,
-    updatedAt: now,
-  };
-  inMemoryProfiles.set(`${org}:${asset.driverId}`, saved);
-  return saved;
+  throw new Error('프로필 저장에 실패하였습니다. (DB 연결 및 테이블 상태를 확인해주세요)');
 }
 
 export async function deleteDriverProfileAsset(
   driverId: string,
   org: string = DEFAULT_ORG
 ): Promise<boolean> {
+  const isTestEnv = isAssetTestRuntime();
+
+  if (isTestEnv && !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    inMemoryProfiles.delete(`${org}:${driverId}`);
+    return true;
+  }
+
   try {
-    await supabaseAdmin
+    const { error } = await supabaseAdmin
       .from('driver_profile_assets')
       .update({ status: 'archived', updated_at: new Date().toISOString() })
       .eq('organization_id', org)
       .eq('driver_id', driverId)
       .eq('status', 'active');
-  } catch {
-    // Ignore DB error
+
+    if (error && !isTestEnv) {
+      throw new Error(`프로필 삭제 처리 실패: ${error.message}`);
+    }
+  } catch (err: any) {
+    if (!isTestEnv) {
+      throw err;
+    }
   }
-  inMemoryProfiles.delete(`${org}:${driverId}`);
   return true;
 }
 
@@ -317,6 +418,14 @@ export async function getDriverVehicleInfoAsset(
   variant: 'pc' | 'mobile',
   org: string = DEFAULT_ORG
 ): Promise<DriverVehicleInfoAsset | null> {
+  const isTestEnv = isAssetTestRuntime();
+
+  if (isTestEnv && !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    const memKey = `${org}:${driverId}:${vehicleId}:${variant}`;
+    const found = inMemoryInfos.get(memKey);
+    return found && found.status === 'active' ? { ...found } : null;
+  }
+
   try {
     const { data, error } = await supabaseAdmin
       .from('driver_vehicle_info_assets')
@@ -326,6 +435,8 @@ export async function getDriverVehicleInfoAsset(
       .eq('vehicle_id', vehicleId)
       .eq('variant', variant)
       .eq('status', 'active')
+      .order('version', { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     if (!error && data) {
@@ -345,33 +456,58 @@ export async function getDriverVehicleInfoAsset(
         version: data.version || 1,
         status: data.status,
         uploadedBy: data.uploaded_by,
-        signedUrl,
+        signedUrl: signedUrl || undefined,
         createdAt: data.created_at,
         updatedAt: data.updated_at,
       };
     }
   } catch {
-    // Table not ready
+    // Table not ready or DB error
   }
 
-  const memKey = `${org}:${driverId}:${vehicleId}:${variant}`;
-  const found = inMemoryInfos.get(memKey);
-  if (found && found.status === 'active') {
-    return { ...found };
-  }
   return null;
 }
 
 export async function saveDriverVehicleInfoAsset(
   asset: Omit<DriverVehicleInfoAsset, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }
 ): Promise<DriverVehicleInfoAsset> {
+  const isTestEnv = isAssetTestRuntime();
   const org = asset.organizationId || DEFAULT_ORG;
   const now = new Date().toISOString();
   const id = asset.id || crypto.randomUUID();
 
+  // Pure unit test bypass when no live Supabase service role key is present
+  if (isTestEnv && !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    const signedUrl = await createSignedAssetUrl(asset.filePath);
+    const saved: DriverVehicleInfoAsset = {
+      id,
+      organizationId: org,
+      driverId: asset.driverId,
+      driverName: asset.driverName,
+      vehicleId: asset.vehicleId,
+      vehiclePlate: asset.vehiclePlate,
+      vehicleModel: asset.vehicleModel,
+      variant: asset.variant,
+      filePath: asset.filePath,
+      fileName: asset.fileName,
+      fileSize: asset.fileSize,
+      mimeType: asset.mimeType,
+      width: asset.width,
+      height: asset.height,
+      version: asset.version || 1,
+      status: 'active',
+      uploadedBy: asset.uploadedBy || '본사 관리자',
+      signedUrl: signedUrl || undefined,
+      createdAt: now,
+      updatedAt: now,
+    };
+    inMemoryInfos.set(`${org}:${asset.driverId}:${asset.vehicleId}:${asset.variant}`, saved);
+    return saved;
+  }
+
   try {
     // Archive previous active asset for this variant
-    await supabaseAdmin
+    const { error: archiveError } = await supabaseAdmin
       .from('driver_vehicle_info_assets')
       .update({ status: 'archived', updated_at: now })
       .eq('organization_id', org)
@@ -379,6 +515,10 @@ export async function saveDriverVehicleInfoAsset(
       .eq('vehicle_id', asset.vehicleId)
       .eq('variant', asset.variant)
       .eq('status', 'active');
+
+    if (archiveError && !isTestEnv) {
+      throw new Error(`이전 차량 Info 보관 처리 실패: ${archiveError.message}`);
+    }
 
     const { data, error } = await supabaseAdmin
       .from('driver_vehicle_info_assets')
@@ -401,13 +541,20 @@ export async function saveDriverVehicleInfoAsset(
       .select('*')
       .single();
 
-    if (!error && data) {
+    if (error) {
+      if (!isTestEnv) {
+        throw new Error(`차량 Info DB 저장 실패: ${error.message} (code: ${error.code})`);
+      }
+    } else if (data) {
       const signedUrl = await createSignedAssetUrl(data.file_path);
       const saved: DriverVehicleInfoAsset = {
         id: data.id,
         organizationId: data.organization_id,
         driverId: data.driver_id,
+        driverName: asset.driverName,
         vehicleId: data.vehicle_id,
+        vehiclePlate: asset.vehiclePlate,
+        vehicleModel: asset.vehicleModel,
         variant: data.variant,
         filePath: data.file_path,
         fileName: data.file_name,
@@ -418,38 +565,19 @@ export async function saveDriverVehicleInfoAsset(
         version: data.version,
         status: data.status,
         uploadedBy: data.uploaded_by,
-        signedUrl,
+        signedUrl: signedUrl || undefined,
         createdAt: data.created_at,
         updatedAt: data.updated_at,
       };
-      inMemoryInfos.set(`${org}:${asset.driverId}:${asset.vehicleId}:${asset.variant}`, saved);
       return saved;
     }
-  } catch {
-    // Fallback
+  } catch (err: any) {
+    if (!isTestEnv) {
+      throw err;
+    }
   }
 
-  const saved: DriverVehicleInfoAsset = {
-    id,
-    organizationId: org,
-    driverId: asset.driverId,
-    vehicleId: asset.vehicleId,
-    variant: asset.variant,
-    filePath: asset.filePath,
-    fileName: asset.fileName,
-    fileSize: asset.fileSize,
-    mimeType: asset.mimeType,
-    width: asset.width,
-    height: asset.height,
-    version: asset.version || 1,
-    status: 'active',
-    uploadedBy: asset.uploadedBy || '본사 관리자',
-    signedUrl: await createSignedAssetUrl(asset.filePath),
-    createdAt: now,
-    updatedAt: now,
-  };
-  inMemoryInfos.set(`${org}:${asset.driverId}:${asset.vehicleId}:${asset.variant}`, saved);
-  return saved;
+  throw new Error('차량 Info 저장에 실패하였습니다. (DB 연결 및 테이블 상태를 확인해주세요)');
 }
 
 export async function deleteDriverVehicleInfoAsset(
@@ -458,8 +586,15 @@ export async function deleteDriverVehicleInfoAsset(
   variant: 'pc' | 'mobile',
   org: string = DEFAULT_ORG
 ): Promise<boolean> {
+  const isTestEnv = isAssetTestRuntime();
+
+  if (isTestEnv && !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    inMemoryInfos.delete(`${org}:${driverId}:${vehicleId}:${variant}`);
+    return true;
+  }
+
   try {
-    await supabaseAdmin
+    const { error } = await supabaseAdmin
       .from('driver_vehicle_info_assets')
       .update({ status: 'archived', updated_at: new Date().toISOString() })
       .eq('organization_id', org)
@@ -467,10 +602,15 @@ export async function deleteDriverVehicleInfoAsset(
       .eq('vehicle_id', vehicleId)
       .eq('variant', variant)
       .eq('status', 'active');
-  } catch {
-    // Ignore DB error
+
+    if (error && !isTestEnv) {
+      throw new Error(`차량 Info 삭제 처리 실패: ${error.message}`);
+    }
+  } catch (err: any) {
+    if (!isTestEnv) {
+      throw err;
+    }
   }
-  inMemoryInfos.delete(`${org}:${driverId}:${vehicleId}:${variant}`);
   return true;
 }
 
@@ -511,6 +651,7 @@ export async function getDriverVehicleBundle(
 export async function recordInfoDispatchLog(
   log: Omit<DriverInfoDispatchLog, 'id' | 'dispatchedAt'> & { id?: string; dispatchedAt?: string }
 ): Promise<DriverInfoDispatchLog> {
+  const isTestEnv = isAssetTestRuntime();
   const id = log.id || crypto.randomUUID();
   const org = log.organizationId || DEFAULT_ORG;
   const now = log.dispatchedAt || new Date().toISOString();
@@ -523,8 +664,13 @@ export async function recordInfoDispatchLog(
     createdAt: now,
   };
 
+  if (isTestEnv && !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    inMemoryDispatchLogs.unshift(record);
+    return record;
+  }
+
   try {
-    await supabaseAdmin.from('driver_info_dispatch_logs').insert({
+    const { error } = await supabaseAdmin.from('driver_info_dispatch_logs').insert({
       id,
       organization_id: org,
       booking_id: log.bookingId,
@@ -543,11 +689,16 @@ export async function recordInfoDispatchLog(
       snapshot: log.snapshot,
       notes: log.notes || null,
     });
-  } catch {
-    // Table not ready
+
+    if (error && !isTestEnv) {
+      throw new Error(`발송 이력 DB 기록 실패: ${error.message} (code: ${error.code})`);
+    }
+  } catch (err: any) {
+    if (!isTestEnv) {
+      throw err;
+    }
   }
 
-  inMemoryDispatchLogs.unshift(record);
   return record;
 }
 
@@ -555,6 +706,13 @@ export async function getLatestDispatchLogForBooking(
   bookingId: string,
   org: string = DEFAULT_ORG
 ): Promise<DriverInfoDispatchLog | null> {
+  const isTestEnv = isAssetTestRuntime();
+
+  if (isTestEnv && !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    const found = inMemoryDispatchLogs.find((l) => l.bookingId === bookingId && l.organizationId === org);
+    return found || null;
+  }
+
   try {
     const { data, error } = await supabaseAdmin
       .from('driver_info_dispatch_logs')
@@ -591,8 +749,7 @@ export async function getLatestDispatchLogForBooking(
     // Table not ready
   }
 
-  const found = inMemoryDispatchLogs.find((l) => l.bookingId === bookingId && l.organizationId === org);
-  return found || null;
+  return null;
 }
 
 /**
