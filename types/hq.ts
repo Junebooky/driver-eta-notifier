@@ -34,10 +34,12 @@ export interface HqBooking {
   pickupLocation: string;
   destination: string;
   driverName: string;
+  driverId?: string;
   driverPhone?: string;
   driverIsEnglishVerified?: boolean;
   vehicleModel: string;
   vehiclePlate?: string;
+  vehicleId?: string;
   dispatchStatus: DispatchStatus;
   driverAck: DriverAckStatus;
   driverAckTime?: string;

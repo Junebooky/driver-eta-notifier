@@ -14,10 +14,14 @@ import {
   Clock,
   BellRing,
   MessageSquareText,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { HqBooking } from '@/types/hq';
 import { haptics } from '@/utils/haptics';
 import { VIP_REAL_VEHICLES, stripManufacturerName } from '@/utils/vehicleData';
+import { HqDriverVehicleInfoModal } from './bookings/HqDriverVehicleInfoModal';
+import { HqDriverAssetManagerModal } from './drivers/HqDriverAssetManagerModal';
+import { useHqDrivers } from '@/utils/useHqDrivers';
 import {
   createBookingPricingSnapshot,
   DEFAULT_DRIVER_PROFILES,
@@ -100,6 +104,13 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Driver & Vehicle Info Asset Modal States
+  const { drivers: hqDrivers } = useHqDrivers();
+  const [isDriverVehicleInfoModalOpen, setIsDriverVehicleInfoModalOpen] = useState(false);
+  const [isAssetManagerModalOpen, setIsAssetManagerModalOpen] = useState(false);
+  const [assetManagerDriverId, setAssetManagerDriverId] = useState('');
+  const [assetManagerVehiclePlate, setAssetManagerVehiclePlate] = useState('');
 
   const isNewBooking = Boolean(booking && !booking.scheduleId && booking.id.startsWith('new_'));
 
@@ -821,13 +832,13 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                 </div>
               )}
 
-              {/* Customer Brochure Card */}
+              {/* Customer Brochure & Driver-Vehicle Info Card */}
               <div className="p-4 rounded-2xl border border-slate-200/90 bg-white space-y-2.5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
-                    <Mail className="w-4 h-4 text-[#1E60F3]" />
+                    <ImageIcon className="w-4 h-4 text-[#1E60F3]" />
                     <span className="text-sm font-black text-slate-900">
-                      고객사 안내자료 발송 기록
+                      기사·차량 Info 고객 안내자료
                     </span>
                   </div>
                   <span
@@ -839,18 +850,35 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                         : 'bg-slate-100 text-slate-500'
                     }`}
                   >
-                    {booking.customerBrochure}
+                    {booking.customerBrochure || '미발송'}
                   </span>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleSendCustomerBrochure}
-                  className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <Send className="w-4 h-4" />
-                  <span>고객사 기사·차량 프로필 발송 완료 처리</span>
-                </button>
+                <p className="text-xs text-slate-500 leading-normal">
+                  확정된 기사와 실차 번호판 조합의 완성형 안내자료(PC·모바일)를 확인하고 다운로드하거나 발송 기록을 남깁니다.
+                </p>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsDriverVehicleInfoModalOpen(true)}
+                    className="flex-1 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-extrabold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
+                  >
+                    <ImageIcon className="w-4 h-4 text-blue-400" />
+                    <span>기사·차량 Info 확인 및 발송창 열기</span>
+                  </button>
+
+                  {booking.customerBrochure !== '발송됨' && (
+                    <button
+                      type="button"
+                      onClick={handleSendCustomerBrochure}
+                      className="py-2.5 px-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold transition-all cursor-pointer"
+                      title="단순 발송 완료 표시"
+                    >
+                      <span>완료 표시</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Dispatch Cancellation Box */}
@@ -913,6 +941,38 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Driver Vehicle Info Modal */}
+      {isDriverVehicleInfoModalOpen && (
+        <HqDriverVehicleInfoModal
+          isOpen={isDriverVehicleInfoModalOpen}
+          booking={booking}
+          onClose={() => setIsDriverVehicleInfoModalOpen(false)}
+          onOpenAssetManager={(drvId, vPlate) => {
+            setAssetManagerDriverId(drvId);
+            setAssetManagerVehiclePlate(vPlate);
+            setIsAssetManagerModalOpen(true);
+          }}
+          onDispatchRecorded={() => {
+            onUpdateBooking({
+              ...booking,
+              customerBrochure: '발송됨',
+            });
+            onSavedServer?.();
+          }}
+        />
+      )}
+
+      {/* Driver Asset Manager Modal */}
+      {isAssetManagerModalOpen && (
+        <HqDriverAssetManagerModal
+          isOpen={isAssetManagerModalOpen}
+          onClose={() => setIsAssetManagerModalOpen(false)}
+          drivers={hqDrivers}
+          initialDriverId={assetManagerDriverId || booking.driverId}
+          initialVehiclePlate={assetManagerVehiclePlate || booking.vehiclePlate}
+        />
+      )}
     </div>
   );
 };

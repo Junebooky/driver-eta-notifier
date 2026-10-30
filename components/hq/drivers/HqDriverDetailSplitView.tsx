@@ -14,10 +14,12 @@ import {
   ArrowLeft,
   Loader2,
   Calendar,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { HqDriverSummary, DriverScheduleItem } from '@/types/driverHq';
 import { useHqDrivers } from '@/utils/useHqDrivers';
 import { haptics } from '@/utils/haptics';
+import { HqDriverAssetManagerModal } from './HqDriverAssetManagerModal';
 
 interface HqDriverDetailSplitViewProps {
   selectedDriverId: string;
@@ -54,6 +56,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
   const [isSavingMemo, setIsSavingMemo] = useState(false);
   const [memoDraft, setMemoDraft] = useState('');
   const [weekOffset, setWeekOffset] = useState<number>(0);
+  const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
 
   // Active Driver
   const activeDriver = useMemo(() => {
@@ -407,6 +410,24 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
             )}
           </div>
 
+          {/* Button: Driver Profile & Vehicle Info Management */}
+          <button
+            type="button"
+            onClick={() => {
+              haptics.lightTap();
+              setIsAssetModalOpen(true);
+            }}
+            className="w-full py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-black transition-all flex items-center justify-between cursor-pointer shadow-2xs group"
+          >
+            <div className="flex items-center gap-2">
+              <ImageIcon className="w-3.5 h-3.5 text-blue-400 group-hover:scale-110 transition-transform" />
+              <span>프로필 및 차량별 Info 관리</span>
+            </div>
+            <span className="px-1.5 py-0.5 rounded bg-blue-500/30 text-blue-200 text-[9.5px] font-black">
+              PC · Mobile
+            </span>
+          </button>
+
           {/* Profile Details List */}
           <div className="bg-slate-50/60 rounded-2xl border border-slate-100 p-4 space-y-2.5 text-xs">
             <div className="flex items-center justify-between">
@@ -717,6 +738,17 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
           </div>
         </div>
       </div>
+
+      {/* Driver Asset Manager Modal */}
+      {isAssetModalOpen && activeDriver && (
+        <HqDriverAssetManagerModal
+          isOpen={isAssetModalOpen}
+          onClose={() => setIsAssetModalOpen(false)}
+          drivers={drivers}
+          initialDriverId={activeDriver.id}
+          initialVehiclePlate={activeDriver.plate || activeDriver.carNumber}
+        />
+      )}
     </div>
   );
 };
