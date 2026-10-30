@@ -72,3 +72,4 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: err?.message || '이미지 미리보기 실패' }, { status: 500 });
   }
 }
+

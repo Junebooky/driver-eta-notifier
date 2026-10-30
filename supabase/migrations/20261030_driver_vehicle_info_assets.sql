@@ -264,3 +264,4 @@ CREATE POLICY dispatch_logs_admin_all_policy ON cockpit.driver_info_dispatch_log
   );
 
 COMMIT;
+
