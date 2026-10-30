@@ -158,7 +158,7 @@ export async function POST(req: NextRequest) {
     }
 
     // P0 Concurrency Mutex & Atomic Batch Upsert Guard with All-or-Nothing Rollback (Point 1)
-    const batchResult = await atomicUpsertServerDispatchBatch(candidates);
+    const batchResult = await atomicUpsertServerDispatchBatch(candidates, undefined, req.headers.get('idempotency-key') || undefined);
     if (!batchResult.ok) {
       if (batchResult.conflicts && batchResult.conflicts.length > 0) {
         return NextResponse.json(
@@ -174,7 +174,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           ok: false,
-          code: batchResult.error?.includes('미확인 장소') ? 'UNRESOLVED_PLACE_GUARD' : 'DISPATCH_SAVE_FAILED',
+          code: batchResult.statusCode === 409 ? 'SCHEDULE_CONFLICT' : batchResult.error?.includes('미확인 장소') ? 'UNRESOLVED_PLACE_GUARD' : 'DISPATCH_SAVE_FAILED',
           error: batchResult.error || '배차 저장에 실패했습니다.',
         },
         { status: batchResult.statusCode || 400 }

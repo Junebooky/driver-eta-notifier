@@ -170,8 +170,8 @@ export function matchSampleReceipt(identifier: string): ReceiptScanResult | null
     matchedPath = SAMPLE_RECEIPT_HASHES[lower];
   } else if (SAMPLE_RECEIPT_PRESETS[identifier]) {
     matchedPath = identifier;
-  } else if (lower.includes('hangang') || lower.includes('한강')) {
-    matchedPath = '/images/receipt_sample_hangang.jpg';
+
+
   } else if (lower.includes('receipt_sample_fuel') || lower.includes('만남의광장')) {
     matchedPath = '/images/receipt_sample_fuel.jpg';
   } else if (lower.includes('receipt_sample_cu') || lower.includes('고양강매')) {

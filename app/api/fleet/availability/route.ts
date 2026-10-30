@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkFleetAvailability } from '@/utils/availabilityEngine';
 import { requireHqAdmin } from '@/lib/auth/serverAuth';
-import { normalizeDateToIso, normalizeTimeHHmm } from '@/utils/dispatchConflictDetector';
+import { normalizeDateToIso, normalizeTimeHHmm, parseKstDateTimeToMs } from '@/utils/dispatchConflictDetector';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,13 +23,13 @@ export async function GET(req: NextRequest) {
     const excludeScheduleId = searchParams.get('excludeScheduleId') || undefined;
 
     const startDate = normalizeDateToIso(rawStart);
-    const endDate = normalizeDateToIso(rawEnd) || startDate;
-    const startTime = normalizeTimeHHmm(rawStartTime) || (rawStartTime.trim() ? '' : '09:00');
-    const endTime = normalizeTimeHHmm(rawEndTime) || (rawEndTime.trim() ? '' : '19:00');
+    const endDate = normalizeDateToIso(rawEnd);
+    const startTime = normalizeTimeHHmm(rawStartTime);
+    const endTime = normalizeTimeHHmm(rawEndTime);
 
-    if (!startDate) {
+    if (!startDate || !endDate || !startTime || !endTime || parseKstDateTimeToMs(endDate, endTime) <= parseKstDateTimeToMs(startDate, startTime)) {
       return NextResponse.json(
-        { ok: false, error: '유효한 시작 날짜(startDate: YYYY-MM-DD)를 입력해 주세요.' },
+        { ok: false, error: '유효한 시작·종료 날짜와 시간을 입력해 주세요.' },
         { status: 400 }
       );
     }

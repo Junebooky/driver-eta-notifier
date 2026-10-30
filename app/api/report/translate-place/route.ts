@@ -1,3 +1,4 @@
+import { verifyServerAuth } from '@/lib/auth/serverAuth';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   lookupApprovedAlias,
@@ -12,6 +13,8 @@ import { PlaceTranslationRecord } from '@/types/reportTranslation';
 const serverTranslationCache = new Map<string, PlaceTranslationRecord>();
 
 export async function POST(req: NextRequest) {
+  const apiAuth = await verifyServerAuth(req);
+  if (!apiAuth.ok) return NextResponse.json({ ok: false, error: apiAuth.error }, { status: apiAuth.statusCode });
   try {
     const body = await req.json();
     const { name, shortName, id, address } = body || {};

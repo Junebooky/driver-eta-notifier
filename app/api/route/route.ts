@@ -1,3 +1,4 @@
+import { verifyServerAuth } from '@/lib/auth/serverAuth';
 import { NextRequest, NextResponse } from 'next/server';
 import { calculateHaversineEstimate } from '@/utils/navigation';
 
@@ -268,6 +269,8 @@ async function handleRouteCalculation(
 
 // Support GET requests (query params: startX, startY, endX, endY or startLat, startLng, endLat, endLng, passList, bypassCache, purpose, clientTimestamp)
 export async function GET(req: NextRequest) {
+  const apiAuth = await verifyServerAuth(req);
+  if (!apiAuth.ok) return NextResponse.json({ ok: false, error: apiAuth.error }, { status: apiAuth.statusCode });
   try {
     const { searchParams } = new URL(req.url);
 
@@ -295,6 +298,8 @@ export async function GET(req: NextRequest) {
 
 // Support POST requests (body: { startLat, startLng, endLat, endLng, passList, bypassCache, purpose, clientTimestamp } or { startX, startY, endX, endY, passList, ... })
 export async function POST(req: NextRequest) {
+  const apiAuth = await verifyServerAuth(req);
+  if (!apiAuth.ok) return NextResponse.json({ ok: false, error: apiAuth.error }, { status: apiAuth.statusCode });
   try {
     const body = await req.json().catch(() => ({}));
 

@@ -162,7 +162,7 @@ export async function parseAndVerifyToken(token: string): Promise<CockpitAuthSes
     try {
       const parsed: CockpitAuthSession = JSON.parse(base64UrlDecode(encodedPayload));
       const now = Math.floor(Date.now() / 1000);
-      if (parsed.expiresAt && parsed.expiresAt < now) {
+      if (!Number.isFinite(parsed.expiresAt) || !Number.isFinite(parsed.issuedAt) || parsed.expiresAt <= now || parsed.issuedAt > now + 60 || !parsed.userId || !['hq_admin', 'driver'].includes(parsed.role)) {
         return null; // Expired
       }
       if (parsed.org !== 'vip_limousine_korea') {
@@ -231,7 +231,7 @@ export function extractAuthToken(req: Request | NextRequest): string | null {
   if (cookieHeader) {
     const match = cookieHeader.match(/(?:^|;\s*)cockpit_session=([^;]+)/);
     if (match && match[1]) {
-      return decodeURIComponent(match[1].trim());
+      try { return decodeURIComponent(match[1].trim()); } catch { return null; }
     }
   }
 
@@ -329,7 +329,7 @@ export function driverCanAccessSchedule(
     return false;
   }
 
-  const sDriverId = schedule.driver_id || schedule.schedule_meta?.driver_id;
+  const sDriverId = schedule.driver_id || schedule.schedule_meta?.driverId || schedule.schedule_meta?.driver_id;
   const sessionDriverId = session.driverId || session.userId;
 
   if (sessionDriverId && sDriverId && sessionDriverId === sDriverId) {

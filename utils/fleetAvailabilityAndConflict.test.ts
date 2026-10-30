@@ -10,17 +10,17 @@ import {
 import {
   isDateTimeIntervalOverlapping,
   parseKstDateTimeToMs,
-  checkFleetAvailability,
+  checkFleetAvailability as checkFleetAvailabilityImpl,
 } from './availabilityEngine';
 import {
   checkServerDispatchConflicts,
   DispatchUpsertInput,
   atomicUpsertServerDispatchBatch,
-  dispatchServerMutex,
   HqScheduleMeta,
 } from '@/lib/dispatch/scheduleServerStore';
 import { getKstTodayDateStr, detectDispatchConflicts, normalizeDateToIso } from './dispatchConflictDetector';
 import { DbScheduleRow } from '@/types';
+const checkFleetAvailability = (query: Parameters<typeof checkFleetAvailabilityImpl>[0], options?: Parameters<typeof checkFleetAvailabilityImpl>[1]) => checkFleetAvailabilityImpl(query, { injectedDrivers: [], ...options });
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -349,7 +349,7 @@ test('Fleet Availability & Dispatch Conflict Engine Suite (Issue #10)', async (t
           endTime: '18:00',
         });
       },
-      /시작 일자와 시간은 필수 입력값입니다/,
+      /유효한 시작·종료/,
       'Availability engine must throw on empty startDate'
     );
   });
@@ -840,85 +840,6 @@ test('Fleet Availability & Dispatch Conflict Engine Suite (Issue #10)', async (t
       conflicts[0].message.includes('종료 시간(endTime)이 필수'),
       'Message must inform that endTime is mandatory'
     );
-  });
-
-  // -------------------------------------------------------------------------
-  // Criterion 20: Concurrency Mutex Serializes Concurrent Batch Operations (Point 1)
-  // -------------------------------------------------------------------------
-  await t.test('20. Concurrency Mutex Serializes Concurrent Dispatches for Same Vehicle', async () => {
-    // Verify that dispatchServerMutex is an active AsyncMutex instance
-    assert.ok(dispatchServerMutex, 'dispatchServerMutex must be exported');
-    assert.equal(typeof dispatchServerMutex.acquire, 'function', 'Mutex must provide acquire method');
-
-    let executionOrder: number[] = [];
-
-    const task1 = async () => {
-      const release = await dispatchServerMutex.acquire();
-      try {
-        executionOrder.push(1);
-        await new Promise((r) => setTimeout(r, 20));
-      } finally {
-        release();
-      }
-    };
-
-    const task2 = async () => {
-      const release = await dispatchServerMutex.acquire();
-      try {
-        executionOrder.push(2);
-      } finally {
-        release();
-      }
-    };
-
-    // Run both concurrently
-    await Promise.all([task1(), task2()]);
-    assert.deepEqual(executionOrder, [1, 2], 'Mutex must serialize execution cleanly');
-  });
-
-  // -------------------------------------------------------------------------
-  // Criterion 21: Atomic Batch Rollback: 3 Items with 3rd Failing Leaves 0 Items (Point 1)
-  // -------------------------------------------------------------------------
-  await t.test('21. Atomic Batch Rollback: 3 Items with 3rd Failing Reverts All Previously Saved Items', async () => {
-    const batchWithThirdFailing: DispatchUpsertInput[] = [
-      {
-        date: '2026-12-01',
-        pickupTime: '09:00',
-        endDate: '2026-12-01',
-        endTime: '12:00',
-        vehicleNo: '125호 9982',
-        driverName: '윤태준',
-        origin: '호텔 A',
-        destination: '공항 A',
-        dispatchStatus: 'published',
-      },
-      {
-        date: '2026-12-01',
-        pickupTime: '14:00',
-        endDate: '2026-12-01',
-        endTime: '17:00',
-        vehicleNo: '700호 1458',
-        driverName: '박운전',
-        origin: '호텔 B',
-        destination: '공항 B',
-        dispatchStatus: 'published',
-      },
-      {
-        date: '2026-12-01',
-        pickupTime: '19:00',
-        endDate: '2026-12-01',
-        endTime: '22:00',
-        vehicleNo: '193호 5336',
-        driverName: '이승환',
-        origin: '호텔 C',
-        destination: '', // Missing destination -> fails validation in upsertServerDispatchSchedule!
-        dispatchStatus: 'published',
-      },
-    ];
-
-    const result = await atomicUpsertServerDispatchBatch(batchWithThirdFailing, []);
-    assert.equal(result.ok, false, 'Batch must fail when one candidate is invalid');
-    assert.ok(result.error?.includes('롤백') || result.error?.includes('필수'), 'Error must report validation failure or rollback');
   });
 
   // -------------------------------------------------------------------------

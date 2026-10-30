@@ -1,3 +1,5 @@
+import { randomUUID, createHash } from 'node:crypto';
+import { validateDispatchInterval } from '@/utils/dispatchInterval';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { ScheduleItem } from '@/data/ferrariSchedules';
 import { DbScheduleRow } from '@/types';
@@ -424,7 +426,7 @@ export async function queryServerSchedules(params: {
     return { schedules: [], hydratedRows: [], error: error.message };
   }
 
-  const allHydrated = (data || []).map((r: Record<string, any>) => hydrateRawScheduleRow(r));
+  const allHydrated = (data || []).filter((r: Record<string, any>) => !r.org_id || r.org_id === 'vip_limousine_korea').map((r: Record<string, any>) => hydrateRawScheduleRow(r));
   const isHqView = params.role === 'hq' || params.statusParam === 'all';
 
   const reqDriverId = params.driverId?.trim() || '';
@@ -449,7 +451,10 @@ export async function queryServerSchedules(params: {
       if (ds !== params.statusParam) return false;
     }
 
-    // 2. Identity boundary (Driver ID / Driver Name / Vehicle Plate / Vehicle No)
+    // Drivers are scoped by immutable UUID; name/plate/vehicle tabs cannot widen access.
+    if (!isHqView) return Boolean(reqDriverId && row.driver_id === reqDriverId);
+
+    // 2. HQ filtering by explicit identity
     if (!reqDriverId && !reqDriverName && !reqPlate && !reqVehicleNo) {
       return true;
     }
@@ -834,9 +839,11 @@ export const inMemoryTestStore = new Map<string, any>();
 /**
  * Inserts or updates a schedule/reservation in `cockpit.schedules` with full HQ-Driver metadata.
  */
-export async function upsertServerDispatchSchedule(
+async function prepareServerDispatchSchedule(
   input: DispatchUpsertInput
-): Promise<{ schedule?: ScheduleItem; error?: string; statusCode?: number }> {
+): Promise<{ row?: Record<string, any>; expectedUpdatedAt?: string; error?: string; statusCode?: number }> {
+  const intervalError = validateDispatchInterval({ ...input, dispatchStatus: input.dispatchStatus || 'published' });
+  if (intervalError) return { error: intervalError, statusCode: 400 };
   const isoDate = normalizeDateToIso(input.date);
   const hhmm = normalizeTimeHHmm(input.pickupTime);
 
@@ -855,7 +862,7 @@ export async function upsertServerDispatchSchedule(
   let effectiveDispatchStatus: HqScheduleMeta['dispatchStatus'] = requestedStatus;
   if (requestedStatus === 'published') {
     const needsDriver = input.serviceMode !== 'vehicle_only';
-    if ((needsDriver && !cleanDrv && !input.vehicleNo) || (!cleanPlt && !input.vehicleNo)) {
+    if ((needsDriver && (!cleanDrv || !input.driverId)) || (!cleanPlt && !input.vehicleNo)) {
       return {
         error: '배차 확정을 위해 차량과 담당 기사를 선택해주세요. 아직 배정 전이라면 [미배정 예약 등록]을 이용하세요.',
         statusCode: 400,
@@ -902,7 +909,10 @@ export async function upsertServerDispatchSchedule(
   }
 
   // Determine canonical `vehicle_no` for FK `cockpit.drivers(vehicle_no)`
-  const matchedVeh = findVipVehicle(input.vehiclePlate || input.vehicleModel || input.vehicleNo || '');
+  const matchedVeh = findVipVehicle(input.vehiclePlate || input.vehicleNo || '');
+  if (requestedStatus === 'published' && (!matchedVeh || cleanVehicleIdentity(matchedVeh.plate) !== cleanVehicleIdentity(input.vehiclePlate || input.vehicleNo) || (input.vehicleId && input.vehicleId !== matchedVeh.uuid))) {
+    return { error: '확정 배차의 차량 UUID와 정확한 전체 번호판을 확인해 주세요.', statusCode: 400 };
+  }
   const resolvedPlate =
     (input.vehiclePlate && input.vehiclePlate !== '미배정' ? input.vehiclePlate.trim() : '') ||
     matchedVeh?.plate ||
@@ -921,24 +931,17 @@ export async function upsertServerDispatchSchedule(
       UNASSIGNED_VEHICLE_SENTINEL;
   }
 
-  await ensureDriverVehicleKeyExists({
-    vehicleNo: targetVehicleNo,
-    carNumber: resolvedPlate || targetVehicleNo,
-    driverName: cleanDrv || input.driverName,
-    driverPhone: input.driverPhone,
-  });
-
   // Check if updating an existing row
   let existingHydrated: (DbScheduleRow & { _meta: HqScheduleMeta }) | null = null;
   if (input.scheduleId) {
-    const { data: exRaw } = await supabaseAdmin
+    const { data: exRaw, error: readError } = await supabaseAdmin
       .from('schedules')
       .select('*')
       .eq('id', input.scheduleId)
       .maybeSingle();
-    if (exRaw) {
-      existingHydrated = hydrateRawScheduleRow(exRaw);
-    }
+    if (readError) return { error: '기존 배차 조회에 실패했습니다.', statusCode: 503 };
+    if (!exRaw) return { error: '해당 배차를 찾을 수 없습니다.', statusCode: 404 };
+    existingHydrated = hydrateRawScheduleRow(exRaw);
   }
 
   const nowIso = new Date().toISOString();
@@ -965,10 +968,12 @@ export async function upsertServerDispatchSchedule(
     const prevMeta = existingHydrated._meta;
     const wasPublished = prevMeta.dispatchStatus === 'published';
     const prevDriverClean = cleanDriverIdentity(prevMeta.driverName || existingHydrated.driver_name);
-    const driverChanged = prevDriverClean !== cleanDrv;
+    const driverChanged = prevMeta.driverId !== input.driverId || prevDriverClean !== cleanDrv;
     const plateChanged = cleanVehicleIdentity(prevMeta.vehiclePlate) !== cleanVehicleIdentity(resolvedPlate);
     const itineraryChanged =
       existingHydrated.date !== isoDate ||
+      existingHydrated.end_date !== (input.endDate || isoDate) ||
+      normalizeTimeHHmm(existingHydrated.end_time) !== normalizeTimeHHmm(input.endTime) ||
       normalizeTimeHHmm(existingHydrated.pickup_time) !== hhmm ||
       existingHydrated.origin !== input.origin.trim() ||
       existingHydrated.destination !== input.destination.trim() ||
@@ -1052,7 +1057,7 @@ export async function upsertServerDispatchSchedule(
         ? '차량만 대여'
         : cleanDrv || null,
     driverPhone: input.driverPhone ?? existingHydrated?._meta.driverPhone ?? null,
-    vehicleId: input.vehicleId || matchedVeh?.id || existingHydrated?._meta.vehicleId || null,
+    vehicleId: input.vehicleId || matchedVeh?.uuid || existingHydrated?._meta.vehicleId || null,
     vehicleModel: resolvedModel || null,
     vehiclePlate: resolvedPlate || null,
     passengerPhone: input.passengerPhone ?? existingHydrated?._meta.passengerPhone ?? null,
@@ -1099,6 +1104,10 @@ export async function upsertServerDispatchSchedule(
       : 'scheduled';
 
   const dbPayload: Record<string, any> = {
+    id: input.scheduleId || randomUUID(),
+    org_id: 'vip_limousine_korea',
+    driver_id: input.serviceMode === 'vehicle_only' ? null : nextMeta.driverId,
+    vehicle_id: nextMeta.vehicleId,
     vehicle_no: targetVehicleNo,
     date: isoDate,
     end_date: input.endDate ? (normalizeDateToIso(input.endDate) || isoDate) : isoDate,
@@ -1135,41 +1144,15 @@ export async function upsertServerDispatchSchedule(
     updated_at: nowIso,
   };
 
-  if (existingHydrated) {
-    const { data, error } = await supabaseAdmin
-      .from('schedules')
-      .update(dbPayload)
-      .eq('id', existingHydrated.id)
-      .select('*')
-      .single();
+  return { row: dbPayload, expectedUpdatedAt: existingHydrated?.updated_at || undefined };
+}
 
-    if (error) {
-      if (isTestRuntime()) {
-        const updatedRow = { ...existingHydrated, ...dbPayload, id: existingHydrated.id };
-        inMemoryTestStore.set(existingHydrated.id, updatedRow);
-        return { schedule: mapHydratedRowToScheduleItem(updatedRow) };
-      }
-      return { error: error.message, statusCode: 400 };
-    }
-    return { schedule: mapHydratedRowToScheduleItem(data) };
-  } else {
-    const { data, error } = await supabaseAdmin
-      .from('schedules')
-      .insert(dbPayload)
-      .select('*')
-      .single();
-
-    if (error) {
-      if (isTestRuntime()) {
-        const testId = `test-sched-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-        const insertedRow = { ...dbPayload, id: testId };
-        inMemoryTestStore.set(testId, insertedRow);
-        return { schedule: mapHydratedRowToScheduleItem(insertedRow) };
-      }
-      return { error: error.message, statusCode: 400 };
-    }
-    return { schedule: mapHydratedRowToScheduleItem(data) };
-  }
+/** All creation/update callers use the same database transaction. No direct insert fallback. */
+export async function upsertServerDispatchSchedule(input: DispatchUpsertInput): Promise<{
+  schedule?: ScheduleItem; error?: string; statusCode?: number;
+}> {
+  const result = await atomicUpsertServerDispatchBatch([input]);
+  return { schedule: result.schedules?.[0], error: result.error, statusCode: result.statusCode };
 }
 
 /**
@@ -1534,165 +1517,43 @@ export async function dismissPendingCustomerNotification(params: {
 }
 
 /**
- * Concurrency Mutex for Serializing Dispatch Commits
- */
-class AsyncMutex {
-  private queue: Array<() => void> = [];
-  private locked = false;
-
-  async acquire(): Promise<() => void> {
-    return new Promise((resolve) => {
-      const release = () => {
-        if (this.queue.length > 0) {
-          const next = this.queue.shift()!;
-          next();
-        } else {
-          this.locked = false;
-        }
-      };
-
-      if (!this.locked) {
-        this.locked = true;
-        resolve(release);
-      } else {
-        this.queue.push(() => resolve(release));
-      }
-    });
-  }
-}
-
-export const dispatchServerMutex = new AsyncMutex();
-
-/**
- * Retrieves a raw schedule row by ID from Supabase (or in-memory test store in test env)
- */
-export async function getServerScheduleById(id: string): Promise<Record<string, any> | null> {
-  if (inMemoryTestStore.has(id)) {
-    return inMemoryTestStore.get(id);
-  }
-  const { data, error } = await supabaseAdmin
-    .from('schedules')
-    .select('*')
-    .eq('id', id)
-    .maybeSingle();
-  if (error || !data) return null;
-  return data;
-}
-
-/**
- * Deletes a schedule by ID from Supabase (used for atomic rollback)
- */
-export async function deleteServerScheduleById(id: string): Promise<boolean> {
-  inMemoryTestStore.delete(id);
-  const { error } = await supabaseAdmin
-    .from('schedules')
-    .delete()
-    .eq('id', id);
-  if (error) {
-    if (!isTestRuntime()) {
-      console.warn(`[deleteServerScheduleById] Notice deleting schedule '${id}':`, error.message);
-    }
-    return isTestRuntime();
-  }
-  return true;
-}
-
-/**
- * Restores a schedule row to its previous state (used for atomic rollback)
- */
-export async function restoreServerScheduleRow(previousRaw: Record<string, any>): Promise<boolean> {
-  if (previousRaw?.id) {
-    inMemoryTestStore.set(previousRaw.id, previousRaw);
-  }
-  const { error } = await supabaseAdmin
-    .from('schedules')
-    .update(previousRaw)
-    .eq('id', previousRaw.id);
-  if (error) {
-    if (!isTestRuntime()) {
-      console.warn(`[restoreServerScheduleRow] Notice restoring schedule '${previousRaw.id}':`, error.message);
-    }
-    return isTestRuntime();
-  }
-  return true;
-}
-
-/**
- * Atomically validates and commits a batch of dispatch candidates with
- * concurrency mutex serialization and full all-or-nothing rollback on failure.
+ * One Postgres RPC commits the entire batch, checks conflicts under a DB lock,
+ * and rolls back on any error. Missing schema/RPC never falls back to process memory.
  */
 export async function atomicUpsertServerDispatchBatch(
   candidates: DispatchUpsertInput[],
-  injectedExistingRows?: Array<DbScheduleRow & { _meta: HqScheduleMeta }>
+  _legacyInjectedRows?: Array<DbScheduleRow & { _meta: HqScheduleMeta }>,
+  requestId: string = randomUUID(),
 ): Promise<{
-  ok: boolean;
-  schedules?: ScheduleItem[];
-  conflicts?: ServerConflictDetail[];
-  error?: string;
-  statusCode?: number;
+  ok: boolean; schedules?: ScheduleItem[]; conflicts?: ServerConflictDetail[];
+  error?: string; statusCode?: number;
 }> {
-  const releaseLock = await dispatchServerMutex.acquire();
-  try {
-    // 1. Under mutex lock: check conflicts strictly
-    const conflicts = await checkServerDispatchConflicts(candidates, injectedExistingRows);
-    if (conflicts.length > 0) {
-      return {
-        ok: false,
-        conflicts,
-        error: conflicts[0].message,
-        statusCode: 409,
-      };
-    }
-
-    // 2. Sequential upsert with transaction rollback tracking
-    const savedSchedules: ScheduleItem[] = [];
-    const rollbacks: Array<() => Promise<void>> = [];
-
-    for (let i = 0; i < candidates.length; i++) {
-      const cand = candidates[i];
-      let previousRaw: Record<string, any> | null = null;
-      if (cand.scheduleId) {
-        previousRaw = await getServerScheduleById(cand.scheduleId);
-      }
-
-      const result = await upsertServerDispatchSchedule(cand);
-      if (result.error || !result.schedule) {
-        // Rollback all previously executed items in this batch
-        for (const rb of rollbacks.reverse()) {
-          try {
-            await rb();
-          } catch (rbErr) {
-            console.error('[Rollback Exception]:', rbErr);
-          }
-        }
-        return {
-          ok: false,
-          error: result.error || `배차 저장 중 오류가 발생하여 전체 배치(${i + 1}건)를 취소(롤백)했습니다.`,
-          statusCode: result.statusCode || 400,
-        };
-      }
-
-      const saved = result.schedule;
-      savedSchedules.push(saved);
-
-      if (previousRaw) {
-        const prev = previousRaw;
-        rollbacks.push(async () => {
-          await restoreServerScheduleRow(prev);
-        });
-      } else {
-        const newId = saved.id;
-        rollbacks.push(async () => {
-          await deleteServerScheduleById(newId);
-        });
-      }
-    }
-
-    return {
-      ok: true,
-      schedules: savedSchedules,
-    };
-  } finally {
-    releaseLock();
+  if (!candidates.length || candidates.length > 100) {
+    return { ok: false, error: '배차는 한 번에 1~100건까지 저장할 수 있습니다.', statusCode: 400 };
   }
+  const prepared = [];
+  for (const candidate of candidates) {
+    const result = await prepareServerDispatchSchedule(candidate);
+    if (result.error || !result.row) return { ok: false, error: result.error, statusCode: result.statusCode || 400 };
+    prepared.push({ row: result.row, expected_updated_at: result.expectedUpdatedAt || null, is_update: Boolean(candidate.scheduleId) });
+  }
+  const { data, error } = await supabaseAdmin.rpc('commit_dispatch_batch', {
+    p_items: prepared, p_request_id: requestId, p_org: 'vip_limousine_korea',
+    p_fingerprint: createHash('sha256').update(JSON.stringify(candidates)).digest('hex'),
+  });
+  if (error) {
+    const conflict = ['23P01', '40001', '23505'].includes(error.code);
+    const invalid = ['22007', '22008', '22023', '23514', '22P02'].includes(error.code);
+    return {
+      ok: false,
+      error: conflict ? '선택한 기사·차량의 일정이 겹치거나 예약이 변경되었습니다. 새로고침 후 확인해 주세요.'
+        : invalid ? '배차 날짜·시간·차량·기사 정보를 확인해 주세요.'
+        : '안전한 배차 저장을 사용할 수 없습니다. DB 연결 및 배차 마이그레이션 적용 상태를 확인해 주세요.',
+      statusCode: conflict ? 409 : invalid ? 400 : 503,
+    };
+  }
+  if (!Array.isArray(data) || data.length !== candidates.length) {
+    return { ok: false, error: 'DB 저장 결과를 확인할 수 없습니다.', statusCode: 503 };
+  }
+  return { ok: true, schedules: data.map(mapHydratedRowToScheduleItem) };
 }

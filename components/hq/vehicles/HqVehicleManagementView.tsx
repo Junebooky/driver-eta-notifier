@@ -1,4 +1,5 @@
 'use client';
+import { scheduleOverlapsInterval } from '@/utils/dispatchInterval';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Image from 'next/image';
@@ -39,7 +40,7 @@ import {
   isBookingActiveForConflict,
 } from '@/utils/dispatchConflictDetector';
 import { HqBooking } from '@/types/hq';
-import { FleetAvailabilityResult } from '@/utils/availabilityEngine';
+import type { FleetAvailabilityResult } from '@/utils/availabilityEngine';
 import { haptics } from '@/utils/haptics';
 
 export interface HqVehicleManagementViewProps {
@@ -119,7 +120,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
   const [activeDetailTab, setActiveDetailTab] = useState<'info' | 'calendar' | 'tips' | 'memo'>('info');
 
   // 4. Overrides (Status, Color, Year, Memo) synced with server store
-  const [statusOverrides, setStatusOverrides] = useState<Record<string, '대기 중' | '운행 중' | '정비 중'>>({});
+  const [statusOverrides, setStatusOverrides] = useState<Record<string, '확인 필요' | '대기 중' | '운행 중' | '정비 중'>>({});
   const [memos, setMemos] = useState<Record<string, string>>({});
   const [serverColors, setServerColors] = useState<Record<string, string>>({});
 
@@ -169,6 +170,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
       if (!data.ok) {
         throw new Error(data.error || '가용성 조회 실패');
       }
+      if (controller.signal.aborted) return;
       setFleetResult(data);
       setAvailabilityState('success');
     } catch (err: any) {
@@ -192,7 +194,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
   const [copiedToast, setCopiedToast] = useState(false);
 
   // Edit Modal Form State
-  const [editStatus, setEditStatus] = useState<'대기 중' | '운행 중' | '정비 중'>('대기 중');
+  const [editStatus, setEditStatus] = useState<'확인 필요' | '대기 중' | '운행 중' | '정비 중'>('확인 필요');
   const [editMemo, setEditMemo] = useState('');
   const [editColor, setEditColor] = useState('');
   const [isSavingEdit, setIsSavingEdit] = useState(false);
@@ -202,13 +204,13 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
   const enrichedVehicles = useMemo(() => {
     return VIP_REAL_VEHICLES.map((v) => {
       const uiCategory = mapVehicleToUiCategory(v);
-      const effectiveStatus = statusOverrides[v.id] || (v.status === '운행 중' ? '운행 중' : v.status === '정비 중' ? '정비 중' : '대기 중');
+      const effectiveStatus = statusOverrides[v.id] || '확인 필요';
       // 연식/색상 추정 금지: 오직 확인된 값만 노출 (5336은 디자인 시안 기준 2023년/오로라 블랙 펄, 그 외는 '미확인')
-      const year = v.year || (v.plateShort === '5336' ? '2023년' : '미확인');
+      const year = v.year || '미확인';
       const color =
         serverColors[v.id] ||
         v.color ||
-        (v.plateShort === '5336' ? '오로라 블랙 펄' : '미확인');
+        '미확인';
       const fuel = v.fuelType === '디젤' ? '경유' : '휘발유';
       return {
         ...v,
@@ -301,13 +303,16 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
         throw new Error(data.error || '서버 상태 저장에 실패했습니다.');
       }
 
-      const newStatuses = { ...statusOverrides, [selectedVehicle.id]: editStatus };
-      const newMemos = { ...memos, [selectedVehicle.id]: editMemo };
-      const newColors = { ...serverColors, [selectedVehicle.id]: editColor || '미확인' };
+      const saved = await res.json();
+      if (!saved.ok) throw new Error(saved.error || '저장 확인 실패');
+      const newStatuses = { ...statusOverrides, ...saved.statuses };
+      const newMemos = { ...memos, ...saved.memos };
+      const newColors = { ...serverColors, ...saved.colors };
       setStatusOverrides(newStatuses);
       setMemos(newMemos);
       setServerColors(newColors);
       setIsEditModalOpen(false);
+      void fetchAvailability();
       haptics.success();
     } catch (err: any) {
       console.error('Error saving vehicle status to server:', err);
@@ -330,37 +335,9 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
       }
 
       // 2. Server/local maintenance override or data
-      const isMaint = statusOverrides[v.id] === '정비 중' || v.status === '정비 중';
+      const isMaint = statusOverrides[v.id] === '정비 중';
       if (isMaint) {
         return { status: '정비 중', detail: '차량 정비/점검' };
-      }
-
-      // 3. Live bookings prop cross-check if provided
-      if (bookings && bookings.length > 0) {
-        const cleanPlate = cleanVehicleIdentity(v.plate);
-        const booked = bookings.find((b) => {
-          if (!isBookingActiveForConflict(b)) return false;
-          const bPlate = cleanVehicleIdentity(b.vehiclePlate || b.vehicleNoKey);
-          const matchPlate = Boolean(bPlate && cleanPlate && bPlate === cleanPlate);
-          const matchId = Boolean(v.uuid && b.vehicleId && v.uuid === b.vehicleId);
-          if (!matchPlate && !matchId) return false;
-          const bStart = normalizeDateToIso(b.pickupDate);
-          const bEnd = normalizeDateToIso(b.endDate) || bStart;
-          return targetDateIso >= bStart && targetDateIso <= bEnd;
-        });
-
-        if (booked) {
-          const isToday = targetDateIso === getKstTodayDateStr();
-          const inTransit =
-            isToday &&
-            (booked.operationStatus === 'in_transit' ||
-              booked.operationStatus === 'boarded' ||
-              statusOverrides[v.id] === '운행 중');
-          return {
-            status: inTransit ? '운행 중' : '예약 있음',
-            detail: `${booked.customerName} (${booked.pickupTime})`,
-          };
-        }
       }
 
       // 4. Check fleetResult from API with exact per-day activeSchedules match
@@ -382,9 +359,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
         // Check if this vehicle has an active schedule overlapping targetDateIso specifically
         if (detail.activeSchedules && detail.activeSchedules.length > 0) {
           const daySchedule = detail.activeSchedules.find((s) => {
-            const sStart = normalizeDateToIso(s.startDate);
-            const sEnd = normalizeDateToIso(s.endDate) || sStart;
-            return targetDateIso >= sStart && targetDateIso <= sEnd;
+            return scheduleOverlapsInterval(s, { startDate: targetDateIso, startTime: '00:00', endDate: targetDateIso, endTime: '23:59' });
           });
 
           if (daySchedule) {
@@ -393,10 +368,9 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
               isToday &&
               (daySchedule.operationStatus === 'in_transit' ||
                 daySchedule.operationStatus === 'boarded' ||
-                statusOverrides[v.id] === '운행 중' ||
-                v.status === '운행 중');
+                statusOverrides[v.id] === '운행 중');
             return {
-              status: inTransit ? '운행 중' : '예약 있음',
+              status: !daySchedule.endTime ? '미확인' : inTransit ? '운행 중' : '예약 있음',
               detail: `${daySchedule.customerName || '고객사'} (${daySchedule.pickupTime})`,
             };
           }
@@ -1122,7 +1096,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
               <div>
                 <label className="font-bold text-slate-700 block mb-1">운행 상태</label>
                 <div className="grid grid-cols-3 gap-2">
-                  {(['대기 중', '운행 중', '정비 중'] as const).map((st) => (
+                  {(['확인 필요', '대기 중', '운행 중', '정비 중'] as const).map((st) => (
                     <button
                       key={st}
                       type="button"

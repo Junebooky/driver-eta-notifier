@@ -61,6 +61,8 @@ import {
   timeHHmmToMinutes,
 } from '@/utils/dispatchConflictDetector';
 import { ScheduleItem } from '@/data/ferrariSchedules';
+import { useFleetAvailability } from '@/hooks/useFleetAvailability';
+import { validateDispatchInterval } from '@/utils/dispatchInterval';
 
 export interface HqQuickDispatchProps {
   existingBookings?: HqBooking[];
@@ -269,6 +271,8 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
 
   // 3. Pickup Time State
   const [pickupTimeOnly, setPickupTimeOnly] = useState('09:00');
+  const [endTime, setEndTime] = useState('');
+  const fleet = useFleetAvailability(pickupDate, pickupTimeOnly, pickupEndDate || pickupDate, endTime);
   const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
   const timePickerRef = useRef<HTMLDivElement>(null);
 
@@ -413,7 +417,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
         return {
           ...a,
           selectedVehicleModel: model,
-          selectedVehiclePlate: matched?.plate || a.selectedVehiclePlate,
+          selectedVehiclePlate: '',
         };
       })
     );
@@ -520,11 +524,16 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
       return;
     }
 
-    // P0 Schedule Conflict Guard: Block confirmed dispatch if live conflicts exist (Point 9)
-    if (mode === 'published' && totalLiveConflicts > 0) {
-      setErrorMsg('기존 배차와 일정이 중복되어 바로 배차할 수 없습니다. 일정을 변경하거나 예약만 등록(미배정)을 이용해 주세요.');
-      haptics.errorAlert();
-      return;
+    if (mode === 'published') {
+      const error = validateDispatchInterval({ date: pickupDate, pickupTime: pickupTimeOnly, endDate: pickupEndDate || pickupDate, endTime, dispatchStatus: mode });
+      if (error) { setErrorMsg(error); return; }
+      if (!fleet.data) { setErrorMsg(fleet.error || '선택한 기간의 가용성 확인이 필요합니다.'); return; }
+      for (const allocation of allocations) {
+        if (!fleet.data.vehicles.some(v => v.plate === allocation.selectedVehiclePlate && v.isAvailable)
+          || (allocation.serviceMode !== 'vehicle_only' && !fleet.data.drivers.some(d => d.id === allocation.selectedDriver && d.isAvailable && (allocation.requestedLanguage !== 'en' || d.isEnglishVerified)))) {
+          setErrorMsg('각 차량의 정확한 번호판과 가능한 기사를 직접 선택해 주세요.'); return;
+        }
+      }
     }
 
     const totalVehicles = allocations.length;
@@ -539,41 +548,11 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
     const payloadItems = allocations.map((alloc, idx) => {
       const vehicleNum = idx + 1;
 
-      // In 'published' (바로 배차) mode, resolve a driver and vehicle from fleet if not pre-assigned
-      let cleanDrv = mode === 'unassigned' ? '' : cleanDriverIdentity(alloc.selectedDriver);
-      if (mode === 'published' && !cleanDrv) {
-        const candidate =
-          (alloc.requestedLanguage === 'en'
-            ? liveDriverProfiles.find((d) => d.isEnglishVerified)
-            : null) ||
-          liveDriverProfiles[idx % Math.max(1, liveDriverProfiles.length)] || {
-            name: '윤태준',
-            plate: '142호 7811',
-            defaultVehicleRaw: 'Mercedes-Benz Sprinter 519 CDI',
-          };
-        cleanDrv = candidate.name;
-      }
-
-      const matchedDriver = cleanDrv
-        ? liveDriverProfiles.find((d) => d.name === cleanDrv || d.id === cleanDrv)
-        : undefined;
-
-      let modelChoice = alloc.selectedVehicleModel || selectedVehicleModel;
-      if (mode === 'published' && !modelChoice) {
-        modelChoice = matchedDriver?.defaultVehicleRaw || 'Mercedes-Benz Sprinter 519 CDI';
-      }
-
-      const matchedVehicle = VEHICLE_OPTIONS.find(
-        (v) => v.modelRaw === modelChoice || v.modelClean === modelChoice
-      );
-
-      const resolvedPlate =
-        mode === 'unassigned'
-          ? ''
-          : alloc.selectedVehiclePlate || matchedVehicle?.plate || matchedDriver?.plate || '142호 7811';
-
-      const resolvedModel =
-        mode === 'unassigned' ? '' : modelChoice || matchedVehicle?.modelRaw || 'Mercedes-Benz Sprinter 519 CDI';
+      const matchedDriver = fleet.data?.drivers.find(d => d.id === alloc.selectedDriver);
+      const cleanDrv = mode === 'published' && alloc.serviceMode !== 'vehicle_only' ? matchedDriver?.name || '' : '';
+      const resolvedPlate = mode === 'unassigned' ? '' : alloc.selectedVehiclePlate;
+      const matchedVehicle = VIP_REAL_VEHICLES.find(v => v.plate === resolvedPlate);
+      const resolvedModel = matchedVehicle?.model || alloc.selectedVehicleModel || selectedVehicleModel;
 
       const resolvedPassengerName =
         commonPassengerName.trim() ||
@@ -630,7 +609,8 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
         date: pickupDate,
         endDate: pickupEndDate || pickupDate,
         pickupTime: pickupTimeOnly,
-        endTime: mode === 'published' ? '18:00' : undefined,
+        endTime: endTime || undefined,
+        vehicleId: matchedVehicle?.uuid,
         origin: pickupLocation.trim(),
         destination: destination.trim(),
         passengerName: resolvedPassengerName,
@@ -941,6 +921,29 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                 </div>
               )}
             </div>
+          </div>
+
+          <div className="space-y-3 rounded-xl border border-slate-200 p-3">
+            <label className="block text-xs font-bold text-slate-700">실제 종료 시간 (배차 확정 시 필수)
+              <input type="time" aria-label="실제 종료 시간" value={endTime} onChange={e => setEndTime(e.target.value)} className="mt-1 w-full h-11 rounded-lg border border-slate-200 px-3" />
+            </label>
+            {endTime && <p className="text-xs text-slate-500">{fleet.error || (fleet.loading ? '선택 기간의 가용성을 확인하고 있습니다.' : '선택 기간 기준 · 운행 후 회차 여유 60분 포함')}</p>}
+            {allocations.map((allocation, index) => (
+              <div key={allocation.id} className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <label className="text-xs font-bold text-slate-700">{index + 1}번 차량
+                  <select aria-label={`${index + 1}번 차량 번호판`} value={allocation.selectedVehiclePlate} onChange={e => setAllocations(prev => prev.map(a => a.id === allocation.id ? { ...a, selectedVehiclePlate: e.target.value } : a))} className="mt-1 w-full h-11 rounded-lg border border-slate-200 px-2" disabled={!fleet.data}>
+                    <option value="">실차 선택</option>
+                    {fleet.data?.vehicles.map(v => <option key={v.uuid} value={v.plate} disabled={!v.isAvailable}>{v.model} · {v.plate}{v.isAvailable ? '' : ' (예약 불가)'}</option>)}
+                  </select>
+                </label>
+                <label className="text-xs font-bold text-slate-700">{index + 1}번 담당 기사
+                  <select aria-label={`${index + 1}번 담당 기사`} value={allocation.selectedDriver} onChange={e => setAllocations(prev => prev.map(a => a.id === allocation.id ? { ...a, selectedDriver: e.target.value } : a))} className="mt-1 w-full h-11 rounded-lg border border-slate-200 px-2" disabled={!fleet.data || allocation.serviceMode === 'vehicle_only'}>
+                    <option value="">기사 선택</option>
+                    {fleet.data?.drivers.map(d => <option key={d.id} value={d.id} disabled={!d.isAvailable || (allocation.requestedLanguage === 'en' && !d.isEnglishVerified)}>{d.name} · {d.phone}{d.isAvailable ? '' : ' (배차 불가)'}</option>)}
+                  </select>
+                </label>
+              </div>
+            ))}
           </div>
 
           {/* 픽업 위치 * & 목적지 * (2 Columns with TMAP Search) */}
@@ -1315,7 +1318,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
           {/* 바로 배차 */}
           <button
             type="button"
-            disabled={isSubmitting || totalLiveConflicts > 0}
+            disabled={isSubmitting || !fleet.data || Boolean(fleet.error)}
             onClick={() => {
               haptics.selection();
               handleSubmit('published');

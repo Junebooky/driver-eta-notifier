@@ -50,6 +50,7 @@ export async function GET(req: NextRequest) {
 
       res.cookies.set('cockpit_session', autoToken, {
         httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
         path: '/',
         sameSite: 'lax',
         maxAge: 60 * 60 * 24 * 7,
@@ -103,6 +104,7 @@ export async function POST(req: NextRequest) {
 
       res.cookies.set('cockpit_session', token, {
         httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
         path: '/',
         sameSite: 'lax',
         maxAge: 60 * 60 * 24 * 7,
@@ -116,6 +118,7 @@ export async function POST(req: NextRequest) {
       const res = NextResponse.json({ ok: true, authenticated: false });
       res.cookies.set('cockpit_session', '', {
         httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
         path: '/',
         maxAge: 0,
       });
@@ -168,6 +171,7 @@ export async function POST(req: NextRequest) {
 
       res.cookies.set('cockpit_session', token, {
         httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
         path: '/',
         sameSite: 'lax',
         maxAge: 60 * 60 * 24 * 14,
@@ -195,9 +199,9 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      if (!driverName?.trim() && !vehicleNo?.trim()) {
+      if (!driverName?.trim() || !vehicleNo?.trim()) {
         return NextResponse.json(
-          { ok: false, error: '기사 성함 또는 차량번호가 필요합니다.' },
+          { ok: false, error: '기사 성함과 정확한 차량번호가 필요합니다.' },
           { status: 400 }
         );
       }
@@ -205,13 +209,10 @@ export async function POST(req: NextRequest) {
       const cleanName = cleanDriverIdentity(driverName);
       let query = supabaseAdmin.from('drivers').select('*');
       if (cleanName) {
-        query = query.ilike('driver_name', `%${cleanName}%`);
+        query = query.eq('driver_name', cleanName);
       }
-      if (vehicleNo?.trim()) {
-        query = query.or(`vehicle_no.eq.${vehicleNo.trim()},car_number.eq.${vehicleNo.trim()}`);
-      }
-
-      const { data: drivers, error: driverErr } = await query.limit(5);
+      const { data: candidates, error: driverErr } = await query.limit(100);
+      const drivers = (candidates || []).filter(d => d.vehicle_no === vehicleNo.trim() || d.car_number?.replace(/\s/g,'') === vehicleNo.replace(/\s/g,''));
 
       if (driverErr || !drivers || drivers.length === 0) {
         return NextResponse.json(
@@ -220,6 +221,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      if (drivers.length !== 1) return NextResponse.json({ ok: false, error: '동일한 이름의 기사가 여러 명입니다. 정확한 차량번호를 함께 입력해 주세요.' }, { status: 409 });
       const matched = drivers[0];
       const sessionPayload: Omit<CockpitAuthSession, 'issuedAt' | 'expiresAt'> = {
         userId: `driver_${matched.id || matched.vehicle_no}`,
@@ -242,6 +244,7 @@ export async function POST(req: NextRequest) {
 
       res.cookies.set('cockpit_session', token, {
         httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
         path: '/',
         sameSite: 'lax',
         maxAge: 60 * 60 * 24 * 30,
