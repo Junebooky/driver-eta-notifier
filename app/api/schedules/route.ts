@@ -1,3 +1,4 @@
+import { dispatchRequestContext } from '@/lib/dispatch/requestContext';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import {
@@ -131,7 +132,9 @@ export async function POST(req: NextRequest) {
       allowUnverified: allow_unverified,
     };
 
-    const result = await upsertServerDispatchSchedule(candInput);
+    const context=dispatchRequestContext(req,auth.session!,body);
+    if(!context)return NextResponse.json({ok:false,error:'저장 요청 번호가 필요합니다.'},{status:400});
+    const result = await upsertServerDispatchSchedule(candInput,context.requestId,context.fingerprint);
 
     if (result.error) {
       return NextResponse.json({ error: result.error }, { status: result.statusCode || 400 });
@@ -240,7 +243,9 @@ export async function PUT(req: NextRequest) {
       allowUnverified: true,
     };
 
-    const result = await upsertServerDispatchSchedule(candInput);
+    const context=dispatchRequestContext(req,auth.session!,body);
+    if(!context)return NextResponse.json({ok:false,error:'저장 요청 번호가 필요합니다.'},{status:400});
+    const result = await upsertServerDispatchSchedule(candInput,context.requestId,context.fingerprint);
 
     if (result.error) {
       return NextResponse.json({ error: result.error }, { status: result.statusCode || 400 });

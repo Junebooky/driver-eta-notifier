@@ -12,7 +12,9 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Use `/login` for driver/HQ credentials, `/` for the driver cockpit and `/hq` for HQ. Hosted environments require actual credentials; missing DB/provider configuration is reported as an error rather than simulated save success.
+Use `/login` for driver/HQ credentials, `/` for the driver cockpit and `/hq` for HQ. Hosted environments use individual Supabase Auth email/password accounts (and a TOTP code when enrolled). Shared PIN/passkey login is disabled. Server-managed `app_metadata` must set `org=vip_limousine_korea`, `cockpit_role=hq_admin|driver`, and each driver must map to an existing `driver_id` UUID. `require_mfa=true` requires an AAL2 session. Apply the reviewed personal-auth proposal to an isolated database first; without its session/rate-limit functions login fails closed. No accounts or invitations are provisioned by this change. Missing DB/provider configuration is reported as an error rather than simulated save success.
+
+See the release plan below for account mapping, Auth session compatibility, schema permissions and the owner-approved migration sequence.
 
 ## Verify
 

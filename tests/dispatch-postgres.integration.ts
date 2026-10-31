@@ -18,7 +18,9 @@ async function main() {
     END $$;
     CREATE SCHEMA cockpit;
     GRANT USAGE ON SCHEMA cockpit TO service_role, anon, authenticated;
-    CREATE TABLE cockpit.drivers (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_no text UNIQUE, driver_name text, english_available boolean, unavailable_windows jsonb DEFAULT '[]'::jsonb);
+    CREATE TABLE cockpit.drivers (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_no text UNIQUE, driver_name text, phone text, default_navi text, passenger_name text, driver_meta jsonb, english_available boolean, unavailable_windows jsonb DEFAULT '[]'::jsonb);
+    CREATE SCHEMA auth;
+    CREATE TABLE auth.sessions(id uuid PRIMARY KEY,user_id uuid NOT NULL,not_after timestamptz);
     CREATE TABLE cockpit.schedules (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_no text REFERENCES cockpit.drivers(vehicle_no),
       date date NOT NULL, pickup_time time NOT NULL, end_date date, end_time time,
@@ -32,6 +34,8 @@ async function main() {
     await admin.query(readFileSync('supabase/migrations/20261030_atomic_dispatch_and_fleet_schema.sql','utf8'));
     // Running the proposal twice must preserve data and remain valid.
     await admin.query(readFileSync('supabase/migrations/20261030_atomic_dispatch_and_fleet_schema.sql','utf8'));
+    await admin.query(readFileSync('supabase/migrations/20261031024614_cockpit_personal_auth.sql','utf8'));
+    await admin.query(readFileSync('supabase/migrations/20261031024614_cockpit_personal_auth.sql','utf8'));
     await a.connect(); await b.connect();
     await Promise.all([a.query('SET ROLE service_role'),b.query('SET ROLE service_role')]);
     const vehicle = randomUUID(); const driver = randomUUID();
@@ -119,6 +123,40 @@ async function main() {
     assert.equal(state.rows[0].memo,'검사 대기');
     await assert.rejects(commit(b,[envelope({date:'2027-01-01',end_date:'2027-01-01'})]), { code:'23P01' });
     console.log('PASS persistent state shared across clients; maintenance prevents dispatch');
+    const emailKey='email:'+'a'.repeat(64),ipKey='ip:'+'b'.repeat(64);
+    for(let i=0;i<8;i++) assert.equal((await a.query('SELECT cockpit.consume_auth_login_attempt($1) allowed',[[emailKey,ipKey]])).rows[0].allowed,true);
+    assert.equal((await b.query('SELECT cockpit.consume_auth_login_attempt($1) allowed',[[emailKey,ipKey]])).rows[0].allowed,false);
+    await admin.query("UPDATE cockpit.auth_login_attempts SET window_started_at=now()-interval '16 minutes'");
+    assert.equal((await b.query('SELECT cockpit.consume_auth_login_attempt($1) allowed',[[emailKey,ipKey]])).rows[0].allowed,true);
+    const authId=randomUUID(),userId=randomUUID();
+    await admin.query('INSERT INTO auth.sessions(id,user_id) VALUES($1,$2)',[authId,userId]);
+    const active=async()=> (await a.query('SELECT cockpit.is_active_auth_session($1,$2) active',[authId,userId])).rows[0].active;
+    assert.equal(await active(),true);
+    assert.equal((await b.query('SELECT cockpit.is_active_auth_session($1,$2) active',[authId,randomUUID()])).rows[0].active,false);
+    await admin.query("UPDATE auth.sessions SET not_after=now()-interval '1 second' WHERE id=$1",[authId]);assert.equal(await active(),false);
+    await admin.query('UPDATE auth.sessions SET not_after=NULL WHERE id=$1',[authId]);
+    await b.query('INSERT INTO cockpit.revoked_auth_sessions(session_id,user_id) VALUES($1,$2)',[authId,userId]);assert.equal(await active(),false);
+    console.log('PASS database login limit/window, active-session binding, expiry and immediate revocation');
+    const profileId=randomUUID();
+    await admin.query("INSERT INTO cockpit.drivers(id,vehicle_no,driver_name,driver_meta) VALUES($1,'기존차량','원래 이름','null'::jsonb)",[profileId]);
+    await admin.query('CREATE TABLE cockpit.test_driver_assets(id uuid PRIMARY KEY,driver_id uuid REFERENCES cockpit.drivers(id),kind text);');
+    await admin.query("INSERT INTO cockpit.test_driver_assets VALUES($1,$2,'면허증'),($3,$2,'운행기록'),($4,$2,'경비')",[randomUUID(),profileId,randomUUID(),randomUUID()]);
+    const driverCount=Number((await admin.query('SELECT count(*) FROM cockpit.drivers')).rows[0].count);
+    const profile=await a.query('SELECT cockpit.update_driver_profile_by_id($1,$2,$3) result',[profileId,{driver_name:'수정 이름',phone:'010-0000-0000'},{presetOrder:['home']}]);
+    assert.equal(profile.rows[0].result.id,profileId);assert.equal(profile.rows[0].result.vehicle_no,'기존차량');assert.deepEqual(profile.rows[0].result.driver_meta,{presetOrder:['home']});
+    // A booking can use a different vehicle without copying or replacing the driver's profile/assets.
+    await commit(b,[envelope({vehicle_id:randomUUID(),vehicle_no:'다른차량',vehicle_plate:'다른차량',driver_id:profileId,date:'2027-02-01',end_date:'2027-02-01'})]);
+    assert.equal(Number((await admin.query('SELECT count(*) FROM cockpit.drivers')).rows[0].count),driverCount);
+    assert.equal(Number((await admin.query('SELECT count(*) FROM cockpit.test_driver_assets WHERE driver_id=$1',[profileId])).rows[0].count),3);
+    await assert.rejects(a.query('SELECT cockpit.update_driver_profile_by_id($1,$2,$3)',[profileId,{id:randomUUID()},{}]),{code:'22023'});
+    await assert.rejects(a.query('SELECT cockpit.update_driver_profile_by_id($1,$2,$3)',[randomUUID(),{phone:'010'},{}]),{code:'22023'});
+    await admin.query('SET ROLE authenticated');
+    for(const query of ['SELECT * FROM cockpit.drivers','SELECT * FROM cockpit.revoked_auth_sessions',"SELECT cockpit.consume_auth_login_attempt(ARRAY['email:'||repeat('a',64),'ip:'||repeat('b',64)])"])
+      await assert.rejects(admin.query(query),{code:'42501'});
+    await assert.rejects(admin.query('SELECT cockpit.is_active_auth_session($1,$2)',[authId,userId]),{code:'42501'});
+    await admin.query('RESET ROLE');
+    console.log('PASS immutable profile UUID and linked assets across vehicle assignments; public access denied');
+
   } finally { await a.end().catch(()=>{}); await b.end().catch(()=>{}); await admin.end(); }
 }
 main().catch(error=>{ console.error(error); process.exitCode=1; });

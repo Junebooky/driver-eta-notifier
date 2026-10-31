@@ -1,3 +1,4 @@
+import { dispatchRequestContext } from '@/lib/dispatch/requestContext';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   checkServerDispatchConflicts,
@@ -157,8 +158,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const context=dispatchRequestContext(req,auth.session!,body);
+    if(!context)return NextResponse.json({ok:false,code:'IDEMPOTENCY_KEY_REQUIRED',error:'저장 요청 번호가 필요합니다. 화면을 새로고침해 주세요.'},{status:400});
+
     // P0 Concurrency Mutex & Atomic Batch Upsert Guard with All-or-Nothing Rollback (Point 1)
-    const batchResult = await atomicUpsertServerDispatchBatch(candidates, undefined, req.headers.get('idempotency-key') || undefined);
+    const batchResult = await atomicUpsertServerDispatchBatch(candidates, undefined, context.requestId, context.fingerprint);
     if (!batchResult.ok) {
       if (batchResult.conflicts && batchResult.conflicts.length > 0) {
         return NextResponse.json(

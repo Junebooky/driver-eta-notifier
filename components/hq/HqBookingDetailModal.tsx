@@ -19,6 +19,7 @@ import {
 import { HqBooking } from '@/types/hq';
 import { useFleetAvailability } from '@/hooks/useFleetAvailability';
 import { validateDispatchInterval } from '@/utils/dispatchInterval';
+import { createRetryableJsonMutation } from '@/utils/retryableJsonMutation';
 import { haptics } from '@/utils/haptics';
 import { VIP_REAL_VEHICLES, stripManufacturerName } from '@/utils/vehicleData';
 import { HqDriverVehicleInfoModal } from './bookings/HqDriverVehicleInfoModal';
@@ -107,6 +108,7 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [cancelReason, setCancelReason] = useState('고객 요청 일정 취소');
   const [isSaving, setIsSaving] = useState(false);
+  const [saveMutation]=useState(()=>createRetryableJsonMutation('cockpit_pending_booking_edit'));
   const [notice, setNotice] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -213,10 +215,7 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
 
     setIsSaving(true);
     try {
-      const res = await fetch('/api/schedules/dispatch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const res = await saveMutation.send('/api/schedules/dispatch', {
           scheduleId: isNewBooking ? undefined : booking.scheduleId || booking.id,
           bookingNo: booking.bookingNo,
           customerName: customerName.trim(),
@@ -275,7 +274,6 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
           appliedPricingSnapshot: pricingSnapshot,
           allowUnverified: true,
           publishedBy: targetStatus === 'unassigned' ? '사모님(예약접수)' : '대표님(배차확정)',
-        }),
       });
 
       const data = await res.json().catch(() => ({}));
@@ -600,6 +598,7 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                 2. 차량 · 기사 배정 및 기사 확인 현황
               </h4>
 
+              {saveMutation.hasPending && <button type="button" className="rounded-xl border border-blue-200 p-3 text-sm text-blue-700" disabled={isSaving} onClick={async()=>{setIsSaving(true);try{const response=await saveMutation.retry();const data=await response.json();if(!response.ok)throw new Error(data.error || '저장 결과 확인 실패');window.location.reload();}catch(error){setErrorMsg(error instanceof Error?error.message:'확인 실패');}finally{setIsSaving(false);}}}>이전 저장 결과 확인</button>}
               {/* Driver Assignment & Ack Card */}
               <div className="p-4 rounded-2xl border-2 border-blue-200/80 bg-blue-50/20 space-y-3.5">
                 <div className="flex items-center justify-between gap-2 flex-wrap">

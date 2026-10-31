@@ -60,6 +60,7 @@ import {
   normalizeDateToIso,
   timeHHmmToMinutes,
 } from '@/utils/dispatchConflictDetector';
+import { createRetryableJsonMutation, quickDispatchIntent } from '@/utils/retryableJsonMutation';
 import { ScheduleItem } from '@/data/ferrariSchedules';
 import { useFleetAvailability } from '@/hooks/useFleetAvailability';
 import { validateDispatchInterval } from '@/utils/dispatchInterval';
@@ -301,6 +302,8 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
   ]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [saveMutation]=useState(()=>createRetryableJsonMutation('cockpit_pending_quick_dispatch'));
+  const submitLock=useRef(false);
   const [notificationMsg, setNotificationMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -447,7 +450,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
   const totalLiveConflicts = Object.values(allocationConflictsMap).reduce((sum, messages) => sum + messages.length, 0);
 
   // Submit Handler: 'unassigned' (예약만 등록) or 'published' (바로 배차)
-  const handleSubmit = async (mode: 'unassigned' | 'published') => {
+  const submit = async (mode: 'unassigned' | 'published') => {
     setErrorMsg(null);
     setNotificationMsg(null);
 
@@ -533,7 +536,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
       return {
         bookingNo,
         customerName: customerName.trim(),
-        customerId: selectedCustomerId || `cust-${Date.now()}`,
+        customerId: selectedCustomerId || undefined,
         endBrand: customerName.trim(),
         eventId: sharedEventId,
         eventName: sharedGroupName,
@@ -575,11 +578,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
     setIsSubmitting(true);
     try {
       await ensureClientAuth('hq');
-      const res = await fetch('/api/schedules/dispatch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: payloadItems }),
-      });
+      const res = await saveMutation.send('/api/schedules/dispatch',{items:payloadItems},{intent:quickDispatchIntent(payloadItems)});
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok || !data.ok) {
@@ -606,7 +605,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
       // Sync Settlement Event Report when assigned/published
       if (mode === 'published' && createdHqBookings.length > 0) {
         const fallbackCustomer: HqCustomer = selectedCustomerObj || {
-          id: selectedCustomerId || `cust-${Date.now()}`,
+          id: selectedCustomerId || 'unlinked-customer',
           name: customerName.trim(),
           tier: 'VIP',
           isFavorite: false,
@@ -692,6 +691,11 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSubmit=async(mode:'unassigned'|'published')=>{
+    if(submitLock.current)return;submitLock.current=true;
+    try{await submit(mode);}finally{submitLock.current=false;}
   };
 
   return (
@@ -1242,6 +1246,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
         )}
       </div>
 
+      {saveMutation.hasPending && <button type="button" className="rounded-xl border border-blue-200 p-3 text-sm text-blue-700" disabled={isSubmitting} onClick={async()=>{setIsSubmitting(true);try{const response=await saveMutation.retry();const data=await response.json();if(!response.ok)throw new Error(data.error || '저장 결과 확인 실패');window.location.reload();}catch(error){setErrorMsg(error instanceof Error?error.message:'확인 실패');}finally{setIsSubmitting(false);}}}>이전 저장 결과 확인</button>}
       {/* 4. Action Buttons (Reference 1) */}
       <div className="pt-4 mt-2">
         <div className="grid grid-cols-2 gap-3">

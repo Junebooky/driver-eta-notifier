@@ -1148,10 +1148,10 @@ async function prepareServerDispatchSchedule(
 }
 
 /** All creation/update callers use the same database transaction. No direct insert fallback. */
-export async function upsertServerDispatchSchedule(input: DispatchUpsertInput): Promise<{
+export async function upsertServerDispatchSchedule(input: DispatchUpsertInput, requestId?:string, fingerprint?:string): Promise<{
   schedule?: ScheduleItem; error?: string; statusCode?: number;
 }> {
-  const result = await atomicUpsertServerDispatchBatch([input]);
+  const result = await atomicUpsertServerDispatchBatch([input],undefined,requestId,fingerprint);
   return { schedule: result.schedules?.[0], error: result.error, statusCode: result.statusCode };
 }
 
@@ -1523,13 +1523,25 @@ export async function dismissPendingCustomerNotification(params: {
 export async function atomicUpsertServerDispatchBatch(
   candidates: DispatchUpsertInput[],
   _legacyInjectedRows?: Array<DbScheduleRow & { _meta: HqScheduleMeta }>,
-  requestId: string = randomUUID(),
+  requestId?: string,
+  requestFingerprint?: string,
 ): Promise<{
   ok: boolean; schedules?: ScheduleItem[]; conflicts?: ServerConflictDetail[];
   error?: string; statusCode?: number;
 }> {
   if (!candidates.length || candidates.length > 100) {
     return { ok: false, error: '배차는 한 번에 1~100건까지 저장할 수 있습니다.', statusCode: 400 };
+  }
+  const fingerprint=requestFingerprint || createHash('sha256').update(JSON.stringify(candidates)).digest('hex');
+  if(requestId){
+    // Replay before preparing updates, generating new IDs, or reading a now-changed booking.
+    const replay=await supabaseAdmin.from('dispatch_requests').select('request_payload,result').eq('organization_id','vip_limousine_korea').eq('request_id',requestId).maybeSingle();
+    if(replay.error)return {ok:false,error:'저장 요청 이력을 조회하지 못했습니다.',statusCode:503};
+    if(replay.data){
+      if(replay.data.request_payload!==fingerprint)return {ok:false,error:'같은 요청 번호에 다른 내용이 포함되어 있습니다.',statusCode:409};
+      if(!Array.isArray(replay.data.result)||replay.data.result.length!==candidates.length)return {ok:false,error:'저장 결과를 확인하지 못했습니다.',statusCode:503};
+      return {ok:true,schedules:replay.data.result.map(mapHydratedRowToScheduleItem)};
+    }
   }
   const prepared = [];
   for (const candidate of candidates) {
@@ -1538,8 +1550,8 @@ export async function atomicUpsertServerDispatchBatch(
     prepared.push({ row: result.row, expected_updated_at: result.expectedUpdatedAt || null, is_update: Boolean(candidate.scheduleId) });
   }
   const { data, error } = await supabaseAdmin.rpc('commit_dispatch_batch', {
-    p_items: prepared, p_request_id: requestId, p_org: 'vip_limousine_korea',
-    p_fingerprint: createHash('sha256').update(JSON.stringify(candidates)).digest('hex'),
+    p_items: prepared, p_request_id: requestId || randomUUID(), p_org: 'vip_limousine_korea',
+    p_fingerprint: fingerprint,
   });
   if (error) {
     const conflict = ['23P01', '40001', '23505'].includes(error.code);

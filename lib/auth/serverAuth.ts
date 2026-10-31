@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { NextRequest } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
-import { cleanDriverIdentity, cleanVehicleIdentity } from '@/utils/dispatchConflictDetector';
+import { cleanVehicleIdentity } from '@/utils/dispatchConflictDetector';
 
 export interface CockpitAuthSession {
   userId: string;
@@ -14,6 +14,7 @@ export interface CockpitAuthSession {
   displayName?: string;
   issuedAt: number;
   expiresAt: number;
+  sessionId?: string;
 }
 
 /**
@@ -140,6 +141,8 @@ export async function parseAndVerifyToken(token: string): Promise<CockpitAuthSes
 
   // Pattern A: Signed Cockpit Session Token (cockpit_s1.<payload>.<signature>)
   if (trimmed.startsWith('cockpit_s1.')) {
+    // Revoke every legacy shared-PIN/passkey token in hosted and production environments.
+    if (!isDevAuthAllowed() && !(process.env.NODE_ENV === 'test' && process.env.VERCEL !== '1')) return null;
     const parts = trimmed.split('.');
     if (parts.length !== 3) return null;
 
@@ -181,26 +184,31 @@ export async function parseAndVerifyToken(token: string): Promise<CockpitAuthSes
       if (error || !data.user) {
         return null;
       }
-      // Security: Strictly enforce app_metadata for authorization claims (role, org, driver_id).
-      // End-users can mutate user_metadata via client SDK, so user_metadata MUST NEVER be trusted for RBAC.
+      // The provider verifies the token signature first; only server-managed metadata grants roles.
       const appMeta = data.user.app_metadata || {};
-      const org = appMeta.org;
-      const role = appMeta.cockpit_role === 'hq_admin' ? 'hq_admin' : 'driver';
-
-      if (org !== 'vip_limousine_korea') {
-        return null;
+      const role = appMeta.cockpit_role;
+      if (appMeta.org !== 'vip_limousine_korea' || !['hq_admin','driver'].includes(role) || appMeta.disabled === true) return null;
+      const claims = JSON.parse(Buffer.from(trimmed.split('.')[1], 'base64url').toString('utf8'));
+      const now = Math.floor(Date.now()/1000);
+      if (claims.sub !== data.user.id || !Number.isFinite(claims.exp) || claims.exp <= now || !claims.session_id || !Number.isFinite(claims.iat)) return null;
+      if (appMeta.require_mfa === true && claims.aal !== 'aal2') return null;
+      const { data: active, error: sessionError } = await supabaseAdmin.rpc('is_active_auth_session', {
+        p_session_id: claims.session_id, p_user_id: data.user.id,
+      });
+      if (sessionError || active !== true) return null;
+      let driver: Record<string, string> | null = null;
+      if (role === 'driver') {
+        if (typeof appMeta.driver_id !== 'string' || !/^[0-9a-f-]{36}$/i.test(appMeta.driver_id)) return null;
+        const result = await supabaseAdmin.from('drivers').select('id,driver_name,vehicle_no,car_number,driver_meta').eq('id',appMeta.driver_id).maybeSingle();
+        if (result.error || !result.data || result.data.driver_meta?.status === 'inactive') return null;
+        driver = result.data;
       }
-
       return {
-        userId: data.user.id,
-        org: 'vip_limousine_korea',
-        role,
-        driverId: appMeta.driver_id,
-        driverName: appMeta.driver_name,
-        vehicleNo: appMeta.vehicle_no,
-        carNumber: appMeta.car_number,
-        issuedAt: Math.floor(Date.now() / 1000),
-        expiresAt: Math.floor(Date.now() / 1000) + 3600 * 24,
+        userId: data.user.id, org: 'vip_limousine_korea', role,
+        driverId: driver?.id, driverName: driver?.driver_name,
+        vehicleNo: driver?.vehicle_no, carNumber: driver?.car_number,
+        displayName: driver?.driver_name || '본사 관리자', sessionId: claims.session_id,
+        issuedAt: claims.iat, expiresAt: claims.exp,
       };
     } catch {
       return null;

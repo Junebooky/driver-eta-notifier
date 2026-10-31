@@ -24,6 +24,7 @@ import {
   HqEmailExtractedDraft,
 } from '@/types/emailHq';
 import { haptics } from '@/utils/haptics';
+import { createRetryableJsonMutation } from '@/utils/retryableJsonMutation';
 import {
   REFERENCE_EMAILS,
   ReferenceEmailItem,
@@ -66,6 +67,7 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
   onCreateBooking,
   onSavedServer,
 }) => {
+  const [dispatchMutation]=useState(()=>createRetryableJsonMutation('cockpit_pending_email_dispatch'));
   const searchParams = useSearchParams();
   const urlStep = searchParams?.get('step') as EmailWorkflowStep | null;
   const urlDriverModal = searchParams?.get('driverModal') === 'true';
@@ -693,11 +695,7 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
         publishedBy: '대표/관리자 (이메일 배차 확정)',
       };
 
-      const res = await fetch('/api/schedules/dispatch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bookingPayload),
-      });
+      const res = await dispatchMutation.send('/api/schedules/dispatch',bookingPayload);
 
       const data = await res.json().catch(() => ({}));
 
@@ -729,7 +727,7 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
       await onSavedServer?.();
 
       setWorkflowStep('step4_dispatch_done');
-      showToast(`${primaryDriver.name} 기사님 Cockpit에 배차 알림이 실시간 전송되었습니다.`);
+      showToast(`${primaryDriver.name} 기사님의 배차 일정이 서버에 저장되었습니다.`);
     } catch (err: any) {
       console.error('Dispatch confirmation failed:', err);
       setDispatchError(err.message || '서버 통신 실패로 배차 확정이 중단되었습니다.');
@@ -1091,6 +1089,7 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
         {/* Dynamic Right Column: Sequential Multi-Step Workflow Card */}
         {/* ========================================================= */}
         <div className="flex-1 min-w-0 w-full space-y-4">
+          {dispatchMutation.hasPending && <button type="button" className="rounded-xl border border-blue-200 p-3 text-sm text-blue-700" onClick={async()=>{try{const response=await dispatchMutation.retry();const data=await response.json();if(!response.ok||!data.ok)throw new Error(data.error || '저장 결과를 확인하지 못했습니다.');window.location.reload();}catch(error){setDispatchError(error instanceof Error?error.message:'저장 결과를 확인하지 못했습니다.');}}}>이전 배차 저장 결과 확인</button>}
           {currentSummary && (
             <div className="rounded-2xl border border-slate-200/90 overflow-hidden shadow-xs">
               <HqEmailWorkflowStepper

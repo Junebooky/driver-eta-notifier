@@ -22,7 +22,7 @@ import { haptics } from '@/utils/haptics';
 interface ScheduleFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (newSchedule: ScheduleItem) => void;
+  onSave: (newSchedule: ScheduleItem) => void | Promise<void>;
   initialDate?: string; // e.g., '2026-09-28', '20260928', '9.28'
   presets?: LocationPreset[];
   vehicleNo?: string;
@@ -119,6 +119,8 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
   homeLocation,
 }) => {
   const [mounted, setMounted] = useState(false);
+  const [isSaving,setIsSaving] = useState(false);
+  const [saveError,setSaveError] = useState('');
 
   // Active Presets: Sync from props or vehicle-isolated localStorage to ensure Personal MY presets are included
   const [activePresets, setActivePresets] = useState<LocationPreset[]>(() => {
@@ -219,8 +221,9 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
   if (!isOpen || !mounted) return null;
 
   // Form Submit Handler
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSaving) return;
 
     const errors: { [key: string]: boolean } = {};
     if (!pickupDate) errors.date = true;
@@ -283,15 +286,17 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
       notes: notes.trim() || undefined,
     };
 
-    onSave(newSchedule);
-    onClose();
+    setIsSaving(true); setSaveError('');
+    try { await onSave(newSchedule); onClose(); }
+    catch(error) { setSaveError(error instanceof Error ? error.message : '저장에 실패했습니다.'); }
+    finally { setIsSaving(false); }
   };
 
   return createPortal(
     <div
       className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 select-none overscroll-contain animate-in fade-in duration-200"
       style={{ overscrollBehavior: 'contain', touchAction: 'pan-y' }}
-      onClick={onClose}
+      onClick={()=>{if(!isSaving)onClose();}}
     >
       {/* Background Dimmed Overlay: covering entire browser viewport without gaps */}
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm -z-10" />
@@ -320,6 +325,7 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
           <button
             type="button"
             onClick={() => {
+              if(isSaving)return;
               haptics.lightTap();
               onClose();
             }}
@@ -514,11 +520,13 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
           </div>
         </div>
 
+        {saveError && <p role="alert" className="px-5 py-2 text-sm text-rose-600">{saveError}</p>}
         {/* Modal Actions Footer */}
         <div className="p-4 sm:p-5 bg-slate-50/80 border-t border-slate-100 flex items-center gap-3 shrink-0">
           <button
             type="button"
             onClick={() => {
+              if(isSaving)return;
               haptics.lightTap();
               onClose();
             }}
@@ -528,11 +536,12 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
           </button>
           <button
             type="button"
+            disabled={isSaving}
             onClick={handleSubmit}
             className="flex-[2] py-4 rounded-2xl bg-[#1E60F3] hover:bg-[#1650D6] text-white font-black text-base shadow-md shadow-blue-500/25 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2"
           >
             <Check className="w-5 h-5 stroke-[2.5]" />
-            <span>스케줄 등록 완료</span>
+            <span>{isSaving ? '저장 중…' : '스케줄 저장'}</span>
           </button>
         </div>
       </div>

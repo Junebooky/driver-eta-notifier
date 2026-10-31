@@ -64,7 +64,7 @@ test('batch saves issue one RPC, preserve metadata, and never compensate with se
     return { data:items.map(i=>i.row), error:null };
   }) as unknown as typeof original;
   try {
-    const success=await atomicUpsertServerDispatchBatch([candidate],undefined,'retry-key');
+    const success=await atomicUpsertServerDispatchBatch([candidate]);
     assert.equal(success.ok,true,success.error); assert.equal(calls,1);
     supabaseAdmin.rpc = (async (_name: string,args: Record<string,unknown>) => {
       const items=args.p_items as {row:Record<string,unknown>}[];

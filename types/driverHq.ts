@@ -75,9 +75,8 @@ export function mapDbDriverToHqSummary(
 
   // Find real schedules associated with this driver's vehicle_no or driver_id
   const driverSchedules = allSchedules.filter((s: any) => {
-    if (s.driver_id && s.driver_id === dbDriver.id) return true;
-    if (dbDriver.vehicle_no && s.vehicle_no === dbDriver.vehicle_no) return true;
-    return false;
+    if (s.schedule_meta?.serviceMode === 'vehicle_only') return false;
+    return Boolean((s.driver_id || s.schedule_meta?.driverId) === dbDriver.id);
   });
 
   // Sort schedules descending by date and pickup_time

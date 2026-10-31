@@ -12,7 +12,9 @@ This report covers main, all 21 open issues and 18 open PRs observed at the star
 | Vehicle state stored in module memory | `fleet_vehicle_operations` persistence by immutable UUID; DB read/write failures return 503; no fake save success; unavailable/unknown state is distinct from verified operation. |
 | Driver data scope widened by matching name or vehicle | Driver schedule and profile reads use the authenticated immutable driver UUID; no hardcoded profile fallback or unmasked directory fallback. |
 | Internal APIs could be called without authentication | Authentication on all previously open internal/paid-provider routes; HQ restrictions on shared place writes/checklist; scoped personal presets; real login/logout entry points. |
-| Auth input and session edge cases | Invalid cookie encoding handled safely; signed token expiry/issued-at/role validation; production Secure + HttpOnly cookies; exact driver name/plate matching and ambiguity rejection. |
+| Auth input and session edge cases | Invalid cookie encoding handled safely; signed token expiry/issued-at/role validation; production Secure + HttpOnly cookies; individual provider accounts, server-only role/driver UUID mapping, active-session checks, revocation and rate limiting; hosted legacy-token rejection. |
+| Vehicle-based profile upsert could overwrite another driver | Existing immutable UUID only; no insert/rekey by vehicle; preference merge under row lock, self-only writes, and confirmed-save modal behavior. |
+| HTTP retry could create another booking | Frozen client request body/key, same-tab reload recovery, actor/operation scoping, pre-hydration ledger replay, changed-body rejection. |
 | OCR could read a user-selected server path or return success after failure | Image data validation; arbitrary filesystem paths rejected; unavailable provider/failure produces non-success HTTP response; sample recognition only accepts exact known identifiers/hashes. |
 | Static sample schedules/live flight prose used as real copilot context | Copilot loads authorized server schedules; removed fabricated flight briefing and historical fallback dispatches. |
 | Wrong representative vehicle and unverified specifications | Unknown current status/year/color no longer inferred; S560 uses a neutral missing-photo illustration; top hero preserved; no gallery reintroduced. |
@@ -22,13 +24,13 @@ This report covers main, all 21 open issues and 18 open PRs observed at the star
 
 ## Verified
 
-- 32/32 unit test files pass; these are file counts, not individual assertion counts.
+- 34/34 unit test files pass; these are file counts, not individual assertion counts.
 - `tsc --noEmit` and Next.js production build pass.
 - Isolated Postgres 16 CI: independent-connection race (one commit/one conflict), intra-batch conflicts, third-row DB error/zero partial inserts, idempotent replay and key mismatch, stale-update rejection, preservation of omitted columns, KST midnight buffer boundary, general authenticated-role denial, cross-connection state persistence and maintenance blocking. Initial evidence: [CI run 41081075917](https://github.com/Junebooky/driver-eta-notifier/actions/runs/41081075917). Later commits extend the same suite with legacy holds, same-name UUIDs and vehicle-only separation.
-- Local production HTTP smoke passes: login HTML, anonymous 401, production development-switch rejection, bad credentials 403, HQ session creation, Secure/HttpOnly cookie, OCR path rejection and missing-end rejection.
+- Local production HTTP smoke passes: login HTML, anonymous 401, production development-switch rejection, wrong-password rejection, personal HQ/driver sign-in, Secure/HttpOnly cookies, UUID isolation, HQ access rejection, refresh rotation, copied-token logout revocation, ninth-attempt rate limiting, OCR path rejection and missing-end rejection. This uses an isolated Auth/PostgREST fixture, not live Supabase.
 - `git diff --check` passes. `npm audit` reports 0 vulnerabilities.
 - Browser visual/mobile interaction QA is **not** claimed: the provided Chromium download failed. HTTP checks do not replace browser verification.
-- Full repository lint still fails: 461 errors / 291 warnings at the last full run, primarily pre-existing `any` types and effect-state patterns. Automatic safe fixes reduced errors from 492 at baseline; the rules were not disabled. Type checking/build passing does not imply lint passing.
+- Full repository lint still fails: 456 errors / 304 warnings at the follow-up run (before unused-import cleanup), primarily pre-existing `any` types and effect-state patterns. Automatic safe fixes reduced errors from 492 at baseline; the rules were not disabled. Type checking/build passing does not imply lint passing.
 
 ## Read-only operating database findings
 
@@ -77,7 +79,7 @@ Code presence is separate from live readiness. These issues are not bulk-closed 
 2. Review current actual schema, take a database backup and validate proposals in a separate database. Old migration files mix `public` and `cockpit`, use inconsistent historical timestamp prefixes and must not be blindly replayed as a folder.
 3. For this fix, review `20261030_atomic_dispatch_and_fleet_schema.sql`. It creates the transaction/state infrastructure, adds nullable UUID linkage, removes only the legacy vehicle-to-driver FK, and restricts direct client access. It does **not** infer legacy end times, seed customer data or need the asset migration first.
 4. Separately review reporting (`20261029_cockpit_driving_logs_and_expenses.sql`) and vehicle asset (`20261030_driver_vehicle_info_assets.sql`) prerequisites. Existing legacy driver association backfill must be checked by an administrator; no name-only identity inference.
-5. Configure actual `.env.example` values. `DEV_AUTH_ENABLED=true` is for local development; hosted production rejects it regardless. Shared driver PIN remains an organization-level credential; individual Supabase Auth account provisioning is a separate deployment requirement for strong per-person authentication.
+5. Configure actual `.env.example` values. `DEV_AUTH_ENABLED=true` is for local development; hosted production rejects it regardless. Shared driver PIN/HQ passkey login and hosted legacy tokens are now rejected. Apply the reviewed personal-auth proposal and prepare verified individual account-to-driver UUID mappings before deploying; see [the concrete release/rollback plan](PERSONAL_AUTH_RELEASE_PLAN.md).
 6. Confirm all 16 genuine end dates/times or explicitly resolve obsolete holds. The 60-minute buffer remains the reviewed draft policy from PR #39; confirm business policy before live release.
 7. Run `npm test`, `npm run test:db` against an empty disposable localhost Postgres, `npm run build`, `npm run test:http`, dependency audit, and actual browser/device acceptance. Existing lint debt must remain visible until corrected.
 8. Release/merge, shared DB migration, real customer delivery and production reservations were not executed during this audit.
