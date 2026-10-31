@@ -40,6 +40,7 @@ function normalizePayloadItem(raw: Record<string, any>, rootBody: Record<string,
     pickupTime: raw.pickupTime || '',
     endTime: raw.endTime || raw.pickupEndTime || '',
     timeDisplay: raw.timeDisplay,
+    routeWaypoints: raw.routeWaypoints,
     origin: raw.origin || raw.pickupLocation || '',
     originAddress: raw.originAddress,
     originLat: raw.originLat,
@@ -77,6 +78,13 @@ export async function POST(req: NextRequest) {
       ? body.items
       : [body];
 
+    for(const raw of rawItems){
+      if(raw.routeWaypoints!==undefined){
+        const points=raw.routeWaypoints;
+        if(!Array.isArray(points)||points.length<2||points.length>200||points.some((p:Record<string,unknown>)=>!p||typeof p.location!=='string'||!p.location.trim()||p.date!==(raw.date || raw.pickupDate)))return NextResponse.json({ok:false,error:'날짜별 경로를 확인해 주세요.'},{status:400});
+        if((raw.dispatchStatus || 'published')==='published' && points.some((p:Record<string,unknown>)=>p.isPoiConfirmed!==true||typeof p.lat!=='number'||Math.abs(p.lat)>90||typeof p.lng!=='number'||Math.abs(p.lng)>180||!Number.isFinite(p.lat)||!Number.isFinite(p.lng)))return NextResponse.json({ok:false,error:'모든 경유지 위치를 확정해 주세요.'},{status:400});
+      }
+    }
     const candidates = rawItems.map((item) => normalizePayloadItem(item, body));
 
     for (const cand of candidates) {

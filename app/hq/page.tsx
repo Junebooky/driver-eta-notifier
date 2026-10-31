@@ -86,7 +86,7 @@ function HqDashboardInner() {
   const [mobileDispatchSubView, setMobileDispatchSubView] = useState<'list' | 'form'>('list');
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeDispatchTab, setActiveDispatchTab] = useState<HqDispatchTabKey>('all');
+  const [activeDispatchTab, setActiveDispatchTab] = useState<HqDispatchTabKey>(()=>searchParams.get('view')==='action'?'action':'all');
   const [activeKpiFilter, setActiveKpiFilter] = useState<string | null>(null);
 
   // Shared Live Server Schedules -> Annotated HqBookings

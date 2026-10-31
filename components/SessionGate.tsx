@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { HqAssignmentInboxLink } from './HqAssignmentInboxLink';
 import { usePathname } from 'next/navigation';
 import { ensureClientAuth, logoutClientSession, type ClientSessionInfo } from '@/utils/cockpitClientAuth';
 
@@ -27,6 +28,7 @@ export function SessionGate({ children }: { children: React.ReactNode }) {
   }
   return <>
     <div className="flex justify-end gap-3 px-4 py-1 text-xs text-slate-500 bg-white">
+      {checked.session.role==='hq_admin' && <HqAssignmentInboxLink />}
       <span>{checked.session.displayName || checked.session.driverName || '로그인됨'}</span>
       <button type="button" onClick={async () => { const confirmed=await logoutClientSession(); if (!confirmed) window.alert('서버 로그아웃을 확인하지 못했습니다. 계정 관리자에게 세션 종료를 요청해 주세요.'); window.location.assign('/login'); }} className="underline">로그아웃</button>
     </div>

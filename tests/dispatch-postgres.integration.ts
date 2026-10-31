@@ -39,6 +39,7 @@ async function main() {
     await admin.query(readFileSync('supabase/migrations/20261031024614_cockpit_personal_auth.sql','utf8'));
     await admin.query(readFileSync('supabase/migrations/20261031033709_reporting_flow_integrity.sql','utf8'));
     await admin.query(readFileSync('supabase/migrations/20261031033709_reporting_flow_integrity.sql','utf8'));
+    await admin.query(readFileSync('supabase/migrations/20261031041612_email_dispatch_source_identity.sql','utf8'));
     await a.connect(); await b.connect();
     await Promise.all([a.query('SET ROLE service_role'),b.query('SET ROLE service_role')]);
     const vehicle = randomUUID(); const driver = randomUUID();
@@ -98,6 +99,12 @@ async function main() {
     await commit(a,[envelope(),envelope({vehicle_id:randomUUID(),vehicle_no:'200가 0002',vehicle_plate:'200가 0002',driver_id:randomUUID()})]);
     assert.equal(await count(),2);
     console.log('PASS same-name drivers with different UUIDs do not conflict');
+    await admin.query('DELETE FROM cockpit.schedules');
+    const emailMeta={serviceMode:'with_driver',intakeSource:'email',eventId:'email-fixture-one',groupVehicleIndex:1};
+    await commit(a,[envelope({schedule_meta:emailMeta})]);
+    await assert.rejects(commit(b,[envelope({vehicle_id:randomUUID(),vehicle_plate:'500가 0005',vehicle_no:'500가 0005',driver_id:randomUUID(),schedule_meta:emailMeta})]),{code:'23505'});
+    assert.equal(await count(),1);
+    console.log('PASS source email/day/slot is unique across independent operators');
     await admin.query('DELETE FROM cockpit.schedules');
     await commit(a,[envelope({schedule_meta:{serviceMode:'vehicle_only'},driver_id:null}),envelope({vehicle_id:randomUUID(),vehicle_no:'200가 0002',vehicle_plate:'200가 0002'})]);
     assert.equal(await count(),2);

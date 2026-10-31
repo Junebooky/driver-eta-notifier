@@ -1,3 +1,4 @@
+import type { RouteWaypointItem } from '@/types/emailHq';
 import { randomUUID, createHash } from 'node:crypto';
 import { validateDispatchInterval } from '@/utils/dispatchInterval';
 import { supabaseAdmin } from '@/lib/supabase/server';
@@ -20,6 +21,7 @@ export const VIP_META_PREFIX = '__VIP_META_V1__:';
 export const UNASSIGNED_VEHICLE_SENTINEL = '미배정';
 
 export interface HqScheduleMeta {
+  routeWaypoints?: RouteWaypointItem[];
   bookingNo?: string;
   customerName?: string;
   customerId?: string;
@@ -288,6 +290,7 @@ export function mapHydratedRowToScheduleItem(rawRow: Record<string, any>): Sched
     passenger_count: row.passenger_count || 1,
     flight: row.flight_number || undefined,
     notes: row.protocol_notes || undefined,
+    adminWaypoints:meta.routeWaypoints?.slice(1,-1).filter(p=>p.isPoiConfirmed&&Number.isFinite(p.lat)&&Number.isFinite(p.lng)).map(p=>({id:p.id,name:p.location,shortName:p.location,lat:p.lat!,lng:p.lng!,category:'CUSTOM' as const})),
     org_id: row.org_id,
     driver_id: row.driver_id || undefined,
     driver_name: row.driver_name || undefined,
@@ -539,6 +542,7 @@ export interface DispatchUpsertInput {
   pickupTime: string;
   endTime?: string;
   timeDisplay?: string;
+  routeWaypoints?: RouteWaypointItem[];
   origin: string;
   originAddress?: string;
   originLat?: number;
@@ -971,6 +975,7 @@ async function prepareServerDispatchSchedule(
     const driverChanged = prevMeta.driverId !== input.driverId || prevDriverClean !== cleanDrv;
     const plateChanged = cleanVehicleIdentity(prevMeta.vehiclePlate) !== cleanVehicleIdentity(resolvedPlate);
     const itineraryChanged =
+      (input.routeWaypoints!==undefined && JSON.stringify(input.routeWaypoints)!==JSON.stringify(prevMeta.routeWaypoints)) ||
       existingHydrated.date !== isoDate ||
       existingHydrated.end_date !== (input.endDate || isoDate) ||
       normalizeTimeHHmm(existingHydrated.end_time) !== normalizeTimeHHmm(input.endTime) ||
@@ -1037,6 +1042,7 @@ async function prepareServerDispatchSchedule(
   const nextMeta: HqScheduleMeta = {
     ...(existingHydrated?._meta || {}),
     bookingNo,
+    routeWaypoints: input.routeWaypoints ?? existingHydrated?._meta.routeWaypoints,
     customerName: input.customerName?.trim() || existingHydrated?._meta.customerName || input.passengerName?.trim() || 'VIP 고객',
     customerId: input.customerId || existingHydrated?._meta.customerId,
     orderingAgency: input.orderingAgency ?? existingHydrated?._meta.orderingAgency,
@@ -1177,6 +1183,8 @@ export async function acknowledgeServerSchedule(params: {
 
   const hydrated = hydrateRawScheduleRow(raw);
 
+  const assignedId=hydrated.driver_id || hydrated._meta.driverId;
+  if(!assignedId || params.driverId!==assignedId)return {error:'해당 배차에 지정된 기사 UUID만 확인할 수 있습니다.',statusCode:403};
   // Guard 1: Block acknowledging cancelled schedules
   if (hydrated.dispatch_status === 'cancelled' || hydrated.status === 'cancelled') {
     return { error: '취소된 배차는 확인할 수 없습니다.', statusCode: 400 };
@@ -1188,16 +1196,6 @@ export async function acknowledgeServerSchedule(params: {
     return {
       error: `현재 버전(v${currentVersion})과 일치하지 않습니다. (요청 버전: v${params.version}) 최신 배차 정보를 확인해주세요.`,
       statusCode: 409,
-    };
-  }
-
-  // Guard 3: Block acknowledging by a different driver
-  const assignedDriver = cleanDriverIdentity(hydrated.driver_name || hydrated._meta.driverName);
-  const reqDriver = cleanDriverIdentity(params.driverName);
-  if (assignedDriver && reqDriver && assignedDriver !== reqDriver) {
-    return {
-      error: `해당 배차의 담당 기사(${hydrated.driver_name})만 확인할 수 있습니다.`,
-      statusCode: 403,
     };
   }
 

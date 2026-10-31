@@ -95,6 +95,8 @@ export interface HqEmailExtractedDraft {
   passengerCount: number;
 
   // Schedule & Route with POI Confirmation
+  savedScheduleIds?: Record<string,string>;
+  dayEndTimes?: Record<string,string>;
   pickupDate: string; // YYYY-MM-DD
   pickupTime: string; // HH:MM
   pickupLocation: string;

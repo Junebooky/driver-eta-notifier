@@ -185,7 +185,10 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
 
   useEffect(() => {
     fetchAvailability();
+    const refresh=()=>{if(document.visibilityState==='visible')void fetchAvailability();};
+    const timer=setInterval(refresh,8000);window.addEventListener('focus',refresh);
     return () => {
+      clearInterval(timer);window.removeEventListener('focus',refresh);
       if (activeAbortRef.current) activeAbortRef.current.abort();
     };
   }, [fetchAvailability]);
