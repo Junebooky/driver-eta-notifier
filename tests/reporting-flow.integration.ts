@@ -56,7 +56,7 @@ export async function verifyReportingFlow(admin:Client,writer:Client,reader:Clie
     if(url.pathname==='/api/driving-logs')return init.method==='POST'?logs.POST(request):logs.GET(request);
     throw new Error('Unexpected test network request');
   }) as typeof fetch;
-  const post=async(route:{POST:(req:NextRequest)=>Promise<Response>},path:string,body:unknown)=>route.POST(new NextRequest('http://localhost'+path,{method:'POST',headers:{authorization:'Bearer '+actor,'content-type':'application/json'},body:JSON.stringify(body)}));
+  const post=async(route:{POST:(req:NextRequest)=>Promise<Response>},path:string,body:unknown,extraHeaders:Record<string,string>={})=>route.POST(new NextRequest('http://localhost'+path,{method:'POST',headers:{authorization:'Bearer '+actor,'content-type':'application/json',...extraHeaders},body:JSON.stringify(body)}));
   const query=async()=> (await reader.query('SELECT expense_amount,expense_count FROM cockpit.driving_logs WHERE booking_id=$1',[booking])).rows[0];
   try{
     const item:ExpenseItem={id:randomUUID(),driverId:driver,bookingId:booking,category:'parking',date:'2026-12-12',time:'10:30',merchant:'격리 주차장',amount:8000,paymentMethod:'company_card',receiptUrl:'data:image/png;base64,iVBORw0KGgo=',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
@@ -97,9 +97,10 @@ export async function verifyReportingFlow(admin:Client,writer:Client,reader:Clie
     assert.equal((await post(acknowledgment,'/api/schedules/ack',{scheduleId:booking,version:2})).status,200);
     console.log('PASS actual driver acknowledgment → HQ confirmed, dispatch revision → reconfirmation required; forged/stale confirmations denied');
     actor=token('hq_admin');
-    const staleEdit=await post(dispatchRoute,'/api/schedules/dispatch',{scheduleId:booking,expectedVersion:1,date:'2026-12-12',pickupTime:'09:00',endDate:'2026-12-12',endTime:'12:00',origin:'공항',destination:'호텔',dispatchStatus:'unassigned',allowUnverified:true});
-    assert.equal(staleEdit.status,409,'stale mobile edit cannot overwrite the latest PC assignment');
+    const staleEdit=await post(dispatchRoute,'/api/schedules/dispatch',{scheduleId:booking,expectedVersion:1,date:'2026-12-12',pickupTime:'09:00',endDate:'2026-12-12',endTime:'12:00',origin:'공항',destination:'호텔',dispatchStatus:'unassigned',allowUnverified:true},{'Idempotency-Key':randomUUID()});
+    assert.equal(staleEdit.status,409,JSON.stringify(await staleEdit.json()));
     assert.equal((await reader.query('SELECT schedule_meta FROM cockpit.schedules WHERE id=$1',[booking])).rows[0].schedule_meta.version,2);
+    console.log('PASS HTTP dispatch expectedVersion guard rejects a stale mobile edit and preserves the latest PC assignment in real Postgres');
     actor=token('driver');
 
     const navigation={...log,id:randomUUID(),bookingId:undefined,drivingDate:'2026-12-13',status:'draft' as const,startKm:'',endKm:'',stops:[{id:'navigation-one',time:'',place:'공항',departureTime:'09:00',actionIdempotencyKey:'nav-one'}]};
