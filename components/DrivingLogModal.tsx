@@ -71,8 +71,8 @@ const DrivingLogModalContent: React.FC<{
     fetch(`/api/driving-logs?${query}`,{cache:'no-store',credentials:'include',signal:abort.signal})
       .then(async response=>{if(!response.ok)return;const data=await response.json();const row=data.logs?.find((entry:HqDrivingLog)=>(entry.bookingId || null)===(bookingId || null));if(!row || abort.signal.aborted)return;
         setLogData(previous=>{
-          if(previous.stops.length || previous.startKm)return {...previous,submissionId:row.id};
-          return {...previous,submissionId:row.id,driverId:row.driverId,clientName:row.customerName,passengerCount:String(row.passengerCount || ''),clockIn:row.clockIn,clockOut:row.clockOut,startKm:row.startKm,endKm:row.endKm,totalDutyHours:row.totalDutyHours,distanceKm:row.distanceKm,notes:row.notes,stops:row.stops.map((stop:HqDrivingLog['stops'][number])=>({...stop,memo:stop.note})),status:row.status==='draft'?'draft':'submitted'};
+          if(previous.stops.length || previous.startKm)return {...previous,submissionId:row.id,hqStatus:row.status};
+          return {...previous,submissionId:row.id,hqStatus:row.status,driverId:row.driverId,clientName:row.customerName,passengerCount:String(row.passengerCount || ''),clockIn:row.clockIn,clockOut:row.clockOut,startKm:row.startKm,endKm:row.endKm,totalDutyHours:row.totalDutyHours,distanceKm:row.distanceKm,notes:row.notes,stops:row.stops.map((stop:HqDrivingLog['stops'][number])=>({...stop,memo:stop.note})),status:row.status==='draft'?'draft':'submitted'};
         });
       }).catch(()=>{});
     return()=>abort.abort();
@@ -280,7 +280,7 @@ const DrivingLogModalContent: React.FC<{
       }
 
       haptics.success();
-      const saved={...logData,submissionId:res.log?.id || logData.submissionId,status:'submitted' as const};
+      const saved={...logData,submissionId:res.log?.id || logData.submissionId,hqStatus:res.log?.status,carNumber:res.log?.vehiclePlate || logData.carNumber,vehicleId:res.log?.vehicleId || logData.vehicleId,status:'submitted' as const};
       setLogData(saved);saveDrivingLogDraft(saved);
       setIsPreviewSubmitModalOpen(true);
     } catch (err: any) {
@@ -392,6 +392,7 @@ const DrivingLogModalContent: React.FC<{
           ref={scrollContainerRef}
           className="flex-1 overflow-y-auto px-4 py-4 space-y-4 w-full pb-4"
         >
+        {logData.hqStatus && <p role="status" className="mb-3 rounded-xl bg-blue-50 p-3 text-xs text-blue-800">본사 검토 상태: {logData.hqStatus==='draft'?'임시 기록':logData.hqStatus}</p>}
         {/* Notice Banner for Demo Fixture or Empty Report */}
         {logData.isDemoFixture && (
           <div className="bg-blue-50/70 border border-blue-100 rounded-xl px-3 py-2 flex items-center justify-between text-xs text-blue-700">

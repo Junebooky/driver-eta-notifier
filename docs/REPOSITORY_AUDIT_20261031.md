@@ -24,7 +24,7 @@ This report covers main, all 21 open issues and 18 open PRs observed at the star
 
 ## Verified
 
-- 34/34 unit test files pass; these are file counts, not individual assertion counts.
+- 35/35 unit test files pass; these are file counts, not individual assertion counts.
 - `tsc --noEmit` and Next.js production build pass.
 - Isolated Postgres 16 CI: independent-connection race (one commit/one conflict), intra-batch conflicts, third-row DB error/zero partial inserts, idempotent replay and key mismatch, stale-update rejection, preservation of omitted columns, KST midnight buffer boundary, general authenticated-role denial, cross-connection state persistence and maintenance blocking. The follow-up also verifies login attempt windows, real SQL session expiry/revocation, UUID-only profile patches and preservation of linked asset fixtures across vehicle assignments. Initial evidence: [CI run 41081075917](https://github.com/Junebooky/driver-eta-notifier/actions/runs/41081075917). Later commits extend the same suite with legacy holds, same-name UUIDs and vehicle-only separation.
 - Local production HTTP smoke passes: login HTML, anonymous 401, production development-switch rejection, wrong-password rejection, personal HQ/driver sign-in, Secure/HttpOnly cookies, UUID isolation, HQ access rejection, refresh rotation, copied-token logout revocation, ninth-attempt rate limiting, OCR path rejection and missing-end rejection. This uses an isolated Auth/PostgREST fixture, not live Supabase.
@@ -32,6 +32,8 @@ This report covers main, all 21 open issues and 18 open PRs observed at the star
 - `git diff --check` passes. `npm audit --omit=dev` reports zero runtime advisories. `npm audit` reports 0 high/critical and 16 moderate reports, rooted in [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249), newly updated October 30. All reported dependency paths are lint tooling. The proposed `npm audit fix --force` downgrade to obsolete ESLint/Next lint configurations was not applied; a compatible upstream fix remains pending. The initial audit had reported zero; that historical result is not the current result.
 - Browser visual/mobile interaction QA is **not** claimed: the provided Chromium download failed. HTTP checks do not replace browser verification.
 - Full repository lint still fails: 456 errors / 288 warnings at the final follow-up run, primarily pre-existing `any` types and effect-state patterns. Automatic safe fixes reduced errors from 492 at baseline; the rules were not disabled. Type checking/build passing does not imply lint passing.
+
+The subsequent driver log/receipt/HQ connection work, its self-contained SQL proposal and actual API-to-Postgres test are recorded in [the reporting flow verification](REPORTING_FLOW_VERIFICATION_20261031.md). These proposals remain unapplied to the operating database.
 
 ## Read-only operating database findings
 

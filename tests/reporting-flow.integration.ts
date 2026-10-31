@@ -17,7 +17,7 @@ import type { ExpenseItem } from '../utils/expense';
 export async function verifyReportingFlow(admin:Client,writer:Client,reader:Client){
   const org='vip_limousine_korea',driver=randomUUID(),other=randomUUID(),booking=randomUUID(),otherBooking=randomUUID();
   await admin.query('INSERT INTO cockpit.drivers(id,driver_name) VALUES($1,$3),($2,$3)',[driver,other,'동명이인']);
-  await admin.query("INSERT INTO cockpit.schedules(id,date,pickup_time,driver_id) VALUES($1,'2026-12-12','09:00',$2),($3,'2026-12-12','13:00',$2)",[booking,driver,otherBooking]);
+  await admin.query("INSERT INTO cockpit.schedules(id,org_id,date,pickup_time,end_date,end_time,driver_id,vehicle_id,vehicle_plate,dispatch_status,schedule_meta) VALUES($1,'vip_limousine_korea','2026-12-12','09:00','2026-12-12','12:00',$2,$4,'fixture-car-one','published','{\"serviceMode\":\"with_driver\"}'),($3,'vip_limousine_korea','2026-12-12','13:00','2026-12-12','18:00',$2,$5,'fixture-car-two','published','{\"serviceMode\":\"with_driver\"}')",[booking,driver,otherBooking,randomUUID(),randomUUID()]);
   const token=(role:'driver'|'hq_admin',driverId=driver)=>signCockpitSession({userId:role==='driver'?driverId:'fixture-hq',org,role,driverId:role==='driver'?driverId:undefined,driverName:'동명이인'});
   let actor=token('driver'),storageFailure=false;const files=new Map<string,Buffer>();
   const original={from:supabaseAdmin.from,rpc:supabaseAdmin.rpc,storage:Object.getOwnPropertyDescriptor(supabaseAdmin,'storage'),fetch:globalThis.fetch};
@@ -77,6 +77,12 @@ export async function verifyReportingFlow(admin:Client,writer:Client,reader:Clie
     assert.equal((await reader.query('SELECT count(*) FROM cockpit.expenses')).rows[0].count,before);assert.deepEqual(await query(),{expense_amount:10000,expense_count:2});
     await writer.query("UPDATE cockpit.expenses SET status='반려' WHERE id=$1",[second.expenses![0].id]);assert.deepEqual(await query(),{expense_amount:8000,expense_count:1});
     await writer.query('DELETE FROM cockpit.expenses WHERE id=$1',[second.expenses![0].id]);assert.deepEqual(await query(),{expense_amount:8000,expense_count:1});
+    const navigation={...log,id:randomUUID(),bookingId:undefined,drivingDate:'2026-12-13',status:'draft' as const,startKm:'',endKm:'',stops:[{id:'navigation-one',time:'',place:'공항',departureTime:'09:00',actionIdempotencyKey:'nav-one'}]};
+    const draft=await submitDriverLogToHqDb(navigation);assert.equal(draft.ok,true,draft.error);
+    const nextStop={id:'navigation-two',time:'',place:'호텔',departureTime:'10:00',actionIdempotencyKey:'nav-two'};
+    const append=await submitDriverLogToHqDb({...navigation,id:randomUUID(),stops:[nextStop]});assert.equal(append.ok,true,append.error);assert.equal(append.log?.id,draft.log?.id);assert.equal(append.log?.stops.length,2);
+    const finish=await submitDriverLogToHqDb({...navigation,id:draft.log!.id,status:'검토 대기',startKm:'1000',endKm:'1050',stops:[{...nextStop,time:'11:00'}]});assert.equal(finish.ok,true,finish.error);assert.equal(finish.log?.stops.length,1);assert.equal(finish.log?.distanceKm,'50 km');
+    console.log('PASS actual navigation draft append/replay, same-row final submission and deliberate route edit');
     await admin.query('SET ROLE authenticated');await assert.rejects(admin.query('SELECT * FROM cockpit.expenses'),{code:'42501'});await assert.rejects(admin.query('SELECT cockpit.reporting_summary($1)',[org]),{code:'42501'});await admin.query('RESET ROLE');
     console.log('PASS reporting flow: client receipt upload → expense API → real Postgres → report linking/totals → HQ summary/read/photo/review → driver status; retries, other-driver denial and batch rollback');
   }finally{supabaseAdmin.from=original.from;supabaseAdmin.rpc=original.rpc;if(original.storage)Object.defineProperty(supabaseAdmin,'storage',original.storage);globalThis.fetch=original.fetch;}

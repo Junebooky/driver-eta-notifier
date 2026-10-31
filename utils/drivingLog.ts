@@ -56,6 +56,7 @@ export interface DrivingLogData {
   isDemoFixture?: boolean;   // True when populated with reference sample data
   bookingId?: string;
   submissionId?: string;
+  hqStatus?: import('@/types/drivingLogHq').HqDrivingLogStatus;
   driverId?: string;
   vehicleId?: string;
   organizationId?: string;

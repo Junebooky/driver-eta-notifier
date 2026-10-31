@@ -73,7 +73,7 @@ const ExpenseModalContent: React.FC<{
         const response=await fetch(`/api/expenses${bookingId?`?bookingId=${encodeURIComponent(bookingId)}`:''}`,{cache:'no-store',credentials:'include'});
         const data=await response.json();
         if(!response.ok || !data.ok)throw new Error(data.error || '서버 경비 내역을 불러오지 못했습니다.');
-        if(!active || initialIsDemo)return;
+        if(!active || isDemoMode)return;
         setServerLoadError('');
         setExpenseList(previous=>{
           const rows:ExpenseItem[]=data.expenses.map((row:import('@/types/expenseHq').HqExpenseRecord)=>({id:row.id,category:row.category,date:row.rawDate,time:row.time,merchant:row.merchant,address:row.address,amount:row.amount,paymentMethod:row.paymentMethod,memo:row.memo,receiptUrl:row.receiptUrl,receiptStoragePath:row.receiptStoragePath,bookingId:row.bookingId,driverId:row.driverId,hqStatus:row.status,submittedToHqAt:row.submittedAt,createdAt:row.rawDate,updatedAt:row.rawDate,ocrExtracted:row.ocrExtracted,ocrSummary:row.ocrSummary}));
@@ -94,7 +94,7 @@ const ExpenseModalContent: React.FC<{
     void recover();const timer=setInterval(()=>{if(document.visibilityState==='visible')void recover();},20_000);
     const resume=()=>void recover();window.addEventListener('online',resume);window.addEventListener('focus',resume);
     return()=>{active=false;clearInterval(timer);window.removeEventListener('online',resume);window.removeEventListener('focus',resume);};
-  },[bookingId,driverProfile?.driverId,initialIsDemo]);
+  },[bookingId,driverProfile?.driverId,isDemoMode]);
 
   // Date navigation: default to 2026-10-24 matching reference screenshot
   const [selectedDate, setSelectedDate] = useState<string>(getKstTodayDateStr);
@@ -144,7 +144,7 @@ const ExpenseModalContent: React.FC<{
   const handleResetToRealDraft = () => {
     haptics.warningPulse();
     updateExpenseList([], false);
-    showToast('실제 빈 경비지출 내역으로 전환되었습니다.');
+    showToast('실제 경비 내역으로 전환했습니다. 서버 내역을 다시 확인합니다.');
   };
 
   const handleLoadDemoFixture = () => {
@@ -192,6 +192,7 @@ const ExpenseModalContent: React.FC<{
   // Delete item handler
   const handleDeleteConfirm = () => {
     if (!deletingItemId) return;
+    if(expenseList.find(item=>item.id===deletingItemId)?.submittedToHqAt){showToast('제출된 경비는 삭제할 수 없습니다. 본사에서 검수·반려를 처리해 주세요.');setDeletingItemId(null);return;}
     haptics.mediumTap();
     const updated = expenseList.filter((i) => i.id !== deletingItemId);
     updateExpenseList(updated, false);
