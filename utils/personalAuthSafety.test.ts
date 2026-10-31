@@ -69,6 +69,12 @@ test('client session refresh is single-flight and a late response cannot restore
   purgeLocalCaches();release();assert.equal((await first).authenticated,false);assert.equal((await second).authenticated,false);
   globalThis.fetch=(async()=>Response.json({authenticated:true,session:{role:'driver',userId:'new-driver'}})) as typeof fetch;
   assert.equal((await ensureClientAuth()).userId,'new-driver');
+  let resumeChecks=0;
+  globalThis.fetch=(async()=>{resumeChecks++;return Response.json({authenticated:true,session:{role:'hq_admin',isRepresentative:true,userId:'new-driver'}});}) as typeof fetch;
+  assert.equal((await ensureClientAuth()).role,'driver');assert.equal(resumeChecks,0,'ordinary reads reuse the short cache');
+  const resumed=await ensureClientAuth(undefined,undefined,{force:true});
+  assert.equal(resumed.role,'hq_admin');assert.equal(resumed.isRepresentative,true);assert.equal(resumeChecks,1,'PWA resume must recheck the trusted role even within the cache TTL');
+
   globalThis.fetch=(async()=>Response.json({ok:false},{status:503})) as typeof fetch;
   assert.equal(await logoutClientSession(),false);
  }finally{purgeLocalCaches();globalThis.fetch=original;Reflect.deleteProperty(globalThis,'window');}

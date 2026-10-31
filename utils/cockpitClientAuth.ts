@@ -27,14 +27,15 @@ const SESSION_CACHE_TTL_MS = 15_000; // 15s cache to avoid rapid duplicate sessi
  */
 export async function ensureClientAuth(
   _role?: 'hq' | 'driver',
-  _params?: { driverName?: string; vehicleNo?: string }
+  _params?: { driverName?: string; vehicleNo?: string },
+  options?: { force?: boolean }
 ): Promise<ClientSessionInfo> {
   if (typeof window === 'undefined') {
     return { authenticated: false };
   }
 
   const now = Date.now();
-  if (sessionCache && sessionCache.authenticated && now - lastSessionCheckTime < SESSION_CACHE_TTL_MS) {
+  if (!options?.force && sessionCache && sessionCache.authenticated && now - lastSessionCheckTime < SESSION_CACHE_TTL_MS) {
     return sessionCache;
   }
 

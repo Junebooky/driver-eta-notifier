@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { HqAssignmentInboxLink } from './HqAssignmentInboxLink';
-import { canAccessPortal } from '@/utils/loginPortal';
+import { accountHome, canAccessPortal } from '@/utils/loginPortal';
 import { usePathname } from 'next/navigation';
 import { ensureClientAuth, logoutClientSession, type ClientSessionInfo } from '@/utils/cockpitClientAuth';
 
@@ -11,13 +11,28 @@ export function SessionGate({ children }: { children: React.ReactNode }) {
   const [checked, setChecked] = useState<{ path: string; session: ClientSessionInfo } | null>(null);
   useEffect(() => {
     let active = true;
-    const check=()=>ensureClientAuth().then(session => { if (active) setChecked({ path: pathname, session }); });
+    const check=()=>ensureClientAuth(undefined, undefined, {force:true}).then(session => { if (active) setChecked({ path: pathname, session }); });
     void check();
-    const timer=setInterval(check,60_000);
-    return () => { active = false; clearInterval(timer); };
+    const visibleCheck = () => { if (document.visibilityState !== 'hidden') void check(); };
+    const timer=setInterval(visibleCheck,60_000);
+    window.addEventListener('pageshow',visibleCheck);
+    window.addEventListener('focus',visibleCheck);
+    window.addEventListener('online',visibleCheck);
+    document.addEventListener('visibilitychange',visibleCheck);
+    return () => {
+      active = false; clearInterval(timer);
+      window.removeEventListener('pageshow',visibleCheck);
+      window.removeEventListener('focus',visibleCheck);
+      window.removeEventListener('online',visibleCheck);
+      document.removeEventListener('visibilitychange',visibleCheck);
+    };
   }, [pathname]);
+  const destination = checked?.path === pathname && checked.session.authenticated && pathname === '/'
+    ? accountHome(checked.session) : '/';
+  useEffect(() => { if (destination !== '/') window.location.replace(destination); }, [destination]);
   if (pathname === '/login' || pathname === '/representative/login') return children;
   if (checked?.path !== pathname) return <div role="status" className="m-auto p-8 text-slate-500">로그인을 확인하고 있습니다.</div>;
+  if (destination !== '/') return <div role="status" className="m-auto p-8 text-slate-500">전용 화면으로 이동하고 있습니다.</div>;
   const hq = pathname.startsWith('/hq');
   const representative = pathname === '/representative' || pathname.startsWith('/representative/');
   const loginPath = representative ? '/representative/login' : '/login';

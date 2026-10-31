@@ -61,12 +61,15 @@ const server=spawn(process.execPath,['node_modules/next/dist/bin/next','start','
 let logs='';server.stdout.on('data',x=>logs+=x);server.stderr.on('data',x=>logs+=x);
 const post=(path,body,cookie,headers={})=>fetch(base+path,{method:'POST',headers:{'content-type':'application/json',...(cookie?{cookie}:{}),...headers},body:JSON.stringify(body)});
 const cookies=response=>response.headers.getSetCookie().map(value=>value.split(';')[0]).join('; ');
-async function assertRepresentativeRedirect(cookie){
- const response=await fetch(base+'/representative',{headers:cookie?{cookie}:{},redirect:'manual'});
+async function assertPageRedirect(path,cookie,target){
+ const response=await fetch(base+path,{headers:cookie?{cookie}:{},redirect:'manual'});
  const html=await response.text();
- assert.ok((response.status===307 && response.headers.get('location')?.endsWith('/representative/login')) ||
-   (response.status===200 && (html.includes('url=/representative/login') || html.includes('NEXT_REDIRECT;replace;/representative/login;307;'))),'unauthorized representative route must redirect to dedicated login');
+ const location=response.headers.get('location');
+ assert.ok((response.status===307 && location && new URL(location,base).href===new URL(target,base).href) ||
+   (response.status===200 && (html.includes(`url=${target}`) || html.includes(`NEXT_REDIRECT;replace;${target};307;`))),`expected ${path} to redirect to ${target}`);
+ return response;
 }
+const assertRepresentativeRedirect=cookie=>assertPageRedirect('/representative',cookie,'/representative/login');
 
 try{
  let ready=false;for(let i=0;i<100;i++){
@@ -96,14 +99,36 @@ try{
 
  const expiredRep=issue('representative',undefined,-1);
  const renewedRep=await fetch(base+'/api/auth/representative-session',{redirect:'manual',headers:{cookie:`cockpit_session=${expiredRep.access_token}; cockpit_refresh=${expiredRep.refresh_token}`}});
- assert.equal(renewedRep.status,307);assert.equal(new URL(renewedRep.headers.get('location')).pathname,'/representative');assert.ok(renewedRep.headers.getSetCookie().some(value=>value.startsWith('cockpit_refresh=')&&!value.includes(expiredRep.refresh_token)));
+ assert.equal(renewedRep.status,307);assert.equal(new URL(renewedRep.headers.get('location'),base).pathname,'/representative');assert.ok(renewedRep.headers.getSetCookie().some(value=>value.startsWith('cockpit_refresh=')&&!value.includes(expiredRep.refresh_token)));
  assert.equal((await fetch(base+'/representative',{redirect:'manual',headers:{cookie:cookies(renewedRep)}})).status,200);
+
+ // Existing and newly installed PWA icons all launch the same root URL.
+ const manifest=await(await fetch(base+'/manifest.json')).json();assert.equal(manifest.start_url,'/');
+ await assertPageRedirect('/',undefined,'/login');
+ await assertPageRedirect('/',cookie,'/hq?tab=dashboard');
+ const representativeRoot=await assertPageRedirect('/',repCookie,'/representative');
+ assert.match(representativeRoot.headers.get('cache-control') || '',/private|no-store/);
+ assert.equal(new URL((await fetch(base+'/api/auth/launch?next=https://other.invalid',{headers:{cookie:repCookie},redirect:'manual'})).headers.get('location'),base).href,base+'/representative');
+ for(const role of ['representative','hq_admin','driver']){
+   const expired=issue(role,undefined,-1),expiredCookie=`cockpit_session=${expired.access_token}; cockpit_refresh=${expired.refresh_token}`;
+   await assertPageRedirect('/',expiredCookie,'/api/auth/launch');
+   const resumed=await fetch(base+'/api/auth/launch',{headers:{cookie:expiredCookie},redirect:'manual'});
+   const home=role==='representative'?'/representative':role==='hq_admin'?'/hq?tab=dashboard':'/';
+   assert.equal(resumed.status,307);assert.equal(new URL(resumed.headers.get('location'),base).href,base+home);
+   assert.ok(resumed.headers.getSetCookie().some(value=>value.startsWith('cockpit_refresh=')&&!value.includes(expired.refresh_token)));
+   const resumedPage=await fetch(base+home,{headers:{cookie:cookies(resumed)},redirect:'manual'});assert.equal(resumedPage.status,200);
+ }
+ const revokedLaunch=issue('representative');revoked.add(verify(revokedLaunch.access_token).claims.session_id);
+ const deniedLaunch=await fetch(base+'/api/auth/launch',{headers:{cookie:`cockpit_session=${revokedLaunch.access_token}; cockpit_refresh=${revokedLaunch.refresh_token}`},redirect:'manual'});
+ assert.equal(new URL(deniedLaunch.headers.get('location'),base).href,base+'/login');assert.ok(deniedLaunch.headers.getSetCookie().every(value=>value.includes('Max-Age=0')));
+ console.log('PASS PWA HTTP: root → representative/HQ/driver by trusted role, expired access → rotated cookies → correct home, revoked session → login, private responses and unchanged manifest start URL');
  console.log('PASS representative HTTP: trusted provider metadata → dedicated login/cookies → server-guarded mobile portal; regular HQ/forged representative denied');
 
  assert.equal((await post('/api/receipt/scan',{image:'/../../.env'},cookie)).status,400);
  assert.equal((await post('/api/schedules/dispatch',{date:'2026-12-01',pickupTime:'19:00',origin:'A',destination:'B'},cookie)).status,400);
  const driverLogin=await post('/api/auth/session',{email:'driver@example.invalid',password:'isolated-password',role:'hq'});assert.equal(driverLogin.status,200);
  const driverCookie=cookies(driverLogin);const driverSession=await driverLogin.json();assert.equal(driverSession.session.role,'driver');assert.equal(driverSession.session.driverId,driverId);
+ assert.equal((await fetch(base+'/',{headers:{cookie:driverCookie},redirect:'manual'})).status,200,'driver launch remains the existing cockpit');
  const own=await(await fetch(base+'/api/driver?vehicle_no=another-driver',{headers:{cookie:driverCookie}})).json();assert.equal(own.driver.id,driverId);
  assert.equal((await fetch(base+`/api/hq/drivers/${driverId}`,{headers:{cookie:driverCookie}})).status,403);
  assert.equal((await post('/api/auth/session',{action:'logout'},driverCookie)).status,200);
