@@ -184,6 +184,7 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
     const builder: any = {
       select: (_fields: string = '*') => builder,
       order: (_col: string, _opts?: any) => builder,
+      is: (field: string, val: any) => {filters.push({field,val});return builder;},
       eq: (field: string, val: any) => {
         filterField = field;
         filterVal = val;
@@ -725,7 +726,7 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
     });
     const authReceiptRes = await getReceipt(authReceiptReq);
     assert.strictEqual(authReceiptRes.status, 200, 'Owner driver must be able to view their receipt');
-    assert.strictEqual(authReceiptRes.headers.get('Cache-Control'), 'private, max-age=3600');
+    assert.strictEqual(authReceiptRes.headers.get('Cache-Control'), 'private, no-store');
 
     // 7.3: Driver B tries to access Driver A's receipt -> 403 Forbidden
     const unauthReceiptReq = new NextRequest(`http://localhost:3000/api/expenses/receipt?expenseId=${EXPENSE_RECEIPT_UUID}`, {
@@ -917,6 +918,8 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
       body: JSON.stringify({
         items: [
           {
+            id:'e0000000-0000-4000-8000-000000000009',
+            time:'10:00',
             bookingId: BOOKING_SPOOFED_NAME_UUID,
             date: '2026-11-09',
             category: 'gas',

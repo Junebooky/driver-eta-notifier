@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "node scripts/run-tests.mjs",
-    "test:db": "node --import tsx tests/dispatch-postgres.integration.ts",
+    "test:db": "node --require ./scripts/test-safety.cjs --import tsx tests/dispatch-postgres.integration.ts",
     "test:http": "node scripts/smoke-http.mjs"
   },
   "dependencies": {

@@ -16,6 +16,7 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 import { HqSidebar } from '@/components/hq/HqSidebar';
+import { HqReportingOverview } from '@/components/hq/HqReportingOverview';
 import { HqHeader } from '@/components/hq/HqHeader';
 import { HqKpiTiles } from '@/components/hq/HqKpiTiles';
 import { HqDispatchTable, HqDispatchTabKey } from '@/components/hq/HqDispatchTable';
@@ -632,6 +633,7 @@ function HqDashboardInner() {
                       : '고객사, 승객명, 예약번호, 기사명, 차량번호 검색...'
           }
         />
+        <HqReportingOverview />
 
         {/* Scrollable Body */}
         <main className="flex-1 p-3.5 sm:p-5 lg:p-6 space-y-4 sm:space-y-5 overflow-y-auto">

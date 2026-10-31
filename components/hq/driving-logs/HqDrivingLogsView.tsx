@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useMemo, useEffect, useSyncExternalStore } from 'react';
+import { useReportingRefresh } from '@/hooks/useReportingRefresh';
+import React, { useState, useMemo, useSyncExternalStore } from 'react';
 import {
   HqDrivingLogStatus,
 } from '@/types/drivingLogHq';
@@ -38,34 +39,10 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
     getHqDrivingLogsServerSnapshot
   );
   const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
-  const [dbError, setDbError] = useState<string | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-
-  // Fetch real authoritative logs from Supabase DB on mount and periodic interval
-  const handleRefreshLogs = async () => {
-    setIsRefreshing(true);
-    try {
-      const result = await fetchHqDrivingLogsFromDb();
-      if (!result.ok && result.error) {
-        setDbError(result.error);
-      } else {
-        setDbError(null);
-      }
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-    handleRefreshLogs();
-    const intervalId = setInterval(() => {
-      fetchHqDrivingLogsFromDb();
-    }, 20000);
-    return () => clearInterval(intervalId);
-  }, []);
+  const {error:dbError,refreshing:isRefreshing,refresh:handleRefreshLogs}=useReportingRefresh(fetchHqDrivingLogsFromDb);
 
   // Filters
-  const [dateRange] = useState('2024. 10. 24 (목) ~ 2024. 10. 24 (목)');
+  const [dateRange] = useState('전체 기간');
   const [selectedDriver, setSelectedDriver] = useState<string>('전체');
   const [selectedVehicle, setSelectedVehicle] = useState<string>('전체');
   const [selectedCustomer, setSelectedCustomer] = useState<string>('전체');
@@ -104,7 +81,8 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
     const pending = logs.filter((l) => l.status === '검토 대기').length;
     const approved = logs.filter((l) => l.status === '승인 완료').length;
     const revision = logs.filter((l) => l.status === '보완 필요').length;
-    const totalToday = logs.length;
+    const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+    const totalToday = logs.filter(log=>log.rawDate===today && log.status!=='draft').length;
 
     return {
       totalToday,
@@ -215,10 +193,7 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
           <button
             type="button"
             onClick={() => {
-              setDbError(null);
-              fetchHqDrivingLogsFromDb().then((result) => {
-                if (!result.ok && result.error) setDbError(result.error);
-              });
+              void handleRefreshLogs();
             }}
             className="text-xs font-bold text-rose-700 bg-white border border-rose-200 px-3 py-1.5 rounded-xl hover:bg-rose-100 transition shrink-0 cursor-pointer"
           >

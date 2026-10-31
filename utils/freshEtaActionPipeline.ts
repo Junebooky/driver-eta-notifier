@@ -10,11 +10,11 @@
  */
 
 import { LocationPreset, NaviProvider, DriverProfile, ReportMode } from '@/types';
-import { RouteStopItem, DrivingLogData, DRIVING_LOG_INDEX_KEY, DRIVING_LOG_STORAGE_PREFIX, loadDrivingLogDraft, saveDrivingLogDraft, formatKoreanDate, formatIsoDate } from '@/utils/drivingLog';
+import { RouteStopItem, loadDrivingLogDraft, saveDrivingLogDraft, formatIsoDate } from '@/utils/drivingLog';
 import { generateVipReportText } from '@/utils/kakao';
 import { generateEnglishReportText, getReportVehicleNo, lookupApprovedAlias } from '@/utils/locationTranslation';
 import { launchNavigationApp } from '@/utils/navigation';
-import { submitDriverLogToHq } from '@/utils/drivingLogHqStorage';
+import { saveHqDrivingLogs,getHqDrivingLogs } from '@/utils/drivingLogHqStorage';
 
 export const OUTBOX_STORAGE_KEY = 'cockpit_driving_log_outbox_v1';
 
@@ -316,37 +316,7 @@ export async function syncNavigationRouteToDrivingLog(params: {
       defaultNavi: 'tmap',
     };
 
-    // 1. Find existing draft for this booking or date
-    const rawIndex = localStorage.getItem(DRIVING_LOG_INDEX_KEY);
-    const indexList: Array<{ reportId: string; date: string; bookingId?: string }> = rawIndex
-      ? JSON.parse(rawIndex)
-      : [];
-
-    let targetReportId: string | null = null;
-    if (bookingId) {
-      const match = indexList.find((item) => item.bookingId === bookingId);
-      if (match) targetReportId = match.reportId;
-    }
-    if (!targetReportId) {
-      const matchDate = indexList.find((item) => item.date === todayIso && !item.bookingId);
-      if (matchDate) targetReportId = matchDate.reportId;
-    }
-
-    let activeLog: DrivingLogData | null = null;
-    if (targetReportId) {
-      const stored = localStorage.getItem(`${DRIVING_LOG_STORAGE_PREFIX}${targetReportId}`);
-      if (stored) {
-        try {
-          activeLog = JSON.parse(stored);
-        } catch {
-          activeLog = null;
-        }
-      }
-    }
-
-    if (!activeLog) {
-      activeLog = loadDrivingLogDraft(defaultProfile, undefined, todayIso, bookingId);
-    }
+    const activeLog = loadDrivingLogDraft(defaultProfile, undefined, todayIso, bookingId);
 
     const stops = activeLog.stops || [];
 
@@ -408,7 +378,7 @@ export async function syncNavigationRouteToDrivingLog(params: {
         bookingId: activeLog.bookingId,
         driverId: activeLog.driverId,
         payload: {
-          id: activeLog.reportId.startsWith('report_') && activeLog.reportId.length === 43 ? activeLog.reportId.slice(7) : undefined,
+          id: activeLog.submissionId,
           bookingId: activeLog.bookingId,
           driverId: activeLog.driverId,
           driverName: activeLog.driverName,
@@ -440,13 +410,14 @@ export async function syncNavigationRouteToDrivingLog(params: {
     }
 
     // Register auto-sync listeners on online / visibilitychange
-    registerOutboxAutoSync();
+    registerOutboxAutoSync(activeLog.driverId);
 
     // 6. Asynchronous sync to Supabase /api/driving-logs (Non-blocking: Failure NEVER blocks navi)
     fetch('/api/driving-logs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        id: activeLog.submissionId,
         bookingId: activeLog.bookingId,
         driverId: activeLog.driverId,
         driverName: activeLog.driverName,
@@ -467,8 +438,9 @@ export async function syncNavigationRouteToDrivingLog(params: {
         if (res.ok) {
           const data = await res.json().catch(() => ({}));
           if (data?.ok && data?.log) {
+            const latest=loadDrivingLogDraft(defaultProfile,undefined,todayIso,bookingId);latest.submissionId=data.log.id;saveDrivingLogDraft(latest);
             // Also notify HQ storage snapshot so HQ view updates
-            submitDriverLogToHq(data.log);
+            saveHqDrivingLogs([data.log,...getHqDrivingLogs().filter(log=>log.id!==data.log.id)]);
             // On successful sync, purge from outbox queue
             markOutboxItemSynced(idempotencyKey);
           }
@@ -505,7 +477,7 @@ export function markOutboxItemSynced(id: string): void {
  * Flush all pending outbox entries to /api/driving-logs
  * Executed on app reconnect, page visibility change, or background worker
  */
-export async function flushNavigationOutboxQueue(): Promise<{
+async function flushNavigationOutboxQueueInternal(): Promise<{
   total: number;
   synced: number;
   failed: number;
@@ -528,6 +500,7 @@ export async function flushNavigationOutboxQueue(): Promise<{
     let failed = 0;
 
     for (const item of outboxList) {
+      if(activeOutboxDriverId && item.driverId!==activeOutboxDriverId){remaining.push(item);continue;}
       if (item.status === 'server_synced') {
         synced++;
         continue;
@@ -545,15 +518,15 @@ export async function flushNavigationOutboxQueue(): Promise<{
           if (data?.ok) {
             synced++;
             if (data.log) {
-              submitDriverLogToHq(data.log);
+              saveHqDrivingLogs([data.log,...getHqDrivingLogs().filter(log=>log.id!==data.log.id)]);
             }
             continue; // Successfully synced, removed from remaining
           }
         }
 
         if (res.status >= 400 && res.status < 500) {
-          // Client validation rejection, discard
           failed++;
+          remaining.push({...item,status:'server_sync_pending',retryCount:(item.retryCount || 0)+1,error:`HTTP ${res.status}: 로그인을 확인하거나 운행일지에서 보완해 주세요.`});
           continue;
         }
 
@@ -577,7 +550,11 @@ export async function flushNavigationOutboxQueue(): Promise<{
       }
     }
 
-    localStorage.setItem(OUTBOX_STORAGE_KEY, JSON.stringify(remaining));
+    const latest:NavigationOutboxItem[]=JSON.parse(localStorage.getItem(OUTBOX_STORAGE_KEY) || '[]');
+    const original=new Map(outboxList.map(item=>[item.id,JSON.stringify(item.payload)]));
+    const added=latest.filter(item=>!original.has(item.id)||original.get(item.id)!==JSON.stringify(item.payload));
+    const addedIds=new Set(added.map(item=>item.id));
+    localStorage.setItem(OUTBOX_STORAGE_KEY, JSON.stringify([...remaining.filter(item=>!addedIds.has(item.id)),...added]));
     return { total: outboxList.length, synced, failed };
   } catch (err) {
     console.warn('[FreshEtaActionPipeline] Error flushing outbox queue:', err);
@@ -585,8 +562,16 @@ export async function flushNavigationOutboxQueue(): Promise<{
   }
 }
 
+let activeOutboxDriverId:string|undefined;
+let flushingOutbox:ReturnType<typeof flushNavigationOutboxQueueInternal>|null=null;
+export function flushNavigationOutboxQueue(){
+  if(flushingOutbox)return flushingOutbox;
+  flushingOutbox=flushNavigationOutboxQueueInternal().finally(()=>{flushingOutbox=null;});
+  return flushingOutbox;
+}
 let hasRegisteredOutboxListeners = false;
-export function registerOutboxAutoSync(): void {
+export function registerOutboxAutoSync(driverId?:string): void {
+  if(driverId)activeOutboxDriverId=driverId;
   if (typeof window === 'undefined' || hasRegisteredOutboxListeners) return;
   hasRegisteredOutboxListeners = true;
 

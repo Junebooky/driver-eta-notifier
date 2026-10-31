@@ -1,6 +1,7 @@
 'use client';
+import { useReportingRefresh } from '@/hooks/useReportingRefresh';
 
-import React, { useState, useMemo, useEffect, useSyncExternalStore } from 'react';
+import React, { useState, useMemo, useSyncExternalStore } from 'react';
 import Image from 'next/image';
 import {
   Receipt,
@@ -38,7 +39,6 @@ import {
   fetchHqExpensesFromDb,
   saveHqExpenses,
   exportExpensesToCsv,
-  mergeServerHipassTollsIntoExpenses,
 } from '@/utils/expenseHqStorage';
 import { formatKRW } from '@/utils/expense';
 import { rotateImageDataUrl } from '@/utils/imageRotate';
@@ -57,33 +57,8 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
   bookings = [],
 }) => {
   const [isHipassModalOpen, setIsHipassModalOpen] = useState(false);
-  const [dbError, setDbError] = useState<string | null>(null);
+  const {error:dbError,refresh}=useReportingRefresh(fetchHqExpensesFromDb);
 
-  // Hydrate server-synced expenses & Hi-Pass tolls from Supabase DB
-  useEffect(() => {
-    let cancelled = false;
-    fetchHqExpensesFromDb().then((result) => {
-      if (!cancelled) {
-        if (!result.ok && result.error) {
-          setDbError(result.error);
-        } else {
-          setDbError(null);
-        }
-      }
-    });
-
-    fetch('/api/expenses/hipass-sync')
-      .then((r) => r.json())
-      .then((json) => {
-        if (!cancelled && json?.ok && Array.isArray(json.tolls) && json.tolls.length > 0) {
-          mergeServerHipassTollsIntoExpenses(json.tolls);
-        }
-      })
-      .catch(() => { });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
   // Live master expenses list via useSyncExternalStore (SSR and Hydration safe)
   const expenses = useSyncExternalStore(
     subscribeHqExpenses,
@@ -432,10 +407,7 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
           <button
             type="button"
             onClick={() => {
-              setDbError(null);
-              fetchHqExpensesFromDb().then((result) => {
-                if (!result.ok && result.error) setDbError(result.error);
-              });
+              void refresh();
             }}
             className="text-xs font-bold text-rose-700 bg-white border border-rose-200 px-3 py-1.5 rounded-xl hover:bg-rose-100 transition shrink-0 cursor-pointer"
           >

@@ -89,6 +89,8 @@ export function purgeLocalCaches() {
     localStorage.removeItem('cockpit_auth_token');
     localStorage.removeItem('cockpit_schedules_cache');
     localStorage.removeItem('cockpit_offline_actions');
+    localStorage.removeItem('cockpit_submitted_driving_logs_v1');
+    localStorage.removeItem('cockpit_hq_expenses_v2');
     sessionStorage.clear();
   } catch {
     // Ignore storage errors

@@ -2,6 +2,7 @@ import { Client } from 'pg';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
+import { verifyReportingFlow } from './reporting-flow.integration';
 
 async function main() {
   const connectionString = process.env.TEST_DATABASE_URL;
@@ -36,6 +37,8 @@ async function main() {
     await admin.query(readFileSync('supabase/migrations/20261030_atomic_dispatch_and_fleet_schema.sql','utf8'));
     await admin.query(readFileSync('supabase/migrations/20261031024614_cockpit_personal_auth.sql','utf8'));
     await admin.query(readFileSync('supabase/migrations/20261031024614_cockpit_personal_auth.sql','utf8'));
+    await admin.query(readFileSync('supabase/migrations/20261031033709_reporting_flow_integrity.sql','utf8'));
+    await admin.query(readFileSync('supabase/migrations/20261031033709_reporting_flow_integrity.sql','utf8'));
     await a.connect(); await b.connect();
     await Promise.all([a.query('SET ROLE service_role'),b.query('SET ROLE service_role')]);
     const vehicle = randomUUID(); const driver = randomUUID();
@@ -156,6 +159,7 @@ async function main() {
     await assert.rejects(admin.query('SELECT cockpit.is_active_auth_session($1,$2)',[authId,userId]),{code:'42501'});
     await admin.query('RESET ROLE');
     console.log('PASS immutable profile UUID and linked assets across vehicle assignments; public access denied');
+    await verifyReportingFlow(admin,a,b);
 
   } finally { await a.end().catch(()=>{}); await b.end().catch(()=>{}); await admin.end(); }
 }

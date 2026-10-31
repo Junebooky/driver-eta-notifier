@@ -597,7 +597,7 @@ export const INITIAL_HQ_DRIVING_LOGS: HqDrivingLog[] = [
   },
 ];
 
-let memoryDrivingLogs: HqDrivingLog[] = [...INITIAL_HQ_DRIVING_LOGS];
+let memoryDrivingLogs: HqDrivingLog[] = [];
 
 export const saveHqDrivingLogs = (logs: HqDrivingLog[]): void => {
   memoryDrivingLogs = logs;
@@ -617,131 +617,12 @@ export const saveHqDrivingLogs = (logs: HqDrivingLog[]): void => {
  * Get all HQ driving logs, merged with user-submitted driver logs and synced with driver expenses
  */
 export const getHqDrivingLogs = (): HqDrivingLog[] => {
-  if (typeof window === 'undefined') return memoryDrivingLogs;
-
-  try {
-    const raw = localStorage.getItem(HQ_DRIVING_LOGS_STORAGE_KEY);
-    let logs: HqDrivingLog[];
-    if (raw === null) {
-      logs = [...INITIAL_HQ_DRIVING_LOGS];
-    } else {
-      try {
-        const parsed = JSON.parse(raw);
-        logs = Array.isArray(parsed) ? parsed : [];
-      } catch {
-        logs = [];
-      }
-    }
-
-    // Connect and dynamically aggregate expenses from HQ expenses storage
-    const hqExpenses = getHqExpenses();
-    let isModified = false;
-
-    // 1. Sync expenses for any matching booking, driver, or vehicle in existing logs
-    logs = logs.map((log) => {
-      const driverExps = hqExpenses.filter((e) => {
-        if (log.bookingId && e.bookingId) {
-          return e.bookingId === log.bookingId;
-        }
-        if (log.bookingId && !e.bookingId) return false;
-        if (!log.bookingId && e.bookingId) return false;
-        return (
-          e.driverName === log.driverName ||
-          (Boolean(log.vehiclePlate) && Boolean(e.vehiclePlate) && e.vehiclePlate === log.vehiclePlate)
-        );
-      });
-
-      if (driverExps.length > 0) {
-        const totalAmount = driverExps.reduce((sum, e) => sum + e.amount, 0);
-        const count = driverExps.length;
-        if (log.expenseAmount !== totalAmount || log.expenseCount !== count) {
-          isModified = true;
-          return {
-            ...log,
-            expenseAmount: totalAmount,
-            expenseCount: count,
-          };
-        }
-      }
-      return log;
-    });
-
-    // 2. If uninitialized local storage (raw === null) and '윤태준' has submitted legacy expenses, populate initial row
-    if (raw === null) {
-      const yoonExpenses = hqExpenses.filter(
-        (e) => !e.bookingId && (e.driverName === '윤태준' || e.vehiclePlate === '116허 1514')
-      );
-      const hasYoonLog = logs.some((l) => !l.bookingId && l.driverName === '윤태준');
-
-      if (yoonExpenses.length > 0 && !hasYoonLog) {
-      const yoonTotal = yoonExpenses.reduce((sum, e) => sum + e.amount, 0);
-      const firstExp = yoonExpenses[0];
-
-      const yoonDrivingLog: HqDrivingLog = {
-        id: 'driver-sub-yoon',
-        no: 1,
-        submittedAt: firstExp.submittedAt || '10/24 10:15',
-        submittedDate: firstExp.submittedDate || '2024. 10. 24 (목)',
-        drivingDate: '10/24',
-        rawDate: firstExp.rawDate || '2024-10-24',
-        driverName: '윤태준',
-        customerName: '인터코스',
-        vehicleModel: '현대 스타리아 리무진',
-        vehiclePlate: '116허 1514',
-        clockIn: '06:40',
-        clockOut: '21:50',
-        totalDutyHours: '15시간 10분',
-        startKm: '154,725',
-        endKm: '154,861',
-        distanceKm: '136 km',
-        expenseAmount: yoonTotal,
-        expenseCount: yoonExpenses.length,
-        status: '검토 대기',
-        stops: [
-          { id: 'd-1', time: '07:00', place: '차고지' },
-          { id: 'd-2', time: '08:50', place: '메리어트 호텔' },
-          { id: 'd-3', time: '09:50', place: '판교 오피스' },
-          { id: 'd-4', time: '11:25', place: '메리어트 호텔' },
-          { id: 'd-5', time: '13:30', place: '판교 오피스' },
-          { id: 'd-6', time: '17:05', place: '강남 올리브영' },
-          { id: 'd-7', time: '21:30', place: '메리어트 호텔' },
-          { id: 'd-8', time: '21:45', place: '차고지' },
-        ],
-        notes: `윤태준 기사의 경비지출(${yoonTotal.toLocaleString()}원 · ${yoonExpenses.length}건)이 운행일지와 실시간 연동되었습니다.`,
-        reviewHistory: [
-          {
-            id: `h-yoon-init`,
-            time: firstExp.submittedAt || '10/24 10:15',
-            message: `윤태준 기사의 경비지출(${yoonTotal.toLocaleString()}원)이 운행일지에 연동되었습니다.`,
-            actor: '시스템',
-            actionType: 'submission',
-          },
-        ],
-        isDriverSubmitted: true,
-      };
-
-      logs = [yoonDrivingLog, ...logs].map((item, idx) => ({
-        ...item,
-        no: idx + 1,
-      }));
-      isModified = true;
-      }
-    }
-
-    if (isModified || !raw) {
-      localStorage.setItem(HQ_DRIVING_LOGS_STORAGE_KEY, JSON.stringify(logs));
-    }
-
-    memoryDrivingLogs = logs;
-    return logs;
-  } catch (err) {
-    console.error('Failed to parse and sync HQ driving logs from storage:', err);
-    return INITIAL_HQ_DRIVING_LOGS;
-  }
+  if(typeof window==='undefined')return memoryDrivingLogs;
+  try{const raw=localStorage.getItem(HQ_DRIVING_LOGS_STORAGE_KEY);const parsed=raw?JSON.parse(raw):[];return Array.isArray(parsed)?parsed:[];}catch{return [];}
 };
 
 let cachedLogsRaw = '';
-let cachedLogsSnapshot: HqDrivingLog[] = INITIAL_HQ_DRIVING_LOGS;
+let cachedLogsSnapshot: HqDrivingLog[] = [];
 
 export const subscribeHqDrivingLogs = (callback: () => void): (() => void) => {
   if (typeof window === 'undefined') return () => {};
@@ -758,19 +639,19 @@ export const subscribeHqDrivingLogs = (callback: () => void): (() => void) => {
 export const getHqDrivingLogsSnapshot = (): HqDrivingLog[] => {
   if (typeof window === 'undefined') return memoryDrivingLogs;
   try {
-    const raw = localStorage.getItem(HQ_DRIVING_LOGS_STORAGE_KEY);
-    if (raw && raw === cachedLogsRaw) return cachedLogsSnapshot;
+    const raw = localStorage.getItem(HQ_DRIVING_LOGS_STORAGE_KEY) || '';
+    if (raw === cachedLogsRaw) return cachedLogsSnapshot;
     const synced = getHqDrivingLogs();
     cachedLogsRaw = localStorage.getItem(HQ_DRIVING_LOGS_STORAGE_KEY) || '';
     cachedLogsSnapshot = synced;
     return cachedLogsSnapshot;
   } catch {
-    return INITIAL_HQ_DRIVING_LOGS;
+    return memoryDrivingLogs;
   }
 };
 
 export const getHqDrivingLogsServerSnapshot = (): HqDrivingLog[] => {
-  return INITIAL_HQ_DRIVING_LOGS;
+  return memoryDrivingLogs;
 };
 
 /**
@@ -1065,7 +946,7 @@ export interface SubmitDriverLogResult {
  */
 export async function fetchHqDrivingLogsFromDb(): Promise<FetchHqDrivingLogsResult> {
   try {
-    const res = await fetch('/api/driving-logs');
+    const res = await fetch('/api/driving-logs',{cache:'no-store',credentials:'include'});
     const data = await res.json().catch(() => ({}));
     if (res.ok && data.ok && Array.isArray(data.logs)) {
       saveHqDrivingLogs(data.logs);
@@ -1089,7 +970,7 @@ export async function submitDriverLogToHqDb(newLog: Partial<HqDrivingLog>): Prom
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok && data.ok && data.log) {
-      submitDriverLogToHq(data.log);
+      saveHqDrivingLogs([data.log,...getHqDrivingLogs().filter(log=>log.id!==data.log.id)]);
       return { ok: true, log: data.log };
     }
     return { ok: false, error: data.error || '운행일지를 서버에 저장하지 못했습니다.' };

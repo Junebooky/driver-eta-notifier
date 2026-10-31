@@ -42,6 +42,8 @@ import {
   fetchFreshEtaRoute,
   executeFreshEtaAction,
   syncNavigationRouteToDrivingLog,
+  registerOutboxAutoSync,
+  flushNavigationOutboxQueue,
   FreshEtaRouteResult,
 } from '@/utils/freshEtaActionPipeline';
 
@@ -265,6 +267,8 @@ export default function Home() {
   }, []);
 
   // Sync isolated presets whenever vehicle changes or profile loads
+  useEffect(()=>{if(profile.driverId){registerOutboxAutoSync(profile.driverId);void flushNavigationOutboxQueue();}},[profile.driverId]);
+
   useEffect(() => {
     if (isLoaded) {
       fetchPresetsForVehicle(currentVehicleNo);

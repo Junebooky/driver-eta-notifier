@@ -1,8 +1,5 @@
 import {
   RouteStopItem,
-  DrivingLogData,
-  DRIVING_LOG_INDEX_KEY,
-  DRIVING_LOG_STORAGE_PREFIX,
   loadDrivingLogDraft,
   saveDrivingLogDraft,
   formatIsoDate,
@@ -43,36 +40,7 @@ export function addNavigationRouteToDrivingLog(params: {
     defaultNavi: 'tmap',
   };
 
-  const rawIndex = localStorage.getItem(DRIVING_LOG_INDEX_KEY);
-  const indexList: Array<{ reportId: string; date: string; bookingId?: string }> = rawIndex
-    ? JSON.parse(rawIndex)
-    : [];
-
-  let targetReportId: string | null = null;
-  if (params.bookingId) {
-    const match = indexList.find((item) => item.bookingId === params.bookingId);
-    if (match) targetReportId = match.reportId;
-  }
-  if (!targetReportId) {
-    const matchDate = indexList.find((item) => item.date === todayIso && !item.bookingId);
-    if (matchDate) targetReportId = matchDate.reportId;
-  }
-
-  let activeLog: DrivingLogData | null = null;
-  if (targetReportId) {
-    const stored = localStorage.getItem(`${DRIVING_LOG_STORAGE_PREFIX}${targetReportId}`);
-    if (stored) {
-      try {
-        activeLog = JSON.parse(stored);
-      } catch {
-        activeLog = null;
-      }
-    }
-  }
-
-  if (!activeLog) {
-    activeLog = loadDrivingLogDraft(defaultProfile, undefined, todayIso, params.bookingId);
-  }
+  const activeLog = loadDrivingLogDraft(defaultProfile, undefined, todayIso, params.bookingId);
 
   const stops = activeLog.stops || [];
   const destName = params.destinationName.trim().toLowerCase();
