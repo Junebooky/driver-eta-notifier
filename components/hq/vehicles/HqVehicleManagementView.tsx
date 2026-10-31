@@ -41,6 +41,7 @@ import {
 } from '@/utils/dispatchConflictDetector';
 import { HqBooking } from '@/types/hq';
 import type { FleetAvailabilityResult } from '@/utils/availabilityEngine';
+import { VEHICLE_STATUS_LABELS } from '@/utils/fleetVehicleStatus';
 import { haptics } from '@/utils/haptics';
 
 export interface HqVehicleManagementViewProps {
@@ -152,7 +153,6 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
     const controller = new AbortController();
     activeAbortRef.current = controller;
 
-    setAvailabilityState('loading');
     setAvailabilityError(null);
 
     const todayIso = getKstTodayDateStr();
@@ -186,9 +186,16 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
   useEffect(() => {
     fetchAvailability();
     const refresh=()=>{if(document.visibilityState==='visible')void fetchAvailability();};
-    const timer=setInterval(refresh,8000);window.addEventListener('focus',refresh);
+    const timer=setInterval(refresh,8000);
+    window.addEventListener('focus',refresh);
+    window.addEventListener('online',refresh);
+    window.addEventListener('vip_hq_schedules_updated',refresh);
+    document.addEventListener('visibilitychange',refresh);
     return () => {
       clearInterval(timer);window.removeEventListener('focus',refresh);
+      window.removeEventListener('online',refresh);
+      window.removeEventListener('vip_hq_schedules_updated',refresh);
+      document.removeEventListener('visibilitychange',refresh);
       if (activeAbortRef.current) activeAbortRef.current.abort();
     };
   }, [fetchAvailability]);
@@ -209,7 +216,9 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
   const enrichedVehicles = useMemo(() => {
     return VIP_REAL_VEHICLES.map((v) => {
       const uiCategory = mapVehicleToUiCategory(v);
-      const effectiveStatus = statusOverrides[v.id] || '확인 필요';
+      const live = availabilityState === 'success' ? fleetResult?.vehicles.find(row => row.uuid === v.uuid) : undefined;
+      const effectiveStatus = live ? VEHICLE_STATUS_LABELS[live.currentStatus]
+        : availabilityState === 'loading' ? '확인 중...' : '확인 불가';
       // 연식과 색상은 확인된 값만 표시합니다.
       const year = v.year || '미확인';
       const color =
@@ -226,7 +235,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
         fuelDisplay: fuel,
       };
     });
-  }, [statusOverrides, serverColors]);
+  }, [availabilityState, fleetResult, serverColors]);
 
   // Filtered vehicles for Center Column
   const filteredVehicles = useMemo(() => {
@@ -277,7 +286,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
   // Open Edit Modal
   const handleOpenEdit = () => {
     if (!selectedVehicle) return;
-    setEditStatus(selectedVehicle.effectiveStatus);
+    setEditStatus(statusOverrides[selectedVehicle.id] || '대기 중');
     setEditMemo(memos[selectedVehicle.id] || '');
     setEditColor(selectedVehicle.color === '미확인' ? '' : selectedVehicle.color);
     setSaveEditError(null);
@@ -340,7 +349,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
       }
 
       // 2. Server/local maintenance override or data
-      const isMaint = statusOverrides[v.id] === '정비 중';
+      const isMaint = fleetResult?.vehicles.find(row => row.uuid === v.uuid)?.currentStatus === 'maintenance';
       if (isMaint) {
         return { status: '정비 중', detail: '차량 정비/점검' };
       }
@@ -361,6 +370,10 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
           return { status: '정비 중', detail: '정비 중' };
         }
 
+        if (targetDateIso === getKstTodayDateStr() && detail.currentStatus === 'in_service') {
+          return { status: '운행 중', detail: '현재 운행 일정·기사 상태 반영' };
+        }
+
         // Check if this vehicle has an active schedule overlapping targetDateIso specifically
         if (detail.activeSchedules && detail.activeSchedules.length > 0) {
           const daySchedule = detail.activeSchedules.find((s) => {
@@ -368,14 +381,8 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
           });
 
           if (daySchedule) {
-            const isToday = targetDateIso === getKstTodayDateStr();
-            const inTransit =
-              isToday &&
-              (daySchedule.operationStatus === 'in_transit' ||
-                daySchedule.operationStatus === 'boarded' ||
-                statusOverrides[v.id] === '운행 중');
             return {
-              status: !daySchedule.endTime ? '미확인' : inTransit ? '운행 중' : '예약 있음',
+              status: !daySchedule.endTime ? '미확인' : '예약 있음',
               detail: `${daySchedule.customerName || '고객사'} (${daySchedule.pickupTime})`,
             };
           }
@@ -387,7 +394,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
       // Default fallback: Fail-closed
       return { status: '확인 불가', detail: '가용성 데이터 부재' };
     },
-    [availabilityState, availabilityError, statusOverrides, bookings, fleetResult]
+    [availabilityState, availabilityError, fleetResult]
   );
 
   // 5 Days Strip computation starting from today with real fail-closed statuses
@@ -610,6 +617,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
           </div>
 
           {/* Cards Stack */}
+          <p className="px-1 text-[11px] text-slate-500">일정·기사 상태 자동 반영 · 8초 갱신</p>
           <div className="space-y-2.5 max-h-[calc(100vh-210px)] overflow-y-auto pr-1">
             {filteredVehicles.map((vehicle) => {
               const isSelected = vehicle.id === selectedVehicle?.id;

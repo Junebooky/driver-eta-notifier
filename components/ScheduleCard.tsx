@@ -25,9 +25,9 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
   onEdit,
   onAcknowledge,
 }) => {
-  const [currentOpStatus, setCurrentOpStatus] = React.useState<string>(
-    item.operation_status || 'ready'
-  );
+  const [operationOverride, setOperationOverride] = React.useState<{ id: string; status: string; sourceStatus: typeof item.operation_status } | null>(null);
+  const currentOpStatus = operationOverride?.id === item.id && operationOverride.sourceStatus === item.operation_status
+    ? operationOverride.status : item.operation_status || 'ready';
   const [isUpdatingOp, setIsUpdatingOp] = React.useState(false);
 
   const handleUpdateOpStatus = async (nextStatus: 'ready' | 'arrived_pickup' | 'boarded' | 'in_transit' | 'completed') => {
@@ -45,7 +45,8 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
       });
       const data = await res.json();
       if (data.ok) {
-        setCurrentOpStatus(nextStatus);
+        setOperationOverride({ id: item.id, status: nextStatus, sourceStatus: item.operation_status });
+        window.dispatchEvent(new CustomEvent('vip_hq_schedules_updated'));
         haptics.success();
       }
     } catch (e) {

@@ -27,7 +27,7 @@ import { FieldTipModal } from '@/components/FieldTipModal';
 import { DriverFieldKnowledgeModal } from '@/components/knowledge/DriverFieldKnowledgeModal';
 import { getFieldTipsCount } from '@/utils/fieldTipData';
 import { ScheduleTab } from '@/components/ScheduleTab';
-import { Navigation, Calendar } from 'lucide-react';
+import { DriverBottomNav, type DriverTab } from '@/components/DriverBottomNav';
 import { ScheduleItem, scheduleToPresets } from '@/data/ferrariSchedules';
 import { PredictionResult } from '@/app/api/route/prediction/route';
 import { LocationPreset, ReportMode, RouteEstimate, HomeLocation, GasStation, FlightType } from '@/types';
@@ -120,7 +120,7 @@ export default function Home() {
   const [isRoadviewModalOpen, setIsRoadviewModalOpen] = useState(false);
 
   // Driving Log (운행일지) & Expense (경비지출) Modals State
-  const [isDrivingLogOpen, setIsDrivingLogOpen] = useState(false);
+  const [hasOpenedDrivingLog, setHasOpenedDrivingLog] = useState(false);
   const [isExpenseOpen, setIsExpenseOpen] = useState(false);
 
   // Field Tips (현장 팁) Modal State
@@ -681,7 +681,13 @@ export default function Home() {
   const [activeBookingId, setActiveBookingId] = useState<string | undefined>(undefined);
   const isRouteRestoredRef = useRef(false);
 
-  const [activeTab, setActiveTab] = useState<'drive' | 'schedule'>('drive');
+  const [activeTab, setActiveTab] = useState<DriverTab>('drive');
+  const selectDriverTab = (tab: DriverTab) => {
+    haptics.lightTap();
+    if (tab === 'log') setHasOpenedDrivingLog(true);
+    setActiveTab(tab);
+    window.scrollTo({ top: 0 });
+  };
   const [reportMode, setReportMode] = useState<ReportMode>('DEPARTURE');
   const [activeLanguage, setActiveLanguage] = useState<'ko' | 'en'>('ko');
   const [activeDisplayedReportText, setActiveDisplayedReportText] = useState<string>('');
@@ -1381,8 +1387,8 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-dvh bg-[#F8FAFC] text-slate-800 flex flex-col items-center justify-between overflow-x-hidden selection:bg-[#1E60F3]/20">
-      <div className="w-full max-w-md mx-auto min-h-dvh flex flex-col justify-between bg-white shadow-xl relative border-x border-slate-200/60 overflow-x-hidden">
+    <main className="driver-app min-h-dvh bg-[#F8FAFC] text-slate-800 flex flex-col items-center justify-between overflow-x-hidden selection:bg-[#1E60F3]/20">
+      <div className="w-full max-w-md mx-auto min-h-dvh pb-[calc(88px+env(safe-area-inset-bottom))] flex flex-col justify-between bg-white shadow-xl relative border-x border-slate-200/60 overflow-x-hidden">
         {/* Top Header with Safe Area Inset & Navi Switcher */}
         <Header
           profile={profile}
@@ -1420,63 +1426,6 @@ export default function Home() {
             </div>
           </div>
         )}
-
-        {/* Top Segmented Navigation: [ 운행 ] | [ 스케줄 ] (Matches ReportTemplateSelector tab size) */}
-        <div className="px-3.5 pt-2.5 pb-1 bg-white shrink-0">
-          <div className="w-full bg-slate-100/90 p-1 rounded-full relative flex items-center select-none shadow-inner">
-            {/* Sliding Indicator Pill */}
-            <div
-              className={`w-[calc(50%-4px)] h-[calc(100%-8px)] absolute top-1 left-1 rounded-full bg-[#1E60F3] shadow-[0_4px_14px_rgba(30,96,243,0.35)] transition-transform duration-300 ease-out pointer-events-none transform ${activeTab === 'drive' ? 'translate-x-0' : 'translate-x-full'
-                }`}
-            />
-
-            {/* Drive Tab Button */}
-            <button
-              type="button"
-              onClick={() => {
-                haptics.lightTap();
-                setActiveTab('drive');
-              }}
-              className="flex-1 py-2.5 rounded-full z-10 flex items-center justify-center space-x-2 cursor-pointer transition-colors duration-300"
-            >
-              <div
-                className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors duration-300 ${activeTab === 'drive' ? 'bg-white/20 text-white' : 'text-slate-400'
-                  }`}
-              >
-                <Navigation className={`w-3 h-3 ${activeTab === 'drive' ? 'text-white fill-white' : 'text-slate-400'}`} />
-              </div>
-              <span
-                className={`text-base tracking-tight transition-colors duration-300 ${activeTab === 'drive' ? 'text-white font-black' : 'text-slate-500 font-semibold'
-                  }`}
-              >
-                운행
-              </span>
-            </button>
-
-            {/* Schedule Tab Button */}
-            <button
-              type="button"
-              onClick={() => {
-                haptics.lightTap();
-                setActiveTab('schedule');
-              }}
-              className="flex-1 py-2.5 rounded-full z-10 flex items-center justify-center space-x-2 cursor-pointer transition-colors duration-300 relative"
-            >
-              <div
-                className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors duration-300 ${activeTab === 'schedule' ? 'bg-white/20 text-white' : 'text-slate-400'
-                  }`}
-              >
-                <Calendar className={`w-3 h-3 ${activeTab === 'schedule' ? 'text-white' : 'text-slate-400'}`} />
-              </div>
-              <span
-                className={`text-base tracking-tight transition-colors duration-300 ${activeTab === 'schedule' ? 'text-white font-black' : 'text-slate-500 font-semibold'
-                  }`}
-              >
-                스케줄
-              </span>
-            </button>
-          </div>
-        </div>
 
         {/* Tab View Switch: [운행 대시보드] vs [배차 스케줄] */}
         {activeTab === 'drive' ? (
@@ -1521,7 +1470,7 @@ export default function Home() {
             {/* 2. Standalone 7-Button Quick Action Bar (4 Top / 3 Centered) */}
             <QuickActionBar
               isVipEnabled={isVipAssigned}
-              onOpenDrivingLogModal={() => setIsDrivingLogOpen(true)}
+              onOpenDrivingLogModal={() => selectDriverTab('log')}
               onOpenExpenseModal={() => setIsExpenseOpen(true)}
               onOpenInspectionModal={() => setIsInspectionModalOpen(true)}
               onOpenPresetModal={handleOpenAddModal}
@@ -1597,7 +1546,7 @@ export default function Home() {
               }}
             />
           </div>
-        ) : (
+        ) : activeTab === 'schedule' ? (
           <div className="flex-1 p-3.5 animate-fade-in">
             <ScheduleTab
               profile={profile}
@@ -1614,7 +1563,15 @@ export default function Home() {
               }}
             />
           </div>
-        )}
+        ) : null}
+        {/* Keep the same editor mounted so switching tabs preserves unsaved input. */}
+        {hasOpenedDrivingLog && <div hidden={activeTab !== 'log'} className="flex-1">
+          <DrivingLogModal presentation="page" isOpen={true}
+            onClose={() => selectDriverTab('drive')} driverProfile={profile} bookingId={activeBookingId}
+            onOpenLocationSearch={() => { setIsSelectingForSchedule(true); setIsLocationSearchOpen(true); }}
+            selectedLocationFromMap={selectedLocationForSchedule} />
+        </div>}
+        <DriverBottomNav activeTab={activeTab} onSelect={selectDriverTab} />
       </div>
 
 
@@ -1783,19 +1740,6 @@ export default function Home() {
         currentDestination={destination}
         presets={presets}
         homeLocation={profile.homeLocation}
-      />
-
-      {/* Driving Log (운행일지) Full-Screen Mobile Modal */}
-      <DrivingLogModal
-        isOpen={isDrivingLogOpen}
-        onClose={() => setIsDrivingLogOpen(false)}
-        driverProfile={profile}
-        bookingId={activeBookingId}
-        onOpenLocationSearch={() => {
-          setIsSelectingForSchedule(true);
-          setIsLocationSearchOpen(true);
-        }}
-        selectedLocationFromMap={selectedLocationForSchedule}
       />
 
       {/* Expense (경비지출) Modal Shell */}

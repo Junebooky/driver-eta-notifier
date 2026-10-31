@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+.driver-app :is(button, input, textarea, select) {
+  scroll-margin-block-end: calc(96px + env(safe-area-inset-bottom));
+}
+
 @layer utilities {
   @keyframes slideUp {
     from {

@@ -1,3 +1,4 @@
+import { resolveVehicleCurrentStatus, compareDispatchVehicles } from './fleetVehicleStatus';
 import { readFleetOperations, FleetOperation } from '@/lib/fleet/operationsStore';
 import { scheduleOverlapsInterval } from '@/utils/dispatchInterval';
 /**
@@ -24,6 +25,7 @@ import {
   normalizeTimeHHmm,
   timeHHmmToMinutes,
   shiftIsoDate,
+  getKstTodayDateStr,
   parseKstDateTimeToMs,
   isDateTimeOverlapping,
   isDateTimeIntervalOverlapping,
@@ -125,7 +127,7 @@ export interface FleetAvailabilityResult {
 /** Real DB failures propagate. Fixture injection is explicit and never changes production behavior. */
 export async function checkFleetAvailability(
   query: AvailabilityQuery,
-  options?: { injectedSchedules?: any[]; injectedDrivers?: any[]; injectedOperations?: FleetOperation[] }
+  options?: { injectedSchedules?: any[]; injectedDrivers?: any[]; injectedOperations?: FleetOperation[]; nowMs?: number }
 ): Promise<FleetAvailabilityResult> {
   const startDate = normalizeDateToIso(query.startDate);
   const endDate = normalizeDateToIso(query.endDate || query.startDate);
@@ -143,7 +145,7 @@ export async function checkFleetAvailability(
     schedules = [];
     for (let offset = 0; ; offset += 1000) {
       const { data, error } = await supabaseAdmin.from('schedules').select('*')
-        .lte('date', shiftIsoDate(endDate, 1)).order('id').range(offset, offset + 999);
+        .lte('date', shiftIsoDate(endDate > getKstTodayDateStr() ? endDate : getKstTodayDateStr(), 1)).order('id').range(offset, offset + 999);
       if (error || !data) throw new Error('가용성 DB 스케줄을 조회할 수 없습니다.');
       schedules.push(...data);
       if (data.length < 1000) break;
@@ -151,11 +153,12 @@ export async function checkFleetAvailability(
     }
   }
   const operations = options?.injectedOperations ?? (options?.injectedSchedules !== undefined ? [] : await readFleetOperations());
-  const activeSchedules = schedules.filter(s => {
-    if (s.id === query.excludeScheduleId || s.status === 'completed' || s.status === 'cancelled') return false;
+  const publishedSchedules = schedules.filter(s => {
+    if (s.status === 'cancelled') return false;
     const status = s.dispatch_status || s.schedule_meta?.dispatchStatus || (['draft','unassigned'].includes(s.status) ? s.status : 'published');
     return status === 'published' && (!s.org_id || s.org_id === 'vip_limousine_korea');
   });
+  const activeSchedules = publishedSchedules.filter(s => s.id !== query.excludeScheduleId && s.status !== 'completed' && s.operation_status !== 'completed');
   const summary = (s: any): VehicleScheduleSummary => ({
     scheduleId: s.id, startDate: normalizeDateToIso(s.date), pickupTime: normalizeTimeHHmm(s.pickup_time),
     endDate: normalizeDateToIso(s.end_date || s.date), endTime: normalizeTimeHHmm(s.end_time) || undefined,
@@ -163,21 +166,21 @@ export async function checkFleetAvailability(
     route: `${s.origin || ''} → ${s.destination || ''}`, operationStatus: s.operation_status,
   });
   const overlaps = (s: any) => scheduleOverlapsInterval(summary(s), query, DEFAULT_TURNAROUND_BUFFER_MINUTES);
-  const now = Date.now();
+  const now = options?.nowMs ?? Date.now();
   const vehicleItems: AvailableVehicleItem[] = VIP_REAL_VEHICLES.map(v => {
     const operation = operations.find(o => o.vehicle_id === v.uuid);
     const vRows = activeSchedules.filter(s => (v.uuid && (s.vehicle_id || s.schedule_meta?.vehicleId) === v.uuid)
       || cleanVehicleIdentity(s.vehicle_plate || s.schedule_meta?.vehiclePlate || s.vehicle_no) === cleanVehicleIdentity(v.plate));
     const conflicting = vRows.find(overlaps);
-    const isDriving = vRows.some(s => ['in_transit','boarded'].includes(s.operation_status)
-      && parseKstDateTimeToMs(s.date,s.pickup_time) <= now
-      && (!s.end_time || parseKstDateTimeToMs(s.end_date || s.date,s.end_time) > now));
+    const operationRows = publishedSchedules.filter(s => (v.uuid && (s.vehicle_id || s.schedule_meta?.vehicleId) === v.uuid)
+      || cleanVehicleIdentity(s.vehicle_plate || s.schedule_meta?.vehiclePlate || s.vehicle_no) === cleanVehicleIdentity(v.plate));
+    const currentStatus = resolveVehicleCurrentStatus(operationRows, operation, now);
     const maintenance = operation?.status === '정비 중';
     return {
       id: v.id, uuid: v.uuid, plate: v.plate, model: v.model,
       category: v.category as AvailableVehicleItem['category'], uiCategory: mapVehicleToUiCategory(v), capacity: v.capacity,
       isAvailable: !maintenance && !conflicting,
-      currentStatus: maintenance ? 'maintenance' : isDriving || operation?.status === '운행 중' ? 'in_service' : operation?.status === '대기 중' ? 'available' : 'unknown',
+      currentStatus,
       requestedIntervalStatus: maintenance ? 'maintenance' : conflicting ? conflicting.end_time ? 'booked' : 'unconfirmed_time' : 'available',
       unavailabilityReason: maintenance ? '차량 정비 중' : conflicting ? conflicting.end_time ? '기존 배차와 충돌' : '기존 배차 종료시간 미확정 (관리자 확인 필요)' : undefined,
       activeSchedules: vRows.map(summary), chargingSpecs: v.chargingSpecs,
@@ -265,7 +268,7 @@ export async function checkFleetAvailability(
     inServiceCount,
     vehicleClasses,
     uiCategories,
-    vehicles: vehicleItems,
+    vehicles: vehicleItems.sort(compareDispatchVehicles),
     drivers: driverItems,
   };
 }

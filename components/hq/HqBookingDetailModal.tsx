@@ -17,6 +17,7 @@ import {
   Image as ImageIcon,
 } from 'lucide-react';
 import { HqBooking } from '@/types/hq';
+import { VEHICLE_STATUS_LABELS } from '@/utils/fleetVehicleStatus';
 import { useFleetAvailability } from '@/hooks/useFleetAvailability';
 import { validateDispatchInterval } from '@/utils/dispatchInterval';
 import { createRetryableJsonMutation } from '@/utils/retryableJsonMutation';
@@ -674,7 +675,7 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                       <option value="">-- 차량 미배정 --</option>
                       {fleet.data?.vehicles.map((v) => (
                         <option key={v.id} value={v.plate} disabled={!v.isAvailable}>
-                          {v.plate} · {stripManufacturerName(v.model)}
+                          {v.plate} · {stripManufacturerName(v.model)} · {VEHICLE_STATUS_LABELS[v.currentStatus]}
                         </option>
                       ))}
                     </select>

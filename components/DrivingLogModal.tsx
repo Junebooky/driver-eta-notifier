@@ -43,6 +43,7 @@ import { submitDriverLogToHqDb } from '@/utils/drivingLogHqStorage';
 import { HqDrivingLog } from '@/types/drivingLogHq';
 
 interface DrivingLogModalProps {
+  presentation?: 'modal' | 'page';
   isOpen: boolean;
   onClose: () => void;
   driverProfile: DriverProfile;
@@ -52,12 +53,13 @@ interface DrivingLogModalProps {
 }
 
 const DrivingLogModalContent: React.FC<{
+  presentation: 'modal' | 'page';
   onClose: () => void;
   driverProfile: DriverProfile;
   bookingId?: string;
   onOpenLocationSearch?: () => void;
   selectedLocationFromMap?: { name: string; address?: string } | null;
-}> = ({ onClose, driverProfile, bookingId, onOpenLocationSearch, selectedLocationFromMap }) => {
+}> = ({ presentation, onClose, driverProfile, bookingId, onOpenLocationSearch, selectedLocationFromMap }) => {
   const scrollContainerRef = useRef<HTMLElement>(null);
 
   // Master driving log state initialized purely (booking-aware)
@@ -315,7 +317,7 @@ const DrivingLogModalContent: React.FC<{
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in select-none overscroll-contain"
+      className={presentation === 'page' ? "w-full select-none" : "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in select-none overscroll-contain"}
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           haptics.lightTap();
@@ -324,7 +326,7 @@ const DrivingLogModalContent: React.FC<{
       }}
     >
       <div
-        className="w-full max-w-lg bg-[#F8FAFC] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[92dvh] h-[92dvh] sm:h-auto sm:max-h-[90vh] animate-in slide-in-from-bottom-6 sm:animate-scale-up duration-300 relative"
+        className={presentation === 'page' ? "relative flex min-h-[70dvh] w-full flex-col bg-[#F8FAFC]" : "w-full max-w-lg bg-[#F8FAFC] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[92dvh] h-[92dvh] sm:h-auto sm:max-h-[90vh] animate-in slide-in-from-bottom-6 sm:animate-scale-up duration-300 relative"}
         onClick={(e) => e.stopPropagation()}
       >
         {/* 1. Modal Header */}
@@ -1059,6 +1061,7 @@ const DrivingLogModalContent: React.FC<{
 };
 
 export const DrivingLogModal: React.FC<DrivingLogModalProps> = ({
+  presentation = 'modal',
   isOpen,
   onClose,
   driverProfile,
@@ -1068,19 +1071,20 @@ export const DrivingLogModal: React.FC<DrivingLogModalProps> = ({
 }) => {
   // Lock body scroll when modal is open
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || presentation === 'page') return;
     const origOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = origOverflow;
     };
-  }, [isOpen]);
+  }, [isOpen, presentation]);
 
   if (!isOpen) return null;
 
   return (
     <DrivingLogModalContent
-      key={`${driverProfile.vehicleNo || 'default'}-${bookingId || 'none'}-${isOpen}`}
+      presentation={presentation}
+      key={`${driverProfile.driverId || 'default'}-${bookingId || 'none'}-${isOpen}`}
       onClose={onClose}
       driverProfile={driverProfile}
       bookingId={bookingId}

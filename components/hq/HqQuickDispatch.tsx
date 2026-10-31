@@ -62,6 +62,7 @@ import {
 } from '@/utils/dispatchConflictDetector';
 import { createRetryableJsonMutation, quickDispatchIntent } from '@/utils/retryableJsonMutation';
 import { ScheduleItem } from '@/data/ferrariSchedules';
+import { VEHICLE_STATUS_LABELS } from '@/utils/fleetVehicleStatus';
 import { useFleetAvailability } from '@/hooks/useFleetAvailability';
 import { validateDispatchInterval } from '@/utils/dispatchInterval';
 
@@ -881,7 +882,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                 <label className="text-xs font-bold text-slate-700">{index + 1}번 차량
                   <select aria-label={`${index + 1}번 차량 번호판`} value={allocation.selectedVehiclePlate} onChange={e => setAllocations(prev => prev.map(a => a.id === allocation.id ? { ...a, selectedVehiclePlate: e.target.value } : a))} className="mt-1 w-full h-11 rounded-lg border border-slate-200 px-2" disabled={!fleet.data}>
                     <option value="">실차 선택</option>
-                    {fleet.data?.vehicles.map(v => <option key={v.uuid} value={v.plate} disabled={!v.isAvailable}>{v.model} · {v.plate}{v.isAvailable ? '' : ' (예약 불가)'}</option>)}
+                    {fleet.data?.vehicles.map(v => <option key={v.uuid} value={v.plate} disabled={!v.isAvailable}>{v.model} · {v.plate} · {VEHICLE_STATUS_LABELS[v.currentStatus]}{v.isAvailable ? '' : ' (예약 불가)'}</option>)}
                   </select>
                 </label>
                 <label className="text-xs font-bold text-slate-700">{index + 1}번 담당 기사

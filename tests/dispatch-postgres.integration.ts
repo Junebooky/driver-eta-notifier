@@ -27,7 +27,7 @@ async function main() {
       date date NOT NULL, pickup_time time NOT NULL, end_date date, end_time time,
       time_display text NOT NULL DEFAULT '', origin text NOT NULL DEFAULT '', destination text NOT NULL DEFAULT '',
       passenger_name text, passenger_note text, driver_name text, status text DEFAULT 'scheduled',
-      operation_status text, schedule_meta jsonb, updated_at timestamptz DEFAULT now(),
+      operation_status text, operation_updated_at timestamptz, operation_history jsonb, schedule_meta jsonb, updated_at timestamptz DEFAULT now(),
       created_at timestamptz DEFAULT now(), retained_legacy_column text DEFAULT 'preserved'
     );
     INSERT INTO cockpit.schedules(id,vehicle_no,date,pickup_time,end_date,end_time,passenger_name)
