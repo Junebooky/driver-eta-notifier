@@ -390,7 +390,8 @@ const DrivingLogModalContent: React.FC<{
         </div>
 
         {/* Main Scrollable Content */}
-        <main
+        <section
+          aria-label="운행일지 작성"
           ref={scrollContainerRef}
           className="flex-1 overflow-y-auto px-4 py-4 space-y-4 w-full pb-4"
         >
@@ -774,7 +775,7 @@ const DrivingLogModalContent: React.FC<{
             </span>
           </div>
         </section>
-      </main>
+      </section>
 
         {/* 8. Bottom Action Buttons inside Modal Card */}
         <div className="p-3.5 bg-white/95 backdrop-blur-md border-t border-slate-100 shrink-0">
