@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { NextRequest } from 'next/server';
 import { supabaseAdmin } from '../lib/supabase/server';
-import { parseAndVerifyToken, signCockpitSession } from '../lib/auth/serverAuth';
+import { parseAndVerifyToken, signCockpitSession, verifyServerAuth } from '../lib/auth/serverAuth';
 import { POST as updateProfile } from '../app/api/driver/route';
 import { GET as readHqDriver } from '../app/api/hq/drivers/[id]/route';
 const id='a0000000-0000-4000-8000-000000000001';
@@ -15,7 +15,7 @@ test('personal authentication binds provider identity, active session and immuta
   let meta:Record<string,unknown>={org:'vip_limousine_korea',cockpit_role:'driver',driver_id:id};
   let active=true,failWrite=false; let writes=0;
   const row={id,driver_name:'본인',vehicle_no:'8호차',car_number:'123가4567',driver_meta:{status:'active'}};
-  supabaseAdmin.auth.getUser=(async()=>({data:{user:{id:userId,aud:'authenticated',created_at:'2026-01-01T00:00:00Z',app_metadata:meta,user_metadata:{cockpit_role:'hq_admin',driver_id:'spoofed'}}},error:null})) as typeof getUser;
+  supabaseAdmin.auth.getUser=(async()=>({data:{user:{id:userId,aud:'authenticated',created_at:'2026-01-01T00:00:00Z',app_metadata:meta,user_metadata:{cockpit_role:'hq_admin',driver_id:'spoofed',cockpit_position:'representative',isRepresentative:true}}},error:null})) as typeof getUser;
   supabaseAdmin.from=((table:string)=>{
     assert.equal(table,'drivers');
     const q={select:()=>q,eq:(key:string,value:string)=>{assert.equal(key,'id');assert.equal(value,id);return q;},maybeSingle:async()=>({data:row,error:null})};return q;
@@ -41,6 +41,13 @@ test('personal authentication binds provider identity, active session and immuta
     assert.equal((await updateProfile(req({driverId:id,driverName:'새 성함',presetOrder:['home','airport']}))).status,200);
     failWrite=true;assert.equal((await updateProfile(req({driverName:'새 성함',presetOrder:['home','airport']}))).status,503);
     assert.equal(writes,2);
+    meta={org:'vip_limousine_korea',cockpit_role:'hq_admin'};
+    assert.equal((await parseAndVerifyToken(jwt()))?.isRepresentative,false,'editable user metadata cannot grant representative access');
+    assert.equal((await verifyServerAuth(req({}),'driver')).statusCode,403,'HQ cannot pass a driver-only requirement');
+    meta={...meta,cockpit_position:'representative'};
+    assert.equal((await parseAndVerifyToken(jwt()))?.isRepresentative,true);
+    meta={...meta,cockpit_role:'driver',driver_id:id};
+    assert.equal((await parseAndVerifyToken(jwt()))?.isRepresentative,false,'representative marker alone cannot elevate a driver');
     meta={org:'vip_limousine_korea',cockpit_role:'hq_admin'};
     assert.equal((await updateProfile(req({vehicle_no:'8호차',driver_name:'덮어쓰기'}))).status,400);
     // Production rejects every legacy signed shared-credential session, even with a valid signature.

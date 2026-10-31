@@ -269,6 +269,8 @@ export function mapHydratedRowToScheduleItem(rawRow: Record<string, any>): Sched
     id: row.id,
     vehicle_no: row.vehicle_no,
     date: row.date,
+    end_date: row.end_date || undefined,
+    end_time: row.end_time?.slice(0, 5) || undefined,
     dateLabel: formatDateLabel(row.date),
     pickup_time: row.pickup_time ? row.pickup_time.slice(0, 5) : '',
     dropoff_time: null,
@@ -515,6 +517,7 @@ export async function queryServerSchedules(params: {
 }
 
 export interface DispatchUpsertInput {
+  expectedVersion?: number;
   scheduleId?: string;
   bookingNo?: string;
   customerName?: string;
@@ -846,6 +849,7 @@ export const inMemoryTestStore = new Map<string, any>();
 async function prepareServerDispatchSchedule(
   input: DispatchUpsertInput
 ): Promise<{ row?: Record<string, any>; expectedUpdatedAt?: string; error?: string; statusCode?: number }> {
+  if (input.expectedVersion !== undefined && (!input.scheduleId || !Number.isInteger(input.expectedVersion) || input.expectedVersion < 1)) return { error: '배차 수정 버전을 확인해 주세요.', statusCode: 400 };
   const intervalError = validateDispatchInterval({ ...input, dispatchStatus: input.dispatchStatus || 'published' });
   if (intervalError) return { error: intervalError, statusCode: 400 };
   const isoDate = normalizeDateToIso(input.date);
@@ -946,6 +950,7 @@ async function prepareServerDispatchSchedule(
     if (readError) return { error: '기존 배차 조회에 실패했습니다.', statusCode: 503 };
     if (!exRaw) return { error: '해당 배차를 찾을 수 없습니다.', statusCode: 404 };
     existingHydrated = hydrateRawScheduleRow(exRaw);
+    if (input.expectedVersion !== undefined && input.expectedVersion !== existingHydrated.version) return { error: '다른 기기에서 배차가 변경되었습니다. 최신 배차를 다시 열어 주세요.', statusCode: 409 };
   }
 
   const nowIso = new Date().toISOString();

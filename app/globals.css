@@ -279,3 +279,10 @@ dialog::backdrop {
   background-color: rgba(15, 23, 42, 0.62);
   backdrop-filter: blur(3px);
 }
+
+@media (max-width: 767px) {
+  .hq-app :is(input, select, textarea),
+  .hq-booking-scroll :is(input, select, textarea) { font-size: 16px; }
+  .hq-app :is(button, input, select, textarea) { scroll-margin-block-end: calc(96px + env(safe-area-inset-bottom)); }
+  .hq-app select { min-height: 44px; }
+}

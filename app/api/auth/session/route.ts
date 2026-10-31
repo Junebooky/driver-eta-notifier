@@ -1,3 +1,4 @@
+import { canAccessPortal, type LoginPortal } from '@/utils/loginPortal';
 import { createHmac } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import type { Session } from '@supabase/supabase-js';
@@ -12,11 +13,11 @@ function clearCookies(response: NextResponse) {
   response.headers.set('Cache-Control','no-store');
   return response;
 }
-async function sessionResponse(provider: Session) {
+async function sessionResponse(provider: Session, portal?: LoginPortal) {
   const session = await parseAndVerifyToken(provider.access_token);
-  if (!session) {
+  if (!session || (portal && !canAccessPortal(session, portal))) {
     await supabaseAdmin.auth.admin.signOut(provider.access_token,'local').catch(()=>{});
-    return clearCookies(NextResponse.json({ok:false,error:'접근 권한 또는 기사 계정 연결을 확인해 주세요.'},{status:403}));
+    return clearCookies(NextResponse.json({ok:false,error:portal === 'representative' ? '대표 전용 계정으로 로그인해 주세요.' : '선택한 로그인 권한 또는 기사 계정 연결을 확인해 주세요.'},{status:403}));
   }
   const response = NextResponse.json({ok:true,authenticated:true,session,isDevAllowed:false});
   const remaining = Math.max(1,session.expiresAt-Math.floor(Date.now()/1000));
@@ -69,6 +70,7 @@ export async function POST(req: NextRequest) {
       }
       return clearCookies(NextResponse.json({ok:true,authenticated:false}));
     }
+    if (body.portal !== undefined && !['driver','hq','representative'].includes(body.portal)) return NextResponse.json({ok:false,error:'로그인 구분을 확인해 주세요.'},{status:400});
     if (typeof body.email !== 'string' || typeof body.password !== 'string' || !body.email.includes('@') || body.email.length>254 || !body.password || body.password.length>1024) {
       return NextResponse.json({ok:false,code:'PERSONAL_AUTH_REQUIRED',error:'개인 계정 이메일과 비밀번호로 로그인해 주세요. 공용 PIN은 사용할 수 없습니다.'},{status:400});
     }
@@ -97,6 +99,6 @@ export async function POST(req: NextRequest) {
       }
       provider=verified.data;
     }
-    return sessionResponse(provider);
+    return sessionResponse(provider, body.portal);
   } catch { return NextResponse.json({ok:false,error:'로그인 서비스에 연결하지 못했습니다.'},{status:503}); }
 }

@@ -1,3 +1,4 @@
+import * as dispatchRoute from '../app/api/schedules/dispatch/route';
 import { GET as fleetAvailability } from '../app/api/fleet/availability/route';
 import * as operationStatus from '../app/api/schedules/operation-status/route';
 import { VIP_REAL_VEHICLES } from '../utils/vehicleData';
@@ -31,7 +32,7 @@ export async function verifyReportingFlow(admin:Client,writer:Client,reader:Clie
   const column=(key:string)=>{assert.match(key,/^[a-z_]+$/);return '"'+key+'"';};
   const value=(key:string,v:unknown)=>['stops','review_history','audit_history','operation_history','ocr_details','meta'].includes(key)?JSON.stringify(v):v;
   supabaseAdmin.from=((table:string)=>{
-    assert.ok(['driving_logs','expenses','schedules','drivers','fleet_vehicle_operations'].includes(table));
+    assert.ok(['driving_logs','expenses','schedules','drivers','fleet_vehicle_operations','dispatch_requests'].includes(table));
     const filters:Array<[string,unknown,string?]>=[],orders:string[]=[];let rows:Record<string,unknown>[]|null=null,patch:Record<string,unknown>|null=null;
     let offset=0,limit=1000;
     const execute=async(single=false)=>{try{
@@ -89,12 +90,18 @@ export async function verifyReportingFlow(admin:Client,writer:Client,reader:Clie
     actor=token('driver');
     assert.equal((await post(acknowledgment,'/api/schedules/ack',{scheduleId:booking,version:1})).status,200);
     const hqRequest=()=>new NextRequest('http://localhost/api/schedules?role=hq',{headers:{authorization:'Bearer '+token('hq_admin')}});
-    let scheduleView=await (await readSchedules(hqRequest())).json();assert.equal(scheduleView.schedules.find((row:{id:string})=>row.id===booking).isAcknowledged,true);
+    let scheduleView=await (await readSchedules(hqRequest())).json();assert.equal(scheduleView.schedules.find((row:{id:string})=>row.id===booking).end_time,'12:00');assert.equal(scheduleView.schedules.find((row:{id:string})=>row.id===booking).end_date,'2026-12-12');assert.equal(scheduleView.schedules.find((row:{id:string})=>row.id===booking).isAcknowledged,true);
     await writer.query("UPDATE cockpit.schedules SET schedule_meta=jsonb_set(schedule_meta,'{version}','2'),updated_at=clock_timestamp() WHERE id=$1",[booking]);
     scheduleView=await (await readSchedules(hqRequest())).json();assert.equal(scheduleView.schedules.find((row:{id:string})=>row.id===booking).isAcknowledged,false);
     assert.equal((await post(acknowledgment,'/api/schedules/ack',{scheduleId:booking,version:1})).status,409);
     assert.equal((await post(acknowledgment,'/api/schedules/ack',{scheduleId:booking,version:2})).status,200);
     console.log('PASS actual driver acknowledgment → HQ confirmed, dispatch revision → reconfirmation required; forged/stale confirmations denied');
+    actor=token('hq_admin');
+    const staleEdit=await post(dispatchRoute,'/api/schedules/dispatch',{scheduleId:booking,expectedVersion:1,date:'2026-12-12',pickupTime:'09:00',endDate:'2026-12-12',endTime:'12:00',origin:'공항',destination:'호텔',dispatchStatus:'unassigned',allowUnverified:true});
+    assert.equal(staleEdit.status,409,'stale mobile edit cannot overwrite the latest PC assignment');
+    assert.equal((await reader.query('SELECT schedule_meta FROM cockpit.schedules WHERE id=$1',[booking])).rows[0].schedule_meta.version,2);
+    actor=token('driver');
+
     const navigation={...log,id:randomUUID(),bookingId:undefined,drivingDate:'2026-12-13',status:'draft' as const,startKm:'',endKm:'',stops:[{id:'navigation-one',time:'',place:'공항',departureTime:'09:00',actionIdempotencyKey:'nav-one'}]};
     const draft=await submitDriverLogToHqDb(navigation);assert.equal(draft.ok,true,draft.error);
     const nextStop={id:'navigation-two',time:'',place:'호텔',departureTime:'10:00',actionIdempotencyKey:'nav-two'};

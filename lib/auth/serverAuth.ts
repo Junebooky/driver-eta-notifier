@@ -7,6 +7,7 @@ export interface CockpitAuthSession {
   userId: string;
   org: 'vip_limousine_korea';
   role: 'hq_admin' | 'driver';
+  isRepresentative?: boolean;
   driverId?: string;
   driverName?: string;
   vehicleNo?: string;
@@ -203,11 +204,13 @@ export async function parseAndVerifyToken(token: string): Promise<CockpitAuthSes
         if (result.error || !result.data || result.data.driver_meta?.status === 'inactive') return null;
         driver = result.data;
       }
+      const isRepresentative = role === 'hq_admin' && appMeta.cockpit_position === 'representative';
       return {
+        isRepresentative,
         userId: data.user.id, org: 'vip_limousine_korea', role,
         driverId: driver?.id, driverName: driver?.driver_name,
         vehicleNo: driver?.vehicle_no, carNumber: driver?.car_number,
-        displayName: driver?.driver_name || '본사 관리자', sessionId: claims.session_id,
+        displayName: driver?.driver_name || (isRepresentative ? '대표' : '본사 관리자'), sessionId: claims.session_id,
         issuedAt: claims.iat, expiresAt: claims.exp,
       };
     } catch {
@@ -293,13 +296,11 @@ export async function verifyServerAuth(
   }
 
   if (requiredRole && session.role !== requiredRole) {
-    if (requiredRole === 'hq_admin' && session.role !== 'hq_admin') {
-      return {
-        ok: false,
-        error: '본사 관리자(HQ Admin) 전용 기능입니다. 접근이 거부되었습니다. (403 Forbidden)',
-        statusCode: 403,
-      };
-    }
+    return {
+      ok: false,
+      error: requiredRole === 'hq_admin' ? '본사 관리자(HQ Admin) 전용 기능입니다. 접근이 거부되었습니다. (403 Forbidden)' : '기사 계정 전용 기능입니다. (403 Forbidden)',
+      statusCode: 403,
+    };
   }
 
   return {

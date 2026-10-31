@@ -54,6 +54,7 @@ import {
 
 export interface HqBookingDetailModalProps {
   booking: HqBooking | null;
+  initialSection?: 'details' | 'assignment';
   existingBookings?: HqBooking[];
   isOpen: boolean;
   onClose: () => void;
@@ -64,6 +65,7 @@ export interface HqBookingDetailModalProps {
 
 export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
   booking,
+  initialSection = 'details',
   existingBookings = [],
   isOpen,
   onClose,
@@ -71,6 +73,14 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
   onSavedServer,
   onOpenCustomerMessage,
 }) => {
+  const [mobileSection, setMobileSection] = useState<'details' | 'assignment'>(initialSection);
+  const [editorBaseline, setEditorBaseline] = useState<{ id: string; version: number } | null>(null);
+  useEffect(() => {
+    if (!isOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = previous; };
+  }, [isOpen]);
   const liveDriverProfiles = useSyncExternalStore(
     subscribeSettlementReports,
     getDriverProfilesSnapshot,
@@ -123,7 +133,10 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
   const isNewBooking = Boolean(booking && !booking.scheduleId && booking.id.startsWith('new_'));
 
   useEffect(() => {
-    if (!booking || !isOpen) return;
+    if (!isOpen) { if (editorBaseline) setEditorBaseline(null); return; }
+    if (!booking || editorBaseline?.id === booking.id) return;
+    setEditorBaseline({ id: booking.id, version: booking.version || 1 });
+    setMobileSection(initialSection);
     setCustomerName(booking.customerName || '');
     setPickupDate(normalizeDateToIso(booking.pickupDate) || getKstTodayDateStr());
     setPickupTime(normalizeTimeHHmm(booking.pickupTime));
@@ -146,7 +159,7 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
     setShowCancelConfirm(false);
     setNotice(null);
     setErrorMsg(null);
-  }, [booking, isOpen]);
+  }, [booking, isOpen, initialSection, editorBaseline]);
 
   const modalConflicts = useMemo(() => {
     if (!booking || !isOpen || !fleet.data) return [];
@@ -160,12 +173,14 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
 
 
   if (!isOpen || !booking) return null;
+  const revisionChanged = editorBaseline?.id === booking.id && editorBaseline.version !== (booking.version || 1);
 
   // Persist reservation (unassigned) or confirmed dispatch (published) to real API
   const handleSaveOrPublish = async (targetStatus: 'unassigned' | 'published') => {
     setErrorMsg(null);
     setNotice(null);
 
+    if (revisionChanged) { setErrorMsg('다른 기기에서 변경된 배차입니다. 닫고 다시 열어 최신 배차를 확인해 주세요.'); return; }
     if (!customerName.trim()) {
       setErrorMsg('고객사명(또는 예약자명)을 입력해 주세요.');
       return;
@@ -218,6 +233,7 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
     try {
       const res = await saveMutation.send('/api/schedules/dispatch', {
           scheduleId: isNewBooking ? undefined : booking.scheduleId || booking.id,
+          expectedVersion: isNewBooking ? undefined : editorBaseline?.version,
           bookingNo: booking.bookingNo,
           customerName: customerName.trim(),
           customerId: booking.customerId || matchedCust?.id,
@@ -285,6 +301,7 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
       }
 
       const updatedBooking = mapScheduleItemToHqBooking(data.schedule, booking.no - 1);
+      setEditorBaseline({ id: updatedBooking.id, version: updatedBooking.version || 1 });
 
       if (targetStatus === 'published' && matchedCust) {
         const evId = updatedBooking.eventId || `ev-${updatedBooking.id}`;
@@ -400,7 +417,8 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-3xl bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[92dvh]"
+        role="dialog" aria-modal="true" aria-label="예약·배차 상세"
+        className="w-full max-w-3xl bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col h-[100dvh] sm:h-auto max-h-[100dvh] sm:max-h-[92dvh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -446,10 +464,15 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
         )}
 
         {/* Modal Scrollable Body */}
-        <div className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1">
+        {revisionChanged && <p role="alert" className="shrink-0 bg-amber-50 px-4 py-3 text-sm text-amber-900">다른 기기에서 배차를 변경했습니다. 입력 내용은 유지됩니다. 닫고 다시 열어 최신 배차를 확인해 주세요.</p>}
+        <div className="grid shrink-0 grid-cols-2 gap-2 border-b border-slate-100 bg-white p-3 md:hidden" aria-label="예약·배차 화면 전환">
+          {(['assignment','details'] as const).map(section=><button type="button" key={section} aria-pressed={mobileSection===section} onClick={()=>setMobileSection(section)} className={`min-h-11 rounded-xl text-sm font-bold ${mobileSection===section?'bg-[#1E60F3] text-white':'bg-slate-100 text-slate-600'}`}>{section==='assignment'?'차량·기사 배정':'예약 정보'}</button>)}
+        </div>
+        <div className="hq-booking-scroll min-h-0 p-4 sm:p-6 overflow-y-auto space-y-5 flex-1 overscroll-contain">
+          <div className="rounded-2xl bg-slate-50 p-3 text-sm md:hidden"><p className="font-bold">{booking.customerName} · {pickupDate} {pickupTime}</p><p className="mt-1 break-words text-slate-500">{pickupLocation} → {destination}</p></div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {/* Left Column: Editable Reservation & Passenger Info */}
-            <div className="space-y-3.5">
+            <div className={`${mobileSection === 'details' ? 'block' : 'hidden md:block'} space-y-3.5`}>
               <h4 className="text-sm font-black text-slate-800 flex items-center justify-between">
                 <span>1. 예약 · 운행 일정 및 담당 승객</span>
                 {booking.groupTotalVehicles && booking.groupTotalVehicles > 1 && (
@@ -594,12 +617,14 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
             </div>
 
             {/* Right Column: Representative Vehicle/Driver Assignment & Driver Cockpit Ack Status */}
-            <div className="space-y-3.5">
+            <div className={`${mobileSection === 'assignment' ? 'block' : 'hidden md:block'} space-y-3.5`}>
               <h4 className="text-sm font-black text-slate-800">
                 2. 차량 · 기사 배정 및 기사 확인 현황
               </h4>
 
               {saveMutation.hasPending && <button type="button" className="rounded-xl border border-blue-200 p-3 text-sm text-blue-700" disabled={isSaving} onClick={async()=>{setIsSaving(true);try{const response=await saveMutation.retry();const data=await response.json();if(!response.ok)throw new Error(data.error || '저장 결과 확인 실패');window.location.reload();}catch(error){setErrorMsg(error instanceof Error?error.message:'확인 실패');}finally{setIsSaving(false);}}}>이전 저장 결과 확인</button>}
+              {!endTime && <button type="button" onClick={()=>setMobileSection('details')} className="min-h-11 w-full rounded-xl bg-amber-50 p-3 text-left text-sm text-amber-900 md:hidden">예약 정보에서 실제 종료 시간을 먼저 입력해 주세요.</button>}
+              {fleet.error && <p role="alert" className="text-sm text-rose-700">{fleet.error}</p>}
               {/* Driver Assignment & Ack Card */}
               <div className="p-4 rounded-2xl border-2 border-blue-200/80 bg-blue-50/20 space-y-3.5">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -645,6 +670,7 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                       담당 기사 선정 (대표님 확인)
                     </label>
                     <select
+                      aria-label="담당 기사 배정"
                       value={selectedDriverId}
                       onChange={(e) => { setSelectedDriverId(e.target.value); setSelectedDriverName(fleet.data?.drivers.find(d => d.id === e.target.value)?.name || ''); }}
                       disabled={isCancelled || !fleet.data}
@@ -664,6 +690,7 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                       투입 차량 선정 (실제 보유 20대)
                     </label>
                     <select
+                      aria-label="배정 차량"
                       value={selectedVehiclePlate}
                       onChange={(e) => {
                         setErrorMsg(null);
@@ -701,7 +728,7 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                   <div className="space-y-2.5 pt-1">
                     <button
                       type="button"
-                      disabled={isSaving || modalConflicts.length > 0}
+                      disabled={isSaving || revisionChanged || !fleet.data || Boolean(fleet.error) || modalConflicts.length > 0}
                       onClick={() => handleSaveOrPublish('published')}
                       className="w-full py-3 px-4 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-[0.99] text-white text-sm font-black shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50"
                     >
@@ -928,7 +955,7 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-4 sm:px-6 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400 shrink-0">
+        <div className="px-4 sm:px-6 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400 shrink-0">
           <span className="truncate">PC · 모바일 · 기사 Cockpit 실시간 연동됨</span>
           <button
             type="button"

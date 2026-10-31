@@ -47,7 +47,7 @@ export const HqAdminLoginModal: React.FC<HqAdminLoginModalProps> = ({
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          email, password:secret, code,
+          email, password:secret, code, portal:'hq',
         }),
       });
 

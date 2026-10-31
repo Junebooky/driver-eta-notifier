@@ -101,9 +101,7 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {menuItems.map((item) => {
           const Icon = item.icon;
-          const isActive =
-            activeTab === item.id ||
-            (item.id === 'dispatch' && (activeTab === 'dashboard' || activeTab === 'vehicles' || activeTab === 'drivers'));
+          const isActive = activeTab === item.id;
 
           return (
             <button

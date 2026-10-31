@@ -21,6 +21,7 @@ import {
   ChevronRight,
   SlidersHorizontal,
 } from 'lucide-react';
+import { HqMobileBookingList } from './HqMobileBookingList';
 import { HqBooking } from '@/types/hq';
 import { haptics } from '@/utils/haptics';
 import { VIP_REAL_VEHICLES, stripManufacturerName } from '@/utils/vehicleData';
@@ -48,6 +49,7 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
   onSelectTab,
   onOpenNewBooking,
   onViewBooking,
+  onAssignDriver,
   onOpenCustomerMessage,
   onRemindDriver,
 }) => {
@@ -391,6 +393,8 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
         </button>
       </div>
 
+      <HqMobileBookingList bookings={filteredList} onView={onViewBooking} onAssign={onAssignDriver || onViewBooking} />
+      <div className="hidden lg:block">
       {/* 4. Horizontal Navigation Guide & Section Quick Jump */}
       <div className="pt-2 pb-1.5 flex items-center justify-between gap-2 text-xs border-t border-slate-100/70 mt-1">
         <div className="flex items-center gap-1.5 overflow-x-auto min-w-0 py-0.5">
@@ -769,6 +773,7 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
             </tbody>
           </table>
         </div>
+      </div>
       </div>
     </div>
   );

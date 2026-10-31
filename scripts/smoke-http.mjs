@@ -10,8 +10,9 @@ const driverId='a0000000-0000-4000-8000-000000000001';
 const revoked=new Set(),sessions=new Map(),refreshes=new Map(),attempts=new Map();
 const fixtureDriver={id:driverId,driver_name:'격리 테스트 기사',vehicle_no:'테스트호차',car_number:'테스트번호',driver_meta:{status:'active'}};
 function issue(role,oldSession,ttl=3600){
- const id=oldSession || randomUUID(),userId=role==='hq_admin'?'b0000000-0000-4000-8000-000000000001':'c0000000-0000-4000-8000-000000000001';
- const user={id:userId,aud:'authenticated',role:'authenticated',email:role==='hq_admin'?'hq@example.invalid':'driver@example.invalid',app_metadata:{org:'vip_limousine_korea',cockpit_role:role,...(role==='driver'?{driver_id:driverId}:{})},user_metadata:{cockpit_role:'hq_admin',driver_name:'spoofed'},created_at:new Date().toISOString()};
+ const representative=role==='representative',hq=role==='hq_admin'||representative;
+ const id=oldSession || randomUUID(),userId=hq?'b0000000-0000-4000-8000-000000000001':'c0000000-0000-4000-8000-000000000001';
+ const user={id:userId,aud:'authenticated',role:'authenticated',email:representative?'representative@example.invalid':hq?'hq@example.invalid':'driver@example.invalid',app_metadata:{org:'vip_limousine_korea',cockpit_role:hq?'hq_admin':'driver',...(representative?{cockpit_position:'representative'}:{}),...(role==='driver'?{driver_id:driverId}:{})},user_metadata:{cockpit_role:'hq_admin',cockpit_position:'representative',isRepresentative:true,driver_name:'spoofed'},created_at:new Date().toISOString()};
  const claims={sub:userId,session_id:id,aud:'authenticated',iat:Math.floor(Date.now()/1000),exp:Math.floor(Date.now()/1000)+ttl,aal:'aal1',jti:randomUUID()};
  const data=Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url')+'.'+Buffer.from(JSON.stringify(claims)).toString('base64url');
  const access_token=data+'.'+createHmac('sha256',signingKey).update(data).digest('base64url');
@@ -35,8 +36,8 @@ const provider=createServer(async(req,res)=>{
    if(!previous || revoked.has(previous.id))return json(400,{error:'invalid_grant',msg:'revoked'});
    return json(200,issue(previous.role,previous.id));
   }
-  if(!['hq@example.invalid','driver@example.invalid'].includes(body.email)||body.password!=='isolated-password')return json(400,{error:'invalid_grant',msg:'Invalid login credentials'});
-  return json(200,issue(body.email.startsWith('hq')?'hq_admin':'driver'));
+  if(!['hq@example.invalid','driver@example.invalid','representative@example.invalid'].includes(body.email)||body.password!=='isolated-password')return json(400,{error:'invalid_grant',msg:'Invalid login credentials'});
+  return json(200,issue(body.email.startsWith('representative')?'representative':body.email.startsWith('hq')?'hq_admin':'driver'));
  }
  const token=req.headers.authorization?.replace(/^Bearer /,'') || '';
  const verified=verify(token);
@@ -60,6 +61,13 @@ const server=spawn(process.execPath,['node_modules/next/dist/bin/next','start','
 let logs='';server.stdout.on('data',x=>logs+=x);server.stderr.on('data',x=>logs+=x);
 const post=(path,body,cookie,headers={})=>fetch(base+path,{method:'POST',headers:{'content-type':'application/json',...(cookie?{cookie}:{}),...headers},body:JSON.stringify(body)});
 const cookies=response=>response.headers.getSetCookie().map(value=>value.split(';')[0]).join('; ');
+async function assertRepresentativeRedirect(cookie){
+ const response=await fetch(base+'/representative',{headers:cookie?{cookie}:{},redirect:'manual'});
+ const html=await response.text();
+ assert.ok((response.status===307 && response.headers.get('location')?.endsWith('/representative/login')) ||
+   (response.status===200 && (html.includes('url=/representative/login') || html.includes('NEXT_REDIRECT;replace;/representative/login;307;'))),'unauthorized representative route must redirect to dedicated login');
+}
+
 try{
  let ready=false;for(let i=0;i<100;i++){
   try{if((await fetch(base+'/login')).ok){ready=true;break;}}catch{}
@@ -78,6 +86,20 @@ try{
  assert.ok(login.headers.getSetCookie().every(c=>/HttpOnly/i.test(c)&&/Secure/i.test(c)));
  const cookie=cookies(login),data=await login.json();assert.equal(data.session.role,'hq_admin');assert.equal(data.access_token,undefined);
  assert.equal((await(await fetch(base+'/api/auth/session',{headers:{cookie}})).json()).authenticated,true);
+ await assertRepresentativeRedirect();
+ await assertRepresentativeRedirect(cookie);
+ const forged=await post('/api/auth/session',{email:'hq@example.invalid',password:'isolated-password',portal:'representative',isRepresentative:true});assert.equal(forged.status,403);assert.ok(forged.headers.getSetCookie().every(value=>value.includes('Max-Age=0')));
+ const repLogin=await post('/api/auth/session',{email:'representative@example.invalid',password:'isolated-password',portal:'representative'});assert.equal(repLogin.status,200);
+ const repCookie=cookies(repLogin),rep=await repLogin.json();assert.equal(rep.session.role,'hq_admin');assert.equal(rep.session.isRepresentative,true);
+ assert.equal((await fetch(base+'/representative',{headers:{cookie:repCookie},redirect:'manual'})).status,200);
+ assert.equal((await(await fetch(base+'/api/auth/session',{headers:{cookie:repCookie}})).json()).session.isRepresentative,true);
+
+ const expiredRep=issue('representative',undefined,-1);
+ const renewedRep=await fetch(base+'/api/auth/representative-session',{redirect:'manual',headers:{cookie:`cockpit_session=${expiredRep.access_token}; cockpit_refresh=${expiredRep.refresh_token}`}});
+ assert.equal(renewedRep.status,307);assert.equal(new URL(renewedRep.headers.get('location')).pathname,'/representative');assert.ok(renewedRep.headers.getSetCookie().some(value=>value.startsWith('cockpit_refresh=')&&!value.includes(expiredRep.refresh_token)));
+ assert.equal((await fetch(base+'/representative',{redirect:'manual',headers:{cookie:cookies(renewedRep)}})).status,200);
+ console.log('PASS representative HTTP: trusted provider metadata → dedicated login/cookies → server-guarded mobile portal; regular HQ/forged representative denied');
+
  assert.equal((await post('/api/receipt/scan',{image:'/../../.env'},cookie)).status,400);
  assert.equal((await post('/api/schedules/dispatch',{date:'2026-12-01',pickupTime:'19:00',origin:'A',destination:'B'},cookie)).status,400);
  const driverLogin=await post('/api/auth/session',{email:'driver@example.invalid',password:'isolated-password',role:'hq'});assert.equal(driverLogin.status,200);

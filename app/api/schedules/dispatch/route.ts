@@ -14,6 +14,7 @@ import { timeHHmmToMinutes, normalizeDateToIso } from '@/utils/dispatchConflictD
 function normalizePayloadItem(raw: Record<string, any>, rootBody: Record<string, any>): DispatchUpsertInput {
   return {
     scheduleId: raw.scheduleId || raw.id,
+    expectedVersion: raw.expectedVersion,
     bookingNo: raw.bookingNo,
     customerName: raw.customerName,
     customerId: raw.customerId,
