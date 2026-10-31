@@ -39,11 +39,13 @@ export function normalizeDateToIso(raw?: string | null): string {
   const trimmed = raw.trim();
   const match = trimmed.match(/(\d{4})\s*[-./년]\s*(\d{1,2})\s*[-./월]\s*(\d{1,2})/);
   if (match) {
-    return `${match[1]}-${match[2].padStart(2, '0')}-${match[3].padStart(2, '0')}`;
+    const iso = `${match[1]}-${match[2].padStart(2, '0')}-${match[3].padStart(2, '0')}`;
+    const date = new Date(`${iso}T00:00:00Z`);
+    return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === iso ? iso : '';
   }
   const compact = trimmed.match(/^(\d{4})(\d{2})(\d{2})$/);
   if (compact) {
-    return `${compact[1]}-${compact[2]}-${compact[3]}`;
+    return normalizeDateToIso(`${compact[1]}-${compact[2]}-${compact[3]}`);
   }
   return '';
 }
@@ -119,7 +121,7 @@ export function parseKstDateTimeToMs(dateStr: string, timeStrOrMin: string | num
   let addDays = 0;
 
   if (typeof timeStrOrMin === 'number') {
-    if (isNaN(timeStrOrMin) || timeStrOrMin < 0) return NaN;
+    if (!Number.isFinite(timeStrOrMin) || !Number.isInteger(timeStrOrMin) || timeStrOrMin < 0) return NaN;
     if (timeStrOrMin >= 1440) {
       addDays = Math.floor(timeStrOrMin / 1440);
       const rem = timeStrOrMin % 1440;
@@ -131,6 +133,7 @@ export function parseKstDateTimeToMs(dateStr: string, timeStrOrMin: string | num
     }
   } else {
     const hhmm = normalizeTimeHHmm(timeStrOrMin);
+    if (!hhmm) return NaN;
     if (hhmm) {
       const [h, m] = hhmm.split(':').map((n) => parseInt(n, 10));
       hh = h || 0;

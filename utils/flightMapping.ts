@@ -491,7 +491,7 @@ export function getFlightLocationPreset(
  * Standard Multi-line KakaoTalk Report Generator for Flights
  */
 export function formatFlightReport(profile: DriverProfile, flight: FlightInfo): string {
-  let v = (profile.vehicleNo || '').trim().replace(/호차\s*$/, '').trim();
+  const v = (profile.vehicleNo || '').trim().replace(/호차\s*$/, '').trim();
   let vehicleDisplay = '의전차량';
   if (v) {
     vehicleDisplay = /^\d+$/.test(v) || !v.includes('호차') ? `${v}호차` : v;

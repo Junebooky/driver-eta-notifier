@@ -35,7 +35,7 @@ import {
   autoEnsureUprightReceipt,
   compressReceiptImage,
 } from '@/utils/imageRotate';
-import { submitSingleExpenseToHq } from '@/utils/expenseHqStorage';
+
 import {
   ExpenseItem,
   ExpenseCategoryKey,
@@ -71,21 +71,15 @@ interface CachedOcrResult {
 const clientOcrCache = new Map<string, CachedOcrResult>();
 
 // Collision-free client cache key computation
-function computeClientCacheKey(str: string): string {
-  if (!str) return '';
-  if (str.startsWith('/')) return str;
-  let hash = 0;
-  for (let i = 0; i < Math.min(str.length, 2048); i++) {
-    hash = ((hash << 5) - hash) + str.charCodeAt(i);
-    hash |= 0;
-  }
-  return `${str.length}_${hash}_${str.slice(-32)}`;
+async function computeClientCacheKey(value:string):Promise<string>{
+  const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,'0')).join('');
 }
 
 interface AddExpenseModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (item: ExpenseItem) => void;
+  onSave: (item: ExpenseItem, submitToHq?: boolean) => void | Promise<void>;
   editingItem?: ExpenseItem | null;
   initialPhotoUrl?: string;
   defaultDate?: string; // YYYY-MM-DD
@@ -117,12 +111,13 @@ export const renderCategoryIcon = (iconName: string, className = 'w-5 h-5') => {
 
 const AddExpenseModalContent: React.FC<{
   onClose: () => void;
-  onSave: (item: ExpenseItem) => void;
+  onSave: (item: ExpenseItem, submitToHq?: boolean) => void | Promise<void>;
   editingItem?: ExpenseItem | null;
   initialPhotoUrl?: string;
   defaultDate?: string;
 }> = ({ onClose, onSave, editingItem, initialPhotoUrl, defaultDate }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [expenseId]=useState(()=>editingItem?.id || crypto.randomUUID());
 
   // Form states initialized purely
   const initialPreset = initialPhotoUrl ? SAMPLE_RECEIPT_PRESETS[initialPhotoUrl] : null;
@@ -272,7 +267,7 @@ const AddExpenseModalContent: React.FC<{
     }
 
     // Step 2: Check client-side cache (Zero Gemini API call)
-    const cacheKey = computeClientCacheKey(imageUrl);
+    const cacheKey = await computeClientCacheKey(imageUrl);
     const cached = clientOcrCache.get(cacheKey);
     if (cached) {
       if (cached.merchant) setMerchant(cached.merchant);
@@ -401,7 +396,7 @@ const AddExpenseModalContent: React.FC<{
       }
     } catch (err) {
       console.error('Failed to rotate receipt image:', err);
-      showToast('이미지 회전에 실패했습니다.');
+      showToast(err instanceof Error ? err.message : '영수증 저장에 실패했습니다.');
     } finally {
       setIsRotating(false);
     }
@@ -429,38 +424,6 @@ const AddExpenseModalContent: React.FC<{
 
       if (wasRotated) {
         showToast('🔄 영수증이 가로로 누워있어 바르게(90° 세우기) 자동 회전했습니다.');
-      }
-
-      // 2. Check if file matches known sample receipt (Zero Gemini API call)
-      const lowerName = file.name.toLowerCase();
-      let matchedPresetKey: string | null = null;
-      if (lowerName.includes('hangang') || lowerName.includes('한강') || file.size === 22307) {
-        matchedPresetKey = '/images/receipt_sample_hangang.jpg';
-      } else if (lowerName.includes('fuel') || lowerName.includes('만남의광장') || file.size === 25451) {
-        matchedPresetKey = '/images/receipt_sample_fuel.jpg';
-      } else if (lowerName.includes('cu') || lowerName.includes('고양강매') || file.size === 22426) {
-        matchedPresetKey = '/images/receipt_sample_cu.jpg';
-      }
-
-      if (matchedPresetKey && SAMPLE_RECEIPT_PRESETS[matchedPresetKey]) {
-        const p = SAMPLE_RECEIPT_PRESETS[matchedPresetKey];
-        setMerchant(p.merchant);
-        setAddress(p.address || '');
-        setAmountRaw(formatKRW(p.amount, false));
-        setCategory(p.category);
-        setDate(p.date);
-        setTime(p.time);
-        setMemo(p.memo);
-        setOcrBannerInfo({
-          merchant: p.merchant,
-          amount: p.amount,
-          category: EXPENSE_CATEGORIES[p.category]?.label || '기타',
-          summary: p.summary,
-          isZeroCost: true,
-        });
-        haptics.success();
-        showToast('✨ 샘플 영수증이 감지되어 자동 적용되었습니다. (API 비용 0원)');
-        return;
       }
 
       // 3. Otherwise run Vision AI scan
@@ -527,7 +490,8 @@ const AddExpenseModalContent: React.FC<{
 
     const nowIso = new Date().toISOString();
     const finalItem: ExpenseItem = {
-      id: editingItem?.id || `exp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      ...editingItem,
+      id: expenseId,
       category,
       date,
       time,
@@ -537,17 +501,18 @@ const AddExpenseModalContent: React.FC<{
       paymentMethod,
       memo: memo.trim() || undefined,
       receiptUrl: safeReceiptUrl,
+      receiptStoragePath:safeReceiptUrl===editingItem?.receiptUrl?editingItem?.receiptStoragePath:undefined,
       createdAt: editingItem?.createdAt || nowIso,
       updatedAt: nowIso,
-      hqStatus: autoSubmitToHq ? '검수 대기' : (editingItem?.hqStatus || '미제출'),
-      submittedToHqAt: autoSubmitToHq ? nowIso : editingItem?.submittedToHqAt,
+      hqStatus: '미제출',
+      submittedToHqAt: undefined,
+      ocrExtracted: Boolean(ocrBannerInfo),
+      ocrSummary: ocrBannerInfo?.summary,
     };
 
-    if (autoSubmitToHq) {
-      submitSingleExpenseToHq(finalItem, '윤태준', '116허 1514', '현대 스타리아 리무진');
-    }
-
-    onSave(finalItem);
+    try { await onSave(finalItem,autoSubmitToHq); }
+    catch(error) { showToast(error instanceof Error ? error.message : '경비 저장에 실패했습니다.'); }
+    finally { setIsSaving(false); }
   };
 
   // One-click Auto Fix Orientation and immediately save to HQ
@@ -580,7 +545,8 @@ const AddExpenseModalContent: React.FC<{
       haptics.success();
       const nowIso = new Date().toISOString();
       const finalItem: ExpenseItem = {
-        id: editingItem?.id || `exp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        ...editingItem,
+      id: expenseId,
         category,
         date,
         time,
@@ -590,20 +556,19 @@ const AddExpenseModalContent: React.FC<{
         paymentMethod,
         memo: memo.trim() || undefined,
         receiptUrl: rotated,
+        receiptStoragePath:undefined,
         createdAt: editingItem?.createdAt || nowIso,
         updatedAt: nowIso,
-        hqStatus: autoSubmitToHq ? '검수 대기' : (editingItem?.hqStatus || '미제출'),
-        submittedToHqAt: autoSubmitToHq ? nowIso : editingItem?.submittedToHqAt,
+        hqStatus: '미제출',
+        submittedToHqAt: undefined,
+        ocrExtracted: Boolean(ocrBannerInfo),
+        ocrSummary: ocrBannerInfo?.summary,
       };
 
-      if (autoSubmitToHq) {
-        submitSingleExpenseToHq(finalItem, '윤태준', '116허 1514', '현대 스타리아 리무진');
-      }
-
-      onSave(finalItem);
+      await onSave(finalItem,autoSubmitToHq);
     } catch (err) {
       console.error('Failed to auto-rotate and save:', err);
-      showToast('이미지 회전에 실패했습니다.');
+      showToast(err instanceof Error ? err.message : '영수증 저장에 실패했습니다.');
     } finally {
       setIsRotating(false);
     }

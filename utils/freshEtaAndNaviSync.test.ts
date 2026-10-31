@@ -557,10 +557,10 @@ test('9. Outbox Queue Consumption Worker Flushes on Reconnect', async () => {
   const rawOutboxItem: NavigationOutboxItem = {
     id: 'action_drv1_book1_fingerprint_100',
     bookingId: 'book-100',
-    driverId: 'drv-100',
+    driverId: mockDriverProfile.driverId,
     payload: {
       bookingId: 'book-100',
-      driverId: 'drv-100',
+      driverId: mockDriverProfile.driverId,
       driverName: '테스트기사',
       vehiclePlate: '116허 1514',
       customerName: '테스트고객',

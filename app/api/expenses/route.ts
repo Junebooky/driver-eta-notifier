@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { verifyServerAuth, requireHqAdmin } from '@/lib/auth/serverAuth';
+import { normalizeDateToIso,normalizeTimeHHmm } from '@/utils/dispatchConflictDetector';
 import { HqExpenseRecord, HqExpenseStatus } from '@/types/expenseHq';
 import { ExpenseCategoryKey, PaymentMethod, EXPENSE_CATEGORIES } from '@/utils/expense';
 
@@ -67,6 +68,7 @@ export function mapDbRowToExpenseRecord(row: any, index: number = 1): HqExpenseR
     status: (row.status as HqExpenseStatus) || '검수 대기',
     hasReceiptImage: Boolean(row.has_receipt_image || row.receipt_storage_path),
     receiptStoragePath: row.receipt_storage_path || undefined,
+    receiptUrl: row.receipt_storage_path ? `/api/expenses/receipt?expenseId=${encodeURIComponent(row.id)}` : undefined,
     ocrExtracted: Boolean(row.ocr_extracted),
     ocrSummary: row.ocr_summary || undefined,
     ocrDetails: row.ocr_details || undefined,
@@ -76,7 +78,11 @@ export function mapDbRowToExpenseRecord(row: any, index: number = 1): HqExpenseR
     hipassCardNo: row.hipass_card_no || undefined,
     billableToCustomer: Boolean(row.billable_to_customer ?? true),
     auditHistory: Array.isArray(row.audit_history) ? row.audit_history : [],
+    reviewNotes:row.review_notes || undefined,
+    reviewedAt:row.reviewed_at || undefined,
+    reviewedBy:row.reviewed_by || undefined,
     bookingId: row.booking_id || undefined,
+    drivingLogId:row.driving_log_id || undefined,
     driverId: row.driver_id || undefined,
     vehicleId: row.vehicle_id || undefined,
   };
@@ -183,19 +189,23 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const rawItems: any[] = Array.isArray(body.items) ? body.items : [body];
 
-    if (rawItems.length === 0) {
+    if (rawItems.length === 0 || rawItems.length > 50) {
       return NextResponse.json(
-        { ok: false, error: '제출할 경비 내역이 없습니다.' },
+        { ok: false, error: '한 번에 1~50건까지 제출할 수 있습니다.' },
         { status: 400 }
       );
     }
 
-    const effectiveDriverId = auth.session.driverId || auth.session.userId;
     const nowIso = new Date().toISOString();
     const rowsToInsert: Record<string, any>[] = [];
 
     for (const item of rawItems) {
-      const amount = Number(item.amount) || 0;
+      const effectiveDriverId=auth.session.role==='driver'?auth.session.driverId || auth.session.userId:item.driverId;
+      if(!isValidUuid(effectiveDriverId))return NextResponse.json({ok:false,error:'실제 기사 UUID가 필요합니다.'},{status:400});
+      if(!normalizeDateToIso(item.date || item.expenseDate) || !normalizeTimeHHmm(item.time || item.expenseTime))return NextResponse.json({ok:false,error:'경비 날짜·시간을 확인해 주세요.'},{status:400});
+      if(!isValidUuid(item.id))return NextResponse.json({ok:false,error:'같은 경비를 다시 저장할 수 있도록 UUID 식별자가 필요합니다.'},{status:400});
+      const amount = Number(item.amount);
+      if(!Number.isSafeInteger(amount))return NextResponse.json({ok:false,error:'금액은 원 단위 정수로 입력해 주세요.'},{status:400});
       if (amount <= 0) {
         return NextResponse.json(
           { ok: false, error: '경비 금액은 0원보다 커야 합니다.' },
@@ -277,7 +287,7 @@ export async function POST(req: NextRequest) {
       if (item.bookingId) {
         const { data: scheduleRow, error: schedErr } = await supabaseAdmin
           .from('schedules')
-          .select('id, customer_id, customer_name, driver_name, driver_id, vehicle_plate, schedule_meta')
+          .select('*')
           .eq('id', item.bookingId)
           .maybeSingle();
 
@@ -296,7 +306,7 @@ export async function POST(req: NextRequest) {
         }
 
         if (auth.session.role === 'driver') {
-          const schedMetaDriverId = scheduleRow.schedule_meta?.driver_id || scheduleRow.driver_id;
+          const schedMetaDriverId = scheduleRow.driver_id || scheduleRow.schedule_meta?.driverId || scheduleRow.schedule_meta?.driver_id;
           if (!schedMetaDriverId || schedMetaDriverId !== effectiveDriverId) {
             return NextResponse.json(
               { ok: false, error: '본인에게 배정되지 않았거나 기사 식별자(UUID)가 확정되지 않은 예약입니다. (403 Forbidden)' },
@@ -305,9 +315,27 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        if(scheduleRow.schedule_meta?.serviceMode==='vehicle_only' || ['draft','unassigned','cancelled'].includes(scheduleRow.dispatch_status))return NextResponse.json({ok:false,error:'현재 기사 운행으로 배정된 예약만 연결할 수 있습니다.'},{status:403});
         validatedBookingId = scheduleRow.id;
-        item.customerId = item.customerId || scheduleRow.customer_id;
-        item.customerName = item.customerName || scheduleRow.customer_name;
+        item.vehicleId=scheduleRow.vehicle_id || item.vehicleId;
+        item.vehiclePlate=scheduleRow.vehicle_plate || scheduleRow.schedule_meta?.vehiclePlate || item.vehiclePlate;
+        item.vehicleModel=scheduleRow.schedule_meta?.vehicleModel || item.vehicleModel;
+        item.customerId = scheduleRow.customer_id || scheduleRow.schedule_meta?.customerId;
+        item.customerName = scheduleRow.customer_name || scheduleRow.schedule_meta?.customerName;
+      }
+
+      if(item.receiptStoragePath){
+        const prefix=`${auth.session.org}/expenses/receipts/${effectiveDriverId}/`;
+        if(typeof item.receiptStoragePath!=='string' || item.receiptStoragePath.includes('..') || !item.receiptStoragePath.startsWith(prefix))return NextResponse.json({ok:false,error:'본인의 영수증 파일만 연결할 수 있습니다.'},{status:403});
+        const file=await supabaseAdmin.storage.from('cockpit-assets').download(item.receiptStoragePath);
+        if(file.error || !file.data)return NextResponse.json({ok:false,error:'영수증 원본이 서버에 저장되지 않았습니다.'},{status:400});
+      }else if(item.receiptUrl || item.hasReceiptImage){
+        return NextResponse.json({ok:false,error:'영수증 원본 업로드를 먼저 완료해 주세요.'},{status:400});
+      }
+      if(item.drivingLogId){
+        const linked=await supabaseAdmin.from('driving_logs').select('id,organization_id,driver_id,booking_id,driving_date').eq('id',item.drivingLogId).maybeSingle();
+        if(linked.error)return NextResponse.json({ok:false,error:'운행일지 연결을 확인하지 못했습니다.'},{status:503});
+        if(!linked.data || linked.data.organization_id!==auth.session.org || linked.data.driver_id!==effectiveDriverId || (linked.data.booking_id || null)!==validatedBookingId || linked.data.driving_date!==(item.date || item.expenseDate))return NextResponse.json({ok:false,error:'같은 기사·예약·날짜의 운행일지만 연결할 수 있습니다.'},{status:403});
       }
 
       const category = item.category || 'other';
@@ -321,8 +349,8 @@ export async function POST(req: NextRequest) {
         booking_id: validatedBookingId,
         driving_log_id: item.drivingLogId || null,
         driver_id: effectiveDriverId,
-        driver_name: auth.session.driverName || item.driverName || '윤태준',
-        vehicle_id: item.vehicleId || auth.session.vehicleNo || '1호차',
+        driver_name: auth.session.driverName || item.driverName || '담당 기사',
+        vehicle_id: item.vehicleId || auth.session.vehicleNo || null,
         vehicle_plate: item.vehiclePlate || auth.session.carNumber || '',
         vehicle_model: item.vehicleModel || '법인 차량',
         customer_id: item.customerId || null,
@@ -347,7 +375,7 @@ export async function POST(req: NextRequest) {
         hipass_exit: item.hipassExit || null,
         hipass_card_no: item.hipassCardNo || null,
         billable_to_customer: Boolean(item.billableToCustomer ?? true),
-        status: item.status || '검수 대기',
+        status: item.status==='submitted' ? '검수 대기' : item.status || '검수 대기',
         submitted_at: nowIso,
         submitted_by: auth.session.displayName || auth.session.driverName || '기사',
         updated_at: nowIso,

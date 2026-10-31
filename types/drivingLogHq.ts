@@ -33,7 +33,8 @@ export interface HqDrivingLog {
   submittedDate: string; // e.g. "2024. 10. 24 (목)"
   drivingDate: string; // e.g. "10/24"
   rawDate: string; // e.g. "2024-10-24"
-  driverName: string; // e.g. "김민수"
+  driverName: string;
+  passengerCount?: number; // e.g. "김민수"
   customerName: string; // e.g. "호텔신라"
   vehicleModel: string; // e.g. "S클래스 8920"
   vehiclePlate: string; // e.g. "서울 12가 8920"

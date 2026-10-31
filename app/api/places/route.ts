@@ -1,8 +1,11 @@
+import { verifyServerAuth } from '@/lib/auth/serverAuth';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { DEFAULT_VERIFIED_PLACES } from '@/services/placeResolutionService';
 
 export async function GET(req: NextRequest) {
+  const apiAuth = await verifyServerAuth(req);
+  if (!apiAuth.ok) return NextResponse.json({ ok: false, error: apiAuth.error }, { status: apiAuth.statusCode });
   try {
     const { searchParams } = new URL(req.url);
     const orgId = searchParams.get('org_id');

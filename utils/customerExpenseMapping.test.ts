@@ -38,7 +38,9 @@ const mockLocalStorage = {
   },
 };
 
-// 1. Test Seed Data Customer Enrichment
+assert.equal(getHqExpenses().length,0,'A new HQ browser must start empty until actual server data is fetched');
+saveHqExpenses(INITIAL_HQ_EXPENSES);
+// 1. Test explicit reference fixture customer enrichment
 const seedExpenses = getHqExpenses();
 assert(seedExpenses.length > 0, 'Seed expenses must exist');
 const ferrariExp = seedExpenses.find((e) => e.customerName === 'Ferrari');

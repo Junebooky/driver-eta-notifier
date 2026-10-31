@@ -55,6 +55,8 @@ export interface DrivingLogData {
   status: 'draft' | 'submitted';
   isDemoFixture?: boolean;   // True when populated with reference sample data
   bookingId?: string;
+  submissionId?: string;
+  hqStatus?: import('@/types/drivingLogHq').HqDrivingLogStatus;
   driverId?: string;
   vehicleId?: string;
   organizationId?: string;
@@ -325,7 +327,7 @@ export const createReferenceDemoFixture = (driverProfile?: DriverProfile): Drivi
     driverProfile?.carNumber ||
     (driverProfile?.carNumberFront && driverProfile?.carNumberBack
       ? `${driverProfile.carNumberFront} ${driverProfile.carNumberBack}`
-      : '142호 7811');
+      : '');
 
   return {
     reportId: 'demo_reference_fixture',
@@ -368,26 +370,23 @@ export const loadDrivingLogDraft = (
   dateIso: string = formatIsoDate(),
   bookingId?: string
 ): DrivingLogData => {
-  // Check if a specific draft exists
-  if (typeof window !== 'undefined' && reportId) {
-    try {
-      const stored = localStorage.getItem(`${DRIVING_LOG_STORAGE_PREFIX}${reportId}`);
-      if (stored) {
-        return JSON.parse(stored);
-      }
-    } catch (e) {
-      console.warn('Failed to load driving log from localStorage:', e);
-    }
+  const driverId=driverProfile.driverId || driverProfile.id || 'unlinked';
+  const scopedReportId=reportId || `report_${driverId}_${bookingId || 'daily'}_${dateIso}`;
+  if(typeof window!=='undefined'){
+    try{
+      const raw=localStorage.getItem(`${DRIVING_LOG_STORAGE_PREFIX}${scopedReportId}`);
+      if(raw){const stored=JSON.parse(raw);if(stored.driverId===driverId && (stored.bookingId || null)===(bookingId || null) && stored.rawDate===dateIso)return stored;}
+    }catch{console.warn('운행일지 초안을 불러오지 못했습니다.');}
   }
 
   // Derive verified driver and vehicle identity
-  const driverName = driverProfile.driverName || '윤태준';
+  const driverName = driverProfile.driverName || '담당 기사';
   const carNumber =
     driverProfile.plateNumber ||
     driverProfile.carNumber ||
     (driverProfile.carNumberFront && driverProfile.carNumberBack
       ? `${driverProfile.carNumberFront} ${driverProfile.carNumberBack}`
-      : '142호 7811');
+      : '');
 
   // Client name & passenger count from verified profile fields or empty
   const clientName = driverProfile.clientName || '';
@@ -400,9 +399,10 @@ export const loadDrivingLogDraft = (
   const { formatted: distanceFormatted } = calculateDrivingDistance(startKm, endKm);
 
   return {
-    reportId: reportId || (bookingId ? `report_${bookingId}` : `report_${Date.now()}`),
+    reportId: scopedReportId,
+    submissionId: crypto.randomUUID(),
     assignmentId: `ASSIGN-${dateIso.replace(/-/g, '')}-${Date.now().toString().slice(-4)}`,
-    date: formatKoreanDate(new Date()),
+    date: formatKoreanDate(new Date(`${dateIso}T12:00:00+09:00`)),
     rawDate: dateIso,
     driverName,
     carNumber,
@@ -420,7 +420,7 @@ export const loadDrivingLogDraft = (
     status: 'draft',
     isDemoFixture: false,
     bookingId,
-    driverId: driverProfile.driverId,
+    driverId,
     vehicleId: driverProfile.vehicleNo,
   };
 };
@@ -433,7 +433,7 @@ export const saveDrivingLogDraft = (data: DrivingLogData): boolean => {
   try {
     const payload: DrivingLogData = {
       ...data,
-      status: 'draft', // Enforce draft status
+      status: data.status,
       savedAt: new Date().toISOString(),
     };
 
@@ -442,7 +442,7 @@ export const saveDrivingLogDraft = (data: DrivingLogData): boolean => {
 
     // Update index of drafts
     const rawIndex = localStorage.getItem(DRIVING_LOG_INDEX_KEY);
-    const index: Array<{ reportId: string; date: string; clientName: string; bookingId?: string; updatedAt: string }> =
+    const index: Array<{ reportId: string; date: string; clientName: string; bookingId?: string; driverId?: string; updatedAt: string }> =
       rawIndex ? JSON.parse(rawIndex) : [];
 
     const existingIdx = index.findIndex((item) => item.reportId === data.reportId);
@@ -451,6 +451,7 @@ export const saveDrivingLogDraft = (data: DrivingLogData): boolean => {
       date: data.rawDate,
       clientName: data.clientName || '미지정',
       bookingId: data.bookingId,
+      driverId: data.driverId,
       updatedAt: new Date().toISOString(),
     };
 

@@ -146,6 +146,8 @@ export interface ExpenseItem {
   vehicleId?: string;
   organizationId?: string;
   receiptStoragePath?: string;
+  ocrExtracted?: boolean;
+  ocrSummary?: string;
 }
 
 export type ExpenseSortOption = 'newest' | 'oldest' | 'highest_amount' | 'lowest_amount';
@@ -398,14 +400,14 @@ export function validateExpenseInput(item: {
 /**
  * Pure loader for expenses with localStorage fallback
  */
-export function loadExpenses(): { items: ExpenseItem[]; isDemo: boolean } {
+export function loadExpenses(driverId?: string): { items: ExpenseItem[]; isDemo: boolean } {
   if (typeof window === 'undefined') {
-    return { items: REFERENCE_DEMO_EXPENSES, isDemo: true };
+    return { items: [], isDemo: false };
   }
 
   try {
-    const rawDemo = localStorage.getItem(EXPENSE_DEMO_FLAG_KEY);
-    const rawItems = localStorage.getItem(EXPENSE_STORAGE_KEY);
+    const rawDemo = localStorage.getItem(driverId ? `${EXPENSE_DEMO_FLAG_KEY}_${driverId}` : EXPENSE_DEMO_FLAG_KEY);
+    const rawItems = localStorage.getItem(driverId ? `${EXPENSE_STORAGE_KEY}_${driverId}` : EXPENSE_STORAGE_KEY);
 
     if (rawDemo === 'false' && rawItems) {
       const parsed = JSON.parse(rawItems);
@@ -422,23 +424,23 @@ export function loadExpenses(): { items: ExpenseItem[]; isDemo: boolean } {
     }
 
     // Default to reference demo fixture
-    return { items: REFERENCE_DEMO_EXPENSES, isDemo: true };
+    return { items: [], isDemo: false };
   } catch (err) {
     console.error('Failed to load expenses from localStorage:', err);
-    return { items: REFERENCE_DEMO_EXPENSES, isDemo: true };
+    return { items: [], isDemo: false };
   }
 }
 
 /**
  * Pure saver for expenses to localStorage with multi-tier quota defense
  */
-export function saveExpenses(items: ExpenseItem[], isDemo: boolean = false): void {
+export function saveExpenses(items: ExpenseItem[], isDemo: boolean = false, driverId?: string): void {
   if (typeof window === 'undefined') return;
 
   const tryPersist = (records: ExpenseItem[]): boolean => {
     try {
-      localStorage.setItem(EXPENSE_STORAGE_KEY, JSON.stringify(records));
-      localStorage.setItem(EXPENSE_DEMO_FLAG_KEY, isDemo ? 'true' : 'false');
+      localStorage.setItem(driverId ? `${EXPENSE_STORAGE_KEY}_${driverId}` : EXPENSE_STORAGE_KEY, JSON.stringify(records));
+      localStorage.setItem(driverId ? `${EXPENSE_DEMO_FLAG_KEY}_${driverId}` : EXPENSE_DEMO_FLAG_KEY, isDemo ? 'true' : 'false');
       return true;
     } catch {
       return false;

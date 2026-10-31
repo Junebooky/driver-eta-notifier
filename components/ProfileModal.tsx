@@ -4,14 +4,14 @@ import React, { useState, useEffect } from 'react';
 import { DriverProfile, NaviProvider } from '@/types';
 import { X, User, Car, Users, Navigation, Check, Phone } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
-import { ENABLE_DEV_FLEET_SWITCHER, FLEET_PRESET_DRIVERS, FleetPresetDriver, getPresetPassengerName } from '@/utils/constants';
-import { getStoredVehicleProfile, setStoredVehicleProfile } from '@/hooks/useDriverProfile';
+import { ENABLE_DEV_FLEET_SWITCHER, FleetPresetDriver } from '@/utils/constants';
+import { getStoredVehicleProfile } from '@/hooks/useDriverProfile';
 
 interface ProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
   profile: DriverProfile;
-  onSave: (updated: Partial<DriverProfile>) => void;
+  onSave: (updated: Partial<DriverProfile>) => Promise<boolean> | boolean | void;
   isOnboarding?: boolean;
 }
 
@@ -74,6 +74,11 @@ export function parsePhoneDetails(raw?: string): {
   }
 }
 
+function profileVehicleDetails(profile: DriverProfile) {
+  const vehicle=parseVehicleDetails(profile.vehicleNo);
+  return profile.carNumber ? {...parseVehicleDetails(profile.carNumber),hocha:vehicle.hocha} : vehicle;
+}
+
 export const ProfileModal: React.FC<ProfileModalProps> = ({
   isOpen,
   onClose,
@@ -81,7 +86,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   onSave,
   isOnboarding = false,
 }) => {
-  const parsed = parseVehicleDetails(profile.vehicleNo);
+  const parsed = profileVehicleDetails(profile);
   const parsedPhone = parsePhoneDetails(profile.phone || profile.mobile);
   const isInitialEmpty = isOnboarding || (!profile.driverName && !profile.vehicleNo);
 
@@ -101,7 +106,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [validationMsg, setValidationMsg] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [fleetPresets, setFleetPresets] = useState<FleetPresetDriver[]>(FLEET_PRESET_DRIVERS);
+  const [fleetPresets, setFleetPresets] = useState<FleetPresetDriver[]>([]);
 
   // Dynamic fetch of all registered drivers from Supabase SSOT
   useEffect(() => {
@@ -113,7 +118,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           const data = await res.json();
           if (Array.isArray(data.drivers) && data.drivers.length > 0) {
             const presetMap = new Map<string, FleetPresetDriver>();
-            FLEET_PRESET_DRIVERS.forEach((d) => presetMap.set(d.vehicleNo, d));
+
 
             data.drivers.forEach((d: any) => {
               if (!d.vehicle_no || d.vehicle_no === '미배정' || d.vehicle_no === 'unassigned') return;
@@ -245,11 +250,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
         setPassengerName('');
         setDefaultNavi('tmap');
       } else {
-        const initial = parseVehicleDetails(profile.vehicleNo);
+        const initial = profileVehicleDetails(profile);
         const initPhone = parsePhoneDetails(profile.phone || profile.mobile);
-        const cleanVehicleKey = initial.hocha ? `${initial.hocha}호차` : profile.vehicleNo;
+
         // Direct read from cockpit_driver_profile_${vehicleNo}
-        const stored = getStoredVehicleProfile(cleanVehicleKey);
+        const stored: ReturnType<typeof getStoredVehicleProfile> = profile.driverId ? { ...profile } : null;
         const initialPassenger =
           stored?.passengerName !== undefined
             ? (stored.passengerName ?? '')
@@ -360,7 +365,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
@@ -453,20 +458,10 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     }
 
     // Save vehicle-isolated profile to cockpit_driver_profile_${vehicleNo}
-    const cleanHochaKey = hTrim ? (hTrim.includes('호차') ? hTrim : `${hTrim}호차`) : '4호차';
+
     const normalizedPassenger = passengerName.trim();
     const valueToSave = normalizedPassenger.length > 0 ? normalizedPassenger : null;
 
-    setStoredVehicleProfile(cleanHochaKey, {
-      vehicleNo: combinedVehicleNo,
-      carNumber: combinedPlate || undefined,
-      carNumberFront: pFront,
-      carNumberBack: pBack,
-      driverName: driverName.trim(),
-      phone: combinedPhone,
-      passengerName: valueToSave,
-      defaultNavi: defaultNavi || 'tmap',
-    });
 
     const payload: Partial<DriverProfile> = {
       vehicleNo: combinedVehicleNo,
@@ -487,17 +482,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       setPassengerName('');
     }
 
-    // 2. Trigger modal exit animation FIRST (60fps scale-down & fade-out without Jank)
-    setIsMounted(false);
+    try {
+      const saved=await onSave(payload);
+      if(saved===false)throw new Error('프로필이 저장되지 않았습니다.');
+      setIsMounted(false);onClose();
+    } catch(error) {
+      setValidationMsg(error instanceof Error ? error.message : '저장에 실패했습니다. 다시 시도해 주세요.');
+    } finally {setIsSaving(false);}
 
-    // 3. Decouple heavy parent updates and database calls from the animation frame
-    setTimeout(() => {
-      React.startTransition(() => {
-        onSave(payload);
-        onClose();
-        setIsSaving(false);
-      });
-    }, 180);
   };
 
   return (
@@ -546,7 +538,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
         {/* Modal Body: Focus strictly on separated inputs, navi switcher, and action buttons */}
         <form onSubmit={handleSubmit} className="p-5 space-y-3.5 overflow-y-auto overscroll-contain flex-1">
           {/* Quick Preset Drivers for Development/Dispatcher */}
-          {ENABLE_DEV_FLEET_SWITCHER && (
+          {ENABLE_DEV_FLEET_SWITCHER && !profile.driverId && (
             <div className="p-3 bg-blue-50/60 border border-blue-200/80 rounded-2xl space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-black text-slate-700 flex items-center gap-1.5">
@@ -609,6 +601,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             </div>
           )}
 
+          {profile.driverId && <p className="text-xs text-slate-500">차량 배정은 HQ 예약·배차에서 변경합니다.</p>}
           {/* 1. Hocha (Optional) Field */}
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center">
@@ -619,6 +612,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
+                readOnly={Boolean(profile.driverId)}
                 value={hocha}
                 onChange={handleHochaChange}
                 placeholder="예: 4"
@@ -654,7 +648,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 <input
                   ref={plateFrontRef}
                   type="text"
-                  value={plateFront}
+                  readOnly={Boolean(profile.driverId)}
+                value={plateFront}
                   onChange={handlePlateFrontChange}
                   placeholder="142호"
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-[#1E60F3] focus:bg-white font-bold transition-colors"
@@ -669,7 +664,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   inputMode="numeric"
                   pattern="[0-9]*"
                   maxLength={4}
-                  value={plateBack}
+                  readOnly={Boolean(profile.driverId)}
+                value={plateBack}
                   onChange={handlePlateBackChange}
                   onKeyDown={handlePlateBackKeyDown}
                   placeholder="7811"

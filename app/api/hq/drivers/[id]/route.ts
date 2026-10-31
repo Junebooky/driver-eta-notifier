@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
-import { verifyServerAuth, requireHqAdmin } from '@/lib/auth/serverAuth';
+import { requireHqAdmin } from '@/lib/auth/serverAuth';
 import { mapDbDriverToHqSummary } from '@/types/driverHq';
 
 export async function GET(
@@ -8,7 +8,7 @@ export async function GET(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await verifyServerAuth(req);
+    const auth = await requireHqAdmin(req);
     if (!auth.ok || !auth.session) {
       return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
     }
@@ -30,8 +30,8 @@ export async function GET(
 
     const { data: dbSchedules } = await supabaseAdmin
       .from('schedules')
-      .select('id, vehicle_no, date, pickup_time, end_time, origin, destination, passenger_name, flight_number, passenger_note, status')
-      .eq('vehicle_no', dbDriver.vehicle_no)
+      .select('*')
+      .eq('driver_id', id)
       .order('date', { ascending: false });
 
     const driverSummary = mapDbDriverToHqSummary(dbDriver, dbSchedules || []);
@@ -115,8 +115,8 @@ export async function PATCH(
     // Fetch schedules to return complete updated summary
     const { data: dbSchedules } = await supabaseAdmin
       .from('schedules')
-      .select('id, vehicle_no, date, pickup_time, end_time, origin, destination, passenger_name, flight_number, passenger_note, status')
-      .eq('vehicle_no', updatedDriver.vehicle_no)
+      .select('*')
+      .eq('driver_id', id)
       .order('date', { ascending: false });
 
     const driverSummary = mapDbDriverToHqSummary(updatedDriver, dbSchedules || []);

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { verifyServerAuth, requireHqAdmin } from '@/lib/auth/serverAuth';
+import { normalizeDateToIso,normalizeTimeHHmm } from '@/utils/dispatchConflictDetector';
 import { HqDrivingLog, HqDrivingLogStatus } from '@/types/drivingLogHq';
 
 export const dynamic = 'force-dynamic';
@@ -42,6 +43,7 @@ export function mapDbRowToDrivingLog(row: any, index: number = 1): HqDrivingLog 
     drivingDate,
     rawDate,
     driverName: row.driver_name,
+    passengerCount: row.passenger_count ?? undefined,
     customerName: row.customer_name || '미지정 고객',
     vehicleModel: row.vehicle_model || '법인 차량',
     vehiclePlate: row.vehicle_plate || '',
@@ -182,17 +184,17 @@ export async function POST(req: NextRequest) {
       totalDutyHours,
       startKm,
       endKm,
-      distanceKm,
       stops,
       notes,
-      expenseAmount = 0,
-      expenseCount = 0,
       status = '검토 대기',
     } = body;
 
+    if(!normalizeDateToIso(drivingDate))return NextResponse.json({ok:false,error:'운행 날짜를 확인해 주세요.'},{status:400});
+    if((clockIn && !normalizeTimeHHmm(clockIn)) || (clockOut && !normalizeTimeHHmm(clockOut)))return NextResponse.json({ok:false,error:'출퇴근 시간을 확인해 주세요.'},{status:400});
     // 1. Role & Identity Enforcement
-    const effectiveDriverId = auth.session.driverId || auth.session.userId;
-    const effectiveDriverName = (auth.session.driverName || driverName || '윤태준').trim();
+    const effectiveDriverId = auth.session.role==='driver' ? auth.session.driverId || auth.session.userId : driverId;
+    if(!isValidUuid(effectiveDriverId))return NextResponse.json({ok:false,error:'실제 기사 UUID가 필요합니다.'},{status:400});
+    const effectiveDriverName = (auth.session.driverName || driverName || '담당 기사').trim();
 
     if (auth.session.role === 'driver') {
       // Driver cannot submit on behalf of another driverId
@@ -215,7 +217,7 @@ export async function POST(req: NextRequest) {
     if (id && isValidUuid(id)) {
       const { data: existingLog, error: existErr } = await supabaseAdmin
         .from('driving_logs')
-        .select('id, driver_id, organization_id, status')
+        .select('id, driver_id, organization_id, status, booking_id, driving_date')
         .eq('id', id)
         .maybeSingle();
 
@@ -227,6 +229,8 @@ export async function POST(req: NextRequest) {
       }
 
       if (existingLog) {
+        if((existingLog.booking_id || null)!==(bookingId || null) || existingLog.driving_date!==drivingDate)return NextResponse.json({ok:false,error:'다른 날짜·예약은 별도 운행일지로 기록해 주세요.'},{status:409});
+        if(status==='draft' && existingLog.status!=='draft')return NextResponse.json({ok:false,error:'이미 제출한 일지를 임시 저장으로 변경할 수 없습니다.'},{status:409});
         // Must belong to same organization
         if (existingLog.organization_id !== auth.session.org) {
           return NextResponse.json(
@@ -284,11 +288,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    let verifiedSchedule: {vehicle_id?:string;vehicle_plate?:string;customer_id?:string;customer_name?:string;schedule_meta?:{vehicleModel?:string;vehiclePlate?:string;customerId?:string;customerName?:string}}|null=null;
     // 4. Verify bookingId and driver schedule assignment
     if (bookingId) {
       const { data: scheduleRow, error: schedErr } = await supabaseAdmin
         .from('schedules')
-        .select('id, customer_name, driver_name, driver_id, vehicle_no, vehicle_plate, schedule_meta')
+        .select('*')
         .eq('id', bookingId)
         .maybeSingle();
 
@@ -306,9 +311,11 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      if(scheduleRow.schedule_meta?.serviceMode==='vehicle_only' || ['draft','unassigned','cancelled'].includes(scheduleRow.dispatch_status))return NextResponse.json({ok:false,error:'현재 기사 운행으로 배정된 예약만 연결할 수 있습니다.'},{status:403});
+      verifiedSchedule=scheduleRow;
       // If requester is a driver, verify that this booking is strictly assigned to their driver_id
       if (auth.session.role === 'driver') {
-        const schedMetaDriverId = scheduleRow.schedule_meta?.driver_id || scheduleRow.driver_id;
+        const schedMetaDriverId = scheduleRow.driver_id || scheduleRow.schedule_meta?.driverId || scheduleRow.schedule_meta?.driver_id;
         if (!schedMetaDriverId || schedMetaDriverId !== effectiveDriverId) {
           return NextResponse.json(
             { ok: false, error: '본인에게 배정되지 않았거나 기사 식별자(UUID)가 확정되지 않은 예약입니다. (403 Forbidden)' },
@@ -318,32 +325,20 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const calculatedDist = endKmNum > startKmNum ? endKmNum - startKmNum : formatOdoNum(distanceKm);
+    const calculatedDist = endKmNum >= startKmNum && endKmNum>0 ? endKmNum - startKmNum : 0;
     const nowIso = new Date().toISOString();
 
-    // Idempotent draft resolution: Reuse existing draft ID for the same booking + driver
-    let targetRowId = id && isValidUuid(id) ? id : null;
-    let existingDraftStops: any[] = [];
-    if (!targetRowId && bookingId) {
-      const { data: existingDraft } = await supabaseAdmin
-        .from('driving_logs')
-        .select('id, stops')
-        .eq('organization_id', auth.session.org)
-        .eq('booking_id', bookingId)
-        .eq('driver_id', effectiveDriverId)
-        .eq('status', 'draft')
-        .maybeSingle();
-
-      if (existingDraft?.id) {
-        targetRowId = existingDraft.id;
-        if (Array.isArray(existingDraft.stops)) {
-          existingDraftStops = existingDraft.stops;
-        }
-      }
-    }
-    if (!targetRowId) {
-      targetRowId = crypto.randomUUID();
-    }
+    // Resolve the same logical report across devices, reconnects and navigation drafts.
+    let lookup=supabaseAdmin.from('driving_logs').select('id, stops, status').eq('organization_id',auth.session.org).eq('driver_id',effectiveDriverId).eq('driving_date',drivingDate);
+    lookup=bookingId?lookup.eq('booking_id',bookingId):lookup.is('booking_id',null);
+    const previous=await lookup.maybeSingle();
+    if(previous.error)return NextResponse.json({ok:false,error:'기존 운행일지 확인에 실패했습니다.'},{status:503});
+    const existing=previous.data;
+    if(existing && auth.session.role==='driver' && ['승인 완료','검토 중'].includes(existing.status))return NextResponse.json({ok:false,error:'이미 검토 중이거나 승인된 운행일지입니다.'},{status:403});
+    if(existing && status==='draft' && existing.status!=='draft')return NextResponse.json({ok:false,error:'이미 제출한 일지를 임시 저장으로 변경할 수 없습니다.'},{status:409});
+    const targetRowId=existing?.id || (isValidUuid(id)?id:crypto.randomUUID());
+    // A background navigation append preserves stops; a deliberate final edit may delete/reorder them.
+    const existingDraftStops = status==='draft' && Array.isArray(existing?.stops)?existing.stops:[];
 
     // Merge stops deduplicating by id or actionIdempotencyKey
     const incomingStops = Array.isArray(stops) ? stops : [];
@@ -365,11 +360,11 @@ export async function POST(req: NextRequest) {
       booking_id: bookingId || null,
       driver_id: effectiveDriverId,
       driver_name: effectiveDriverName,
-      vehicle_id: vehicleId || auth.session.vehicleNo || '1호차',
-      vehicle_plate: vehiclePlate || auth.session.carNumber || '',
-      vehicle_model: vehicleModel || '법인 차량',
-      customer_id: customerId || null,
-      customer_name: customerName || 'VIP 고객',
+      vehicle_id: verifiedSchedule?.vehicle_id || vehicleId || null,
+      vehicle_plate: verifiedSchedule?.vehicle_plate || verifiedSchedule?.schedule_meta?.vehiclePlate || vehiclePlate || auth.session.carNumber || '',
+      vehicle_model: verifiedSchedule?.schedule_meta?.vehicleModel || vehicleModel || '',
+      customer_id: verifiedSchedule?.customer_id || verifiedSchedule?.schedule_meta?.customerId || customerId || null,
+      customer_name: verifiedSchedule?.customer_name || verifiedSchedule?.schedule_meta?.customerName || customerName || '',
       driving_date: drivingDate || new Date().toISOString().split('T')[0],
       clock_in: clockIn || null,
       clock_out: clockOut || null,
@@ -383,8 +378,9 @@ export async function POST(req: NextRequest) {
       distance_km: calculatedDist,
       stops: mergedStops.length > 0 ? mergedStops : incomingStops,
       notes: notes || '',
-      expense_amount: Number(expenseAmount) || 0,
-      expense_count: Number(expenseCount) || 0,
+      passenger_count: Number.isInteger(body.passengerCount) && body.passengerCount>=0 ? body.passengerCount : null,
+      expense_amount: 0,
+      expense_count: 0,
       status: isSubmitting ? '검토 대기' : 'draft',
       submitted_at: isSubmitting ? nowIso : null,
       submitted_by: isSubmitting ? (auth.session.displayName || auth.session.driverName || '기사') : null,
@@ -404,25 +400,6 @@ export async function POST(req: NextRequest) {
         { ok: false, error: `데이터베이스 저장 실패: ${saveErr.message}` },
         { status: 500 }
       );
-    }
-
-    // If linked to a booking, sync the driving_log metadata on cockpit.schedules
-    if (bookingId) {
-      await supabaseAdmin
-        .from('schedules')
-        .update({
-          driving_log: {
-            logId: savedRow.id,
-            status: insertPayload.status,
-            startKm: startKmNum,
-            endKm: endKmNum,
-            distanceKm: calculatedDist,
-            stopsCount: Array.isArray(stops) ? stops.length : 0,
-            submittedAt: nowIso,
-            updatedAt: nowIso,
-          },
-        })
-        .eq('id', bookingId);
     }
 
     return NextResponse.json({

@@ -23,7 +23,9 @@ import {
   HqEmailDetail,
   HqEmailExtractedDraft,
 } from '@/types/emailHq';
+import { buildEmailDispatchPlan } from '@/utils/emailDispatchPlan';
 import { haptics } from '@/utils/haptics';
+import { createRetryableJsonMutation } from '@/utils/retryableJsonMutation';
 import {
   REFERENCE_EMAILS,
   ReferenceEmailItem,
@@ -66,6 +68,7 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
   onCreateBooking,
   onSavedServer,
 }) => {
+  const [dispatchMutation]=useState(()=>createRetryableJsonMutation('cockpit_pending_email_dispatch'));
   const searchParams = useSearchParams();
   const urlStep = searchParams?.get('step') as EmailWorkflowStep | null;
   const urlDriverModal = searchParams?.get('driverModal') === 'true';
@@ -575,168 +578,25 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
   // =========================================================
   // Step 2 -> Step 4 Dispatch Confirmation (Server Real Sync)
   // =========================================================
-  const handleConfirmDispatch = async () => {
-    if (!currentSummary) return;
-
-    // P0 Requirement: Administrator MUST explicitly assign a driver.
-    const assignedSlots = vehicleSlots.filter((slot) => slot.driver !== null);
-    if (assignedSlots.length === 0) {
-      setDispatchError('배차 확정을 진행하려면 1명 이상의 가용 기사를 직접 선택해야 합니다.');
-      haptics.errorAlert();
-      return;
-    }
-
-    const primaryDriver = assignedSlots[0]?.driver;
-    if (!primaryDriver) {
-      setDispatchError('배차할 1호차 기사를 선택해 주세요.');
-      return;
-    }
-
-    // Dynamic Draft Values - Strict Validation (No Arbitrary Defaults or allowUnverified Bypass)
-    const draft = currentDraft;
-    if (!draft) {
-      setDispatchError('예약 정보가 없습니다. 먼저 이메일 AI 추출 또는 수동 입력을 진행해 주세요.');
-      haptics.errorAlert();
-      return;
-    }
-
-    const pickupDate = draft.pickupDate?.trim();
-    if (!pickupDate) {
-      setDispatchError('운행 일자가 지정되지 않았습니다. 예약 일자를 먼저 확인/입력해 주세요.');
-      haptics.errorAlert();
-      return;
-    }
-
-    const pickupTime = draft.pickupTime?.trim();
-    if (!pickupTime) {
-      setDispatchError('픽업 시간이 지정되지 않았습니다. 픽업 시간을 먼저 확인/입력해 주세요.');
-      haptics.errorAlert();
-      return;
-    }
-
-    const passengerName = draft.passengerName?.trim();
-    if (!passengerName) {
-      setDispatchError('탑승객명이 지정되지 않았습니다. 탑승객명을 먼저 확인/입력해 주세요.');
-      haptics.errorAlert();
-      return;
-    }
-
-    const origin = draft.pickupLocation?.trim();
-    const destination = draft.dropoffLocation?.trim();
-    if (!origin || !destination) {
-      setDispatchError('출발지(픽업 위치)와 목적지는 필수 입력 항목입니다.');
-      haptics.errorAlert();
-      return;
-    }
-
-    // TMAP POI candidate confirmation enforcement with coordinates (Issue #33)
-    if (
-      !draft.isPickupPoiConfirmed ||
-      typeof draft.pickupLat !== 'number' ||
-      typeof draft.pickupLng !== 'number'
-    ) {
-      setDispatchError('출발지의 TMAP 위치 후보를 직접 클릭하여 좌표를 확정해야 배차를 최종 등록할 수 있습니다.');
-      haptics.errorAlert();
-      return;
-    }
-
-    if (
-      !draft.isDropoffPoiConfirmed ||
-      typeof draft.dropoffLat !== 'number' ||
-      typeof draft.dropoffLng !== 'number'
-    ) {
-      setDispatchError('목적지의 TMAP 위치 후보를 직접 클릭하여 좌표를 확정해야 배차를 최종 등록할 수 있습니다.');
-      haptics.errorAlert();
-      return;
-    }
-
-    setIsDispatching(true);
-    setDispatchError(null);
-
-    try {
-      // Disambiguate passenger phone: NEVER allow an email address!
-      const rawPassengerPhone = draft.passengerPhone?.trim() || '';
-      const safePassengerPhone = rawPassengerPhone.includes('@') ? '' : rawPassengerPhone;
-
-      const bookingPayload = {
-        customerName: draft.companyName?.trim() || '미등록 고객사',
-        contactName: draft.contactName?.trim() || '',
-        contactPhone: draft.contactPhone?.trim() || '',
-        contactEmail: draft.contactEmail?.trim() || '',
-        clientId: draft.clientId || null,
-        contactId: draft.contactId || null,
-        intakeSource: 'email',
-        date: pickupDate,
-        pickupTime: pickupTime,
-        origin: origin,
-        originAddress: origin,
-        originLat: draft.pickupLat,
-        originLng: draft.pickupLng,
-        destination: destination,
-        destinationAddress: destination,
-        destinationLat: draft.dropoffLat,
-        destinationLng: draft.dropoffLng,
-        placeVerified: true,
-        allowUnverified: false, // STRICTLY FALSE: Unverified dispatches are blocked!
-        passengerName: passengerName,
-        passengerPhone: safePassengerPhone,
-        passengerCount: typeof draft.passengerCount === 'number' && draft.passengerCount > 0 ? draft.passengerCount : 1,
-        flightNumber: draft.flightNumber?.trim() || '',
-        notes: draft.specialRequests || `이메일 접수 (편명: ${draft.flightNumber || '미지정'})`,
-        driverId: primaryDriver.id,
-        driverName: primaryDriver.name,
-        driverPhone: primaryDriver.phone,
-        vehicleNo: primaryDriver.plate,
-        vehiclePlate: primaryDriver.plate,
-        vehicleModel: assignedSlots[0].vehicleModel,
-        dispatchStatus: 'published',
-        publishedBy: '대표/관리자 (이메일 배차 확정)',
-      };
-
-      const res = await fetch('/api/schedules/dispatch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bookingPayload),
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      // STRICT VALIDATION: Do NOT show fake success or advance if API failed
-      if (!res.ok || !data.ok || !data.schedule) {
-        throw new Error(data.error || '배차 저장 API가 정상 응답을 반환하지 않았습니다.');
-      }
-
-      // True Success Handlers
-      setDispatchedSchedule(data.schedule);
-      const savedBooking = mapScheduleItemToHqBooking(data.schedule, 0);
-
-      if (draft) {
-        const updatedDraft: HqEmailExtractedDraft = {
-          ...draft,
-          status: 'published',
-          assignedDriver: primaryDriver.name,
-          assignedVehicle: assignedSlots[0]?.vehicleModel || null,
-          assignedVehiclePlate: primaryDriver.plate || null,
-        };
-        saveEmailDraft(updatedDraft);
-        setDraftsByEmailId((prev) => ({
-          ...prev,
-          [currentSummary.id]: updatedDraft,
-        }));
-      }
-
-      onCreateBooking?.(savedBooking);
+  const handleConfirmDispatch = async (status:'published'|'unassigned'='published') => {
+    if(!currentSummary || !currentDraft || isDispatching)return;
+    setIsDispatching(true);setDispatchError(null);
+    try{
+      if(currentDraft.savedScheduleIds)throw new Error('이미 저장된 요청입니다. 모바일·PC의 예약 목록에서 날짜별 배정을 진행해 주세요.');
+      const items=buildEmailDispatchPlan(currentDraft,vehicleSlots,status);
+      if(currentDraft.savedScheduleIds && (Object.keys(currentDraft.savedScheduleIds).length!==items.length || items.some(item=>!item.scheduleId)))throw new Error('이미 저장한 날짜·차량 구성이 변경되었습니다. 기존 미배정 예약을 먼저 확인·취소해 주세요.');
+      const response=await dispatchMutation.send('/api/schedules/dispatch',{items});
+      const data=await response.json();
+      if(!response.ok || !data.ok || data.schedules?.length!==items.length)throw new Error(data.error || '전체 일정 저장을 확인하지 못했습니다.');
+      const updated={...currentDraft,status:status==='published'?'published' as const:'saved' as const,associatedBookingId:data.schedules[0].id,savedScheduleIds:Object.fromEntries(items.map((item,index)=>[`${item.date}:${item.groupVehicleIndex-1}`,data.schedules[index].id]))};
+      saveEmailDraft(updated);setDraftsByEmailId(previous=>({...previous,[currentSummary.id]:updated}));
+      setDispatchedSchedule(data.schedules[0]);
+      data.schedules.forEach((schedule:import('@/data/ferrariSchedules').ScheduleItem,index:number)=>onCreateBooking?.(mapScheduleItemToHqBooking(schedule,index)));
       await onSavedServer?.();
-
-      setWorkflowStep('step4_dispatch_done');
-      showToast(`${primaryDriver.name} 기사님 Cockpit에 배차 알림이 실시간 전송되었습니다.`);
-    } catch (err: any) {
-      console.error('Dispatch confirmation failed:', err);
-      setDispatchError(err.message || '서버 통신 실패로 배차 확정이 중단되었습니다.');
-      haptics.errorAlert();
-    } finally {
-      setIsDispatching(false);
-    }
+      if(status==='published')setWorkflowStep('step4_dispatch_done');
+      showToast(status==='published'?`${items.length}건의 날짜별 배차가 저장되었습니다.`:'대표 모바일·PC의 미배정 배차 목록에 지정 요청이 저장되었습니다.');
+    }catch(error){setDispatchError(error instanceof Error?error.message:'배차 저장에 실패했습니다.');}
+    finally{setIsDispatching(false);}
   };
 
   // Reset to Step 1
@@ -1091,6 +951,7 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
         {/* Dynamic Right Column: Sequential Multi-Step Workflow Card */}
         {/* ========================================================= */}
         <div className="flex-1 min-w-0 w-full space-y-4">
+          {dispatchMutation.hasPending && <button type="button" className="rounded-xl border border-blue-200 p-3 text-sm text-blue-700" onClick={async()=>{try{const response=await dispatchMutation.retry();const data=await response.json();if(!response.ok||!data.ok)throw new Error(data.error || '저장 결과를 확인하지 못했습니다.');window.location.reload();}catch(error){setDispatchError(error instanceof Error?error.message:'저장 결과를 확인하지 못했습니다.');}}}>이전 배차 저장 결과 확인</button>}
           {currentSummary && (
             <div className="rounded-2xl border border-slate-200/90 overflow-hidden shadow-xs">
               <HqEmailWorkflowStepper
@@ -1138,7 +999,8 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                   extractedDraft={currentDraft}
                   vehicleSlots={vehicleSlots}
                   onOpenDriverModal={handleOpenDriverModal}
-                  onConfirmDispatch={handleConfirmDispatch}
+                  onConfirmDispatch={()=>void handleConfirmDispatch('published')}
+                  onRequestAssignment={()=>void handleConfirmDispatch('unassigned')}
                   onBackToStep1={() => setWorkflowStep('step1_extract')}
                   onUpdateDraft={handleUpdateDraft}
                   onUpdateVehicleSlots={setVehicleSlots}

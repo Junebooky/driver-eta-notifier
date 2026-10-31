@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import Script from 'next/script';
 import './globals.css';
+import { SessionGate } from '@/components/SessionGate';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -35,8 +36,6 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   viewportFit: 'cover',
   themeColor: '#FFFFFF',
 };
@@ -64,7 +63,7 @@ export default function RootLayout({
         </Script>
       </head>
       <body className={`${inter.className} min-h-dvh flex flex-col bg-[#F8FAFC] antialiased select-none overflow-x-hidden`}>
-        {children}
+        <SessionGate>{children}</SessionGate>
       </body>
     </html>
   );

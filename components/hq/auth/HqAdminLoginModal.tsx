@@ -21,6 +21,8 @@ export const HqAdminLoginModal: React.FC<HqAdminLoginModalProps> = ({
   initialMessage,
 }) => {
   const [secret, setSecret] = useState('');
+  const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
   const [showSecret, setShowSecret] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(initialMessage || null);
@@ -31,7 +33,7 @@ export const HqAdminLoginModal: React.FC<HqAdminLoginModalProps> = ({
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!secret.trim()) {
-      setErrorMessage('본사 관리자 비밀키를 입력해주세요.');
+      setErrorMessage('개인 계정 비밀번호를 입력해 주세요.');
       return;
     }
 
@@ -45,17 +47,16 @@ export const HqAdminLoginModal: React.FC<HqAdminLoginModalProps> = ({
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          role: 'hq_admin',
-          secret: secret.trim(),
+          email, password:secret, code,
         }),
       });
 
       const data = await res.json().catch(() => ({}));
 
-      if (!res.ok || !data.ok) {
+      if (!res.ok || !data.ok || data.session?.role !== 'hq_admin') {
         haptics.errorAlert();
         setErrorMessage(
-          data.error || `로그인 실패 (HTTP ${res.status}): 비밀키를 확인해주세요.`
+          data.error || `로그인 실패 (HTTP ${res.status}): 개인 계정 정보를 확인해 주세요.`
         );
         return;
       }
@@ -111,9 +112,15 @@ export const HqAdminLoginModal: React.FC<HqAdminLoginModalProps> = ({
 
         {/* Form Body */}
         <form onSubmit={handleLogin} className="p-6 space-y-4">
+          <label className="block text-xs font-bold text-slate-700">이메일
+            <input type="email" autoComplete="username" value={email} onChange={e=>setEmail(e.target.value)} required className="mt-2 w-full rounded-xl border border-slate-200 p-3" />
+          </label>
+          <label className="block text-xs font-bold text-slate-700">인증 앱 번호 (설정된 경우)
+            <input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,''))} className="mt-2 w-full rounded-xl border border-slate-200 p-3" />
+          </label>
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5">
-              관리자 비밀키 (HQ Secret Passkey)
+              개인 계정 비밀번호
             </label>
             <div className="relative">
               <div className="w-8 h-8 absolute left-2 top-1/2 -translate-y-1/2 flex items-center justify-center text-slate-400">
@@ -123,7 +130,8 @@ export const HqAdminLoginModal: React.FC<HqAdminLoginModalProps> = ({
                 type={showSecret ? 'text' : 'password'}
                 value={secret}
                 onChange={(e) => setSecret(e.target.value)}
-                placeholder="관리자 비밀키를 입력하세요"
+                placeholder="비밀번호를 입력하세요"
+                autoComplete="current-password"
                 autoFocus
                 className="w-full pl-10 pr-10 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-mono font-bold text-slate-900 placeholder:text-slate-400 placeholder:font-sans focus:bg-white focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 outline-none transition-all"
               />
@@ -131,7 +139,7 @@ export const HqAdminLoginModal: React.FC<HqAdminLoginModalProps> = ({
                 type="button"
                 onClick={() => setShowSecret(!showSecret)}
                 className="w-8 h-8 absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center text-slate-400 hover:text-slate-600 cursor-pointer"
-                aria-label={showSecret ? '비밀키 숨기기' : '비밀키 보기'}
+                aria-label={showSecret ? '비밀번호 숨기기' : '비밀번호 보기'}
               >
                 {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -163,7 +171,7 @@ export const HqAdminLoginModal: React.FC<HqAdminLoginModalProps> = ({
               기사 명단 조회, 신규 기사 등록 및 차량별 안내자료(Info) 관리는 본사 관리자(HQ Admin) 권한이 필요합니다.
             </p>
             <p className="text-slate-400">
-              * 서버 환경 변수(HQ_ADMIN_SECRET)로 구성된 전용 관리자 비밀키를 입력해주세요.
+              * 관리자가 권한을 연결한 개인 계정으로 로그인해 주세요.
             </p>
           </div>
 

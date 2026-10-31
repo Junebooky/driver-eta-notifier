@@ -11,6 +11,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
     }
 
+    if(auth.session.role!=='driver')return NextResponse.json({ok:false,error:'배차 확인은 지정된 기사 계정에서 진행해 주세요.'},{status:403});
     const body = await req.json().catch(() => ({}));
     const { scheduleId, version, deviceSummary = 'Driver Cockpit Mobile' } = body;
 

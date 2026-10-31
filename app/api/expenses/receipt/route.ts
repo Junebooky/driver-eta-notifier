@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { verifyServerAuth } from '@/lib/auth/serverAuth';
@@ -8,7 +9,6 @@ const ALLOWED_MIME_TYPES = [
   'image/jpeg',
   'image/png',
   'image/webp',
-  'image/heic',
   'application/pdf',
 ];
 const MAX_RECEIPT_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
@@ -130,7 +130,8 @@ export async function GET(req: NextRequest) {
     return new NextResponse(Buffer.from(arrayBuffer), {
       headers: {
         'Content-Type': contentType,
-        'Cache-Control': 'private, max-age=3600',
+        'Cache-Control': 'private, no-store',
+        'X-Content-Type-Options': 'nosniff',
       },
     });
   } catch (err: any) {
@@ -180,7 +181,7 @@ export async function POST(req: NextRequest) {
     }
 
     // File size validation (10MB)
-    if (file.size > MAX_RECEIPT_SIZE_BYTES) {
+    if (file.size===0 || file.size > MAX_RECEIPT_SIZE_BYTES) {
       return NextResponse.json(
         { ok: false, error: '영수증 파일 크기는 10MB 이하여야 합니다.' },
         { status: 400 }
@@ -191,11 +192,10 @@ export async function POST(req: NextRequest) {
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
-    const ext = file.name.split('.').pop() || 'jpg';
-    const uniqueId = `rec_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    const storagePath = `${auth.session.org}/expenses/receipts/${effectiveDriverId}/${year}/${month}/${uniqueId}.${ext}`;
-
     const buffer = Buffer.from(await file.arrayBuffer());
+    const ext=({'image/jpeg':'jpg','image/png':'png','image/webp':'webp','application/pdf':'pdf'} as Record<string,string>)[mimeType];
+    const digest=createHash('sha256').update(buffer).digest('hex');
+    const storagePath = `${auth.session.org}/expenses/receipts/${effectiveDriverId}/${year}/${month}/${digest}.${ext}`;
 
     const { error: uploadError } = await supabaseAdmin.storage
       .from('cockpit-assets')
@@ -205,7 +205,7 @@ export async function POST(req: NextRequest) {
       });
 
     // Zero simulated fallback on error: Strictly report actual failure
-    if (uploadError) {
+    if (uploadError && String((uploadError as {statusCode?:string}).statusCode)!=='409') {
       console.error('[Receipt Upload] Storage Error:', uploadError.message);
       return NextResponse.json(
         { ok: false, error: `영수증 스토리지 저장 실패: ${uploadError.message}` },

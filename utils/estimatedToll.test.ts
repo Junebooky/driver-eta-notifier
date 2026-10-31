@@ -3,26 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { NextRequest } from 'next/server';
 
-// Load .env.local if running standalone outside Next.js runtime
-if (!process.env.TMAP_API_KEY) {
-  try {
-    const envPath = path.resolve(process.cwd(), '.env.local');
-    if (fs.existsSync(envPath)) {
-      const content = fs.readFileSync(envPath, 'utf8');
-      content.split('\n').forEach((line) => {
-        const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
-        if (match) {
-          const key = match[1];
-          let value = match[2] || '';
-          if (value.startsWith('"') && value.endsWith('"')) value = value.slice(1, -1);
-          if (!process.env[key]) process.env[key] = value;
-        }
-      });
-    }
-  } catch {
-    // fallback
-  }
-}
+process.env.DEV_AUTH_ENABLED = 'true';
+process.env.NEXT_PUBLIC_USE_MOCK = 'true';
 
 async function runTollTests() {
   console.log('🧪 Starting P2 Estimated Toll (Phase H1) Test Suite...');

@@ -1,3 +1,4 @@
+import { dispatchRequestContext } from '@/lib/dispatch/requestContext';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   checkServerDispatchConflicts,
@@ -39,6 +40,7 @@ function normalizePayloadItem(raw: Record<string, any>, rootBody: Record<string,
     pickupTime: raw.pickupTime || '',
     endTime: raw.endTime || raw.pickupEndTime || '',
     timeDisplay: raw.timeDisplay,
+    routeWaypoints: raw.routeWaypoints,
     origin: raw.origin || raw.pickupLocation || '',
     originAddress: raw.originAddress,
     originLat: raw.originLat,
@@ -76,6 +78,13 @@ export async function POST(req: NextRequest) {
       ? body.items
       : [body];
 
+    for(const raw of rawItems){
+      if(raw.routeWaypoints!==undefined){
+        const points=raw.routeWaypoints;
+        if(!Array.isArray(points)||points.length<2||points.length>200||points.some((p:Record<string,unknown>)=>!p||typeof p.location!=='string'||!p.location.trim()||p.date!==(raw.date || raw.pickupDate)))return NextResponse.json({ok:false,error:'날짜별 경로를 확인해 주세요.'},{status:400});
+        if((raw.dispatchStatus || 'published')==='published' && points.some((p:Record<string,unknown>)=>p.isPoiConfirmed!==true||typeof p.lat!=='number'||Math.abs(p.lat)>90||typeof p.lng!=='number'||Math.abs(p.lng)>180||!Number.isFinite(p.lat)||!Number.isFinite(p.lng)))return NextResponse.json({ok:false,error:'모든 경유지 위치를 확정해 주세요.'},{status:400});
+      }
+    }
     const candidates = rawItems.map((item) => normalizePayloadItem(item, body));
 
     for (const cand of candidates) {
@@ -157,8 +166,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const context=dispatchRequestContext(req,auth.session!,body);
+    if(!context)return NextResponse.json({ok:false,code:'IDEMPOTENCY_KEY_REQUIRED',error:'저장 요청 번호가 필요합니다. 화면을 새로고침해 주세요.'},{status:400});
+
     // P0 Concurrency Mutex & Atomic Batch Upsert Guard with All-or-Nothing Rollback (Point 1)
-    const batchResult = await atomicUpsertServerDispatchBatch(candidates);
+    const batchResult = await atomicUpsertServerDispatchBatch(candidates, undefined, context.requestId, context.fingerprint);
     if (!batchResult.ok) {
       if (batchResult.conflicts && batchResult.conflicts.length > 0) {
         return NextResponse.json(
@@ -174,7 +186,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           ok: false,
-          code: batchResult.error?.includes('미확인 장소') ? 'UNRESOLVED_PLACE_GUARD' : 'DISPATCH_SAVE_FAILED',
+          code: batchResult.statusCode === 409 ? 'SCHEDULE_CONFLICT' : batchResult.error?.includes('미확인 장소') ? 'UNRESOLVED_PLACE_GUARD' : 'DISPATCH_SAVE_FAILED',
           error: batchResult.error || '배차 저장에 실패했습니다.',
         },
         { status: batchResult.statusCode || 400 }

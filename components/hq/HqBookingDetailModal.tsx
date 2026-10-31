@@ -17,6 +17,9 @@ import {
   Image as ImageIcon,
 } from 'lucide-react';
 import { HqBooking } from '@/types/hq';
+import { useFleetAvailability } from '@/hooks/useFleetAvailability';
+import { validateDispatchInterval } from '@/utils/dispatchInterval';
+import { createRetryableJsonMutation } from '@/utils/retryableJsonMutation';
 import { haptics } from '@/utils/haptics';
 import { VIP_REAL_VEHICLES, stripManufacturerName } from '@/utils/vehicleData';
 import { HqDriverVehicleInfoModal } from './bookings/HqDriverVehicleInfoModal';
@@ -87,6 +90,9 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
   const [customerName, setCustomerName] = useState('');
   const [pickupDate, setPickupDate] = useState('');
   const [pickupTime, setPickupTime] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [endTime, setEndTime] = useState('');
+  const fleet = useFleetAvailability(pickupDate, pickupTime, endDate || pickupDate, endTime, booking?.scheduleId);
   const [pickupLocation, setPickupLocation] = useState('');
   const [destination, setDestination] = useState('');
   const [passengerName, setPassengerName] = useState('');
@@ -96,11 +102,13 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
   const [notes, setNotes] = useState('');
 
   const [selectedDriverName, setSelectedDriverName] = useState('');
+  const [selectedDriverId, setSelectedDriverId] = useState('');
   const [selectedVehiclePlate, setSelectedVehiclePlate] = useState('');
 
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [cancelReason, setCancelReason] = useState('고객 요청 일정 취소');
   const [isSaving, setIsSaving] = useState(false);
+  const [saveMutation]=useState(()=>createRetryableJsonMutation('cockpit_pending_booking_edit'));
   const [notice, setNotice] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -117,7 +125,9 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
     if (!booking || !isOpen) return;
     setCustomerName(booking.customerName || '');
     setPickupDate(normalizeDateToIso(booking.pickupDate) || getKstTodayDateStr());
-    setPickupTime(normalizeTimeHHmm(booking.pickupTime) || '09:00');
+    setPickupTime(normalizeTimeHHmm(booking.pickupTime));
+    setEndDate(normalizeDateToIso(booking.endDate || booking.pickupDate));
+    setEndTime(normalizeTimeHHmm(booking.endTime));
     setPickupLocation(booking.pickupLocation || '');
     setDestination(booking.destination || '');
     setPassengerName(booking.passengerName || '');
@@ -128,6 +138,7 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
 
     const cleanDrv = cleanDriverIdentity(booking.driverName);
     setSelectedDriverName(cleanDrv);
+    setSelectedDriverId(booking.driverId || '');
     setSelectedVehiclePlate(
       booking.vehiclePlate && booking.vehiclePlate !== '미배정' ? booking.vehiclePlate : ''
     );
@@ -136,47 +147,18 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
     setErrorMsg(null);
   }, [booking, isOpen]);
 
-  const sortedDrivers = useMemo(
-    () => getSortedDriversForLanguage(booking?.requestedLanguage || 'ko', liveDriverProfiles),
-    [booking?.requestedLanguage, liveDriverProfiles]
-  );
-
-  // Live conflict check in modal
-  const matchedDriver = useMemo(
-    () => liveDriverProfiles.find((d) => d.name === selectedDriverName),
-    [liveDriverProfiles, selectedDriverName]
-  );
-
   const modalConflicts = useMemo(() => {
-    if (!booking || !isOpen) return [];
-    return detectDispatchConflicts(
-      {
-        id: booking.id,
-        scheduleId: booking.scheduleId,
-        pickupDate,
-        pickupTime,
-        endDate: booking.endDate,
-        endTime: booking.endTime,
-        driverName: selectedDriverName,
-        driverId: matchedDriver?.id || booking.driverId,
-        vehiclePlate: selectedVehiclePlate,
-        vehicleId: booking.vehicleId,
-        serviceMode: booking.serviceMode,
-      },
-      existingBookings
-    );
-  }, [booking, isOpen, pickupDate, pickupTime, selectedDriverName, matchedDriver?.id, selectedVehiclePlate, existingBookings]);
+    if (!booking || !isOpen || !fleet.data) return [];
+    const messages: { message: string }[] = [];
+    const vehicle = fleet.data.vehicles.find(v => v.plate === selectedVehiclePlate);
+    const driver = fleet.data.drivers.find(d => d.id === selectedDriverId);
+    if (vehicle && !vehicle.isAvailable) messages.push({ message: vehicle.unavailabilityReason || '선택 기간에 차량 예약이 있습니다.' });
+    if (booking.serviceMode !== 'vehicle_only' && driver && !driver.isAvailable) messages.push({ message: driver.unavailabilityReason || '선택 기간에 기사 배차가 있습니다.' });
+    return messages;
+  }, [booking, isOpen, fleet.data, selectedVehiclePlate, selectedDriverId]);
+
 
   if (!isOpen || !booking) return null;
-
-  const handleSelectDriver = (drvName: string) => {
-    setErrorMsg(null);
-    setSelectedDriverName(drvName);
-    const matched = liveDriverProfiles.find((d) => d.name === drvName);
-    if (matched && !selectedVehiclePlate) {
-      setSelectedVehiclePlate(matched.plate);
-    }
-  };
 
   // Persist reservation (unassigned) or confirmed dispatch (published) to real API
   const handleSaveOrPublish = async (targetStatus: 'unassigned' | 'published') => {
@@ -193,7 +175,10 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
     }
 
     if (targetStatus === 'published') {
-      if (booking.serviceMode !== 'vehicle_only' && !selectedDriverName) {
+      const intervalError = validateDispatchInterval({ date: pickupDate, pickupTime, endDate, endTime, dispatchStatus: targetStatus });
+      if (intervalError) { setErrorMsg(intervalError); return; }
+      if (!fleet.data?.vehicles.some(v => v.plate === selectedVehiclePlate && v.isAvailable)) { setErrorMsg(fleet.error || '선택한 기간의 차량 가용성을 확인해 주세요.'); return; }
+      if (booking.serviceMode !== 'vehicle_only' && !fleet.data?.drivers.some(d => d.id === selectedDriverId && d.isAvailable && (booking.requestedLanguage !== 'en' || d.isEnglishVerified))) {
         setErrorMsg('배차 확정을 위해 담당 기사를 선택해 주세요. 선정 전이라면 [미배정 대기함 저장]을 이용하세요.');
         return;
       }
@@ -207,11 +192,11 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
       }
     }
 
-    const matchedDriver = liveDriverProfiles.find((d) => d.name === selectedDriverName);
+    const matchedDriver = fleet.data?.drivers.find(d => d.id === selectedDriverId);
     const matchedVehicle = VIP_REAL_VEHICLES.find((v) => v.plate === selectedVehiclePlate);
     const resolvedModel =
       matchedVehicle?.model ||
-      matchedDriver?.defaultVehicleRaw ||
+      matchedDriver?.model ||
       (booking.vehicleModel !== '-' ? booking.vehicleModel : '');
 
     const matchedCust = liveCustomers.find(
@@ -230,10 +215,7 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
 
     setIsSaving(true);
     try {
-      const res = await fetch('/api/schedules/dispatch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const res = await saveMutation.send('/api/schedules/dispatch', {
           scheduleId: isNewBooking ? undefined : booking.scheduleId || booking.id,
           bookingNo: booking.bookingNo,
           customerName: customerName.trim(),
@@ -269,8 +251,9 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
           driverPhone: matchedDriver?.phone || booking.driverPhone,
           date: pickupDate,
           pickupTime,
-          endDate: booking.endDate || pickupDate,
-          endTime: booking.endTime || (targetStatus === 'published' ? '18:00' : undefined),
+          endDate: endDate || pickupDate,
+          endTime: endTime || undefined,
+          vehicleId: matchedVehicle?.uuid,
           origin: pickupLocation.trim(),
           destination: destination.trim(),
           passengerName: passengerName.trim() || customerName.trim(),
@@ -291,7 +274,6 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
           appliedPricingSnapshot: pricingSnapshot,
           allowUnverified: true,
           publishedBy: targetStatus === 'unassigned' ? '사모님(예약접수)' : '대표님(배차확정)',
-        }),
       });
 
       const data = await res.json().catch(() => ({}));
@@ -511,6 +493,16 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label className="text-xs font-bold text-slate-700">종료 날짜
+                    <input type="date" aria-label="종료 날짜" value={endDate} onChange={e => setEndDate(e.target.value)} className="mt-1 h-11 w-full rounded-xl border border-slate-200 px-3" />
+                  </label>
+                  <label className="text-xs font-bold text-slate-700">실제 종료 시간
+                    <input type="time" aria-label="실제 종료 시간" value={endTime} onChange={e => setEndTime(e.target.value)} className="mt-1 h-11 w-full rounded-xl border border-slate-200 px-3" />
+                  </label>
+                </div>
+                {fleet.error && <p role="alert" className="text-xs text-red-600">{fleet.error}</p>}
+
                 <HqPlaceSearchInput
                   label="출발지 (픽업 위치)"
                   required
@@ -606,6 +598,7 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                 2. 차량 · 기사 배정 및 기사 확인 현황
               </h4>
 
+              {saveMutation.hasPending && <button type="button" className="rounded-xl border border-blue-200 p-3 text-sm text-blue-700" disabled={isSaving} onClick={async()=>{setIsSaving(true);try{const response=await saveMutation.retry();const data=await response.json();if(!response.ok)throw new Error(data.error || '저장 결과 확인 실패');window.location.reload();}catch(error){setErrorMsg(error instanceof Error?error.message:'확인 실패');}finally{setIsSaving(false);}}}>이전 저장 결과 확인</button>}
               {/* Driver Assignment & Ack Card */}
               <div className="p-4 rounded-2xl border-2 border-blue-200/80 bg-blue-50/20 space-y-3.5">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -651,16 +644,15 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                       담당 기사 선정 (대표님 확인)
                     </label>
                     <select
-                      value={selectedDriverName}
-                      onChange={(e) => handleSelectDriver(e.target.value)}
-                      disabled={isCancelled}
+                      value={selectedDriverId}
+                      onChange={(e) => { setSelectedDriverId(e.target.value); setSelectedDriverName(fleet.data?.drivers.find(d => d.id === e.target.value)?.name || ''); }}
+                      disabled={isCancelled || !fleet.data}
                       className="w-full h-11 px-3.5 rounded-xl border border-slate-200 hover:border-blue-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 bg-white text-sm font-bold text-slate-900 shadow-2xs cursor-pointer outline-none"
                     >
                       <option value="">-- 기사 미배정 (배차 대기함) --</option>
-                      {sortedDrivers.map(({ driver }) => (
-                        <option key={driver.id} value={driver.name}>
-                          {driver.isEnglishVerified ? '[영어검증] ' : '[국문전용] '}
-                          {driver.name} 기사 ({driver.phone} · 기본 {driver.plate})
+                      {fleet.data?.drivers.map(driver => (
+                        <option key={driver.id} value={driver.id} disabled={!driver.isAvailable || (booking.requestedLanguage === 'en' && !driver.isEnglishVerified)}>
+                          {driver.name} · {driver.phone}{driver.isAvailable ? '' : ' (배차 불가)'}
                         </option>
                       ))}
                     </select>
@@ -676,12 +668,12 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                         setErrorMsg(null);
                         setSelectedVehiclePlate(e.target.value);
                       }}
-                      disabled={isCancelled}
+                      disabled={isCancelled || !fleet.data}
                       className="w-full h-11 px-3.5 rounded-xl border border-slate-200 hover:border-blue-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 bg-white text-sm font-bold text-slate-900 shadow-2xs cursor-pointer outline-none"
                     >
                       <option value="">-- 차량 미배정 --</option>
-                      {VIP_REAL_VEHICLES.map((v) => (
-                        <option key={v.id} value={v.plate}>
+                      {fleet.data?.vehicles.map((v) => (
+                        <option key={v.id} value={v.plate} disabled={!v.isAvailable}>
                           {v.plate} · {stripManufacturerName(v.model)}
                         </option>
                       ))}

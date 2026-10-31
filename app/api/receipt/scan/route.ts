@@ -1,7 +1,6 @@
+import { verifyServerAuth } from '@/lib/auth/serverAuth';
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
-import fs from 'fs';
-import path from 'path';
 import crypto from 'crypto';
 import {
   ReceiptScanResult,
@@ -41,6 +40,8 @@ function getFallbackReceiptData(image: string): ReceiptScanResult {
 }
 
 export async function POST(req: NextRequest) {
+  const apiAuth = await verifyServerAuth(req);
+  if (!apiAuth.ok) return NextResponse.json({ ok: false, error: apiAuth.error }, { status: apiAuth.statusCode });
   const requestStartTime = Date.now();
 
   try {
@@ -101,28 +102,10 @@ export async function POST(req: NextRequest) {
     let mimeType = 'image/jpeg';
     let base64Data = image;
 
-    // Case A: Relative file path in /public (e.g. /images/receipt_sample_fuel.jpg)
-    if (image.startsWith('/')) {
-      try {
-        const filePath = path.join(process.cwd(), 'public', image.replace(/^\//, ''));
-        if (fs.existsSync(filePath)) {
-          const fileBuffer = fs.readFileSync(filePath);
-          base64Data = fileBuffer.toString('base64');
-          if (image.endsWith('.png')) mimeType = 'image/png';
-          else if (image.endsWith('.webp')) mimeType = 'image/webp';
-          else mimeType = 'image/jpeg';
-        }
-      } catch (fileErr) {
-        console.warn('Failed to load local file for OCR:', fileErr);
-      }
-    } else {
-      // Case B: Base64 data URL
-      const match = image.match(/^data:(image\/[a-zA-Z+]+);base64,(.+)$/);
-      if (match) {
-        mimeType = match[1];
-        base64Data = match[2];
-      }
-    }
+    // User input is image data, never a server filesystem path or a remote URL.
+    const match = image.match(/^data:(image\/(?:jpeg|png|webp|heic));base64,([A-Za-z0-9+/=\r\n]+)$/);
+    if (!match) return NextResponse.json({ success: false, error: '지원되는 이미지 파일을 업로드해 주세요.' }, { status: 400 });
+    mimeType = match[1]; base64Data = match[2];
 
     // Step 3: Compute SHA-256 hash of normalized base64 content
     const imageHash = crypto.createHash('sha256').update(base64Data).digest('hex');
@@ -149,9 +132,7 @@ export async function POST(req: NextRequest) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       console.log('[Receipt OCR: Fallback] No GEMINI_API_KEY detected. Returning deterministic fallback.');
-      const fallbackResult = getFallbackReceiptData(image);
-      globalReceiptOcrCache.set(imageHash, fallbackResult);
-      return NextResponse.json(fallbackResult);
+      return NextResponse.json({ success: false, error: '영수증 자동 판독이 설정되지 않았습니다. 내역을 직접 입력해 주세요.' }, { status: 503 });
     }
 
     // Server-side configurable models (Defaults to cheaper Gemini 3.1 Flash-Lite)
@@ -325,9 +306,9 @@ Return strictly a single valid JSON object with this exact schema (no markdown f
     console.error('Receipt Scan API Fatal Error:', err);
     const errMsg = err instanceof Error ? err.message : '영수증 판독 중 오류가 발생했습니다.';
     return NextResponse.json({
-      ...getFallbackReceiptData(''),
+      success: false,
       error: errMsg,
       processingTimeMs: Date.now() - requestStartTime,
-    });
+    }, { status: 502 });
   }
 }

@@ -1,3 +1,4 @@
+import { verifyServerAuth } from '@/lib/auth/serverAuth';
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { supabaseAdmin } from '@/lib/supabase/server';
@@ -198,6 +199,8 @@ async function resolveScheduleLocation(
 }
 
 export async function POST(req: NextRequest) {
+  const apiAuth = await verifyServerAuth(req);
+  if (!apiAuth.ok) return NextResponse.json({ ok: false, error: apiAuth.error }, { status: apiAuth.statusCode });
   try {
     const body: ParseScheduleRequestBody = await req.json();
     const { imageBase64, fileName, fileType, profile } = body;

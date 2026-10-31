@@ -39,9 +39,8 @@ import {
 import Link from 'next/link';
 import { AddScheduleModal } from './AddScheduleModal';
 import { haptics } from '@/utils/haptics';
-import { submitDriverLogToHq, submitDriverLogToHqDb } from '@/utils/drivingLogHqStorage';
+import { submitDriverLogToHqDb } from '@/utils/drivingLogHqStorage';
 import { HqDrivingLog } from '@/types/drivingLogHq';
-import { getHqExpenses } from '@/utils/expenseHqStorage';
 
 interface DrivingLogModalProps {
   isOpen: boolean;
@@ -65,6 +64,19 @@ const DrivingLogModalContent: React.FC<{
   const [logData, setLogData] = useState<DrivingLogData>(() =>
     loadDrivingLogDraft(driverProfile, undefined, undefined, bookingId)
   );
+
+  useEffect(()=>{
+    const abort=new AbortController();
+    const query=new URLSearchParams({date:logData.rawDate});if(bookingId)query.set('bookingId',bookingId);
+    fetch(`/api/driving-logs?${query}`,{cache:'no-store',credentials:'include',signal:abort.signal})
+      .then(async response=>{if(!response.ok)return;const data=await response.json();const row=data.logs?.find((entry:HqDrivingLog)=>(entry.bookingId || null)===(bookingId || null));if(!row || abort.signal.aborted)return;
+        setLogData(previous=>{
+          if(previous.stops.length || previous.startKm)return {...previous,submissionId:row.id,hqStatus:row.status};
+          return {...previous,submissionId:row.id,hqStatus:row.status,driverId:row.driverId,clientName:row.customerName,passengerCount:String(row.passengerCount || ''),clockIn:row.clockIn,clockOut:row.clockOut,startKm:row.startKm,endKm:row.endKm,totalDutyHours:row.totalDutyHours,distanceKm:row.distanceKm,notes:row.notes,stops:row.stops.map((stop:HqDrivingLog['stops'][number])=>({...stop,memo:stop.note})),status:row.status==='draft'?'draft':'submitted'};
+        });
+      }).catch(()=>{});
+    return()=>abort.abort();
+  },[bookingId,driverProfile.driverId,logData.rawDate]);
 
   // Auto-scroll to top when modal mounts
   useEffect(() => {
@@ -220,6 +232,7 @@ const DrivingLogModalContent: React.FC<{
 
   // Submit Driving Log to HQ Operations system
   const handleSubmitLog = async () => {
+    if(logData.isDemoFixture){alert('샘플 운행일지는 본사에 제출할 수 없습니다. 실제 운행 기록으로 전환해 주세요.');return;}
     if (isSubmittingLog) return;
     setIsSubmittingLog(true);
     haptics.selection();
@@ -233,29 +246,23 @@ const DrivingLogModalContent: React.FC<{
       address: s.address,
     }));
 
-    // Calculate current expenses for this driver
-    const currentDriverName = logData.driverName || driverProfile.driverName || '윤태준';
-    const currentVehiclePlate = logData.carNumber || driverProfile.plateNumber || '116허 1514';
-    const currentHqExpenses = getHqExpenses().filter(
-      (e) => e.driverName === currentDriverName || (Boolean(currentVehiclePlate) && e.vehiclePlate === currentVehiclePlate)
-    );
-    const calculatedExpenseAmount = currentHqExpenses.reduce((sum, e) => sum + e.amount, 0);
-    const calculatedExpenseCount = currentHqExpenses.length;
+    const currentDriverName = logData.driverName || driverProfile.driverName || '';
+    const currentVehiclePlate = logData.carNumber || driverProfile.carNumber || '';
 
     try {
       const payload: Partial<HqDrivingLog> = {
+        id:logData.submissionId,
         driverName: currentDriverName,
-        customerName: logData.clientName || '인터코스',
+        customerName: logData.clientName || '',
         vehicleModel: driverProfile.carModel || currentVehiclePlate,
         vehiclePlate: currentVehiclePlate,
-        clockIn: logData.clockIn || '06:40',
-        clockOut: logData.clockOut || '21:50',
-        totalDutyHours: logData.totalDutyHours || '15시간 10분',
-        startKm: logData.startKm || '154,725',
-        endKm: logData.endKm || '154,861',
-        distanceKm: logData.distanceKm || '136 km',
-        expenseAmount: calculatedExpenseAmount,
-        expenseCount: calculatedExpenseCount,
+        clockIn: logData.clockIn,
+        clockOut: logData.clockOut,
+        totalDutyHours: logData.totalDutyHours,
+        passengerCount:logData.passengerCount ? Number(logData.passengerCount) : undefined,
+        startKm: logData.startKm,
+        endKm: logData.endKm,
+        distanceKm: logData.distanceKm,
         stops: stopsMapped,
         notes: logData.notes || '',
         status: '검토 대기',
@@ -273,7 +280,8 @@ const DrivingLogModalContent: React.FC<{
       }
 
       haptics.success();
-      saveDrivingLogDraft({ ...logData, status: 'submitted' });
+      const saved={...logData,submissionId:res.log?.id || logData.submissionId,hqStatus:res.log?.status,carNumber:res.log?.vehiclePlate || logData.carNumber,vehicleId:res.log?.vehicleId || logData.vehicleId,status:'submitted' as const};
+      setLogData(saved);saveDrivingLogDraft(saved);
       setIsPreviewSubmitModalOpen(true);
     } catch (err: any) {
       alert(`운행일지 제출 중 오류: ${err.message}`);
@@ -384,6 +392,7 @@ const DrivingLogModalContent: React.FC<{
           ref={scrollContainerRef}
           className="flex-1 overflow-y-auto px-4 py-4 space-y-4 w-full pb-4"
         >
+        {logData.hqStatus && <p role="status" className="mb-3 rounded-xl bg-blue-50 p-3 text-xs text-blue-800">본사 검토 상태: {logData.hqStatus==='draft'?'임시 기록':logData.hqStatus}</p>}
         {/* Notice Banner for Demo Fixture or Empty Report */}
         {logData.isDemoFixture && (
           <div className="bg-blue-50/70 border border-blue-100 rounded-xl px-3 py-2 flex items-center justify-between text-xs text-blue-700">

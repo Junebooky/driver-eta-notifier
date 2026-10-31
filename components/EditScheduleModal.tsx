@@ -10,7 +10,7 @@ interface EditScheduleModalProps {
   isOpen: boolean;
   onClose: () => void;
   schedule: ScheduleItem | null;
-  onSave: (updated: ScheduleItem) => void;
+  onSave: (updated: ScheduleItem) => void | Promise<void>;
 }
 
 export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
@@ -20,6 +20,8 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
   onSave,
 }) => {
   const [mounted, setMounted] = useState(false);
+  const [isSaving,setIsSaving] = useState(false);
+  const [saveError,setSaveError] = useState('');
   const [passenger, setPassenger] = useState('');
   const [flight, setFlight] = useState('');
   const [timeDisplay, setTimeDisplay] = useState('');
@@ -50,8 +52,9 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
 
   if (!isOpen || !mounted || !schedule) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSaving) return;
 
     // Extract pickup_time if timeDisplay starts with HH:mm
     const timeMatch = timeDisplay.match(/(\d{1,2}:\d{2})/);
@@ -66,16 +69,17 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
       notes: notes.trim() || undefined,
     };
 
-    haptics.success();
-    onSave(updated);
-    onClose();
+    setIsSaving(true); setSaveError('');
+    try { await onSave(updated); haptics.success(); onClose(); }
+    catch(error) { setSaveError(error instanceof Error ? error.message : '저장에 실패했습니다.'); }
+    finally { setIsSaving(false); }
   };
 
   return createPortal(
     <div
       className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 select-none overscroll-contain animate-in fade-in duration-200"
       style={{ overscrollBehavior: 'contain', touchAction: 'pan-y' }}
-      onClick={onClose}
+      onClick={()=>{if(!isSaving)onClose();}}
     >
       {/* Background Dimmed Overlay */}
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm -z-10" />
@@ -113,6 +117,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
           className="p-5 sm:p-6 space-y-4 overflow-y-auto max-h-[90dvh] flex-1 overscroll-contain touch-pan-y"
           style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
         >
+          {saveError && <p role="alert" className="text-sm text-rose-600">{saveError}</p>}
           {/* Field 1: Time Display */}
           <div className="space-y-1.5">
             <label className="text-base font-extrabold text-slate-700 flex items-center gap-1.5">
@@ -192,6 +197,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
               취소
             </button>
             <button
+              disabled={isSaving}
               type="submit"
               className="flex-[2] py-4 rounded-2xl bg-[#1E60F3] hover:bg-[#1650D6] active:scale-[0.98] text-base font-black text-white shadow-md shadow-blue-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
             >

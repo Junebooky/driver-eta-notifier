@@ -25,6 +25,8 @@ import {
 } from 'lucide-react';
 import { AvailableDriverItem, driverSupportsEnglish } from './HqDriverSelectModal';
 import { HqEmailSummary, HqEmailDetail, HqEmailExtractedDraft } from '@/types/emailHq';
+import { emailDispatchDays } from '@/utils/emailDispatchPlan';
+import { VIP_REAL_VEHICLES } from '@/utils/vehicleData';
 import { haptics } from '@/utils/haptics';
 import { HqPlaceSearchInput, PoiResult } from '@/components/hq/HqPlaceSearchInput';
 import { saveContactToCrm } from '@/utils/crmCustomerSync';
@@ -33,6 +35,7 @@ import { getVehicleImageForModel, STANDARD_FLEET_MODELS } from '@/utils/vehicleS
 export interface VehicleSlotAssignment {
   slotIndex: number;
   vehicleModel: string;
+  vehiclePlate?: string;
   driver: AvailableDriverItem | null;
   status: 'unassigned' | 'assigned';
 }
@@ -44,6 +47,7 @@ export interface HqStep2BookingDetailViewProps {
   vehicleSlots: VehicleSlotAssignment[];
   onOpenDriverModal: (slotIndex: number, requiredLanguage?: 'any' | 'english') => void;
   onConfirmDispatch: () => void;
+  onRequestAssignment?:()=>void;
   onBackToStep1: () => void;
   onUpdateDraft?: (updated: HqEmailExtractedDraft) => void;
   onUpdateVehicleSlots?: (slots: VehicleSlotAssignment[]) => void;
@@ -60,6 +64,7 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
   vehicleSlots,
   onOpenDriverModal,
   onConfirmDispatch,
+  onRequestAssignment,
   onBackToStep1,
   onUpdateDraft,
   onUpdateVehicleSlots,
@@ -202,11 +207,16 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
     }
   };
 
+  const updateDraftRoute=(updated:HqEmailExtractedDraft)=>{
+    const points=updated.waypoints || [];const first=points[0],last=points[points.length-1];
+    onUpdateDraft?.(first&&last?{...updated,pickupLocation:first.location,pickupLat:first.lat,pickupLng:first.lng,isPickupPoiConfirmed:first.isPoiConfirmed,dropoffLocation:last.location,dropoffLat:last.lat,dropoffLng:last.lng,isDropoffPoiConfirmed:last.isPoiConfirmed}:updated);
+  };
   const handleSelectPickupPoi = (poi: PoiResult) => {
     if (!extractedDraft) return;
     const updated: HqEmailExtractedDraft = {
       ...extractedDraft,
       pickupLocation: poi.name,
+      waypoints:extractedDraft.waypoints?.map((point,index)=>index===0?{...point,location:poi.name,lat:poi.lat,lng:poi.lng,isPoiConfirmed:true}:point),
       pickupLat: poi.lat,
       pickupLng: poi.lng,
       isPickupPoiConfirmed: true,
@@ -219,6 +229,7 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
     const updated: HqEmailExtractedDraft = {
       ...extractedDraft,
       dropoffLocation: poi.name,
+      waypoints:extractedDraft.waypoints?.map((point,index)=>index===(extractedDraft.waypoints?.length || 0)-1?{...point,location:poi.name,lat:poi.lat,lng:poi.lng,isPoiConfirmed:true}:point),
       dropoffLat: poi.lat,
       dropoffLng: poi.lng,
       isDropoffPoiConfirmed: true,
@@ -355,6 +366,16 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
         </div>
       )}
 
+      {extractedDraft && <section className="rounded-2xl border border-blue-200 p-4 space-y-4">
+        <h3 className="text-sm font-bold">날짜별 경로·종료시간 확인</h3>
+        {(()=>{try{return emailDispatchDays(extractedDraft).map(day=><div key={day.date} className="space-y-2 border-t pt-3"><p className="text-sm font-bold">{day.date}</p>
+          {day.points.map(point=><div key={point.id} className="grid grid-cols-[90px_1fr] gap-2"><input aria-label={`${day.date} 경유 시간`} type="time" value={point.time || ''} onChange={event=>updateDraftRoute({...extractedDraft,waypoints:emailDispatchDays(extractedDraft).flatMap(d=>d.points).map(p=>p.id===point.id?{...p,time:event.target.value}:p)})}/><HqPlaceSearchInput value={point.location} isConfirmed={point.isPoiConfirmed} onChange={location=>updateDraftRoute({...extractedDraft,waypoints:emailDispatchDays(extractedDraft).flatMap(d=>d.points).map(p=>p.id===point.id?{...p,location,isPoiConfirmed:false}:p)})} onSelectPoi={poi=>updateDraftRoute({...extractedDraft,waypoints:emailDispatchDays(extractedDraft).flatMap(d=>d.points).map(p=>p.id===point.id?{...p,location:poi.name,lat:poi.lat,lng:poi.lng,isPoiConfirmed:true}:p)})}/></div>)}
+          <label className="block text-xs">실제 종료 시간<input type="time" className="ml-3 rounded border p-2" value={day.endTime} onChange={event=>onUpdateDraft?.({...extractedDraft,dayEndTimes:{...extractedDraft.dayEndTimes,[day.date]:event.target.value}})}/></label>
+        </div>);}catch(error){return <p role="alert">{error instanceof Error?error.message:'날짜를 확인해 주세요.'}</p>;}})()}
+        {vehicleSlots.map((slot,index)=><label key={slot.slotIndex} className="block text-xs">{index+1}호차 실제 차량<select className="ml-2 rounded border p-2" value={slot.vehiclePlate || ''} onChange={event=>onUpdateVehicleSlots?.(vehicleSlots.map((value,i)=>i===index?{...value,vehiclePlate:event.target.value}:value))}><option value="">번호판 선택</option>{VIP_REAL_VEHICLES.map(vehicle=><option key={vehicle.uuid} value={vehicle.plate}>{vehicle.plate} · {vehicle.model}</option>)}</select></label>)}
+        <button type="button" disabled={isDispatching} onClick={onRequestAssignment} className="rounded-xl border border-blue-300 p-3 text-sm text-blue-700">대표 모바일·PC에 기사·차량 지정 요청</button>
+        <p className="text-xs text-slate-500">미배정 일정으로 서버에 저장합니다. 모바일과 PC의 같은 예약에서 배정하며, 전체 날짜·차량을 한 번에 확정합니다.</p>
+      </section>}
       {/* 3. Main 2-Column Split */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* ========================================================= */}
@@ -514,6 +535,7 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
                         onUpdateDraft?.({
                           ...extractedDraft,
                           pickupLocation: val,
+                          waypoints:extractedDraft.waypoints?.map((point,index)=>index===0?{...point,location:val,isPoiConfirmed:false}:point),
                           isPickupPoiConfirmed: false,
                         });
                       }}
@@ -540,6 +562,7 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
                         onUpdateDraft?.({
                           ...extractedDraft,
                           dropoffLocation: val,
+                          waypoints:extractedDraft.waypoints?.map((point,index)=>index===(extractedDraft.waypoints?.length || 0)-1?{...point,location:val,isPoiConfirmed:false}:point),
                           isDropoffPoiConfirmed: false,
                         });
                       }}

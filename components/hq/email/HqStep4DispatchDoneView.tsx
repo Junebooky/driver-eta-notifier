@@ -1,24 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
-import {
-  Car,
-  CheckCircle2,
-  Copy,
-  Edit,
-  MoreHorizontal,
-  Clock,
-  Compass,
-  User,
-  ArrowRight,
-  Star,
-  RefreshCw,
-  MessageSquare,
-  ChevronLeft,
-} from 'lucide-react';
+import React, { useState,useEffect } from 'react';
+import { CheckCircle2, Copy, Edit, MoreHorizontal, Star, RefreshCw, MessageSquare } from 'lucide-react';
 import { VehicleSlotAssignment } from './HqStep2BookingDetailView';
 import { HqEmailSummary, HqEmailDetail, HqEmailExtractedDraft } from '@/types/emailHq';
-import { haptics } from '@/utils/haptics';
+import Link from 'next/link';
+import type { ScheduleItem } from '@/data/ferrariSchedules';
+import { emailDispatchProgress } from '@/utils/emailDispatchPlan';
 
 export interface HqStep4DispatchDoneViewProps {
   emailSummary: HqEmailSummary;
@@ -28,7 +16,7 @@ export interface HqStep4DispatchDoneViewProps {
   onOpenDriverModal: (slotIndex: number) => void;
   onResetToNewBooking: () => void;
   onOpenCustomerMessage?: () => void;
-  dispatchedSchedule?: any;
+  dispatchedSchedule?: ScheduleItem|null;
   // Backward compatibility
   emailItem?: any;
 }
@@ -38,46 +26,27 @@ export const HqStep4DispatchDoneView: React.FC<HqStep4DispatchDoneViewProps> = (
   emailDetail,
   extractedDraft,
   vehicleSlots,
-  onOpenDriverModal,
   onResetToNewBooking,
   onOpenCustomerMessage,
   dispatchedSchedule,
 }) => {
-  const [driverAccepted, setDriverAccepted] = useState(false);
-  const [driverRejected, setDriverRejected] = useState(false);
-
-  const handleDriverAccept = () => {
-    haptics.success();
-    setDriverAccepted(true);
-    setDriverRejected(false);
-  };
-
-  const handleDriverReject = () => {
-    haptics.selection();
-    setDriverRejected(true);
-    setDriverAccepted(false);
-  };
-
-  const handleOpenNavi = () => {
-    haptics.lightTap();
-    const dest = extractedDraft?.dropoffLocation || '조선팰리스서울';
-    const url = `https://apis.openapi.sk.com/tmap/app/routes?appKey=live&name=${encodeURIComponent(dest)}`;
-    window.open(url, '_blank');
-  };
-
-  const bookingDate = extractedDraft?.pickupDate || '오늘';
-  const bookingTime = extractedDraft?.pickupTime || '09:00';
-  const pickupLocation = extractedDraft?.pickupLocation || '출발지';
-  const dropoffLocation = extractedDraft?.dropoffLocation || '도착지';
-  const passengerName = extractedDraft?.passengerName || 'VIP 고객';
-  const passengerCount = extractedDraft?.passengerCount ?? 1;
-  const flightNumber = extractedDraft?.flightNumber;
-
-  const primarySlot = vehicleSlots[0] || {
-    vehicleModel: '의전 차량',
-    driver: null,
-  };
-
+  const [savedSchedules,setSavedSchedules]=useState<ScheduleItem[]>([]);
+  const [syncError,setSyncError]=useState('');
+  const identity=Object.values(extractedDraft?.savedScheduleIds || {}).sort().join('|') || dispatchedSchedule?.id || '';
+  useEffect(()=>{
+    const abort=new AbortController();let running=false;
+    const refresh=async()=>{
+      if(running || !identity)return;running=true;
+      try{const response=await fetch('/api/schedules?role=hq',{cache:'no-store',signal:abort.signal});const data=await response.json();if(!response.ok)throw new Error(data.error || '일정을 조회하지 못했습니다.');if(abort.signal.aborted)return;
+        const ids=new Set(identity.split('|'));const rows:ScheduleItem[]=data.schedules.filter((row:ScheduleItem)=>ids.has(row.id));
+        setSavedSchedules(rows);setSyncError(rows.length===ids.size?'':'일부 저장 일정을 조회하지 못했습니다. 예약 목록을 확인해 주세요.');
+      }catch(error){if(!abort.signal.aborted)setSyncError(error instanceof Error?error.message:'서버 확인 실패');}finally{running=false;}
+    };
+    void refresh();const timer=setInterval(()=>{if(document.visibilityState==='visible')void refresh();},8000);
+    window.addEventListener('focus',refresh);return()=>{abort.abort();clearInterval(timer);window.removeEventListener('focus',refresh);};
+  },[identity]);
+  const progress=emailDispatchProgress(identity?identity.split('|'):[],savedSchedules);
+  const driverAccepted=progress.complete;
   return (
     <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-5 space-y-5">
       {/* 1. Header Bar */}
@@ -160,7 +129,7 @@ export const HqStep4DispatchDoneView: React.FC<HqStep4DispatchDoneViewProps> = (
                 </span>
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-extrabold text-slate-900">기사 Cockpit 알림</span>
-                  <span className="text-emerald-600 font-bold">실시간 발송 완료</span>
+                  <span className="text-emerald-600 font-bold">{syncError?'조회 실패':driverAccepted?'전체 기사 확인 완료':'기사 확인 대기'}</span>
                 </div>
               </div>
 
@@ -218,11 +187,11 @@ export const HqStep4DispatchDoneView: React.FC<HqStep4DispatchDoneViewProps> = (
 
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200 text-right">
-                      알림 전송됨
+                      배차 저장됨
                     </span>
                     <button
                       type="button"
-                      onClick={() => onOpenDriverModal(slot.slotIndex)}
+                      onClick={() => window.location.assign('/hq?tab=dispatch')}
                       className="px-2 py-1 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 text-[11px] font-bold cursor-pointer"
                     >
                       변경
@@ -258,139 +227,18 @@ export const HqStep4DispatchDoneView: React.FC<HqStep4DispatchDoneViewProps> = (
         </div>
 
         {/* ========================================================= */}
-        {/* Right Sub-Column: 기사 앱 알림 화면 (Smartphone Mockup)     */}
-        {/* ========================================================= */}
-        <div className="lg:col-span-6 flex flex-col items-center">
-          <div className="w-full text-left mb-2 flex items-center justify-between">
-            <h3 className="text-xs font-black text-slate-900 flex items-center gap-1.5">
-              <span>기사 앱 알림 화면</span>
-              <span className="text-[10px] text-slate-400 font-normal">
-                (기사 스마트폰 Cockpit 화면)
-              </span>
-            </h3>
-          </div>
-
-          {/* Smartphone Mockup */}
-          <div className="w-full max-w-[340px] bg-slate-900 p-3 rounded-[38px] shadow-2xl border-4 border-slate-800">
-            {/* Screen bezel */}
-            <div className="bg-slate-50 rounded-[30px] overflow-hidden flex flex-col min-h-[500px]">
-              {/* Dynamic Island / Speaker Notch */}
-              <div className="pt-2.5 pb-1 flex justify-center bg-white">
-                <div className="w-20 h-4 bg-slate-900 rounded-full" />
-              </div>
-
-              {/* Mobile App Header */}
-              <div className="px-4 py-3 bg-white border-b border-slate-100 flex items-center justify-between">
-                <div className="flex items-center gap-1 text-slate-800 font-black text-xs">
-                  <ChevronLeft className="w-4 h-4" />
-                  <span>배차 상세</span>
-                </div>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">
-                  배차완료
-                </span>
-              </div>
-
-              {/* Mobile Card Content */}
-              <div className="p-4 flex-1 space-y-3.5 overflow-y-auto font-sans">
-                {/* Date & Flight Banner */}
-                <div className="flex items-center justify-between text-xs font-extrabold text-slate-900">
-                  <span>{bookingDate}</span>
-                  <div className="flex items-center gap-1 text-blue-600">
-                    {flightNumber && <span>✈ {flightNumber}</span>}
-                    {flightNumber && <span className="text-slate-400 font-normal">|</span>}
-                    <span>{bookingTime}</span>
-                  </div>
-                </div>
-
-                {/* Route Card */}
-                <div className="p-3 bg-white rounded-xl border border-slate-200/90 shadow-2xs space-y-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="text-[11px] font-bold text-slate-900 truncate">
-                        {pickupLocation}
-                      </div>
-                      <div className="text-[9px] text-slate-400">출발 픽업지</div>
-                    </div>
-
-                    <ArrowRight className="w-4 h-4 text-slate-400 shrink-0 mt-1" />
-
-                    <div className="min-w-0 text-right">
-                      <div className="text-[11px] font-bold text-slate-900 truncate">
-                        {dropoffLocation}
-                      </div>
-                      <div className="text-[9px] text-slate-400">도착지</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Passenger Row */}
-                <div className="p-2.5 bg-white rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-2 text-xs">
-                  <div className="w-6 h-6 rounded-full bg-blue-50 text-[#1E60F3] flex items-center justify-center shrink-0">
-                    <User className="w-3.5 h-3.5" />
-                  </div>
-                  <span className="font-bold text-slate-800 truncate">
-                    {passengerName} ({passengerCount}명)
-                  </span>
-                </div>
-
-                {/* Vehicle Row */}
-                <div className="p-2.5 bg-white rounded-xl border border-slate-200/80 shadow-2xs flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <img
-                      src="/images/car_phone_carnival.png"
-                      alt="배정 차량"
-                      className="w-10 h-7 object-contain shrink-0"
-                    />
-                    <div className="min-w-0">
-                      <div className="text-[11px] font-black text-slate-900 leading-tight truncate">
-                        {primarySlot.vehicleModel}
-                      </div>
-                      <div className="text-[10px] text-slate-400 font-medium truncate">
-                        {primarySlot.driver?.plate || '차량 배정'} · {primarySlot.driver?.name || '담당기사'}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Navigation Button */}
-                <button
-                  type="button"
-                  onClick={handleOpenNavi}
-                  className="w-full py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-98 text-slate-800 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <Compass className="w-3.5 h-3.5 text-[#1E60F3]" />
-                  <span>내비게이션 열기</span>
-                </button>
-
-                {/* Acceptance Action Buttons */}
-                <div className="grid grid-cols-2 gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={handleDriverReject}
-                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      driverRejected
-                        ? 'bg-rose-50 text-rose-600 border border-rose-300'
-                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    {driverRejected ? '거절됨' : '거절'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleDriverAccept}
-                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      driverAccepted
-                        ? 'bg-emerald-600 text-white shadow-xs'
-                        : 'bg-[#1E60F3] text-white hover:bg-blue-600 shadow-xs'
-                    }`}
-                  >
-                    {driverAccepted ? '수락 완료 ✓' : '수락'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <section className="lg:col-span-6 space-y-3" aria-label="날짜별 실제 기사 확인 상태">
+          <h3 className="text-sm font-bold text-slate-900">전체 일정 · 기사 확인 {progress.confirmed}/{progress.expected}건</h3>
+          <p className="text-xs text-slate-500">실제 기사 계정에서 확인한 최신 배차 버전만 반영합니다. 이 화면에서 대신 수락하지 않습니다.</p>
+          {syncError && <p role="alert" className="text-sm text-rose-600">{syncError}</p>}
+          {!savedSchedules.length && !syncError && <p role="status">서버 확인 상태를 조회하고 있습니다.</p>}
+          {[...savedSchedules].sort((a,b)=>`${a.date} ${a.pickup_time}`.localeCompare(`${b.date} ${b.pickup_time}`)).map(row=><article key={row.id} className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2">
+            <p className="text-sm font-bold">{row.date} · {row.pickup_time}</p><p className="text-xs">{row.origin_name} → {(row.adminWaypoints || []).map(point=>point.name+' → ')}{row.destination_name}</p>
+            <p className="text-xs">{row.vehicle_plate || '차량 미배정'} · {row.driver_name || '기사 미배정'}</p>
+            <p className="text-xs font-bold text-[#1E60F3]">{row.dispatch_status==='cancelled'?'취소됨':row.isAcknowledged && row.last_ack_version===row.version?'기사 확인 완료':'기사 확인 대기'}{row.last_ack_at?` · ${new Date(row.last_ack_at).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})}`:''}</p>
+          </article>)}
+          <Link href="/hq?tab=dispatch" className="inline-block rounded-xl bg-[#1E60F3] px-4 py-3 text-sm font-bold text-white">저장된 예약에서 배정·변경 확인</Link>
+        </section>
       </div>
     </div>
   );

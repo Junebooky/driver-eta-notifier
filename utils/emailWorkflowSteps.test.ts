@@ -65,6 +65,7 @@ const driver1 = mapDbDriverToHqSummary(sampleDbRow1, []);
 const driver2 = mapDbDriverToHqSummary(sampleDbRow2, [
   {
     id: 'sch-1',
+    driver_id: sampleDbRow2.id,
     vehicle_no: '8호차',
     date: '2026-09-20',
     pickup_time: '15:30',

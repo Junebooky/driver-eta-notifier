@@ -1,7 +1,10 @@
+import { verifyServerAuth } from '@/lib/auth/serverAuth';
 import { NextRequest, NextResponse } from 'next/server';
 import { resolvePlaceQuery } from '@/services/placeResolutionService';
 
 export async function GET(req: NextRequest) {
+  const apiAuth = await verifyServerAuth(req);
+  if (!apiAuth.ok) return NextResponse.json({ ok: false, error: apiAuth.error }, { status: apiAuth.statusCode });
   try {
     const { searchParams } = new URL(req.url);
     const query = searchParams.get('query');
