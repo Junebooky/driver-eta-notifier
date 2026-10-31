@@ -74,6 +74,11 @@ export function parsePhoneDetails(raw?: string): {
   }
 }
 
+function profileVehicleDetails(profile: DriverProfile) {
+  const vehicle=parseVehicleDetails(profile.vehicleNo);
+  return profile.carNumber ? {...parseVehicleDetails(profile.carNumber),hocha:vehicle.hocha} : vehicle;
+}
+
 export const ProfileModal: React.FC<ProfileModalProps> = ({
   isOpen,
   onClose,
@@ -81,7 +86,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   onSave,
   isOnboarding = false,
 }) => {
-  const parsed = parseVehicleDetails(profile.vehicleNo);
+  const parsed = profileVehicleDetails(profile);
   const parsedPhone = parsePhoneDetails(profile.phone || profile.mobile);
   const isInitialEmpty = isOnboarding || (!profile.driverName && !profile.vehicleNo);
 
@@ -245,7 +250,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
         setPassengerName('');
         setDefaultNavi('tmap');
       } else {
-        const initial = parseVehicleDetails(profile.vehicleNo);
+        const initial = profileVehicleDetails(profile);
         const initPhone = parsePhoneDetails(profile.phone || profile.mobile);
 
         // Direct read from cockpit_driver_profile_${vehicleNo}
