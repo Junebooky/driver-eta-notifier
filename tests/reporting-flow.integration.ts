@@ -1,4 +1,6 @@
-import type { Client } from 'pg';
+import { types,type Client } from 'pg';
+import * as acknowledgment from '../app/api/schedules/ack/route';
+import { GET as readSchedules } from '../app/api/schedules/route';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { NextRequest } from 'next/server';
@@ -20,6 +22,7 @@ export async function verifyReportingFlow(admin:Client,writer:Client,reader:Clie
   await admin.query("INSERT INTO cockpit.schedules(id,org_id,date,pickup_time,end_date,end_time,driver_id,vehicle_id,vehicle_plate,dispatch_status,schedule_meta) VALUES($1,'vip_limousine_korea','2026-12-12','09:00','2026-12-12','12:00',$2,$4,'fixture-car-one','published','{\"serviceMode\":\"with_driver\"}'),($3,'vip_limousine_korea','2026-12-12','13:00','2026-12-12','18:00',$2,$5,'fixture-car-two','published','{\"serviceMode\":\"with_driver\"}')",[booking,driver,otherBooking,randomUUID(),randomUUID()]);
   const token=(role:'driver'|'hq_admin',driverId=driver)=>signCockpitSession({userId:role==='driver'?driverId:'fixture-hq',org,role,driverId:role==='driver'?driverId:undefined,driverName:'동명이인'});
   let actor=token('driver'),storageFailure=false;const files=new Map<string,Buffer>();
+  const timestampParser=types.getTypeParser(1184);types.setTypeParser(1184,value=>value);
   const original={from:supabaseAdmin.from,rpc:supabaseAdmin.rpc,storage:Object.getOwnPropertyDescriptor(supabaseAdmin,'storage'),fetch:globalThis.fetch};
   const column=(key:string)=>{assert.match(key,/^[a-z_]+$/);return '"'+key+'"';};
   const value=(key:string,v:unknown)=>['stops','review_history','audit_history','ocr_details','meta'].includes(key)?JSON.stringify(v):v;
@@ -77,6 +80,17 @@ export async function verifyReportingFlow(admin:Client,writer:Client,reader:Clie
     assert.equal((await reader.query('SELECT count(*) FROM cockpit.expenses')).rows[0].count,before);assert.deepEqual(await query(),{expense_amount:10000,expense_count:2});
     await writer.query("UPDATE cockpit.expenses SET status='반려' WHERE id=$1",[second.expenses![0].id]);assert.deepEqual(await query(),{expense_amount:8000,expense_count:1});
     await writer.query('DELETE FROM cockpit.expenses WHERE id=$1',[second.expenses![0].id]);assert.deepEqual(await query(),{expense_amount:8000,expense_count:1});
+    actor=token('driver',other);
+    assert.equal((await post(acknowledgment,'/api/schedules/ack',{scheduleId:booking,driverId:driver,version:1})).status,403);
+    actor=token('driver');
+    assert.equal((await post(acknowledgment,'/api/schedules/ack',{scheduleId:booking,version:1})).status,200);
+    const hqRequest=()=>new NextRequest('http://localhost/api/schedules?role=hq',{headers:{authorization:'Bearer '+token('hq_admin')}});
+    let scheduleView=await (await readSchedules(hqRequest())).json();assert.equal(scheduleView.schedules.find((row:{id:string})=>row.id===booking).isAcknowledged,true);
+    await writer.query("UPDATE cockpit.schedules SET schedule_meta=jsonb_set(schedule_meta,'{version}','2'),updated_at=clock_timestamp() WHERE id=$1",[booking]);
+    scheduleView=await (await readSchedules(hqRequest())).json();assert.equal(scheduleView.schedules.find((row:{id:string})=>row.id===booking).isAcknowledged,false);
+    assert.equal((await post(acknowledgment,'/api/schedules/ack',{scheduleId:booking,version:1})).status,409);
+    assert.equal((await post(acknowledgment,'/api/schedules/ack',{scheduleId:booking,version:2})).status,200);
+    console.log('PASS actual driver acknowledgment → HQ confirmed, dispatch revision → reconfirmation required; forged/stale confirmations denied');
     const navigation={...log,id:randomUUID(),bookingId:undefined,drivingDate:'2026-12-13',status:'draft' as const,startKm:'',endKm:'',stops:[{id:'navigation-one',time:'',place:'공항',departureTime:'09:00',actionIdempotencyKey:'nav-one'}]};
     const draft=await submitDriverLogToHqDb(navigation);assert.equal(draft.ok,true,draft.error);
     const nextStop={id:'navigation-two',time:'',place:'호텔',departureTime:'10:00',actionIdempotencyKey:'nav-two'};
@@ -85,5 +99,5 @@ export async function verifyReportingFlow(admin:Client,writer:Client,reader:Clie
     console.log('PASS actual navigation draft append/replay, same-row final submission and deliberate route edit');
     await admin.query('SET ROLE authenticated');await assert.rejects(admin.query('SELECT * FROM cockpit.expenses'),{code:'42501'});await assert.rejects(admin.query('SELECT cockpit.reporting_summary($1)',[org]),{code:'42501'});await admin.query('RESET ROLE');
     console.log('PASS reporting flow: client receipt upload → expense API → real Postgres → report linking/totals → HQ summary/read/photo/review → driver status; retries, other-driver denial and batch rollback');
-  }finally{supabaseAdmin.from=original.from;supabaseAdmin.rpc=original.rpc;if(original.storage)Object.defineProperty(supabaseAdmin,'storage',original.storage);globalThis.fetch=original.fetch;}
+  }finally{types.setTypeParser(1184,timestampParser);supabaseAdmin.from=original.from;supabaseAdmin.rpc=original.rpc;if(original.storage)Object.defineProperty(supabaseAdmin,'storage',original.storage);globalThis.fetch=original.fetch;}
 }

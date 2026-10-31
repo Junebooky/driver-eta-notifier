@@ -21,8 +21,8 @@ test('missing end/POI/assignment fails; an unassigned mobile request retains eve
 });
 test('existing atomic save preserves the full route for the driver app and uses existing IDs on continuation',async()=>{
  const original=supabaseAdmin.rpc;let calls=0;
- supabaseAdmin.rpc=(async(name:string,args:{p_items:Array<{row:Record<string,unknown>}>})=>{calls++;assert.equal(name,'commit_dispatch_batch');assert.equal(args.p_items.length,4);assert.ok(args.p_items.every(i=>(i.row.schedule_meta as {routeWaypoints:unknown[]}).routeWaypoints.length===3));return {data:args.p_items.map(i=>i.row),error:null};}) as unknown as typeof original;
- try{const result=await atomicUpsertServerDispatchBatch(buildEmailDispatchPlan(draft(),slots(),'published'));assert.equal(result.ok,true,result.error);assert.equal(calls,1);assert.equal(result.schedules?.[0].adminWaypoints?.[0].name,'행사장');}finally{supabaseAdmin.rpc=original;}
+ supabaseAdmin.rpc=(async(name:string,args:{p_items:Array<{row:Record<string,unknown>}>})=>{calls++;assert.equal(name,'commit_dispatch_batch');assert.equal(args.p_items.length,4);assert.ok(args.p_items.every(i=>(i.row.schedule_meta as {routeWaypoints:unknown[]}).routeWaypoints.length===3));return {data:args.p_items.map(i=>({...i.row,origin_lat:undefined,origin_lng:undefined,destination_lat:undefined,destination_lng:undefined})),error:null};}) as unknown as typeof original;
+ try{const result=await atomicUpsertServerDispatchBatch(buildEmailDispatchPlan(draft(),slots(),'published'));assert.equal(result.ok,true,result.error);assert.equal(calls,1);assert.equal(result.schedules?.[0].adminWaypoints?.[0].name,'행사장');assert.equal(result.schedules?.[0].origin_lat,37.4);assert.equal(result.schedules?.[0].destination_lng,126.5);}finally{supabaseAdmin.rpc=original;}
 });
 import {acknowledgeServerSchedule} from '../lib/dispatch/scheduleServerStore';
 import {POST as ackRoute} from '../app/api/schedules/ack/route';
@@ -35,4 +35,14 @@ test('HQ cannot impersonate a driver acknowledgment; same-name other UUID is rej
  const row={id:'one',driver_id:'assigned',driver_name:'같은 이름',date:'2026-12-10',pickup_time:'09:00',dispatch_status:'published',schedule_meta:{version:1,driverId:'assigned',driverName:'같은 이름',dispatchStatus:'published'}};
  supabaseAdmin.from=(()=>{let patch={};const q={select:()=>q,eq:()=>q,maybeSingle:async()=>({data:row,error:null}),update:(value:object)=>{writes++;patch=value;return q;},single:async()=>({data:{...row,...patch},error:null})};return q;}) as unknown as typeof original;
  try{assert.equal((await acknowledgeServerSchedule({scheduleId:'one',driverId:'other',driverName:'같은 이름',version:1})).statusCode,403);assert.equal(writes,0);assert.equal((await acknowledgeServerSchedule({scheduleId:'one',driverId:'assigned',driverName:'변경된 성함',version:1})).error,undefined);assert.equal(writes,1);}finally{supabaseAdmin.from=original;}
+});
+
+import {emailDispatchProgress} from './emailDispatchPlan';
+test('completion screen counts every saved day and requires the latest real acknowledgment',()=>{
+ const first={id:'one',dispatch_status:'published',version:2,last_ack_version:2,isAcknowledged:true};
+ assert.equal(emailDispatchProgress(['one','two'],[first]).complete,false);
+ assert.equal(emailDispatchProgress(['one','two'],[first,{...first,id:'two',last_ack_version:1}]).complete,false);
+ assert.equal(emailDispatchProgress(['one','two'],[first,{...first,id:'two'}]).complete,true);
+ assert.equal(emailDispatchProgress(['one'],[{...first,dispatch_status:'cancelled'}]).complete,false);
+ assert.equal(emailDispatchProgress([],[]).complete,false);
 });

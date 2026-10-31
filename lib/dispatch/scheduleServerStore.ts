@@ -276,13 +276,13 @@ export function mapHydratedRowToScheduleItem(rawRow: Record<string, any>): Sched
     flightType: isDeparture ? 'departure' : 'arrival',
     origin_name: row.origin,
     origin_address: row.origin_address || '',
-    origin_lat: row.origin_lat || 37.5042,
-    origin_lng: row.origin_lng || 127.0425,
+    origin_lat: meta.routeWaypoints?.[0]?.lat ?? row.origin_lat ?? 37.5042,
+    origin_lng: meta.routeWaypoints?.[0]?.lng ?? row.origin_lng ?? 127.0425,
     origin_preset_id: `preset-${(row.origin || 'origin').replace(/\s+/g, '-').toLowerCase()}`,
     destination_name: row.destination,
     destination_address: row.destination_address || '',
-    destination_lat: row.destination_lat || 37.4495,
-    destination_lng: row.destination_lng || 126.4512,
+    destination_lat: meta.routeWaypoints?.[meta.routeWaypoints.length-1]?.lat ?? row.destination_lat ?? 37.4495,
+    destination_lng: meta.routeWaypoints?.[meta.routeWaypoints.length-1]?.lng ?? row.destination_lng ?? 126.4512,
     destination_preset_id: `preset-${(row.destination || 'dest').replace(/\s+/g, '-').toLowerCase()}`,
     status: itemStatus,
     passenger: row.passenger_name || meta.customerName || '고객 미지정',
@@ -1222,7 +1222,7 @@ export async function acknowledgeServerSchedule(params: {
     ],
   };
 
-  const { data: updated, error: updateErr } = await supabaseAdmin
+  let updateQuery = supabaseAdmin
     .from('schedules')
     .update({
       passenger_note: encodeScheduleMeta(nextMeta),
@@ -1232,12 +1232,12 @@ export async function acknowledgeServerSchedule(params: {
       status: hydrated._meta.dispatchStatus === 'cancelled' ? 'cancelled' : 'confirmed',
       updated_at: nowIso,
     })
-    .eq('id', params.scheduleId)
-    .select('*')
-    .single();
+    .eq('id', params.scheduleId);
+  if(raw.updated_at)updateQuery=updateQuery.eq('updated_at',raw.updated_at);
+  const {data:updated,error:updateErr}=await updateQuery.select('*').single();
 
-  if (updateErr) {
-    return { error: updateErr.message, statusCode: 400 };
+  if (updateErr || !updated) {
+    return {error:'배차가 변경되었거나 확인을 저장하지 못했습니다. 최신 일정을 다시 확인해 주세요.',statusCode:!updated || updateErr?.code==='PGRST116'?409:503};
   }
 
   return {
@@ -1300,7 +1300,7 @@ export async function cancelServerSchedule(params: {
     .single();
 
   if (updateErr) {
-    return { error: updateErr.message, statusCode: 500 };
+    return { error: '배차가 변경되었거나 확인을 저장하지 못했습니다. 최신 일정을 다시 확인해 주세요.', statusCode: 409 };
   }
 
   return {

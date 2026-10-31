@@ -30,3 +30,10 @@ export function buildEmailDispatchPlan(draft:HqEmailExtractedDraft,slots:Array<{
   });
  });
 }
+
+/** Confirmation is complete only when every saved row has the assigned driver's current-version acknowledgment. */
+export function emailDispatchProgress(ids:string[],rows:Array<{id:string;dispatch_status?:string;isAcknowledged?:boolean;last_ack_version?:number;version?:number}>){
+ const unique=new Set(ids);const matched=rows.filter(row=>unique.has(row.id));
+ const confirmed=new Set(matched.filter(row=>row.dispatch_status==='published'&&row.isAcknowledged===true&&Number.isInteger(row.version)&&row.last_ack_version===row.version).map(row=>row.id)).size;
+ return {expected:unique.size,confirmed,complete:unique.size>0&&confirmed===unique.size};
+}
