@@ -1,3 +1,6 @@
+import * as custody from '../app/api/vehicle-custody/route';
+import * as custodyPhotos from '../app/api/vehicle-custody/photo/route';
+import { verifyCustodyFlow } from './vehicle-custody-flow.integration';
 import * as dispatchRoute from '../app/api/schedules/dispatch/route';
 import { GET as fleetAvailability } from '../app/api/fleet/availability/route';
 import * as operationStatus from '../app/api/schedules/operation-status/route';
@@ -25,32 +28,42 @@ export async function verifyReportingFlow(admin:Client,writer:Client,reader:Clie
   const org='vip_limousine_korea',driver=randomUUID(),other=randomUUID(),booking=randomUUID(),otherBooking=randomUUID();
   await admin.query('INSERT INTO cockpit.drivers(id,driver_name) VALUES($1,$3),($2,$3)',[driver,other,'동명이인']);
   await admin.query("INSERT INTO cockpit.schedules(id,org_id,date,pickup_time,end_date,end_time,driver_id,vehicle_id,vehicle_plate,dispatch_status,schedule_meta) VALUES($1,'vip_limousine_korea','2026-12-12','09:00','2026-12-12','12:00',$2,$4,'fixture-car-one','published','{\"serviceMode\":\"with_driver\"}'),($3,'vip_limousine_korea','2026-12-12','13:00','2026-12-12','18:00',$2,$5,'fixture-car-two','published','{\"serviceMode\":\"with_driver\"}')",[booking,driver,otherBooking,randomUUID(),randomUUID()]);
-  const token=(role:'driver'|'hq_admin',driverId=driver)=>signCockpitSession({userId:role==='driver'?driverId:'fixture-hq',org,role,driverId:role==='driver'?driverId:undefined,driverName:'동명이인'});
+  const token=(role:'driver'|'hq_admin',driverId:string=driver)=>signCockpitSession({userId:role==='driver'?driverId:'fixture-hq',org,role,driverId:role==='driver'?driverId:undefined,driverName:'동명이인'});
   let actor=token('driver'),storageFailure=false;const files=new Map<string,Buffer>();
   const timestampParser=types.getTypeParser(1184);types.setTypeParser(1184,value=>value);
   const original={from:supabaseAdmin.from,rpc:supabaseAdmin.rpc,storage:Object.getOwnPropertyDescriptor(supabaseAdmin,'storage'),fetch:globalThis.fetch};
-  const column=(key:string)=>{assert.match(key,/^[a-z_]+$/);return '"'+key+'"';};
+  const column=(key:string)=>{if(key==='result->>outcome')return '"result"->>\'outcome\'';assert.match(key,/^[a-z_]+$/);return '"'+key+'"';};
   const value=(key:string,v:unknown)=>['stops','review_history','audit_history','operation_history','ocr_details','meta'].includes(key)?JSON.stringify(v):v;
   supabaseAdmin.from=((table:string)=>{
-    assert.ok(['driving_logs','expenses','schedules','drivers','fleet_vehicle_operations','dispatch_requests'].includes(table));
+    assert.ok(['driving_logs','expenses','schedules','drivers','fleet_vehicle_operations','dispatch_requests','vehicle_custodies','vehicle_custody_requests'].includes(table));
     const filters:Array<[string,unknown,string?]>=[],orders:string[]=[];let rows:Record<string,unknown>[]|null=null,patch:Record<string,unknown>|null=null;
-    let offset=0,limit=1000;
+    let offset=0,limit=1000;let eitherDate: string | null=null;
     const execute=async(single=false)=>{try{
       let sql='';const params:unknown[]=[];
       if(rows){const keys=Object.keys(rows[0]);sql=`INSERT INTO cockpit.${table} (${keys.map(column)}) VALUES `+rows.map(row=>'('+keys.map(key=>{params.push(value(key,row[key]));return '$'+params.length;}).join(',')+')').join(',')+' ON CONFLICT(id) DO UPDATE SET '+keys.filter(k=>k!=='id').map(k=>`${column(k)}=EXCLUDED.${column(k)}`).join(',')+' RETURNING *';}
-      else {const where=filters.map(([key,val,operator])=>{if(val===null)return column(key)+' IS NULL';params.push(val);return column(key)+(operator || '=')+'$'+params.length;}).join(' AND ');
+      else {let where=filters.map(([key,val,operator])=>{if(val===null)return column(key)+' IS NULL';params.push(val);return column(key)+(operator || '=')+'$'+params.length;}).join(' AND ');
+        if(eitherDate){params.push(eitherDate);where+=(where?' AND ':'')+`(end_date >= $${params.length} OR date >= $${params.length})`;}
         if(patch){const assignments=Object.entries(patch).map(([key,val])=>{params.push(value(key,val));return column(key)+'=$'+params.length;});sql=`UPDATE cockpit.${table} SET ${assignments.join(',')}${where?' WHERE '+where:''} RETURNING *`;}
         else sql=`SELECT * FROM cockpit.${table}${where?' WHERE '+where:''}${orders.length?' ORDER BY '+orders.join(','):''} LIMIT ${limit} OFFSET ${offset}`;
       }
       const result=await writer.query(sql,params);const records=result.rows.map(row=>Object.fromEntries(Object.entries(row).map(([key,val])=>[key,val instanceof Date?(key==='date'||key.endsWith('_date')?val.toISOString().slice(0,10):val.toISOString()):val])));return {data:single?records[0] || null:records,error:null};
     }catch(error){const e=error as {message:string;code?:string};return {data:null,error:{message:e.message,code:e.code}};}};
-    const q={select:()=>q,eq:(key:string,val:unknown)=>{filters.push([key,val]);return q;},neq:(key:string,val:unknown)=>{filters.push([key,val,'<>']);return q;},lte:(key:string,val:unknown)=>{filters.push([key,val,'<=']);return q;},is:(key:string,val:null)=>{filters.push([key,val]);return q;},order:(key:string,options?:{ascending?:boolean})=>{orders.push(column(key)+(options?.ascending===false?' DESC':' ASC'));return q;},range:(start:number,end:number)=>{offset=start;limit=end-start+1;return q;},upsert:(input:Record<string,unknown>|Record<string,unknown>[])=>{rows=Array.isArray(input)?input:[input];return q;},update:(input:Record<string,unknown>)=>{patch=input;return q;},single:()=>execute(true),maybeSingle:()=>execute(true),then:(resolve:unknown,reject:unknown)=>execute().then(resolve as never,reject as never)};return q;
+    const q={select:()=>q,limit:(n:number)=>{limit=n;return q;},or:(expression:string)=>{const match=expression.match(/^end_date\.gte\.(\d{4}-\d{2}-\d{2}),date\.gte\.\1$/);assert.ok(match);eitherDate=match[1];return q;},eq:(key:string,val:unknown)=>{filters.push([key,val]);return q;},neq:(key:string,val:unknown)=>{filters.push([key,val,'<>']);return q;},lte:(key:string,val:unknown)=>{filters.push([key,val,'<=']);return q;},is:(key:string,val:null)=>{filters.push([key,val]);return q;},order:(key:string,options?:{ascending?:boolean})=>{orders.push(column(key)+(options?.ascending===false?' DESC':' ASC'));return q;},range:(start:number,end:number)=>{offset=start;limit=end-start+1;return q;},upsert:(input:Record<string,unknown>|Record<string,unknown>[])=>{rows=Array.isArray(input)?input:[input];return q;},update:(input:Record<string,unknown>)=>{patch=input;return q;},single:()=>execute(true),maybeSingle:()=>execute(true),then:(resolve:unknown,reject:unknown)=>execute().then(resolve as never,reject as never)};return q;
   }) as unknown as typeof supabaseAdmin.from;
-  supabaseAdmin.rpc=(async(name:string,args:{p_org:string})=>{assert.equal(name,'reporting_summary');return {data:(await reader.query('SELECT cockpit.reporting_summary($1) result',[args.p_org])).rows[0].result,error:null};}) as unknown as typeof supabaseAdmin.rpc;
+  supabaseAdmin.rpc=(async(name:string,args:Record<string,unknown>)=>{
+    if(name==='commit_vehicle_custody'){
+      try{return {data:(await writer.query('SELECT cockpit.commit_vehicle_custody($1,$2,$3,$4,$5::jsonb) result',[args.p_org,args.p_driver_id,args.p_actor_id,args.p_request_id,JSON.stringify(args.p_data)])).rows[0].result,error:null};}
+      catch(error){const e=error as {code:string;message:string};return {data:null,error:{code:e.code,message:e.message}};}
+    }
+    assert.equal(name,'reporting_summary');return {data:(await reader.query('SELECT cockpit.reporting_summary($1) result',[args.p_org])).rows[0].result,error:null};
+  }) as unknown as typeof supabaseAdmin.rpc;
   Object.defineProperty(supabaseAdmin,'storage',{configurable:true,value:{from:(bucket:string)=>{assert.equal(bucket,'cockpit-assets');return {upload:async(path:string,data:Buffer)=>{if(storageFailure)return {error:{message:'isolated storage failure'}};if(files.has(path))return {error:{statusCode:'409'}};files.set(path,Buffer.from(data));return {error:null};},download:async(path:string)=>files.has(path)?{data:new Blob([new Uint8Array(files.get(path)!)],{type:'image/png'}),error:null}:{data:null,error:{message:'missing'}}};}}});
   globalThis.fetch=(async(input:unknown,init:RequestInit={})=>{
     const url=new URL(String(input),'http://localhost');const headers=new Headers(init.headers);headers.set('authorization','Bearer '+actor);
     const request=new NextRequest(url,{...init,signal:init.signal || undefined,headers});
+    if(url.pathname==='/api/fleet/availability')return fleetAvailability(request);
+    if(url.pathname==='/api/vehicle-custody')return init.method==='POST'?custody.POST(request):init.method==='PATCH'?custody.PATCH(request):custody.GET(request);
+    if(url.pathname==='/api/vehicle-custody/photo')return custodyPhotos.GET(request);
     if(url.pathname==='/api/expenses/receipt')return init.method==='POST'?receipts.POST(request):receipts.GET(request);
     if(url.pathname==='/api/expenses')return init.method==='POST'?expenses.POST(request):init.method==='PUT'?expenses.PUT(request):expenses.GET(request);
     if(url.pathname==='/api/driving-logs')return init.method==='POST'?logs.POST(request):logs.GET(request);
@@ -141,6 +154,8 @@ export async function verifyReportingFlow(admin:Client,writer:Client,reader:Clie
     assert.equal((await post(operationStatus,'/api/schedules/operation-status',{scheduleId:liveBooking,status:'completed'})).status,200);
     assert.equal((await liveCar()).currentStatus,'available','driver completion reaches the vehicle-management server result immediately');
     console.log('PASS real Postgres schedule assignment → shared fleet API live status/order → assigned driver start/completion → waiting; other-driver update denied');
+
+    await verifyCustodyFlow(admin,writer,reader,{setActor:(role,id)=>{actor=token(role,id);}});
 
     await admin.query('SET ROLE authenticated');await assert.rejects(admin.query('SELECT * FROM cockpit.expenses'),{code:'42501'});await assert.rejects(admin.query('SELECT cockpit.reporting_summary($1)',[org]),{code:'42501'});await admin.query('RESET ROLE');
     console.log('PASS reporting flow: client receipt upload → expense API → real Postgres → report linking/totals → HQ summary/read/photo/review → driver status; retries, other-driver denial and batch rollback');

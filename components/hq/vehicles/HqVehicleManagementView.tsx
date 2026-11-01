@@ -1,4 +1,5 @@
 'use client';
+import { HqVehicleCustodyPanel } from './HqVehicleCustodyPanel';
 import { scheduleOverlapsInterval } from '@/utils/dispatchInterval';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -371,8 +372,10 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
         }
 
         if (targetDateIso === getKstTodayDateStr() && detail.currentStatus === 'in_service') {
-          return { status: '운행 중', detail: '현재 운행 일정·기사 상태 반영' };
+          return { status: '운행 중', detail: '일정·기사 상태·차량 인수 기록 반영' };
         }
+
+        if (detail.requestedIntervalStatus === 'custody_hold') return { status: '미확인', detail: '차량 인수 중 · 반납 확인 필요' };
 
         // Check if this vehicle has an active schedule overlapping targetDateIso specifically
         if (detail.activeSchedules && detail.activeSchedules.length > 0) {
@@ -481,6 +484,8 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
           차량 이미지, 차량번호, 차량별 운영 팁을 한눈에 관리합니다.
         </p>
       </div>
+
+      <HqVehicleCustodyPanel vehicleId={selectedVehicle.uuid} />
 
       {/* Main 3-Column Layout Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">

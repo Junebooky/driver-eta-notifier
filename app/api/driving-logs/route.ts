@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { verifyServerAuth, requireHqAdmin } from '@/lib/auth/serverAuth';
 import { normalizeDateToIso,normalizeTimeHHmm } from '@/utils/dispatchConflictDetector';
+import { custodyOdometerForLog } from '@/utils/vehicleCustody';
+import type { VehicleCustody } from '@/types/vehicleCustody';
 import { HqDrivingLog, HqDrivingLogStatus } from '@/types/drivingLogHq';
 
 export const dynamic = 'force-dynamic';
@@ -65,6 +67,7 @@ export function mapDbRowToDrivingLog(row: any, index: number = 1): HqDrivingLog 
     reviewHistory: Array.isArray(row.review_history) ? row.review_history : [],
     isDriverSubmitted: Boolean(row.submitted_at),
     bookingId: row.booking_id,
+    custodyId: row.meta?.custodyId || undefined,
     driverId: row.driver_id,
     vehicleId: row.vehicle_id,
     organizationId: row.organization_id,
@@ -166,6 +169,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const {
       id,
+      custodyId,
       bookingId,
       driverId,
       driverName,
@@ -325,11 +329,23 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    let verifiedCustody: VehicleCustody | null = null;
+    if (custodyId !== undefined) {
+      if (!isValidUuid(custodyId)) return NextResponse.json({ok:false,error:'인수·반납 기록 식별자를 확인해 주세요.'},{status:400});
+      const found = await supabaseAdmin.from('vehicle_custodies').select('*').eq('id',custodyId).eq('organization_id',auth.session.org).maybeSingle();
+      if (found.error) return NextResponse.json({ok:false,error:'인수·반납 원본을 검증하지 못했습니다.'},{status:503});
+      const mileage = found.data && custodyOdometerForLog(found.data as VehicleCustody, bookingId, effectiveDriverId, normalizeDateToIso(drivingDate));
+      if (!mileage || Number(mileage.startKm)!==startKmNum || Number(mileage.endKm)!==endKmNum || mileage.vehicleId!==verifiedSchedule?.vehicle_id) {
+        return NextResponse.json({ok:false,error:'같은 기사·차량·일정·날짜의 서버 계기판과 일치하지 않습니다. 최신 기록을 적용하거나 직접 입력으로 전환해 주세요.'},{status:409});
+      }
+      verifiedCustody=found.data as VehicleCustody;
+    }
+
     const calculatedDist = endKmNum >= startKmNum && endKmNum>0 ? endKmNum - startKmNum : 0;
     const nowIso = new Date().toISOString();
 
     // Resolve the same logical report across devices, reconnects and navigation drafts.
-    let lookup=supabaseAdmin.from('driving_logs').select('id, stops, status').eq('organization_id',auth.session.org).eq('driver_id',effectiveDriverId).eq('driving_date',drivingDate);
+    let lookup=supabaseAdmin.from('driving_logs').select('id, stops, status, meta').eq('organization_id',auth.session.org).eq('driver_id',effectiveDriverId).eq('driving_date',drivingDate);
     lookup=bookingId?lookup.eq('booking_id',bookingId):lookup.is('booking_id',null);
     const previous=await lookup.maybeSingle();
     if(previous.error)return NextResponse.json({ok:false,error:'기존 운행일지 확인에 실패했습니다.'},{status:503});
@@ -356,6 +372,7 @@ export async function POST(req: NextRequest) {
 
     const insertPayload: Record<string, any> = {
       id: targetRowId,
+      meta: { ...(existing?.meta || {}), custodyId: verifiedCustody?.id || null, odoSource: verifiedCustody ? 'server_custody' : 'manual' },
       organization_id: auth.session.org,
       booking_id: bookingId || null,
       driver_id: effectiveDriverId,

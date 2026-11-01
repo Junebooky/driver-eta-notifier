@@ -7,13 +7,13 @@ WITH required_tables(name) AS (VALUES
   ('cockpit.auth_login_attempts'), ('cockpit.revoked_auth_sessions'),
   ('cockpit.driving_logs'), ('cockpit.expenses'),
   ('cockpit.driver_profile_assets'), ('cockpit.driver_vehicle_info_assets'),
-  ('cockpit.driver_info_dispatch_logs')
+  ('cockpit.driver_info_dispatch_logs'), ('cockpit.vehicle_custodies'), ('cockpit.vehicle_custody_requests')
 ), required_functions(signature) AS (VALUES
   ('cockpit.commit_dispatch_batch(jsonb,text,text,text)'),
   ('cockpit.consume_auth_login_attempt(text[])'),
   ('cockpit.is_active_auth_session(uuid,uuid)'),
   ('cockpit.update_driver_profile_by_id(uuid,jsonb,jsonb)'),
-  ('cockpit.reporting_summary(text)')
+  ('cockpit.reporting_summary(text)'), ('cockpit.commit_vehicle_custody(text,uuid,text,text,jsonb)')
 ), protected_tables AS (
   SELECT name, to_regclass(name) AS oid FROM required_tables
   WHERE name NOT IN ('cockpit.vehicles', 'cockpit.schedules')

@@ -40,6 +40,8 @@ async function main() {
     await admin.query(readFileSync('supabase/migrations/20261031033709_reporting_flow_integrity.sql','utf8'));
     await admin.query(readFileSync('supabase/migrations/20261031033709_reporting_flow_integrity.sql','utf8'));
     await admin.query(readFileSync('supabase/migrations/20261031041612_email_dispatch_source_identity.sql','utf8'));
+    await admin.query(readFileSync('supabase/migrations/20261101103643_vehicle_custody_integrity.sql','utf8'));
+    await admin.query(readFileSync('supabase/migrations/20261101103643_vehicle_custody_integrity.sql','utf8'));
     await a.connect(); await b.connect();
     await Promise.all([a.query('SET ROLE service_role'),b.query('SET ROLE service_role')]);
     const vehicle = randomUUID(); const driver = randomUUID();

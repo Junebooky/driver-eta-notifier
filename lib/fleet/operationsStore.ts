@@ -16,3 +16,10 @@ export async function readFleetOperations(): Promise<FleetOperation[]> {
   if (error || !Array.isArray(data)) throw new Error('차량 상태를 조회할 수 없습니다. DB 연결과 차량 상태 마이그레이션을 확인해 주세요.');
   return data;
 }
+
+export async function readActiveCustodies(): Promise<import('@/types/vehicleCustody').VehicleCustody[]> {
+  const { data, error } = await supabaseAdmin.from('vehicle_custodies').select('*')
+    .eq('organization_id', 'vip_limousine_korea').is('returned_at', null);
+  if (error || !Array.isArray(data)) throw new Error('차량 인수 상태를 조회하지 못했습니다. 서버 연결과 인수·반납 마이그레이션을 확인해 주세요.');
+  return data;
+}

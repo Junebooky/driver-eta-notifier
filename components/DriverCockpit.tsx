@@ -109,7 +109,7 @@ export default function DriverCockpit() {
   const [flightModalInitialFlightId, setFlightModalInitialFlightId] = useState<string | undefined>(undefined);
   const [flightModalInitialType, setFlightModalInitialType] = useState<FlightType | undefined>(undefined);
 
-  // Vehicle Inspection (Receipt / Daily / Return) Modal State (No-DB / Pure LocalStorage)
+  // Vehicle Inspection (pickup / daily / return) state
   const [isInspectionModalOpen, setIsInspectionModalOpen] = useState(false);
   const [inspectionInitialMode, setInspectionInitialMode] = useState<'pickup' | 'daily' | 'return' | 'receipt'>('pickup');
 
@@ -1690,15 +1690,17 @@ export default function DriverCockpit() {
         initialType={flightModalInitialType}
       />
 
-      {/* Vehicle Inspection (Receipt & Return) Modal (Pure Client-Side / localStorage Math) */}
-      <VehicleInspectionModal
+      {/* Existing inspection UI with authoritative company custody and local drafts */}
+      {isInspectionModalOpen && <VehicleInspectionModal
+        key={profile.driverId || 'local'}
         isOpen={isInspectionModalOpen}
         onClose={() => setIsInspectionModalOpen(false)}
         profile={profile}
         profilePlateNumber={profile.plateNumber}
         initialMode={inspectionInitialMode}
+        onCustodySaved={setActiveBookingId}
         bookingId={activeBookingId}
-      />
+      />}
 
       {/* Standalone Location Search & Preset Modal */}
       <LocationSearchModal

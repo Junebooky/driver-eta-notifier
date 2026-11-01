@@ -1,4 +1,5 @@
 'use client';
+import { HqVehicleCustodyPanel } from './vehicles/HqVehicleCustodyPanel';
 import { ArrowRight, CalendarDays, Car, ClipboardList, Receipt, Users } from 'lucide-react';
 import type { HqBooking } from '@/types/hq';
 import { getKstTodayDateStr } from '@/utils/dispatchConflictDetector';
@@ -44,6 +45,7 @@ export function HqDashboardOverview({ bookings, loading, error, representative, 
     <section aria-label="운영 바로가기" className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       {[{tab:'vehicles',label:'차량 관리',icon:Car},{tab:'drivers',label:'기사 관리',icon:Users},{tab:'driving_logs',label:'운행일지',icon:ClipboardList},{tab:'expenses',label:'경비·영수증',icon:Receipt}].map(({tab,label,icon:Icon}) => <button key={tab} type="button" onClick={() => onNavigate(tab)} className="flex min-h-16 items-center gap-2 rounded-2xl border border-slate-200 bg-white p-4 text-sm font-bold"><Icon className="h-5 w-5 text-[#1E60F3]" aria-hidden="true" />{label}</button>)}
     </section>
+    <HqVehicleCustodyPanel onOpenBooking={id => { const booking = bookings.find(row => (row.scheduleId || row.id) === id); if (booking) onAssign(booking); else onNavigate('dispatch'); }} />
     <HqReportingOverview />
     <button type="button" onClick={() => onNavigate('dispatch', 'today')} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-blue-50 p-4 font-bold text-[#1E60F3]"><CalendarDays className="h-5 w-5" aria-hidden="true" />오늘의 전체 일정 보기</button>
   </div>;

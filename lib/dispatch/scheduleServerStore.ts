@@ -1561,7 +1561,8 @@ export async function atomicUpsertServerDispatchBatch(
     const invalid = ['22007', '22008', '22023', '23514', '22P02'].includes(error.code);
     return {
       ok: false,
-      error: conflict ? '선택한 기사·차량의 일정이 겹치거나 예약이 변경되었습니다. 새로고침 후 확인해 주세요.'
+      error: error.message?.includes('CUSTODY_') ? '차량 인수 기록이 남아 있어 배차를 변경할 수 없습니다. 기사 반납 기록과 현재 인수 상태를 먼저 확인해 주세요.'
+        : conflict ? '선택한 기사·차량의 일정이 겹치거나 예약이 변경되었습니다. 새로고침 후 확인해 주세요.'
         : invalid ? '배차 날짜·시간·차량·기사 정보를 확인해 주세요.'
         : '안전한 배차 저장을 사용할 수 없습니다. DB 연결 및 배차 마이그레이션 적용 상태를 확인해 주세요.',
       statusCode: conflict ? 409 : invalid ? 400 : 503,

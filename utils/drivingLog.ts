@@ -47,6 +47,7 @@ export interface DrivingLogData {
   distanceKm: string;        // 오늘 운행: "136 km"
   isOdoManualOverride?: boolean;
   odoSource?: 'inspection_verified' | 'manual' | 'demo';
+  custodyId?: string;
   // Route timeline
   stops: RouteStopItem[];
   // Special notes
@@ -257,9 +258,10 @@ export const calculateDrivingDistance = (
 export const getVerifiedInspectionOdometer = (
   vehicleNo?: string,
   targetDateIso: string = formatIsoDate(),
-  bookingId?: string
+  bookingId?: string,
+  driverId?: string,
 ): { startKm: string; endKm: string; isVerified: boolean } => {
-  if (typeof window === 'undefined' || !vehicleNo) {
+  if (driverId || typeof window === 'undefined' || !vehicleNo) {
     return { startKm: '', endKm: '', isVerified: false };
   }
 
@@ -393,7 +395,7 @@ export const loadDrivingLogDraft = (
   const passengerCount = driverProfile.passengerCount || '';
 
   // Check verified vehicle inspection odometer for today (booking-aware)
-  const verifiedOdo = getVerifiedInspectionOdometer(driverProfile.vehicleNo, dateIso, bookingId);
+  const verifiedOdo = getVerifiedInspectionOdometer(driverProfile.vehicleNo, dateIso, bookingId, driverProfile.driverId);
   const startKm = verifiedOdo.startKm || '';
   const endKm = verifiedOdo.endKm || '';
   const { formatted: distanceFormatted } = calculateDrivingDistance(startKm, endKm);

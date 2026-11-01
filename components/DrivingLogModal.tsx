@@ -23,6 +23,7 @@ import {
   NotebookPen,
 } from 'lucide-react';
 import { DriverProfile } from '@/types';
+import { CustodyMileageLink } from './CustodyMileageLink';
 import {
   RouteStopItem,
   DrivingLogData,
@@ -170,6 +171,7 @@ const DrivingLogModalContent: React.FC<{
       distanceKm: formatted,
       isOdoManualOverride: true,
       odoSource: 'manual',
+      custodyId: undefined,
     }));
     setIsEditingMileage(false);
     haptics.success();
@@ -273,6 +275,7 @@ const DrivingLogModalContent: React.FC<{
         bookingId: logData.bookingId || bookingId,
         driverId: logData.driverId,
         vehicleId: logData.vehicleId,
+        custodyId: logData.custodyId,
       };
 
       const res = await submitDriverLogToHqDb(payload);
@@ -549,6 +552,12 @@ const DrivingLogModalContent: React.FC<{
             <Navigation className="w-4 h-4 text-[#1E60F3] stroke-[2.2]" />
             <h2 className="text-sm font-bold text-slate-900 tracking-tight">주행거리</h2>
           </div>
+
+          <CustodyMileageLink driverId={driverProfile.driverId} bookingId={bookingId} date={logData.rawDate} onApply={value => {
+            const distance = calculateDrivingDistance(value.startKm, value.endKm);
+            setLogData(previous => ({ ...previous, ...value, startKm: formatOdometer(value.startKm), endKm: formatOdometer(value.endKm), distanceKm: distance.formatted, odoSource: 'inspection_verified', isOdoManualOverride: false }));
+            showToast('서버 인수·반납 계기판 값을 적용했습니다.');
+          }} />
 
           {/* Improved hierarchy with directional arrow and emphasized 오늘 운행 box */}
           <div className="flex items-center gap-2">
