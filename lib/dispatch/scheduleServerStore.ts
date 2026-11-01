@@ -44,7 +44,7 @@ export interface HqScheduleMeta {
   vehicleModel?: string | null;
   vehiclePlate?: string | null;
   passengerPhone?: string | null;
-  customerBrochure?: '미생성' | '미발송' | '발송됨' | '재발송 필요' | '실패';
+  customerBrochure?: '미생성' | '미발송' | '준비완료' | '수동 발송 기록' | '발송됨' | '재발송 필요' | '실패';
   requestedLanguage?: 'ko' | 'en' | 'other';
   languageOverrideConfirmed?: boolean;
   serviceMode?: 'with_driver' | 'vehicle_only';
@@ -564,7 +564,7 @@ export interface DispatchUpsertInput {
   allowUnverified?: boolean;
   allowConflictOverride?: boolean;
   publishedBy?: string;
-  customerBrochure?: '미생성' | '미발송' | '발송됨' | '재발송 필요' | '실패';
+  customerBrochure?: '미생성' | '미발송' | '준비완료' | '수동 발송 기록' | '발송됨' | '재발송 필요' | '실패';
   requestedLanguage?: 'ko' | 'en' | 'other';
   languageOverrideConfirmed?: boolean;
   serviceMode?: 'with_driver' | 'vehicle_only';

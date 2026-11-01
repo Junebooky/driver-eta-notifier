@@ -1077,25 +1077,33 @@ export async function submitDriverExpensesToHqDb(
 /**
  * Update expense status in Supabase DB via /api/expenses
  */
-export async function updateHqExpenseStatusDb(
+export type ExpenseReviewResult =
+  | { ok: true; expense: HqExpenseRecord }
+  | { ok: false; error: string; conflict?: boolean };
+
+export async function updateHqExpenseReviewDb(
   expenseId: string,
-  newStatus: HqExpenseStatus,
-  reviewNotes?: string,
-  actor: string = '본사 관리자'
-): Promise<boolean> {
+  patch: { status?: HqExpenseStatus; reviewNotes?: string; billableToCustomer?: boolean },
+  expectedUpdatedAt?: string,
+): Promise<ExpenseReviewResult> {
+  if (!expectedUpdatedAt) return { ok: false, error: '서버의 최신 경비 내역을 불러온 뒤 검수해 주세요.' };
   try {
     const res = await fetch('/api/expenses', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: expenseId, status: newStatus, reviewNotes }),
+      body: JSON.stringify({ id: expenseId, ...patch, expectedUpdatedAt }),
     });
     const data = await res.json().catch(() => ({}));
-    if (res.ok && data.ok) {
-      updateHqExpenseStatus(expenseId, newStatus, reviewNotes, actor);
-      return true;
+    if (res.ok && data.ok === true && data.expense?.id === expenseId &&
+        (patch.status === undefined || data.expense.status === patch.status) &&
+        (patch.billableToCustomer === undefined || data.expense.billableToCustomer === patch.billableToCustomer) &&
+        data.expense.updatedAt) {
+      // Use the authoritative server row, including reviewer, audit and revision.
+      saveHqExpenses(getHqExpenses().map(expense => expense.id === expenseId ? data.expense : expense));
+      return { ok: true, expense: data.expense };
     }
-    return false;
+    return { ok: false, conflict: res.status === 409, error: data.error || '서버에서 검수 저장 결과를 확인하지 못했습니다. 최신 내역을 확인해 주세요.' };
   } catch {
-    return false;
+    return { ok: false, error: '검수 저장 결과를 확인하지 못했습니다. 연결을 확인하고 최신 내역을 다시 불러와 주세요.' };
   }
 }

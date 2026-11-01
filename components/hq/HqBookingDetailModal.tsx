@@ -396,16 +396,6 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
     }
   };
 
-  const handleSendCustomerBrochure = async () => {
-    haptics.successPulse();
-    const updated: HqBooking = {
-      ...booking,
-      customerBrochure: '발송됨',
-    };
-    onUpdateBooking(updated);
-    setNotice('고객 안내자료(기사·차량 블랙&골드 프로필) 발송 상태가 기록되었습니다.');
-  };
-
   const isAlreadyPublished =
     !isNewBooking &&
     (booking.dispatchStatus === '배차 완료' || booking.dispatchStatus === '재확인 필요');
@@ -893,16 +883,7 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                     <span>기사·차량 Info 확인 및 발송창 열기</span>
                   </button>
 
-                  {booking.customerBrochure !== '발송됨' && (
-                    <button
-                      type="button"
-                      onClick={handleSendCustomerBrochure}
-                      className="py-2.5 px-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold transition-all cursor-pointer"
-                      title="단순 발송 완료 표시"
-                    >
-                      <span>완료 표시</span>
-                    </button>
-                  )}
+
                 </div>
               </div>
 
@@ -970,6 +951,7 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
       {/* Driver Vehicle Info Modal */}
       {isDriverVehicleInfoModalOpen && (
         <HqDriverVehicleInfoModal
+          key={`${booking.scheduleId || booking.id}:${booking.version}:${booking.driverId}:${booking.vehiclePlate}`}
           isOpen={isDriverVehicleInfoModalOpen}
           booking={booking}
           onClose={() => setIsDriverVehicleInfoModalOpen(false)}
@@ -978,10 +960,10 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
             setAssetManagerVehiclePlate(vPlate);
             setIsAssetManagerModalOpen(true);
           }}
-          onDispatchRecorded={() => {
-            onUpdateBooking({
+          onDispatchRecorded={(status, scheduleSynced) => {
+            if (scheduleSynced) onUpdateBooking({
               ...booking,
-              customerBrochure: '발송됨',
+              customerBrochure: status,
             });
             onSavedServer?.();
           }}

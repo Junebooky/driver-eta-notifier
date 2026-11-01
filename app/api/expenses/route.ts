@@ -81,6 +81,7 @@ export function mapDbRowToExpenseRecord(row: any, index: number = 1): HqExpenseR
     reviewNotes:row.review_notes || undefined,
     reviewedAt:row.reviewed_at || undefined,
     reviewedBy:row.reviewed_by || undefined,
+    updatedAt: row.updated_at || undefined,
     bookingId: row.booking_id || undefined,
     drivingLogId:row.driving_log_id || undefined,
     driverId: row.driver_id || undefined,
@@ -430,7 +431,15 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { id, status, reviewNotes, billableToCustomer } = body;
+    const { id, status, reviewNotes, billableToCustomer, expectedUpdatedAt } = body;
+    const validStatuses = new Set(['검수 대기', '승인 완료', '금액 확인', '반려', '보완 필요']);
+    if ((status !== undefined && !validStatuses.has(status)) ||
+        (reviewNotes !== undefined && (typeof reviewNotes !== 'string' || reviewNotes.length > 5000)) ||
+        (expectedUpdatedAt !== undefined && (typeof expectedUpdatedAt !== 'string' || !Number.isFinite(Date.parse(expectedUpdatedAt)))) ||
+        (billableToCustomer !== undefined && typeof billableToCustomer !== 'boolean') ||
+        (status === undefined && billableToCustomer === undefined)) {
+      return NextResponse.json({ ok: false, error: '검수 상태·의견·저장 버전을 확인해 주세요.' }, { status: 400 });
+    }
 
     if (!id) {
       return NextResponse.json(
@@ -467,14 +476,18 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    const nowIso = new Date().toISOString();
+    if (expectedUpdatedAt !== undefined && expectedUpdatedAt !== existing.updated_at) {
+      return NextResponse.json({ ok: false, error: '다른 기기에서 경비가 변경되었습니다. 최신 내역을 확인한 뒤 다시 검수해 주세요.' }, { status: 409 });
+    }
+
+    const nowIso = new Date(Math.max(Date.now(), new Date(existing.updated_at || 0).getTime() + 1)).toISOString();
     const actor = auth.session.displayName || auth.session.driverName || '본사 관리자';
     const prevHistory = Array.isArray(existing.audit_history) ? existing.audit_history : [];
 
     let actionType: 'approved' | 'revision_requested' | 'rejected' | 'update' = 'approved';
     let auditMessage = `관리자(${actor})가 ${status || '정보 수정'} 처리했습니다.`;
 
-    if (status === '보완 필요') {
+    if (status === '보완 필요' || status === '금액 확인') {
       actionType = 'revision_requested';
       auditMessage = reviewNotes ? `보완 요청: ${reviewNotes}` : '추가 증빙 확인이 필요합니다.';
     } else if (status === '반려') {
@@ -511,12 +524,11 @@ export async function PUT(req: NextRequest) {
       updatePayload.billable_to_customer = billableToCustomer;
     }
 
-    const { data: updatedRow, error: updateErr } = await supabaseAdmin
-      .from('expenses')
-      .update(updatePayload)
-      .eq('id', id)
-      .select('*')
-      .single();
+    let updateQuery = supabaseAdmin.from('expenses').update(updatePayload)
+      .eq('id', id).eq('organization_id', auth.session.org);
+    // Compare the row read above, even for older clients without a revision.
+    if (existing.updated_at) updateQuery = updateQuery.eq('updated_at', existing.updated_at);
+    const { data: updatedRow, error: updateErr } = await updateQuery.select('*').maybeSingle();
 
     if (updateErr) {
       return NextResponse.json(
@@ -525,6 +537,9 @@ export async function PUT(req: NextRequest) {
       );
     }
 
+    if (!updatedRow) {
+      return NextResponse.json({ ok: false, error: '검수 중 경비가 변경되었습니다. 최신 내역을 확인한 뒤 다시 시도해 주세요.' }, { status: 409 });
+    }
     return NextResponse.json({
       ok: true,
       expense: mapDbRowToExpenseRecord(updatedRow),

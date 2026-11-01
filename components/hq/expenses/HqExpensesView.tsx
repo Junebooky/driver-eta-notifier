@@ -1,7 +1,7 @@
 'use client';
 import { useReportingRefresh } from '@/hooks/useReportingRefresh';
 
-import React, { useState, useMemo, useSyncExternalStore } from 'react';
+import React, { useState, useMemo, useRef, useSyncExternalStore } from 'react';
 import Image from 'next/image';
 import {
   Receipt,
@@ -17,7 +17,6 @@ import {
   X,
   ZoomIn,
   ZoomOut,
-  Loader2,
   Sparkles,
   Maximize2,
   AlertTriangle,
@@ -34,14 +33,11 @@ import {
   getHqExpensesSnapshot,
   getHqExpensesServerSnapshot,
   getHqExpenseKpiSummary,
-  updateHqExpenseStatus,
-  updateHqExpenseStatusDb,
+  updateHqExpenseReviewDb,
   fetchHqExpensesFromDb,
-  saveHqExpenses,
   exportExpensesToCsv,
 } from '@/utils/expenseHqStorage';
 import { formatKRW } from '@/utils/expense';
-import { rotateImageDataUrl } from '@/utils/imageRotate';
 import { haptics } from '@/utils/haptics';
 import { checkDuplicateReceipt } from '@/utils/settlementCalculator';
 import { HqBooking } from '@/types/hq';
@@ -77,12 +73,15 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
   const [inspectorTab, setInspectorTab] = useState<'photo' | 'details'>('photo');
 
   // Review notes map per expense ID
-  const [reviewNotesMap, setReviewNotesMap] = useState<Record<string, string>>({});
+  const [reviewNotesMap, setReviewNotesMap] = useState<Record<string, { text: string; updatedAt?: string }>>({});
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [isReviewSaving, setIsReviewSaving] = useState(false);
+  const reviewSavingRef = useRef(false);
 
   // Receipt rotation & zoom in inspection drawer
   const [rotationAngle, setRotationAngle] = useState<number>(0);
-  const [isRotating, setIsRotating] = useState(false);
+
   const [isReceiptZoomOpen, setIsReceiptZoomOpen] = useState(false);
   const [zoomScale, setZoomScale] = useState<number>(1);
 
@@ -101,7 +100,7 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
   }, [expenses, selectedExpenseId]);
 
   const currentReviewNotes = selectedExpense
-    ? (reviewNotesMap[selectedExpense.id] ?? selectedExpense.reviewNotes ?? '')
+    ? (reviewNotesMap[selectedExpense.id]?.text ?? selectedExpense.reviewNotes ?? '')
     : '';
 
   // KPI Summary
@@ -143,46 +142,39 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
     });
   }, [expenses, searchQuery, selectedCategory, selectedStatus]);
 
-  // Handle Review Status Change (strictly syncs to DB)
-  const handleUpdateStatus = async (newStatus: HqExpenseStatus) => {
-    if (!selectedExpense) return;
-    haptics.success();
-    const ok = await updateHqExpenseStatusDb(
-      selectedExpense.id,
-      newStatus,
-      currentReviewNotes.trim() || undefined,
-      '본사 관리자'
-    );
-    if (!ok) {
-      updateHqExpenseStatus(
-        selectedExpense.id,
-        newStatus,
-        currentReviewNotes.trim() || undefined,
-        '본사 관리자'
-      );
+  // Change the local review only after the server confirms the exact record.
+  const handleReview = async (patch: { status?: HqExpenseStatus; reviewNotes?: string; billableToCustomer?: boolean }) => {
+    if (!selectedExpense || reviewSavingRef.current) return;
+    reviewSavingRef.current = true;
+    setIsReviewSaving(true);
+    setReviewError(null);
+    setToastMessage(null);
+    const expense = selectedExpense;
+    try {
+      const expectedUpdatedAt = patch.reviewNotes !== undefined ? (reviewNotesMap[expense.id]?.updatedAt ?? expense.updatedAt) : expense.updatedAt;
+      const result = await updateHqExpenseReviewDb(expense.id, patch, expectedUpdatedAt);
+      if (!result.ok) {
+        setReviewError(result.error);
+        haptics.errorAlert();
+        if (result.conflict) await refresh();
+        return;
+      }
+      if (patch.reviewNotes !== undefined) setReviewNotesMap(prev => {
+        const next = { ...prev }; delete next[expense.id]; return next;
+      });
+      haptics.success();
+      showToast(patch.status ? `${expense.driverName} 기사님의 경비 상태가 '${result.expense.status}'(으)로 저장되었습니다.` : '정산 반영 구분이 서버에 저장되었습니다.');
+    } finally {
+      reviewSavingRef.current = false;
+      setIsReviewSaving(false);
     }
-    showToast(`${selectedExpense.driverName} 기사님의 경비 상태가 '${newStatus}'(으)로 변경되었습니다.`);
   };
 
-  // Rotate receipt 90 degrees
-  const handleRotateCurrentReceipt = async (degrees: number = 90) => {
-    if (!selectedExpense?.receiptUrl || isRotating) return;
+  // Rotate the preview only; retain the immutable uploaded receipt.
+  const handleRotateCurrentReceipt = (degrees: number = 90) => {
+    if (!selectedExpense?.receiptUrl) return;
     haptics.selection();
-    setIsRotating(true);
-    setRotationAngle((prev) => (prev + degrees) % 360);
-
-    try {
-      const rotated = await rotateImageDataUrl(selectedExpense.receiptUrl, degrees);
-      const updatedList = expenses.map((e) =>
-        e.id === selectedExpense.id ? { ...e, receiptUrl: rotated } : e
-      );
-      saveHqExpenses(updatedList);
-      showToast('영수증 사진이 90° 회전되었습니다.');
-    } catch (err) {
-      console.error('Failed to rotate receipt in inspection drawer:', err);
-    } finally {
-      setIsRotating(false);
-    }
+    setRotationAngle(prev => (prev + degrees) % 360);
   };
 
   // CSV Export
@@ -737,7 +729,7 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
                         <button
                           type="button"
                           onClick={() => handleRotateCurrentReceipt(90)}
-                          disabled={isRotating}
+                          disabled={!selectedExpense?.receiptUrl}
                           className="px-2.5 py-1.5 rounded-lg bg-slate-900/75 hover:bg-slate-900 text-white text-[11px] font-bold flex items-center gap-1 shadow-sm backdrop-blur-xs cursor-pointer"
                           title="90° 회전"
                         >
@@ -815,13 +807,8 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
                     <div className="inline-flex bg-white border border-slate-200 rounded-lg p-0.5 text-[10px] font-bold">
                       <button
                         type="button"
-                        onClick={() => {
-                          const updated = expenses.map((e) =>
-                            e.id === selectedExpense.id ? { ...e, billableToCustomer: true } : e
-                          );
-                          saveHqExpenses(updated);
-                          showToast('고객사 실비 재청구 대상으로 설정되었습니다.');
-                        }}
+                        onClick={() => handleReview({ billableToCustomer: true })}
+                        disabled={isReviewSaving}
                         className={`px-2 py-1 rounded-md cursor-pointer transition-colors ${selectedExpense.billableToCustomer !== false
                             ? 'bg-[#1E60F3] text-white'
                             : 'text-slate-500 hover:text-slate-800'
@@ -831,13 +818,8 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
-                          const updated = expenses.map((e) =>
-                            e.id === selectedExpense.id ? { ...e, billableToCustomer: false } : e
-                          );
-                          saveHqExpenses(updated);
-                          showToast('회사 자체 부담 직접비로 분류되었습니다.');
-                        }}
+                        onClick={() => handleReview({ billableToCustomer: false })}
+                        disabled={isReviewSaving}
                         className={`px-2 py-1 rounded-md cursor-pointer transition-colors ${selectedExpense.billableToCustomer === false
                             ? 'bg-slate-800 text-white'
                             : 'text-slate-500 hover:text-slate-800'
@@ -952,11 +934,12 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
                     <label className="text-xs font-bold text-slate-700 block">검수 의견 / 메모</label>
                     <textarea
                       value={currentReviewNotes}
+                      disabled={isReviewSaving}
                       onChange={(e) => {
                         if (selectedExpense) {
                           setReviewNotesMap((prev) => ({
                             ...prev,
-                            [selectedExpense.id]: e.target.value,
+                            [selectedExpense.id]: { text: e.target.value, updatedAt: prev[selectedExpense.id]?.updatedAt ?? selectedExpense.updatedAt },
                           }));
                         }
                       }}
@@ -968,12 +951,22 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
                 </div>
               )}
 
-              {/* 3 Bottom Action Buttons in a Single Row */}
-              <div className="pt-2">
+              {/* The server remains authoritative when saving fails. */}
+              <div className="pt-2" aria-busy={isReviewSaving}>
+                {reviewError && <div role="alert" className="mb-2 text-xs font-semibold text-rose-700">
+                  <p>{reviewError}</p>
+                  <button type="button" disabled={isReviewSaving} className="mt-1 underline" onClick={async () => {
+                    await refresh();
+                    setReviewNotesMap(prev => { const next = { ...prev }; delete next[selectedExpense.id]; return next; });
+                    setReviewError(null);
+                  }}>작성한 검수 의견을 비우고 최신 내역 다시 확인</button>
+                </div>}
+                {isReviewSaving && <p role="status" className="mb-2 text-xs text-slate-600">검수 결과를 저장하고 있습니다.</p>}
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
-                    onClick={() => handleUpdateStatus('승인 완료')}
+                    onClick={() => handleReview({ status: '승인 완료', reviewNotes: currentReviewNotes.trim() })}
+                    disabled={isReviewSaving}
                     className="py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1 cursor-pointer"
                   >
                     <CheckCircle2 className="w-3.5 h-3.5" />
@@ -982,7 +975,8 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => handleUpdateStatus('금액 확인')}
+                    onClick={() => handleReview({ status: '금액 확인', reviewNotes: currentReviewNotes.trim() })}
+                    disabled={isReviewSaving}
                     className="py-2.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1 cursor-pointer"
                   >
                     <AlertCircle className="w-3.5 h-3.5" />
@@ -991,7 +985,8 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
 
                   <button
                     type="button"
-                    onClick={() => handleUpdateStatus('반려')}
+                    onClick={() => handleReview({ status: '반려', reviewNotes: currentReviewNotes.trim() })}
+                    disabled={isReviewSaving}
                     className="py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1 cursor-pointer"
                   >
                     <XCircle className="w-3.5 h-3.5" />
@@ -1038,7 +1033,7 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
               <button
                 type="button"
                 onClick={() => handleRotateCurrentReceipt(-90)}
-                disabled={isRotating}
+                disabled={!selectedExpense?.receiptUrl}
                 className="bg-white/15 hover:bg-white/25 active:scale-95 disabled:opacity-40 text-white text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5 backdrop-blur-xs transition-all cursor-pointer"
                 title="반시계방향 90° 회전"
               >
@@ -1048,15 +1043,11 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
               <button
                 type="button"
                 onClick={() => handleRotateCurrentReceipt(90)}
-                disabled={isRotating}
+                disabled={!selectedExpense?.receiptUrl}
                 className="bg-[#1E60F3] hover:bg-blue-600 active:scale-95 disabled:opacity-40 text-white text-xs font-bold px-3.5 py-1.5 rounded-full flex items-center gap-1.5 shadow-md transition-all cursor-pointer"
                 title="시계방향 90° 세우기"
               >
-                {isRotating ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <RotateCw className="w-3.5 h-3.5" />
-                )}
+                <RotateCw className="w-3.5 h-3.5" />
                 <span>90° 세우기</span>
               </button>
               <button
@@ -1110,7 +1101,7 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
 
       {/* Floating Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-60 bg-slate-900/95 text-white text-xs font-bold px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2 backdrop-blur-sm animate-in fade-in slide-in-from-bottom-2 duration-150">
+        <div role="status" className="fixed bottom-6 right-6 z-60 bg-slate-900/95 text-white text-xs font-bold px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2 backdrop-blur-sm animate-in fade-in slide-in-from-bottom-2 duration-150">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{toastMessage}</span>
         </div>

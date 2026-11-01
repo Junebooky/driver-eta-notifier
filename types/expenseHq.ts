@@ -50,6 +50,7 @@ export interface HqExpenseRecord {
   reviewNotes?: string;
   reviewedAt?: string;
   reviewedBy?: string;
+  updatedAt?: string; // Server revision used to reject stale reviews.
   // Billing & Duplicate Prevention
   billableToCustomer?: boolean;   // default true when status === '승인 완료'
   eventId?: string;

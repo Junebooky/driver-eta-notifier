@@ -723,7 +723,8 @@ export async function getLatestDispatchLogForBooking(
       .limit(1)
       .maybeSingle();
 
-    if (!error && data) {
+    if (error) throw new Error('안내자료 기록을 조회하지 못했습니다. 최신 기록을 다시 확인해 주세요.');
+    if (data) {
       return {
         id: data.id,
         organizationId: data.organization_id,
@@ -745,8 +746,8 @@ export async function getLatestDispatchLogForBooking(
         createdAt: data.created_at,
       };
     }
-  } catch {
-    // Table not ready
+  } catch (error) {
+    if (!isTestEnv) throw error;
   }
 
   return null;
