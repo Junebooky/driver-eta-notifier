@@ -166,12 +166,9 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
         `/api/fleet/availability?startDate=${todayIso}&endDate=${endIso}&startTime=00:00&endTime=23:59`,
         { signal: controller.signal, cache: 'no-store' }
       );
-      if (!res.ok) {
-        throw new Error(`서버 응답 에러 (${res.status})`);
-      }
-      const data = await res.json();
-      if (!data.ok) {
-        throw new Error(data.error || '가용성 조회 실패');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || `서버 응답 에러 (${res.status})`);
       }
       if (controller.signal.aborted) return;
       setFleetResult(data);

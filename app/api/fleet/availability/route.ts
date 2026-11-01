@@ -47,9 +47,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: true, ...result });
   } catch (err: any) {
     console.error('GET /api/fleet/availability error (fail-closed):', err);
+    const isDbUnavailable = err.message?.includes('마이그레이션') || err.message?.includes('fleet_vehicle_operations') || err.message?.includes('조회할 수 없습니다');
     return NextResponse.json(
       { ok: false, error: err.message || '차량 가용성 조회 중 서버 오류가 발생했습니다.' },
-      { status: 500 }
+      { status: isDbUnavailable ? 503 : 500 }
     );
   }
 }
