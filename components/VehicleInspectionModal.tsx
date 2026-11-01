@@ -104,7 +104,8 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
   const mutation = useMemo(() => createRetryableJsonMutation(`cockpit_custody_pending_${profile.driverId || 'unlinked'}`), [profile.driverId]);
   const [pendingCustody, setPendingCustody] = useState(mutation.hasPending);
   const initialBinding = useRef('');
-  const inspectionDraftKey = serverMode ? `cockpit_inspection_draft_${profile.driverId}_${selectedBookingId || bookingId || 'unselected'}` : getInspectionStorageKey(profile.vehicleNo);
+  const serverAssignmentPlate = selectedBooking?.vehicle_plate || activeCustody?.vehicle_plate || '';
+  const inspectionDraftKey = serverMode ? `cockpit_inspection_draft_${profile.driverId}_${selectedBooking?.id || bookingId || 'unselected'}` : getInspectionStorageKey(profile.vehicleNo);
 
 
   // Profile hocha and car number defaults
@@ -275,6 +276,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
       initialData: currentInitialData,
       bookingId: (serverMode ? selectedBooking?.id : bookingId) || overrides?.bookingId,
       driverId: profile.driverId,
+      mismatchReason,
       savedAt: new Date().toISOString(),
       ...overrides,
     };
@@ -310,6 +312,8 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
       return;
     }
 
+    if (serverMode && !custody.ready) return;
+    const defaultPlate = serverMode ? serverAssignmentPlate : detectedCarNumber;
     const currentKey = inspectionDraftKey;
     let rawData: string | null = null;
     try {
@@ -349,7 +353,8 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
       try {
         const parsed = JSON.parse(rawData);
         setVehicleHocha(parsed.vehicleHocha || detectedHocha);
-        setCarNumber(detectedCarNumber || parsed.carNumber || '');
+        setCarNumber(serverMode ? parsed.carNumber || defaultPlate : detectedCarNumber || parsed.carNumber || '');
+        if (serverMode) setMismatchReason(parsed.mismatchReason || '');
 
         // Pickup (Receipt) Data
         const pOdo = parsed.pickupOdo || parsed.receiptTotalKm || '';
@@ -411,20 +416,21 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
         console.error('점검 데이터 파싱 실패:', e);
         resetToCleanState();
         setVehicleHocha(detectedHocha);
-        setCarNumber(detectedCarNumber);
+        setCarNumber(defaultPlate);
       }
     } else {
       // 해당 호차의 점검 기록이 없으면 깨끗한 초기 상태(Clean State)로 리셋
       resetToCleanState();
       setVehicleHocha(detectedHocha);
-      setCarNumber(detectedCarNumber);
+      setCarNumber(defaultPlate);
     }
 
     isLoadedRef.current = true;
-  }, [isOpen, profile.vehicleNo, detectedHocha, detectedCarNumber, inspectionDraftKey, serverMode]);
+  }, [isOpen, profile.vehicleNo, detectedHocha, detectedCarNumber, inspectionDraftKey, serverMode, custody.ready, serverAssignmentPlate]);
 
   // Task 2: Real-time synchronization of profilePlateNumber / profile.plateNumber to carNumber when modal is open or profile updates
   useEffect(() => {
+    if (serverMode) return;
     const targetPlate = profilePlateNumber?.trim() || profile.plateNumber?.trim() || detectedCarNumber;
     if (isOpen && targetPlate) {
       setCarNumber(targetPlate);

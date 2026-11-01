@@ -746,6 +746,7 @@ export default function DriverCockpit() {
 
   // Initialization Gate: check driver onboarding status on first launch before revealing dashboard
   useEffect(() => {
+    if (!isLoaded) return;
     try {
       const onboarded = localStorage.getItem('cockpit_driver_onboarded');
       if (!onboarded) {
@@ -765,7 +766,7 @@ export default function DriverCockpit() {
       console.warn('Failed to check driver onboarding status:', e);
       setIsInitialized(true);
     }
-  }, []);
+  }, [isLoaded]);
 
   // Route estimation state (initialized with immediate dynamic estimate)
   const [routeEstimate, setRouteEstimate] = useState<RouteEstimate>(() =>

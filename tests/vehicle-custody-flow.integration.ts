@@ -28,6 +28,9 @@ export async function verifyCustodyFlow(admin:Client, writer:Client, reader:Clie
   assert.equal((await reader.query('SELECT vehicle_id FROM cockpit.schedules WHERE id=$1',[booking])).rows[0].vehicle_id,car.uuid);
   assert.equal(Number((await reader.query('SELECT count(*) FROM cockpit.vehicle_custodies WHERE booking_id=$1',[booking])).rows[0].count),0);
   auth.setActor('hq_admin');const alert=await fetchVehicleCustody();assert.equal(alert.mismatches.some(row=>row.request_id===mismatch.requestId),true);
+  const reviewed=await fetch('/api/vehicle-custody',{method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({requestId:mismatch.requestId,note:'배정 차량 유지로 기사 안내'})});assert.equal(reviewed.status,200);
+  assert.equal(Number((await reader.query('SELECT count(*) FROM cockpit.vehicle_custodies WHERE booking_id=$1',[booking])).rows[0].count),0,'HQ alert acknowledgment is not a pickup/swap approval');
+  auth.setActor('driver',driver);const pendingAgain=await write({...pickup,vehicleId:VIP_REAL_VEHICLES[5].uuid,reason:'다시 확인 요청'});assert.equal(pendingAgain.status,200);
   auth.setActor('driver',other);assert.equal((await fetch('/api/vehicle-custody/photo?requestId='+mismatch.requestId)).status,403);
   auth.setActor('driver',driver);assert.equal((await fetch('/api/vehicle-custody/photo?requestId='+mismatch.requestId)).status,200);
   const key=randomUUID();const simultaneous=await Promise.all([write({...pickup,photo},key),write({...pickup,photo},key)]);
@@ -36,11 +39,16 @@ export async function verifyCustodyFlow(admin:Client, writer:Client, reader:Clie
   assert.equal((await fetchVehicleCustody()).mismatches.length,0,'matching verified pickup resolves the driver mismatch');
   assert.equal((await write({...pickup,inspection:{...pickup.inspection,odometer:101}},key)).status,409,'frozen request key cannot change the confirmed mileage');
   assert.equal((await write(pickup)).status,409,'a second device with a different key cannot create another possession');
-  auth.setActor('driver',other);assert.equal((await write({...pickup,bookingId:later})).status,409,'a future driver cannot claim a still-held vehicle');
+  auth.setActor('driver',other);assert.equal((await write({action:'return',custodyId:saved.custody.id,vehicleId:car.uuid,confirmed:true,inspection:{odometer:140}})).status,403);assert.equal((await write({...pickup,bookingId:later})).status,409,'a future driver cannot claim a still-held vehicle');
   assert.equal((await fetchVehicleCustody()).custodies.length,0,'same-name drivers cannot see each other custody');
   auth.setActor('hq_admin');assert.equal((await live()).custody.id,saved.custody.id);
   assert.equal((await live()).currentStatus,'in_service');assert.equal((await live()).isAvailable,false);assert.equal(currentDriverAvailable,false,'a driver without a fixed vehicle_no stays in the roster and is held by their custody');
   await assert.rejects(writer.query('UPDATE cockpit.schedules SET driver_id=$2 WHERE id=$1',[booking,other]),{code:'23P01'});
+  await admin.query("UPDATE cockpit.vehicle_custodies SET expected_return_at=clock_timestamp()-interval '1 minute' WHERE id=$1",[saved.custody.id]);
+  await assert.rejects(writer.query(`INSERT INTO cockpit.schedules(org_id,date,pickup_time,end_date,end_time,driver_id,vehicle_id,vehicle_plate,dispatch_status)
+    VALUES($1,(clock_timestamp() AT TIME ZONE 'Asia/Seoul')::date+7,'09:00',(clock_timestamp() AT TIME ZONE 'Asia/Seoul')::date+7,'10:00',$2,$3,$4,'published')`,[org,other,car.uuid,car.plate]),{code:'23P01'},'an overdue unreturned vehicle blocks even non-overlapping future allocations');
+  await admin.query('UPDATE cockpit.vehicle_custodies SET expected_return_at=$2 WHERE id=$1',[saved.custody.id,saved.custody.expected_return_at]);
+
   await admin.query("UPDATE cockpit.schedules SET dispatch_status='cancelled',status='cancelled' WHERE id=$1",[booking]);
   assert.equal((await live()).currentStatus,'in_service','cancelling a booking does not return a physical car');
   auth.setActor('driver',driver);
