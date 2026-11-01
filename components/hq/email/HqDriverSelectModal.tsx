@@ -85,6 +85,25 @@ export const HqDriverSelectModal: React.FC<HqDriverSelectModalProps> = ({
     }
   }, [requiredLanguage, isOpen]);
 
+  // Lock background scroll and handle Escape key while modal is open
+  useEffect(() => {
+    if (!isOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const filteredDrivers = driversList.filter((d) => {
@@ -106,12 +125,12 @@ export const HqDriverSelectModal: React.FC<HqDriverSelectModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in overscroll-contain"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh] animate-scale-up">
+      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh] animate-scale-up overscroll-contain">
         {/* Header */}
         <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-white shrink-0">
           <div>
@@ -133,7 +152,7 @@ export const HqDriverSelectModal: React.FC<HqDriverSelectModalProps> = ({
         {/* 3-Column Body */}
         <div className="grid grid-cols-1 md:grid-cols-12 flex-1 overflow-hidden divide-y md:divide-y-0 md:divide-x divide-slate-200">
           {/* Column 1: Filters (md:col-span-3) */}
-          <div className="md:col-span-3 p-4 bg-slate-50/60 space-y-4 overflow-y-auto">
+          <div className="md:col-span-3 p-4 bg-slate-50/60 space-y-4 overflow-y-auto overscroll-contain">
             <div>
               <span className="block text-xs font-extrabold text-slate-900 mb-2">
                 운행일 기준 가용 기사
@@ -201,7 +220,7 @@ export const HqDriverSelectModal: React.FC<HqDriverSelectModalProps> = ({
           </div>
 
           {/* Column 2: Driver List (md:col-span-5) */}
-          <div className="md:col-span-5 p-3 overflow-y-auto space-y-2 bg-white max-h-[520px]">
+          <div className="md:col-span-5 p-3 overflow-y-auto space-y-2 bg-white max-h-[520px] overscroll-contain">
             {hookDrivers.isLoading && driversList.length === 0 ? (
               <div className="py-16 text-center text-slate-400">
                 <Loader2 className="w-7 h-7 mx-auto text-[#1E60F3] animate-spin mb-2" />
@@ -316,7 +335,7 @@ export const HqDriverSelectModal: React.FC<HqDriverSelectModalProps> = ({
           </div>
 
           {/* Column 3: Selected Driver Profile Card (md:col-span-4) */}
-          <div className="md:col-span-4 p-4 bg-slate-50/40 flex flex-col justify-between overflow-y-auto">
+          <div className="md:col-span-4 p-4 bg-slate-50/40 flex flex-col justify-between overflow-y-auto overscroll-contain">
             {activeDriver ? (
               <div className="space-y-4">
                 {/* Profile Top */}

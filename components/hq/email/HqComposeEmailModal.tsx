@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Send, Mail, Sparkles, Check, AlertCircle, Loader2 } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
@@ -258,6 +258,7 @@ const EmailTagInput: React.FC<EmailTagInputProps> = ({
 };
 
 const HqComposeEmailModalContent: React.FC<HqComposeEmailModalProps> = ({
+  isOpen,
   onClose,
   initialTo = '',
   initialSubject = '',
@@ -277,6 +278,25 @@ const HqComposeEmailModalContent: React.FC<HqComposeEmailModalProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successToast, setSuccessToast] = useState<string | null>(null);
   const [isConfirmedRealSend, setIsConfirmedRealSend] = useState(false);
+
+  // Lock background scroll and handle Escape key while modal is open
+  useEffect(() => {
+    if (!isOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
 
   // Handle template insertion
   const handleApplyTemplate = (tmpl: (typeof EMAIL_TEMPLATES)[0]) => {
@@ -401,8 +421,8 @@ const HqComposeEmailModalContent: React.FC<HqComposeEmailModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden max-h-[92vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 overscroll-contain">
+      <div className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden max-h-[92vh] overscroll-contain">
         {/* Header */}
         <div className="px-6 py-4 bg-gradient-to-r from-[#0B1E48] to-[#123485] text-white flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -428,7 +448,7 @@ const HqComposeEmailModalContent: React.FC<HqComposeEmailModalProps> = ({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSendEmail} className="flex-1 overflow-y-auto p-6 space-y-4">
+        <form onSubmit={handleSendEmail} className="flex-1 overflow-y-auto p-6 space-y-4 overscroll-contain">
           {/* Success Banner */}
           {successToast && (
             <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2 text-emerald-800 text-xs font-bold animate-in fade-in">
