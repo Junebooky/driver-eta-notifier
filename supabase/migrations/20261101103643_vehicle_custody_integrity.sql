@@ -35,7 +35,7 @@ GRANT SELECT,INSERT,UPDATE ON cockpit.vehicle_custodies,cockpit.vehicle_custody_
 CREATE OR REPLACE FUNCTION cockpit.commit_vehicle_custody(p_org text,p_driver_id uuid,p_actor_id text,p_request_id text,p_data jsonb)
 RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
 DECLARE s cockpit.schedules; c cockpit.vehicle_custodies; previous cockpit.vehicle_custody_requests;
-  driver_json jsonb; result jsonb; action text:=p_data->>'action'; current_version integer;
+  driver_json jsonb; outcome_json jsonb; action text:=p_data->>'action'; current_version integer;
   chosen uuid:=(p_data->>'vehicleId')::uuid; details jsonb:=p_data->'inspection';
   odo integer:=(p_data->'inspection'->>'odometer')::integer; booking uuid;
   at_time timestamptz:=clock_timestamp(); return_at timestamptz;
@@ -68,7 +68,7 @@ BEGIN
     -- The original owner can return physical custody even after dispatch cancellation/reassignment.
     UPDATE cockpit.vehicle_custodies SET return_odometer=odo,return_details=details,returned_at=at_time,returned_by=p_actor_id,return_request_id=p_request_id WHERE id=c.id RETURNING * INTO c;
     booking:=c.booking_id;
-    result:=jsonb_build_object('ok',true,'outcome','returned','custody',to_jsonb(c),'requestId',p_request_id);
+    outcome_json:=jsonb_build_object('ok',true,'outcome','returned','custody',to_jsonb(c),'requestId',p_request_id);
   ELSE
     booking:=(p_data->>'bookingId')::uuid;
     SELECT * INTO s FROM cockpit.schedules WHERE id=booking FOR UPDATE;
@@ -86,7 +86,7 @@ BEGIN
     END IF;
     IF chosen IS DISTINCT FROM s.vehicle_id THEN
       IF length(trim(coalesce(p_data->>'reason',''))) NOT BETWEEN 1 AND 1000 THEN RAISE EXCEPTION 'MISMATCH_REASON_REQUIRED' USING ERRCODE='22023'; END IF;
-      result:=jsonb_build_object('ok',true,'outcome','mismatch','assignedPlate',coalesce(s.vehicle_plate,s.schedule_meta->>'vehiclePlate',s.vehicle_no),
+      outcome_json:=jsonb_build_object('ok',true,'outcome','mismatch','assignedPlate',coalesce(s.vehicle_plate,s.schedule_meta->>'vehiclePlate',s.vehicle_no),
         'actualPlate',p_data->>'vehiclePlate','hasPhoto',details ? 'photoPath','reason',p_data->>'reason','requestId',p_request_id);
     ELSE
       IF regexp_replace(coalesce(s.vehicle_plate,s.schedule_meta->>'vehiclePlate',s.vehicle_no),'\s','','g') IS DISTINCT FROM regexp_replace(p_data->>'vehiclePlate','\s','','g') THEN
@@ -107,12 +107,12 @@ BEGIN
         VALUES(p_org,p_driver_id,coalesce(driver_json->>'driver_name','담당 기사'),booking,current_version,chosen,p_data->>'vehiclePlate',odo,details,p_actor_id,p_request_id,return_at) RETURNING * INTO c;
       UPDATE cockpit.vehicle_custody_requests SET resolved_at=at_time,resolved_by=p_actor_id,resolution_note='최신 배차와 실제 차량 일치 확인 후 인수'
         WHERE organization_id=p_org AND booking_id=booking AND driver_id=p_driver_id AND result->>'outcome'='mismatch' AND resolved_at IS NULL;
-      result:=jsonb_build_object('ok',true,'outcome','picked_up','custody',to_jsonb(c),'requestId',p_request_id);
+      outcome_json:=jsonb_build_object('ok',true,'outcome','picked_up','custody',to_jsonb(c),'requestId',p_request_id);
     END IF;
   END IF;
   INSERT INTO cockpit.vehicle_custody_requests(request_id,organization_id,actor_id,driver_id,driver_name,booking_id,request_payload,result)
-    VALUES(p_request_id,p_org,p_actor_id,p_driver_id,coalesce(driver_json->>'driver_name','담당 기사'),booking,p_data,result);
-  RETURN result;
+    VALUES(p_request_id,p_org,p_actor_id,p_driver_id,coalesce(driver_json->>'driver_name','담당 기사'),booking,p_data,outcome_json);
+  RETURN outcome_json;
 END;
 $$;
 REVOKE ALL ON FUNCTION cockpit.commit_vehicle_custody(text,uuid,text,text,jsonb) FROM PUBLIC,anon,authenticated;
