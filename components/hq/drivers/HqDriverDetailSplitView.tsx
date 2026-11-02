@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Users,
   ChevronLeft,
@@ -35,6 +35,7 @@ interface HqDriverDetailSplitViewProps {
   };
   isLoading?: boolean;
   onUpdateDriver?: (id: string, updates: Record<string, any>) => Promise<boolean>;
+  onRefreshDrivers?: () => Promise<void> | void;
 }
 
 export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = ({
@@ -45,6 +46,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
   counts: propCounts,
   isLoading: propIsLoading,
   onUpdateDriver: propOnUpdateDriver,
+  onRefreshDrivers,
 }) => {
   const hookState = useHqDrivers();
   const drivers = propDrivers ?? hookState.drivers;
@@ -58,11 +60,49 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
   const [memoDraft, setMemoDraft] = useState('');
   const [weekOffset, setWeekOffset] = useState<number>(0);
   const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
+  const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | null>(null);
+  const [avatarLoadError, setAvatarLoadError] = useState(false);
 
   // Active Driver
   const activeDriver = useMemo(() => {
     return drivers.find((d) => d.id === selectedDriverId) || drivers[0] || null;
   }, [drivers, selectedDriverId]);
+
+  // Synchronize and fetch profile photo whenever active driver changes
+  useEffect(() => {
+    let isMounted = true;
+    setAvatarLoadError(false);
+
+    if (!activeDriver?.id) {
+      setProfileAvatarUrl(null);
+      return;
+    }
+
+    if (activeDriver.avatarUrl) {
+      setProfileAvatarUrl(activeDriver.avatarUrl);
+    }
+
+    // Always query latest active profile asset from cockpit storage
+    fetch(`/api/hq/drivers/assets?driverId=${encodeURIComponent(activeDriver.id)}&type=profile`, {
+      headers: { 'Cache-Control': 'no-cache' },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!isMounted) return;
+        if (data?.ok && data.profile?.signedUrl) {
+          setProfileAvatarUrl(data.profile.signedUrl);
+        } else if (data?.ok && !data.profile) {
+          setProfileAvatarUrl(null);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeDriver?.id, activeDriver?.avatarUrl]);
+
+  const effectiveAvatarUrl = profileAvatarUrl || activeDriver?.avatarUrl || null;
 
   // Sync memo draft when active driver changes
   const currentMemo = activeDriver?.memo || '';
@@ -256,9 +296,9 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
-                    {driver.avatarUrl ? (
+                    {driver.avatarUrl || (driver.id === activeDriver?.id && effectiveAvatarUrl) ? (
                       <img
-                        src={driver.avatarUrl}
+                        src={(driver.id === activeDriver?.id && effectiveAvatarUrl) || driver.avatarUrl}
                         alt={driver.name}
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = 'none';
@@ -326,19 +366,32 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
 
           {/* Driver Profile Header Card */}
           <div className="flex items-start gap-4 p-3 bg-slate-50/70 rounded-2xl border border-slate-100">
-            {activeDriver.avatarUrl ? (
-              <img
-                src={activeDriver.avatarUrl}
-                alt={activeDriver.name}
-                onError={(e) => {
-                  (e.target as HTMLElement).style.display = 'none';
-                }}
-                className="w-16 h-16 rounded-2xl object-cover border-2 border-white shadow-xs shrink-0"
-              />
-            ) : (
-              <div className="w-16 h-16 rounded-2xl bg-blue-50 text-[#1E60F3] border-2 border-blue-100 font-black text-xl flex items-center justify-center shadow-xs shrink-0">
-                {activeDriver.name.slice(0, 1)}
+            {effectiveAvatarUrl && !avatarLoadError ? (
+              <div
+                className="relative group/avatar cursor-pointer shrink-0"
+                onClick={() => setIsAssetModalOpen(true)}
+                title="프로필 및 차량 Info 관리"
+              >
+                <img
+                  key={effectiveAvatarUrl}
+                  src={effectiveAvatarUrl}
+                  alt={activeDriver.name}
+                  onError={() => setAvatarLoadError(true)}
+                  className="w-16 h-16 rounded-2xl object-cover border-2 border-white shadow-xs ring-1 ring-slate-200/80 transition-transform group-hover/avatar:scale-105"
+                />
+                <div className="absolute inset-0 rounded-2xl bg-black/30 opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center text-white">
+                  <ImageIcon className="w-4 h-4" />
+                </div>
               </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsAssetModalOpen(true)}
+                title="프로필 사진 등록하기"
+                className="w-16 h-16 rounded-2xl bg-blue-50 hover:bg-blue-100 text-[#1E60F3] border-2 border-blue-100 font-black text-xl flex items-center justify-center shadow-xs shrink-0 cursor-pointer transition-colors"
+              >
+                {activeDriver.name.slice(0, 1)}
+              </button>
             )}
 
             <div className="min-w-0 flex-1">
@@ -750,6 +803,23 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
           drivers={drivers}
           initialDriverId={activeDriver.id}
           initialVehiclePlate={activeDriver.plate || activeDriver.carNumber}
+          onAssetUpdated={async () => {
+            // 1. Immediately refresh active driver's profile asset
+            try {
+              const res = await fetch(
+                `/api/hq/drivers/assets?driverId=${encodeURIComponent(activeDriver.id)}&type=profile`,
+                { headers: { 'Cache-Control': 'no-cache' } }
+              );
+              const data = await res.json();
+              if (data?.ok) {
+                setProfileAvatarUrl(data.profile?.signedUrl || null);
+                setAvatarLoadError(false);
+              }
+            } catch {}
+            // 2. Refetch full driver roster
+            onRefreshDrivers?.();
+            hookState.refetch();
+          }}
         />
       )}
     </div>

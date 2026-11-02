@@ -48,7 +48,7 @@ test('Fleet Availability & Dispatch Conflict Engine Suite (Issue #10)', async (t
     assert.ok(gv80);
     assert.equal(mapVehicleToUiCategory(gv80), 'suv');
 
-    const g90l = VIP_REAL_VEHICLES.find((v) => v.plateShort === '2269');
+    const g90l = VIP_REAL_VEHICLES.find((v) => v.plateShort === '1336' || v.plateShort === '2269');
     assert.ok(g90l);
     assert.equal(mapVehicleToUiCategory(g90l), 'sedan');
 

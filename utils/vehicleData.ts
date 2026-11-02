@@ -9,7 +9,7 @@
  * [기아 카니발 하이리무진] 1대: 193호 5336
  * [제네시스 GV80] 1대: 203호 5947
  * [제네시스 G90 리무진] 1대: 102부 4280
- * [제네시스 G90L] 1대: 208호 2269
+ * [제네시스 G90L] 1대: 116호 1336
  * [제네시스 G90] 1대: 125호 8839
  * [벤츠 S560] 1대: 01호 3343
  *
@@ -435,8 +435,8 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
   {
     id: 'veh-gn-2269',
     uuid: 'e0f7c22a-0001-4c12-8800-000000002269',
-    plate: '208호 2269',
-    plateShort: '2269',
+    plate: '116호 1336',
+    plateShort: '1336',
     model: '제네시스 G90L',
     modelShort: 'G90L (롱휠베이스)',
     brand: '제네시스',
@@ -522,7 +522,7 @@ export const VIP_VEHICLE_FLEET_CATEGORIES = [
     activeCount: 3,
     availableCount: 1,
     details: 'GV80 1대 · G90 리무진 1대 · G90L 1대 · G90 1대',
-    plates: ['203호 5947', '102부 4280', '208호 2269', '125호 8839'],
+    plates: ['203호 5947', '102부 4280', '116호 1336', '125호 8839'],
   },
   {
     id: 's_class',
@@ -606,14 +606,14 @@ export function resolveVehicleEntity(plateOrId: string, fallbackModel?: string):
   const category: VehicleCategoryKey = /스프린터|sprinter/i.test(resolvedModel)
     ? 'sprinter'
     : /스타리아|staria/i.test(resolvedModel)
-    ? 'staria'
-    : /카니발|carnival/i.test(resolvedModel)
-    ? 'carnival'
-    : /g90|gv80|제네시스|genesis/i.test(resolvedModel)
-    ? 'genesis'
-    : /s560|s-class|s클래스/i.test(resolvedModel)
-    ? 's_class'
-    : 'sprinter';
+      ? 'staria'
+      : /카니발|carnival/i.test(resolvedModel)
+        ? 'carnival'
+        : /g90|gv80|제네시스|genesis/i.test(resolvedModel)
+          ? 'genesis'
+          : /s560|s-class|s클래스/i.test(resolvedModel)
+            ? 's_class'
+            : 'sprinter';
 
   return {
     id: `veh-custom-${cleanPlate.replace(/\s+/g, '')}`,
@@ -714,8 +714,9 @@ export function getVehicleImage(
     return '/images/vehicles/g90_black.webp';
   }
 
-  // 7. Genesis G90L (1 vehicle: 208호 2269)
+  // 7. Genesis G90L (1 vehicle: 116호 1336 / legacy 208호 2269)
   if (
+    plateShort === '1336' ||
     plateShort === '2269' ||
     (category === 'genesis' && (model.includes('G90L') || subType.includes('G90L')))
   ) {

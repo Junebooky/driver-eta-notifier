@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { requireHqAdmin } from '@/lib/auth/serverAuth';
 import { mapDbDriverToHqSummary } from '@/types/driverHq';
+import { createSignedAssetUrl } from '@/lib/assets/driverAssetServerStore';
 
 export async function GET(
   req: NextRequest,
@@ -35,6 +36,25 @@ export async function GET(
       .order('date', { ascending: false });
 
     const driverSummary = mapDbDriverToHqSummary(dbDriver, dbSchedules || []);
+
+    try {
+      const { data: profileAsset } = await supabaseAdmin
+        .from('driver_profile_assets')
+        .select('file_path')
+        .eq('driver_id', id)
+        .eq('status', 'active')
+        .maybeSingle();
+
+      if (profileAsset?.file_path) {
+        const signedUrl = await createSignedAssetUrl(profileAsset.file_path);
+        if (signedUrl) {
+          driverSummary.avatarUrl = signedUrl;
+        }
+      }
+    } catch {
+      // Ignore
+    }
+
     return NextResponse.json({ ok: true, driver: driverSummary });
   } catch (err: any) {
     console.error('[HQ Drivers API] Error in GET [id]:', err);

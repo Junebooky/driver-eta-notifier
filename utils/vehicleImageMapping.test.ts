@@ -67,8 +67,8 @@ test('VIP Real Vehicles - Model Image Mapping Policy (Issue #10)', async (t) => 
     assert.equal(getVehicleImage(veh), '/images/vehicles/gv80.webp');
   });
 
-  await t.test('7. Genesis G90L (208호 2269) uses g90_lwb.webp', () => {
-    const vehG90L = findVipVehicle('208호 2269');
+  await t.test('7. Genesis G90L (116호 1336 / 208호 2269) uses g90_lwb.webp', () => {
+    const vehG90L = findVipVehicle('116호 1336') || findVipVehicle('208호 2269');
     assert.ok(vehG90L);
     assert.equal(getVehicleImage(vehG90L), '/images/vehicles/g90_lwb.webp');
   });

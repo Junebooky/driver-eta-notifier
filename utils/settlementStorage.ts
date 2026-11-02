@@ -344,7 +344,7 @@ function buildSeedSettlementReports(
       driverName: '박서연',
       driverPhone: '010-7281-9304',
       vehicleModel: '제네시스 G90L',
-      vehiclePlate: '208호 2269',
+      vehiclePlate: '116호 1336',
       dispatchStatus: '운행 완료',
       driverAck: '확인완료',
       customerBrochure: '발송됨',
@@ -394,7 +394,7 @@ function buildSeedSettlementReports(
       driverName: '박서연',
       customerName: 'Ferrari',
       vehicleModel: '제네시스 G90L',
-      vehiclePlate: '208호 2269',
+      vehiclePlate: '116호 1336',
       clockIn: '07:30',
       clockOut: '20:00',
       totalDutyHours: '12시간 30분',
@@ -962,12 +962,12 @@ export function reassignBookingVehicleOrDriver(params: {
       const nextReports = reports.map((r) =>
         r.id === report.id
           ? {
-              ...r,
-              contractTerms: {
-                ...r.contractTerms!,
-                vehicleBaseRatesByIndex: nextByIndex,
-              },
-            }
+            ...r,
+            contractTerms: {
+              ...r.contractTerms!,
+              vehicleBaseRatesByIndex: nextByIndex,
+            },
+          }
           : r
       );
       saveSettlementReports(nextReports);
@@ -1168,8 +1168,8 @@ export function updateSettlementReportContractTerms(
     averageDirectMarginPercent,
     profitConfirmStatus:
       !hasUnverifiedItems &&
-      Boolean(target.areAllDirectCostsConfirmed) &&
-      (target.status === 'approved' || target.status === 'invoiced')
+        Boolean(target.areAllDirectCostsConfirmed) &&
+        (target.status === 'approved' || target.status === 'invoiced')
         ? 'confirmed'
         : 'provisional',
   };
@@ -1180,7 +1180,7 @@ export function updateSettlementReportContractTerms(
 }
 
 export function subscribeSettlementReports(callback: () => void): () => void {
-  if (typeof window === 'undefined') return () => {};
+  if (typeof window === 'undefined') return () => { };
   const handler = () => callback();
   window.addEventListener(SETTLEMENT_UPDATE_EVENT, handler);
   window.addEventListener('storage', handler);
@@ -1258,10 +1258,9 @@ export function exportClientSettlementCsv(report: EventSettlementReport): string
   lines.push(`승인 실비경비 합계,${report.totalApprovedExpenses}`);
   lines.push(`공급가액 합계,${report.supplyAmount}`);
   lines.push(
-    `부가세(VAT),${
-      report.vatMode === 'excluded'
-        ? report.vatAmount
-        : report.vatMode === 'included'
+    `부가세(VAT),${report.vatMode === 'excluded'
+      ? report.vatAmount
+      : report.vatMode === 'included'
         ? '공급가액에 포함'
         : '별도 확인 (미포함)'
     }`
@@ -1305,8 +1304,7 @@ export function exportAdminProfitabilityCsv(report: EventSettlementReport): stri
 
   lines.push('');
   lines.push(
-    `합계,,,,-,${report.supplyAmount},${report.totalDriverLaborCost},${report.totalVehicleDirectCost},${report.totalOtherDirectCost},${report.totalDirectProfit},${report.averageDirectMarginPercent}%,${
-      report.profitConfirmStatus === 'confirmed' ? '확정' : '잠정(예상)'
+    `합계,,,,-,${report.supplyAmount},${report.totalDriverLaborCost},${report.totalVehicleDirectCost},${report.totalOtherDirectCost},${report.totalDirectProfit},${report.averageDirectMarginPercent}%,${report.profitConfirmStatus === 'confirmed' ? '확정' : '잠정(예상)'
     }`
   );
 

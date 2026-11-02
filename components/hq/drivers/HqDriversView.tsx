@@ -170,6 +170,7 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
           counts={counts}
           isLoading={isLoading}
           onUpdateDriver={updateDriver}
+          onRefreshDrivers={refetch}
         />
       )}
 

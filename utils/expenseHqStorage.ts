@@ -254,7 +254,7 @@ export const INITIAL_HQ_EXPENSES: HqExpenseRecord[] = [
     time: '17:40',
     driverName: '강원우',
     vehicleModel: '제네시스 G90L',
-    vehiclePlate: '208호 2269',
+    vehiclePlate: '116호 1336',
     customerName: 'Hyundai',
     customerId: 'cust-hyundai',
     category: 'other',
@@ -324,7 +324,7 @@ export function resolveCustomerForExpense(params: {
           }
         }
       }
-    } catch {}
+    } catch { }
   }
 
   // 3. Driver & Vehicle assignment mapping
@@ -368,15 +368,15 @@ let memoryExpenses: HqExpenseRecord[] = [];
  * Read all HQ expenses from localStorage (or memory cache in Node test environment)
  */
 export const getHqExpenses = (): HqExpenseRecord[] => {
-  if(typeof window==='undefined')return memoryExpenses;
-  try{const raw=localStorage.getItem(HQ_EXPENSES_STORAGE_KEY);const parsed=raw?JSON.parse(raw):[];return Array.isArray(parsed)?parsed:[];}catch{return [];}
+  if (typeof window === 'undefined') return memoryExpenses;
+  try { const raw = localStorage.getItem(HQ_EXPENSES_STORAGE_KEY); const parsed = raw ? JSON.parse(raw) : []; return Array.isArray(parsed) ? parsed : []; } catch { return []; }
 };
 
 let cachedExpensesRaw = '';
 let cachedExpensesSnapshot: HqExpenseRecord[] = [];
 
 export const subscribeHqExpenses = (callback: () => void): (() => void) => {
-  if (typeof window === 'undefined') return () => {};
+  if (typeof window === 'undefined') return () => { };
   window.addEventListener(HQ_EXPENSE_UPDATE_EVENT, callback);
   window.addEventListener('cockpit_hq_expense_updated', callback);
   window.addEventListener('storage', callback);
@@ -511,12 +511,12 @@ export const submitDriverExpensesToHq = (
       context?.customerName && context?.customerId
         ? { customerName: context.customerName, customerId: context.customerId }
         : resolveCustomerForExpense({
-            driverName,
-            vehiclePlate,
-            date: item.date,
-            time: item.time,
-            memo: item.memo,
-          });
+          driverName,
+          vehiclePlate,
+          date: item.date,
+          time: item.time,
+          memo: item.memo,
+        });
 
     return {
       id: item.id || `hq-sub-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 6)}`,
@@ -552,10 +552,10 @@ export const submitDriverExpensesToHq = (
       ocrSummary: `${item.merchant} ${item.amount.toLocaleString()}원 결제 내역`,
       ocrDetails: context?.approvalNo
         ? {
-            approvalNo: context.approvalNo,
-            supplyAmount: Math.round(item.amount / 1.1),
-            vat: item.amount - Math.round(item.amount / 1.1),
-          }
+          approvalNo: context.approvalNo,
+          supplyAmount: Math.round(item.amount / 1.1),
+          vat: item.amount - Math.round(item.amount / 1.1),
+        }
         : undefined,
     };
   });
@@ -575,16 +575,16 @@ export const submitDriverExpensesToHq = (
             const isMatched = context?.bookingId
               ? log.bookingId === context.bookingId
               : !log.bookingId &&
-                (log.driverName === driverName ||
-                  (Boolean(vehiclePlate) && log.vehiclePlate === vehiclePlate));
+              (log.driverName === driverName ||
+                (Boolean(vehiclePlate) && log.vehiclePlate === vehiclePlate));
 
             if (isMatched) {
               const matchingExps = updated.filter((e) =>
                 log.bookingId
                   ? e.bookingId === log.bookingId
                   : !e.bookingId &&
-                    (e.driverName === driverName ||
-                      (Boolean(vehiclePlate) && e.vehiclePlate === vehiclePlate))
+                  (e.driverName === driverName ||
+                    (Boolean(vehiclePlate) && e.vehiclePlate === vehiclePlate))
               );
               logFound = true;
               return {
@@ -706,10 +706,12 @@ export const getHqExpenseKpiSummary = (expenses: HqExpenseRecord[] = getHqExpens
   let approvedCount = 0;
   let actionNeededCount = 0;
 
-  const today=getKstTodayDateStr();
+  const today = getKstTodayDateStr();
   expenses.forEach((e) => {
-    if(e.status!=='반려'){if(e.rawDate?.slice(0,7)===today.slice(0,7))monthTotal += e.amount;
-    if(e.rawDate===today)todayTotal += e.amount;}
+    if (e.status !== '반려') {
+      if (e.rawDate?.slice(0, 7) === today.slice(0, 7)) monthTotal += e.amount;
+      if (e.rawDate === today) todayTotal += e.amount;
+    }
     if (e.status === '검수 대기') pendingCount += 1;
     else if (e.status === '승인 완료') approvedCount += 1;
     else if (e.status === '금액 확인' || e.status === '반려') actionNeededCount += 1;
@@ -802,11 +804,11 @@ export const importReconciledHipassTolls = (
       item.matchedCustomerName
         ? { customerName: item.matchedCustomerName, customerId: item.matchedCustomerId }
         : resolveCustomerForExpense({
-            driverName: item.resolvedDriverName,
-            vehiclePlate: item.resolvedPlate || item.vehiclePlateRaw,
-            rawDate: item.rawDate,
-            time: item.time,
-          });
+          driverName: item.resolvedDriverName,
+          vehiclePlate: item.resolvedPlate || item.vehiclePlateRaw,
+          rawDate: item.rawDate,
+          time: item.time,
+        });
 
     const routeDesc = `${item.entrance} ➔ ${item.exit}`;
     const bookingBadge = item.matchedBookingNo ? ` (${item.matchedBookingNo})` : '';
@@ -1003,7 +1005,7 @@ export interface SubmitDriverExpensesResult {
  */
 export async function fetchHqExpensesFromDb(): Promise<FetchHqExpensesResult> {
   try {
-    const res = await fetch('/api/expenses',{cache:'no-store',credentials:'include'});
+    const res = await fetch('/api/expenses', { cache: 'no-store', credentials: 'include' });
     const data = await res.json().catch(() => ({}));
     if (res.ok && data.ok && Array.isArray(data.expenses)) {
       // A poll begun before a confirmed write must not roll the shared cache back.
@@ -1035,12 +1037,12 @@ export async function submitDriverExpensesToHqDb(
     return { ok: false, count: 0, totalAmount: 0, error: '제출할 항목이 없습니다.' };
   }
 
-  if(items.some(item=>item.receiptUrl && !item.receiptStoragePath))return {ok:false,count:0,totalAmount:0,error:'영수증 원본을 먼저 서버에 보관해 주세요.'};
-  if(items.some(item=>!isReportingUuid(item.id)))return {ok:false,count:0,totalAmount:0,error:'경비 저장 식별자를 확인해 주세요. 같은 내역을 새로 생성하지 말고 기존 초안에서 다시 제출해 주세요.'};
+  if (items.some(item => item.receiptUrl && !item.receiptStoragePath)) return { ok: false, count: 0, totalAmount: 0, error: '영수증 원본을 먼저 서버에 보관해 주세요.' };
+  if (items.some(item => !isReportingUuid(item.id))) return { ok: false, count: 0, totalAmount: 0, error: '경비 저장 식별자를 확인해 주세요. 같은 내역을 새로 생성하지 말고 기존 초안에서 다시 제출해 주세요.' };
   try {
     const payloadItems = items.map((item) => ({
       ...item,
-      receiptUrl:undefined,
+      receiptUrl: undefined,
       bookingId: item.bookingId || bookingId || null,
       driverName,
       vehiclePlate,
@@ -1055,9 +1057,9 @@ export async function submitDriverExpensesToHqDb(
 
     const data = await res.json().catch(() => ({}));
     if (res.ok && data.ok && Array.isArray(data.expenses)) {
-      if(data.expenses.length!==items.length || data.expenses.some((expense:HqExpenseRecord)=>!items.some(item=>item.id===expense.id)))return {ok:false,count:0,totalAmount:0,error:'일부 경비의 저장 결과를 확인하지 못했습니다. 같은 항목으로 다시 확인해 주세요.'};
-      const ids=new Set(data.expenses.map((expense:HqExpenseRecord)=>expense.id));
-      saveHqExpenses([...data.expenses,...getHqExpenses().filter(expense=>!ids.has(expense.id))]);
+      if (data.expenses.length !== items.length || data.expenses.some((expense: HqExpenseRecord) => !items.some(item => item.id === expense.id))) return { ok: false, count: 0, totalAmount: 0, error: '일부 경비의 저장 결과를 확인하지 못했습니다. 같은 항목으로 다시 확인해 주세요.' };
+      const ids = new Set(data.expenses.map((expense: HqExpenseRecord) => expense.id));
+      saveHqExpenses([...data.expenses, ...getHqExpenses().filter(expense => !ids.has(expense.id))]);
       return {
         ok: true,
         count: data.count || data.expenses.length,
@@ -1102,11 +1104,11 @@ export async function updateHqExpenseReviewDb(
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok && data.ok === true && data.expense?.id === expenseId &&
-        (patch.status === undefined || data.expense.status === patch.status) &&
-        (patch.billableToCustomer === undefined || data.expense.billableToCustomer === patch.billableToCustomer) &&
-        (patch.reviewNotes === undefined || (data.expense.reviewNotes || '') === patch.reviewNotes) &&
-        (patch.corrections === undefined || expenseFieldChanges(normalizeExpenseCorrections(patch.corrections),expenseCorrectionFields(data.expense)).length === 0) &&
-        data.expense.updatedAt) {
+      (patch.status === undefined || data.expense.status === patch.status) &&
+      (patch.billableToCustomer === undefined || data.expense.billableToCustomer === patch.billableToCustomer) &&
+      (patch.reviewNotes === undefined || (data.expense.reviewNotes || '') === patch.reviewNotes) &&
+      (patch.corrections === undefined || expenseFieldChanges(normalizeExpenseCorrections(patch.corrections), expenseCorrectionFields(data.expense)).length === 0) &&
+      data.expense.updatedAt) {
       // Use the authoritative server row, including reviewer, audit and revision.
       saveHqExpenses(getHqExpenses().map(expense => expense.id === expenseId ? data.expense : expense));
       return { ok: true, expense: data.expense };

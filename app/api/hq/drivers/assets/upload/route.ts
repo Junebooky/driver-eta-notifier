@@ -266,6 +266,35 @@ export async function POST(req: NextRequest) {
     const signedUrl = await createSignedAssetUrl(storagePath);
     savedAsset.signedUrl = signedUrl || undefined;
 
+    // Synchronize avatar_url back to cockpit.drivers table driver_meta
+    if (assetType === 'profile') {
+      try {
+        const avatarUrl = savedAsset.signedUrl || `/api/hq/drivers/assets/preview?path=${encodeURIComponent(storagePath)}`;
+        const { data: curDriver } = await supabaseAdmin
+          .from('drivers')
+          .select('driver_meta')
+          .eq('id', driverId)
+          .maybeSingle();
+
+        const currentMeta = typeof curDriver?.driver_meta === 'object' && curDriver?.driver_meta !== null
+          ? curDriver.driver_meta
+          : {};
+
+        await supabaseAdmin
+          .from('drivers')
+          .update({
+            driver_meta: {
+              ...currentMeta,
+              avatar_url: avatarUrl,
+              avatar_storage_path: storagePath,
+            },
+          })
+          .eq('id', driverId);
+      } catch (metaErr) {
+        console.warn('[Profile Upload] Note: could not update drivers.driver_meta:', metaErr);
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       asset: savedAsset,
