@@ -506,18 +506,7 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
             <caption id="hq-dispatch-table-caption" className="sr-only">
               예약 접수 및 기사 배차 확인 현황 목록
             </caption>
-            <colgroup>
-              <col className="w-[13%] min-w-[100px]" /> {/* 1. 고객사 */}
-              <col className="w-[11%] min-w-[85px]" />  {/* 2. 승객 */}
-              <col className="w-[8%] min-w-[65px]" />   {/* 3. 출발 일시 */}
-              <col className="w-[8%] min-w-[65px]" />   {/* 4. 담당 기사님 */}
-              <col className="w-[10%] min-w-[80px]" />  {/* 5. 배정 차량 */}
-              <col className="w-[12%] min-w-[95px]" />  {/* 6. 출발지 */}
-              <col className="w-[13%] min-w-[105px]" /> {/* 7. 도착지 */}
-              <col className="w-[8%] min-w-[70px]" />   {/* 8. 배차 상태 */}
-              <col className="w-[8%] min-w-[75px]" />   {/* 9. 기사님 확인 */}
-              <col className="w-[9%] min-w-[80px]" />   {/* 10. 고객 안내 */}
-            </colgroup>
+            <colgroup><col className="w-[13%] min-w-[100px]" /><col className="w-[11%] min-w-[85px]" /><col className="w-[8%] min-w-[65px]" /><col className="w-[8%] min-w-[65px]" /><col className="w-[10%] min-w-[80px]" /><col className="w-[12%] min-w-[95px]" /><col className="w-[13%] min-w-[105px]" /><col className="w-[8%] min-w-[70px]" /><col className="w-[8%] min-w-[75px]" /><col className="w-[9%] min-w-[80px]" /></colgroup>
             <thead>
               <tr className="border-b border-slate-200 text-[11px] font-bold text-slate-500 bg-slate-50">
                 <th scope="col" className="py-2.5 px-2 bg-slate-50">고객사</th>
