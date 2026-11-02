@@ -1,5 +1,4 @@
 'use client';
-import { HqVehicleCustodyPanel } from './HqVehicleCustodyPanel';
 import { scheduleOverlapsInterval } from '@/utils/dispatchInterval';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -481,8 +480,6 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
           차량 이미지, 차량번호, 차량별 운영 팁을 한눈에 관리합니다.
         </p>
       </div>
-
-      <HqVehicleCustodyPanel vehicleId={selectedVehicle.uuid} />
 
       {/* Main 3-Column Layout Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
