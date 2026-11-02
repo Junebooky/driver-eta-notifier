@@ -561,7 +561,7 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
           onOpenAdminLogin={() => setIsAdminLoginOpen(true)}
           onOpenNotifications={() => setIsAlertDrawerOpen(true)}
           title={
-            activeSidebarTab === 'dashboard' ? (representativeMode ? '대표 대시보드' : '운영 대시보드') : activeSidebarTab === 'operations'
+            activeSidebarTab === 'dashboard' ? '운영 대시보드' : activeSidebarTab === 'operations'
               ? '실시간 행사 운영 보드'
               : activeSidebarTab === 'quotes'
                 ? '가격표 견적기 및 견적서 관리'

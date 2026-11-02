@@ -56,11 +56,21 @@ export function getAuthSecret(): string | null {
  */
 export const DEV_ACCOUNTS = {
   admin: {
-    userId: 'dev_admin_hq',
+    userId: '3b4308d0-ee46-4e99-b02e-283e0b018ce4',
     org: 'vip_limousine_korea' as const,
     role: 'hq_admin' as const,
     driverName: '본사 관리자',
     displayName: '본사 관리자 (HQ Admin)',
+  },
+  driver: {
+    userId: '2ab15b22-4ab8-43a2-aa17-e002e7962634',
+    org: 'vip_limousine_korea' as const,
+    role: 'driver' as const,
+    driverId: 'd7a00000-0000-4000-8000-000000000001',
+    driverName: 'QA 테스트 기사',
+    vehicleNo: '99호차 (QA)',
+    carNumber: '서울99바9999',
+    displayName: '기사 (QA 테스트 기사 · 99호차)',
   },
   driver_a: {
     userId: 'dev_driver_yoon',

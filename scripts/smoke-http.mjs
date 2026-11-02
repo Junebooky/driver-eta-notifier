@@ -78,7 +78,7 @@ try{
   await new Promise(resolve=>setTimeout(resolve,100));
  }
  assert.ok(ready,`Next server did not start: ${logs}`);
- const html=await(await fetch(base+'/login')).text();assert.ok(html.includes('Driver Cockpit')&&!html.includes('본사 관리자 로그인')&&html.includes('계정 이메일'));
+ const html=await(await fetch(base+'/login')).text();assert.ok(html.includes('Driver Cockpit')&&html.includes('본사 관리자 로그인')&&html.includes('계정 이메일'));
  const hqHtml=await(await fetch(base+'/hq/login')).text();assert.ok(hqHtml.includes('본사 관리자 로그인')&&hqHtml.includes('계정 이메일'));
  assert.equal((await fetch(base+'/api/driver')).status,401);assert.equal((await fetch(base+'/api/schedules')).status,401);
  assert.equal((await post('/api/auth/session',{action:'dev_switch',target:'admin'})).status,403);

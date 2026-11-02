@@ -20,7 +20,7 @@ export function HqDashboardOverview({ bookings, loading, error, representative, 
   ];
   return <div className="space-y-5">
     <section className="rounded-3xl bg-[#0B1E48] p-5 text-white">
-      <p className="text-xs text-blue-200">{representative ? '대표 모바일 관제' : 'VIP 운영 현황'}</p>
+      <p className="text-xs text-blue-200">본사 통합 관제 현황</p>
       <h2 className="mt-2 text-2xl font-black">오늘의 운행을 한눈에</h2>
       <p className="mt-2 text-sm text-blue-100">일정 확인 · 차량과 기사 배정 · 기사 확인 상태</p>
       <button type="button" onClick={() => onNavigate('dispatch', 'kpi_unassigned')} className="mt-5 flex min-h-12 w-full items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 font-bold text-[#0B1E48]">
