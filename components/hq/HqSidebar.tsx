@@ -18,8 +18,10 @@ import {
   Activity,
   Calculator,
   X,
+  LogOut,
 } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
+import { logoutClientSession } from '@/utils/cockpitClientAuth';
 
 export interface HqSidebarProps {
   activeTab: string;
@@ -142,8 +144,8 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
         })}
       </nav>
 
-      {/* Switch to Driver Cockpit shortcut */}
-      <div className="p-3 border-t border-slate-100">
+      {/* Switch to Driver Cockpit shortcut & Admin Logout */}
+      <div className="p-3 border-t border-slate-100 space-y-1">
         <Link
           href="/"
           onClick={() => {
@@ -159,6 +161,22 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
           </div>
           <span className="text-[10px] text-slate-400 group-hover:text-[#1E60F3]">➔</span>
         </Link>
+
+        <button
+          type="button"
+          onClick={async () => {
+            haptics.lightTap();
+            await logoutClientSession();
+            window.location.assign('/hq/login');
+          }}
+          className="w-full flex items-center justify-between p-2.5 rounded-xl text-slate-500 hover:text-rose-600 hover:bg-rose-50 text-xs font-bold transition-all cursor-pointer"
+          title="본사 관리자 세션 로그아웃"
+        >
+          <div className="flex items-center gap-2">
+            <LogOut className="w-3.5 h-3.5 text-slate-400" />
+            <span>관리자 로그아웃</span>
+          </div>
+        </button>
       </div>
 
       {/* Footer Watermark */}
