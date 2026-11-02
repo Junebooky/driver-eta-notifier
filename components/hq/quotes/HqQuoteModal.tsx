@@ -49,6 +49,7 @@ interface HqQuoteModalProps {
   isOpen: boolean;
   onClose: () => void;
   onBookingConverted?: (bookingIds: string[]) => void;
+  initialVehicleProductCode?: string;
 }
 
 const SERVICE_CATEGORIES: {
@@ -94,6 +95,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
   isOpen,
   onClose,
   onBookingConverted,
+  initialVehicleProductCode,
 }) => {
   // Wizard Step State (1 ~ 4)
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
@@ -116,11 +118,22 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
   const [excessKm, setExcessKm] = useState<number>(0);
 
   // Step 3: 차량 및 옵션
-  const [vehicleProductCode, setVehicleProductCode] = useState<string>('sprinter_519_premium');
+  const [vehicleProductCode, setVehicleProductCode] = useState<string>(initialVehicleProductCode || 'sprinter_519_premium');
   const [vehicleCount, setVehicleCount] = useState<number>(1);
   const [serviceMode, setServiceMode] = useState<'with_driver' | 'vehicle_only'>('with_driver');
   const [englishOption, setEnglishOption] = useState<'basic_included' | 'fluent_upgrade'>('basic_included');
   const [vehicleCategoryFilter, setVehicleCategoryFilter] = useState<'all' | 'sprinter' | 'sedan' | 'suv' | 'van' | 'bus'>('all');
+
+  // Synchronize when initialVehicleProductCode is passed
+  useEffect(() => {
+    if (isOpen && initialVehicleProductCode) {
+      setVehicleProductCode(initialVehicleProductCode);
+      const sku = STANDARD_VEHICLE_SKU_MAPPINGS.find((m) => m.vehicleProductCode === initialVehicleProductCode);
+      if (sku) {
+        setVehicleCategoryFilter(sku.tier as any);
+      }
+    }
+  }, [isOpen, initialVehicleProductCode]);
 
   // Calculation & Actions State
   const [isCalculating, setIsCalculating] = useState(false);

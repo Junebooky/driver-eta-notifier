@@ -741,6 +741,11 @@ export function getVehicleImage(
     return '/images/vehicles/g90_black.webp';
   }
 
+  // 11. Bus (45-seat, 28-seat limo, 22-seat premium limo)
+  if (category === 'bus' || model.includes('버스') || subType.includes('버스')) {
+    return '/images/vehicles/bus.webp';
+  }
+
   return '/images/thumb_g90.jpg';
 }
 

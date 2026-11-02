@@ -102,6 +102,7 @@ test('VIP Real Vehicles - Model Image Mapping Policy (Issue #10)', async (t) => 
       'g90_black.webp',
       'gv80.webp',
       'carnival_high.webp',
+      'bus.webp',
     ];
     for (const f of requiredFiles) {
       const fullPath = path.join(publicVehiclesDir, f);
@@ -111,7 +112,13 @@ test('VIP Real Vehicles - Model Image Mapping Policy (Issue #10)', async (t) => 
     }
   });
 
-  await t.test('11. First vehicle in canonical VIP fleet is 125호 9982 (Benz Sprinter Tourer 319 CDI from mockup)', () => {
+  await t.test('11. Bus models (45인승, 28인승, 22인승) map to bus.webp', () => {
+    assert.equal(getVehicleImage({ model: '버스', category: 'bus' }), '/images/vehicles/bus.webp');
+    assert.equal(getVehicleImage({ model: '리무진 버스', category: 'bus' }), '/images/vehicles/bus.webp');
+    assert.equal(getVehicleImage({ model: '프리미엄 럭셔리 리무진 버스', category: 'bus' }), '/images/vehicles/bus.webp');
+  });
+
+  await t.test('12. First vehicle in canonical VIP fleet is 125호 9982 (Benz Sprinter Tourer 319 CDI from mockup)', () => {
     const firstVeh = VIP_REAL_VEHICLES[0];
     assert.equal(firstVeh.plate, '125호 9982');
     assert.equal(firstVeh.model, '벤츠 스프린터 투어러 (319 CDI)');

@@ -155,6 +155,7 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isAdminLoginOpen, setIsAdminLoginOpen] = useState(false);
   const [isQuoteModalOpen, setIsQuoteModalOpen] = useState(() => searchParams.get('quoteModal') === 'true');
+  const [selectedQuoteVehicleCode, setSelectedQuoteVehicleCode] = useState<string | undefined>();
   const [isChauffeurCardOpen, setIsChauffeurCardOpen] = useState(false);
   const [isAlertDrawerOpen, setIsAlertDrawerOpen] = useState(false);
   const [customerMsgTarget, setCustomerMsgTarget] = useState<{
@@ -727,7 +728,10 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
             />
           ) : activeSidebarTab === 'quotes' ? (
             <HqOfficialPricingView
-              onOpenQuoteModal={() => setIsQuoteModalOpen(true)}
+              onOpenQuoteModal={(code) => {
+                if (code) setSelectedQuoteVehicleCode(code);
+                setIsQuoteModalOpen(true);
+              }}
               onOpenChauffeurCard={() => setIsChauffeurCardOpen(true)}
             />
           ) : activeSidebarTab === 'field_knowledge' ? (
@@ -957,7 +961,11 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
       {/* 5. Realtime Pricing Calculator & Quotation Modal */}
       <HqQuoteModal
         isOpen={isQuoteModalOpen}
-        onClose={() => setIsQuoteModalOpen(false)}
+        initialVehicleProductCode={selectedQuoteVehicleCode}
+        onClose={() => {
+          setIsQuoteModalOpen(false);
+          setSelectedQuoteVehicleCode(undefined);
+        }}
         onBookingConverted={() => {
           fetchSharedBookings(true);
           navigateWorkspace('dispatch');
