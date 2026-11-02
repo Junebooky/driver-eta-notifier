@@ -871,7 +871,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight">
-                  {initialBooking ? '예약 · 배차 상세 및 빠른 수정' : '빠른 예약 · 배차'}
+                  {initialBooking ? '예약 · 배차 수정' : '빠른 예약 · 배차'}
                 </h2>
                 {initialBooking && (
                   <span className="font-mono text-xs font-black px-2 py-0.5 rounded-md bg-blue-50 text-[#1E60F3] border border-blue-200">
@@ -881,7 +881,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
               </div>
               <p className="text-xs text-slate-400 font-normal leading-relaxed mt-0.5 truncate">
                 {initialBooking
-                  ? '예약 일정 수정, 실차·담당 기사 즉시 배정 및 확인 관리'
+                  ? '일정을 변경하거나 차량과 기사님을 바로 배정해요'
                   : '필수 정보만 입력하고 예약하거나 바로 배차하세요.'}
               </p>
             </div>
@@ -964,10 +964,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                   )}
                   <span>
                     {initialBooking.driverAck === '확인완료'
-                      ? '기사 확인완료'
+                      ? '확인 완료'
                       : initialBooking.driverAck === '재확인 필요'
                       ? '재확인 대기'
-                      : '기사 미확인'}
+                      : '확인 대기'}
                   </span>
                   {initialBooking.driverAckTime && (
                     <span className="text-[10px] text-slate-500 font-normal">
@@ -994,7 +994,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                   title="담당 기사 스마트폰 Cockpit으로 즉시 확인 요청 알림을 재전송합니다"
                 >
                   <BellRing className={`w-3.5 h-3.5 ${isReminding ? 'animate-bounce' : ''}`} />
-                  <span>{remindSuccess ? '기사 재알림 전송됨!' : isReminding ? '전송 중...' : '기사 미확인 재알림 전송'}</span>
+                  <span>{remindSuccess ? '다시 알림 전송됨!' : isReminding ? '전송 중...' : '기사님께 다시 알리기'}</span>
                 </button>
               )}
 
@@ -1007,12 +1007,12 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                     onOpenCustomerMessage(initialBooking);
                   }}
                   className="px-3 py-1.5 rounded-xl text-xs font-bold bg-[#1E60F3] hover:bg-blue-600 text-white transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
-                  title="고객사 자동 안내메시지 (배차확정·기사정보·출발도착 알림) 확인 및 발송"
+                  title="고객사 자동 안내문자 (배차확정·기사정보·출발도착 알림) 확인 및 발송"
                 >
                   <MessageSquareText className="w-3.5 h-3.5" />
                   <span>
-                    고객사 안내메시지
-                    {initialBooking.pendingCustomerTrigger ? ' (안내준비됨)' : ''}
+                    고객 안내문자 보내기
+                    {initialBooking.pendingCustomerTrigger ? ' (준비완료)' : ''}
                   </span>
                 </button>
               )}
@@ -1029,7 +1029,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                   title="고객 안내용 기사 프로필 & 차량 안내장 카드 확인 및 이미지 다운로드"
                 >
                   <ImageIcon className="w-3.5 h-3.5 text-[#1E60F3]" />
-                  <span>Info 고객 안내자료</span>
+                  <span>안내 카드 확인</span>
                 </button>
               )}
 
@@ -1042,9 +1042,9 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                     onOpenDetailModal(initialBooking);
                   }}
                   className="ml-auto px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
-                  title="기존 상세 배정 모달 (운행 기록 및 정산 세부사항) 열기"
+                  title="전체 배정표 및 세부사항 확인"
                 >
-                  <span>상세 배정 전체보기</span>
+                  <span>전체 배정표 보기</span>
                   <ExternalLink className="w-3 h-3 text-slate-500" />
                 </button>
               )}
@@ -1054,10 +1054,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
 
         {/* 2. Main Form Fields */}
         <div className="space-y-3.5 mt-1">
-          {/* 고객사 / 예약자 * */}
+          {/* 고객사 · 예약자 * */}
           <div className="relative" ref={customerDropdownRef}>
             <label className="block text-xs font-bold text-slate-800 mb-1.5">
-              고객사 / 예약자 <span className="text-red-500 font-bold ml-0.5">*</span>
+              고객사 · 예약자 <span className="text-red-500 font-bold ml-0.5">*</span>
             </label>
 
             <div
@@ -1130,11 +1130,11 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
             )}
           </div>
 
-          {/* 운행 날짜 * & 픽업 시간 * (2 Columns) */}
+          {/* 출발 날짜 * & 출발 시간 * (2 Columns) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* 운행 날짜 */}
+            {/* 출발 날짜 */}
             <TossDateRangePicker
-              label="운행 날짜"
+              label="출발 날짜"
               required
               startDate={pickupDate}
               endDate={pickupEndDate}
@@ -1145,10 +1145,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
               heightClass="h-12"
             />
 
-            {/* 픽업 시간 */}
+            {/* 출발 시간 */}
             <div className="relative" ref={timePickerRef}>
               <label className="block text-xs font-bold text-slate-800 mb-1.5">
-                픽업 시간 <span className="text-red-500 font-bold ml-0.5">*</span>
+                출발 시간 <span className="text-red-500 font-bold ml-0.5">*</span>
               </label>
 
               <div
@@ -1173,7 +1173,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
               {isTimePickerOpen && (
                 <div className="absolute left-0 right-0 top-full mt-1.5 z-40 bg-white border border-slate-200 rounded-2xl shadow-2xl p-3 animate-in fade-in duration-150 space-y-2">
                   <div className="text-[11px] font-bold text-slate-400 px-1 pb-1 border-b border-slate-100">
-                    주요 픽업 시간 선택
+                    주요 출발 시간 선택
                   </div>
                   <div className="grid grid-cols-3 gap-1.5 max-h-48 overflow-y-auto p-0.5">
                     {POPULAR_TIMES.map((time) => (
@@ -1213,7 +1213,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                 <span className="ml-1.5 text-[11px] text-slate-400 font-medium">실제 배차 확정 시 선택</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-slate-600">차량 대수:</span>
+                <span className="text-xs font-bold text-slate-600">차량 수:</span>
                 <div className="inline-flex items-center bg-white border border-slate-200 rounded-lg p-0.5 shadow-2xs">
                   <button
                     type="button"
@@ -1242,10 +1242,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
             </div>
 
             <label className="block text-xs font-bold text-slate-700">
-              실제 종료 시간 (배차 확정 시 필수)
+              도착 예상 시간 (필수)
               <input
                 type="time"
-                aria-label="실제 종료 시간"
+                aria-label="도착 예상 시간"
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
                 className="mt-1 w-full h-11 rounded-lg border border-slate-200 px-3 bg-white"
@@ -1253,16 +1253,16 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
             </label>
             {endTime && (
               <p className="text-xs text-slate-500">
-                {fleet.error || (fleet.loading ? '선택 기간의 가용성을 확인하고 있습니다.' : '선택 기간 기준 · 운행 후 회차 여유 60분 포함')}
+                {fleet.error || (fleet.loading ? '선택 기간의 가용성을 확인하고 있습니다.' : '복귀 여유 시간 60분이 포함되어 있어요')}
               </p>
             )}
 
             {allocations.map((allocation, index) => (
               <div key={allocation.id} className="grid grid-cols-1 gap-2 sm:grid-cols-2 pt-1 border-t border-slate-200/50">
                 <label className="text-xs font-bold text-slate-700">
-                  {index + 1}번 차량
+                  {allocations.length > 1 ? `${index + 1}번 배정 차량` : '배정 차량'}
                   <select
-                    aria-label={`${index + 1}번 차량 번호판`}
+                    aria-label={allocations.length > 1 ? `${index + 1}번 배정 차량 번호판` : '배정 차량 번호판'}
                     value={allocation.selectedVehiclePlate}
                     onChange={(e) => {
                       const plate = e.target.value;
@@ -1295,9 +1295,9 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                   </select>
                 </label>
                 <label className="text-xs font-bold text-slate-700">
-                  {index + 1}번 담당 기사
+                  {allocations.length > 1 ? `${index + 1}번 담당 기사님` : '담당 기사님'}
                   <select
-                    aria-label={`${index + 1}번 담당 기사`}
+                    aria-label={allocations.length > 1 ? `${index + 1}번 담당 기사님` : '담당 기사님'}
                     value={allocation.selectedDriver}
                     onChange={(e) =>
                       setAllocations((prev) =>
@@ -1326,11 +1326,11 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
             ))}
           </div>
 
-          {/* 픽업 위치 * & 목적지 * (2 Columns with TMAP Search) */}
+          {/* 출발지 * & 도착지 * (2 Columns with TMAP Search) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* 픽업 위치 */}
+            {/* 출발지 */}
             <HqPlaceSearchInput
-              label="픽업 위치"
+              label="출발지"
               required
               value={pickupLocation}
               onChange={(val) => {
@@ -1341,9 +1341,9 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
               icon="mapPin"
             />
 
-            {/* 목적지 */}
+            {/* 도착지 */}
             <HqPlaceSearchInput
-              label="목적지"
+              label="도착지"
               required
               value={destination}
               onChange={(val) => {
@@ -1373,10 +1373,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                   </div>
                   <div>
                     <h3 className="text-xs sm:text-sm font-bold text-slate-900 tracking-tight">
-                      추가 정보 (선택사항)
+                      추가 전달사항 (선택)
                     </h3>
                     <p className="text-[11px] text-slate-400 font-medium">
-                      기사 언어, 탑승객, 항공편, 요청사항 등을 입력하세요.
+                      탑승객 정보, 항공편명, 특별 요청사항을 적어주세요
                     </p>
                   </div>
                 </div>
@@ -1403,10 +1403,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                     </div>
                     <div>
                       <h3 className="text-xs sm:text-sm font-bold text-slate-900 tracking-tight">
-                        추가 정보 (선택사항)
+                        추가 전달사항 (선택)
                       </h3>
                       <p className="text-[10px] sm:text-[11px] text-slate-400 font-normal">
-                        언어, 탑승객, 항공편, 요청사항 등을 입력하세요.
+                        탑승객 정보, 항공편명, 특별 요청사항을 적어주세요
                       </p>
                     </div>
                   </div>
@@ -1600,7 +1600,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
             className="w-full h-12 bg-white border border-slate-200 hover:bg-slate-50 active:scale-[0.98] text-slate-800 font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer disabled:opacity-50"
           >
             <FileText className="w-4 h-4 text-slate-700" />
-            <span>{initialBooking ? '예약 수정 저장 (배차대기)' : '예약만 등록'}</span>
+            <span>{initialBooking ? '수정 내용만 저장' : '예약만 등록'}</span>
           </button>
 
           {/* 바로 배차 / 배차 확정 */}
@@ -1618,7 +1618,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
             ) : (
               <Send className="w-4 h-4 text-white" />
             )}
-            <span>{initialBooking ? '배차 확정 (기사 Cockpit 전송)' : '바로 배차'}</span>
+            <span>{initialBooking ? '배차 확정하고 기사님께 보내기' : '바로 배차'}</span>
           </button>
         </div>
 
@@ -1640,7 +1640,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={initialBooking ? '예약 · 배차 상세 및 빠른 수정' : '빠른 예약 · 배차'}
+        aria-label={initialBooking ? '예약 · 배차 수정' : '빠른 예약 · 배차'}
         className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200"
         onClick={(e) => {
           if (e.target === e.currentTarget) {

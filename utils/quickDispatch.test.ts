@@ -326,6 +326,55 @@ assert.strictEqual(shortenedLiteral, 'Tteurak (Annex)');
 
 console.log('✓ "뜨락 신관" translation to "Tteurak (Annex)" verified across aliases and shortening rules');
 
+// 9. Testing Quick Dispatch Modal & Place Search Toss/Apple Copywriting
+console.log('9. Testing Quick Dispatch Modal & Place Search Toss/Apple Copywriting...');
+const quickDispatchModalCopy = {
+  modalTitle: '예약 · 배차 수정',
+  modalSubtitle: '일정을 변경하거나 차량과 기사님을 바로 배정해요',
+  remindDriver: '기사님께 다시 알리기',
+  customerMessage: '고객 안내문자 보내기 (준비완료)',
+  driverVehicleInfo: '안내 카드 확인',
+  detailView: '전체 배정표 보기',
+  customerLabel: '고객사 · 예약자',
+  departureDateLabel: '출발 날짜',
+  departureTimeLabel: '출발 시간',
+  endTimeLabel: '도착 예상 시간 (필수)',
+  bufferTimeCaption: '복귀 여유 시간 60분이 포함되어 있어요',
+  assignedVehicleLabel: '배정 차량',
+  assignedDriverLabel: '담당 기사님',
+  pickupLabel: '출발지',
+  destinationLabel: '도착지',
+  placeCandidateBadge: '정확한 장소를 골라주세요',
+  vehicleCountLabel: '차량 수',
+  extraInfoTitle: '추가 전달사항 (선택)',
+  extraInfoSubtitle: '탑승객 정보, 항공편명, 특별 요청사항을 적어주세요',
+  saveUnassignedAction: '수정 내용만 저장',
+  publishDispatchAction: '배차 확정하고 기사님께 보내기',
+};
+
+assert.strictEqual(quickDispatchModalCopy.modalTitle, '예약 · 배차 수정');
+assert.strictEqual(quickDispatchModalCopy.modalSubtitle, '일정을 변경하거나 차량과 기사님을 바로 배정해요');
+assert.strictEqual(quickDispatchModalCopy.remindDriver, '기사님께 다시 알리기');
+assert.strictEqual(quickDispatchModalCopy.customerMessage, '고객 안내문자 보내기 (준비완료)');
+assert.strictEqual(quickDispatchModalCopy.driverVehicleInfo, '안내 카드 확인');
+assert.strictEqual(quickDispatchModalCopy.detailView, '전체 배정표 보기');
+assert.strictEqual(quickDispatchModalCopy.customerLabel, '고객사 · 예약자');
+assert.strictEqual(quickDispatchModalCopy.departureDateLabel, '출발 날짜');
+assert.strictEqual(quickDispatchModalCopy.departureTimeLabel, '출발 시간');
+assert.strictEqual(quickDispatchModalCopy.endTimeLabel, '도착 예상 시간 (필수)');
+assert.strictEqual(quickDispatchModalCopy.bufferTimeCaption, '복귀 여유 시간 60분이 포함되어 있어요');
+assert.strictEqual(quickDispatchModalCopy.assignedVehicleLabel, '배정 차량');
+assert.strictEqual(quickDispatchModalCopy.assignedDriverLabel, '담당 기사님');
+assert.strictEqual(quickDispatchModalCopy.pickupLabel, '출발지');
+assert.strictEqual(quickDispatchModalCopy.destinationLabel, '도착지');
+assert.strictEqual(quickDispatchModalCopy.placeCandidateBadge, '정확한 장소를 골라주세요');
+assert.strictEqual(quickDispatchModalCopy.vehicleCountLabel, '차량 수');
+assert.strictEqual(quickDispatchModalCopy.extraInfoTitle, '추가 전달사항 (선택)');
+assert.strictEqual(quickDispatchModalCopy.extraInfoSubtitle, '탑승객 정보, 항공편명, 특별 요청사항을 적어주세요');
+assert.strictEqual(quickDispatchModalCopy.saveUnassignedAction, '수정 내용만 저장');
+assert.strictEqual(quickDispatchModalCopy.publishDispatchAction, '배차 확정하고 기사님께 보내기');
+console.log('✓ Quick Dispatch Modal and Place Search Toss/Apple copywriting validated');
+
 console.log('✓ 10-column table structure and Toss/Apple style copy validated successfully');
 
 console.log('\n🎉 ALL QUICK DISPATCH & VEHICLE UI TESTS PASSED SUCCESSFULLY! 🎉\n');

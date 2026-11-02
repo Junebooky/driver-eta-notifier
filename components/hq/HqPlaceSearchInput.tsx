@@ -237,7 +237,7 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
             ) : (
               <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 animate-pulse">
                 <AlertTriangle className="w-3 h-3 text-amber-600" />
-                <span>후보 선택 필요</span>
+                <span>정확한 장소를 골라주세요</span>
               </span>
             )
           )}
