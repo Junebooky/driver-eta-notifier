@@ -1,15 +1,13 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   X,
   Calculator,
   Calendar,
   Clock,
   Car,
-  Languages,
-  DollarSign,
-  ArrowRight,
+  Check,
   CheckCircle2,
   AlertCircle,
   FileText,
@@ -18,6 +16,19 @@ import {
   Award,
   ShieldAlert,
   Info,
+  Building2,
+  User,
+  Phone,
+  Mail,
+  MapPin,
+  Flag,
+  Copy,
+  ChevronRight,
+  ChevronLeft,
+  Send,
+  Plus,
+  Minus,
+  ExternalLink,
 } from 'lucide-react';
 import { HqQuoteItem, QuoteCalculationInput } from '@/types/quoteHq';
 import { OfficialServiceCategory } from '@/types/officialPricingHq';
@@ -27,6 +38,10 @@ import {
 } from '@/lib/pricing/officialPricingSkus';
 import { VipChauffeurCardModal } from '@/components/cards/VipChauffeurCardModal';
 import { ensureClientAuth } from '@/utils/cockpitClientAuth';
+import { HqPlaceSearchInput } from '@/components/hq/HqPlaceSearchInput';
+import { INITIAL_HQ_CUSTOMERS } from '@/utils/customerHqData';
+import { getVehicleImage } from '@/utils/vehicleData';
+import { haptics } from '@/utils/haptics';
 
 interface HqQuoteModalProps {
   isOpen: boolean;
@@ -34,42 +49,83 @@ interface HqQuoteModalProps {
   onBookingConverted?: (bookingIds: string[]) => void;
 }
 
-const SERVICE_CATEGORIES: { id: OfficialServiceCategory; label: string; baseHours: number; description: string }[] = [
-  { id: 'daily_metro', label: '일반 의전 (수도권 9시간)', baseHours: 9, description: '수도권 기준, 9시간 기본 (125km 포함)' },
-  { id: 'daily_regional', label: '일반 의전 (지방/광역 9시간)', baseHours: 9, description: '지방 운행 전용 요율 (추가 지방 할증 중복 없음)' },
-  { id: 'airport_incheon', label: '공항 편도 (인천국제공항 3시간)', baseHours: 3, description: '인천공항 픽업/샌딩 편도 3시간 기준' },
-  { id: 'airport_gimpo', label: '공항 편도 (김포공항 3시간)', baseHours: 3, description: '김포공항 픽업/샌딩 편도 3시간 기준' },
+const SERVICE_CATEGORIES: {
+  id: OfficialServiceCategory;
+  label: string;
+  baseHours: number;
+  description: string;
+}[] = [
+  {
+    id: 'daily_metro',
+    label: '일반 의전 (수도권 9시간)',
+    baseHours: 9,
+    description: '수도권 기준, 9시간 기본 (125km 포함)',
+  },
+  {
+    id: 'daily_regional',
+    label: '일반 의전 (지방/광역 9시간)',
+    baseHours: 9,
+    description: '지방 운행 전용 요율 (추가 지방 할증 중복 없음)',
+  },
+  {
+    id: 'airport_incheon',
+    label: '공항 편도 (인천국제공항 3시간)',
+    baseHours: 3,
+    description: '인천공항 픽업/샌딩 편도 3시간 기준',
+  },
+  {
+    id: 'airport_gimpo',
+    label: '공항 편도 (김포공항 3시간)',
+    baseHours: 3,
+    description: '김포공항 픽업/샌딩 편도 3시간 기준',
+  },
 ];
+
+const WIZARD_STEPS = [
+  { number: 1, label: '고객사 및 행사 정보' },
+  { number: 2, label: '서비스 선택' },
+  { number: 3, label: '차량 및 옵션' },
+  { number: 4, label: '견적 확인' },
+] as const;
 
 export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
   isOpen,
   onClose,
   onBookingConverted,
 }) => {
+  // Wizard Step State (1 ~ 4)
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
+
+  // Step 1: 고객사 및 행사 정보
   const [customerName, setCustomerName] = useState('인터코스');
   const [contactPerson, setContactPerson] = useState('김지현 팀장');
   const [contactPhone, setContactPhone] = useState('010-3342-9910');
+  const [contactEmail, setContactEmail] = useState('');
+  const [notes, setNotes] = useState('프랑스 본사 임원단 방한 의전');
+
+  // Step 2: 서비스 선택 & 일정/경로
+  const [serviceCategory, setServiceCategory] = useState<OfficialServiceCategory>('daily_metro');
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [serviceStartTime, setServiceStartTime] = useState('09:00');
   const [serviceEndTime, setServiceEndTime] = useState('18:00');
-  
-  // 2026 Official Tariff states
-  const [serviceCategory, setServiceCategory] = useState<OfficialServiceCategory>('daily_metro');
-  const [vehicleProductCode, setVehicleProductCode] = useState<string>('sprinter_519_premium');
   const [serviceHours, setServiceHours] = useState<number>(9);
-  const [excessKm, setExcessKm] = useState<number>(0);
-  const [englishOption, setEnglishOption] = useState<'basic_included' | 'fluent_upgrade'>('basic_included');
-  
   const [origin, setOrigin] = useState('인천국제공항 T2');
   const [destination, setDestination] = useState('조선 팰리스 강남');
+  const [excessKm, setExcessKm] = useState<number>(0);
+
+  // Step 3: 차량 및 옵션
+  const [vehicleProductCode, setVehicleProductCode] = useState<string>('sprinter_519_premium');
   const [vehicleCount, setVehicleCount] = useState<number>(1);
   const [serviceMode, setServiceMode] = useState<'with_driver' | 'vehicle_only'>('with_driver');
-  const [notes, setNotes] = useState('프랑스 본사 임원단 방한 의전');
+  const [englishOption, setEnglishOption] = useState<'basic_included' | 'fluent_upgrade'>('basic_included');
+  const [vehicleCategoryFilter, setVehicleCategoryFilter] = useState<'all' | 'sprinter' | 'sedan' | 'suv' | 'van' | 'bus'>('all');
 
+  // Calculation & Actions State
   const [isCalculating, setIsCalculating] = useState(false);
   const [calculatedQuote, setCalculatedQuote] = useState<HqQuoteItem | null>(null);
   const [isConverting, setIsConverting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
   const [conversionSuccess, setConversionSuccess] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -78,6 +134,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
 
   // Handle serviceCategory change -> auto-update default hours
   const handleCategoryChange = (newCat: OfficialServiceCategory) => {
+    haptics.selection();
     setServiceCategory(newCat);
     const catConfig = SERVICE_CATEGORIES.find((c) => c.id === newCat);
     if (catConfig) {
@@ -90,7 +147,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
     }
   };
 
-  // Recalculate quote in-memory when inputs change (Pure calculation, ZERO DB writes)
+  // Recalculate quote in-memory whenever inputs change
   useEffect(() => {
     if (!isOpen) return;
 
@@ -108,6 +165,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
           customerName,
           contactPerson,
           contactPhone,
+          contactEmail,
           date,
           serviceStartTime,
           serviceEndTime,
@@ -155,6 +213,9 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
   }, [
     isOpen,
     customerName,
+    contactPerson,
+    contactPhone,
+    contactEmail,
     date,
     serviceStartTime,
     serviceEndTime,
@@ -175,6 +236,17 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
   // Selected SKU Object
   const currentSku = STANDARD_VEHICLE_SKU_MAPPINGS.find((m) => m.vehicleProductCode === vehicleProductCode);
   const isBusSku = currentSku?.tier === 'bus' || calculatedQuote?.quoteRequired === true;
+
+  // Filtered SKUs for Step 3
+  const filteredSkus = STANDARD_VEHICLE_SKU_MAPPINGS.filter((sku) => {
+    if (vehicleCategoryFilter === 'all') return true;
+    if (vehicleCategoryFilter === 'sprinter') return sku.tier === 'sprinter';
+    if (vehicleCategoryFilter === 'sedan') return sku.tier === 'sedan' || sku.tier === 'genesis';
+    if (vehicleCategoryFilter === 'suv') return sku.tier === 'suv';
+    if (vehicleCategoryFilter === 'van') return sku.tier === 'van';
+    if (vehicleCategoryFilter === 'bus') return sku.tier === 'bus';
+    return true;
+  });
 
   // P0-1: Quarantine unapproved 'draft' tariff
   const isDraftTariff =
@@ -202,6 +274,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
           customerName,
           contactPerson,
           contactPhone,
+          contactEmail,
           date,
           serviceStartTime,
           serviceEndTime,
@@ -281,42 +354,85 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
     }
   };
 
+  // Copy receipt text to clipboard
+  const handleCopyReceipt = () => {
+    if (!calculatedQuote) return;
+    haptics.lightTap();
+    const text = `[VIP LIMOUSINE KOREA 공식 견적 영수증]
+견적번호: ${calculatedQuote.quoteNo}
+발급일시: ${new Date().toLocaleDateString('ko-KR')} ${new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+----------------------------------------
+고객사명: ${customerName}
+담당자명: ${contactPerson} (${contactPhone})
+행사내용: ${notes || 'VIP 수행 의전'}
+운행일정: ${date} (${serviceStartTime} ~ ${serviceEndTime}, ${serviceHours}시간)
+운행경로: ${origin} → ${destination}
+----------------------------------------
+선택차량: ${calculatedQuote.vehicleModel} (${vehicleCount}대)
+기사서비스: ${englishOption === 'fluent_upgrade' ? '영어 능통 전담 의전 기사' : '기본 한국어 기사'}
+서비스구분: ${SERVICE_CATEGORIES.find((c) => c.id === serviceCategory)?.label || serviceCategory}
+----------------------------------------
+• 공급가액 소계: ${calculatedQuote.supplyPriceTotal !== null ? `${calculatedQuote.supplyPriceTotal.toLocaleString()}원` : '상담 후 산정'}
+• 부가가치세 (10%): ${calculatedQuote.vatAmount !== null ? `${calculatedQuote.vatAmount.toLocaleString()}원` : '별도 산정'}
+========================================
+총 청구 예상금액: ${calculatedQuote.estimatedGrandTotal !== null ? `${calculatedQuote.estimatedGrandTotal.toLocaleString()}원` : '상담 후 산정'} (VAT 포함)
+========================================
+* 2026 공식 요금표 기준 실시간 산출 견적`;
+
+    navigator.clipboard.writeText(text);
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 3000);
+  };
+
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-6 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-        <div className="relative w-full max-w-5xl max-h-[92vh] flex flex-col bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden text-white">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="2026 공식 요금표 실시간 견적기"
+        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200 select-none"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            haptics.lightTap();
+            onClose();
+          }
+        }}
+      >
+        <div className="relative w-full max-w-4xl max-h-[92vh] flex flex-col bg-white border border-slate-200/90 rounded-3xl shadow-2xl overflow-hidden my-auto animate-in zoom-in-95 duration-150">
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-950/70 shrink-0">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-white shrink-0">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                <Calculator className="w-5 h-5" />
+              <div className="w-10 h-10 rounded-2xl bg-blue-50 text-[#1E60F3] border border-blue-100 flex items-center justify-center shrink-0 shadow-2xs">
+                <Car className="w-5 h-5" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-base md:text-lg font-bold text-slate-100">
+                  <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
                     2026 공식 요금표 실시간 견적기
                   </h3>
-                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-semibold border border-emerald-500/30">
-                    2026 공식 요율 초안 (Draft)
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-[#1E60F3] font-bold border border-blue-200">
+                    2026 공식 요율
                   </span>
                 </div>
-                <p className="text-xs text-slate-400">
-                  표준 9시간 의전 & 3시간 공항 편도 • 14개 SKU 공식 요금 자동 연동 • 확정 예약 즉시 전환
+                <p className="text-xs text-slate-400 font-medium mt-0.5">
+                  단계별로 정보를 입력하여 VIP 수행 의전 견적을 빠르고 정확하게 생성합니다.
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
               <button
+                type="button"
                 onClick={() => setIsChauffeurCardOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition"
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 transition cursor-pointer"
               >
-                <Award className="w-3.5 h-3.5 text-amber-400" />
-                VIP 배차 소개서
+                <Award className="w-3.5 h-3.5 text-amber-500" />
+                <span>VIP 배차 소개서</span>
               </button>
               <button
+                type="button"
                 onClick={onClose}
-                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
+                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition cursor-pointer"
                 aria-label="닫기"
               >
                 <X className="w-5 h-5" />
@@ -324,464 +440,817 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
             </div>
           </div>
 
-          {/* Body */}
-          <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-12 gap-6">
-            {/* Left Inputs (7 cols) */}
-            <div className="md:col-span-7 space-y-4">
-              {/* Customer & Event Info */}
-              <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-3">
-                <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5 text-blue-400" /> 고객사 및 행사 정보
-                </h4>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <label className="text-xs text-slate-400 block mb-1">고객사명</label>
-                    <input
-                      type="text"
-                      value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-400 outline-none"
-                      placeholder="예: 인터코스, 샤넬코리아"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-slate-400 block mb-1">담당자 / 연락처</label>
-                    <input
-                      type="text"
-                      value={contactPerson}
-                      onChange={(e) => setContactPerson(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-400 outline-none"
-                      placeholder="예: 김지현 팀장"
-                    />
-                  </div>
+          {/* Stepper (1 ~ 4) */}
+          <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 shrink-0">
+            <div className="flex items-center justify-between max-w-2xl mx-auto relative">
+              {/* Background connector line */}
+              <div className="absolute top-4 left-6 right-6 h-0.5 bg-slate-200 -z-0" />
+
+              {WIZARD_STEPS.map((step) => {
+                const isCurrent = currentStep === step.number;
+                const isCompleted = currentStep > step.number;
+                return (
+                  <button
+                    key={step.number}
+                    type="button"
+                    onClick={() => {
+                      if (isCompleted || step.number < currentStep) {
+                        haptics.lightTap();
+                        setCurrentStep(step.number as 1 | 2 | 3 | 4);
+                      }
+                    }}
+                    disabled={!isCompleted && !isCurrent}
+                    className={`flex flex-col items-center gap-1.5 z-10 bg-transparent transition-all cursor-pointer ${
+                      !isCompleted && !isCurrent ? 'cursor-not-allowed opacity-50' : ''
+                    }`}
+                  >
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all ${
+                        isCurrent
+                          ? 'bg-[#1E60F3] text-white ring-4 ring-blue-100 shadow-sm scale-105'
+                          : isCompleted
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white border-2 border-slate-300 text-slate-400'
+                      }`}
+                    >
+                      {isCompleted ? <Check className="w-4 h-4 stroke-[3]" /> : step.number}
+                    </div>
+                    <span
+                      className={`text-xs transition-colors whitespace-nowrap ${
+                        isCurrent
+                          ? 'text-[#1E60F3] font-black'
+                          : isCompleted
+                          ? 'text-slate-700 font-bold'
+                          : 'text-slate-400 font-medium'
+                      }`}
+                    >
+                      {step.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Body Content */}
+          <div className="flex-1 overflow-y-auto p-5 sm:p-7">
+            {/* Step 1: 고객사 및 행사 정보 */}
+            {currentStep === 1 && (
+              <div className="space-y-4 max-w-2xl mx-auto animate-in fade-in duration-200">
+                <div className="border-b border-slate-100 pb-2">
+                  <h4 className="text-sm font-black text-slate-900 tracking-tight">
+                    1. 고객사 및 행사 정보
+                  </h4>
+                  <p className="text-xs text-slate-400 font-medium mt-0.5">
+                    견적서를 발송하고 관제 스케줄을 배정할 고객사 및 담당자 정보를 입력해 주세요.
+                  </p>
                 </div>
 
-                {/* Service Category */}
+                <div className="space-y-3.5">
+                  {/* 고객사명 */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      고객사명 <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Building2 className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                        placeholder="예: 인터코스, 샤넬코리아, 페라리"
+                        className="w-full h-11 pl-10 pr-3.5 rounded-xl border border-slate-200 focus:border-[#1E60F3] focus:ring-1 focus:ring-[#1E60F3] text-sm font-bold text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-2xs"
+                      />
+                    </div>
+                    {/* Customer quick chips */}
+                    <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                      <span className="text-[11px] text-slate-400 font-medium">추천 고객사:</span>
+                      {INITIAL_HQ_CUSTOMERS.slice(0, 5).map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => {
+                            haptics.lightTap();
+                            setCustomerName(c.name);
+                            if (c.primaryContactName) setContactPerson(c.primaryContactName);
+                            if (c.mainPhone) setContactPhone(c.mainPhone);
+                            if (c.mainEmail) setContactEmail(c.mainEmail);
+                          }}
+                          className="px-2 py-0.5 rounded-lg text-[11px] font-bold bg-slate-100 hover:bg-blue-50 hover:text-[#1E60F3] text-slate-600 border border-slate-200/80 transition cursor-pointer"
+                        >
+                          {c.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 담당자 & 연락처 */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        담당자 / 예약자 <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          value={contactPerson}
+                          onChange={(e) => setContactPerson(e.target.value)}
+                          placeholder="예: 김지현 팀장"
+                          className="w-full h-11 pl-10 pr-3.5 rounded-xl border border-slate-200 focus:border-[#1E60F3] focus:ring-1 focus:ring-[#1E60F3] text-sm font-bold text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-2xs"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                        담당자 연락처 <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          value={contactPhone}
+                          onChange={(e) => setContactPhone(e.target.value)}
+                          placeholder="010-0000-0000"
+                          className="w-full h-11 pl-10 pr-3.5 rounded-xl border border-slate-200 focus:border-[#1E60F3] focus:ring-1 focus:ring-[#1E60F3] text-sm font-bold text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-2xs font-mono"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 이메일 */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      견적서 수신 이메일 (선택)
+                    </label>
+                    <div className="relative">
+                      <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="email"
+                        value={contactEmail}
+                        onChange={(e) => setContactEmail(e.target.value)}
+                        placeholder="vip@intercos.com"
+                        className="w-full h-11 pl-10 pr-3.5 rounded-xl border border-slate-200 focus:border-[#1E60F3] focus:ring-1 focus:ring-[#1E60F3] text-sm font-semibold text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-2xs"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 행사명 / 운행 목적 */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      행사명 / 운행 목적
+                    </label>
+                    <div className="relative">
+                      <FileText className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        placeholder="예: 프랑스 본사 임원단 방한 의전"
+                        className="w-full h-11 pl-10 pr-3.5 rounded-xl border border-slate-200 focus:border-[#1E60F3] focus:ring-1 focus:ring-[#1E60F3] text-sm font-bold text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-2xs"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                      <span className="text-[11px] text-slate-400 font-medium">자주 쓰는 목적:</span>
+                      {['VIP 영접 의전', '공항 픽업/샌딩', '본사 임원단 방한', '비즈니스 투어', '골프 의전'].map((chip) => (
+                        <button
+                          key={chip}
+                          type="button"
+                          onClick={() => {
+                            haptics.lightTap();
+                            setNotes(chip);
+                          }}
+                          className="px-2 py-0.5 rounded-lg text-[11px] font-bold bg-slate-100 hover:bg-blue-50 hover:text-[#1E60F3] text-slate-600 border border-slate-200/80 transition cursor-pointer"
+                        >
+                          {chip}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Step 2: 서비스 선택 & 일정/경로 */}
+            {currentStep === 2 && (
+              <div className="space-y-4 max-w-2xl mx-auto animate-in fade-in duration-200">
+                <div className="border-b border-slate-100 pb-2">
+                  <h4 className="text-sm font-black text-slate-900 tracking-tight">
+                    2. 서비스 선택 및 운행 경로
+                  </h4>
+                  <p className="text-xs text-slate-400 font-medium mt-0.5">
+                    의전 서비스 구분과 운행 일시, 출발지 및 도착지를 지정합니다.
+                  </p>
+                </div>
+
+                {/* Service Categories 4 Cards */}
                 <div>
-                  <label className="text-xs text-slate-400 block mb-1.5 font-medium">서비스 구분 (2026 표준 요금 기준)</label>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    {SERVICE_CATEGORIES.map((cat) => (
-                      <button
-                        key={cat.id}
-                        type="button"
-                        onClick={() => handleCategoryChange(cat.id)}
-                        className={`p-2.5 rounded-lg border text-left transition ${
-                          serviceCategory === cat.id
-                            ? 'bg-amber-500/20 border-amber-400 text-amber-200 font-bold'
-                            : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-slate-600'
-                        }`}
-                      >
-                        <div className="text-xs font-bold">{cat.label}</div>
-                        <div className="text-[11px] text-slate-400 mt-0.5 line-clamp-1">{cat.description}</div>
-                      </button>
-                    ))}
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    서비스 구분 (2026 표준 요금 기준) <span className="text-red-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {SERVICE_CATEGORIES.map((cat) => {
+                      const active = serviceCategory === cat.id;
+                      return (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => handleCategoryChange(cat.id)}
+                          className={`p-3 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs flex items-start gap-2.5 ${
+                            active
+                              ? 'bg-blue-50/80 border-[#1E60F3] ring-1 ring-[#1E60F3]'
+                              : 'bg-white border-slate-200 hover:border-slate-300'
+                          }`}
+                        >
+                          <div
+                            className={`w-4 h-4 rounded-full border mt-0.5 flex items-center justify-center shrink-0 ${
+                              active ? 'border-[#1E60F3] bg-[#1E60F3]' : 'border-slate-300'
+                            }`}
+                          >
+                            {active && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                          </div>
+                          <div>
+                            <div className="text-xs font-black text-slate-900">{cat.label}</div>
+                            <div className="text-[11px] text-slate-500 font-medium mt-0.5">
+                              {cat.description}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3 text-sm">
+                {/* 운행 일자 & 시간 */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="text-xs text-slate-400 block mb-1">운행 일자</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      운행 일자 <span className="text-red-500">*</span>
+                    </label>
                     <input
                       type="date"
                       value={date}
                       onChange={(e) => setDate(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-400 outline-none"
+                      className="w-full h-11 px-3.5 rounded-xl border border-slate-200 focus:border-[#1E60F3] text-sm font-bold text-slate-900 outline-none shadow-2xs bg-white"
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-slate-400 block mb-1">시작 시간</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      출발 시간 <span className="text-red-500">*</span>
+                    </label>
                     <input
                       type="time"
                       value={serviceStartTime}
                       onChange={(e) => setServiceStartTime(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-400 outline-none"
+                      className="w-full h-11 px-3.5 rounded-xl border border-slate-200 focus:border-[#1E60F3] text-sm font-bold text-slate-900 outline-none shadow-2xs bg-white font-mono"
                     />
                   </div>
                   <div>
-                    <label className="text-xs text-slate-400 block mb-1">종료 시간</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      종료 예정 시간
+                    </label>
                     <input
                       type="time"
                       value={serviceEndTime}
                       onChange={(e) => setServiceEndTime(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-400 outline-none"
+                      className="w-full h-11 px-3.5 rounded-xl border border-slate-200 focus:border-[#1E60F3] text-sm font-bold text-slate-900 outline-none shadow-2xs bg-white font-mono"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 text-sm">
+                {/* 기본 이용 시간 & 초과 주행 */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs text-slate-400 block mb-1">픽업지 (출발)</label>
-                    <input
-                      type="text"
-                      value={origin}
-                      onChange={(e) => setOrigin(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-400 outline-none"
-                      placeholder="예: 인천국제공항 T2"
-                    />
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      기본 이용 시간 (시간 단위)
+                    </label>
+                    <div className="flex items-center h-11 bg-white border border-slate-200 rounded-xl px-3 justify-between shadow-2xs">
+                      <button
+                        type="button"
+                        onClick={() => setServiceHours((prev) => Math.max(1, prev - 1))}
+                        disabled={serviceHours <= 1}
+                        className="w-7 h-7 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-black flex items-center justify-center cursor-pointer disabled:opacity-40"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+                      <span className="text-sm font-black text-slate-900">{serviceHours}시간</span>
+                      <button
+                        type="button"
+                        onClick={() => setServiceHours((prev) => Math.min(24, prev + 1))}
+                        className="w-7 h-7 rounded bg-blue-50 hover:bg-blue-100 text-[#1E60F3] font-black flex items-center justify-center cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                   <div>
-                    <label className="text-xs text-slate-400 block mb-1">목적지 (도착)</label>
-                    <input
-                      type="text"
-                      value={destination}
-                      onChange={(e) => setDestination(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-400 outline-none"
-                      placeholder="예: 조선 팰리스 강남"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Vehicle & Chauffeur selection */}
-              <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-3">
-                <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                  <Car className="w-3.5 h-3.5 text-amber-400" /> 차종 및 2026 공식 상품 선택
-                </h4>
-
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">차량 모델 및 공식 상품 SKU (14종)</label>
-                  <select
-                    value={vehicleProductCode}
-                    onChange={(e) => setVehicleProductCode(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-400 outline-none"
-                  >
-                    <optgroup label="벤츠 스프린터 라인업 (5종)">
-                      <option value="sprinter_519_premium">벤츠 스프린터 519 최고급형 리무진 (9·11·12인승)</option>
-                      <option value="sprinter_519_standard">벤츠 스프린터 519 일반형 리무진</option>
-                      <option value="sprinter_519_business">벤츠 스프린터 519 비즈니스 (15·16인승)</option>
-                      <option value="sprinter_519_shuttle">벤츠 스프린터 519 셔틀 (15·16인승)</option>
-                      <option value="sprinter_319_new_6seat">벤츠 스프린터 319 신차 (6인승 독립 VIP)</option>
-                    </optgroup>
-                    <optgroup label="제네시스 라인업 (3종)">
-                      <option value="genesis_g90_donghaeng">제네시스 G90 리무진 (동행 VIP 의전)</option>
-                      <option value="genesis_g90_standard">제네시스 G90 신차 최고급형</option>
-                      <option value="genesis_gv80_new">제네시스 신형 GV80 럭셔리 SUV</option>
-                    </optgroup>
-                    <optgroup label="세단 및 밴 라인업 (3종)">
-                      <option value="benz_s560">벤츠 S560 플래그십 세단</option>
-                      <option value="hyundai_staria_lounge_limo">현대 스타리아 라운지 리무진 (7·9인승)</option>
-                      <option value="kia_carnival_hi_limo">기아 카니발 하이리무진 (4·7인승)</option>
-                    </optgroup>
-                    <optgroup label="대형 버스 (가격 상담 전용 / 견적 필수)">
-                      <option value="bus_premium_22">프리미엄 럭셔리 리무진 버스 (22인승 • 견적 별도)</option>
-                      <option value="bus_limo_28">우등 리무진 버스 (28인승 • 견적 별도)</option>
-                      <option value="bus_45">대형 투어 버스 (45인승 • 견적 별도)</option>
-                    </optgroup>
-                  </select>
-                  {currentSku?.capacityNote && (
-                    <p className="text-[11px] text-slate-400 mt-1">
-                      탑승 규격: <span className="text-amber-300 font-medium">{currentSku.capacityNote}</span>
-                      {currentSku.notes && ` • ${currentSku.notes}`}
-                    </p>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-4 gap-3 text-sm">
-                  <div>
-                    <label className="text-xs text-slate-400 block mb-1">필요 대수</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={20}
-                      value={vehicleCount}
-                      onChange={(e) => setVehicleCount(Math.max(1, parseInt(e.target.value) || 1))}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-400 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-slate-400 block mb-1">이용 시간</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={24}
-                      value={serviceHours}
-                      onChange={(e) => setServiceHours(Math.max(1, parseInt(e.target.value) || 1))}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-400 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-slate-400 block mb-1">초과 주행(km)</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      예상 초과 주행거리 (선택, km)
+                    </label>
                     <input
                       type="number"
                       min={0}
                       step={10}
                       value={excessKm}
                       onChange={(e) => setExcessKm(Math.max(0, parseInt(e.target.value) || 0))}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-400 outline-none"
                       placeholder="기본 125km 초과분"
+                      className="w-full h-11 px-3.5 rounded-xl border border-slate-200 focus:border-[#1E60F3] text-sm font-bold text-slate-900 outline-none shadow-2xs bg-white font-mono"
                     />
-                  </div>
-                  <div>
-                    <label className="text-xs text-slate-400 block mb-1">기사 언어</label>
-                    <select
-                      value={englishOption}
-                      onChange={(e) => setEnglishOption(e.target.value as any)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-400 outline-none"
-                    >
-                      <option value="basic_included">기본 영어 기사 (0원)</option>
-                      <option value="fluent_upgrade">프리토킹 영어 전문 (+10만)</option>
-                    </select>
                   </div>
                 </div>
 
-                {serviceCategory === 'daily_regional' && (
-                  <div className="p-2.5 bg-blue-500/10 border border-blue-500/20 rounded-lg text-blue-300 text-[11px] flex items-center gap-1.5">
-                    <Info className="w-3.5 h-3.5 shrink-0 text-blue-400" />
-                    <span>지방 운행 공식 요율이 적용되어 별도의 추가 지방 할증이 중복 부과되지 않습니다.</span>
-                  </div>
-                )}
-
-                <div>
-                  <label className="text-xs text-slate-400 block mb-1">특이사항 / 메모</label>
-                  <input
-                    type="text"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:border-amber-400 outline-none"
-                    placeholder="예: VIP 영접 피켓 준비, 비행편 KE012"
+                {/* 출발지 & 도착지 */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <HqPlaceSearchInput
+                    label="출발 장소"
+                    required
+                    value={origin}
+                    onChange={(val) => setOrigin(val)}
+                    placeholder="출발 장소 검색 또는 입력"
+                    icon="mapPin"
+                  />
+                  <HqPlaceSearchInput
+                    label="도착 장소"
+                    required
+                    value={destination}
+                    onChange={(val) => setDestination(val)}
+                    placeholder="도착 장소 검색 또는 입력"
+                    icon="flag"
                   />
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* Right Quote Summary (5 cols) */}
-            <div className="md:col-span-5 flex flex-col justify-between bg-slate-950 p-5 rounded-xl border border-amber-500/30">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                  <div>
-                    <span className="text-xs text-amber-400 font-semibold">
-                      {calculatedQuote?.quoteNo || 'QT-CALCULATING'}
-                    </span>
-                    <h4 className="text-sm font-bold text-slate-200">
-                      {calculatedQuote?.vehicleModel || '차량'} 견적 명세
-                    </h4>
-                  </div>
-                  <span className="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
-                    VAT 10% 별도 산정
-                  </span>
+            {/* Step 3: 차량 및 옵션 */}
+            {currentStep === 3 && (
+              <div className="space-y-4 max-w-2xl mx-auto animate-in fade-in duration-200">
+                <div className="border-b border-slate-100 pb-2">
+                  <h4 className="text-sm font-black text-slate-900 tracking-tight">
+                    3. 차량 및 옵션 선택
+                  </h4>
+                  <p className="text-xs text-slate-400 font-medium mt-0.5">
+                    의전 목적에 맞는 2026 공식 상품 차량과 의전 기사 언어 옵션을 지정합니다.
+                  </p>
                 </div>
 
-                {/* Bus Quote Required Warning Notice */}
-                {isBusSku && (
-                  <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-300 text-xs flex items-start gap-2.5">
-                    <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
-                    <div>
-                      <p className="font-bold text-amber-300">대형 버스 가격 상담 전용 상품</p>
-                      <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
-                        대형 버스는 이동 동선, 유류비, 고속도로 통행료를 감안하여 유선 협의 후 단가가 확정됩니다. 0원 임의 확정을 방지하기 위해 예약 전환 버튼이 비활성화됩니다.
-                      </p>
+                {/* Category Filter Pills */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                  {(
+                    [
+                      { key: 'all', label: '전체' },
+                      { key: 'sprinter', label: '스프린터' },
+                      { key: 'sedan', label: '세단' },
+                      { key: 'suv', label: 'SUV' },
+                      { key: 'van', label: '밴' },
+                      { key: 'bus', label: '대형버스' },
+                    ] as const
+                  ).map((cat) => {
+                    const active = vehicleCategoryFilter === cat.key;
+                    return (
+                      <button
+                        key={cat.key}
+                        type="button"
+                        onClick={() => {
+                          haptics.lightTap();
+                          setVehicleCategoryFilter(cat.key);
+                        }}
+                        className={`px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer shrink-0 ${
+                          active
+                            ? 'bg-[#1E60F3] text-white shadow-2xs'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        {cat.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Vehicle SKU Cards */}
+                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                  {filteredSkus.map((sku) => {
+                    const isSelected = vehicleProductCode === sku.vehicleProductCode;
+                    const thumb = getVehicleImage({ model: sku.vehicleProductLabel, category: sku.tier });
+                    return (
+                      <button
+                        key={sku.vehicleProductCode}
+                        type="button"
+                        onClick={() => {
+                          haptics.selection();
+                          setVehicleProductCode(sku.vehicleProductCode);
+                        }}
+                        className={`w-full p-3 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs flex items-center justify-between ${
+                          isSelected
+                            ? 'bg-blue-50/80 border-[#1E60F3] ring-1 ring-[#1E60F3]'
+                            : 'bg-white border-slate-200 hover:border-slate-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <div className="w-14 h-8 relative shrink-0 flex items-center justify-center">
+                            <img
+                              src={thumb}
+                              alt={sku.vehicleProductLabel}
+                              onError={(e) => {
+                                (e.currentTarget as HTMLImageElement).src = '/images/thumb_g90.jpg';
+                              }}
+                              className="w-full h-full object-contain"
+                            />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-black text-slate-900 truncate">
+                                {sku.vehicleProductLabel}
+                              </span>
+                              {sku.quoteRequired && (
+                                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200 shrink-0">
+                                  가격 상담 전용
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-slate-500 font-medium mt-0.5">
+                              {sku.capacityNote || sku.notes || '공식 요율 적용'}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="shrink-0 ml-3">
+                          <div
+                            className={`w-5 h-5 rounded-full border flex items-center justify-center ${
+                              isSelected
+                                ? 'bg-[#1E60F3] border-[#1E60F3] text-white'
+                                : 'border-slate-300'
+                            }`}
+                          >
+                            {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* 차량 대수 & 기사 언어 */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      필요 차량 수
+                    </label>
+                    <div className="flex items-center h-11 bg-white border border-slate-200 rounded-xl px-3 justify-between shadow-2xs">
+                      <button
+                        type="button"
+                        onClick={() => setVehicleCount((prev) => Math.max(1, prev - 1))}
+                        disabled={vehicleCount <= 1}
+                        className="w-7 h-7 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-black flex items-center justify-center cursor-pointer disabled:opacity-40"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+                      <span className="text-sm font-black text-slate-900">{vehicleCount}대</span>
+                      <button
+                        type="button"
+                        onClick={() => setVehicleCount((prev) => Math.min(20, prev + 1))}
+                        className="w-7 h-7 rounded bg-blue-50 hover:bg-blue-100 text-[#1E60F3] font-black flex items-center justify-center cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
-                )}
 
-                {/* Calculation breakdown */}
-                {isCalculating ? (
-                  <div className="py-12 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
-                    <span className="animate-spin text-amber-400">⏳</span>
-                    <span>2026 공식 요율 산출 중...</span>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      의전 기사 언어 옵션
+                    </label>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          haptics.selection();
+                          setEnglishOption('basic_included');
+                        }}
+                        className={`h-11 px-2.5 rounded-xl border text-xs font-bold flex items-center justify-center transition cursor-pointer ${
+                          englishOption === 'basic_included'
+                            ? 'bg-blue-50 text-[#1E60F3] border-[#1E60F3] ring-1 ring-[#1E60F3]'
+                            : 'bg-white border-slate-200 text-slate-600'
+                        }`}
+                      >
+                        기본 한국어 기사
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          haptics.selection();
+                          setEnglishOption('fluent_upgrade');
+                        }}
+                        className={`h-11 px-2.5 rounded-xl border text-xs font-bold flex items-center justify-center transition cursor-pointer ${
+                          englishOption === 'fluent_upgrade'
+                            ? 'bg-blue-50 text-[#1E60F3] border-[#1E60F3] ring-1 ring-[#1E60F3]'
+                            : 'bg-white border-slate-200 text-slate-600'
+                        }`}
+                      >
+                        영어 능통 기사 (+추가)
+                      </button>
+                    </div>
                   </div>
-                ) : calculatedQuote ? (
-                  <div className="space-y-2.5 text-xs text-slate-300">
-                    {/* Base Fare */}
+                </div>
+              </div>
+            )}
+
+            {/* Step 4: 견적 확인 & 영수증 요약 */}
+            {currentStep === 4 && (
+              <div className="max-w-xl mx-auto space-y-5 animate-in zoom-in-95 duration-200">
+                <div className="border-b border-slate-100 pb-2 text-center">
+                  <h4 className="text-base font-black text-slate-900 tracking-tight">
+                    4. 공식 견적서 영수증 확인
+                  </h4>
+                  <p className="text-xs text-slate-400 font-medium mt-0.5">
+                    입력하신 정보로 실시간 산출된 공식 견적 영수증입니다.
+                  </p>
+                </div>
+
+                {/* Authentic VIP Chauffeur Receipt Card */}
+                <div className="bg-white border border-slate-300 rounded-3xl p-6 sm:p-7 shadow-xl relative overflow-hidden font-sans">
+                  {/* Decorative Header */}
+                  <div className="text-center pb-3">
+                    <span className="text-[11px] font-black tracking-widest text-[#1E60F3] uppercase block">
+                      VIP LIMOUSINE KOREA
+                    </span>
+                    <h5 className="text-sm font-extrabold text-slate-900 tracking-tight mt-0.5">
+                      공식 견적 영수증 (OFFICIAL ESTIMATE)
+                    </h5>
+                    <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium mt-3 px-1">
+                      <span>견적번호: <strong className="text-slate-800 font-mono">{calculatedQuote?.quoteNo || 'QT-261102-811'}</strong></span>
+                      <span>발급일시: {new Date().toLocaleDateString('ko-KR')}</span>
+                    </div>
+                  </div>
+
+                  {/* Dotted Divider */}
+                  <div className="border-b-2 border-dashed border-slate-200 my-3" />
+
+                  {/* 1. 고객 및 행사 개요 */}
+                  <div className="space-y-1.5 text-xs">
                     <div className="flex justify-between items-center">
-                      <span className="text-slate-400">
-                        차량 기본료 ({calculatedQuote.vehicleCount}대 × {calculatedQuote.appliedPricingSnapshot?.baseHours || (serviceCategory.startsWith('airport') ? 3 : 9)}h)
-                      </span>
-                      <span className="font-semibold text-slate-200">
-                        {calculatedQuote.baseFareTotal !== null
-                          ? `${calculatedQuote.baseFareTotal.toLocaleString()}원`
-                          : <span className="text-amber-400 font-bold">상담 후 산정</span>}
+                      <span className="text-slate-400 font-medium">고객사명</span>
+                      <span className="font-bold text-slate-900">{customerName}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-400 font-medium">담당자</span>
+                      <span className="font-semibold text-slate-700">{contactPerson} ({contactPhone})</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-400 font-medium">행사/목적</span>
+                      <span className="font-semibold text-slate-700">{notes || 'VIP 수행 의전'}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-400 font-medium">운행 일정</span>
+                      <span className="font-semibold text-slate-700">
+                        {date} ({serviceStartTime} ~ {serviceEndTime}, {serviceHours}시간)
                       </span>
                     </div>
-
-                    {/* Overtime */}
-                    {calculatedQuote.overtimeHours > 0 && (
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-400">
-                          초과 시간 요금 ({calculatedQuote.overtimeHours}시간)
-                        </span>
-                        <span className="font-semibold text-amber-300">
-                          {calculatedQuote.overtimeFareTotal !== null
-                            ? `+${calculatedQuote.overtimeFareTotal.toLocaleString()}원`
-                            : '상담 후 산정'}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Excess Distance */}
-                    {(calculatedQuote.excessDistanceTotal || 0) > 0 && (
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-400">
-                          초과 주행 요금 ({excessKm}km)
-                        </span>
-                        <span className="font-semibold text-amber-300">
-                          +{calculatedQuote.excessDistanceTotal?.toLocaleString()}원
-                        </span>
-                      </div>
-                    )}
-
-                    {/* English Chauffeur Option */}
                     <div className="flex justify-between items-center">
-                      <span className="text-slate-400">
-                        기사 언어 옵션
+                      <span className="text-slate-400 font-medium">운행 구간</span>
+                      <span className="font-bold text-slate-900 truncate max-w-[240px]">
+                        {origin} → {destination}
                       </span>
-                      <span className="font-semibold">
-                        {calculatedQuote.englishSurchargeTotal > 0 ? (
-                          <span className="text-blue-300">
-                            +{calculatedQuote.englishSurchargeTotal.toLocaleString()}원 (프리토킹 전문)
+                    </div>
+                  </div>
+
+                  {/* Dotted Divider */}
+                  <div className="border-b-2 border-dashed border-slate-200 my-3" />
+
+                  {/* 2. 차량 및 옵션 개요 */}
+                  <div className="space-y-1.5 text-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-400 font-medium">선택 차량</span>
+                      <span className="font-bold text-slate-900">
+                        {calculatedQuote?.vehicleModel || currentSku?.vehicleProductLabel}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-400 font-medium">차량 수량</span>
+                      <span className="font-semibold text-slate-800">{vehicleCount}대</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-400 font-medium">서비스 구분</span>
+                      <span className="font-semibold text-slate-800">
+                        {SERVICE_CATEGORIES.find((c) => c.id === serviceCategory)?.label || serviceCategory}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-400 font-medium">기사 서비스</span>
+                      <span className="font-semibold text-blue-700">
+                        {englishOption === 'fluent_upgrade'
+                          ? '영어 능통 전담 의전 기사'
+                          : '기본 한국어 의전 기사'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Dotted Divider */}
+                  <div className="border-b-2 border-dashed border-slate-200 my-3" />
+
+                  {/* 3. 세부 금액 명세 */}
+                  <div className="space-y-2 text-xs">
+                    {isCalculating ? (
+                      <div className="py-6 text-center text-xs text-slate-400 font-medium flex items-center justify-center gap-2">
+                        <span className="animate-spin text-[#1E60F3]">⏳</span>
+                        <span>실시간 요율 산출 중...</span>
+                      </div>
+                    ) : calculatedQuote ? (
+                      <>
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-500 font-medium">
+                            기본 대절료 ({vehicleCount}대 × {serviceHours}시간)
                           </span>
-                        ) : (
-                          <span className="text-emerald-400">
-                            기본 영어 기사 포함 (0원)
+                          <span className="font-bold text-slate-900 font-mono">
+                            {calculatedQuote.baseFareTotal !== null
+                              ? `${calculatedQuote.baseFareTotal.toLocaleString()}원`
+                              : '상담 후 산정'}
                           </span>
-                        )}
-                      </span>
-                    </div>
+                        </div>
 
-                    {/* Supply Price */}
-                    <div className="pt-2 border-t border-slate-800 flex justify-between items-center">
-                      <span className="text-slate-400 font-medium">공급가액 소계</span>
-                      <span className="font-bold text-slate-100 text-sm">
-                        {calculatedQuote.supplyPriceTotal !== null ? (
-                          `${calculatedQuote.supplyPriceTotal.toLocaleString()}원`
-                        ) : (
-                          <span className="text-amber-400">상담 후 별도 산정</span>
+                        {calculatedQuote.overtimeHours > 0 && (
+                          <div className="flex justify-between items-center text-amber-700">
+                            <span>초과 시간 요금 ({calculatedQuote.overtimeHours}시간)</span>
+                            <span className="font-bold font-mono">
+                              +{calculatedQuote.overtimeFareTotal?.toLocaleString()}원
+                            </span>
+                          </div>
                         )}
-                      </span>
-                    </div>
 
-                    {/* VAT */}
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-400">부가가치세 (10%)</span>
-                      <span className="font-semibold text-slate-400">
-                        {calculatedQuote.vatAmount !== null ? (
-                          `${calculatedQuote.vatAmount.toLocaleString()}원`
-                        ) : (
-                          <span className="text-slate-500">별도 산정</span>
+                        {(calculatedQuote.excessDistanceTotal || 0) > 0 && (
+                          <div className="flex justify-between items-center text-amber-700">
+                            <span>초과 주행 요금 ({excessKm}km)</span>
+                            <span className="font-bold font-mono">
+                              +{calculatedQuote.excessDistanceTotal?.toLocaleString()}원
+                            </span>
+                          </div>
                         )}
-                      </span>
-                    </div>
 
-                    {/* Grand Total */}
-                    <div className="pt-3 border-t-2 border-amber-500/30 flex justify-between items-baseline">
-                      <div>
-                        <span className="text-xs text-amber-400 font-bold block">총 청구 예상금액</span>
-                        <span className="text-[10px] text-slate-500">(VAT 10% 포함)</span>
-                      </div>
-                      <span className="text-xl font-black text-amber-300">
-                        {calculatedQuote.estimatedGrandTotal !== null ? (
-                          `${calculatedQuote.estimatedGrandTotal.toLocaleString()}원`
-                        ) : (
-                          <span className="text-base text-amber-400">상담 후 산정</span>
+                        {calculatedQuote.englishSurchargeTotal > 0 && (
+                          <div className="flex justify-between items-center text-blue-700">
+                            <span>의전 기사 영어 수당</span>
+                            <span className="font-bold font-mono">
+                              +{calculatedQuote.englishSurchargeTotal.toLocaleString()}원
+                            </span>
+                          </div>
                         )}
-                      </span>
-                    </div>
+
+                        <div className="border-t border-slate-200 pt-2 flex justify-between items-center">
+                          <span className="text-slate-600 font-bold">공급가액 소계</span>
+                          <span className="font-black text-slate-900 text-sm font-mono">
+                            {calculatedQuote.supplyPriceTotal !== null
+                              ? `${calculatedQuote.supplyPriceTotal.toLocaleString()}원`
+                              : '상담 후 산정'}
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between items-center text-slate-500">
+                          <span>부가가치세 (10%)</span>
+                          <span className="font-semibold font-mono">
+                            {calculatedQuote.vatAmount !== null
+                              ? `${calculatedQuote.vatAmount.toLocaleString()}원`
+                              : '별도 산정'}
+                          </span>
+                        </div>
+
+                        {/* Grand Total Highlight Box */}
+                        <div className="mt-3 p-4 rounded-2xl bg-blue-50/90 border border-blue-200/90 flex items-center justify-between shadow-2xs">
+                          <div>
+                            <span className="text-xs font-black text-slate-900 block">
+                              총 청구 예상금액
+                            </span>
+                            <span className="text-[11px] text-blue-600 font-bold">
+                              (부가가치세 10% 포함)
+                            </span>
+                          </div>
+                          <span className="text-2xl sm:text-3xl font-black text-[#1E60F3] font-mono">
+                            {calculatedQuote.estimatedGrandTotal !== null
+                              ? `${calculatedQuote.estimatedGrandTotal.toLocaleString()}원`
+                              : '상담 후 산정'}
+                          </span>
+                        </div>
+                      </>
+                    ) : null}
                   </div>
-                ) : (
-                  <div className="py-12 text-center text-xs text-slate-500">
-                    견적 계산 중...
-                  </div>
-                )}
 
-                {/* P0-1: Quarantine unapproved 'draft' tariff banner */}
-                {isDraftTariff && (
-                  <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-300 text-xs flex items-start gap-2.5">
-                    <ShieldAlert className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
-                    <div>
-                      <span className="font-bold block text-amber-300">
-                        [2026 공식 요율 초안 - 관리자 시뮬레이션 전용]
-                      </span>
-                      <span className="text-[11px] text-amber-200/80 leading-relaxed block mt-0.5">
-                        본 요율표는 승인(approved) 전 상태(draft)이므로 실제 고객사 견적서 DB 저장 및 확정 예약 전환이 안전하게 제한됩니다.
-                      </span>
-                    </div>
+                  {/* Receipt Notice */}
+                  <div className="mt-4 pt-3 border-t border-slate-200/80 text-[10px] text-slate-400 text-center font-medium leading-relaxed">
+                    * 본 견적서는 2026 공식 요율표 기준 실시간 산출 견적서입니다.<br />
+                    예약 전환 시 실시간 관제 스케줄에 즉시 등록됩니다.
                   </div>
-                )}
+                </div>
 
-                {/* Feedback / Error Alerts */}
+                {/* Notifications & Feedback */}
                 {errorMessage && (
-                  <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-lg text-rose-300 text-xs flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0" />
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
                     <span>{errorMessage}</span>
                   </div>
                 )}
-
                 {saveSuccess && (
-                  <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg text-blue-300 text-xs flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 shrink-0 text-blue-400" />
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-blue-700 text-xs flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 shrink-0 text-[#1E60F3]" />
                     <span>{saveSuccess}</span>
                   </div>
                 )}
-
                 {conversionSuccess && (
-                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-emerald-300 text-xs flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
                     <span>{conversionSuccess}</span>
                   </div>
                 )}
-              </div>
 
-              {/* Action Buttons */}
-              <div className="pt-4 border-t border-slate-800 space-y-2">
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={handleSaveQuote}
-                    disabled={isSaving || !calculatedQuote || isDraftTariff}
-                    title={
-                      isDraftTariff
-                        ? '2026 공식 요율표가 미승인(draft) 상태이므로 고객 견적서 저장이 차단됩니다.'
-                        : undefined
-                    }
-                    className="w-full py-2.5 px-3 rounded-xl border border-amber-500/50 bg-amber-500/10 hover:bg-amber-500/20 disabled:opacity-40 disabled:cursor-not-allowed text-amber-300 font-bold text-xs transition flex items-center justify-center gap-1.5"
-                  >
-                    <FileText className="w-3.5 h-3.5 text-amber-400" />
-                    {isSaving ? '저장 중...' : isDraftTariff ? 'DB 저장 (초안 잠김)' : '견적서 DB 저장'}
-                  </button>
+                {/* Action Buttons */}
+                <div className="space-y-2.5 pt-1">
+                  {/* Primary Convert Button */}
                   <button
                     type="button"
                     onClick={handleConvertToBooking}
                     disabled={isConverting || !calculatedQuote || calculatedQuote.quoteRequired || isDraftTariff}
-                    title={
-                      isDraftTariff
-                        ? '2026 공식 요율표가 미승인(draft) 상태이므로 확정 예약 전환이 차단됩니다.'
-                        : calculatedQuote?.quoteRequired
-                        ? '대형 버스는 관리자 상담 후 단가 입력 시 예약으로 전환할 수 있습니다.'
-                        : undefined
-                    }
-                    className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 font-bold text-xs shadow-md transition flex items-center justify-center gap-1.5"
+                    className="w-full h-12 rounded-xl bg-[#1E60F3] hover:bg-blue-600 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-md shadow-blue-500/25 active:scale-98 transition cursor-pointer disabled:opacity-50"
                   >
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    {isConverting
-                      ? '전환 중...'
-                      : isDraftTariff
-                      ? '예약 전환 (초안 차단)'
-                      : calculatedQuote?.quoteRequired
-                      ? '상담 필수 (전환 잠김)'
-                      : '확정 예약 전환'}
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>{isConverting ? '예약 전환 중...' : '예약 전환 및 관제 등록'}</span>
                   </button>
-                </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => window.print()}
-                    className="py-2.5 px-3 rounded-xl border border-slate-700 bg-slate-900 hover:bg-slate-800 text-slate-300 font-semibold text-xs transition flex items-center justify-center gap-1.5"
-                  >
-                    <Printer className="w-3.5 h-3.5" />
-                    견적서 인쇄 / PDF
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsChauffeurCardOpen(true)}
-                    className="py-2.5 px-3 rounded-xl border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-semibold text-xs transition flex items-center justify-center gap-1.5"
-                  >
-                    <Award className="w-3.5 h-3.5" />
-                    VIP 의전 소개서 보기
-                  </button>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={handleCopyReceipt}
+                      className="py-2.5 px-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+                    >
+                      <Copy className="w-3.5 h-3.5 text-slate-500" />
+                      <span>{isCopied ? '복사 완료!' : '견적서 복사'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => window.print()}
+                      className="py-2.5 px-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+                    >
+                      <Printer className="w-3.5 h-3.5 text-slate-500" />
+                      <span>견적서 PDF</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveQuote}
+                      disabled={isSaving || !calculatedQuote || isDraftTariff}
+                      className="py-2.5 px-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer disabled:opacity-50"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-slate-500" />
+                      <span>{isSaving ? '저장 중...' : '임시 저장'}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
+          </div>
+
+          {/* Wizard Footer Navigation */}
+          <div className="px-6 py-4 border-t border-slate-100 bg-white flex items-center justify-between shrink-0">
+            {currentStep > 1 ? (
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.lightTap();
+                  setCurrentStep((prev) => (prev - 1) as 1 | 2 | 3 | 4);
+                }}
+                className="inline-flex items-center gap-1 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs transition cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                <span>이전 단계</span>
+              </button>
+            ) : (
+              <div />
+            )}
+
+            {currentStep < 4 ? (
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.selection();
+                  if (currentStep === 1 && !customerName.trim()) {
+                    setErrorMessage('고객사명을 입력해 주세요.');
+                    return;
+                  }
+                  setErrorMessage(null);
+                  setCurrentStep((prev) => (prev + 1) as 1 | 2 | 3 | 4);
+                }}
+                className="inline-flex items-center gap-1 px-6 py-2.5 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white font-black text-xs shadow-md shadow-blue-500/20 transition cursor-pointer"
+              >
+                <span>{currentStep === 3 ? '견적 산출 및 확인' : '다음 단계'}</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.lightTap();
+                  setCurrentStep(1);
+                }}
+                className="inline-flex items-center gap-1 px-4 py-2.5 rounded-xl text-slate-500 hover:text-slate-800 text-xs font-bold transition cursor-pointer"
+              >
+                <span>처음부터 다시 작성</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
