@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useRef, useEffect, useSyncExternalStore } from 'react';
+import Image from 'next/image';
 import {
   Car,
   Send,
@@ -31,7 +32,12 @@ import {
 } from 'lucide-react';
 import { HqBooking } from '@/types/hq';
 import { haptics } from '@/utils/haptics';
-import { VIP_REAL_VEHICLES, stripManufacturerName } from '@/utils/vehicleData';
+import {
+  VIP_REAL_VEHICLES,
+  stripManufacturerName,
+  mapVehicleToUiCategory,
+  getVehicleImage,
+} from '@/utils/vehicleData';
 import { INITIAL_HQ_CUSTOMERS } from '@/utils/customerHqData';
 import { HqCustomer } from '@/types/customerHq';
 import {
@@ -162,6 +168,23 @@ export function parseFlexibleTimeInput(raw: string): string | null {
   }
 
   return null;
+}
+
+/**
+ * Returns driver avatar profile image URL with graceful fallbacks.
+ * If driver does not have a registered profile photo, falls back to default suited chauffeur profile.
+ */
+export function getDriverProfileImage(driver?: { id?: string; name?: string; avatarUrl?: string } | null): string {
+  if (driver?.avatarUrl) return driver.avatarUrl;
+  const name = driver?.name || '';
+  if (name.includes('김')) return '/images/driver_kim.png';
+  if (name.includes('이')) return '/images/driver_lee.png';
+  if (name.includes('박')) return '/images/driver_park.png';
+  if (name.includes('최')) return '/images/driver_choi.png';
+  if (name.includes('정')) return '/images/driver_jung.png';
+  if (name.includes('홍')) return '/images/driver_kim.png';
+  if (name.includes('윤')) return '/images/driver_jung.png';
+  return '/images/driver_kim.png';
 }
 
 export interface VehicleAllocationItem {
@@ -388,6 +411,16 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
   const [commonPassengerPhone, setCommonPassengerPhone] = useState(() => initialBooking?.passengerPhone || '');
   const [commonMemo, setCommonMemo] = useState(() => initialBooking?.notes || '');
 
+  // 7. Card Dropdown State for Vehicle & Driver
+  const [activeCardDropdown, setActiveCardDropdown] = useState<{
+    allocId: string;
+    type: 'vehicle' | 'driver';
+  } | null>(null);
+  const [vehicleSearchQuery, setVehicleSearchQuery] = useState('');
+  const [vehicleCategoryFilter, setVehicleCategoryFilter] = useState<'all' | 'sedan' | 'suv' | 'van' | 'sprinter'>('all');
+  const [driverSearchQuery, setDriverSearchQuery] = useState('');
+  const activeCardDropdownRef = useRef<HTMLDivElement>(null);
+
   // Allocations (1 to N vehicles)
   const [allocations, setAllocations] = useState<VehicleAllocationItem[]>(() => {
     if (initialBooking) {
@@ -563,10 +596,83 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
       if (timePickerRef.current && !timePickerRef.current.contains(target)) {
         setIsTimePickerOpen(false);
       }
+      if (activeCardDropdownRef.current && !activeCardDropdownRef.current.contains(target)) {
+        const isTrigger = (target as HTMLElement).closest?.('[data-card-dropdown-trigger="true"]');
+        if (!isTrigger) {
+          setActiveCardDropdown(null);
+        }
+      }
     };
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
+
+  const allVehicles = useMemo(() => {
+    return VIP_REAL_VEHICLES.map((v) => {
+      const live = fleet.data?.vehicles.find((fv) => fv.plate === v.plate || fv.uuid === v.uuid);
+      const isAvailable = live ? live.isAvailable : true;
+      const currentStatus = live ? live.currentStatus : 'available';
+      const statusLabel = live ? VEHICLE_STATUS_LABELS[live.currentStatus] : '대기 중';
+      const uiCategory = mapVehicleToUiCategory(v);
+      const image = getVehicleImage(v);
+      return {
+        ...v,
+        isAvailable,
+        currentStatus,
+        statusLabel,
+        uiCategory,
+        image,
+      };
+    });
+  }, [fleet.data?.vehicles]);
+
+  const filteredVehiclesForDropdown = useMemo(() => {
+    return allVehicles.filter((v) => {
+      if (vehicleCategoryFilter !== 'all' && v.uiCategory !== vehicleCategoryFilter) {
+        return false;
+      }
+      if (vehicleSearchQuery.trim()) {
+        const q = vehicleSearchQuery.toLowerCase().trim();
+        const matchesPlate = v.plate.toLowerCase().includes(q);
+        const matchesModel = v.model.toLowerCase().includes(q);
+        const matchesBrand = v.brand.toLowerCase().includes(q);
+        if (!matchesPlate && !matchesModel && !matchesBrand) return false;
+      }
+      return true;
+    });
+  }, [allVehicles, vehicleCategoryFilter, vehicleSearchQuery]);
+
+  const allDrivers = useMemo(() => {
+    const source = (fleet.data?.drivers && fleet.data.drivers.length > 0)
+      ? fleet.data.drivers
+      : liveDriverProfiles;
+
+    return source.map((d) => {
+      const profile = liveDriverProfiles.find((p) => p.id === d.id || p.name === d.name);
+      const phone = d.phone || profile?.phone || '010-0000-0000';
+      const isAvailable = (d as any).isAvailable !== undefined ? (d as any).isAvailable : true;
+      const avatarUrl =
+        (d as any).avatarUrl || (profile as any)?.avatarUrl || getDriverProfileImage(d || profile);
+      return {
+        ...d,
+        phone,
+        isAvailable,
+        avatarUrl,
+      };
+    });
+  }, [fleet.data?.drivers, liveDriverProfiles]);
+
+  const filteredDriversForDropdown = useMemo(() => {
+    return allDrivers.filter((d) => {
+      if (driverSearchQuery.trim()) {
+        const q = driverSearchQuery.toLowerCase().trim();
+        const matchesName = d.name.toLowerCase().includes(q);
+        const matchesPhone = (d.phone || '').replace(/-/g, '').includes(q.replace(/-/g, ''));
+        if (!matchesName && !matchesPhone) return false;
+      }
+      return true;
+    });
+  }, [allDrivers, driverSearchQuery]);
 
   const filteredCustomerSuggestions = useMemo(() => {
     if (!customerName.trim()) {
@@ -627,6 +733,40 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
     if (allocations.length <= 1) return;
     haptics.lightTap();
     setAllocations((prev) => prev.slice(0, prev.length - 1));
+  };
+
+  const handleSelectVehicle = (allocId: string, vehicle: (typeof allVehicles)[0] | null) => {
+    haptics.selection();
+    setAllocations((prev) =>
+      prev.map((a) =>
+        a.id === allocId
+          ? {
+              ...a,
+              selectedVehiclePlate: vehicle ? vehicle.plate : '',
+              selectedVehicleModel: vehicle ? vehicle.model : '',
+            }
+          : a
+      )
+    );
+    if (vehicle?.model) {
+      setSelectedVehicleModel(vehicle.model);
+    }
+    setActiveCardDropdown(null);
+  };
+
+  const handleSelectDriver = (allocId: string, driver: (typeof allDrivers)[0] | null) => {
+    haptics.selection();
+    setAllocations((prev) =>
+      prev.map((a) =>
+        a.id === allocId
+          ? {
+              ...a,
+              selectedDriver: driver ? driver.id : '',
+            }
+          : a
+      )
+    );
+    setActiveCardDropdown(null);
   };
 
   // Time picker handlers
@@ -1394,73 +1534,412 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
               </p>
             )}
 
-            {allocations.map((allocation, index) => (
-              <div key={allocation.id} className="grid grid-cols-1 gap-2 sm:grid-cols-2 pt-1 border-t border-slate-200/50">
-                <label className="text-xs font-bold text-slate-700">
-                  {allocations.length > 1 ? `${index + 1}번 배정 차량` : '배정 차량'}
-                  <select
-                    aria-label={allocations.length > 1 ? `${index + 1}번 배정 차량 번호판` : '배정 차량 번호판'}
-                    value={allocation.selectedVehiclePlate}
-                    onChange={(e) => {
-                      const plate = e.target.value;
-                      const vMatch = fleet.data?.vehicles.find((v) => v.plate === plate) || VIP_REAL_VEHICLES.find((v) => v.plate === plate);
-                      setAllocations((prev) =>
-                        prev.map((a) =>
-                          a.id === allocation.id
-                            ? {
-                                ...a,
-                                selectedVehiclePlate: plate,
-                                selectedVehicleModel: vMatch?.model || a.selectedVehicleModel,
-                              }
-                            : a
-                        )
-                      );
-                      if (vMatch?.model) {
-                        setSelectedVehicleModel(vMatch.model);
-                      }
-                    }}
-                    className="mt-1 w-full h-11 rounded-lg border border-slate-200 px-2 bg-white"
-                    disabled={!fleet.data}
-                  >
-                    <option value="">실차 선택</option>
-                    {fleet.data?.vehicles.map((v) => (
-                      <option key={v.uuid} value={v.plate} disabled={!v.isAvailable}>
-                        {v.model} · {v.plate} · {VEHICLE_STATUS_LABELS[v.currentStatus]}
-                        {v.isAvailable ? '' : ' (예약 불가)'}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="text-xs font-bold text-slate-700">
-                  {allocations.length > 1 ? `${index + 1}번 담당 기사님` : '담당 기사님'}
-                  <select
-                    aria-label={allocations.length > 1 ? `${index + 1}번 담당 기사님` : '담당 기사님'}
-                    value={allocation.selectedDriver}
-                    onChange={(e) =>
-                      setAllocations((prev) =>
-                        prev.map((a) =>
-                          a.id === allocation.id ? { ...a, selectedDriver: e.target.value } : a
-                        )
-                      )
+            {allocations.map((allocation, index) => {
+              const isOpenVehicle =
+                activeCardDropdown?.allocId === allocation.id && activeCardDropdown?.type === 'vehicle';
+              const isOpenDriver =
+                activeCardDropdown?.allocId === allocation.id && activeCardDropdown?.type === 'driver';
+
+              const selectedVehicle =
+                allVehicles.find((v) => v.plate === allocation.selectedVehiclePlate) ||
+                (allocation.selectedVehiclePlate
+                  ? {
+                      plate: allocation.selectedVehiclePlate,
+                      model: allocation.selectedVehicleModel || allocation.selectedVehiclePlate,
+                      image: getVehicleImage({
+                        plate: allocation.selectedVehiclePlate,
+                        model: allocation.selectedVehicleModel,
+                      }),
+                      statusLabel: '대기 중',
+                      currentStatus: 'available',
                     }
-                    className="mt-1 w-full h-11 rounded-lg border border-slate-200 px-2 bg-white"
-                    disabled={!fleet.data || allocation.serviceMode === 'vehicle_only'}
-                  >
-                    <option value="">기사 선택</option>
-                    {fleet.data?.drivers.map((d) => (
-                      <option
-                        key={d.id}
-                        value={d.id}
-                        disabled={!d.isAvailable || (allocation.requestedLanguage === 'en' && !d.isEnglishVerified)}
+                  : null);
+
+              const selectedDriver =
+                allDrivers.find(
+                  (d) => d.id === allocation.selectedDriver || d.name === allocation.selectedDriver
+                ) ||
+                (allocation.selectedDriver
+                  ? {
+                      id: allocation.selectedDriver,
+                      name: allocation.selectedDriver,
+                      phone: '010-0000-0000',
+                      isAvailable: true,
+                      avatarUrl: getDriverProfileImage({ name: allocation.selectedDriver }),
+                    }
+                  : null);
+
+              return (
+                <div
+                  key={allocation.id}
+                  className="grid grid-cols-1 gap-3 sm:grid-cols-2 pt-2 border-t border-slate-200/50"
+                >
+                  {/* 1. 배정 차량 Selector */}
+                  <div className="relative">
+                    <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                      {allocations.length > 1 ? `${index + 1}번 배정 차량` : '배정 차량'}{' '}
+                      <span className="text-red-500 font-bold">*</span>
+                    </label>
+
+                    <button
+                      type="button"
+                      data-card-dropdown-trigger="true"
+                      onClick={() => {
+                        haptics.lightTap();
+                        if (isOpenVehicle) {
+                          setActiveCardDropdown(null);
+                        } else {
+                          setActiveCardDropdown({ allocId: allocation.id, type: 'vehicle' });
+                          setVehicleSearchQuery('');
+                          setVehicleCategoryFilter('all');
+                        }
+                      }}
+                      className={`w-full h-12 bg-white rounded-xl px-3 flex items-center justify-between transition-all cursor-pointer shadow-2xs border ${
+                        isOpenVehicle
+                          ? 'border-[#1E60F3] ring-1 ring-[#1E60F3]'
+                          : 'border-slate-200 hover:border-slate-300'
+                      }`}
+                      aria-expanded={isOpenVehicle}
+                      aria-label={allocations.length > 1 ? `${index + 1}번 배정 차량 선택` : '배정 차량 선택'}
+                    >
+                      {selectedVehicle ? (
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <div className="w-12 h-7 relative shrink-0 flex items-center justify-center">
+                            <img
+                              src={selectedVehicle.image}
+                              alt={selectedVehicle.model}
+                              onError={(e) => {
+                                (e.currentTarget as HTMLImageElement).src = '/images/thumb_g90.jpg';
+                              }}
+                              className="w-full h-full object-contain"
+                            />
+                          </div>
+                          <span className="text-xs sm:text-sm font-black text-slate-900 truncate">
+                            {selectedVehicle.model} · {selectedVehicle.plate}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-slate-400">
+                          <Car className="w-4 h-4 shrink-0 text-slate-400" />
+                          <span className="text-xs sm:text-sm font-medium">배정 차량 선택</span>
+                        </div>
+                      )}
+                      <ChevronDown
+                        className={`w-4 h-4 text-slate-500 transition-transform duration-200 shrink-0 ml-2 ${
+                          isOpenVehicle ? 'rotate-180 text-[#1E60F3]' : ''
+                        }`}
+                      />
+                    </button>
+
+                    {/* Vehicle Dropdown Popover */}
+                    {isOpenVehicle && (
+                      <div
+                        ref={activeCardDropdownRef}
+                        className="absolute left-0 top-full mt-1.5 w-full sm:min-w-[420px] max-w-[520px] z-50 bg-white border border-slate-200/90 rounded-2xl shadow-xl p-3 animate-in fade-in duration-150"
                       >
-                        {d.name} · {d.phone}
-                        {d.isAvailable ? '' : ' (배차 불가)'}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            ))}
+                        {/* Top Bar: Search Input & Category Pills */}
+                        <div className="flex flex-col gap-2 pb-2.5 border-b border-slate-100">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 relative">
+                              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                              <input
+                                type="text"
+                                value={vehicleSearchQuery}
+                                onChange={(e) => setVehicleSearchQuery(e.target.value)}
+                                placeholder="차량명 또는 차량번호 검색"
+                                className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200/80 rounded-lg text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] focus:bg-white"
+                              />
+                              {vehicleSearchQuery && (
+                                <button
+                                  type="button"
+                                  onClick={() => setVehicleSearchQuery('')}
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-1 shrink-0">
+                              {(
+                                [
+                                  { key: 'all', label: '전체' },
+                                  { key: 'sedan', label: '세단' },
+                                  { key: 'suv', label: 'SUV' },
+                                  { key: 'van', label: '밴' },
+                                  { key: 'sprinter', label: '스프린터' },
+                                ] as const
+                              ).map((cat) => {
+                                const active = vehicleCategoryFilter === cat.key;
+                                return (
+                                  <button
+                                    key={cat.key}
+                                    type="button"
+                                    onClick={() => setVehicleCategoryFilter(cat.key)}
+                                    className={`px-2 py-1 rounded-full text-[11px] font-bold transition-colors cursor-pointer ${
+                                      active
+                                        ? 'bg-[#1E60F3] text-white shadow-2xs'
+                                        : 'text-slate-600 hover:bg-slate-100'
+                                    }`}
+                                  >
+                                    {cat.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Unassign Option */}
+                        {allocation.selectedVehiclePlate && (
+                          <button
+                            type="button"
+                            onClick={() => handleSelectVehicle(allocation.id, null)}
+                            className="w-full mt-1.5 mb-1 px-2.5 py-1.5 text-left text-xs font-bold text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-between cursor-pointer"
+                          >
+                            <span>배정 해제 (미배정)</span>
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+
+                        {/* Vehicle List */}
+                        <div className="max-h-60 overflow-y-auto space-y-1 mt-1 pr-1">
+                          {filteredVehiclesForDropdown.length === 0 ? (
+                            <div className="py-6 text-center text-xs text-slate-400 font-medium">
+                              일치하는 차량이 없습니다
+                            </div>
+                          ) : (
+                            filteredVehiclesForDropdown.map((v) => {
+                              const isSelected = allocation.selectedVehiclePlate === v.plate;
+                              return (
+                                <button
+                                  key={v.uuid || v.plate}
+                                  type="button"
+                                  onClick={() => handleSelectVehicle(allocation.id, v)}
+                                  className={`w-full px-2.5 py-2 rounded-xl flex items-center justify-between transition-colors cursor-pointer text-left ${
+                                    isSelected
+                                      ? 'bg-blue-50/80 border border-blue-200'
+                                      : 'hover:bg-slate-50 border border-transparent'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    <div className="w-14 h-8 relative shrink-0 flex items-center justify-center">
+                                      <img
+                                        src={v.image}
+                                        alt={v.model}
+                                        onError={(e) => {
+                                          (e.currentTarget as HTMLImageElement).src = '/images/thumb_g90.jpg';
+                                        }}
+                                        className="w-full h-full object-contain"
+                                      />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-xs font-black text-slate-900 truncate">
+                                        {v.model}
+                                      </p>
+                                      <p className="text-[11px] font-semibold text-slate-500 mt-0.5">
+                                        {v.plate}
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-2.5 shrink-0 ml-2">
+                                    <span
+                                      className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                                        v.currentStatus === 'in_service'
+                                          ? 'text-amber-700 bg-amber-50'
+                                          : v.currentStatus === 'maintenance'
+                                          ? 'text-slate-500 bg-slate-100'
+                                          : 'text-blue-600 bg-blue-50'
+                                      }`}
+                                    >
+                                      ● {v.statusLabel || '대기 중'}
+                                    </span>
+                                    {isSelected && (
+                                      <Check className="w-4 h-4 text-[#1E60F3] stroke-[3]" />
+                                    )}
+                                  </div>
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 2. 담당 기사님 Selector */}
+                  <div className="relative">
+                    <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                      {allocations.length > 1 ? `${index + 1}번 담당 기사님` : '담당 기사님'}{' '}
+                      <span className="text-red-500 font-bold">*</span>
+                    </label>
+
+                    <button
+                      type="button"
+                      data-card-dropdown-trigger="true"
+                      onClick={() => {
+                        haptics.lightTap();
+                        if (isOpenDriver) {
+                          setActiveCardDropdown(null);
+                        } else {
+                          setActiveCardDropdown({ allocId: allocation.id, type: 'driver' });
+                          setDriverSearchQuery('');
+                        }
+                      }}
+                      disabled={!fleet.data || allocation.serviceMode === 'vehicle_only'}
+                      className={`w-full h-12 bg-white rounded-xl px-3 flex items-center justify-between transition-all cursor-pointer shadow-2xs border ${
+                        isOpenDriver
+                          ? 'border-[#1E60F3] ring-1 ring-[#1E60F3]'
+                          : 'border-slate-200 hover:border-slate-300'
+                      } disabled:opacity-50 disabled:pointer-events-none`}
+                      aria-expanded={isOpenDriver}
+                      aria-label={allocations.length > 1 ? `${index + 1}번 담당 기사님 선택` : '담당 기사님 선택'}
+                    >
+                      {selectedDriver ? (
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <div className="w-7 h-7 rounded-full overflow-hidden border border-slate-200 shrink-0 relative bg-slate-100">
+                            <img
+                              src={selectedDriver.avatarUrl || getDriverProfileImage(selectedDriver)}
+                              alt={selectedDriver.name}
+                              onError={(e) => {
+                                (e.currentTarget as HTMLImageElement).src = '/images/driver_kim.png';
+                              }}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <span className="text-xs sm:text-sm font-black text-slate-900 truncate">
+                            {selectedDriver.name} · {selectedDriver.phone}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-slate-400">
+                          <Users className="w-4 h-4 shrink-0 text-slate-400" />
+                          <span className="text-xs sm:text-sm font-medium">담당 기사님 선택</span>
+                        </div>
+                      )}
+                      <ChevronDown
+                        className={`w-4 h-4 text-slate-500 transition-transform duration-200 shrink-0 ml-2 ${
+                          isOpenDriver ? 'rotate-180 text-[#1E60F3]' : ''
+                        }`}
+                      />
+                    </button>
+
+                    {/* Driver Dropdown Popover */}
+                    {isOpenDriver && (
+                      <div
+                        ref={activeCardDropdownRef}
+                        className="absolute left-0 sm:left-auto sm:right-0 top-full mt-1.5 w-full sm:min-w-[340px] md:min-w-[380px] max-w-[460px] z-50 bg-white border border-slate-200/90 rounded-2xl shadow-xl p-3 animate-in fade-in duration-150"
+                      >
+                        {/* Top Search Area */}
+                        <div className="pb-2.5 border-b border-slate-100">
+                          <div className="relative">
+                            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                            <input
+                              type="text"
+                              value={driverSearchQuery}
+                              onChange={(e) => setDriverSearchQuery(e.target.value)}
+                              placeholder="기사명 또는 연락처 검색"
+                              className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200/80 rounded-lg text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] focus:bg-white"
+                            />
+                            {driverSearchQuery && (
+                              <button
+                                type="button"
+                                onClick={() => setDriverSearchQuery('')}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Unassign Option */}
+                        {allocation.selectedDriver && (
+                          <button
+                            type="button"
+                            onClick={() => handleSelectDriver(allocation.id, null)}
+                            className="w-full mt-1.5 mb-1 px-2.5 py-1.5 text-left text-xs font-bold text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-between cursor-pointer"
+                          >
+                            <span>배정 해제 (미배정)</span>
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+
+                        {/* Driver List */}
+                        <div className="max-h-60 overflow-y-auto space-y-1 mt-1 pr-1">
+                          {filteredDriversForDropdown.length === 0 ? (
+                            <div className="py-6 text-center text-xs text-slate-400 font-medium">
+                              일치하는 기사님이 없습니다
+                            </div>
+                          ) : (
+                            filteredDriversForDropdown.map((d) => {
+                              const isSelected =
+                                allocation.selectedDriver === d.id || allocation.selectedDriver === d.name;
+                              const isEnglishNeeded = allocation.requestedLanguage === 'en';
+                              const isEnglishUnqualified = isEnglishNeeded && !(d as any).isEnglishVerified;
+                              const isBlocked = !d.isAvailable || isEnglishUnqualified;
+
+                              return (
+                                <button
+                                  key={d.id}
+                                  type="button"
+                                  disabled={isBlocked}
+                                  onClick={() => handleSelectDriver(allocation.id, d)}
+                                  className={`w-full px-2.5 py-2 rounded-xl flex items-center justify-between transition-colors cursor-pointer text-left ${
+                                    isSelected
+                                      ? 'bg-blue-50/80 border border-blue-200'
+                                      : isBlocked
+                                      ? 'opacity-50 cursor-not-allowed border border-transparent'
+                                      : 'hover:bg-slate-50 border border-transparent'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    <div className="w-8 h-8 rounded-full overflow-hidden border border-slate-200 shrink-0 relative bg-slate-100">
+                                      <img
+                                        src={d.avatarUrl || getDriverProfileImage(d)}
+                                        alt={d.name}
+                                        onError={(e) => {
+                                          (e.currentTarget as HTMLImageElement).src = '/images/driver_kim.png';
+                                        }}
+                                        className="w-full h-full object-cover"
+                                      />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-xs font-black text-slate-900 truncate">
+                                        {d.name}
+                                      </p>
+                                      <p className="text-[11px] font-semibold text-slate-500 mt-0.5">
+                                        {d.phone}
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-2 shrink-0 ml-2">
+                                    {!d.isAvailable ? (
+                                      <span className="text-[10px] text-amber-700 bg-amber-50 font-semibold px-2 py-0.5 rounded-full">
+                                        배차 불가
+                                      </span>
+                                    ) : isEnglishUnqualified ? (
+                                      <span className="text-[10px] text-amber-700 bg-amber-50 font-semibold px-2 py-0.5 rounded-full">
+                                        영어 미인증
+                                      </span>
+                                    ) : null}
+                                    {isSelected && (
+                                      <Check className="w-4 h-4 text-[#1E60F3] stroke-[3]" />
+                                    )}
+                                  </div>
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           {/* 출발지 * & 도착지 * (2 Columns with TMAP Search) */}

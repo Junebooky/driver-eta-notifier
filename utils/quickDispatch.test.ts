@@ -377,7 +377,7 @@ console.log('✓ Quick Dispatch Modal and Place Search Toss/Apple copywriting va
 
 // 10. Testing Departure Time Dropdown & Direct Number Typing Parser
 console.log('10. Testing Departure Time Dropdown & Direct Typing Parser...');
-import { parseFlexibleTimeInput, formatTimeKoreanAmPm, DEFAULT_TIME_OPTIONS } from '../components/hq/HqQuickDispatch';
+import { parseFlexibleTimeInput, formatTimeKoreanAmPm, DEFAULT_TIME_OPTIONS, getDriverProfileImage } from '../components/hq/HqQuickDispatch';
 
 // 48 intervals (every 30 mins)
 assert.strictEqual(DEFAULT_TIME_OPTIONS.length, 48);
@@ -413,6 +413,19 @@ assert.strictEqual(formatTimeKoreanAmPm('14:30'), '오후 02:30');
 assert.strictEqual(formatTimeKoreanAmPm('00:00'), '오전 12:00');
 assert.strictEqual(formatTimeKoreanAmPm('12:00'), '오후 12:00');
 console.log('✓ Departure Time Dropdown & Direct Number Typing verified successfully');
+
+// Driver Profile Image Fallback Verification
+console.log('Testing Driver Profile Image Fallback & Avatar Mapping...');
+assert.strictEqual(getDriverProfileImage({ name: '홍승범' }), '/images/driver_kim.png');
+assert.strictEqual(getDriverProfileImage({ name: '김민수' }), '/images/driver_kim.png');
+assert.strictEqual(getDriverProfileImage({ name: '이재훈' }), '/images/driver_lee.png');
+assert.strictEqual(getDriverProfileImage({ name: '박태준' }), '/images/driver_park.png');
+assert.strictEqual(getDriverProfileImage({ name: '최진우' }), '/images/driver_choi.png');
+assert.strictEqual(getDriverProfileImage({ name: '정태훈' }), '/images/driver_jung.png');
+assert.strictEqual(getDriverProfileImage(null), '/images/driver_kim.png');
+assert.strictEqual(getDriverProfileImage(undefined), '/images/driver_kim.png');
+assert.strictEqual(getDriverProfileImage({ avatarUrl: '/custom/avatar.png' }), '/custom/avatar.png');
+console.log('✓ Driver Profile Image Fallbacks and Default Suit Chauffeur Avatar validated');
 
 console.log('✓ 10-column table structure and Toss/Apple style copy validated successfully');
 
