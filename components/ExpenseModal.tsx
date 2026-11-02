@@ -269,6 +269,7 @@ const ExpenseModalContent: React.FC<{
       setIsAddModalOpen(true);
     };
     reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
   return (
@@ -434,9 +435,7 @@ const ExpenseModalContent: React.FC<{
           tabIndex={0}
           onClick={() => {
             haptics.selection();
-            setUploadedReceiptUrl('/images/receipt_sample_hangang.jpg');
-            setEditingItem(null);
-            setIsAddModalOpen(true);
+            quickFileInputRef.current?.click();
           }}
           className="relative bg-gradient-to-b from-[#F2F7FF] via-[#EBF3FF] to-[#E3EFFF] border border-[#D5E5FE] hover:border-blue-300 rounded-2xl p-5 text-center shadow-xs cursor-pointer active:scale-99 transition-all group overflow-hidden"
         >
@@ -470,10 +469,24 @@ const ExpenseModalContent: React.FC<{
                 haptics.selection();
                 quickFileInputRef.current?.click();
               }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/90 hover:bg-white text-slate-700 hover:text-[#1E60F3] border border-blue-200/80 rounded-full text-[11px] font-bold shadow-2xs transition-all"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/90 hover:bg-white text-slate-700 hover:text-[#1E60F3] border border-blue-200/80 rounded-full text-[11px] font-bold shadow-2xs transition-all cursor-pointer"
             >
               <Camera className="w-3.5 h-3.5 text-[#1E60F3]" />
               <span>사진 직접 촬영 / 앨범</span>
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                haptics.lightTap();
+                setEditingItem(null);
+                setUploadedReceiptUrl(undefined);
+                setIsAddModalOpen(true);
+              }}
+              className="inline-flex items-center gap-1 px-3 py-1.5 bg-white/90 hover:bg-white text-slate-600 hover:text-slate-900 border border-slate-200 rounded-full text-[11px] font-semibold shadow-2xs transition-all cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5 text-slate-500" />
+              <span>직접 입력</span>
             </button>
           </div>
 
