@@ -24,7 +24,12 @@ import { HqDriverSummary } from '@/types/driverHq';
 import {
   DriverVehicleAssetBundle,
 } from '@/types/driverVehicleAsset';
-import { VIP_REAL_VEHICLES, VipRealVehicle, resolveVehicleEntity } from '@/utils/vehicleData';
+import {
+  VIP_REAL_VEHICLES,
+  VipRealVehicle,
+  resolveVehicleEntity,
+  getVehicleImage,
+} from '@/utils/vehicleData';
 import { haptics } from '@/utils/haptics';
 
 export interface HqDriverAssetManagerModalProps {
@@ -34,17 +39,6 @@ export interface HqDriverAssetManagerModalProps {
   initialDriverId?: string;
   initialVehiclePlate?: string;
   onAssetUpdated?: () => void;
-}
-
-// Vehicle thumbnail resolver matching fleet assets
-function getVehicleThumb(v: VipRealVehicle): string {
-  if (v.plateShort === '5336') return '/images/thumb_carnival.jpg';
-  if (v.category === 's_class') return '/images/thumb_g90.jpg';
-  if (v.category === 'carnival') return '/images/thumb_carnival.jpg';
-  if (v.category === 'staria') return '/images/thumb_staria.jpg';
-  if (v.category === 'sprinter') return '/images/thumb_sprinter.jpg';
-  if (v.category === 'genesis' && v.model.includes('GV80')) return '/images/thumb_gv80.jpg';
-  return '/images/thumb_g90.jpg';
 }
 
 export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps> = ({
@@ -338,11 +332,10 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
           {/* Quick Summary Chips for Driver */}
           <div className="flex items-center gap-2 self-end sm:self-center shrink-0 pt-1 sm:pt-4">
             <span
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border flex items-center gap-1 ${
-                bundle?.profile
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border flex items-center gap-1 ${bundle?.profile
                   ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                   : 'bg-slate-100 text-slate-500 border-slate-200'
-              }`}
+                }`}
             >
               <User className="w-3 h-3" />
               {bundle?.profile ? '프로필 사진 등록됨' : '프로필 사진 미등록'}
@@ -357,13 +350,12 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
         {/* Notification Status Banner */}
         {statusMessage && (
           <div
-            className={`px-4 py-2 text-xs font-bold flex items-center gap-2 shrink-0 ${
-              statusMessage.type === 'success'
+            className={`px-4 py-2 text-xs font-bold flex items-center gap-2 shrink-0 ${statusMessage.type === 'success'
                 ? 'bg-emerald-50 text-emerald-800 border-b border-emerald-100'
                 : statusMessage.type === 'warning'
-                ? 'bg-amber-50 text-amber-800 border-b border-amber-100'
-                : 'bg-rose-50 text-rose-800 border-b border-rose-100'
-            }`}
+                  ? 'bg-amber-50 text-amber-800 border-b border-amber-100'
+                  : 'bg-rose-50 text-rose-800 border-b border-rose-100'
+              }`}
           >
             {statusMessage.type === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
             {statusMessage.type === 'warning' && <AlertTriangle className="w-4 h-4 text-amber-600" />}
@@ -518,18 +510,16 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                           haptics.selection();
                           setSelectedCategory(cat.key);
                         }}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${
-                          isSelected
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${isSelected
                             ? 'bg-[#1E60F3] text-white shadow-2xs'
                             : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900'
-                        }`}
+                          }`}
                       >
                         <IconComp className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : 'text-slate-500'}`} />
                         <span>{cat.label}</span>
                         <span
-                          className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
-                            isSelected ? 'bg-white/20 text-white' : 'bg-slate-200/70 text-slate-600'
-                          }`}
+                          className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-200/70 text-slate-600'
+                            }`}
                         >
                           {cat.count}
                         </span>
@@ -564,7 +554,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
               <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-2 max-h-48 overflow-y-auto p-1 bg-slate-50/60 rounded-xl border border-slate-200/70">
                 {filteredVehicles.map((v) => {
                   const isSelected = selectedVehiclePlate === v.plate;
-                  const thumb = getVehicleThumb(v);
+                  const thumb = getVehicleImage(v);
                   const status = vehicleAssetSummary[v.uuid];
                   const isComplete = status?.pc && status?.mobile;
                   const isPartial = status && (status.pc || status.mobile) && !isComplete;
@@ -577,17 +567,16 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                         haptics.selection();
                         setSelectedVehiclePlate(v.plate);
                       }}
-                      className={`p-2 rounded-xl text-left transition-all border flex flex-col justify-between gap-1.5 cursor-pointer relative group ${
-                        isSelected
+                      className={`p-2 rounded-xl text-left transition-all border flex flex-col justify-between gap-1.5 cursor-pointer relative group ${isSelected
                           ? 'border-[#1E60F3] bg-blue-50/70 ring-2 ring-[#1E60F3]/30 shadow-xs'
                           : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/80'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center justify-between gap-1">
                         <img
                           src={thumb}
                           alt={v.modelShort}
-                          className="w-8 h-6 rounded object-cover border border-slate-200 shrink-0"
+                          className="w-8 h-6 rounded object-contain bg-slate-50 border border-slate-200 shrink-0 p-0.5"
                         />
                         {isComplete ? (
                           <span className="px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-black flex items-center gap-0.5">

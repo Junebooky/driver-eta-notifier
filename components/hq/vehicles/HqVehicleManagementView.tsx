@@ -32,6 +32,7 @@ import {
   VipRealVehicle,
   VehicleUiCategoryKey,
   mapVehicleToUiCategory,
+  getVehicleImage,
 } from '@/utils/vehicleData';
 import {
   getKstTodayDateStr,
@@ -59,26 +60,12 @@ export type AvailabilityDayStatus =
   | '확인 불가'
   | '미확인';
 
-// Helper to get thumbnail image matching the mockup
-function getVehicleThumb(v: VipRealVehicle): string {
-  if (v.plateShort === '5336') return '/images/thumb_carnival.jpg';
-  if (v.category === 's_class') return '/images/vehicle_photo_pending.svg';
-  if (v.category === 'carnival') return '/images/thumb_carnival.jpg';
-  if (v.category === 'staria') return '/images/thumb_staria.jpg';
-  if (v.category === 'sprinter') return '/images/thumb_sprinter.jpg';
-  if (v.category === 'genesis' && v.model.includes('GV80')) return '/images/thumb_gv80.jpg';
-  return '/images/thumb_g90.jpg';
+// Preserved resolver aliases adhering to centralized mapping (Issue #10)
+export function getVehicleHero(v: VipRealVehicle): string {
+  return getVehicleImage(v);
 }
-
-// Helper to get Hero image matching the mockup
-function getVehicleHero(v: VipRealVehicle): string {
-  if (v.plateShort === '5336') return '/images/carnival_hero.jpg';
-  if (v.category === 's_class') return '/images/vehicle_photo_pending.svg';
-  if (v.category === 'carnival') return '/images/thumb_carnival.jpg';
-  if (v.category === 'staria') return '/images/thumb_staria.jpg';
-  if (v.category === 'sprinter') return '/images/thumb_sprinter.jpg';
-  if (v.category === 'genesis' && v.model.includes('GV80')) return '/images/thumb_gv80.jpg';
-  return '/images/thumb_g90.jpg';
+export function getVehicleThumb(v: VipRealVehicle): string {
+  return getVehicleImage(v);
 }
 
 // Specific vehicle tips strictly following verified real data
@@ -620,7 +607,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
           <div className="space-y-2.5 max-h-[calc(100vh-210px)] overflow-y-auto pr-1">
             {filteredVehicles.map((vehicle) => {
               const isSelected = vehicle.id === selectedVehicle?.id;
-              const thumbUrl = getVehicleThumb(vehicle);
+              const thumbUrl = getVehicleImage(vehicle);
 
               return (
                 <div
@@ -636,12 +623,12 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                   }`}
                 >
                   {/* Left Thumbnail Image */}
-                  <div className="relative w-20 h-14 rounded-xl overflow-hidden bg-slate-100 shrink-0 border border-slate-100">
+                  <div className="relative w-20 h-14 rounded-xl overflow-hidden bg-slate-50 shrink-0 border border-slate-100 p-0.5">
                     <Image
                       src={thumbUrl}
                       alt={vehicle.model}
                       fill
-                      className="object-cover"
+                      className="object-contain"
                       sizes="80px"
                     />
                   </div>
@@ -718,12 +705,12 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
               <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
                 <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
                   {/* Left Hero Photo */}
-                  <div className="relative w-full sm:w-[220px] h-[135px] rounded-xl overflow-hidden bg-slate-100 shrink-0 border border-slate-100">
+                  <div className="relative w-full sm:w-[220px] h-[135px] rounded-xl overflow-hidden bg-slate-50 shrink-0 border border-slate-100 p-2">
                     <Image
                       src={getVehicleHero(selectedVehicle)}
                       alt={selectedVehicle.model}
                       fill
-                      className="object-cover"
+                      className="object-contain"
                       priority
                     />
                   </div>
