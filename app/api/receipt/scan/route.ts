@@ -14,6 +14,41 @@ import {
 // Global server-side OCR cache to prevent redundant Gemini API calls (Zero Fee Waste)
 const globalReceiptOcrCache = new Map<string, ReceiptScanResult>();
 
+// Robust JSON parser for AI outputs (handles markdown codeblocks, conversational preamble/postscript)
+function extractJsonFromAiResponse(rawText?: string): Record<string, unknown> {
+  if (!rawText) return {};
+  const trimmed = rawText.trim();
+  if (!trimmed) return {};
+
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    // 1. Try extracting content inside markdown codeblock: ```json ... ``` or ``` ... ```
+    const fenceMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    if (fenceMatch && fenceMatch[1]) {
+      try {
+        return JSON.parse(fenceMatch[1].trim());
+      } catch {
+        // continue to next extraction heuristic
+      }
+    }
+
+    // 2. Try extracting outermost { ... }
+    const firstBrace = trimmed.indexOf('{');
+    const lastBrace = trimmed.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      const candidate = trimmed.slice(firstBrace, lastBrace + 1);
+      try {
+        return JSON.parse(candidate);
+      } catch {
+        // continue
+      }
+    }
+
+    throw new Error('AI 응답에서 유효한 JSON 객체를 찾지 못했습니다.');
+  }
+}
+
 // Fallback deterministic recognition for offline/demo environments
 function getFallbackReceiptData(image: string): ReceiptScanResult {
   const sample = matchSampleReceipt(image);
@@ -100,12 +135,45 @@ export async function POST(req: NextRequest) {
     }
 
     let mimeType = 'image/jpeg';
-    let base64Data = image;
+    let base64Data = '';
 
-    // User input is image data, never a server filesystem path or a remote URL.
-    const match = image.match(/^data:(image\/(?:jpeg|png|webp|heic));base64,([A-Za-z0-9+/=\r\n]+)$/);
-    if (!match) return NextResponse.json({ success: false, error: '지원되는 이미지 파일을 업로드해 주세요.' }, { status: 400 });
-    mimeType = match[1]; base64Data = match[2];
+    if (image.startsWith('data:')) {
+      const commaIdx = image.indexOf(',');
+      if (commaIdx === -1) {
+        return NextResponse.json(
+          { success: false, error: '올바른 이미지 데이터 URL 형식이 아닙니다.' },
+          { status: 400 }
+        );
+      }
+      const header = image.slice(5, commaIdx);
+      const rawMime = header.split(';')[0]?.trim().toLowerCase() || 'image/jpeg';
+
+      if (rawMime === 'image/jpg' || rawMime === 'image/pjpeg') {
+        mimeType = 'image/jpeg';
+      } else if (rawMime === 'image/heif') {
+        mimeType = 'image/heic';
+      } else if (['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/gif'].includes(rawMime)) {
+        mimeType = rawMime;
+      } else {
+        return NextResponse.json(
+          { success: false, error: `지원되지 않는 이미지 형식(${rawMime})입니다. JPG, PNG, WEBP, HEIC 이미지를 업로드해 주세요.` },
+          { status: 400 }
+        );
+      }
+
+      base64Data = image.slice(commaIdx + 1).replace(/\s+/g, '');
+    } else {
+      // Direct raw base64 data
+      base64Data = image.replace(/\s+/g, '');
+      mimeType = 'image/jpeg';
+    }
+
+    if (!base64Data || base64Data.length < 50) {
+      return NextResponse.json(
+        { success: false, error: '유효한 영수증 이미지 데이터가 전달되지 않았습니다.' },
+        { status: 400 }
+      );
+    }
 
     // Step 3: Compute SHA-256 hash of normalized base64 content
     const imageHash = crypto.createHash('sha256').update(base64Data).digest('hex');
@@ -223,11 +291,9 @@ Return strictly a single valid JSON object with this exact schema (no markdown f
     let parsedPrimary: Record<string, unknown> = {};
     if (primarySuccess && primaryResponse) {
       try {
-        const rawText = primaryResponse.text?.trim() || '{}';
-        const cleaned = rawText.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
-        parsedPrimary = JSON.parse(cleaned);
-      } catch {
-        console.warn('[Receipt OCR] Failed to parse primary model JSON output.');
+        parsedPrimary = extractJsonFromAiResponse(primaryResponse.text);
+      } catch (parseErr) {
+        console.warn('[Receipt OCR] Failed to parse primary model JSON output:', parseErr);
         primarySuccess = false;
       }
     }
@@ -267,13 +333,14 @@ Return strictly a single valid JSON object with this exact schema (no markdown f
         totalInputTokens += fallbackResponse?.usageMetadata?.promptTokenCount || 0;
         totalOutputTokens += fallbackResponse?.usageMetadata?.candidatesTokenCount || 0;
 
-        const rawText = fallbackResponse.text?.trim() || '{}';
-        const cleaned = rawText.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
-        const parsedFallback = JSON.parse(cleaned);
+        const parsedFallback = extractJsonFromAiResponse(fallbackResponse.text);
         const { result: validatedFallback } = validateReceiptScanResult(parsedFallback, fallbackModel);
         finalResult = validatedFallback;
       } catch (fbErr) {
         console.error(`[Receipt OCR] Fallback model ${fallbackModel} also failed:`, fbErr);
+        if (!finalResult.success && !finalResult.error) {
+          finalResult.error = '영수증 텍스트를 판독하지 못했습니다. 상호명과 금액을 직접 입력해 주세요.';
+        }
       }
     }
 

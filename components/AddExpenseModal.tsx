@@ -51,6 +51,7 @@ import {
   SAMPLE_RECEIPT_PRESETS,
   ReceiptScanResult,
 } from '@/utils/receiptOcr';
+import { useDriverProfile } from '@/hooks/useDriverProfile';
 import { haptics } from '@/utils/haptics';
 
 export { SAMPLE_RECEIPT_PRESETS };
@@ -116,6 +117,10 @@ const AddExpenseModalContent: React.FC<{
   initialPhotoUrl?: string;
   defaultDate?: string;
 }> = ({ onClose, onSave, editingItem, initialPhotoUrl, defaultDate }) => {
+  const { profile } = useDriverProfile();
+  const currentDriverName = profile?.driverName || '윤태준';
+  const currentCarModel = profile?.carModel || profile?.carNumber || profile?.vehicleNo || '116허 1514';
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [expenseId]=useState(()=>editingItem?.id || crypto.randomUUID());
 
@@ -240,11 +245,11 @@ const AddExpenseModalContent: React.FC<{
   }, [receiptUrl]);
 
   // Vision AI Receipt Scanner with intelligent sample & client caching (Zero Fee Waste)
-  const runVisionAiScan = useCallback(async (imageUrl: string) => {
+  const runVisionAiScan = useCallback(async (imageUrl: string, forceRefresh: boolean = false) => {
     if (!imageUrl) return;
 
-    // Step 1: Check known sample presets (Zero Gemini API call)
-    if (SAMPLE_RECEIPT_PRESETS[imageUrl]) {
+    // Step 1: Check known sample presets (Zero Gemini API call) unless forceRefresh
+    if (!forceRefresh && SAMPLE_RECEIPT_PRESETS[imageUrl]) {
       const p = SAMPLE_RECEIPT_PRESETS[imageUrl];
       setMerchant(p.merchant);
       setAddress(p.address || '');
@@ -266,33 +271,37 @@ const AddExpenseModalContent: React.FC<{
       return;
     }
 
-    // Step 2: Check client-side cache (Zero Gemini API call)
+    // Step 2: Check client-side cache (Zero Gemini API call) unless forceRefresh
     const cacheKey = await computeClientCacheKey(imageUrl);
-    const cached = clientOcrCache.get(cacheKey);
-    if (cached) {
-      if (cached.merchant) setMerchant(cached.merchant);
-      if (cached.address) setAddress(cached.address);
-      if (typeof cached.amount === 'number' && cached.amount > 0) {
-        setAmountRaw(formatKRW(cached.amount, false));
-        setErrors((prev) => ({ ...prev, amount: '' }));
+    if (forceRefresh) {
+      clientOcrCache.delete(cacheKey);
+    } else {
+      const cached = clientOcrCache.get(cacheKey);
+      if (cached) {
+        if (cached.merchant) setMerchant(cached.merchant);
+        if (cached.address) setAddress(cached.address);
+        if (typeof cached.amount === 'number' && cached.amount > 0) {
+          setAmountRaw(formatKRW(cached.amount, false));
+          setErrors((prev) => ({ ...prev, amount: '' }));
+        }
+        if (cached.category && EXPENSE_CATEGORIES[cached.category as ExpenseCategoryKey]) {
+          setCategory(cached.category as ExpenseCategoryKey);
+        }
+        if (cached.date) setDate(cached.date);
+        if (cached.time) setTime(cached.time);
+        if (cached.paymentMethod) setPaymentMethod(cached.paymentMethod);
+        setOcrBannerInfo({
+          merchant: cached.merchant || '상호 미확인 가맹점',
+          amount: cached.amount ?? null,
+          category: EXPENSE_CATEGORIES[cached.category as ExpenseCategoryKey]?.label || '기타',
+          summary: cached.summary || '캐시된 영수증 정보입니다.',
+          modelName: cached.modelUsed || 'Gemini 3.1 Flash-Lite (비용 0원 · 캐시)',
+          isZeroCost: true,
+        });
+        haptics.success();
+        showToast('✨ 캐시된 영수증 판독 정보를 즉시 불러왔습니다. (API 비용 0원)');
+        return;
       }
-      if (cached.category && EXPENSE_CATEGORIES[cached.category as ExpenseCategoryKey]) {
-        setCategory(cached.category as ExpenseCategoryKey);
-      }
-      if (cached.date) setDate(cached.date);
-      if (cached.time) setTime(cached.time);
-      if (cached.paymentMethod) setPaymentMethod(cached.paymentMethod);
-      setOcrBannerInfo({
-        merchant: cached.merchant || '상호 미확인 가맹점',
-        amount: cached.amount ?? null,
-        category: EXPENSE_CATEGORIES[cached.category as ExpenseCategoryKey]?.label || '기타',
-        summary: cached.summary || '캐시된 영수증 정보입니다.',
-        modelName: cached.modelUsed || 'Gemini 3.1 Flash-Lite (비용 0원 · 캐시)',
-        isZeroCost: true,
-      });
-      haptics.success();
-      showToast('✨ 캐시된 영수증 판독 정보를 즉시 불러왔습니다. (API 비용 0원)');
-      return;
     }
 
     setIsAiScanning(true);
@@ -303,12 +312,15 @@ const AddExpenseModalContent: React.FC<{
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           image: imageUrl,
-          driverName: '윤태준',
-          carModel: '116허 1514',
+          driverName: currentDriverName,
+          carModel: currentCarModel,
         }),
       });
-      const data: ReceiptScanResult = await res.json();
-      if (data && data.success) {
+      const data: ReceiptScanResult = await res.json().catch(() => ({
+        success: false,
+        error: '서버 응답을 처리하지 못했습니다.',
+      }));
+      if (res.ok && data && data.success) {
         clientOcrCache.set(cacheKey, data);
         if (data.merchant) setMerchant(data.merchant);
         if (data.address) setAddress(data.address);
@@ -348,15 +360,20 @@ const AddExpenseModalContent: React.FC<{
           ? '✨ 샘플/캐시 영수증 정보가 즉시 적용되었습니다. (API 비용 0원)'
           : `✨ Vision AI (${modelDisplayName})가 영수증 정보를 자동 판독했습니다!`);
       } else {
-        showToast('영수증 분석을 완료하지 못했습니다. 직접 입력해 주세요.');
+        const errorMsg = data?.error || (data?.summary && data.summary !== '영수증이 업로드되었습니다. 세부 금액과 거래처를 확인해 주세요.' ? data.summary : null);
+        if (errorMsg) {
+          showToast(`⚠️ ${errorMsg}`);
+        } else {
+          showToast('영수증에서 글자를 명확히 인식하지 못했습니다. 상호명과 금액을 직접 입력해 주세요.');
+        }
       }
     } catch (err) {
       console.warn('Vision AI Scan Error:', err);
-      showToast('영수증 분석 중 오류가 발생했습니다.');
+      showToast('영수증 분석 중 네트워크 오류가 발생했습니다. 직접 입력해 주세요.');
     } finally {
       setIsAiScanning(false);
     }
-  }, []);
+  }, [currentDriverName, currentCarModel]);
 
   // Auto scan sample receipt or initial photo once on load (Skips Gemini if already a sample preset or editing an item)
   useEffect(() => {
@@ -623,7 +640,7 @@ const AddExpenseModalContent: React.FC<{
                 <div className="flex items-center gap-1.5 sm:gap-2">
                   <button
                     type="button"
-                    onClick={() => runVisionAiScan(receiptUrl)}
+                    onClick={() => runVisionAiScan(receiptUrl, true)}
                     disabled={isAiScanning || isRotating}
                     className="text-[11px] text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-50 px-2.5 py-1 rounded-full font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer"
                     title="Vision AI 영수증 재분석"
