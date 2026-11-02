@@ -370,7 +370,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
 운행경로: ${origin} → ${destination}
 ----------------------------------------
 선택차량: ${calculatedQuote.vehicleModel} (${vehicleCount}대)
-기사서비스: ${englishOption === 'fluent_upgrade' ? '영어 능통 전담 의전 기사' : '기본 한국어 기사'}
+기사서비스: ${englishOption === 'fluent_upgrade' ? '🇺🇸 영어 (추가 비용)' : '🇰🇷 한국어'}
 서비스구분: ${SERVICE_CATEGORIES.find((c) => c.id === serviceCategory)?.label || serviceCategory}
 ----------------------------------------
 • 공급가액 소계: ${calculatedQuote.supplyPriceTotal !== null ? `${calculatedQuote.supplyPriceTotal.toLocaleString()}원` : '상담 후 산정'}
@@ -385,9 +385,144 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
     setTimeout(() => setIsCopied(false), 3000);
   };
 
+  // Print receipt as a clean 1-page PDF
+  const handlePrintPdf = () => {
+    haptics.selection();
+    const receiptCard = document.getElementById('quote-receipt-card');
+    if (!receiptCard) {
+      window.print();
+      return;
+    }
+
+    // Create an invisible iframe for isolated 1-page printing
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (!doc) {
+      window.print();
+      return;
+    }
+
+    // Collect all stylesheets (Tailwind, compiled CSS)
+    const styleTags = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+      .map((el) => el.outerHTML)
+      .join('\n');
+
+    doc.open();
+    doc.write(`
+      <!DOCTYPE html>
+      <html lang="ko">
+        <head>
+          <meta charset="utf-8" />
+          <title>VIP_공식견적서_${calculatedQuote?.quoteNo || 'QT'}</title>
+          ${styleTags}
+          <style>
+            @page {
+              size: A4 portrait;
+              margin: 10mm 12mm;
+            }
+            html, body {
+              background: #ffffff !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              height: auto !important;
+              overflow: visible !important;
+              font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", Roboto, sans-serif !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            .print-receipt-outer {
+              max-width: 620px;
+              margin: 0 auto;
+              padding: 24px;
+              border: 1px solid #cbd5e1;
+              border-radius: 20px;
+              background: #ffffff;
+              box-shadow: none !important;
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="print-receipt-outer font-sans">
+            ${receiptCard.innerHTML}
+          </div>
+        </body>
+      </html>
+    `);
+    doc.close();
+
+    setTimeout(() => {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+      setTimeout(() => {
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
+        }
+      }, 2000);
+    }, 250);
+  };
+
   return (
     <>
+      <style>{`
+        @media print {
+          @page {
+            size: A4 portrait;
+            margin: 10mm 15mm;
+          }
+          html, body {
+            background: #ffffff !important;
+            height: auto !important;
+            overflow: visible !important;
+          }
+          .hq-app,
+          header,
+          nav,
+          aside,
+          #quote-modal-header,
+          #quote-modal-stepper,
+          #quote-step-title,
+          #quote-feedback-messages,
+          #quote-actions-container,
+          #quote-modal-footer,
+          .no-print {
+            display: none !important;
+          }
+          #quote-modal-backdrop {
+            position: static !important;
+            background: transparent !important;
+            padding: 0 !important;
+          }
+          #quote-modal-container {
+            border: none !important;
+            box-shadow: none !important;
+            max-height: none !important;
+            overflow: visible !important;
+            padding: 0 !important;
+            margin: 0 auto !important;
+          }
+          #quote-receipt-card {
+            box-shadow: none !important;
+            border: 1.5px solid #cbd5e1 !important;
+            max-width: 620px !important;
+            margin: 0 auto !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+        }
+      `}</style>
+
       <div
+        id="quote-modal-backdrop"
         role="dialog"
         aria-modal="true"
         aria-label="의전 견적 계산기"
@@ -399,9 +534,9 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
           }
         }}
       >
-        <div className="relative w-full max-w-4xl max-h-[92vh] flex flex-col bg-white border border-slate-200/90 rounded-3xl shadow-2xl overflow-hidden my-auto animate-in zoom-in-95 duration-150">
+        <div id="quote-modal-container" className="relative w-full max-w-4xl max-h-[92vh] flex flex-col bg-white border border-slate-200/90 rounded-3xl shadow-2xl overflow-hidden my-auto animate-in zoom-in-95 duration-150">
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-white shrink-0">
+          <div id="quote-modal-header" className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-white shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-blue-50 text-[#1E60F3] border border-blue-100 flex items-center justify-center shrink-0 shadow-2xs">
                 <Car className="w-5 h-5" />
@@ -428,7 +563,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
           </div>
 
           {/* Stepper (1 ~ 4) */}
-          <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 shrink-0">
+          <div id="quote-modal-stepper" className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 shrink-0">
             <div className="flex items-center justify-between max-w-2xl mx-auto relative">
               {/* Background connector line */}
               <div className="absolute top-4 left-6 right-6 h-0.5 bg-slate-200 -z-0" />
@@ -895,7 +1030,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                           : 'bg-white border-slate-200 text-slate-600'
                           }`}
                       >
-                        기본 한국어 기사
+                        🇰🇷 한국어
                       </button>
                       <button
                         type="button"
@@ -908,7 +1043,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                           : 'bg-white border-slate-200 text-slate-600'
                           }`}
                       >
-                        영어 능통 기사 (+추가)
+                        🇺🇸 영어 (추가 비용)
                       </button>
                     </div>
                   </div>
@@ -919,7 +1054,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
             {/* Step 4: 견적 확인 & 영수증 요약 */}
             {currentStep === 4 && (
               <div className="max-w-xl mx-auto space-y-5 animate-in zoom-in-95 duration-200">
-                <div className="border-b border-slate-100 pb-2 text-center">
+                <div id="quote-step-title" className="border-b border-slate-100 pb-2 text-center">
                   <h4 className="text-base font-black text-slate-900 tracking-tight">
                     4. 공식 견적서 영수증 확인
                   </h4>
@@ -929,7 +1064,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                 </div>
 
                 {/* Authentic VIP Chauffeur Receipt Card */}
-                <div className="bg-white border border-slate-300 rounded-3xl p-6 sm:p-7 shadow-xl relative overflow-hidden font-sans">
+                <div id="quote-receipt-card" className="bg-white border border-slate-300 rounded-3xl p-6 sm:p-7 shadow-xl relative overflow-hidden font-sans">
                   {/* Decorative Header */}
                   <div className="text-center pb-3">
                     <span className="text-[11px] font-black tracking-widest text-[#1E60F3] uppercase block">
@@ -1000,8 +1135,8 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                       <span className="text-slate-400 font-medium">기사 서비스</span>
                       <span className="font-semibold text-blue-700">
                         {englishOption === 'fluent_upgrade'
-                          ? '영어 능통 전담 의전 기사'
-                          : '기본 한국어 의전 기사'}
+                          ? '🇺🇸 영어 (추가 비용)'
+                          : '🇰🇷 한국어'}
                       </span>
                     </div>
                   </div>
@@ -1102,27 +1237,29 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                 </div>
 
                 {/* Notifications & Feedback */}
-                {errorMessage && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
-                    <span>{errorMessage}</span>
-                  </div>
-                )}
-                {saveSuccess && (
-                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-blue-700 text-xs flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 shrink-0 text-[#1E60F3]" />
-                    <span>{saveSuccess}</span>
-                  </div>
-                )}
-                {conversionSuccess && (
-                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
-                    <span>{conversionSuccess}</span>
-                  </div>
-                )}
+                <div id="quote-feedback-messages" className="space-y-2">
+                  {errorMessage && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+                      <span>{errorMessage}</span>
+                    </div>
+                  )}
+                  {saveSuccess && (
+                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-blue-700 text-xs flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 shrink-0 text-[#1E60F3]" />
+                      <span>{saveSuccess}</span>
+                    </div>
+                  )}
+                  {conversionSuccess && (
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                      <span>{conversionSuccess}</span>
+                    </div>
+                  )}
+                </div>
 
                 {/* Action Buttons */}
-                <div className="space-y-2.5 pt-1">
+                <div id="quote-actions-container" className="space-y-2.5 pt-1">
                   {/* Primary Convert Button */}
                   <button
                     type="button"
@@ -1145,7 +1282,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                     </button>
                     <button
                       type="button"
-                      onClick={() => window.print()}
+                      onClick={handlePrintPdf}
                       className="py-2.5 px-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
                     >
                       <Printer className="w-3.5 h-3.5 text-slate-500" />
@@ -1167,7 +1304,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
           </div>
 
           {/* Wizard Footer Navigation */}
-          <div className="px-6 py-4 border-t border-slate-100 bg-white flex items-center justify-between shrink-0">
+          <div id="quote-modal-footer" className="px-6 py-4 border-t border-slate-100 bg-white flex items-center justify-between shrink-0">
             {currentStep > 1 ? (
               <button
                 type="button"
