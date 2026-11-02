@@ -5,11 +5,9 @@ import React, { useState, useMemo, useSyncExternalStore } from 'react';
 import {
   Receipt,
   Search,
-  Download,
   CheckCircle2,
   AlertCircle,
   Clock,
-  CreditCard,
   X,
   Fuel,
   Car,
@@ -23,6 +21,7 @@ import {
   SlidersHorizontal,
   SquareParking,
   Sparkles,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { HqExpenseStatus } from '@/types/expenseHq';
 import {
@@ -39,7 +38,6 @@ import { haptics } from '@/utils/haptics';
 import { nextPendingReceiptId } from '@/utils/expenseReview';
 import HqReceiptReviewWorkspace from './HqReceiptReviewWorkspace';
 import { HqBooking } from '@/types/hq';
-import HqHipassImportModal from './HqHipassImportModal';
 
 export interface HqExpensesViewProps {
   initialSearchQuery?: string;
@@ -50,7 +48,6 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
   initialSearchQuery = '',
   bookings = [],
 }) => {
-  const [isHipassModalOpen, setIsHipassModalOpen] = useState(false);
   const {error:dbError,refresh}=useReportingRefresh(fetchHqExpensesFromDb);
 
   // Live master expenses list via useSyncExternalStore (SSR and Hydration safe)
@@ -230,49 +227,6 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
 
   return (
     <div className="space-y-4 animate-in fade-in duration-200 select-none">
-      {/* 1. Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#1E60F3] border border-blue-200/60 flex items-center justify-center shadow-2xs">
-              <Receipt className="w-4 h-4" />
-            </div>
-            <h2 className="text-xl font-black text-slate-900 tracking-tight">
-              경비지출 관리 및 영수증 검수
-            </h2>
-            <span className="text-xs bg-blue-50 text-[#1E60F3] font-bold px-2.5 py-0.5 rounded-full border border-blue-200/70">
-              실시간 연동
-            </span>
-          </div>
-          <p className="text-xs text-slate-500 mt-1">
-            기사 Cockpit 앱에서 제출된 법인카드, 주유, 통행료, 주차비 영수증을 Vision AI 판독 결과와 함께 대조 검수합니다.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              haptics.lightTap();
-              setIsHipassModalOpen(true);
-            }}
-            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer"
-          >
-            <CreditCard className="w-3.5 h-3.5" />
-            <span>하이패스 통행료 자동 정산</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleExportCsv}
-            className="px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all active:scale-95 cursor-pointer"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>CSV 내보내기</span>
-          </button>
-        </div>
-      </div>
-
       {/* DB Connection / Query Failure Banner */}
       {dbError && (
         <div className="flex items-center justify-between gap-3 rounded-2xl border border-rose-300 bg-rose-50 px-4 py-3 text-rose-800 shadow-xs">
@@ -292,93 +246,7 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
         </div>
       )}
 
-      {/* 2. Top 4 KPI Metric Tiles */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
-        {/* 오늘 총 지출 */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs">
-          <div className="flex items-center justify-between text-xs text-slate-500 font-semibold mb-1">
-            <span>오늘 총 지출</span>
-            <CreditCard className="w-4 h-4 text-[#1E60F3]" />
-          </div>
-          <div className="text-2xl font-black text-slate-900 tracking-tight">
-            {formatKRW(kpi.todayTotal)}
-          </div>
-          <div className="text-[11px] text-slate-400 mt-1 font-medium">
-            전체 등록: {kpi.totalCount}건
-          </div>
-        </div>
-
-        {/* 검수 대기 */}
-        <div
-          onClick={() => {
-            haptics.selection();
-            setSelectedStatus(selectedStatus === '검수 대기' ? '전체' : '검수 대기');
-          }}
-          className={`border rounded-2xl p-4 shadow-xs cursor-pointer transition-all ${selectedStatus === '검수 대기'
-              ? 'bg-amber-50/70 border-amber-300 ring-2 ring-amber-400/20'
-              : 'bg-white border-slate-200/80 hover:border-amber-300'
-            }`}
-        >
-          <div className="flex items-center justify-between text-xs text-amber-700 font-bold mb-1">
-            <span>검수 대기</span>
-            <Clock className="w-4 h-4 text-amber-600" />
-          </div>
-          <div className="text-2xl font-black text-amber-700 tracking-tight">
-            {kpi.pendingCount}건
-          </div>
-          <div className="text-[11px] text-amber-600/80 mt-1 font-medium">
-            영수증 확인 및 승인 대기
-          </div>
-        </div>
-
-        {/* 승인 완료 */}
-        <div
-          onClick={() => {
-            haptics.selection();
-            setSelectedStatus(selectedStatus === '승인 완료' ? '전체' : '승인 완료');
-          }}
-          className={`border rounded-2xl p-4 shadow-xs cursor-pointer transition-all ${selectedStatus === '승인 완료'
-              ? 'bg-emerald-50/70 border-emerald-300 ring-2 ring-emerald-400/20'
-              : 'bg-white border-slate-200/80 hover:border-emerald-300'
-            }`}
-        >
-          <div className="flex items-center justify-between text-xs text-emerald-700 font-bold mb-1">
-            <span>승인 완료</span>
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-          </div>
-          <div className="text-2xl font-black text-emerald-700 tracking-tight">
-            {kpi.approvedCount}건
-          </div>
-          <div className="text-[11px] text-emerald-600/80 mt-1 font-medium">
-            정상 승인 처리 완료
-          </div>
-        </div>
-
-        {/* 확인 필요 / 반려 */}
-        <div
-          onClick={() => {
-            haptics.selection();
-            setSelectedStatus(selectedStatus === '금액 확인' ? '전체' : '금액 확인');
-          }}
-          className={`border rounded-2xl p-4 shadow-xs cursor-pointer transition-all ${selectedStatus === '금액 확인'
-              ? 'bg-rose-50/70 border-rose-300 ring-2 ring-rose-400/20'
-              : 'bg-white border-slate-200/80 hover:border-rose-300'
-            }`}
-        >
-          <div className="flex items-center justify-between text-xs text-rose-700 font-bold mb-1">
-            <span>확인 필요 / 반려</span>
-            <AlertCircle className="w-4 h-4 text-rose-600" />
-          </div>
-          <div className="text-2xl font-black text-rose-700 tracking-tight">
-            {kpi.actionNeededCount}건
-          </div>
-          <div className="text-[11px] text-rose-600/80 mt-1 font-medium">
-            금액 재확인 또는 보완 요청
-          </div>
-        </div>
-      </div>
-
-      {/* 3. Expenses List & Review Workspace Table */}
+      {/* Expenses List & Review Workspace Table */}
       <div className="bg-white border border-slate-200/80 rounded-2xl sm:rounded-3xl shadow-xs overflow-hidden p-5 sm:p-6 space-y-4">
         {/* Card Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -395,8 +263,18 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
             </span>
           </div>
 
-          {/* Right: Search + Filter button */}
+          {/* Right: CSV Button + Search + Filter button */}
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              className="px-2.5 sm:px-3 py-1.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 shadow-2xs hover:border-emerald-300 hover:text-emerald-700 active:scale-95"
+              title="경비 지출 내역 CSV 다운로드"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+              <span>CSV</span>
+            </button>
+
             <div className="relative w-full sm:w-64">
               <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <input
@@ -469,6 +347,19 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
             >
               <Check className="w-3.5 h-3.5 text-slate-400" />
               <span>승인 완료 {kpi.approvedCount}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                haptics.selection();
+                setSelectedStatus(selectedStatus === '금액 확인' ? '전체' : '금액 확인');
+              }}
+              className={`flex items-center gap-1 transition-colors cursor-pointer ${
+                selectedStatus === '금액 확인' || selectedStatus === '반려' ? 'text-rose-600 font-bold' : 'hover:text-slate-700'
+              }`}
+            >
+              <AlertCircle className="w-3.5 h-3.5 text-slate-400" />
+              <span>확인 필요 / 반려 {kpi.actionNeededCount}</span>
             </button>
           </div>
         </div>
@@ -627,17 +518,6 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
           if (!next) showToast('현재 검수 목록을 모두 확인했습니다.');
         }}/>}
 
-      {/* Hi-Pass Toll Auto-Reconciliation Modal */}
-      <HqHipassImportModal
-        isOpen={isHipassModalOpen}
-        bookings={bookings}
-        onClose={() => setIsHipassModalOpen(false)}
-        onImported={(summary) => {
-          showToast(
-            `하이패스 통행료 ${summary.addedCount}건(₩${summary.totalAmount.toLocaleString()}) 정산 연결 완료`
-          );
-        }}
-      />
 
       {/* Floating Toast Notification */}
       {toastMessage && (
