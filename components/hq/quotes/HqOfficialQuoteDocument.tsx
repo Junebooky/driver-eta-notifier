@@ -107,19 +107,18 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
         width: '100%',
         maxWidth: '700px',
         margin: '0 auto',
-        backgroundColor: '#ffffff',
+        backgroundColor: '#FFFFFF',
         color: '#111827',
         fontFamily: 'Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         padding: '34px 34px 28px 34px',
-        border: '1px solid #e2e8f0',
+        border: '1px solid #E2E8F0',
         borderRadius: '12px',
-        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.05)',
       }}
     >
       {/* 1. Top Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '14px' }}>
         {/* Top Left */}
-        <div style={{ width: '130px', textAlign: 'left' }}>
+        <div style={{ flex: 1, minWidth: '90px', textAlign: 'left' }}>
           <div
             style={{
               fontFamily: "'Playfair Display', Georgia, serif",
@@ -146,8 +145,8 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
           </div>
         </div>
 
-        {/* Center Logo & Title */}
-        <div style={{ textAlign: 'center', flex: 1 }}>
+        {/* Center Logo & Title (Strict Single-Line Layout) */}
+        <div style={{ textAlign: 'center', flex: 2, minWidth: '280px' }}>
           <img
             src="/images/receipt/header.png"
             alt="VIP Limousine Emblem"
@@ -159,33 +158,35 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
               fontSize: '20px',
               fontWeight: 300,
               color: '#111827',
-              letterSpacing: '0.1em',
+              letterSpacing: '0.06em',
               marginTop: '5px',
               lineHeight: 1.2,
+              whiteSpace: 'nowrap',
             }}
           >
             VIP LIMOUSINE KOREA
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '4px' }}>
-            <span style={{ width: '32px', height: '1px', backgroundColor: '#9b7a4f', display: 'inline-block' }} />
+            <span style={{ width: '32px', height: '1px', backgroundColor: '#9B7A4F', display: 'inline-block' }} />
             <span
               style={{
                 fontFamily: "'Playfair Display', Georgia, serif",
                 fontSize: '8.5px',
                 letterSpacing: '0.22em',
-                color: '#9b7a4f',
+                color: '#9B7A4F',
                 textTransform: 'uppercase',
                 fontWeight: 600,
+                whiteSpace: 'nowrap',
               }}
             >
               EXECUTIVE CHAUFFEUR
             </span>
-            <span style={{ width: '32px', height: '1px', backgroundColor: '#9b7a4f', display: 'inline-block' }} />
+            <span style={{ width: '32px', height: '1px', backgroundColor: '#9B7A4F', display: 'inline-block' }} />
           </div>
         </div>
 
         {/* Top Right */}
-        <div style={{ width: '130px', textAlign: 'right' }}>
+        <div style={{ flex: 1, minWidth: '90px', textAlign: 'right' }}>
           <div
             style={{
               fontFamily: "'Playfair Display', Georgia, serif",
@@ -214,13 +215,13 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
       </div>
 
       {/* Thin Gold/Beige Divider Line with spacious breathing room */}
-      <div style={{ width: '100%', height: '1px', backgroundColor: '#e5dec9', margin: '18px 0 22px 0' }} />
+      <div style={{ width: '100%', height: '1px', backgroundColor: '#E5DEC9', margin: '18px 0 22px 0' }} />
 
-      {/* 2. Official Estimate Title & Quote Metadata (Vertical Grid) */}
+      {/* 2. Official Estimate Title & Quote Metadata (Vertical Grid Aligned) */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
         {/* Left: Title */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ width: '3.5px', height: '36px', backgroundColor: '#9b7a4f', borderRadius: '1.5px' }} />
+          <div style={{ width: '3.5px', height: '36px', backgroundColor: '#9B7A4F', borderRadius: '1.5px' }} />
           <div>
             <div style={{ fontSize: '20px', fontWeight: 700, color: '#111827', lineHeight: 1.2, letterSpacing: '-0.02em' }}>
               공식 견적 영수증
@@ -230,7 +231,7 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
                 fontFamily: "'Playfair Display', Georgia, serif",
                 fontSize: '9px',
                 letterSpacing: '0.22em',
-                color: '#64748b',
+                color: '#64748B',
                 textTransform: 'uppercase',
                 marginTop: '1px',
               }}
@@ -251,12 +252,12 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
             fontSize: '11px',
           }}
         >
-          <span style={{ color: '#64748b', textAlign: 'left', fontWeight: 500 }}>견적번호 :</span>
-          <span style={{ fontWeight: 700, color: '#0f172a', fontFamily: 'Pretendard, monospace', textAlign: 'right' }}>
+          <span style={{ color: '#64748B', textAlign: 'left', fontWeight: 500 }}>견적번호 :</span>
+          <span style={{ fontWeight: 700, color: '#0F172A', fontFamily: 'Pretendard, monospace', textAlign: 'right' }}>
             {quoteNo}
           </span>
-          <span style={{ color: '#64748b', textAlign: 'left', fontWeight: 500 }}>발급일시 :</span>
-          <span style={{ fontWeight: 500, color: '#0f172a', textAlign: 'right' }}>
+          <span style={{ color: '#64748B', textAlign: 'left', fontWeight: 500 }}>발급일시 :</span>
+          <span style={{ fontWeight: 500, color: '#0F172A', textAlign: 'right' }}>
             {displayDate}
           </span>
         </div>
@@ -281,13 +282,13 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
               fontStyle: 'italic',
               fontSize: '19px',
               fontWeight: 600,
-              color: '#9b7a4f',
+              color: '#9B7A4F',
               marginRight: '8px',
             }}
           >
             01
           </span>
-          <span style={{ color: '#cbd5e1', marginRight: '8px', fontWeight: 300 }}>|</span>
+          <span style={{ color: '#CBD5E1', marginRight: '8px', fontWeight: 300 }}>|</span>
           <span style={{ fontSize: '14px', fontWeight: 700, color: '#111827', marginRight: '8px' }}>
             기본 정보
           </span>
@@ -296,7 +297,7 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
               fontFamily: "'Playfair Display', Georgia, serif",
               fontSize: '9px',
               letterSpacing: '0.16em',
-              color: '#8c7355',
+              color: '#8C7355',
               textTransform: 'uppercase',
             }}
           >
@@ -305,36 +306,36 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
         </div>
 
         {/* Table Content */}
-        <div style={{ borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0' }}>
+        <div style={{ borderTop: '1px solid #E2E8F0', borderBottom: '1px solid #E2E8F0' }}>
           {/* Row 1 */}
-          <div style={{ display: 'flex', alignItems: 'center', padding: '9px 10px', borderBottom: '1px solid #f1f5f9', fontSize: '11px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', padding: '9px 10px', borderBottom: '1px solid #F1F5F9', fontSize: '11px' }}>
             <div style={{ width: '75px', color: '#475569', fontWeight: 500 }}>고객사명</div>
-            <div style={{ flex: 1, fontWeight: 700, color: '#0f172a' }}>{customerName || '인터코스'}</div>
+            <div style={{ flex: 1, fontWeight: 700, color: '#0F172A' }}>{customerName || '인터코스'}</div>
             <div style={{ width: '60px', color: '#475569', fontWeight: 500 }}>담당자</div>
-            <div style={{ flex: 1, fontWeight: 600, color: '#0f172a' }}>
+            <div style={{ flex: 1, fontWeight: 600, color: '#0F172A' }}>
               {contactPerson || '김지현 팀장'}{contactPhone ? ` (${contactPhone})` : ''}
             </div>
           </div>
           {/* Row 2 */}
-          <div style={{ display: 'flex', alignItems: 'center', padding: '9px 10px', borderBottom: '1px solid #f1f5f9', fontSize: '11px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', padding: '9px 10px', borderBottom: '1px solid #F1F5F9', fontSize: '11px' }}>
             <div style={{ width: '75px', color: '#475569', fontWeight: 500 }}>행사 / 목적</div>
-            <div style={{ flex: 1, fontWeight: 600, color: '#0f172a' }}>{notes || '비즈니스 투어'}</div>
+            <div style={{ flex: 1, fontWeight: 600, color: '#0F172A' }}>{notes || '비즈니스 투어'}</div>
             <div style={{ width: '60px', color: '#475569', fontWeight: 500 }}>운행 일정</div>
-            <div style={{ flex: 1, fontWeight: 600, color: '#0f172a' }}>
+            <div style={{ flex: 1, fontWeight: 600, color: '#0F172A' }}>
               {date} ({serviceStartTime} ~ {serviceEndTime}, {serviceHours}시간)
             </div>
           </div>
           {/* Row 3 */}
           <div style={{ display: 'flex', alignItems: 'center', padding: '9px 10px', fontSize: '11px' }}>
             <div style={{ width: '75px', color: '#475569', fontWeight: 500 }}>운행 구간</div>
-            <div style={{ flex: 1, fontWeight: 700, color: '#0f172a' }}>
+            <div style={{ flex: 1, fontWeight: 700, color: '#0F172A' }}>
               {origin} → {destination}
             </div>
           </div>
         </div>
       </div>
 
-      {/* 5. Section 02: 차량 및 서비스 (VEHICLE & SERVICE) */}
+      {/* 5. Section 02: 차량 및 서비스 (모두 일치된 인라인 그리드) */}
       <div style={{ marginBottom: '22px' }}>
         {/* Section Header */}
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
@@ -344,13 +345,13 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
               fontStyle: 'italic',
               fontSize: '19px',
               fontWeight: 600,
-              color: '#9b7a4f',
+              color: '#9B7A4F',
               marginRight: '8px',
             }}
           >
             02
           </span>
-          <span style={{ color: '#cbd5e1', marginRight: '8px', fontWeight: 300 }}>|</span>
+          <span style={{ color: '#CBD5E1', marginRight: '8px', fontWeight: 300 }}>|</span>
           <span style={{ fontSize: '14px', fontWeight: 700, color: '#111827', marginRight: '8px' }}>
             차량 및 서비스
           </span>
@@ -359,7 +360,7 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
               fontFamily: "'Playfair Display', Georgia, serif",
               fontSize: '9px',
               letterSpacing: '0.16em',
-              color: '#8c7355',
+              color: '#8C7355',
               textTransform: 'uppercase',
             }}
           >
@@ -367,49 +368,60 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
           </span>
         </div>
 
-        {/* 4-Column Box */}
+        {/* 4-Column Box: Precise Aligned Grid Layout */}
         <div
           style={{
-            backgroundColor: '#f8fafc',
-            border: '1px solid #e2e8f0',
+            backgroundColor: '#F8FAFC',
+            border: '1px solid #E2E8F0',
             borderRadius: '4px',
             padding: '12px 14px',
             display: 'flex',
-            alignItems: 'center',
+            alignItems: 'stretch',
           }}
         >
           {/* Col 1 */}
-          <div style={{ flex: '2.2', paddingRight: '10px' }}>
-            <div style={{ fontSize: '10px', color: '#64748b', marginBottom: '3px' }}>선택 차량</div>
-            <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#0f172a' }}>
+          <div style={{ flex: 2.2, paddingRight: '12px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
+            <div style={{ fontSize: '10px', color: '#64748B', height: '16px', lineHeight: '16px', marginBottom: '4px', fontWeight: 500, whiteSpace: 'nowrap' }}>
+              선택 차량
+            </div>
+            <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#0F172A', lineHeight: 1.35 }}>
               {vehicleModel || '제네시스 G90 신차 최고급형'}
             </div>
           </div>
+
           {/* Col 2 */}
-          <div style={{ flex: '1', borderLeft: '1px solid #e2e8f0', paddingLeft: '10px', paddingRight: '10px' }}>
-            <div style={{ fontSize: '10px', color: '#64748b', marginBottom: '3px' }}>차량 수량</div>
-            <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#0f172a' }}>
+          <div style={{ flex: 1, borderLeft: '1px solid #E2E8F0', paddingLeft: '12px', paddingRight: '12px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
+            <div style={{ fontSize: '10px', color: '#64748B', height: '16px', lineHeight: '16px', marginBottom: '4px', fontWeight: 500, whiteSpace: 'nowrap' }}>
+              차량 수량
+            </div>
+            <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#0F172A', lineHeight: 1.35 }}>
               {vehicleCount}대
             </div>
           </div>
-          {/* Col 3: 서비스 구분 (2줄 분리 표시) */}
-          <div style={{ flex: '2', borderLeft: '1px solid #e2e8f0', paddingLeft: '10px', paddingRight: '10px' }}>
-            <div style={{ fontSize: '10px', color: '#64748b', marginBottom: '3px' }}>서비스 구분</div>
-            <div>
-              <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#0f172a' }}>
+
+          {/* Col 3: 서비스 구분 (상단 라벨 및 기준선 정렬) */}
+          <div style={{ flex: 2.2, borderLeft: '1px solid #E2E8F0', paddingLeft: '12px', paddingRight: '12px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
+            <div style={{ fontSize: '10px', color: '#64748B', height: '16px', lineHeight: '16px', marginBottom: '4px', fontWeight: 500, whiteSpace: 'nowrap' }}>
+              서비스 구분
+            </div>
+            <div style={{ lineHeight: 1.35 }}>
+              <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#0F172A' }}>
                 {categorySplit.main}
               </div>
               {categorySplit.sub && (
-                <div style={{ fontSize: '10.5px', fontWeight: 500, color: '#475569', marginTop: '2px' }}>
+                <div style={{ fontSize: '10px', fontWeight: 500, color: '#475569', marginTop: '2px' }}>
                   {categorySplit.sub}
                 </div>
               )}
             </div>
           </div>
+
           {/* Col 4 */}
-          <div style={{ flex: '1.4', borderLeft: '1px solid #e2e8f0', paddingLeft: '10px' }}>
-            <div style={{ fontSize: '10px', color: '#64748b', marginBottom: '3px' }}>기사 서비스</div>
-            <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#0f172a' }}>
+          <div style={{ flex: 1.4, borderLeft: '1px solid #E2E8F0', paddingLeft: '12px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
+            <div style={{ fontSize: '10px', color: '#64748B', height: '16px', lineHeight: '16px', marginBottom: '4px', fontWeight: 500, whiteSpace: 'nowrap' }}>
+              기사 서비스
+            </div>
+            <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#0F172A', lineHeight: 1.35 }}>
               {driverServiceLabel}
             </div>
           </div>
@@ -426,13 +438,13 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
               fontStyle: 'italic',
               fontSize: '19px',
               fontWeight: 600,
-              color: '#9b7a4f',
+              color: '#9B7A4F',
               marginRight: '8px',
             }}
           >
             03
           </span>
-          <span style={{ color: '#cbd5e1', marginRight: '8px', fontWeight: 300 }}>|</span>
+          <span style={{ color: '#CBD5E1', marginRight: '8px', fontWeight: 300 }}>|</span>
           <span style={{ fontSize: '14px', fontWeight: 700, color: '#111827', marginRight: '8px' }}>
             요금 상세
           </span>
@@ -441,7 +453,7 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
               fontFamily: "'Playfair Display', Georgia, serif",
               fontSize: '9px',
               letterSpacing: '0.16em',
-              color: '#8c7355',
+              color: '#8C7355',
               textTransform: 'uppercase',
             }}
           >
@@ -450,18 +462,18 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
         </div>
 
         {/* Price Breakdown List */}
-        <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '8px' }}>
+        <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '8px' }}>
           {/* Base Fare */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', fontSize: '11px' }}>
-            <span style={{ color: '#1e293b' }}>기본 대절료 ({vehicleCount}대 × {serviceHours}시간)</span>
-            <span style={{ fontWeight: 600, color: '#0f172a', fontFamily: 'Pretendard, monospace' }}>
+            <span style={{ color: '#1E293B' }}>기본 대절료 ({vehicleCount}대 × {serviceHours}시간)</span>
+            <span style={{ fontWeight: 600, color: '#0F172A', fontFamily: 'Pretendard, monospace' }}>
               {baseFareTotal !== null ? `${baseFareTotal.toLocaleString()}원` : (quoteRequired ? '상담 후 산정' : '-')}
             </span>
           </div>
 
           {/* Overtime (if any) */}
           {overtimeHours > 0 && overtimeFareTotal > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', fontSize: '11px', color: '#92400e' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', fontSize: '11px', color: '#92400E' }}>
               <span>초과 시간 요금 ({overtimeHours}시간)</span>
               <span style={{ fontWeight: 600, fontFamily: 'Pretendard, monospace' }}>
                 +{overtimeFareTotal.toLocaleString()}원
@@ -471,7 +483,7 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
 
           {/* Excess Km (if any) */}
           {excessKm > 0 && excessDistanceTotal > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', fontSize: '11px', color: '#92400e' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', fontSize: '11px', color: '#92400E' }}>
               <span>초과 거리 요금 ({excessKm}km)</span>
               <span style={{ fontWeight: 600, fontFamily: 'Pretendard, monospace' }}>
                 +{excessDistanceTotal.toLocaleString()}원
@@ -481,7 +493,7 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
 
           {/* English Surcharge (if any) */}
           {englishSurchargeTotal > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', fontSize: '11px', color: '#1e40af' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', fontSize: '11px', color: '#1E40AF' }}>
               <span>의전 기사 영어 수당</span>
               <span style={{ fontWeight: 600, fontFamily: 'Pretendard, monospace' }}>
                 +{englishSurchargeTotal.toLocaleString()}원
@@ -490,44 +502,45 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
           )}
 
           {/* Subtotal Divider */}
-          <div style={{ borderTop: '1px solid #e2e8f0', margin: '8px 0' }} />
+          <div style={{ borderTop: '1px solid #E2E8F0', margin: '8px 0' }} />
 
           {/* Supply Price Subtotal */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', fontSize: '12px' }}>
-            <span style={{ fontWeight: 700, color: '#0f172a' }}>공급가액 소계</span>
-            <span style={{ fontWeight: 700, color: '#0f172a', fontFamily: 'Pretendard, monospace' }}>
+            <span style={{ fontWeight: 700, color: '#0F172A' }}>공급가액 소계</span>
+            <span style={{ fontWeight: 700, color: '#0F172A', fontFamily: 'Pretendard, monospace' }}>
               {supplyPriceTotal !== null ? `${supplyPriceTotal.toLocaleString()}원` : (quoteRequired ? '상담 후 산정' : '-')}
             </span>
           </div>
 
           {/* VAT */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '24px', padding: '3px 0', fontSize: '10.5px' }}>
-            <span style={{ color: '#64748b' }}>부가가치세 (10%)</span>
-            <span style={{ fontWeight: 500, color: '#0f172a', fontFamily: 'Pretendard, monospace' }}>
+            <span style={{ color: '#64748B' }}>부가가치세 (10%)</span>
+            <span style={{ fontWeight: 500, color: '#0F172A', fontFamily: 'Pretendard, monospace' }}>
               {vatAmount !== null ? `${vatAmount.toLocaleString()}원` : '별도 산정'}
             </span>
           </div>
         </div>
       </div>
 
-      {/* 7. 총 청구 예상금액 (GRAND TOTAL BANNER, No '04') */}
+      {/* 7. 총 청구 예상금액 (배경화면 제거 #FFFFFF, 좌우 완전 정렬) */}
       <div
         style={{
-          backgroundColor: '#f7f4ed',
-          border: '1px solid #eadfc9',
-          borderRadius: '4px',
-          padding: '16px 20px',
+          backgroundColor: '#FFFFFF',
+          borderTop: '2px solid #E2E8F0',
+          borderBottom: '2px solid #E2E8F0',
+          padding: '16px 0px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           marginBottom: '22px',
+          width: '100%',
         }}
       >
         {/* Left: Accent bar & Label without '04' */}
         <div style={{ display: 'flex', alignItems: 'center' }}>
-          <div style={{ width: '3.5px', height: '26px', backgroundColor: '#9b7a4f', marginRight: '12px', borderRadius: '1.5px' }} />
-          <span style={{ fontSize: '13.5px', fontWeight: 700, color: '#1e293b' }}>
-            총 청구 예상금액 <span style={{ fontSize: '11px', fontWeight: 500, color: '#64748b' }}>(부가가치세 10% 포함)</span>
+          <div style={{ width: '3.5px', height: '24px', backgroundColor: '#9B7A4F', marginRight: '10px', borderRadius: '1.5px' }} />
+          <span style={{ fontSize: '15px', fontWeight: 700, color: '#111827' }}>
+            총 청구 예상금액 <span style={{ fontSize: '11px', fontWeight: 500, color: '#64748B' }}>(부가가치세 10% 포함)</span>
           </span>
         </div>
 
@@ -539,6 +552,7 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
             color: '#614421',
             fontFamily: 'Pretendard, -apple-system, sans-serif',
             letterSpacing: '-0.02em',
+            textAlign: 'right',
           }}
         >
           {estimatedGrandTotal !== null ? `${estimatedGrandTotal.toLocaleString()}원` : (quoteRequired ? '상담 후 산정' : '0원')}
@@ -546,7 +560,7 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
       </div>
 
       {/* 8. Notice text */}
-      <div style={{ fontSize: '9.5px', color: '#64748b', lineHeight: 1.6, marginBottom: '22px', paddingLeft: '2px' }}>
+      <div style={{ fontSize: '9.5px', color: '#64748B', lineHeight: 1.6, marginBottom: '22px', paddingLeft: '2px' }}>
         <div>* 본 견적서는 2026 공식 요율표 기준 실시간 산출 견적서입니다.</div>
         <div style={{ paddingLeft: '8px' }}>예약 전환 시 실시간 관제 스케줄에 즉시 등록됩니다.</div>
       </div>
@@ -554,7 +568,7 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
       {/* 9. Bottom Footer (Clean Brand Signature without scribble SVG) */}
       <div
         style={{
-          borderTop: '1px solid #e2d8cc',
+          borderTop: '1px solid #E2D8CC',
           paddingTop: '14px',
           display: 'flex',
           alignItems: 'center',
@@ -574,13 +588,13 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
         >
           VIP LIMOUSINE KOREA
         </span>
-        <span style={{ color: '#cbd5e1', fontSize: '9px' }}>|</span>
+        <span style={{ color: '#CBD5E1', fontSize: '9px' }}>|</span>
         <span
           style={{
             fontFamily: "'Playfair Display', Georgia, serif",
             fontSize: '9px',
             letterSpacing: '0.14em',
-            color: '#64748b',
+            color: '#64748B',
             textTransform: 'uppercase',
           }}
         >
@@ -611,8 +625,8 @@ export function generateOfficialQuotePrintHtml(props: HqOfficialQuoteDocumentPro
     props.baseFareTotal !== null
       ? `${props.baseFareTotal.toLocaleString()}원`
       : props.quoteRequired
-        ? '상담 후 산정'
-        : '-';
+      ? '상담 후 산정'
+      : '-';
   const overtimeFormatted =
     props.overtimeHours && props.overtimeFareTotal ? `+${props.overtimeFareTotal.toLocaleString()}원` : null;
   const excessKmFormatted =
@@ -624,15 +638,15 @@ export function generateOfficialQuotePrintHtml(props: HqOfficialQuoteDocumentPro
     props.supplyPriceTotal !== null
       ? `${props.supplyPriceTotal.toLocaleString()}원`
       : props.quoteRequired
-        ? '상담 후 산정'
-        : '-';
+      ? '상담 후 산정'
+      : '-';
   const vatFormatted = props.vatAmount !== null ? `${props.vatAmount.toLocaleString()}원` : '별도 산정';
   const grandTotalFormatted =
     props.estimatedGrandTotal !== null
       ? `${props.estimatedGrandTotal.toLocaleString()}원`
       : props.quoteRequired
-        ? '상담 후 산정'
-        : '0원';
+      ? '상담 후 산정'
+      : '0원';
 
   return `<!DOCTYPE html>
 <html lang="ko">
@@ -656,7 +670,7 @@ export function generateOfficialQuotePrintHtml(props: HqOfficialQuoteDocumentPro
     html, body {
       margin: 0 !important;
       padding: 0 !important;
-      background: #ffffff !important;
+      background: #FFFFFF !important;
       font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
       color: #111827 !important;
       overflow: hidden !important;
@@ -667,7 +681,7 @@ export function generateOfficialQuotePrintHtml(props: HqOfficialQuoteDocumentPro
       max-width: 690px !important;
       margin: 0 auto !important;
       padding: 28px 32px 24px 32px !important;
-      background: #ffffff !important;
+      background: #FFFFFF !important;
       page-break-inside: avoid !important;
       break-inside: avoid !important;
     }
@@ -684,7 +698,7 @@ export function generateOfficialQuotePrintHtml(props: HqOfficialQuoteDocumentPro
   <div class="print-sheet">
     <!-- 1. Top Header -->
     <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px;">
-      <div style="width: 130px; text-align: left;">
+      <div style="flex: 1; min-width: 90px; text-align: left;">
         <div style="font-family: 'Playfair Display', Georgia, serif; font-size: 8.5px; color: #475569; letter-spacing: 0.12em; line-height: 1.3; text-transform: uppercase;">
           PREMIUM
         </div>
@@ -693,21 +707,21 @@ export function generateOfficialQuotePrintHtml(props: HqOfficialQuoteDocumentPro
         </div>
       </div>
 
-      <div style="text-align: center; flex: 1;">
+      <div style="text-align: center; flex: 2; min-width: 280px;">
         <img src="/images/receipt/header.png" alt="VIP Limousine Emblem" style="height: 36px; margin: 0 auto; display: block; object-fit: contain;" />
-        <div style="font-family: 'Playfair Display', Georgia, serif; font-size: 20px; font-weight: 300; color: #111827; letter-spacing: 0.1em; margin-top: 5px; line-height: 1.2;">
+        <div style="font-family: 'Playfair Display', Georgia, serif; font-size: 20px; font-weight: 300; color: #111827; letter-spacing: 0.06em; margin-top: 5px; line-height: 1.2; white-space: nowrap;">
           VIP LIMOUSINE KOREA
         </div>
         <div class="header-flourish">
-          <span style="width: 32px; height: 1px; background-color: #9b7a4f; display: inline-block;"></span>
-          <span style="font-family: 'Playfair Display', Georgia, serif; font-size: 8.5px; letter-spacing: 0.22em; color: #9b7a4f; text-transform: uppercase; font-weight: 600;">
+          <span style="width: 32px; height: 1px; background-color: #9B7A4F; display: inline-block;"></span>
+          <span style="font-family: 'Playfair Display', Georgia, serif; font-size: 8.5px; letter-spacing: 0.22em; color: #9B7A4F; text-transform: uppercase; font-weight: 600; white-space: nowrap;">
             EXECUTIVE CHAUFFEUR
           </span>
-          <span style="width: 32px; height: 1px; background-color: #9b7a4f; display: inline-block;"></span>
+          <span style="width: 32px; height: 1px; background-color: #9B7A4F; display: inline-block;"></span>
         </div>
       </div>
 
-      <div style="width: 130px; text-align: right;">
+      <div style="flex: 1; min-width: 90px; text-align: right;">
         <div style="font-family: 'Playfair Display', Georgia, serif; font-size: 8.5px; color: #475569; letter-spacing: 0.12em; line-height: 1.3; text-transform: uppercase;">
           COMFORT · SAFETY
         </div>
@@ -718,27 +732,27 @@ export function generateOfficialQuotePrintHtml(props: HqOfficialQuoteDocumentPro
     </div>
 
     <!-- Thin Divider Line with breathing room -->
-    <div style="width: 100%; height: 1px; background-color: #e5dec9; margin: 18px 0 22px 0;"></div>
+    <div style="width: 100%; height: 1px; background-color: #E5DEC9; margin: 18px 0 22px 0;"></div>
 
     <!-- 2. Official Estimate Title & Metadata (Vertical Grid Aligned) -->
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
       <div style="display: flex; align-items: center; gap: 10px;">
-        <div style="width: 3.5px; height: 36px; background-color: #9b7a4f; border-radius: 1.5px;"></div>
+        <div style="width: 3.5px; height: 36px; background-color: #9B7A4F; border-radius: 1.5px;"></div>
         <div>
           <div style="font-size: 20px; font-weight: 700; color: #111827; line-height: 1.2; letter-spacing: -0.02em;">
             공식 견적 영수증
           </div>
-          <div style="font-family: 'Playfair Display', Georgia, serif; font-size: 9px; letter-spacing: 0.22em; color: #64748b; text-transform: uppercase; margin-top: 1px;">
+          <div style="font-family: 'Playfair Display', Georgia, serif; font-size: 9px; letter-spacing: 0.22em; color: #64748B; text-transform: uppercase; margin-top: 1px;">
             OFFICIAL ESTIMATE
           </div>
         </div>
       </div>
 
       <div style="display: grid; grid-template-columns: auto auto; column-gap: 16px; row-gap: 5px; align-items: baseline; font-size: 11px;">
-        <span style="color: #64748b; text-align: left; font-weight: 500;">견적번호 :</span>
-        <span style="font-weight: 700; color: #0f172a; font-family: Pretendard, monospace; text-align: right;">${props.quoteNo}</span>
-        <span style="color: #64748b; text-align: left; font-weight: 500;">발급일시 :</span>
-        <span style="font-weight: 500; color: #0f172a; text-align: right;">${displayDate}</span>
+        <span style="color: #64748B; text-align: left; font-weight: 500;">견적번호 :</span>
+        <span style="font-weight: 700; color: #0F172A; font-family: Pretendard, monospace; text-align: right;">${props.quoteNo}</span>
+        <span style="color: #64748B; text-align: left; font-weight: 500;">발급일시 :</span>
+        <span style="font-weight: 500; color: #0F172A; text-align: right;">${displayDate}</span>
       </div>
     </div>
 
@@ -750,63 +764,64 @@ export function generateOfficialQuotePrintHtml(props: HqOfficialQuoteDocumentPro
     <!-- 4. Section 01: 기본 정보 -->
     <div style="margin-bottom: 22px;">
       <div style="display: flex; align-items: center; margin-bottom: 8px;">
-        <span style="font-family: 'Playfair Display', Georgia, serif; font-style: italic; font-size: 19px; font-weight: 600; color: #9b7a4f; margin-right: 8px;">01</span>
-        <span style="color: #cbd5e1; margin-right: 8px; font-weight: 300;">|</span>
+        <span style="font-family: 'Playfair Display', Georgia, serif; font-style: italic; font-size: 19px; font-weight: 600; color: #9B7A4F; margin-right: 8px;">01</span>
+        <span style="color: #CBD5E1; margin-right: 8px; font-weight: 300;">|</span>
         <span style="font-size: 14px; font-weight: 700; color: #111827; margin-right: 8px;">기본 정보</span>
-        <span style="font-family: 'Playfair Display', Georgia, serif; font-size: 9px; letter-spacing: 0.16em; color: #8c7355; text-transform: uppercase;">BASIC INFORMATION</span>
+        <span style="font-family: 'Playfair Display', Georgia, serif; font-size: 9px; letter-spacing: 0.16em; color: #8C7355; text-transform: uppercase;">BASIC INFORMATION</span>
       </div>
 
-      <div style="border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;">
-        <div style="display: flex; align-items: center; padding: 9px 10px; border-bottom: 1px solid #f1f5f9; font-size: 11px;">
+      <div style="border-top: 1px solid #E2E8F0; border-bottom: 1px solid #E2E8F0;">
+        <div style="display: flex; align-items: center; padding: 9px 10px; border-bottom: 1px solid #F1F5F9; font-size: 11px;">
           <div style="width: 75px; color: #475569; font-weight: 500;">고객사명</div>
-          <div style="flex: 1; font-weight: 700; color: #0f172a;">${props.customerName || '인터코스'}</div>
+          <div style="flex: 1; font-weight: 700; color: #0F172A;">${props.customerName || '인터코스'}</div>
           <div style="width: 60px; color: #475569; font-weight: 500;">담당자</div>
-          <div style="flex: 1; font-weight: 600; color: #0f172a;">${props.contactPerson || '김지현 팀장'}${props.contactPhone ? ` (${props.contactPhone})` : ''}</div>
+          <div style="flex: 1; font-weight: 600; color: #0F172A;">${props.contactPerson || '김지현 팀장'}${props.contactPhone ? ` (${props.contactPhone})` : ''}</div>
         </div>
-        <div style="display: flex; align-items: center; padding: 9px 10px; border-bottom: 1px solid #f1f5f9; font-size: 11px;">
+        <div style="display: flex; align-items: center; padding: 9px 10px; border-bottom: 1px solid #F1F5F9; font-size: 11px;">
           <div style="width: 75px; color: #475569; font-weight: 500;">행사 / 목적</div>
-          <div style="flex: 1; font-weight: 600; color: #0f172a;">${props.notes || '비즈니스 투어'}</div>
+          <div style="flex: 1; font-weight: 600; color: #0F172A;">${props.notes || '비즈니스 투어'}</div>
           <div style="width: 60px; color: #475569; font-weight: 500;">운행 일정</div>
-          <div style="flex: 1; font-weight: 600; color: #0f172a;">${props.date} (${props.serviceStartTime} ~ ${props.serviceEndTime}, ${props.serviceHours}시간)</div>
+          <div style="flex: 1; font-weight: 600; color: #0F172A;">${props.date} (${props.serviceStartTime} ~ ${props.serviceEndTime}, ${props.serviceHours}시간)</div>
         </div>
         <div style="display: flex; align-items: center; padding: 9px 10px; font-size: 11px;">
           <div style="width: 75px; color: #475569; font-weight: 500;">운행 구간</div>
-          <div style="flex: 1; font-weight: 700; color: #0f172a;">${props.origin} → ${props.destination}</div>
+          <div style="flex: 1; font-weight: 700; color: #0F172A;">${props.origin} → ${props.destination}</div>
         </div>
       </div>
     </div>
 
-    <!-- 5. Section 02: 차량 및 서비스 (서비스 구분 2줄 분리) -->
+    <!-- 5. Section 02: 차량 및 서비스 (모두 일치된 인라인 그리드) -->
     <div style="margin-bottom: 22px;">
       <div style="display: flex; align-items: center; margin-bottom: 8px;">
-        <span style="font-family: 'Playfair Display', Georgia, serif; font-style: italic; font-size: 19px; font-weight: 600; color: #9b7a4f; margin-right: 8px;">02</span>
-        <span style="color: #cbd5e1; margin-right: 8px; font-weight: 300;">|</span>
+        <span style="font-family: 'Playfair Display', Georgia, serif; font-style: italic; font-size: 19px; font-weight: 600; color: #9B7A4F; margin-right: 8px;">02</span>
+        <span style="color: #CBD5E1; margin-right: 8px; font-weight: 300;">|</span>
         <span style="font-size: 14px; font-weight: 700; color: #111827; margin-right: 8px;">차량 및 서비스</span>
-        <span style="font-family: 'Playfair Display', Georgia, serif; font-size: 9px; letter-spacing: 0.16em; color: #8c7355; text-transform: uppercase;">VEHICLE & SERVICE</span>
+        <span style="font-family: 'Playfair Display', Georgia, serif; font-size: 9px; letter-spacing: 0.16em; color: #8C7355; text-transform: uppercase;">VEHICLE & SERVICE</span>
       </div>
 
-      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 12px 14px; display: flex; align-items: center;">
-        <div style="flex: 2.2; padding-right: 10px;">
-          <div style="font-size: 10px; color: #64748b; margin-bottom: 3px;">선택 차량</div>
-          <div style="font-size: 11.5px; font-weight: 700; color: #0f172a;">${props.vehicleModel || '제네시스 G90 신차 최고급형'}</div>
+      <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 4px; padding: 12px 14px; display: flex; align-items: stretch;">
+        <div style="flex: 2.2; padding-right: 12px; display: flex; flexDirection: column; justify-content: flex-start;">
+          <div style="font-size: 10px; color: #64748B; height: 16px; line-height: 16px; margin-bottom: 4px; font-weight: 500; white-space: nowrap;">선택 차량</div>
+          <div style="font-size: 11.5px; font-weight: 700; color: #0F172A; line-height: 1.35;">${props.vehicleModel || '제네시스 G90 신차 최고급형'}</div>
         </div>
-        <div style="flex: 1; border-left: 1px solid #e2e8f0; padding-left: 10px; padding-right: 10px;">
-          <div style="font-size: 10px; color: #64748b; margin-bottom: 3px;">차량 수량</div>
-          <div style="font-size: 11.5px; font-weight: 700; color: #0f172a;">${props.vehicleCount}대</div>
+        <div style="flex: 1; border-left: 1px solid #E2E8F0; padding-left: 12px; padding-right: 12px; display: flex; flexDirection: column; justify-content: flex-start;">
+          <div style="font-size: 10px; color: #64748B; height: 16px; line-height: 16px; margin-bottom: 4px; font-weight: 500; white-space: nowrap;">차량 수량</div>
+          <div style="font-size: 11.5px; font-weight: 700; color: #0F172A; line-height: 1.35;">${props.vehicleCount}대</div>
         </div>
-        <div style="flex: 2; border-left: 1px solid #e2e8f0; padding-left: 10px; padding-right: 10px;">
-          <div style="font-size: 10px; color: #64748b; margin-bottom: 3px;">서비스 구분</div>
-          <div>
-            <div style="font-size: 11.5px; font-weight: 700; color: #0f172a;">${categorySplit.main}</div>
-            ${categorySplit.sub
-      ? `<div style="font-size: 10.5px; font-weight: 500; color: #475569; margin-top: 2px;">${categorySplit.sub}</div>`
-      : ''
-    }
+        <div style="flex: 2.2; border-left: 1px solid #E2E8F0; padding-left: 12px; padding-right: 12px; display: flex; flexDirection: column; justify-content: flex-start;">
+          <div style="font-size: 10px; color: #64748B; height: 16px; line-height: 16px; margin-bottom: 4px; font-weight: 500; white-space: nowrap;">서비스 구분</div>
+          <div style="line-height: 1.35;">
+            <div style="font-size: 11.5px; font-weight: 700; color: #0F172A;">${categorySplit.main}</div>
+            ${
+              categorySplit.sub
+                ? `<div style="font-size: 10px; font-weight: 500; color: #475569; margin-top: 2px;">${categorySplit.sub}</div>`
+                : ''
+            }
           </div>
         </div>
-        <div style="flex: 1.4; border-left: 1px solid #e2e8f0; padding-left: 10px;">
-          <div style="font-size: 10px; color: #64748b; margin-bottom: 3px;">기사 서비스</div>
-          <div style="font-size: 11.5px; font-weight: 700; color: #0f172a;">${driverServiceLabel}</div>
+        <div style="flex: 1.4; border-left: 1px solid #E2E8F0; padding-left: 12px; display: flex; flexDirection: column; justify-content: flex-start;">
+          <div style="font-size: 10px; color: #64748B; height: 16px; line-height: 16px; margin-bottom: 4px; font-weight: 500; white-space: nowrap;">기사 서비스</div>
+          <div style="font-size: 11.5px; font-weight: 700; color: #0F172A; line-height: 1.35;">${driverServiceLabel}</div>
         </div>
       </div>
     </div>
@@ -814,86 +829,89 @@ export function generateOfficialQuotePrintHtml(props: HqOfficialQuoteDocumentPro
     <!-- 6. Section 03: 요금 상세 -->
     <div style="margin-bottom: 22px;">
       <div style="display: flex; align-items: center; margin-bottom: 8px;">
-        <span style="font-family: 'Playfair Display', Georgia, serif; font-style: italic; font-size: 19px; font-weight: 600; color: #9b7a4f; margin-right: 8px;">03</span>
-        <span style="color: #cbd5e1; margin-right: 8px; font-weight: 300;">|</span>
+        <span style="font-family: 'Playfair Display', Georgia, serif; font-style: italic; font-size: 19px; font-weight: 600; color: #9B7A4F; margin-right: 8px;">03</span>
+        <span style="color: #CBD5E1; margin-right: 8px; font-weight: 300;">|</span>
         <span style="font-size: 14px; font-weight: 700; color: #111827; margin-right: 8px;">요금 상세</span>
-        <span style="font-family: 'Playfair Display', Georgia, serif; font-size: 9px; letter-spacing: 0.16em; color: #8c7355; text-transform: uppercase;">PRICE BREAKDOWN</span>
+        <span style="font-family: 'Playfair Display', Georgia, serif; font-size: 9px; letter-spacing: 0.16em; color: #8C7355; text-transform: uppercase;">PRICE BREAKDOWN</span>
       </div>
 
-      <div style="border-top: 1px solid #e2e8f0; padding-top: 8px;">
+      <div style="border-top: 1px solid #E2E8F0; padding-top: 8px;">
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 11px;">
-          <span style="color: #1e293b;">기본 대절료 (${props.vehicleCount}대 × ${props.serviceHours}시간)</span>
-          <span style="font-weight: 600; color: #0f172a; font-family: Pretendard, monospace;">${baseFareFormatted}</span>
+          <span style="color: #1E293B;">기본 대절료 (${props.vehicleCount}대 × ${props.serviceHours}시간)</span>
+          <span style="font-weight: 600; color: #0F172A; font-family: Pretendard, monospace;">${baseFareFormatted}</span>
         </div>
 
-        ${overtimeFormatted
-      ? `
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 11px; color: #92400e;">
+        ${
+          overtimeFormatted
+            ? `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 11px; color: #92400E;">
           <span>초과 시간 요금 (${props.overtimeHours}시간)</span>
           <span style="font-weight: 600; font-family: Pretendard, monospace;">${overtimeFormatted}</span>
         </div>`
-      : ''
-    }
+            : ''
+        }
 
-        ${excessKmFormatted
-      ? `
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 11px; color: #92400e;">
+        ${
+          excessKmFormatted
+            ? `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 11px; color: #92400E;">
           <span>초과 거리 요금 (${props.excessKm}km)</span>
           <span style="font-weight: 600; font-family: Pretendard, monospace;">${excessKmFormatted}</span>
         </div>`
-      : ''
-    }
+            : ''
+        }
 
-        ${englishSurchargeFormatted
-      ? `
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 11px; color: #1e40af;">
+        ${
+          englishSurchargeFormatted
+            ? `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 11px; color: #1E40AF;">
           <span>의전 기사 영어 수당</span>
           <span style="font-weight: 600; font-family: Pretendard, monospace;">${englishSurchargeFormatted}</span>
         </div>`
-      : ''
-    }
+            : ''
+        }
 
-        <div style="border-top: 1px solid #e2e8f0; margin: 8px 0;"></div>
+        <div style="border-top: 1px solid #E2E8F0; margin: 8px 0;"></div>
 
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 12px;">
-          <span style="font-weight: 700; color: #0f172a;">공급가액 소계</span>
-          <span style="font-weight: 700; color: #0f172a; font-family: Pretendard, monospace;">${supplyPriceFormatted}</span>
+          <span style="font-weight: 700; color: #0F172A;">공급가액 소계</span>
+          <span style="font-weight: 700; color: #0F172A; font-family: Pretendard, monospace;">${supplyPriceFormatted}</span>
         </div>
 
         <div style="display: flex; justify-content: flex-end; align-items: center; gap: 24px; padding: 3px 0; font-size: 10.5px;">
-          <span style="color: #64748b;">부가가치세 (10%)</span>
-          <span style="font-weight: 500; color: #0f172a; font-family: Pretendard, monospace;">${vatFormatted}</span>
+          <span style="color: #64748B;">부가가치세 (10%)</span>
+          <span style="font-weight: 500; color: #0F172A; font-family: Pretendard, monospace;">${vatFormatted}</span>
         </div>
       </div>
     </div>
 
-    <!-- 7. 총 청구 예상금액 (GRAND TOTAL BANNER, No '04') -->
-    <div style="background-color: #f7f4ed; border: 1px solid #eadfc9; border-radius: 4px; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px;">
+    <!-- 7. 총 청구 예상금액 (배경화면 제거 #FFFFFF, 좌우 완전 일치 정렬) -->
+    <div style="background-color: #FFFFFF; border-top: 2px solid #E2E8F0; border-bottom: 2px solid #E2E8F0; padding: 16px 0px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; width: 100%;">
       <div style="display: flex; align-items: center;">
-        <div style="width: 3.5px; height: 26px; background-color: #9b7a4f; margin-right: 12px; border-radius: 1.5px;"></div>
-        <span style="font-size: 13.5px; font-weight: 700; color: #1e293b;">
-          총 청구 예상금액 <span style="font-size: 11px; font-weight: 500; color: #64748b;">(부가가치세 10% 포함)</span>
+        <div style="width: 3.5px; height: 24px; background-color: #9B7A4F; margin-right: 10px; border-radius: 1.5px;"></div>
+        <span style="font-size: 15px; font-weight: 700; color: #111827;">
+          총 청구 예상금액 <span style="font-size: 11px; font-weight: 500; color: #64748B;">(부가가치세 10% 포함)</span>
         </span>
       </div>
 
-      <div style="font-size: 26px; font-weight: 800; color: #614421; font-family: Pretendard, -apple-system, sans-serif; letter-spacing: -0.02em;">
+      <div style="font-size: 26px; font-weight: 800; color: #614421; font-family: Pretendard, -apple-system, sans-serif; letter-spacing: -0.02em; text-align: right;">
         ${grandTotalFormatted}
       </div>
     </div>
 
     <!-- 8. Notice text -->
-    <div style="font-size: 9.5px; color: #64748b; line-height: 1.6; margin-bottom: 22px; padding-left: 2px;">
+    <div style="font-size: 9.5px; color: #64748B; line-height: 1.6; margin-bottom: 22px; padding-left: 2px;">
       <div>* 본 견적서는 2026 공식 요율표 기준 실시간 산출 견적서입니다.</div>
       <div style="padding-left: 8px;">예약 전환 시 실시간 관제 스케줄에 즉시 등록됩니다.</div>
     </div>
 
     <!-- 9. Bottom Footer (Clean Brand Signature without scribble SVG) -->
-    <div style="border-top: 1px solid #e2d8cc; padding-top: 14px; display: flex; align-items: center; justify-content: flex-start; gap: 8px;">
+    <div style="border-top: 1px solid #E2D8CC; padding-top: 14px; display: flex; align-items: center; justify-content: flex-start; gap: 8px;">
       <span style="font-family: 'Playfair Display', Georgia, serif; font-size: 9.5px; font-weight: 600; letter-spacing: 0.12em; color: #475569; text-transform: uppercase;">
         VIP LIMOUSINE KOREA
       </span>
-      <span style="color: #cbd5e1; font-size: 9px;">|</span>
-      <span style="font-family: 'Playfair Display', Georgia, serif; font-size: 9px; letter-spacing: 0.14em; color: #64748b; text-transform: uppercase;">
+      <span style="color: #CBD5E1; font-size: 9px;">|</span>
+      <span style="font-family: 'Playfair Display', Georgia, serif; font-size: 9px; letter-spacing: 0.14em; color: #64748B; text-transform: uppercase;">
         EXECUTIVE CHAUFFEUR SERVICE
       </span>
     </div>
