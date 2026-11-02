@@ -88,7 +88,55 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeDispatchTab, setActiveDispatchTab] = useState<HqDispatchTabKey>(()=>searchParams.get('view')==='action' || representativeMode ? 'action':'all');
-  const [activeKpiFilter, setActiveKpiFilter] = useState<string | null>(null);
+  const [activeKpiFilter, setActiveKpiFilter] = useState<string | null>(() => {
+    const f = searchParams.get('filter');
+    return f && f !== 'today' ? f : null;
+  });
+
+  // Sync activeTabOverride when tabParam changes (e.g. browser navigation or external link)
+  useEffect(() => {
+    if (tabParam) {
+      setActiveTabOverride(tabParam);
+      try {
+        sessionStorage.setItem('hq_active_tab', tabParam);
+      } catch {}
+    }
+  }, [tabParam]);
+
+  // Restore saved tab from session if URL has no tab param on fresh load
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const url = new URL(window.location.href);
+      const urlTab = url.searchParams.get('tab');
+      const savedTab = sessionStorage.getItem('hq_active_tab');
+
+      if (!urlTab && savedTab) {
+        setActiveTabOverride(savedTab);
+        url.searchParams.set('tab', savedTab);
+        window.history.replaceState(null, '', url.pathname + url.search);
+      } else if (urlTab) {
+        sessionStorage.setItem('hq_active_tab', urlTab);
+      }
+    } catch {}
+  }, []);
+
+  // Listen to popstate for browser back/forward buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      try {
+        const url = new URL(window.location.href);
+        const currentTab = url.searchParams.get('tab') || 'dashboard';
+        const currentFilter = url.searchParams.get('filter');
+        setActiveTabOverride(currentTab);
+        setActiveKpiFilter(currentFilter && currentFilter !== 'today' ? currentFilter : null);
+        sessionStorage.setItem('hq_active_tab', currentTab);
+      } catch {}
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Shared Live Server Schedules -> Annotated HqBookings
   const [bookings, setBookings] = useState<HqBooking[]>([]);
@@ -524,9 +572,28 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
     setSelectedBooking(booking); setBookingModalSection('assignment'); setIsDetailModalOpen(true);
   };
   const navigateWorkspace = (tab: string, filter?: string) => {
-    setActiveTabOverride(tab); setSearchQuery(''); setActiveKpiFilter(filter && filter !== 'today' ? filter : null);
+    setActiveTabOverride(tab);
+    setSearchQuery('');
+    setActiveKpiFilter(filter && filter !== 'today' ? filter : null);
     setActiveDispatchTab(filter === 'today' ? 'today' : filter ? 'all' : representativeMode ? 'action' : 'all');
-    setMobileDispatchSubView('list'); window.scrollTo({ top: 0 });
+    setMobileDispatchSubView('list');
+    window.scrollTo({ top: 0 });
+
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.setItem('hq_active_tab', tab);
+        const url = new URL(window.location.href);
+        url.searchParams.set('tab', tab);
+        if (filter && filter !== 'today') {
+          url.searchParams.set('filter', filter);
+        } else {
+          url.searchParams.delete('filter');
+        }
+        window.history.replaceState(null, '', url.pathname + url.search);
+      } catch (err) {
+        console.error('Failed to sync tab to URL:', err);
+      }
+    }
   };
 
   const todayFullLabel = formatKoreanFullDateLabel();
@@ -675,7 +742,7 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
           ) : activeSidebarTab === 'customers' ? (
             <HqCustomersView
               initialSearchQuery={searchQuery}
-              onOpenSettlementReport={() => setActiveTabOverride('reports')}
+              onOpenSettlementReport={() => navigateWorkspace('reports')}
             />
           ) : activeSidebarTab === 'reports' ? (
             <HqReportsView initialSearchQuery={searchQuery} />
@@ -691,7 +758,7 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
                   onSavedServer={() => fetchSharedBookings(true)}
                   onCreateBooking={() => {
                     fetchSharedBookings(true);
-                    setActiveTabOverride('dispatch');
+                    navigateWorkspace('dispatch');
                   }}
                 />
               </div>
@@ -914,7 +981,7 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
         onClose={() => setIsQuoteModalOpen(false)}
         onBookingConverted={() => {
           fetchSharedBookings(true);
-          setActiveTabOverride('dispatch');
+          navigateWorkspace('dispatch');
         }}
       />
 
