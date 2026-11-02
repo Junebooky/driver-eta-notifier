@@ -104,7 +104,7 @@ export function purgeLocalCaches() {
  * Switches the active development test profile (admin, driver_a, driver_b).
  * Only works when DEV_AUTH_ENABLED=true on localhost.
  */
-export async function switchDevAccount(target: 'admin' | 'driver_a' | 'driver_b'): Promise<boolean> {
+export async function switchDevAccount(target: 'admin' | 'driver' | 'driver_a' | 'driver_b'): Promise<boolean> {
   if (typeof window === 'undefined') return false;
 
   try {
