@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   AlertTriangle,
   XCircle,
-  MoreHorizontal,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -239,13 +238,12 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
               <th className="py-3 px-3 text-right">운행합</th>
               <th className="py-3 px-3 text-right">경비지출</th>
               <th className="py-3 px-3 text-center">상태</th>
-              <th className="py-3 px-3 text-center">작업</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100/90 text-slate-700 font-medium">
             {logs.length === 0 ? (
               <tr>
-                <td colSpan={16} className="py-12 text-center text-slate-400 text-xs">
+                <td colSpan={15} className="py-12 text-center text-slate-400 text-xs">
                   조건에 해당하는 운행일지가 없습니다.
                 </td>
               </tr>
@@ -348,34 +346,6 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
 
                     {/* 상태 */}
                     <td className="py-3 px-3 text-center">{renderStatusBadge(log.status)}</td>
-
-                    {/* 작업 */}
-                    <td className="py-3 px-3 text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            haptics.lightTap();
-                            onSelectLog(log);
-                          }}
-                          className="px-2 py-0.5 border border-slate-200 hover:border-[#1E60F3] hover:text-[#1E60F3] rounded text-[11px] font-bold text-slate-600 transition-colors"
-                        >
-                          보기
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            haptics.lightTap();
-                            onSelectLog(log);
-                          }}
-                          className="p-1 text-slate-400 hover:text-slate-600 rounded transition-colors"
-                        >
-                          <MoreHorizontal className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
                   </tr>
                 );
               })
