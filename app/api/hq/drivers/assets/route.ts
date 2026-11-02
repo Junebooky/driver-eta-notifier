@@ -7,6 +7,7 @@ import {
   getDriverProfileAsset,
   getDriverVehicleBundle,
   getDriverVehicleInfoAsset,
+  getDriverVehicleAssetSummary,
 } from '@/lib/assets/driverAssetServerStore';
 import { resolveVehicleEntity } from '@/utils/vehicleData';
 
@@ -117,12 +118,16 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const bundle = await getDriverVehicleBundle(driverId, resolvedVehicle.uuid, undefined, org);
+    const [bundle, vehicleAssetSummary] = await Promise.all([
+      getDriverVehicleBundle(driverId, resolvedVehicle.uuid, undefined, org),
+      getDriverVehicleAssetSummary(driverId, org),
+    ]);
     return NextResponse.json({
       ok: true,
       isDbReady: dbCheck.isReady,
       dbReason: dbCheck.reason,
       bundle,
+      vehicleAssetSummary,
     });
   } catch (err: any) {
     return NextResponse.json(

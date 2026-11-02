@@ -644,6 +644,54 @@ export async function getDriverVehicleBundle(
   };
 }
 
+/**
+ * Returns summary of PC and Mobile info asset existence for all vehicles of a driver.
+ */
+export async function getDriverVehicleAssetSummary(
+  driverId: string,
+  org: string = DEFAULT_ORG
+): Promise<Record<string, { pc: boolean; mobile: boolean }>> {
+  const summary: Record<string, { pc: boolean; mobile: boolean }> = {};
+  const isTestEnv = isAssetTestRuntime();
+
+  if (isTestEnv && !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    for (const [key, val] of inMemoryInfos.entries()) {
+      const parts = key.split(':');
+      if (parts[0] === org && parts[1] === driverId && val.status === 'active') {
+        const vId = parts[2];
+        const variant = parts[3] as 'pc' | 'mobile';
+        if (!summary[vId]) summary[vId] = { pc: false, mobile: false };
+        if (variant === 'pc') summary[vId].pc = true;
+        if (variant === 'mobile') summary[vId].mobile = true;
+      }
+    }
+    return summary;
+  }
+
+  try {
+    const { data } = await supabaseAdmin
+      .from('driver_vehicle_info_assets')
+      .select('vehicle_id, variant')
+      .eq('organization_id', org)
+      .eq('driver_id', driverId)
+      .eq('status', 'active');
+
+    if (data) {
+      for (const row of data) {
+        if (!summary[row.vehicle_id]) {
+          summary[row.vehicle_id] = { pc: false, mobile: false };
+        }
+        if (row.variant === 'pc') summary[row.vehicle_id].pc = true;
+        if (row.variant === 'mobile') summary[row.vehicle_id].mobile = true;
+      }
+    }
+  } catch {
+    // Return graceful fallback
+  }
+
+  return summary;
+}
+
 // -----------------------------------------------------------------------------
 // Dispatch Logs & Snapshots
 // -----------------------------------------------------------------------------
