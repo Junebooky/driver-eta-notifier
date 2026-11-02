@@ -23,6 +23,10 @@ import {
   Flag,
   Plane,
   RefreshCw,
+  BellRing,
+  MessageSquareText,
+  ExternalLink,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { HqBooking } from '@/types/hq';
 import { haptics } from '@/utils/haptics';
@@ -73,6 +77,14 @@ export interface HqQuickDispatchProps {
     booking: Partial<HqBooking> | Partial<HqBooking>[],
     isDraft: boolean
   ) => void;
+  isModal?: boolean;
+  isOpen?: boolean;
+  onClose?: () => void;
+  initialBooking?: HqBooking | null;
+  onRemindDriver?: (booking: HqBooking) => Promise<void> | void;
+  onOpenCustomerMessage?: (booking: HqBooking) => void;
+  onOpenDriverVehicleInfo?: (booking: HqBooking) => void;
+  onOpenDetailModal?: (booking: HqBooking) => void;
 }
 
 const VEHICLE_OPTIONS = VIP_REAL_VEHICLES.map((v) => ({
@@ -260,53 +272,194 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
   existingBookings = [],
   onSavedBookings,
   onCreateBooking,
+  isModal = false,
+  isOpen = true,
+  onClose,
+  initialBooking = null,
+  onRemindDriver,
+  onOpenCustomerMessage,
+  onOpenDriverVehicleInfo,
+  onOpenDetailModal,
 }) => {
   // 1. Customer Selection
-  const [customerName, setCustomerName] = useState('');
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [customerName, setCustomerName] = useState(() => initialBooking?.customerName || '');
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(() => initialBooking?.customerId || null);
   const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
   const customerDropdownRef = useRef<HTMLDivElement>(null);
 
   // 2. Date Range State (Single Day vs Multiple Days)
-  const [pickupDate, setPickupDate] = useState(() => getKstTodayDateStr());
-  const [pickupEndDate, setPickupEndDate] = useState<string>(() => getKstTodayDateStr());
+  const [pickupDate, setPickupDate] = useState(() => initialBooking?.pickupDate || getKstTodayDateStr());
+  const [pickupEndDate, setPickupEndDate] = useState<string>(() => initialBooking?.endDate || initialBooking?.pickupDate || getKstTodayDateStr());
 
   // 3. Pickup Time State
-  const [pickupTimeOnly, setPickupTimeOnly] = useState('09:00');
-  const [endTime, setEndTime] = useState('');
-  const fleet = useFleetAvailability(pickupDate, pickupTimeOnly, pickupEndDate || pickupDate, endTime);
+  const [pickupTimeOnly, setPickupTimeOnly] = useState(() => initialBooking?.pickupTime || '09:00');
+  const [endTime, setEndTime] = useState(() => initialBooking?.endTime || '');
+  const excludeScheduleId = initialBooking?.scheduleId || initialBooking?.id;
+  const fleet = useFleetAvailability(pickupDate, pickupTimeOnly, pickupEndDate || pickupDate, endTime, excludeScheduleId);
   const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
   const timePickerRef = useRef<HTMLDivElement>(null);
 
   // 4. Locations
-  const [pickupLocation, setPickupLocation] = useState('');
-  const [destination, setDestination] = useState('');
+  const [pickupLocation, setPickupLocation] = useState(() => initialBooking?.pickupLocation || '');
+  const [destination, setDestination] = useState(() => initialBooking?.destination || '');
 
   // 5. Vehicle Model Selection
-  const [selectedVehicleModel, setSelectedVehicleModel] = useState('');
+  const [selectedVehicleModel, setSelectedVehicleModel] = useState(() => (initialBooking?.vehicleModel && initialBooking.vehicleModel !== '-' ? initialBooking.vehicleModel : ''));
   const [isVehicleModelDropdownOpen, setIsVehicleModelDropdownOpen] = useState(false);
   const vehicleModelRef = useRef<HTMLDivElement>(null);
 
   // 6. Additional Info Accordion & Fields
   // Extra Info Accordion Open/Closed State (default collapsed per Reference 1)
   const [isExtraInfoOpen, setIsExtraInfoOpen] = useState(false);
-  const [commonLanguage, setCommonLanguage] = useState<RequestedDriverLanguage>('ko');
-  const [commonFlightNumber, setCommonFlightNumber] = useState('');
-  const [commonPassengerCount, setCommonPassengerCount] = useState<number>(1);
-  const [commonPassengerName, setCommonPassengerName] = useState('');
-  const [commonPassengerPhone, setCommonPassengerPhone] = useState('');
-  const [commonMemo, setCommonMemo] = useState('');
+  const [commonLanguage, setCommonLanguage] = useState<RequestedDriverLanguage>(() => initialBooking?.requestedLanguage || 'ko');
+  const [commonFlightNumber, setCommonFlightNumber] = useState(() => initialBooking?.flightNumber || '');
+  const [commonPassengerCount, setCommonPassengerCount] = useState<number>(() => initialBooking?.passengerCount || 1);
+  const [commonPassengerName, setCommonPassengerName] = useState(() => initialBooking?.passengerName || '');
+  const [commonPassengerPhone, setCommonPassengerPhone] = useState(() => initialBooking?.passengerPhone || '');
+  const [commonMemo, setCommonMemo] = useState(() => initialBooking?.notes || '');
 
   // Allocations (1 to N vehicles)
-  const [allocations, setAllocations] = useState<VehicleAllocationItem[]>([
-    createInitialAllocation(1, 'ko', false),
-  ]);
+  const [allocations, setAllocations] = useState<VehicleAllocationItem[]>(() => {
+    if (initialBooking) {
+      const cleanModel = initialBooking.vehicleModel && initialBooking.vehicleModel !== '-' ? initialBooking.vehicleModel : '';
+      const cleanPlate = initialBooking.vehiclePlate && initialBooking.vehiclePlate !== '미배정' ? initialBooking.vehiclePlate : '';
+      return [{
+        id: `alloc-init-${initialBooking.id}`,
+        vehicleIndex: 1,
+        selectedDriver: initialBooking.driverId || '',
+        selectedVehicleModel: cleanModel,
+        selectedVehiclePlate: cleanPlate,
+        requestedLanguage: initialBooking.requestedLanguage || 'ko',
+        languageOverrideConfirmed: false,
+        serviceMode: initialBooking.serviceMode || 'with_driver',
+        hasCustomItinerary: false,
+        customPassengerName: initialBooking.passengerName || '',
+        customPassengerPhone: initialBooking.passengerPhone || '',
+        customFlightNumber: initialBooking.flightNumber || '',
+        customPickupTime: initialBooking.pickupTime || '',
+        customPickupLocation: initialBooking.pickupLocation || '',
+        customDestination: initialBooking.destination || '',
+        customNotes: initialBooking.notes || '',
+      }];
+    }
+    return [createInitialAllocation(1, 'ko', false)];
+  });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [saveMutation]=useState(()=>createRetryableJsonMutation('cockpit_pending_quick_dispatch'));
   const submitLock=useRef(false);
   const [notificationMsg, setNotificationMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isReminding, setIsReminding] = useState(false);
+  const [remindSuccess, setRemindSuccess] = useState(false);
+
+  // Sync state when initialBooking prop changes
+  useEffect(() => {
+    if (initialBooking) {
+      setCustomerName(initialBooking.customerName || '');
+      setSelectedCustomerId(initialBooking.customerId || null);
+      setPickupDate(initialBooking.pickupDate || getKstTodayDateStr());
+      setPickupEndDate(initialBooking.endDate || initialBooking.pickupDate || getKstTodayDateStr());
+      setPickupTimeOnly(initialBooking.pickupTime || '09:00');
+      setEndTime(initialBooking.endTime || '');
+      setPickupLocation(initialBooking.pickupLocation || '');
+      setDestination(initialBooking.destination || '');
+      const cleanModel = initialBooking.vehicleModel && initialBooking.vehicleModel !== '-' ? initialBooking.vehicleModel : '';
+      setSelectedVehicleModel(cleanModel);
+      setCommonPassengerName(initialBooking.passengerName || '');
+      setCommonPassengerPhone(initialBooking.passengerPhone || '');
+      setCommonFlightNumber(initialBooking.flightNumber || '');
+      setCommonMemo(initialBooking.notes || '');
+      setCommonPassengerCount(initialBooking.passengerCount || 1);
+      const lang = initialBooking.requestedLanguage || 'ko';
+      setCommonLanguage(lang);
+
+      let driverId = initialBooking.driverId || '';
+      if (!driverId && initialBooking.driverName && initialBooking.driverName !== '-' && fleet.data?.drivers) {
+        const match = fleet.data.drivers.find(d => d.name === initialBooking.driverName);
+        if (match) driverId = match.id;
+      }
+      const cleanPlate = initialBooking.vehiclePlate && initialBooking.vehiclePlate !== '미배정' ? initialBooking.vehiclePlate : '';
+
+      setAllocations([
+        {
+          id: `alloc-init-${initialBooking.id}`,
+          vehicleIndex: 1,
+          selectedDriver: driverId,
+          selectedVehicleModel: cleanModel,
+          selectedVehiclePlate: cleanPlate,
+          requestedLanguage: lang,
+          languageOverrideConfirmed: false,
+          serviceMode: initialBooking.serviceMode || 'with_driver',
+          hasCustomItinerary: false,
+          customPassengerName: initialBooking.passengerName || '',
+          customPassengerPhone: initialBooking.passengerPhone || '',
+          customFlightNumber: initialBooking.flightNumber || '',
+          customPickupTime: initialBooking.pickupTime || '',
+          customPickupLocation: initialBooking.pickupLocation || '',
+          customDestination: initialBooking.destination || '',
+          customNotes: initialBooking.notes || '',
+        }
+      ]);
+    } else {
+      setCustomerName('');
+      setSelectedCustomerId(null);
+      setPickupDate(getKstTodayDateStr());
+      setPickupEndDate(getKstTodayDateStr());
+      setPickupTimeOnly('09:00');
+      setEndTime('');
+      setPickupLocation('');
+      setDestination('');
+      setSelectedVehicleModel('');
+      setCommonPassengerName('');
+      setCommonPassengerPhone('');
+      setCommonFlightNumber('');
+      setCommonMemo('');
+      setCommonPassengerCount(1);
+      setCommonLanguage('ko');
+      setAllocations([createInitialAllocation(1, 'ko', false)]);
+    }
+    setErrorMsg(null);
+    setNotificationMsg(null);
+  }, [initialBooking]);
+
+  // Sync driverId if fleet.data.drivers loads asynchronously
+  useEffect(() => {
+    if (initialBooking && initialBooking.driverName && initialBooking.driverName !== '-' && fleet.data?.drivers) {
+      const match = fleet.data.drivers.find(d => d.name === initialBooking.driverName);
+      if (match) {
+        setAllocations(prev => prev.map((a, idx) => idx === 0 && !a.selectedDriver ? { ...a, selectedDriver: match.id } : a));
+      }
+    }
+  }, [fleet.data?.drivers, initialBooking]);
+
+  // Modal ESC key listener
+  useEffect(() => {
+    if (!isModal || !isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose?.();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isModal, isOpen, onClose]);
+
+  const handleRemindClick = async () => {
+    if (!initialBooking || !onRemindDriver || isReminding) return;
+    setIsReminding(true);
+    try {
+      await onRemindDriver(initialBooking);
+      haptics.successPulse();
+      setRemindSuccess(true);
+      setTimeout(() => setRemindSuccess(false), 3000);
+    } catch {
+      haptics.errorAlert();
+      setErrorMsg('기사 재알림 전송 실패: 네트워크 상태를 확인해 주세요.');
+    } finally {
+      setIsReminding(false);
+    }
+  };
 
   const liveVehiclePresets = useSyncExternalStore(
     subscribeSettlementReports,
@@ -484,10 +637,13 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
       }
     }
 
+    const isEditMode = Boolean(initialBooking);
     const totalVehicles = allocations.length;
     const isMultiVehicleGroup = totalVehicles > 1;
-    const sharedEventId = `ev-${Date.now()}`;
-    const sharedGroupId = isMultiVehicleGroup ? `grp-${Date.now()}` : undefined;
+    const sharedEventId = (isEditMode && initialBooking?.eventId) || `ev-${Date.now()}`;
+    const sharedGroupId = isMultiVehicleGroup
+      ? (isEditMode && initialBooking?.groupId ? initialBooking.groupId : `grp-${Date.now()}`)
+      : undefined;
     const sharedGroupName = `${customerName.trim()} ${isMultiVehicleGroup ? `VIP 단체 의전 (${totalVehicles}대)` : 'VIP 의전'}`;
 
     const isMultiDay = Boolean(pickupEndDate && pickupEndDate !== pickupDate);
@@ -530,11 +686,17 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
 
       const dateCompact = pickupDate.replace(/-/g, '').slice(2);
       const randSuffix = String(Math.floor(100 + Math.random() * 900));
-      const bookingNo = isMultiVehicleGroup
+      const fallbackBookingNo = isMultiVehicleGroup
         ? `#${dateCompact}-${randSuffix}-${vehicleNum}`
         : `#${dateCompact}-${randSuffix}`;
 
+      const bookingNo = (isEditMode && initialBooking?.bookingNo) ? initialBooking.bookingNo : fallbackBookingNo;
+      const scheduleId = (isEditMode && (initialBooking?.scheduleId || initialBooking?.id)) ? (initialBooking.scheduleId || initialBooking.id) : undefined;
+      const expectedVersion = isEditMode ? initialBooking?.version : undefined;
+
       return {
+        scheduleId,
+        expectedVersion,
         bookingNo,
         customerName: customerName.trim(),
         customerId: selectedCustomerId || undefined,
@@ -568,7 +730,9 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
         notes: combinedNotes || undefined,
         dispatchStatus: mode,
         allowUnverified: true,
-        publishedBy: mode === 'unassigned' ? '사모님(예약접수)' : '대표님(배차확정)',
+        publishedBy: isEditMode
+          ? (mode === 'unassigned' ? '사모님(예약수정)' : '대표님(배차확정)')
+          : (mode === 'unassigned' ? '사모님(예약접수)' : '대표님(배차확정)'),
         requestedLanguage: alloc.requestedLanguage,
         languageOverrideConfirmed: alloc.languageOverrideConfirmed,
         serviceMode: alloc.serviceMode,
@@ -655,32 +819,44 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
 
       if (mode === 'unassigned') {
         setNotificationMsg(
-          isMultiVehicleGroup
+          isEditMode
+            ? '예약 정보가 수정되어 배차 대기함에 반영되었습니다.'
+            : isMultiVehicleGroup
             ? `전화 예약 ${totalVehicles}대가 [배차 대기함(미배정)]에 등록되었습니다. 대표님 스마트폰에서 바로 배차 확정할 수 있습니다.`
             : `전화 예약이 [배차 대기함(미배정)]에 등록되었습니다. 대표님 스마트폰에서 차량·기사를 배정할 수 있습니다.`
         );
       } else {
         setNotificationMsg(
-          isMultiVehicleGroup
+          isEditMode
+            ? '배차가 확정되어 담당 기사님의 Driver Cockpit에 즉시 반영되었습니다!'
+            : isMultiVehicleGroup
             ? `총 ${totalVehicles}대 배차가 확정되어 각 담당 기사님의 Driver Cockpit에 즉시 반영되었습니다!`
             : `배차가 확정되어 담당 기사님의 Driver Cockpit에 즉시 반영되었습니다!`
         );
       }
 
-      // Reset form cleanly
-      setCustomerName('');
-      setSelectedCustomerId(null);
-      setPickupLocation('');
-      setDestination('');
-      setSelectedVehicleModel('');
-      setCommonPassengerName('');
-      setCommonPassengerPhone('');
-      setCommonFlightNumber('');
-      setCommonMemo('');
-      setCommonLanguage('ko');
-      setCommonPassengerCount(1);
-      setIsExtraInfoOpen(false);
-      setAllocations([createInitialAllocation(1, 'ko', false)]);
+      if (isModal) {
+        setTimeout(() => {
+          onClose?.();
+        }, 1200);
+      }
+
+      // Reset form cleanly if not in edit modal mode
+      if (!isEditMode) {
+        setCustomerName('');
+        setSelectedCustomerId(null);
+        setPickupLocation('');
+        setDestination('');
+        setSelectedVehicleModel('');
+        setCommonPassengerName('');
+        setCommonPassengerPhone('');
+        setCommonFlightNumber('');
+        setCommonMemo('');
+        setCommonLanguage('ko');
+        setCommonPassengerCount(1);
+        setIsExtraInfoOpen(false);
+        setAllocations([createInitialAllocation(1, 'ko', false)]);
+      }
 
       setTimeout(() => {
         setNotificationMsg(null);
@@ -699,23 +875,206 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
     try{await submit(mode);}finally{submitLock.current=false;}
   };
 
-  return (
-    <div className="@container bg-white border border-slate-200/90 rounded-[24px] p-5 sm:p-6 shadow-[0_10px_30px_rgba(0,0,0,0.04)] select-none flex flex-col justify-between">
+  if (isModal && !isOpen) return null;
+
+  const content = (
+    <div
+      className={`@container bg-white select-none flex flex-col justify-between ${
+        isModal
+          ? 'w-full'
+          : 'border border-slate-200/90 rounded-[24px] p-5 sm:p-6 shadow-[0_10px_30px_rgba(0,0,0,0.04)]'
+      }`}
+    >
       <div>
-        {/* 1. Header (Reference 1) */}
-        <div className="flex items-center gap-3 pb-4">
-          <div className="w-12 h-12 rounded-2xl bg-[#EBF3FF] text-[#1E60F3] flex items-center justify-center shrink-0">
-            <BrandFilledCarIcon className="w-6 h-6" />
+        {/* 1. Header */}
+        <div className="flex items-center justify-between gap-3 pb-3.5 border-b border-slate-100">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-[#EBF3FF] text-[#1E60F3] flex items-center justify-center shrink-0 shadow-2xs">
+              <BrandFilledCarIcon className="w-6 h-6" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight">
+                  {initialBooking ? '예약 · 배차 상세 및 빠른 수정' : '빠른 예약 · 배차'}
+                </h2>
+                {initialBooking && (
+                  <span className="font-mono text-xs font-black px-2 py-0.5 rounded-md bg-blue-50 text-[#1E60F3] border border-blue-200">
+                    {initialBooking.bookingNo}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-400 font-normal leading-relaxed mt-0.5 truncate">
+                {initialBooking
+                  ? '예약 일정 수정, 실차·담당 기사 즉시 배정 및 확인 관리'
+                  : '필수 정보만 입력하고 예약하거나 바로 배차하세요.'}
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-lg font-extrabold text-slate-900 tracking-tight">
-              빠른 예약 · 배차
-            </h2>
-            <p className="text-xs text-slate-400 font-normal leading-relaxed mt-0.5">
-              필수 정보만 입력하고 예약하거나 바로 배차하세요.
-            </p>
-          </div>
+
+          {isModal && onClose && (
+            <button
+              type="button"
+              onClick={() => {
+                haptics.lightTap();
+                onClose();
+              }}
+              className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 active:scale-95 flex items-center justify-center text-slate-500 hover:text-slate-800 cursor-pointer transition-colors shrink-0"
+              aria-label="닫기"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
         </div>
+
+        {/* Connected Booking Action & Status Bar (Only in Edit/Row-Click Mode) */}
+        {initialBooking && (
+          <div className="mt-3.5 mb-2 rounded-2xl bg-gradient-to-r from-blue-50/80 via-indigo-50/60 to-white border border-blue-200/90 p-3.5 sm:p-4 shadow-2xs">
+            {/* Top Row: Identity and Real-time Statuses */}
+            <div className="flex flex-wrap items-center justify-between gap-2.5 pb-2.5 border-b border-blue-100/90">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-black text-slate-800">
+                  {initialBooking.customerName}
+                </span>
+                {initialBooking.passengerName && initialBooking.passengerName !== initialBooking.customerName && (
+                  <span className="text-[11px] text-slate-500 font-medium">
+                    (탑승: {initialBooking.passengerName})
+                  </span>
+                )}
+                {initialBooking.driverName && initialBooking.driverName !== '-' && (
+                  <span className="text-[11px] font-bold text-slate-700 bg-white px-2 py-0.5 rounded-md border border-slate-200">
+                    기사: {initialBooking.driverName}
+                  </span>
+                )}
+                {initialBooking.vehiclePlate && initialBooking.vehiclePlate !== '미배정' && (
+                  <span className="text-[11px] font-bold text-slate-700 bg-white px-2 py-0.5 rounded-md border border-slate-200">
+                    차량: {initialBooking.vehiclePlate} ({stripManufacturerName(initialBooking.vehicleModel)})
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* 배차 상태 Badge */}
+                <span
+                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black ${
+                    initialBooking.dispatchStatus === '배차 완료'
+                      ? 'bg-[#1E60F3] text-white shadow-xs'
+                      : initialBooking.dispatchStatus === '재확인 필요'
+                      ? 'bg-indigo-600 text-white'
+                      : initialBooking.dispatchStatus === '취소'
+                      ? 'bg-slate-200 text-slate-600 line-through'
+                      : 'bg-amber-100 text-amber-800 border border-amber-300'
+                  }`}
+                >
+                  <span>{initialBooking.dispatchStatus}</span>
+                  {initialBooking.version && initialBooking.version > 1 && (
+                    <span className="text-[10px] opacity-80 font-mono">v{initialBooking.version}</span>
+                  )}
+                </span>
+
+                {/* 기사 확인 현황 Badge */}
+                <span
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold ${
+                    initialBooking.driverAck === '확인완료'
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                      : initialBooking.driverAck === '재확인 필요'
+                      ? 'bg-indigo-100 text-indigo-800 border border-indigo-300'
+                      : 'bg-amber-50 text-amber-900 border border-amber-200'
+                  }`}
+                >
+                  {initialBooking.driverAck === '확인완료' ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  ) : (
+                    <Clock className="w-3.5 h-3.5 text-amber-600" />
+                  )}
+                  <span>
+                    {initialBooking.driverAck === '확인완료'
+                      ? '기사 확인완료'
+                      : initialBooking.driverAck === '재확인 필요'
+                      ? '재확인 대기'
+                      : '기사 미확인'}
+                  </span>
+                  {initialBooking.driverAckTime && (
+                    <span className="text-[10px] text-slate-500 font-normal">
+                      ({initialBooking.driverAckTime})
+                    </span>
+                  )}
+                </span>
+              </div>
+            </div>
+
+            {/* Bottom Row: Connected Actions */}
+            <div className="pt-2.5 flex flex-wrap items-center gap-2">
+              {/* 1. 기사 미확인 재알림 전송 */}
+              {onRemindDriver && (
+                <button
+                  type="button"
+                  onClick={handleRemindClick}
+                  disabled={isReminding}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95 ${
+                    remindSuccess
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-amber-500 hover:bg-amber-600 text-white'
+                  }`}
+                  title="담당 기사 스마트폰 Cockpit으로 즉시 확인 요청 알림을 재전송합니다"
+                >
+                  <BellRing className={`w-3.5 h-3.5 ${isReminding ? 'animate-bounce' : ''}`} />
+                  <span>{remindSuccess ? '기사 재알림 전송됨!' : isReminding ? '전송 중...' : '기사 미확인 재알림 전송'}</span>
+                </button>
+              )}
+
+              {/* 2. 고객사 자동 안내메시지 */}
+              {onOpenCustomerMessage && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    haptics.lightTap();
+                    onOpenCustomerMessage(initialBooking);
+                  }}
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold bg-[#1E60F3] hover:bg-blue-600 text-white transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
+                  title="고객사 자동 안내메시지 (배차확정·기사정보·출발도착 알림) 확인 및 발송"
+                >
+                  <MessageSquareText className="w-3.5 h-3.5" />
+                  <span>
+                    고객사 안내메시지
+                    {initialBooking.pendingCustomerTrigger ? ' (안내준비됨)' : ''}
+                  </span>
+                </button>
+              )}
+
+              {/* 3. Info 고객 안내자료 */}
+              {onOpenDriverVehicleInfo && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    haptics.lightTap();
+                    onOpenDriverVehicleInfo(initialBooking);
+                  }}
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
+                  title="고객 안내용 기사 프로필 & 차량 안내장 카드 확인 및 이미지 다운로드"
+                >
+                  <ImageIcon className="w-3.5 h-3.5 text-[#1E60F3]" />
+                  <span>Info 고객 안내자료</span>
+                </button>
+              )}
+
+              {/* 4. 전체 상세 / 배정 보기 */}
+              {onOpenDetailModal && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    haptics.lightTap();
+                    onOpenDetailModal(initialBooking);
+                  }}
+                  className="ml-auto px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                  title="기존 상세 배정 모달 (운행 기록 및 정산 세부사항) 열기"
+                >
+                  <span>상세 배정 전체보기</span>
+                  <ExternalLink className="w-3 h-3 text-slate-500" />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* 2. Main Form Fields */}
         <div className="space-y-3.5 mt-1">
@@ -1248,10 +1607,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
       </div>
 
       {saveMutation.hasPending && <button type="button" className="rounded-xl border border-blue-200 p-3 text-sm text-blue-700" disabled={isSubmitting} onClick={async()=>{setIsSubmitting(true);try{const response=await saveMutation.retry();const data=await response.json();if(!response.ok)throw new Error(data.error || '저장 결과 확인 실패');window.location.reload();}catch(error){setErrorMsg(error instanceof Error?error.message:'확인 실패');}finally{setIsSubmitting(false);}}}>이전 저장 결과 확인</button>}
-      {/* 4. Action Buttons (Reference 1) */}
+      {/* 4. Action Buttons */}
       <div className="pt-4 mt-2">
         <div className="grid grid-cols-2 gap-3">
-          {/* 예약만 등록 */}
+          {/* 예약만 등록 / 예약 수정 저장 */}
           <button
             type="button"
             disabled={isSubmitting}
@@ -1262,10 +1621,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
             className="w-full h-12 bg-white border border-slate-200 hover:bg-slate-50 active:scale-[0.98] text-slate-800 font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer disabled:opacity-50"
           >
             <FileText className="w-4 h-4 text-slate-700" />
-            <span>예약만 등록</span>
+            <span>{initialBooking ? '예약 수정 저장 (배차대기)' : '예약만 등록'}</span>
           </button>
 
-          {/* 바로 배차 */}
+          {/* 바로 배차 / 배차 확정 */}
           <button
             type="button"
             disabled={isSubmitting || !fleet.data || Boolean(fleet.error) || totalLiveConflicts > 0}
@@ -1280,16 +1639,43 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
             ) : (
               <Send className="w-4 h-4 text-white" />
             )}
-            <span>바로 배차</span>
+            <span>{initialBooking ? '배차 확정 (기사 Cockpit 전송)' : '바로 배차'}</span>
           </button>
         </div>
 
         {/* Helper Note */}
         <div className="flex items-center justify-center gap-1.5 pt-3 text-xs text-slate-400 font-medium text-center">
           <Info className="w-4 h-4 text-[#1E60F3] shrink-0" />
-          <span>예약만 등록하면 미배정 대기함에 저장됩니다.</span>
+          <span>
+            {initialBooking
+              ? '배차 확정 시 담당 기사의 Cockpit에 즉시 반영되며 기사 확인 상태가 관리됩니다.'
+              : '예약만 등록하면 미배정 대기함에 저장됩니다.'}
+          </span>
         </div>
       </div>
     </div>
   );
+
+  if (isModal) {
+    return (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={initialBooking ? '예약 · 배차 상세 및 빠른 수정' : '빠른 예약 · 배차'}
+        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            haptics.lightTap();
+            onClose?.();
+          }
+        }}
+      >
+        <div className="relative w-full max-w-4xl max-h-[92vh] overflow-y-auto bg-white rounded-3xl border border-slate-200/90 shadow-2xl p-5 sm:p-7 flex flex-col justify-between my-auto animate-in zoom-in-95 duration-150">
+          {content}
+        </div>
+      </div>
+    );
+  }
+
+  return content;
 };

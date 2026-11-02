@@ -23,6 +23,7 @@ import { HqKpiTiles } from '@/components/hq/HqKpiTiles';
 import { HqDispatchTable, HqDispatchTabKey } from '@/components/hq/HqDispatchTable';
 import { HqQuickDispatch } from '@/components/hq/HqQuickDispatch';
 import { HqBookingDetailModal } from '@/components/hq/HqBookingDetailModal';
+import { HqDriverVehicleInfoModal } from '@/components/hq/bookings/HqDriverVehicleInfoModal';
 import { HqDrivingLogsView } from '@/components/hq/driving-logs/HqDrivingLogsView';
 import { HqExpensesView } from '@/components/hq/expenses/HqExpensesView';
 import { HqEmailInboxView } from '@/components/hq/email/HqEmailInboxView';
@@ -85,6 +86,9 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
 
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [mobileDispatchSubView, setMobileDispatchSubView] = useState<'list' | 'form'>('list');
+  const [isQuickDispatchModalOpen, setIsQuickDispatchModalOpen] = useState(false);
+  const [quickDispatchBooking, setQuickDispatchBooking] = useState<HqBooking | null>(null);
+  const [infoModalBooking, setInfoModalBooking] = useState<HqBooking | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeDispatchTab, setActiveDispatchTab] = useState<HqDispatchTabKey>(()=>searchParams.get('view')==='action' || representativeMode ? 'action':'all');
@@ -473,27 +477,9 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
 
   // Open Fast Phone Intake Modal (usable from Header or Table on both PC & Mobile)
   const handleOpenQuickPhoneBookingModal = useCallback(() => {
-    const todayIso = getKstTodayDateStr();
-    const dateCompact = todayIso.replace(/-/g, '').slice(2);
-    setSelectedBooking({
-      id: `new_${Date.now()}`,
-      bookingNo: `#${dateCompact}-${String(Math.floor(100 + Math.random() * 900))}`,
-      no: bookings.length + 1,
-      customerName: '',
-      pickupDate: todayIso,
-      pickupTime: '09:00',
-      pickupLocation: '',
-      destination: '',
-      driverName: '-',
-      vehicleModel: '-',
-      vehiclePlate: '미배정',
-      dispatchStatus: '미배정',
-      driverAck: '-',
-      customerBrochure: '미발송',
-      intakeSource: 'phone',
-    });
-    setIsDetailModalOpen(true);
-  }, [bookings.length]);
+    setQuickDispatchBooking(null);
+    setIsQuickDispatchModalOpen(true);
+  }, []);
 
   // KPI Tile click handler
   const handleSelectKpi = (metricId: string) => {
@@ -780,86 +766,38 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
 
 
 
-                  {/* Section 1: 7 Live KPI Metric Tiles */}
-                  <section aria-label="운영 지표 현황" className="hidden md:block">
-                    <HqKpiTiles
-                      metrics={liveKpiMetrics}
-                      activeFilter={activeKpiFilter}
-                      onSelectMetric={handleSelectKpi}
-                    />
-                  </section>
-
-                  {/* Mobile / Tablet Quick Workspace Toggle (< xl) */}
-                  <div className="flex xl:hidden items-center bg-slate-200/70 p-1 rounded-xl text-xs font-black text-slate-600">
-                    <button
-                      type="button"
-                      onClick={() => setMobileDispatchSubView('list')}
-                      className={`flex-1 py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${mobileDispatchSubView === 'list'
-                          ? 'bg-white text-slate-900 shadow-xs'
-                          : 'hover:text-slate-900'
-                        }`}
-                    >
-                      <CalendarCheck className="w-3.5 h-3.5 text-[#1E60F3]" />
-                      <span>배차 대기함 · 예약 목록 ({kpiAndHeaderFilteredBookings.length})</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMobileDispatchSubView('form')}
-                      className={`flex-1 py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${mobileDispatchSubView === 'form'
-                          ? 'bg-white text-[#1E60F3] shadow-xs'
-                          : 'hover:text-slate-900'
-                        }`}
-                    >
-                      <PhoneCall className="w-3.5 h-3.5" />
-                      <span>전화 예약 · 빠른 배차 생성</span>
-                    </button>
-                  </div>
-
-                  {/* Section 2: Main Working Area (Left 8 Cols Table + Right 4 Cols Quick Dispatch) */}
+                  {/* Main Working Area (Full-width Dispatch Table) */}
                   <section
-                    aria-label="예약 대기함 및 빠른 배차 작업 영역"
-                    className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start"
+                    aria-label="예약 대기함 및 배차 확인 현황"
+                    className="w-full"
                   >
-                    <div
-                      className={`xl:col-span-7 2xl:col-span-7 ${mobileDispatchSubView !== 'list' ? 'hidden xl:block' : 'block'
-                        }`}
-                    >
-                      <HqDispatchTable
-                        bookings={kpiAndHeaderFilteredBookings}
-                        allBookingsForCounts={bookings}
-                        activeTab={activeDispatchTab}
-                        onSelectTab={(tab) => {
-                          setActiveKpiFilter(null);
-                          setActiveDispatchTab(tab);
-                        }}
-                        onOpenNewBooking={handleOpenQuickPhoneBookingModal}
-                        onAssignDriver={openAssignment}
-                        onViewBooking={(booking) => {
-                          setBookingModalSection('details');
-                          setSelectedBooking(booking);
-                          setIsDetailModalOpen(true);
-                        }}
-                        onOpenCustomerMessage={(booking) => {
-                          setCustomerMsgTarget({
-                            booking,
-                            trigger: booking.pendingCustomerTrigger || undefined,
-                          });
-                        }}
-                        onRemindDriver={async (booking) => {
-                          await handleSendDriverReminder(booking.scheduleId || booking.id);
-                        }}
-                      />
-                    </div>
-
-                    <div
-                      className={`xl:col-span-5 2xl:col-span-5 ${mobileDispatchSubView !== 'form' ? 'hidden xl:block' : 'block'
-                        }`}
-                    >
-                      <HqQuickDispatch
-                        existingBookings={bookings}
-                        onSavedBookings={() => fetchSharedBookings(true)}
-                      />
-                    </div>
+                    <HqDispatchTable
+                      bookings={kpiAndHeaderFilteredBookings}
+                      allBookingsForCounts={bookings}
+                      activeTab={activeDispatchTab}
+                      onSelectTab={(tab) => {
+                        setActiveKpiFilter(null);
+                        setActiveDispatchTab(tab);
+                      }}
+                      onOpenNewBooking={handleOpenQuickPhoneBookingModal}
+                      onAssignDriver={(booking) => {
+                        setQuickDispatchBooking(booking);
+                        setIsQuickDispatchModalOpen(true);
+                      }}
+                      onViewBooking={(booking) => {
+                        setQuickDispatchBooking(booking);
+                        setIsQuickDispatchModalOpen(true);
+                      }}
+                      onOpenCustomerMessage={(booking) => {
+                        setCustomerMsgTarget({
+                          booking,
+                          trigger: booking.pendingCustomerTrigger || undefined,
+                        });
+                      }}
+                      onRemindDriver={async (booking) => {
+                        await handleSendDriverReminder(booking.scheduleId || booking.id);
+                      }}
+                    />
                   </section>
 
                   {/* Section 3: Live Bottom Summary Cards */}
@@ -873,8 +811,8 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
                       onSelectItem={(item) => {
                         const target = bookings.find((b) => b.id === item.id);
                         if (target) {
-                          setSelectedBooking(target);
-                          setIsDetailModalOpen(true);
+                          setQuickDispatchBooking(target);
+                          setIsQuickDispatchModalOpen(true);
                         }
                       }}
                       onRemindItem={async (item) => {
@@ -887,13 +825,12 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
                       onViewAll={() => {
                         setActiveKpiFilter('kpi_unassigned');
                         setActiveDispatchTab('all');
-                        setMobileDispatchSubView('list');
                       }}
                       onSelectItem={(item) => {
                         const target = bookings.find((b) => b.id === item.id);
                         if (target) {
-                          setSelectedBooking(target);
-                          setIsDetailModalOpen(true);
+                          setQuickDispatchBooking(target);
+                          setIsQuickDispatchModalOpen(true);
                         }
                       }}
                     />
@@ -903,7 +840,6 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
                       onViewAll={() => {
                         setActiveKpiFilter(null);
                         setActiveDispatchTab('today');
-                        setMobileDispatchSubView('list');
                       }}
                     />
                   </section>
@@ -912,8 +848,55 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
         </main>
       </div>
 
-      <HqMobileNav activeTab={activeSidebarTab} formOpen={mobileDispatchSubView === 'form'} actionCount={operationalCounts.totalActionNeeded}
+      <HqMobileNav activeTab={activeSidebarTab} formOpen={isQuickDispatchModalOpen} actionCount={operationalCounts.totalActionNeeded}
         onNavigate={navigateWorkspace} onQuickBooking={handleOpenQuickPhoneBookingModal} onMenu={() => setIsMobileSidebarOpen(true)} />
+
+      {/* 4-A. Fast Booking & Quick Dispatch Modal (New Booking or Row-Click Edit / Assignment) */}
+      {isQuickDispatchModalOpen && (
+        <HqQuickDispatch
+          isModal
+          isOpen={isQuickDispatchModalOpen}
+          initialBooking={quickDispatchBooking}
+          existingBookings={bookings}
+          onClose={() => {
+            setIsQuickDispatchModalOpen(false);
+            setQuickDispatchBooking(null);
+          }}
+          onSavedBookings={async () => {
+            await fetchSharedBookings(true);
+          }}
+          onRemindDriver={async (booking) => {
+            await handleSendDriverReminder(booking.scheduleId || booking.id);
+          }}
+          onOpenCustomerMessage={(booking) => {
+            setCustomerMsgTarget({
+              booking,
+              trigger: booking.pendingCustomerTrigger || undefined,
+            });
+          }}
+          onOpenDriverVehicleInfo={(booking) => {
+            setInfoModalBooking(booking);
+          }}
+          onOpenDetailModal={(booking) => {
+            setSelectedBooking(booking);
+            setBookingModalSection('details');
+            setIsDetailModalOpen(true);
+          }}
+        />
+      )}
+
+      {/* 4-A2. Driver & Vehicle Info Modal opened directly from Quick Dispatch */}
+      {infoModalBooking && (
+        <HqDriverVehicleInfoModal
+          key={`${infoModalBooking.scheduleId || infoModalBooking.id}:${infoModalBooking.version}`}
+          isOpen={Boolean(infoModalBooking)}
+          booking={infoModalBooking}
+          onClose={() => setInfoModalBooking(null)}
+          onDispatchRecorded={(_status, _synced) => {
+            fetchSharedBookings(true);
+          }}
+        />
+      )}
 
       {/* 4. Interactive Booking Detail, Assignment, Edit & Cancel Modal */}
       <HqBookingDetailModal
@@ -941,8 +924,8 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
         onOpenBookingDetail={(bookingId) => {
           const found = bookings.find((b) => b.id === bookingId || b.scheduleId === bookingId);
           if (found) {
-            setSelectedBooking(found);
-            setIsDetailModalOpen(true);
+            setQuickDispatchBooking(found);
+            setIsQuickDispatchModalOpen(true);
           }
         }}
         onOpenCustomerMessage={(bookingId, trigger) => {

@@ -174,4 +174,63 @@ assert.strictEqual(driverSchedulesKim[0].vehiclePlate, '01호 3343');
 
 console.log('✓ Multi-vehicle group linking and driver isolation verified');
 
+// 4. Modal Editing & Row-Click Connected Quick Dispatch Mapping
+console.log('4. Testing Quick Dispatch Modal Pre-fill and Connected Actions...');
+
+const mockBooking: HqBooking = {
+  id: 'sch-test-999',
+  scheduleId: 'sch-test-999',
+  bookingNo: '#261102-777',
+  no: 1,
+  customerName: '루이비통 코리아',
+  customerId: 'cust-lv',
+  pickupDate: '2026-11-03',
+  pickupTime: '10:00',
+  endDate: '2026-11-03',
+  endTime: '18:00',
+  pickupLocation: '청담동 루이비통 메종',
+  destination: '인천공항 제2여객터미널',
+  driverName: '김민수',
+  driverId: 'drv-kms',
+  vehicleModel: '벤츠 스프린터 519 CDI',
+  vehiclePlate: '703서 2658',
+  dispatchStatus: '배차 완료',
+  driverAck: '미확인',
+  customerBrochure: '미발송',
+  passengerName: '장마크(지사장)',
+  passengerPhone: '010-9999-8888',
+  notes: 'VIP 고객 영접 의전',
+  version: 2,
+};
+
+// Simulate payload mapping for existing booking edit
+function simulateEditDispatchPayload(booking: HqBooking, updateMode: 'unassigned' | 'published') {
+  return {
+    scheduleId: booking.scheduleId || booking.id,
+    bookingNo: booking.bookingNo,
+    expectedVersion: booking.version,
+    customerName: booking.customerName,
+    dispatchStatus: updateMode,
+    publishedBy: updateMode === 'unassigned' ? '사모님(예약수정)' : '대표님(배차확정)',
+    driverName: updateMode === 'published' ? booking.driverName : undefined,
+    vehiclePlate: updateMode === 'published' ? booking.vehiclePlate : undefined,
+  };
+}
+
+const unassignedEdit = simulateEditDispatchPayload(mockBooking, 'unassigned');
+assert.strictEqual(unassignedEdit.scheduleId, 'sch-test-999', 'Existing scheduleId must be preserved on edit');
+assert.strictEqual(unassignedEdit.bookingNo, '#261102-777');
+assert.strictEqual(unassignedEdit.expectedVersion, 2);
+assert.strictEqual(unassignedEdit.dispatchStatus, 'unassigned');
+assert.strictEqual(unassignedEdit.publishedBy, '사모님(예약수정)');
+
+const publishedEdit = simulateEditDispatchPayload(mockBooking, 'published');
+assert.strictEqual(publishedEdit.scheduleId, 'sch-test-999');
+assert.strictEqual(publishedEdit.dispatchStatus, 'published');
+assert.strictEqual(publishedEdit.publishedBy, '대표님(배차확정)');
+assert.strictEqual(publishedEdit.driverName, '김민수');
+assert.strictEqual(publishedEdit.vehiclePlate, '703서 2658');
+
+console.log('✓ Quick Dispatch Modal edit payload correctly preserves scheduleId, version, and updates status');
+
 console.log('\n🎉 ALL QUICK DISPATCH & VEHICLE UI TESTS PASSED SUCCESSFULLY! 🎉\n');

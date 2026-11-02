@@ -213,7 +213,7 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
   };
 
   return (
-    <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col justify-between">
+    <div className="w-full bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col justify-between">
       {/* 1. Header */}
       <div className="flex items-center justify-between gap-2 pb-3.5 border-b border-slate-100">
         <div className="flex items-center gap-2 min-w-0">
@@ -225,7 +225,7 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
               예약 · 배차 대기함 및 확인 현황
             </h2>
             <p className="text-[11px] text-slate-400 font-medium truncate">
-              행을 터치/클릭하면 차량·기사 선정, 일정 변경(재확인), 배차 취소를 처리합니다
+              행을 클릭하면 빠른 예약·배차 모달이 열려 차량·기사 배정, 기사 확인 관리, 고객 안내를 즉시 처리할 수 있습니다
             </p>
           </div>
         </div>
@@ -493,15 +493,15 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
           tabIndex={0}
           role="region"
           aria-labelledby="hq-dispatch-table-caption"
-          className="hq-responsive-table-wrapper"
+          className="hq-responsive-table-wrapper w-full overflow-x-auto"
         >
-          <table className="text-left select-none min-w-[860px]">
+          <table className="w-full text-left select-none min-w-[960px]">
             <caption id="hq-dispatch-table-caption" className="sr-only">
               예약 접수 및 기사 배차 확인 현황 목록
             </caption>
             <thead>
               <tr className="border-b border-slate-200 text-[11px] font-bold text-slate-500 bg-slate-50">
-                <th scope="col" className="py-2.5 px-3 bg-slate-50">고객사 · 승객</th>
+                <th scope="col" className="py-2.5 px-3.5 bg-slate-50">고객사 · 승객</th>
                 <th scope="col" className="py-2.5 px-3 bg-slate-50">운행 일시</th>
                 <th scope="col" className="py-2.5 px-3 bg-slate-50">담당 기사</th>
                 <th scope="col" className="py-2.5 px-3 bg-slate-50">배정 차량</th>
@@ -613,12 +613,12 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                       </td>
 
                       {/* Col 5: 픽업 출발지 */}
-                      <td className="py-3 px-3 text-slate-700 font-medium max-w-[150px] truncate" title={b.pickupLocation}>
+                      <td className="py-3 px-3 text-slate-700 font-medium max-w-[200px] xl:max-w-[260px] truncate" title={b.pickupLocation}>
                         {b.pickupLocation}
                       </td>
 
                       {/* Col 6: 도착 목적지 */}
-                      <td className="py-3 px-3 text-slate-700 font-medium max-w-[160px] truncate" title={b.destination}>
+                      <td className="py-3 px-3 text-slate-700 font-medium max-w-[200px] xl:max-w-[260px] truncate" title={b.destination}>
                         <span>{b.destination}</span>
                         {b.flightNumber && (
                           <span className="ml-1 text-[10px] font-mono font-bold text-[#1E60F3]">
