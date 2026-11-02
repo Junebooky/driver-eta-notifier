@@ -133,10 +133,10 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
     const currentWps = extractedDraft.waypoints && extractedDraft.waypoints.length > 0
       ? [...extractedDraft.waypoints]
       : [
-          { id: 'wp-1', order: 1, date: fallbackDate, time: pickupTime !== '시간 미지정' ? pickupTime : '10:00', location: pickupLocation || '' },
-          { id: 'wp-2', order: 2, date: fallbackDate, time: '', location: dropoffLocation || '' },
-        ];
-    
+        { id: 'wp-1', order: 1, date: fallbackDate, time: pickupTime !== '시간 미지정' ? pickupTime : '10:00', location: pickupLocation || '' },
+        { id: 'wp-2', order: 2, date: fallbackDate, time: '', location: dropoffLocation || '' },
+      ];
+
     const nextIdx = currentWps.length + 1;
     const lastDate = currentWps[currentWps.length - 1]?.date || fallbackDate;
     const newWp: RouteWaypointItem = {
@@ -504,13 +504,12 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                     type="button"
                     onClick={handleSaveToCrm}
                     disabled={extractedDraft.isSavedToCrm || isSavingCrm}
-                    className={`px-2 py-1 rounded-lg text-[10px] font-extrabold border transition-colors shrink-0 flex items-center gap-1 ${
-                      extractedDraft.isSavedToCrm
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300 cursor-default'
-                        : isSavingCrm
+                    className={`px-2 py-1 rounded-lg text-[10px] font-extrabold border transition-colors shrink-0 flex items-center gap-1 ${extractedDraft.isSavedToCrm
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-300 cursor-default'
+                      : isSavingCrm
                         ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
                         : 'bg-blue-50 text-[#1E60F3] border-blue-200 hover:bg-blue-100 cursor-pointer'
-                    }`}
+                      }`}
                     title="고객 관리에 회사 및 담당자 정보를 저장하거나 연결합니다"
                   >
                     <BookmarkCheck className="w-3 h-3" />
@@ -518,8 +517,8 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                       {isSavingCrm
                         ? '저장 중...'
                         : extractedDraft.isSavedToCrm
-                        ? '고객 관리 연결됨'
-                        : '고객 관리에 저장'}
+                          ? '고객 관리 연결됨'
+                          : '고객 관리에 저장'}
                     </span>
                   </button>
                 </div>
@@ -647,9 +646,8 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                             onDragStart={() => handleDragStart(index)}
                             onDragOver={(e) => handleDragOver(e, index)}
                             onDragEnd={handleDragEnd}
-                            className={`flex items-center gap-1.5 group transition-all ${
-                              draggedIndex === index ? 'opacity-40' : 'opacity-100'
-                            }`}
+                            className={`flex items-center gap-1.5 group transition-all ${draggedIndex === index ? 'opacity-40' : 'opacity-100'
+                              }`}
                           >
                             {/* Drag handle (6 dots ⋮⋮) */}
                             <div
@@ -849,22 +847,22 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
               <Sparkles className="w-7 h-7 fill-[#1E60F3]" />
             </div>
             <h4 className="text-base font-extrabold text-slate-900">
-              AI 예약 정보 추출 대기 중
+              메일에서 예약 정보를 찾아낼까요?
             </h4>
             <p className="text-xs text-slate-500 max-w-sm leading-relaxed">
-              Gemini AI 모델이 본문 내용을 분석하여 고객사명, 담당자 연락처, 픽업 일시, TMAP 장소 후보 등을 안전하게 자동 구조화합니다.
+              고객사, 담당자 연락처, 픽업 일정부터 목적지까지 AI가 한눈에 보기 쉽게 정리해 드려요.
             </p>
             <button
               type="button"
               onClick={onExtractWithAi}
               disabled={isExtractingAi || isLoadingDetail}
-              className="mt-3 px-5 py-3 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white text-xs font-black shadow-md transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50"
+              className="mt-3 px-5 py-3 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white text-sm font-black shadow-md transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50"
             >
               <Sparkles className={`w-4 h-4 ${isExtractingAi ? 'animate-spin' : ''}`} />
-              <span>{isExtractingAi ? 'Gemini AI 실시간 분석 중...' : 'AI 예약 정보 추출 시작'}</span>
+              <span>{isExtractingAi ? '예약 내용을 꼼꼼히 읽고 있어요...' : '3초 만에 예약 정보 채우기'}</span>
             </button>
             <p className="text-[11px] text-slate-400 pt-2">
-              * 본사 관리자 명시 클릭 시에만 Gemini API가 호출됩니다.
+              * 직접 누르실 때만 안전하게 분석이 시작됩니다.
             </p>
           </div>
         )}

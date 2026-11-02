@@ -64,92 +64,6 @@ export const HqOfficialPricingView: React.FC<HqOfficialPricingViewProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* 1. Official Tariff Header Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 rounded-3xl border border-slate-700/80 p-6 shadow-xl relative overflow-hidden text-white">
-        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <span className="px-3 py-1 rounded-full text-xs font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1.5">
-                <Lock className="w-3.5 h-3.5 text-amber-400" />
-                회사 공식 2026 VIP 의전 요금표
-              </span>
-              <span className="px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-blue-500/20 text-blue-300 border border-blue-500/30">
-                초안 (Draft) • vlk_2026_initial
-              </span>
-              <span className="px-2 py-0.5 rounded text-[10.5px] font-bold bg-slate-800 text-slate-300">
-                14개 차종/상품 등록됨
-              </span>
-            </div>
-            <h2 className="text-xl md:text-2xl font-black text-slate-100 tracking-tight">
-              2026 차종별 공식 의전 요율 & 실시간 견적 엔진
-            </h2>
-            <p className="text-xs md:text-sm text-slate-400 max-w-2xl leading-relaxed font-medium">
-              일반 의전 9시간(수도권·지방) 및 공항 편도 3시간(김포·인천)을 기준으로 단일 SKU 체계를 적용합니다.
-              승인 전까지 초안(Draft) 상태를 유지하며, 실제 공식 요율을 바탕으로 즉시 실시간 견적을 산출할 수 있습니다.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2.5 shrink-0">
-            <button
-              type="button"
-              onClick={onOpenQuoteModal}
-              className="px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs md:text-sm shadow-lg shadow-amber-500/20 active:scale-95 transition-all cursor-pointer flex items-center gap-2"
-            >
-              <Calculator className="w-4 h-4" />
-              <span>공식 요금 견적서 작성</span>
-            </button>
-            <button
-              type="button"
-              onClick={onOpenChauffeurCard}
-              className="px-4 py-3 rounded-2xl border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-300 font-bold text-xs md:text-sm transition-all cursor-pointer"
-            >
-              VIP 배차 소개서
-            </button>
-          </div>
-        </div>
-
-        {/* Navigation Tabs inside Banner */}
-        <div className="flex items-center gap-2 mt-6 pt-5 border-t border-slate-800/80 text-xs font-bold">
-          <button
-            type="button"
-            onClick={() => setActiveTab('cards')}
-            className={`px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'cards'
-                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-xs'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-            }`}
-          >
-            <Layers className="w-3.5 h-3.5" />
-            <span>2026 공식 요금표 (14건)</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('mapping')}
-            className={`px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'mapping'
-                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-xs'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-            }`}
-          >
-            <Car className="w-3.5 h-3.5" />
-            <span>차종-상품 SKU 매핑 현황</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('rules')}
-            className={`px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'rules'
-                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-xs'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-            }`}
-          >
-            <ShieldAlert className="w-3.5 h-3.5" />
-            <span>검수 필요 추가 규정 (12건)</span>
-          </button>
-        </div>
-      </div>
 
       {/* 2. Main Content Area */}
       {isLoading ? (
@@ -181,11 +95,10 @@ export const HqOfficialPricingView: React.FC<HqOfficialPricingViewProps> = ({
               return (
                 <div
                   key={card.id}
-                  className={`rounded-2xl border transition-all p-5 flex flex-col justify-between ${
-                    isBus
-                      ? 'bg-amber-50/40 border-amber-200/80 shadow-xs'
-                      : 'bg-white border-slate-200 hover:border-blue-400 hover:shadow-md'
-                  }`}
+                  className={`rounded-2xl border transition-all p-5 flex flex-col justify-between ${isBus
+                    ? 'bg-amber-50/40 border-amber-200/80 shadow-xs'
+                    : 'bg-white border-slate-200 hover:border-blue-400 hover:shadow-md'
+                    }`}
                 >
                   <div className="space-y-3">
                     {/* Header */}
@@ -347,11 +260,10 @@ export const HqOfficialPricingView: React.FC<HqOfficialPricingViewProps> = ({
               return (
                 <div
                   key={rule.id}
-                  className={`p-4 rounded-2xl border text-xs space-y-2 ${
-                    isConfirm
-                      ? 'bg-amber-50/30 border-amber-200'
-                      : 'bg-slate-50/50 border-slate-200'
-                  }`}
+                  className={`p-4 rounded-2xl border text-xs space-y-2 ${isConfirm
+                    ? 'bg-amber-50/30 border-amber-200'
+                    : 'bg-slate-50/50 border-slate-200'
+                    }`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5">

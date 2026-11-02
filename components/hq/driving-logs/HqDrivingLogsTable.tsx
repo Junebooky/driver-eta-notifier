@@ -160,9 +160,8 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
                 haptics.selection();
                 onSelectStatus?.('전체');
               }}
-              className={`flex items-center gap-1 transition-colors cursor-pointer ${
-                selectedStatus === '전체' ? 'text-[#1E60F3] font-bold' : 'hover:text-slate-800'
-              }`}
+              className={`flex items-center gap-1 transition-colors cursor-pointer ${selectedStatus === '전체' ? 'text-[#1E60F3] font-bold' : 'hover:text-slate-800'
+                }`}
               title="전체 운행일지 보기"
             >
               <span>오늘 제출 <strong className="text-slate-700 font-bold">{kpiCounts.totalToday}</strong></span>
@@ -173,9 +172,8 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
                 haptics.selection();
                 onSelectStatus?.(selectedStatus === '검토 대기' ? '전체' : '검토 대기');
               }}
-              className={`flex items-center gap-1 transition-colors cursor-pointer ${
-                selectedStatus === '검토 대기' ? 'text-[#1E60F3] font-bold' : 'hover:text-slate-800'
-              }`}
+              className={`flex items-center gap-1 transition-colors cursor-pointer ${selectedStatus === '검토 대기' ? 'text-[#1E60F3] font-bold' : 'hover:text-slate-800'
+                }`}
               title="검토 대기 필터"
             >
               <Clock className="w-3.5 h-3.5 text-slate-400" />
@@ -187,9 +185,8 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
                 haptics.selection();
                 onSelectStatus?.(selectedStatus === '승인 완료' ? '전체' : '승인 완료');
               }}
-              className={`flex items-center gap-1 transition-colors cursor-pointer ${
-                selectedStatus === '승인 완료' ? 'text-emerald-600 font-bold' : 'hover:text-slate-800'
-              }`}
+              className={`flex items-center gap-1 transition-colors cursor-pointer ${selectedStatus === '승인 완료' ? 'text-emerald-600 font-bold' : 'hover:text-slate-800'
+                }`}
               title="승인 완료 필터"
             >
               <Check className="w-3.5 h-3.5 text-slate-400" />
@@ -201,9 +198,8 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
                 haptics.selection();
                 onSelectStatus?.(selectedStatus === '보완 필요' ? '전체' : '보완 필요');
               }}
-              className={`flex items-center gap-1 transition-colors cursor-pointer ${
-                selectedStatus === '보완 필요' || selectedStatus === '반려' ? 'text-rose-600 font-bold' : 'hover:text-slate-800'
-              }`}
+              className={`flex items-center gap-1 transition-colors cursor-pointer ${selectedStatus === '보완 필요' || selectedStatus === '반려' ? 'text-rose-600 font-bold' : 'hover:text-slate-800'
+                }`}
               title="보완 필요/반려 필터"
             >
               <AlertTriangle className="w-3.5 h-3.5 text-slate-400" />
@@ -261,9 +257,8 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
                       haptics.selection();
                       onSelectLog(log);
                     }}
-                    className={`transition-colors cursor-pointer hover:bg-blue-50/40 ${
-                      isSelected ? 'bg-blue-50/80 font-semibold text-slate-900 ring-1 ring-inset ring-[#1E60F3]/30' : ''
-                    }`}
+                    className={`transition-colors cursor-pointer hover:bg-blue-50/40 ${isSelected ? 'bg-blue-50/80 font-semibold text-slate-900 ring-1 ring-inset ring-[#1E60F3]/30' : ''
+                      }`}
                   >
                     {/* Checkbox */}
                     <td className="py-3 px-3 text-center">
@@ -271,7 +266,7 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
                         type="checkbox"
                         checked={isChecked}
                         onClick={(e) => handleToggleSelectOne(log.id, e)}
-                        onChange={() => {}}
+                        onChange={() => { }}
                         className="rounded border-slate-300 text-[#1E60F3] focus:ring-[#1E60F3] cursor-pointer"
                       />
                     </td>
@@ -346,7 +341,7 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
                               onSelectLog(log);
                             }
                           }}
-                          className="inline-flex flex-col items-center justify-center px-2.5 py-1 rounded-xl bg-blue-50/70 hover:bg-blue-100 border border-blue-200/60 transition-all cursor-pointer group shadow-2xs hover:scale-105 active:scale-95"
+                          className="inline-flex flex-col items-center justify-center px-2.5 py-1 rounded-xl hover:bg-blue-100 transition-all cursor-pointer group shadow-2xs hover:scale-105 active:scale-95"
                           title="경비 지출 상세 내역 확인하기"
                         >
                           <span className="text-[11px] font-extrabold text-slate-700 group-hover:text-slate-900 leading-tight">
@@ -415,11 +410,10 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
                   haptics.selection();
                   onPageChange(pageNum);
                 }}
-                className={`w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  isCurrent
+                className={`w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${isCurrent
                     ? 'bg-[#1E60F3] text-white shadow-xs'
                     : 'border border-slate-200 text-slate-600 hover:bg-slate-50'
-                }`}
+                  }`}
               >
                 {pageNum}
               </button>

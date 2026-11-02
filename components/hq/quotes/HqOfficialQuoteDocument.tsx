@@ -64,7 +64,7 @@ export interface HqOfficialQuoteDocumentProps {
  * into main service line and parenthesized secondary line.
  */
 function splitServiceCategory(rawLabel: string): { main: string; sub: string | null } {
-  const label = (rawLabel || '일반 의전 (수도권 9시간)').trim();
+  const label = (rawLabel || '수도권 기본 의전 (9시간)').trim();
   const match = label.match(/^(.*?)\s*(\(.*?\))$/);
   if (match) {
     return {
@@ -124,7 +124,7 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
       day: 'numeric',
     }).format(new Date());
 
-  const driverServiceLabel = englishOption === 'fluent_upgrade' ? '영어 (추가 비용)' : '한국어';
+  const driverServiceLabel = englishOption === 'fluent_upgrade' ? '영어' : '한국어';
   const categorySplit = splitServiceCategory(serviceCategoryLabel);
 
   return (
@@ -243,7 +243,7 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
             VIP LIMOUSINE KOREA
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '4px' }}>
-            <span style={{ width: '32px', height: '1px', backgroundColor: '#9B7A4F', display: 'inline-block' }} />
+            <span style={{ width: '32px', height: '1px', backgroundColor: '#E5DEC9', display: 'inline-block' }} />
             <span
               style={{
                 fontFamily: "'Playfair Display', Georgia, serif",
@@ -257,7 +257,7 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
             >
               EXECUTIVE CHAUFFEUR
             </span>
-            <span style={{ width: '32px', height: '1px', backgroundColor: '#9B7A4F', display: 'inline-block' }} />
+            <span style={{ width: '32px', height: '1px', backgroundColor: '#E5DEC9', display: 'inline-block' }} />
           </div>
         </div>
 
@@ -300,7 +300,7 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
           <div style={{ width: '3.5px', height: '36px', backgroundColor: '#9B7A4F', borderRadius: '1.5px' }} />
           <div>
             <div style={{ fontSize: '20px', fontWeight: 700, color: '#111827', lineHeight: 1.2, letterSpacing: '-0.02em' }}>
-              공식 견적 영수증
+              공식 견적서
             </div>
             <div
               style={{
@@ -329,11 +329,11 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
             fontSize: '11px',
           }}
         >
-          <span style={{ color: '#64748B', textAlign: 'left', fontWeight: 500 }}>견적번호 :</span>
+          <span style={{ color: '#64748B', textAlign: 'left', fontWeight: 500 }}>견적 번호 :</span>
           <span className="quote-meta-no" data-field="quote-no" style={{ fontWeight: 700, color: '#0F172A', fontFamily: 'Pretendard, monospace', textAlign: 'right' }}>
             {quoteNo}
           </span>
-          <span style={{ color: '#64748B', textAlign: 'left', fontWeight: 500 }}>발급일시 :</span>
+          <span style={{ color: '#64748B', textAlign: 'left', fontWeight: 500 }}>발급 일시 :</span>
           <span className="quote-meta-date" data-field="issued-date" style={{ fontWeight: 500, color: '#0F172A', textAlign: 'right' }}>
             {displayDate}
           </span>
@@ -395,16 +395,16 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
           </div>
           {/* Row 2 */}
           <div style={{ display: 'flex', alignItems: 'center', padding: '9px 10px', borderBottom: '1px solid #E5DEC9', fontSize: '11px' }}>
-            <div style={{ width: '75px', color: '#475569', fontWeight: 500 }}>행사 / 목적</div>
+            <div style={{ width: '75px', color: '#475569', fontWeight: 500 }}>운행 목적</div>
             <div className="quote-val-purpose" data-field="trip-purpose" style={{ flex: 1, fontWeight: 600, color: '#0F172A' }}>{notes || '비즈니스 투어'}</div>
-            <div style={{ width: '60px', color: '#475569', fontWeight: 500 }}>운행 일정</div>
+            <div style={{ width: '60px', color: '#475569', fontWeight: 500 }}>이용 일정</div>
             <div className="quote-val-schedule" data-field="trip-schedule" style={{ flex: 1.2, fontWeight: 600, color: '#0F172A' }}>
               {date} ({serviceStartTime} ~ {serviceEndTime}, {serviceHours}시간)
             </div>
           </div>
           {/* Row 3 */}
           <div style={{ display: 'flex', alignItems: 'center', padding: '9px 10px', fontSize: '11px' }}>
-            <div style={{ width: '75px', color: '#475569', fontWeight: 500 }}>운행 구간</div>
+            <div style={{ width: '75px', color: '#475569', fontWeight: 500 }}>이동 경로</div>
             <div className="quote-val-route" data-field="trip-route" style={{ flex: 1, fontWeight: 700, color: '#0F172A' }}>
               {origin} → {destination}
             </div>
@@ -465,21 +465,21 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
                 data-field="label-selected-vehicle"
                 style={{ width: '34%', padding: '10px 12px 4px', fontSize: '10px', color: '#64748B', fontWeight: 500, verticalAlign: 'top', borderRight: '1px solid #E5DEC9' }}
               >
-                선택 차량
+                배정 차량
               </td>
               <td
                 className="quote-cell-label quote-label-count"
                 data-field="label-vehicle-count"
                 style={{ width: '16%', padding: '10px 12px 4px', fontSize: '10px', color: '#64748B', fontWeight: 500, verticalAlign: 'top', borderRight: '1px solid #E5DEC9' }}
               >
-                차량 수량
+                차량 대수
               </td>
               <td
                 className="quote-cell-label quote-label-category"
                 data-field="label-service-category"
                 style={{ width: '28%', padding: '10px 12px 4px', fontSize: '10px', color: '#64748B', fontWeight: 500, verticalAlign: 'top', borderRight: '1px solid #E5DEC9' }}
               >
-                서비스 구분
+                이용 서비스
               </td>
               <td
                 className="quote-cell-label quote-label-driver"
@@ -593,8 +593,8 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
 
           {/* English Surcharge (if any) */}
           {englishSurchargeTotal > 0 && (
-            <div className="quote-row-english" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', fontSize: '11px', color: '#1E40AF' }}>
-              <span>의전 기사 영어 수당</span>
+            <div className="quote-row-english" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', fontSize: '11px', color: '#1E293B' }}>
+              <span>외국어(영어) 의전 지원비</span>
               <span className="quote-val-english" data-field="english-surcharge" style={{ fontWeight: 600, fontFamily: 'Pretendard, monospace' }}>
                 +{englishSurchargeTotal.toLocaleString()}원
               </span>
@@ -614,7 +614,7 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
 
           {/* VAT */}
           <div className="quote-row-vat" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '24px', padding: '3px 0', fontSize: '10.5px' }}>
-            <span style={{ color: '#64748B' }}>부가가치세 (10%)</span>
+            <span style={{ color: '#64748B' }}>부가세 (10%)</span>
             <span className="quote-val-vat" data-field="vat-amount" style={{ fontWeight: 500, color: '#0F172A', fontFamily: 'Pretendard, monospace' }}>
               {vatAmount !== null ? `${vatAmount.toLocaleString()}원` : '별도 산정'}
             </span>
@@ -642,7 +642,7 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <div style={{ width: '3.5px', height: '24px', backgroundColor: '#9B7A4F', marginRight: '10px', borderRadius: '1.5px' }} />
           <span className="quote-grand-total-label" data-field="grand-total-label" style={{ fontSize: '15px', fontWeight: 700, color: '#111827' }}>
-            총 청구 예상금액 <span style={{ fontSize: '11px', fontWeight: 500, color: '#64748B' }}>(부가가치세 10% 포함)</span>
+            최종 견적 금액 <span style={{ fontSize: '11px', fontWeight: 500, color: '#64748B' }}>(부가가치세 10% 포함)</span>
           </span>
         </div>
 
@@ -653,7 +653,7 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
           style={{
             fontSize: '26px',
             fontWeight: 800,
-            color: '#614421',
+            color: '#000000',
             fontFamily: 'Pretendard, -apple-system, sans-serif',
             letterSpacing: '-0.02em',
             textAlign: 'right',
@@ -663,11 +663,6 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
         </div>
       </div>
 
-      {/* 8. Notice */}
-      <div className="quote-notice-box" data-section="notice" style={{ fontSize: '10px', color: '#64748B', lineHeight: 1.6, marginBottom: '22px' }}>
-        <div>* 본 견적서는 2026 공식 요율표 기준 실시간 산출 견적서입니다.</div>
-        <div style={{ paddingLeft: '8px' }}>예약 전환 시 실시간 관제 스케줄에 즉시 등록됩니다.</div>
-      </div>
 
       {/* 9. Bottom Footer (#E5DEC9 divider line) */}
       <div
@@ -731,8 +726,8 @@ export function generateOfficialQuotePrintHtml(props: HqOfficialQuoteDocumentPro
     props.baseFareTotal !== null
       ? `${props.baseFareTotal.toLocaleString()}원`
       : props.quoteRequired
-      ? '상담 후 산정'
-      : '-';
+        ? '상담 후 산정'
+        : '-';
 
   const overtimeFormatted =
     props.overtimeHours && props.overtimeHours > 0 && props.overtimeFareTotal && props.overtimeFareTotal > 0
@@ -753,8 +748,8 @@ export function generateOfficialQuotePrintHtml(props: HqOfficialQuoteDocumentPro
     props.supplyPriceTotal !== null
       ? `${props.supplyPriceTotal.toLocaleString()}원`
       : props.quoteRequired
-      ? '상담 후 산정'
-      : '-';
+        ? '상담 후 산정'
+        : '-';
 
   const vatFormatted =
     props.vatAmount !== null ? `${props.vatAmount.toLocaleString()}원` : '별도 산정';
@@ -763,8 +758,8 @@ export function generateOfficialQuotePrintHtml(props: HqOfficialQuoteDocumentPro
     props.estimatedGrandTotal !== null
       ? `${props.estimatedGrandTotal.toLocaleString()}원`
       : props.quoteRequired
-      ? '상담 후 산정'
-      : '0원';
+        ? '상담 후 산정'
+        : '0원';
 
   return `<!DOCTYPE html>
 <html lang="ko">
@@ -1002,35 +997,32 @@ export function generateOfficialQuotePrintHtml(props: HqOfficialQuoteDocumentPro
           <span class="quote-val-basefare" data-field="base-fare" style="font-weight: 600; color: #0F172A; font-family: Pretendard, monospace;">${baseFareFormatted}</span>
         </div>
 
-        ${
-          overtimeFormatted
-            ? `
+        ${overtimeFormatted
+      ? `
         <div class="quote-row-overtime" style="display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 11px; color: #92400E;">
           <span>초과 시간 요금 (${props.overtimeHours}시간)</span>
           <span class="quote-val-overtime" data-field="overtime-fare" style="font-weight: 600; font-family: Pretendard, monospace;">${overtimeFormatted}</span>
         </div>`
-            : ''
-        }
+      : ''
+    }
 
-        ${
-          excessKmFormatted
-            ? `
+        ${excessKmFormatted
+      ? `
         <div class="quote-row-excesskm" style="display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 11px; color: #92400E;">
           <span>초과 거리 요금 (${props.excessKm}km)</span>
           <span class="quote-val-excesskm" data-field="excess-km-fare" style="font-weight: 600; font-family: Pretendard, monospace;">${excessKmFormatted}</span>
         </div>`
-            : ''
-        }
+      : ''
+    }
 
-        ${
-          englishFormatted
-            ? `
-        <div class="quote-row-english" style="display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 11px; color: #1E40AF;">
+        ${englishFormatted
+      ? `
+        <div class="quote-row-english" style="display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 11px; color: #1E293B;">
           <span>의전 기사 영어 수당</span>
           <span class="quote-val-english" data-field="english-surcharge" style="font-weight: 600; font-family: Pretendard, monospace;">${englishFormatted}</span>
         </div>`
-            : ''
-        }
+      : ''
+    }
 
         <div style="border-top: 1px solid #E5DEC9; margin: 8px 0;"></div>
 
