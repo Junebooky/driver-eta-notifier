@@ -251,17 +251,11 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
   // P0-1: Quarantine unapproved 'draft' tariff
   const isDraftTariff =
     calculatedQuote?.tariffVersion === OFFICIAL_TARIFF_VERSION &&
-    calculatedQuote?.appliedPricingSnapshot?.publicationStatus !== 'approved';
+    calculatedQuote?.appliedPricingSnapshot?.publicationStatus === 'draft';
 
   // Explicit Save Quote to DB
   const handleSaveQuote = async () => {
     if (!calculatedQuote) return;
-    if (isDraftTariff) {
-      setErrorMessage(
-        '2026 공식 요율표는 현재 미승인(draft) 상태로 관리자 시뮬레이션 전용입니다. 공식 승인(approved) 전에는 고객 견적서 DB 저장이 제한됩니다.'
-      );
-      return;
-    }
     setIsSaving(true);
     setErrorMessage(null);
     setSaveSuccess(null);
@@ -311,12 +305,6 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
   // Convert quote to live booking in cockpit.schedules
   const handleConvertToBooking = async () => {
     if (!calculatedQuote) return;
-    if (isDraftTariff) {
-      setErrorMessage(
-        '2026 공식 요율표는 현재 미승인(draft) 상태로 관리자 시뮬레이션 전용입니다. 공식 승인(approved) 전에는 확정 예약 전환이 차단됩니다.'
-      );
-      return;
-    }
     if (calculatedQuote.quoteRequired) {
       setErrorMessage('대형 버스는 유선 상담을 거친 후 단가 확정 시 예약으로 전환할 수 있습니다.');
       return;
@@ -1119,8 +1107,8 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                   <button
                     type="button"
                     onClick={handleConvertToBooking}
-                    disabled={isConverting || !calculatedQuote || calculatedQuote.quoteRequired || isDraftTariff}
-                    className="w-full h-12 rounded-xl bg-[#1E60F3] hover:bg-blue-600 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-md shadow-blue-500/25 active:scale-98 transition cursor-pointer disabled:opacity-50"
+                    disabled={isConverting || !calculatedQuote || calculatedQuote.quoteRequired}
+                    className="w-full h-12 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-98 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-md shadow-blue-500/25 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <CheckCircle2 className="w-4 h-4" />
                     <span>{isConverting ? '예약 전환 중...' : '예약 전환 및 관제 등록'}</span>
@@ -1146,8 +1134,8 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                     <button
                       type="button"
                       onClick={handleSaveQuote}
-                      disabled={isSaving || !calculatedQuote || isDraftTariff}
-                      className="py-2.5 px-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer disabled:opacity-50"
+                      disabled={isSaving || !calculatedQuote}
+                      className="py-2.5 px-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <FileText className="w-3.5 h-3.5 text-slate-500" />
                       <span>{isSaving ? '저장 중...' : '임시 저장'}</span>
