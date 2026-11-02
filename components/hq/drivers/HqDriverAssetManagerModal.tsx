@@ -576,7 +576,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                         <img
                           src={thumb}
                           alt={v.modelShort}
-                          className="w-8 h-6 rounded object-contain bg-slate-50 border border-slate-200 shrink-0 p-0.5"
+                          className="w-9 h-6 object-contain shrink-0 filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.18)]"
                         />
                         {isComplete ? (
                           <span className="px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-black flex items-center gap-0.5">

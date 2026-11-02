@@ -382,7 +382,7 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     capacity: '7인승',
     status: '운행 중',
     fuelType: '가솔린',
-    imageUrl: '/images/thumb_carnival.jpg',
+    imageUrl: '/images/vehicles/carnival_high.webp',
     chargingSpecs: {
       front: {
         status: 'confirmed',
@@ -428,7 +428,7 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     capacity: '4인승',
     status: '운행 중',
     fuelType: '가솔린',
-    imageUrl: '/images/vehicles/g90_lwb.webp',
+    imageUrl: '/images/vehicles/g90_black.webp',
   },
 
   // 9. [제네시스 G90L] 1대
@@ -464,7 +464,7 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     capacity: '4인승',
     status: '차고지 대기',
     fuelType: '가솔린',
-    imageUrl: '/images/thumb_g90.jpg',
+    imageUrl: '/images/vehicles/g90_black.webp',
   },
 
   // 11. [벤츠 S560] 1대
@@ -706,24 +706,38 @@ export function getVehicleImage(
     return '/images/vehicles/gv80.webp';
   }
 
-  // 6. Genesis G90L / G90 Limousine (2 vehicles: 2269, 4280)
-  // Strictly excluded: standard G90 sedan (8839)
+  // 6. Genesis G90 Black (2 vehicles: 102부 4280, 125호 8839)
+  if (
+    plateShort === '4280' ||
+    plateShort === '8839'
+  ) {
+    return '/images/vehicles/g90_black.webp';
+  }
+
+  // 7. Genesis G90L (1 vehicle: 208호 2269)
   if (
     plateShort === '2269' ||
-    plateShort === '4280' ||
-    (category === 'genesis' && (model.includes('G90L') || model.includes('리무진') || subType.includes('G90L') || subType.includes('리무진')))
+    (category === 'genesis' && (model.includes('G90L') || subType.includes('G90L')))
   ) {
     return '/images/vehicles/g90_lwb.webp';
   }
 
-  // 7. Carnival (2 vehicles: 7681, 5336) - No WebP asset provided yet; keep existing verified placeholder
+  // 8. Carnival Hi-Limousine (193호 5336)
+  if (
+    plateShort === '5336' ||
+    (category === 'carnival' && (model.includes('하이리무진') || subType.includes('하이리무진')))
+  ) {
+    return '/images/vehicles/carnival_high.webp';
+  }
+
+  // 9. Standard Carnival (101호 7681)
   if (category === 'carnival' || model.includes('카니발')) {
     return '/images/thumb_carnival.jpg';
   }
 
-  // 8. Standard G90 Sedan (8839) - No WebP asset provided yet; keep existing placeholder
-  if (plateShort === '8839' || (category === 'genesis' && model.includes('G90'))) {
-    return '/images/thumb_g90.jpg';
+  // 10. Fallback Genesis G90
+  if (category === 'genesis' && model.includes('G90')) {
+    return '/images/vehicles/g90_black.webp';
   }
 
   return '/images/thumb_g90.jpg';
