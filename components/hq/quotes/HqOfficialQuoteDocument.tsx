@@ -56,7 +56,8 @@ function splitServiceCategory(rawLabel: string): { main: string; sub: string | n
  * - English font: Playfair Display
  * - Korean font: Pretendard
  * - Assets: /images/receipt/header.png (Chauffeur logo) & /images/receipt/bg.png (Hero banner)
- * - Formatted strictly for seamless 1-page A4 PDF printing
+ * - All structural lines unified to #E5DEC9
+ * - Formatted strictly for seamless 1-page A4 PDF printing with zero text collision
  */
 export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = ({
   quoteNo,
@@ -111,7 +112,7 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
         color: '#111827',
         fontFamily: 'Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         padding: '34px 34px 28px 34px',
-        border: '1px solid #E2E8F0',
+        border: '1px solid #E5DEC9',
         borderRadius: '12px',
       }}
     >
@@ -305,10 +306,10 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
           </span>
         </div>
 
-        {/* Table Content */}
-        <div style={{ borderTop: '1px solid #E2E8F0', borderBottom: '1px solid #E2E8F0' }}>
+        {/* Table Content with #E5DEC9 dividers */}
+        <div style={{ borderTop: '1px solid #E5DEC9', borderBottom: '1px solid #E5DEC9' }}>
           {/* Row 1 */}
-          <div style={{ display: 'flex', alignItems: 'center', padding: '9px 10px', borderBottom: '1px solid #F1F5F9', fontSize: '11px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', padding: '9px 10px', borderBottom: '1px solid #E5DEC9', fontSize: '11px' }}>
             <div style={{ width: '75px', color: '#475569', fontWeight: 500 }}>고객사명</div>
             <div style={{ flex: 1, fontWeight: 700, color: '#0F172A' }}>{customerName || '인터코스'}</div>
             <div style={{ width: '60px', color: '#475569', fontWeight: 500 }}>담당자</div>
@@ -317,7 +318,7 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
             </div>
           </div>
           {/* Row 2 */}
-          <div style={{ display: 'flex', alignItems: 'center', padding: '9px 10px', borderBottom: '1px solid #F1F5F9', fontSize: '11px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', padding: '9px 10px', borderBottom: '1px solid #E5DEC9', fontSize: '11px' }}>
             <div style={{ width: '75px', color: '#475569', fontWeight: 500 }}>행사 / 목적</div>
             <div style={{ flex: 1, fontWeight: 600, color: '#0F172A' }}>{notes || '비즈니스 투어'}</div>
             <div style={{ width: '60px', color: '#475569', fontWeight: 500 }}>운행 일정</div>
@@ -335,7 +336,7 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
         </div>
       </div>
 
-      {/* 5. Section 02: 차량 및 서비스 (모두 일치된 인라인 그리드) */}
+      {/* 5. Section 02: 차량 및 서비스 (테이블 구조로 글자 뭉침/충돌 원천 차단) */}
       <div style={{ marginBottom: '22px' }}>
         {/* Section Header */}
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
@@ -368,67 +369,56 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
           </span>
         </div>
 
-        {/* 4-Column Box: Precise Aligned Grid Layout */}
-        <div
+        {/* 4-Column Box: Table Structure (글자 겹침 원천 차단 및 선 색상 #E5DEC9 통일) */}
+        <table
           style={{
+            width: '100%',
+            borderCollapse: 'collapse',
             backgroundColor: '#F8FAFC',
-            border: '1px solid #E2E8F0',
+            border: '1px solid #E5DEC9',
             borderRadius: '4px',
-            padding: '12px 14px',
-            display: 'flex',
-            alignItems: 'stretch',
+            overflow: 'hidden',
           }}
         >
-          {/* Col 1 */}
-          <div style={{ flex: 2.2, paddingRight: '12px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
-            <div style={{ fontSize: '10px', color: '#64748B', height: '16px', lineHeight: '16px', marginBottom: '4px', fontWeight: 500, whiteSpace: 'nowrap' }}>
-              선택 차량
-            </div>
-            <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#0F172A', lineHeight: 1.35 }}>
-              {vehicleModel || '제네시스 G90 신차 최고급형'}
-            </div>
-          </div>
-
-          {/* Col 2 */}
-          <div style={{ flex: 1, borderLeft: '1px solid #E2E8F0', paddingLeft: '12px', paddingRight: '12px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
-            <div style={{ fontSize: '10px', color: '#64748B', height: '16px', lineHeight: '16px', marginBottom: '4px', fontWeight: 500, whiteSpace: 'nowrap' }}>
-              차량 수량
-            </div>
-            <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#0F172A', lineHeight: 1.35 }}>
-              {vehicleCount}대
-            </div>
-          </div>
-
-          {/* Col 3: 서비스 구분 (상단 라벨 및 기준선 정렬) */}
-          <div style={{ flex: 2.2, borderLeft: '1px solid #E2E8F0', paddingLeft: '12px', paddingRight: '12px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
-            <div style={{ fontSize: '10px', color: '#64748B', height: '16px', lineHeight: '16px', marginBottom: '4px', fontWeight: 500, whiteSpace: 'nowrap' }}>
-              서비스 구분
-            </div>
-            <div style={{ lineHeight: 1.35 }}>
-              <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#0F172A' }}>
-                {categorySplit.main}
-              </div>
-              {categorySplit.sub && (
-                <div style={{ fontSize: '10px', fontWeight: 500, color: '#475569', marginTop: '2px' }}>
-                  {categorySplit.sub}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Col 4 */}
-          <div style={{ flex: 1.4, borderLeft: '1px solid #E2E8F0', paddingLeft: '12px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
-            <div style={{ fontSize: '10px', color: '#64748B', height: '16px', lineHeight: '16px', marginBottom: '4px', fontWeight: 500, whiteSpace: 'nowrap' }}>
-              기사 서비스
-            </div>
-            <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#0F172A', lineHeight: 1.35 }}>
-              {driverServiceLabel}
-            </div>
-          </div>
-        </div>
+          <tbody>
+            <tr>
+              <td style={{ width: '34%', padding: '10px 12px 4px 12px', fontSize: '10px', color: '#64748B', fontWeight: 500, verticalAlign: 'top', borderRight: '1px solid #E5DEC9' }}>
+                선택 차량
+              </td>
+              <td style={{ width: '16%', padding: '10px 12px 4px 12px', fontSize: '10px', color: '#64748B', fontWeight: 500, verticalAlign: 'top', borderRight: '1px solid #E5DEC9' }}>
+                차량 수량
+              </td>
+              <td style={{ width: '28%', padding: '10px 12px 4px 12px', fontSize: '10px', color: '#64748B', fontWeight: 500, verticalAlign: 'top', borderRight: '1px solid #E5DEC9' }}>
+                서비스 구분
+              </td>
+              <td style={{ width: '22%', padding: '10px 12px 4px 12px', fontSize: '10px', color: '#64748B', fontWeight: 500, verticalAlign: 'top' }}>
+                기사 서비스
+              </td>
+            </tr>
+            <tr>
+              <td style={{ padding: '0 12px 10px 12px', fontSize: '11.5px', fontWeight: 700, color: '#0F172A', lineHeight: 1.35, verticalAlign: 'top', borderRight: '1px solid #E5DEC9' }}>
+                {vehicleModel || '제네시스 G90 신차 최고급형'}
+              </td>
+              <td style={{ padding: '0 12px 10px 12px', fontSize: '11.5px', fontWeight: 700, color: '#0F172A', lineHeight: 1.35, verticalAlign: 'top', borderRight: '1px solid #E5DEC9' }}>
+                {vehicleCount}대
+              </td>
+              <td style={{ padding: '0 12px 10px 12px', fontSize: '11.5px', fontWeight: 700, color: '#0F172A', lineHeight: 1.35, verticalAlign: 'top', borderRight: '1px solid #E5DEC9' }}>
+                <div>{categorySplit.main}</div>
+                {categorySplit.sub && (
+                  <div style={{ fontSize: '10px', fontWeight: 500, color: '#475569', marginTop: '2px' }}>
+                    {categorySplit.sub}
+                  </div>
+                )}
+              </td>
+              <td style={{ padding: '0 12px 10px 12px', fontSize: '11.5px', fontWeight: 700, color: '#0F172A', lineHeight: 1.35, verticalAlign: 'top' }}>
+                {driverServiceLabel}
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
-      {/* 6. Section 03: 요금 상세 (PRICE BREAKDOWN) */}
+      {/* 6. Section 03: 요금 상세 (PRICE BREAKDOWN, 선 색상 #E5DEC9 통일) */}
       <div style={{ marginBottom: '22px' }}>
         {/* Section Header */}
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
@@ -462,7 +452,7 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
         </div>
 
         {/* Price Breakdown List */}
-        <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '8px' }}>
+        <div style={{ borderTop: '1px solid #E5DEC9', paddingTop: '8px' }}>
           {/* Base Fare */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', fontSize: '11px' }}>
             <span style={{ color: '#1E293B' }}>기본 대절료 ({vehicleCount}대 × {serviceHours}시간)</span>
@@ -501,8 +491,8 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
             </div>
           )}
 
-          {/* Subtotal Divider */}
-          <div style={{ borderTop: '1px solid #E2E8F0', margin: '8px 0' }} />
+          {/* Subtotal Divider (#E5DEC9) */}
+          <div style={{ borderTop: '1px solid #E5DEC9', margin: '8px 0' }} />
 
           {/* Supply Price Subtotal */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', fontSize: '12px' }}>
@@ -522,12 +512,12 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
         </div>
       </div>
 
-      {/* 7. 총 청구 예상금액 (배경화면 제거 #FFFFFF, 좌우 완전 정렬) */}
+      {/* 7. 총 청구 예상금액 (배경화면 제거 #FFFFFF, 좌우 완전 정렬, 선 색상 #E5DEC9) */}
       <div
         style={{
           backgroundColor: '#FFFFFF',
-          borderTop: '2px solid #E2E8F0',
-          borderBottom: '2px solid #E2E8F0',
+          borderTop: '2px solid #E5DEC9',
+          borderBottom: '2px solid #E5DEC9',
           padding: '16px 0px',
           display: 'flex',
           alignItems: 'center',
@@ -565,10 +555,10 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
         <div style={{ paddingLeft: '8px' }}>예약 전환 시 실시간 관제 스케줄에 즉시 등록됩니다.</div>
       </div>
 
-      {/* 9. Bottom Footer (Clean Brand Signature without scribble SVG) */}
+      {/* 9. Bottom Footer (#E5DEC9 divider line) */}
       <div
         style={{
-          borderTop: '1px solid #E2D8CC',
+          borderTop: '1px solid #E5DEC9',
           paddingTop: '14px',
           display: 'flex',
           alignItems: 'center',
@@ -731,7 +721,7 @@ export function generateOfficialQuotePrintHtml(props: HqOfficialQuoteDocumentPro
       </div>
     </div>
 
-    <!-- Thin Divider Line with breathing room -->
+    <!-- Thin Divider Line with breathing room (#E5DEC9) -->
     <div style="width: 100%; height: 1px; background-color: #E5DEC9; margin: 18px 0 22px 0;"></div>
 
     <!-- 2. Official Estimate Title & Metadata (Vertical Grid Aligned) -->
@@ -761,7 +751,7 @@ export function generateOfficialQuotePrintHtml(props: HqOfficialQuoteDocumentPro
       <img src="/images/receipt/bg.png" alt="VIP Chauffeur Service" style="width: 100%; height: 100%; object-fit: cover; object-position: center; display: block;" />
     </div>
 
-    <!-- 4. Section 01: 기본 정보 -->
+    <!-- 4. Section 01: 기본 정보 (#E5DEC9 lines) -->
     <div style="margin-bottom: 22px;">
       <div style="display: flex; align-items: center; margin-bottom: 8px;">
         <span style="font-family: 'Playfair Display', Georgia, serif; font-style: italic; font-size: 19px; font-weight: 600; color: #9B7A4F; margin-right: 8px;">01</span>
@@ -770,14 +760,14 @@ export function generateOfficialQuotePrintHtml(props: HqOfficialQuoteDocumentPro
         <span style="font-family: 'Playfair Display', Georgia, serif; font-size: 9px; letter-spacing: 0.16em; color: #8C7355; text-transform: uppercase;">BASIC INFORMATION</span>
       </div>
 
-      <div style="border-top: 1px solid #E2E8F0; border-bottom: 1px solid #E2E8F0;">
-        <div style="display: flex; align-items: center; padding: 9px 10px; border-bottom: 1px solid #F1F5F9; font-size: 11px;">
+      <div style="border-top: 1px solid #E5DEC9; border-bottom: 1px solid #E5DEC9;">
+        <div style="display: flex; align-items: center; padding: 9px 10px; border-bottom: 1px solid #E5DEC9; font-size: 11px;">
           <div style="width: 75px; color: #475569; font-weight: 500;">고객사명</div>
           <div style="flex: 1; font-weight: 700; color: #0F172A;">${props.customerName || '인터코스'}</div>
           <div style="width: 60px; color: #475569; font-weight: 500;">담당자</div>
           <div style="flex: 1; font-weight: 600; color: #0F172A;">${props.contactPerson || '김지현 팀장'}${props.contactPhone ? ` (${props.contactPhone})` : ''}</div>
         </div>
-        <div style="display: flex; align-items: center; padding: 9px 10px; border-bottom: 1px solid #F1F5F9; font-size: 11px;">
+        <div style="display: flex; align-items: center; padding: 9px 10px; border-bottom: 1px solid #E5DEC9; font-size: 11px;">
           <div style="width: 75px; color: #475569; font-weight: 500;">행사 / 목적</div>
           <div style="flex: 1; font-weight: 600; color: #0F172A;">${props.notes || '비즈니스 투어'}</div>
           <div style="width: 60px; color: #475569; font-weight: 500;">운행 일정</div>
@@ -790,7 +780,7 @@ export function generateOfficialQuotePrintHtml(props: HqOfficialQuoteDocumentPro
       </div>
     </div>
 
-    <!-- 5. Section 02: 차량 및 서비스 (모두 일치된 인라인 그리드) -->
+    <!-- 5. Section 02: 차량 및 서비스 (테이블 구조로 글자 뭉침/충돌 원천 차단, 선 색상 #E5DEC9) -->
     <div style="margin-bottom: 22px;">
       <div style="display: flex; align-items: center; margin-bottom: 8px;">
         <span style="font-family: 'Playfair Display', Georgia, serif; font-style: italic; font-size: 19px; font-weight: 600; color: #9B7A4F; margin-right: 8px;">02</span>
@@ -799,34 +789,42 @@ export function generateOfficialQuotePrintHtml(props: HqOfficialQuoteDocumentPro
         <span style="font-family: 'Playfair Display', Georgia, serif; font-size: 9px; letter-spacing: 0.16em; color: #8C7355; text-transform: uppercase;">VEHICLE & SERVICE</span>
       </div>
 
-      <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 4px; padding: 12px 14px; display: flex; align-items: stretch;">
-        <div style="flex: 2.2; padding-right: 12px; display: flex; flexDirection: column; justify-content: flex-start;">
-          <div style="font-size: 10px; color: #64748B; height: 16px; line-height: 16px; margin-bottom: 4px; font-weight: 500; white-space: nowrap;">선택 차량</div>
-          <div style="font-size: 11.5px; font-weight: 700; color: #0F172A; line-height: 1.35;">${props.vehicleModel || '제네시스 G90 신차 최고급형'}</div>
-        </div>
-        <div style="flex: 1; border-left: 1px solid #E2E8F0; padding-left: 12px; padding-right: 12px; display: flex; flexDirection: column; justify-content: flex-start;">
-          <div style="font-size: 10px; color: #64748B; height: 16px; line-height: 16px; margin-bottom: 4px; font-weight: 500; white-space: nowrap;">차량 수량</div>
-          <div style="font-size: 11.5px; font-weight: 700; color: #0F172A; line-height: 1.35;">${props.vehicleCount}대</div>
-        </div>
-        <div style="flex: 2.2; border-left: 1px solid #E2E8F0; padding-left: 12px; padding-right: 12px; display: flex; flexDirection: column; justify-content: flex-start;">
-          <div style="font-size: 10px; color: #64748B; height: 16px; line-height: 16px; margin-bottom: 4px; font-weight: 500; white-space: nowrap;">서비스 구분</div>
-          <div style="line-height: 1.35;">
-            <div style="font-size: 11.5px; font-weight: 700; color: #0F172A;">${categorySplit.main}</div>
-            ${
-              categorySplit.sub
-                ? `<div style="font-size: 10px; font-weight: 500; color: #475569; margin-top: 2px;">${categorySplit.sub}</div>`
-                : ''
-            }
-          </div>
-        </div>
-        <div style="flex: 1.4; border-left: 1px solid #E2E8F0; padding-left: 12px; display: flex; flexDirection: column; justify-content: flex-start;">
-          <div style="font-size: 10px; color: #64748B; height: 16px; line-height: 16px; margin-bottom: 4px; font-weight: 500; white-space: nowrap;">기사 서비스</div>
-          <div style="font-size: 11.5px; font-weight: 700; color: #0F172A; line-height: 1.35;">${driverServiceLabel}</div>
-        </div>
-      </div>
+      <table style="width: 100%; border-collapse: collapse; background-color: #F8FAFC; border: 1px solid #E5DEC9; border-radius: 4px; overflow: hidden;">
+        <tbody>
+          <tr>
+            <td style="width: 34%; padding: 10px 12px 4px 12px; font-size: 10px; color: #64748B; font-weight: 500; vertical-align: top; border-right: 1px solid #E5DEC9;">
+              선택 차량
+            </td>
+            <td style="width: 16%; padding: 10px 12px 4px 12px; font-size: 10px; color: #64748B; font-weight: 500; vertical-align: top; border-right: 1px solid #E5DEC9;">
+              차량 수량
+            </td>
+            <td style="width: 28%; padding: 10px 12px 4px 12px; font-size: 10px; color: #64748B; font-weight: 500; vertical-align: top; border-right: 1px solid #E5DEC9;">
+              서비스 구분
+            </td>
+            <td style="width: 22%; padding: 10px 12px 4px 12px; font-size: 10px; color: #64748B; font-weight: 500; vertical-align: top;">
+              기사 서비스
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 12px 10px 12px; font-size: 11.5px; font-weight: 700; color: #0F172A; line-height: 1.35; vertical-align: top; border-right: 1px solid #E5DEC9;">
+              ${props.vehicleModel || '제네시스 G90 신차 최고급형'}
+            </td>
+            <td style="padding: 0 12px 10px 12px; font-size: 11.5px; font-weight: 700; color: #0F172A; line-height: 1.35; vertical-align: top; border-right: 1px solid #E5DEC9;">
+              ${props.vehicleCount}대
+            </td>
+            <td style="padding: 0 12px 10px 12px; font-size: 11.5px; font-weight: 700; color: #0F172A; line-height: 1.35; vertical-align: top; border-right: 1px solid #E5DEC9;">
+              <div>${categorySplit.main}</div>
+              ${categorySplit.sub ? `<div style="font-size: 10px; font-weight: 500; color: #475569; margin-top: 2px;">${categorySplit.sub}</div>` : ''}
+            </td>
+            <td style="padding: 0 12px 10px 12px; font-size: 11.5px; font-weight: 700; color: #0F172A; line-height: 1.35; vertical-align: top;">
+              ${driverServiceLabel}
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
-    <!-- 6. Section 03: 요금 상세 -->
+    <!-- 6. Section 03: 요금 상세 (선 색상 #E5DEC9) -->
     <div style="margin-bottom: 22px;">
       <div style="display: flex; align-items: center; margin-bottom: 8px;">
         <span style="font-family: 'Playfair Display', Georgia, serif; font-style: italic; font-size: 19px; font-weight: 600; color: #9B7A4F; margin-right: 8px;">03</span>
@@ -835,7 +833,7 @@ export function generateOfficialQuotePrintHtml(props: HqOfficialQuoteDocumentPro
         <span style="font-family: 'Playfair Display', Georgia, serif; font-size: 9px; letter-spacing: 0.16em; color: #8C7355; text-transform: uppercase;">PRICE BREAKDOWN</span>
       </div>
 
-      <div style="border-top: 1px solid #E2E8F0; padding-top: 8px;">
+      <div style="border-top: 1px solid #E5DEC9; padding-top: 8px;">
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 11px;">
           <span style="color: #1E293B;">기본 대절료 (${props.vehicleCount}대 × ${props.serviceHours}시간)</span>
           <span style="font-weight: 600; color: #0F172A; font-family: Pretendard, monospace;">${baseFareFormatted}</span>
@@ -871,7 +869,7 @@ export function generateOfficialQuotePrintHtml(props: HqOfficialQuoteDocumentPro
             : ''
         }
 
-        <div style="border-top: 1px solid #E2E8F0; margin: 8px 0;"></div>
+        <div style="border-top: 1px solid #E5DEC9; margin: 8px 0;"></div>
 
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 12px;">
           <span style="font-weight: 700; color: #0F172A;">공급가액 소계</span>
@@ -885,8 +883,8 @@ export function generateOfficialQuotePrintHtml(props: HqOfficialQuoteDocumentPro
       </div>
     </div>
 
-    <!-- 7. 총 청구 예상금액 (배경화면 제거 #FFFFFF, 좌우 완전 일치 정렬) -->
-    <div style="background-color: #FFFFFF; border-top: 2px solid #E2E8F0; border-bottom: 2px solid #E2E8F0; padding: 16px 0px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; width: 100%;">
+    <!-- 7. 총 청구 예상금액 (배경화면 제거 #FFFFFF, 좌우 완전 일치 정렬, 선 색상 #E5DEC9) -->
+    <div style="background-color: #FFFFFF; border-top: 2px solid #E5DEC9; border-bottom: 2px solid #E5DEC9; padding: 16px 0px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; width: 100%;">
       <div style="display: flex; align-items: center;">
         <div style="width: 3.5px; height: 24px; background-color: #9B7A4F; margin-right: 10px; border-radius: 1.5px;"></div>
         <span style="font-size: 15px; font-weight: 700; color: #111827;">
@@ -905,8 +903,8 @@ export function generateOfficialQuotePrintHtml(props: HqOfficialQuoteDocumentPro
       <div style="padding-left: 8px;">예약 전환 시 실시간 관제 스케줄에 즉시 등록됩니다.</div>
     </div>
 
-    <!-- 9. Bottom Footer (Clean Brand Signature without scribble SVG) -->
-    <div style="border-top: 1px solid #E2D8CC; padding-top: 14px; display: flex; align-items: center; justify-content: flex-start; gap: 8px;">
+    <!-- 9. Bottom Footer (#E5DEC9 divider line) -->
+    <div style="border-top: 1px solid #E5DEC9; padding-top: 14px; display: flex; align-items: center; justify-content: flex-start; gap: 8px;">
       <span style="font-family: 'Playfair Display', Georgia, serif; font-size: 9.5px; font-weight: 600; letter-spacing: 0.12em; color: #475569; text-transform: uppercase;">
         VIP LIMOUSINE KOREA
       </span>
