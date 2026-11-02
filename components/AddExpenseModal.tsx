@@ -204,7 +204,7 @@ const AddExpenseModalContent: React.FC<{
     }
     return null;
   });
-  const [autoSubmitToHq, setAutoSubmitToHq] = useState(true);
+  const autoSubmitToHq = true;
   const hasAutoScannedRef = useRef(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -267,7 +267,6 @@ const AddExpenseModalContent: React.FC<{
         isZeroCost: true,
       });
       haptics.success();
-      showToast('✨ 샘플 영수증 정보가 즉시 적용되었습니다. (API 비용 0원)');
       return;
     }
 
@@ -299,7 +298,6 @@ const AddExpenseModalContent: React.FC<{
           isZeroCost: true,
         });
         haptics.success();
-        showToast('✨ 캐시된 영수증 판독 정보를 즉시 불러왔습니다. (API 비용 0원)');
         return;
       }
     }
@@ -356,9 +354,6 @@ const AddExpenseModalContent: React.FC<{
         });
 
         haptics.success();
-        showToast(isZeroFee
-          ? '✨ 샘플/캐시 영수증 정보가 즉시 적용되었습니다. (API 비용 0원)'
-          : `✨ Vision AI (${modelDisplayName})가 영수증 정보를 자동 판독했습니다!`);
       } else {
         const errorMsg = data?.error || (data?.summary && data.summary !== '영수증이 업로드되었습니다. 세부 금액과 거래처를 확인해 주세요.' ? data.summary : null);
         if (errorMsg) {
@@ -1087,30 +1082,6 @@ const AddExpenseModalContent: React.FC<{
               />
             </div>
           </section>
-
-          {/* 9. Direct HQ Dashboard Submission Toggle */}
-          <section className="pt-1">
-            <label className="flex items-start gap-3 p-3.5 rounded-2xl bg-blue-50/70 border border-blue-200 hover:bg-blue-50/90 transition-all cursor-pointer">
-              <input
-                type="checkbox"
-                checked={autoSubmitToHq}
-                onChange={(e) => setAutoSubmitToHq(e.target.checked)}
-                className="w-4 h-4 mt-0.5 text-[#1E60F3] rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
-              />
-              <div className="flex-1 text-xs">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-extrabold text-slate-900">본사(HQ) 대시보드로 즉시 전송</span>
-                  <span className="text-[10px] font-bold bg-[#1E60F3] text-white px-1.5 py-0.2 rounded">
-                    권장
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  저장과 동시에 본사 경비 검수 시스템에 &apos;검수 대기&apos;로 즉시 등록되어 관리자에게 제출됩니다.
-                </p>
-              </div>
-              <Send className="w-4 h-4 text-[#1E60F3] shrink-0 mt-0.5" />
-            </label>
-          </section>
         </div>
 
         {/* Sticky Footer */}
@@ -1153,15 +1124,10 @@ const AddExpenseModalContent: React.FC<{
                 <RotateCw className="w-5 h-5" />
                 <span>영수증 90° 세우기 후 제출 가능</span>
               </>
-            ) : autoSubmitToHq ? (
+            ) : (
               <>
                 <Send className="w-5 h-5" />
                 <span>{editingItem ? '수정 후 본사 제출' : '지출 저장 및 본사 제출'}</span>
-              </>
-            ) : (
-              <>
-                <Check className="w-5 h-5" />
-                <span>{editingItem ? '지출 수정 완료' : '기기 내 저장'}</span>
               </>
             )}
           </button>
