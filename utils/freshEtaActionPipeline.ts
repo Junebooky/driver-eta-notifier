@@ -13,7 +13,7 @@ import { LocationPreset, NaviProvider, DriverProfile, ReportMode } from '@/types
 import { RouteStopItem, loadDrivingLogDraft, saveDrivingLogDraft, formatIsoDate } from '@/utils/drivingLog';
 import { generateVipReportText } from '@/utils/kakao';
 import { generateEnglishReportText, getReportVehicleNo, lookupApprovedAlias } from '@/utils/locationTranslation';
-import { launchNavigationApp } from '@/utils/navigation';
+import { launchNavigationApp, calculateHaversineEstimate } from '@/utils/navigation';
 import { saveHqDrivingLogs,getHqDrivingLogs } from '@/utils/drivingLogHqStorage';
 
 export const OUTBOX_STORAGE_KEY = 'cockpit_driving_log_outbox_v1';
@@ -178,12 +178,12 @@ export async function fetchFreshEtaRoute(snapshot: FreshEtaSnapshot): Promise<Fr
   const url = `/api/route?startX=${origin.lng}&startY=${origin.lat}&endX=${destination.lng}&endY=${destination.lat}&startName=${startName}&endName=${endName}${passListParam}&bypassCache=true&purpose=action&clientTimestamp=${clickedAt.getTime()}`;
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 3500);
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
 
   try {
     const res = await fetch(url, {
       signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal
-        ? AbortSignal.timeout(3500)
+        ? AbortSignal.timeout(8000)
         : controller.signal,
     });
 

@@ -47,7 +47,29 @@ async function runTollTests() {
     }
   }
 
-  // Test 2: Toll fee formatting logic
+  // Test 2: Same location route (departure === destination)
+  const sameReq = new NextRequest(
+    'http://localhost:3000/api/route?startLat=37.5042&startLng=127.0425&endLat=37.5042&endLng=127.0425'
+  );
+  const sameRes = await GET(sameReq);
+  const sameData = await sameRes.json();
+  assert.strictEqual(sameRes.status, 200, 'Same location route should return HTTP 200');
+  assert.strictEqual(sameData.durationMinutes, 0, 'Same location duration must be 0 minutes');
+  assert.strictEqual(sameData.distanceKm, 0, 'Same location distance must be 0 km');
+  assert.strictEqual(sameData.trafficSummary, '출발지와 도착지가 동일합니다');
+  console.log('✅ Same location route gracefully verified (0 min, 0 km).');
+
+  // Test 3: Undefined string coordinates sanitization
+  const undefReq = new NextRequest(
+    'http://localhost:3000/api/route?startX=undefined&startY=undefined&endX=126.4512&endY=37.4495'
+  );
+  const undefRes = await GET(undefReq);
+  const undefData = await undefRes.json();
+  assert.strictEqual(undefRes.status, 200, 'Undefined coordinates should be sanitized and return HTTP 200');
+  assert.ok(typeof undefData.durationMinutes === 'number' && undefData.durationMinutes >= 0);
+  console.log('✅ Undefined coordinates sanitization verified without 400/502 error.');
+
+  // Test 4: Toll fee formatting logic
   const formatTollDisplay = (toll: number | null | undefined): string => {
     if (toll === null || toll === undefined) return '-';
     if (toll === 0) return '0원 (무료)';

@@ -31,7 +31,7 @@ import { DriverBottomNav, type DriverTab } from '@/components/DriverBottomNav';
 import { ScheduleItem, scheduleToPresets } from '@/data/ferrariSchedules';
 import { PredictionResult } from '@/app/api/route/prediction/route';
 import { LocationPreset, ReportMode, RouteEstimate, HomeLocation, GasStation, FlightType } from '@/types';
-import { DEFAULT_PRESET_LOCATIONS } from '@/utils/presets';
+import { DEFAULT_PRESET_LOCATIONS, DEFAULT_ORIGIN } from '@/utils/presets';
 import { getPresetPassengerName } from '@/utils/constants';
 import { generateReportText } from '@/utils/reportGenerator';
 import { calculateHaversineEstimate, getEtaString, launchNavigationApp } from '@/utils/navigation';
@@ -781,27 +781,32 @@ export default function DriverCockpit() {
   const [predictionResult, setPredictionResult] = useState<PredictionResult | null>(null);
   const [isLoadingPrediction, setIsLoadingPrediction] = useState(false);
 
-  // Fetch route duration & ETA from API with dynamic client clock calculation with 3.5s timeout guard
+  // Fetch route duration & ETA from API with dynamic client clock calculation with 8s timeout guard
   const fetchRouteEstimate = useCallback(
     async (start: LocationPreset, end: LocationPreset, waypoints: LocationPreset[] = []) => {
       setIsLoadingRoute(true);
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const validWaypoints = (waypoints || []).filter(
+        (w) => w && typeof w.lat === 'number' && typeof w.lng === 'number' && (w.lat !== 0 || w.lng !== 0)
+      );
+      const safeStartLat = typeof start?.lat === 'number' && Number.isFinite(start.lat) ? start.lat : DEFAULT_ORIGIN.lat;
+      const safeStartLng = typeof start?.lng === 'number' && Number.isFinite(start.lng) ? start.lng : DEFAULT_ORIGIN.lng;
+      const safeEndLat = typeof end?.lat === 'number' && Number.isFinite(end.lat) ? end.lat : DEFAULT_PRESET_LOCATIONS[0].lat;
+      const safeEndLng = typeof end?.lng === 'number' && Number.isFinite(end.lng) ? end.lng : DEFAULT_PRESET_LOCATIONS[0].lng;
+
       try {
-        const validWaypoints = (waypoints || []).filter(
-          (w) => w && typeof w.lat === 'number' && typeof w.lng === 'number' && (w.lat !== 0 || w.lng !== 0)
-        );
         const passListParam =
           validWaypoints.length > 0
             ? `&passList=${validWaypoints.map((w) => `${w.lng},${w.lat}`).join('_')}`
             : '';
-        const url = `/api/route?startX=${start.lng}&startY=${start.lat}&endX=${end.lng}&endY=${end.lat}&startName=${encodeURIComponent(
-          start.shortName || start.name
-        )}&endName=${encodeURIComponent(end.shortName || end.name)}${passListParam}`;
+        const url = `/api/route?startX=${safeStartLng}&startY=${safeStartLat}&endX=${safeEndLng}&endY=${safeEndLat}&startName=${encodeURIComponent(
+          start?.shortName || start?.name || '출발지'
+        )}&endName=${encodeURIComponent(end?.shortName || end?.name || '도착지')}${passListParam}`;
 
         const res = await fetch(url, {
           signal: typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal
-            ? AbortSignal.timeout(3500)
+            ? AbortSignal.timeout(8000)
             : controller.signal,
         });
         if (!res.ok) {
@@ -809,33 +814,39 @@ export default function DriverCockpit() {
         }
 
         const data = await res.json();
-        const durationMinutes = data.durationMinutes || 45;
+        const durationMinutes = typeof data.durationMinutes === 'number' ? data.durationMinutes : 45;
 
         // Dynamic ETA Calculation from Local Device Clock (Strict 24h format HH:mm)
         const now = new Date();
         const dynamicEtaFormatted = getEtaString(durationMinutes, now);
 
         setRouteEstimate({
-          distanceKm: data.distanceKm || 50,
+          distanceKm: typeof data.distanceKm === 'number' ? data.distanceKm : 50,
           durationMinutes,
           etaFormatted: dynamicEtaFormatted,
           trafficSummary: data.trafficSummary || '원활',
+          estimatedTollWon: data.estimatedTollWon ?? null,
           isMock: Boolean(data.isMock),
           isFallback: Boolean(data.isFallback),
           fallbackNotice: data.fallbackNotice,
           isCached: Boolean(data.isCached),
         });
       } catch (err: any) {
-        console.warn('TMAP Route API call failed or timed out:', err?.message);
+        console.warn('TMAP Route API call failed or timed out, applying local estimate fallback:', err?.message);
+        const fallback = calculateHaversineEstimate(safeStartLat, safeStartLng, safeEndLat, safeEndLng, validWaypoints);
+        const now = new Date();
+        const dynamicEtaFormatted = getEtaString(fallback.durationMinutes, now);
+
         setRouteEstimate({
-          distanceKm: 0,
-          durationMinutes: 0,
-          etaFormatted: '--:--',
-          trafficSummary: 'TMAP 경로 조회 불가',
+          distanceKm: fallback.distanceKm,
+          durationMinutes: fallback.durationMinutes,
+          etaFormatted: dynamicEtaFormatted,
+          trafficSummary: '직선 추정 (통신 재시도 중)',
+          estimatedTollWon: null,
           isMock: false,
-          isFallback: false,
-          isUnavailable: true,
-          error: 'TMAP 실시간 경로를 불러올 수 없습니다.',
+          isFallback: true,
+          fallbackNotice: '통신 연결 지연으로 거점 직선거리 기반 추정 ETA가 표시됩니다.',
+          isCached: false,
         });
       } finally {
         clearTimeout(timeoutId);
