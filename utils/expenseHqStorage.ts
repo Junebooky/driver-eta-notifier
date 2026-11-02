@@ -1,3 +1,4 @@
+import { type ExpenseReviewPatch, expenseFieldChanges, expenseCorrectionFields, normalizeExpenseCorrections } from './expenseReview';
 import { HqExpenseRecord, HqExpenseStatus, HqExpenseKpiSummary } from '@/types/expenseHq';
 import { ExpenseItem, EXPENSE_CATEGORIES, PAYMENT_METHODS } from '@/utils/expense';
 import type { ReconciledHipassItem } from '@/utils/hipassReconciler';
@@ -1005,8 +1006,14 @@ export async function fetchHqExpensesFromDb(): Promise<FetchHqExpensesResult> {
     const res = await fetch('/api/expenses',{cache:'no-store',credentials:'include'});
     const data = await res.json().catch(() => ({}));
     if (res.ok && data.ok && Array.isArray(data.expenses)) {
-      saveHqExpenses(data.expenses);
-      return { ok: true, expenses: data.expenses };
+      // A poll begun before a confirmed write must not roll the shared cache back.
+      const current = getHqExpenses();
+      const rows = data.expenses.map((row: HqExpenseRecord) => {
+        const local = current.find(item => item.id === row.id);
+        return local?.updatedAt && row.updatedAt && Date.parse(local.updatedAt) > Date.parse(row.updatedAt) ? local : row;
+      });
+      saveHqExpenses(rows);
+      return { ok: true, expenses: rows };
     }
     return { ok: false, expenses: [], error: data.error || `서버 응답 오류 (${res.status})` };
   } catch (err: any) {
@@ -1083,7 +1090,7 @@ export type ExpenseReviewResult =
 
 export async function updateHqExpenseReviewDb(
   expenseId: string,
-  patch: { status?: HqExpenseStatus; reviewNotes?: string; billableToCustomer?: boolean },
+  patch: ExpenseReviewPatch,
   expectedUpdatedAt?: string,
 ): Promise<ExpenseReviewResult> {
   if (!expectedUpdatedAt) return { ok: false, error: '서버의 최신 경비 내역을 불러온 뒤 검수해 주세요.' };
@@ -1097,6 +1104,8 @@ export async function updateHqExpenseReviewDb(
     if (res.ok && data.ok === true && data.expense?.id === expenseId &&
         (patch.status === undefined || data.expense.status === patch.status) &&
         (patch.billableToCustomer === undefined || data.expense.billableToCustomer === patch.billableToCustomer) &&
+        (patch.reviewNotes === undefined || (data.expense.reviewNotes || '') === patch.reviewNotes) &&
+        (patch.corrections === undefined || expenseFieldChanges(normalizeExpenseCorrections(patch.corrections),expenseCorrectionFields(data.expense)).length === 0) &&
         data.expense.updatedAt) {
       // Use the authoritative server row, including reviewer, audit and revision.
       saveHqExpenses(getHqExpenses().map(expense => expense.id === expenseId ? data.expense : expense));

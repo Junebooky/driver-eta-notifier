@@ -21,6 +21,7 @@ import { GET as summary } from '../app/api/hq/reporting/summary/route';
 import { prepareExpenseReceipt } from '../utils/receiptSubmission';
 import { submitDriverExpensesToHqDb,fetchHqExpensesFromDb,updateHqExpenseReviewDb,getHqExpenses } from '../utils/expenseHqStorage';
 import { submitDriverLogToHqDb,fetchHqDrivingLogsFromDb } from '../utils/drivingLogHqStorage';
+import { expenseCorrectionFields } from '../utils/expenseReview';
 import type { ExpenseItem } from '../utils/expense';
 
 /** Actual API handlers and shipped client submission helpers, with real Postgres and isolated Auth/Storage fixtures. */
@@ -104,6 +105,29 @@ export async function verifyReportingFlow(admin:Client,writer:Client,reader:Clie
     assert.equal((await updateHqExpenseReviewDb(item.id,{status:'승인 완료'},afterRace.updatedAt)).ok,true);
     console.log('PASS receipt review: shipped client helper → real API/Postgres → exact server row; stale and concurrent review 409/audit retained; billable classification persisted; invalid status denied');
     actor=token('driver');const own=await fetchHqExpensesFromDb();assert.equal(own.expenses.find(row=>row.id===item.id)?.status,'승인 완료');
+    actor=token('hq_admin');
+    const putReview=(body:unknown)=>expenses.PUT(new NextRequest('http://localhost/api/expenses',{method:'PUT',headers:{authorization:'Bearer '+actor,'content-type':'application/json'},body:JSON.stringify(body)}));
+    const fresh=async()=>(await fetchHqExpensesFromDb()).expenses.find(row=>row.id===item.id)!;
+    const duplicate=(await fetchHqExpensesFromDb()).expenses.find(row=>row.id!==item.id)!;
+    const doubleApproval=await updateHqExpenseReviewDb(duplicate.id,{status:'승인 완료'},duplicate.updatedAt);assert.equal(doubleApproval.ok,false);if(!doubleApproval.ok)assert.equal(doubleApproval.conflict,true);
+    await admin.query('UPDATE cockpit.expenses SET ocr_details=$2 WHERE id=$1',[item.id,JSON.stringify({total:8000,approvalNo:'immutable-proof'})]);
+    let latest=await fresh();const originalPath=latest.receiptStoragePath;
+    const correction={...expenseCorrectionFields(latest),amount:9000,merchant:'수정 주차장',address:'원본 대조 주소',memo:'검수 수정'};
+    assert.equal((await putReview({id:item.id,expectedUpdatedAt:latest.updatedAt,status:'승인 완료',corrections:correction})).status,400,'save and approve must be separate');
+    assert.equal((await putReview({id:item.id,expectedUpdatedAt:latest.updatedAt,corrections:{...correction,receiptStoragePath:'replacement'}})).status,400,'original evidence cannot be overwritten by a correction');
+    const corrected=await updateHqExpenseReviewDb(item.id,{corrections:correction,reviewNotes:'금액 원본 대조'},latest.updatedAt);assert.equal(corrected.ok,true,JSON.stringify(corrected));
+    latest=await fresh();assert.equal(latest.status,'검수 대기');assert.equal(latest.reviewedAt,undefined);assert.equal(latest.receiptStoragePath,originalPath);assert.deepEqual(latest.ocrDetails,{total:8000,approvalNo:'immutable-proof'});
+    assert.ok(latest.auditHistory?.[0].changes.some((change:{field:string;before:unknown;after:unknown})=>change.field==='amount' && change.before===8000 && change.after===9000));assert.equal(latest.auditHistory?.[0].actorId,'fixture-hq');
+    assert.deepEqual(await query(),{expense_amount:11000,expense_count:2});
+    assert.equal((await putReview({id:item.id,expectedUpdatedAt:latest.updatedAt,corrections:{...correction,bookingId:otherBooking}})).status,403,'another vehicle booking cannot receive this receipt');
+    const moved=await updateHqExpenseReviewDb(item.id,{corrections:{...correction,rawDate:'2026-12-13'}},latest.updatedAt);assert.equal(moved.ok,true,JSON.stringify(moved));
+    latest=await fresh();assert.equal(latest.drivingLogId,undefined);assert.deepEqual(await query(),{expense_amount:2000,expense_count:1});
+    assert.equal((await updateHqExpenseReviewDb(item.id,{corrections:{...correction,amount:8000,rawDate:item.date}},latest.updatedAt)).ok,true);
+    latest=await fresh();assert.ok(latest.drivingLogId);assert.deepEqual(await query(),{expense_amount:10000,expense_count:2});
+    assert.equal((await updateHqExpenseReviewDb(item.id,{status:'승인 완료'},latest.updatedAt)).ok,true);
+    // The database guard also protects writes outside this HTTP handler.
+    await assert.rejects(writer.query("UPDATE cockpit.expenses SET amount=0 WHERE id=$1",[item.id]),{code:'23514'});
+    console.log('PASS receipt correction → real API/Postgres → aggregate relinking; before/after/actor audit and immutable OCR preserved; save-before-approve, duplicate source, invalid approval and cross-vehicle link denied');
     actor=token('driver',other);assert.equal((await fetch(hqExpenses.expenses[0].receiptUrl!)).status,403);assert.equal((await fetchHqDrivingLogsFromDb()).logs.length,0);
     actor=token('driver');
     const malicious=await post(expenses,'/api/expenses',{...item,id:randomUUID(),receiptUrl:undefined,drivingLogId:separate.log!.id,receiptStoragePath:ready.receiptStoragePath});assert.equal(malicious.status,403);

@@ -3,7 +3,9 @@ import { supabaseAdmin } from '@/lib/supabase/server';
 import { verifyServerAuth, requireHqAdmin } from '@/lib/auth/serverAuth';
 import { normalizeDateToIso,normalizeTimeHHmm } from '@/utils/dispatchConflictDetector';
 import { HqExpenseRecord, HqExpenseStatus } from '@/types/expenseHq';
-import { ExpenseCategoryKey, PaymentMethod, EXPENSE_CATEGORIES } from '@/utils/expense';
+import { ExpenseCategoryKey, PaymentMethod, EXPENSE_CATEGORIES, PAYMENT_METHODS } from '@/utils/expense';
+
+import { normalizeExpenseCorrections, expenseCorrectionFields, expenseFieldChanges, approvalProblem } from '@/utils/expenseReview';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,7 +30,7 @@ function getPaymentMethodLabel(method: string): string {
     case 'cash':
       return '현금';
     default:
-      return '회사 카드';
+      return PAYMENT_METHODS.find(item => item.key === method)?.label || '결제 미확인';
   }
 }
 
@@ -36,13 +38,13 @@ function getPaymentMethodLabel(method: string): string {
  * Maps DB row from cockpit.expenses to frontend HqExpenseRecord interface
  */
 export function mapDbRowToExpenseRecord(row: any, index: number = 1): HqExpenseRecord {
-  const rawDate = row.expense_date || new Date().toISOString().split('T')[0];
+  const rawDate = row.expense_date || '';
   const dateParts = rawDate.split('-');
   const submittedDate = dateParts.length === 3 ? `${dateParts[0]}. ${dateParts[1]}. ${dateParts[2]}` : rawDate;
-  const time = row.expense_time ? String(row.expense_time).slice(0, 5) : '12:00';
+  const time = row.expense_time ? String(row.expense_time).slice(0, 5) : '';
 
-  const m = dateParts[1] || '10';
-  const d = dateParts[2] || '24';
+  const m = dateParts[1] || '--';
+  const d = dateParts[2] || '--';
   const submittedAt = `${m}/${d} ${time}`;
 
   return {
@@ -59,10 +61,10 @@ export function mapDbRowToExpenseRecord(row: any, index: number = 1): HqExpenseR
     customerId: row.customer_id || undefined,
     category: (row.category as ExpenseCategoryKey) || 'other',
     categoryLabel: row.category_label || getCategoryLabel(row.category),
-    merchant: row.merchant || '거래처',
+    merchant: row.merchant || '',
     address: row.address || undefined,
     amount: Number(row.amount) || 0,
-    paymentMethod: (row.payment_method as PaymentMethod) || 'company_card',
+    paymentMethod: (row.payment_method as PaymentMethod) || 'unspecified',
     paymentMethodLabel: row.payment_method_label || getPaymentMethodLabel(row.payment_method),
     memo: row.memo || undefined,
     status: (row.status as HqExpenseStatus) || '검수 대기',
@@ -431,17 +433,17 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { id, status, reviewNotes, billableToCustomer, expectedUpdatedAt } = body;
+    const { id, status, reviewNotes, billableToCustomer, expectedUpdatedAt, corrections } = body;
     const validStatuses = new Set(['검수 대기', '승인 완료', '금액 확인', '반려', '보완 필요']);
     if ((status !== undefined && !validStatuses.has(status)) ||
         (reviewNotes !== undefined && (typeof reviewNotes !== 'string' || reviewNotes.length > 5000)) ||
-        (expectedUpdatedAt !== undefined && (typeof expectedUpdatedAt !== 'string' || !Number.isFinite(Date.parse(expectedUpdatedAt)))) ||
+        (typeof expectedUpdatedAt !== 'string' || !Number.isFinite(Date.parse(expectedUpdatedAt))) ||
         (billableToCustomer !== undefined && typeof billableToCustomer !== 'boolean') ||
-        (status === undefined && billableToCustomer === undefined)) {
+        (status === undefined && billableToCustomer === undefined && corrections === undefined && reviewNotes === undefined)) {
       return NextResponse.json({ ok: false, error: '검수 상태·의견·저장 버전을 확인해 주세요.' }, { status: 400 });
     }
 
-    if (!id) {
+    if (!isValidUuid(id)) {
       return NextResponse.json(
         { ok: false, error: '수정할 경비 ID(id)가 필요합니다.' },
         { status: 400 }
@@ -480,6 +482,35 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ ok: false, error: '다른 기기에서 경비가 변경되었습니다. 최신 내역을 확인한 뒤 다시 검수해 주세요.' }, { status: 409 });
     }
 
+    let normalized;
+    if (corrections !== undefined) {
+      if (status !== undefined) return NextResponse.json({ ok:false,error:'항목 수정은 먼저 저장한 뒤 별도로 승인해 주세요.' },{status:400});
+      if (!expectedUpdatedAt) return NextResponse.json({ok:false,error:'수정하려면 서버 저장 버전이 필요합니다.'},{status:400});
+      try { normalized = normalizeExpenseCorrections(corrections); }
+      catch(error) { return NextResponse.json({ok:false,error:error instanceof Error ? error.message : '수정 항목을 확인해 주세요.'},{status:400}); }
+    }
+    const changes = normalized ? expenseFieldChanges(expenseCorrectionFields(mapDbRowToExpenseRecord(existing)),normalized) : [];
+    let linkedCustomer: { id: string | null; name: string | null } | undefined;
+    if (normalized && normalized.bookingId !== (existing.booking_id || null)) {
+      linkedCustomer = { id:null,name:null };
+      if (normalized.bookingId) {
+        const result = await supabaseAdmin.from('schedules').select('*').eq('id',normalized.bookingId).maybeSingle();
+        if (result.error) return NextResponse.json({ok:false,error:'예약 정보를 불러오지 못했습니다.'},{status:503});
+        const row=result.data;
+        const driverId=row?.driver_id || row?.schedule_meta?.driverId || row?.schedule_meta?.driver_id;
+        if (!row || row.org_id !== auth.session.org || !driverId || driverId !== existing.driver_id ||
+            (existing.vehicle_id ? row.vehicle_id !== existing.vehicle_id : !existing.vehicle_plate || String(row.vehicle_plate || row.schedule_meta?.vehiclePlate || '').replace(/\s/g,'') !== String(existing.vehicle_plate).replace(/\s/g,'')) ||
+            row.schedule_meta?.serviceMode === 'vehicle_only' || ['draft','unassigned','cancelled'].includes(row.dispatch_status)) {
+          return NextResponse.json({ok:false,error:'같은 조직·기사·차량에 배정된 예약만 연결할 수 있습니다.'},{status:403});
+        }
+        linkedCustomer={id:row.customer_id || row.schedule_meta?.customerId || null,name:row.customer_name || row.schedule_meta?.customerName || null};
+      }
+    }
+    if (status === '승인 완료') {
+      const problem=approvalProblem(mapDbRowToExpenseRecord(existing));
+      if (problem) return NextResponse.json({ok:false,error:problem},{status:400});
+    }
+
     const nowIso = new Date(Math.max(Date.now(), new Date(existing.updated_at || 0).getTime() + 1)).toISOString();
     const actor = auth.session.displayName || auth.session.driverName || '본사 관리자';
     const prevHistory = Array.isArray(existing.audit_history) ? existing.audit_history : [];
@@ -506,6 +537,14 @@ export async function PUT(req: NextRequest) {
       message: auditMessage,
       actor,
       actionType,
+      actorId: auth.session.userId,
+      at: nowIso,
+      changes: [
+        ...changes,
+        ...(reviewNotes !== undefined && reviewNotes !== (existing.review_notes || '') ? [{field:'reviewNotes',before:existing.review_notes || '',after:reviewNotes}] : []),
+        ...(billableToCustomer !== undefined && billableToCustomer !== existing.billable_to_customer ? [{field:'billableToCustomer',before:existing.billable_to_customer,after:billableToCustomer}] : []),
+        ...((status || (changes.length ? '검수 대기' : undefined)) && (status || '검수 대기') !== existing.status ? [{field:'status',before:existing.status,after:status || '검수 대기'}] : []),
+      ],
     };
 
     const updatePayload: Record<string, any> = {
@@ -513,6 +552,18 @@ export async function PUT(req: NextRequest) {
       updated_at: nowIso,
     };
 
+    if (normalized) {
+      Object.assign(updatePayload, {
+        merchant:normalized.merchant,address:normalized.address || null,expense_date:normalized.rawDate,expense_time:normalized.time,
+        category:normalized.category,category_label:getCategoryLabel(normalized.category),amount:normalized.amount,
+        payment_method:normalized.paymentMethod,payment_method_label:getPaymentMethodLabel(normalized.paymentMethod),
+        memo:normalized.memo || null,booking_id:normalized.bookingId,
+      });
+      if (changes.length) Object.assign(updatePayload,{status:'검수 대기',reviewed_at:null,reviewed_by:null});
+      if (normalized.bookingId !== (existing.booking_id || null) || normalized.rawDate !== existing.expense_date) updatePayload.driving_log_id=null;
+      if (linkedCustomer) Object.assign(updatePayload,{customer_id:linkedCustomer.id,customer_name:linkedCustomer.name});
+    }
+    if (reviewNotes !== undefined) updatePayload.review_notes=reviewNotes;
     if (status) {
       updatePayload.status = status;
       updatePayload.reviewed_at = nowIso;
@@ -531,6 +582,8 @@ export async function PUT(req: NextRequest) {
     const { data: updatedRow, error: updateErr } = await updateQuery.select('*').maybeSingle();
 
     if (updateErr) {
+      if (updateErr.code === '23505') return NextResponse.json({ok:false,error:'동일한 원본으로 이미 승인된 영수증이 있습니다. 중복 내역을 확인해 주세요.'},{status:409});
+      if (updateErr.code === '23514') return NextResponse.json({ok:false,error:'승인에 필요한 금액·항목·결제수단·증빙을 확인해 주세요.'},{status:400});
       return NextResponse.json(
         { ok: false, error: `DB 수정 실패: ${updateErr.message}` },
         { status: 500 }

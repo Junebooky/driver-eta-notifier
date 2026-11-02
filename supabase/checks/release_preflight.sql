@@ -31,6 +31,16 @@ SELECT jsonb_build_object(
   'missing_tables', (SELECT coalesce(jsonb_agg(name), '[]'::jsonb) FROM required_tables WHERE to_regclass(name) IS NULL),
   'missing_functions', (SELECT coalesce(jsonb_agg(signature), '[]'::jsonb) FROM required_functions WHERE to_regprocedure(signature) IS NULL),
   'email_source_uniqueness_ready', to_regclass('cockpit.schedules_email_day_slot_identity') IS NOT NULL,
+  'receipt_review_integrity', jsonb_build_object(
+    'approved_source_index_ready', EXISTS (
+      SELECT 1 FROM pg_index WHERE indexrelid = to_regclass('cockpit.expenses_one_approved_receipt_source')
+        AND indisunique AND indisvalid
+    ),
+    'approval_trigger_ready', EXISTS (
+      SELECT 1 FROM pg_trigger WHERE tgrelid = to_regclass('cockpit.expenses')
+        AND tgname = 'expense_approval_integrity' AND tgenabled IN ('O', 'A') AND NOT tgisinternal
+    )
+  ),
   'protected_table_access', (SELECT coalesce(jsonb_agg(jsonb_build_object(
     'table', name,
     'rls_enabled', (SELECT relrowsecurity FROM pg_class WHERE pg_class.oid = p.oid),
