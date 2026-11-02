@@ -45,7 +45,16 @@ import { HqComposeEmailModal } from './HqComposeEmailModal';
 import { HqEmailWorkflowStepper, WorkflowStepId } from './HqEmailWorkflowStepper';
 import { parseVehicleSlotsFromRequestedClass } from '@/utils/vehicleSlotParser';
 import { mapScheduleItemToHqBooking, getKstTodayDateStr } from '@/utils/dispatchConflictDetector';
-import { saveEmailDraft, getEmailDraft, deleteEmailDraft } from '@/utils/emailHqStorage';
+import {
+  saveEmailDraft,
+  getEmailDraft,
+  deleteEmailDraft,
+  getEmailInboxCache,
+  setEmailInboxCache,
+  getCachedEmailDetail,
+  getAllCachedEmailDetails,
+  setCachedEmailDetail,
+} from '@/utils/emailHqStorage';
 
 export interface HqEmailInboxViewProps {
   onCreateBooking?: (booking: HqBooking) => void;
@@ -79,14 +88,23 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
       : 'any';
   const urlDemo = searchParams?.get('demo') === 'true';
 
-  // 1. Live Inbox State
+  // 1. Live Inbox State (Hydrated from persistent cache to prevent flickering)
   const [emails, setEmails] = useState<HqEmailSummary[]>(() => {
     if (urlDemo) {
       return REFERENCE_EMAILS.map((e) => e.summary);
     }
+    const cached = getEmailInboxCache();
+    if (cached?.data?.emails && cached.data.emails.length > 0) {
+      return cached.data.emails;
+    }
     return [];
   });
-  const [isLoadingInbox, setIsLoadingInbox] = useState<boolean>(!urlDemo);
+  const [isLoadingInbox, setIsLoadingInbox] = useState<boolean>(() => {
+    if (urlDemo) return false;
+    const cached = getEmailInboxCache();
+    return !(cached?.data?.emails && cached.data.emails.length > 0);
+  });
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [inboxError, setInboxError] = useState<string | null>(null);
   const [imapState, setImapState] = useState<ImapConnectionState>(() => {
     if (urlDemo) {
@@ -97,6 +115,10 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
         accountEmail: 'demo@viplimousine.kr (데모 모드)',
         lastSync: '데모 샘플',
       };
+    }
+    const cached = getEmailInboxCache();
+    if (cached?.data?.imapState) {
+      return cached.data.imapState;
     }
     return {
       isConfigured: false,
@@ -114,10 +136,14 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
     if (urlDemo) {
       return REFERENCE_EMAILS[0]?.summary.id || null;
     }
+    const cached = getEmailInboxCache();
+    if (cached?.data?.emails && cached.data.emails.length > 0) {
+      return cached.data.emails[0].id;
+    }
     return null;
   });
 
-  // 4. Email Detail Cache (Read-Only)
+  // 4. Email Detail Cache (Read-Only, hydrated from memory/session cache)
   const [emailDetails, setEmailDetails] = useState<Record<string, HqEmailDetail>>(() => {
     if (urlDemo) {
       const initialDetails: Record<string, HqEmailDetail> = {};
@@ -132,7 +158,7 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
       }
       return initialDetails;
     }
-    return {};
+    return getAllCachedEmailDetails();
   });
   const [isLoadingDetail, setIsLoadingDetail] = useState<boolean>(false);
 
@@ -208,71 +234,114 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
   };
 
   // =========================================================
-  // Live Fetch Inbox via GET /api/email/inbox
+  // Live Fetch Inbox via GET /api/email/inbox (with multi-tier caching)
   // =========================================================
-  const fetchLiveInbox = useCallback(async () => {
-    if (isDemoMode) return;
-    setIsLoadingInbox(true);
-    setInboxError(null);
+  const fetchLiveInbox = useCallback(
+    async (forceRefresh = false) => {
+      if (isDemoMode) return;
 
-    try {
-      const res = await fetch('/api/email/inbox', {
-        method: 'GET',
-        headers: { credentials: 'include' },
-      });
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok || !data.ok) {
-        setImapState({
-          isConfigured: data.isConfigured ?? false,
-          syncStatus: data.syncStatus || 'disconnected',
-          totalCount: 0,
-          accountEmail: data.accountEmail || '',
-          lastSync: data.lastSync || '',
-          error: data.error || 'NAVER 메일함 동기화 실패',
-        });
-        setInboxError(data.error || '이메일 수신함 조회에 실패했습니다.');
-        setEmails([]);
-        setSelectedEmailId(null);
-      } else {
-        const liveEmails: HqEmailSummary[] = data.emails || [];
-        setImapState({
-          isConfigured: true,
-          syncStatus: 'connected',
-          totalCount: data.totalCount ?? liveEmails.length,
-          accountEmail: data.accountEmail || 'NAVER 공식 계정',
-          lastSync: data.lastSync || new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
-        });
-        setEmails(liveEmails);
-        if (liveEmails.length > 0) {
-          setSelectedEmailId((prev) => prev || liveEmails[0].id);
-        } else {
-          setSelectedEmailId(null);
+      // When not forcing refresh, use valid client cache if available
+      if (!forceRefresh) {
+        const cached = getEmailInboxCache();
+        if (cached && !cached.isStale && cached.data.emails.length > 0) {
+          setEmails(cached.data.emails);
+          setImapState(cached.data.imapState);
+          setIsLoadingInbox(false);
+          return;
         }
       }
-    } catch (err: any) {
-      setInboxError(err.message || '네트워크 연결 오류가 발생했습니다.');
-      setImapState({
-        isConfigured: false,
-        syncStatus: 'error',
-        totalCount: 0,
-        error: err.message,
-      });
-      setEmails([]);
-      setSelectedEmailId(null);
-    } finally {
-      setIsLoadingInbox(false);
-    }
-  }, [isDemoMode]);
+
+      if (forceRefresh) {
+        setIsRefreshing(true);
+      } else {
+        // Only show full loading spinner if we don't have any cached emails to display
+        setEmails((prev) => {
+          if (prev.length === 0) {
+            setIsLoadingInbox(true);
+          }
+          return prev;
+        });
+      }
+      setInboxError(null);
+
+      try {
+        const url = forceRefresh ? '/api/email/inbox?refresh=true' : '/api/email/inbox';
+        const res = await fetch(url, {
+          method: 'GET',
+          headers: { credentials: 'include' },
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok || !data.ok) {
+          const nextImapState: ImapConnectionState = {
+            isConfigured: data.isConfigured ?? false,
+            syncStatus: data.syncStatus || 'disconnected',
+            totalCount: 0,
+            accountEmail: data.accountEmail || '',
+            lastSync: data.lastSync || '',
+            error: data.error || 'NAVER 메일함 동기화 실패',
+          };
+          setImapState(nextImapState);
+          setInboxError(data.error || '이메일 수신함 조회에 실패했습니다.');
+          setEmails((prev) => {
+            if (forceRefresh && prev.length > 0) return prev;
+            return [];
+          });
+          if (!forceRefresh) {
+            setSelectedEmailId(null);
+          }
+        } else {
+          const liveEmails: HqEmailSummary[] = data.emails || [];
+          const nextImapState: ImapConnectionState = {
+            isConfigured: true,
+            syncStatus: 'connected',
+            totalCount: data.totalCount ?? liveEmails.length,
+            accountEmail: data.accountEmail || 'NAVER 공식 계정',
+            lastSync:
+              data.lastSync ||
+              new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+          };
+          setImapState(nextImapState);
+          setEmails(liveEmails);
+          setEmailInboxCache(liveEmails, nextImapState);
+
+          if (liveEmails.length > 0) {
+            setSelectedEmailId((prev) => prev || liveEmails[0].id);
+          } else {
+            setSelectedEmailId(null);
+          }
+
+          if (forceRefresh) {
+            showToast('이메일 수신함이 최신 상태로 동기화되었습니다.');
+          }
+        }
+      } catch (err: any) {
+        setInboxError(err.message || '네트워크 연결 오류가 발생했습니다.');
+        setImapState({
+          isConfigured: false,
+          syncStatus: 'error',
+          totalCount: 0,
+          error: err.message,
+        });
+      } finally {
+        setIsLoadingInbox(false);
+        setIsRefreshing(false);
+      }
+    },
+    [isDemoMode]
+  );
 
   useEffect(() => {
     if (!isDemoMode) {
-      fetchLiveInbox();
+      const cached = getEmailInboxCache();
+      if (!cached || cached.isStale || cached.data.emails.length === 0) {
+        fetchLiveInbox(false);
+      }
     }
   }, [fetchLiveInbox, isDemoMode]);
 
   // =========================================================
-  // Fetch Email Detail via GET /api/email/[id]
+  // Fetch Email Detail via GET /api/email/[id] (with memory & session cache)
   // =========================================================
   useEffect(() => {
     if (!selectedEmailId) return;
@@ -301,8 +370,26 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
       return;
     }
 
-    // In Live Mode: check cache first
-    if (emailDetails[selectedEmailId]) return;
+    // In Live Mode: check state and storage cache first
+    if (emailDetails[selectedEmailId]) {
+      return;
+    }
+
+    const cachedDetail = getCachedEmailDetail(selectedEmailId);
+    if (cachedDetail) {
+      setEmailDetails((prev) => ({
+        ...prev,
+        [selectedEmailId]: cachedDetail,
+      }));
+      const cachedDraft = getEmailDraft(selectedEmailId);
+      if (cachedDraft && !draftsByEmailId[selectedEmailId]) {
+        setDraftsByEmailId((prev) => ({
+          ...prev,
+          [selectedEmailId]: cachedDraft,
+        }));
+      }
+      return;
+    }
 
     let active = true;
     setIsLoadingDetail(true);
@@ -319,6 +406,8 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
             ...prev,
             [selectedEmailId]: data.email,
           }));
+          setCachedEmailDetail(data.email);
+
           // Check if previously saved draft exists in localStorage
           const cachedDraft = getEmailDraft(selectedEmailId);
           if (cachedDraft && !draftsByEmailId[selectedEmailId]) {
@@ -360,7 +449,7 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
       setIsDemoMode(false);
       setEmails([]);
       setSelectedEmailId(null);
-      fetchLiveInbox();
+      fetchLiveInbox(true);
       showToast('실제 NAVER 메일함 동기화 모드로 전환되었습니다.');
     }
   };
@@ -731,12 +820,12 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
           {/* Refresh Button */}
           <button
             type="button"
-            onClick={fetchLiveInbox}
-            disabled={isLoadingInbox || isDemoMode}
+            onClick={() => fetchLiveInbox(true)}
+            disabled={isLoadingInbox || isRefreshing || isDemoMode}
             className="px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
             title="메일함 새로고침"
           >
-            <RefreshCw className={`w-3.5 h-3.5 text-slate-500 ${isLoadingInbox ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 text-slate-500 ${isRefreshing || isLoadingInbox ? 'animate-spin' : ''}`} />
             <span>새로고침</span>
           </button>
         </div>

@@ -715,7 +715,18 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
 
         {/* Scrollable Body */}
         <main className="flex-1 p-3.5 sm:p-5 lg:p-6 space-y-4 sm:space-y-5 overflow-y-auto">
-          {activeSidebarTab === 'dashboard' ? (
+          {/* Dedicated 고객 이메일 View - persistently mounted for instant switching without re-fetch */}
+          <div className={activeSidebarTab === 'emails' ? 'block' : 'hidden'}>
+            <HqEmailInboxView
+              onSavedServer={() => fetchSharedBookings(true)}
+              onCreateBooking={() => {
+                fetchSharedBookings(true);
+                navigateWorkspace('dispatch');
+              }}
+            />
+          </div>
+
+          {activeSidebarTab === 'emails' ? null : activeSidebarTab === 'dashboard' ? (
             <HqDashboardOverview bookings={bookings} loading={isLoadingBookings} error={syncError} representative={representativeMode} onNavigate={navigateWorkspace} onAssign={openAssignment} />
           ) : activeSidebarTab === 'operations' ? (
             <HqOperationsBoard
@@ -752,22 +763,9 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
             <HqVehicleManagementView initialSearchQuery={searchQuery} bookings={bookings} />
           ) : (
             <>
-              {/* Dedicated 고객 이메일 View - kept mounted for instant switching */}
-              <div className={activeSidebarTab === 'emails' ? 'block' : 'hidden'}>
-                <HqEmailInboxView
-                  onSavedServer={() => fetchSharedBookings(true)}
-                  onCreateBooking={() => {
-                    fetchSharedBookings(true);
-                    navigateWorkspace('dispatch');
-                  }}
-                />
-              </div>
-
               {/* Operations Reservation & Dispatch View */}
-              {activeSidebarTab !== 'emails' && (
-                <>
-                  {/* Sync Error Banner (if any) */}
-                  {syncError && (
+              {/* Sync Error Banner (if any) */}
+              {syncError && (
                     <div className="p-3 rounded-xl bg-slate-900 border border-slate-700 text-xs font-bold text-white flex items-center justify-between gap-2 shadow-sm">
                       <span>서버 동기화 안내: {syncError}</span>
                       <button
@@ -911,8 +909,6 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
                   </section>
                 </>
               )}
-            </>
-          )}
         </main>
       </div>
 

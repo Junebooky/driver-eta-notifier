@@ -3,14 +3,153 @@
  * Uses localStorage with useSyncExternalStore hooks and dispatch conversion
  */
 
-import { HqEmailExtractedDraft, EmailAiStatus } from '@/types/emailHq';
+import {
+  HqEmailExtractedDraft,
+  EmailAiStatus,
+  HqEmailSummary,
+  HqEmailDetail,
+} from '@/types/emailHq';
 import { HqBooking } from '@/types/hq';
 import { getKstTodayDateStr } from '@/utils/dispatchConflictDetector';
 
 export const HQ_EMAIL_DRAFTS_STORAGE_KEY = 'vip_hq_email_drafts';
 export const HQ_EMAIL_SETTINGS_STORAGE_KEY = 'vip_hq_email_settings';
 export const HQ_EMAIL_STATUS_OVERRIDES_KEY = 'vip_hq_email_status_overrides';
+export const HQ_EMAIL_INBOX_CACHE_KEY = 'vip_hq_email_inbox_cache';
+export const HQ_EMAIL_DETAILS_CACHE_KEY = 'vip_hq_email_details_cache';
 export const HQ_EMAIL_UPDATE_EVENT = 'vip_hq_email_updated';
+
+export interface EmailInboxCachePayload {
+  emails: HqEmailSummary[];
+  imapState: {
+    isConfigured: boolean;
+    syncStatus: 'connected' | 'disconnected' | 'syncing' | 'error';
+    totalCount: number;
+    unreadCount?: number;
+    accountEmail?: string;
+    lastSync?: string;
+    error?: string;
+  };
+  cachedAt: number;
+}
+
+export const EMAIL_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes cache TTL
+
+// In-memory cache variables for instant synchronous access across component re-mounts
+let memoryInboxCache: EmailInboxCachePayload | null = null;
+let memoryDetailsCache: Record<string, HqEmailDetail> = {};
+
+export function getEmailInboxCache(ttlMs: number = EMAIL_CACHE_TTL_MS): {
+  data: EmailInboxCachePayload;
+  isStale: boolean;
+} | null {
+  // 1. Check in-memory cache first
+  if (memoryInboxCache) {
+    const isStale = Date.now() - memoryInboxCache.cachedAt >= ttlMs;
+    return { data: memoryInboxCache, isStale };
+  }
+
+  // 2. Check sessionStorage
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(HQ_EMAIL_INBOX_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && Array.isArray(parsed.emails) && typeof parsed.cachedAt === 'number') {
+      memoryInboxCache = parsed;
+      const isStale = Date.now() - parsed.cachedAt >= ttlMs;
+      return { data: parsed, isStale };
+    }
+  } catch (e) {
+    console.warn('[emailHqStorage] Failed to read inbox cache from sessionStorage:', e);
+  }
+  return null;
+}
+
+export function setEmailInboxCache(
+  emails: HqEmailSummary[],
+  imapState: EmailInboxCachePayload['imapState']
+): void {
+  const payload: EmailInboxCachePayload = {
+    emails,
+    imapState,
+    cachedAt: Date.now(),
+  };
+  memoryInboxCache = payload;
+
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.setItem(HQ_EMAIL_INBOX_CACHE_KEY, JSON.stringify(payload));
+  } catch (e) {
+    console.warn('[emailHqStorage] Failed to persist inbox cache to sessionStorage:', e);
+  }
+}
+
+export function getCachedEmailDetail(emailId: string): HqEmailDetail | null {
+  if (memoryDetailsCache[emailId]) {
+    return memoryDetailsCache[emailId];
+  }
+
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(HQ_EMAIL_DETAILS_CACHE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        memoryDetailsCache = { ...parsed, ...memoryDetailsCache };
+        return memoryDetailsCache[emailId] || null;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+export function getAllCachedEmailDetails(): Record<string, HqEmailDetail> {
+  if (Object.keys(memoryDetailsCache).length > 0) {
+    return memoryDetailsCache;
+  }
+
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = sessionStorage.getItem(HQ_EMAIL_DETAILS_CACHE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        memoryDetailsCache = parsed;
+        return parsed;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return {};
+}
+
+export function setCachedEmailDetail(detail: HqEmailDetail): void {
+  if (!detail || !detail.id) return;
+  memoryDetailsCache[detail.id] = detail;
+
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.setItem(HQ_EMAIL_DETAILS_CACHE_KEY, JSON.stringify(memoryDetailsCache));
+  } catch (e) {
+    console.warn('[emailHqStorage] Failed to persist detail cache:', e);
+  }
+}
+
+export function clearEmailInboxCache(): void {
+  memoryInboxCache = null;
+  memoryDetailsCache = {};
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.removeItem(HQ_EMAIL_INBOX_CACHE_KEY);
+    sessionStorage.removeItem(HQ_EMAIL_DETAILS_CACHE_KEY);
+  } catch {
+    // ignore
+  }
+}
 
 export interface EmailHqSettings {
   autoAiCandidateExtraction: boolean; // Default false per spec
