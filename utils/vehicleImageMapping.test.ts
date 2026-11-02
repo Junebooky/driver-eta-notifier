@@ -110,4 +110,14 @@ test('VIP Real Vehicles - Model Image Mapping Policy (Issue #10)', async (t) => 
       assert.ok(stats.size > 10000, `${f} must not be empty (actual: ${stats.size} bytes)`);
     }
   });
+
+  await t.test('11. First vehicle in canonical VIP fleet is 125호 9982 (Benz Sprinter Tourer 319 CDI from mockup)', () => {
+    const firstVeh = VIP_REAL_VEHICLES[0];
+    assert.equal(firstVeh.plate, '125호 9982');
+    assert.equal(firstVeh.model, '벤츠 스프린터 투어러 (319 CDI)');
+    assert.equal(firstVeh.brand, '벤츠');
+    assert.equal(firstVeh.capacity, '13인승');
+    assert.equal(firstVeh.category, 'sprinter');
+    assert.equal(firstVeh.fuelType, '디젤');
+  });
 });
