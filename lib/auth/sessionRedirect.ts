@@ -6,7 +6,7 @@ export async function redirectSessionResponse(sessionResponse: NextResponse, rep
   const data = await sessionResponse.json();
   const authenticated = sessionResponse.ok && data.authenticated === true;
   const destination = representativeOnly
-    ? authenticated && canAccessPortal(data.session || {}, 'representative') ? '/representative' : '/representative/login'
+    ? authenticated && canAccessPortal(data.session || {}, 'hq') ? '/hq?tab=dashboard' : '/hq/login'
     : authenticated ? accountHome(data.session || {}) : '/login';
   const response = new NextResponse(null, { status: 307, headers: { Location: destination } });
   for (const cookie of sessionResponse.cookies.getAll()) response.cookies.set(cookie);
