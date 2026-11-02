@@ -1,6 +1,6 @@
 'use client';
 import { HqVehicleCustodyPanel } from './vehicles/HqVehicleCustodyPanel';
-import { ArrowRight, CalendarDays, Car, ClipboardList, Receipt, Users } from 'lucide-react';
+import { CalendarDays, Car, ClipboardList, Receipt, Users } from 'lucide-react';
 import type { HqBooking } from '@/types/hq';
 import { getKstTodayDateStr } from '@/utils/dispatchConflictDetector';
 import { HqReportingOverview } from './HqReportingOverview';
@@ -19,14 +19,6 @@ export function HqDashboardOverview({ bookings, loading, error, representative, 
     { label: '재확인 필요', count: active.filter(row => row.driverAck === '재확인 필요' || row.dispatchStatus === '재확인 필요').length, filter: 'kpi_reconfirm_needed' },
   ];
   return <div className="space-y-5">
-    <section className="rounded-3xl bg-[#0B1E48] p-5 text-white">
-      <p className="text-xs text-blue-200">본사 통합 관제 현황</p>
-      <h2 className="mt-2 text-2xl font-black">오늘의 운행을 한눈에</h2>
-      <p className="mt-2 text-sm text-blue-100">일정 확인 · 차량과 기사 배정 · 기사 확인 상태</p>
-      <button type="button" onClick={() => onNavigate('dispatch', 'kpi_unassigned')} className="mt-5 flex min-h-12 w-full items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 font-bold text-[#0B1E48]">
-        <span>배차 대기 일정 확인</span><ArrowRight className="h-5 w-5 shrink-0" aria-hidden="true" />
-      </button>
-    </section>
     {error && <p role="alert" className="rounded-2xl bg-amber-50 p-4 text-sm text-amber-900">{error} · 새로고침으로 다시 확인해 주세요.</p>}
     <section aria-label="실시간 배차 요약" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       {metrics.map(metric => <button key={metric.label} type="button" onClick={() => onNavigate('dispatch', metric.filter)} className="min-h-24 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-xs">
