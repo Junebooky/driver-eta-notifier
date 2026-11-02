@@ -5,6 +5,7 @@ import {
   Calendar,
   Plus,
   Search,
+  Check,
   CheckCircle2,
   Clock,
   AlertCircle,
@@ -65,6 +66,19 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
   const [driverFilter, setDriverFilter] = useState('all');
   const [vehicleFilter, setVehicleFilter] = useState('all');
   const [customerFilter, setCustomerFilter] = useState('all');
+  const [remindingId, setRemindingId] = useState<string | null>(null);
+
+  const handleClockClick = async (e: React.MouseEvent, b: HqBooking) => {
+    e.stopPropagation();
+    haptics.mediumTap();
+    if (!onRemindDriver || remindingId === b.id) return;
+    setRemindingId(b.id);
+    try {
+      await onRemindDriver(b);
+    } finally {
+      setRemindingId(null);
+    }
+  };
 
   const sourceForCounts = allBookingsForCounts || bookings;
 
@@ -502,11 +516,11 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
           aria-labelledby="hq-dispatch-table-caption"
           className="hq-responsive-table-wrapper w-full overflow-x-auto"
         >
-          <table className="w-full table-fixed text-left select-none min-w-[820px]">
+          <table className="w-full table-fixed text-left select-none min-w-[760px]">
             <caption id="hq-dispatch-table-caption" className="sr-only">
               예약 접수 및 기사 배차 확인 현황 목록
             </caption>
-            <colgroup><col className="w-[13%] min-w-[100px]" /><col className="w-[11%] min-w-[85px]" /><col className="w-[8%] min-w-[65px]" /><col className="w-[8%] min-w-[65px]" /><col className="w-[10%] min-w-[80px]" /><col className="w-[12%] min-w-[95px]" /><col className="w-[13%] min-w-[105px]" /><col className="w-[8%] min-w-[70px]" /><col className="w-[8%] min-w-[75px]" /><col className="w-[9%] min-w-[80px]" /></colgroup>
+            <colgroup><col className="w-[14%] min-w-[95px]" /><col className="w-[11%] min-w-[75px]" /><col className="w-[8%] min-w-[65px]" /><col className="w-[9%] min-w-[70px]" /><col className="w-[11%] min-w-[80px]" /><col className="w-[16%] min-w-[100px]" /><col className="w-[17%] min-w-[110px]" /><col className="w-[4%] min-w-[45px]" /><col className="w-[5%] min-w-[55px]" /><col className="w-[5%] min-w-[55px]" /></colgroup>
             <thead>
               <tr className="border-b border-slate-200 text-[11px] font-bold text-slate-500 bg-slate-50">
                 <th scope="col" className="py-2.5 px-2 bg-slate-50">고객사</th>
@@ -516,9 +530,9 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                 <th scope="col" className="py-2.5 px-2 bg-slate-50">배정 차량</th>
                 <th scope="col" className="py-2.5 px-2 bg-slate-50">출발지</th>
                 <th scope="col" className="py-2.5 px-2 bg-slate-50">도착지</th>
-                <th scope="col" className="py-2.5 px-2 bg-slate-50">배차 상태</th>
-                <th scope="col" className="py-2.5 px-2 bg-slate-50">기사님 확인</th>
-                <th scope="col" className="py-2.5 px-2 bg-slate-50">고객 안내</th>
+                <th scope="col" className="py-2.5 px-1 bg-slate-50 text-center">배차</th>
+                <th scope="col" className="py-2.5 px-1 bg-slate-50 text-center">기사 확인</th>
+                <th scope="col" className="py-2.5 px-1 bg-slate-50 text-center">고객 안내</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100/80 text-xs">
@@ -658,143 +672,108 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                         </div>
                       </td>
 
-                      {/* Col 8: 배차 상태 & 일정 충돌 */}
-                      <td className="py-3 px-2 whitespace-nowrap">
-                        <div className="flex flex-col items-end sm:items-start gap-1">
-                          {isAssigned && (
-                            <span className="inline-flex items-center gap-1.5 font-bold text-blue-700 text-[11px]">
-                              <span className="w-1.5 h-1.5 rounded-full bg-[#1E60F3]" />
-                              <span>{b.dispatchStatus}</span>
-                              {b.version && b.version > 1 && (
-                                <span className="text-[10px] text-slate-400 font-mono">v{b.version}</span>
-                              )}
-                            </span>
-                          )}
-                          {isUnassigned && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 border border-slate-300 text-slate-800 font-extrabold text-[11px]">
-                              <Clock className="w-3 h-3 text-slate-600" />
-                              <span>미배정</span>
-                            </span>
-                          )}
-                          {isDraft && (
-                            <span className="inline-flex items-center gap-1 font-bold text-slate-600 text-[11px]">
-                              <FileText className="w-3.5 h-3.5 text-slate-400" />
-                              <span>작성 중</span>
-                            </span>
-                          )}
-                          {isReconfirm && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 border border-indigo-200 font-extrabold text-indigo-700 text-[11px]">
-                              <RotateCcw className="w-3.5 h-3.5 text-indigo-600" />
-                              <span>재확인 필요 (v{b.version || 2})</span>
-                            </span>
-                          )}
-                          {isCancelled && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-200 text-slate-600 font-bold text-[11px] line-through">
-                              <Ban className="w-3 h-3" />
-                              <span>배차 취소</span>
-                            </span>
+                      {/* Col 8: 배차 */}
+                      <td className="py-3 px-1 text-center whitespace-nowrap align-middle">
+                        <div className="flex items-center justify-center gap-1">
+                          {isAssigned ? (
+                            <span
+                              className="inline-block w-2.5 h-2.5 rounded-full bg-[#1E60F3] shadow-xs"
+                              title={`배차 완료${b.version && b.version > 1 ? ` (v${b.version})` : ''}`}
+                            />
+                          ) : isUnassigned ? (
+                            <span
+                              className="inline-block w-2.5 h-2.5 rounded-full bg-amber-400"
+                              title="미배정 (기사님 지정 필요)"
+                            />
+                          ) : isDraft ? (
+                            <span
+                              className="inline-block w-2.5 h-2.5 rounded-full bg-slate-400"
+                              title="작성 중"
+                            />
+                          ) : isReconfirm ? (
+                            <span
+                              className="inline-block w-2.5 h-2.5 rounded-full bg-indigo-600 animate-pulse"
+                              title={`재확인 필요 (v${b.version || 2})`}
+                            />
+                          ) : isCancelled ? (
+                            <span
+                              className="inline-block w-2.5 h-2.5 rounded-full bg-slate-300"
+                              title="배차 취소"
+                            />
+                          ) : (
+                            <span
+                              className="inline-block w-2.5 h-2.5 rounded-full bg-[#1E60F3]"
+                              title={b.dispatchStatus}
+                            />
                           )}
 
                           {b.hasConflict && (
-                            <span
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-900 border border-slate-700 text-white font-black text-[10px]"
-                              title={(b.conflictMessages || []).join('\n')}
-                            >
-                              <AlertTriangle className="w-3 h-3 text-blue-400" />
-                              <span>일정 중복</span>
+                            <span title={(b.conflictMessages || []).join('\n')} className="inline-flex items-center">
+                              <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                             </span>
                           )}
                         </div>
                       </td>
 
-                      {/* Col 9: 기사님 확인 */}
-                      <td className="py-3 px-2 whitespace-nowrap">
-                        {b.driverAck === '확인완료' ? (
-                          <div className="inline-flex items-center gap-1 text-emerald-700 font-bold text-[11px]">
-                            <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
-                            <span>확인완료</span>
-                            {b.driverAckTime && (
-                              <span className="text-[10px] text-slate-400 font-medium">
-                                {b.driverAckTime}
-                              </span>
-                            )}
-                          </div>
-                        ) : b.driverAck === '미확인' || b.driverAck === '재확인 필요' ? (
-                          <div className="flex flex-col items-end sm:items-start gap-1">
-                            {b.driverAck === '미확인' ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200/90 text-slate-700 font-bold text-[11px]">
-                                <Clock className="w-3 h-3 shrink-0 text-slate-500" />
-                                <span>확인 대기</span>
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-800 font-extrabold text-[11px]">
-                                <RotateCcw className="w-3 h-3 text-indigo-600" />
-                                <span>재확인 대기 (v{b.version || 2})</span>
-                              </span>
-                            )}
-                            <div className="flex items-center gap-1">
-                              {(b.reminderCount || 0) > 0 && (
-                                <span className="text-[10px] font-bold text-slate-500">
-                                  재알림 {b.reminderCount}회
-                                </span>
-                              )}
-                              {onRemindDriver && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    haptics.mediumTap();
-                                    onRemindDriver(b);
-                                  }}
-                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#1E60F3] hover:bg-blue-600 text-white text-[10px] font-extrabold shadow-2xs transition-all cursor-pointer"
-                                  title="담당 기사 Cockpit에 즉시 확인 요청 알림 전송"
-                                >
-                                  <Send className="w-2.5 h-2.5" />
-                                  <span>다시 알리기</span>
-                                </button>
-                              )}
+                      {/* Col 9: 기사 확인 */}
+                      <td className="py-3 px-1 text-center whitespace-nowrap align-middle">
+                        <div className="flex items-center justify-center">
+                          {b.driverAck === '확인완료' ? (
+                            <div
+                              className="w-8 h-8 rounded-xl bg-blue-50/90 text-[#1E60F3] border border-blue-100/80 flex items-center justify-center shadow-2xs"
+                              title={`기사님 확인 완료${b.driverAckTime ? ` (${b.driverAckTime})` : ''}`}
+                            >
+                              <Check className="w-4 h-4 stroke-[2.8]" />
                             </div>
-                          </div>
-                        ) : (
-                          <span className="text-slate-300 font-normal">-</span>
-                        )}
-                      </td>
-
-                      {/* Col 10: 고객 안내 (소개서 + 자동 안내 문자·메일) */}
-                      <td className="py-3 px-2 whitespace-nowrap">
-                        <div className="flex flex-col items-end sm:items-start gap-1">
-                          {onOpenCustomerMessage && !isCancelled && (
+                          ) : (
                             <button
                               type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                haptics.lightTap();
-                                onOpenCustomerMessage(b);
-                              }}
-                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-extrabold cursor-pointer transition-all ${
-                                b.pendingCustomerTrigger
-                                  ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-2xs'
-                                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
-                              }`}
-                              title="배차 확정 / 기사 변경 / 픽업지 도착 고객사 안내 문자·이메일 확인 및 발송"
+                              onClick={(e) => handleClockClick(e, b)}
+                              className="w-8 h-8 rounded-xl bg-slate-50 border border-slate-200/90 text-slate-500 hover:bg-blue-50 hover:text-[#1E60F3] hover:border-blue-200 active:scale-95 flex items-center justify-center shadow-2xs transition-all cursor-pointer group/clock"
+                              title={
+                                onRemindDriver
+                                  ? `확인 대기 · 클릭하면 기사님께 다시 알림을 전송해요${
+                                      (b.reminderCount || 0) > 0 ? ` (재알림 ${b.reminderCount}회)` : ''
+                                    }`
+                                  : '확인 대기'
+                              }
+                              aria-label="기사님께 다시 알리기"
                             >
-                              <MessageSquareText className="w-3 h-3" />
-                              <span>
-                                {b.pendingCustomerTrigger
-                                  ? b.pendingCustomerTrigger === 'arrived_pickup'
-                                    ? '도착안내 준비됨'
-                                    : b.pendingCustomerTrigger === 'driver_changed'
-                                    ? '변경안내 준비됨'
-                                    : '확정안내 준비됨'
-                                  : (b.customerNotifications?.length || 0) > 0
-                                  ? `안내발송(${b.customerNotifications!.length})`
-                                  : '안내문자 보내기'}
-                              </span>
+                              {remindingId === b.id ? (
+                                <Clock className="w-4 h-4 animate-spin text-[#1E60F3]" />
+                              ) : (
+                                <Clock className="w-4 h-4 text-slate-500 group-hover/clock:text-[#1E60F3] transition-colors" />
+                              )}
                             </button>
                           )}
-                          <span className="text-[10px] text-slate-400 font-medium">
-                            {b.customerBrochure === '미발송' ? '프로필 미전송' : `프로필: ${b.customerBrochure}`}
-                          </span>
+                        </div>
+                      </td>
+
+                      {/* Col 10: 고객 안내 */}
+                      <td className="py-3 px-1 text-center whitespace-nowrap align-middle">
+                        <div className="flex items-center justify-center">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              haptics.lightTap();
+                              onOpenCustomerMessage?.(b);
+                            }}
+                            className={`w-8 h-8 rounded-xl bg-blue-50/90 border border-blue-100/80 text-[#1E60F3] hover:bg-blue-100 active:scale-95 flex items-center justify-center shadow-2xs transition-all cursor-pointer relative ${
+                              isCancelled ? 'opacity-40 pointer-events-none' : ''
+                            }`}
+                            title={
+                              b.pendingCustomerTrigger
+                                ? '고객 안내 준비됨 (클릭하여 문자 발송)'
+                                : '고객 안내문자 보내기'
+                            }
+                            aria-label="고객 안내문자 보내기"
+                          >
+                            <Send className="w-4 h-4 text-[#1E60F3]" />
+                            {b.pendingCustomerTrigger && (
+                              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-indigo-600 ring-2 ring-white" />
+                            )}
+                          </button>
                         </div>
                       </td>
                     </tr>
