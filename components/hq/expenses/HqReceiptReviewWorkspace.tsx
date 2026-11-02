@@ -163,8 +163,6 @@ export default function HqReceiptReviewWorkspace({ expense, expenses, bookings, 
           <button ref={approveButton} className={`${buttonClass} flex w-full items-center justify-center gap-2 bg-blue-600 text-white`} disabled={!canApprove} onClick={() => void persist({ status: '승인 완료' }, true)}><Check size={18}/>승인 후 다음 영수증</button>
           <p className="text-xs text-slate-500">저장되지 않은 수정이 있으면 승인할 수 없습니다. 입력 칸 밖에서 Ctrl/Cmd+Enter로 승인할 수 있습니다.</p>
           <div className="flex flex-wrap gap-2"><button className={buttonClass} disabled={busy || dirty || stale} onClick={() => void persist({ status: '금액 확인' })}>보완 요청</button><button className={buttonClass} disabled={busy || dirty || stale} onClick={() => void persist({ status: '반려' })}>반려</button></div>
-          {saved.ocrDetails && <details><summary className="cursor-pointer text-sm font-bold">원본 OCR 추출 정보 (보존)</summary><pre className="mt-2 whitespace-pre-wrap break-all rounded-lg bg-slate-50 p-3 text-xs">{JSON.stringify(saved.ocrDetails, null, 2)}</pre></details>}
-          <details><summary className="cursor-pointer text-sm font-bold">검수 이력 ({saved.auditHistory?.length || 0})</summary><ul className="mt-2 space-y-2">{saved.auditHistory?.map((entry, index) => <li key={entry.id || index} className="rounded-lg bg-slate-50 p-3 text-xs"><p>{entry.at || entry.time} · {entry.actor}</p><p>{entry.message}</p>{entry.changes?.map((change: {field:string;before:unknown;after:unknown}) => <p key={change.field}>{change.field}: {String(change.before ?? '없음')} → {String(change.after ?? '없음')}</p>)}</li>)}</ul></details>
         </section>
       </div>
       {busy && <p role="status" className="border-t p-3 text-center text-sm">서버 저장 결과를 확인하고 있습니다.</p>}
