@@ -1068,7 +1068,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
             {currentStep === 4 && (
               <div className="max-w-xl mx-auto space-y-5 animate-in zoom-in-95 duration-200">
                 <div id="quote-step-title" className="border-b border-slate-100 pb-2 text-center">
-                  <h4 className="text-base font-black text-slate-900 tracking-tight">
+                  <h4 className="text-xl font-black text-slate-900 tracking-tight">
                     4. 공식 견적서 확인
                   </h4>
                   <p className="text-xs text-slate-400 font-medium mt-0.5">
