@@ -149,7 +149,7 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
       {/* Subheader: Guide & Counters (Matching Expenses pattern) */}
       <div className="px-5 py-2.5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
         <div className="text-slate-400 font-medium">
-          행을 선택하면 운행 상세 정보와 영수증 내역을 확인하고 검수할 수 있습니다.
+          행을 누르면 운행 상세 정보와 영수증 내역 모달이 열려 편리하게 검수할 수 있어요.
         </div>
         {kpiCounts && (
           <div className="flex flex-wrap items-center gap-3.5 text-slate-500 font-medium shrink-0">

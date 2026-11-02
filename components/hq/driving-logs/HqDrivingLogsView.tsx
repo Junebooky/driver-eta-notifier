@@ -38,6 +38,7 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
     getHqDrivingLogsServerSnapshot
   );
   const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const {error:dbError,refreshing:isRefreshing,refresh:handleRefreshLogs}=useReportingRefresh(fetchHqDrivingLogsFromDb);
 
   // Filters
@@ -144,8 +145,8 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
 
   // Selected Log Object
   const selectedLog = useMemo(() => {
-    return logs.find((l) => l.id === selectedLogId) || filteredLogs[0] || null;
-  }, [logs, selectedLogId, filteredLogs]);
+    return logs.find((l) => l.id === selectedLogId) || null;
+  }, [logs, selectedLogId]);
 
   // Status Action Handlers (strictly syncs to DB)
   const handleApprove = async (logId: string) => {
@@ -260,41 +261,43 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
         onExportExcel={handleExportExcel}
       />
 
-      {/* 2. Main Working Area: Left Table (60-65%) + Right Detail Panel (35-40%) */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start">
-        {/* Left Column: 운행일지 목록 Table */}
-        <div className="xl:col-span-8">
-          <HqDrivingLogsTable
-            logs={paginatedLogs}
-            totalCount={filteredLogs.length}
-            selectedLogId={selectedLog?.id || null}
-            onSelectLog={(log) => setSelectedLogId(log.id)}
-            pageSize={pageSize}
-            onPageSizeChange={(size) => {
-              setPageSize(size);
-              setCurrentPage(1);
-            }}
-            currentPage={currentPage}
-            onPageChange={setCurrentPage}
-            kpiCounts={kpiCounts}
-            selectedStatus={selectedStatus}
-            onSelectStatus={(status) => {
-              setSelectedStatus(status);
-              setCurrentPage(1);
-            }}
-          />
-        </div>
-
-        {/* Right Column: 선택된 운행일지 상세 정보 Panel */}
-        <div className="xl:col-span-4 sticky top-20">
-          <HqDrivingLogDetailPanel
-            log={selectedLog}
-            onApprove={handleApprove}
-            onRequestRevision={handleRequestRevision}
-            onReject={handleReject}
-          />
-        </div>
+      {/* 2. Main Working Area: Full-width Driving Logs Table */}
+      <div className="w-full">
+        <HqDrivingLogsTable
+          logs={paginatedLogs}
+          totalCount={filteredLogs.length}
+          selectedLogId={selectedLog?.id || null}
+          onSelectLog={(log) => {
+            setSelectedLogId(log.id);
+            setIsDetailModalOpen(true);
+          }}
+          pageSize={pageSize}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setCurrentPage(1);
+          }}
+          currentPage={currentPage}
+          onPageChange={setCurrentPage}
+          kpiCounts={kpiCounts}
+          selectedStatus={selectedStatus}
+          onSelectStatus={(status) => {
+            setSelectedStatus(status);
+            setCurrentPage(1);
+          }}
+        />
       </div>
+
+      {/* 3. Detailed Info Modal (Opens on row click or '보기' action) */}
+      {isDetailModalOpen && selectedLog && (
+        <HqDrivingLogDetailPanel
+          log={selectedLog}
+          onApprove={handleApprove}
+          onRequestRevision={handleRequestRevision}
+          onReject={handleReject}
+          onClose={() => setIsDetailModalOpen(false)}
+          isModal
+        />
+      )}
 
       <HqHipassImportModal
         isOpen={isHipassModalOpen}

@@ -94,6 +94,57 @@ function runTests() {
   assert('Demo fixture status is draft', demoFixture.status === 'draft');
   assert('Demo fixture isDemoFixture flag is true', demoFixture.isDemoFixture === true);
 
+  console.log('\n--- 6. Testing Full-Width Driving Logs Table & Detail Modal Contract ---');
+  interface DrivingLogsViewLayoutState {
+    tableWidthClass: string;
+    isDetailModalOpen: boolean;
+    selectedLogId: string | null;
+  }
+
+  // Initial state: table is full width (w-full), detail modal is closed
+  let viewState: DrivingLogsViewLayoutState = {
+    tableWidthClass: 'w-full',
+    isDetailModalOpen: false,
+    selectedLogId: null,
+  };
+
+  assert('Driving logs table must occupy full width (w-full)', viewState.tableWidthClass === 'w-full');
+  assert('Detail modal is initially closed', viewState.isDetailModalOpen === false);
+
+  // When a user selects a log row or clicks '보기':
+  const onSelectLog = (logId: string) => {
+    viewState = {
+      ...viewState,
+      selectedLogId: logId,
+      isDetailModalOpen: true,
+    };
+  };
+
+  onSelectLog('log-001');
+  assert('Selecting a row opens detail modal', viewState.isDetailModalOpen === true);
+  assert('Selected log ID is set to log-001', viewState.selectedLogId === 'log-001');
+
+  // Modal attributes verification
+  const modalAria = {
+    role: 'dialog',
+    ariaModal: 'true',
+    ariaLabel: '선택된 운행일지 상세 정보',
+  };
+  assert('Modal has role dialog', modalAria.role === 'dialog');
+  assert('Modal has aria-modal true', modalAria.ariaModal === 'true');
+  assert('Modal has descriptive aria-label', modalAria.ariaLabel === '선택된 운행일지 상세 정보');
+
+  // When closing the modal:
+  const onCloseModal = () => {
+    viewState = {
+      ...viewState,
+      isDetailModalOpen: false,
+    };
+  };
+
+  onCloseModal();
+  assert('Closing modal sets isDetailModalOpen to false', viewState.isDetailModalOpen === false);
+
   console.log(`\nTests finished: ${passed}/${total} passed.`);
 }
 

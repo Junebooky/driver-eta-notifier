@@ -24,6 +24,8 @@ export interface HqDrivingLogDetailPanelProps {
   onApprove: (logId: string) => void;
   onRequestRevision: (logId: string, reason: string) => void;
   onReject: (logId: string, reason: string) => void;
+  onClose?: () => void;
+  isModal?: boolean;
 }
 
 export const HqDrivingLogDetailPanel: React.FC<HqDrivingLogDetailPanelProps> = ({
@@ -31,11 +33,26 @@ export const HqDrivingLogDetailPanel: React.FC<HqDrivingLogDetailPanelProps> = (
   onApprove,
   onRequestRevision,
   onReject,
+  onClose,
+  isModal = false,
 }) => {
   const [modalAction, setModalAction] = useState<'revision' | 'reject' | null>(null);
   const [reasonText, setReasonText] = useState('');
 
+  // ESC key support when opened in modal mode
+  React.useEffect(() => {
+    if (!isModal || !onClose) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !modalAction) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isModal, onClose, modalAction]);
+
   if (!log) {
+    if (isModal) return null;
     return (
       <div className="bg-white rounded-2xl border border-slate-200/80 p-8 text-center text-slate-400 space-y-2 shadow-2xs">
         <FileText className="w-8 h-8 text-slate-300 mx-auto" />
@@ -60,12 +77,16 @@ export const HqDrivingLogDetailPanel: React.FC<HqDrivingLogDetailPanelProps> = (
     setReasonText('');
   };
 
-  return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden flex flex-col space-y-4 p-5">
+  const cardWrapperClasses = isModal
+    ? 'overflow-hidden flex flex-col space-y-4'
+    : 'bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden flex flex-col space-y-4 p-5';
+
+  const content = (
+    <div className={cardWrapperClasses}>
       {/* 1. Header with Title & Status Badge */}
       <div className="flex items-center justify-between pb-3 border-b border-slate-100">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#1E60F3] flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#1E60F3] flex items-center justify-center shrink-0">
             <Car className="w-4 h-4 stroke-[2.2]" />
           </div>
           <div>
@@ -76,8 +97,8 @@ export const HqDrivingLogDetailPanel: React.FC<HqDrivingLogDetailPanelProps> = (
           </div>
         </div>
 
-        {/* Status Badge */}
-        <div>
+        {/* Status Badge & Modal Close Button */}
+        <div className="flex items-center gap-2">
           {log.status === 'draft' && (
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border border-amber-300 bg-amber-50 text-amber-700">
               <Clock className="w-3.5 h-3.5 stroke-[2.2]" />
@@ -113,6 +134,20 @@ export const HqDrivingLogDetailPanel: React.FC<HqDrivingLogDetailPanelProps> = (
               <XCircle className="w-3.5 h-3.5 stroke-[2.2]" />
               <span>반려</span>
             </span>
+          )}
+
+          {isModal && onClose && (
+            <button
+              type="button"
+              onClick={() => {
+                haptics.lightTap();
+                onClose();
+              }}
+              className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 active:scale-95 flex items-center justify-center text-slate-500 hover:text-slate-800 cursor-pointer transition-colors shrink-0 ml-1"
+              aria-label="닫기"
+            >
+              <X className="w-4 h-4" />
+            </button>
           )}
         </div>
       </div>
@@ -382,7 +417,7 @@ export const HqDrivingLogDetailPanel: React.FC<HqDrivingLogDetailPanelProps> = (
 
       {/* Action Reason Input Modal (for 보완 요청 / 반려) */}
       {modalAction && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl p-5 w-full max-w-sm shadow-2xl space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-slate-900">
@@ -391,7 +426,7 @@ export const HqDrivingLogDetailPanel: React.FC<HqDrivingLogDetailPanelProps> = (
               <button
                 type="button"
                 onClick={() => setModalAction(null)}
-                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg"
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -415,14 +450,14 @@ export const HqDrivingLogDetailPanel: React.FC<HqDrivingLogDetailPanelProps> = (
               <button
                 type="button"
                 onClick={() => setModalAction(null)}
-                className="flex-1 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50"
+                className="flex-1 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 cursor-pointer"
               >
                 취소
               </button>
               <button
                 type="button"
                 onClick={handleConfirmAction}
-                className={`flex-1 py-2.5 text-white rounded-xl text-xs font-bold shadow-xs ${
+                className={`flex-1 py-2.5 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer ${
                   modalAction === 'revision'
                     ? 'bg-[#1E60F3] hover:bg-blue-600'
                     : 'bg-rose-500 hover:bg-rose-600'
@@ -436,4 +471,27 @@ export const HqDrivingLogDetailPanel: React.FC<HqDrivingLogDetailPanelProps> = (
       )}
     </div>
   );
+
+  if (isModal) {
+    return (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="선택된 운행일지 상세 정보"
+        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            haptics.lightTap();
+            onClose?.();
+          }
+        }}
+      >
+        <div className="relative w-full max-w-2xl max-h-[92vh] overflow-y-auto bg-white rounded-3xl border border-slate-200/90 shadow-2xl p-5 sm:p-6 my-auto animate-in zoom-in-95 duration-150">
+          {content}
+        </div>
+      </div>
+    );
+  }
+
+  return content;
 };
