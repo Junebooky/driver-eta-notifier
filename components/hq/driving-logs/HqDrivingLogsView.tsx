@@ -3,6 +3,7 @@
 import { useReportingRefresh } from '@/hooks/useReportingRefresh';
 import React, { useState, useMemo, useSyncExternalStore } from 'react';
 import {
+  HqDrivingLog,
   HqDrivingLogStatus,
 } from '@/types/drivingLogHq';
 import {
@@ -17,6 +18,7 @@ import {
 import { HqDrivingLogsFilterBar } from './HqDrivingLogsFilterBar';
 import { HqDrivingLogsTable } from './HqDrivingLogsTable';
 import { HqDrivingLogDetailPanel } from './HqDrivingLogDetailPanel';
+import { HqLogExpenseDetailModal } from './HqLogExpenseDetailModal';
 import { CheckCircle2, AlertCircle, RotateCw } from 'lucide-react';
 import { HqBooking } from '@/types/hq';
 import HqHipassImportModal from '../expenses/HqHipassImportModal';
@@ -38,6 +40,7 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
     getHqDrivingLogsServerSnapshot
   );
   const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
+  const [selectedExpenseLog, setSelectedExpenseLog] = useState<HqDrivingLog | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const {error:dbError,refreshing:isRefreshing,refresh:handleRefreshLogs}=useReportingRefresh(fetchHqDrivingLogsFromDb);
 
@@ -271,6 +274,9 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
             setSelectedLogId(log.id);
             setIsDetailModalOpen(true);
           }}
+          onOpenExpenseDetail={(log) => {
+            setSelectedExpenseLog(log);
+          }}
           pageSize={pageSize}
           onPageSizeChange={(size) => {
             setPageSize(size);
@@ -296,6 +302,18 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
           onReject={handleReject}
           onClose={() => setIsDetailModalOpen(false)}
           isModal
+        />
+      )}
+
+      {/* 4. Dedicated Expense Details Modal (Opens on clicking 경비지출 cell) */}
+      {selectedExpenseLog && (
+        <HqLogExpenseDetailModal
+          log={selectedExpenseLog}
+          onClose={() => setSelectedExpenseLog(null)}
+          onNavigateToExpenses={() => {
+            setSelectedExpenseLog(null);
+            window.location.assign('/hq?tab=expenses');
+          }}
         />
       )}
 

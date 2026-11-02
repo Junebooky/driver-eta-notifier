@@ -19,6 +19,7 @@ export interface HqDrivingLogsTableProps {
   totalCount: number;
   selectedLogId: string | null;
   onSelectLog: (log: HqDrivingLog) => void;
+  onOpenExpenseDetail?: (log: HqDrivingLog) => void;
   pageSize: number;
   onPageSizeChange: (size: number) => void;
   currentPage: number;
@@ -40,6 +41,7 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
   totalCount,
   selectedLogId,
   onSelectLog,
+  onOpenExpenseDetail,
   pageSize,
   onPageSizeChange,
   currentPage,
@@ -236,7 +238,7 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
               <th className="py-3 px-2 text-right">시작 km</th>
               <th className="py-3 px-2 text-right">종료 km</th>
               <th className="py-3 px-3 text-right">운행합</th>
-              <th className="py-3 px-3 text-right">경비지출</th>
+              <th className="py-3 px-3 text-center">경비지출</th>
               <th className="py-3 px-3 text-center">상태</th>
             </tr>
           </thead>
@@ -330,17 +332,32 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
                       {log.distanceKm}
                     </td>
 
-                    {/* 경비지출 */}
-                    <td className="py-3 px-3 text-right font-bold text-slate-800">
-                      {log.expenseAmount > 0 ? (
-                        <div className="flex flex-col items-end">
-                          <span className="text-[#1E60F3] font-black">{log.expenseAmount.toLocaleString()}원</span>
-                          {log.expenseCount && log.expenseCount > 0 ? (
-                            <span className="text-[10px] text-slate-400 font-medium">({log.expenseCount}건)</span>
-                          ) : null}
-                        </div>
+                    {/* 경비지출: 건수 위(중앙), 금액 아래(중앙) */}
+                    <td className="py-3 px-3 text-center">
+                      {log.expenseAmount > 0 || (log.expenseCount && log.expenseCount > 0) ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            haptics.lightTap();
+                            if (onOpenExpenseDetail) {
+                              onOpenExpenseDetail(log);
+                            } else {
+                              onSelectLog(log);
+                            }
+                          }}
+                          className="inline-flex flex-col items-center justify-center px-2.5 py-1 rounded-xl bg-blue-50/70 hover:bg-blue-100 border border-blue-200/60 transition-all cursor-pointer group shadow-2xs hover:scale-105 active:scale-95"
+                          title="경비 지출 상세 내역 확인하기"
+                        >
+                          <span className="text-[11px] font-extrabold text-slate-700 group-hover:text-slate-900 leading-tight">
+                            {log.expenseCount ? `${log.expenseCount}건` : '1건'}
+                          </span>
+                          <span className="text-[11px] font-black text-[#1E60F3] group-hover:text-blue-700 leading-tight mt-0.5">
+                            {log.expenseAmount.toLocaleString()}원
+                          </span>
+                        </button>
                       ) : (
-                        <span className="text-slate-400 font-medium">-</span>
+                        <span className="text-slate-400 font-medium text-xs">-</span>
                       )}
                     </td>
 

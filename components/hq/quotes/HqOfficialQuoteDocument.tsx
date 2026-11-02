@@ -784,3 +784,4 @@ export function generateOfficialQuotePrintHtml(props: HqOfficialQuoteDocumentPro
 </body>
 </html>`;
 }
+
