@@ -251,11 +251,11 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
             fontSize: '11px',
           }}
         >
-          <span style={{ color: '#64748b', textAlign: 'left', fontWeight: 500 }}>견적번호</span>
+          <span style={{ color: '#64748b', textAlign: 'left', fontWeight: 500 }}>견적번호 :</span>
           <span style={{ fontWeight: 700, color: '#0f172a', fontFamily: 'Pretendard, monospace', textAlign: 'right' }}>
             {quoteNo}
           </span>
-          <span style={{ color: '#64748b', textAlign: 'left', fontWeight: 500 }}>발급일시</span>
+          <span style={{ color: '#64748b', textAlign: 'left', fontWeight: 500 }}>발급일시 :</span>
           <span style={{ fontWeight: 500, color: '#0f172a', textAlign: 'right' }}>
             {displayDate}
           </span>
@@ -611,8 +611,8 @@ export function generateOfficialQuotePrintHtml(props: HqOfficialQuoteDocumentPro
     props.baseFareTotal !== null
       ? `${props.baseFareTotal.toLocaleString()}원`
       : props.quoteRequired
-      ? '상담 후 산정'
-      : '-';
+        ? '상담 후 산정'
+        : '-';
   const overtimeFormatted =
     props.overtimeHours && props.overtimeFareTotal ? `+${props.overtimeFareTotal.toLocaleString()}원` : null;
   const excessKmFormatted =
@@ -624,15 +624,15 @@ export function generateOfficialQuotePrintHtml(props: HqOfficialQuoteDocumentPro
     props.supplyPriceTotal !== null
       ? `${props.supplyPriceTotal.toLocaleString()}원`
       : props.quoteRequired
-      ? '상담 후 산정'
-      : '-';
+        ? '상담 후 산정'
+        : '-';
   const vatFormatted = props.vatAmount !== null ? `${props.vatAmount.toLocaleString()}원` : '별도 산정';
   const grandTotalFormatted =
     props.estimatedGrandTotal !== null
       ? `${props.estimatedGrandTotal.toLocaleString()}원`
       : props.quoteRequired
-      ? '상담 후 산정'
-      : '0원';
+        ? '상담 후 산정'
+        : '0원';
 
   return `<!DOCTYPE html>
 <html lang="ko">
@@ -735,9 +735,9 @@ export function generateOfficialQuotePrintHtml(props: HqOfficialQuoteDocumentPro
       </div>
 
       <div style="display: grid; grid-template-columns: auto auto; column-gap: 16px; row-gap: 5px; align-items: baseline; font-size: 11px;">
-        <span style="color: #64748b; text-align: left; font-weight: 500;">견적번호</span>
+        <span style="color: #64748b; text-align: left; font-weight: 500;">견적번호 :</span>
         <span style="font-weight: 700; color: #0f172a; font-family: Pretendard, monospace; text-align: right;">${props.quoteNo}</span>
-        <span style="color: #64748b; text-align: left; font-weight: 500;">발급일시</span>
+        <span style="color: #64748b; text-align: left; font-weight: 500;">발급일시 :</span>
         <span style="font-weight: 500; color: #0f172a; text-align: right;">${displayDate}</span>
       </div>
     </div>
@@ -798,11 +798,10 @@ export function generateOfficialQuotePrintHtml(props: HqOfficialQuoteDocumentPro
           <div style="font-size: 10px; color: #64748b; margin-bottom: 3px;">서비스 구분</div>
           <div>
             <div style="font-size: 11.5px; font-weight: 700; color: #0f172a;">${categorySplit.main}</div>
-            ${
-              categorySplit.sub
-                ? `<div style="font-size: 10.5px; font-weight: 500; color: #475569; margin-top: 2px;">${categorySplit.sub}</div>`
-                : ''
-            }
+            ${categorySplit.sub
+      ? `<div style="font-size: 10.5px; font-weight: 500; color: #475569; margin-top: 2px;">${categorySplit.sub}</div>`
+      : ''
+    }
           </div>
         </div>
         <div style="flex: 1.4; border-left: 1px solid #e2e8f0; padding-left: 10px;">
@@ -827,35 +826,32 @@ export function generateOfficialQuotePrintHtml(props: HqOfficialQuoteDocumentPro
           <span style="font-weight: 600; color: #0f172a; font-family: Pretendard, monospace;">${baseFareFormatted}</span>
         </div>
 
-        ${
-          overtimeFormatted
-            ? `
+        ${overtimeFormatted
+      ? `
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 11px; color: #92400e;">
           <span>초과 시간 요금 (${props.overtimeHours}시간)</span>
           <span style="font-weight: 600; font-family: Pretendard, monospace;">${overtimeFormatted}</span>
         </div>`
-            : ''
-        }
+      : ''
+    }
 
-        ${
-          excessKmFormatted
-            ? `
+        ${excessKmFormatted
+      ? `
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 11px; color: #92400e;">
           <span>초과 거리 요금 (${props.excessKm}km)</span>
           <span style="font-weight: 600; font-family: Pretendard, monospace;">${excessKmFormatted}</span>
         </div>`
-            : ''
-        }
+      : ''
+    }
 
-        ${
-          englishSurchargeFormatted
-            ? `
+        ${englishSurchargeFormatted
+      ? `
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 11px; color: #1e40af;">
           <span>의전 기사 영어 수당</span>
           <span style="font-weight: 600; font-family: Pretendard, monospace;">${englishSurchargeFormatted}</span>
         </div>`
-            : ''
-        }
+      : ''
+    }
 
         <div style="border-top: 1px solid #e2e8f0; margin: 8px 0;"></div>
 
