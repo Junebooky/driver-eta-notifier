@@ -42,6 +42,13 @@ export interface HqDispatchTableProps {
   onRemindDriver?: (booking: HqBooking) => void;
 }
 
+export function truncateLocation(text?: string | null, maxChars: number = 13): string {
+  if (!text) return '-';
+  const trimmed = text.trim();
+  if (trimmed.length <= maxChars) return trimmed;
+  return `${trimmed.slice(0, maxChars).trimEnd()}...`;
+}
+
 export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
   bookings,
   allBookingsForCounts,
@@ -495,21 +502,32 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
           aria-labelledby="hq-dispatch-table-caption"
           className="hq-responsive-table-wrapper w-full overflow-x-auto"
         >
-          <table className="w-full text-left select-none min-w-[960px]">
+          <table className="w-full table-fixed text-left select-none min-w-[860px]">
             <caption id="hq-dispatch-table-caption" className="sr-only">
               예약 접수 및 기사 배차 확인 현황 목록
             </caption>
+            <colgroup>
+              <col className="w-[18%] min-w-[130px]" /> {/* 1. 고객사 · 승객 */}
+              <col className="w-[8%] min-w-[68px]" />   {/* 2. 운행 일시 */}
+              <col className="w-[8%] min-w-[68px]" />   {/* 3. 담당 기사 */}
+              <col className="w-[11%] min-w-[88px]" />  {/* 4. 배정 차량 */}
+              <col className="w-[12%] min-w-[96px]" />  {/* 5. 픽업 출발지 */}
+              <col className="w-[14%] min-w-[115px]" /> {/* 6. 도착 목적지 */}
+              <col className="w-[9%] min-w-[75px]" />   {/* 7. 배차 상태 */}
+              <col className="w-[10%] min-w-[90px]" />  {/* 8. 기사 확인 */}
+              <col className="w-[10%] min-w-[90px]" />  {/* 9. 안내자료 */}
+            </colgroup>
             <thead>
               <tr className="border-b border-slate-200 text-[11px] font-bold text-slate-500 bg-slate-50">
-                <th scope="col" className="py-2.5 px-3.5 bg-slate-50">고객사 · 승객</th>
-                <th scope="col" className="py-2.5 px-3 bg-slate-50">운행 일시</th>
-                <th scope="col" className="py-2.5 px-3 bg-slate-50">담당 기사</th>
-                <th scope="col" className="py-2.5 px-3 bg-slate-50">배정 차량</th>
-                <th scope="col" className="py-2.5 px-3 bg-slate-50">픽업 출발지</th>
-                <th scope="col" className="py-2.5 px-3 bg-slate-50">도착 목적지</th>
-                <th scope="col" className="py-2.5 px-3 bg-slate-50">배차 상태</th>
-                <th scope="col" className="py-2.5 px-3 bg-slate-50">기사 확인</th>
-                <th scope="col" className="py-2.5 px-3 bg-slate-50">안내자료</th>
+                <th scope="col" className="py-2.5 px-2.5 bg-slate-50">고객사 · 승객</th>
+                <th scope="col" className="py-2.5 px-2 bg-slate-50">운행 일시</th>
+                <th scope="col" className="py-2.5 px-2 bg-slate-50">담당 기사</th>
+                <th scope="col" className="py-2.5 px-2 bg-slate-50">배정 차량</th>
+                <th scope="col" className="py-2.5 px-2 bg-slate-50">픽업 출발지</th>
+                <th scope="col" className="py-2.5 px-2 bg-slate-50">도착 목적지</th>
+                <th scope="col" className="py-2.5 px-2 bg-slate-50">배차 상태</th>
+                <th scope="col" className="py-2.5 px-2 bg-slate-50">기사 확인</th>
+                <th scope="col" className="py-2.5 px-2 bg-slate-50">안내자료</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100/80 text-xs">
@@ -542,27 +560,27 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                       }`}
                     >
                       {/* Col 1 (Row Header <th>): 고객사 · 승객 · 그룹 · 접수채널 */}
-                      <th scope="row" className="py-3 px-3 text-left font-bold text-slate-900 align-middle">
+                      <th scope="row" className="py-3 px-2.5 text-left font-bold text-slate-900 align-middle">
                         <div className="flex items-center justify-between sm:justify-start gap-1.5 flex-wrap">
-                          <span className="group-hover:text-[#1E60F3] transition-colors font-black">
+                          <span className="group-hover:text-[#1E60F3] transition-colors font-black truncate max-w-[130px]" title={b.customerName}>
                             {b.customerName}
                           </span>
 
                           {b.intakeSource === 'phone' && (
-                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/70">
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/70 shrink-0">
                               <PhoneCall className="w-2.5 h-2.5" />
                               전화
                             </span>
                           )}
                           {b.intakeSource === 'email' && (
-                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/70">
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/70 shrink-0">
                               <Mail className="w-2.5 h-2.5" />
                               메일
                             </span>
                           )}
 
                           {b.groupTotalVehicles && b.groupTotalVehicles > 1 && (
-                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-50 text-[#1E60F3] border border-blue-200">
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-50 text-[#1E60F3] border border-blue-200 shrink-0">
                               <Users className="w-2.5 h-2.5" />
                               {b.groupVehicleIndex || 1}호차/{b.groupTotalVehicles}대
                             </span>
@@ -571,19 +589,21 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                         <div className="text-[11px] font-medium text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
                           <span className="font-mono text-[10px] text-slate-400">{b.bookingNo}</span>
                           {b.passengerName && b.passengerName !== b.customerName && (
-                            <span className="text-slate-700 font-semibold">· 탑승: {b.passengerName}</span>
+                            <span className="text-slate-700 font-semibold truncate max-w-[110px]" title={b.passengerName}>
+                              · 탑승: {b.passengerName}
+                            </span>
                           )}
                         </div>
                       </th>
 
                       {/* Col 2: 운행 일시 */}
-                      <td className="py-3 px-3 whitespace-nowrap">
+                      <td className="py-3 px-2 whitespace-nowrap">
                         <div className="font-black text-slate-900">{b.pickupTime || '-'}</div>
                         <div className="text-[10px] text-slate-400 font-semibold">{b.pickupDate}</div>
                       </td>
 
                       {/* Col 3: 담당 기사 */}
-                      <td className="py-3 px-3 whitespace-nowrap">
+                      <td className="py-3 px-2 whitespace-nowrap">
                         {isUnassigned || b.driverName === '-' ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 border border-blue-200 text-[#1E60F3] font-black text-[11px]">
                             배정 필요
@@ -594,7 +614,7 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                       </td>
 
                       {/* Col 4: 배정 차량 */}
-                      <td className="py-3 px-3 whitespace-nowrap">
+                      <td className="py-3 px-2 whitespace-nowrap">
                         {b.vehicleModel === '-' && (!b.vehiclePlate || b.vehiclePlate === '미배정') ? (
                           <span className="text-slate-400 font-medium text-[11px]">차량 미선정</span>
                         ) : (
@@ -603,7 +623,7 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                               {b.vehiclePlate && b.vehiclePlate !== '미배정' ? b.vehiclePlate : '-'}
                             </div>
                             <div
-                              className="text-[11px] text-slate-500 font-medium truncate max-w-[140px]"
+                              className="text-[11px] text-slate-500 font-medium truncate max-w-[130px]"
                               title={b.vehicleModel}
                             >
                               {stripManufacturerName(b.vehicleModel)}
@@ -613,22 +633,28 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                       </td>
 
                       {/* Col 5: 픽업 출발지 */}
-                      <td className="py-3 px-3 text-slate-700 font-medium max-w-[200px] xl:max-w-[260px] truncate" title={b.pickupLocation}>
-                        {b.pickupLocation}
+                      <td className="py-3 px-2 text-slate-700 font-medium truncate" title={b.pickupLocation}>
+                        <span className="truncate block" title={b.pickupLocation}>
+                          {truncateLocation(b.pickupLocation, 12)}
+                        </span>
                       </td>
 
                       {/* Col 6: 도착 목적지 */}
-                      <td className="py-3 px-3 text-slate-700 font-medium max-w-[200px] xl:max-w-[260px] truncate" title={b.destination}>
-                        <span>{b.destination}</span>
-                        {b.flightNumber && (
-                          <span className="ml-1 text-[10px] font-mono font-bold text-[#1E60F3]">
-                            ({b.flightNumber})
+                      <td className="py-3 px-2 text-slate-700 font-medium truncate" title={`${b.destination}${b.flightNumber ? ` (${b.flightNumber})` : ''}`}>
+                        <div className="flex items-center gap-1 min-w-0">
+                          <span className="truncate" title={b.destination}>
+                            {truncateLocation(b.destination, b.flightNumber ? 10 : 13)}
                           </span>
-                        )}
+                          {b.flightNumber && (
+                            <span className="shrink-0 text-[10px] font-mono font-bold text-[#1E60F3]">
+                              ({b.flightNumber})
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Col 7: 배차 상태 & 일정 충돌 */}
-                      <td className="py-3 px-3 whitespace-nowrap">
+                      <td className="py-3 px-2 whitespace-nowrap">
                         <div className="flex flex-col items-end sm:items-start gap-1">
                           {isAssigned && (
                             <span className="inline-flex items-center gap-1.5 font-bold text-blue-700 text-[11px]">
@@ -677,7 +703,7 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                       </td>
 
                       {/* Col 8: 기사 확인 */}
-                      <td className="py-3 px-3 whitespace-nowrap">
+                      <td className="py-3 px-2 whitespace-nowrap">
                         {b.driverAck === '확인완료' ? (
                           <div className="inline-flex items-center gap-1 text-emerald-700 font-bold text-[11px]">
                             <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
@@ -730,7 +756,7 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                       </td>
 
                       {/* Col 9: 고객 안내 (소개서 + 자동 안내 문자·메일) */}
-                      <td className="py-3 px-3 whitespace-nowrap">
+                      <td className="py-3 px-2 whitespace-nowrap">
                         <div className="flex flex-col items-end sm:items-start gap-1">
                           {onOpenCustomerMessage && !isCancelled && (
                             <button

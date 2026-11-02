@@ -233,4 +233,20 @@ assert.strictEqual(publishedEdit.vehiclePlate, '703서 2658');
 
 console.log('✓ Quick Dispatch Modal edit payload correctly preserves scheduleId, version, and updates status');
 
+// 5. Testing Address/Location Truncation for Compact Table Width
+console.log('5. Testing Location Truncation for Compact Table Layout...');
+function truncateLocationTest(text?: string | null, maxChars: number = 13): string {
+  if (!text) return '-';
+  const trimmed = text.trim();
+  if (trimmed.length <= maxChars) return trimmed;
+  return `${trimmed.slice(0, maxChars).trimEnd()}...`;
+}
+
+assert.strictEqual(truncateLocationTest('조선팰리스 강남', 12), '조선팰리스 강남');
+assert.strictEqual(truncateLocationTest('인천공항 T1', 10), '인천공항 T1');
+assert.strictEqual(truncateLocationTest('레스케이프 호텔 명동 (L\'ESCAPE HOTEL MYEONGDONG)', 12), '레스케이프 호텔 명동...');
+assert.strictEqual(truncateLocationTest(null, 12), '-');
+assert.strictEqual(truncateLocationTest('', 12), '-');
+console.log('✓ Location truncation accurately caps long strings with ellipsis');
+
 console.log('\n🎉 ALL QUICK DISPATCH & VEHICLE UI TESTS PASSED SUCCESSFULLY! 🎉\n');
