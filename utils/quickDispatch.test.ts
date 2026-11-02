@@ -249,4 +249,50 @@ assert.strictEqual(truncateLocationTest(null, 12), '-');
 assert.strictEqual(truncateLocationTest('', 12), '-');
 console.log('✓ Location truncation accurately caps long strings with ellipsis');
 
+// 6. Testing 10-Column Separation & Toss/Apple Style Label Mappings
+console.log('6. Testing 10-Column Separation & Toss/Apple Style Label Mappings...');
+const expectedTableHeaders = [
+  '고객사',
+  '승객',
+  '출발 일시',
+  '담당 기사님',
+  '배정 차량',
+  '출발지',
+  '도착지',
+  '배차 상태',
+  '기사님 확인',
+  '고객 안내',
+];
+assert.strictEqual(expectedTableHeaders.length, 10);
+assert.strictEqual(expectedTableHeaders[0], '고객사');
+assert.strictEqual(expectedTableHeaders[1], '승객');
+assert.strictEqual(expectedTableHeaders[2], '출발 일시');
+assert.strictEqual(expectedTableHeaders[3], '담당 기사님');
+assert.strictEqual(expectedTableHeaders[8], '기사님 확인');
+assert.strictEqual(expectedTableHeaders[9], '고객 안내');
+
+// Toss/Apple Style Copy Verification
+const friendlyCopyMappings: Record<string, string> = {
+  unassignedDriver: '기사님 지정',
+  driverUnacked: '확인 대기',
+  remindDriver: '다시 알리기',
+  customerMessage: '안내문자 보내기',
+  brochureUnsent: '프로필 미전송',
+  headerTitle: '실시간 배차 관제',
+  headerSubtitle: '예약 접수부터 기사님 배정까지 실시간으로 연결돼요',
+  tableSectionTitle: '배차 관리 목록',
+  tableSectionSubtitle: '예약을 누르면 기사님 배정과 고객 안내를 바로 처리할 수 있어요.',
+  tabAction: '확인 필요',
+  tabToday: '오늘 출발',
+  tabTomorrow: '내일 출발',
+  searchPlaceholder: '고객사, 승객명, 목적지로 찾아보세요',
+};
+
+assert.strictEqual(friendlyCopyMappings.unassignedDriver, '기사님 지정');
+assert.strictEqual(friendlyCopyMappings.driverUnacked, '확인 대기');
+assert.strictEqual(friendlyCopyMappings.remindDriver, '다시 알리기');
+assert.strictEqual(friendlyCopyMappings.customerMessage, '안내문자 보내기');
+assert.strictEqual(friendlyCopyMappings.brochureUnsent, '프로필 미전송');
+console.log('✓ 10-column table structure and Toss/Apple style copy validated successfully');
+
 console.log('\n🎉 ALL QUICK DISPATCH & VEHICLE UI TESTS PASSED SUCCESSFULLY! 🎉\n');

@@ -71,7 +71,7 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
                 <>
                   <span className="font-bold text-slate-700">{todayLabel}</span>
                   <span className="text-slate-300">|</span>
-                  <span className="text-slate-400 truncate">사모님(접수) · 대표님(배차) · 기사 실시간 동기화</span>
+                  <span className="text-slate-400 truncate">예약 접수부터 기사님 배정까지 실시간으로 연결돼요</span>
                 </>
               )}
             </div>
@@ -110,13 +110,12 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
                 haptics.lightTap();
                 onOpenQuickPhoneBooking();
               }}
-              aria-label="전화 예약 접수"
+              aria-label="전화 예약 받기"
               className="flex h-11 w-11 sm:w-auto justify-center items-center gap-1.5 px-2.5 sm:px-3.5 py-2 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white text-xs font-bold transition-all cursor-pointer shadow-xs"
               title="전화 문의 즉시 예약 접수 (배차 대기함 등록 가능)"
             >
               <PhoneCall className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden sm:inline">전화 예약 접수</span>
-
+              <span className="hidden sm:inline">전화 예약 받기</span>
             </button>
           )}
 
@@ -132,7 +131,7 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
               title="가격표 기반 실시간 견적서 작성"
             >
               <Calculator className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-              <span className="hidden sm:inline">견적기</span>
+              <span className="hidden sm:inline">예상 금액 계산</span>
             </button>
           )}
 
@@ -163,10 +162,18 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
               disabled={isRefreshing}
               aria-label="일정 새로고침"
               className="h-11 w-11 sm:w-auto px-2.5 rounded-xl border border-slate-200/80 bg-white hover:bg-slate-50 flex items-center gap-1.5 text-slate-600 text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-2xs disabled:opacity-60"
-              title={lastSyncedLabel ? `최근 동기화: ${lastSyncedLabel}` : '실시간 서버 동기화'}
+              title={lastSyncedLabel ? `최근 업데이트: ${lastSyncedLabel}` : '실시간 서버 동기화'}
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-[#1E60F3]' : ''}`} />
-              <span className="hidden xl:inline">{lastSyncedLabel ? `동기화 ${lastSyncedLabel}` : '동기화'}</span>
+              <span className="hidden xl:inline">
+                {lastSyncedLabel
+                  ? `방금 업데이트됨 (${
+                      lastSyncedLabel.split(':').length >= 2
+                        ? `${lastSyncedLabel.split(':')[0]}:${lastSyncedLabel.split(':')[1]}`
+                        : lastSyncedLabel
+                    })`
+                  : '방금 업데이트됨'}
+              </span>
             </button>
           )}
 

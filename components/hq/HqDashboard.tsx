@@ -449,25 +449,25 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
     return {
       totalDrivers: total,
       active: {
-        label: '오늘 배차 투입',
+        label: '운행 중',
         count: activeCount,
         percentage: pct(activeCount),
         color: '#1E60F3',
       },
       standby: {
-        label: '배차 가능 대기',
+        label: '배차 가능',
         count: standbyCount,
         percentage: pct(standbyCount),
         color: '#60A5FA',
       },
       offDuty: {
-        label: '휴무 / 정비',
+        label: '휴무·정비',
         count: 0,
         percentage: 0,
         color: '#94A3B8',
       },
       unassigned: {
-        label: '미배정 예약건',
+        label: '대기 중인 예약',
         count: operationalCounts.unassignedCount,
         percentage: pct(unassignedQueueCount),
         color: '#F59E0B',
@@ -634,7 +634,7 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
                               ? '차량 관리'
                               : activeSidebarTab === 'drivers'
                                 ? '기사 관리'
-                                : '예약 · 배차 통합 관제'
+                                : '실시간 배차 관제'
           }
           subtitle={
             activeSidebarTab === 'operations' ? (
@@ -676,7 +676,7 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
                 <span className="font-bold text-slate-700">{todayFullLabel}</span>
                 <span className="text-slate-300">|</span>
                 <span className="text-slate-500">
-                  사모님(예약 접수) ↔ 대표님(차량·기사 배차 확정) ↔ 기사 Cockpit 실시간 연동
+                  예약 접수부터 기사님 배정까지 실시간으로 연결돼요
                 </span>
               </>
             )

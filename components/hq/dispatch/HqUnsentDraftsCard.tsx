@@ -25,7 +25,7 @@ export const HqUnsentDraftsCard: React.FC<HqUnsentDraftsCardProps> = ({
             <FileText className="w-3.5 h-3.5" />
           </div>
           <h3 className="text-sm font-black text-slate-900 tracking-tight">
-            미발송 초안
+            작성 중인 예약
           </h3>
           <span className="w-5 h-5 rounded-full bg-rose-100 text-rose-600 text-[10px] font-black flex items-center justify-center">
             {items.length}
