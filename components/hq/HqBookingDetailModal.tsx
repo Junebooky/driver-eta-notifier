@@ -42,6 +42,7 @@ import {
 import { INITIAL_HQ_CUSTOMERS } from '@/utils/customerHqData';
 import { HqPlaceSearchInput } from './HqPlaceSearchInput';
 import { TossDatePicker } from '@/components/common/TossDatePicker';
+import { formatPhoneNumber } from '@/utils/formatters';
 import {
   cleanDriverIdentity,
   detectDispatchConflicts,
@@ -557,8 +558,9 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                     <input
                       type="tel"
                       value={passengerPhone}
-                      onChange={(e) => setPassengerPhone(e.target.value)}
+                      onChange={(e) => setPassengerPhone(formatPhoneNumber(e.target.value))}
                       placeholder="010-0000-0000"
+                      maxLength={13}
                       className="w-full h-11 px-3.5 bg-white border border-slate-200 hover:border-blue-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 rounded-xl text-sm font-medium text-slate-900 shadow-2xs transition-all outline-none"
                     />
                   </div>

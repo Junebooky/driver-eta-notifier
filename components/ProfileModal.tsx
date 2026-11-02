@@ -166,7 +166,16 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       setPhoneError(false);
       setValidationMsg(null);
     }
-    const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 3);
+    const raw = e.target.value.replace(/[^0-9]/g, '');
+    if (raw.length >= 10) {
+      const p = parsePhoneDetails(raw);
+      setPhone1(p.p1);
+      setPhone2(p.p2);
+      setPhone3(p.p3);
+      phone3Ref.current?.focus();
+      return;
+    }
+    const val = raw.slice(0, 3);
     setPhone1(val);
     if (val.length === 3) {
       phone2Ref.current?.focus();

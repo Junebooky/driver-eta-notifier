@@ -19,6 +19,7 @@ import {
 import { HqBooking, CustomerBrochureStatus } from '@/types/hq';
 import { DriverVehicleAssetBundle, DriverInfoDispatchLog } from '@/types/driverVehicleAsset';
 import { haptics } from '@/utils/haptics';
+import { formatPhoneNumber } from '@/utils/formatters';
 
 export interface HqDriverVehicleInfoModalProps {
   isOpen: boolean;
@@ -427,8 +428,11 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
                     <input
                       type="text"
                       value={recipient}
-                      onChange={(e) => setRecipient(e.target.value)}
-                      placeholder="수신 전화번호 또는 이메일 주소"
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setRecipient(val.includes('@') ? val : formatPhoneNumber(val));
+                      }}
+                      placeholder="010-0000-0000 또는 이메일 주소"
                       className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-900"
                     />
                   </div>

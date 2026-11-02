@@ -22,6 +22,7 @@ import {
   generateCustomerNotificationDraft,
   formatSmsAppUrl,
 } from '@/utils/customerMessageGenerator';
+import { formatPhoneNumber } from '@/utils/formatters';
 
 interface HqCustomerMessageModalProps {
   isOpen: boolean;
@@ -554,10 +555,11 @@ export default function HqCustomerMessageModal({
                   type="tel"
                   value={recipientPhone}
                   onChange={(e) => {
-                    setRecipientPhone(e.target.value);
+                    setRecipientPhone(formatPhoneNumber(e.target.value));
                     isPhoneEditedRef.current = true;
                   }}
                   placeholder="예: 010-1234-5678"
+                  maxLength={13}
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium focus:border-indigo-500 focus:outline-hidden"
                 />
               </div>

@@ -42,6 +42,7 @@ import { HqPlaceSearchInput } from '@/components/hq/HqPlaceSearchInput';
 import { INITIAL_HQ_CUSTOMERS } from '@/utils/customerHqData';
 import { getVehicleImage } from '@/utils/vehicleData';
 import { haptics } from '@/utils/haptics';
+import { formatPhoneNumber } from '@/utils/formatters';
 
 interface HqQuoteModalProps {
   isOpen: boolean;
@@ -55,36 +56,36 @@ const SERVICE_CATEGORIES: {
   baseHours: number;
   description: string;
 }[] = [
-  {
-    id: 'daily_metro',
-    label: '일반 의전 (수도권 9시간)',
-    baseHours: 9,
-    description: '수도권 기준, 9시간 기본 (125km 포함)',
-  },
-  {
-    id: 'daily_regional',
-    label: '일반 의전 (지방/광역 9시간)',
-    baseHours: 9,
-    description: '지방 운행 전용 요율 (추가 지방 할증 중복 없음)',
-  },
-  {
-    id: 'airport_incheon',
-    label: '공항 편도 (인천국제공항 3시간)',
-    baseHours: 3,
-    description: '인천공항 픽업/샌딩 편도 3시간 기준',
-  },
-  {
-    id: 'airport_gimpo',
-    label: '공항 편도 (김포공항 3시간)',
-    baseHours: 3,
-    description: '김포공항 픽업/샌딩 편도 3시간 기준',
-  },
-];
+    {
+      id: 'daily_metro',
+      label: '일반 의전 (수도권 9시간)',
+      baseHours: 9,
+      description: '수도권 기준, 9시간 기본 (125km 포함)',
+    },
+    {
+      id: 'daily_regional',
+      label: '일반 의전 (지방/광역 9시간)',
+      baseHours: 9,
+      description: '지방 운행 전용 요율 (추가 지방 할증 중복 없음)',
+    },
+    {
+      id: 'airport_incheon',
+      label: '공항 편도 (인천국제공항 3시간)',
+      baseHours: 3,
+      description: '인천공항 픽업/샌딩 편도 3시간 기준',
+    },
+    {
+      id: 'airport_gimpo',
+      label: '공항 편도 (김포공항 3시간)',
+      baseHours: 3,
+      description: '김포공항 픽업/샌딩 편도 3시간 기준',
+    },
+  ];
 
 const WIZARD_STEPS = [
-  { number: 1, label: '고객사 및 행사 정보' },
-  { number: 2, label: '서비스 선택' },
-  { number: 3, label: '차량 및 옵션' },
+  { number: 1, label: '고객 정보' },
+  { number: 2, label: '일정 선택' },
+  { number: 3, label: '차량 선택' },
   { number: 4, label: '견적 확인' },
 ] as const;
 
@@ -389,7 +390,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="2026 공식 요금표 실시간 견적기"
+        aria-label="의전 견적 계산기"
         className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200 select-none"
         onClick={(e) => {
           if (e.target === e.currentTarget) {
@@ -408,27 +409,13 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
-                    2026 공식 요금표 실시간 견적기
+                    의전 견적 계산기
                   </h3>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-[#1E60F3] font-bold border border-blue-200">
-                    2026 공식 요율
-                  </span>
                 </div>
-                <p className="text-xs text-slate-400 font-medium mt-0.5">
-                  단계별로 정보를 입력하여 VIP 수행 의전 견적을 빠르고 정확하게 생성합니다.
-                </p>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setIsChauffeurCardOpen(true)}
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 transition cursor-pointer"
-              >
-                <Award className="w-3.5 h-3.5 text-amber-500" />
-                <span>VIP 배차 소개서</span>
-              </button>
               <button
                 type="button"
                 onClick={onClose}
@@ -460,29 +447,26 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                       }
                     }}
                     disabled={!isCompleted && !isCurrent}
-                    className={`flex flex-col items-center gap-1.5 z-10 bg-transparent transition-all cursor-pointer ${
-                      !isCompleted && !isCurrent ? 'cursor-not-allowed opacity-50' : ''
-                    }`}
+                    className={`flex flex-col items-center gap-1.5 z-10 bg-transparent transition-all cursor-pointer ${!isCompleted && !isCurrent ? 'cursor-not-allowed opacity-50' : ''
+                      }`}
                   >
                     <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all ${
-                        isCurrent
-                          ? 'bg-[#1E60F3] text-white ring-4 ring-blue-100 shadow-sm scale-105'
-                          : isCompleted
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all ${isCurrent
+                        ? 'bg-[#1E60F3] text-white ring-4 ring-blue-100 shadow-sm scale-105'
+                        : isCompleted
                           ? 'bg-blue-600 text-white'
                           : 'bg-white border-2 border-slate-300 text-slate-400'
-                      }`}
+                        }`}
                     >
                       {isCompleted ? <Check className="w-4 h-4 stroke-[3]" /> : step.number}
                     </div>
                     <span
-                      className={`text-xs transition-colors whitespace-nowrap ${
-                        isCurrent
-                          ? 'text-[#1E60F3] font-black'
-                          : isCompleted
+                      className={`text-xs transition-colors whitespace-nowrap ${isCurrent
+                        ? 'text-[#1E60F3] font-black'
+                        : isCompleted
                           ? 'text-slate-700 font-bold'
                           : 'text-slate-400 font-medium'
-                      }`}
+                        }`}
                     >
                       {step.label}
                     </span>
@@ -497,14 +481,6 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
             {/* Step 1: 고객사 및 행사 정보 */}
             {currentStep === 1 && (
               <div className="space-y-4 max-w-2xl mx-auto animate-in fade-in duration-200">
-                <div className="border-b border-slate-100 pb-2">
-                  <h4 className="text-sm font-black text-slate-900 tracking-tight">
-                    1. 고객사 및 행사 정보
-                  </h4>
-                  <p className="text-xs text-slate-400 font-medium mt-0.5">
-                    견적서를 발송하고 관제 스케줄을 배정할 고객사 및 담당자 정보를 입력해 주세요.
-                  </p>
-                </div>
 
                 <div className="space-y-3.5">
                   {/* 고객사명 */}
@@ -533,7 +509,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                             haptics.lightTap();
                             setCustomerName(c.name);
                             if (c.primaryContactName) setContactPerson(c.primaryContactName);
-                            if (c.mainPhone) setContactPhone(c.mainPhone);
+                            if (c.mainPhone) setContactPhone(formatPhoneNumber(c.mainPhone));
                             if (c.mainEmail) setContactEmail(c.mainEmail);
                           }}
                           className="px-2 py-0.5 rounded-lg text-[11px] font-bold bg-slate-100 hover:bg-blue-50 hover:text-[#1E60F3] text-slate-600 border border-slate-200/80 transition cursor-pointer"
@@ -568,10 +544,11 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                       <div className="relative">
                         <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                         <input
-                          type="text"
+                          type="tel"
                           value={contactPhone}
-                          onChange={(e) => setContactPhone(e.target.value)}
+                          onChange={(e) => setContactPhone(formatPhoneNumber(e.target.value))}
                           placeholder="010-0000-0000"
+                          maxLength={13}
                           className="w-full h-11 pl-10 pr-3.5 rounded-xl border border-slate-200 focus:border-[#1E60F3] focus:ring-1 focus:ring-[#1E60F3] text-sm font-bold text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-2xs font-mono"
                         />
                       </div>
@@ -634,19 +611,11 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
             {/* Step 2: 서비스 선택 & 일정/경로 */}
             {currentStep === 2 && (
               <div className="space-y-4 max-w-2xl mx-auto animate-in fade-in duration-200">
-                <div className="border-b border-slate-100 pb-2">
-                  <h4 className="text-sm font-black text-slate-900 tracking-tight">
-                    2. 서비스 선택 및 운행 경로
-                  </h4>
-                  <p className="text-xs text-slate-400 font-medium mt-0.5">
-                    의전 서비스 구분과 운행 일시, 출발지 및 도착지를 지정합니다.
-                  </p>
-                </div>
 
                 {/* Service Categories 4 Cards */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    서비스 구분 (2026 표준 요금 기준) <span className="text-red-500">*</span>
+                    서비스 종류 <span className="text-red-500">*</span>
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     {SERVICE_CATEGORIES.map((cat) => {
@@ -656,16 +625,14 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                           key={cat.id}
                           type="button"
                           onClick={() => handleCategoryChange(cat.id)}
-                          className={`p-3 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs flex items-start gap-2.5 ${
-                            active
-                              ? 'bg-blue-50/80 border-[#1E60F3] ring-1 ring-[#1E60F3]'
-                              : 'bg-white border-slate-200 hover:border-slate-300'
-                          }`}
+                          className={`p-3 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs flex items-start gap-2.5 ${active
+                            ? 'bg-blue-50/80 border-[#1E60F3] ring-1 ring-[#1E60F3]'
+                            : 'bg-white border-slate-200 hover:border-slate-300'
+                            }`}
                         >
                           <div
-                            className={`w-4 h-4 rounded-full border mt-0.5 flex items-center justify-center shrink-0 ${
-                              active ? 'border-[#1E60F3] bg-[#1E60F3]' : 'border-slate-300'
-                            }`}
+                            className={`w-4 h-4 rounded-full border mt-0.5 flex items-center justify-center shrink-0 ${active ? 'border-[#1E60F3] bg-[#1E60F3]' : 'border-slate-300'
+                              }`}
                           >
                             {active && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
                           </div>
@@ -814,11 +781,10 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                           haptics.lightTap();
                           setVehicleCategoryFilter(cat.key);
                         }}
-                        className={`px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer shrink-0 ${
-                          active
-                            ? 'bg-[#1E60F3] text-white shadow-2xs'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                        }`}
+                        className={`px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer shrink-0 ${active
+                          ? 'bg-[#1E60F3] text-white shadow-2xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
                       >
                         {cat.label}
                       </button>
@@ -839,11 +805,10 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                           haptics.selection();
                           setVehicleProductCode(sku.vehicleProductCode);
                         }}
-                        className={`w-full p-3 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs flex items-center justify-between ${
-                          isSelected
-                            ? 'bg-blue-50/80 border-[#1E60F3] ring-1 ring-[#1E60F3]'
-                            : 'bg-white border-slate-200 hover:border-slate-300'
-                        }`}
+                        className={`w-full p-3 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs flex items-center justify-between ${isSelected
+                          ? 'bg-blue-50/80 border-[#1E60F3] ring-1 ring-[#1E60F3]'
+                          : 'bg-white border-slate-200 hover:border-slate-300'
+                          }`}
                       >
                         <div className="flex items-center gap-3 min-w-0 flex-1">
                           <div className="w-14 h-8 relative shrink-0 flex items-center justify-center">
@@ -875,11 +840,10 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
 
                         <div className="shrink-0 ml-3">
                           <div
-                            className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                              isSelected
-                                ? 'bg-[#1E60F3] border-[#1E60F3] text-white'
-                                : 'border-slate-300'
-                            }`}
+                            className={`w-5 h-5 rounded-full border flex items-center justify-center ${isSelected
+                              ? 'bg-[#1E60F3] border-[#1E60F3] text-white'
+                              : 'border-slate-300'
+                              }`}
                           >
                             {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                           </div>
@@ -926,11 +890,10 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                           haptics.selection();
                           setEnglishOption('basic_included');
                         }}
-                        className={`h-11 px-2.5 rounded-xl border text-xs font-bold flex items-center justify-center transition cursor-pointer ${
-                          englishOption === 'basic_included'
-                            ? 'bg-blue-50 text-[#1E60F3] border-[#1E60F3] ring-1 ring-[#1E60F3]'
-                            : 'bg-white border-slate-200 text-slate-600'
-                        }`}
+                        className={`h-11 px-2.5 rounded-xl border text-xs font-bold flex items-center justify-center transition cursor-pointer ${englishOption === 'basic_included'
+                          ? 'bg-blue-50 text-[#1E60F3] border-[#1E60F3] ring-1 ring-[#1E60F3]'
+                          : 'bg-white border-slate-200 text-slate-600'
+                          }`}
                       >
                         기본 한국어 기사
                       </button>
@@ -940,11 +903,10 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                           haptics.selection();
                           setEnglishOption('fluent_upgrade');
                         }}
-                        className={`h-11 px-2.5 rounded-xl border text-xs font-bold flex items-center justify-center transition cursor-pointer ${
-                          englishOption === 'fluent_upgrade'
-                            ? 'bg-blue-50 text-[#1E60F3] border-[#1E60F3] ring-1 ring-[#1E60F3]'
-                            : 'bg-white border-slate-200 text-slate-600'
-                        }`}
+                        className={`h-11 px-2.5 rounded-xl border text-xs font-bold flex items-center justify-center transition cursor-pointer ${englishOption === 'fluent_upgrade'
+                          ? 'bg-blue-50 text-[#1E60F3] border-[#1E60F3] ring-1 ring-[#1E60F3]'
+                          : 'bg-white border-slate-200 text-slate-600'
+                          }`}
                       >
                         영어 능통 기사 (+추가)
                       </button>
@@ -1234,7 +1196,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                   setErrorMessage(null);
                   setCurrentStep((prev) => (prev + 1) as 1 | 2 | 3 | 4);
                 }}
-                className="inline-flex items-center gap-1 px-6 py-2.5 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white font-black text-xs shadow-md shadow-blue-500/20 transition cursor-pointer"
+                className="inline-flex items-center gap-1 px-6 py-2.5 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white font-black text-sm shadow-md shadow-blue-500/20 transition cursor-pointer"
               >
                 <span>{currentStep === 3 ? '견적 산출 및 확인' : '다음 단계'}</span>
                 <ChevronRight className="w-4 h-4" />

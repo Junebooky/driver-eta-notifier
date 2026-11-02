@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { X, Building2, User, Plus, Loader2 } from 'lucide-react';
 import { HqCustomer, CustomerTier } from '@/types/customerHq';
 import { haptics } from '@/utils/haptics';
+import { formatPhoneNumber } from '@/utils/formatters';
 
 interface HqCustomerRegisterModalProps {
   isOpen: boolean;
@@ -208,10 +209,10 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
               <div>
                 <label className="block text-[10px] font-bold text-slate-600 mb-0.5">연락처</label>
                 <input
-                  type="text"
+                  type="tel"
                   value={contactPhone}
-                  onChange={(e) => setContactPhone(e.target.value)}
-                  placeholder="예: +33 6 12 34 56 78"
+                  onChange={(e) => setContactPhone(formatPhoneNumber(e.target.value))}
+                  placeholder="예: 010-1234-5678 또는 +33 6 12 34 56 78"
                   className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900"
                 />
               </div>

@@ -32,6 +32,7 @@ import {
   FIELD_KNOWLEDGE_CHANGE_EVENT,
 } from '@/utils/fieldKnowledgeData';
 import { haptics } from '@/utils/haptics';
+import { formatPhoneNumber } from '@/utils/formatters';
 
 export interface HqFieldKnowledgeViewProps {
   initialSearchQuery?: string;
@@ -412,10 +413,11 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
                   <span>대표전화</span>
                 </label>
                 <input
-                  type="text"
+                  type="tel"
                   value={editingItem.phone || ''}
-                  onChange={(e) => setEditingItem({ ...editingItem, phone: e.target.value })}
-                  placeholder="예: 02-727-7200"
+                  onChange={(e) => setEditingItem({ ...editingItem, phone: formatPhoneNumber(e.target.value) })}
+                  placeholder="예: 02-727-7200 또는 010-1234-5678"
+                  maxLength={13}
                   className="w-full px-3.5 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:outline-hidden focus:border-[#1E60F3]"
                 />
               </div>

@@ -59,6 +59,7 @@ import {
 import { ensureClientAuth } from '@/utils/cockpitClientAuth';
 import { HqPlaceSearchInput } from './HqPlaceSearchInput';
 import { TossDateRangePicker } from '@/components/common/TossDateRangePicker';
+import { formatPhoneNumber } from '@/utils/formatters';
 import {
   cleanDriverIdentity,
   cleanVehicleIdentity,
@@ -2141,8 +2142,9 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                     <input
                       type="tel"
                       value={commonPassengerPhone}
-                      onChange={(e) => setCommonPassengerPhone(e.target.value)}
+                      onChange={(e) => setCommonPassengerPhone(formatPhoneNumber(e.target.value))}
                       placeholder="연락처 (010-1234-5678)"
+                      maxLength={13}
                       className="w-full h-9 sm:h-10 bg-white border border-slate-200 rounded-lg px-2.5 text-xs font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#1E60F3] focus:ring-1 focus:ring-blue-100 transition-all min-w-0"
                     />
                   </div>
