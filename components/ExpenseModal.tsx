@@ -778,31 +778,31 @@ const ExpenseModalContent: React.FC<{
         </section>
       </main>
 
-      {/* Sticky Bottom Submission Bar */}
-      <div className="p-3.5 sm:p-4 border-t border-slate-100 bg-white shrink-0">
-        <button
-          type="button"
-          onClick={handleSubmitAllToHq}
-          disabled={isSubmittingToHq || displayedItems.length === 0}
-          className="w-full py-3.5 bg-[#1E60F3] hover:bg-blue-600 active:scale-98 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl text-sm sm:text-base shadow-[0_4px_16px_rgba(30,96,243,0.3)] transition-all flex items-center justify-center gap-2 cursor-pointer"
-        >
-          {isSubmittingToHq ? (
-            <>
-              <Loader2 className="w-5 h-5 animate-spin" />
-              <span>본사 대시보드로 전송 중...</span>
-            </>
-          ) : (
-            <>
-              <Send className="w-5 h-5" />
-              <span>
-                {displayedItems.length > 0
-                  ? `본사(HQ) 대시보드로 경비 제출하기 (${displayedItems.length}건 · ${formatKRW(totalAmount)})`
-                  : '본사(HQ) 대시보드로 경비 제출하기'}
-              </span>
-            </>
-          )}
-        </button>
-      </div>
+      {/* Sticky Bottom Submission Bar: Only shown when there are unsubmitted/offline items */}
+      {displayedItems.some((item) => !item.submittedToHqAt) && (
+        <div className="p-3.5 sm:p-4 border-t border-slate-100 bg-white shrink-0">
+          <button
+            type="button"
+            onClick={handleSubmitAllToHq}
+            disabled={isSubmittingToHq}
+            className="w-full py-3.5 bg-[#1E60F3] hover:bg-blue-600 active:scale-98 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl text-sm sm:text-base shadow-[0_4px_16px_rgba(30,96,243,0.3)] transition-all flex items-center justify-center gap-2 cursor-pointer"
+          >
+            {isSubmittingToHq ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span>본사 대시보드로 전송 중...</span>
+              </>
+            ) : (
+              <>
+                <Send className="w-5 h-5" />
+                <span>
+                  미전송 경비 본사 제출하기 ({displayedItems.filter((item) => !item.submittedToHqAt).length}건)
+                </span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
 
       {/* Floating Success Toast */}
       {hqSubmitSuccessToast && (
