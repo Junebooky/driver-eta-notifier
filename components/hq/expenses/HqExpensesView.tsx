@@ -2,7 +2,28 @@
 import { useReportingRefresh } from '@/hooks/useReportingRefresh';
 
 import React, { useState, useMemo, useSyncExternalStore } from 'react';
-import { Receipt, Search, Download, CheckCircle2, AlertCircle, XCircle, Clock, CreditCard, X, Fuel, Car, Utensils, Wrench, HelpCircle, Building2 } from 'lucide-react';
+import {
+  Receipt,
+  Search,
+  Download,
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+  CreditCard,
+  X,
+  Fuel,
+  Car,
+  Utensils,
+  Wrench,
+  ReceiptText,
+  FileText,
+  FileX,
+  Check,
+  ChevronRight,
+  SlidersHorizontal,
+  SquareParking,
+  Sparkles,
+} from 'lucide-react';
 import { HqExpenseStatus } from '@/types/expenseHq';
 import {
   subscribeHqExpenses,
@@ -45,6 +66,7 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('전체');
   const [selectedStatus, setSelectedStatus] = useState<string>('전체');
   const [searchQuery, setSearchQuery] = useState<string>(initialSearchQuery);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   const [reviewQueue, setReviewQueue] = useState<string[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -109,93 +131,101 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
     showToast('경비 지출 내역 CSV 다운로드가 완료되었습니다.');
   };
 
-  const getStatusBadge = (status: HqExpenseStatus) => {
-    switch (status) {
-      case '검수 대기':
-        return (
-          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-300 flex items-center gap-1 shadow-2xs">
-            <Clock className="w-3 h-3 text-amber-600" />
-            <span>검수 대기</span>
-          </span>
-        );
-      case '승인 완료':
-        return (
-          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-300 flex items-center gap-1 shadow-2xs">
-            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-            <span>승인 완료</span>
-          </span>
-        );
-      case '금액 확인':
-        return (
-          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-300 flex items-center gap-1 shadow-2xs">
-            <AlertCircle className="w-3 h-3 text-rose-600" />
-            <span>금액 확인</span>
-          </span>
-        );
-      case '반려':
-        return (
-          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-300 flex items-center gap-1 shadow-2xs">
-            <XCircle className="w-3 h-3 text-slate-500" />
-            <span>반려</span>
-          </span>
-        );
+  const formatSubmittedAt = (val?: string) => {
+    if (!val) return '-';
+    if (val.includes('/') && val.includes(':')) return val;
+    const d = new Date(val);
+    if (!isNaN(d.getTime())) {
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const hh = String(d.getHours()).padStart(2, '0');
+      const min = String(d.getMinutes()).padStart(2, '0');
+      return `${mm}/${dd} ${hh}:${min}`;
+    }
+    return val;
+  };
+
+  const getCategoryIcon = (categoryLabel: string) => {
+    switch (categoryLabel) {
+      case '주유비':
+        return <Fuel className="w-3.5 h-3.5 text-slate-400 shrink-0" />;
+      case '통행료':
+        return <Car className="w-3.5 h-3.5 text-slate-400 shrink-0" />;
+      case '주차비':
+        return <SquareParking className="w-3.5 h-3.5 text-slate-400 shrink-0" />;
+      case '식비':
+        return <Utensils className="w-3.5 h-3.5 text-slate-400 shrink-0" />;
+      case '세차비':
+        return <Sparkles className="w-3.5 h-3.5 text-slate-400 shrink-0" />;
+      case '정비비':
+        return <Wrench className="w-3.5 h-3.5 text-slate-400 shrink-0" />;
       default:
-        return <span>{status}</span>;
+        return <Receipt className="w-3.5 h-3.5 text-slate-400 shrink-0" />;
     }
   };
 
-  const getCategoryBadge = (categoryLabel: string) => {
-    switch (categoryLabel) {
-      case '주유비':
+  const renderStatusBadge = (status: HqExpenseStatus) => {
+    switch (status) {
+      case '검수 대기':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-[#1E60F3] border border-blue-200">
-            <Fuel className="w-3 h-3" />
-            <span>주유비</span>
-          </span>
+          <div
+            className="w-7 h-7 rounded-full border border-slate-200 bg-white flex items-center justify-center text-slate-500 shadow-2xs mx-auto"
+            title="검수 대기"
+          >
+            <Clock className="w-3.5 h-3.5 stroke-[2]" />
+          </div>
         );
-      case '통행료':
+      case '승인 완료':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
-            <Car className="w-3 h-3" />
-            <span>통행료</span>
-          </span>
+          <div
+            className="w-7 h-7 rounded-full border border-slate-300 bg-white flex items-center justify-center text-slate-700 shadow-2xs mx-auto"
+            title="승인 완료"
+          >
+            <Check className="w-3.5 h-3.5 stroke-[2.2]" />
+          </div>
         );
-      case '주차비':
+      case '반려':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-            <span className="text-[10px] font-black">🅿️</span>
-            <span>주차비</span>
-          </span>
+          <div
+            className="w-7 h-7 rounded-full border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-400 shadow-2xs mx-auto"
+            title="반려"
+          >
+            <X className="w-3.5 h-3.5 stroke-[2]" />
+          </div>
         );
-      case '식비':
+      case '금액 확인':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-orange-50 text-orange-700 border border-orange-200">
-            <Utensils className="w-3 h-3" />
-            <span>식비</span>
-          </span>
-        );
-      case '세차비':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-cyan-50 text-cyan-700 border border-cyan-200">
-            <span className="text-[10px] font-black">🫧</span>
-            <span>세차비</span>
-          </span>
-        );
-      case '정비비':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-300">
-            <Wrench className="w-3 h-3" />
-            <span>정비비</span>
-          </span>
+          <div
+            className="w-7 h-7 rounded-full border border-slate-200 bg-white flex items-center justify-center text-slate-400 shadow-2xs mx-auto"
+            title="금액 확인"
+          >
+            <AlertCircle className="w-3.5 h-3.5 stroke-[2]" />
+          </div>
         );
       default:
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-            <HelpCircle className="w-3 h-3" />
-            <span>{categoryLabel || '기타'}</span>
-          </span>
-        );
+        return <span className="text-xs text-slate-500">{status}</span>;
     }
+  };
+
+  const renderReceiptBadge = (hasReceipt: boolean) => {
+    if (hasReceipt) {
+      return (
+        <div
+          className="w-8 h-8 rounded-xl border border-slate-200/80 bg-white flex items-center justify-center text-slate-400 shadow-2xs mx-auto"
+          title="영수증 원본 있음"
+        >
+          <FileText className="w-4 h-4 stroke-[1.8]" />
+        </div>
+      );
+    }
+    return (
+      <div
+        className="w-8 h-8 rounded-xl border border-slate-200/50 bg-slate-50/70 flex items-center justify-center text-slate-300 shadow-2xs mx-auto"
+        title="영수증 없음"
+      >
+        <FileX className="w-4 h-4 stroke-[1.8]" />
+      </div>
+    );
   };
 
   return (
@@ -348,104 +378,176 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
         </div>
       </div>
 
-      {/* 3. Filter Bar & Search */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs space-y-3">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          {/* Status Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
-            {['전체', '검수 대기', '승인 완료', '금액 확인', '반려'].map((status) => (
-              <button
-                key={status}
-                type="button"
-                onClick={() => {
-                  haptics.selection();
-                  setSelectedStatus(status);
-                }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${selectedStatus === status
-                    ? 'bg-[#1E60F3] text-white shadow-xs'
-                    : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
-                  }`}
-              >
-                {status}
-              </button>
-            ))}
-          </div>
-
-          {/* Search Input */}
-          <div className="relative w-full md:w-80">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="기사명, 차량번호, 차종, 상호명 검색..."
-              className="w-full pl-9 pr-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-hidden focus:border-[#1E60F3] focus:bg-white transition-all"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Category Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pt-1 border-t border-slate-100">
-          <span className="text-[11px] font-bold text-slate-500 mr-1 shrink-0">항목:</span>
-          {['전체', '주유비', '통행료', '주차비', '식비', '세차비', '정비비', '기타'].map((cat) => (
-            <button
-              key={cat}
-              type="button"
-              onClick={() => {
-                haptics.selection();
-                setSelectedCategory(cat);
-              }}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${selectedCategory === cat
-                  ? 'bg-slate-900 text-white shadow-2xs'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* 4. Expenses list and receipt review workspace */}
-      <div className="space-y-4">
-        {/* Left: Expenses Table */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden flex flex-col">
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-            <h3 className="text-sm font-black text-slate-900 tracking-tight">
-              제출 목록 ({filteredExpenses.length}건)
+      {/* 3. Expenses List & Review Workspace Table */}
+      <div className="bg-white border border-slate-200/80 rounded-2xl sm:rounded-3xl shadow-xs overflow-hidden p-5 sm:p-6 space-y-4">
+        {/* Card Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          {/* Left: Icon + Title + Count */}
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#1E60F3] text-white flex items-center justify-center shrink-0 shadow-xs">
+              <ReceiptText className="w-4 h-4 sm:w-5 sm:h-5" />
+            </div>
+            <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+              경비지출 제출 목록
             </h3>
-            <span className="text-xs text-slate-400">
-              행을 선택하면 원본과 항목을 나란히 검수할 수 있습니다.
+            <span className="bg-slate-100 text-slate-500 font-bold px-2 py-0.5 rounded-full text-xs">
+              {filteredExpenses.length}건
             </span>
           </div>
 
-          <div className="overflow-x-auto flex-1">
-            <table className="w-full text-left text-xs select-none">
-              <thead>
-                <tr className="bg-slate-50/70 border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                  <th className="py-2.5 px-3 w-10 text-center">NO</th>
-                  <th className="py-2.5 px-3">제출일시</th>
-                  <th className="py-2.5 px-3">기사 / 차량</th>
-                  <th className="py-2.5 px-3">고객사</th>
-                  <th className="py-2.5 px-3">항목</th>
-                  <th className="py-2.5 px-3">상호 / 가맹점</th>
-                  <th className="py-2.5 px-3 text-right">금액</th>
-                  <th className="py-2.5 px-3 text-center">영수증</th>
-                  <th className="py-2.5 px-3 text-center">상태</th>
+          {/* Right: Search + Filter button */}
+          <div className="flex items-center gap-2">
+            <div className="relative w-full sm:w-64">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="기사 · 차량 · 거래처 검색"
+                className="w-full pl-8 pr-7 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-hidden focus:border-[#1E60F3] focus:bg-white transition-all"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                haptics.selection();
+                setIsFilterOpen((prev) => !prev);
+              }}
+              className={`px-3 py-1.5 border rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 ${
+                isFilterOpen || selectedStatus !== '전체' || selectedCategory !== '전체'
+                  ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              <span>필터</span>
+              {(selectedStatus !== '전체' || selectedCategory !== '전체') && (
+                <span className="w-1.5 h-1.5 rounded-full bg-[#1E60F3]" />
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Subheader: Guide & Counters */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs border-b border-slate-100 pb-3">
+          <div className="text-slate-400 font-medium">
+            행을 선택하면 영수증 원본과 지출 내역을 확인하고 검수할 수 있습니다.
+          </div>
+          <div className="flex items-center gap-3 text-slate-500 font-medium shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                haptics.selection();
+                setSelectedStatus(selectedStatus === '검수 대기' ? '전체' : '검수 대기');
+              }}
+              className={`flex items-center gap-1 transition-colors cursor-pointer ${
+                selectedStatus === '검수 대기' ? 'text-[#1E60F3] font-bold' : 'hover:text-slate-700'
+              }`}
+            >
+              <Clock className="w-3.5 h-3.5 text-slate-400" />
+              <span>검수 대기 {kpi.pendingCount}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                haptics.selection();
+                setSelectedStatus(selectedStatus === '승인 완료' ? '전체' : '승인 완료');
+              }}
+              className={`flex items-center gap-1 transition-colors cursor-pointer ${
+                selectedStatus === '승인 완료' ? 'text-emerald-600 font-bold' : 'hover:text-slate-700'
+              }`}
+            >
+              <Check className="w-3.5 h-3.5 text-slate-400" />
+              <span>승인 완료 {kpi.approvedCount}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Collapsible Filter Bar */}
+        {isFilterOpen && (
+          <div className="bg-slate-50/70 border border-slate-200/70 rounded-xl p-3 space-y-2.5 animate-in fade-in duration-150">
+            <div className="flex items-center gap-1.5 overflow-x-auto">
+              <span className="text-[11px] font-bold text-slate-400 mr-1 shrink-0">상태:</span>
+              {['전체', '검수 대기', '승인 완료', '금액 확인', '반려'].map((status) => (
+                <button
+                  key={status}
+                  type="button"
+                  onClick={() => {
+                    haptics.selection();
+                    setSelectedStatus(status);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                    selectedStatus === status
+                      ? 'bg-[#1E60F3] text-white shadow-2xs'
+                      : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/60'
+                  }`}
+                >
+                  {status}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-1.5 overflow-x-auto pt-1 border-t border-slate-200/50">
+              <span className="text-[11px] font-bold text-slate-400 mr-1 shrink-0">항목:</span>
+              {['전체', '주유비', '통행료', '주차비', '식비', '세차비', '정비비', '기타'].map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => {
+                    haptics.selection();
+                    setSelectedCategory(cat);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                    selectedCategory === cat
+                      ? 'bg-slate-900 text-white shadow-2xs'
+                      : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/60'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Table Content */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs select-none">
+            <thead>
+              <tr className="border-b border-slate-100 text-[11px] font-medium text-slate-400">
+                <th className="py-3 px-3 w-12 text-center font-medium">NO</th>
+                <th className="py-3 px-3 font-medium">제출일시</th>
+                <th className="py-3 px-3 font-medium">기사 / 차량</th>
+                <th className="py-3 px-3 font-medium">고객사</th>
+                <th className="py-3 px-3 font-medium">항목</th>
+                <th className="py-3 px-3 font-medium">상호 / 가맹점</th>
+                <th className="py-3 px-3 font-medium">금액</th>
+                <th className="py-3 px-3 text-center font-medium w-16">영수증</th>
+                <th className="py-3 px-3 text-center font-medium w-16">상태</th>
+                <th className="py-3 px-2 w-8 text-right font-medium"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredExpenses.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className="py-12 text-center text-slate-400 text-xs font-medium">
+                    조건에 맞는 경비지출 내역이 없습니다.
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredExpenses.map((item) => {
+              ) : (
+                filteredExpenses.map((item, index) => {
                   const isSelected = selectedExpense?.id === item.id;
+                  const rowNumber = String(index + 1).padStart(2, '0');
+                  const hasReceipt = Boolean(item.hasReceiptImage || item.receiptUrl);
 
                   return (
                     <tr
@@ -453,65 +555,67 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
                       tabIndex={0}
                       role="button"
                       aria-label={`${item.merchant} 영수증 검수`}
-                      onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedExpenseId(item.id); setReviewQueue(filteredExpenses.map(row => row.id)); } }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          setSelectedExpenseId(item.id);
+                          setReviewQueue(filteredExpenses.map((row) => row.id));
+                        }
+                      }}
                       onClick={() => {
                         haptics.lightTap();
                         setSelectedExpenseId(item.id);
-                        setReviewQueue(filteredExpenses.map(row => row.id));
+                        setReviewQueue(filteredExpenses.map((row) => row.id));
                       }}
-                      className={`cursor-pointer transition-colors ${isSelected
-                          ? 'bg-blue-50/80 font-bold'
-                          : 'hover:bg-slate-50/80'
-                        }`}
+                      className={`group cursor-pointer transition-colors ${
+                        isSelected ? 'bg-blue-50/50' : 'hover:bg-slate-50/80'
+                      }`}
                     >
-                      <td className="py-3 px-3 text-slate-400 text-center font-semibold text-[11px]">
-                        {item.no}
+                      <td className="py-3.5 px-3 text-slate-400 text-center font-medium text-xs">
+                        {rowNumber}
                       </td>
-                      <td className="py-3 px-3 text-slate-600 whitespace-nowrap text-[11px] font-medium">
-                        {item.submittedAt}
+                      <td className="py-3.5 px-3 text-slate-500 whitespace-nowrap text-xs font-medium">
+                        {formatSubmittedAt(item.submittedAt)}
                       </td>
-                      <td className="py-3 px-3 whitespace-nowrap">
-                        <div className="font-bold text-slate-900">{item.driverName}</div>
-                        <div className="text-xs font-bold text-slate-800 tracking-tight">{item.vehiclePlate}</div>
-                        <div className="text-[10px] text-slate-400 font-medium truncate max-w-[140px]" title={item.vehicleModel}>
-                          {item.vehicleModel}
+                      <td className="py-3.5 px-3 whitespace-nowrap">
+                        <div className="font-extrabold text-slate-900 text-xs sm:text-sm">
+                          {item.driverName}
+                        </div>
+                        <div className="text-[11px] font-normal text-slate-400 mt-0.5">
+                          {item.vehiclePlate}
                         </div>
                       </td>
-                      <td className="py-3 px-3 whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50/70 text-[#1E60F3] font-bold text-[11px] border border-blue-100 shadow-2xs">
-                          <Building2 className="w-3 h-3 text-[#1E60F3] shrink-0" />
-                          <span className="truncate max-w-[110px]">{item.customerName || '일반 / 미지정'}</span>
-                        </span>
+                      <td className="py-3.5 px-3 whitespace-nowrap text-xs text-slate-600 font-normal">
+                        {item.customerName || '일반 / 미지정'}
                       </td>
-                      <td className="py-3 px-3 whitespace-nowrap">
-                        {getCategoryBadge(item.categoryLabel)}
+                      <td className="py-3.5 px-3 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700">
+                          {getCategoryIcon(item.categoryLabel)}
+                          <span>{item.categoryLabel || '기타'}</span>
+                        </div>
                       </td>
-                      <td className="py-3 px-3 max-w-[160px] truncate">
-                        <span className="font-bold text-slate-800">{item.merchant}</span>
+                      <td className="py-3.5 px-3 font-extrabold text-slate-900 text-xs sm:text-sm whitespace-nowrap">
+                        {item.merchant}
                       </td>
-                      <td className="py-3 px-3 text-right font-black text-slate-900 whitespace-nowrap">
+                      <td className="py-3.5 px-3 font-extrabold text-slate-900 text-xs sm:text-sm whitespace-nowrap">
                         {formatKRW(item.amount)}
                       </td>
-                      <td className="py-3 px-3 text-center whitespace-nowrap">
-                        {item.hasReceiptImage ? (
-                          <span className="inline-block text-[10px] bg-sky-50 text-sky-700 px-2 py-0.5 rounded font-bold border border-sky-200">
-                            영수증 유
-                          </span>
-                        ) : (
-                          <span className="text-[10px] text-slate-300">-</span>
-                        )}
+                      <td className="py-3.5 px-3 text-center whitespace-nowrap">
+                        {renderReceiptBadge(hasReceipt)}
                       </td>
-                      <td className="py-3 px-3 text-center whitespace-nowrap">
-                        {getStatusBadge(item.status)}
+                      <td className="py-3.5 px-3 text-center whitespace-nowrap">
+                        {renderStatusBadge(item.status)}
+                      </td>
+                      <td className="py-3.5 px-2 text-right whitespace-nowrap">
+                        <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 transition-colors inline-block" />
                       </td>
                     </tr>
                   );
-                })}
-              </tbody>
-            </table>
-          </div>
+                })
+              )}
+            </tbody>
+          </table>
         </div>
-
       </div>
       {selectedExpense && <HqReceiptReviewWorkspace key={selectedExpense.id} expense={selectedExpense} expenses={expenses} bookings={bookings}
         onClose={() => setSelectedExpenseId(null)} onRefresh={refresh}
