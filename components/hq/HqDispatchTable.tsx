@@ -587,11 +587,9 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                               {b.groupVehicleIndex || 1}호차
                             </span>
                           )}
-                        </div>
-                        <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1 mt-0.5">
-                          <span>#{b.scheduleId || b.id}</span>
+
                           {b.version && b.version > 1 && (
-                            <span className="text-[9px] font-bold text-purple-600 bg-purple-50 px-1 py-0.2 rounded border border-purple-200">
+                            <span className="text-[9px] font-bold text-purple-600 bg-purple-50 px-1 py-0.2 rounded border border-purple-200 shrink-0" title={`수정 버전: v${b.version}`}>
                               v{b.version}
                             </span>
                           )}

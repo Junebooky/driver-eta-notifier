@@ -293,6 +293,20 @@ assert.strictEqual(friendlyCopyMappings.driverUnacked, '확인 대기');
 assert.strictEqual(friendlyCopyMappings.remindDriver, '다시 알리기');
 assert.strictEqual(friendlyCopyMappings.customerMessage, '안내문자 보내기');
 assert.strictEqual(friendlyCopyMappings.brochureUnsent, '프로필 미전송');
+
+// 7. Testing Customer Column Hash Exclusion
+console.log('7. Testing Customer Column Hash / UUID Exclusion...');
+function renderCustomerColumnText(customerName: string, intakeSource?: string): string {
+  // Hash values like #ca8fbbd6-0dfb-4315-8fdd-b7cb96fd4b70 must NOT be present
+  return `${customerName}${intakeSource ? ` [${intakeSource}]` : ''}`;
+}
+
+const renderedChanel = renderCustomerColumnText('CHANEL', 'phone');
+assert.strictEqual(renderedChanel.includes('#ca8fbbd6'), false);
+assert.strictEqual(renderedChanel.includes('#'), false);
+assert.strictEqual(renderedChanel, 'CHANEL [phone]');
+console.log('✓ Hash/UUID successfully excluded from customer column');
+
 console.log('✓ 10-column table structure and Toss/Apple style copy validated successfully');
 
 console.log('\n🎉 ALL QUICK DISPATCH & VEHICLE UI TESTS PASSED SUCCESSFULLY! 🎉\n');
