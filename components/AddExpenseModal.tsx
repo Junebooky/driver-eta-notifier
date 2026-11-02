@@ -840,45 +840,7 @@ const AddExpenseModalContent: React.FC<{
               accept="image/*"
               className="hidden"
               onChange={handlePhotoUpload}
-            />
-
-            {/* AI OCR Recognition Result Banner */}
-            {ocrBannerInfo && (
-              <div className="bg-gradient-to-r from-blue-50/90 via-indigo-50/40 to-blue-50/90 border border-blue-200/90 rounded-2xl p-3.5 flex items-start gap-3 animate-in fade-in slide-in-from-top-1 duration-200 shadow-2xs">
-                <div className="w-7 h-7 rounded-xl bg-[#1E60F3] text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <div className="flex-1 min-w-0 text-xs">
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="font-extrabold text-[#1E60F3] tracking-tight">
-                      Vision AI 자동 인식 및 분류 완료
-                    </span>
-                    <span
-                      className={`text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 ${
-                        ocrBannerInfo.isZeroCost
-                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                          : 'bg-blue-100 text-[#1E60F3]'
-                      }`}
-                    >
-                      {ocrBannerInfo.isZeroCost ? (
-                        <>
-                          <Sparkles className="w-2.5 h-2.5 text-emerald-600" />
-                          <span>{ocrBannerInfo.modelName || 'Gemini 3.1 Flash-Lite (비용 0원 · 캐시)'}</span>
-                        </>
-                      ) : (
-                        <span>{ocrBannerInfo.modelName || 'Gemini 3.1 Flash-Lite'}</span>
-                      )}
-                    </span>
-                  </div>
-                  <div className="text-slate-900 font-bold mt-1 text-xs truncate">
-                    {ocrBannerInfo.merchant} · {formatKRW(ocrBannerInfo.amount || 0)} ({ocrBannerInfo.category})
-                  </div>
-                  <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
-                    {ocrBannerInfo.summary}
-                  </p>
-                </div>
-              </div>
-            )}
+            />      
           </section>
 
           {/* 2. 지출 항목 (Category Selector) */}
