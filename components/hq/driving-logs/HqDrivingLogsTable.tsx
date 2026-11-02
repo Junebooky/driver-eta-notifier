@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import {
   FileText,
   Clock,
+  Check,
   CheckCircle2,
   AlertTriangle,
   XCircle,
@@ -23,6 +24,16 @@ export interface HqDrivingLogsTableProps {
   onPageSizeChange: (size: number) => void;
   currentPage: number;
   onPageChange: (page: number) => void;
+  kpiCounts?: {
+    totalToday: number;
+    pending: number;
+    approved: number;
+    revision: number;
+    rejected?: number;
+    inProgressDrafts?: number;
+  };
+  selectedStatus?: HqDrivingLogStatus | '전체';
+  onSelectStatus?: (status: HqDrivingLogStatus | '전체') => void;
 }
 
 export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
@@ -34,6 +45,9 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
   onPageSizeChange,
   currentPage,
   onPageChange,
+  kpiCounts,
+  selectedStatus,
+  onSelectStatus,
 }) => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
@@ -113,19 +127,87 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden flex flex-col">
-      {/* Table Header / Title */}
+      {/* Table Header: Icon + Title + Count */}
       <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#1E60F3] flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#1E60F3] flex items-center justify-center shrink-0">
             <FileText className="w-4 h-4" />
           </div>
           <h2 className="text-sm font-bold text-slate-900 tracking-tight">운행일지 목록</h2>
-          <span className="text-xs font-black text-[#1E60F3] ml-1">총 {totalCount}건</span>
+          <span className="bg-slate-100 text-slate-500 font-bold px-2 py-0.5 rounded-full text-xs">
+            {totalCount}건
+          </span>
         </div>
 
         {selectedIds.length > 0 && (
           <div className="text-xs font-semibold text-slate-600 bg-blue-50 px-3 py-1 rounded-lg border border-blue-100">
             <span className="font-bold text-[#1E60F3]">{selectedIds.length}개</span> 항목 선택됨
+          </div>
+        )}
+      </div>
+
+      {/* Subheader: Guide & Counters (Matching Expenses pattern) */}
+      <div className="px-5 py-2.5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+        <div className="text-slate-400 font-medium">
+          행을 선택하면 운행 상세 정보와 영수증 내역을 확인하고 검수할 수 있습니다.
+        </div>
+        {kpiCounts && (
+          <div className="flex flex-wrap items-center gap-3.5 text-slate-500 font-medium shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                haptics.selection();
+                onSelectStatus?.('전체');
+              }}
+              className={`flex items-center gap-1 transition-colors cursor-pointer ${
+                selectedStatus === '전체' ? 'text-[#1E60F3] font-bold' : 'hover:text-slate-800'
+              }`}
+              title="전체 운행일지 보기"
+            >
+              <span>오늘 제출 <strong className="text-slate-700 font-bold">{kpiCounts.totalToday}</strong></span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                haptics.selection();
+                onSelectStatus?.(selectedStatus === '검토 대기' ? '전체' : '검토 대기');
+              }}
+              className={`flex items-center gap-1 transition-colors cursor-pointer ${
+                selectedStatus === '검토 대기' ? 'text-[#1E60F3] font-bold' : 'hover:text-slate-800'
+              }`}
+              title="검토 대기 필터"
+            >
+              <Clock className="w-3.5 h-3.5 text-slate-400" />
+              <span>검토 대기 <strong className="text-slate-700 font-bold">{kpiCounts.pending}</strong></span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                haptics.selection();
+                onSelectStatus?.(selectedStatus === '승인 완료' ? '전체' : '승인 완료');
+              }}
+              className={`flex items-center gap-1 transition-colors cursor-pointer ${
+                selectedStatus === '승인 완료' ? 'text-emerald-600 font-bold' : 'hover:text-slate-800'
+              }`}
+              title="승인 완료 필터"
+            >
+              <Check className="w-3.5 h-3.5 text-slate-400" />
+              <span>승인 완료 <strong className="text-slate-700 font-bold">{kpiCounts.approved}</strong></span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                haptics.selection();
+                onSelectStatus?.(selectedStatus === '보완 필요' ? '전체' : '보완 필요');
+              }}
+              className={`flex items-center gap-1 transition-colors cursor-pointer ${
+                selectedStatus === '보완 필요' || selectedStatus === '반려' ? 'text-rose-600 font-bold' : 'hover:text-slate-800'
+              }`}
+              title="보완 필요/반려 필터"
+            >
+              <AlertTriangle className="w-3.5 h-3.5 text-slate-400" />
+              <span>보완 필요 <strong className="text-slate-700 font-bold">{kpiCounts.revision}</strong></span>
+            </button>
           </div>
         )}
       </div>
