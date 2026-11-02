@@ -43,6 +43,7 @@ import { INITIAL_HQ_CUSTOMERS } from '@/utils/customerHqData';
 import { getVehicleImage } from '@/utils/vehicleData';
 import { haptics } from '@/utils/haptics';
 import { formatPhoneNumber } from '@/utils/formatters';
+import { HqOfficialQuoteDocument, generateOfficialQuotePrintHtml } from './HqOfficialQuoteDocument';
 
 interface HqQuoteModalProps {
   isOpen: boolean;
@@ -385,14 +386,66 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
     setTimeout(() => setIsCopied(false), 3000);
   };
 
-  // Print receipt as a clean 1-page PDF
+  const selectedSkuObj = useMemo(
+    () => STANDARD_VEHICLE_SKU_MAPPINGS.find((m) => m.vehicleProductCode === vehicleProductCode),
+    [vehicleProductCode]
+  );
+  const currentCategoryConfig = useMemo(
+    () => SERVICE_CATEGORIES.find((c) => c.id === serviceCategory),
+    [serviceCategory]
+  );
+  const serviceCategoryLabel = currentCategoryConfig?.label || serviceCategory;
+
+  const quoteDocProps = useMemo(() => {
+    return {
+      quoteNo: calculatedQuote?.quoteNo || 'QT-261102-188',
+      customerName: customerName || '인터코스',
+      contactPerson: contactPerson || '김지현 팀장',
+      contactPhone: contactPhone || '010-6348-8726',
+      notes: notes || '비즈니스 투어',
+      date,
+      serviceStartTime,
+      serviceEndTime,
+      serviceHours: Number(serviceHours),
+      origin,
+      destination,
+      vehicleModel: calculatedQuote?.vehicleModel || selectedSkuObj?.vehicleProductLabel || '제네시스 G90 신차 최고급형',
+      vehicleCount: Number(vehicleCount),
+      serviceCategoryLabel,
+      englishOption,
+      baseFareTotal: calculatedQuote?.baseFareTotal ?? null,
+      overtimeHours: calculatedQuote?.overtimeHours || 0,
+      overtimeFareTotal: calculatedQuote?.overtimeFareTotal || 0,
+      excessKm: Number(excessKm) || 0,
+      excessDistanceTotal: calculatedQuote?.excessDistanceTotal || 0,
+      englishSurchargeTotal: calculatedQuote?.englishSurchargeTotal || 0,
+      supplyPriceTotal: calculatedQuote?.supplyPriceTotal ?? null,
+      vatAmount: calculatedQuote?.vatAmount ?? null,
+      estimatedGrandTotal: calculatedQuote?.estimatedGrandTotal ?? null,
+      quoteRequired: Boolean(calculatedQuote?.quoteRequired),
+    };
+  }, [
+    calculatedQuote,
+    customerName,
+    contactPerson,
+    contactPhone,
+    notes,
+    date,
+    serviceStartTime,
+    serviceEndTime,
+    serviceHours,
+    origin,
+    destination,
+    selectedSkuObj,
+    vehicleCount,
+    serviceCategoryLabel,
+    englishOption,
+    excessKm,
+  ]);
+
+  // Print receipt as a clean 1-page PDF matching reference specification
   const handlePrintPdf = () => {
     haptics.selection();
-    const receiptCard = document.getElementById('quote-receipt-card');
-    if (!receiptCard) {
-      window.print();
-      return;
-    }
 
     // Create an invisible iframe for isolated 1-page printing
     const iframe = document.createElement('iframe');
@@ -410,65 +463,37 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
       return;
     }
 
-    // Collect all stylesheets (Tailwind, compiled CSS)
-    const styleTags = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
-      .map((el) => el.outerHTML)
-      .join('\n');
-
+    const printHtml = generateOfficialQuotePrintHtml(quoteDocProps);
     doc.open();
-    doc.write(`
-      <!DOCTYPE html>
-      <html lang="ko">
-        <head>
-          <meta charset="utf-8" />
-          <title>VIP_공식견적서_${calculatedQuote?.quoteNo || 'QT'}</title>
-          ${styleTags}
-          <style>
-            @page {
-              size: A4 portrait;
-              margin: 10mm 12mm;
-            }
-            html, body {
-              background: #ffffff !important;
-              margin: 0 !important;
-              padding: 0 !important;
-              height: auto !important;
-              overflow: visible !important;
-              font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", Roboto, sans-serif !important;
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
-            }
-            .print-receipt-outer {
-              max-width: 620px;
-              margin: 0 auto;
-              padding: 24px;
-              border: 1px solid #cbd5e1;
-              border-radius: 20px;
-              background: #ffffff;
-              box-shadow: none !important;
-              page-break-inside: avoid !important;
-              break-inside: avoid !important;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="print-receipt-outer font-sans">
-            ${receiptCard.innerHTML}
-          </div>
-        </body>
-      </html>
-    `);
+    doc.write(printHtml);
     doc.close();
 
-    setTimeout(() => {
-      iframe.contentWindow?.focus();
-      iframe.contentWindow?.print();
-      setTimeout(() => {
-        if (document.body.contains(iframe)) {
-          document.body.removeChild(iframe);
-        }
-      }, 2000);
-    }, 250);
+    const triggerPrint = () => {
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch (e) {
+        console.warn('iframe print error:', e);
+      } finally {
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+        }, 3000);
+      }
+    };
+
+    if (iframe.contentWindow?.document?.fonts?.ready) {
+      iframe.contentWindow.document.fonts.ready
+        .then(() => {
+          setTimeout(triggerPrint, 250);
+        })
+        .catch(() => {
+          setTimeout(triggerPrint, 350);
+        });
+    } else {
+      setTimeout(triggerPrint, 350);
+    }
   };
 
   return (
@@ -1063,178 +1088,8 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                   </p>
                 </div>
 
-                {/* Authentic VIP Chauffeur Receipt Card */}
-                <div id="quote-receipt-card" className="bg-white border border-slate-300 rounded-3xl p-6 sm:p-7 shadow-xl relative overflow-hidden font-sans">
-                  {/* Decorative Header */}
-                  <div className="text-center pb-3">
-                    <span className="text-[11px] font-black tracking-widest text-[#1E60F3] uppercase block">
-                      VIP LIMOUSINE KOREA
-                    </span>
-                    <h5 className="text-sm font-extrabold text-slate-900 tracking-tight mt-0.5">
-                      공식 견적 영수증 (OFFICIAL ESTIMATE)
-                    </h5>
-                    <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium mt-3 px-1">
-                      <span>견적번호: <strong className="text-slate-800 font-mono">{calculatedQuote?.quoteNo || 'QT-261102-811'}</strong></span>
-                      <span>발급일시: {new Date().toLocaleDateString('ko-KR')}</span>
-                    </div>
-                  </div>
-
-                  {/* Dotted Divider */}
-                  <div className="border-b-2 border-dashed border-slate-200 my-3" />
-
-                  {/* 1. 고객 및 행사 개요 */}
-                  <div className="space-y-1.5 text-xs">
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-400 font-medium">고객사명</span>
-                      <span className="font-bold text-slate-900">{customerName}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-400 font-medium">담당자</span>
-                      <span className="font-semibold text-slate-700">{contactPerson} ({contactPhone})</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-400 font-medium">행사/목적</span>
-                      <span className="font-semibold text-slate-700">{notes || 'VIP 수행 의전'}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-400 font-medium">운행 일정</span>
-                      <span className="font-semibold text-slate-700">
-                        {date} ({serviceStartTime} ~ {serviceEndTime}, {serviceHours}시간)
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-400 font-medium">운행 구간</span>
-                      <span className="font-bold text-slate-900 truncate max-w-[240px]">
-                        {origin} → {destination}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Dotted Divider */}
-                  <div className="border-b-2 border-dashed border-slate-200 my-3" />
-
-                  {/* 2. 차량 및 옵션 개요 */}
-                  <div className="space-y-1.5 text-xs">
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-400 font-medium">선택 차량</span>
-                      <span className="font-bold text-slate-900">
-                        {calculatedQuote?.vehicleModel || currentSku?.vehicleProductLabel}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-400 font-medium">차량 수량</span>
-                      <span className="font-semibold text-slate-800">{vehicleCount}대</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-400 font-medium">서비스 구분</span>
-                      <span className="font-semibold text-slate-800">
-                        {SERVICE_CATEGORIES.find((c) => c.id === serviceCategory)?.label || serviceCategory}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-400 font-medium">기사 서비스</span>
-                      <span className="font-semibold text-blue-700">
-                        {englishOption === 'fluent_upgrade'
-                          ? '🇺🇸 영어 (추가 비용)'
-                          : '🇰🇷 한국어'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Dotted Divider */}
-                  <div className="border-b-2 border-dashed border-slate-200 my-3" />
-
-                  {/* 3. 세부 금액 명세 */}
-                  <div className="space-y-2 text-xs">
-                    {isCalculating ? (
-                      <div className="py-6 text-center text-xs text-slate-400 font-medium flex items-center justify-center gap-2">
-                        <span className="animate-spin text-[#1E60F3]">⏳</span>
-                        <span>실시간 요율 산출 중...</span>
-                      </div>
-                    ) : calculatedQuote ? (
-                      <>
-                        <div className="flex justify-between items-center">
-                          <span className="text-slate-500 font-medium">
-                            기본 대절료 ({vehicleCount}대 × {serviceHours}시간)
-                          </span>
-                          <span className="font-bold text-slate-900 font-mono">
-                            {calculatedQuote.baseFareTotal !== null
-                              ? `${calculatedQuote.baseFareTotal.toLocaleString()}원`
-                              : '상담 후 산정'}
-                          </span>
-                        </div>
-
-                        {calculatedQuote.overtimeHours > 0 && (
-                          <div className="flex justify-between items-center text-amber-700">
-                            <span>초과 시간 요금 ({calculatedQuote.overtimeHours}시간)</span>
-                            <span className="font-bold font-mono">
-                              +{calculatedQuote.overtimeFareTotal?.toLocaleString()}원
-                            </span>
-                          </div>
-                        )}
-
-                        {(calculatedQuote.excessDistanceTotal || 0) > 0 && (
-                          <div className="flex justify-between items-center text-amber-700">
-                            <span>초과 주행 요금 ({excessKm}km)</span>
-                            <span className="font-bold font-mono">
-                              +{calculatedQuote.excessDistanceTotal?.toLocaleString()}원
-                            </span>
-                          </div>
-                        )}
-
-                        {calculatedQuote.englishSurchargeTotal > 0 && (
-                          <div className="flex justify-between items-center text-blue-700">
-                            <span>의전 기사 영어 수당</span>
-                            <span className="font-bold font-mono">
-                              +{calculatedQuote.englishSurchargeTotal.toLocaleString()}원
-                            </span>
-                          </div>
-                        )}
-
-                        <div className="border-t border-slate-200 pt-2 flex justify-between items-center">
-                          <span className="text-slate-600 font-bold">공급가액 소계</span>
-                          <span className="font-black text-slate-900 text-sm font-mono">
-                            {calculatedQuote.supplyPriceTotal !== null
-                              ? `${calculatedQuote.supplyPriceTotal.toLocaleString()}원`
-                              : '상담 후 산정'}
-                          </span>
-                        </div>
-
-                        <div className="flex justify-between items-center text-slate-500">
-                          <span>부가가치세 (10%)</span>
-                          <span className="font-semibold font-mono">
-                            {calculatedQuote.vatAmount !== null
-                              ? `${calculatedQuote.vatAmount.toLocaleString()}원`
-                              : '별도 산정'}
-                          </span>
-                        </div>
-
-                        {/* Grand Total Highlight Box */}
-                        <div className="mt-3 p-4 rounded-2xl bg-blue-50/90 border border-blue-200/90 flex items-center justify-between shadow-2xs">
-                          <div>
-                            <span className="text-xs font-black text-slate-900 block">
-                              총 청구 예상금액
-                            </span>
-                            <span className="text-[11px] text-blue-600 font-bold">
-                              (부가가치세 10% 포함)
-                            </span>
-                          </div>
-                          <span className="text-2xl sm:text-3xl font-black text-[#1E60F3] font-mono">
-                            {calculatedQuote.estimatedGrandTotal !== null
-                              ? `${calculatedQuote.estimatedGrandTotal.toLocaleString()}원`
-                              : '상담 후 산정'}
-                          </span>
-                        </div>
-                      </>
-                    ) : null}
-                  </div>
-
-                  {/* Receipt Notice */}
-                  <div className="mt-4 pt-3 border-t border-slate-200/80 text-[10px] text-slate-400 text-center font-medium leading-relaxed">
-                    * 본 견적서는 2026 공식 요율표 기준 실시간 산출 견적서입니다.<br />
-                    예약 전환 시 실시간 관제 스케줄에 즉시 등록됩니다.
-                  </div>
-                </div>
+                {/* Authentic VIP Chauffeur Official Receipt Document */}
+                <HqOfficialQuoteDocument {...quoteDocProps} />
 
                 {/* Notifications & Feedback */}
                 <div id="quote-feedback-messages" className="space-y-2">

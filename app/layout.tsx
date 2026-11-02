@@ -1,10 +1,11 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter } from 'next/font/google';
+import { Inter, Playfair_Display } from 'next/font/google';
 import Script from 'next/script';
 import './globals.css';
 import { SessionGate } from '@/components/SessionGate';
 
 const inter = Inter({ subsets: ['latin'] });
+const playfair = Playfair_Display({ subsets: ['latin'], variable: '--font-playfair' });
 
 export const metadata: Metadata = {
   title: 'Protocol Cockpit | VIP 의전 드라이버 스마트 관제 런처',
@@ -48,6 +49,10 @@ export default function RootLayout({
   return (
     <html lang="ko" className="h-full min-h-dvh bg-[#F8FAFC] text-slate-900">
       <head>
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css"
+        />
         <Script
           src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.4/kakao.min.js"
           strategy="beforeInteractive"
@@ -62,7 +67,7 @@ export default function RootLayout({
           `}
         </Script>
       </head>
-      <body className={`${inter.className} min-h-dvh flex flex-col bg-[#F8FAFC] antialiased select-none overflow-x-hidden`}>
+      <body className={`${inter.className} ${playfair.variable} min-h-dvh flex flex-col bg-[#F8FAFC] antialiased select-none overflow-x-hidden`}>
         <SessionGate>{children}</SessionGate>
       </body>
     </html>
