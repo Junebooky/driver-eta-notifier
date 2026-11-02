@@ -375,6 +375,45 @@ assert.strictEqual(quickDispatchModalCopy.saveUnassignedAction, '수정 내용�
 assert.strictEqual(quickDispatchModalCopy.publishDispatchAction, '배차 확정하고 기사님께 보내기');
 console.log('✓ Quick Dispatch Modal and Place Search Toss/Apple copywriting validated');
 
+// 10. Testing Departure Time Dropdown & Direct Number Typing Parser
+console.log('10. Testing Departure Time Dropdown & Direct Typing Parser...');
+import { parseFlexibleTimeInput, formatTimeKoreanAmPm, DEFAULT_TIME_OPTIONS } from '../components/hq/HqQuickDispatch';
+
+// 48 intervals (every 30 mins)
+assert.strictEqual(DEFAULT_TIME_OPTIONS.length, 48);
+assert.strictEqual(DEFAULT_TIME_OPTIONS[0], '00:00');
+assert.strictEqual(DEFAULT_TIME_OPTIONS[1], '00:30');
+assert.strictEqual(DEFAULT_TIME_OPTIONS[15], '07:30');
+assert.strictEqual(DEFAULT_TIME_OPTIONS[47], '23:30');
+
+// Direct input parsing
+assert.strictEqual(parseFlexibleTimeInput('07:30'), '07:30');
+assert.strictEqual(parseFlexibleTimeInput('7:30'), '07:30');
+assert.strictEqual(parseFlexibleTimeInput('0730'), '07:30');
+assert.strictEqual(parseFlexibleTimeInput('730'), '07:30');
+assert.strictEqual(parseFlexibleTimeInput('1430'), '14:30');
+assert.strictEqual(parseFlexibleTimeInput('14:30'), '14:30');
+assert.strictEqual(parseFlexibleTimeInput('845'), '08:45');
+assert.strictEqual(parseFlexibleTimeInput('0845'), '08:45');
+assert.strictEqual(parseFlexibleTimeInput('8:45'), '08:45');
+assert.strictEqual(parseFlexibleTimeInput('9'), '09:00');
+assert.strictEqual(parseFlexibleTimeInput('14'), '14:00');
+assert.strictEqual(parseFlexibleTimeInput('오전 07:30'), '07:30');
+assert.strictEqual(parseFlexibleTimeInput('오전 7:30'), '07:30');
+assert.strictEqual(parseFlexibleTimeInput('오후 02:30'), '14:30');
+assert.strictEqual(parseFlexibleTimeInput('오후 230'), '14:30');
+assert.strictEqual(parseFlexibleTimeInput('오후 2시 30분'), '14:30');
+assert.strictEqual(parseFlexibleTimeInput('2359'), '23:59');
+assert.strictEqual(parseFlexibleTimeInput('invalid'), null);
+assert.strictEqual(parseFlexibleTimeInput(''), null);
+
+// Korean AM/PM formatting
+assert.strictEqual(formatTimeKoreanAmPm('07:30'), '오전 07:30');
+assert.strictEqual(formatTimeKoreanAmPm('14:30'), '오후 02:30');
+assert.strictEqual(formatTimeKoreanAmPm('00:00'), '오전 12:00');
+assert.strictEqual(formatTimeKoreanAmPm('12:00'), '오후 12:00');
+console.log('✓ Departure Time Dropdown & Direct Number Typing verified successfully');
+
 console.log('✓ 10-column table structure and Toss/Apple style copy validated successfully');
 
 console.log('\n🎉 ALL QUICK DISPATCH & VEHICLE UI TESTS PASSED SUCCESSFULLY! 🎉\n');

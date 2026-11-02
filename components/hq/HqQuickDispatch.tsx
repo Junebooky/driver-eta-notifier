@@ -5,6 +5,7 @@ import {
   Car,
   Send,
   Info,
+  Check,
   CheckCircle2,
   Plus,
   Minus,
@@ -103,22 +104,65 @@ const POPULAR_VEHICLE_MODELS = [
   'Genesis G90 LWB',
 ];
 
-const POPULAR_TIMES = [
-  '07:00',
-  '08:00',
-  '09:00',
-  '10:00',
-  '11:00',
-  '12:00',
-  '13:00',
-  '14:00',
-  '15:00',
-  '16:00',
-  '17:00',
-  '18:00',
-  '19:00',
-  '20:00',
-];
+export const DEFAULT_TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
+  const h = Math.floor(i / 2);
+  const m = i % 2 === 0 ? '00' : '30';
+  return `${String(h).padStart(2, '0')}:${m}`;
+});
+export const POPULAR_TIMES = DEFAULT_TIME_OPTIONS;
+
+/**
+ * Parses user flexible time input into 24h "HH:mm" format.
+ * Supports:
+ * - "07:30", "14:20", "8:45"
+ * - "0730", "730", "1420", "845"
+ * - "오전 7:30", "오후 2:30", "오후 230", "오후 2시 30분"
+ * - "7", "07", "14", "20" -> "07:00", "14:00", "20:00"
+ */
+export function parseFlexibleTimeInput(raw: string): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  const isPm = /오후|pm|p\.m\./i.test(trimmed);
+  const isAm = /오전|am|a\.m\./i.test(trimmed);
+
+  const clean = trimmed.replace(/[^\d:]/g, '');
+  if (!clean) return null;
+
+  if (clean.includes(':')) {
+    const parts = clean.split(':');
+    let h = parseInt(parts[0], 10);
+    const m = parseInt(parts[1] || '0', 10);
+    if (isNaN(h) || isNaN(m) || m < 0 || m > 59) return null;
+    if (isPm && h < 12) h += 12;
+    if (isAm && h === 12) h = 0;
+    if (h < 0 || h > 23) return null;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  }
+
+  if (clean.length === 3 || clean.length === 4) {
+    const h = clean.length === 3 ? parseInt(clean.slice(0, 1), 10) : parseInt(clean.slice(0, 2), 10);
+    const m = clean.length === 3 ? parseInt(clean.slice(1, 3), 10) : parseInt(clean.slice(2, 4), 10);
+    if (isNaN(h) || isNaN(m) || m < 0 || m > 59) return null;
+    let finalH = h;
+    if (isPm && finalH < 12) finalH += 12;
+    if (isAm && finalH === 12) finalH = 0;
+    if (finalH < 0 || finalH > 23) return null;
+    return `${String(finalH).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  }
+
+  if (clean.length === 1 || clean.length === 2) {
+    let h = parseInt(clean, 10);
+    if (isNaN(h)) return null;
+    if (isPm && h < 12) h += 12;
+    if (isAm && h === 12) h = 0;
+    if (h < 0 || h > 23) return null;
+    return `${String(h).padStart(2, '0')}:00`;
+  }
+
+  return null;
+}
 
 export interface VehicleAllocationItem {
   id: string;
@@ -293,11 +337,39 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
 
   // 3. Pickup Time State
   const [pickupTimeOnly, setPickupTimeOnly] = useState(() => initialBooking?.pickupTime || '09:00');
+  const [timeInputText, setTimeInputText] = useState(() => formatTimeKoreanAmPm(initialBooking?.pickupTime || '09:00'));
+  const [isInputFocused, setIsInputFocused] = useState(false);
+  const selectedTimeItemRef = useRef<HTMLButtonElement>(null);
+  const timeDropdownListRef = useRef<HTMLDivElement>(null);
   const [endTime, setEndTime] = useState(() => initialBooking?.endTime || '');
   const excludeScheduleId = initialBooking?.scheduleId || initialBooking?.id;
   const fleet = useFleetAvailability(pickupDate, pickupTimeOnly, pickupEndDate || pickupDate, endTime, excludeScheduleId);
   const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
   const timePickerRef = useRef<HTMLDivElement>(null);
+
+  const timeDropdownOptions = useMemo(() => {
+    if (pickupTimeOnly && !DEFAULT_TIME_OPTIONS.includes(pickupTimeOnly)) {
+      return [...DEFAULT_TIME_OPTIONS, pickupTimeOnly].sort();
+    }
+    return DEFAULT_TIME_OPTIONS;
+  }, [pickupTimeOnly]);
+
+  useEffect(() => {
+    if (!isInputFocused) {
+      setTimeInputText(formatTimeKoreanAmPm(pickupTimeOnly));
+    }
+  }, [pickupTimeOnly, isInputFocused]);
+
+  useEffect(() => {
+    if (isTimePickerOpen) {
+      const timer = setTimeout(() => {
+        if (selectedTimeItemRef.current && timeDropdownListRef.current) {
+          selectedTimeItemRef.current.scrollIntoView({ block: 'nearest' });
+        }
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [isTimePickerOpen]);
 
   // 4. Locations
   const [pickupLocation, setPickupLocation] = useState(() => initialBooking?.pickupLocation || '');
@@ -359,6 +431,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
       setPickupDate(initialBooking.pickupDate || getKstTodayDateStr());
       setPickupEndDate(initialBooking.endDate || initialBooking.pickupDate || getKstTodayDateStr());
       setPickupTimeOnly(initialBooking.pickupTime || '09:00');
+      setTimeInputText(formatTimeKoreanAmPm(initialBooking.pickupTime || '09:00'));
       setEndTime(initialBooking.endTime || '');
       setPickupLocation(initialBooking.pickupLocation || '');
       setDestination(initialBooking.destination || '');
@@ -556,10 +629,50 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
     setAllocations((prev) => prev.slice(0, prev.length - 1));
   };
 
-  // Time picker handler
+  // Time picker handlers
+  const handleTimeInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setTimeInputText(val);
+    if (!isTimePickerOpen) setIsTimePickerOpen(true);
+
+    const parsed = parseFlexibleTimeInput(val);
+    if (parsed) {
+      setPickupTimeOnly(parsed);
+    }
+  };
+
+  const handleTimeInputBlur = () => {
+    setIsInputFocused(false);
+    const parsed = parseFlexibleTimeInput(timeInputText);
+    if (parsed) {
+      setPickupTimeOnly(parsed);
+      setTimeInputText(formatTimeKoreanAmPm(parsed));
+    } else {
+      setTimeInputText(formatTimeKoreanAmPm(pickupTimeOnly));
+    }
+  };
+
+  const handleTimeInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const parsed = parseFlexibleTimeInput(timeInputText);
+      if (parsed) {
+        setPickupTimeOnly(parsed);
+        setTimeInputText(formatTimeKoreanAmPm(parsed));
+      }
+      setIsTimePickerOpen(false);
+      (e.target as HTMLInputElement).blur();
+    } else if (e.key === 'Escape') {
+      setIsTimePickerOpen(false);
+      setTimeInputText(formatTimeKoreanAmPm(pickupTimeOnly));
+      (e.target as HTMLInputElement).blur();
+    }
+  };
+
   const handleSelectTime = (hhmm: string) => {
     haptics.selection();
     setPickupTimeOnly(hhmm);
+    setTimeInputText(formatTimeKoreanAmPm(hhmm));
     setIsTimePickerOpen(false);
   };
 
@@ -1152,55 +1265,79 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
               </label>
 
               <div
-                role="button"
-                tabIndex={0}
-                onClick={() => {
-                  haptics.lightTap();
-                  setIsTimePickerOpen((prev) => !prev);
-                }}
-                className="w-full h-12 bg-white border border-slate-200 hover:border-blue-400 focus:border-[#1E60F3] rounded-xl px-3.5 flex items-center justify-between transition-all cursor-pointer shadow-2xs"
+                className={`w-full h-12 bg-white border rounded-xl px-3.5 flex items-center justify-between transition-all shadow-2xs ${
+                  isTimePickerOpen
+                    ? 'border-[#1E60F3] ring-1 ring-[#1E60F3]'
+                    : 'border-slate-200 hover:border-slate-300'
+                }`}
               >
-                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                <div className="flex items-center gap-2.5 min-w-0 flex-1 h-full">
                   <Clock className="w-5 h-5 text-slate-700 shrink-0" />
-                  <span className="text-sm font-bold text-slate-900 truncate">
-                    {formatTimeKoreanAmPm(pickupTimeOnly)}
-                  </span>
+                  <input
+                    type="text"
+                    value={timeInputText}
+                    onChange={handleTimeInputChange}
+                    onFocus={() => {
+                      setIsInputFocused(true);
+                      setIsTimePickerOpen(true);
+                    }}
+                    onBlur={handleTimeInputBlur}
+                    onKeyDown={handleTimeInputKeyDown}
+                    placeholder="예: 오전 07:30 또는 0730"
+                    aria-label="출발 시간 입력 및 선택"
+                    className="w-full h-full bg-transparent text-sm font-bold text-slate-900 focus:outline-none placeholder:text-slate-400"
+                  />
                 </div>
-                <ChevronDown className="w-5 h-5 text-slate-600 shrink-0" />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => {
+                    haptics.lightTap();
+                    setIsTimePickerOpen((prev) => !prev);
+                  }}
+                  className="p-1 -mr-1 text-slate-600 hover:text-slate-900 cursor-pointer"
+                  aria-label="시간 목록 보기"
+                >
+                  <ChevronDown
+                    className={`w-5 h-5 transition-transform duration-200 ${
+                      isTimePickerOpen ? 'rotate-180 text-[#1E60F3]' : ''
+                    }`}
+                  />
+                </button>
               </div>
 
               {/* Time Picker Dropdown */}
               {isTimePickerOpen && (
-                <div className="absolute left-0 right-0 top-full mt-1.5 z-40 bg-white border border-slate-200 rounded-2xl shadow-2xl p-3 animate-in fade-in duration-150 space-y-2">
-                  <div className="text-[11px] font-bold text-slate-400 px-1 pb-1 border-b border-slate-100">
-                    주요 출발 시간 선택
-                  </div>
-                  <div className="grid grid-cols-3 gap-1.5 max-h-48 overflow-y-auto p-0.5">
-                    {POPULAR_TIMES.map((time) => (
+                <div
+                  ref={timeDropdownListRef}
+                  className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white border border-slate-200/90 rounded-2xl shadow-xl p-2 max-h-56 overflow-y-auto animate-in fade-in duration-150 space-y-0.5"
+                >
+                  {timeDropdownOptions.map((time) => {
+                    const isSelected = pickupTimeOnly === time;
+                    return (
                       <button
                         key={time}
+                        ref={isSelected ? selectedTimeItemRef : undefined}
                         type="button"
-                        onClick={() => handleSelectTime(time)}
-                        className={`py-2 px-1 text-xs font-bold rounded-lg text-center transition-colors cursor-pointer ${
-                          pickupTimeOnly === time
-                            ? 'bg-[#1E60F3] text-white shadow-xs'
-                            : 'bg-slate-50 hover:bg-blue-50 text-slate-700'
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleSelectTime(time);
+                        }}
+                        className={`w-full px-3 py-2.5 rounded-xl text-left text-sm flex items-center transition-colors cursor-pointer ${
+                          isSelected
+                            ? 'bg-blue-50 text-[#1E60F3] font-bold'
+                            : 'hover:bg-slate-50 text-slate-800 font-medium'
                         }`}
                       >
-                        {formatTimeKoreanAmPm(time)}
+                        <span className="w-5 flex items-center justify-start shrink-0">
+                          {isSelected && <Check className="w-4 h-4 text-[#1E60F3] stroke-[2.5]" />}
+                        </span>
+                        <span className={isSelected ? 'text-[#1E60F3] font-bold' : 'text-slate-800'}>
+                          {formatTimeKoreanAmPm(time)}
+                        </span>
                       </button>
-                    ))}
-                  </div>
-
-                  <div className="pt-2 border-t border-slate-100 flex items-center gap-2">
-                    <span className="text-xs text-slate-500 font-bold shrink-0">직접 입력:</span>
-                    <input
-                      type="time"
-                      value={pickupTimeOnly}
-                      onChange={(e) => setPickupTimeOnly(e.target.value)}
-                      className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800"
-                    />
-                  </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
