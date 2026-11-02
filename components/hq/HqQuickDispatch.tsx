@@ -305,8 +305,6 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
 
   // 5. Vehicle Model Selection
   const [selectedVehicleModel, setSelectedVehicleModel] = useState(() => (initialBooking?.vehicleModel && initialBooking.vehicleModel !== '-' ? initialBooking.vehicleModel : ''));
-  const [isVehicleModelDropdownOpen, setIsVehicleModelDropdownOpen] = useState(false);
-  const vehicleModelRef = useRef<HTMLDivElement>(null);
 
   // 6. Additional Info Accordion & Fields
   // Extra Info Accordion Open/Closed State (default collapsed per Reference 1)
@@ -492,9 +490,6 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
       if (timePickerRef.current && !timePickerRef.current.contains(target)) {
         setIsTimePickerOpen(false);
       }
-      if (vehicleModelRef.current && !vehicleModelRef.current.contains(target)) {
-        setIsVehicleModelDropdownOpen(false);
-      }
     };
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
@@ -559,25 +554,6 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
     if (allocations.length <= 1) return;
     haptics.lightTap();
     setAllocations((prev) => prev.slice(0, prev.length - 1));
-  };
-
-  // Vehicle model selector
-  const handleSelectVehicleModel = (model: string) => {
-    haptics.selection();
-    setSelectedVehicleModel(model);
-    setIsVehicleModelDropdownOpen(false);
-    setAllocations((prev) =>
-      prev.map((a) => {
-        const matched = VEHICLE_OPTIONS.find(
-          (v) => v.modelRaw === model || v.modelClean === model
-        );
-        return {
-          ...a,
-          selectedVehicleModel: model,
-          selectedVehiclePlate: '',
-        };
-      })
-    );
   };
 
   // Time picker handler
@@ -1181,7 +1157,6 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                 onClick={() => {
                   haptics.lightTap();
                   setIsTimePickerOpen((prev) => !prev);
-                  setIsVehicleModelDropdownOpen(false);
                 }}
                 className="w-full h-12 bg-white border border-slate-200 hover:border-blue-400 focus:border-[#1E60F3] rounded-xl px-3.5 flex items-center justify-between transition-all cursor-pointer shadow-2xs"
               >
@@ -1231,23 +1206,120 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
             </div>
           </div>
 
-          <div className="space-y-3 rounded-xl border border-slate-200 p-3">
-            <label className="block text-xs font-bold text-slate-700">실제 종료 시간 (배차 확정 시 필수)
-              <input type="time" aria-label="실제 종료 시간" value={endTime} onChange={e => setEndTime(e.target.value)} className="mt-1 w-full h-11 rounded-lg border border-slate-200 px-3" />
+          <div className="space-y-3 rounded-xl border border-slate-200 p-3 bg-slate-50/50">
+            <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
+              <div>
+                <span className="text-xs font-black text-slate-900">차량 및 기사 배차</span>
+                <span className="ml-1.5 text-[11px] text-slate-400 font-medium">실제 배차 확정 시 선택</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-600">차량 대수:</span>
+                <div className="inline-flex items-center bg-white border border-slate-200 rounded-lg p-0.5 shadow-2xs">
+                  <button
+                    type="button"
+                    onClick={handleDecrementVehicle}
+                    disabled={allocations.length <= 1}
+                    className="w-7 h-7 rounded bg-blue-50/80 hover:bg-blue-100 text-[#1E60F3] font-black flex items-center justify-center transition-colors active:scale-95 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                    aria-label="차량 감소"
+                  >
+                    <Minus className="w-3.5 h-3.5 stroke-[3]" />
+                  </button>
+
+                  <span className="w-9 text-xs font-black text-slate-900 text-center">
+                    {allocations.length}대
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={handleIncrementVehicle}
+                    className="w-7 h-7 rounded bg-blue-50/80 hover:bg-blue-100 text-[#1E60F3] font-black flex items-center justify-center transition-colors active:scale-95 cursor-pointer"
+                    aria-label="차량 증가"
+                  >
+                    <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <label className="block text-xs font-bold text-slate-700">
+              실제 종료 시간 (배차 확정 시 필수)
+              <input
+                type="time"
+                aria-label="실제 종료 시간"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+                className="mt-1 w-full h-11 rounded-lg border border-slate-200 px-3 bg-white"
+              />
             </label>
-            {endTime && <p className="text-xs text-slate-500">{fleet.error || (fleet.loading ? '선택 기간의 가용성을 확인하고 있습니다.' : '선택 기간 기준 · 운행 후 회차 여유 60분 포함')}</p>}
+            {endTime && (
+              <p className="text-xs text-slate-500">
+                {fleet.error || (fleet.loading ? '선택 기간의 가용성을 확인하고 있습니다.' : '선택 기간 기준 · 운행 후 회차 여유 60분 포함')}
+              </p>
+            )}
+
             {allocations.map((allocation, index) => (
-              <div key={allocation.id} className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <label className="text-xs font-bold text-slate-700">{index + 1}번 차량
-                  <select aria-label={`${index + 1}번 차량 번호판`} value={allocation.selectedVehiclePlate} onChange={e => setAllocations(prev => prev.map(a => a.id === allocation.id ? { ...a, selectedVehiclePlate: e.target.value } : a))} className="mt-1 w-full h-11 rounded-lg border border-slate-200 px-2" disabled={!fleet.data}>
+              <div key={allocation.id} className="grid grid-cols-1 gap-2 sm:grid-cols-2 pt-1 border-t border-slate-200/50">
+                <label className="text-xs font-bold text-slate-700">
+                  {index + 1}번 차량
+                  <select
+                    aria-label={`${index + 1}번 차량 번호판`}
+                    value={allocation.selectedVehiclePlate}
+                    onChange={(e) => {
+                      const plate = e.target.value;
+                      const vMatch = fleet.data?.vehicles.find((v) => v.plate === plate) || VIP_REAL_VEHICLES.find((v) => v.plate === plate);
+                      setAllocations((prev) =>
+                        prev.map((a) =>
+                          a.id === allocation.id
+                            ? {
+                                ...a,
+                                selectedVehiclePlate: plate,
+                                selectedVehicleModel: vMatch?.model || a.selectedVehicleModel,
+                              }
+                            : a
+                        )
+                      );
+                      if (vMatch?.model) {
+                        setSelectedVehicleModel(vMatch.model);
+                      }
+                    }}
+                    className="mt-1 w-full h-11 rounded-lg border border-slate-200 px-2 bg-white"
+                    disabled={!fleet.data}
+                  >
                     <option value="">실차 선택</option>
-                    {fleet.data?.vehicles.map(v => <option key={v.uuid} value={v.plate} disabled={!v.isAvailable}>{v.model} · {v.plate} · {VEHICLE_STATUS_LABELS[v.currentStatus]}{v.isAvailable ? '' : ' (예약 불가)'}</option>)}
+                    {fleet.data?.vehicles.map((v) => (
+                      <option key={v.uuid} value={v.plate} disabled={!v.isAvailable}>
+                        {v.model} · {v.plate} · {VEHICLE_STATUS_LABELS[v.currentStatus]}
+                        {v.isAvailable ? '' : ' (예약 불가)'}
+                      </option>
+                    ))}
                   </select>
                 </label>
-                <label className="text-xs font-bold text-slate-700">{index + 1}번 담당 기사
-                  <select aria-label={`${index + 1}번 담당 기사`} value={allocation.selectedDriver} onChange={e => setAllocations(prev => prev.map(a => a.id === allocation.id ? { ...a, selectedDriver: e.target.value } : a))} className="mt-1 w-full h-11 rounded-lg border border-slate-200 px-2" disabled={!fleet.data || allocation.serviceMode === 'vehicle_only'}>
+                <label className="text-xs font-bold text-slate-700">
+                  {index + 1}번 담당 기사
+                  <select
+                    aria-label={`${index + 1}번 담당 기사`}
+                    value={allocation.selectedDriver}
+                    onChange={(e) =>
+                      setAllocations((prev) =>
+                        prev.map((a) =>
+                          a.id === allocation.id ? { ...a, selectedDriver: e.target.value } : a
+                        )
+                      )
+                    }
+                    className="mt-1 w-full h-11 rounded-lg border border-slate-200 px-2 bg-white"
+                    disabled={!fleet.data || allocation.serviceMode === 'vehicle_only'}
+                  >
                     <option value="">기사 선택</option>
-                    {fleet.data?.drivers.map(d => <option key={d.id} value={d.id} disabled={!d.isAvailable || (allocation.requestedLanguage === 'en' && !d.isEnglishVerified)}>{d.name} · {d.phone}{d.isAvailable ? '' : ' (배차 불가)'}</option>)}
+                    {fleet.data?.drivers.map((d) => (
+                      <option
+                        key={d.id}
+                        value={d.id}
+                        disabled={!d.isAvailable || (allocation.requestedLanguage === 'en' && !d.isEnglishVerified)}
+                      >
+                        {d.name} · {d.phone}
+                        {d.isAvailable ? '' : ' (배차 불가)'}
+                      </option>
+                    ))}
                   </select>
                 </label>
               </div>
@@ -1281,99 +1353,6 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
               placeholder="목적지 검색 또는 입력"
               icon="flag"
             />
-          </div>
-
-          {/* 차량 대수 * & 차종 (선택) (2 Columns) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* 차량 대수 */}
-            <div>
-              <label className="block text-xs font-bold text-slate-800 mb-1.5">
-                차량 대수 <span className="text-red-500 font-bold ml-0.5">*</span>
-              </label>
-
-              <div className="w-full h-12 bg-white border border-slate-200 rounded-xl px-2.5 flex items-center justify-between shadow-2xs">
-                <button
-                  type="button"
-                  onClick={handleDecrementVehicle}
-                  disabled={allocations.length <= 1}
-                  className="w-8 h-8 rounded-lg bg-blue-50/80 hover:bg-blue-100 text-[#1E60F3] font-black text-base flex items-center justify-center transition-colors active:scale-95 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
-                  aria-label="차량 감소"
-                >
-                  <Minus className="w-4 h-4 stroke-[3]" />
-                </button>
-
-                <span className="text-sm font-black text-slate-900 text-center flex-1">
-                  {allocations.length}대
-                </span>
-
-                <button
-                  type="button"
-                  onClick={handleIncrementVehicle}
-                  className="w-8 h-8 rounded-lg bg-blue-50/80 hover:bg-blue-100 text-[#1E60F3] font-black text-base flex items-center justify-center transition-colors active:scale-95 cursor-pointer"
-                  aria-label="차량 증가"
-                >
-                  <Plus className="w-4 h-4 stroke-[3]" />
-                </button>
-              </div>
-            </div>
-
-            {/* 차종 (선택) */}
-            <div className="relative" ref={vehicleModelRef}>
-              <label className="block text-xs font-bold text-slate-800 mb-1.5">
-                차종 (선택)
-              </label>
-
-              <div
-                role="button"
-                tabIndex={0}
-                onClick={() => {
-                  haptics.lightTap();
-                  setIsVehicleModelDropdownOpen((prev) => !prev);
-                  setIsTimePickerOpen(false);
-                }}
-                className="w-full h-12 bg-white border border-slate-200 hover:border-blue-400 focus:border-[#1E60F3] rounded-xl px-3.5 flex items-center justify-between transition-all cursor-pointer shadow-2xs"
-              >
-                <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                  <Car className="w-5 h-5 text-slate-700 shrink-0" />
-                  <span
-                    className={`text-sm truncate ${
-                      selectedVehicleModel ? 'font-bold text-slate-900' : 'font-medium text-slate-400'
-                    }`}
-                  >
-                    {selectedVehicleModel || '차종 선택'}
-                  </span>
-                </div>
-                <ChevronDown className="w-5 h-5 text-slate-600 shrink-0" />
-              </div>
-
-              {/* Vehicle Model Dropdown */}
-              {isVehicleModelDropdownOpen && (
-                <div className="absolute left-0 right-0 top-full mt-1.5 z-40 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden py-1 divide-y divide-slate-100 animate-in fade-in duration-150">
-                  <button
-                    type="button"
-                    onClick={() => handleSelectVehicleModel('')}
-                    className="w-full px-3.5 py-2.5 text-left text-xs font-semibold text-slate-500 hover:bg-slate-50 flex items-center justify-between cursor-pointer"
-                  >
-                    <span>차종 미정 (현장 배정)</span>
-                  </button>
-                  {POPULAR_VEHICLE_MODELS.map((model) => (
-                    <button
-                      key={model}
-                      type="button"
-                      onClick={() => handleSelectVehicleModel(model)}
-                      className={`w-full px-3.5 py-2.5 text-left text-xs font-bold flex items-center justify-between cursor-pointer transition-colors ${
-                        selectedVehicleModel === model
-                          ? 'bg-blue-50 text-[#1E60F3]'
-                          : 'text-slate-800 hover:bg-slate-50'
-                      }`}
-                    >
-                      <span>{model}</span>
-                      {selectedVehicleModel === model && <CheckCircle2 className="w-4 h-4 text-[#1E60F3]" />}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
           </div>
 
           {/* 3. 추가 정보 (선택사항) Accordion (Reference 1 & 2 - Compact Harmony) */}

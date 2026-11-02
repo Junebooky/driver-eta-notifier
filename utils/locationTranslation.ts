@@ -106,6 +106,17 @@ export const COMPANY_APPROVED_ALIASES: Record<string, string> = {
   '정부세종청사': 'Sejong Government Complex',
   '해운대': 'Haeundae',
 
+  // VIP Dining & Famous Restaurants
+  '뜨락': 'Tteurak',
+  '뜨락 신관': 'Tteurak (Annex)',
+  '뜨락신관': 'Tteurak (Annex)',
+  '뜨락 본관': 'Tteurak (Main)',
+  '뜨락본관': 'Tteurak (Main)',
+  '청담 뜨락': 'Tteurak Cheongdam',
+  '청담뜨락': 'Tteurak Cheongdam',
+  '뜨락 청담': 'Tteurak Cheongdam',
+  '뜨락청담': 'Tteurak Cheongdam',
+
   // Presets & Defaults
   '현 위치': 'Current Location',
   '현위치': 'Current Location',
@@ -163,7 +174,12 @@ export function shortenEnglishPlaceName(translated: string): string {
     .replace(/\bTerminal\s*1\b/gi, 'T1')
     .replace(/\bTerminal\s*2\b/gi, 'T2')
     .replace(/Josun Palace Seoul Gangnam/gi, 'Josun Palace')
-    .replace(/Josun Palace Gangnam/gi, 'Josun Palace');
+    .replace(/Josun Palace Gangnam/gi, 'Josun Palace')
+    // Restaurant / VIP spot corrections (prevent literal machine translation of proper nouns)
+    .replace(/\bCourtyard\s+new\s+building\b/gi, 'Tteurak (Annex)')
+    .replace(/\bCourtyard\s+annex\b/gi, 'Tteurak (Annex)')
+    .replace(/\bCourtyard\s+main\s+building\b/gi, 'Tteurak (Main)')
+    .replace(/\bCourtyard\s+main\b/gi, 'Tteurak (Main)');
 
   return text.trim();
 }

@@ -307,6 +307,25 @@ assert.strictEqual(renderedChanel.includes('#'), false);
 assert.strictEqual(renderedChanel, 'CHANEL [phone]');
 console.log('✓ Hash/UUID successfully excluded from customer column');
 
+// 8. Testing VIP Place Translation for '뜨락 신관' & Avoiding Literal 'Courtyard new building'
+console.log('8. Testing VIP Place Translation for "뜨락 신관"...');
+import { lookupApprovedAlias, shortenEnglishPlaceName } from './locationTranslation';
+
+const tteurakAnnexAlias = lookupApprovedAlias({ name: '뜨락 신관' });
+assert.strictEqual(tteurakAnnexAlias, 'Tteurak (Annex)');
+
+const tteurakMainAlias = lookupApprovedAlias({ name: '뜨락' });
+assert.strictEqual(tteurakMainAlias, 'Tteurak');
+
+const cheongdamTteurakAlias = lookupApprovedAlias({ name: '청담 뜨락' });
+assert.strictEqual(cheongdamTteurakAlias, 'Tteurak Cheongdam');
+
+// Ensure that even if a machine translation produced 'Courtyard new building', it is intercepted:
+const shortenedLiteral = shortenEnglishPlaceName('Courtyard new building');
+assert.strictEqual(shortenedLiteral, 'Tteurak (Annex)');
+
+console.log('✓ "뜨락 신관" translation to "Tteurak (Annex)" verified across aliases and shortening rules');
+
 console.log('✓ 10-column table structure and Toss/Apple style copy validated successfully');
 
 console.log('\n🎉 ALL QUICK DISPATCH & VEHICLE UI TESTS PASSED SUCCESSFULLY! 🎉\n');
