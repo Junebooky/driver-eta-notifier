@@ -233,8 +233,6 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
     notes,
   ]);
 
-  if (!isOpen) return null;
-
   // Selected SKU Object
   const currentSku = STANDARD_VEHICLE_SKU_MAPPINGS.find((m) => m.vehicleProductCode === vehicleProductCode);
   const isBusSku = currentSku?.tier === 'bus' || calculatedQuote?.quoteRequired === true;
@@ -495,6 +493,8 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
       setTimeout(triggerPrint, 350);
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <>
