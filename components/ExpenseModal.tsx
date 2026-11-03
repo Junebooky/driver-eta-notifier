@@ -445,8 +445,8 @@ const ExpenseModalContent: React.FC<{
           {/* 3D Receipt Upload Illustration */}
           <div className="relative w-16 h-16 sm:w-18 sm:h-18 mx-auto mb-2 flex items-center justify-center">
             <Image
-                          unoptimized
-              src="/images/receipt_upload_icon.png"
+              unoptimized
+              src="/images/icons/driver_ui/icon_upload_receipt.png"
               alt="영수증 업로드 아이콘"
               width={72}
               height={72}
@@ -502,14 +502,14 @@ const ExpenseModalContent: React.FC<{
         {/* 4. Hero Summary Card: "오늘 총 지출" */}
         <section className="bg-gradient-to-r from-[#EBF3FF] via-[#F1F6FF] to-[#E6F0FF] border border-[#D6E5FE] rounded-2xl p-4 sm:p-5 relative overflow-hidden shadow-xs">
           {/* Background coins and receipt illustration */}
-          <div className="absolute right-2 -bottom-1 w-24 h-20 opacity-80 pointer-events-none sm:w-28 sm:h-22">
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 w-16 h-16 sm:w-20 sm:h-20 opacity-90 pointer-events-none flex items-center justify-center">
             <Image
-                          unoptimized
-              src="/images/expense_hero_coins.png"
+              unoptimized
+              src="/images/icons/driver_ui/icon_expense.png"
               alt="지출 코인 그래픽"
-              width={95}
-              height={70}
-              className="object-contain object-bottom"
+              width={80}
+              height={80}
+              className="object-contain drop-shadow-xs"
             />
           </div>
 
