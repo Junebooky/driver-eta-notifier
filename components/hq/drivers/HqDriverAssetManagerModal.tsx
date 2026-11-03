@@ -47,7 +47,12 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
   onAssetUpdated,
 }) => {
   const [selectedDriverId, setSelectedDriverId] = useState<string>(initialDriverId || '');
-  const [selectedVehiclePlate, setSelectedVehiclePlate] = useState<string>(initialVehiclePlate || '');
+  const [selectedVehiclePlate, setSelectedVehiclePlate] = useState<string>(() => {
+    if (initialVehiclePlate && VIP_REAL_VEHICLES.some((v) => v.plate === initialVehiclePlate)) {
+      return initialVehiclePlate;
+    }
+    return VIP_REAL_VEHICLES[0]?.plate || '125호 9982';
+  });
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [vehicleSearchQuery, setVehicleSearchQuery] = useState<string>('');
 
@@ -72,7 +77,11 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
   // Sync initial props
   useEffect(() => {
     if (initialDriverId) setSelectedDriverId(initialDriverId);
-    if (initialVehiclePlate) setSelectedVehiclePlate(initialVehiclePlate);
+    if (initialVehiclePlate && VIP_REAL_VEHICLES.some((v) => v.plate === initialVehiclePlate)) {
+      setSelectedVehiclePlate(initialVehiclePlate);
+    } else if (VIP_REAL_VEHICLES.length > 0) {
+      setSelectedVehiclePlate(VIP_REAL_VEHICLES[0].plate);
+    }
   }, [initialDriverId, initialVehiclePlate, isOpen]);
 
   // Set default driver and vehicle if none selected
@@ -90,7 +99,11 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
   }, [drivers, selectedDriverId]);
 
   const activeVehicle = useMemo(() => {
-    return resolveVehicleEntity(selectedVehiclePlate || (VIP_REAL_VEHICLES[0]?.plate || ''));
+    const targetPlate =
+      selectedVehiclePlate && VIP_REAL_VEHICLES.some((v) => v.plate === selectedVehiclePlate)
+        ? selectedVehiclePlate
+        : VIP_REAL_VEHICLES[0]?.plate || '125호 9982';
+    return resolveVehicleEntity(targetPlate);
   }, [selectedVehiclePlate]);
 
   // Clean vehicle display name (eliminating double brand names like '벤츠 벤츠...')
@@ -318,11 +331,11 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh]">
+      <div className="w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[88vh]">
         {/* Header */}
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#1E60F3] flex items-center justify-center font-bold">
+            <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#0050FF] flex items-center justify-center font-bold">
               <Sparkles className="w-4 h-4" />
             </div>
             <div>
@@ -344,7 +357,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
         <div className="p-4 bg-slate-50/80 border-b border-slate-200/80 shrink-0 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <div className="flex-1 min-w-0">
             <label className="block text-[11px] font-black text-slate-700 mb-1.5 flex items-center gap-1.5">
-              <User className="w-3.5 h-3.5 text-[#1E60F3]" />
+              <User className="w-3.5 h-3.5 text-[#0050FF]" />
               <span>기사 선택</span>
             </label>
             <select
@@ -364,14 +377,14 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
           <div className="flex items-center gap-2 self-end sm:self-center shrink-0 pt-1 sm:pt-4">
             <span
               className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border flex items-center gap-1 ${bundle?.profile
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                ? 'bg-slate-100 text-slate-700 border-slate-200'
                 : 'bg-slate-100 text-slate-500 border-slate-200'
                 }`}
             >
               <User className="w-3 h-3" />
               {bundle?.profile ? '프로필 등록됨' : '프로필 미등록'}
             </span>
-            <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-50 text-[#1E60F3] border border-blue-200 flex items-center gap-1">
+            <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-50 text-[#0050FF] border border-blue-200 flex items-center gap-1">
               <Car className="w-3 h-3" />
               카드 {completedVehiclesCount}/20 등록
             </span>
@@ -402,7 +415,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
-                  <User className="w-4 h-4 text-[#1E60F3]" />
+                  <User className="w-4 h-4 text-[#0050FF]" />
                   <span>기사 프로필</span>
                 </h3>
                 <p className="text-[11px] text-slate-500">
@@ -410,11 +423,11 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                 </p>
               </div>
               {bundle?.profile ? (
-                <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-extrabold flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3" /> 등록 완료
+                <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 text-[11px] font-bold flex items-center gap-1">
+                  <Check className="w-3 h-3" /> 등록 완료
                 </span>
               ) : (
-                <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[11px] font-bold">
+                <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200 text-[11px] font-bold">
                   미등록
                 </span>
               )}
@@ -438,7 +451,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
               }}
               onDrop={(e) => handleDropFile(e, 'profile')}
               className={`flex flex-col sm:flex-row items-center gap-4 bg-white p-3.5 rounded-xl border transition-all ${isDraggingProfile
-                ? 'border-2 border-dashed border-[#1E60F3] bg-blue-50/60 ring-2 ring-blue-300'
+                ? 'border-2 border-dashed border-[#0050FF] bg-blue-50/60 ring-2 ring-blue-300'
                 : 'border-slate-200 shadow-2xs'
                 }`}
             >
@@ -458,22 +471,12 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
               <div className="min-w-0 flex-1 space-y-1">
                 <div className="text-xs font-black text-slate-800">
                   {activeDriver?.name} 기사님
-                  <span className="ml-2 font-normal text-slate-400">
-                    {bundle?.profile ? bundle.profile.fileName : '프로필 사진을 등록해 주세요'}
-                  </span>
                 </div>
-                {bundle?.profile && (
-                  <div className="text-[11px] text-slate-500 flex flex-wrap gap-x-3 gap-y-0.5">
-                    <span>크기: {Math.round(bundle.profile.fileSize / 1024)} KB</span>
-                    {bundle.profile.width && bundle.profile.height && (
-                      <span>해상도: {bundle.profile.width} × {bundle.profile.height}</span>
-                    )}
-                    <span>버전: v{bundle.profile.version}</span>
-                  </div>
+                {!bundle?.profile && (
+                  <p className="text-[10.5px] text-slate-400">
+                    1:1 정방형 권장 · 최대 10MB
+                  </p>
                 )}
-                <p className="text-[10.5px] text-slate-400">
-                  1:1 정방형 권장 · 최대 10MB
-                </p>
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
@@ -548,9 +551,9 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
 
             {/* Visual Vehicle Selector with Category Filter Tabs & Plate Chips */}
             <div className="bg-white rounded-xl border border-slate-200 p-3 space-y-3 shadow-2xs">
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+              <div className="flex items-center justify-between gap-2">
                 {/* Category Filter Tabs with no wrapping truncation */}
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none flex-nowrap shrink-0">
+                <div className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none flex-1 min-w-0">
                   {categoryTabs.map((cat) => {
                     const isSelected = selectedCategory === cat.key;
                     const IconComp = cat.icon;
@@ -563,7 +566,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                           setSelectedCategory(cat.key);
                         }}
                         className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${isSelected
-                          ? 'bg-[#1E60F3] text-white shadow-2xs'
+                          ? 'bg-[#0050FF] text-white shadow-2xs'
                           : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900'
                           }`}
                       >
@@ -581,20 +584,20 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                 </div>
 
                 {/* Quick Vehicle Plate Search */}
-                <div className="relative w-full sm:w-48 shrink-0">
+                <div className="relative w-44 flex-shrink-0">
                   <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
                   <input
                     type="text"
                     value={vehicleSearchQuery}
                     onChange={(e) => setVehicleSearchQuery(e.target.value)}
-                    placeholder="차량번호 또는 모델 검색"
-                    className="w-full pl-8 pr-7 py-1 text-xs border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:border-[#1E60F3] placeholder:text-slate-400"
+                    placeholder="차량번호나 차종 검색"
+                    className="w-full pl-8 pr-7 py-1 text-xs border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:border-[#0050FF] placeholder:text-slate-400"
                   />
                   {vehicleSearchQuery && (
                     <button
                       type="button"
                       onClick={() => setVehicleSearchQuery('')}
-                      className="absolute right-2 top-1.5 text-slate-400 hover:text-slate-600"
+                      className="absolute right-2 top-1.5 text-slate-400 hover:text-slate-600 cursor-pointer"
                     >
                       <X className="w-3 h-3" />
                     </button>
@@ -620,7 +623,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                         setSelectedVehiclePlate(v.plate);
                       }}
                       className={`p-2 rounded-xl text-left transition-all border flex flex-col justify-between gap-1.5 cursor-pointer relative group ${isSelected
-                        ? 'border-[#1E60F3] bg-blue-50/70 ring-2 ring-[#1E60F3]/30 shadow-xs'
+                        ? 'ring-2 ring-[#0050FF] border-[#0050FF] bg-blue-50/30 shadow-xs'
                         : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/80'
                         }`}
                     >
@@ -644,7 +647,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                       </div>
 
                       <div className="min-w-0">
-                        <div className={`text-[11px] font-black truncate ${isSelected ? 'text-[#1E60F3]' : 'text-slate-800'}`}>
+                        <div className={`text-[11px] font-black truncate ${isSelected ? 'text-[#0050FF]' : 'text-slate-800'}`}>
                           {v.plate}
                         </div>
                         <div className="text-[10px] text-slate-400 truncate">
@@ -659,7 +662,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
               {/* Active Vehicle Status Bar (Cleaned from duplicate brand name) */}
               <div className="px-3 py-2 bg-blue-50/50 rounded-lg border border-blue-100 flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-black text-[#1E60F3] uppercase tracking-wider">
+                  <span className="text-[11px] font-black text-[#0050FF] uppercase tracking-wider">
                     현재 선택 차량:
                   </span>
                   <span className="font-bold text-slate-800">
@@ -714,8 +717,8 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                     }}
                     onDrop={(e) => handleDropFile(e, 'info', 'pc')}
                     className={`w-full aspect-video rounded-xl overflow-hidden border transition-all flex items-center justify-center relative group ${isDraggingPc
-                      ? 'border-2 border-dashed border-[#1E60F3] bg-blue-50/60 ring-2 ring-blue-300'
-                      : 'border-slate-200 bg-slate-100'
+                      ? 'border-2 border-dashed border-[#0050FF] bg-blue-50/60 ring-2 ring-blue-300'
+                      : 'border-slate-200 bg-white'
                       }`}
                   >
                     {bundle?.pcInfo?.signedUrl ? (
@@ -735,11 +738,11 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                         </a>
                       </>
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center p-4">
+                      <div className="w-full h-full flex items-center justify-center p-4 bg-white">
                         <img
                           src="/images/icons/pc.png"
                           alt="PC"
-                          className="w-80 h-80 sm:w-95 sm:h-95 object-contain transition-transform group-hover:scale-105 drop-shadow-sm select-none"
+                          className="w-[100px] h-[100px] sm:w-[112px] sm:h-[112px] object-contain transition-transform group-hover:scale-105 drop-shadow-sm select-none"
                         />
                       </div>
                     )}
@@ -840,12 +843,12 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                     }}
                     onDrop={(e) => handleDropFile(e, 'info', 'mobile')}
                     className={`w-32 sm:w-36 aspect-[9/16] rounded-2xl border transition-all bg-white relative overflow-hidden flex flex-col group ${isDraggingMobile
-                      ? 'border-2 border-dashed border-[#1E60F3] bg-blue-50/60 ring-2 ring-blue-300'
-                      : 'border-slate-300 shadow-2xs'
+                      ? 'border-2 border-dashed border-[#0050FF] bg-blue-50/60 ring-2 ring-blue-300'
+                      : 'border-slate-200 shadow-2xs'
                       }`}
                   >
                     {/* Screen Content */}
-                    <div className="flex-1 bg-slate-100 relative flex items-center justify-center overflow-hidden">
+                    <div className="flex-1 bg-white relative flex items-center justify-center overflow-hidden">
                       {bundle?.mobileInfo?.signedUrl ? (
                         <>
                           <img
@@ -864,11 +867,11 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                           </a>
                         </>
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center p-3">
+                        <div className="w-full h-full flex items-center justify-center p-3 bg-white">
                           <img
                             src="/images/icons/mobile.png"
                             alt="Mobile"
-                            className="w-16 h-16 sm:w-20 sm:h-20 object-contain transition-transform group-hover:scale-105 drop-shadow-sm select-none"
+                            className="w-[84px] h-[84px] sm:w-[92px] sm:h-[92px] object-contain transition-transform group-hover:scale-105 drop-shadow-sm select-none"
                           />
                         </div>
                       )}
@@ -940,7 +943,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl bg-slate-900 text-white font-bold hover:bg-slate-800 transition-colors cursor-pointer shadow-xs"
+            className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-50 transition-colors cursor-pointer shadow-xs"
           >
             닫기
           </button>
