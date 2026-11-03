@@ -3,7 +3,6 @@
 import React from 'react';
 import Link from 'next/link';
 import {
-  LayoutDashboard,
   CalendarCheck,
   Building2,
   Mail,
@@ -45,7 +44,6 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
     badge?: number;
     badgeColor?: string;
   }[] = [
-    { id: 'dashboard', label: '대시보드', icon: LayoutDashboard },
     {
       id: 'dispatch',
       label: '예약·배차 관리',

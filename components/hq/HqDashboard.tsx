@@ -16,7 +16,6 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 import { HqSidebar } from '@/components/hq/HqSidebar';
-import { HqDashboardOverview } from '@/components/hq/HqDashboardOverview';
 import { HqMobileNav } from '@/components/hq/HqMobileNav';
 import { HqHeader } from '@/components/hq/HqHeader';
 import { HqKpiTiles } from '@/components/hq/HqKpiTiles';
@@ -81,8 +80,13 @@ function formatElapsedWait(isoStr?: string): { label: string; isUrgent: boolean 
 function HqDashboardInner({ representativeMode }: { representativeMode: boolean }) {
   const searchParams = useSearchParams();
   const tabParam = searchParams.get('tab');
+  const resolveTab = (tab: string | null | undefined): string => {
+    if (!tab || tab === 'dashboard') return 'dispatch';
+    return tab;
+  };
+
   const [activeTabOverride, setActiveTabOverride] = useState<string | null>(null);
-  const activeSidebarTab = activeTabOverride ?? tabParam ?? 'dashboard';
+  const activeSidebarTab = resolveTab(activeTabOverride ?? tabParam);
 
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [mobileDispatchSubView, setMobileDispatchSubView] = useState<'list' | 'form'>('list');
@@ -100,9 +104,10 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
   // Sync activeTabOverride when tabParam changes (e.g. browser navigation or external link)
   useEffect(() => {
     if (tabParam) {
-      setActiveTabOverride(tabParam);
+      const targetTab = resolveTab(tabParam);
+      setActiveTabOverride(targetTab);
       try {
-        sessionStorage.setItem('hq_active_tab', tabParam);
+        sessionStorage.setItem('hq_active_tab', targetTab);
       } catch {}
     }
   }, [tabParam]);
@@ -116,11 +121,12 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
       const savedTab = sessionStorage.getItem('hq_active_tab');
 
       if (!urlTab && savedTab) {
-        setActiveTabOverride(savedTab);
-        url.searchParams.set('tab', savedTab);
+        const resolved = resolveTab(savedTab);
+        setActiveTabOverride(resolved);
+        url.searchParams.set('tab', resolved);
         window.history.replaceState(null, '', url.pathname + url.search);
       } else if (urlTab) {
-        sessionStorage.setItem('hq_active_tab', urlTab);
+        sessionStorage.setItem('hq_active_tab', resolveTab(urlTab));
       }
     } catch {}
   }, []);
@@ -130,7 +136,7 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
     const handlePopState = () => {
       try {
         const url = new URL(window.location.href);
-        const currentTab = url.searchParams.get('tab') || 'dashboard';
+        const currentTab = resolveTab(url.searchParams.get('tab'));
         const currentFilter = url.searchParams.get('filter');
         setActiveTabOverride(currentTab);
         setActiveKpiFilter(currentFilter && currentFilter !== 'today' ? currentFilter : null);
@@ -615,7 +621,7 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
           onOpenAdminLogin={() => setIsAdminLoginOpen(true)}
           onOpenNotifications={() => setIsAlertDrawerOpen(true)}
           title={
-            activeSidebarTab === 'dashboard' ? '운영 대시보드' : activeSidebarTab === 'operations'
+            activeSidebarTab === 'operations'
               ? '실시간 행사 운영 보드'
               : activeSidebarTab === 'quotes'
                 ? '표준 요금표'
@@ -715,9 +721,7 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
             />
           </div>
 
-          {activeSidebarTab === 'emails' ? null : activeSidebarTab === 'dashboard' ? (
-            <HqDashboardOverview bookings={bookings} loading={isLoadingBookings} error={syncError} representative={representativeMode} onNavigate={navigateWorkspace} onAssign={openAssignment} />
-          ) : activeSidebarTab === 'operations' ? (
+          {activeSidebarTab === 'emails' ? null : activeSidebarTab === 'operations' ? (
             <HqOperationsBoard
               onOpenCustomerMessageForSchedule={(scheduleId, trigger) => {
                 const found = bookings.find(

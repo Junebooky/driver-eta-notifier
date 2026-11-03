@@ -1,12 +1,12 @@
 'use client';
-import { LayoutDashboard, CalendarCheck, Car, Plus, Menu } from 'lucide-react';
+import { CalendarCheck, Activity, Car, Plus, Menu } from 'lucide-react';
 
 export function HqMobileNav({ activeTab, formOpen, actionCount, onNavigate, onQuickBooking, onMenu }: {
   activeTab: string; formOpen: boolean; actionCount: number; onNavigate: (tab: string) => void; onQuickBooking: () => void; onMenu: () => void;
 }) {
   const tabs = [
-    {id:'dashboard',label:'대시보드',icon:LayoutDashboard,action:()=>onNavigate('dashboard')},
     {id:'dispatch',label:'배차',icon:CalendarCheck,action:()=>onNavigate('dispatch')},
+    {id:'operations',label:'실시간',icon:Activity,action:()=>onNavigate('operations')},
     {id:'vehicles',label:'차량',icon:Car,action:()=>onNavigate('vehicles')},
     {id:'quick',label:'빠른예약',icon:Plus,action:onQuickBooking},
     {id:'menu',label:'전체메뉴',icon:Menu,action:onMenu},

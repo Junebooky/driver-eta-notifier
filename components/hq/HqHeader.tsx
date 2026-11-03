@@ -83,22 +83,31 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
 
           {/* Quick Quote Calculator Button */}
           {onOpenQuoteModal && (
-            <button
-              type="button"
-              onClick={() => {
-                haptics.lightTap();
-                onOpenQuoteModal();
-              }}
-              className="hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 active:scale-95 text-amber-700 border border-amber-500/30 text-xs font-bold transition-all cursor-pointer"
-              title="가격표 기반 실시간 견적서 작성"
-            >
-              <img
-                src="/images/icons/calculator.png"
-                alt="계산기"
-                className="w-4 h-4 object-contain shrink-0"
-              />
-              <span className="hidden sm:inline">예상 금액 계산</span>
-            </button>
+            <div className="relative group hidden sm:flex items-center">
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.lightTap();
+                  onOpenQuoteModal();
+                }}
+                aria-label="빠른 견적 계산"
+                className="flex items-center justify-center p-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 active:scale-95 active:translate-y-0 text-slate-800 transition-all duration-200 ease-out cursor-pointer hover:scale-115 hover:-translate-y-1 hover:shadow-md border border-blue-400/20"
+              >
+                <img
+                  src="/images/icons/calculator.png"
+                  alt="계산기"
+                  className="w-8 h-8 object-contain shrink-0 transition-transform duration-200 group-hover:scale-105"
+                />
+              </button>
+
+              {/* Hover Tooltip: 빠른 견적 계산 */}
+              <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 hidden group-hover:flex flex-col items-center pointer-events-none z-50">
+                <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 shadow-xs" />
+                <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+                  빠른 견적 계산
+                </span>
+              </div>
+            </div>
           )}
 
 

@@ -11,5 +11,5 @@ export default async function RepresentativePage() {
   const session = token ? await parseAndVerifyToken(token) : null;
   if (!session && cookieStore.get('cockpit_refresh')?.value) redirect('/api/auth/representative-session');
   if (!session || !canAccessPortal(session, 'hq')) redirect('/hq/login');
-  redirect('/hq?tab=dashboard');
+  redirect('/hq?tab=dispatch');
 }

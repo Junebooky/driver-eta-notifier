@@ -47,7 +47,7 @@ export const DevAuthSwitcher: React.FC<DevAuthSwitcherProps> = ({ className = ''
       const ok = await switchDevAccount(target);
       if (ok) {
         if (target === 'admin') {
-          window.location.assign('/hq?tab=dashboard');
+          window.location.assign('/hq?tab=dispatch');
         } else {
           window.location.assign('/');
         }
