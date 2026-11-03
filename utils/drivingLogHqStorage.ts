@@ -150,7 +150,7 @@ export const INITIAL_HQ_DRIVING_LOGS: HqDrivingLog[] = [
     driverName: '이호준',
     customerName: 'LG전자',
     vehicleModel: '제네시스 G90L',
-    vehiclePlate: '208호 2269',
+    vehiclePlate: '116호 1336',
     clockIn: '09:00',
     clockOut: '18:00',
     totalDutyHours: '9시간 0분',
@@ -617,15 +617,15 @@ export const saveHqDrivingLogs = (logs: HqDrivingLog[]): void => {
  * Get all HQ driving logs, merged with user-submitted driver logs and synced with driver expenses
  */
 export const getHqDrivingLogs = (): HqDrivingLog[] => {
-  if(typeof window==='undefined')return memoryDrivingLogs;
-  try{const raw=localStorage.getItem(HQ_DRIVING_LOGS_STORAGE_KEY);const parsed=raw?JSON.parse(raw):[];return Array.isArray(parsed)?parsed:[];}catch{return [];}
+  if (typeof window === 'undefined') return memoryDrivingLogs;
+  try { const raw = localStorage.getItem(HQ_DRIVING_LOGS_STORAGE_KEY); const parsed = raw ? JSON.parse(raw) : []; return Array.isArray(parsed) ? parsed : []; } catch { return []; }
 };
 
 let cachedLogsRaw = '';
 let cachedLogsSnapshot: HqDrivingLog[] = [];
 
 export const subscribeHqDrivingLogs = (callback: () => void): (() => void) => {
-  if (typeof window === 'undefined') return () => {};
+  if (typeof window === 'undefined') return () => { };
   window.addEventListener(HQ_LOGS_UPDATE_EVENT, callback);
   window.addEventListener('cockpit_hq_expense_updated', callback);
   window.addEventListener('storage', callback);
@@ -725,15 +725,15 @@ export const submitDriverLogToHq = (newLog: Partial<HqDrivingLog>): HqDrivingLog
       newLog.stops !== undefined
         ? newLog.stops
         : [
-            { id: 'd-1', time: '07:00', place: '차고지' },
-            { id: 'd-2', time: '08:50', place: '메리어트 호텔' },
-            { id: 'd-3', time: '09:50', place: '판교 오피스' },
-            { id: 'd-4', time: '11:25', place: '메리어트 호텔' },
-            { id: 'd-5', time: '13:30', place: '판교 오피스' },
-            { id: 'd-6', time: '17:05', place: '강남 올리브영' },
-            { id: 'd-7', time: '21:30', place: '메리어트 호텔' },
-            { id: 'd-8', time: '21:45', place: '차고지' },
-          ],
+          { id: 'd-1', time: '07:00', place: '차고지' },
+          { id: 'd-2', time: '08:50', place: '메리어트 호텔' },
+          { id: 'd-3', time: '09:50', place: '판교 오피스' },
+          { id: 'd-4', time: '11:25', place: '메리어트 호텔' },
+          { id: 'd-5', time: '13:30', place: '판교 오피스' },
+          { id: 'd-6', time: '17:05', place: '강남 올리브영' },
+          { id: 'd-7', time: '21:30', place: '메리어트 호텔' },
+          { id: 'd-8', time: '21:45', place: '차고지' },
+        ],
     notes: newLog.notes || '',
     reviewHistory: newLog.reviewHistory || [
       {
@@ -946,7 +946,7 @@ export interface SubmitDriverLogResult {
  */
 export async function fetchHqDrivingLogsFromDb(): Promise<FetchHqDrivingLogsResult> {
   try {
-    const res = await fetch('/api/driving-logs',{cache:'no-store',credentials:'include'});
+    const res = await fetch('/api/driving-logs', { cache: 'no-store', credentials: 'include' });
     const data = await res.json().catch(() => ({}));
     if (res.ok && data.ok && Array.isArray(data.logs)) {
       saveHqDrivingLogs(data.logs);
@@ -970,7 +970,7 @@ export async function submitDriverLogToHqDb(newLog: Partial<HqDrivingLog>): Prom
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok && data.ok && data.log) {
-      saveHqDrivingLogs([data.log,...getHqDrivingLogs().filter(log=>log.id!==data.log.id)]);
+      saveHqDrivingLogs([data.log, ...getHqDrivingLogs().filter(log => log.id !== data.log.id)]);
       return { ok: true, log: data.log };
     }
     return { ok: false, error: data.error || '운행일지를 서버에 저장하지 못했습니다.' };
