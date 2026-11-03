@@ -29,6 +29,7 @@ import {
   AlertTriangle,
   RefreshCw,
   Minus,
+  Trash2,
 } from 'lucide-react';
 import {
   VIP_REAL_VEHICLES,
@@ -224,6 +225,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   const [isNewVehicleModalOpen, setIsNewVehicleModalOpen] = useState(false);
+  const [vehicleToDelete, setVehicleToDelete] = useState<VipRealVehicle | null>(null);
   const [copiedToast, setCopiedToast] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -234,6 +236,8 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
 
   // Custom vehicles dynamically added via NewVehicleModal (persisted to localStorage)
   const [customVehicles, setCustomVehicles] = useState<VipRealVehicle[]>([]);
+  // Deleted vehicle IDs (persisted to localStorage)
+  const [deletedVehicleIds, setDeletedVehicleIds] = useState<string[]>([]);
 
   useEffect(() => {
     try {
@@ -247,11 +251,26 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
     } catch (e) {
       console.warn('Failed to parse cached custom vehicles', e);
     }
+
+    try {
+      const storedDeleted = localStorage.getItem('vip_hq_deleted_vehicle_ids');
+      if (storedDeleted) {
+        const parsedDeleted = JSON.parse(storedDeleted);
+        if (Array.isArray(parsedDeleted)) {
+          setDeletedVehicleIds(parsedDeleted);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to parse cached deleted vehicle ids', e);
+    }
   }, []);
 
   const allBaseVehicles = useMemo(() => {
-    return [...customVehicles, ...VIP_REAL_VEHICLES];
-  }, [customVehicles]);
+    const combined = [...customVehicles, ...VIP_REAL_VEHICLES];
+    return combined.filter(
+      (v) => !deletedVehicleIds.includes(v.id) && !deletedVehicleIds.includes(v.plate)
+    );
+  }, [customVehicles, deletedVehicleIds]);
 
   // Edit Modal Form State
   const [editStatus, setEditStatus] = useState<'확인 필요' | '대기 중' | '운행 중' | '정비 중'>('확인 필요');
@@ -589,6 +608,46 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
     haptics.success();
   };
 
+  // Delete Vehicle Handler
+  const handleConfirmDeleteVehicle = (vehicle: VipRealVehicle) => {
+    haptics.warningPulse();
+
+    // 1. Remove from custom vehicles state if present
+    setCustomVehicles((prev) => {
+      const next = prev.filter((v) => v.id !== vehicle.id && v.plate !== vehicle.plate);
+      try {
+        localStorage.setItem('vip_hq_custom_vehicles', JSON.stringify(next));
+      } catch (e) {
+        console.warn('Failed to update custom vehicles in localStorage', e);
+      }
+      return next;
+    });
+
+    // 2. Add to deleted vehicle IDs
+    setDeletedVehicleIds((prev) => {
+      const next = Array.from(new Set([...prev, vehicle.id, vehicle.plate]));
+      try {
+        localStorage.setItem('vip_hq_deleted_vehicle_ids', JSON.stringify(next));
+      } catch (e) {
+        console.warn('Failed to save deleted vehicle ids to localStorage', e);
+      }
+      return next;
+    });
+
+    // 3. Clear modal
+    setVehicleToDelete(null);
+
+    // 4. Update selected vehicle to next available vehicle
+    const remaining = enrichedVehicles.filter((v) => v.id !== vehicle.id && v.plate !== vehicle.plate);
+    if (remaining.length > 0) {
+      setSelectedVehicleId(remaining[0].id);
+    }
+
+    // 5. Toast & haptics
+    showToast(`차량 '${vehicle.plate}' (${vehicle.model})이(가) 삭제되었습니다.`);
+    haptics.success();
+  };
+
   return (
     <div className="space-y-4">
       {/* Top Horizontal Filter Bar */}
@@ -812,6 +871,25 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                 <Car className="w-8 h-8 text-slate-300 mx-auto" />
                 <p className="text-xs font-bold text-slate-700">검색된 차량이 없습니다.</p>
                 <p className="text-[11px] text-slate-400">필터나 검색어를 변경해 보세요.</p>
+                {deletedVehicleIds.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      haptics.impactMedium();
+                      setDeletedVehicleIds([]);
+                      try {
+                        localStorage.removeItem('vip_hq_deleted_vehicle_ids');
+                      } catch (e) {
+                        console.warn(e);
+                      }
+                      showToast('삭제된 모든 차량이 복구되었습니다.');
+                    }}
+                    className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
+                    <span>삭제된 차량 초기화 및 복구</span>
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -887,6 +965,20 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                         >
                           <Edit2 className="w-3 h-3" />
                           <span>정보 수정</span>
+                        </button>
+
+                        {/* Delete Button */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            haptics.warningPulse();
+                            setVehicleToDelete(selectedVehicle);
+                          }}
+                          className="border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-600 text-xs font-bold px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-2xs cursor-pointer transition-colors active:scale-95"
+                          title="차량 삭제"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                          <span className="hidden sm:inline">차량 삭제</span>
                         </button>
                       </div>
                     </div>
@@ -1390,24 +1482,39 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
               )}
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
               <button
                 type="button"
                 disabled={isSavingEdit}
-                onClick={() => setIsEditModalOpen(false)}
-                className="px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer disabled:opacity-50"
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  haptics.warningPulse();
+                  setVehicleToDelete(selectedVehicle);
+                }}
+                className="px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-xl cursor-pointer disabled:opacity-50 flex items-center gap-1.5 transition-colors"
               >
-                취소
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>차량 삭제</span>
               </button>
-              <button
-                type="button"
-                disabled={isSavingEdit}
-                onClick={handleSaveEdit}
-                className="px-4 py-2 text-xs font-bold bg-[#1E60F3] hover:bg-blue-700 text-white rounded-xl cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
-              >
-                {isSavingEdit && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                <span>저장하기</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={isSavingEdit}
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer disabled:opacity-50"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  disabled={isSavingEdit}
+                  onClick={handleSaveEdit}
+                  className="px-4 py-2 text-xs font-bold bg-[#1E60F3] hover:bg-blue-700 text-white rounded-xl cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isSavingEdit && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                  <span>저장하기</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1500,6 +1607,72 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                 className="px-4 py-2 text-xs font-bold bg-slate-900 text-white rounded-xl cursor-pointer"
               >
                 닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Vehicle Confirmation Modal */}
+      {vehicleToDelete && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-2xl border border-slate-150 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-100 shrink-0">
+                <Trash2 className="w-5 h-5 stroke-[2.2]" />
+              </div>
+              <div className="space-y-0.5 min-w-0">
+                <h3 className="text-base font-black text-slate-900 tracking-tight">차량 삭제</h3>
+                <p className="text-xs text-slate-500 break-keep">
+                  정말로 이 차량을 목록에서 삭제하시겠습니까?
+                </p>
+              </div>
+            </div>
+
+            {/* Target Vehicle Summary Card */}
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center gap-3">
+              <div className="relative w-16 h-12 shrink-0 flex items-center justify-center">
+                <Image
+                  src={getVehicleHero(vehicleToDelete)}
+                  alt={vehicleToDelete.model}
+                  fill
+                  className="object-contain filter drop-shadow-xs"
+                />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-xs font-black text-slate-900 truncate">
+                  {vehicleToDelete.model}
+                </div>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="text-[11px] font-bold text-slate-700 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                    {vehicleToDelete.plate}
+                  </span>
+                  <span className="text-[10px] text-slate-500">
+                    {(vehicleToDelete as any).fuelDisplay || vehicleToDelete.fuelType}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-slate-400 bg-slate-50/70 p-2.5 rounded-lg border border-slate-100 leading-relaxed">
+              * 삭제된 차량은 목록 및 통계에서 즉시 제외되며, 필요시 언제든지 복구할 수 있습니다.
+            </p>
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setVehicleToDelete(null)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 cursor-pointer transition-colors"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={() => handleConfirmDeleteVehicle(vehicleToDelete)}
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs cursor-pointer transition-all flex items-center justify-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>삭제 완료</span>
               </button>
             </div>
           </div>
