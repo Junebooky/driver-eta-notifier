@@ -644,7 +644,7 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
               </span>
             ) : activeSidebarTab === 'quotes' ? (
               <span className="text-slate-500 font-medium">
-                사모님 실시간 가격표 견적 산출 및 확정 견적 ➔ 배차 대기함 자동 전환
+                차량별 표준 요금을 확인하고 바로 견적을 계산할 수 있어요
               </span>
             ) : activeSidebarTab === 'field_knowledge' ? (
               <span className="text-slate-500 font-medium">
