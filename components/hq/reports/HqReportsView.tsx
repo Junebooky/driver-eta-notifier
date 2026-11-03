@@ -98,6 +98,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
   // Modals
   const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
   const [isContractModalOpen, setIsContractModalOpen] = useState(false);
+  const [showDevConsole, setShowDevConsole] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [demoLogs, setDemoLogs] = useState<string[]>([]);
   const [confirmDirectCostsOnApprove, setConfirmDirectCostsOnApprove] = useState(false);
@@ -263,30 +264,29 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
     switch (status) {
       case 'approved':
         return (
-          <span className="px-2.5 py-1 rounded-full text-[11px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
+          <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
             <CheckCircle2 className="w-3 h-3" />
-            <span>검토·승인 완료</span>
+            <span>승인 완료</span>
           </span>
         );
       case 'invoiced':
         return (
-          <span className="px-2.5 py-1 rounded-full text-[11px] font-black bg-blue-50 text-[#1E60F3] border border-blue-200 inline-flex items-center gap-1">
+          <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-blue-50 text-[#0050FF] border border-blue-200 inline-flex items-center gap-1">
             <Receipt className="w-3 h-3" />
             <span>청구 완료</span>
           </span>
         );
       case 'reviewing':
         return (
-          <span className="px-2.5 py-1 rounded-full text-[11px] font-black bg-amber-50 text-amber-700 border border-amber-200 inline-flex items-center gap-1">
+          <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-amber-50 text-amber-700 border border-amber-200 inline-flex items-center gap-1">
             <Clock className="w-3 h-3" />
-            <span>관리자 검토 중</span>
+            <span>검토 중</span>
           </span>
         );
       default:
         return (
-          <span className="px-2.5 py-1 rounded-full text-[11px] font-black bg-slate-100 text-slate-600 border border-slate-200 inline-flex items-center gap-1">
-            <FileText className="w-3 h-3" />
-            <span>청구 대기 (초안)</span>
+          <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-slate-100 text-slate-600 border border-slate-200 inline-flex items-center gap-1">
+            <span>청구 대기</span>
           </span>
         );
     }
@@ -329,200 +329,368 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
   };
 
   return (
-    <div className="space-y-5 select-none">
-      {/* 1. Top Notice Bar: Temporary Preset & Operational Principle */}
-      <div className="bg-gradient-to-r from-blue-50/90 via-white to-slate-50 rounded-2xl border border-blue-200/80 p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3 shadow-2xs print:hidden">
-        <div className="flex items-start gap-3">
-          <div className="w-9 h-9 rounded-xl bg-[#1E60F3] text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
-            <BarChart3 className="w-4 h-4" />
+    <div className="space-y-4 select-none">
+      {/* 1. Header Bar: Title + Simple Actions (Diet banner) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1 print:hidden">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-blue-50 text-[#0050FF] flex items-center justify-center font-bold shrink-0 shadow-2xs">
+            <BarChart3 className="w-5 h-5" />
           </div>
           <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-sm font-black text-slate-900">
-                고객사 정산 · 기사 인건비 · 배차별 수익성 통합 관리
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-extrabold text-slate-900">
+                정산 · 통계 리포트
               </h2>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-200">
-                임시 요금 프리셋(10시간 기준) 적용 중
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                10시간 기준
               </span>
             </div>
-            <p className="text-xs text-slate-600 font-medium mt-0.5">
-              정산 기준은 <strong>고객사 서비스 시작~종료 시간</strong>으로 통일되며(차고지 픽업 제외), 기사 포함 청구 요금에 기사 인건비를 이중 청구하지 않습니다.
+            <p className="text-xs text-slate-500 font-medium mt-0.5">
+              고객사 운행 정산서 발행 및 배차별 손익 분석
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={() => {
               haptics.lightTap();
               setIsPresetModalOpen(true);
             }}
-            className="px-3.5 py-2 rounded-xl bg-white hover:bg-blue-50 text-[#1E60F3] border border-blue-200 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+            className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
           >
-            <Settings2 className="w-3.5 h-3.5" />
-            <span>기본 요금 프리셋 · 인건비 설정</span>
+            <Settings2 className="w-3.5 h-3.5 text-slate-500" />
+            <span>기본 요금 및 인건비 설정</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowDevConsole(!showDevConsole)}
+            className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              showDevConsole
+                ? 'bg-slate-900 text-white'
+                : 'bg-white border border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-50'
+            }`}
+          >
+            <span>{showDevConsole ? '테스트 콘솔 닫기' : '테스트 콘솔'}</span>
           </button>
         </div>
       </div>
 
-      {/* 1-B. End-to-End Pipeline Scenario Generator & Automated Verification Runner (DEMO/TEST) */}
-      <div className="bg-slate-900 text-white rounded-2xl p-4 border border-slate-800 space-y-2.5 print:hidden">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="px-2 py-0.5 rounded bg-blue-600 text-white text-[10px] font-black tracking-wide">
-              DEMO / TEST 자동 검증
-            </span>
-            <span className="text-xs font-black text-white">
-              End-to-End 업무·정산 파이프라인 통합 시나리오 실행기
-            </span>
-            <span className="text-[11px] text-slate-400">
-              (고객사 등록 → 배차 → 운행일지 → 서비스/초과시간 → 영수증 검수 → 정산 초안 → 승인·출력)
-            </span>
-          </div>
+      {/* 1-B. End-to-End Pipeline Scenario Generator (Collapsed by Default, Isolated) */}
+      {showDevConsole && (
+        <div className="bg-slate-900 text-white rounded-2xl p-4 border border-slate-800 space-y-2.5 animate-in fade-in duration-150 print:hidden">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="px-2 py-0.5 rounded bg-blue-600 text-white text-[10px] font-black tracking-wide">
+                DEV TEST CONSOLE
+              </span>
+              <span className="text-xs font-black text-white">
+                E2E 업무·정산 파이프라인 시나리오 실행기
+              </span>
+            </div>
 
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {(
-              [
-                { code: 'A', label: '시나리오 A (단일차량·영수증)' },
-                { code: 'B', label: '시나리오 B (복수3대·초과·대행사)' },
-                { code: 'C', label: '시나리오 C (수정·자동재계산)' },
-                { code: 'D', label: '시나리오 D (예외·경계조건)' },
-                { code: 'ALL', label: '전체 A~D 통합 실행' },
-              ] as const
-            ).map((btn) => (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {(
+                [
+                  { code: 'A', label: '시나리오 A (단일차량)' },
+                  { code: 'B', label: '시나리오 B (복수3대)' },
+                  { code: 'C', label: '시나리오 C (수정·재계산)' },
+                  { code: 'D', label: '시나리오 D (경계조건)' },
+                  { code: 'ALL', label: '전체 A~D 실행' },
+                ] as const
+              ).map((btn) => (
+                <button
+                  key={btn.code}
+                  type="button"
+                  onClick={() => {
+                    haptics.selection();
+                    const res = runDemoPipelineScenario(btn.code);
+                    setDemoLogs(res.summaryLog);
+                    const firstDemo = res.reports.find((r) => r.isDemoScenario);
+                    if (firstDemo) setSelectedReportId(firstDemo.id);
+                    showToast(`시나리오 ${btn.code} E2E 데이터 생성 및 정산 검증 완료`);
+                  }}
+                  className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
+                    btn.code === 'ALL'
+                      ? 'bg-[#0050FF] hover:bg-blue-600 text-white shadow-xs'
+                      : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+                  }`}
+                >
+                  {btn.label}
+                </button>
+              ))}
+
               <button
-                key={btn.code}
                 type="button"
                 onClick={() => {
-                  haptics.selection();
-                  const res = runDemoPipelineScenario(btn.code);
-                  setDemoLogs(res.summaryLog);
-                  const firstDemo = res.reports.find((r) => r.isDemoScenario);
-                  if (firstDemo) setSelectedReportId(firstDemo.id);
-                  showToast(`시나리오 ${btn.code} E2E 파이프라인 데이터 생성 및 정산 검증이 완료되었습니다.`);
+                  haptics.lightTap();
+                  resetDemoPipelineData();
+                  setDemoLogs([]);
+                  showToast('DEMO 시나리오 데이터가 초기화되었습니다.');
                 }}
-                className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
-                  btn.code === 'ALL'
-                    ? 'bg-[#1E60F3] hover:bg-blue-500 text-white shadow-xs'
-                    : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
-                }`}
+                className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-rose-950/80 hover:bg-rose-900 text-rose-200 border border-rose-800/70 cursor-pointer"
               >
-                {btn.label}
+                초기화
               </button>
-            ))}
-
-            <button
-              type="button"
-              onClick={() => {
-                haptics.lightTap();
-                resetDemoPipelineData();
-                setDemoLogs([]);
-                showToast('DEMO/TEST 시나리오 데이터가 초기화되었습니다.');
-              }}
-              className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-rose-950/80 hover:bg-rose-900 text-rose-200 border border-rose-800/70 cursor-pointer"
-            >
-              DEMO 초기화
-            </button>
+            </div>
           </div>
+
+          {demoLogs.length > 0 && (
+            <div className="p-2.5 rounded-xl bg-slate-950/90 border border-slate-800 text-[11px] text-emerald-300 font-mono space-y-1">
+              {demoLogs.map((logLine, i) => (
+                <div key={i}>✓ {logLine}</div>
+              ))}
+            </div>
+          )}
         </div>
+      )}
 
-        {demoLogs.length > 0 && (
-          <div className="p-2.5 rounded-xl bg-slate-950/90 border border-slate-800 text-[11px] text-emerald-300 font-mono space-y-1">
-            {demoLogs.map((logLine, i) => (
-              <div key={i}>✓ {logLine}</div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* 2. Section 8: 6 Admin Settlement & Profitability KPI Tiles (Hidden in Client Print) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5 print:hidden">
-        {/* Tile 1: 고객사별 총 매출 */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs">
+      {/* 2. Top 6 Settlement & Profitability KPI Tiles */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 print:hidden">
+        {/* Tile 1: 총 매출 (공급가) */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-xs text-slate-500 font-bold">
-            <span>고객사 총 매출 (공급가)</span>
-            <Building2 className="w-4 h-4 text-[#1E60F3]" />
+            <span>총 매출 (공급가)</span>
+            <Building2 className="w-4 h-4 text-[#0050FF]" />
           </div>
-          <div className="text-lg font-black text-slate-900 mt-1.5">
+          <div className="text-lg sm:text-xl font-black text-slate-900 mt-2">
             {formatKRW(dashboardKpis.totalRevenue)}
           </div>
-          <div className="text-[10px] text-amber-700 font-bold mt-1 flex items-center gap-1">
-            <span>임시 단가 포함 예상 매출</span>
+          <div className="text-[11px] text-slate-400 font-medium mt-1">
+            임시 단가 포함
           </div>
         </div>
 
-        {/* Tile 2: 기사 인건비 합계 */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs">
+        {/* Tile 2: 기사 인건비 */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-xs text-slate-500 font-bold">
-            <span>기사 인건비 합계</span>
+            <span>기사 인건비</span>
             <Users className="w-4 h-4 text-indigo-600" />
           </div>
-          <div className="text-lg font-black text-slate-900 mt-1.5">
+          <div className="text-lg sm:text-xl font-black text-slate-900 mt-2">
             {formatKRW(dashboardKpis.totalDriverLabor)}
           </div>
-          <div className="text-[10px] text-slate-400 font-medium mt-1">
-            스프린터 15/20만 · 일반 10/15만
+          <div className="text-[11px] text-slate-400 font-medium mt-1">
+            총 {reports.reduce((acc, r) => acc + r.totalVehiclesCount, 0)}대 기준
           </div>
         </div>
 
-        {/* Tile 3: 승인된 경비지출 */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs">
+        {/* Tile 3: 승인 실비 */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-xs text-slate-500 font-bold">
-            <span>승인된 실비 경비</span>
+            <span>승인 실비</span>
             <Receipt className="w-4 h-4 text-emerald-600" />
           </div>
-          <div className="text-lg font-black text-slate-900 mt-1.5">
+          <div
+            className={`text-lg sm:text-xl mt-2 ${
+              dashboardKpis.totalApprovedExpenses === 0
+                ? 'text-slate-400 font-semibold'
+                : 'font-black text-slate-900'
+            }`}
+          >
             {formatKRW(dashboardKpis.totalApprovedExpenses)}
           </div>
-          <div className="text-[10px] text-emerald-600 font-bold mt-1">
-            관리자 승인 완료분만 반영
+          <div className="text-[11px] text-slate-400 font-medium mt-1">
+            승인 완료분
           </div>
         </div>
 
-        {/* Tile 4: 배차별 직접이익 및 이익률 */}
-        <div className="bg-white rounded-2xl border border-blue-200 bg-blue-50/20 p-4 shadow-2xs">
-          <div className="flex items-center justify-between text-xs text-[#1E60F3] font-black">
-            <span>배차별 직접이익 (잠정)</span>
-            <TrendingUp className="w-4 h-4 text-[#1E60F3]" />
+        {/* Tile 4: 배차 직접이익 */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs flex flex-col justify-between">
+          <div className="flex items-center justify-between text-xs text-slate-500 font-bold">
+            <span>배차 직접이익</span>
+            <TrendingUp className="w-4 h-4 text-[#0050FF]" />
           </div>
-          <div className="text-lg font-black text-[#1E60F3] mt-1.5 flex items-baseline gap-1.5">
+          <div className="text-lg sm:text-xl font-black text-[#0050FF] mt-2 flex items-baseline gap-1.5 flex-wrap">
             <span>{formatKRW(dashboardKpis.totalDirectProfit)}</span>
-            <span className="text-xs font-extrabold text-blue-700 bg-blue-100 px-1.5 py-0.2 rounded">
-              {dashboardKpis.avgMargin}%
+            <span className="px-2 py-0.5 rounded-full text-xs font-black bg-blue-50 text-[#0050FF]">
+              이익률 {dashboardKpis.avgMargin}%
             </span>
           </div>
-          <div className="text-[10px] text-slate-500 font-semibold mt-1">
-            ※ 영업이익·순이익 아님 (간접비 차감 전)
+          <div className="text-[11px] text-slate-400 font-medium mt-1">
+            직접비 차감 기준
           </div>
         </div>
 
-        {/* Tile 5: 초과 서비스 시간 */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs">
+        {/* Tile 5: 초과 운행 */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-xs text-slate-500 font-bold">
-            <span>초과 서비스 시간</span>
+            <span>초과 운행</span>
             <Clock className="w-4 h-4 text-amber-600" />
           </div>
-          <div className="text-lg font-black text-slate-900 mt-1.5">
+          <div className="text-lg sm:text-xl font-black text-slate-900 mt-2">
             {Math.floor(dashboardKpis.totalOvertimeMin / 60)}시간 {dashboardKpis.totalOvertimeMin % 60}분
           </div>
-          <div className="text-[10px] text-slate-400 font-medium mt-1">
-            차고지 픽업 시간 제외 기준
+          <div className="text-[11px] text-slate-400 font-medium mt-1">
+            서비스 초과분
           </div>
         </div>
 
-        {/* Tile 6: 정산 상태 현황 */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs">
+        {/* Tile 6: 정산 현황 */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs flex flex-col justify-between">
           <div className="flex items-center justify-between text-xs text-slate-500 font-bold">
-            <span>정산 확정 / 대기</span>
+            <span>정산 현황</span>
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
           </div>
-          <div className="text-lg font-black text-slate-900 mt-1.5">
-            승인 {dashboardKpis.approvedCount}건{' '}
-            <span className="text-xs font-bold text-slate-400">/ 대기 {dashboardKpis.pendingCount}건</span>
+          <div className="text-lg sm:text-xl font-black text-slate-900 mt-2">
+            승인 {dashboardKpis.approvedCount}건 · 대기 {dashboardKpis.pendingCount}건
           </div>
-          <div className="text-[10px] text-slate-400 font-medium mt-1">
-            승인 후 고객사 청구서 발행 가능
+          <div className="text-[11px] text-slate-400 font-medium mt-1">
+            전체 {reports.length}건 중
+          </div>
+        </div>
+      </div>
+
+      {/* 2-B. Reference-Style Mini Analytics: 수익성 추이 & 비용 구성 */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 print:hidden">
+        {/* 수익성 추이 (7 cols) */}
+        <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-2xs space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-slate-900">수익성 추이</h3>
+            <span className="text-xs font-semibold text-slate-400">최근 7일 정산</span>
+          </div>
+
+          <div className="h-44 w-full flex flex-col justify-end relative pt-6">
+            {/* Pill Tooltip */}
+            <div className="absolute right-4 top-2 bg-[#0050FF] text-white text-[11px] font-bold px-2.5 py-1 rounded-full shadow-md shadow-blue-500/25 flex items-center gap-1">
+              <span>{formatKRW(dashboardKpis.totalDirectProfit)}</span>
+            </div>
+
+            {/* SVG Curve Area */}
+            <svg
+              className="w-full h-32 overflow-visible"
+              viewBox="0 0 500 120"
+              preserveAspectRatio="none"
+            >
+              <defs>
+                <linearGradient id="profitGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#0050FF" stopOpacity="0.18" />
+                  <stop offset="100%" stopColor="#0050FF" stopOpacity="0.0" />
+                </linearGradient>
+              </defs>
+              {/* Horizontal grid lines */}
+              <line x1="0" y1="20" x2="500" y2="20" stroke="#F1F5F9" strokeWidth="1" strokeDasharray="3 3" />
+              <line x1="0" y1="60" x2="500" y2="60" stroke="#F1F5F9" strokeWidth="1" strokeDasharray="3 3" />
+              <line x1="0" y1="100" x2="500" y2="100" stroke="#F1F5F9" strokeWidth="1" strokeDasharray="3 3" />
+
+              {/* Area */}
+              <path
+                d="M 15 105 C 80 100, 140 70, 200 90 C 260 110, 320 60, 380 75 C 430 85, 460 30, 485 28 L 485 118 L 15 118 Z"
+                fill="url(#profitGrad)"
+              />
+              {/* Smooth line */}
+              <path
+                d="M 15 105 C 80 100, 140 70, 200 90 C 260 110, 320 60, 380 75 C 430 85, 460 30, 485 28"
+                fill="none"
+                stroke="#0050FF"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              />
+              {/* End Point Dot */}
+              <circle cx="485" cy="28" r="4.5" fill="#FFFFFF" stroke="#0050FF" strokeWidth="2.5" />
+            </svg>
+
+            {/* X-axis date labels */}
+            <div className="flex justify-between text-[11px] font-semibold text-slate-400 pt-2 border-t border-slate-100">
+              <span>10/29</span>
+              <span>10/30</span>
+              <span>10/31</span>
+              <span>11/01</span>
+              <span>11/02</span>
+              <span>11/03</span>
+              <span className="font-bold text-[#0050FF]">11/04</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 비용 구성 (5 cols) */}
+        <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-2xs space-y-3 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-slate-900">비용 구성</h3>
+            <span className="text-xs font-semibold text-slate-400">매출 대비 비중</span>
+          </div>
+
+          <div className="flex items-center justify-around gap-4 py-2 my-auto">
+            {/* Donut Chart */}
+            <div className="relative w-32 h-32 flex items-center justify-center shrink-0">
+              <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+                {/* Background Ring */}
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="38"
+                  fill="transparent"
+                  stroke="#F1F5F9"
+                  strokeWidth="12"
+                />
+                {/* Labor Ring */}
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="38"
+                  fill="transparent"
+                  stroke="#93C5FD"
+                  strokeWidth="12"
+                  strokeDasharray="238.76"
+                  strokeDashoffset={238.76 * (1 - 0.99)}
+                />
+                {/* Direct Profit Ring (Main) */}
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="38"
+                  fill="transparent"
+                  stroke="#0050FF"
+                  strokeWidth="12"
+                  strokeDasharray="238.76"
+                  strokeDashoffset={238.76 * (1 - Math.min(Math.max(dashboardKpis.avgMargin / 100, 0), 1))}
+                  strokeLinecap="round"
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                <span className="text-[10px] text-slate-400 font-bold">수익률</span>
+                <span className="text-base font-black text-slate-900 leading-tight">
+                  {dashboardKpis.avgMargin}%
+                </span>
+              </div>
+            </div>
+
+            {/* Legend List */}
+            <div className="space-y-2.5 text-xs min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#0050FF] shrink-0" />
+                <div className="min-w-0">
+                  <span className="text-slate-500 font-medium block text-[11px]">직접이익</span>
+                  <span className="font-extrabold text-slate-900 truncate block">
+                    {formatKRW(dashboardKpis.totalDirectProfit)}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-blue-300 shrink-0" />
+                <div className="min-w-0">
+                  <span className="text-slate-500 font-medium block text-[11px]">기사 인건비</span>
+                  <span className="font-extrabold text-slate-900 truncate block">
+                    {formatKRW(dashboardKpis.totalDriverLabor)}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-slate-200 shrink-0" />
+                <div className="min-w-0">
+                  <span className="text-slate-500 font-medium block text-[11px]">기타 비용</span>
+                  <span className="font-extrabold text-slate-900 truncate block">
+                    {formatKRW(dashboardKpis.totalApprovedExpenses)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="text-[11px] text-slate-400 text-center pt-1 border-t border-slate-100">
+            총 공급가액 기준 정산 집계
           </div>
         </div>
       </div>
@@ -561,7 +729,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                   onClick={() => setStatusFilter(tab.id)}
                   className={`px-2.5 py-1 rounded-lg text-[11px] font-bold shrink-0 cursor-pointer transition-colors ${
                     statusFilter === tab.id
-                      ? 'bg-[#1E60F3] text-white'
+                      ? 'bg-[#0050FF] text-white'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
@@ -571,10 +739,15 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
             </div>
           </div>
 
-          {/* Report Cards List */}
+          {/* Report Cards List (Compact 3-Row Hierarchy) */}
           <div className="space-y-2.5 max-h-[680px] overflow-y-auto pr-1">
             {filteredReports.map((rep) => {
               const isSelected = selectedReport?.id === rep.id;
+              const formattedDate = rep.eventDate.replace(/-/g, '. ');
+              const title = rep.eventName.startsWith(rep.customerName)
+                ? rep.eventName
+                : `${rep.customerName} ${rep.eventName}`;
+
               return (
                 <button
                   key={rep.id}
@@ -583,55 +756,35 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                     haptics.lightTap();
                     setSelectedReportId(rep.id);
                   }}
-                  className={`w-full text-left p-3.5 rounded-xl border transition-all cursor-pointer space-y-2 ${
+                  className={`w-full text-left p-3.5 rounded-xl border transition-all cursor-pointer ${
                     isSelected
-                      ? 'bg-blue-50/70 border-[#1E60F3] ring-1 ring-[#1E60F3]/30 shadow-xs'
+                      ? 'bg-blue-50/60 border-[#0050FF] ring-1 ring-[#0050FF]/25 shadow-xs'
                       : 'bg-white hover:bg-slate-50 border-slate-200/80'
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-xs font-black text-slate-900">
-                          {rep.customerName}
-                        </span>
-                        {rep.orderingAgency && (
-                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">
-                            발주: {rep.orderingAgency}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs font-bold text-slate-700 truncate mt-0.5">
-                        {rep.eventName}
-                      </p>
-                    </div>
+                  {/* 1행: 행사명 (볼드) */}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs sm:text-sm font-bold text-slate-900 truncate">
+                      {title}
+                    </span>
+                  </div>
+
+                  {/* 2행: 날짜 · 차량 1대 | 상태 뱃지 */}
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 mt-1">
+                    <span>
+                      {formattedDate} · 차량 {rep.totalVehiclesCount}대
+                    </span>
                     {getStatusBadge(rep.status)}
                   </div>
 
-                  <div className="flex items-center justify-between text-[11px] text-slate-500">
-                    <span>
-                      {rep.eventDate} · 차량 {rep.totalVehiclesCount}대
+                  {/* 3행: 메인 금액 + 우측 이익 (라벨 제거) */}
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between mt-2">
+                    <span className="font-extrabold text-slate-900 text-sm">
+                      {rep.supplyAmount > 0 ? formatKRW(rep.grandTotal) : '요금 미등록'}
                     </span>
-                    {getPricingSourceBadge(rep.pricingSource, rep.isTemporaryPreset)}
-                  </div>
-
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                    <div>
-                      <span className="text-[10px] text-slate-400 font-semibold block">
-                        고객사 청구액
-                      </span>
-                      <span className="font-black text-slate-900">
-                        {rep.supplyAmount > 0 ? formatKRW(rep.grandTotal) : '요금 미등록(확인필요)'}
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-[10px] text-slate-400 font-semibold block">
-                        배차 직접이익 (내부)
-                      </span>
-                      <span className="font-black text-[#1E60F3]">
-                        {formatKRW(rep.totalDirectProfit)} ({rep.averageDirectMarginPercent}%)
-                      </span>
-                    </div>
+                    <span className="text-xs font-bold text-slate-400">
+                      이익 {formatKRW(rep.totalDirectProfit)} ({rep.averageDirectMarginPercent}%)
+                    </span>
                   </div>
                 </button>
               );
@@ -652,14 +805,14 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                       haptics.selection();
                       setReportViewMode('admin_internal');
                     }}
-                    className={`px-3.5 py-2 rounded-lg text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all ${
+                    className={`px-3.5 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all ${
                       reportViewMode === 'admin_internal'
-                        ? 'bg-[#1E60F3] text-white shadow-xs'
+                        ? 'bg-[#0050FF] text-white shadow-xs'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     <Lock className="w-3.5 h-3.5" />
-                    <span>본사 관리자 내부 정산·수익성 뷰 (대외비)</span>
+                    <span>내부 정산서</span>
                   </button>
                   <button
                     type="button"
@@ -667,14 +820,14 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                       haptics.selection();
                       setReportViewMode('client_external');
                     }}
-                    className={`px-3.5 py-2 rounded-lg text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all ${
+                    className={`px-3.5 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all ${
                       reportViewMode === 'client_external'
                         ? 'bg-slate-900 text-white shadow-xs'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     <Eye className="w-3.5 h-3.5" />
-                    <span>고객사 전달용 리포트 뷰 (인건비·수익 비공개)</span>
+                    <span>고객사 제출용</span>
                   </button>
                 </div>
 
@@ -687,13 +840,13 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                         onClick={handleOpenContractModal}
                         className="px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer"
                       >
-                        <Settings2 className="w-3.5 h-3.5 text-[#1E60F3]" />
+                        <Settings2 className="w-3.5 h-3.5 text-[#0050FF]" />
                         <span>계약·요율 설정</span>
                       </button>
                       <button
                         type="button"
                         onClick={handleDownloadAdminCsv}
-                        className="px-3 py-2 rounded-xl border border-blue-200 bg-blue-50/70 hover:bg-blue-100 text-[#1E60F3] text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                        className="px-3 py-2 rounded-xl border border-blue-200 bg-blue-50/70 hover:bg-blue-100 text-[#0050FF] text-xs font-bold flex items-center gap-1.5 cursor-pointer"
                       >
                         <FileSpreadsheet className="w-3.5 h-3.5" />
                         <span>내부 수익성 Excel</span>
@@ -713,7 +866,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                   <button
                     type="button"
                     onClick={handlePrintPdf}
-                    className="px-3.5 py-2 rounded-xl bg-[#1E60F3] hover:bg-blue-600 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                    className="px-3.5 py-2 rounded-xl bg-[#0050FF] hover:bg-blue-600 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
                   >
                     <Printer className="w-3.5 h-3.5" />
                     <span>PDF / 인쇄</span>
@@ -743,8 +896,13 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-bold text-[#1E60F3]">{selectedReport.reportNo}</span>
+                      <span className="text-xs font-bold text-[#0050FF]">{selectedReport.reportNo}</span>
                       {getStatusBadge(selectedReport.status)}
+                      {reportViewMode === 'admin_internal' && (
+                        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 text-[10px] font-bold border border-slate-200">
+                          대외비 (Internal Only)
+                        </span>
+                      )}
                       {reportViewMode === 'admin_internal' &&
                         getPricingSourceBadge(
                           selectedReport.pricingSource,
@@ -758,7 +916,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
 
                   <div className="text-left sm:text-right">
                     <div className="text-[11px] text-slate-400 font-semibold">최종 청구 금액</div>
-                    <div className="text-xl font-black text-[#1E60F3]">
+                    <div className="text-xl font-black text-[#0050FF]">
                       {selectedReport.supplyAmount > 0
                         ? formatKRW(selectedReport.grandTotal)
                         : '단가 확인 필요'}
@@ -791,7 +949,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                   </div>
                   <div className="bg-white p-2.5 rounded-xl border border-slate-200/60">
                     <span className="text-[10px] text-slate-400 font-bold block">실제 청구 대상</span>
-                    <span className="font-black text-[#1E60F3] mt-0.5 block">
+                    <span className="font-black text-[#0050FF] mt-0.5 block">
                       {selectedReport.billingTargetName}
                     </span>
                   </div>
@@ -804,16 +962,22 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                 </div>
               </div>
 
-              {/* Contract / Temporary Preset Warning Banner */}
+              {/* Contract / Temporary Preset Warning Banner (Compressed 1-Line) */}
               {selectedReport.contractWarning && reportViewMode === 'admin_internal' && (
-                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-2.5 text-xs text-amber-900">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-bold">{selectedReport.contractWarning}</span>
-                    <p className="text-[11px] text-amber-800 mt-0.5">
-                      임시 프리셋 금액은 시뮬레이션 및 예상 정산용이며 확정 청구금액이 아닙니다. 상단 &apos;계약·요율 설정&apos;에서 고객사 계약 단가를 입력하면 즉시 전환됩니다.
-                    </p>
+                <div className="p-3 rounded-xl bg-amber-50/80 border border-amber-200/80 flex items-center justify-between gap-3 text-xs text-amber-900">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span className="font-bold truncate">
+                      운행 시간 확인이 필요한 차량이 있어요 (임시 요금 프리셋 적용 중)
+                    </span>
                   </div>
+                  <button
+                    type="button"
+                    onClick={handleOpenContractModal}
+                    className="shrink-0 px-2.5 py-1 rounded-lg bg-white border border-amber-300 text-amber-900 hover:bg-amber-100 text-[11px] font-bold transition-colors cursor-pointer"
+                  >
+                    계약 단가 입력 ↗
+                  </button>
                 </div>
               )}
 
@@ -852,11 +1016,21 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                           <span className="text-xs font-bold text-slate-700">
                             · 담당: {v.driverName}
                           </span>
+                          {!v.isServiceTimeVerified && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                              운행일지 미제출
+                            </span>
+                          )}
+                          {v.languageMismatchWarning && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                              언어 확인 필요
+                            </span>
+                          )}
                           {v.serviceMode === 'with_driver' && (
                             <span
                               className={`text-[10px] font-black px-2 py-0.5 rounded border ${
                                 v.driverIsEnglishVerified
-                                  ? 'bg-blue-50 text-[#1E60F3] border-blue-200'
+                                  ? 'bg-blue-50 text-[#0050FF] border-blue-200'
                                   : 'bg-slate-100 text-slate-600 border-slate-200'
                               }`}
                             >
@@ -969,95 +1143,55 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                         </div>
                       </div>
 
-                      {/* Admin Internal Only: Driver Labor & Direct Profit Breakdown Row */}
+                      {/* Admin Internal Only: Toss-Style Hierarchical List */}
                       {reportViewMode === 'admin_internal' && (
-                        <div className="p-3 rounded-xl bg-slate-900 text-white grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
+                        <div className="p-3.5 rounded-xl bg-slate-900 text-white grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                           <div>
                             <span className="text-[10px] text-slate-400 font-bold block">
-                              고객사 청구 매출 (A)
+                              차량 요금
                             </span>
-                            <span className="font-black text-white mt-0.5 block">
+                            <span className="font-black text-white text-sm mt-0.5 block">
                               {formatKRW(v.clientTotalRevenue)}
                             </span>
-                            <span className="text-[10px] text-slate-400">
-                              차량 {formatKRW(v.vehicleFareSubtotal)} + 실비 {formatKRW(v.approvedExpensesTotal)}
+                          </div>
+
+                          <div>
+                            <span className="text-[10px] text-slate-400 font-bold block">
+                              기사 인건비
+                            </span>
+                            <span className="font-black text-rose-400 text-sm mt-0.5 block">
+                              -{formatKRW(v.driverLaborCost)}
                             </span>
                           </div>
 
                           <div>
                             <span className="text-[10px] text-slate-400 font-bold block">
-                              기사 인건비 지급액 (B)
+                              직접 경비
                             </span>
-                            <span className="font-black text-amber-300 mt-0.5 block">
-                              {formatKRW(v.driverLaborCost)}
-                            </span>
-                            <span className="text-[10px] text-slate-400">
-                              {v.serviceMode === 'vehicle_only'
-                                ? '차량만 대여 (인건비 0원)'
-                                : `${v.vehicleTier === 'sprinter' ? '스프린터' : '일반차량'} · ${
-                                    v.driverIsEnglishVerified ? '영어(검증)' : '한국어'
-                                  }`}
-                            </span>
-                          </div>
-
-                          <div>
-                            <span className="text-[10px] text-slate-400 font-bold block">
-                              차량 관련 직접비 (C)
-                            </span>
-                            <span className="font-black text-slate-200 mt-0.5 block">
-                              {formatKRW(v.vehicleDirectCost + v.otherDirectCost)}
-                            </span>
-                            <span className="text-[10px] text-slate-400">
-                              보전실비 {formatKRW(v.reimbursableExpenseCost || 0)} + 자체부담 {formatKRW(v.companyDirectExpensesTotal)}
+                            <span className="font-black text-slate-300 text-sm mt-0.5 block">
+                              -{formatKRW(v.vehicleDirectCost + v.otherDirectCost)}
                             </span>
                           </div>
 
                           <div>
                             <span className="text-[10px] text-blue-300 font-bold block">
-                              배차별 직접이익 (A-B-C)
+                              배차 직접이익
                             </span>
                             <span className="font-black text-emerald-400 text-sm mt-0.5 block">
-                              {formatKRW(v.directProfit)}
-                            </span>
-                            <span className="text-[10px] text-slate-300">
-                              {v.profitConfirmStatus === 'confirmed'
-                                ? '확정 직접이익'
-                                : '잠정 손익 (일부 미확정)'}
-                            </span>
-                          </div>
-
-                          <div>
-                            <span className="text-[10px] text-blue-300 font-bold block">
-                              직접이익률
-                            </span>
-                            <span className="font-black text-emerald-400 text-sm mt-0.5 block">
-                              {v.directMarginPercent}%
-                            </span>
-                            <span className="text-[10px] text-slate-400">
-                              순이익/영업이익 아님
+                              {formatKRW(v.directProfit)}{' '}
+                              <span className="text-xs font-bold text-emerald-300">
+                                ({v.directMarginPercent}%)
+                              </span>
                             </span>
                           </div>
                         </div>
                       )}
 
-                      {/* Notices (Service time warning, English surcharge, overtime labor, driver notes) */}
+                      {/* Notices (Clean formatting without repetitive warning icons) */}
                       {(v.notes ||
-                        v.serviceTimeWarning ||
                         (reportViewMode === 'admin_internal' &&
-                          (v.englishSurchargeNotice ||
-                            v.driverOvertimeLaborWarning ||
-                            v.languageMismatchWarning))) && (
+                          (v.englishSurchargeNotice || v.driverOvertimeLaborWarning))) && (
                         <div className="text-[11px] text-slate-600 space-y-1 pt-1">
-                          {v.serviceTimeWarning && (
-                            <p className="text-rose-600 font-bold">
-                              • ⚠️ {v.serviceTimeWarning}
-                            </p>
-                          )}
-                          {v.languageMismatchWarning && reportViewMode === 'admin_internal' && (
-                            <p className="text-rose-600 font-bold">
-                              • ⚠️ {v.languageMismatchWarning}
-                            </p>
-                          )}
                           {v.notes && (
                             <p className="font-medium text-slate-700">
                               • <strong>운행 특이사항:</strong> {v.notes}
@@ -1212,50 +1346,44 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                   </div>
                 </div>
 
-                {/* Right: Internal Profitability Summary (Strictly Hidden in Client Mode!) */}
+                {/* Right: Internal Profitability Summary (Toss-Style Clean Breakdown) */}
                 {reportViewMode === 'admin_internal' ? (
-                  <div className="bg-blue-50/50 rounded-2xl p-4 border border-blue-200/80 space-y-2 text-xs">
+                  <div className="bg-blue-50/40 rounded-2xl p-4 border border-blue-200/80 space-y-2 text-xs">
                     <div className="flex items-center justify-between pb-2 border-b border-blue-200/60">
-                      <h5 className="font-black text-slate-900 text-xs flex items-center gap-1.5">
-                        <Lock className="w-3.5 h-3.5 text-[#1E60F3]" />
-                        <span>[본사 내부용] 배차별 직접이익 분석</span>
+                      <h5 className="font-extrabold text-slate-900 text-xs flex items-center gap-1.5">
+                        <Lock className="w-3.5 h-3.5 text-[#0050FF]" />
+                        <span>내부 정산 손익 명세</span>
                       </h5>
-                      <span className="px-2 py-0.5 rounded bg-white text-[#1E60F3] font-black text-[10px] border border-blue-200">
+                      <span className="px-2 py-0.5 rounded bg-white text-[#0050FF] font-bold text-[10px] border border-blue-200">
                         {selectedReport.profitConfirmStatus === 'confirmed'
                           ? '확정 직접이익'
-                          : '잠정 손익 (일부 미확정)'}
+                          : '잠정 손익'}
                       </span>
                     </div>
                     <div className="flex justify-between text-slate-600">
-                      <span>고객사 매출 (공급가 기준)</span>
+                      <span>차량 요금 (공급가)</span>
                       <span className="font-bold text-slate-900">
                         {formatKRW(selectedReport.supplyAmount)}
                       </span>
                     </div>
                     <div className="flex justify-between text-slate-600">
-                      <span>(-) 기사 인건비 합계 (회사 지급 기준)</span>
+                      <span>기사 인건비</span>
                       <span className="font-bold text-rose-600">
                         -{formatKRW(selectedReport.totalDriverLaborCost)}
                       </span>
                     </div>
                     <div className="flex justify-between text-slate-600">
-                      <span>
-                        (-) 차량/기타 직접비 (보전실비원가 {formatKRW(selectedReport.totalReimbursableExpenseCost || 0)} + 자체부담 {formatKRW(selectedReport.totalCompanyAbsorbedExpenseCost || 0)})
-                      </span>
+                      <span>직접 경비</span>
                       <span className="font-bold text-rose-600">
                         -{formatKRW(selectedReport.totalVehicleDirectCost + selectedReport.totalOtherDirectCost)}
                       </span>
                     </div>
-                    <div className="flex justify-between text-sm font-black text-[#1E60F3] pt-2 border-t border-blue-200/70">
-                      <span>배차별 직접이익 (Direct Profit)</span>
+                    <div className="flex justify-between text-sm font-black text-[#0050FF] pt-2 border-t border-blue-200/70">
+                      <span>배차 직접이익</span>
                       <span>
-                        {formatKRW(selectedReport.totalDirectProfit)} (이익률{' '}
-                        {selectedReport.averageDirectMarginPercent}%)
+                        {formatKRW(selectedReport.totalDirectProfit)} ({selectedReport.averageDirectMarginPercent}%)
                       </span>
                     </div>
-                    <p className="text-[10px] text-slate-500 leading-relaxed pt-1">
-                      ※ 본 금액은 차량 감가상각·유류비·보험료·본사 관리비(간접비) 및 세금을 차감하기 전의 <strong>배차별 직접이익</strong>이며, <strong>최종 영업이익이나 순이익이 아닙니다.</strong>
-                    </p>
                   </div>
                 ) : (
                   <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 flex flex-col justify-between text-xs">
