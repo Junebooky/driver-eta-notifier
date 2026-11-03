@@ -7,10 +7,10 @@ import {
   Plus,
   MapPin,
   ChevronDown,
-  Star,
-  MoreHorizontal,
   ChevronLeft,
   ChevronRight,
+  MoreHorizontal,
+  Phone,
   Loader2,
   ShieldAlert,
   AlertTriangle,
@@ -20,6 +20,8 @@ import {
 import { HqDriverSummary } from '@/types/driverHq';
 import { useHqDrivers } from '@/utils/useHqDrivers';
 import { haptics } from '@/utils/haptics';
+import { formatPhoneNumber } from '@/utils/formatters';
+import { getKstTodayDateStr } from '@/utils/dispatchConflictDetector';
 
 export interface HqDriversTableViewProps {
   onSelectDriver: (driverId: string) => void;
@@ -63,10 +65,44 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [affiliationFilter, setAffiliationFilter] = useState<'all' | 'employed' | 'freelance'>('all');
   const [residenceFilter, setResidenceFilter] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'vacation'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'driving' | 'off' | 'active' | 'vacation'>('all');
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const pageSize = 10;
+
+  // Helper to determine real-time operation status:
+  // 'driving' (운행 중 - 파랑 칩) | 'available' (운행 가능 - 초록 칩) | 'off' (휴무 - 회색 칩)
+  const getDriverStatus = (driver: HqDriverSummary): 'available' | 'driving' | 'off' => {
+    if (!driver.isAvailable) return 'off';
+    const today = getKstTodayDateStr();
+    const hasTodayTrip = driver.schedules?.some((s) => s.dateStr === today);
+    if (hasTodayTrip) return 'driving';
+    return 'available';
+  };
+
+  // Helper to check if a driver joined within the last 14 days
+  const isNewDriver = (driver: HqDriverSummary): boolean => {
+    if (!driver.createdAt) return false;
+    try {
+      const createdTime = new Date(driver.createdAt).getTime();
+      const diffDays = (Date.now() - createdTime) / (1000 * 60 * 60 * 24);
+      return diffDays >= 0 && diffDays <= 14;
+    } catch {
+      return false;
+    }
+  };
+
+  // Helper to build vehicle subtext
+  const getVehicleSubtext = (driver: HqDriverSummary): string => {
+    const model = driver.vehicleModel && driver.vehicleModel !== '차량 미지정' ? driver.vehicleModel : '';
+    const plate = driver.carNumber && driver.carNumber !== '차량 미등록'
+      ? driver.carNumber
+      : (driver.vehicleNo && driver.vehicleNo !== '미지정' ? driver.vehicleNo : '');
+
+    if (model && plate) return `${model} · ${plate}`;
+    if (model) return model;
+    if (plate) return plate;
+    return '차량 미지정';
+  };
 
   // Filtered List
   const filteredDrivers = useMemo(() => {
@@ -84,8 +120,15 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
       }
 
       // Status filter
-      if (statusFilter === 'active' && !driver.isAvailable) return false;
-      if (statusFilter === 'vacation' && driver.isAvailable) return false;
+      if (statusFilter !== 'all') {
+        const opStatus = getDriverStatus(driver);
+        if (statusFilter === 'available' && opStatus !== 'available') return false;
+        if (statusFilter === 'driving' && opStatus !== 'driving') return false;
+        if (statusFilter === 'off' && opStatus !== 'off') return false;
+        // Backward-compat for legacy filters
+        if (statusFilter === 'active' && !driver.isAvailable) return false;
+        if (statusFilter === 'vacation' && driver.isAvailable) return false;
+      }
 
       // Search query
       if (searchQuery.trim()) {
@@ -110,34 +153,6 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
     const start = (currentPage - 1) * pageSize;
     return filteredDrivers.slice(start, start + pageSize);
   }, [filteredDrivers, currentPage, pageSize]);
-
-  // Select all on current page
-  const allCurrentSelected =
-    paginatedDrivers.length > 0 &&
-    paginatedDrivers.every((d) => selectedIds.has(d.id));
-
-  const handleToggleAllCurrent = () => {
-    haptics.selection();
-    const next = new Set(selectedIds);
-    if (allCurrentSelected) {
-      paginatedDrivers.forEach((d) => next.delete(d.id));
-    } else {
-      paginatedDrivers.forEach((d) => next.add(d.id));
-    }
-    setSelectedIds(next);
-  };
-
-  const handleToggleRow = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    haptics.selection();
-    const next = new Set(selectedIds);
-    if (next.has(id)) {
-      next.delete(id);
-    } else {
-      next.add(id);
-    }
-    setSelectedIds(next);
-  };
 
   const handleRowClick = (driverId: string) => {
     haptics.lightTap();
@@ -189,55 +204,58 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
       </div>
 
       {/* 2. Filter Bar */}
-      <div className="px-6 py-3.5 bg-slate-50/60 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
+      <div className="px-6 py-3.5 bg-slate-50/50 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
         {/* Affiliation Tabs */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <button
             type="button"
             onClick={() => {
+              haptics.selection();
               setAffiliationFilter('all');
               setCurrentPage(1);
             }}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
               affiliationFilter === 'all'
-                ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 shadow-2xs'
+                ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 shadow-2xs font-bold'
                 : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300'
             }`}
           >
             <span>전체 </span>
-            <span className="font-extrabold">{counts.total}</span>
+            <span className="font-bold">{counts.total}</span>
           </button>
 
           <button
             type="button"
             onClick={() => {
+              haptics.selection();
               setAffiliationFilter('employed');
               setCurrentPage(1);
             }}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
               affiliationFilter === 'employed'
-                ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 shadow-2xs'
+                ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 shadow-2xs font-bold'
                 : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300'
             }`}
           >
             <span>소속 </span>
-            <span className="font-extrabold">{counts.employed}</span>
+            <span className="font-bold">{counts.employed}</span>
           </button>
 
           <button
             type="button"
             onClick={() => {
+              haptics.selection();
               setAffiliationFilter('freelance');
               setCurrentPage(1);
             }}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
               affiliationFilter === 'freelance'
-                ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 shadow-2xs'
+                ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 shadow-2xs font-bold'
                 : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300'
             }`}
           >
             <span>프리랜서 </span>
-            <span className="font-extrabold">{counts.freelance}</span>
+            <span className="font-bold">{counts.freelance}</span>
           </button>
         </div>
 
@@ -251,63 +269,53 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                 setStatusFilter(e.target.value as any);
                 setCurrentPage(1);
               }}
-              className="appearance-none bg-white border border-slate-200 rounded-xl px-3.5 py-1.5 pr-8 text-xs font-bold text-slate-700 hover:border-slate-300 focus:outline-none focus:ring-1 focus:ring-[#1E60F3] cursor-pointer shadow-2xs"
+              className="appearance-none bg-white border border-slate-200 rounded-xl px-3 py-1.5 pr-7 text-xs font-semibold text-slate-700 hover:border-slate-300 focus:outline-none focus:ring-1 focus:ring-[#1E60F3] cursor-pointer shadow-2xs"
             >
               <option value="all">운행 상태 전체</option>
-              <option value="active">운행 가능</option>
-              <option value="vacation">휴무/점검</option>
+              <option value="available">운행 가능</option>
+              <option value="driving">운행 중</option>
+              <option value="off">휴무</option>
             </select>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
 
           {/* Residence Filter Dropdown */}
           <div className="relative flex items-center">
-            <MapPin className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
+            <MapPin className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
             <select
               value={residenceFilter}
               onChange={(e) => {
                 setResidenceFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="appearance-none bg-white border border-slate-200 rounded-xl pl-8 pr-8 py-1.5 text-xs font-bold text-slate-700 hover:border-slate-300 focus:outline-none focus:ring-1 focus:ring-[#1E60F3] cursor-pointer shadow-2xs"
+              className="appearance-none bg-white border border-slate-200 rounded-xl pl-7 pr-7 py-1.5 text-xs font-semibold text-slate-700 hover:border-slate-300 focus:outline-none focus:ring-1 focus:ring-[#1E60F3] cursor-pointer shadow-2xs"
             >
               <option value="all">거주 지역 전체</option>
               <option value="서울">서울 권역</option>
               <option value="경기">경기 권역</option>
               <option value="인천">인천 권역</option>
             </select>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 pointer-events-none" />
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 pointer-events-none" />
           </div>
         </div>
       </div>
 
-      {/* 3. Driver Table */}
+      {/* 3. Driver Table (Toss / Apple Style 5 Columns) */}
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="border-b border-slate-100 bg-slate-50/50 text-[11px] font-black text-slate-400 uppercase tracking-wider select-none">
-              <th className="py-3 px-4 w-12 text-center">
-                <input
-                  type="checkbox"
-                  checked={allCurrentSelected}
-                  onChange={handleToggleAllCurrent}
-                  className="w-4 h-4 rounded border-slate-300 text-[#1E60F3] focus:ring-[#1E60F3] cursor-pointer"
-                />
-              </th>
-              <th className="py-3 px-4">기사명</th>
-              <th className="py-3 px-4">소속</th>
-              <th className="py-3 px-4">연락처</th>
-              <th className="py-3 px-4">거주 지역</th>
-              <th className="py-3 px-4">언어</th>
-              <th className="py-3 px-4">평점</th>
-              <th className="py-3 px-4">최근 운행일</th>
-              <th className="py-3 px-4 text-center w-16">관리</th>
+            <tr className="border-b border-slate-100 bg-slate-50/60 text-xs font-medium text-slate-400 select-none">
+              <th className="py-3.5 px-5 font-medium">기사 정보</th>
+              <th className="py-3.5 px-5 font-medium">운행 상태</th>
+              <th className="py-3.5 px-5 font-medium">연락처</th>
+              <th className="py-3.5 px-5 font-medium">지원 언어</th>
+              <th className="py-3.5 px-5 font-medium text-right w-24">더보기</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700">
             {isLoading ? (
               <tr>
-                <td colSpan={9} className="py-16 text-center text-slate-400">
+                <td colSpan={5} className="py-16 text-center text-slate-400">
                   <Loader2 className="w-8 h-8 mx-auto text-[#1E60F3] animate-spin mb-3" />
                   <p className="font-bold text-slate-600">실시간 기사 데이터 동기화 중...</p>
                 </td>
@@ -315,7 +323,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
             ) : error ? (
               statusCode === 401 || statusCode === 403 ? (
                 <tr>
-                  <td colSpan={9} className="py-12 px-4 text-center">
+                  <td colSpan={5} className="py-12 px-4 text-center">
                     <div className="max-w-md mx-auto p-6 bg-amber-50/80 border border-amber-200/90 rounded-3xl space-y-3 shadow-sm">
                       <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mx-auto shadow-xs">
                         <ShieldAlert className="w-6 h-6 text-amber-600" />
@@ -356,7 +364,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                 </tr>
               ) : (
                 <tr>
-                  <td colSpan={9} className="py-12 px-4 text-center">
+                  <td colSpan={5} className="py-12 px-4 text-center">
                     <div className="max-w-md mx-auto p-6 bg-rose-50/80 border border-rose-200/90 rounded-3xl space-y-3 shadow-sm">
                       <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center mx-auto shadow-xs">
                         <AlertTriangle className="w-6 h-6 text-rose-600" />
@@ -388,7 +396,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
               )
             ) : paginatedDrivers.length === 0 ? (
               <tr>
-                <td colSpan={9} className="py-12 text-center text-slate-400">
+                <td colSpan={5} className="py-12 text-center text-slate-400">
                   <Users className="w-8 h-8 mx-auto text-slate-300 mb-2" />
                   <p className="font-bold text-slate-600">
                     {drivers.length === 0
@@ -399,7 +407,17 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
               </tr>
             ) : (
               paginatedDrivers.map((driver) => {
-                const isChecked = selectedIds.has(driver.id);
+                const opStatus = getDriverStatus(driver);
+                const vehicleSubtext = getVehicleSubtext(driver);
+                const isNew = isNewDriver(driver);
+
+                // Multi-language support check: only non-Korean languages shown as mini badge
+                const foreignLanguages = (driver.languageLabels || [])
+                  .filter((l) => l !== '한국어')
+                  .concat(
+                    driver.englishAvailable && !(driver.languageLabels || []).includes('영어') ? ['영어'] : []
+                  );
+                const hasForeignLanguage = foreignLanguages.length > 0;
 
                 return (
                   <tr
@@ -407,19 +425,9 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                     onClick={() => handleRowClick(driver.id)}
                     className="hover:bg-blue-50/40 transition-colors cursor-pointer group"
                   >
-                    {/* Checkbox */}
-                    <td className="py-3 px-4 text-center" onClick={(e) => handleToggleRow(driver.id, e)}>
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => {}}
-                        className="w-4 h-4 rounded border-slate-300 text-[#1E60F3] focus:ring-[#1E60F3] cursor-pointer"
-                      />
-                    </td>
-
-                    {/* Driver Name with Avatar or Fallback Circle */}
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-3">
+                    {/* 1열: 기사 정보 (Avatar + Name + Vehicle subtext) */}
+                    <td className="py-4 px-5">
+                      <div className="flex items-center gap-3.5">
                         {driver.avatarUrl ? (
                           <img
                             src={driver.avatarUrl}
@@ -427,89 +435,112 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                             onError={(e) => {
                               (e.target as HTMLElement).style.display = 'none';
                             }}
-                            className="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0"
+                            className="w-10 h-10 rounded-full object-cover border border-slate-200/80 shrink-0 shadow-2xs"
                           />
                         ) : (
-                          <div className="w-8 h-8 rounded-full bg-blue-50 text-[#1E60F3] border border-blue-100 font-black text-xs flex items-center justify-center shrink-0">
+                          <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-600 border border-slate-200/80 font-bold text-xs flex items-center justify-center shrink-0">
                             {driver.name.slice(0, 1)}
                           </div>
                         )}
-                        <div>
-                          <div className="font-extrabold text-slate-900 group-hover:text-[#1E60F3] transition-colors">
-                            {driver.name}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-slate-900 group-hover:text-[#1E60F3] transition-colors">
+                              {driver.name}
+                            </span>
+                            {/* Special Status Badges Only (Freelance / New) */}
+                            {driver.affiliationType === 'freelance' && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200/80">
+                                프리랜서
+                              </span>
+                            )}
+                            {isNew && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                                신규
+                              </span>
+                            )}
                           </div>
-                          {driver.vehicleModel && driver.vehicleModel !== '차량 미지정' && (
-                            <div className="text-[10.5px] text-slate-400 font-semibold truncate max-w-[140px]">
-                              {driver.vehicleModel}
-                            </div>
-                          )}
+                          <div className="text-[11px] text-slate-400 font-medium truncate mt-0.5">
+                            {vehicleSubtext}
+                          </div>
                         </div>
                       </div>
                     </td>
 
-                    {/* Affiliation Badge */}
-                    <td className="py-3 px-4">
-                      {driver.affiliationType === 'employed' ? (
-                        <span className="px-2 py-0.5 rounded-md bg-blue-50 text-[#1E60F3] border border-blue-200/80 font-black text-[11px] inline-block">
-                          소속
+                    {/* 2열: 운행 상태 (운행 가능 / 운행 중 / 휴무) */}
+                    <td className="py-4 px-5 whitespace-nowrap">
+                      {opStatus === 'driving' ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-[#1E60F3] border border-blue-200/60 shadow-2xs">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#1E60F3] animate-pulse" />
+                          운행 중
+                        </span>
+                      ) : opStatus === 'off' ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-200/60">
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                          휴무
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200/80 font-black text-[11px] inline-block">
-                          프리랜서
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 shadow-2xs">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          운행 가능
                         </span>
                       )}
                     </td>
 
-                    {/* Contact Phone */}
-                    <td className="py-3 px-4 font-mono font-bold text-slate-800">
-                      {driver.phone || '-'}
+                    {/* 3열: 연락처 (전화 걸기 연동) */}
+                    <td className="py-4 px-5 whitespace-nowrap">
+                      {driver.phone ? (
+                        <a
+                          href={`tel:${driver.phone}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="font-mono text-xs font-semibold text-slate-700 hover:text-[#1E60F3] hover:underline transition-colors inline-flex items-center gap-1.5 group/phone"
+                          title="전화 걸기"
+                        >
+                          <Phone className="w-3.5 h-3.5 text-slate-400 group-hover/phone:text-[#1E60F3] transition-colors" />
+                          <span>{formatPhoneNumber(driver.phone)}</span>
+                        </a>
+                      ) : (
+                        <span className="text-slate-300 font-mono text-xs">-</span>
+                      )}
                     </td>
 
-                    {/* Residence */}
-                    <td className="py-3 px-4 text-slate-600 font-semibold">
-                      {driver.residence}
-                    </td>
-
-                    {/* Language Flags */}
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-1.5 text-sm">
-                        {driver.flags.map((flag, idx) => (
-                          <span key={idx} title={flag === '🇺🇸' ? '영어 가능' : '한국어'}>
-                            {flag}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-
-                    {/* Rating (Real only; no fabricated ratings) */}
-                    <td className="py-3 px-4">
-                      {driver.rating !== undefined && driver.rating !== null ? (
-                        <div className="flex items-center gap-1 text-amber-500 font-extrabold text-xs">
-                          <Star className="w-3.5 h-3.5 fill-amber-400 shrink-0" />
-                          <span>{driver.rating.toFixed(1)}</span>
+                    {/* 4열: 지원 언어 (다국어 지원 기사만 미니 뱃지) */}
+                    <td className="py-4 px-5 whitespace-nowrap">
+                      {hasForeignLanguage ? (
+                        <div className="flex items-center gap-1">
+                          {foreignLanguages.map((lang) => (
+                            <span
+                              key={lang}
+                              className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200/80"
+                            >
+                              {lang}
+                            </span>
+                          ))}
                         </div>
                       ) : (
-                        <span className="text-slate-400 font-bold text-xs">-</span>
+                        <span className="text-slate-300 text-xs font-medium">-</span>
                       )}
                     </td>
 
-                    {/* Recent Trip Date */}
-                    <td className="py-3 px-4 font-mono text-slate-600">
-                      {driver.recentTripDate || (
-                        <span className="text-slate-400 font-normal text-[11px]">이력 없음</span>
-                      )}
-                    </td>
-
-                    {/* Actions */}
-                    <td className="py-3 px-4 text-center" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        type="button"
-                        onClick={() => handleRowClick(driver.id)}
-                        className="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer mx-auto"
-                        title="기사 상세 보기"
-                      >
-                        <MoreHorizontal className="w-4 h-4" />
-                      </button>
+                    {/* 5열: 더보기 (호버 인터랙션) */}
+                    <td className="py-4 px-5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleRowClick(driver.id)}
+                          className="px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-500 hover:text-[#1E60F3] hover:bg-blue-50/80 transition-all opacity-0 group-hover:opacity-100 flex items-center gap-1 cursor-pointer"
+                        >
+                          <span>상세</span>
+                          <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRowClick(driver.id)}
+                          className="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer group-hover:hidden"
+                          title="기사 상세 보기"
+                        >
+                          <MoreHorizontal className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -520,33 +551,32 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
       </div>
 
       {/* 4. Table Footer (Pagination & Count) */}
-      <div className="p-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs bg-white">
-        <div className="flex items-center gap-3">
-          <span className="font-bold text-slate-500">
-            총 <span className="font-extrabold text-slate-900">{filteredDrivers.length}명</span>
+      <div className="p-4 sm:px-6 border-t border-slate-100 flex flex-wrap items-center justify-between gap-4 text-xs bg-white">
+        <div className="flex items-center gap-2 text-slate-500 font-medium">
+          <span>
+            총 <strong className="font-bold text-slate-900">{filteredDrivers.length}명</strong>의 기사님이 등록되어 있어요
           </span>
-          {error ? (
-            <span className="text-[11px] text-rose-600 font-bold flex items-center gap-1.5 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse shrink-0"></span>
-              <span>동기화 실패 (HTTP {statusCode || 500})</span>
-            </span>
-          ) : (
-            <span className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1.5 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
-              <span>실시간 DB 동기화 완료 ({drivers.length}명)</span>
+          {error && (
+            <span className="text-[11px] text-rose-600 font-semibold flex items-center gap-1.5 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse shrink-0" />
+              <span>동기화 확인 필요</span>
             </span>
           )}
         </div>
 
-        {/* Pagination buttons */}
-        <div className="flex items-center gap-1">
+        {/* Pagination rounded buttons */}
+        <div className="flex items-center gap-1.5">
           <button
             type="button"
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            onClick={() => {
+              haptics.selection();
+              setCurrentPage((p) => Math.max(1, p - 1));
+            }}
             disabled={currentPage === 1}
-            className="w-7 h-7 rounded-lg border border-slate-200 hover:bg-slate-50 flex items-center justify-center text-slate-500 disabled:opacity-30 cursor-pointer"
+            className="w-8 h-8 rounded-full border border-slate-200 hover:bg-slate-50 flex items-center justify-center text-slate-500 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer"
+            aria-label="이전 페이지"
           >
-            <ChevronLeft className="w-3.5 h-3.5" />
+            <ChevronLeft className="w-4 h-4" />
           </button>
 
           {Array.from({ length: totalPages }).map((_, idx) => {
@@ -556,11 +586,14 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
               <button
                 key={pageNum}
                 type="button"
-                onClick={() => setCurrentPage(pageNum)}
-                className={`w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                onClick={() => {
+                  haptics.selection();
+                  setCurrentPage(pageNum);
+                }}
+                className={`min-w-8 h-8 px-2 rounded-full text-xs transition-all cursor-pointer ${
                   isActive
-                    ? 'bg-[#1E60F3] text-white shadow-2xs font-extrabold'
-                    : 'border border-slate-200 hover:bg-slate-50 text-slate-700'
+                    ? 'bg-[#1E60F3] text-white font-bold shadow-2xs'
+                    : 'border border-slate-200 hover:bg-slate-50 text-slate-600 font-medium'
                 }`}
               >
                 {pageNum}
@@ -570,17 +603,16 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
 
           <button
             type="button"
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            onClick={() => {
+              haptics.selection();
+              setCurrentPage((p) => Math.min(totalPages, p + 1));
+            }}
             disabled={currentPage === totalPages}
-            className="w-7 h-7 rounded-lg border border-slate-200 hover:bg-slate-50 flex items-center justify-center text-slate-500 disabled:opacity-30 cursor-pointer"
+            className="w-8 h-8 rounded-full border border-slate-200 hover:bg-slate-50 flex items-center justify-center text-slate-500 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer"
+            aria-label="다음 페이지"
           >
-            <ChevronRight className="w-3.5 h-3.5" />
+            <ChevronRight className="w-4 h-4" />
           </button>
-        </div>
-
-        {/* Page size indicator */}
-        <div className="flex items-center gap-1.5 text-slate-500 font-semibold">
-          <span className="text-slate-600 font-bold">10개씩 보기</span>
         </div>
       </div>
     </div>

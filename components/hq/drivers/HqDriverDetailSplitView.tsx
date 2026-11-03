@@ -424,12 +424,15 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                   <span className="text-slate-400 font-semibold text-xs">평점 없음</span>
                 )}
                 <span className="text-slate-300">•</span>
-                <div className="flex items-center gap-1 text-sm">
-                  {activeDriver.flags.map((flag, idx) => (
-                    <span key={idx} title={flag === '🇺🇸' ? '영어 가능' : '한국어'}>
-                      {flag}
+                <div className="flex items-center gap-1 text-xs">
+                  <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[11px] font-semibold">
+                    한국어
+                  </span>
+                  {activeDriver.englishAvailable && (
+                    <span className="px-1.5 py-0.5 rounded bg-blue-50 text-[#1E60F3] border border-blue-200/60 text-[11px] font-semibold">
+                      영어
                     </span>
-                  ))}
+                  )}
                 </div>
               </div>
             </div>
@@ -510,15 +513,12 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
             <div className="flex items-center justify-between">
               <span className="text-slate-400 font-semibold">언어 가능</span>
               <div className="flex items-center gap-1.5 font-bold text-slate-800">
-                {activeDriver.englishAvailable ? (
-                  <span className="flex items-center gap-1 text-[#1E60F3] bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 font-black">
-                    <span>🇺🇸</span>
-                    <span>영어 가능</span>
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1 text-slate-700">
-                    <span>🇰🇷</span>
-                    <span>한국어</span>
+                <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-xs font-semibold">
+                  한국어
+                </span>
+                {activeDriver.englishAvailable && (
+                  <span className="px-2 py-0.5 rounded bg-blue-50 text-[#1E60F3] border border-blue-200/60 text-xs font-bold">
+                    영어
                   </span>
                 )}
               </div>
