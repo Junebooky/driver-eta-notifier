@@ -1,11 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X, Check } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 import {
   getKstTodayDateStr,
-  getKstTomorrowDateStr,
   normalizeDateToIso,
 } from '@/utils/dispatchConflictDetector';
 import { formatDateRangeDisplay } from '@/components/hq/HqQuickDispatch';
@@ -50,19 +49,6 @@ function formatIso(year: number, month: number, day: number): string {
   const mm = String(month).padStart(2, '0');
   const dd = String(day).padStart(2, '0');
   return `${year}-${mm}-${dd}`;
-}
-
-function addDays(iso: string, days: number): string {
-  try {
-    const d = new Date(iso + 'T00:00:00+09:00');
-    d.setDate(d.getDate() + days);
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-  } catch {
-    return iso;
-  }
 }
 
 export const TossDateRangePicker: React.FC<TossDateRangePickerProps> = ({
@@ -119,7 +105,6 @@ export const TossDateRangePicker: React.FC<TossDateRangePickerProps> = ({
   }, [isOpen]);
 
   const todayIso = useMemo(() => getKstTodayDateStr(), []);
-  const tomorrowIso = useMemo(() => getKstTomorrowDateStr(), []);
 
   // Compute calendar grid days
   const calendarDays = useMemo(() => {
@@ -199,34 +184,25 @@ export const TossDateRangePicker: React.FC<TossDateRangePickerProps> = ({
       setTempStart(clickedIso);
       setTempEnd(clickedIso);
       setPickStep('end');
+      onChangeRange(clickedIso, clickedIso);
     } else {
       // Step === 'end'
       if (clickedIso < tempStart) {
-        // Clicked date is earlier than start: make it new start
         setTempStart(clickedIso);
         setTempEnd(clickedIso);
         setPickStep('end');
+        onChangeRange(clickedIso, clickedIso);
+      } else if (clickedIso === tempStart) {
+        onChangeRange(clickedIso, clickedIso);
+        setPickStep('start');
+        setIsOpen(false);
       } else {
         setTempEnd(clickedIso);
         setPickStep('start');
+        onChangeRange(tempStart, clickedIso);
+        setIsOpen(false);
       }
     }
-  };
-
-  const applyPreset = (s: string, e: string) => {
-    haptics.lightTap();
-    setTempStart(s);
-    setTempEnd(e);
-    setPickStep('start');
-    const p = parseIso(s);
-    setViewYear(p.year);
-    setViewMonth(p.month);
-  };
-
-  const handleApply = () => {
-    haptics.successPulse();
-    onChangeRange(tempStart, tempEnd || tempStart);
-    setIsOpen(false);
   };
 
   const displayLabel = formatDateRangeDisplay(startDate, endDate);
@@ -258,17 +234,17 @@ export const TossDateRangePicker: React.FC<TossDateRangePickerProps> = ({
           disabled ? 'opacity-60 pointer-events-none' : ''
         }`}
       >
-        <CalendarIcon className="w-5 h-5 text-[#1E60F3] shrink-0" />
+        <CalendarIcon className="w-5 h-5 text-slate-700 shrink-0" />
         <span className="text-sm font-bold text-slate-900 truncate flex-1">
           {displayLabel}
         </span>
       </div>
 
-      {/* Toss-Style Calendar Popover */}
+      {/* Toss-Style Calendar Popover (Clean White) */}
       {isOpen && (
-        <div className="absolute left-0 sm:left-auto right-auto sm:right-0 top-full mt-2 z-50 w-[310px] sm:w-[332px] rounded-3xl bg-gradient-to-b from-blue-50/70 via-white to-white border border-blue-100/90 shadow-[0_20px_60px_rgba(30,96,243,0.16)] p-4 animate-in fade-in zoom-in-95 duration-150 backdrop-blur-md">
+        <div className="absolute left-0 sm:left-auto right-auto sm:right-0 top-full mt-2 z-50 w-[310px] sm:w-[332px] rounded-2xl bg-white border border-slate-200 shadow-xl p-4 animate-in fade-in zoom-in-95 duration-150">
           {/* Header Bar */}
-          <div className="flex items-center justify-between pb-3 mb-2 border-b border-blue-100/60">
+          <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-100">
             <span className="text-base font-extrabold text-slate-900 tracking-tight">
               {viewYear}년 {viewMonth}월
             </span>
@@ -278,7 +254,7 @@ export const TossDateRangePicker: React.FC<TossDateRangePickerProps> = ({
                 type="button"
                 onClick={handlePrevMonth}
                 aria-label="이전 달"
-                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-white/80 active:scale-95 transition-all cursor-pointer shadow-2xs"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 active:scale-95 transition-all cursor-pointer shadow-2xs"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
@@ -286,7 +262,7 @@ export const TossDateRangePicker: React.FC<TossDateRangePickerProps> = ({
                 type="button"
                 onClick={handleNextMonth}
                 aria-label="다음 달"
-                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-white/80 active:scale-95 transition-all cursor-pointer shadow-2xs"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 active:scale-95 transition-all cursor-pointer shadow-2xs"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -294,59 +270,11 @@ export const TossDateRangePicker: React.FC<TossDateRangePickerProps> = ({
                 type="button"
                 onClick={() => setIsOpen(false)}
                 aria-label="닫기"
-                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-white/80 active:scale-95 transition-all cursor-pointer ml-1"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 active:scale-95 transition-all cursor-pointer ml-1"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
-          </div>
-
-          {/* Preset Chips */}
-          <div className="flex flex-wrap items-center gap-1.5 mb-3 px-0.5">
-            <button
-              type="button"
-              onClick={() => applyPreset(todayIso, todayIso)}
-              className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                tempStart === todayIso && tempEnd === todayIso
-                  ? 'bg-[#1E60F3] text-white shadow-xs'
-                  : 'bg-white/90 text-slate-700 hover:bg-blue-50 hover:text-[#1E60F3] border border-slate-200/60'
-              }`}
-            >
-              오늘
-            </button>
-            <button
-              type="button"
-              onClick={() => applyPreset(tomorrowIso, tomorrowIso)}
-              className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                tempStart === tomorrowIso && tempEnd === tomorrowIso
-                  ? 'bg-[#1E60F3] text-white shadow-xs'
-                  : 'bg-white/90 text-slate-700 hover:bg-blue-50 hover:text-[#1E60F3] border border-slate-200/60'
-              }`}
-            >
-              내일
-            </button>
-            <button
-              type="button"
-              onClick={() => applyPreset(tempStart, addDays(tempStart, 1))}
-              className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                tempEnd === addDays(tempStart, 1)
-                  ? 'bg-[#1E60F3] text-white shadow-xs'
-                  : 'bg-white/90 text-slate-700 hover:bg-blue-50 hover:text-[#1E60F3] border border-slate-200/60'
-              }`}
-            >
-              +1일 (1박2일)
-            </button>
-            <button
-              type="button"
-              onClick={() => applyPreset(tempStart, addDays(tempStart, 2))}
-              className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                tempEnd === addDays(tempStart, 2)
-                  ? 'bg-[#1E60F3] text-white shadow-xs'
-                  : 'bg-white/90 text-slate-700 hover:bg-blue-50 hover:text-[#1E60F3] border border-slate-200/60'
-              }`}
-            >
-              +2일 (2박3일)
-            </button>
           </div>
 
           {/* Weekday Row */}
@@ -393,7 +321,7 @@ export const TossDateRangePicker: React.FC<TossDateRangePickerProps> = ({
                         : isToday
                         ? 'bg-blue-50 text-[#1E60F3] font-black border border-blue-200'
                         : item.isCurrentMonth
-                        ? 'text-slate-800 font-semibold hover:bg-white hover:shadow-2xs hover:text-[#1E60F3]'
+                        ? 'text-slate-800 font-semibold hover:bg-slate-100 hover:text-[#1E60F3]'
                         : 'text-slate-300 font-normal hover:bg-slate-100/50'
                     } ${isDisabled ? 'opacity-30 pointer-events-none' : ''}`}
                   >
@@ -405,24 +333,6 @@ export const TossDateRangePicker: React.FC<TossDateRangePickerProps> = ({
                 </div>
               );
             })}
-          </div>
-
-          {/* Selected Schedule Summary Bar */}
-          <div className="mt-3.5 p-2.5 rounded-2xl bg-blue-50/70 border border-blue-100 flex items-center justify-between text-xs">
-            <div>
-              <span className="text-[10px] text-slate-500 block">선택된 일정</span>
-              <span className="text-xs font-black text-[#1E60F3]">
-                {formatDateRangeDisplay(tempStart, tempEnd)}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={handleApply}
-              className="px-3.5 py-1.5 rounded-xl bg-[#1E60F3] hover:bg-blue-600 text-white font-extrabold text-xs shadow-xs transition-all cursor-pointer flex items-center gap-1 active:scale-95"
-            >
-              <Check className="w-3.5 h-3.5" />
-              <span>일정 적용</span>
-            </button>
           </div>
         </div>
       )}

@@ -445,12 +445,16 @@ export const HqOfficialPricingView: React.FC<HqOfficialPricingViewProps> = ({
                     {item.seats}
                   </td>
 
-                  {/* 3~6. 요금 4개 열 (버스는 하이픈 4번 대신 연한 회색 배경에 '별도 상담' 뱃지 1개 표시) */}
+                  {/* 3~6. 요금 4개 열 (버스는 하이픈 4번 대신 별도 상담 전화 아이콘 표시) */}
                   {item.quoteRequired ? (
                     <td colSpan={4} className="py-3.5 px-3 text-center bg-slate-50/50">
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200/80 shadow-2xs">
-                        별도 상담
-                      </span>
+                      <div className="inline-flex items-center justify-center group/call cursor-pointer" title="별도 상담 (전화 문의)">
+                        <img
+                          src="/images/icons/call.png"
+                          alt="별도 상담"
+                          className="w-7 h-7 object-contain transition-transform duration-200 group-hover/call:scale-125 drop-shadow-xs"
+                        />
+                      </div>
                     </td>
                   ) : (
                     <>

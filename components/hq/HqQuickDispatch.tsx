@@ -367,8 +367,23 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
   const selectedTimeItemRef = useRef<HTMLButtonElement>(null);
   const timeDropdownListRef = useRef<HTMLDivElement>(null);
   const [endTime, setEndTime] = useState(() => initialBooking?.endTime || '');
+
+  // Automatically compute sensible effective end time if not explicitly provided
+  const effectiveEndTime = useMemo(() => {
+    if (endTime) return endTime;
+    if (initialBooking?.endTime) return initialBooking.endTime;
+    const [h, m] = (pickupTimeOnly || '09:00').split(':').map((v) => parseInt(v, 10));
+    if (isNaN(h)) return '18:00';
+    if (pickupEndDate && pickupDate && pickupEndDate > pickupDate) {
+      return pickupTimeOnly || '18:00';
+    }
+    const endHour = Math.min(23, h + 3);
+    const endMinute = isNaN(m) ? 0 : m;
+    return `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`;
+  }, [endTime, initialBooking?.endTime, pickupTimeOnly, pickupDate, pickupEndDate]);
+
   const excludeScheduleId = initialBooking?.scheduleId || initialBooking?.id;
-  const fleet = useFleetAvailability(pickupDate, pickupTimeOnly, pickupEndDate || pickupDate, endTime, excludeScheduleId);
+  const fleet = useFleetAvailability(pickupDate, pickupTimeOnly, pickupEndDate || pickupDate, effectiveEndTime, excludeScheduleId);
   const { drivers: hqDrivers } = useHqDrivers();
   const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
   const timePickerRef = useRef<HTMLDivElement>(null);
@@ -892,7 +907,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
 
     if (mode === 'published') {
       if (totalLiveConflicts > 0) { setErrorMsg('선택 기간의 기사·차량 충돌을 먼저 해결해 주세요.'); return; }
-      const error = validateDispatchInterval({ date: pickupDate, pickupTime: pickupTimeOnly, endDate: pickupEndDate || pickupDate, endTime, dispatchStatus: mode });
+      const error = validateDispatchInterval({ date: pickupDate, pickupTime: pickupTimeOnly, endDate: pickupEndDate || pickupDate, endTime: effectiveEndTime, dispatchStatus: mode });
       if (error) { setErrorMsg(error); return; }
       if (!fleet.data) { setErrorMsg(fleet.error || '선택한 기간의 가용성 확인이 필요합니다.'); return; }
       for (const allocation of allocations) {
@@ -985,7 +1000,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
         date: pickupDate,
         endDate: pickupEndDate || pickupDate,
         pickupTime: pickupTimeOnly,
-        endTime: endTime || undefined,
+        endTime: effectiveEndTime,
         vehicleId: matchedVehicle?.uuid,
         origin: pickupLocation.trim(),
         destination: destination.trim(),
@@ -1519,55 +1534,40 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
             </div>
           </div>
 
-          <div className="space-y-3 rounded-xl border border-slate-200 p-3 bg-slate-50/50">
-            <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
-              <div>
-                <span className="text-xs font-black text-slate-900">차량 및 기사 배차</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-slate-600">차량 수:</span>
+          {/* 차량 및 기사 배차 (Clean White UI, Aligned with Other Fields) */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-bold text-slate-800">
+                차량 및 기사 배차
+              </label>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] font-bold text-slate-500">차량 수:</span>
                 <div className="inline-flex items-center bg-white border border-slate-200 rounded-lg p-0.5 shadow-2xs">
                   <button
                     type="button"
                     onClick={handleDecrementVehicle}
                     disabled={allocations.length <= 1}
-                    className="w-7 h-7 rounded bg-blue-50/80 hover:bg-blue-100 text-[#1E60F3] font-black flex items-center justify-center transition-colors active:scale-95 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                    className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-black flex items-center justify-center transition-colors active:scale-95 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
                     aria-label="차량 감소"
                   >
-                    <Minus className="w-3.5 h-3.5 stroke-[3]" />
+                    <Minus className="w-3 h-3 stroke-[2.5]" />
                   </button>
 
-                  <span className="w-9 text-xs font-black text-slate-900 text-center">
+                  <span className="w-7 text-xs font-black text-slate-900 text-center">
                     {allocations.length}대
                   </span>
 
                   <button
                     type="button"
                     onClick={handleIncrementVehicle}
-                    className="w-7 h-7 rounded bg-blue-50/80 hover:bg-blue-100 text-[#1E60F3] font-black flex items-center justify-center transition-colors active:scale-95 cursor-pointer"
+                    className="w-6 h-6 rounded bg-[#1E60F3] hover:bg-blue-600 text-white font-black flex items-center justify-center transition-colors active:scale-95 cursor-pointer"
                     aria-label="차량 증가"
                   >
-                    <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                    <Plus className="w-3 h-3 stroke-[2.5]" />
                   </button>
                 </div>
               </div>
             </div>
-
-            <label className="block text-xs font-bold text-slate-800">
-              도착 예정 시간 <span className="text-red-500 font-bold ml-0.5">*</span>
-              <input
-                type="time"
-                aria-label="도착 예정 시간"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-                className="mt-1 w-full h-11 rounded-lg border border-slate-200 px-3 bg-white text-xs font-semibold"
-              />
-            </label>
-            {endTime && (
-              <p className="text-[11px] text-slate-400 font-medium mt-1">
-                {fleet.error || (fleet.loading ? '선택 기간의 가용성을 확인하고 있습니다.' : '복귀 여유 60분 포함')}
-              </p>
-            )}
 
             {allocations.map((allocation, index) => {
               const isOpenVehicle =
@@ -1607,7 +1607,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
               return (
                 <div
                   key={allocation.id}
-                  className="grid grid-cols-1 gap-3 sm:grid-cols-2 pt-2 border-t border-slate-200/50"
+                  className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${index > 0 ? 'pt-2.5 border-t border-slate-100' : ''}`}
                 >
                   {/* 1. 배정 차량 Selector */}
                   <div className="relative">
