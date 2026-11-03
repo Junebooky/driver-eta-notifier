@@ -44,25 +44,25 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
     badge?: number;
     badgeColor?: string;
   }[] = [
-    {
-      id: 'dispatch',
-      label: '예약·배차 관리',
-      icon: CalendarCheck,
-      badge: dispatchActionBadgeCount > 0 ? dispatchActionBadgeCount : undefined,
-      badgeColor: 'bg-[#1E60F3] text-white',
-    },
-    { id: 'operations', label: '실시간 운영 보드', icon: Activity },
-    { id: 'quotes', label: '견적·가격표', icon: Calculator },
-    { id: 'customers', label: '고객 관리', icon: Building2 },
-    { id: 'emails', label: '고객 이메일', icon: Mail },
-    { id: 'vehicles', label: '차량 관리', icon: Car },
-    { id: 'drivers', label: '기사 관리', icon: Users },
-    { id: 'driving_logs', label: '운행일지 관리', icon: FileSpreadsheet },
-    { id: 'expenses', label: '경비지출', icon: Receipt },
-    { id: 'field_knowledge', label: '현장 지식', icon: BookOpen },
-    { id: 'reports', label: '보고서·통계', icon: BarChart3 },
-    { id: 'settings', label: '설정·권한', icon: Settings },
-  ];
+      {
+        id: 'dispatch',
+        label: '예약·배차 관리',
+        icon: CalendarCheck,
+        badge: dispatchActionBadgeCount > 0 ? dispatchActionBadgeCount : undefined,
+        badgeColor: 'bg-[#1E60F3] text-white',
+      },
+      { id: 'operations', label: '실시간 운영 보드', icon: Activity },
+      { id: 'quotes', label: '견적·가격표', icon: Calculator },
+      { id: 'customers', label: '고객 관리', icon: Building2 },
+      { id: 'emails', label: '고객 이메일', icon: Mail },
+      { id: 'vehicles', label: '차량 관리', icon: Car },
+      { id: 'drivers', label: '기사 관리', icon: Users },
+      { id: 'driving_logs', label: '운행일지 관리', icon: FileSpreadsheet },
+      { id: 'expenses', label: '경비지출', icon: Receipt },
+      { id: 'field_knowledge', label: '현장 지식', icon: BookOpen },
+      { id: 'reports', label: '보고서·통계', icon: BarChart3 },
+      { id: 'settings', label: '설정·권한', icon: Settings },
+    ];
 
   const renderSidebarBody = (isMobileDrawer: boolean) => (
     <>
@@ -81,7 +81,7 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
 
         <div
           onClick={() => haptics.lightTap()}
-          className="group relative flex flex-col items-center justify-center p-3 rounded-2xl bg-gradient-to-b from-slate-50/80 to-slate-100/40 border border-slate-200/70 shadow-2xs hover:border-blue-200 hover:shadow-xs transition-all duration-200 cursor-pointer"
+          className="group relative flex flex-col items-center justify-center p-3 rounded-2xl shadow-2xs hover:shadow-xs transition-all duration-200 cursor-pointer"
         >
           {/* 말풍선 Tooltip - reveals on hover */}
           <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 whitespace-nowrap bg-slate-900 text-white text-[11px] font-extrabold px-3 py-1.5 rounded-full shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 group-hover:-translate-y-1 transition-all duration-200 flex items-center gap-1 z-30">
@@ -94,7 +94,7 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
             <img
               src="/logo.png"
               alt="VIP Limousine Logo"
-              className="w-24 h-24 sm:w-28 sm:h-28 object-contain drop-shadow-md select-none"
+              className="w-24 h-24 sm:w-24 sm:h-24 object-contain drop-shadow-md select-none"
             />
           </div>
         </div>
@@ -115,27 +115,24 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
                 onSelectTab(item.id);
                 onCloseMobile?.();
               }}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all text-left cursor-pointer active:scale-[0.98] ${
-                activeTab === item.id || (item.id === 'dispatch' && activeTab === 'dispatch')
-                  ? 'bg-blue-50/80 text-[#1E60F3] shadow-xs'
-                  : isActive && item.id !== 'dispatch'
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all text-left cursor-pointer active:scale-[0.98] ${activeTab === item.id || (item.id === 'dispatch' && activeTab === 'dispatch')
+                ? 'bg-blue-50/80 text-[#1E60F3] shadow-xs'
+                : isActive && item.id !== 'dispatch'
                   ? 'bg-blue-50/80 text-[#1E60F3] shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
+                }`}
             >
               <div className="flex items-center gap-3 min-w-0">
                 <Icon
-                  className={`w-4 h-4 shrink-0 transition-colors ${
-                    activeTab === item.id ? 'text-[#1E60F3]' : 'text-slate-400'
-                  }`}
+                  className={`w-4 h-4 shrink-0 transition-colors ${activeTab === item.id ? 'text-[#1E60F3]' : 'text-slate-400'
+                    }`}
                 />
                 <span className="truncate">{item.label}</span>
               </div>
               {item.badge !== undefined && (
                 <span
-                  className={`min-w-5 h-5 px-1.5 rounded-full text-[10px] font-black flex items-center justify-center shrink-0 ${
-                    item.badgeColor || 'bg-blue-100 text-[#1E60F3]'
-                  }`}
+                  className={`min-w-5 h-5 px-1.5 rounded-full text-[10px] font-black flex items-center justify-center shrink-0 ${item.badgeColor || 'bg-blue-100 text-[#1E60F3]'
+                    }`}
                 >
                   {item.badge}
                 </span>

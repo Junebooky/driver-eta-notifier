@@ -76,7 +76,7 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
   onCreateBooking,
   onSavedServer,
 }) => {
-  const [dispatchMutation]=useState(()=>createRetryableJsonMutation('cockpit_pending_email_dispatch'));
+  const [dispatchMutation] = useState(() => createRetryableJsonMutation('cockpit_pending_email_dispatch'));
   const searchParams = useSearchParams();
   const urlStep = searchParams?.get('step') as EmailWorkflowStep | null;
   const urlDriverModal = searchParams?.get('driverModal') === 'true';
@@ -481,8 +481,8 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
         draft?.status === 'published' || item.draftId
           ? 'completed'
           : draft || item.aiStatus === 'draft_generated'
-          ? 'reviewing'
-          : 'unprocessed';
+            ? 'reviewing'
+            : 'unprocessed';
 
       if (statusFilter !== 'all' && category !== statusFilter) {
         return false;
@@ -580,7 +580,7 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
           emailBody = detailData.email.bodyText;
           setEmailDetails((prev) => ({ ...prev, [currentSummary.id]: detailData.email }));
         }
-      } catch {}
+      } catch { }
     }
 
     if (!emailBody?.trim()) {
@@ -642,25 +642,25 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
   // =========================================================
   // Step 2 -> Step 4 Dispatch Confirmation (Server Real Sync)
   // =========================================================
-  const handleConfirmDispatch = async (status:'published'|'unassigned'='published') => {
-    if(!currentSummary || !currentDraft || isDispatching)return;
-    setIsDispatching(true);setDispatchError(null);
-    try{
-      if(currentDraft.savedScheduleIds)throw new Error('이미 저장된 요청입니다. 모바일·PC의 예약 목록에서 날짜별 배정을 진행해 주세요.');
-      const items=buildEmailDispatchPlan(currentDraft,vehicleSlots,status);
-      if(currentDraft.savedScheduleIds && (Object.keys(currentDraft.savedScheduleIds).length!==items.length || items.some(item=>!item.scheduleId)))throw new Error('이미 저장한 날짜·차량 구성이 변경되었습니다. 기존 미배정 예약을 먼저 확인·취소해 주세요.');
-      const response=await dispatchMutation.send('/api/schedules/dispatch',{items});
-      const data=await response.json();
-      if(!response.ok || !data.ok || data.schedules?.length!==items.length)throw new Error(data.error || '전체 일정 저장을 확인하지 못했습니다.');
-      const updated={...currentDraft,status:status==='published'?'published' as const:'saved' as const,associatedBookingId:data.schedules[0].id,savedScheduleIds:Object.fromEntries(items.map((item,index)=>[`${item.date}:${item.groupVehicleIndex-1}`,data.schedules[index].id]))};
-      saveEmailDraft(updated);setDraftsByEmailId(previous=>({...previous,[currentSummary.id]:updated}));
+  const handleConfirmDispatch = async (status: 'published' | 'unassigned' = 'published') => {
+    if (!currentSummary || !currentDraft || isDispatching) return;
+    setIsDispatching(true); setDispatchError(null);
+    try {
+      if (currentDraft.savedScheduleIds) throw new Error('이미 저장된 요청입니다. 모바일·PC의 예약 목록에서 날짜별 배정을 진행해 주세요.');
+      const items = buildEmailDispatchPlan(currentDraft, vehicleSlots, status);
+      if (currentDraft.savedScheduleIds && (Object.keys(currentDraft.savedScheduleIds).length !== items.length || items.some(item => !item.scheduleId))) throw new Error('이미 저장한 날짜·차량 구성이 변경되었습니다. 기존 미배정 예약을 먼저 확인·취소해 주세요.');
+      const response = await dispatchMutation.send('/api/schedules/dispatch', { items });
+      const data = await response.json();
+      if (!response.ok || !data.ok || data.schedules?.length !== items.length) throw new Error(data.error || '전체 일정 저장을 확인하지 못했습니다.');
+      const updated = { ...currentDraft, status: status === 'published' ? 'published' as const : 'saved' as const, associatedBookingId: data.schedules[0].id, savedScheduleIds: Object.fromEntries(items.map((item, index) => [`${item.date}:${item.groupVehicleIndex - 1}`, data.schedules[index].id])) };
+      saveEmailDraft(updated); setDraftsByEmailId(previous => ({ ...previous, [currentSummary.id]: updated }));
       setDispatchedSchedule(data.schedules[0]);
-      data.schedules.forEach((schedule:import('@/data/ferrariSchedules').ScheduleItem,index:number)=>onCreateBooking?.(mapScheduleItemToHqBooking(schedule,index)));
+      data.schedules.forEach((schedule: import('@/data/ferrariSchedules').ScheduleItem, index: number) => onCreateBooking?.(mapScheduleItemToHqBooking(schedule, index)));
       await onSavedServer?.();
-      if(status==='published')setWorkflowStep('step4_dispatch_done');
-      showToast(status==='published'?`${items.length}건의 날짜별 배차가 저장되었습니다.`:'대표 모바일·PC의 미배정 배차 목록에 지정 요청이 저장되었습니다.');
-    }catch(error){setDispatchError(error instanceof Error?error.message:'배차 저장에 실패했습니다.');}
-    finally{setIsDispatching(false);}
+      if (status === 'published') setWorkflowStep('step4_dispatch_done');
+      showToast(status === 'published' ? `${items.length}건의 날짜별 배차가 저장되었습니다.` : '대표 모바일·PC의 미배정 배차 목록에 지정 요청이 저장되었습니다.');
+    } catch (error) { setDispatchError(error instanceof Error ? error.message : '배차 저장에 실패했습니다.'); }
+    finally { setIsDispatching(false); }
   };
 
   // Reset to Step 1
@@ -746,7 +746,7 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
           <img
             src="/images/icons/icon_naver.png"
             alt="Naver"
-            className="w-6 h-6 sm:w-7 sm:h-7 object-contain shrink-0"
+            className="w-8 h-8 sm:w-8 sm:h-8 object-contain shrink-0"
           />
           <span className="text-xs font-bold text-slate-600 truncate">
             동기화: {imapState.lastSync || '방금 전'}
@@ -813,22 +813,20 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
             <button
               type="button"
               onClick={() => setStatusFilter('all')}
-              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer shrink-0 ${
-                statusFilter === 'all'
+              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer shrink-0 ${statusFilter === 'all'
                   ? 'bg-slate-900 text-white shadow-2xs'
                   : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900'
-              }`}
+                }`}
             >
               전체
             </button>
             <button
               type="button"
               onClick={() => setStatusFilter('unprocessed')}
-              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer shrink-0 flex items-center gap-1 ${
-                statusFilter === 'unprocessed'
+              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer shrink-0 flex items-center gap-1 ${statusFilter === 'unprocessed'
                   ? 'bg-blue-600 text-white shadow-2xs'
                   : 'bg-blue-50/70 border border-blue-200/60 text-[#1E60F3] hover:bg-blue-100'
-              }`}
+                }`}
             >
               <span>미처리</span>
               <span className="font-black">{counts.unprocessed}</span>
@@ -836,11 +834,10 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
             <button
               type="button"
               onClick={() => setStatusFilter('reviewing')}
-              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer shrink-0 flex items-center gap-1 ${
-                statusFilter === 'reviewing'
+              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer shrink-0 flex items-center gap-1 ${statusFilter === 'reviewing'
                   ? 'bg-slate-700 text-white shadow-2xs'
                   : 'bg-slate-100 border border-slate-200 text-slate-600 hover:bg-slate-200'
-              }`}
+                }`}
             >
               <span>검토중</span>
               <span className="font-black">{counts.reviewing}</span>
@@ -848,11 +845,10 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
             <button
               type="button"
               onClick={() => setStatusFilter('completed')}
-              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer shrink-0 flex items-center gap-1 ${
-                statusFilter === 'completed'
+              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer shrink-0 flex items-center gap-1 ${statusFilter === 'completed'
                   ? 'bg-emerald-600 text-white shadow-2xs'
                   : 'bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100'
-              }`}
+                }`}
             >
               <span>예약완료</span>
               <span className="font-black">{counts.completed}</span>
@@ -901,11 +897,10 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                   <div
                     key={item.id}
                     onClick={() => handleSelectEmail(item.id)}
-                    className={`p-3.5 transition-all cursor-pointer relative group ${
-                      isSelected
+                    className={`p-3.5 transition-all cursor-pointer relative group ${isSelected
                         ? 'bg-blue-50/90 border-l-4 border-l-[#1E60F3] shadow-2xs'
                         : 'hover:bg-slate-50 border-l-4 border-l-transparent'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-start gap-3">
                       {/* Avatar Initials Badge */}
@@ -916,11 +911,10 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-1">
                           <span
-                            className={`text-xs truncate ${
-                              isSelected
+                            className={`text-xs truncate ${isSelected
                                 ? 'font-black text-[#0B1E48]'
                                 : 'font-extrabold text-slate-800'
-                            }`}
+                              }`}
                           >
                             {item.from.name || item.from.address}
                           </span>
@@ -930,11 +924,10 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                         </div>
 
                         <h4
-                          className={`text-xs mt-0.5 line-clamp-1 leading-snug ${
-                            isSelected
+                          className={`text-xs mt-0.5 line-clamp-1 leading-snug ${isSelected
                               ? 'font-extrabold text-blue-950'
                               : 'font-semibold text-slate-700'
-                          }`}
+                            }`}
                         >
                           {item.subject}
                         </h4>
@@ -974,7 +967,7 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
         {/* Dynamic Right Column: Sequential Multi-Step Workflow Card */}
         {/* ========================================================= */}
         <div className="flex-1 min-w-0 w-full space-y-4">
-          {dispatchMutation.hasPending && <button type="button" className="rounded-xl border border-blue-200 p-3 text-sm text-blue-700" onClick={async()=>{try{const response=await dispatchMutation.retry();const data=await response.json();if(!response.ok||!data.ok)throw new Error(data.error || '저장 결과를 확인하지 못했습니다.');window.location.reload();}catch(error){setDispatchError(error instanceof Error?error.message:'저장 결과를 확인하지 못했습니다.');}}}>이전 배차 저장 결과 확인</button>}
+          {dispatchMutation.hasPending && <button type="button" className="rounded-xl border border-blue-200 p-3 text-sm text-blue-700" onClick={async () => { try { const response = await dispatchMutation.retry(); const data = await response.json(); if (!response.ok || !data.ok) throw new Error(data.error || '저장 결과를 확인하지 못했습니다.'); window.location.reload(); } catch (error) { setDispatchError(error instanceof Error ? error.message : '저장 결과를 확인하지 못했습니다.'); } }}>이전 배차 저장 결과 확인</button>}
           {currentSummary && (
             <div className="rounded-2xl border border-slate-200/90 overflow-hidden shadow-xs">
               <HqEmailWorkflowStepper
@@ -1022,8 +1015,8 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                   extractedDraft={currentDraft}
                   vehicleSlots={vehicleSlots}
                   onOpenDriverModal={handleOpenDriverModal}
-                  onConfirmDispatch={()=>void handleConfirmDispatch('published')}
-                  onRequestAssignment={()=>void handleConfirmDispatch('unassigned')}
+                  onConfirmDispatch={() => void handleConfirmDispatch('published')}
+                  onRequestAssignment={() => void handleConfirmDispatch('unassigned')}
                   onBackToStep1={() => setWorkflowStep('step1_extract')}
                   onUpdateDraft={handleUpdateDraft}
                   onUpdateVehicleSlots={setVehicleSlots}

@@ -47,6 +47,7 @@ import { HqBooking } from '@/types/hq';
 import type { FleetAvailabilityResult } from '@/utils/availabilityEngine';
 import { VEHICLE_STATUS_LABELS } from '@/utils/fleetVehicleStatus';
 import { haptics } from '@/utils/haptics';
+import { NewVehicleModal, NewVehicleFormData } from './NewVehicleModal';
 
 export interface HqVehicleManagementViewProps {
   initialSearchQuery?: string;
@@ -219,10 +220,38 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
     };
   }, [fetchAvailability]);
 
-  // 6. Modals State
+  // 6. Modals & Toast State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
+  const [isNewVehicleModalOpen, setIsNewVehicleModalOpen] = useState(false);
   const [copiedToast, setCopiedToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = useCallback((msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3200);
+  }, []);
+
+  // Custom vehicles dynamically added via NewVehicleModal (persisted to localStorage)
+  const [customVehicles, setCustomVehicles] = useState<VipRealVehicle[]>([]);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('vip_hq_custom_vehicles');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          setCustomVehicles(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to parse cached custom vehicles', e);
+    }
+  }, []);
+
+  const allBaseVehicles = useMemo(() => {
+    return [...customVehicles, ...VIP_REAL_VEHICLES];
+  }, [customVehicles]);
 
   // Edit Modal Form State
   const [editStatus, setEditStatus] = useState<'확인 필요' | '대기 중' | '운행 중' | '정비 중'>('확인 필요');
@@ -233,7 +262,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
 
   // Enriched vehicles with category, fuel normalization, and verified attributes
   const enrichedVehicles = useMemo(() => {
-    return VIP_REAL_VEHICLES.map((v) => {
+    return allBaseVehicles.map((v) => {
       const uiCategory = mapVehicleToUiCategory(v);
       const override = statusOverrides[v.id] || statusOverrides[v.plate];
       const live = availabilityState === 'success' ? fleetResult?.vehicles.find(row => row.uuid === v.uuid) : undefined;
@@ -262,7 +291,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
         fuelDisplay: fuel,
       };
     });
-  }, [availabilityState, fleetResult, serverColors, statusOverrides]);
+  }, [allBaseVehicles, availabilityState, fleetResult, serverColors, statusOverrides]);
 
   // Filtered vehicles for Center Column
   const filteredVehicles = useMemo(() => {
@@ -485,21 +514,80 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
   }, [selectedVehicle]);
 
 
-  // Category counts
+  // Dynamic Category counts
   const categoryCounts = useMemo(() => {
-    const counts = { all: 20, sedan: 4, suv: 1, van: 6, sprinter: 9 };
-    return counts;
-  }, []);
+    return {
+      all: enrichedVehicles.length,
+      sedan: enrichedVehicles.filter((v) => v.uiCategory === 'sedan').length,
+      suv: enrichedVehicles.filter((v) => v.uiCategory === 'suv').length,
+      van: enrichedVehicles.filter((v) => v.uiCategory === 'van').length,
+      sprinter: enrichedVehicles.filter((v) => v.uiCategory === 'sprinter').length,
+    };
+  }, [enrichedVehicles]);
 
-  // Fuel counts
+  // Dynamic Fuel counts
   const fuelCounts = useMemo(() => {
     return {
-      all: 20,
+      all: enrichedVehicles.length,
       gasoline: enrichedVehicles.filter((v) => v.fuelDisplay === '휘발유').length,
       diesel: enrichedVehicles.filter((v) => v.fuelDisplay === '경유').length,
       hybrid: enrichedVehicles.filter((v) => v.fuelType === '하이브리드').length,
     };
   }, [enrichedVehicles]);
+
+  // Register New Vehicle Handler
+  const handleCreateVehicle = (data: NewVehicleFormData) => {
+    const newVehicle: VipRealVehicle = {
+      id: `vehicle-custom-${Date.now()}`,
+      uuid: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `custom-${Date.now()}`,
+      plate: data.plate,
+      plateShort: data.plate.trim().split(/\s+/).pop() || data.plate.slice(-4),
+      model: data.model,
+      modelShort: data.model.replace(/^(벤츠|현대|기아|제네시스)\s+/, ''),
+      brand: (
+        data.model.includes('벤츠') ? '벤츠' :
+        data.model.includes('현대') ? '현대' :
+        data.model.includes('기아') ? '기아' :
+        data.model.includes('제네시스') ? '제네시스' :
+        data.category === 'sprinter' ? '벤츠' :
+        data.category === 'sedan' ? '제네시스' :
+        data.category === 'suv' ? '제네시스' : '현대'
+      ),
+      category: (
+        data.category === 'sprinter' ? 'sprinter' :
+        data.category === 'suv' ? 'genesis' :
+        data.category === 'van' ? 'carnival' :
+        data.model.includes('벤츠') || data.model.includes('S') ? 's_class' : 'genesis'
+      ),
+      categoryLabel: (
+        data.category === 'sprinter' ? '스프린터' :
+        data.category === 'suv' ? 'SUV' :
+        data.category === 'van' ? '밴' : '세단'
+      ),
+      subType: data.model,
+      capacity: data.capacity,
+      status: '차고지 대기', // Initial status: displays as '배차 가능'
+      fuelType: data.fuelType === '경유' ? '디젤' : data.fuelType === '휘발유' ? '가솔린' : '하이브리드',
+      year: '2026',
+      color: '블랙 (기본)',
+      imageUrl: data.imageUrl,
+    };
+
+    setCustomVehicles((prev) => {
+      const next = [newVehicle, ...prev];
+      try {
+        localStorage.setItem('vip_hq_custom_vehicles', JSON.stringify(next));
+      } catch (err) {
+        console.warn('Failed to save custom vehicles to localStorage', err);
+      }
+      return next;
+    });
+
+    setSelectedVehicleId(newVehicle.id);
+    setIsNewVehicleModalOpen(false);
+    showToast('차량이 성공적으로 등록되었습니다.');
+    haptics.success();
+  };
 
   return (
     <div className="space-y-4">
@@ -584,7 +672,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
             </div>
 
             {/* Search Input */}
-            <div className="relative min-w-[220px] flex-1 sm:w-64">
+            <div className="relative min-w-[200px] flex-1 sm:w-64">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
               <input
                 type="text"
@@ -603,6 +691,20 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                 </button>
               )}
             </div>
+
+            {/* + 차량 등록 Button */}
+            <button
+              type="button"
+              onClick={() => {
+                haptics.lightTap();
+                setIsNewVehicleModalOpen(true);
+              }}
+              className="bg-[#0050FF] hover:bg-blue-700 text-white font-semibold text-xs px-3.5 py-2 rounded-xl shadow-xs transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer active:scale-95 shrink-0"
+              title="신규 차량 등록"
+            >
+              <Plus className="w-4 h-4 stroke-[2.2]" />
+              <span>+ 차량 등록</span>
+            </button>
           </div>
         </div>
       </div>
@@ -1401,6 +1503,21 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* New Vehicle Registration Modal */}
+      <NewVehicleModal
+        isOpen={isNewVehicleModalOpen}
+        onClose={() => setIsNewVehicleModalOpen(false)}
+        onSubmit={handleCreateVehicle}
+      />
+
+      {/* Toast Alert Banner */}
+      {toastMessage && (
+        <div className="fixed top-20 right-6 z-50 bg-[#0B1E48] text-white px-4 py-3 rounded-2xl shadow-xl border border-blue-500/30 flex items-center gap-2.5 text-xs font-bold animate-slide-up">
+          <span className="w-2 h-2 rounded-full bg-[#1E60F3] animate-ping" />
+          <span>{toastMessage}</span>
         </div>
       )}
     </div>
