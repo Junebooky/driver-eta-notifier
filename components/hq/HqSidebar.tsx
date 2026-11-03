@@ -66,35 +66,38 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
 
   const renderSidebarBody = (isMobileDrawer: boolean) => (
     <>
-      {/* Brand Header */}
-      <div className="p-5 pb-5 border-b border-slate-100/80 flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="flex items-baseline tracking-tight">
-              <span className="text-xl font-black text-[#0B1E48] tracking-tighter">VIP</span>
-              <span className="text-[13px] font-black text-[#1E60F3] ml-1.5 tracking-tight uppercase">
-                Limousine
-              </span>
-              <span className="text-[11px] font-bold text-slate-500 ml-1 tracking-tight">
-                Korea
-              </span>
-            </div>
-          </div>
-          <p className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase mt-0.5">
-            HQ Operations System
-          </p>
-        </div>
-
+      {/* Brand Header Card with Logo */}
+      <div className="p-3.5 pt-5 pb-4 border-b border-slate-100/80 relative">
         {isMobileDrawer && (
           <button
             type="button"
             onClick={onCloseMobile}
-            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center cursor-pointer"
+            className="absolute top-2.5 right-2.5 z-40 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center cursor-pointer transition-colors"
             aria-label="메뉴 닫기"
           >
             <X className="w-4 h-4" />
           </button>
         )}
+
+        <div
+          onClick={() => haptics.lightTap()}
+          className="group relative flex flex-col items-center justify-center p-3 rounded-2xl bg-gradient-to-b from-slate-50/80 to-slate-100/40 border border-slate-200/70 shadow-2xs hover:border-blue-200 hover:shadow-xs transition-all duration-200 cursor-pointer"
+        >
+          {/* 말풍선 Tooltip - reveals on hover */}
+          <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 whitespace-nowrap bg-slate-900 text-white text-[11px] font-extrabold px-3 py-1.5 rounded-full shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 group-hover:-translate-y-1 transition-all duration-200 flex items-center gap-1 z-30">
+            <span>현재 개발 중!</span>
+            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-slate-900 rotate-45" />
+          </div>
+
+          {/* Logo with center scale-up on hover */}
+          <div className="transition-transform duration-200 ease-out group-hover:scale-110 active:scale-95 flex items-center justify-center py-1">
+            <img
+              src="/logo.png"
+              alt="VIP Limousine Logo"
+              className="w-24 h-24 sm:w-28 sm:h-28 object-contain drop-shadow-md select-none"
+            />
+          </div>
+        </div>
       </div>
 
       {/* Navigation List */}
