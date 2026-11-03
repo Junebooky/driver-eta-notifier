@@ -5,7 +5,6 @@ import {
   AlertTriangle,
   CheckCircle2,
   CreditCard,
-  FileSpreadsheet,
   Info,
   Link2,
   Sparkles,
@@ -365,9 +364,13 @@ export default function HqHipassImportModal({
           <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
             <div className="md:col-span-5 flex flex-col justify-between rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
               <div>
-                <div className="flex items-center gap-2 text-xs font-extrabold text-slate-800 mb-1">
-                  <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
-                  1. 하이패스 엑셀(XLSX) / CSV 파일 업로드
+                <div className="flex items-center gap-2 text-xs font-extrabold text-slate-800 mb-1 group">
+                  <img
+                    src="/images/icons/icon_excel.png"
+                    alt="Excel"
+                    className="w-4 h-4 object-contain shrink-0 transition-transform duration-150 group-hover:scale-110"
+                  />
+                  <span>1. 하이패스 엑셀(XLSX) / CSV 파일 업로드</span>
                 </div>
                 <p className="text-[11px] text-slate-500 leading-relaxed">
                   지원 형식: .xlsx, .xls, .csv, .tsv (도로공사 및 카드사 명세서 자동 호환)

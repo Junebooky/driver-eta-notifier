@@ -8,9 +8,7 @@ import {
   Car,
   CheckCircle2,
   Clock,
-  Download,
   Eye,
-  FileSpreadsheet,
   FileText,
   Globe,
   Info,
@@ -846,9 +844,13 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                       <button
                         type="button"
                         onClick={handleDownloadAdminCsv}
-                        className="px-3 py-2 rounded-xl border border-blue-200 bg-blue-50/70 hover:bg-blue-100 text-[#0050FF] text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                        className="group px-3 py-2 rounded-xl border border-blue-200 bg-blue-50/70 hover:bg-blue-100 text-[#0050FF] text-xs font-bold flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all"
                       >
-                        <FileSpreadsheet className="w-3.5 h-3.5" />
+                        <img
+                          src="/images/icons/icon_excel.png"
+                          alt="Excel"
+                          className="w-4 h-4 object-contain shrink-0 transition-transform duration-150 group-hover:scale-110"
+                        />
                         <span>내부 수익성 Excel</span>
                       </button>
                     </>
@@ -857,9 +859,13 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                   <button
                     type="button"
                     onClick={handleDownloadClientCsv}
-                    className="px-3 py-2 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                    className="group px-3 py-2 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all"
                   >
-                    <Download className="w-3.5 h-3.5" />
+                    <img
+                      src="/images/icons/icon_excel.png"
+                      alt="Excel"
+                      className="w-4 h-4 object-contain shrink-0 transition-transform duration-150 group-hover:scale-110"
+                    />
                     <span>고객사 제출용 Excel</span>
                   </button>
 

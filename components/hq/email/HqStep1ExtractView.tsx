@@ -5,7 +5,6 @@ import {
   Sparkles,
   Paperclip,
   FileText,
-  FileSpreadsheet,
   ArrowRight,
   Edit3,
   Calendar,
@@ -503,9 +502,13 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:border-emerald-400 transition-colors cursor-pointer group">
-                <div className="w-6 h-6 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                  <FileSpreadsheet className="w-3.5 h-3.5" />
+              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:border-emerald-400 transition-colors cursor-pointer group active:scale-95">
+                <div className="w-6 h-6 rounded-md bg-emerald-50 flex items-center justify-center shrink-0">
+                  <img
+                    src="/images/icons/icon_excel.png"
+                    alt="Excel"
+                    className="w-4 h-4 object-contain shrink-0 transition-transform duration-150 group-hover:scale-110"
+                  />
                 </div>
                 <div className="text-left">
                   <div className="text-[11px] font-bold text-slate-800 group-hover:text-emerald-600 transition-colors">

@@ -15,7 +15,6 @@ import {
   AlertCircle,
   CheckCircle2,
   Lock,
-  Layers,
 } from 'lucide-react';
 import { HqBooking } from '@/types/hq';
 import {
@@ -430,30 +429,6 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
     };
   }, [selectedEmailId, isDemoMode, emailDetails, draftsByEmailId]);
 
-  // Toggle Demo Mode (for local development preview only)
-  const handleToggleDemoMode = () => {
-    if (!isDemoMode) {
-      setIsDemoMode(true);
-      const demoSummaries = REFERENCE_EMAILS.map((e) => e.summary);
-      setEmails(demoSummaries);
-      setSelectedEmailId(demoSummaries[0]?.id || null);
-      setImapState({
-        isConfigured: true,
-        syncStatus: 'connected',
-        totalCount: demoSummaries.length,
-        accountEmail: 'demo@viplimousine.kr (데모 모드)',
-        lastSync: '데모 샘플',
-      });
-      showToast('데모 샘플 메일함으로 전환되었습니다.');
-    } else {
-      setIsDemoMode(false);
-      setEmails([]);
-      setSelectedEmailId(null);
-      fetchLiveInbox(true);
-      showToast('실제 NAVER 메일함 동기화 모드로 전환되었습니다.');
-    }
-  };
-
   // Active email summary & detail
   const currentSummary: HqEmailSummary | null = useMemo(() => {
     if (!selectedEmailId) return null;
@@ -766,69 +741,28 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
       )}
 
       {/* Live Connection / IMAP Status Banner */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs ${
-            imapState.syncStatus === 'connected'
-              ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
-              : 'bg-amber-50 text-amber-600 border border-amber-200'
-          }`}>
-            <Mail className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-black text-slate-900">
-                {isDemoMode ? '데모 샘플 메일함' : 'NAVER 공식 메일함'}
-              </span>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border flex items-center gap-1 ${
-                imapState.syncStatus === 'connected'
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                  : 'bg-amber-50 text-amber-700 border-amber-200'
-              }`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${imapState.syncStatus === 'connected' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                <span>{imapState.syncStatus === 'connected' ? '실시간 동기화 (PEEK Read-Only)' : '미연결 / 설정 확인'}</span>
-              </span>
-            </div>
-            <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-2">
-              <span>계정: {imapState.accountEmail || '미설정'}</span>
-              {imapState.lastSync && (
-                <>
-                  <span>•</span>
-                  <span>동기화: {imapState.lastSync}</span>
-                </>
-              )}
-            </div>
-          </div>
+      <div className="bg-white rounded-2xl border border-slate-200/80 px-4 py-3 shadow-xs flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <img
+            src="/images/icons/icon_naver.png"
+            alt="Naver"
+            className="w-6 h-6 sm:w-7 sm:h-7 object-contain shrink-0"
+          />
+          <span className="text-xs font-bold text-slate-600 truncate">
+            동기화: {imapState.lastSync || '방금 전'}
+          </span>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Explicit Localhost Demo Switch */}
-          <button
-            type="button"
-            onClick={handleToggleDemoMode}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center gap-1.5 ${
-              isDemoMode
-                ? 'bg-blue-50 border-blue-300 text-[#1E60F3]'
-                : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-600'
-            }`}
-            title="개발/테스트용 데모 데이터 토글"
-          >
-            <Layers className="w-3.5 h-3.5" />
-            <span>{isDemoMode ? '실메일 모드로 복귀' : '데모 샘플 메일함 전환'}</span>
-          </button>
-
-          {/* Refresh Button */}
-          <button
-            type="button"
-            onClick={() => fetchLiveInbox(true)}
-            disabled={isLoadingInbox || isRefreshing || isDemoMode}
-            className="px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
-            title="메일함 새로고침"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 text-slate-500 ${isRefreshing || isLoadingInbox ? 'animate-spin' : ''}`} />
-            <span>새로고침</span>
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => fetchLiveInbox(true)}
+          disabled={isLoadingInbox || isRefreshing}
+          className="w-8 h-8 flex items-center justify-center rounded-xl bg-transparent border-0 hover:bg-slate-100 active:bg-slate-200 active:scale-95 transition-all duration-150 cursor-pointer disabled:opacity-50 group"
+          title={imapState.lastSync ? `최근 동기화: ${imapState.lastSync}` : '메일함 새로고침'}
+          aria-label="메일함 새로고침"
+        >
+          <RefreshCw className={`w-4 h-4 text-slate-400 group-hover:text-slate-700 transition-transform duration-150 group-hover:scale-110 active:scale-95 ${isRefreshing || isLoadingInbox ? 'animate-spin' : ''}`} />
+        </button>
       </div>
 
       {/* Disconnected / Error Notice */}
@@ -838,7 +772,7 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
           <div className="space-y-1">
             <span className="font-extrabold block">NAVER IMAP 연동 환경변수 미설정</span>
             <p className="text-amber-800 leading-relaxed font-normal">
-              서버 환경에 <code className="bg-amber-100 px-1 py-0.5 rounded font-mono font-bold">NAVER_USER</code> 및 <code className="bg-amber-100 px-1 py-0.5 rounded font-mono font-bold">NAVER_APP_PASSWORD</code>가 등록되지 않았습니다. 실메일 대신 안전하게 공백 상태를 유지하고 있으며, 테스트가 필요하신 경우 우측 상단의 <strong>[데모 샘플 메일함 전환]</strong> 버튼을 이용하세요.
+              서버 환경에 <code className="bg-amber-100 px-1 py-0.5 rounded font-mono font-bold">NAVER_USER</code> 및 <code className="bg-amber-100 px-1 py-0.5 rounded font-mono font-bold">NAVER_APP_PASSWORD</code>가 등록되지 않았습니다. 실메일 대신 안전하게 공백 상태를 유지하고 있습니다.
             </p>
           </div>
         </div>

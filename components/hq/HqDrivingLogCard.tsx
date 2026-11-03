@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { FileSpreadsheet, ChevronRight } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { HqDrivingLogItem } from '@/types/hq';
 import { haptics } from '@/utils/haptics';
 
@@ -49,9 +49,13 @@ export const HqDrivingLogCard: React.FC<HqDrivingLogCardProps> = ({
     <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
       {/* Header */}
       <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-lg bg-blue-50 text-[#1E60F3] flex items-center justify-center shrink-0">
-            <FileSpreadsheet className="w-3.5 h-3.5" />
+        <div className="flex items-center gap-2 group">
+          <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+            <img
+              src="/images/icons/icon_excel.png"
+              alt="운행일지"
+              className="w-4 h-4 object-contain shrink-0 transition-transform duration-150 group-hover:scale-110"
+            />
           </div>
           <h3 className="text-sm font-black text-slate-900 tracking-tight">
             운행일지 검토

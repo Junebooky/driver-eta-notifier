@@ -21,7 +21,6 @@ import {
   SlidersHorizontal,
   SquareParking,
   Sparkles,
-  FileSpreadsheet,
 } from 'lucide-react';
 import { HqExpenseStatus } from '@/types/expenseHq';
 import {
@@ -268,10 +267,14 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
             <button
               type="button"
               onClick={handleExportCsv}
-              className="px-2.5 sm:px-3 py-1.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 shadow-2xs hover:border-emerald-300 hover:text-emerald-700 active:scale-95"
+              className="group px-2.5 sm:px-3 py-1.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 shadow-2xs hover:border-emerald-300 hover:text-emerald-700 active:scale-95"
               title="경비 지출 내역 CSV 다운로드"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+              <img
+                src="/images/icons/icon_excel.png"
+                alt="CSV"
+                className="w-4 h-4 object-contain shrink-0 transition-transform duration-150 group-hover:scale-110"
+              />
               <span>CSV</span>
             </button>
 

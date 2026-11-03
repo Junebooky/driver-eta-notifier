@@ -6,7 +6,6 @@ import {
   ChevronDown,
   Search,
   X,
-  FileSpreadsheet,
 } from 'lucide-react';
 import { HqDrivingLogStatus } from '@/types/drivingLogHq';
 import { haptics } from '@/utils/haptics';
@@ -180,10 +179,14 @@ export const HqDrivingLogsFilterBar: React.FC<HqDrivingLogsFilterBarProps> = ({
               haptics.success();
               onExportExcel();
             }}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-[#1E60F3] hover:bg-blue-600 text-white rounded-xl text-xs font-bold transition-all shadow-xs shrink-0 cursor-pointer active:scale-98"
+            className="group flex items-center gap-1.5 px-3.5 py-2 bg-[#1E60F3] hover:bg-blue-600 text-white rounded-xl text-xs font-bold transition-all shadow-xs shrink-0 cursor-pointer active:scale-95"
             title="현재 목록 엑셀(CSV) 다운로드"
           >
-            <FileSpreadsheet className="w-3.5 h-3.5 stroke-[2.2]" />
+            <img
+              src="/images/icons/icon_excel.png"
+              alt="엑셀"
+              className="w-4 h-4 object-contain shrink-0 transition-transform duration-150 group-hover:scale-110"
+            />
             <span>엑셀 내보내기</span>
           </button>
         </div>
