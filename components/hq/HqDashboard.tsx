@@ -618,7 +618,7 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
             activeSidebarTab === 'dashboard' ? '운영 대시보드' : activeSidebarTab === 'operations'
               ? '실시간 행사 운영 보드'
               : activeSidebarTab === 'quotes'
-                ? '가격표 견적기 및 견적서 관리'
+                ? '표준 요금표'
                 : activeSidebarTab === 'field_knowledge'
                   ? '현장 지식'
                   : activeSidebarTab === 'driving_logs'
@@ -644,7 +644,7 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
               </span>
             ) : activeSidebarTab === 'quotes' ? (
               <span className="text-slate-500 font-medium">
-                차량별 표준 요금을 확인하고 바로 견적을 계산할 수 있어요
+                차량별 기본 요금을 확인하고 바로 견적서를 만들 수 있어요.
               </span>
             ) : activeSidebarTab === 'field_knowledge' ? (
               <span className="text-slate-500 font-medium">
