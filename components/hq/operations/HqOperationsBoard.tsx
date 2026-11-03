@@ -773,11 +773,10 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
               haptics.selection();
               setActiveTab('all');
             }}
-            className={`px-3.5 py-1.5 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === 'all'
-                ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 shadow-2xs font-extrabold'
-                : 'bg-white border border-slate-200/80 text-slate-600 hover:text-slate-900'
-            }`}
+            className={`px-3.5 py-1.5 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap ${activeTab === 'all'
+              ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 shadow-2xs font-extrabold'
+              : 'bg-white border border-slate-200/80 text-slate-600 hover:text-slate-900'
+              }`}
           >
             <span>전체 행사 </span>
             <span className="font-black">{eventGroups.length}</span>
@@ -789,11 +788,10 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
               haptics.selection();
               setActiveTab('running');
             }}
-            className={`px-3.5 py-1.5 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === 'running'
-                ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 shadow-2xs font-extrabold'
-                : 'bg-white border border-slate-200/80 text-slate-600 hover:text-slate-900'
-            }`}
+            className={`px-3.5 py-1.5 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap ${activeTab === 'running'
+              ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 shadow-2xs font-extrabold'
+              : 'bg-white border border-slate-200/80 text-slate-600 hover:text-slate-900'
+              }`}
           >
             <span>운영 중 </span>
             <span className="font-black">{eventGroups.length}</span>
@@ -805,11 +803,10 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
               haptics.selection();
               setActiveTab('closed');
             }}
-            className={`px-3.5 py-1.5 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === 'closed'
-                ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 shadow-2xs font-extrabold'
-                : 'bg-white border border-slate-200/80 text-slate-600 hover:text-slate-900'
-            }`}
+            className={`px-3.5 py-1.5 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap ${activeTab === 'closed'
+              ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 shadow-2xs font-extrabold'
+              : 'bg-white border border-slate-200/80 text-slate-600 hover:text-slate-900'
+              }`}
           >
             <span>대기·종료 </span>
             <span className="font-black">0</span>

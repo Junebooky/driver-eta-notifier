@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Sparkles,
   Paperclip,
@@ -66,6 +66,32 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
   const [isSavingCrm, setIsSavingCrm] = useState(false);
   const [crmSavedNotice, setCrmSavedNotice] = useState<string | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [isAiNudging, setIsAiNudging] = useState(false);
+
+  useEffect(() => {
+    // Nudge every 15 seconds
+    const interval = setInterval(() => {
+      setIsAiNudging(true);
+      const timer = setTimeout(() => {
+        setIsAiNudging(false);
+      }, 3500);
+      return () => clearTimeout(timer);
+    }, 15000);
+
+    // Initial nudge after 4 seconds
+    const initialTimer = setTimeout(() => {
+      setIsAiNudging(true);
+      const timer = setTimeout(() => {
+        setIsAiNudging(false);
+      }, 3500);
+      return () => clearTimeout(timer);
+    }, 4000);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(initialTimer);
+    };
+  }, []);
 
   // Field values with safe fallbacks
   const companyName = extractedDraft?.companyName || '';
@@ -843,9 +869,39 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
         ) : (
           /* On-Demand AI Extraction Callout (When not yet analyzed) */
           <div className="flex-1 flex flex-col items-center justify-center text-center p-6 space-y-3">
-            <div className="w-14 h-14 rounded-2xl bg-blue-50 text-[#1E60F3] flex items-center justify-center shadow-xs">
-              <Sparkles className="w-7 h-7 fill-[#1E60F3]" />
+            <style>{`
+              @keyframes aiWiggle {
+                0%, 100% { transform: scale(1.1) rotate(0deg); }
+                20% { transform: scale(1.14) rotate(-7deg); }
+                40% { transform: scale(1.14) rotate(7deg); }
+                60% { transform: scale(1.12) rotate(-4deg); }
+                80% { transform: scale(1.12) rotate(4deg); }
+              }
+            `}</style>
+            <div className="relative flex flex-col items-center">
+              {/* Speech Bubble */}
+              {isAiNudging && (
+                <div className="absolute -top-11 left-1/2 -translate-x-1/2 whitespace-nowrap bg-slate-900 text-white text-[11px] font-extrabold px-3 py-1.5 rounded-full shadow-xl animate-in fade-in zoom-in-95 duration-200 flex items-center gap-1.5 z-20 pointer-events-none">
+                  <span>⚡ 3초만에 스케줄링 해드릴게요!</span>
+                  <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-slate-900 rotate-45" />
+                </div>
+              )}
+
+              {/* AI Email Icon with dynamic nudge */}
+              <div
+                className={`transition-all duration-300 ${
+                  isAiNudging ? 'scale-110' : 'scale-100 hover:scale-105'
+                }`}
+                style={isAiNudging ? { animation: 'aiWiggle 0.8s ease-in-out infinite' } : undefined}
+              >
+                <img
+                  src="/images/icons/ai_email.png"
+                  alt="AI 예약 정보 추출"
+                  className="w-16 h-16 sm:w-20 sm:h-20 object-contain drop-shadow-md select-none"
+                />
+              </div>
             </div>
+
             <h4 className="text-base font-extrabold text-slate-900">
               메일에서 예약 정보를 찾아낼까요?
             </h4>
@@ -856,7 +912,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
               type="button"
               onClick={onExtractWithAi}
               disabled={isExtractingAi || isLoadingDetail}
-              className="mt-3 px-5 py-3 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white text-sm font-black shadow-md transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50"
+              className="mt-3 px-5 py-3 rounded-xl bg-[#1E60F3] hover:bg-blue-600 hover:-translate-y-1 hover:shadow-xl hover:shadow-blue-500/25 active:translate-y-0 active:scale-95 text-white text-sm font-black shadow-md transition-all duration-200 cursor-pointer flex items-center gap-2 disabled:opacity-50"
             >
               <Sparkles className={`w-4 h-4 ${isExtractingAi ? 'animate-spin' : ''}`} />
               <span>{isExtractingAi ? '예약 내용을 꼼꼼히 읽고 있어요...' : '3초 만에 예약 정보 채우기'}</span>

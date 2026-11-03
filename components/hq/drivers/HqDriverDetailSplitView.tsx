@@ -16,6 +16,8 @@ import {
   Loader2,
   Calendar,
   Image as ImageIcon,
+  Pencil,
+  IdCard,
 } from 'lucide-react';
 import { HqDriverSummary, DriverScheduleItem } from '@/types/driverHq';
 import { useHqDrivers } from '@/utils/useHqDrivers';
@@ -401,83 +403,60 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
             )}
 
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 whitespace-nowrap">
-                <h4 className="text-base font-black text-slate-900 truncate">
-                  {activeDriver.name}
-                </h4>
+              {/* 1행: 이름 + 소속 뱃지 + 연필 수정 아이콘 */}
+              <div className="flex items-center gap-2">
+                <h3 className="text-xl font-bold text-slate-900 truncate">{activeDriver.name}</h3>
                 {activeDriver.affiliationType === 'employed' && (
-                  <span className="px-2 py-0.5 rounded-md bg-blue-100 text-[#0050FF] text-[10px] font-black shrink-0">
+                  <span className="px-2 py-0.5 text-xs font-semibold rounded-md bg-blue-50 text-[#0050FF] shrink-0">
                     소속
                   </span>
                 )}
                 <button
                   type="button"
+                  title="기사 정보 수정"
                   onClick={() => {
                     haptics.selection();
                     setIsEditModalOpen(true);
                   }}
-                  className="px-2.5 py-1 rounded-lg border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 text-xs font-bold transition-all ml-auto flex items-center gap-1 cursor-pointer shadow-2xs shrink-0"
-                  title="기사 정보 수정"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors ml-auto cursor-pointer shrink-0"
                 >
-                  <Edit3 className="w-3.5 h-3.5 text-slate-400" />
-                  <span>정보 수정</span>
+                  <Pencil className="w-3.5 h-3.5 stroke-[2.2]" />
                 </button>
               </div>
 
-              {/* Supported Languages Chip (Rating removed as requested) */}
-              <div className="flex items-center gap-1.5 mt-2 text-xs">
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[11px] font-semibold">
-                  <span>🇰🇷</span>
-                  <span>한국어</span>
-                </span>
+              {/* 2행: 언어 뱃지 및 연락처 */}
+              <div className="flex items-center gap-1.5 text-xs text-slate-600 mt-1 flex-wrap">
+                <span className="bg-slate-100 px-2 py-0.5 rounded-full text-[11px] font-medium">🇰🇷 한국어</span>
                 {activeDriver.englishAvailable && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-[#0050FF] border border-blue-200/60 text-[11px] font-bold">
-                    <span>🇺🇸</span>
-                    <span>영어</span>
-                  </span>
+                  <span className="bg-slate-100 px-2 py-0.5 rounded-full text-[11px] font-medium">🇺🇸 영어</span>
+                )}
+                <span className="text-slate-400">·</span>
+                {activeDriver.phone ? (
+                  <a
+                    href={`tel:${activeDriver.phone}`}
+                    className="font-mono hover:text-[#0050FF] hover:underline transition-colors"
+                  >
+                    {formatPhoneNumber(activeDriver.phone)}
+                  </a>
+                ) : (
+                  <span className="text-slate-400">연락처 미등록</span>
                 )}
               </div>
-            </div>
-          </div>
 
-          {/* Quick Contact Action Buttons */}
-          <div className="flex items-center gap-2">
-            <a
-              href={`tel:${activeDriver.phone}`}
-              className="flex-1 py-2 px-3 rounded-xl bg-blue-50/70 hover:bg-blue-100 border border-blue-200/80 text-[#0050FF] text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
-            >
-              <Phone className="w-3.5 h-3.5" />
-              <span className="font-mono">{formatPhoneNumber(activeDriver.phone) || '연락처 미등록'}</span>
-            </a>
-
-            {activeDriver.phone && (
-              <a
-                href={`sms:${activeDriver.phone}`}
-                className="w-9 h-9 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 flex items-center justify-center transition-all cursor-pointer shadow-2xs shrink-0"
-                title="문자 발송"
+              {/* 3행: VIP 의전 카드 메인 버튼 */}
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.lightTap();
+                  setIsAssetModalOpen(true);
+                }}
+                className="mt-3 w-full inline-flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-[#0050FF] bg-blue-50/40 hover:bg-blue-100/60 text-[#0050FF] text-xs font-bold transition-all cursor-pointer shadow-2xs"
               >
-                <MessageSquare className="w-3.5 h-3.5" />
-              </a>
-            )}
-          </div>
-
-          {/* Button: 배차 안내 카드 설정 (Cobalt blue outline style) */}
-          <button
-            type="button"
-            onClick={() => {
-              haptics.lightTap();
-              setIsAssetModalOpen(true);
-            }}
-            className="w-full py-2.5 px-3.5 rounded-xl border border-[#0050FF] text-[#0050FF] bg-blue-50/40 hover:bg-blue-100/60 text-xs font-black transition-all flex items-center justify-between cursor-pointer shadow-2xs group"
-          >
-            <div className="flex items-center gap-2">
-              <ImageIcon className="w-4 h-4 text-[#0050FF] group-hover:scale-110 transition-transform" />
-              <span>배차 안내 카드 설정</span>
+                <IdCard className="w-4 h-4" />
+                <span>VIP 의전 카드 관리</span>
+              </button>
             </div>
-            <span className="px-1.5 py-0.5 rounded bg-blue-100/80 text-[#0050FF] text-[9.5px] font-black">
-              PC · Mobile
-            </span>
-          </button>
+          </div>
 
           {/* Profile Details List */}
           <div className="bg-slate-50/60 rounded-2xl border border-slate-100 p-4 space-y-2.5 text-xs">
