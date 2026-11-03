@@ -34,6 +34,7 @@ export interface UseHqDriversResult {
   statusCode: number | null;
   refetch: () => Promise<void>;
   updateDriver: (id: string, updates: Record<string, any>) => Promise<boolean>;
+  deleteDriver: (id: string) => Promise<boolean>;
   createDriver: (data: Record<string, any>, allowDuplicate?: boolean) => Promise<CreateDriverResult>;
 }
 
@@ -111,7 +112,31 @@ export function useHqDrivers(): UseHqDriversResult {
         return false;
       }
     },
-    []
+    [fetchDrivers]
+  );
+
+  const deleteDriver = useCallback(
+    async (id: string): Promise<boolean> => {
+      try {
+        const res = await fetch(`/api/hq/drivers/${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok || !data.ok) {
+          throw new Error(data.error || '기사 삭제에 실패했습니다.');
+        }
+
+        // Optimistically remove from local state
+        setDrivers((prev) => prev.filter((d) => d.id !== id));
+        fetchDrivers().catch(() => {});
+        return true;
+      } catch (err: any) {
+        console.error('[useHqDrivers] Delete error:', err);
+        return false;
+      }
+    },
+    [fetchDrivers]
   );
 
   const createDriver = useCallback(
@@ -158,6 +183,7 @@ export function useHqDrivers(): UseHqDriversResult {
     statusCode,
     refetch: fetchDrivers,
     updateDriver,
+    deleteDriver,
     createDriver,
   };
 }

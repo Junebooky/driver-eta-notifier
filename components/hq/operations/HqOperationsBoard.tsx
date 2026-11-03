@@ -672,7 +672,11 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
         {/* Card 1: 운영 중인 행사 (Active Blue Highlight) */}
         <div className="p-4 rounded-2xl bg-blue-50/50 border border-blue-200/80 shadow-2xs flex items-center gap-3.5">
           <div className="w-11 h-11 rounded-2xl bg-white border border-blue-200 text-[#1E60F3] flex items-center justify-center shrink-0 shadow-xs">
-            <Car className="w-5 h-5" />
+            <img
+              src="/images/icons/live_dashboard/active_events.png"
+              alt="운영 중인 행사"
+              className="w-7 h-7 object-contain"
+            />
           </div>
           <div className="min-w-0">
             <div className="text-xs text-slate-500 font-bold">운영 중인 행사</div>
@@ -685,7 +689,11 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
         {/* Card 2: 전체 배차 */}
         <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex items-center gap-3.5">
           <div className="w-11 h-11 rounded-2xl bg-slate-50 border border-slate-200 text-slate-600 flex items-center justify-center shrink-0">
-            <Users className="w-5 h-5" />
+            <img
+              src="/images/icons/live_dashboard/total_dispatch.png"
+              alt="전체 배차"
+              className="w-7 h-7 object-contain"
+            />
           </div>
           <div className="min-w-0">
             <div className="text-xs text-slate-500 font-bold">전체 배차</div>
@@ -698,7 +706,11 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
         {/* Card 3: 운행 중 */}
         <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex items-center gap-3.5">
           <div className="w-11 h-11 rounded-2xl bg-slate-50 border border-slate-200 text-slate-600 flex items-center justify-center shrink-0">
-            <Play className="w-5 h-5 fill-slate-600" />
+            <img
+              src="/images/icons/live_dashboard/in_operation.png"
+              alt="운행 중"
+              className="w-7 h-7 object-contain"
+            />
           </div>
           <div className="min-w-0">
             <div className="text-xs text-slate-500 font-bold">운행 중</div>
@@ -711,7 +723,11 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
         {/* Card 4: 완료 */}
         <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex items-center gap-3.5">
           <div className="w-11 h-11 rounded-2xl bg-slate-50 border border-slate-200 text-slate-600 flex items-center justify-center shrink-0">
-            <Check className="w-5 h-5 stroke-[2.5]" />
+            <img
+              src="/images/icons/live_dashboard/completed.png"
+              alt="완료"
+              className="w-7 h-7 object-contain"
+            />
           </div>
           <div className="min-w-0">
             <div className="text-xs text-slate-500 font-bold">완료</div>
@@ -721,38 +737,24 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
           </div>
         </div>
 
-        {/* Card 5: 운영 진행률 (Ring Progress) */}
+        {/* Card 5: 운영 진행률 */}
         <div className="col-span-2 sm:col-span-1 p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            {/* SVG Circular Progress Ring */}
-            <div className="relative w-11 h-11 flex items-center justify-center shrink-0">
-              <svg className="w-11 h-11 -rotate-90" viewBox="0 0 36 36">
-                <path
-                  className="text-slate-100"
-                  strokeWidth="3.5"
-                  stroke="currentColor"
-                  fill="none"
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                />
-                <path
-                  className="text-[#1E60F3] transition-all duration-500"
-                  strokeDasharray={`${kpiStats.progressRate}, 100`}
-                  strokeWidth="3.5"
-                  strokeLinecap="round"
-                  stroke="currentColor"
-                  fill="none"
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                />
-              </svg>
-              <span className="absolute text-[11px] font-black text-slate-900">
-                {kpiStats.progressRate}%
-              </span>
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="w-11 h-11 rounded-2xl bg-slate-50 border border-slate-200 text-slate-600 flex items-center justify-center shrink-0">
+              <img
+                src="/images/icons/live_dashboard/operation_progress.png"
+                alt="운영 진행률"
+                className="w-7 h-7 object-contain"
+              />
             </div>
 
             <div className="min-w-0">
-              <div className="text-xs text-slate-700 font-bold">운영 진행률</div>
-              <div className="text-[11px] text-slate-400 font-semibold truncate mt-0.5">
-                {kpiStats.inTransit} / {kpiStats.totalVehicles}대 운행 중
+              <div className="text-xs text-slate-500 font-bold">운영 진행률</div>
+              <div className="text-lg sm:text-xl font-black text-slate-900 mt-0.5 flex items-baseline gap-1">
+                <span>{kpiStats.progressRate}%</span>
+                <span className="text-[11px] text-slate-400 font-semibold truncate">
+                  ({kpiStats.inTransit}/{kpiStats.totalVehicles}대)
+                </span>
               </div>
             </div>
           </div>

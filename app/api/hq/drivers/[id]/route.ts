@@ -146,3 +146,52 @@ export async function PATCH(
     return NextResponse.json({ ok: false, error: err.message || '서버 오류' }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const auth = await requireHqAdmin(req);
+    if (!auth.ok) {
+      return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
+    }
+
+    const { id } = await context.params;
+    if (!id) {
+      return NextResponse.json({ ok: false, error: 'Driver ID is required' }, { status: 400 });
+    }
+
+    // 1. Unlink driver from any schedules so schedules remain safe
+    await supabaseAdmin
+      .from('schedules')
+      .update({ driver_id: null })
+      .eq('driver_id', id);
+
+    // 2. Clean up profile asset db entries if any
+    try {
+      await supabaseAdmin
+        .from('driver_profile_assets')
+        .delete()
+        .eq('driver_id', id);
+    } catch {
+      // Ignore
+    }
+
+    // 3. Delete driver from drivers table
+    const { error: deleteErr } = await supabaseAdmin
+      .from('drivers')
+      .delete()
+      .eq('id', id);
+
+    if (deleteErr) {
+      console.error('[HQ Drivers API] Delete error:', deleteErr);
+      return NextResponse.json({ ok: false, error: deleteErr.message }, { status: 400 });
+    }
+
+    return NextResponse.json({ ok: true, deletedId: id });
+  } catch (err: any) {
+    console.error('[HQ Drivers API] Error in DELETE [id]:', err);
+    return NextResponse.json({ ok: false, error: err.message || '서버 오류' }, { status: 500 });
+  }
+}

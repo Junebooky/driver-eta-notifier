@@ -384,17 +384,15 @@ export const HqOfficialPricingView: React.FC<HqOfficialPricingViewProps> = ({
                   haptics.selection();
                   setActiveTab(tab.id);
                 }}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                  isSelected
-                    ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 shadow-2xs font-bold'
-                    : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300'
-                }`}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${isSelected
+                  ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 shadow-2xs font-bold'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300'
+                  }`}
               >
                 <span>{tab.label}</span>
                 <span
-                  className={`text-[11px] ${
-                    isSelected ? 'font-black text-[#1E60F3]' : 'text-slate-400 font-medium'
-                  }`}
+                  className={`text-[11px] ${isSelected ? 'font-black text-[#1E60F3]' : 'text-slate-400 font-medium'
+                    }`}
                 >
                   {count}
                 </span>
@@ -494,7 +492,7 @@ export const HqOfficialPricingView: React.FC<HqOfficialPricingViewProps> = ({
                         <img
                           src="/images/icons/call.png"
                           alt="별도 상담"
-                          className="w-7 h-7 object-contain transition-transform duration-200 group-hover/call:scale-125 drop-shadow-xs"
+                          className="w-10 h-10 object-contain transition-transform duration-200 group-hover/call:scale-125 drop-shadow-xs"
                         />
                       </div>
                     </td>

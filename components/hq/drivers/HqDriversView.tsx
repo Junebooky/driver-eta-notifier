@@ -21,7 +21,7 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
   const urlDriverId = searchParams?.get('driverId');
   const urlView = searchParams?.get('view') as 'table' | 'detail' | null;
 
-  const { drivers, counts, isLoading, error, statusCode, refetch, updateDriver, createDriver } = useHqDrivers();
+  const { drivers, counts, isLoading, error, statusCode, refetch, updateDriver, deleteDriver, createDriver } = useHqDrivers();
 
   const urlAdd = searchParams?.get('add') === 'true';
 
@@ -162,6 +162,7 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
           onRetry={refetch}
           onOpenLogin={() => setIsLoginModalOpen(true)}
           onUpdateDriver={updateDriver}
+          onDeleteDriver={deleteDriver}
         />
       ) : (
         <HqDriverDetailSplitView

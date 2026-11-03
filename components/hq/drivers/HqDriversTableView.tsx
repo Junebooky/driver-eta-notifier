@@ -20,6 +20,7 @@ import {
   UserCheck,
   UserMinus,
   User,
+  Trash2,
 } from 'lucide-react';
 import { HqDriverSummary } from '@/types/driverHq';
 import { useHqDrivers } from '@/utils/useHqDrivers';
@@ -45,6 +46,7 @@ export interface HqDriversTableViewProps {
   onRetry?: () => void;
   onOpenLogin?: () => void;
   onUpdateDriver?: (id: string, updates: Record<string, any>) => Promise<boolean>;
+  onDeleteDriver?: (id: string) => Promise<boolean>;
 }
 
 export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
@@ -59,6 +61,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
   onRetry: propOnRetry,
   onOpenLogin,
   onUpdateDriver: propOnUpdateDriver,
+  onDeleteDriver: propOnDeleteDriver,
 }) => {
   // If not passed from parent, use the custom hook
   const hookState = useHqDrivers();
@@ -66,6 +69,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
   const counts = propCounts ?? hookState.counts;
   const isLoading = propIsLoading ?? hookState.isLoading;
   const updateDriver = propOnUpdateDriver ?? hookState.updateDriver;
+  const deleteDriver = propOnDeleteDriver ?? hookState.deleteDriver;
   const error = propError ?? hookState.error;
   const statusCode = propStatusCode ?? hookState.statusCode;
   const onRetry = propOnRetry ?? hookState.refetch;
@@ -605,6 +609,31 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                               >
                                 <Edit3 className="w-3.5 h-3.5 text-slate-400" />
                                 <span>기사 정보 수정</span>
+                              </button>
+
+                              <div className="my-1 border-t border-slate-100" />
+
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  haptics.warningPulse();
+                                  setMenuOpenDriverId(null);
+                                  const confirmed = window.confirm(
+                                    `'${driver.name}' 기사님을 목록에서 삭제하시겠습니까?\n배정된 운행 기록이 있는 경우 기사 배정만 해제됩니다.`
+                                  );
+                                  if (confirmed) {
+                                    const ok = await deleteDriver(driver.id);
+                                    if (ok) {
+                                      haptics.success();
+                                    } else {
+                                      alert('기사 삭제에 실패했습니다.');
+                                    }
+                                  }
+                                }}
+                                className="w-full px-3 py-2 text-rose-600 hover:bg-rose-50 flex items-center gap-2 font-bold cursor-pointer transition-colors"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                                <span>기사 삭제</span>
                               </button>
                             </div>
                           </>

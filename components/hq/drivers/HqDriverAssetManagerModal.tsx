@@ -700,6 +700,13 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                 {/* Vertically centered Preview Area */}
                 <div className="my-auto py-3 flex-1 flex flex-col justify-center">
                   <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      if (!bundle?.pcInfo && isDbReady && !isUploading) {
+                        pcInputRef.current?.click();
+                      }
+                    }}
                     onDragOver={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -716,9 +723,9 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                       setIsDraggingPc(false);
                     }}
                     onDrop={(e) => handleDropFile(e, 'info', 'pc')}
-                    className={`w-full aspect-video rounded-xl overflow-hidden border transition-all flex items-center justify-center relative group ${isDraggingPc
+                    className={`w-full aspect-video rounded-xl overflow-hidden border transition-all flex items-center justify-center relative group cursor-pointer ${isDraggingPc
                       ? 'border-2 border-dashed border-[#0050FF] bg-blue-50/60 ring-2 ring-blue-300'
-                      : 'border-slate-200 bg-white'
+                      : 'border-slate-200 bg-white hover:border-blue-400'
                       }`}
                   >
                     {bundle?.pcInfo?.signedUrl ? (
@@ -738,11 +745,11 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                         </a>
                       </>
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center p-4 bg-white">
+                      <div className="w-full h-full flex items-center justify-center p-2 bg-white">
                         <img
                           src="/images/icons/pc.png"
                           alt="PC"
-                          className="w-[100px] h-[100px] sm:w-[112px] sm:h-[112px] object-contain transition-transform group-hover:scale-105 drop-shadow-sm select-none"
+                          className="w-auto h-auto max-h-[85%] max-w-[85%] sm:max-h-[90%] sm:max-w-[90%] object-contain transition-transform duration-200 group-hover:scale-105 drop-shadow-md select-none"
                         />
                       </div>
                     )}
@@ -826,6 +833,13 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                 {/* Vertically centered Preview Area */}
                 <div className="my-auto py-3 flex-1 flex flex-col items-center justify-center">
                   <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      if (!bundle?.mobileInfo && isDbReady && !isUploading) {
+                        mobileInputRef.current?.click();
+                      }
+                    }}
                     onDragOver={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -842,9 +856,9 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                       setIsDraggingMobile(false);
                     }}
                     onDrop={(e) => handleDropFile(e, 'info', 'mobile')}
-                    className={`w-32 sm:w-36 aspect-[9/16] rounded-2xl border transition-all bg-white relative overflow-hidden flex flex-col group ${isDraggingMobile
+                    className={`w-32 sm:w-36 aspect-[9/16] rounded-2xl border transition-all bg-white relative overflow-hidden flex flex-col group cursor-pointer ${isDraggingMobile
                       ? 'border-2 border-dashed border-[#0050FF] bg-blue-50/60 ring-2 ring-blue-300'
-                      : 'border-slate-200 shadow-2xs'
+                      : 'border-slate-200 shadow-2xs hover:border-blue-400'
                       }`}
                   >
                     {/* Screen Content */}
@@ -867,11 +881,11 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                           </a>
                         </>
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center p-3 bg-white">
+                        <div className="w-full h-full flex items-center justify-center p-1 bg-white">
                           <img
                             src="/images/icons/mobile.png"
                             alt="Mobile"
-                            className="w-[84px] h-[84px] sm:w-[92px] sm:h-[92px] object-contain transition-transform group-hover:scale-105 drop-shadow-sm select-none"
+                            className="w-full h-full max-h-[92%] object-contain transition-transform duration-200 group-hover:scale-105 drop-shadow-md select-none"
                           />
                         </div>
                       )}
