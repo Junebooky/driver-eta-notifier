@@ -67,12 +67,12 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
   const renderSidebarBody = (isMobileDrawer: boolean) => (
     <>
       {/* Brand Header Card with Logo */}
-      <div className="p-3.5 pt-5 pb-4 border-b border-slate-100/80 relative">
+      <div className="h-[71px] flex items-center justify-center px-4 border-b border-slate-100/80 relative shrink-0">
         {isMobileDrawer && (
           <button
             type="button"
             onClick={onCloseMobile}
-            className="absolute top-2.5 right-2.5 z-40 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center cursor-pointer transition-colors"
+            className="absolute top-1/2 -translate-y-1/2 right-3 z-40 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center cursor-pointer transition-colors"
             aria-label="메뉴 닫기"
           >
             <X className="w-4 h-4" />
@@ -81,27 +81,33 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
 
         <div
           onClick={() => haptics.lightTap()}
-          className="group relative flex flex-col items-center justify-center p-3 rounded-2xl shadow-2xs hover:shadow-xs transition-all duration-200 cursor-pointer"
+          className="group relative flex items-center justify-center cursor-pointer"
         >
-          {/* 말풍선 Tooltip - reveals on hover */}
-          <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 whitespace-nowrap bg-slate-900 text-white text-[11px] font-extrabold px-3 py-1.5 rounded-full shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 group-hover:-translate-y-1 transition-all duration-200 flex items-center gap-1 z-30">
+          {/* 말풍선 Tooltip - reveals on hover (우측 상단 45도 / 시계 2시 방향) */}
+          <div className="absolute -top-1.5 left-[calc(100%-4px)] whitespace-nowrap bg-slate-900 text-white text-[11px] font-extrabold px-2.5 py-1 rounded-full shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all duration-200 flex items-center gap-1 z-30">
             <span>현재 개발 중!</span>
-            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-slate-900 rotate-45" />
+            {/* 꼬리표: 좌측 하단 (캐릭터 머리 쪽 가리킴) */}
+            <svg
+              className="absolute -bottom-1.5 left-2.5 w-3 h-2 text-slate-900 fill-current"
+              viewBox="0 0 12 8"
+            >
+              <path d="M0,8 L3,0 L11,0 Z" />
+            </svg>
           </div>
 
-          {/* Logo with center scale-up on hover */}
-          <div className="transition-transform duration-200 ease-out group-hover:scale-110 active:scale-95 flex items-center justify-center py-1">
+          {/* Logo with center scale-up on hover (아담한 프로필 뱃지 사이즈) */}
+          <div className="transition-transform duration-200 ease-out group-hover:scale-110 active:scale-95 flex items-center justify-center">
             <img
               src="/logo.png"
               alt="VIP Limousine Logo"
-              className="w-24 h-24 sm:w-24 sm:h-24 object-contain drop-shadow-md select-none"
+              className="w-11 h-11 sm:w-11 sm:h-11 object-contain drop-shadow-sm select-none"
             />
           </div>
         </div>
       </div>
 
       {/* Navigation List */}
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+      <nav className="flex-1 px-3 pt-5 pb-4 space-y-1 overflow-y-auto">
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
