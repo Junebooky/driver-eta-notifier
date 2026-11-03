@@ -675,7 +675,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
             haptics.lightTap();
             setActiveTab('running');
           }}
-          className="p-4 rounded-2xl bg-blue-50/50 border border-blue-200/80 shadow-2xs flex items-center gap-3.5 transition-all duration-200 hover:-translate-y-1 hover:shadow-md cursor-pointer active:translate-y-0 select-none"
+          className="p-4 rounded-2xl bg-white border border-gray-200/80 shadow-2xs flex items-center gap-3.5 transition-all duration-200 hover:-translate-y-1 hover:shadow-md cursor-pointer active:translate-y-0 select-none"
         >
           <img
             src="/images/icons/live_dashboard/active_events.png"

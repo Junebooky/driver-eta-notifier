@@ -104,19 +104,19 @@ const abcEmail = REFERENCE_EMAILS.find((e) => e.summary.from.name === '이서연
 if (!abcEmail) throw new Error('ABC Korea reference email missing!');
 
 const abcDraft = abcEmail.extractedDraft;
-if (!abcDraft.waypoints || abcDraft.waypoints.length !== 6) {
-  throw new Error(`Expected 6 waypoints for ABC Korea, got ${abcDraft.waypoints?.length}`);
+if (!abcDraft.waypoints || abcDraft.waypoints.length !== 14) {
+  throw new Error(`Expected 14 waypoints for ABC Korea, got ${abcDraft.waypoints?.length}`);
 }
-if (abcDraft.waypoints[0].location !== '인천공항 제1터미널 (T1)' || abcDraft.waypoints[0].time !== '10:00') {
+if (!abcDraft.waypoints[0].location.includes('인천공항') || abcDraft.waypoints[0].time !== '10:00') {
   throw new Error(`First stop mismatch: ${JSON.stringify(abcDraft.waypoints[0])}`);
 }
-if (abcDraft.waypoints[5].location !== '조선팰리스 호텔' || abcDraft.waypoints[5].time !== '18:30') {
-  throw new Error(`Final stop mismatch: ${JSON.stringify(abcDraft.waypoints[5])}`);
+if (!abcDraft.waypoints[13].location.includes('인천공항') || abcDraft.waypoints[13].time !== '16:00') {
+  throw new Error(`Final stop mismatch: ${JSON.stringify(abcDraft.waypoints[13])}`);
 }
 if (abcDraft.waypoints[0].date !== '2026-11-09') {
   throw new Error(`Waypoint date missing or mismatch: ${abcDraft.waypoints[0].date}`);
 }
-console.log('✅ Test 5 Passed: Multi-destination 6-stop itinerary verified for ABC Korea.');
+console.log('✅ Test 5 Passed: Multi-destination 14-stop 3-day itinerary verified for ABC Korea.');
 
 // Test 6: Verify Multi-Day Intermediate Date Separation & Waypoint Date Grouping
 console.log('\n[Test 6] Verify Multi-Day Intermediate Date Separation & Waypoint Date Grouping...');

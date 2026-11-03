@@ -749,7 +749,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                         <img
                           src="/images/icons/pc.png"
                           alt="PC"
-                          className="w-28 h-28 sm:w-36 sm:h-36 max-h-[85%] max-w-[85%] object-contain transition-transform duration-200 group-hover:scale-105 drop-shadow-md select-none"
+                          className="w-95 h-95 sm:w-95 sm:h-95 max-h-[85%] max-w-[85%] object-contain transition-transform duration-200 group-hover:scale-105 drop-shadow-md select-none"
                         />
                       </div>
                     )}
