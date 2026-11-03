@@ -79,13 +79,14 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
     return 'available';
   };
 
-  // Helper to check if a driver joined within the last 14 days
+  // Helper to check if a driver joined within the last 7 days (and has an explicit, valid created date)
   const isNewDriver = (driver: HqDriverSummary): boolean => {
     if (!driver.createdAt) return false;
     try {
       const createdTime = new Date(driver.createdAt).getTime();
-      const diffDays = (Date.now() - createdTime) / (1000 * 60 * 60 * 24);
-      return diffDays >= 0 && diffDays <= 14;
+      const diffMs = Date.now() - createdTime;
+      const diffDays = diffMs / (1000 * 60 * 60 * 24);
+      return diffDays >= 0 && diffDays <= 7;
     } catch {
       return false;
     }
@@ -161,106 +162,66 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
-      {/* 1. Header Bar */}
-      <div className="p-6 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4 bg-white">
-        <div className="flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-2xl bg-blue-50 border border-blue-100/80 text-[#1E60F3] flex items-center justify-center shadow-xs">
-            <Users className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-xl font-black text-slate-900 tracking-tight">기사 관리</h1>
-            <p className="text-xs text-slate-500 font-medium mt-0.5">
-              실제 등록된 기사 정보를 조회하고, 상세 프로필과 운행 일정을 관리할 수 있습니다.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {/* Search Bar */}
-          <div className="relative w-64 sm:w-72">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
+      {/* 1. Control & Filter Toolbar (Compact single bar without duplicate title/desc) */}
+      <div className="p-4 sm:px-6 bg-white border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
+        {/* Left: Affiliation & Dropdown Filters */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Affiliation Tabs */}
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                haptics.selection();
+                setAffiliationFilter('all');
                 setCurrentPage(1);
               }}
-              placeholder="기사명, 연락처, 차종, 거주지..."
-              className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1E60F3] focus:bg-white transition-all shadow-2xs"
-            />
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                affiliationFilter === 'all'
+                  ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 shadow-2xs font-bold'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300'
+              }`}
+            >
+              <span>전체 </span>
+              <span className="font-bold">{counts.total}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                haptics.selection();
+                setAffiliationFilter('employed');
+                setCurrentPage(1);
+              }}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                affiliationFilter === 'employed'
+                  ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 shadow-2xs font-bold'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300'
+              }`}
+            >
+              <span>소속 </span>
+              <span className="font-bold">{counts.employed}</span>
+            </button>
+
+            {counts.freelance > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.selection();
+                  setAffiliationFilter('freelance');
+                  setCurrentPage(1);
+                }}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  affiliationFilter === 'freelance'
+                    ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 shadow-2xs font-bold'
+                    : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300'
+                }`}
+              >
+                <span>프리랜서 </span>
+                <span className="font-bold">{counts.freelance}</span>
+              </button>
+            )}
           </div>
 
-          {/* Add Driver Button */}
-          <button
-            type="button"
-            onClick={onOpenAddDriver}
-            className="px-4 py-2.5 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white text-xs font-extrabold shadow-md transition-all cursor-pointer flex items-center gap-1.5"
-          >
-            <Plus className="w-4 h-4" />
-            <span>기사 추가</span>
-          </button>
-        </div>
-      </div>
-
-      {/* 2. Filter Bar */}
-      <div className="px-6 py-3.5 bg-slate-50/50 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
-        {/* Affiliation Tabs */}
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => {
-              haptics.selection();
-              setAffiliationFilter('all');
-              setCurrentPage(1);
-            }}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-              affiliationFilter === 'all'
-                ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 shadow-2xs font-bold'
-                : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300'
-            }`}
-          >
-            <span>전체 </span>
-            <span className="font-bold">{counts.total}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              haptics.selection();
-              setAffiliationFilter('employed');
-              setCurrentPage(1);
-            }}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-              affiliationFilter === 'employed'
-                ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 shadow-2xs font-bold'
-                : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300'
-            }`}
-          >
-            <span>소속 </span>
-            <span className="font-bold">{counts.employed}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              haptics.selection();
-              setAffiliationFilter('freelance');
-              setCurrentPage(1);
-            }}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-              affiliationFilter === 'freelance'
-                ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 shadow-2xs font-bold'
-                : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300'
-            }`}
-          >
-            <span>프리랜서 </span>
-            <span className="font-bold">{counts.freelance}</span>
-          </button>
-        </div>
-
-        {/* Dropdowns */}
-        <div className="flex items-center gap-2">
           {/* Status Dropdown */}
           <div className="relative">
             <select
@@ -297,6 +258,34 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
             </select>
             <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 pointer-events-none" />
           </div>
+        </div>
+
+        {/* Right: Search & Register Driver Button */}
+        <div className="flex items-center gap-2.5">
+          {/* Search Bar */}
+          <div className="relative w-56 sm:w-64">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="기사명, 차종, 연락처로 검색"
+              className="w-full pl-9 pr-3.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1E60F3] focus:bg-white transition-all shadow-2xs"
+            />
+          </div>
+
+          {/* Add Driver Button */}
+          <button
+            type="button"
+            onClick={onOpenAddDriver}
+            className="px-3.5 py-1.5 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white text-xs font-extrabold shadow-sm transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>기사 등록</span>
+          </button>
         </div>
       </div>
 
@@ -479,8 +468,8 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                           휴무
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 shadow-2xs">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200/80">
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
                           운행 가능
                         </span>
                       )}
@@ -503,39 +492,33 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                       )}
                     </td>
 
-                    {/* 4열: 지원 언어 (다국어 지원 기사만 미니 뱃지) */}
+                    {/* 4열: 지원 언어 (미국 국기 🇺🇸 표기, 비어있으면 하이픈 없이 빈 공간) */}
                     <td className="py-4 px-5 whitespace-nowrap">
                       {hasForeignLanguage ? (
-                        <div className="flex items-center gap-1">
-                          {foreignLanguages.map((lang) => (
-                            <span
-                              key={lang}
-                              className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200/80"
-                            >
-                              {lang}
-                            </span>
-                          ))}
+                        <div className="flex items-center gap-1.5">
+                          {foreignLanguages.map((lang) => {
+                            const isEng = lang === '영어' || lang.toLowerCase() === 'english' || lang === 'en';
+                            return (
+                              <span
+                                key={lang}
+                                className={isEng ? 'text-sm select-none' : 'inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200/80'}
+                                title={isEng ? '영어 소통 가능' : lang}
+                              >
+                                {isEng ? '🇺🇸' : lang}
+                              </span>
+                            );
+                          })}
                         </div>
-                      ) : (
-                        <span className="text-slate-300 text-xs font-medium">-</span>
-                      )}
+                      ) : null}
                     </td>
 
-                    {/* 5열: 더보기 (호버 인터랙션) */}
+                    {/* 5열: 더보기 (··· 아이콘 하나만 남김) */}
                     <td className="py-4 px-5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end gap-1.5">
+                      <div className="flex items-center justify-end">
                         <button
                           type="button"
                           onClick={() => handleRowClick(driver.id)}
-                          className="px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-500 hover:text-[#1E60F3] hover:bg-blue-50/80 transition-all opacity-0 group-hover:opacity-100 flex items-center gap-1 cursor-pointer"
-                        >
-                          <span>상세</span>
-                          <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleRowClick(driver.id)}
-                          className="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer group-hover:hidden"
+                          className="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
                           title="기사 상세 보기"
                         >
                           <MoreHorizontal className="w-4 h-4" />

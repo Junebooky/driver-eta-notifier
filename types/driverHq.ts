@@ -170,6 +170,6 @@ export function mapDbDriverToHqSummary(
     languageLabels,
     isAvailable: dbDriver.vehicle_status !== 'maintenance' && dbDriver.vehicle_status !== 'unavailable',
     schedules: mappedSchedules,
-    createdAt: dbDriver.created_at || new Date().toISOString(),
+    createdAt: dbDriver.created_at || undefined,
   };
 }

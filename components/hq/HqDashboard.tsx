@@ -692,7 +692,7 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
                   : activeSidebarTab === 'vehicles'
                     ? '차량명이나 번호로 검색'
                     : activeSidebarTab === 'drivers'
-                      ? '기사명, 연락처, 거주지 검색...'
+                      ? '기사명, 차종, 연락처로 검색'
                       : activeSidebarTab === 'expenses' || activeSidebarTab === 'receipts'
                       ? '기사명, 차량번호, 상호명 검색...'
                       : activeSidebarTab === 'operations'

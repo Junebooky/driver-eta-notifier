@@ -237,7 +237,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
             <div className="w-7 h-7 rounded-lg bg-blue-50 text-[#1E60F3] flex items-center justify-center">
               <Users className="w-4 h-4" />
             </div>
-            <h2 className="text-sm font-black text-slate-900">기사 관리</h2>
+            <h2 className="text-sm font-black text-slate-900">기사 목록</h2>
           </div>
 
           {/* Filter Pills */}
@@ -264,17 +264,19 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
             >
               소속 {counts.employed}
             </button>
-            <button
-              type="button"
-              onClick={() => setFilterAffiliation('freelance')}
-              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
-                filterAffiliation === 'freelance'
-                  ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 font-extrabold shadow-2xs'
-                  : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              프리 {counts.freelance}
-            </button>
+            {counts.freelance > 0 && (
+              <button
+                type="button"
+                onClick={() => setFilterAffiliation('freelance')}
+                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                  filterAffiliation === 'freelance'
+                    ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 font-extrabold shadow-2xs'
+                    : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                프리 {counts.freelance}
+              </button>
+            )}
           </div>
 
           {/* Driver List */}
