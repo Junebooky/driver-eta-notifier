@@ -52,6 +52,7 @@ export interface HqBooking {
   notes?: string;
   isToday?: boolean;
   isTomorrow?: boolean;
+  isPast?: boolean;
   isDispatchTarget?: boolean;
   groupId?: string;
   groupName?: string;

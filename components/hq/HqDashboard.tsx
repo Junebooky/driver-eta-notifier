@@ -57,6 +57,7 @@ import {
   formatShortAckTime,
   getKstTodayDateStr,
   getKstTomorrowDateStr,
+  isBookingInPast,
   mapScheduleItemToHqBooking,
 } from '@/utils/dispatchConflictDetector';
 import { ensureClientAuth } from '@/utils/cockpitClientAuth';
@@ -265,17 +266,20 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
 
   // Live Operational Counts (Omission & Conflict Prevention)
   const operationalCounts = useMemo(() => {
+    const todayIso = getKstTodayDateStr();
     const active = bookings.filter((b) => b.dispatchStatus !== '취소');
+    // Active current/upcoming dispatches drive live operation action counts & urgent alerts
+    const activeUpcoming = active.filter((b) => !isBookingInPast(b, todayIso));
     const todayBookings = active.filter((b) => b.isToday);
-    const unassigned = active.filter((b) => b.dispatchStatus === '미배정');
-    const unacked = active.filter((b) => b.driverAck === '미확인');
-    const reconfirm = active.filter(
+    const unassigned = activeUpcoming.filter((b) => b.dispatchStatus === '미배정');
+    const unacked = activeUpcoming.filter((b) => b.driverAck === '미확인');
+    const reconfirm = activeUpcoming.filter(
       (b) => b.dispatchStatus === '재확인 필요' || b.driverAck === '재확인 필요'
     );
-    const conflicts = active.filter((b) => b.hasConflict);
-    const drafts = active.filter((b) => b.dispatchStatus === '작성 중');
+    const conflicts = activeUpcoming.filter((b) => b.hasConflict);
+    const drafts = activeUpcoming.filter((b) => b.dispatchStatus === '작성 중');
     const multiGroups = new Set(
-      active
+      activeUpcoming
         .filter((b) => (b.groupTotalVehicles || 1) > 1 && b.groupId)
         .map((b) => b.groupId)
     ).size;

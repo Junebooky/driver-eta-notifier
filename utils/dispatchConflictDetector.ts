@@ -31,6 +31,22 @@ export function getKstTomorrowDateStr(now: Date = new Date()): string {
 }
 
 /**
+ * Checks if a booking's departure/operation is strictly in the past relative to today in KST.
+ * For multi-day schedules with an endDate, returns false if endDate is today or in the future.
+ */
+export function isBookingInPast(
+  b: { pickupDate: string; endDate?: string; isToday?: boolean; isTomorrow?: boolean; isPast?: boolean },
+  todayIso: string = getKstTodayDateStr()
+): boolean {
+  if (b.isToday || b.isTomorrow) return false;
+  if (typeof b.isPast === 'boolean') return b.isPast;
+  const rawEnd = b.endDate ? (normalizeDateToIso(b.endDate) || b.endDate) : null;
+  if (rawEnd && rawEnd >= todayIso) return false;
+  const rawStart = normalizeDateToIso(b.pickupDate) || b.pickupDate;
+  return Boolean(rawStart && rawStart < todayIso);
+}
+
+/**
  * Normalizes various Korean/dot/slash date representations ('2026. 10. 28', '2026.10.28', '2026/10/28')
  * into strict 'YYYY-MM-DD'. Returns empty string if unparseable.
  */
@@ -505,6 +521,8 @@ export function mapScheduleItemToHqBooking(
   tomorrowIso: string = getKstTomorrowDateStr()
 ): HqBooking {
   const dateIso = normalizeDateToIso(item.date) || item.date;
+  const endDateIso = normalizeDateToIso(item.end_date) || dateIso;
+  const isPast = dateIso < todayIso && endDateIso < todayIso;
   const ver = item.version || 1;
   const ackVer = item.last_ack_version || 0;
   const isAcked = ackVer >= ver && ver >= 1;
@@ -604,6 +622,7 @@ export function mapScheduleItemToHqBooking(
     notes: item.notes,
     isToday: dateIso === todayIso,
     isTomorrow: dateIso === tomorrowIso,
+    isPast,
     isDispatchTarget:
       dispatchStatus === '미배정' ||
       dispatchStatus === '작성 중' ||

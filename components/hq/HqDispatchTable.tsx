@@ -20,14 +20,16 @@ import {
   Send,
   ChevronLeft,
   ChevronRight,
+  History,
 } from 'lucide-react';
 import { HqMobileBookingList } from './HqMobileBookingList';
 import { HqBooking } from '@/types/hq';
 import { haptics } from '@/utils/haptics';
 import { VIP_REAL_VEHICLES, stripManufacturerName } from '@/utils/vehicleData';
 import { DEFAULT_DRIVER_PROFILES } from '@/utils/settlementCalculator';
+import { isBookingInPast } from '@/utils/dispatchConflictDetector';
 
-export type HqDispatchTabKey = 'action' | 'today' | 'tomorrow' | 'all';
+export type HqDispatchTabKey = 'action' | 'today' | 'tomorrow' | 'all' | 'past';
 
 export interface HqDispatchTableProps {
   bookings: HqBooking[];
@@ -83,8 +85,11 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
 
   const tabCounts = useMemo(() => {
     const activeNonCancelled = sourceForCounts.filter((b) => b.dispatchStatus !== '취소');
+    const upcomingNonCancelled = activeNonCancelled.filter((b) => !isBookingInPast(b));
+    const pastBookings = sourceForCounts.filter((b) => isBookingInPast(b));
+
     return {
-      action: activeNonCancelled.filter(
+      action: upcomingNonCancelled.filter(
         (b) =>
           b.dispatchStatus === '미배정' ||
           b.dispatchStatus === '작성 중' ||
@@ -95,7 +100,8 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
       ).length,
       today: sourceForCounts.filter((b) => b.isToday).length,
       tomorrow: sourceForCounts.filter((b) => b.isTomorrow).length,
-      all: sourceForCounts.length,
+      all: sourceForCounts.filter((b) => !isBookingInPast(b)).length,
+      past: pastBookings.length,
     };
   }, [sourceForCounts]);
 
@@ -128,18 +134,27 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
 
   const filteredList = useMemo(() => {
     return bookings.filter((b) => {
-      if (activeTab === 'today' && !b.isToday) return false;
-      if (activeTab === 'tomorrow' && !b.isTomorrow) return false;
-      if (activeTab === 'action') {
-        const needsAction =
-          b.dispatchStatus !== '취소' &&
-          (b.dispatchStatus === '미배정' ||
-            b.dispatchStatus === '작성 중' ||
-            b.dispatchStatus === '재확인 필요' ||
-            b.driverAck === '미확인' ||
-            b.driverAck === '재확인 필요' ||
-            Boolean(b.hasConflict));
-        if (!needsAction) return false;
+      const isPast = isBookingInPast(b);
+
+      if (activeTab === 'past') {
+        if (!isPast) return false;
+      } else {
+        // Active operational tabs ('action', 'today', 'tomorrow', 'all') only show current & upcoming dispatches
+        if (isPast) return false;
+
+        if (activeTab === 'today' && !b.isToday) return false;
+        if (activeTab === 'tomorrow' && !b.isTomorrow) return false;
+        if (activeTab === 'action') {
+          const needsAction =
+            b.dispatchStatus !== '취소' &&
+            (b.dispatchStatus === '미배정' ||
+              b.dispatchStatus === '작성 중' ||
+              b.dispatchStatus === '재확인 필요' ||
+              b.driverAck === '미확인' ||
+              b.driverAck === '재확인 필요' ||
+              Boolean(b.hasConflict));
+          if (!needsAction) return false;
+        }
       }
 
       if (searchQuery.trim()) {
@@ -254,77 +269,120 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
       </div>
 
       {/* 2. Operational Tabs (with real live counts) */}
-      <div className="pt-3 flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1">
-        <button
-          type="button"
-          onClick={() => {
-            haptics.lightTap();
-            onSelectTab('action');
-          }}
-          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
-            activeTab === 'action'
-              ? 'bg-[#0B1E48] text-white shadow-xs'
-              : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200/80'
-          }`}
-        >
-          <span>확인 필요</span>
-          <span
-            className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
-              activeTab === 'action' ? 'bg-[#1E60F3] text-white' : 'bg-slate-900 text-white'
+      <div className="pt-3 flex items-center justify-between gap-2 overflow-x-auto pb-1">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => {
+              haptics.lightTap();
+              onSelectTab('action');
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+              activeTab === 'action'
+                ? 'bg-[#0B1E48] text-white shadow-xs'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200/80'
             }`}
           >
-            {tabCounts.action}
-          </span>
-        </button>
+            <span>확인 필요</span>
+            <span
+              className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                activeTab === 'action' ? 'bg-[#1E60F3] text-white' : 'bg-slate-900 text-white'
+              }`}
+            >
+              {tabCounts.action}
+            </span>
+          </button>
 
-        <button
-          type="button"
-          onClick={() => {
-            haptics.lightTap();
-            onSelectTab('today');
-          }}
-          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
-            activeTab === 'today'
-              ? 'bg-[#1E60F3] text-white shadow-xs'
-              : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-          }`}
-        >
-          <span>오늘 출발</span>
-          <span className="font-black">{tabCounts.today}</span>
-        </button>
+          <button
+            type="button"
+            onClick={() => {
+              haptics.lightTap();
+              onSelectTab('today');
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+              activeTab === 'today'
+                ? 'bg-[#1E60F3] text-white shadow-xs'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+            }`}
+          >
+            <span>오늘 출발</span>
+            <span className="font-black">{tabCounts.today}</span>
+          </button>
 
-        <button
-          type="button"
-          onClick={() => {
-            haptics.lightTap();
-            onSelectTab('tomorrow');
-          }}
-          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
-            activeTab === 'tomorrow'
-              ? 'bg-[#1E60F3] text-white shadow-xs'
-              : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-          }`}
-        >
-          <span>내일 출발</span>
-          <span className="font-black">{tabCounts.tomorrow}</span>
-        </button>
+          <button
+            type="button"
+            onClick={() => {
+              haptics.lightTap();
+              onSelectTab('tomorrow');
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+              activeTab === 'tomorrow'
+                ? 'bg-[#1E60F3] text-white shadow-xs'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+            }`}
+          >
+            <span>내일 출발</span>
+            <span className="font-black">{tabCounts.tomorrow}</span>
+          </button>
 
-        <button
-          type="button"
-          onClick={() => {
-            haptics.lightTap();
-            onSelectTab('all');
-          }}
-          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
-            activeTab === 'all'
-              ? 'bg-[#1E60F3] text-white shadow-xs'
-              : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-          }`}
-        >
-          <span>전체 일정</span>
-          <span className="font-black">{tabCounts.all}</span>
-        </button>
+          <button
+            type="button"
+            onClick={() => {
+              haptics.lightTap();
+              onSelectTab('all');
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+              activeTab === 'all'
+                ? 'bg-[#1E60F3] text-white shadow-xs'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+            }`}
+            title="오늘 및 향후 모든 배차 일정"
+          >
+            <span>전체 예정</span>
+            <span className="font-black">{tabCounts.all}</span>
+          </button>
+        </div>
+
+        {/* Past Records Tab */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => {
+              haptics.lightTap();
+              onSelectTab('past');
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+              activeTab === 'past'
+                ? 'bg-slate-800 text-white shadow-xs'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-500'
+            }`}
+            title="출발 일시가 오늘 이전인 과거 배차 기록 (정산용 데이터 보존)"
+          >
+            <History className="w-3.5 h-3.5" />
+            <span>지난 일정</span>
+            <span className="font-bold text-[11px] opacity-80">{tabCounts.past}</span>
+          </button>
+        </div>
       </div>
+
+      {/* Notice Banner when viewing Past Records */}
+      {activeTab === 'past' && (
+        <div className="mt-2.5 px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200/90 text-xs text-slate-600 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="w-2 h-2 rounded-full bg-slate-400 shrink-0" />
+            <span className="truncate">
+              출발 일시가 오늘 이전인 과거 배차 기록입니다. 정산 및 리포트 통계에 안전하게 보존되어 있어요.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => onSelectTab('all')}
+            className="text-[11px] font-bold text-[#1E60F3] hover:underline shrink-0 cursor-pointer"
+          >
+            현재 배차 목록 보기 →
+          </button>
+        </div>
+      )}
 
       {/* 3. Filter Row */}
       <div className="pt-2.5 pb-1 flex flex-wrap items-center gap-2 text-xs">
@@ -472,7 +530,20 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
               {filteredList.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="py-12 text-center text-slate-400 font-medium">
-                    현재 조건에 해당하는 예약/배차 내역이 없습니다.
+                    <p>현재 조건에 해당하는 예약/배차 내역이 없습니다.</p>
+                    {activeTab !== 'past' && tabCounts.past > 0 && (
+                      <p className="mt-2 text-xs text-slate-400">
+                        출발 일시가 지난 일정은{' '}
+                        <button
+                          type="button"
+                          onClick={() => onSelectTab('past')}
+                          className="font-bold text-[#1E60F3] hover:underline cursor-pointer"
+                        >
+                          지난 일정 ({tabCounts.past}건)
+                        </button>
+                        에서 확인할 수 있어요.
+                      </p>
+                    )}
                   </td>
                 </tr>
               ) : (
