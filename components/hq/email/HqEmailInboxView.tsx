@@ -15,6 +15,7 @@ import {
   AlertCircle,
   CheckCircle2,
   Lock,
+  X,
 } from 'lucide-react';
 import { HqBooking } from '@/types/hq';
 import {
@@ -787,85 +788,97 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
           {/* Header Row */}
           <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white">
             <div className="flex items-center gap-2">
-              <Mail className="w-4 h-4 text-[#1E60F3]" />
+              <Mail className="w-4 h-4 text-[#0050FF]" />
               <h2 className="text-sm font-extrabold text-slate-900">
-                이메일 ({counts.total})
+                이메일
               </h2>
+              <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-600">
+                {counts.total}
+              </span>
             </div>
             <button
               type="button"
               onClick={() => {
+                haptics.lightTap();
                 setComposeTo('');
                 setComposeSubject('');
                 setComposeBody('');
                 setIsComposeOpen(true);
               }}
-              className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-[#1E60F3] text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1"
+              className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all cursor-pointer shadow-2xs active:scale-95 flex items-center gap-1"
               title="새 이메일 작성"
             >
-              <Plus className="w-3 h-3" />
+              <Plus className="w-3.5 h-3.5 stroke-[2.2] text-slate-500" />
               <span>메일 작성</span>
             </button>
           </div>
 
           {/* Status Filter Badges */}
-          <div className="p-3 border-b border-slate-100 bg-slate-50/50 flex items-center gap-1.5 overflow-x-auto text-xs font-bold">
-            <button
-              type="button"
-              onClick={() => setStatusFilter('all')}
-              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer shrink-0 ${statusFilter === 'all'
-                  ? 'bg-slate-900 text-white shadow-2xs'
-                  : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900'
-                }`}
-            >
-              전체
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatusFilter('unprocessed')}
-              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer shrink-0 flex items-center gap-1 ${statusFilter === 'unprocessed'
-                  ? 'bg-blue-600 text-white shadow-2xs'
-                  : 'bg-blue-50/70 border border-blue-200/60 text-[#1E60F3] hover:bg-blue-100'
-                }`}
-            >
-              <span>미처리</span>
-              <span className="font-black">{counts.unprocessed}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatusFilter('reviewing')}
-              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer shrink-0 flex items-center gap-1 ${statusFilter === 'reviewing'
-                  ? 'bg-slate-700 text-white shadow-2xs'
-                  : 'bg-slate-100 border border-slate-200 text-slate-600 hover:bg-slate-200'
-                }`}
-            >
-              <span>검토중</span>
-              <span className="font-black">{counts.reviewing}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatusFilter('completed')}
-              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer shrink-0 flex items-center gap-1 ${statusFilter === 'completed'
-                  ? 'bg-emerald-600 text-white shadow-2xs'
-                  : 'bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100'
-                }`}
-            >
-              <span>예약완료</span>
-              <span className="font-black">{counts.completed}</span>
-            </button>
+          <div className="p-3 border-b border-slate-100 bg-slate-50/50 flex items-center gap-1.5 overflow-x-auto text-xs font-bold scrollbar-none">
+            {[
+              { id: 'all' as const, label: '전체', count: undefined },
+              { id: 'unprocessed' as const, label: '미처리', count: counts.unprocessed },
+              { id: 'reviewing' as const, label: '검토중', count: counts.reviewing },
+              { id: 'completed' as const, label: '예약완료', count: counts.completed },
+            ].map((tab) => {
+              const isSelected = statusFilter === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => {
+                    haptics.selection();
+                    setStatusFilter(tab.id);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1 ${
+                    isSelected
+                      ? 'bg-[#0050FF] text-white shadow-2xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  <span>{tab.label}</span>
+                  {tab.count !== undefined && (
+                    <span
+                      className={`text-[11px] ${
+                        isSelected
+                          ? 'text-white/90 font-black'
+                          : tab.count === 0
+                          ? 'text-slate-400 font-medium'
+                          : 'text-slate-500 font-extrabold'
+                      }`}
+                    >
+                      {tab.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           {/* Search Input */}
-          <div className="p-3 border-b border-slate-100 bg-white space-y-2">
+          <div className="p-3 border-b border-slate-100 bg-white">
             <div className="relative">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="이메일 검색..."
-                className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:ring-1 focus:ring-blue-500 transition-all placeholder:text-slate-400"
+                placeholder="보낸 사람, 제목 또는 내용 검색"
+                className="w-full pl-8 pr-7 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-hidden focus:border-[#0050FF] focus:ring-2 focus:ring-blue-100 transition-all duration-150"
               />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    haptics.lightTap();
+                    setSearchQuery('');
+                  }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-0.5 rounded-md hover:bg-slate-100 transition-colors"
+                  title="검색어 지우기"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
             </div>
           </div>
 
