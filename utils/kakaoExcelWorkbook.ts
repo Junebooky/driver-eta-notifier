@@ -101,9 +101,9 @@ export function appendKakaoExcelReport(bytes: Uint8Array, draft: KakaoExcelDraft
   while (rowValues(target, insertRow).some(x => x !== null && String(x).trim() !== '')) insertRow++;
   const newRow: (string | number | null)[] = [
     serial, shortPlate(draft.plate), safeText(draft.model), safeText(draft.customer),
-    safeText(draft.driver), safeText(draft.time), safeText(draft.route),
-    safeText(draft.serviceType), numberOrText(draft.overtime),
-    numberOrText(draft.amount), safeText(draft.payment), numberOrText(draft.totalWithVat),
+    safeText(draft.driver), safeText(draft.time), draft.route.trim() ? safeText(draft.route) : null,
+    draft.serviceType.trim() ? safeText(draft.serviceType) : null, numberOrText(draft.overtime),
+    numberOrText(draft.amount), draft.payment.trim() ? safeText(draft.payment) : null, numberOrText(draft.totalWithVat),
   ];
   XLSX.utils.sheet_add_aoa(target, [newRow], {origin: 'A' + insertRow});
   const dateCell = target['A' + insertRow] as XLSX.CellObject | undefined;
