@@ -161,6 +161,7 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
           statusCode={statusCode}
           onRetry={refetch}
           onOpenLogin={() => setIsLoginModalOpen(true)}
+          onUpdateDriver={updateDriver}
         />
       ) : (
         <HqDriverDetailSplitView

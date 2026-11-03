@@ -16,12 +16,17 @@ import {
   AlertTriangle,
   Key,
   RefreshCw,
+  Edit3,
+  UserCheck,
+  UserMinus,
+  User,
 } from 'lucide-react';
 import { HqDriverSummary } from '@/types/driverHq';
 import { useHqDrivers } from '@/utils/useHqDrivers';
 import { haptics } from '@/utils/haptics';
 import { formatPhoneNumber } from '@/utils/formatters';
 import { getKstTodayDateStr } from '@/utils/dispatchConflictDetector';
+import { HqDriverEditModal } from './HqDriverEditModal';
 
 export interface HqDriversTableViewProps {
   onSelectDriver: (driverId: string) => void;
@@ -39,6 +44,7 @@ export interface HqDriversTableViewProps {
   statusCode?: number | null;
   onRetry?: () => void;
   onOpenLogin?: () => void;
+  onUpdateDriver?: (id: string, updates: Record<string, any>) => Promise<boolean>;
 }
 
 export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
@@ -52,12 +58,14 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
   statusCode: propStatusCode,
   onRetry: propOnRetry,
   onOpenLogin,
+  onUpdateDriver: propOnUpdateDriver,
 }) => {
   // If not passed from parent, use the custom hook
   const hookState = useHqDrivers();
   const drivers = propDrivers ?? hookState.drivers;
   const counts = propCounts ?? hookState.counts;
   const isLoading = propIsLoading ?? hookState.isLoading;
+  const updateDriver = propOnUpdateDriver ?? hookState.updateDriver;
   const error = propError ?? hookState.error;
   const statusCode = propStatusCode ?? hookState.statusCode;
   const onRetry = propOnRetry ?? hookState.refetch;
@@ -67,6 +75,8 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
   const [residenceFilter, setResidenceFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'driving' | 'off' | 'active' | 'vacation'>('all');
   const [currentPage, setCurrentPage] = useState<number>(1);
+  const [menuOpenDriverId, setMenuOpenDriverId] = useState<string | null>(null);
+  const [editingDriver, setEditingDriver] = useState<HqDriverSummary | null>(null);
   const pageSize = 10;
 
   // Helper to determine real-time operation status:
@@ -105,9 +115,9 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
     return '차량 미지정';
   };
 
-  // Filtered List
+  // Filtered List (소속 기사 우선 노출)
   const filteredDrivers = useMemo(() => {
-    return drivers.filter((driver) => {
+    const list = drivers.filter((driver) => {
       // Affiliation filter
       if (affiliationFilter !== 'all' && driver.affiliationType !== affiliationFilter) {
         return false;
@@ -145,6 +155,14 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
       }
 
       return true;
+    });
+
+    // 소속(employed) 기사를 최상단에 먼저 노출, 동일 조건 시 이름 가나다순 정렬
+    return list.slice().sort((a, b) => {
+      if (a.affiliationType !== b.affiliationType) {
+        return a.affiliationType === 'employed' ? -1 : 1;
+      }
+      return a.name.localeCompare(b.name, 'ko');
     });
   }, [drivers, affiliationFilter, residenceFilter, statusFilter, searchQuery]);
 
@@ -512,17 +530,85 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                       ) : null}
                     </td>
 
-                    {/* 5열: 더보기 (··· 아이콘 하나만 남김) */}
+                    {/* 5열: 더보기 (··· 아이콘 클릭 시 소속 전환 및 정보 수정 팝오버) */}
                     <td className="py-4 px-5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end">
+                      <div className="flex items-center justify-end relative">
                         <button
                           type="button"
-                          onClick={() => handleRowClick(driver.id)}
-                          className="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
-                          title="기사 상세 보기"
+                          onClick={() => {
+                            haptics.lightTap();
+                            setMenuOpenDriverId((prev) => (prev === driver.id ? null : driver.id));
+                          }}
+                          className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
+                            menuOpenDriverId === driver.id
+                              ? 'bg-blue-50 text-[#1E60F3]'
+                              : 'hover:bg-slate-100 text-slate-400 hover:text-slate-700'
+                          }`}
+                          title="기사 관리 메뉴"
                         >
                           <MoreHorizontal className="w-4 h-4" />
                         </button>
+
+                        {/* Dropdown Menu */}
+                        {menuOpenDriverId === driver.id && (
+                          <>
+                            <div
+                              className="fixed inset-0 z-40"
+                              onClick={() => setMenuOpenDriverId(null)}
+                            />
+                            <div className="absolute right-0 top-9 z-50 w-44 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 text-xs text-left animate-in fade-in zoom-in-95 duration-100">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setMenuOpenDriverId(null);
+                                  handleRowClick(driver.id);
+                                }}
+                                className="w-full px-3 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 font-bold cursor-pointer transition-colors"
+                              >
+                                <User className="w-3.5 h-3.5 text-slate-400" />
+                                <span>상세 프로필</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  haptics.selection();
+                                  setMenuOpenDriverId(null);
+                                  const targetAffiliation = driver.affiliationType === 'employed' ? 'freelance' : 'employed';
+                                  await updateDriver(driver.id, { affiliationType: targetAffiliation });
+                                }}
+                                className="w-full px-3 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 font-bold cursor-pointer transition-colors"
+                              >
+                                {driver.affiliationType === 'employed' ? (
+                                  <>
+                                    <UserMinus className="w-3.5 h-3.5 text-slate-500" />
+                                    <span>프리랜서로 전환</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <UserCheck className="w-3.5 h-3.5 text-[#1E60F3]" />
+                                    <span className="text-[#1E60F3]">소속 기사로 전환</span>
+                                  </>
+                                )}
+                              </button>
+
+                              <div className="my-1 border-t border-slate-100" />
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  haptics.lightTap();
+                                  setMenuOpenDriverId(null);
+                                  setEditingDriver(driver);
+                                }}
+                                className="w-full px-3 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 font-bold cursor-pointer transition-colors"
+                              >
+                                <Edit3 className="w-3.5 h-3.5 text-slate-400" />
+                                <span>기사 정보 수정</span>
+                              </button>
+                            </div>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -598,6 +684,22 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Driver Edit Modal */}
+      {editingDriver && (
+        <HqDriverEditModal
+          isOpen={Boolean(editingDriver)}
+          onClose={() => setEditingDriver(null)}
+          driver={editingDriver}
+          onSave={async (id, updates) => {
+            const ok = await updateDriver(id, updates);
+            if (ok) {
+              setEditingDriver(null);
+            }
+            return ok;
+          }}
+        />
+      )}
     </div>
   );
 };

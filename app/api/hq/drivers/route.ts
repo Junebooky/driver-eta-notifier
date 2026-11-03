@@ -69,6 +69,14 @@ export async function GET(req: NextRequest) {
       return summary;
     });
 
+    // 4.5. Sort: Employed (소속) drivers appear first, followed by freelancers, then alphabetically by name
+    mappedDrivers.sort((a, b) => {
+      if (a.affiliationType !== b.affiliationType) {
+        return a.affiliationType === 'employed' ? -1 : 1;
+      }
+      return a.name.localeCompare(b.name, 'ko');
+    });
+
     // 5. Calculate real KPI counts
     const total = mappedDrivers.length;
     const employed = mappedDrivers.filter((d) => d.affiliationType === 'employed').length;

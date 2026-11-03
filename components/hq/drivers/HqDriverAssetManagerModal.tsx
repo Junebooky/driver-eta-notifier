@@ -680,7 +680,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
             {/* Grid 2 Cards: PC Widescreen & True 9:16 Minimal Line Mobile Wireframe */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Card A: PC Info (Horizontal 16:9) */}
-              <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3 flex flex-col justify-between shadow-2xs">
+              <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col justify-between shadow-2xs h-full">
                 <div>
                   <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                     <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
@@ -697,8 +697,10 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                       </span>
                     )}
                   </div>
+                </div>
 
-                  {/* Preview Area: 16:9 Aspect Video with Drag & Drop */}
+                {/* Vertically centered Preview Area */}
+                <div className="my-auto py-3 flex-1 flex flex-col justify-center">
                   <div
                     onDragOver={(e) => {
                       e.preventDefault();
@@ -716,7 +718,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                       setIsDraggingPc(false);
                     }}
                     onDrop={(e) => handleDropFile(e, 'info', 'pc')}
-                    className={`mt-3 aspect-video rounded-xl overflow-hidden border transition-all flex items-center justify-center relative group ${
+                    className={`w-full aspect-video rounded-xl overflow-hidden border transition-all flex items-center justify-center relative group ${
                       isDraggingPc
                         ? 'border-2 border-dashed border-[#1E60F3] bg-blue-50/60 ring-2 ring-blue-300'
                         : 'border-slate-200 bg-slate-100'
@@ -739,14 +741,12 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                         </a>
                       </>
                     ) : (
-                      <div className="text-center p-4 text-slate-400">
+                      <div className="w-full h-full flex items-center justify-center p-4">
                         <img
                           src="/images/icons/pc.png"
                           alt="PC"
-                          className="w-12 h-12 object-contain mx-auto mb-1.5 opacity-75"
+                          className="w-24 h-24 sm:w-28 sm:h-28 object-contain transition-transform group-hover:scale-105 drop-shadow-sm select-none"
                         />
-                        <span className="text-xs font-bold text-slate-600 block">가로형 카드 등록하기</span>
-                        <div className="text-[10px] text-slate-400 mt-0.5">권장: 1920×1080 (16:9) · 드래그 앤 드롭 가능</div>
                       </div>
                     )}
                   </div>
@@ -765,7 +765,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                 </div>
 
                 {/* PC Card Actions */}
-                <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                <div className="flex items-center gap-2 pt-2 border-t border-slate-100 shrink-0">
                   <input
                     ref={pcInputRef}
                     type="file"
@@ -807,7 +807,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
               </div>
 
               {/* Card B: Mobile Info (Minimal Line Wireframe matching PC preview) */}
-              <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3 flex flex-col justify-between shadow-2xs">
+              <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col justify-between shadow-2xs h-full">
                 <div>
                   <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                     <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
@@ -824,8 +824,10 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                       </span>
                     )}
                   </div>
+                </div>
 
-                  {/* Minimal Device Frame with 9:16 Ratio & Drag & Drop */}
+                {/* Vertically centered Preview Area */}
+                <div className="my-auto py-3 flex-1 flex flex-col items-center justify-center">
                   <div
                     onDragOver={(e) => {
                       e.preventDefault();
@@ -843,48 +845,40 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                       setIsDraggingMobile(false);
                     }}
                     onDrop={(e) => handleDropFile(e, 'info', 'mobile')}
-                    className="mt-3 flex flex-col items-center justify-center p-2.5 bg-slate-50/70 rounded-xl border border-slate-200/80"
+                    className={`w-32 sm:w-36 aspect-[9/16] rounded-2xl border transition-all bg-white relative overflow-hidden flex flex-col group ${
+                      isDraggingMobile
+                        ? 'border-2 border-dashed border-[#1E60F3] bg-blue-50/60 ring-2 ring-blue-300'
+                        : 'border-slate-300 shadow-2xs'
+                    }`}
                   >
-                    <div
-                      className={`w-32 sm:w-36 aspect-[9/16] rounded-2xl border transition-all bg-white relative overflow-hidden flex flex-col group ${
-                        isDraggingMobile
-                          ? 'border-2 border-dashed border-[#1E60F3] bg-blue-50/60 ring-2 ring-blue-300'
-                          : 'border-slate-300 shadow-2xs'
-                      }`}
-                    >
-                      {/* Screen Content */}
-                      <div className="flex-1 bg-slate-100 relative flex items-center justify-center overflow-hidden">
-                        {bundle?.mobileInfo?.signedUrl ? (
-                          <>
-                            <img
-                              src={bundle.mobileInfo.signedUrl}
-                              alt="Mobile Info"
-                              className="w-full h-full object-cover"
-                            />
-                            <a
-                              href={bundle.mobileInfo.signedUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="absolute inset-0 bg-slate-900/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-[10.5px] font-bold gap-1 p-2 text-center"
-                            >
-                              <ExternalLink className="w-4 h-4" />
-                              <span>원본 보기</span>
-                            </a>
-                          </>
-                        ) : (
-                          <div className="p-3 text-center text-slate-400 flex flex-col items-center justify-center gap-1.5 h-full">
-                            <img
-                              src="/images/icons/mobile.png"
-                              alt="Mobile"
-                              className="w-10 h-10 object-contain mx-auto opacity-75"
-                            />
-                            <span className="text-[11px] font-bold text-slate-600 leading-tight">
-                              세로형 카드 등록하기
-                            </span>
-                            <span className="text-[9.5px] text-slate-400">1080×1920 (9:16)</span>
-                          </div>
-                        )}
-                      </div>
+                    {/* Screen Content */}
+                    <div className="flex-1 bg-slate-100 relative flex items-center justify-center overflow-hidden">
+                      {bundle?.mobileInfo?.signedUrl ? (
+                        <>
+                          <img
+                            src={bundle.mobileInfo.signedUrl}
+                            alt="Mobile Info"
+                            className="w-full h-full object-cover"
+                          />
+                          <a
+                            href={bundle.mobileInfo.signedUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="absolute inset-0 bg-slate-900/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-[10.5px] font-bold gap-1 p-2 text-center"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                            <span>원본 보기</span>
+                          </a>
+                        </>
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center p-3">
+                          <img
+                            src="/images/icons/mobile.png"
+                            alt="Mobile"
+                            className="w-16 h-16 sm:w-20 sm:h-20 object-contain transition-transform group-hover:scale-105 drop-shadow-sm select-none"
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -902,7 +896,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                 </div>
 
                 {/* Mobile Card Actions */}
-                <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                <div className="flex items-center gap-2 pt-2 border-t border-slate-100 shrink-0">
                   <input
                     ref={mobileInputRef}
                     type="file"

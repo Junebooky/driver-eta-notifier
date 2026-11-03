@@ -66,9 +66,12 @@ export function mapDbDriverToHqSummary(
 
   const isEnglish = Boolean(dbDriver.english_available);
   const cleanName = (dbDriver.driver_name || '').trim();
-  // Only 'QA 테스트' and '지용주' drivers are employed; all other drivers are freelancers
-  const isEmployed = cleanName === '지용주' || cleanName.includes('지용주') || cleanName.includes('QA 테스트');
-  const affiliationType: 'employed' | 'freelance' = isEmployed ? 'employed' : 'freelance';
+  // Default rule: QA 테스트 and 지용주 are employed by default; all others are freelance by default
+  const isDefaultEmployed = cleanName === '지용주' || cleanName.includes('지용주') || cleanName.includes('QA 테스트');
+  // Honor explicit affiliation saved in driver_meta; otherwise fall back to default rule
+  const affiliationType: 'employed' | 'freelance' = (meta.affiliation === 'employed' || meta.affiliation === 'freelance')
+    ? meta.affiliation
+    : (isDefaultEmployed ? 'employed' : 'freelance');
   const affiliationLabel = affiliationType === 'employed' ? '소속' : '프리랜서';
 
   // Find real schedules associated with this driver's vehicle_no or driver_id

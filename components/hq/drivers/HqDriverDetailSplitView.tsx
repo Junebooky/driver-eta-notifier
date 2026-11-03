@@ -10,6 +10,7 @@ import {
   Star,
   Plane,
   Edit2,
+  Edit3,
   Check,
   ArrowLeft,
   Loader2,
@@ -20,6 +21,7 @@ import { HqDriverSummary, DriverScheduleItem } from '@/types/driverHq';
 import { useHqDrivers } from '@/utils/useHqDrivers';
 import { haptics } from '@/utils/haptics';
 import { HqDriverAssetManagerModal } from './HqDriverAssetManagerModal';
+import { HqDriverEditModal } from './HqDriverEditModal';
 import { getKstTodayDateStr } from '@/utils/dispatchConflictDetector';
 
 interface HqDriverDetailSplitViewProps {
@@ -60,6 +62,8 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
   const [memoDraft, setMemoDraft] = useState('');
   const [weekOffset, setWeekOffset] = useState<number>(0);
   const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isUpdatingAffiliation, setIsUpdatingAffiliation] = useState(false);
   const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | null>(null);
   const [avatarLoadError, setAvatarLoadError] = useState(false);
 
@@ -128,11 +132,19 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
     }
   };
 
-  // Filtered driver list for left column
+  // Filtered driver list for left column (소속 기사 우선 노출)
   const filteredDrivers = useMemo(() => {
-    return drivers.filter((d) => {
+    const list = drivers.filter((d) => {
       if (filterAffiliation === 'all') return true;
       return d.affiliationType === filterAffiliation;
+    });
+
+    // 소속(employed) 기사를 최상단에 먼저 노출
+    return list.slice().sort((a, b) => {
+      if (a.affiliationType !== b.affiliationType) {
+        return a.affiliationType === 'employed' ? -1 : 1;
+      }
+      return a.name.localeCompare(b.name, 'ko');
     });
   }, [drivers, filterAffiliation]);
 
@@ -402,6 +414,18 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                     소속
                   </span>
                 )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    haptics.selection();
+                    setIsEditModalOpen(true);
+                  }}
+                  className="px-2.5 py-1 rounded-lg border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 text-xs font-bold transition-all ml-auto flex items-center gap-1 cursor-pointer shadow-2xs"
+                  title="기사 정보 수정"
+                >
+                  <Edit3 className="w-3.5 h-3.5 text-slate-400" />
+                  <span>정보 수정</span>
+                </button>
               </div>
 
               {/* Rating and badges */}
@@ -483,11 +507,60 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
 
           {/* Profile Details List */}
           <div className="bg-slate-50/60 rounded-2xl border border-slate-100 p-4 space-y-2.5 text-xs">
-            <div className="flex items-center justify-between">
-              <span className="text-slate-400 font-semibold">소속</span>
-              <span className="font-extrabold text-slate-800">
-                {activeDriver.affiliationLabel}
-              </span>
+            <div className="flex items-center justify-between py-0.5">
+              <span className="text-slate-500 font-bold">소속 변경</span>
+              <div className="inline-flex items-center bg-slate-200/70 p-0.5 rounded-xl border border-slate-200 shadow-2xs">
+                <button
+                  type="button"
+                  disabled={isUpdatingAffiliation}
+                  onClick={async () => {
+                    if (activeDriver.affiliationType !== 'employed') {
+                      haptics.selection();
+                      setIsUpdatingAffiliation(true);
+                      try {
+                        const ok = await updateDriver(activeDriver.id, { affiliationType: 'employed' });
+                        if (ok) {
+                          onRefreshDrivers?.();
+                        }
+                      } finally {
+                        setIsUpdatingAffiliation(false);
+                      }
+                    }
+                  }}
+                  className={`px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                    activeDriver.affiliationType === 'employed'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                  }`}
+                >
+                  소속
+                </button>
+                <button
+                  type="button"
+                  disabled={isUpdatingAffiliation}
+                  onClick={async () => {
+                    if (activeDriver.affiliationType !== 'freelance') {
+                      haptics.selection();
+                      setIsUpdatingAffiliation(true);
+                      try {
+                        const ok = await updateDriver(activeDriver.id, { affiliationType: 'freelance' });
+                        if (ok) {
+                          onRefreshDrivers?.();
+                        }
+                      } finally {
+                        setIsUpdatingAffiliation(false);
+                      }
+                    }
+                  }}
+                  className={`px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                    activeDriver.affiliationType === 'freelance'
+                      ? 'bg-slate-700 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                  }`}
+                >
+                  프리랜서
+                </button>
+              </div>
             </div>
 
             <div className="flex items-center justify-between">
@@ -813,6 +886,23 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
             // 2. Refetch full driver roster
             onRefreshDrivers?.();
             hookState.refetch();
+          }}
+        />
+      )}
+
+      {/* Driver Profile Edit Modal */}
+      {isEditModalOpen && activeDriver && (
+        <HqDriverEditModal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          driver={activeDriver}
+          onSave={async (id, updates) => {
+            const ok = await updateDriver(id, updates);
+            if (ok) {
+              onRefreshDrivers?.();
+              hookState.refetch();
+            }
+            return ok;
           }}
         />
       )}

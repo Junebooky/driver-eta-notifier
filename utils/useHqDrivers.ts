@@ -103,6 +103,8 @@ export function useHqDrivers(): UseHqDriversResult {
         setDrivers((prev) =>
           prev.map((d) => (d.id === id ? { ...d, ...data.driver } : d))
         );
+        // Re-fetch in background to update KPI counts (employed/freelance counts)
+        fetchDrivers().catch(() => {});
         return true;
       } catch (err: any) {
         console.error('[useHqDrivers] Update error:', err);
