@@ -81,7 +81,7 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
         {/* Right Actions: Desktop Search + Phone Intake + Sync + Bell + Profile */}
         <div className="flex items-center gap-1 sm:gap-2 shrink-0">
 
-          {/* Quick Quote Calculator Button */}
+          {/* Quick Quote Calculator Button (Ghost Style) */}
           {onOpenQuoteModal && (
             <div className="relative group hidden sm:flex items-center">
               <button
@@ -91,12 +91,12 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
                   onOpenQuoteModal();
                 }}
                 aria-label="빠른 견적 계산"
-                className="flex items-center justify-center p-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 active:scale-95 active:translate-y-0 text-slate-800 transition-all duration-200 ease-out cursor-pointer hover:scale-115 hover:-translate-y-1 hover:shadow-md border border-blue-400/20"
+                className="w-10 h-10 flex items-center justify-center rounded-xl bg-transparent border-0 hover:bg-slate-100 active:bg-slate-200 active:scale-95 transition-all duration-150 cursor-pointer"
               >
                 <img
                   src="/images/icons/calculator.png"
                   alt="계산기"
-                  className="w-8 h-8 object-contain shrink-0 transition-transform duration-200 group-hover:scale-105"
+                  className="w-7.5 h-7.5 object-contain shrink-0 transition-transform duration-150 group-hover:scale-110"
                 />
               </button>
 
@@ -121,7 +121,7 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
               }}
               disabled={isRefreshing}
               aria-label="일정 새로고침"
-              className="h-11 w-11 sm:w-auto px-2.5 rounded-xl border border-slate-200/80 bg-white hover:bg-slate-50 flex items-center gap-1.5 text-slate-600 text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-2xs disabled:opacity-60"
+              className="h-10 w-10 sm:w-auto px-2.5 rounded-xl border border-slate-200/80 bg-white hover:bg-slate-50 flex items-center gap-1.5 text-slate-600 text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-2xs disabled:opacity-60"
               title={lastSyncedLabel ? `최근 업데이트: ${lastSyncedLabel}` : '실시간 서버 동기화'}
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-[#1E60F3]' : ''}`} />
@@ -136,7 +136,7 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
             </button>
           )}
 
-          {/* Notifications Alarm */}
+          {/* Notifications Alarm (Ghost Style) */}
           <div className="relative group flex items-center">
             <button
               type="button"
@@ -145,16 +145,16 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
                 onOpenNotifications?.();
               }}
               aria-label="배차 알림 열기"
-              className="flex items-center justify-center p-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 active:scale-95 active:translate-y-0 text-slate-800 transition-all duration-200 ease-out cursor-pointer hover:scale-115 hover:-translate-y-1 hover:shadow-md border border-blue-400/20 relative"
+              className="w-10 h-10 flex items-center justify-center rounded-xl bg-transparent border-0 hover:bg-slate-100 active:bg-slate-200 active:scale-95 transition-all duration-150 cursor-pointer relative"
               title="미배정 · 기사 미확인 · 재확인 필요 점검"
             >
               <img
                 src="/images/icons/alarm.png"
                 alt="알림"
-                className="w-8 h-8 object-contain shrink-0 transition-transform duration-200 group-hover:scale-105"
+                className="w-7.5 h-7.5 object-contain shrink-0 transition-transform duration-150 group-hover:scale-110"
               />
               {unreadAlertsCount > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-rose-500 text-white rounded-full text-[9px] font-black flex items-center justify-center shadow-xs">
+                <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-rose-500 text-white rounded-full text-[9px] font-black flex items-center justify-center shadow-xs">
                   {unreadAlertsCount > 99 ? '99+' : unreadAlertsCount}
                 </span>
               )}
