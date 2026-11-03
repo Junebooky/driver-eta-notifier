@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Search, X, ChevronDown, Menu, RefreshCw, PhoneCall, Award } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 import { formatKoreanFullDateLabel } from '@/utils/dispatchConflictDetector';
@@ -42,6 +42,45 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
   searchPlaceholder = '고객명, 예약번호, 기사명, 차량번호 검색...',
 }) => {
   const todayLabel = formatKoreanFullDateLabel();
+
+  // 1-minute alert pulse & speech bubble
+  const [isMinutePulsing, setIsMinutePulsing] = useState(false);
+  const [showMinuteBubble, setShowMinuteBubble] = useState(false);
+  const lastMinuteRef = useRef<number>(Math.floor(Date.now() / 60000));
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const currentMinute = Math.floor(Date.now() / 60000);
+      if (currentMinute !== lastMinuteRef.current) {
+        lastMinuteRef.current = currentMinute;
+        setIsMinutePulsing(true);
+        setShowMinuteBubble(true);
+
+        const pulseTimer = setTimeout(() => setIsMinutePulsing(false), 1200);
+        const bubbleTimer = setTimeout(() => setShowMinuteBubble(false), 5000);
+        return () => {
+          clearTimeout(pulseTimer);
+          clearTimeout(bubbleTimer);
+        };
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  const formattedSyncTime = useMemo(() => {
+    if (!lastSyncedLabel) {
+      return new Intl.DateTimeFormat('ko-KR', {
+        timeZone: 'Asia/Seoul',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).format(new Date());
+    }
+    const parts = lastSyncedLabel.split(':');
+    if (parts.length >= 2) return `${parts[0]}:${parts[1]}`;
+    return lastSyncedLabel;
+  }, [lastSyncedLabel]);
 
   return (
     <header className="bg-white border-b border-slate-100 px-3.5 sm:px-6 py-3 sticky top-0 z-20 space-y-2.5">
@@ -111,29 +150,42 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
           )}
 
 
-          {/* Live Server Sync Button */}
+          {/* Live Server Sync Button (Ghost Style with Update Icon & Minute Pulse) */}
           {onRefresh && (
-            <button
-              type="button"
-              onClick={() => {
-                haptics.lightTap();
-                onRefresh();
-              }}
-              disabled={isRefreshing}
-              aria-label="일정 새로고침"
-              className="h-10 w-10 sm:w-auto px-2.5 rounded-xl border border-slate-200/80 bg-white hover:bg-slate-50 flex items-center gap-1.5 text-slate-600 text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-2xs disabled:opacity-60"
-              title={lastSyncedLabel ? `최근 업데이트: ${lastSyncedLabel}` : '실시간 서버 동기화'}
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-[#1E60F3]' : ''}`} />
-              <span className="hidden xl:inline">
-                {lastSyncedLabel
-                  ? `업데이트 (${lastSyncedLabel.split(':').length >= 2
-                    ? `${lastSyncedLabel.split(':')[0]}:${lastSyncedLabel.split(':')[1]}`
-                    : lastSyncedLabel
-                  })`
-                  : '방금 업데이트됨'}
-              </span>
-            </button>
+            <div className="relative group flex items-center">
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.lightTap();
+                  onRefresh();
+                }}
+                disabled={isRefreshing}
+                aria-label="실시간 서버 동기화"
+                className="w-10 h-10 flex items-center justify-center rounded-xl bg-transparent border-0 hover:bg-slate-100 active:bg-slate-200 hover:scale-110 active:scale-95 transition-all duration-150 cursor-pointer disabled:opacity-60 relative"
+                title={lastSyncedLabel ? `최근 업데이트: ${lastSyncedLabel}` : '실시간 서버 동기화'}
+              >
+                <img
+                  src="/images/icons/update.png"
+                  alt="동기화"
+                  className={`w-7.5 h-7.5 object-contain shrink-0 transition-all duration-300 ${
+                    isRefreshing ? 'animate-spin' : ''
+                  } ${isMinutePulsing ? 'scale-125 drop-shadow-md' : 'group-hover:scale-110'}`}
+                />
+              </button>
+
+              {/* Speech Bubble: Hover or 1-minute alert */}
+              <div
+                className={`absolute top-full left-1/2 -translate-x-1/2 pt-2 flex-col items-center pointer-events-none z-50 transition-all duration-200 ${
+                  showMinuteBubble ? 'flex animate-in fade-in zoom-in-95' : 'hidden group-hover:flex'
+                }`}
+              >
+                <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 shadow-xs" />
+                <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg flex items-center gap-1.5 animate-in fade-in-50 duration-150">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping inline-block" />
+                  {formattedSyncTime} 업데이트
+                </span>
+              </div>
+            </div>
           )}
 
           {/* Notifications Alarm (Ghost Style) */}
