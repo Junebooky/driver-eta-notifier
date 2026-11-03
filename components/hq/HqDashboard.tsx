@@ -640,7 +640,7 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
           subtitle={
             activeSidebarTab === 'operations' ? (
               <span className="text-slate-500 font-medium">
-                대표님 모바일·PC 다중 차량 5단계 운행 상태(준비·도착·탑승·이동·종료) 실시간 관제
+                진행 중인 행사의 차량 위치와 운행 상태를 실시간으로 확인해요
               </span>
             ) : activeSidebarTab === 'quotes' ? (
               <span className="text-slate-500 font-medium">
@@ -695,7 +695,9 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
                       ? '기사명, 연락처, 거주지 검색...'
                       : activeSidebarTab === 'expenses' || activeSidebarTab === 'receipts'
                       ? '기사명, 차량번호, 상호명 검색...'
-                      : '고객사, 승객명, 예약번호, 기사명, 차량번호 검색...'
+                      : activeSidebarTab === 'operations'
+                        ? '기사님, 차량번호, 장소로 찾아보세요'
+                        : '고객사, 승객명, 예약번호, 기사명, 차량번호 검색...'
           }
         />
 
