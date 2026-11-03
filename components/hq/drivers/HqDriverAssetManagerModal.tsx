@@ -329,6 +329,21 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
     }
   };
 
+  // Format asset dimensions & size (e.g. '2000 × 1500 px · 2.6 MB')
+  const formatAssetDimensionAndSize = (asset?: { width?: number; height?: number; fileSize: number } | null) => {
+    if (!asset) return null;
+    const dimensionStr = asset.width && asset.height ? `${asset.width} × ${asset.height} px` : '';
+    const sizeStr =
+      asset.fileSize >= 1024 * 1024
+        ? `${(asset.fileSize / (1024 * 1024)).toFixed(1)} MB`
+        : `${Math.round(asset.fileSize / 1024)} KB`;
+
+    if (dimensionStr && sizeStr) {
+      return `${dimensionStr} · ${sizeStr}`;
+    }
+    return dimensionStr || sizeStr;
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
       <div className="w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[88vh]">
@@ -423,11 +438,14 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                 </p>
               </div>
               {bundle?.profile ? (
-                <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 text-[11px] font-bold flex items-center gap-1">
-                  <Check className="w-3 h-3" /> 등록 완료
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-[#0050FF] text-xs font-semibold">
+                  <span className="w-4 h-4 rounded-full bg-[#0050FF] text-white flex items-center justify-center shrink-0">
+                    <Check className="w-2.5 h-2.5 stroke-[2.5]" />
+                  </span>
+                  <span>등록 완료</span>
                 </span>
               ) : (
-                <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200 text-[11px] font-bold">
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 text-xs font-semibold">
                   미등록
                 </span>
               )}
@@ -535,15 +553,18 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
               </div>
 
               {bundle?.isFullyComplete ? (
-                <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-extrabold flex items-center gap-1 self-start sm:self-auto">
-                  <CheckCircle2 className="w-3 h-3" /> 완비 (PC·모바일)
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-[#0050FF] text-xs font-semibold self-start sm:self-auto">
+                  <span className="w-4 h-4 rounded-full bg-[#0050FF] text-white flex items-center justify-center shrink-0">
+                    <Check className="w-2.5 h-2.5 stroke-[2.5]" />
+                  </span>
+                  <span>완비 (PC·모바일)</span>
                 </span>
               ) : bundle?.isReadyForCustomerDispatch ? (
-                <span className="px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 text-[11px] font-extrabold flex items-center gap-1 self-start sm:self-auto">
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold border border-indigo-100 self-start sm:self-auto">
                   1종 등록됨
                 </span>
               ) : (
-                <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[11px] font-bold self-start sm:self-auto">
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 text-xs font-semibold self-start sm:self-auto">
                   카드 미등록
                 </span>
               )}
@@ -551,9 +572,9 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
 
             {/* Visual Vehicle Selector with Category Filter Tabs & Plate Chips */}
             <div className="bg-white rounded-xl border border-slate-200 p-3 space-y-3 shadow-2xs">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center justify-between gap-2.5">
                 {/* Category Filter Tabs with no wrapping truncation */}
-                <div className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none flex-1 min-w-0">
+                <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none">
                   {categoryTabs.map((cat) => {
                     const isSelected = selectedCategory === cat.key;
                     const IconComp = cat.icon;
@@ -571,7 +592,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                           }`}
                       >
                         <IconComp className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-white' : 'text-slate-500'}`} />
-                        <span className="whitespace-nowrap">{cat.label}</span>
+                        <span className="whitespace-nowrap shrink-0">{cat.label}</span>
                         <span
                           className={`text-[10px] px-1.5 py-0.2 rounded-full font-black shrink-0 ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-200/70 text-slate-600'
                             }`}
@@ -584,7 +605,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                 </div>
 
                 {/* Quick Vehicle Plate Search */}
-                <div className="relative w-44 flex-shrink-0">
+                <div className="relative w-36 sm:w-44 shrink-0">
                   <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
                   <input
                     type="text"
@@ -634,8 +655,11 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                           className="w-9 h-6 object-contain shrink-0 filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.18)]"
                         />
                         {isComplete ? (
-                          <span className="px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-black flex items-center gap-0.5">
-                            <Check className="w-2.5 h-2.5" /> 완비
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-50 text-[#0050FF] text-[9.5px] font-semibold shrink-0">
+                            <span className="w-3.5 h-3.5 rounded-full bg-[#0050FF] text-white flex items-center justify-center shrink-0">
+                              <Check className="w-2 h-2 stroke-[2.5]" />
+                            </span>
+                            <span>완비</span>
                           </span>
                         ) : isPartial ? (
                           <span className="px-1.5 py-0.2 rounded-full bg-indigo-100 text-indigo-800 text-[9px] font-black">
@@ -686,11 +710,14 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                       <span>PC용 가로 카드 (16:9)</span>
                     </span>
                     {bundle?.pcInfo ? (
-                      <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-black border border-emerald-200">
-                        등록 완료
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-[#0050FF] text-xs font-semibold">
+                        <span className="w-4 h-4 rounded-full bg-[#0050FF] text-white flex items-center justify-center shrink-0">
+                          <Check className="w-2.5 h-2.5 stroke-[2.5]" />
+                        </span>
+                        <span>등록 완료</span>
                       </span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-500 text-[10px] font-bold">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 text-xs font-semibold">
                         미등록
                       </span>
                     )}
@@ -756,14 +783,8 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                   </div>
 
                   {bundle?.pcInfo && (
-                    <div className="mt-2 text-[10.5px] text-slate-500 space-y-0.5">
-                      <div className="font-bold truncate text-slate-800">{bundle.pcInfo.fileName}</div>
-                      <div>
-                        {bundle.pcInfo.width && bundle.pcInfo.height
-                          ? `${bundle.pcInfo.width}×${bundle.pcInfo.height} px · `
-                          : ''}
-                        {Math.round(bundle.pcInfo.fileSize / 1024)} KB · v{bundle.pcInfo.version}
-                      </div>
+                    <div className="mt-2 text-xs text-slate-400 text-center">
+                      {formatAssetDimensionAndSize(bundle.pcInfo)}
                     </div>
                   )}
                 </div>
@@ -819,11 +840,14 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                       <span>모바일용 세로 카드 (9:16)</span>
                     </span>
                     {bundle?.mobileInfo ? (
-                      <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-black border border-emerald-200">
-                        등록 완료
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-[#0050FF] text-xs font-semibold">
+                        <span className="w-4 h-4 rounded-full bg-[#0050FF] text-white flex items-center justify-center shrink-0">
+                          <Check className="w-2.5 h-2.5 stroke-[2.5]" />
+                        </span>
+                        <span>등록 완료</span>
                       </span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-500 text-[10px] font-bold">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 text-xs font-semibold">
                         미등록
                       </span>
                     )}
@@ -893,14 +917,8 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                   </div>
 
                   {bundle?.mobileInfo && (
-                    <div className="mt-2 text-[10.5px] text-slate-500 space-y-0.5 text-center">
-                      <div className="font-bold truncate text-slate-800">{bundle.mobileInfo.fileName}</div>
-                      <div>
-                        {bundle.mobileInfo.width && bundle.mobileInfo.height
-                          ? `${bundle.mobileInfo.width}×${bundle.mobileInfo.height} px · `
-                          : ''}
-                        {Math.round(bundle.mobileInfo.fileSize / 1024)} KB · v{bundle.mobileInfo.version}
-                      </div>
+                    <div className="mt-2 text-xs text-slate-400 text-center">
+                      {formatAssetDimensionAndSize(bundle.mobileInfo)}
                     </div>
                   )}
                 </div>
