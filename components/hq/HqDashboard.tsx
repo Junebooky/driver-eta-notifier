@@ -660,7 +660,7 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
               </span>
             ) : activeSidebarTab === 'vehicles' ? (
               <span className="text-slate-500 font-medium">
-                보유 차량 20대 실시간 운영 현황 · 일정별 예약 가용성 및 좌석별 전자기기 충전 사양 관리
+                총 20대의 차량이 등록되어 있어요
               </span>
             ) : activeSidebarTab === 'drivers' ? (
               <span className="text-slate-500 font-medium">
@@ -690,7 +690,7 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
                 : activeSidebarTab === 'reports'
                   ? '고객사, 행사명, 대행사, 기사명, 차량 검색...'
                   : activeSidebarTab === 'vehicles'
-                    ? '차량번호, 차종, 기사명 검색...'
+                    ? '차량명이나 번호로 검색'
                     : activeSidebarTab === 'drivers'
                       ? '기사명, 연락처, 거주지 검색...'
                       : activeSidebarTab === 'expenses' || activeSidebarTab === 'receipts'
