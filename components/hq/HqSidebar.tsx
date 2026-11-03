@@ -9,6 +9,7 @@ import {
   Car,
   Users,
   FileSpreadsheet,
+  ClipboardPaste,
   Receipt,
   BookOpen,
   BarChart3,
@@ -61,6 +62,7 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
     { id: 'expenses', label: '경비지출', icon: Receipt },
     { id: 'field_knowledge', label: '현장 지식', icon: BookOpen },
     { id: 'reports', label: '보고서·통계', icon: BarChart3 },
+    { id: 'excel_import', label: '카카오톡 → Excel', icon: ClipboardPaste },
     { id: 'settings', label: '설정·권한', icon: Settings },
   ];
 
