@@ -6,12 +6,9 @@ import {
   Upload,
   User,
   Car,
-  Image as ImageIcon,
   CheckCircle2,
   AlertTriangle,
   Trash2,
-  Monitor,
-  Smartphone,
   Loader2,
   ExternalLink,
   Bus,
@@ -60,6 +57,9 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
   const [dbNotice, setDbNotice] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState<'profile' | 'pc' | 'mobile' | null>(null);
+  const [isDraggingProfile, setIsDraggingProfile] = useState(false);
+  const [isDraggingPc, setIsDraggingPc] = useState(false);
+  const [isDraggingMobile, setIsDraggingMobile] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{
     type: 'success' | 'warning' | 'error';
     text: string;
@@ -92,6 +92,20 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
   const activeVehicle = useMemo(() => {
     return resolveVehicleEntity(selectedVehiclePlate || (VIP_REAL_VEHICLES[0]?.plate || ''));
   }, [selectedVehiclePlate]);
+
+  // Clean vehicle display name (eliminating double brand names like '벤츠 벤츠...')
+  const displayVehicleName = useMemo(() => {
+    if (!activeVehicle) return '';
+    const brand = activeVehicle.brand || '';
+    const model = activeVehicle.model || '';
+    if (model.startsWith('벤츠')) {
+      return model.replace(/^벤츠\s*/, '메르세데스-벤츠 ');
+    }
+    if (model.startsWith(brand)) {
+      return model;
+    }
+    return `${brand} ${model}`.trim();
+  }, [activeVehicle]);
 
   // Category Tabs Configuration
   const categoryTabs = useMemo(() => [
@@ -282,6 +296,26 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
     }
   };
 
+  // Drag & Drop File Handler
+  const handleDropFile = (
+    e: React.DragEvent<HTMLDivElement>,
+    assetType: 'profile' | 'info',
+    variant?: 'pc' | 'mobile'
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (assetType === 'profile') setIsDraggingProfile(false);
+    else if (variant === 'pc') setIsDraggingPc(false);
+    else if (variant === 'mobile') setIsDraggingMobile(false);
+
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      handleFileUpload(file, assetType, variant);
+    } else if (file) {
+      setStatusMessage({ type: 'error', text: '이미지 파일(JPG, PNG, WEBP)만 업로드할 수 있습니다.' });
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
       <div className="w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh]">
@@ -293,11 +327,8 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
             </div>
             <div>
               <h2 className="text-base font-black text-slate-900">
-                기사 프로필 & 차량 안내 카드 관리
+                기사 프로필 및 배차 카드
               </h2>
-              <p className="text-xs text-slate-400">
-                기사님 프로필 사진과 차량별 고객 배차 카드를 등록·관리합니다.
-              </p>
             </div>
           </div>
           <button
@@ -332,17 +363,18 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
           {/* Quick Summary Chips for Driver */}
           <div className="flex items-center gap-2 self-end sm:self-center shrink-0 pt-1 sm:pt-4">
             <span
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border flex items-center gap-1 ${bundle?.profile
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border flex items-center gap-1 ${
+                bundle?.profile
                   ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                   : 'bg-slate-100 text-slate-500 border-slate-200'
-                }`}
+              }`}
             >
               <User className="w-3 h-3" />
-              {bundle?.profile ? '프로필 사진 등록됨' : '프로필 사진 미등록'}
+              {bundle?.profile ? '프로필 등록됨' : '프로필 미등록'}
             </span>
             <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-50 text-[#1E60F3] border border-blue-200 flex items-center gap-1">
               <Car className="w-3 h-3" />
-              차량 카드 {completedVehiclesCount}/20대 완비
+              카드 {completedVehiclesCount}/20 등록
             </span>
           </div>
         </div>
@@ -372,10 +404,10 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
               <div>
                 <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
                   <User className="w-4 h-4 text-[#1E60F3]" />
-                  <span>기사 프로필 사진</span>
+                  <span>기사 프로필</span>
                 </h3>
                 <p className="text-[11px] text-slate-500">
-                  배차 알림 및 모바일 명함에 노출되는 기사님 단독 프로필입니다 (차량 무관).
+                  고객 알림톡과 모바일 명함에 표시돼요
                 </p>
               </div>
               {bundle?.profile ? (
@@ -383,13 +415,35 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                   <CheckCircle2 className="w-3 h-3" /> 등록 완료
                 </span>
               ) : (
-                <span className="px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-600 text-[11px] font-bold">
+                <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[11px] font-bold">
                   미등록
                 </span>
               )}
             </div>
 
-            <div className="flex flex-col sm:flex-row items-center gap-4 bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs">
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDraggingProfile(true);
+              }}
+              onDragEnter={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDraggingProfile(true);
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDraggingProfile(false);
+              }}
+              onDrop={(e) => handleDropFile(e, 'profile')}
+              className={`flex flex-col sm:flex-row items-center gap-4 bg-white p-3.5 rounded-xl border transition-all ${
+                isDraggingProfile
+                  ? 'border-2 border-dashed border-[#1E60F3] bg-blue-50/60 ring-2 ring-blue-300'
+                  : 'border-slate-200 shadow-2xs'
+              }`}
+            >
               {bundle?.profile?.signedUrl ? (
                 <img
                   src={bundle.profile.signedUrl}
@@ -407,7 +461,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                 <div className="text-xs font-black text-slate-800">
                   {activeDriver?.name} 기사님
                   <span className="ml-2 font-normal text-slate-400">
-                    {bundle?.profile ? bundle.profile.fileName : '등록된 프로필 사진이 없습니다.'}
+                    {bundle?.profile ? bundle.profile.fileName : '프로필 사진을 등록해 주세요'}
                   </span>
                 </div>
                 {bundle?.profile && (
@@ -420,7 +474,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                   </div>
                 )}
                 <p className="text-[10.5px] text-slate-400">
-                  권장: 1:1 정방형 또는 3:4 인물 사진 (JPG/PNG, 최대 10MB)
+                  1:1 정방형 권장 · 최대 10MB
                 </p>
               </div>
 
@@ -448,7 +502,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                     <Upload className="w-3.5 h-3.5" />
                   )}
                   <span>
-                    {bundle?.profile ? '사진 교체' : '프로필 업로드'}
+                    {bundle?.profile ? '사진 교체' : '사진 등록'}
                   </span>
                 </button>
 
@@ -472,10 +526,10 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
               <div>
                 <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
                   <Car className="w-4 h-4 text-[#1E60F3]" />
-                  <span>차량별 맞춤 안내 카드 (PC · 모바일)</span>
+                  <span>차량별 배차 카드</span>
                 </h3>
                 <p className="text-[11px] text-slate-500">
-                  기사님이 해당 차량으로 운행할 때 고객에게 발송되는 전용 안내 카드를 등록합니다.
+                  해당 차량 운행 시 고객에게 전달되는 전용 카드예요
                 </p>
               </div>
 
@@ -488,8 +542,8 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                   1종 등록됨
                 </span>
               ) : (
-                <span className="px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[11px] font-bold self-start sm:self-auto">
-                  안내 카드 미등록
+                <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[11px] font-bold self-start sm:self-auto">
+                  카드 미등록
                 </span>
               )}
             </div>
@@ -497,8 +551,8 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
             {/* Visual Vehicle Selector with Category Filter Tabs & Plate Chips */}
             <div className="bg-white rounded-xl border border-slate-200 p-3 space-y-3 shadow-2xs">
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
-                {/* Category Filter Tabs */}
-                <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+                {/* Category Filter Tabs with no wrapping truncation */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none flex-nowrap shrink-0">
                   {categoryTabs.map((cat) => {
                     const isSelected = selectedCategory === cat.key;
                     const IconComp = cat.icon;
@@ -510,16 +564,18 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                           haptics.selection();
                           setSelectedCategory(cat.key);
                         }}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 cursor-pointer ${isSelected
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
+                          isSelected
                             ? 'bg-[#1E60F3] text-white shadow-2xs'
                             : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900'
-                          }`}
+                        }`}
                       >
-                        <IconComp className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : 'text-slate-500'}`} />
-                        <span>{cat.label}</span>
+                        <IconComp className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-white' : 'text-slate-500'}`} />
+                        <span className="whitespace-nowrap">{cat.label}</span>
                         <span
-                          className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-200/70 text-slate-600'
-                            }`}
+                          className={`text-[10px] px-1.5 py-0.2 rounded-full font-black shrink-0 ${
+                            isSelected ? 'bg-white/20 text-white' : 'bg-slate-200/70 text-slate-600'
+                          }`}
                         >
                           {cat.count}
                         </span>
@@ -567,10 +623,11 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                         haptics.selection();
                         setSelectedVehiclePlate(v.plate);
                       }}
-                      className={`p-2 rounded-xl text-left transition-all border flex flex-col justify-between gap-1.5 cursor-pointer relative group ${isSelected
+                      className={`p-2 rounded-xl text-left transition-all border flex flex-col justify-between gap-1.5 cursor-pointer relative group ${
+                        isSelected
                           ? 'border-[#1E60F3] bg-blue-50/70 ring-2 ring-[#1E60F3]/30 shadow-xs'
                           : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/80'
-                        }`}
+                      }`}
                     >
                       <div className="flex items-center justify-between gap-1">
                         <img
@@ -604,14 +661,14 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                 })}
               </div>
 
-              {/* Active Vehicle Status Bar */}
+              {/* Active Vehicle Status Bar (Cleaned from duplicate brand name) */}
               <div className="px-3 py-2 bg-blue-50/50 rounded-lg border border-blue-100 flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] font-black text-[#1E60F3] uppercase tracking-wider">
                     현재 선택 차량:
                   </span>
                   <span className="font-bold text-slate-800">
-                    {activeVehicle.brand} {activeVehicle.model} ({activeVehicle.plate})
+                    {displayVehicleName} ({activeVehicle.plate})
                   </span>
                 </div>
                 <span className="text-[11px] text-slate-500 hidden sm:inline">
@@ -620,15 +677,15 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
               </div>
             </div>
 
-            {/* Grid 2 Cards: PC Widescreen & True 9:16 Mobile Smartphone Frame */}
+            {/* Grid 2 Cards: PC Widescreen & True 9:16 Minimal Line Mobile Wireframe */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Card A: PC Info (Horizontal 16:9) */}
               <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3 flex flex-col justify-between shadow-2xs">
                 <div>
                   <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                     <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
-                      <Monitor className="w-3.5 h-3.5 text-[#1E60F3]" />
-                      <span>PC 가로 안내 카드 (16:9 와이드)</span>
+                      <img src="/images/icons/pc.png" alt="PC" className="w-4 h-4 object-contain" />
+                      <span>PC용 가로 카드 (16:9)</span>
                     </span>
                     {bundle?.pcInfo ? (
                       <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-black border border-emerald-200">
@@ -641,8 +698,30 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                     )}
                   </div>
 
-                  {/* Preview Area: 16:9 Aspect Video */}
-                  <div className="mt-3 aspect-video rounded-xl bg-slate-100 overflow-hidden border border-slate-200 flex items-center justify-center relative group">
+                  {/* Preview Area: 16:9 Aspect Video with Drag & Drop */}
+                  <div
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setIsDraggingPc(true);
+                    }}
+                    onDragEnter={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setIsDraggingPc(true);
+                    }}
+                    onDragLeave={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setIsDraggingPc(false);
+                    }}
+                    onDrop={(e) => handleDropFile(e, 'info', 'pc')}
+                    className={`mt-3 aspect-video rounded-xl overflow-hidden border transition-all flex items-center justify-center relative group ${
+                      isDraggingPc
+                        ? 'border-2 border-dashed border-[#1E60F3] bg-blue-50/60 ring-2 ring-blue-300'
+                        : 'border-slate-200 bg-slate-100'
+                    }`}
+                  >
                     {bundle?.pcInfo?.signedUrl ? (
                       <>
                         <img
@@ -661,9 +740,13 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                       </>
                     ) : (
                       <div className="text-center p-4 text-slate-400">
-                        <Monitor className="w-8 h-8 mx-auto mb-1 stroke-1 text-slate-300" />
-                        <span className="text-xs font-medium">16:9 PC 안내 카드를 등록해주세요</span>
-                        <div className="text-[10px] text-slate-400 mt-0.5">권장: 1920×1080 (가로형)</div>
+                        <img
+                          src="/images/icons/pc.png"
+                          alt="PC"
+                          className="w-12 h-12 object-contain mx-auto mb-1.5 opacity-75"
+                        />
+                        <span className="text-xs font-bold text-slate-600 block">가로형 카드 등록하기</span>
+                        <div className="text-[10px] text-slate-400 mt-0.5">권장: 1920×1080 (16:9) · 드래그 앤 드롭 가능</div>
                       </div>
                     )}
                   </div>
@@ -706,7 +789,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                       <Upload className="w-3.5 h-3.5" />
                     )}
                     <span>
-                      {bundle?.pcInfo ? 'PC 카드 교체' : 'PC 카드 등록'}
+                      {bundle?.pcInfo ? '이미지 교체' : '이미지 등록'}
                     </span>
                   </button>
 
@@ -723,13 +806,13 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                 </div>
               </div>
 
-              {/* Card B: Mobile Info (Intuitive 9:16 Vertical Smartphone Mockup!) */}
+              {/* Card B: Mobile Info (Minimal Line Wireframe matching PC preview) */}
               <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3 flex flex-col justify-between shadow-2xs">
                 <div>
                   <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                     <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
-                      <Smartphone className="w-3.5 h-3.5 text-[#1E60F3]" />
-                      <span>모바일 세로 안내 카드 (9:16 포트레이트)</span>
+                      <img src="/images/icons/mobile.png" alt="Mobile" className="w-4 h-4 object-contain" />
+                      <span>모바일용 세로 카드 (9:16)</span>
                     </span>
                     {bundle?.mobileInfo ? (
                       <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-black border border-emerald-200">
@@ -742,16 +825,35 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                     )}
                   </div>
 
-                  {/* Smartphone Frame with 9:16 Ratio */}
-                  <div className="mt-3 flex flex-col items-center justify-center p-2.5 bg-slate-50/70 rounded-xl border border-slate-200/80">
-                    <div className="w-32 sm:w-36 aspect-[9/16] rounded-2xl border-[3px] border-slate-800 bg-slate-950 shadow-md relative overflow-hidden flex flex-col group">
-                      {/* Top Phone Speaker / Punch hole */}
-                      <div className="h-3.5 bg-slate-900 flex items-center justify-center shrink-0">
-                        <div className="w-8 h-1 bg-slate-700 rounded-full" />
-                      </div>
-
+                  {/* Minimal Device Frame with 9:16 Ratio & Drag & Drop */}
+                  <div
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setIsDraggingMobile(true);
+                    }}
+                    onDragEnter={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setIsDraggingMobile(true);
+                    }}
+                    onDragLeave={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setIsDraggingMobile(false);
+                    }}
+                    onDrop={(e) => handleDropFile(e, 'info', 'mobile')}
+                    className="mt-3 flex flex-col items-center justify-center p-2.5 bg-slate-50/70 rounded-xl border border-slate-200/80"
+                  >
+                    <div
+                      className={`w-32 sm:w-36 aspect-[9/16] rounded-2xl border transition-all bg-white relative overflow-hidden flex flex-col group ${
+                        isDraggingMobile
+                          ? 'border-2 border-dashed border-[#1E60F3] bg-blue-50/60 ring-2 ring-blue-300'
+                          : 'border-slate-300 shadow-2xs'
+                      }`}
+                    >
                       {/* Screen Content */}
-                      <div className="flex-1 bg-slate-900 relative flex items-center justify-center overflow-hidden">
+                      <div className="flex-1 bg-slate-100 relative flex items-center justify-center overflow-hidden">
                         {bundle?.mobileInfo?.signedUrl ? (
                           <>
                             <img
@@ -763,25 +865,25 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                               href={bundle.mobileInfo.signedUrl}
                               target="_blank"
                               rel="noreferrer"
-                              className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-[10.5px] font-bold gap-1 p-2 text-center"
+                              className="absolute inset-0 bg-slate-900/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-[10.5px] font-bold gap-1 p-2 text-center"
                             >
                               <ExternalLink className="w-4 h-4" />
                               <span>원본 보기</span>
                             </a>
                           </>
                         ) : (
-                          <div className="p-3 text-center text-slate-400 flex flex-col items-center justify-center gap-1">
-                            <Smartphone className="w-6 h-6 text-slate-500 stroke-1" />
-                            <span className="text-[10px] font-bold text-slate-400 leading-tight">
-                              9:16 세로 카드<br />미등록
+                          <div className="p-3 text-center text-slate-400 flex flex-col items-center justify-center gap-1.5 h-full">
+                            <img
+                              src="/images/icons/mobile.png"
+                              alt="Mobile"
+                              className="w-10 h-10 object-contain mx-auto opacity-75"
+                            />
+                            <span className="text-[11px] font-bold text-slate-600 leading-tight">
+                              세로형 카드 등록하기
                             </span>
+                            <span className="text-[9.5px] text-slate-400">1080×1920 (9:16)</span>
                           </div>
                         )}
-                      </div>
-
-                      {/* Bottom Phone Home Indicator */}
-                      <div className="h-2.5 bg-slate-900 flex items-center justify-center shrink-0">
-                        <div className="w-10 h-0.5 bg-slate-700 rounded-full" />
                       </div>
                     </div>
                   </div>
@@ -824,7 +926,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                       <Upload className="w-3.5 h-3.5" />
                     )}
                     <span>
-                      {bundle?.mobileInfo ? '모바일 카드 교체' : '모바일 카드 등록'}
+                      {bundle?.mobileInfo ? '이미지 교체' : '이미지 등록'}
                     </span>
                   </button>
 
@@ -846,8 +948,8 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
 
         {/* Footer */}
         <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-400 shrink-0">
-          <span className="hidden sm:inline">고객 배차 알림톡 및 차량 상세 화면에 실시간 자동 반영됩니다.</span>
-          <span className="sm:hidden">배차 알림 실시간 연동</span>
+          <span className="hidden sm:inline">등록된 카드는 고객 알림톡과 차량 상세 화면에 실시간으로 반영돼요.</span>
+          <span className="sm:hidden">실시간 고객 배차 연동</span>
           <button
             type="button"
             onClick={onClose}

@@ -323,13 +323,9 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                           {driver.name}
                         </span>
 
-                        {driver.affiliationType === 'employed' ? (
+                        {driver.affiliationType === 'employed' && (
                           <span className="px-1.5 py-0.2 rounded bg-blue-100 text-[#1E60F3] text-[9.5px] font-black shrink-0">
                             소속
-                          </span>
-                        ) : (
-                          <span className="px-1.5 py-0.2 rounded bg-sky-100 text-sky-700 text-[9.5px] font-black shrink-0">
-                            프리
                           </span>
                         )}
                       </div>
@@ -401,13 +397,9 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                 <h4 className="text-base font-black text-slate-900">
                   {activeDriver.name}
                 </h4>
-                {activeDriver.affiliationType === 'employed' ? (
+                {activeDriver.affiliationType === 'employed' && (
                   <span className="px-2 py-0.5 rounded-md bg-blue-100 text-[#1E60F3] text-[10px] font-black">
                     소속
-                  </span>
-                ) : (
-                  <span className="px-2 py-0.5 rounded-md bg-sky-100 text-sky-700 text-[10px] font-black">
-                    프리랜서
                   </span>
                 )}
               </div>

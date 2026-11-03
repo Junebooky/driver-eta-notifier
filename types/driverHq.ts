@@ -65,12 +65,10 @@ export function mapDbDriverToHqSummary(
     : {};
 
   const isEnglish = Boolean(dbDriver.english_available);
-  const rawAffiliation = meta.affiliation || (
-    dbDriver.vehicle_no?.includes('프리') || dbDriver.driver_name?.includes('프리')
-      ? 'freelance'
-      : 'employed'
-  );
-  const affiliationType: 'employed' | 'freelance' = rawAffiliation === 'freelance' ? 'freelance' : 'employed';
+  const cleanName = (dbDriver.driver_name || '').trim();
+  // Only 'QA 테스트' and '지용주' drivers are employed; all other drivers are freelancers
+  const isEmployed = cleanName === '지용주' || cleanName.includes('지용주') || cleanName.includes('QA 테스트');
+  const affiliationType: 'employed' | 'freelance' = isEmployed ? 'employed' : 'freelance';
   const affiliationLabel = affiliationType === 'employed' ? '소속' : '프리랜서';
 
   // Find real schedules associated with this driver's vehicle_no or driver_id

@@ -436,10 +436,10 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                             <span className="font-bold text-slate-900 group-hover:text-[#1E60F3] transition-colors">
                               {driver.name}
                             </span>
-                            {/* Special Status Badges Only (Freelance / New) */}
-                            {driver.affiliationType === 'freelance' && (
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200/80">
-                                프리랜서
+                            {/* 소속 기사만 '소속' 뱃지 표시 (프리랜서는 다수이므로 미표시하여 시각적 소음 제거) */}
+                            {driver.affiliationType === 'employed' && (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-[#1E60F3] border border-blue-200/80">
+                                소속
                               </span>
                             )}
                             {isNew && (
