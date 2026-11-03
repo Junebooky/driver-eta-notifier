@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Search, X, Bell, ChevronDown, Menu, RefreshCw, PhoneCall, Award } from 'lucide-react';
+import { Search, X, ChevronDown, Menu, RefreshCw, PhoneCall, Award } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 import { formatKoreanFullDateLabel } from '@/utils/dispatchConflictDetector';
 import { DevAuthSwitcher } from '@/components/DevAuthSwitcher';
@@ -136,24 +136,38 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
             </button>
           )}
 
-          {/* Notifications Bell */}
-          <button
-            type="button"
-            onClick={() => {
-              haptics.lightTap();
-              onOpenNotifications?.();
-            }}
-            aria-label="배차 알림 열기"
-            className="w-11 h-11 rounded-xl border border-slate-200/80 bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 relative transition-all active:scale-95 cursor-pointer shadow-2xs"
-            title="미배정 · 기사 미확인 · 재확인 필요 점검"
-          >
-            <Bell className="w-4 h-4" />
-            {unreadAlertsCount > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-rose-500 text-white rounded-full text-[9px] font-black flex items-center justify-center shadow-xs">
-                {unreadAlertsCount > 99 ? '99+' : unreadAlertsCount}
+          {/* Notifications Alarm */}
+          <div className="relative group flex items-center">
+            <button
+              type="button"
+              onClick={() => {
+                haptics.lightTap();
+                onOpenNotifications?.();
+              }}
+              aria-label="배차 알림 열기"
+              className="flex items-center justify-center p-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 active:scale-95 active:translate-y-0 text-slate-800 transition-all duration-200 ease-out cursor-pointer hover:scale-115 hover:-translate-y-1 hover:shadow-md border border-blue-400/20 relative"
+              title="미배정 · 기사 미확인 · 재확인 필요 점검"
+            >
+              <img
+                src="/images/icons/alarm.png"
+                alt="알림"
+                className="w-8 h-8 object-contain shrink-0 transition-transform duration-200 group-hover:scale-105"
+              />
+              {unreadAlertsCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-rose-500 text-white rounded-full text-[9px] font-black flex items-center justify-center shadow-xs">
+                  {unreadAlertsCount > 99 ? '99+' : unreadAlertsCount}
+                </span>
+              )}
+            </button>
+
+            {/* Hover Tooltip: 배차 알림 */}
+            <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 hidden group-hover:flex flex-col items-center pointer-events-none z-50">
+              <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 shadow-xs" />
+              <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+                배차 알림
               </span>
-            )}
-          </button>
+            </div>
+          </div>
 
           {/* Dev Test Account Switcher (only renders on localhost with DEV_AUTH_ENABLED) */}
           <DevAuthSwitcher />

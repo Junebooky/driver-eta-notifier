@@ -610,32 +610,32 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                         <div className="flex items-center justify-center gap-1">
                           {isAssigned ? (
                             <span
-                              className="inline-block w-2.5 h-2.5 rounded-full bg-[#1E60F3] shadow-xs"
+                              className="inline-block w-2 h-2 rounded-full bg-[#1E60F3] shadow-xs"
                               title={`배차 완료${b.version && b.version > 1 ? ` (v${b.version})` : ''}`}
                             />
                           ) : isUnassigned ? (
                             <span
-                              className="inline-block w-2.5 h-2.5 rounded-full bg-amber-400"
+                              className="inline-block w-2 h-2 rounded-full bg-amber-400"
                               title="미배정 (기사님 지정 필요)"
                             />
                           ) : isDraft ? (
                             <span
-                              className="inline-block w-2.5 h-2.5 rounded-full bg-slate-400"
+                              className="inline-block w-2 h-2 rounded-full bg-slate-400"
                               title="작성 중"
                             />
                           ) : isReconfirm ? (
                             <span
-                              className="inline-block w-2.5 h-2.5 rounded-full bg-indigo-600 animate-pulse"
+                              className="inline-block w-2 h-2 rounded-full bg-indigo-600 animate-pulse"
                               title={`재확인 필요 (v${b.version || 2})`}
                             />
                           ) : isCancelled ? (
                             <span
-                              className="inline-block w-2.5 h-2.5 rounded-full bg-slate-300"
+                              className="inline-block w-2 h-2 rounded-full bg-slate-300"
                               title="배차 취소"
                             />
                           ) : (
                             <span
-                              className="inline-block w-2.5 h-2.5 rounded-full bg-[#1E60F3]"
+                              className="inline-block w-2 h-2 rounded-full bg-[#1E60F3]"
                               title={b.dispatchStatus}
                             />
                           )}
