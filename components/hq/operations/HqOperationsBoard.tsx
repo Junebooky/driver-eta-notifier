@@ -670,7 +670,13 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
       {/* 2. Top 5-Card KPI Summary Widget */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {/* Card 1: 운영 중인 행사 (Active Blue Highlight) */}
-        <div className="p-4 rounded-2xl bg-blue-50/50 border border-blue-200/80 shadow-2xs flex items-center gap-3.5">
+        <div
+          onClick={() => {
+            haptics.lightTap();
+            setActiveTab('running');
+          }}
+          className="p-4 rounded-2xl bg-blue-50/50 border border-blue-200/80 shadow-2xs flex items-center gap-3.5 transition-all duration-200 hover:-translate-y-1 hover:shadow-md cursor-pointer active:translate-y-0 select-none"
+        >
           <img
             src="/images/icons/live_dashboard/active_events.png"
             alt="운영 중인 행사"
@@ -685,7 +691,13 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
         </div>
 
         {/* Card 2: 전체 배차 */}
-        <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex items-center gap-3.5">
+        <div
+          onClick={() => {
+            haptics.lightTap();
+            setActiveTab('all');
+          }}
+          className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex items-center gap-3.5 transition-all duration-200 hover:-translate-y-1 hover:shadow-md cursor-pointer active:translate-y-0 select-none"
+        >
           <img
             src="/images/icons/live_dashboard/total_dispatch.png"
             alt="전체 배차"
@@ -700,7 +712,13 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
         </div>
 
         {/* Card 3: 운행 중 */}
-        <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex items-center gap-3.5">
+        <div
+          onClick={() => {
+            haptics.lightTap();
+            setActiveTab('running');
+          }}
+          className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex items-center gap-3.5 transition-all duration-200 hover:-translate-y-1 hover:shadow-md cursor-pointer active:translate-y-0 select-none"
+        >
           <img
             src="/images/icons/live_dashboard/in_operation.png"
             alt="운행 중"
@@ -715,7 +733,13 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
         </div>
 
         {/* Card 4: 완료 */}
-        <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex items-center gap-3.5">
+        <div
+          onClick={() => {
+            haptics.lightTap();
+            setActiveTab('closed');
+          }}
+          className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex items-center gap-3.5 transition-all duration-200 hover:-translate-y-1 hover:shadow-md cursor-pointer active:translate-y-0 select-none"
+        >
           <img
             src="/images/icons/live_dashboard/completed.png"
             alt="완료"
@@ -730,7 +754,13 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
         </div>
 
         {/* Card 5: 운영 진행률 */}
-        <div className="col-span-2 sm:col-span-1 p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex items-center justify-between gap-3">
+        <div
+          onClick={() => {
+            haptics.lightTap();
+            setActiveTab('all');
+          }}
+          className="col-span-2 sm:col-span-1 p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex items-center justify-between gap-3 transition-all duration-200 hover:-translate-y-1 hover:shadow-md cursor-pointer active:translate-y-0 select-none"
+        >
           <div className="flex items-center gap-3.5 min-w-0">
             <img
               src="/images/icons/live_dashboard/operation_progress.png"
