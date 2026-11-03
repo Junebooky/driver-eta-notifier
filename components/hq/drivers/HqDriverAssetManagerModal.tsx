@@ -749,7 +749,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                         <img
                           src="/images/icons/pc.png"
                           alt="PC"
-                          className="w-auto h-auto max-h-[85%] max-w-[85%] sm:max-h-[90%] sm:max-w-[90%] object-contain transition-transform duration-200 group-hover:scale-105 drop-shadow-md select-none"
+                          className="w-28 h-28 sm:w-36 sm:h-36 max-h-[85%] max-w-[85%] object-contain transition-transform duration-200 group-hover:scale-105 drop-shadow-md select-none"
                         />
                       </div>
                     )}
@@ -885,7 +885,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                           <img
                             src="/images/icons/mobile.png"
                             alt="Mobile"
-                            className="w-full h-full max-h-[92%] object-contain transition-transform duration-200 group-hover:scale-105 drop-shadow-md select-none"
+                            className="w-20 h-20 sm:w-24 sm:h-24 max-h-[92%] object-contain transition-transform duration-200 group-hover:scale-105 drop-shadow-md select-none"
                           />
                         </div>
                       )}

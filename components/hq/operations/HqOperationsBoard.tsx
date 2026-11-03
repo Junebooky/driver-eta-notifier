@@ -671,13 +671,11 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {/* Card 1: 운영 중인 행사 (Active Blue Highlight) */}
         <div className="p-4 rounded-2xl bg-blue-50/50 border border-blue-200/80 shadow-2xs flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-2xl bg-white border border-blue-200 text-[#1E60F3] flex items-center justify-center shrink-0 shadow-xs">
-            <img
-              src="/images/icons/live_dashboard/active_events.png"
-              alt="운영 중인 행사"
-              className="w-7 h-7 object-contain"
-            />
-          </div>
+          <img
+            src="/images/icons/live_dashboard/active_events.png"
+            alt="운영 중인 행사"
+            className="w-11 h-11 sm:w-12 sm:h-12 object-contain shrink-0 drop-shadow-xs"
+          />
           <div className="min-w-0">
             <div className="text-xs text-slate-500 font-bold">운영 중인 행사</div>
             <div className="text-lg sm:text-xl font-black text-slate-900 mt-0.5">
@@ -688,13 +686,11 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
 
         {/* Card 2: 전체 배차 */}
         <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-2xl bg-slate-50 border border-slate-200 text-slate-600 flex items-center justify-center shrink-0">
-            <img
-              src="/images/icons/live_dashboard/total_dispatch.png"
-              alt="전체 배차"
-              className="w-7 h-7 object-contain"
-            />
-          </div>
+          <img
+            src="/images/icons/live_dashboard/total_dispatch.png"
+            alt="전체 배차"
+            className="w-11 h-11 sm:w-12 sm:h-12 object-contain shrink-0 drop-shadow-xs"
+          />
           <div className="min-w-0">
             <div className="text-xs text-slate-500 font-bold">전체 배차</div>
             <div className="text-lg sm:text-xl font-black text-slate-900 mt-0.5">
@@ -705,13 +701,11 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
 
         {/* Card 3: 운행 중 */}
         <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-2xl bg-slate-50 border border-slate-200 text-slate-600 flex items-center justify-center shrink-0">
-            <img
-              src="/images/icons/live_dashboard/in_operation.png"
-              alt="운행 중"
-              className="w-7 h-7 object-contain"
-            />
-          </div>
+          <img
+            src="/images/icons/live_dashboard/in_operation.png"
+            alt="운행 중"
+            className="w-11 h-11 sm:w-12 sm:h-12 object-contain shrink-0 drop-shadow-xs"
+          />
           <div className="min-w-0">
             <div className="text-xs text-slate-500 font-bold">운행 중</div>
             <div className="text-lg sm:text-xl font-black text-slate-900 mt-0.5">
@@ -722,13 +716,11 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
 
         {/* Card 4: 완료 */}
         <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-2xl bg-slate-50 border border-slate-200 text-slate-600 flex items-center justify-center shrink-0">
-            <img
-              src="/images/icons/live_dashboard/completed.png"
-              alt="완료"
-              className="w-7 h-7 object-contain"
-            />
-          </div>
+          <img
+            src="/images/icons/live_dashboard/completed.png"
+            alt="완료"
+            className="w-11 h-11 sm:w-12 sm:h-12 object-contain shrink-0 drop-shadow-xs"
+          />
           <div className="min-w-0">
             <div className="text-xs text-slate-500 font-bold">완료</div>
             <div className="text-lg sm:text-xl font-black text-slate-900 mt-0.5">
@@ -740,13 +732,11 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
         {/* Card 5: 운영 진행률 */}
         <div className="col-span-2 sm:col-span-1 p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex items-center justify-between gap-3">
           <div className="flex items-center gap-3.5 min-w-0">
-            <div className="w-11 h-11 rounded-2xl bg-slate-50 border border-slate-200 text-slate-600 flex items-center justify-center shrink-0">
-              <img
-                src="/images/icons/live_dashboard/operation_progress.png"
-                alt="운영 진행률"
-                className="w-7 h-7 object-contain"
-              />
-            </div>
+            <img
+              src="/images/icons/live_dashboard/operation_progress.png"
+              alt="운영 진행률"
+              className="w-11 h-11 sm:w-12 sm:h-12 object-contain shrink-0 drop-shadow-xs"
+            />
 
             <div className="min-w-0">
               <div className="text-xs text-slate-500 font-bold">운영 진행률</div>

@@ -88,26 +88,34 @@ interface AddExpenseModalProps {
 
 // Helper to render category icon component
 export const renderCategoryIcon = (iconName: string, className = 'w-5 h-5') => {
-  switch (iconName) {
-    case 'utensils':
-      return <Utensils className={className} />;
-    case 'car':
-      return <Car className={className} />;
-    case 'parking':
-      return <ParkingSquare className={className} />;
-    case 'bed':
-      return <Bed className={className} />;
-    case 'milestone':
-      return <Milestone className={className} />;
-    case 'sparkles':
-      return <Sparkles className={className} />;
-    case 'bus':
-      return <Bus className={className} />;
-    case 'more':
-      return <MoreHorizontal className={className} />;
-    default:
-      return <HelpCircle className={className} />;
-  }
+  const iconMap: Record<string, string> = {
+    utensils: '/images/icons/expense_driver/icon-expense-meal.png',
+    meal: '/images/icons/expense_driver/icon-expense-meal.png',
+    car: '/images/icons/expense_driver/icon-expense-fuel.png',
+    fuel: '/images/icons/expense_driver/icon-expense-fuel.png',
+    parking: '/images/icons/expense_driver/icon-expense-parking.png',
+    bed: '/images/icons/expense_driver/icon-expense-lodging.png',
+    stay: '/images/icons/expense_driver/icon-expense-lodging.png',
+    milestone: '/images/icons/expense_driver/icon-expense-toll.png',
+    toll: '/images/icons/expense_driver/icon-expense-toll.png',
+    sparkles: '/images/icons/expense_driver/icon-expense-carwash.png',
+    wash: '/images/icons/expense_driver/icon-expense-carwash.png',
+    bus: '/images/icons/expense_driver/icon-expense-transit.png',
+    transit: '/images/icons/expense_driver/icon-expense-transit.png',
+    more: '/images/icons/expense_driver/icon-expense-misc.png',
+    other: '/images/icons/expense_driver/icon-expense-misc.png',
+    unclassified: '/images/icons/expense_driver/icon-expense-misc.png',
+  };
+
+  const src = iconMap[iconName] || '/images/icons/expense_driver/icon-expense-misc.png';
+
+  return (
+    <img
+      src={src}
+      alt={iconName}
+      className={`${className} object-contain select-none`}
+    />
+  );
 };
 
 const AddExpenseModalContent: React.FC<{
@@ -858,9 +866,9 @@ const AddExpenseModalContent: React.FC<{
             >
               <div className="flex items-center gap-3">
                 <div
-                  className={`w-8 h-8 rounded-full ${selectedCategoryMeta.badgeBg} ${selectedCategoryMeta.badgeTextColor} border ${selectedCategoryMeta.badgeBorder} flex items-center justify-center shrink-0`}
+                  className={`w-9 h-9 rounded-full ${selectedCategoryMeta.badgeBg} flex items-center justify-center shrink-0 shadow-2xs`}
                 >
-                  {renderCategoryIcon(selectedCategoryMeta.iconName, 'w-4 h-4')}
+                  {renderCategoryIcon(selectedCategoryMeta.iconName, 'w-5 h-5')}
                 </div>
                 <span className="text-sm font-bold text-slate-800">
                   {selectedCategoryMeta.label}
@@ -1135,9 +1143,9 @@ const AddExpenseModalContent: React.FC<{
                     >
                       <div className="flex items-center gap-3">
                         <div
-                          className={`w-9 h-9 rounded-full ${itemMeta.badgeBg} ${itemMeta.badgeTextColor} border ${itemMeta.badgeBorder} flex items-center justify-center shrink-0`}
+                          className={`w-10 h-10 rounded-full ${itemMeta.badgeBg} flex items-center justify-center shrink-0 shadow-2xs`}
                         >
-                          {renderCategoryIcon(itemMeta.iconName, 'w-4 h-4')}
+                          {renderCategoryIcon(itemMeta.iconName, 'w-6 h-6')}
                         </div>
                         <div>
                           <div className="font-bold text-sm text-slate-900">{itemMeta.label}</div>
