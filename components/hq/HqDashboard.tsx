@@ -672,11 +672,7 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
               <span className="text-slate-500 font-medium">
                 총 20대의 차량이 등록되어 있어요
               </span>
-            ) : activeSidebarTab === 'drivers' ? (
-              <span className="text-slate-500 font-medium">
-                기사 정보를 관리하고, 프로필과 운행 일정을 확인할 수 있습니다.
-              </span>
-            ) : activeSidebarTab === 'expenses' || activeSidebarTab === 'receipts' ? (
+            ) : activeSidebarTab === 'drivers' ? null : activeSidebarTab === 'expenses' || activeSidebarTab === 'receipts' ? (
               <>
                 <span className="font-bold text-slate-700">{todayFullLabel}</span>
                 <span className="text-slate-300">|</span>

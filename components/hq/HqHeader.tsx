@@ -105,15 +105,17 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
             <h1 className="text-base sm:text-xl font-black text-slate-900 tracking-tight truncate">
               {title}
             </h1>
-            <div className="flex items-center gap-1.5 mt-0.5 text-[11px] sm:text-xs text-slate-500 font-medium truncate">
-              {subtitle || (
-                <>
-                  <span className="font-bold text-slate-700">{todayLabel}</span>
-                  <span className="text-slate-300">|</span>
-                  <span className="text-slate-400 truncate">예약 접수부터 기사님 배정까지 실시간으로 연결돼요</span>
-                </>
-              )}
-            </div>
+            {subtitle !== null && (
+              <div className="flex items-center gap-1.5 mt-0.5 text-[11px] sm:text-xs text-slate-500 font-medium truncate">
+                {subtitle ?? (
+                  <>
+                    <span className="font-bold text-slate-700">{todayLabel}</span>
+                    <span className="text-slate-300">|</span>
+                    <span className="text-slate-400 truncate">예약 접수부터 기사님 배정까지 실시간으로 연결돼요</span>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
