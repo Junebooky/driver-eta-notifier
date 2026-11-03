@@ -240,11 +240,13 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
   const [deletedVehicleIds, setDeletedVehicleIds] = useState<string[]>([]);
 
   useEffect(() => {
+    let customList: VipRealVehicle[] = [];
     try {
       const stored = localStorage.getItem('vip_hq_custom_vehicles');
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) {
+          customList = parsed;
           setCustomVehicles(parsed);
         }
       }
@@ -257,7 +259,13 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
       if (storedDeleted) {
         const parsedDeleted = JSON.parse(storedDeleted);
         if (Array.isArray(parsedDeleted)) {
-          setDeletedVehicleIds(parsedDeleted);
+          // Self-heal: Any plate that the user has explicitly registered should NOT remain deleted
+          const customPlates = new Set(customList.map((cv) => cv.plate?.trim().replace(/\s+/g, '')));
+          const cleaned = parsedDeleted.filter((id) => !customPlates.has(String(id).trim().replace(/\s+/g, '')));
+          setDeletedVehicleIds(cleaned);
+          if (cleaned.length !== parsedDeleted.length) {
+            localStorage.setItem('vip_hq_deleted_vehicle_ids', JSON.stringify(cleaned));
+          }
         }
       }
     } catch (e) {
@@ -266,10 +274,33 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
   }, []);
 
   const allBaseVehicles = useMemo(() => {
-    const combined = [...customVehicles, ...VIP_REAL_VEHICLES];
-    return combined.filter(
-      (v) => !deletedVehicleIds.includes(v.id) && !deletedVehicleIds.includes(v.plate)
+    // 1. Plates in customVehicles (user explicitly registered these, so they take highest priority)
+    const customPlates = new Set(customVehicles.map((v) => v.plate.trim().replace(/\s+/g, '')));
+
+    // 2. Active deleted set, excluding any plate that exists in customVehicles
+    const activeDeletedSet = new Set(
+      deletedVehicleIds
+        .map((id) => id.trim().replace(/\s+/g, ''))
+        .filter((cleanId) => !customPlates.has(cleanId))
     );
+
+    const isNotDeleted = (v: VipRealVehicle) => {
+      const cleanPlate = v.plate.trim().replace(/\s+/g, '');
+      const cleanId = v.id.trim().replace(/\s+/g, '');
+      if (activeDeletedSet.has(cleanPlate) || activeDeletedSet.has(cleanId)) {
+        return false;
+      }
+      return true;
+    };
+
+    const validCustom = customVehicles.filter(isNotDeleted);
+
+    // Filter default vehicles: not deleted AND not superseded by a custom vehicle with same plate
+    const validDefault = VIP_REAL_VEHICLES.filter(
+      (v) => isNotDeleted(v) && !customPlates.has(v.plate.trim().replace(/\s+/g, ''))
+    );
+
+    return [...validCustom, ...validDefault];
   }, [customVehicles, deletedVehicleIds]);
 
   // Edit Modal Form State
@@ -556,13 +587,16 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
 
   // Register New Vehicle Handler
   const handleCreateVehicle = (data: NewVehicleFormData) => {
+    const normalizedPlate = data.plate.trim();
+    const cleanPlate = normalizedPlate.replace(/\s+/g, '');
+
     const newVehicle: VipRealVehicle = {
       id: `vehicle-custom-${Date.now()}`,
       uuid: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `custom-${Date.now()}`,
-      plate: data.plate,
-      plateShort: data.plate.trim().split(/\s+/).pop() || data.plate.slice(-4),
-      model: data.model,
-      modelShort: data.model.replace(/^(벤츠|현대|기아|제네시스)\s+/, ''),
+      plate: normalizedPlate,
+      plateShort: normalizedPlate.split(/\s+/).pop() || normalizedPlate.slice(-4),
+      model: data.model.trim(),
+      modelShort: data.model.trim().replace(/^(벤츠|현대|기아|제네시스)\s+/, ''),
       brand: (
         data.model.includes('벤츠') ? '벤츠' :
         data.model.includes('현대') ? '현대' :
@@ -583,7 +617,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
         data.category === 'suv' ? 'SUV' :
         data.category === 'van' ? '밴' : '세단'
       ),
-      subType: data.model,
+      subType: data.model.trim(),
       capacity: data.capacity,
       status: '차고지 대기', // Initial status: displays as '배차 가능'
       fuelType: data.fuelType === '경유' ? '디젤' : data.fuelType === '휘발유' ? '가솔린' : '하이브리드',
@@ -592,8 +626,31 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
       imageUrl: data.imageUrl,
     };
 
+    // 1. Immediately un-delete this plate if it was previously marked deleted
+    setDeletedVehicleIds((prev) => {
+      const next = prev.filter((id) => {
+        const cleanId = id.trim().replace(/\s+/g, '');
+        if (cleanId === cleanPlate || id === normalizedPlate) return false;
+        const matchingDefault = VIP_REAL_VEHICLES.find(
+          (dv) => dv.plate.replace(/\s+/g, '') === cleanPlate
+        );
+        if (matchingDefault && (matchingDefault.id === id || matchingDefault.plate === id)) {
+          return false;
+        }
+        return true;
+      });
+      try {
+        localStorage.setItem('vip_hq_deleted_vehicle_ids', JSON.stringify(next));
+      } catch (err) {
+        console.warn('Failed to update deleted vehicle ids in localStorage', err);
+      }
+      return next;
+    });
+
+    // 2. Add to customVehicles state and localStorage (replace duplicate if exists)
     setCustomVehicles((prev) => {
-      const next = [newVehicle, ...prev];
+      const filteredPrev = prev.filter((v) => v.plate.trim().replace(/\s+/g, '') !== cleanPlate);
+      const next = [newVehicle, ...filteredPrev];
       try {
         localStorage.setItem('vip_hq_custom_vehicles', JSON.stringify(next));
       } catch (err) {
@@ -602,9 +659,15 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
       return next;
     });
 
+    // 3. Reset filters so the new vehicle is immediately visible
+    setSelectedCategory('all');
+    setFuelFilter('all');
+    setSearchQuery('');
+
+    // 4. Focus on the new vehicle
     setSelectedVehicleId(newVehicle.id);
     setIsNewVehicleModalOpen(false);
-    showToast('차량이 성공적으로 등록되었습니다.');
+    showToast(`차량 '${normalizedPlate}'이(가) 등록되었습니다.`);
     haptics.success();
   };
 
@@ -612,9 +675,13 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
   const handleConfirmDeleteVehicle = (vehicle: VipRealVehicle) => {
     haptics.warningPulse();
 
+    const cleanPlate = vehicle.plate.trim().replace(/\s+/g, '');
+
     // 1. Remove from custom vehicles state if present
     setCustomVehicles((prev) => {
-      const next = prev.filter((v) => v.id !== vehicle.id && v.plate !== vehicle.plate);
+      const next = prev.filter(
+        (v) => v.id !== vehicle.id && v.plate.trim().replace(/\s+/g, '') !== cleanPlate
+      );
       try {
         localStorage.setItem('vip_hq_custom_vehicles', JSON.stringify(next));
       } catch (e) {
@@ -625,7 +692,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
 
     // 2. Add to deleted vehicle IDs
     setDeletedVehicleIds((prev) => {
-      const next = Array.from(new Set([...prev, vehicle.id, vehicle.plate]));
+      const next = Array.from(new Set([...prev, vehicle.id, vehicle.plate.trim(), cleanPlate]));
       try {
         localStorage.setItem('vip_hq_deleted_vehicle_ids', JSON.stringify(next));
       } catch (e) {
@@ -638,7 +705,9 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
     setVehicleToDelete(null);
 
     // 4. Update selected vehicle to next available vehicle
-    const remaining = enrichedVehicles.filter((v) => v.id !== vehicle.id && v.plate !== vehicle.plate);
+    const remaining = enrichedVehicles.filter(
+      (v) => v.id !== vehicle.id && v.plate.trim().replace(/\s+/g, '') !== cleanPlate
+    );
     if (remaining.length > 0) {
       setSelectedVehicleId(remaining[0].id);
     }
@@ -790,9 +859,31 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                 </button>
               </div>
             </div>
-            <span className="text-xs text-slate-400 font-bold">
-              {filteredVehicles.length}대
-            </span>
+            <div className="flex items-center gap-2">
+              {deletedVehicleIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    haptics.impactMedium();
+                    setDeletedVehicleIds([]);
+                    try {
+                      localStorage.removeItem('vip_hq_deleted_vehicle_ids');
+                    } catch (e) {
+                      console.warn(e);
+                    }
+                    showToast('삭제된 모든 차량이 복구되었습니다.');
+                  }}
+                  className="text-[11px] font-bold text-slate-600 hover:text-[#0050FF] flex items-center gap-1 transition-colors cursor-pointer bg-slate-100/80 hover:bg-blue-50 px-2 py-0.5 rounded-lg border border-slate-200"
+                  title="삭제된 차량 초기화 및 복구"
+                >
+                  <RefreshCw className="w-2.5 h-2.5 text-slate-400" />
+                  <span>복구</span>
+                </button>
+              )}
+              <span className="text-xs text-slate-400 font-bold">
+                {filteredVehicles.length}대
+              </span>
+            </div>
           </div>
 
           {/* Cards Stack */}
