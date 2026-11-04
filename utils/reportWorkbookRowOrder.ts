@@ -116,8 +116,11 @@ export function organizeManagedMonth(bytes:Uint8Array,month:string,year:number,m
   if(!hasData){protectedRows.add(row);continue;}
   const raw=sheet.cells['A'+row]?.v??'';
   const date=reportDate(raw,year,wb.date1904);
-  if(!date||!date.startsWith(year+'-'+String(yearMonth).padStart(2,'0')+'-'))
-   return unchanged(row+'행의 수기 기록 날짜를 확인할 수 없습니다. 원본은 변경하지 않았습니다.');
+  if(!date||!date.startsWith(year+'-'+String(yearMonth).padStart(2,'0')+'-')){
+   if(managed)return unchanged(row+'행의 자동 보고 날짜가 불명확해 안전하게 이동할 수 없습니다.');
+   protectedRows.add(row); // Keep undated manual notes/periods in their original location.
+   continue;
+  }
   if(incoming?.row===row&&incoming.date!==date)
    return unchanged('새 보고의 날짜와 실제 Excel 날짜가 일치하지 않습니다.');
   if(!rowMap.has(row))return unchanged(row+'행의 Excel 내용을 찾을 수 없습니다.');
