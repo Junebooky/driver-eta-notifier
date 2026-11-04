@@ -77,7 +77,7 @@ import { ScheduleItem } from '@/data/ferrariSchedules';
 import { VEHICLE_STATUS_LABELS } from '@/utils/fleetVehicleStatus';
 import { useFleetAvailability } from '@/hooks/useFleetAvailability';
 import { validateDispatchInterval } from '@/utils/dispatchInterval';
-import { editedBookingIdentity } from '@/utils/quickDispatchContinuity';
+import { editedBookingIdentity, resolveQuickDispatchPlaces } from '@/utils/quickDispatchContinuity';
 import { driverDispatchSmsHref } from '@/utils/driverDispatchSms';
 import { useHqDrivers } from '@/utils/useHqDrivers';
 
@@ -921,6 +921,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
     const totalVehicles = allocations.length;
     const isMultiVehicleGroup = totalVehicles > 1;
     const lineage = editedBookingIdentity(initialBooking, pickupLocation, destination);
+    const verifiedPlaces = resolveQuickDispatchPlaces(lineage, pickupPoi, destinationPoi);
     const sharedEventId = lineage?.eventId || `ev-${Date.now()}`;
     const sharedGroupId = lineage ? lineage.groupId : isMultiVehicleGroup ? `grp-${Date.now()}` : undefined;
     const sharedGroupName = lineage?.eventName
@@ -1004,14 +1005,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
         vehicleId: matchedVehicle?.uuid,
         origin: pickupLocation.trim(),
         destination: destination.trim(),
-        originLat: pickupPoi?.lat ?? lineage?.originLat,
-        originLng: pickupPoi?.lng ?? lineage?.originLng,
-        destinationLat: destinationPoi?.lat ?? lineage?.destinationLat,
-        destinationLng: destinationPoi?.lng ?? lineage?.destinationLng,
-        // Once an emailed place changes, both legs need independently verified POIs.
-        placeVerified: lineage || pickupPoi || destinationPoi
-          ? Boolean((pickupPoi || lineage?.pickupPoiVerified) && (destinationPoi || lineage?.destinationPoiVerified))
-          : undefined,
+        ...verifiedPlaces,
         passengerName: resolvedPassengerName,
         passengerPhone: resolvedPassengerPhone,
         passengerCount: Math.max(1, commonPassengerCount || 1),
