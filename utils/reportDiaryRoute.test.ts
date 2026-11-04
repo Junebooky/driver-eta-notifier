@@ -50,6 +50,15 @@ test('standalone dash and > split no-time stop lists; hyphenated proper names st
  assert.deepEqual(parseDiaryRoute(same).stops.map(s=>s.place),['차고지','호텔','차고지']);
 });
 
+test('timed dashes can be tight, and spaced hyphens inside a hotel name remain intact',()=>{
+ const diary='운행일지\n17:00 그랜드 - 인터컨티넨탈 서울 - 18:00 호텔-별관 > 19:30 차고지';
+ const parsed=parseDiaryRoute(diary);
+ assert.deepEqual(parsed.stops.map(s=>s.place),['그랜드 - 인터컨티넨탈 서울','호텔-별관','차고지']);
+ assert.deepEqual(parsed.stops.map(s=>s.time),['17:00','18:00','19:30']);
+ const tight=parseDiaryRoute('운행일지\n17:00 차고지-18:00 호텔-19:30 차고지');
+ assert.deepEqual(tight.stops.map(s=>s.place),['차고지','호텔','차고지']);
+});
+
 test('next-day clock conversion is explicit; never silently roll over an earlier bare time',()=>{
  assert.equal(statedReportTime('익일 03:30'),'27:30');
  assert.equal(statedReportTime('다음날 05:10'),'29:10');
