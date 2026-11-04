@@ -1,14 +1,18 @@
 'use client';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {ChevronDown,ChevronUp,ChevronLeft,ChevronRight,Expand,Minimize2,FileSpreadsheet,Pencil,Save,X,ArrowUpDown,ZoomIn,ZoomOut} from 'lucide-react';
+export type ReportExcelFocus={year:number;sheet:string;row:number;requestId:number};
 type Row={row:number;cells:string[];locked:string[]};
 type Grid={version:string;year:number;filename:string;month:string;months:string[];total:number;offset:number;limit:number;rows:Row[];columns:string[]};
 const columnWidths=[120,112,165,210,125,145,475,165,190,130,130,135];
 const totalWidth=52+columnWidths.reduce((sum,width)=>sum+width,0);
 const headers=['날짜','차량번호','차종','거래처','운전자','타임','운행경로','셀프/의전','OT Hours','금액','결제방법','합계'];
-export function HqExcelWorkbookView({year,onCommitted}:{year:number;onCommitted:()=>Promise<void>}){
+export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onCommitted:()=>Promise<void>;focus?:ReportExcelFocus|null}){
  const [open,setOpen]=useState(false),[month,setMonth]=useState(''),[grid,setGrid]=useState<Grid|null>(null);
  const [offset,setOffset]=useState(0);
+ const [navigateTo,setNavigateTo]=useState<ReportExcelFocus|null>(null);
+ const [highlightedRow,setHighlightedRow]=useState<number|null>(null);
+ const [flashSequence,setFlashSequence]=useState(0);
  const scrollRef=useRef<HTMLDivElement>(null);
  const [zoom,setZoom]=useState(false);
  const [tableScale,setTableScale]=useState(100);
@@ -17,15 +21,42 @@ export function HqExcelWorkbookView({year,onCommitted}:{year:number;onCommitted:
  useEffect(()=>{syncScroll();const node=scrollRef.current;if(!node)return;const observer=new ResizeObserver(syncScroll);observer.observe(node);return()=>observer.disconnect();},[syncScroll,grid,zoom,tableScale]);
  useEffect(()=>{if(!zoom)return;const key=(event:KeyboardEvent)=>{if(event.key==='Escape'){setZoom(false);setEdit(null);setTableScale(100);}};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[zoom]);
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[edit,setEdit]=useState<{row:number;col:string;value:string}|null>(null);
- const load=useCallback(async(target:string)=>{
+ useEffect(()=>{
+  if(!focus||focus.year!==year)return;
+  queueMicrotask(()=>{
+   setOpen(true);setMonth(focus.sheet);setEdit(null);setError('');
+   setNavigateTo(focus);
+  });
+ },[focus,year]);
+ useEffect(()=>{
+  if(!highlightedRow||!grid?.rows.some(row=>row.row===highlightedRow))return;
+  const target=scrollRef.current?.querySelector<HTMLTableRowElement>('tr[data-excel-row="'+highlightedRow+'"]');
+  if(!target)return;
+  const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  target.scrollIntoView({behavior:reduced?'auto':'smooth',block:'center',inline:'nearest'});
+ },[grid,highlightedRow,flashSequence]);
+
+ const load=useCallback(async(target:string,focusRow?:number)=>{
   const params=new URLSearchParams({view:'1',year:String(year)});
-  if(target)params.set('month',target);params.set('offset',String(offset));
+  if(target)params.set('month',target);
+  params.set('offset',String(focusRow===undefined?offset:0));
+  if(focusRow!==undefined)params.set('focusRow',String(focusRow));
   const r=await fetch('/api/hq/report-workbook?'+params,{cache:'no-store'});
   const data=await r.json();
   if(!r.ok)throw Error(data.error||'Excel을 불러올 수 없습니다.');
   setGrid(data);setMonth(data.month);
+  if(focusRow!==undefined){
+   setOffset(data.offset);setHighlightedRow(focusRow);setFlashSequence(count=>count+1);
+   setNavigateTo(null);
+  }
  },[year,offset]);
- useEffect(()=>{if(open)void Promise.resolve().then(()=>load(month)).catch(e=>setError((e as Error).message));},[open,month,load]);
+ useEffect(()=>{
+  if(!open)return;
+  if(navigateTo&&navigateTo.sheet!==month)return;
+  void Promise.resolve().then(()=>load(month,navigateTo?.row)).catch(e=>{
+   setNavigateTo(null);setError((e as Error).message);
+  });
+ },[open,month,load,navigateTo]);
  async function sortMonth(){
   if(!grid||busy)return;
   setBusy(true);setError('');
@@ -185,7 +216,7 @@ export function HqExcelWorkbookView({year,onCommitted}:{year:number;onCommitted:
     </div>
    </div>
    <div role="tablist" aria-label="월별 시트" className="flex max-w-full gap-1.5 overflow-x-auto pb-1">
-    {grid?.months.map(name=><button type="button" role="tab" aria-selected={month===name} key={name} onClick={()=>{setEdit(null);setError('');setOffset(0);setMonth(name);}}
+    {grid?.months.map(name=><button type="button" role="tab" aria-selected={month===name} key={name} onClick={()=>{setEdit(null);setError('');setHighlightedRow(null);setNavigateTo(null);setOffset(0);setMonth(name);}}
      className={'shrink-0 rounded-xl px-3 py-2 text-xs font-semibold '+(month===name?'bg-[#1E60F3] text-white':'bg-[#F2F4F6] text-[#6F809A]')}>{name}</button>)}
    </div>
    {error&&<p role="alert" className="rounded-xl bg-[#F3F6FC] p-3 text-sm text-[#65758A]">{error}</p>}
@@ -195,7 +226,7 @@ export function HqExcelWorkbookView({year,onCommitted}:{year:number;onCommitted:
       <th className="sticky left-0 z-20 border-b border-r border-[#DCE5F1] bg-[#EDF2F8] px-2 py-2">행</th>
       {headers.map(h=><th key={h} className="overflow-hidden whitespace-nowrap border-b border-r border-[#DCE5F1] px-3 py-2 text-left">{h}</th>)}
      </tr></thead>
-     <tbody>{grid.rows.map(row=><tr key={row.row} className="hover:bg-[#F8FAFD]">
+     <tbody>{grid.rows.map(row=><tr key={row.row+(highlightedRow===row.row?'-'+flashSequence:'')} data-excel-row={row.row} className={highlightedRow===row.row?'hq-excel-target-row':'hover:bg-[#F8FAFD]'}>
       <td className="sticky left-0 z-[1] border-b border-r border-[#E8EDF3] bg-[#F7F9FC] px-2 py-2 text-center font-medium text-[#8B9BB1]">{row.row}</td>
       {row.cells.map((value,i)=>{
        const col=grid.columns[i],active=edit?.row===row.row&&edit.col===col,locked=row.locked.includes(col);
