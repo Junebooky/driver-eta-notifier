@@ -1,7 +1,10 @@
 // Run against a disposable localhost Next + PostgREST + Postgres fixture only.
 // Tokens JSON contains isolated fixture sessions {driver,hq}; never production credentials.
-const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
-const fs=require('node:fs'),assert=require('node:assert/strict'),crypto=require('node:crypto');
+import {createRequire} from 'node:module';
+const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE||'playwright');
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 const base=process.env.REPORT_CHAT_QA_URL,tokenFile=process.env.REPORT_CHAT_QA_TOKENS,file=process.env.REPORT_CHAT_QA_WORKBOOK;
 if(!base||!['localhost','127.0.0.1'].includes(new URL(base).hostname)||!tokenFile||!file)throw new Error('Provide localhost REPORT_CHAT_QA_URL, REPORT_CHAT_QA_TOKENS and REPORT_CHAT_QA_WORKBOOK (2026 annual workbook with approved 10월 sheet).');
 (async()=>{const tokens=JSON.parse(fs.readFileSync(tokenFile));const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH,headless:true,args:['--no-sandbox']});
