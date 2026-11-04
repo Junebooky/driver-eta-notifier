@@ -29,7 +29,7 @@ export function amendReportRow(bytes:Uint8Array,sheet:string,row:number,draft:Ka
  const old=source.match(rowRE(row))?.[0];if(!old)throw new Error('정정 위치가 없습니다.');
  const kept=clearCells(old);const replacement=kept.endsWith('/>')?kept.slice(0,-2)+'>'+cells+'</row>':kept.replace('</row>',cells+'</row>');
  // Restore original dimension and all other worksheet contents; only owned A–L cells change.
- after[path]=strToU8(widenReportColumns(source.replace(rowRE(row),replacement),routeColumnWidth([draft.route,...Object.entries(workbookFromFile(bytes).Sheets[sheet].cells).filter(([address])=>/^G[1-9]\d*$/.test(address)).map(([,cell])=>String(cell.v??''))])));
+ after[path]=strToU8(widenReportColumns(source.replace(rowRE(row),replacement),routeColumnWidth([draft.route,...Object.entries(workbookFromFile(bytes).Sheets[sheet].cells).filter(([address])=>/^G[1-9]\d*$/.test(address)&&address!=='G'+row).map(([,cell])=>String(cell.v??''))])));
  return {...out,bytes:zipSync(after),rowNumber:row};
 }
 /** HQ approves a blank template derived from an existing company month, not its records. */
@@ -97,4 +97,21 @@ export function ensureReportMonth(bytes:Uint8Array,targetMonth:number,approvedSo
  // Unsupported formulas or external references fail closed rather than corrupt data.
  const next=addApprovedMonth(bytes,source,targetMonth);
  return {bytes:next,created:true,sourceMonth:source};
+}
+
+/** Download presentation copy: refit G for every existing month without touching
+ * the immutable stored workbook/version. Version and original downloads remain exact. */
+export function refitWorkbookRouteColumns(bytes:Uint8Array){
+ const book=workbookFromFile(bytes);
+ const entries=unzipSync(bytes);let modified=false;
+ for(const month of book.SheetNames.filter(name=>/^(?:[1-9]|1[0-2])월$/.test(name))){
+  const path=pathFor(entries,month),source=strFromU8(entries[path]);
+  const routes=Object.entries(book.Sheets[month].cells).filter(([address])=>/^G[1-9]\d*$/.test(address)).map(([,cell])=>String(cell.v??''));
+  const fitted=widenReportColumns(source,routeColumnWidth(routes));
+  if(fitted!==source){entries[path]=strToU8(fitted);modified=true;}
+ }
+ if(!modified)return bytes;
+ const output=zipSync(entries,{level:6});
+ workbookFromFile(output);
+ return output;
 }
