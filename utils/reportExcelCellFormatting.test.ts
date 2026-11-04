@@ -6,6 +6,7 @@ import {kakaoWorkbookFixture} from './kakaoExcelFixture';
 import {appendKakaoExcelReport,workbookFromFile} from './kakaoExcelWorkbook';
 import {routeColumnWidth,EXCEL_MAX_COL_WIDTH} from './reportExcelCellFormatting';
 import {amendReportRow} from './reportWorkbookOperations';
+import {patchWorkbookCell} from './reportWorkbookGrid';
 import {blankKakaoExcelDraft} from './kakaoExcelImport';
 const parser=new DOMParser();
 const report={...blankKakaoExcelDraft(),date:'2026-04-06',plate:'700호 1458',
@@ -52,13 +53,13 @@ test('Blank H/I still carry 10pt and subsequent append reuses styles',()=>{
  const second=appendKakaoExcelReport(first.bytes,{...report,time:'18:00~19:00',serviceType:'',overtime:''});
  assert.deepEqual(unzipSync(second.bytes)['xl/styles.xml'],unzipSync(first.bytes)['xl/styles.xml']);
 });
-test('Existing wider width is not reduced; overlapping groups are split without losing neighbours',()=>{
+test('G route width refits to contents, while grouped neighbouring column widths remain intact',()=>{
  const entries=unzipSync(kakaoWorkbookFixture());
  const sheet=strFromU8(entries['xl/worksheets/sheet1.xml']);
  entries['xl/worksheets/sheet1.xml']=strToU8(sheet.replace('</cols>','<col min="5" max="10" width="75" customWidth="1"/></cols>'));
  const output=appendKakaoExcelReport(zipSync(entries),report);
  const after=strFromU8(unzipSync(output.bytes)['xl/worksheets/sheet1.xml']);
- for(const col of [7,8,9])assert.match(after,new RegExp('<col[^>]*min="'+col+'"[^>]*max="'+col+'"[^>]*width="'+(col===7?Math.max(75,routeColumnWidth([report.route])):75)+'"'));
+ for(const col of [7,8,9])assert.match(after,new RegExp('<col[^>]*min="'+col+'"[^>]*max="'+col+'"[^>]*width="'+(col===7?routeColumnWidth([report.route]):75)+'"'));
  assert.match(after,/<col min="5" max="6" width="75" customWidth="1"\/>/);
  assert.match(after,/<col min="10" max="10" width="75" customWidth="1"\/>/);
 });
@@ -99,4 +100,19 @@ test('G grows between 62 and 255 and does not shrink when a short report is appe
  const amendedWidth=Number(strFromU8(unzipSync(adjusted.bytes)['xl/worksheets/sheet1.xml']).match(/<col min="7" max="7" width="([^"]+)"/)?.[1]);
  assert.ok(amendedWidth>=firstWidth);
  assert.equal(cellStyle(adjusted.bytes,'G',246).wrap,'0');
+});
+
+test('G width shrinks after the previously longest route is shortened, keeping other XML parts',()=>{
+ const longRoute=Array.from({length:35},()=> '파르나스').join(' - ');
+ const first=appendKakaoExcelReport(kakaoWorkbookFixture(),{...report,route:longRoute});
+ const before=unzipSync(first.bytes);
+ const previous=Number(strFromU8(before['xl/worksheets/sheet1.xml']).match(/<col min="7" max="7" width="([^"]+)"/)?.[1]);
+ assert.ok(previous>70);
+ const edited=patchWorkbookCell(first.bytes,'4월',245,'G','차고지 - 호텔');
+ const after=unzipSync(edited.bytes);
+ const newWidth=Number(strFromU8(after['xl/worksheets/sheet1.xml']).match(/<col min="7" max="7" width="([^"]+)"/)?.[1]);
+ assert.equal(newWidth,routeColumnWidth(['차고지 - 호텔']));
+ assert.ok(newWidth<previous);
+ assert.equal(workbookFromFile(edited.bytes).Sheets['4월'].cells.G245.v,'차고지 - 호텔');
+ for(const part of Object.keys(before))if(part!=='xl/worksheets/sheet1.xml')assert.deepEqual(before[part],after[part]);
 });
