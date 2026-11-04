@@ -529,9 +529,12 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
             {/* Header: Sparkles + Title + Refresh Button (Clean, no dev subtitle) */}
             <div className="flex items-center justify-between pb-3.5 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#0050FF] flex items-center justify-center shadow-xs">
-                  <Sparkles className="w-4 h-4 fill-[#0050FF]" />
-                </div>
+                <img
+                  src="/images/icons/ai_email.png"
+                  alt="AI가 추출한 예약 정보"
+                  className="w-8 h-8 object-contain shrink-0 select-none"
+                  draggable={false}
+                />
                 <h3 className="text-sm font-black text-slate-900">
                   AI가 추출한 예약 정보
                 </h3>

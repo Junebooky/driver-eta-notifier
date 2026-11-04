@@ -467,8 +467,8 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [saveMutation]=useState(()=>createRetryableJsonMutation('cockpit_pending_quick_dispatch'));
-  const submitLock=useRef(false);
+  const [saveMutation] = useState(() => createRetryableJsonMutation('cockpit_pending_quick_dispatch'));
+  const submitLock = useRef(false);
   const [notificationMsg, setNotificationMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isReminding, setIsReminding] = useState(false);
@@ -793,10 +793,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
       prev.map((a) =>
         a.id === allocId
           ? {
-              ...a,
-              selectedVehiclePlate: vehicle ? vehicle.plate : '',
-              selectedVehicleModel: vehicle ? vehicle.model : '',
-            }
+            ...a,
+            selectedVehiclePlate: vehicle ? vehicle.plate : '',
+            selectedVehicleModel: vehicle ? vehicle.model : '',
+          }
           : a
       )
     );
@@ -812,9 +812,9 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
       prev.map((a) =>
         a.id === allocId
           ? {
-              ...a,
-              selectedDriver: driver ? driver.id : '',
-            }
+            ...a,
+            selectedDriver: driver ? driver.id : '',
+          }
           : a
       )
     );
@@ -1024,7 +1024,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
     setIsSubmitting(true);
     try {
       await ensureClientAuth('hq');
-      const res = await saveMutation.send('/api/schedules/dispatch',{items:payloadItems},{intent:quickDispatchIntent(payloadItems)});
+      const res = await saveMutation.send('/api/schedules/dispatch', { items: payloadItems }, { intent: quickDispatchIntent(payloadItems) });
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok || !data.ok) {
@@ -1041,8 +1041,8 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
       const savedSchedules: ScheduleItem[] = Array.isArray(data.schedules)
         ? data.schedules
         : data.schedule
-        ? [data.schedule]
-        : [];
+          ? [data.schedule]
+          : [];
 
       const createdHqBookings = savedSchedules.map((s, idx) =>
         mapScheduleItemToHqBooking(s, idx)
@@ -1103,16 +1103,16 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
           isEditMode
             ? '예약 정보가 수정되어 배차 대기함에 반영되었습니다.'
             : isMultiVehicleGroup
-            ? `전화 예약 ${totalVehicles}대가 [배차 대기함(미배정)]에 등록되었습니다. 대표님 스마트폰에서 바로 배차 확정할 수 있습니다.`
-            : `전화 예약이 [배차 대기함(미배정)]에 등록되었습니다. 대표님 스마트폰에서 차량·기사를 배정할 수 있습니다.`
+              ? `전화 예약 ${totalVehicles}대가 [배차 대기함(미배정)]에 등록되었습니다. 대표님 스마트폰에서 바로 배차 확정할 수 있습니다.`
+              : `전화 예약이 [배차 대기함(미배정)]에 등록되었습니다. 대표님 스마트폰에서 차량·기사를 배정할 수 있습니다.`
         );
       } else {
         setNotificationMsg(
           isEditMode
             ? '배차가 확정되어 담당 기사님의 Driver Cockpit에 즉시 반영되었습니다!'
             : isMultiVehicleGroup
-            ? `총 ${totalVehicles}대 배차가 확정되어 각 담당 기사님의 Driver Cockpit에 즉시 반영되었습니다!`
-            : `배차가 확정되어 담당 기사님의 Driver Cockpit에 즉시 반영되었습니다!`
+              ? `총 ${totalVehicles}대 배차가 확정되어 각 담당 기사님의 Driver Cockpit에 즉시 반영되었습니다!`
+              : `배차가 확정되어 담당 기사님의 Driver Cockpit에 즉시 반영되었습니다!`
         );
       }
 
@@ -1151,38 +1151,35 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
     }
   };
 
-  const handleSubmit=async(mode:'unassigned'|'published')=>{
-    if(submitLock.current)return;submitLock.current=true;
-    try{await submit(mode);}finally{submitLock.current=false;}
+  const handleSubmit = async (mode: 'unassigned' | 'published') => {
+    if (submitLock.current) return; submitLock.current = true;
+    try { await submit(mode); } finally { submitLock.current = false; }
   };
 
   if (isModal && !isOpen) return null;
 
   const content = (
     <div
-      className={`@container bg-white select-none flex flex-col justify-between ${
-        isModal
+      className={`@container bg-white select-none flex flex-col justify-between ${isModal
           ? 'w-full'
           : 'border border-slate-200/90 rounded-[24px] p-5 sm:p-6 shadow-[0_10px_30px_rgba(0,0,0,0.04)]'
-      }`}
+        }`}
     >
       <div>
         {/* 1. Header */}
         <div className="flex items-center justify-between gap-3 pb-3.5 border-b border-slate-100">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-[#EBF3FF] text-[#1E60F3] flex items-center justify-center shrink-0 shadow-2xs">
-              <BrandFilledCarIcon className="w-6 h-6" />
-            </div>
+            <img
+              src="/images/icons/reservations/icon_reservations.png"
+              alt="빠른 예약 · 배차"
+              className="w-11 h-11 sm:w-12 sm:h-12 object-contain shrink-0 select-none"
+              draggable={false}
+            />
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight">
                   {initialBooking ? '예약 · 배차 수정' : '빠른 예약 · 배차'}
                 </h2>
-                {initialBooking && (
-                  <span className="font-mono text-xs font-black px-2 py-0.5 rounded-md bg-blue-50 text-[#1E60F3] border border-blue-200">
-                    {initialBooking.bookingNo}
-                  </span>
-                )}
               </div>
               {!initialBooking && (
                 <p className="text-xs text-slate-400 font-normal leading-relaxed mt-0.5 truncate">
@@ -1236,15 +1233,14 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
               <div className="flex items-center gap-2 flex-wrap">
                 {/* 배차 상태 Badge */}
                 <span
-                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black ${
-                    initialBooking.dispatchStatus === '배차 완료'
+                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black ${initialBooking.dispatchStatus === '배차 완료'
                       ? 'bg-[#1E60F3] text-white shadow-xs'
                       : initialBooking.dispatchStatus === '재확인 필요'
-                      ? 'bg-indigo-600 text-white'
-                      : initialBooking.dispatchStatus === '취소'
-                      ? 'bg-slate-200 text-slate-600 line-through'
-                      : 'bg-amber-100 text-amber-800 border border-amber-300'
-                  }`}
+                        ? 'bg-indigo-600 text-white'
+                        : initialBooking.dispatchStatus === '취소'
+                          ? 'bg-slate-200 text-slate-600 line-through'
+                          : 'bg-amber-100 text-amber-800 border border-amber-300'
+                    }`}
                 >
                   <span>{initialBooking.dispatchStatus}</span>
                   {initialBooking.version && initialBooking.version > 1 && (
@@ -1254,13 +1250,12 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
 
                 {/* 기사 확인 현황 Badge (Tone down to calm cool gray) */}
                 <span
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold ${
-                    initialBooking.driverAck === '확인완료'
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold ${initialBooking.driverAck === '확인완료'
                       ? 'bg-slate-100 text-slate-600 border border-slate-200/80'
                       : initialBooking.driverAck === '재확인 필요'
-                      ? 'bg-indigo-100 text-indigo-800 border border-indigo-300'
-                      : 'bg-amber-50 text-amber-900 border border-amber-200'
-                  }`}
+                        ? 'bg-indigo-100 text-indigo-800 border border-indigo-300'
+                        : 'bg-amber-50 text-amber-900 border border-amber-200'
+                    }`}
                 >
                   {initialBooking.driverAck === '확인완료' ? (
                     <CheckCircle2 className="w-3.5 h-3.5 text-slate-500" />
@@ -1271,8 +1266,8 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                     {initialBooking.driverAck === '확인완료'
                       ? '확인 완료'
                       : initialBooking.driverAck === '재확인 필요'
-                      ? '재확인 대기'
-                      : '확인 대기'}
+                        ? '재확인 대기'
+                        : '확인 대기'}
                   </span>
                   {initialBooking.driverAckTime && (
                     <span className="text-[10px] text-slate-500 font-normal">
@@ -1291,11 +1286,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                   type="button"
                   onClick={handleRemindClick}
                   disabled={isReminding}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95 ${
-                    remindSuccess
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95 ${remindSuccess
                       ? 'bg-emerald-600 text-white'
                       : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200/60'
-                  }`}
+                    }`}
                   title="담당 기사 스마트폰 Cockpit으로 즉시 확인 요청 알림을 재전송합니다"
                 >
                   <BellRing className={`w-3.5 h-3.5 ${isReminding ? 'animate-bounce text-[#1E60F3]' : ''}`} />
@@ -1407,13 +1401,12 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                           <div className="flex items-center gap-1.5">
                             <span className="font-bold text-slate-900 text-xs truncate">{c.name}</span>
                             <span
-                              className={`text-[10px] px-1.5 py-0.2 rounded font-black ${
-                                c.tier === 'VIP'
+                              className={`text-[10px] px-1.5 py-0.2 rounded font-black ${c.tier === 'VIP'
                                   ? 'bg-purple-100 text-purple-700'
                                   : c.tier === '주요'
-                                  ? 'bg-blue-100 text-[#1E60F3]'
-                                  : 'bg-slate-100 text-slate-600'
-                              }`}
+                                    ? 'bg-blue-100 text-[#1E60F3]'
+                                    : 'bg-slate-100 text-slate-600'
+                                }`}
                             >
                               {c.tier}
                             </span>
@@ -1456,11 +1449,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
               </label>
 
               <div
-                className={`w-full h-12 bg-white border rounded-xl px-3.5 flex items-center justify-between transition-all shadow-2xs ${
-                  isTimePickerOpen
+                className={`w-full h-12 bg-white border rounded-xl px-3.5 flex items-center justify-between transition-all shadow-2xs ${isTimePickerOpen
                     ? 'border-[#1E60F3] ring-1 ring-[#1E60F3]'
                     : 'border-slate-200 hover:border-slate-300'
-                }`}
+                  }`}
               >
                 <div className="flex items-center gap-2.5 min-w-0 flex-1 h-full">
                   <Clock className="w-5 h-5 text-slate-700 shrink-0" />
@@ -1490,9 +1482,8 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                   aria-label="시간 목록 보기"
                 >
                   <ChevronDown
-                    className={`w-5 h-5 transition-transform duration-200 ${
-                      isTimePickerOpen ? 'rotate-180 text-[#1E60F3]' : ''
-                    }`}
+                    className={`w-5 h-5 transition-transform duration-200 ${isTimePickerOpen ? 'rotate-180 text-[#1E60F3]' : ''
+                      }`}
                   />
                 </button>
               </div>
@@ -1514,11 +1505,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                           e.preventDefault();
                           handleSelectTime(time);
                         }}
-                        className={`w-full px-3 py-2.5 rounded-xl text-left text-sm flex items-center transition-colors cursor-pointer ${
-                          isSelected
+                        className={`w-full px-3 py-2.5 rounded-xl text-left text-sm flex items-center transition-colors cursor-pointer ${isSelected
                             ? 'bg-blue-50 text-[#1E60F3] font-bold'
                             : 'hover:bg-slate-50 text-slate-800 font-medium'
-                        }`}
+                          }`}
                       >
                         <span className="w-5 flex items-center justify-start shrink-0">
                           {isSelected && <Check className="w-4 h-4 text-[#1E60F3] stroke-[2.5]" />}
@@ -1579,15 +1569,15 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                 allVehicles.find((v) => v.plate === allocation.selectedVehiclePlate) ||
                 (allocation.selectedVehiclePlate
                   ? {
+                    plate: allocation.selectedVehiclePlate,
+                    model: allocation.selectedVehicleModel || allocation.selectedVehiclePlate,
+                    image: getVehicleImage({
                       plate: allocation.selectedVehiclePlate,
-                      model: allocation.selectedVehicleModel || allocation.selectedVehiclePlate,
-                      image: getVehicleImage({
-                        plate: allocation.selectedVehiclePlate,
-                        model: allocation.selectedVehicleModel,
-                      }),
-                      statusLabel: '대기 중',
-                      currentStatus: 'available',
-                    }
+                      model: allocation.selectedVehicleModel,
+                    }),
+                    statusLabel: '대기 중',
+                    currentStatus: 'available',
+                  }
                   : null);
 
               const selectedDriver =
@@ -1596,12 +1586,12 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                 ) ||
                 (allocation.selectedDriver
                   ? {
-                      id: allocation.selectedDriver,
-                      name: allocation.selectedDriver,
-                      phone: '010-0000-0000',
-                      isAvailable: true,
-                      avatarUrl: getDriverProfileImage({ name: allocation.selectedDriver }),
-                    }
+                    id: allocation.selectedDriver,
+                    name: allocation.selectedDriver,
+                    phone: '010-0000-0000',
+                    isAvailable: true,
+                    avatarUrl: getDriverProfileImage({ name: allocation.selectedDriver }),
+                  }
                   : null);
 
               return (
@@ -1629,11 +1619,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                           setVehicleCategoryFilter('all');
                         }
                       }}
-                      className={`w-full h-12 bg-white rounded-xl px-3 flex items-center justify-between transition-all cursor-pointer shadow-2xs border ${
-                        isOpenVehicle
+                      className={`w-full h-12 bg-white rounded-xl px-3 flex items-center justify-between transition-all cursor-pointer shadow-2xs border ${isOpenVehicle
                           ? 'border-[#1E60F3] ring-1 ring-[#1E60F3]'
                           : 'border-slate-200 hover:border-slate-300'
-                      }`}
+                        }`}
                       aria-expanded={isOpenVehicle}
                       aria-label={allocations.length > 1 ? `${index + 1}번 배정 차량 선택` : '배정 차량 선택'}
                     >
@@ -1660,9 +1649,8 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                         </div>
                       )}
                       <ChevronDown
-                        className={`w-4 h-4 text-slate-500 transition-transform duration-200 shrink-0 ml-2 ${
-                          isOpenVehicle ? 'rotate-180 text-[#1E60F3]' : ''
-                        }`}
+                        className={`w-4 h-4 text-slate-500 transition-transform duration-200 shrink-0 ml-2 ${isOpenVehicle ? 'rotate-180 text-[#1E60F3]' : ''
+                          }`}
                       />
                     </button>
 
@@ -1711,11 +1699,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                                     key={cat.key}
                                     type="button"
                                     onClick={() => setVehicleCategoryFilter(cat.key)}
-                                    className={`px-2 py-1 rounded-full text-[11px] font-bold transition-colors cursor-pointer ${
-                                      active
+                                    className={`px-2 py-1 rounded-full text-[11px] font-bold transition-colors cursor-pointer ${active
                                         ? 'bg-[#1E60F3] text-white shadow-2xs'
                                         : 'text-slate-600 hover:bg-slate-100'
-                                    }`}
+                                      }`}
                                   >
                                     {cat.label}
                                   </button>
@@ -1751,11 +1738,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                                   key={v.uuid || v.plate}
                                   type="button"
                                   onClick={() => handleSelectVehicle(allocation.id, v)}
-                                  className={`w-full px-2.5 py-2 rounded-xl flex items-center justify-between transition-colors cursor-pointer text-left ${
-                                    isSelected
+                                  className={`w-full px-2.5 py-2 rounded-xl flex items-center justify-between transition-colors cursor-pointer text-left ${isSelected
                                       ? 'bg-blue-50/80 border border-blue-200'
                                       : 'hover:bg-slate-50 border border-transparent'
-                                  }`}
+                                    }`}
                                 >
                                   <div className="flex items-center gap-3 min-w-0 flex-1">
                                     <div className="w-14 h-8 relative shrink-0 flex items-center justify-center">
@@ -1780,13 +1766,12 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
 
                                   <div className="flex items-center gap-2.5 shrink-0 ml-2">
                                     <span
-                                      className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                                        v.currentStatus === 'in_service'
+                                      className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${v.currentStatus === 'in_service'
                                           ? 'text-amber-700 bg-amber-50'
                                           : v.currentStatus === 'maintenance'
-                                          ? 'text-slate-500 bg-slate-100'
-                                          : 'text-blue-600 bg-blue-50'
-                                      }`}
+                                            ? 'text-slate-500 bg-slate-100'
+                                            : 'text-blue-600 bg-blue-50'
+                                        }`}
                                     >
                                       ● {v.statusLabel || '대기 중'}
                                     </span>
@@ -1823,11 +1808,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                         }
                       }}
                       disabled={allocation.serviceMode === 'vehicle_only'}
-                      className={`w-full h-12 bg-white rounded-xl px-3 flex items-center justify-between transition-all cursor-pointer shadow-2xs border ${
-                        isOpenDriver
+                      className={`w-full h-12 bg-white rounded-xl px-3 flex items-center justify-between transition-all cursor-pointer shadow-2xs border ${isOpenDriver
                           ? 'border-[#1E60F3] ring-1 ring-[#1E60F3]'
                           : 'border-slate-200 hover:border-slate-300'
-                      } disabled:opacity-50 disabled:pointer-events-none`}
+                        } disabled:opacity-50 disabled:pointer-events-none`}
                       aria-expanded={isOpenDriver}
                       aria-label={allocations.length > 1 ? `${index + 1}번 담당 기사 선택` : '담당 기사 선택'}
                     >
@@ -1854,9 +1838,8 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                         </div>
                       )}
                       <ChevronDown
-                        className={`w-4 h-4 text-slate-500 transition-transform duration-200 shrink-0 ml-2 ${
-                          isOpenDriver ? 'rotate-180 text-[#1E60F3]' : ''
-                        }`}
+                        className={`w-4 h-4 text-slate-500 transition-transform duration-200 shrink-0 ml-2 ${isOpenDriver ? 'rotate-180 text-[#1E60F3]' : ''
+                          }`}
                       />
                     </button>
 
@@ -1921,13 +1904,12 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                                   type="button"
                                   disabled={isBlocked}
                                   onClick={() => handleSelectDriver(allocation.id, d)}
-                                  className={`w-full px-2.5 py-2 rounded-xl flex items-center justify-between transition-colors cursor-pointer text-left ${
-                                    isSelected
+                                  className={`w-full px-2.5 py-2 rounded-xl flex items-center justify-between transition-colors cursor-pointer text-left ${isSelected
                                       ? 'bg-blue-50/80 border border-blue-200'
                                       : isBlocked
-                                      ? 'opacity-50 cursor-not-allowed border border-transparent'
-                                      : 'hover:bg-slate-50 border border-transparent'
-                                  }`}
+                                        ? 'opacity-50 cursor-not-allowed border border-transparent'
+                                        : 'hover:bg-slate-50 border border-transparent'
+                                    }`}
                                 >
                                   <div className="flex items-center gap-3 min-w-0 flex-1">
                                     <div className="w-8 h-8 rounded-full overflow-hidden border border-slate-200 shrink-0 relative bg-slate-100">
@@ -2081,11 +2063,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                       <button
                         type="button"
                         onClick={() => handleCommonLanguageChange("ko")}
-                        className={`h-9 sm:h-10 rounded-lg flex items-center justify-center gap-1.5 px-2 transition-all cursor-pointer ${
-                          commonLanguage === "ko"
+                        className={`h-9 sm:h-10 rounded-lg flex items-center justify-center gap-1.5 px-2 transition-all cursor-pointer ${commonLanguage === "ko"
                             ? "bg-[#EAF2FF] border-2 border-[#1E60F3] text-[#1E60F3] shadow-xs"
                             : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
-                        }`}
+                          }`}
                       >
                         <span className="text-xs">🇰🇷</span>
                         <span className="text-xs font-bold whitespace-nowrap">한국어</span>
@@ -2094,11 +2075,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                       <button
                         type="button"
                         onClick={() => handleCommonLanguageChange("en")}
-                        className={`h-9 sm:h-10 rounded-lg flex items-center justify-center gap-1.5 px-2 transition-all cursor-pointer ${
-                          commonLanguage === "en"
+                        className={`h-9 sm:h-10 rounded-lg flex items-center justify-center gap-1.5 px-2 transition-all cursor-pointer ${commonLanguage === "en"
                             ? "bg-[#EAF2FF] border-2 border-[#1E60F3] text-[#1E60F3] shadow-xs"
                             : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
-                        }`}
+                          }`}
                       >
                         <span className="text-xs">🇺🇸</span>
                         <span className="text-xs font-bold whitespace-nowrap">영어</span>
@@ -2233,7 +2213,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
         )}
       </div>
 
-      {saveMutation.hasPending && <button type="button" className="rounded-xl border border-blue-200 p-3 text-sm text-blue-700" disabled={isSubmitting} onClick={async()=>{setIsSubmitting(true);try{const response=await saveMutation.retry();const data=await response.json();if(!response.ok)throw new Error(data.error || '저장 결과 확인 실패');window.location.reload();}catch(error){setErrorMsg(error instanceof Error?error.message:'확인 실패');}finally{setIsSubmitting(false);}}}>이전 저장 결과 확인</button>}
+      {saveMutation.hasPending && <button type="button" className="rounded-xl border border-blue-200 p-3 text-sm text-blue-700" disabled={isSubmitting} onClick={async () => { setIsSubmitting(true); try { const response = await saveMutation.retry(); const data = await response.json(); if (!response.ok) throw new Error(data.error || '저장 결과 확인 실패'); window.location.reload(); } catch (error) { setErrorMsg(error instanceof Error ? error.message : '확인 실패'); } finally { setIsSubmitting(false); } }}>이전 저장 결과 확인</button>}
       {/* 4. Action Buttons */}
       <div className="pt-4 mt-2">
         <div className="grid grid-cols-2 gap-3">

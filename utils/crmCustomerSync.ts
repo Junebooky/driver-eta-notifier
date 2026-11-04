@@ -7,6 +7,7 @@
 import { HqCustomer, CustomerContact, CustomerTier } from '@/types/customerHq';
 import { INITIAL_HQ_CUSTOMERS } from '@/utils/customerHqData';
 import { ensureClientAuth } from '@/utils/cockpitClientAuth';
+import { saveHqCustomers } from '@/utils/settlementStorage';
 
 export const CRM_CUSTOMERS_STORAGE_KEY = 'vip_hq_customers_state';
 export const CRM_CUSTOMERS_UPDATE_EVENT = 'vip_hq_customers_updated';
@@ -170,6 +171,9 @@ export function saveStoredCustomers(customers: HqCustomer[], broadcast: boolean 
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(CRM_CUSTOMERS_STORAGE_KEY, JSON.stringify(customers));
+    if (customers.length > 0) {
+      saveHqCustomers(customers);
+    }
     if (broadcast) {
       window.dispatchEvent(new CustomEvent(CRM_CUSTOMERS_UPDATE_EVENT, { detail: { count: customers.length } }));
     }
