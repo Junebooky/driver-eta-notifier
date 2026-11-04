@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   Mail,
@@ -105,6 +105,7 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
     return !(cached?.data?.emails && cached.data.emails.length > 0);
   });
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const lastAutoRefreshRef = useRef(0);
   const [inboxError, setInboxError] = useState<string | null>(null);
   const [imapState, setImapState] = useState<ImapConnectionState>(() => {
     if (urlDemo) {
@@ -237,7 +238,7 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
   // Live Fetch Inbox via GET /api/email/inbox (with multi-tier caching)
   // =========================================================
   const fetchLiveInbox = useCallback(
-    async (forceRefresh = false) => {
+    async (forceRefresh = false, silent = false) => {
       if (isDemoMode) return;
 
       // When not forcing refresh, use valid client cache if available
@@ -252,7 +253,7 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
       }
 
       if (forceRefresh) {
-        setIsRefreshing(true);
+        if (!silent) setIsRefreshing(true);
       } else {
         // Only show full loading spinner if we don't have any cached emails to display
         setEmails((prev) => {
@@ -268,7 +269,7 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
         const url = forceRefresh ? '/api/email/inbox?refresh=true' : '/api/email/inbox';
         const res = await fetch(url, {
           method: 'GET',
-          headers: { credentials: 'include' },
+          credentials: 'same-origin',
         });
         const data = await res.json().catch(() => ({}));
 
@@ -306,12 +307,12 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
           setEmailInboxCache(liveEmails, nextImapState);
 
           if (liveEmails.length > 0) {
-            setSelectedEmailId((prev) => prev || liveEmails[0].id);
+            setSelectedEmailId((prev) => prev && liveEmails.some(item => item.id === prev) ? prev : liveEmails[0].id);
           } else {
             setSelectedEmailId(null);
           }
 
-          if (forceRefresh) {
+          if (forceRefresh && !silent) {
             showToast('이메일 수신함이 최신 상태로 동기화되었습니다.');
           }
         }
@@ -339,6 +340,27 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
       }
     }
   }, [fetchLiveInbox, isDemoMode]);
+
+  // Refresh the visible HQ email inbox quietly, without polling other tabs.
+  useEffect(() => {
+    if (isDemoMode || searchParams?.get('tab') !== 'emails') return;
+    const refreshWhenVisible = () => {
+      if (document.visibilityState !== 'visible' || isLoadingInbox || isRefreshing) return;
+      const now = Date.now();
+      if (now - lastAutoRefreshRef.current < 75_000) return;
+      lastAutoRefreshRef.current = now;
+      void fetchLiveInbox(true, true);
+    };
+    refreshWhenVisible();
+    const interval = window.setInterval(refreshWhenVisible, 90_000);
+    window.addEventListener('focus', refreshWhenVisible);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [isDemoMode, searchParams, fetchLiveInbox, isLoadingInbox, isRefreshing]);
 
   // =========================================================
   // Fetch Email Detail via GET /api/email/[id] (with memory & session cache)
