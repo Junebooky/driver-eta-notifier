@@ -1,8 +1,8 @@
 'use client';
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {Upload,Download,RefreshCw,History,ArrowRight,Check,Search} from 'lucide-react';
+import {Upload,Download,RefreshCw,History,ArrowRight,Check,Search,LocateFixed} from 'lucide-react';
 import {HqExcelSectionIcon} from './HqExcelSectionIcon';
-import {HqExcelWorkbookView} from './HqExcelWorkbookView';
+import {HqExcelWorkbookView,type ReportExcelFocus} from './HqExcelWorkbookView';
 import type {DriverReportSubmission,ReportChatMessage} from '@/types/driverReportChat';
 import {reportDisplayStatus,reportMatchesFilter,visibleHqReportMessages,type ReportHqFilter} from '@/utils/reportHqPresentation';
 type Version={id:string;generation:number;kind:string;created_at:string};
@@ -17,6 +17,16 @@ export function HqDriverReportInbox() {
  const [chat,setChat]=useState<ReportChatMessage[]>([]),[audit,setAudit]=useState<{id:string;action:string;created_at:string}[]>([]);
  const [corrected,setCorrected]=useState(''),[note,setNote]=useState(''),[version,setVersion]=useState('');
  const [search,setSearch]=useState('');
+ const [excelFocus,setExcelFocus]=useState<ReportExcelFocus|null>(null);
+ const focusCounter=useRef(0);
+ function viewExcelLocation(report:DriverReportSubmission){
+  if(report.excel_status!=='applied'||!report.excel_sheet_name||!report.excel_row_number)return;
+  const year=report.ledger_year??workbook?.year;
+  if(!year){setMessage('연결된 연간 Excel 장부를 확인할 수 없습니다.');return;}
+  setMessage('');
+  setExcelFocus({year,sheet:report.excel_sheet_name,row:report.excel_row_number,requestId:++focusCounter.current});
+ }
+
  const [filter,setFilter]=useState<ReportHqFilter>('all'),[more,setMore]=useState(false);const file=useRef<HTMLInputElement>(null),selection=useRef<string|null>(null);
  const refresh=useCallback(async()=>{
   const [r,w,reads]=await Promise.all([json('/api/hq/driver-reports'),json('/api/hq/report-workbook'),json('/api/hq/report-reads')]);
@@ -83,7 +93,7 @@ export function HqDriverReportInbox() {
   </div>
   
 
-  {workbook&&<HqExcelWorkbookView year={workbook.year} onCommitted={refresh}/>}
+  {(workbook||excelFocus)&&<HqExcelWorkbookView year={excelFocus?.year??workbook!.year} focus={excelFocus} onCommitted={refresh}/>}
 
   {message&&<p role="status" className="rounded-xl bg-blue-50 p-3 text-sm text-slate-600">{message}</p>}
   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
@@ -128,7 +138,12 @@ export function HqDriverReportInbox() {
      <div className="min-h-0 overflow-hidden">
       <div className="pt-2">
        {selected?.id===report.id&&<div className="space-y-3 rounded-xl border border-blue-100 bg-slate-50 p-4"><div className="flex items-center justify-between"><h3 className="text-sm font-bold text-slate-700">보고 확인</h3><button onClick={()=>setIsExpanded(false)} className="text-sm text-slate-500">닫기</button></div>
-   <p className="text-xs text-[#7A879A]">{selected.excel_sheet_name&&`${selected.excel_sheet_name} · ${selected.excel_row_number}행`}{selected.excel_status!=='applied'&&!selected.excel_sheet_name?'Excel 반영 확인 필요':''}</p>
+   {selected.excel_status==='applied'&&selected.excel_sheet_name&&selected.excel_row_number
+    ?<button type="button" onClick={()=>viewExcelLocation(selected)}
+      className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#D8E4F8] bg-white px-3 text-xs font-semibold text-[#1E60F3] transition-colors hover:bg-[#F1F5FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/30">
+      <LocateFixed size={15}/>Excel에서 위치 보기 · {selected.excel_sheet_name} · {selected.excel_row_number}행
+     </button>
+    :<p className="text-xs text-[#7A879A]">Excel 반영 확인 필요</p>}
    {(selected.last_error||selected.parsed.reviewReasons.length>0)&&<details className="text-xs text-[#6D7B90]"><summary className="cursor-pointer py-1">확인 항목 보기</summary><div className="mt-2 space-y-1 rounded-xl bg-white p-3">{selected.parsed.reviewReasons.map((reason,index)=><p key={index}>{reason}</p>)}{selected.last_error&&<p>{selected.last_error}</p>}</div></details>}
    <div aria-label="제출 대화 기록" className="max-h-60 space-y-2 overflow-y-auto">{visibleHqReportMessages(chat).map(m=><p key={m.id} className="whitespace-pre-wrap rounded-xl bg-white p-3 text-xs leading-5 text-[#596981]"><span className="font-semibold">{m.sender_type==='driver'?'기사':'관리자'} · </span>{m.body}</p>)}</div>
    {<><label className="block text-xs font-medium text-slate-500">확인한 보고 내용 (원문은 보관됩니다)<textarea value={corrected} onChange={e=>setCorrected(e.target.value)} rows={7} className="mt-2 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700"/></label><label className="block text-xs text-slate-500">검토 메모<input value={note} onChange={e=>setNote(e.target.value)} className="mt-2 w-full rounded-lg border border-slate-200 p-3 text-sm"/></label><div className="flex flex-wrap gap-2"><button disabled={busy} className={btn} onClick={()=>void action({action:'review',id:selected.id,revision:selected.revision,correctedMessage:corrected,note})}>{selected.applied_version?'정정 후 기존 기록 반영':'확인 후 반영'}</button><button disabled={busy} className={btn} onClick={()=>void action({action:'retry',id:selected.id})}>기존 내용 재처리</button></div></>}
