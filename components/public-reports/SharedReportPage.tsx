@@ -15,7 +15,8 @@ export function SharedReportPage(){
  const [draft,setDraft]=useState(''),[items,setItems]=useState<LocalMessage[]>([]);
  const [error,setError]=useState(''),[busy,setBusy]=useState(false),[templates,setTemplates]=useState(false);
  const pending=useRef<{id:string;body:string}|null>(null);
- const end=useRef<HTMLDivElement>(null),input=useRef<HTMLTextAreaElement>(null);
+ const frame=useRef<HTMLElement>(null),scroller=useRef<HTMLElement>(null);
+ const input=useRef<HTMLTextAreaElement>(null);
  useEffect(()=>{
   const incoming=new URLSearchParams(location.hash.slice(1)).get('key')||'';
   let stored='';
@@ -26,7 +27,13 @@ export function SharedReportPage(){
   if(incoming)history.replaceState(history.state,'',location.pathname);
   queueMicrotask(()=>{setToken(valid(stored)?stored:'');setReady(true);});
  },[]);
- useEffect(()=>{end.current?.scrollIntoView({block:'end'});},[items,error]);
+ useEffect(()=>{const view=scroller.current;if(view)view.scrollTop=view.scrollHeight;},[items,error]);
+ useEffect(()=>{
+  const viewport=window.visualViewport;
+  const resize=()=>{if(frame.current)frame.current.style.height=Math.round(viewport?.height||window.innerHeight)+'px';};
+  resize();viewport?.addEventListener('resize',resize);window.addEventListener('resize',resize);
+  return()=>{viewport?.removeEventListener('resize',resize);window.removeEventListener('resize',resize);};
+ },[]);
  useEffect(()=>{if(input.current){input.current.style.height='auto';input.current.style.height=Math.min(176,input.current.scrollHeight)+'px';}},[draft]);
  function template(){
   const [y,m,d]=today().split('-');
@@ -53,13 +60,12 @@ export function SharedReportPage(){
   finally{setBusy(false);input.current?.focus();}
  }
  function goBack(){if(draft.trim()&&!confirm('작성 중인 보고를 두고 나가시겠어요?'))return;window.history.back();}
- return <main className="mx-auto flex h-dvh w-full max-w-2xl flex-col overflow-hidden bg-[#B2C7D9] text-[#30353A]">
+ return <main ref={frame} className="mx-auto flex h-dvh min-h-0 min-w-0 w-full max-w-full flex-col overflow-x-hidden overflow-y-hidden bg-[#B2C7D9] text-[#30353A] sm:max-w-2xl">
   <header className="z-10 flex shrink-0 items-center gap-2 bg-[#B2C7D9] px-2 pb-3 pt-[max(12px,env(safe-area-inset-top))]">
    <button type="button" aria-label="뒤로 가기" onClick={goBack} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg hover:bg-white/15"><ArrowLeft size={24} strokeWidth={1.9}/></button>
    <h1 className="min-w-0 flex-1 truncate text-[18px] font-semibold tracking-[-0.025em]">VIP리무진코리아</h1>
-   <VipChatAvatar/>
   </header>
-  <section aria-label="VIP리무진코리아와 대화" className="min-h-0 flex-1 select-text space-y-4 overflow-y-auto overscroll-contain px-3 pb-5 pt-3 sm:px-5">
+  <section ref={scroller} aria-label="VIP리무진코리아와 대화" className="min-h-0 min-w-0 flex-1 select-text space-y-4 overflow-x-hidden overflow-y-auto overscroll-contain px-3 pb-5 pt-3 sm:px-5">
    <div className="text-center"><span className="rounded-full bg-[#94AABD]/70 px-4 py-1 text-[11px] font-medium text-white">{showDay(today())}</span></div>
    <div className="flex items-start gap-2.5">
     <VipChatAvatar/>
@@ -87,7 +93,6 @@ export function SharedReportPage(){
      </div>
     </div>
    </div>)}
-   <div ref={end}/>
   </section>
   {error&&<div role="status" className="flex items-center gap-2 bg-white/90 px-4 py-2.5 text-xs leading-5 text-[#59646D]"><span className="flex-1">{error}</span><button type="button" aria-label="오류 안내 닫기" onClick={()=>setError('')}><RefreshCw size={15}/></button></div>}
   <footer className="shrink-0 bg-white px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-2.5">
@@ -98,7 +103,7 @@ export function SharedReportPage(){
      onChange={e=>{setDraft(e.target.value);pending.current=null;}}
      onKeyDown={e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();void send();}}}
      rows={1} maxLength={20000} placeholder="메시지 입력"
-     className="max-h-44 min-h-11 min-w-0 flex-1 resize-none rounded-[10px] border border-[#E2E4E6] bg-white px-3 py-2.5 text-[14px] leading-[1.55] outline-none placeholder:text-[#A4ABB1] focus:border-[#B9C1C7] disabled:bg-[#F7F8F9]"/>
+     className="max-h-44 min-h-11 min-w-0 flex-1 resize-none rounded-[10px] border border-[#E2E4E6] bg-white px-3 py-2.5 text-[16px] leading-[1.5] outline-none placeholder:text-[#A4ABB1] focus:border-[#B9C1C7] disabled:bg-[#F7F8F9]"/>
     <button type="button" aria-label="메시지 보내기" disabled={!token||!draft.trim()||busy} onClick={()=>void send()} className="mb-0.5 flex h-9 shrink-0 items-center justify-center rounded-[7px] bg-[#FEE500] px-3.5 text-[13px] font-semibold text-[#3B3C35] disabled:bg-[#F2F2F2] disabled:text-[#B4B9BC]">전송</button>
    </div>
   </footer>

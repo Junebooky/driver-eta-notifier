@@ -16,7 +16,7 @@ export function DriverReportChat({driverId,driverName='기사님'}:{driverId:str
  const [draftLoaded,setDraftLoaded]=useState(false);
  const frame=useRef<HTMLDivElement>(null);
  const [today,setToday]=useState(koreaDate()),[templates,setTemplates]=useState(false),[sending,setSending]=useState(false);
- const tail=useRef<HTMLDivElement>(null),input=useRef<HTMLTextAreaElement>(null),active=useRef(true),inflight=useRef(false),stick=useRef(true),fetched=useRef(false);
+ const scroller=useRef<HTMLElement>(null),input=useRef<HTMLTextAreaElement>(null),active=useRef(true),inflight=useRef(false),stick=useRef(true),fetched=useRef(false);
  const load=useCallback(async(before?:number)=>{
   const res=await fetch('/api/driver-reports?driverId='+encodeURIComponent(driverId)+(before?'&before='+before:''),{cache:'no-store'});
   const data=await res.json();
@@ -43,10 +43,12 @@ export function DriverReportChat({driverId,driverName='기사님'}:{driverId:str
  },[driverId]);
  useEffect(()=>{if(draftLoaded)try{saveChatDraft(localStorage,driverId,text,outgoing);}catch{queueMicrotask(()=>setError('임시 저장 공간이 부족해요. 작성 내용을 복사해 보관해 주세요.'));}},[draftLoaded,driverId,text,outgoing]);
  useEffect(()=>{
-  const vv=window.visualViewport;const fit=()=>{if(frame.current)frame.current.style.height=(vv?.height||window.innerHeight)+'px';};fit();vv?.addEventListener('resize',fit);return()=>vv?.removeEventListener('resize',fit);
+  const vv=window.visualViewport;const fit=()=>{if(frame.current)frame.current.style.height=Math.round(vv?.height||window.innerHeight)+'px';};
+  fit();vv?.addEventListener('resize',fit);window.addEventListener('resize',fit);
+  return()=>{vv?.removeEventListener('resize',fit);window.removeEventListener('resize',fit);};
  },[]);
  useEffect(()=>{if(input.current){input.current.style.height='auto';input.current.style.height=Math.min(176,input.current.scrollHeight)+'px';}},[text]);
- useEffect(()=>{if(stick.current)tail.current?.scrollIntoView({block:'end'});},[messages,outgoing]);
+ useEffect(()=>{const view=scroller.current;if(view&&stick.current)view.scrollTop=view.scrollHeight;},[messages,outgoing]);
  useEffect(()=>{
   const guard=(e:BeforeUnloadEvent)=>{if(text||outgoing.length){e.preventDefault();e.returnValue='';}};
   window.addEventListener('beforeunload',guard);return()=>window.removeEventListener('beforeunload',guard);
@@ -83,26 +85,25 @@ export function DriverReportChat({driverId,driverName='기사님'}:{driverId:str
    </div>
   </div>
  </div>;
- return <div ref={frame} className="mx-auto flex h-dvh w-full max-w-2xl flex-col overflow-hidden bg-[#B2C7D9] text-[#30353A]">
+ return <div ref={frame} className="mx-auto flex h-dvh min-h-0 min-w-0 w-full max-w-full flex-col overflow-x-hidden overflow-y-hidden bg-[#B2C7D9] text-[#30353A] sm:max-w-2xl">
   <header className="z-10 flex shrink-0 items-center gap-2 bg-[#B2C7D9] px-2 pb-3 pt-[max(12px,env(safe-area-inset-top))]">
    <Link href="/" aria-label="기사 홈으로" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg hover:bg-white/15"><ArrowLeft size={24} strokeWidth={1.9}/></Link>
    <div className="min-w-0 flex-1"><h1 className="truncate text-[18px] font-semibold tracking-[-0.025em]">VIP리무진코리아</h1></div>
-   <VipChatAvatar/>
   </header>
   <div className="shrink-0 pb-3 pt-3 text-center"><span className="rounded-full bg-[#94AABD]/70 px-4 py-1 text-[11px] font-medium text-white">{dayLabel(today)}</span></div>
-  <section aria-label="VIP리무진코리아와 대화" className="min-h-0 flex-1 select-text space-y-3 overflow-y-auto overscroll-contain pb-5 pt-2" onScroll={e=>{const el=e.currentTarget;stick.current=el.scrollHeight-el.scrollTop-el.clientHeight<100;}}>
+  <section ref={scroller} aria-label="VIP리무진코리아와 대화" className="min-h-0 min-w-0 flex-1 select-text space-y-3 overflow-x-hidden overflow-y-auto overscroll-contain pb-5 pt-2" onScroll={e=>{const el=e.currentTarget;stick.current=el.scrollHeight-el.scrollTop-el.clientHeight<100;}}>
    {hasMore&&<button onClick={()=>{stick.current=false;void load(messages[0]?.seq).catch(e=>setError(e.message));}} className="mx-auto flex items-center gap-1 rounded-full bg-white/70 px-4 py-2 text-xs text-[#566B7C]"><ChevronUp size={13}/>이전 대화</button>}
    {!loading&&!messages.length&&bubble({id:'welcome',created_at:new Date().toISOString(),body:`${driverName}님, 오늘도 수고 많으셨어요.\n운행보고를 여기로 보내 주세요.`},false)}
    {loading&&<p role="status" className="text-center text-xs text-[#566B7C]">이전 대화를 불러오고 있어요…</p>}
    {messages.map((m,i)=><div key={m.id} className="space-y-3">{koreaDate(new Date(m.created_at))!==today&&(i===0||koreaDate(new Date(messages[i-1].created_at))!==koreaDate(new Date(m.created_at)))&&<p className="text-center text-[11px] text-[#566B7C]">{dayLabel(koreaDate(new Date(m.created_at)))}</p>}{bubble(m,m.sender_type==='driver')}</div>)}
-   {outgoing.map(m=>bubble(m,true,m))}<div ref={tail}/>
+   {outgoing.map(m=>bubble(m,true,m))}
   </section>
   {error&&<div role="status" className="flex items-center gap-2 border-t border-white/50 bg-white/90 px-4 py-2.5 text-xs leading-5 text-[#59646D]"><span className="flex-1">{error}</span><button aria-label="대화 다시 불러오기" onClick={()=>void load().catch(e=>setError(e.message))}><RefreshCw size={15}/></button></div>}
   <footer className="shrink-0 bg-white px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-2.5">
    {templates&&<div className="mb-2 rounded-lg bg-[#F4F5F6] p-2"><button onClick={template} className="w-full rounded-md px-3 py-2 text-left text-sm text-[#49525C]">운행보고 양식 불러오기</button></div>}
    <div className="flex items-end gap-2.5">
     <button aria-label="보고 양식" aria-expanded={templates} onClick={()=>setTemplates(v=>!v)} className="mb-0.5 flex h-10 w-10 shrink-0 items-center justify-center text-[#6B747B] hover:bg-[#F3F4F5]"><Plus size={29} strokeWidth={1.7}/></button>
-    <textarea ref={input} aria-label="메시지 입력" placeholder="메시지 입력" value={text} onChange={e=>setText(e.target.value)} maxLength={20000} rows={1} onKeyDown={e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();void send();}}} className="max-h-44 min-h-11 min-w-0 flex-1 resize-none rounded-[10px] border border-[#E2E4E6] bg-white px-3 py-2.5 text-[14px] leading-[1.55] outline-none placeholder:text-[#A4ABB1] focus:border-[#B9C1C7]"/>
+    <textarea ref={input} aria-label="메시지 입력" placeholder="메시지 입력" value={text} onChange={e=>setText(e.target.value)} maxLength={20000} rows={1} onKeyDown={e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();void send();}}} className="max-h-44 min-h-11 min-w-0 flex-1 resize-none rounded-[10px] border border-[#E2E4E6] bg-white px-3 py-2.5 text-[16px] leading-[1.5] outline-none placeholder:text-[#A4ABB1] focus:border-[#B9C1C7]"/>
     <button aria-label="메시지 보내기" disabled={!text.trim()||sending} onClick={()=>void send()} className="mb-0.5 flex h-9 shrink-0 items-center justify-center rounded-[7px] bg-[#FEE500] px-3.5 text-[13px] font-semibold text-[#3B3C35] disabled:bg-[#F2F2F2] disabled:text-[#B4B9BC]">전송</button>
    </div>
   </footer>
