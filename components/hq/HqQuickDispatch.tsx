@@ -1005,7 +1005,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
         originLng: isEditMode && pickupLocation.trim() === initialBooking?.pickupLocation.trim() ? initialBooking?.pickupLng : undefined,
         destinationLat: isEditMode && destination.trim() === initialBooking?.destination.trim() ? initialBooking?.destinationLat : undefined,
         destinationLng: isEditMode && destination.trim() === initialBooking?.destination.trim() ? initialBooking?.destinationLng : undefined,
-        placeVerified: isEditMode && pickupLocation.trim() === initialBooking?.pickupLocation.trim() && destination.trim() === initialBooking?.destination.trim() ? initialBooking?.placeVerified : false,
+        placeVerified: isEditMode ? (pickupLocation.trim() === initialBooking?.pickupLocation.trim() && destination.trim() === initialBooking?.destination.trim() ? initialBooking?.placeVerified : false) : undefined,
         passengerName: resolvedPassengerName,
         passengerPhone: resolvedPassengerPhone,
         passengerCount: Math.max(1, commonPassengerCount || 1),
