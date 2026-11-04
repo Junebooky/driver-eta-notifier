@@ -1,6 +1,6 @@
 'use client';
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {Upload,Download,RefreshCw,History,ArrowRight,Check,Search,LocateFixed} from 'lucide-react';
+import {Upload,Download,RefreshCw,ArrowRight,Check,Search,LocateFixed} from 'lucide-react';
 import {HqExcelSectionIcon} from './HqExcelSectionIcon';
 import {HqExcelWorkbookView,type ReportExcelFocus} from './HqExcelWorkbookView';
 import type {DriverReportSubmission,ReportChatMessage} from '@/types/driverReportChat';
@@ -155,15 +155,5 @@ export function HqDriverReportInbox() {
    </div>;})}
    {!reports.some(s=>reportMatchesFilter(s.excel_status,filter)&&(!search||[s.parsed.draft.driver,s.parsed.draft.customer,s.parsed.draft.plate,s.parsed.draft.date].some(v=>v.includes(search))))&&<p className="py-8 text-center text-sm text-[#8B97A8]">{reports.length?'조건에 맞는 보고가 없습니다.':'아직 접수된 운행보고가 없습니다.'}</p>}
   </div>
-  <details className="text-xs text-[#7A879A]">
-   <summary className="cursor-pointer select-none py-1 hover:text-slate-700 transition-colors">누락 내역 재처리</summary>
-   <button className={btn+' mt-2'} disabled={busy} onClick={()=>void action({action:'drain'})}><RefreshCw size={14}/>누락 내역 재처리 (최대 20건)</button>
-  </details>
-  {more&&<button onClick={()=>void older()} className={btn}>이전 보고 더 보기</button>}
-
-  {versions.length>0&&<details className="text-xs text-slate-500"><summary className="flex cursor-pointer items-center gap-2 select-none py-1 hover:text-slate-700 transition-colors"><History size={14}/>버전 기록</summary><div className="mt-3 flex flex-wrap gap-2"><select aria-label="Excel 버전" value={version} onChange={e=>setVersion(e.target.value)} className={btn}><option value="">버전 선택</option>{versions.map(v=><option key={v.id} value={v.id}>#{v.generation} · {v.kind} · {new Date(v.created_at).toLocaleString('ko-KR')}</option>)}</select>{version&&<><a className={btn} href={'/api/hq/report-workbook?download=1&version='+version+'&year='+workbook?.year}>선택 버전 다운로드</a><button disabled={busy} className={btn} onClick={()=>{
-    if(!window.confirm('이 버전으로 복구한 뒤, 빠진 보고는 다시 반영 대기로 돌립니다. 계속할까요?'))return;
-    setBusy(true);void json('/api/hq/report-workbook',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'restore',version,expected:workbook?.active_version})}).then(()=>refresh()).catch(e=>setMessage(e.message)).finally(()=>setBusy(false));
-   }}>선택 버전 복구</button></>}</div></details>}
  </section>;
 }
