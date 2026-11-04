@@ -3,6 +3,7 @@
  * the customer's 2026 vehicle-use workbook. No new log/expense columns.
  */
 import { VIP_REAL_VEHICLES } from '@/utils/vehicleData';
+import {parseDiaryRoute,statedReportTime} from './reportDiaryRoute';
 
 export interface KakaoExcelDraft {
   date: string; // yyyy-mm-dd
@@ -102,9 +103,9 @@ export function parseKakaoExcelReport(raw: string, assumedYear = currentReportYe
   const vehicle = findExactFleetVehicle(plate);
   if (plate && !vehicle) warnings.push('전체 차량번호와 등록 차량이 정확히 일치하지 않습니다. 차종을 직접 확인해 주세요.');
 
-  const start = checkedTime(getLine(src, '시작\\s*시간'));
-  const end = checkedTime(getLine(src, '종료\\s*시간'));
-  const dutyStart = checkedTime(getLine(src, '출\\s*근'));
+  const start = statedReportTime(getLine(src, '시작\\s*시간'));
+  const end = statedReportTime(getLine(src, '종료\\s*시간'));
+  const dutyStart = statedReportTime(getLine(src, '출\\s*근'));
   const from = getLine(src, '출발지');
   const to = getLine(src, '최종\\s*도착지');
   if ((!start || !end) && dutyStart) warnings.push('고객 서비스 시작·종료시간이 불완전하여 출근시간으로 대체하지 않았습니다.');
@@ -118,18 +119,13 @@ export function parseKakaoExcelReport(raw: string, assumedYear = currentReportYe
     const declared = Number(expected[1]) * 60 + Number(expected[2]);
     if (actual !== declared) warnings.push('보고된 운행총시간과 시작·종료시간 계산이 일치하지 않습니다.');
   }
-  // Route locations are independent of timestamps. Preserve the exact written
-  // stop order even when timeline times contradict one another.
-  const timeline = src.match(/(?:^|\n)[ \t]*운행일지[ \t]*\n([\s\S]*?)(?=\n[ \t]*(?:경비\s*지출|특이\s*사항)(?:[ \t]*[:：]?[ \t]*(?:\n|$))|$)/i)?.[1] || '';
-  const stops = timeline.split(/\s*(?:→|➡|➔|⇒|->)\s*/)
-    .map(part => part.replace(/^\s*\d{1,2}:\d{2}\s*/, '')
-      .replace(/\s*\/\s*(?:업무\s*종료|운행\s*종료|종료)\s*$/, '').trim())
-    .filter(part => part && /[가-힣a-z]/i.test(part) && !/^(?:업무\s*종료|운행\s*종료|종료)$/.test(part));
-  const route = stops.length >= 2 ? stops.join(' → ') : (from && to ? from + ' → ' + to : from || to || '');
-  const times = [...timeline.matchAll(/(?:^|[^\d])(\d{1,2}):(\d{2})(?=[^\d]|$)/g)].map(m => Number(m[1]) * 60 + Number(m[2]));
-  if (times.some((v, i) => i > 0 && v < times[i - 1])) {
-    warnings.push('경유시간의 앞뒤 순서가 맞지 않습니다. 경유지는 원문 순서대로 모두 추출했으며, 경유시간은 Excel 경로에 반영하지 않았습니다.');
-  }
+  // All report entry points share the same separator and next-day clock parser.
+  // Preserve the original waypoint order and annotation text in G; omit times.
+  const diary=parseDiaryRoute(src);
+  const stops=diary.stops.map(stop=>stop.place);
+  const route=stops.length>=2?stops.join(' → '):(from&&to?from+' → '+to:from||to||'');
+  if(diary.timesOutOfOrder)warnings.push('경유시간의 앞뒤 순서가 맞지 않습니다. 경유지는 원문 순서대로 모두 추출했으며, 경유시간은 Excel 경로에 반영하지 않았습니다.');
+  if(diary.invalidTimes)warnings.push('운행일지에 올바르지 않은 경유시간이 있습니다. 시간 표기를 확인해 주세요.');
   if (!getLine(src, '고객명')) warnings.push('거래처가 없으며, 임의로 고객사를 생성하지 않습니다.');
   const draft: KakaoExcelDraft = {
     date, plate, model: excelVehicleModel(plate),
