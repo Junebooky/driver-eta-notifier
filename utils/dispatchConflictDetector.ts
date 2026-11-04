@@ -609,7 +609,6 @@ export function mapScheduleItemToHqBooking(
     pickupLng: item.origin_lng,
     destinationLat: item.destination_lat,
     destinationLng: item.destination_lng,
-    placeVerified: item.place_verified,
     driverName: resolvedDriverName,
     driverId: item.driver_id,
     driverPhone: item.driver_phone,
