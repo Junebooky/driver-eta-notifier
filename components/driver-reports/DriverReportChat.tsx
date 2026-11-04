@@ -20,6 +20,7 @@ export function DriverReportChat({driverId,driverName='기사님'}:{driverId:str
  const [text,setText]=useState(''),[error,setError]=useState(''),[hasMore,setHasMore]=useState(false),[loading,setLoading]=useState(true);
  const [draftLoaded,setDraftLoaded]=useState(false);
  const [serviceType,setServiceType]=useState<ReportServiceType|null>(null);
+ const [reportActive,setReportActive]=useState(true);
  const frame=useRef<HTMLDivElement>(null);
  useChatViewport(frame);
  const [today,setToday]=useState(koreaDate()),[templates,setTemplates]=useState(false),[sending,setSending]=useState(false);
@@ -44,8 +45,17 @@ export function DriverReportChat({driverId,driverName='기사님'}:{driverId:str
   return()=>{active.current=false;window.clearInterval(poll);};
  },[load]);
  useEffect(()=>{
-  let alive=true;queueMicrotask(()=>{if(!alive)return;try{const d=readChatDraft(localStorage,driverId);if(d){setText(d.text);setOutgoing(d.outgoing);setServiceType(d.serviceType);}}catch{setError('이 기기에 임시 저장할 수 없어요.');}setDraftLoaded(true);});
-  const clear=()=>{setText('');setOutgoing([]);setServiceType(null);clearChatDrafts(localStorage);};
+  let alive=true;queueMicrotask(()=>{
+   if(!alive)return;
+   try{
+    const d=readChatDraft(localStorage,driverId);
+    if(d){setText(d.text);setOutgoing(d.outgoing);setServiceType(d.serviceType);}
+    // A finished report stays finished even after returning to the chat.
+    if(!d?.text&&!d?.outgoing?.length&&!d?.serviceType&&sessionStorage.getItem('vip_driver_report_completed_v1:'+driverId)==='1')setReportActive(false);
+   }catch{setError('이 기기에 임시 저장할 수 없어요.');}
+   setDraftLoaded(true);
+  });
+  const clear=()=>{setText('');setOutgoing([]);setServiceType(null);setReportActive(true);clearChatDrafts(localStorage);try{sessionStorage.removeItem('vip_driver_report_completed_v1:'+driverId);}catch{}};
   window.addEventListener('report-draft-clear',clear);return()=>{alive=false;window.removeEventListener('report-draft-clear',clear);};
  },[driverId]);
  useEffect(()=>{if(draftLoaded)try{saveChatDraft(localStorage,driverId,text,outgoing,serviceType);}catch{queueMicrotask(()=>setError('임시 저장 공간이 부족해요. 작성 내용을 복사해 보관해 주세요.'));}},[draftLoaded,driverId,text,outgoing,serviceType]);
@@ -77,10 +87,17 @@ export function DriverReportChat({driverId,driverName='기사님'}:{driverId:str
     return;
    }
    await load();setOutgoing(p=>p.filter(v=>v.id!==item.id));
-   if(data.accepted)setServiceType(null);
+   if(data.accepted){
+    setServiceType(null);setReportActive(false);setTemplates(false);
+    try{sessionStorage.setItem('vip_driver_report_completed_v1:'+driverId,'1');}catch{/* Optional session state. */}
+   }
    if(data.duplicate)setError('이미 접수된 보고예요. 기존 대화와 반영 상태를 확인해 주세요.');
   }catch(e){setOutgoing(p=>p.map(v=>v.id===item.id?{...v,failed:true}:v));setError(e instanceof Error?e.message:'연결을 확인해 주세요.');}
   finally{inflight.current=false;setSending(false);input.current?.focus();}
+ }
+ function startNextReport(){
+  setReportActive(true);setServiceType(null);setTemplates(false);setError('');
+  try{sessionStorage.removeItem('vip_driver_report_completed_v1:'+driverId);}catch{/* Optional session state. */}
  }
  function template(){
   if(text.trim()&&!window.confirm('작성 중인 내용 대신 보고 양식을 불러올까요?'))return;
@@ -113,15 +130,15 @@ export function DriverReportChat({driverId,driverName='기사님'}:{driverId:str
    {messages.map((m,i)=><div key={m.id} className="space-y-3">{koreaDate(new Date(m.created_at))!==today&&(i===0||koreaDate(new Date(messages[i-1].created_at))!==koreaDate(new Date(m.created_at)))&&<p className="text-center text-[11px] text-[#566B7C]">{dayLabel(koreaDate(new Date(m.created_at)))}</p>}{bubble(m,m.sender_type==='driver')}</div>)}
    {outgoing.map(m=>bubble(m,true,m))}
    {localGuidance.map(m=><div key={m.id} className="space-y-3">{bubble({id:m.id+'-sent',body:m.body,created_at:m.created_at},true)}{bubble({id:m.id+'-help',body:m.reply,created_at:m.created_at},false)}</div>)}
-   {draftLoaded&&<div className="px-3 sm:px-5"><ReportServicePicker value={serviceType} onChange={v=>{setServiceType(v);setError('');}}/></div>}
+   {draftLoaded&&reportActive&&<div className="px-3 sm:px-5"><ReportServicePicker value={serviceType} onChange={v=>{setServiceType(v);setError('');}}/></div>}
   </section>
   {error&&<div role="status" className="flex items-center gap-2 border-t border-white/50 bg-white/90 px-4 py-2.5 text-xs leading-5 text-[#59646D]"><span className="flex-1">{error}</span><button aria-label="대화 다시 불러오기" onClick={()=>void load().catch(e=>setError(e.message))}><RefreshCw size={15}/></button></div>}
   <footer className="shrink-0 bg-white px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-2.5">
-   {templates&&<div className="mb-2 rounded-lg bg-[#F4F5F6] p-2"><button onClick={template} className="w-full rounded-md px-3 py-2 text-left text-sm text-[#49525C]">운행보고 양식 불러오기</button></div>}
+   {reportActive&&templates&&<div className="mb-2 rounded-lg bg-[#F4F5F6] p-2"><button onClick={template} className="w-full rounded-md px-3 py-2 text-left text-sm text-[#49525C]">운행보고 양식 불러오기</button></div>}
    <div className="flex items-end gap-2.5">
-    <button aria-label="보고 양식" aria-expanded={templates} onClick={()=>setTemplates(v=>!v)} className="mb-0.5 flex h-10 w-10 shrink-0 items-center justify-center text-[#6B747B] hover:bg-[#F3F4F5]"><Plus size={29} strokeWidth={1.7}/></button>
-    <textarea ref={input} aria-label="메시지 입력" placeholder={serviceType?'메시지 입력':'먼저 운행 유형을 선택해 주세요'} disabled={!serviceType} value={text} onChange={e=>setText(e.target.value)} maxLength={20000} rows={1} onKeyDown={e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();void send();}}} className="max-h-44 min-h-11 min-w-0 flex-1 resize-none rounded-[10px] border border-[#E2E4E6] bg-white px-3 py-2.5 text-[16px] leading-[1.5] outline-none placeholder:text-[#A4ABB1] focus:border-[#B9C1C7]"/>
-    <button aria-label="메시지 보내기" disabled={!serviceType||!text.trim()||sending} onClick={()=>void send()} className="mb-0.5 flex h-9 shrink-0 items-center justify-center rounded-[7px] bg-[#FEE500] px-3.5 text-[13px] font-semibold text-[#3B3C35] disabled:bg-[#F2F2F2] disabled:text-[#B4B9BC]">전송</button>
+    <button aria-label={reportActive?"보고 양식":"새 운행보고 시작"} aria-expanded={reportActive&&templates} onClick={()=>reportActive?setTemplates(v=>!v):startNextReport()} className="mb-0.5 flex h-10 w-10 shrink-0 items-center justify-center text-[#6B747B] hover:bg-[#F3F4F5]"><Plus size={29} strokeWidth={1.7}/></button>
+    <textarea ref={input} aria-label="메시지 입력" placeholder={!reportActive?'다음 보고는 + 버튼으로 시작해 주세요':serviceType?'메시지 입력':'먼저 운행 유형을 선택해 주세요'} disabled={!reportActive||!serviceType} value={text} onChange={e=>setText(e.target.value)} maxLength={20000} rows={1} onKeyDown={e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();void send();}}} className="max-h-44 min-h-11 min-w-0 flex-1 resize-none rounded-[10px] border border-[#E2E4E6] bg-white px-3 py-2.5 text-[16px] leading-[1.5] outline-none placeholder:text-[#A4ABB1] focus:border-[#B9C1C7]"/>
+    <button aria-label="메시지 보내기" disabled={!reportActive||!serviceType||!text.trim()||sending} onClick={()=>void send()} className="mb-0.5 flex h-9 shrink-0 items-center justify-center rounded-[7px] bg-[#FEE500] px-3.5 text-[13px] font-semibold text-[#3B3C35] disabled:bg-[#F2F2F2] disabled:text-[#B4B9BC]">전송</button>
    </div>
   </footer>
  </div>;

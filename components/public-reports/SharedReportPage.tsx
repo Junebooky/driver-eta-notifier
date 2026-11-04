@@ -8,6 +8,7 @@ import {ReportServicePicker} from '@/components/driver-reports/ReportServicePick
 import type {ReportServiceType} from '@/utils/reportServiceTypes';
 
 const STORE_KEY='vip_shared_report_link_v1';
+const COMPLETED_KEY='vip_shared_report_last_completed_v1';
 const valid=(s:string)=>/^[A-Za-z0-9_-]{43}$/.test(s);
 type LocalMessage={id:string;body:string;at:string;reply:string};
 const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
@@ -18,6 +19,7 @@ export function SharedReportPage(){
  const [token,setToken]=useState(''),[ready,setReady]=useState(false);
  const [draft,setDraft]=useState(''),[items,setItems]=useState<LocalMessage[]>([]);
  const [serviceType,setServiceType]=useState<ReportServiceType|null>(null);
+ const [reportActive,setReportActive]=useState(true);
  const [error,setError]=useState(''),[busy,setBusy]=useState(false),[templates,setTemplates]=useState(false);
  const pending=useRef<{id:string;body:string;serviceType:ReportServiceType}|null>(null);
  const frame=useRef<HTMLElement>(null),scroller=useRef<HTMLElement>(null);
@@ -31,7 +33,11 @@ export function SharedReportPage(){
    stored=sessionStorage.getItem(STORE_KEY)||'';
   }catch{stored=incoming;}
   if(incoming)history.replaceState(history.state,'',location.pathname);
-  queueMicrotask(()=>{setToken(valid(stored)?stored:'');setReady(true);});
+  queueMicrotask(()=>{
+   setToken(valid(stored)?stored:'');
+   try{if(valid(stored)&&sessionStorage.getItem(COMPLETED_KEY)===stored)setReportActive(false);}catch{/* Private browsing may block storage. */}
+   setReady(true);
+  });
  },[]);
  useEffect(()=>{const view=scroller.current;if(view)view.scrollTop=view.scrollHeight;},[items,error,serviceType]);
  useEffect(()=>{if(input.current){input.current.style.height='auto';input.current.style.height=Math.min(176,input.current.scrollHeight)+'px';}},[draft]);
@@ -57,9 +63,18 @@ export function SharedReportPage(){
    if(!response.ok)throw new Error(data.error||'보고를 전송하지 못했습니다.');
    setItems(prev=>[...prev,{id:item.id,body:item.body,at:new Date().toISOString(),reply:data.reply||'운행보고 잘 받았습니다. 감사합니다 ^.^'}]);
    setDraft('');pending.current=null;
-   if(data.accepted)setServiceType(null);
+   if(data.accepted){
+    setServiceType(null);
+    setReportActive(false);
+    setTemplates(false);
+    try{sessionStorage.setItem(COMPLETED_KEY,token);}catch{/* Optional session state. */}
+   }
   }catch(e){setError(e instanceof Error?e.message:'연결을 확인하고 다시 보내 주세요.');}
   finally{setBusy(false);input.current?.focus();}
+ }
+ function startNextReport(){
+  setReportActive(true);setServiceType(null);setTemplates(false);setError('');
+  try{sessionStorage.removeItem(COMPLETED_KEY);}catch{/* Optional session state. */}
  }
  function goBack(){if(draft.trim()&&!confirm('작성 중인 보고를 두고 나가시겠어요?'))return;window.history.back();}
  return <main ref={frame} className="fixed inset-x-0 top-0 z-40 mx-auto flex h-dvh min-h-0 min-w-0 w-full max-w-full flex-col overflow-x-hidden overflow-y-hidden bg-[#B2C7D9] text-[#30353A] sm:max-w-2xl">
@@ -95,19 +110,19 @@ export function SharedReportPage(){
      </div>
     </div>
    </div>)}
-   {ready&&token&&<ReportServicePicker value={serviceType} onChange={v=>{setServiceType(v);pending.current=null;setError('');}}/>}
+   {ready&&token&&reportActive&&<ReportServicePicker value={serviceType} onChange={v=>{setServiceType(v);pending.current=null;setError('');}}/>}
   </section>
   {error&&<div role="status" className="flex items-center gap-2 bg-white/90 px-4 py-2.5 text-xs leading-5 text-[#59646D]"><span className="flex-1">{error}</span><button type="button" aria-label="오류 안내 닫기" onClick={()=>setError('')}><RefreshCw size={15}/></button></div>}
   <footer className="shrink-0 bg-white px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-2.5">
-   {templates&&<div className="mb-2 rounded-lg bg-[#F4F5F6] p-2"><button type="button" onClick={template} className="w-full rounded-md px-3 py-2 text-left text-sm text-[#49525C]">운행보고 양식 불러오기</button></div>}
+   {reportActive&&templates&&<div className="mb-2 rounded-lg bg-[#F4F5F6] p-2"><button type="button" onClick={template} className="w-full rounded-md px-3 py-2 text-left text-sm text-[#49525C]">운행보고 양식 불러오기</button></div>}
    <div className="flex items-end gap-2.5">
-    <button type="button" aria-label="보고 양식" aria-expanded={templates} onClick={()=>setTemplates(v=>!v)} className="mb-0.5 flex h-10 w-10 shrink-0 items-center justify-center text-[#6B747B] hover:bg-[#F3F4F5]"><Plus size={29} strokeWidth={1.7}/></button>
-    <textarea ref={input} aria-label="메시지 입력" value={draft} disabled={!token||busy||!serviceType}
+    <button type="button" aria-label={reportActive?"보고 양식":"새 운행보고 시작"} aria-expanded={reportActive&&templates} onClick={()=>reportActive?setTemplates(v=>!v):startNextReport()} className="mb-0.5 flex h-10 w-10 shrink-0 items-center justify-center text-[#6B747B] hover:bg-[#F3F4F5]"><Plus size={29} strokeWidth={1.7}/></button>
+    <textarea ref={input} aria-label="메시지 입력" value={draft} disabled={!token||busy||!reportActive||!serviceType}
      onChange={e=>{setDraft(e.target.value);pending.current=null;}}
      onKeyDown={e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();void send();}}}
-     rows={1} maxLength={20000} placeholder="메시지 입력"
+     rows={1} maxLength={20000} placeholder={reportActive?"메시지 입력":"다음 보고는 + 버튼으로 시작해 주세요"}
      className="max-h-44 min-h-11 min-w-0 flex-1 resize-none rounded-[10px] border border-[#E2E4E6] bg-white px-3 py-2.5 text-[16px] leading-[1.5] outline-none placeholder:text-[#A4ABB1] focus:border-[#B9C1C7] disabled:bg-[#F7F8F9]"/>
-    <button type="button" aria-label="메시지 보내기" disabled={!token||!serviceType||!draft.trim()||busy} onClick={()=>void send()} className="mb-0.5 flex h-9 shrink-0 items-center justify-center rounded-[7px] bg-[#FEE500] px-3.5 text-[13px] font-semibold text-[#3B3C35] disabled:bg-[#F2F2F2] disabled:text-[#B4B9BC]">전송</button>
+    <button type="button" aria-label="메시지 보내기" disabled={!token||!reportActive||!serviceType||!draft.trim()||busy} onClick={()=>void send()} className="mb-0.5 flex h-9 shrink-0 items-center justify-center rounded-[7px] bg-[#FEE500] px-3.5 text-[13px] font-semibold text-[#3B3C35] disabled:bg-[#F2F2F2] disabled:text-[#B4B9BC]">전송</button>
    </div>
   </footer>
  </main>;
