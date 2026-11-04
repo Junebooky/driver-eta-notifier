@@ -5,6 +5,7 @@ import {readChatDraft,saveChatDraft,clearChatDrafts} from '@/utils/reportChatDra
 import {ArrowLeft,Plus,RefreshCw,ChevronUp} from 'lucide-react';
 import {VipChatAvatar} from './VipChatAvatar';
 import {useChatViewport} from './useChatViewport';
+import {buildDriverReportTemplate} from '@/utils/reportChatTemplate';
 import type {ReportChatMessage} from '@/types/driverReportChat';
 import {koreaDate} from '@/utils/driverReportChat';
 
@@ -66,8 +67,8 @@ export function DriverReportChat({driverId,driverName='기사님'}:{driverId:str
  }
  function template(){
   if(text.trim()&&!window.confirm('작성 중인 내용 대신 보고 양식을 불러올까요?'))return;
-  const [y,m,d]=today.split('-');
-  setText(`${y}년 ${Number(m)}월 ${Number(d)}일\n수행담당 : ${driverName}\n차량번호 : \n고객명 : \n시작 시간 : \n종료 시간 : \n운행일지\n`);setTemplates(false);input.current?.focus();
+  const reportDate=today;
+  setText(buildDriverReportTemplate(reportDate));setTemplates(false);input.current?.focus();
  }
  const bubble=(m:{id:string;body:string;created_at:string},mine:boolean,status?:Outgoing)=> <div key={m.id} className={'flex items-start gap-2.5 px-3 sm:px-5 '+(mine?'justify-end':'justify-start')}>
   {!mine&&<VipChatAvatar/>}

@@ -3,6 +3,7 @@ import {useEffect,useRef,useState} from 'react';
 import {ArrowLeft,Plus,RefreshCw} from 'lucide-react';
 import {VipChatAvatar} from '@/components/driver-reports/VipChatAvatar';
 import {useChatViewport} from '@/components/driver-reports/useChatViewport';
+import {buildDriverReportTemplate} from '@/utils/reportChatTemplate';
 
 const STORE_KEY='vip_shared_report_link_v1';
 const valid=(s:string)=>/^[A-Za-z0-9_-]{43}$/.test(s);
@@ -32,10 +33,10 @@ export function SharedReportPage(){
  useEffect(()=>{const view=scroller.current;if(view)view.scrollTop=view.scrollHeight;},[items,error]);
  useEffect(()=>{if(input.current){input.current.style.height='auto';input.current.style.height=Math.min(176,input.current.scrollHeight)+'px';}},[draft]);
  function template(){
-  const [y,m,d]=today().split('-');
+  const reportDate=today();
   if(draft.trim()&&!confirm('작성 중인 내용을 보고 양식으로 바꿀까요?'))return;
   pending.current=null;
-  setDraft(y+'년 '+Number(m)+'월 '+Number(d)+'일\n수행담당 : \n차량번호 : \n고객명 : \n시작 시간 : \n종료 시간 : \n운행일지\n');
+  setDraft(buildDriverReportTemplate(reportDate));
   setTemplates(false);input.current?.focus();
  }
  async function send(){
