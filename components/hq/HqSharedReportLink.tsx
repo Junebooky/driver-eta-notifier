@@ -1,7 +1,8 @@
 'use client';
 
 import {useCallback,useEffect,useState} from 'react';
-import {Check,Copy,Link2,Plus,RefreshCw,ShieldCheck,ShieldOff} from 'lucide-react';
+import {Check,Copy,Plus,RefreshCw,ShieldCheck,ShieldOff} from 'lucide-react';
+import {HqExcelSectionIcon} from './HqExcelSectionIcon';
 
 type LinkStatus={
  ok:boolean;
@@ -89,9 +90,7 @@ export function HqSharedReportLink(){
  const locked=busy||refreshing;
  return <section aria-label="공용 운행 링크" className="w-full min-w-0 space-y-6 rounded-[24px] border border-[#E4EAF3] bg-white p-5 shadow-[0_10px_36px_rgba(54,78,115,0.06)] sm:space-y-7 sm:p-8">
   <div className="flex min-w-0 items-start gap-4 sm:gap-5">
-   <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-[#EFF4FD] text-[#1E60F3] sm:h-16 sm:w-16" aria-hidden="true">
-    <Link2 size={29} strokeWidth={2.1}/>
-   </span>
+   <HqExcelSectionIcon src="/images/icons/excel/icon_link.png" label="공용 운행 링크"/>
    <div className="min-w-0 space-y-1">
     <h2 className="text-[21px] font-bold leading-tight tracking-[-0.035em] text-[#263550] sm:text-[24px]">공용 운행 링크</h2>
     <p className="text-[14px] leading-6 text-[#65738B] sm:text-[15px]">링크로 운행보고를 간편하게 받아보세요.</p>
