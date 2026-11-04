@@ -52,6 +52,7 @@ export function DriverReportChat({driverId,driverName='기사님'}:{driverId:str
  },[text,outgoing]);
  async function send(retry?:Outgoing) {
   if(inflight.current||(!retry&&!text.trim()))return;
+  if(!retry&&outgoing.length>=10){setError('미전송 보고가 10건 있어요. 먼저 다시 보내기를 눌러 주세요.');return;}
   inflight.current=true;setSending(true);stick.current=true;
   const item=retry||{id:crypto.randomUUID(),body:text.trim(),created_at:new Date().toISOString(),failed:false};
   setOutgoing(p=>[...p.filter(v=>v.id!==item.id),{...item,failed:false}]);if(!retry)setText('');
@@ -83,7 +84,7 @@ export function DriverReportChat({driverId,driverName='기사님'}:{driverId:str
    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#1E60F3]"><MessageCircle size={21}/></div>
   </header>
   <div className="shrink-0 pb-3 pt-4 text-center"><span className="rounded-full bg-slate-200/60 px-4 py-1.5 text-[11px] font-medium text-slate-500">{dayLabel(today)}</span></div>
-  <section aria-label="VIP리무진코리아와 대화" className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain pb-6 pt-3" onScroll={e=>{const el=e.currentTarget;stick.current=el.scrollHeight-el.scrollTop-el.clientHeight<100;}}>
+  <section aria-label="VIP리무진코리아와 대화" className="min-h-0 flex-1 select-text space-y-5 overflow-y-auto overscroll-contain pb-6 pt-3" onScroll={e=>{const el=e.currentTarget;stick.current=el.scrollHeight-el.scrollTop-el.clientHeight<100;}}>
    {hasMore&&<button onClick={()=>{stick.current=false;void load(messages[0]?.seq).catch(e=>setError(e.message));}} className="mx-auto flex items-center gap-1 rounded-full bg-white px-4 py-2 text-xs text-slate-500"><ChevronUp size={13}/>이전 대화</button>}
    {!loading&&!messages.length&&bubble({id:'welcome',created_at:new Date().toISOString(),body:`${driverName}님, 오늘도 수고 많으셨어요.\n운행보고를 여기로 보내 주세요.`},false)}
    {loading&&<p role="status" className="text-center text-xs text-slate-400">이전 대화를 불러오고 있어요…</p>}

@@ -1,7 +1,7 @@
 import {NextRequest} from 'next/server';
 import {requireHqAdmin} from '@/lib/auth/serverAuth';
 import {supabaseAdmin as db} from '@/lib/supabase/server';
-import {check,drainReports,processReport,currentWorkbook,nightEndHour} from '@/lib/driverReports/service';
+import {check,drainReports,processReport,nightEndHour} from '@/lib/driverReports/service';
 import {parseDriverReport} from '@/utils/driverReportChat';
 import {boundedBody,UUID,privateJson,failure,sameOrigin} from '@/lib/driverReports/http';
 export const dynamic='force-dynamic';
@@ -36,8 +36,7 @@ export async function POST(req:NextRequest) {
    const explicit=b.correctedMessage.match(/(20\d{2})\s*년/);
    const previous=await db.from('report_submissions').select('parsed_date').eq('org_id',s.org).eq('id',b.id).single();check(previous.error);
    const requestedYear=explicit?Number(explicit[1]):Number(previous.data!.parsed_date.slice(0,4));
-   const w=await currentWorkbook(s.org,requestedYear);
-   const parsed=parseDriverReport(b.correctedMessage,undefined,new Date(),{workbookYear:w?.year??requestedYear,nightEndHour:nightEndHour()});
+   const parsed=parseDriverReport(b.correctedMessage,undefined,new Date(),{workbookYear:requestedYear,nightEndHour:nightEndHour()});
    if(parsed.reviewReasons.length)throw new Error(parsed.reviewReasons.join(' '));
    const r=await db.rpc('review_report',{p_org:s.org,p_actor:s.userId,p_id:b.id,p_revision:b.revision,p_parsed:parsed,p_note:String(b.note||'확인 후 재처리합니다.').slice(0,500)});check(r.error);
    if(!r.data)return privateJson({ok:false,error:'다른 담당자가 변경했습니다. 새로고침해 주세요.'},409);

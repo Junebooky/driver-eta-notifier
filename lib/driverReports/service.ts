@@ -22,6 +22,8 @@ export async function processReport(org:string,id:string,actor:string,lease?:str
  if(!lease){await runReportWorker(org,1,id);return;}
  try{
   for(let attempt=0;attempt<12;attempt++){
+   const ownership=await db.from('report_jobs').select('lease_token,lease_until').eq('org_id',org).eq('submission_id',id).single();check(ownership.error);
+   if(ownership.data?.lease_token!==lease||Date.parse(ownership.data.lease_until)<=Date.now())return;
    const r=await db.from('report_submissions').select('*').eq('org_id',org).eq('id',id).single();check(r.error);const s=r.data as DriverReportSubmission & {ledger_year:number|null};
    if(!['pending','error'].includes(s.excel_status))return;
    const targetYear=Number(s.parsed.draft.date.slice(0,4));let target=await currentWorkbook(org,targetYear);
@@ -52,9 +54,14 @@ export async function runReportWorker(org?:string,limit=15,id?:string){
  for(const job of claim.data||[])await processReport(job.org_id,job.submission_id,'00000000-0000-4000-8000-000000000001',job.lease_token);
  return claim.data?.length||0;
 }
+export async function activeLedgerYear(org:string){
+ const registry=await db.from('report_workbooks').select('active_version').eq('org_id',org).maybeSingle();check(registry.error);if(!registry.data)return null;
+ const version=await db.from('report_workbook_versions').select('ledger_year').eq('org_id',org).eq('id',registry.data.active_version).single();check(version.error);
+ return version.data?.ledger_year??(await currentWorkbook(org))?.year??null;
+}
 export async function submitReport(session:CockpitAuthSession,raw:string,requestKey:string){
  if(session.role!=='driver'||!session.driverId)throw new Error('기사 계정이 필요합니다.');
- let year:number|null=null;try{year=(await currentWorkbook(session.org))?.year??null;}catch{/* Submission remains durable. */}
+ let year:number|null=null;try{year=await activeLedgerYear(session.org);}catch{/* Submission remains durable. */}
  const parsed=parseDriverReport(raw,session.driverName,new Date(),{workbookYear:year,nightEndHour:nightEndHour()});
  const fingerprint=createHash('sha256').update((parsed.draft.date||'')+'|'+raw.trim().replace(/\r/g,'')).digest('hex');
  const saved=await db.rpc('submit_report',{p_org:session.org,p_driver:session.driverId,p_request:requestKey,p_fingerprint:fingerprint,p_raw:raw,p_parsed:parsed,p_reply:reportReply(parsed)});

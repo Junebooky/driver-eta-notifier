@@ -56,6 +56,7 @@ CREATE OR REPLACE FUNCTION cockpit.finish_report_failure(p_org text,p_id uuid,p_
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,cockpit AS $$
 DECLARE j cockpit.report_jobs;
 BEGIN
+ PERFORM 1 FROM cockpit.report_submissions WHERE id=p_id AND org_id=p_org FOR UPDATE;
  SELECT * INTO j FROM cockpit.report_jobs WHERE submission_id=p_id AND org_id=p_org FOR UPDATE;
  IF NOT FOUND OR j.lease_token IS DISTINCT FROM p_lease THEN RETURN; END IF;
  UPDATE cockpit.report_jobs SET last_error=left(p_reason,1000),lease_until=NULL,lease_token=NULL,next_attempt_at=now()+make_interval(secs=>least(3600,15*power(2,j.attempts)::integer)) WHERE submission_id=p_id;

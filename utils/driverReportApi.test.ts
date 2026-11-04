@@ -21,7 +21,7 @@ test('chat APIs enforce authenticated UUID/org and never grant workbook access t
   then:(resolve:(v:unknown)=>unknown)=>Promise.resolve({data:[{id:'only-own-message'}],error:null}).then(resolve),single:async()=>({data:{excel_status:'review'},error:null})};
  try{
   db.from=(()=>builder) as unknown as typeof db.from;
-  db.rpc=(async(_fn:string,args:Record<string,unknown>)=>{if(_fn==='submit_report'){saved=args;return {data:{id,duplicate:false},error:null};}return {data:[],error:null};}) as unknown as typeof db.rpc;
+  db.rpc=(async(_fn:string,args:Record<string,unknown>)=>{if(_fn==='allow_report_link_attempt')return {data:true,error:null};if(_fn==='submit_report'){saved=args;return {data:{id,duplicate:false},error:null};}return {data:[],error:null};}) as unknown as typeof db.rpc;
   const response=await GET(new NextRequest('http://localhost/api/driver-reports',{headers:{cookie:cookie()}}));assert.equal(response.status,200);assert.equal(predicates.driver_id,id);assert.equal(predicates.org_id,'vip_limousine_korea');assert.match(response.headers.get('cache-control')||'',/no-store/);
   const wrongThread=await POST(new NextRequest('http://localhost/api/driver-reports',{method:'POST',headers:{cookie:cookie(),'content-type':'application/json'},body:JSON.stringify({message:'다른 대화방',requestKey:other,driverId:other})}));assert.equal(wrongThread.status,403);
   const submitted=await POST(new NextRequest('http://localhost/api/driver-reports',{method:'POST',headers:{cookie:cookie(),'content-type':'application/json'},body:JSON.stringify({message:'未확정 보고',requestKey:other,org_id:'forged-org'})}));

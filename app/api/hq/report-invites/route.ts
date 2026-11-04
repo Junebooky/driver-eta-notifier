@@ -7,6 +7,7 @@ export async function GET(req:NextRequest){
  const auth=await requireHqAdmin(req);if(!auth.ok||!auth.session)return privateJson({ok:false},auth.statusCode);
  try{
   const id=req.nextUrl.searchParams.get('driverId');if(!id||!UUID.test(id))throw new Error('기사 UUID를 확인해 주세요.');
+  const scope=await db.rpc('report_driver_scope',{p_org:auth.session.org,p_driver:id});if(scope.error||scope.data!==true)return privateJson({ok:false,error:'기사 연결을 확인해 주세요.'},404);
   const active=await db.rpc('report_driver_active',{p_org:auth.session.org,p_driver:id});
   const d=await db.from('report_driver_devices').select('id,label,created_at,last_seen_at,expires_at,absolute_expires_at,revoked_at').eq('org_id',auth.session.org).eq('driver_id',id).order('created_at',{ascending:false}).limit(50);
   const i=await db.from('report_driver_invites').select('id,created_at,expires_at,used_at,revoked_at').eq('org_id',auth.session.org).eq('driver_id',id).order('created_at',{ascending:false}).limit(10);
@@ -20,6 +21,7 @@ export async function POST(req:NextRequest){
  if(!sameOrigin(req))return privateJson({ok:false},403);
  try{
   const b=JSON.parse(new TextDecoder().decode(await boundedBody(req,2048))),s=auth.session;if(!UUID.test(b.driverId||''))throw new Error('실제 기사 UUID를 선택해 주세요.');
+  const scope=await db.rpc('report_driver_scope',{p_org:s.org,p_driver:b.driverId});if(scope.error||scope.data!==true)return privateJson({ok:false,error:'기사 연결을 확인해 주세요.'},404);
   if(b.action==='revoke'){
    if(b.deviceId&&!UUID.test(b.deviceId))throw new Error('기기를 확인해 주세요.');
    const r=await db.rpc('revoke_report_devices',{p_org:s.org,p_driver:b.driverId,p_actor:s.userId,p_device:b.deviceId||null});if(r.error)throw new Error('철회하지 못했습니다.');return privateJson({ok:true});

@@ -8,6 +8,8 @@ export interface ClientSessionInfo {
   authenticated: boolean;
   role?: 'hq_admin' | 'driver';
   isRepresentative?: boolean;
+  reportDevice?:boolean;
+  driverId?:string;
   userId?: string;
   driverName?: string;
   vehicleNo?: string;
@@ -57,6 +59,8 @@ export async function ensureClientAuth(
         sessionCache = {
           authenticated: true,
           role: data.session.role,
+          reportDevice:data.session.reportDevice===true,
+          driverId:data.session.driverId,
           isRepresentative: data.session.isRepresentative === true,
           userId: data.session.userId,
           driverName: data.session.driverName,

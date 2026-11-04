@@ -22,6 +22,13 @@ export async function verifyReportCompletion(c:Client,url:string){
  const inactive=newDeviceSecret();await call(c,'issue_report_invite',['vip_limousine_korea',driver,actor,tokenHash(inactive)]);await c.query("UPDATE cockpit.drivers SET driver_meta='{\"status\":\"inactive\"}' WHERE id=$1",[driver]);assert.equal(await call(c,'redeem_report_invite',[tokenHash(inactive),tokenHash(newDeviceSecret()),'phone']),null);
  await assert.rejects(call(c,'issue_report_invite',['other-org',driver,actor,tokenHash(newDeviceSecret())]),{code:'42501'});
  }finally{await a.end();await b.end();}
+ await c.query('CREATE SCHEMA IF NOT EXISTS auth;CREATE TABLE IF NOT EXISTS auth.users(id uuid PRIMARY KEY,raw_app_meta_data jsonb)');
+ await c.query("UPDATE cockpit.drivers SET driver_meta='{\"status\":\"active\"}' WHERE id=$1",[driver]);
+ const authUser=randomUUID();await c.query('INSERT INTO auth.users VALUES($1,$2)',[authUser,{driver_id:driver,org:'vip_limousine_korea',cockpit_role:'driver'}]);
+ const bound=newDeviceSecret(),boundDevice=newDeviceSecret();await call(c,'issue_report_invite',['vip_limousine_korea',driver,actor,tokenHash(bound)]);assert.ok(await call(c,'redeem_report_invite',[tokenHash(bound),tokenHash(boundDevice),'bound']));
+ await c.query("UPDATE auth.users SET raw_app_meta_data=raw_app_meta_data||'{\"disabled\":true}' WHERE id=$1",[authUser]);assert.equal(await call(c,'verify_report_device',[tokenHash(boundDevice)]),null);
+ await c.query('DELETE FROM auth.users WHERE id=$1',[authUser]);assert.equal(await call(c,'verify_report_device',[tokenHash(boundDevice)]),null);
+ const budget=tokenHash(newDeviceSecret());for(let i=0;i<60;i++)assert.equal(await call(c,'allow_report_link_attempt',[budget]),true);assert.equal(await call(c,'allow_report_link_attempt',[budget]),false);
  console.log('PASS device auth: single-use concurrent redemption, existing master UUID, isolated role, revoke, expired and inactive links');
  const org='completion_'+randomUUID(),source=kakaoWorkbookFixture();await call(c,'register_report_ledger',[org,2026,actor,'company2026.xlsx',storage(source)]);
  const raw=(i:number)=>`4월 5일\n수행담당 : 기사${i}\n차량번호 : 700호 1458\n고객명 : 거래처${i}\n시작 시간 : 10:00\n종료 시간 : 24:00\n운행일지\n서울 → 인천 → 서울`;

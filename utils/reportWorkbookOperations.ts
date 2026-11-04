@@ -38,7 +38,7 @@ export function addApprovedMonth(bytes:Uint8Array,sourceMonth:string,targetMonth
  const entries=unzipSync(bytes),sourcePath=pathFor(entries,sourceMonth);let sheet=strFromU8(entries[sourcePath]);
  // Drawings/comments contain old report data and are not portable template content.
  sheet=sheet.replace(/<(?:legacyDrawing|drawing|hyperlinks|extLst)\b[^>]*(?:\/>|>[\s\S]*?<\/(?:legacyDrawing|drawing|hyperlinks|extLst)>)/g,'');
- const parsed=doc(sheet);for(const f of Array.from(parsed.getElementsByTagName('f')))if((f.textContent||'').includes('!')||['shared','array'].includes(f.getAttribute('t')||''))throw new Error('다른 시트를 참조하는 수식이 있습니다. 승인된 독립 양식을 준비해 주세요.');
+ const parsed=doc(sheet);for(const node of Array.from(parsed.getElementsByTagName('*')))if(node.hasAttribute('r:id')&&node.tagName!=='pageSetup')throw new Error('이 양식의 외부 연결을 먼저 확인해 주세요.');for(const f of Array.from(parsed.getElementsByTagName('f')))if((f.textContent||'').includes('!')||['shared','array'].includes(f.getAttribute('t')||''))throw new Error('다른 시트를 참조하는 수식이 있습니다. 승인된 독립 양식을 준비해 주세요.');
  sheet=sheet.replace(/<c\b([^>]*\br="([A-Z]+)(\d+)"[^>]*)(?:\/>|>([\s\S]*?)<\/c>)/g,(all,attrs,col,r,body='')=>{
   if(Number(r)===1)return all;
   const style=attrs.match(/\bs="\d+"/)?.[0]||'';

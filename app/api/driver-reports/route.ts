@@ -1,3 +1,4 @@
+import {tokenHash} from '@/lib/driverDevices/tokens';
 import {NextRequest} from 'next/server';
 import {verifyServerAuth} from '@/lib/auth/serverAuth';
 import {supabaseAdmin as db} from '@/lib/supabase/server';
@@ -22,6 +23,9 @@ export async function POST(req:NextRequest) {
   if(!auth.ok||!auth.session?.driverId)return privateJson({ok:false,error:'기사 로그인이 필요합니다.'},auth.ok?403:auth.statusCode);
   if(!sameOrigin(req))return privateJson({ok:false,error:'허용되지 않은 요청입니다.'},403);
   try {
+    const rate=await db.rpc('allow_report_link_attempt',{p_bucket:tokenHash('report-submit:'+auth.session.org+':'+auth.session.driverId)});
+    if(rate.error)return privateJson({ok:false,error:'요청 보호 상태를 확인하지 못했습니다.'},503);
+    if(rate.data!==true)return privateJson({ok:false,error:'요청이 많습니다. 잠시 후 다시 보내 주세요.'},429);
     const body=JSON.parse(new TextDecoder().decode(await boundedBody(req,90000)));
     if(body.driverId&&body.driverId!==auth.session.driverId)return privateJson({ok:false,error:'기사 계정이 변경되었습니다. 대화방을 다시 열어 주세요.'},403);
     if(typeof body.message!=='string'||!body.message.trim()||body.message.length>20000||!UUID.test(body.requestKey||''))throw new Error('운행보고와 전송 번호를 확인해 주세요.');

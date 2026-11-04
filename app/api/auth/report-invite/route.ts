@@ -6,7 +6,7 @@ export async function POST(req:NextRequest){
  if(!sameOrigin(req))return privateJson({ok:false,error:'허용되지 않은 요청입니다.'},403);
  try{
   const b=JSON.parse(new TextDecoder().decode(await boundedBody(req,2048)));if(!validSecret(b.token))return privateJson({ok:false,error:'링크를 확인해 주세요.'},400);
-  const rate=await db.rpc('consume_auth_login_attempt',{p_keys:['ip:'+tokenHash('report-invite:'+String(req.headers.get('x-forwarded-for')||'unknown'))]});
+  const rate=await db.rpc('allow_report_link_attempt',{p_bucket:tokenHash('report-invite:'+String(req.headers.get('x-forwarded-for')||'unknown'))});
   if(rate.error||rate.data!==true)return privateJson({ok:false,error:'잠시 후 다시 시도해 주세요.'},429);
   const previous=req.cookies.get('cockpit_session')?.value;
   const old=previous?.startsWith(devicePrefix)?previous.slice(devicePrefix.length):null;

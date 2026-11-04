@@ -88,7 +88,7 @@ LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path=pg_catalog,cockpit AS $
 DECLARE amount integer:=0;denied boolean:=false;
 BEGIN
  IF to_regclass('auth.users') IS NOT NULL THEN
- EXECUTE 'SELECT count(*),coalesce(bool_or(coalesce((raw_app_meta_data->>''disabled'')::boolean,false) OR raw_app_meta_data->>''cockpit_role'' IS DISTINCT FROM ''driver''),false) FROM auth.users WHERE raw_app_meta_data->>''driver_id''=$1' INTO amount,denied USING p_driver::text;
+ EXECUTE 'SELECT count(*),coalesce(bool_or(coalesce((raw_app_meta_data->>''disabled'')::boolean,false) OR raw_app_meta_data->>''cockpit_role'' IS DISTINCT FROM ''driver'' OR raw_app_meta_data->>''org'' IS DISTINCT FROM ''vip_limousine_korea''),false) FROM auth.users WHERE raw_app_meta_data->>''driver_id''=$1' INTO amount,denied USING p_driver::text;
  END IF;
  RETURN jsonb_build_object('count',amount,'allowed',amount<=1 AND NOT denied);
 END $$;
@@ -112,3 +112,25 @@ DROP TRIGGER IF EXISTS report_device_auth_binding ON cockpit.report_driver_devic
 CREATE TRIGGER report_device_auth_binding BEFORE INSERT ON cockpit.report_driver_devices FOR EACH ROW EXECUTE FUNCTION cockpit.remember_report_auth_link();
 REVOKE ALL ON FUNCTION cockpit.report_auth_link_state(uuid),cockpit.remember_report_auth_link() FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION cockpit.report_auth_link_state(uuid) TO service_role;
+CREATE TABLE IF NOT EXISTS cockpit.report_link_attempts(bucket text PRIMARY KEY CHECK(length(bucket)=64),hits integer NOT NULL,window_start timestamptz NOT NULL);
+ALTER TABLE cockpit.report_link_attempts ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON cockpit.report_link_attempts FROM PUBLIC,anon,authenticated;
+GRANT ALL ON cockpit.report_link_attempts TO service_role;
+CREATE OR REPLACE FUNCTION cockpit.allow_report_link_attempt(p_bucket text) RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,cockpit AS $$
+DECLARE amount integer;
+BEGIN
+ DELETE FROM cockpit.report_link_attempts WHERE window_start<now()-interval '1 day';
+ INSERT INTO cockpit.report_link_attempts VALUES(p_bucket,1,now()) ON CONFLICT(bucket) DO UPDATE SET
+ hits=CASE WHEN report_link_attempts.window_start<now()-interval '1 minute' THEN 1 ELSE report_link_attempts.hits+1 END,
+ window_start=CASE WHEN report_link_attempts.window_start<now()-interval '1 minute' THEN now() ELSE report_link_attempts.window_start END RETURNING hits INTO amount;
+ RETURN amount<=60;
+END $$;
+REVOKE ALL ON FUNCTION cockpit.allow_report_link_attempt(text) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION cockpit.allow_report_link_attempt(text) TO service_role;
+CREATE OR REPLACE FUNCTION cockpit.report_driver_scope(p_org text,p_driver uuid) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog,cockpit AS $$
+ SELECT EXISTS(SELECT 1 FROM cockpit.drivers d WHERE id=p_driver AND coalesce(to_jsonb(d)->>'organization_id',d.driver_meta->>'organization_id','vip_limousine_korea')=p_org)
+$$;
+REVOKE ALL ON FUNCTION cockpit.report_driver_scope(text,uuid) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION cockpit.report_driver_scope(text,uuid) TO service_role;
