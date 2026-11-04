@@ -34,6 +34,7 @@ function reportDate(raw:string|number,year:number,date1904:boolean):string|null{
   return Number.isFinite(date.getTime())?isoDate(date.getUTCFullYear(),date.getUTCMonth()+1,date.getUTCDate()):null;
  }
  const text=String(raw||'').trim();
+ if(/[~～]/.test(text))return null; // Date ranges cannot be placed on a single day.
  let m=text.match(/^(\d{4})\s*(?:년|[-./])\s*(\d{1,2})\s*(?:월|[-./])\s*(\d{1,2})(?:일)?(?!\d)/);
  if(m)return isoDate(Number(m[1]),Number(m[2]),Number(m[3]));
  m=text.match(/^(\d{1,2})\s*(?:월|[-./])\s*(\d{1,2})(?:일)?(?!\d)/);
