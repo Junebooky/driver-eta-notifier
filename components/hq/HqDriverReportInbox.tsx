@@ -1,6 +1,6 @@
 'use client';
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {Upload,Download,RefreshCw,ArrowRight,Check,Search} from 'lucide-react';
+import {Upload,Download,RefreshCw,ChevronRight,Check,Search} from 'lucide-react';
 import {HqExcelSectionIcon} from './HqExcelSectionIcon';
 import {HqExcelWorkbookView,type ReportExcelFocus} from './HqExcelWorkbookView';
 import type {DriverReportSubmission,ReportChatMessage} from '@/types/driverReportChat';
@@ -115,7 +115,7 @@ export function HqDriverReportInbox() {
      className="h-10 w-full min-w-0 rounded-xl border border-slate-200/90 bg-white pl-9 pr-3 text-[13px] text-slate-800 placeholder:text-slate-400 outline-none transition-all hover:border-slate-300 focus:border-[#1E60F3] focus:ring-2 focus:ring-[#1E60F3]/10"/>
    </div>
   </div>
-  <div className="space-y-2">
+  <div className="space-y-2.5">
    {reports.filter(s=>reportMatchesFilter(s.excel_status,filter)&&(!search||[s.parsed.draft.driver,s.parsed.draft.customer,s.parsed.draft.plate,s.parsed.draft.date].some(v=>v.includes(search)))).map(report=>{
     const title = (report.parsed.draft.driver && report.parsed.draft.plate)
       ? `${report.parsed.draft.driver} · ${report.parsed.draft.plate}`
@@ -124,45 +124,47 @@ export function HqDriverReportInbox() {
       ? `${report.parsed.draft.date} · ${report.parsed.draft.customer}`
       : [report.parsed.draft.date, report.parsed.draft.customer].filter(Boolean).join(' · ') || '기사 및 거래처 정보 미확인';
     return <div key={report.id} className="min-w-0">
-    <div className={'flex w-full items-center gap-2.5 sm:gap-3 rounded-2xl border p-3.5 sm:p-4 text-left transition-colors duration-150 hover:bg-[#F7F9FC] '+(selected?.id===report.id&&isExpanded?'border-[#CBDCFB] bg-[#FAFCFF]':'border-[#E9EDF4] bg-white')}>
+    <div className={'flex w-full items-center gap-3 sm:gap-4 rounded-[20px] border px-5 py-4 sm:px-6 sm:py-[18px] text-left transition-all duration-200 '+(selected?.id===report.id&&isExpanded?'border-[#C8DAFA] bg-[linear-gradient(110deg,#FFFFFF_45%,#F2F7FF_100%)] shadow-[0_6px_24px_rgba(30,96,243,0.08)]':'border-[#EDF1F7] bg-[linear-gradient(110deg,#FFFFFF_52%,#F6F9FF_100%)] shadow-[0_4px_20px_rgba(15,23,42,0.035)] hover:border-[#DCE5F2] hover:shadow-[0_6px_24px_rgba(15,23,42,0.06)]')}>
      <button type="button" aria-expanded={selected?.id===report.id&&isExpanded} aria-controls={'report-details-'+report.id}
       onClick={()=>void detail(report)} className="min-w-0 flex-1 text-left focus:outline-none cursor-pointer">
-      <p className="text-sm font-semibold text-[#465775]">{title}</p>
-      <p className="mt-1 truncate text-xs text-[#8B97A8]">{subtitle}</p>
+      <p className="text-[15px] sm:text-[15.5px] font-bold tracking-[-0.02em] text-[#222E42] leading-snug">{title}</p>
+      <p className="mt-1 truncate text-[13px] font-normal tracking-[-0.01em] text-[#7A8699] leading-snug">{subtitle}</p>
      </button>
 
-     {/* 위치 찾기 3D 아이콘 (반영 완료 바로 왼쪽) */}
-     {report.excel_status==='applied'&&report.excel_sheet_name&&report.excel_row_number&&(
-      <div className="relative group/pos inline-flex items-center justify-center shrink-0">
-       <button
-        type="button"
-        onClick={(e)=>{e.stopPropagation(); viewExcelLocation(report);}}
-        className="cursor-pointer transition-transform duration-150 group-hover/pos:scale-110 active:scale-95 flex items-center justify-center p-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/30 rounded-lg"
-        aria-label="해당 시트를 찾아드려요!"
-        title="해당 시트를 찾아드려요!"
-       >
-        <img
-         src="/images/icons/excel/icon_position.png"
-         alt="해당 시트를 찾아드려요!"
-         className="w-7 h-7 sm:w-8 sm:h-8 object-contain drop-shadow-2xs select-none"
-         draggable={false}
-        />
-       </button>
+     <div className="flex shrink-0 items-center gap-3 sm:gap-3.5">
+      {/* 위치 찾기 3D 아이콘 (반영 완료 바로 왼쪽) */}
+      {report.excel_status==='applied'&&report.excel_sheet_name&&report.excel_row_number&&(
+       <div className="relative group/pos inline-flex items-center justify-center shrink-0">
+        <button
+         type="button"
+         onClick={(e)=>{e.stopPropagation(); viewExcelLocation(report);}}
+         className="cursor-pointer transition-transform duration-150 group-hover/pos:scale-110 active:scale-95 flex items-center justify-center p-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/30 rounded-lg"
+         aria-label="해당 시트를 찾아드려요!"
+         title="해당 시트를 찾아드려요!"
+        >
+         <img
+          src="/images/icons/excel/icon_position.png"
+          alt="해당 시트를 찾아드려요!"
+          className="w-8 h-8 sm:w-9 sm:h-9 object-contain select-none"
+          draggable={false}
+         />
+        </button>
 
-       {/* Hover Tooltip (위로 향하는 말풍선 규격) */}
-       <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/pos:flex flex-col items-center pointer-events-none z-[100]">
-        <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
-         해당 시트를 찾아드려요!
-        </span>
-        <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 shadow-xs"/>
+        {/* Hover Tooltip (위로 향하는 말풍선 규격) */}
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/pos:flex flex-col items-center pointer-events-none z-[100]">
+         <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+          해당 시트를 찾아드려요!
+         </span>
+         <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 shadow-xs"/>
+        </div>
        </div>
-      </div>
-     )}
+      )}
 
-     <span className={'shrink-0 rounded-full px-3 py-1 text-xs font-medium '+(report.excel_status==='applied'?'bg-[#EAF0FE] text-[#1E60F3]':'bg-[#F2F4F6] text-[#6D7B90]')}>{reportDisplayStatus(report.excel_status)}</span>
-     <button type="button" aria-label="상세 내용 토글" onClick={()=>void detail(report)} className="shrink-0 p-1 text-[#B4BFCC] hover:text-slate-600 cursor-pointer focus:outline-none">
-      <ArrowRight size={15} className={'transition-transform duration-200 '+(selected?.id===report.id&&isExpanded?'rotate-90':'')}/>
-     </button>
+      <span className={'shrink-0 rounded-full px-3.5 py-1.5 text-[12.5px] font-semibold tracking-[-0.01em] '+(report.excel_status==='applied'?'bg-[#E8F0FE] text-[#2463EB]':'bg-[#F2F4F7] text-[#667085]')}>{reportDisplayStatus(report.excel_status)}</span>
+      <button type="button" aria-label="상세 내용 토글" onClick={()=>void detail(report)} className="shrink-0 p-0.5 text-[#8E9BAA] hover:text-[#475569] transition-colors cursor-pointer focus:outline-none">
+       <ChevronRight size={17} strokeWidth={2} className={'transition-transform duration-200 '+(selected?.id===report.id&&isExpanded?'rotate-90':'')}/>
+      </button>
+     </div>
     </div>
     <div id={'report-details-'+report.id} aria-hidden={!(selected?.id===report.id&&isExpanded)}
       className={'grid transition-[grid-template-rows,opacity] duration-300 ease-in-out '+(selected?.id===report.id&&isExpanded?'grid-rows-[1fr] opacity-100':'grid-rows-[0fr] opacity-0')}>
