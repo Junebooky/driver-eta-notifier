@@ -120,8 +120,8 @@ export function SharedReportPage(){
     <textarea ref={input} aria-label="메시지 입력" value={draft} disabled={!token||busy||!reportActive||!serviceType}
      onChange={e=>{setDraft(e.target.value);pending.current=null;}}
      onKeyDown={e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();void send();}}}
-     rows={1} maxLength={20000} placeholder={reportActive?"메시지 입력":"다음 보고는 + 버튼으로 시작해 주세요"}
-     className="max-h-44 min-h-11 min-w-0 flex-1 resize-none rounded-[10px] border border-[#E2E4E6] bg-white px-3 py-2.5 text-[16px] leading-[1.5] outline-none placeholder:text-[#A4ABB1] focus:border-[#B9C1C7] disabled:bg-[#F7F8F9]"/>
+     rows={1} maxLength={20000} placeholder={reportActive?"메시지 입력":"다음 보고는 + 버튼을 눌러주세요"}
+     className="max-h-44 min-h-11 min-w-0 flex-1 resize-none rounded-[10px] border border-[#E2E4E6] bg-white px-3 py-2.5 text-[16px] leading-[1.5] outline-none placeholder:text-[#A4ABB1] placeholder:text-[12px] placeholder:whitespace-nowrap sm:placeholder:text-[14px] focus:border-[#B9C1C7] disabled:bg-[#F7F8F9]"/>
     <button type="button" aria-label="메시지 보내기" disabled={!token||!reportActive||!serviceType||!draft.trim()||busy} onClick={()=>void send()} className="mb-0.5 flex h-9 shrink-0 items-center justify-center rounded-[7px] bg-[#FEE500] px-3.5 text-[13px] font-semibold text-[#3B3C35] disabled:bg-[#F2F2F2] disabled:text-[#B4B9BC]">전송</button>
    </div>
   </footer>
