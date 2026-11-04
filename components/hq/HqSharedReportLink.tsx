@@ -90,19 +90,9 @@ export function HqSharedReportLink(){
  return <section aria-label="공용 운행 링크 관리" className="w-full min-w-0">
   <div className="flex flex-wrap items-center justify-between gap-2.5">
    <button type="button" aria-expanded={expanded} aria-controls="hq-shared-link-details" onClick={()=>setExpanded(value=>!value)}
-    className="group inline-flex h-9 items-center gap-2 rounded-full border border-slate-200/90 bg-white px-3.5 text-[13px] font-semibold text-slate-700 shadow-2xs transition-all hover:bg-slate-50 hover:border-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/30">
-    <span className="text-[13px]">🔗</span>
+    className="group inline-flex h-9 items-center gap-2 rounded-full border border-slate-200/90 bg-white pl-2.5 pr-3 text-[13px] font-semibold text-slate-700 shadow-2xs transition-all hover:bg-slate-50 hover:border-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/30">
+    <img src="/images/icons/excel/icon_link.png" alt="" className="h-4 w-4 shrink-0 object-contain select-none" draggable={false}/>
     <span>공용 운행 링크 관리</span>
-    {state?.active ? (
-     <span className="inline-flex items-center gap-1 pl-1 text-[11px] font-medium text-emerald-600">
-      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"/>
-      사용 가능
-     </span>
-    ) : (
-     <span className="inline-flex items-center gap-1 pl-1 text-[11px] font-medium text-slate-400">
-      미발급
-     </span>
-    )}
     <span className="text-slate-400 transition-transform duration-150 group-hover:text-slate-600">
      {expanded?<ChevronUp size={14}/>:<ChevronDown size={14}/>}
     </span>
@@ -119,9 +109,14 @@ export function HqSharedReportLink(){
 
   {expanded&&<div id="hq-shared-link-details" className="mt-3 space-y-4 rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs">
    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
-    <div>
-     <h3 className="text-[15px] font-bold text-slate-800">공용 운행 링크</h3>
-     <p className="mt-0.5 text-xs text-slate-500">기사 계정 없이 링크만 열면 보고를 제출할 수 있어요.</p>
+    <div className="flex items-center gap-2.5">
+     <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50/80 border border-blue-100/80 p-1">
+      <img src="/images/icons/excel/icon_link.png" alt="" draggable={false} className="h-full w-full object-contain select-none"/>
+     </div>
+     <div>
+      <h3 className="text-[14px] font-bold text-slate-800">공용 운행 링크</h3>
+      <p className="mt-0.5 text-xs text-slate-500">기사 계정 없이 링크만 열면 보고를 제출할 수 있어요.</p>
+     </div>
     </div>
     <div className="flex items-center gap-2">
      <button type="button" disabled={locked} onClick={()=>void act('issue')}
@@ -131,23 +126,32 @@ export function HqSharedReportLink(){
     </div>
    </div>
 
-   <p className="text-xs text-slate-500" role="status">
-    <span className="mr-2 font-medium text-slate-400">상태</span>
-    <span className="font-semibold text-slate-700">{state?(state.active?'사용 가능':'미발급 또는 만료'):'확인 중'}</span>
-    {state?.active&&state.expiresAt&&<span className="ml-2">· 만료 {formatExpiry(state.expiresAt)}</span>}
-   </p>
+   {state?.active&&state.expiresAt&&(
+    <p className="text-xs text-slate-500" role="status">
+     <span className="font-medium text-slate-400">만료 예정</span>
+     <span className="ml-2 font-semibold text-slate-700">{formatExpiry(state.expiresAt)}</span>
+    </p>
+   )}
 
    {link&&<div className="space-y-3 rounded-xl bg-slate-50 p-3.5">
     <div className="flex items-center justify-between gap-2">
-     <span className="text-xs font-semibold text-slate-700">발급된 링크</span>
+     <div className="flex items-center gap-1.5">
+      <img src="/images/icons/excel/icon_link.png" alt="" draggable={false} className="h-4 w-4 object-contain select-none"/>
+      <span className="text-xs font-semibold text-slate-700">발급된 링크</span>
+     </div>
      <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-medium text-[#1E60F3]">
       <ShieldCheck size={13}/>보안 링크
      </span>
     </div>
     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-     <input id="hq-shared-report-link" aria-label="발급된 운행보고 주소" readOnly value={link}
-      onFocus={event=>event.currentTarget.select()}
-      className="h-10 flex-1 min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-700 outline-none focus:border-[#1E60F3]"/>
+     <div className="flex flex-1 items-center gap-2 min-w-0">
+      <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200/90 bg-white p-1.5 shadow-2xs">
+       <img src="/images/icons/excel/icon_link.png" alt="링크" draggable={false} className="h-full w-full object-contain select-none"/>
+      </div>
+      <input id="hq-shared-report-link" aria-label="발급된 운행보고 주소" readOnly value={link}
+       onFocus={event=>event.currentTarget.select()}
+       className="h-10 flex-1 min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-700 outline-none focus:border-[#1E60F3]"/>
+     </div>
      <button type="button" onClick={()=>void copy()}
       className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-white border border-slate-200 px-3.5 text-xs font-semibold text-[#1E60F3] shadow-2xs hover:bg-slate-50">
       <Copy size={14}/>링크 복사

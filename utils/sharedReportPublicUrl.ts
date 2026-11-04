@@ -1,6 +1,6 @@
 /** The publicly reachable Vercel report entry point. Do not use window.location.origin:
  * HQ often runs on localhost or a preview with authentication protection. */
-export const DEFAULT_SHARED_REPORT_ORIGIN='https://driver-eta-notifier-report-junebookys-projects.vercel.app';
+export const DEFAULT_SHARED_REPORT_ORIGIN='https://driver-eta-notifier-git-feat-driver-4af899-junebookys-projects.vercel.app';
 
 export function sharedReportPublicUrl(path:string,configuredOrigin?:string):string{
  if(!/^\/report#key=[A-Za-z0-9_-]{43}$/.test(path))throw new Error('공용 보고 링크 주소 형식을 확인해 주세요.');
