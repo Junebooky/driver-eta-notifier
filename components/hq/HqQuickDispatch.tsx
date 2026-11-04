@@ -368,19 +368,8 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
   const timeDropdownListRef = useRef<HTMLDivElement>(null);
   const [endTime, setEndTime] = useState(() => initialBooking?.endTime || '');
 
-  // Automatically compute sensible effective end time if not explicitly provided
-  const effectiveEndTime = useMemo(() => {
-    if (endTime) return endTime;
-    if (initialBooking?.endTime) return initialBooking.endTime;
-    const [h, m] = (pickupTimeOnly || '09:00').split(':').map((v) => parseInt(v, 10));
-    if (isNaN(h)) return '18:00';
-    if (pickupEndDate && pickupDate && pickupEndDate > pickupDate) {
-      return pickupTimeOnly || '18:00';
-    }
-    const endHour = Math.min(23, h + 3);
-    const endMinute = isNaN(m) ? 0 : m;
-    return `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`;
-  }, [endTime, initialBooking?.endTime, pickupTimeOnly, pickupDate, pickupEndDate]);
+  // Never invent a trip end time: an HQ operator must set it before publishing.
+  const effectiveEndTime = endTime.trim();
 
   const excludeScheduleId = initialBooking?.scheduleId || initialBooking?.id;
   const fleet = useFleetAvailability(pickupDate, pickupTimeOnly, pickupEndDate || pickupDate, effectiveEndTime, excludeScheduleId);
@@ -906,6 +895,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
     }
 
     if (mode === 'published') {
+      if (!effectiveEndTime) {
+        setErrorMsg('배차 확정 전에 실제 예정 종료 시간을 입력해 주세요. 자동으로 추정하지 않습니다.');
+        return;
+      }
       if (totalLiveConflicts > 0) { setErrorMsg('선택 기간의 기사·차량 충돌을 먼저 해결해 주세요.'); return; }
       const error = validateDispatchInterval({ date: pickupDate, pickupTime: pickupTimeOnly, endDate: pickupEndDate || pickupDate, endTime: effectiveEndTime, dispatchStatus: mode });
       if (error) { setErrorMsg(error); return; }
@@ -922,10 +915,11 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
     const totalVehicles = allocations.length;
     const isMultiVehicleGroup = totalVehicles > 1;
     const sharedEventId = (isEditMode && initialBooking?.eventId) || `ev-${Date.now()}`;
-    const sharedGroupId = isMultiVehicleGroup
-      ? (isEditMode && initialBooking?.groupId ? initialBooking.groupId : `grp-${Date.now()}`)
-      : undefined;
-    const sharedGroupName = `${customerName.trim()} ${isMultiVehicleGroup ? `VIP 단체 의전 (${totalVehicles}대)` : 'VIP 의전'}`;
+    const sharedGroupId = isEditMode
+      ? initialBooking?.groupId
+      : isMultiVehicleGroup ? `grp-${Date.now()}` : undefined;
+    const sharedGroupName = (isEditMode && initialBooking?.eventName)
+      || `${customerName.trim()} ${isMultiVehicleGroup ? `VIP 단체 의전 (${totalVehicles}대)` : 'VIP 의전'}`;
 
     const isMultiDay = Boolean(pickupEndDate && pickupEndDate !== pickupDate);
     const dateRangeLabel = formatDateRangeDisplay(pickupDate, pickupEndDate);
@@ -987,10 +981,11 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
         billingTarget: 'end_brand',
         billingTargetName: `${customerName.trim()} 귀하`,
         groupId: sharedGroupId,
-        groupName: isMultiVehicleGroup ? sharedGroupName : undefined,
-        groupTotalVehicles: totalVehicles,
-        groupVehicleIndex: vehicleNum,
-        intakeSource: mode === 'unassigned' ? 'phone' : 'quick_dispatch',
+        groupName: isEditMode ? initialBooking?.groupName : isMultiVehicleGroup ? sharedGroupName : undefined,
+        groupTotalVehicles: isEditMode ? (initialBooking?.groupTotalVehicles || totalVehicles) : totalVehicles,
+        groupVehicleIndex: isEditMode ? (initialBooking?.groupVehicleIndex || vehicleNum) : vehicleNum,
+        // Keep the original email identity when an unassigned booking is later assigned on mobile.
+        intakeSource: isEditMode ? initialBooking?.intakeSource : mode === 'unassigned' ? 'phone' : 'quick_dispatch',
         vehicleNo: resolvedPlate || undefined,
         vehicleModel: resolvedModel || undefined,
         vehiclePlate: resolvedPlate || undefined,
@@ -1004,6 +999,13 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
         vehicleId: matchedVehicle?.uuid,
         origin: pickupLocation.trim(),
         destination: destination.trim(),
+        // Reuse only previously verified POI coordinates for unchanged email locations.
+        // Changing a place invalidates its old coordinates and requires re-verification.
+        originLat: isEditMode && pickupLocation.trim() === initialBooking?.pickupLocation.trim() ? initialBooking?.pickupLat : undefined,
+        originLng: isEditMode && pickupLocation.trim() === initialBooking?.pickupLocation.trim() ? initialBooking?.pickupLng : undefined,
+        destinationLat: isEditMode && destination.trim() === initialBooking?.destination.trim() ? initialBooking?.destinationLat : undefined,
+        destinationLng: isEditMode && destination.trim() === initialBooking?.destination.trim() ? initialBooking?.destinationLng : undefined,
+        placeVerified: isEditMode && pickupLocation.trim() === initialBooking?.pickupLocation.trim() && destination.trim() === initialBooking?.destination.trim() ? initialBooking?.placeVerified : false,
         passengerName: resolvedPassengerName,
         passengerPhone: resolvedPassengerPhone,
         passengerCount: Math.max(1, commonPassengerCount || 1),
@@ -1521,6 +1523,28 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                   })}
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Explicit end time — no silently inferred duration, including on mobile. */}
+          <div className="rounded-2xl border border-slate-200 bg-[#F8FAFC] p-3.5 sm:p-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+              <div>
+                <label htmlFor="hq-dispatch-end-time" className="block text-xs font-semibold text-slate-800">
+                  예정 종료 시간 <span className="font-normal text-slate-500">(배차 확정 시 필수)</span>
+                </label>
+                <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+                  종료 시간을 임의로 계산하지 않습니다. 예약만 등록할 때는 비워 두셔도 됩니다.
+                </p>
+              </div>
+              <input
+                id="hq-dispatch-end-time"
+                type="time"
+                value={endTime}
+                onChange={(event) => setEndTime(event.target.value)}
+                aria-label="예정 종료 시간 직접 입력"
+                className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-medium text-slate-800 outline-none focus:border-[#1E60F3] focus:ring-1 focus:ring-[#1E60F3]/20 sm:w-40"
+              />
             </div>
           </div>
 
