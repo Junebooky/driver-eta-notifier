@@ -1,6 +1,9 @@
-/** Wait only for the remaining visual typing time; the network request starts immediately. */
-export const typingTimeRemaining=(start:number,now:number,minimum=2000)=>Math.max(0,minimum-Math.max(0,now-start));
-export async function waitForChatTyping(start:number,now=()=>Date.now(),delay=(ms:number)=>new Promise<void>(resolve=>setTimeout(resolve,ms))){
- const rest=typingTimeRemaining(start,now());
- if(rest>0)await delay(rest);
+/** The bot reply must remain visually pending for a full two seconds AFTER the
+ * server acknowledges the report, regardless of request processing time.
+ * This only affects presentation: the server writes the report immediately. */
+export const BOT_REPLY_TYPING_MS=2000;
+export async function waitForChatTyping(
+ sleep:(ms:number)=>Promise<void>=(ms)=>new Promise<void>(resolve=>setTimeout(resolve,ms))
+):Promise<void>{
+ await sleep(BOT_REPLY_TYPING_MS);
 }
