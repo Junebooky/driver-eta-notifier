@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { OfficialPriceCard } from '@/types/officialPricingHq';
 import { haptics } from '@/utils/haptics';
+import { formatCapacity } from '@/utils/formatters';
 
 interface HqOfficialPricingViewProps {
   onOpenQuoteModal: (vehicleProductCode?: string) => void;
@@ -43,7 +44,7 @@ const CANONICAL_VEHICLES: PricingTableRow[] = [
     vehicleProductCode: 'benz_s560',
     vehicleProductLabel: '벤츠 S560',
     yearTrim: '2026년형',
-    seats: '최대 3인',
+    seats: '3인',
     imageUrl: '/images/vehicles/s560.webp',
     dailyMetroKrw: 800000,
     dailyRegionalKrw: 900000,
@@ -57,7 +58,7 @@ const CANONICAL_VEHICLES: PricingTableRow[] = [
     vehicleProductCode: 'genesis_g90_donghaeng',
     vehicleProductLabel: '제네시스 G90 리무진 롱휠',
     yearTrim: '2026년형',
-    seats: '최대 3인',
+    seats: '3인',
     imageUrl: '/images/vehicles/g90_lwb.webp',
     dailyMetroKrw: 800000,
     dailyRegionalKrw: 900000,
@@ -71,7 +72,7 @@ const CANONICAL_VEHICLES: PricingTableRow[] = [
     vehicleProductCode: 'genesis_g90_standard',
     vehicleProductLabel: '제네시스 G90 신차 최고급형',
     yearTrim: '2026년형',
-    seats: '최대 3인',
+    seats: '3인',
     imageUrl: '/images/vehicles/g90_black.webp',
     dailyMetroKrw: 550000,
     dailyRegionalKrw: 600000,
@@ -87,7 +88,7 @@ const CANONICAL_VEHICLES: PricingTableRow[] = [
     vehicleProductCode: 'genesis_gv80_new',
     vehicleProductLabel: '제네시스 GV80 신차',
     yearTrim: '2026년형',
-    seats: '최대 4인',
+    seats: '4인',
     imageUrl: '/images/vehicles/gv80.webp',
     dailyMetroKrw: 500000,
     dailyRegionalKrw: 550000,
@@ -117,7 +118,7 @@ const CANONICAL_VEHICLES: PricingTableRow[] = [
     vehicleProductCode: 'kia_carnival_hi_limo',
     vehicleProductLabel: '기아 카니발 하이리무진 최고급형',
     yearTrim: '2026년형',
-    seats: '최대 4~7인',
+    seats: '4~7인',
     imageUrl: '/images/vehicles/carnival_high.webp',
     dailyMetroKrw: 430000,
     dailyRegionalKrw: 480000,
@@ -133,7 +134,7 @@ const CANONICAL_VEHICLES: PricingTableRow[] = [
     vehicleProductCode: 'sprinter_319_new_6seat',
     vehicleProductLabel: '벤츠 스프린터 319 신차',
     yearTrim: '2026년형',
-    seats: '6인승',
+    seats: '6인',
     imageUrl: '/images/vehicles/sprinter_319.webp',
     dailyMetroKrw: 800000,
     dailyRegionalKrw: 900000,
@@ -203,7 +204,7 @@ const CANONICAL_VEHICLES: PricingTableRow[] = [
     vehicleProductCode: 'sprinter_519_premium',
     vehicleProductLabel: '벤츠 스프린터 519 최고급형',
     yearTrim: '2026년형',
-    seats: '최대 16인',
+    seats: '16인',
     imageUrl: '/images/vehicles/sprinter_519.webp',
     dailyMetroKrw: 800000,
     dailyRegionalKrw: 900000,
@@ -233,7 +234,7 @@ const CANONICAL_VEHICLES: PricingTableRow[] = [
     vehicleProductCode: 'bus_45',
     vehicleProductLabel: '버스',
     yearTrim: '2026년형',
-    seats: '45인승',
+    seats: '45인',
     imageUrl: '/images/vehicles/bus.webp',
     dailyMetroKrw: null,
     dailyRegionalKrw: null,
@@ -247,7 +248,7 @@ const CANONICAL_VEHICLES: PricingTableRow[] = [
     vehicleProductCode: 'bus_limo_28',
     vehicleProductLabel: '리무진 버스',
     yearTrim: '2026년형',
-    seats: '28인승',
+    seats: '28인',
     imageUrl: '/images/vehicles/bus.webp',
     dailyMetroKrw: null,
     dailyRegionalKrw: null,
@@ -261,7 +262,7 @@ const CANONICAL_VEHICLES: PricingTableRow[] = [
     vehicleProductCode: 'bus_premium_22',
     vehicleProductLabel: '프리미엄 럭셔리 리무진 버스',
     yearTrim: '2026년형',
-    seats: '22인승',
+    seats: '22인',
     imageUrl: '/images/vehicles/bus.webp',
     dailyMetroKrw: null,
     dailyRegionalKrw: null,
@@ -421,8 +422,8 @@ export const HqOfficialPricingView: React.FC<HqOfficialPricingViewProps> = ({
                 <th className="py-3.5 px-5 font-bold text-slate-800 text-left min-w-[240px]">
                   차량명
                 </th>
-                <th className="py-3.5 px-3 font-bold text-slate-800 text-center min-w-[80px]">
-                  좌석
+                <th className="py-3.5 px-3 font-bold text-slate-800 text-center min-w-[80px] whitespace-nowrap">
+                  탑승 정원
                 </th>
                 <th className="py-3.5 px-3 font-bold text-slate-800 text-center min-w-[110px]">
                   수도권 (9시간)
@@ -480,9 +481,9 @@ export const HqOfficialPricingView: React.FC<HqOfficialPricingViewProps> = ({
                     </div>
                   </td>
 
-                  {/* 2. 좌석 (탑승 인원 수로만 명확히 통일) */}
-                  <td className="py-3.5 px-3 text-center text-xs font-semibold text-slate-700 whitespace-nowrap">
-                    {item.seats}
+                  {/* 2. 탑승 정원 (토스/애플 스타일 간결한 [숫자]인 표준 규격) */}
+                  <td className="py-3.5 px-3 text-center text-xs text-slate-600 font-medium whitespace-nowrap">
+                    {formatCapacity(item.seats)}
                   </td>
 
                   {/* 3~6. 요금 4개 열 (버스는 하이픈 4번 대신 별도 상담 전화 아이콘 표시) */}

@@ -75,3 +75,26 @@ export function formatPhoneNumber(value: string): string {
   return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7, 11)}`;
 }
 
+/**
+ * Formats seating capacity to standard "[number]인" or "[range]인" format.
+ * Strips prefixes like "최대" and suffixes like "인승" to maintain a clean Toss/Apple style.
+ * E.g.
+ * - "최대 3인" -> "3인"
+ * - "최대 4~7인" -> "4~7인"
+ * - "6인승" -> "6인"
+ * - "최대 16인" -> "16인"
+ * - "45인승" -> "45인"
+ * - 4 -> "4인"
+ */
+export function formatCapacity(val?: string | number | null): string {
+  if (!val || val === '-') return '-';
+  let str = String(val).trim();
+  if (!str || str === '-') return '-';
+  str = str.replace(/^최대\s*/, '').replace(/인승$/, '인');
+  if (/\d/.test(str) && !str.endsWith('인')) {
+    str += '인';
+  }
+  return str;
+}
+
+

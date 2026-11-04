@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { formatPhoneNumber, sanitizePlaceName } from './formatters';
+import { formatPhoneNumber, sanitizePlaceName, formatCapacity } from './formatters';
 
 describe('formatPhoneNumber', () => {
   it('formats standard 11-digit mobile numbers with hyphens', () => {
@@ -58,3 +58,33 @@ describe('formatPhoneNumber', () => {
     assert.strictEqual(formatPhoneNumber('010abc6348def8726'), '010-6348-8726');
   });
 });
+
+describe('formatCapacity', () => {
+  it('standardizes various capacity inputs into [number]인 format', () => {
+    assert.strictEqual(formatCapacity('최대 3인'), '3인');
+    assert.strictEqual(formatCapacity('최대 4인'), '4인');
+    assert.strictEqual(formatCapacity('최대 4~7인'), '4~7인');
+    assert.strictEqual(formatCapacity('7~9인'), '7~9인');
+    assert.strictEqual(formatCapacity('6인승'), '6인');
+    assert.strictEqual(formatCapacity('15~16인'), '15~16인');
+    assert.strictEqual(formatCapacity('최대 16인'), '16인');
+    assert.strictEqual(formatCapacity('45인승'), '45인');
+    assert.strictEqual(formatCapacity('28인승'), '28인');
+    assert.strictEqual(formatCapacity('22인승'), '22인');
+  });
+
+  it('formats numeric and raw range values correctly', () => {
+    assert.strictEqual(formatCapacity(4), '4인');
+    assert.strictEqual(formatCapacity('4'), '4인');
+    assert.strictEqual(formatCapacity('4~7'), '4~7인');
+    assert.strictEqual(formatCapacity('최대 3인승'), '3인');
+  });
+
+  it('handles null, undefined, empty, and dash placeholders', () => {
+    assert.strictEqual(formatCapacity(''), '-');
+    assert.strictEqual(formatCapacity(null), '-');
+    assert.strictEqual(formatCapacity(undefined), '-');
+    assert.strictEqual(formatCapacity('-'), '-');
+  });
+});
+
