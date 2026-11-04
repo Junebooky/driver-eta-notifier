@@ -84,7 +84,7 @@ export function HqExcelWorkbookView({year,onCommitted}:{year:number;onCommitted:
          <button type="button" aria-label="저장" disabled={busy} onClick={()=>void save()} className="p-1.5 text-[#1E60F3]"><Save size={16}/></button>
          <button type="button" aria-label="취소" onClick={()=>setEdit(null)} className="p-1.5 text-[#8A97A9]"><X size={16}/></button>
         </div>:
-        <button type="button" disabled={busy||locked} title={locked?'수식은 편집할 수 없습니다.':'클릭하여 편집'}
+        <button type="button" disabled={busy||locked}
          onClick={()=>{setEdit({row:row.row,col,value});setError('');}}
          className="block min-h-9 w-full max-w-full whitespace-pre-wrap break-words px-3 py-2 text-left [overflow-wrap:anywhere] hover:bg-[#EAF1FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]" title={locked?'수식은 편집할 수 없습니다.':value}>{value||' '}</button>}
        </td>;
