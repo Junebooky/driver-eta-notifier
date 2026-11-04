@@ -738,8 +738,8 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
               </div>
             )}
 
-            {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 */}
-            <div className="absolute bottom-full left-0 mb-2 hidden group-hover/vehicles:flex flex-col items-start pointer-events-none z-50">
+            {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 (최상단 레이어) */}
+            <div className="absolute bottom-full left-0 mb-2 hidden group-hover/vehicles:flex flex-col items-start pointer-events-none z-[100]">
               <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
                 VIP 의전 세단·SUV·밴·스프린터의 실시간 배차 및 제원을 관리해요
               </span>

@@ -246,7 +246,7 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
       )}
 
       {/* Expenses List & Review Workspace Table */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl sm:rounded-3xl shadow-xs overflow-hidden p-5 sm:p-6 space-y-4">
+      <div className="bg-white border border-slate-200/80 rounded-2xl sm:rounded-3xl shadow-xs p-5 sm:p-6 space-y-4 relative z-20">
         {/* Card Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           {/* Left: Icon + Title + Count */}
@@ -258,8 +258,8 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
                 className="w-8 h-8 object-contain shrink-0 transition-transform duration-150 group-hover/expense:scale-110"
               />
 
-              {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 (아이콘 근접 시에만 노출) */}
-              <div className="absolute bottom-full left-0 mb-2 hidden group-hover/expense:flex flex-col items-start pointer-events-none z-50">
+              {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 (아이콘 근접 시에만 노출, 최상단 레이어) */}
+              <div className="absolute bottom-full left-0 mb-2 hidden group-hover/expense:flex flex-col items-start pointer-events-none z-[100]">
                 <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
                   기사님이 제출한 유류비·통행료 등 실비 영수증 목록이에요
                 </span>
@@ -292,8 +292,8 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
                 />
               </button>
 
-              {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 */}
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/csv:flex flex-col items-center pointer-events-none z-50">
+              {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 (최상단 레이어) */}
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/csv:flex flex-col items-center pointer-events-none z-[100]">
                 <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
                   경비 내역을 엑셀(CSV)로 내보내요
                 </span>

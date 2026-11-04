@@ -368,8 +368,8 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
 
   return (
     <div className="space-y-4 select-none">
-      {/* 1. Header Bar: Title + Rounded Utility Controls */}
-      <div className="flex items-start sm:items-center justify-between gap-3 pb-1 print:hidden">
+      {/* 1. Header Bar: Title + Rounded Utility Controls (Card Box) */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:px-5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-20 print:hidden">
         <div className="flex items-center gap-3">
           {/* 리포트 통계 아이콘 & 마우스 호버 툴팁 */}
           <div className="relative group/report inline-flex items-center justify-center cursor-pointer shrink-0">
@@ -387,8 +387,8 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
               <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
 
-            {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 */}
-            <div className="absolute bottom-full left-0 mb-2 hidden group-hover/report:flex flex-col items-start pointer-events-none z-50">
+            {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 (최상단 레이어) */}
+            <div className="absolute bottom-full left-0 mb-2 hidden group-hover/report:flex flex-col items-start pointer-events-none z-[100]">
               <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
                 고객사 정산과 기사 인건비, 배차별 직접이익을 종합 분석해요
               </span>
@@ -413,7 +413,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
               haptics.lightTap();
               showToast("정산 기간 필터: 전체 기간이 선택되어 있습니다.");
             }}
-            className="p-2 rounded-xl bg-white hover:bg-slate-50 text-slate-600 border border-slate-200/80 cursor-pointer shadow-2xs transition-colors"
+            className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/80 cursor-pointer shadow-2xs transition-colors"
             title="정산 기간 필터"
           >
             <Calendar className="w-4 h-4" />
@@ -426,7 +426,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                 e.stopPropagation();
                 setShowHeaderMenu(!showHeaderMenu);
               }}
-              className="p-2 rounded-xl bg-white hover:bg-slate-50 text-slate-600 border border-slate-200/80 cursor-pointer shadow-2xs transition-colors"
+              className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/80 cursor-pointer shadow-2xs transition-colors"
               title="설정 및 추가 옵션"
             >
               <MoreHorizontal className="w-4 h-4" />

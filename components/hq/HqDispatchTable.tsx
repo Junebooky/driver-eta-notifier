@@ -258,8 +258,8 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
               </div>
             )}
 
-            {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 */}
-            <div className="absolute bottom-full left-0 mb-2 hidden group-hover/dispatch:flex flex-col items-start pointer-events-none z-50">
+            {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 (최상단 레이어) */}
+            <div className="absolute bottom-full left-0 mb-2 hidden group-hover/dispatch:flex flex-col items-start pointer-events-none z-[100]">
               <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
                 실시간 예약 접수와 기사님 배정 일정을 관리해요
               </span>

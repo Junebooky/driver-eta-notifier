@@ -184,9 +184,9 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
+    <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm relative z-20">
       {/* Card Header: Icon + Title + Count */}
-      <div className="p-4 sm:px-6 border-b border-slate-100 flex items-center justify-between">
+      <div className="p-4 sm:px-6 border-b border-slate-100 flex items-center justify-between rounded-t-2xl">
         <div className="flex items-center gap-2.5">
           {/* 기사관리 아이콘 & 마우스 호버 툴팁 */}
           <div className="relative group/drivers inline-flex items-center justify-center cursor-pointer shrink-0">
@@ -203,8 +203,8 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
               </div>
             )}
 
-            {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 */}
-            <div className="absolute bottom-full left-0 mb-2 hidden group-hover/drivers:flex flex-col items-start pointer-events-none z-50">
+            {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 (최상단 레이어) */}
+            <div className="absolute bottom-full left-0 mb-2 hidden group-hover/drivers:flex flex-col items-start pointer-events-none z-[100]">
               <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
                 소속 및 프리랜서 기사님들의 프로필과 배차 자격을 관리해요
               </span>

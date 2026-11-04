@@ -410,8 +410,8 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                   className="w-12 h-12 object-contain transition-transform duration-150 group-hover/clients:scale-110"
                 />
 
-                {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 (아이콘 근접 시에만 노출) */}
-                <div className="absolute bottom-full left-0 mb-2 hidden group-hover/clients:flex flex-col items-start pointer-events-none z-50">
+                {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 (아이콘 근접 시에만 노출, 최상단 레이어) */}
+                <div className="absolute bottom-full left-0 mb-2 hidden group-hover/clients:flex flex-col items-start pointer-events-none z-[100]">
                   <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
                     주요 고객사의 계약 단가와 예약 이력을 관리해요
                   </span>

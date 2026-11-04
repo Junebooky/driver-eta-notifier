@@ -647,8 +647,8 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
                 <Activity className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
 
-              {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 */}
-              <div className="absolute bottom-full left-0 mb-2 hidden group-hover/operations:flex flex-col items-start pointer-events-none z-50">
+              {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 (최상단 레이어) */}
+              <div className="absolute bottom-full left-0 mb-2 hidden group-hover/operations:flex flex-col items-start pointer-events-none z-[100]">
                 <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
                   진행 중인 행사의 차량 위치와 운행 상태를 실시간으로 확인해요
                 </span>

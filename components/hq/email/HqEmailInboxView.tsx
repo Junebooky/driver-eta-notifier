@@ -752,7 +752,7 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
             />
 
             {/* Hover Tooltip: 위로 향하는 실제 네이버 이메일 강조 말풍선 */}
-            <div className="absolute bottom-full left-0 mb-2 hidden group-hover/naver:flex flex-col items-start pointer-events-none z-50">
+            <div className="absolute bottom-full left-0 mb-2 hidden group-hover/naver:flex flex-col items-start pointer-events-none z-[100]">
               <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150 flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#03C75A] inline-block animate-pulse" />
                 실제 네이버 이메일
@@ -795,9 +795,9 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
         {/* ========================================================= */}
         {/* Pinned Left Column: 이메일 목록                           */}
         {/* ========================================================= */}
-        <div className="w-full md:w-80 lg:w-[320px] xl:w-[340px] shrink-0 bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden flex flex-col min-h-[700px] md:sticky md:top-20">
+        <div className="w-full md:w-80 lg:w-[320px] xl:w-[340px] shrink-0 bg-white rounded-2xl border border-slate-200/80 shadow-xs flex flex-col min-h-[700px] md:sticky md:top-20 relative z-20">
           {/* Header Row */}
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white">
+          <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white rounded-t-2xl">
             <div className="relative group/email flex items-center gap-2 cursor-pointer">
               <img
                 src="/images/icons/eemail/icon_email.png"
@@ -811,8 +811,8 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                 {counts.total}
               </span>
 
-              {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 */}
-              <div className="absolute bottom-full left-0 mb-2 hidden group-hover/email:flex flex-col items-start pointer-events-none z-50">
+              {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 (최상단 레이어) */}
+              <div className="absolute bottom-full left-0 mb-2 hidden group-hover/email:flex flex-col items-start pointer-events-none z-[100]">
                 <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
                   실제 관리자님에게 온 이메일 목록이에요
                 </span>
@@ -904,7 +904,7 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
           </div>
 
           {/* Scrollable Email Cards List */}
-          <div className="divide-y divide-slate-100 overflow-y-auto max-h-[580px] flex-1">
+          <div className="divide-y divide-slate-100 overflow-y-auto max-h-[580px] flex-1 rounded-b-2xl">
             {isLoadingInbox ? (
               <div className="p-12 text-center text-slate-400 space-y-2">
                 <RefreshCw className="w-7 h-7 mx-auto animate-spin text-[#1E60F3]" />

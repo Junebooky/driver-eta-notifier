@@ -126,9 +126,9 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden flex flex-col">
+    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col relative z-20">
       {/* Table Header: Icon + Title + Count */}
-      <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+      <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between rounded-t-2xl">
         <div className="flex items-center gap-2">
           {/* 운행일지 아이콘 & 마우스 호버 툴팁 */}
           <div className="group/icon relative flex items-center cursor-help">
@@ -138,8 +138,8 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
               className="w-8 h-8 sm:w-9 sm:h-9 object-contain shrink-0 transition-transform duration-200 group-hover/icon:scale-110"
             />
 
-            {/* 마우스 호버 말풍선 Tooltip: 위로 향하는 블랙 말풍선 규격 */}
-            <div className="absolute left-0 bottom-full mb-2 hidden group-hover/icon:flex flex-col z-30 w-64 p-2.5 bg-slate-900/95 text-white rounded-xl shadow-xl backdrop-blur-xs pointer-events-none transition-all duration-200 animate-in fade-in zoom-in-95">
+            {/* 마우스 호버 말풍선 Tooltip: 위로 향하는 블랙 말풍선 규격 (최상단 레이어) */}
+            <div className="absolute left-0 bottom-full mb-2 hidden group-hover/icon:flex flex-col z-[100] w-64 p-2.5 bg-slate-900/95 text-white rounded-xl shadow-xl backdrop-blur-xs pointer-events-none transition-all duration-200 animate-in fade-in zoom-in-95">
               <div className="flex items-center gap-1.5 font-bold text-blue-300 text-[11px] mb-0.5">
                 <span>📋 운행일지 검수 · 승인</span>
               </div>
@@ -244,7 +244,7 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
       </div>
 
       {/* Table Container with Horizontal Scroll */}
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto rounded-b-2xl">
         <table className="w-full text-left border-collapse text-xs whitespace-nowrap">
           <thead>
             <tr className="bg-slate-50/75 border-b border-slate-100 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
