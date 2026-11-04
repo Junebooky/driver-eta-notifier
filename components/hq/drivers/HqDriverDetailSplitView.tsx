@@ -241,13 +241,26 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
         {/* ========================================================= */}
         {/* Column 1 (Left): Compact Driver List (w-[250px])           */}
         {/* ========================================================= */}
-        <div className="w-full lg:w-[250px] shrink-0 bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden flex flex-col h-[750px]">
+        <div className="w-full lg:w-[250px] shrink-0 bg-white rounded-2xl border border-slate-200/90 shadow-sm flex flex-col h-[750px]">
           {/* Header */}
-          <div className="p-3.5 border-b border-slate-100 flex items-center gap-2 bg-white">
-            <div className="w-7 h-7 rounded-lg bg-blue-50 text-[#1E60F3] flex items-center justify-center">
-              <Users className="w-4 h-4" />
+          <div className="p-3.5 border-b border-slate-100 flex items-center gap-2 bg-white rounded-t-2xl">
+            <div className="relative group/drivers inline-flex items-center gap-2 cursor-pointer">
+              <img
+                src="/images/icons/drivers/icon_driver.png"
+                alt="기사 목록"
+                className="w-12 h-12 object-contain shrink-0 transition-transform duration-150 group-hover/drivers:scale-110 drop-shadow-2xs select-none"
+                draggable={false}
+              />
+              <h2 className="text-sm font-black text-slate-900">기사 목록</h2>
+
+              {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 (최상단 레이어) */}
+              <div className="absolute bottom-full left-0 mb-2 hidden group-hover/drivers:flex flex-col items-start pointer-events-none z-[100]">
+                <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+                  소속 및 프리랜서 기사님들의 프로필과 배차 자격을 관리해요
+                </span>
+                <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 ml-4 shadow-xs" />
+              </div>
             </div>
-            <h2 className="text-sm font-black text-slate-900">기사 목록</h2>
           </div>
 
           {/* Filter Pills */}
@@ -256,8 +269,8 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
               type="button"
               onClick={() => setFilterAffiliation('all')}
               className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${filterAffiliation === 'all'
-                  ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 font-extrabold shadow-2xs'
-                  : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900'
+                ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 font-extrabold shadow-2xs'
+                : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900'
                 }`}
             >
               전체 {counts.total}
@@ -266,8 +279,8 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
               type="button"
               onClick={() => setFilterAffiliation('employed')}
               className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${filterAffiliation === 'employed'
-                  ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 font-extrabold shadow-2xs'
-                  : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900'
+                ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 font-extrabold shadow-2xs'
+                : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900'
                 }`}
             >
               소속 {counts.employed}
@@ -277,8 +290,8 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                 type="button"
                 onClick={() => setFilterAffiliation('freelance')}
                 className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${filterAffiliation === 'freelance'
-                    ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 font-extrabold shadow-2xs'
-                    : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900'
+                  ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 font-extrabold shadow-2xs'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900'
                   }`}
               >
                 프리랜서 {counts.freelance}
@@ -287,7 +300,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
           </div>
 
           {/* Driver List */}
-          <div className="divide-y divide-slate-100 overflow-y-auto flex-1">
+          <div className="divide-y divide-slate-100 overflow-y-auto flex-1 rounded-b-2xl">
             {filteredDrivers.map((driver) => {
               const isSelected = driver.id === activeDriver.id;
 
@@ -299,8 +312,8 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                     onSelectDriver(driver.id);
                   }}
                   className={`p-3 transition-all cursor-pointer relative ${isSelected
-                      ? 'bg-blue-50/80 border-l-4 border-l-[#1E60F3] shadow-2xs'
-                      : 'hover:bg-slate-50 border-l-4 border-l-transparent'
+                    ? 'bg-blue-50/80 border-l-4 border-l-[#1E60F3] shadow-2xs'
+                    : 'hover:bg-slate-50 border-l-4 border-l-transparent'
                     }`}
                 >
                   <div className="flex items-center gap-2.5">
@@ -493,8 +506,8 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                     }
                   }}
                   className={`px-2 py-0.5 rounded-md text-[11px] font-extrabold transition-all cursor-pointer ${activeDriver.affiliationType === 'employed'
-                      ? 'bg-[#0050FF] text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                    ? 'bg-[#0050FF] text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
                     }`}
                 >
                   소속
@@ -517,8 +530,8 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                     }
                   }}
                   className={`px-2 py-0.5 rounded-md text-[11px] font-extrabold transition-all cursor-pointer ${activeDriver.affiliationType === 'freelance'
-                      ? 'bg-slate-700 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                    ? 'bg-slate-700 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
                     }`}
                 >
                   프리랜서
@@ -785,8 +798,8 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                               right: '3px',
                             }}
                             className={`absolute rounded-xl p-2 border shadow-xs text-left cursor-pointer transition-all hover:scale-[1.02] flex flex-col justify-between overflow-hidden z-10 ${isAirport || isEvent
-                                ? 'bg-blue-50/95 border-blue-300 text-blue-950 border-l-4 border-l-[#1E60F3]'
-                                : 'bg-slate-100/95 border-slate-200 text-slate-800 border-l-4 border-l-slate-400'
+                              ? 'bg-blue-50/95 border-blue-300 text-blue-950 border-l-4 border-l-[#1E60F3]'
+                              : 'bg-slate-100/95 border-slate-200 text-slate-800 border-l-4 border-l-slate-400'
                               }`}
                           >
                             <div className="min-w-0 flex-1 flex flex-col justify-between">
