@@ -80,7 +80,7 @@ export function patchWorkbookCell(bytes:Uint8Array,month:string,row:number,col:s
  if(revisedRow===original)throw new Error('셀 값을 변경하지 못했습니다.');
  let changedSource=source.replace(original,revisedRow);
  if(col==='G'){
-  const routes=Object.entries(book.Sheets[month].cells).filter(([address])=>/^G[1-9]\\d*$/.test(address)&&address!==col+row).map(([,cell])=>String(cell.v??''));
+  const routes=Object.entries(book.Sheets[month].cells).filter(([address])=>/^G[1-9]\d*$/.test(address)&&address!==col+row).map(([,cell])=>String(cell.v??''));
   changedSource=widenReportColumns(changedSource,routeColumnWidth([...routes,trimmed]));
  }
  entries[path]=strToU8(changedSource);
