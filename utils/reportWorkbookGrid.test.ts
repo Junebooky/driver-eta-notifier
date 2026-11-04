@@ -31,3 +31,14 @@ test('HQ preview paginates beyond the first range, includes protected totals, an
  const blank=zipSync(entries),oldDriver=workbookFromFile(blank).Sheets['4월'].cells.E2.v;
  const out=patchWorkbookCell(blank,'4월',2,'D','빈 셀 수정');assert.equal(workbookFromFile(out.bytes).Sheets['4월'].cells.E2.v,oldDriver);assert.equal(workbookFromFile(out.bytes).Sheets['4월'].cells.D2.v,'빈 셀 수정');
 });
+
+test('HQ row locator selects correct page by physical Excel row, never by report order',()=>{
+ const bytes=kakaoWorkbookFixture();
+ const page=readWorkbookGrid(bytes,'4월',1,0,3);
+ assert.equal(page.offset,1);
+ assert.equal(page.rows.length,1);
+ assert.equal(page.rows[0].row,3);
+ assert.equal(readWorkbookGrid(bytes,'4월',1,100,2).offset,0);
+ assert.throws(()=>readWorkbookGrid(bytes,'4월',1,0,99999),/행/);
+ assert.throws(()=>readWorkbookGrid(bytes,'4월',1,0,999),/현재 Excel 행/);
+});
