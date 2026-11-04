@@ -45,7 +45,7 @@ test('When drivers fill the full template, only A-L Excel fields are populated; 
  assert.equal(parsed.draft.driver,'김승준');
  assert.equal(parsed.draft.time,'09:00~21:50');
  assert.equal(parsed.draft.route,'차고지 - 메리어트 호텔 - 판교 오피스 - 한강 아파트 - 차고지');
- assert.equal(parsed.draft.overtime,'OT 1시간 50분 / 심야 0분'.replace(' / 심야 0분',''));
+ assert.equal(parsed.draft.overtime,'OT 2시간 50분');
  assert.equal(parsed.draft.amount,'');
  assert.equal(parsed.draft.payment,'');
  assert.equal(parsed.draft.totalWithVat,'');
