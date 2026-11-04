@@ -25,7 +25,7 @@ export function validateReportInput(raw:string):ReportInputCheck{
  // rejected merely for writing >, standalone -, or explicit next-day times.
  const diary=parseDiaryRoute(text);
  const stops=diary.stops.map(stop=>stop.place);
- if(!diary.present||stops.length<2||stops.some(stop=>!/[\\p{L}0-9]/u.test(stop)))missing.push('운행일지(경유지 2곳 이상)');
+ if(!diary.present||stops.length<2||stops.some(stop=>!/[\p{L}0-9]/u.test(stop)))missing.push('운행일지(경유지 2곳 이상)');
  if(!missing.length)return {accepted:true,needsTemplate:false,reply:'',missing:[]};
  const detail=anyReportField?'필요한 항목: '+missing.slice(0,7).join(' · ')+(missing.length>7?' 외':'')+'\n':'';
  return {accepted:false,needsTemplate:true,missing,reply:detail+SIMPLE};
