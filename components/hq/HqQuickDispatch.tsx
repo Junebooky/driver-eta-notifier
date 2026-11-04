@@ -567,7 +567,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
       setTimeout(() => setRemindSuccess(false), 3000);
     } catch {
       haptics.errorAlert();
-      setErrorMsg('기사 재알림 전송 실패: 네트워크 상태를 확인해 주세요.');
+      setErrorMsg('기사 앱 내 확인 요청 처리에 실패했습니다. 네트워크 상태를 확인해 주세요.');
     } finally {
       setIsReminding(false);
     }
@@ -1109,10 +1109,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
       } else {
         setNotificationMsg(
           isEditMode
-            ? '배차가 확정되어 담당 기사님의 Driver Cockpit에 즉시 반영되었습니다!'
+            ? '변경된 배차가 저장되었습니다. 기사 Cockpit에 표시됩니다.'
             : isMultiVehicleGroup
-              ? `총 ${totalVehicles}대 배차가 확정되어 각 담당 기사님의 Driver Cockpit에 즉시 반영되었습니다!`
-              : `배차가 확정되어 담당 기사님의 Driver Cockpit에 즉시 반영되었습니다!`
+              ? `총 ${totalVehicles}대의 배차가 저장되었습니다. 기사 Cockpit에 표시됩니다.`
+               : `배차가 저장되었습니다. 기사 Cockpit에 표시됩니다.`
         );
       }
 
@@ -1290,10 +1290,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                       ? 'bg-emerald-600 text-white'
                       : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200/60'
                     }`}
-                  title="담당 기사 스마트폰 Cockpit으로 즉시 확인 요청 알림을 재전송합니다"
+                  title="기사 Cockpit에 확인 요청을 다시 표시합니다. 문자·푸시가 자동 발송되는 기능은 아닙니다."
                 >
                   <BellRing className={`w-3.5 h-3.5 ${isReminding ? 'animate-bounce text-[#1E60F3]' : ''}`} />
-                  <span>{remindSuccess ? '다시 알림 전송됨!' : isReminding ? '전송 중...' : '기사 재알림'}</span>
+                  <span>{remindSuccess ? '앱 내 확인 요청 갱신됨' : isReminding ? '처리 중...' : '기사 확인 재요청'}</span>
                 </button>
               )}
 
