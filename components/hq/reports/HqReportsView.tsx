@@ -370,13 +370,40 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
     <div className="space-y-4 select-none">
       {/* 1. Header Bar: Title + Rounded Utility Controls */}
       <div className="flex items-start sm:items-center justify-between gap-3 pb-1 print:hidden">
-        <div>
-          <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
-            정산 · 수익성 · 종합 리포트
-          </h2>
-          <p className="text-xs text-slate-400 font-medium mt-1">
-            고객사 서비스 시간 기준 정산 · 기사 인건비 · 배차별 직접이익 분석 리포트
-          </p>
+        <div className="flex items-center gap-3">
+          {/* 리포트 통계 아이콘 & 마우스 호버 툴팁 */}
+          <div className="relative group/report inline-flex items-center justify-center cursor-pointer shrink-0">
+            <img
+              src="/images/icons/report/icon_report.png"
+              alt="종합 리포트"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+                const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                if (fallback) fallback.style.display = 'flex';
+              }}
+              className="w-11 h-11 sm:w-12 sm:h-12 object-contain shrink-0 transition-transform duration-150 group-hover/report:scale-110"
+            />
+            <div className="hidden w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-blue-50 border border-blue-100 text-[#1E60F3] items-center justify-center shrink-0 transition-transform duration-150 group-hover/report:scale-110 shadow-2xs">
+              <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6" />
+            </div>
+
+            {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 */}
+            <div className="absolute bottom-full left-0 mb-2 hidden group-hover/report:flex flex-col items-start pointer-events-none z-50">
+              <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+                고객사 정산과 기사 인건비, 배차별 직접이익을 종합 분석해요
+              </span>
+              <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 ml-4 shadow-xs" />
+            </div>
+          </div>
+
+          <div>
+            <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
+              정산 · 수익성 · 종합 리포트
+            </h2>
+            <p className="text-xs text-slate-500 font-medium mt-0.5">
+              고객사 서비스 시간 기준 정산 · 기사 인건비 · 배차별 직접이익 분석 리포트
+            </p>
+          </div>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">

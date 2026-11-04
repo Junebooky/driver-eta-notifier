@@ -627,159 +627,166 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* 1. Header Bar */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs">
+      {/* 1. Header Bar & 5-Card KPI Summary Widget (Unified Single Card) */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-2xs space-y-4 sm:space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <span className="text-[11px] font-black tracking-wider text-slate-400 uppercase">
-              OPERATIONS
-            </span>
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-0.5">
-              실시간 행사 운영 보드
-            </h1>
-            <p className="text-xs text-slate-500 font-medium mt-1">
-              진행 중인 행사의 차량 위치와 운행 상태를 실시간으로 확인해요
-            </p>
-          </div>
+          <div className="flex items-center gap-3">
+            {/* 실시간 운영 보드 아이콘 & 마우스 호버 툴팁 */}
+            <div className="relative group/operations inline-flex items-center justify-center cursor-pointer shrink-0">
+              <img
+                src="/images/icons/live_dashboard/icon_live_dashboard.png"
+                alt="실시간 행사 운영 보드"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                  if (fallback) fallback.style.display = 'flex';
+                }}
+                className="w-11 h-11 sm:w-12 sm:h-12 object-contain shrink-0 transition-transform duration-150 group-hover/operations:scale-110"
+              />
+              <div className="hidden w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-blue-50 border border-blue-100 text-[#1E60F3] items-center justify-center shrink-0 transition-transform duration-150 group-hover/operations:scale-110 shadow-2xs">
+                <Activity className="w-5 h-5 sm:w-6 sm:h-6" />
+              </div>
 
-          <div className="flex items-center gap-2 self-start sm:self-center">
-            {/* Live Indicator Badge */}
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 shadow-2xs">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span>실시간 운영 중</span>
-            </span>
+              {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 */}
+              <div className="absolute bottom-full left-0 mb-2 hidden group-hover/operations:flex flex-col items-start pointer-events-none z-50">
+                <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+                  진행 중인 행사의 차량 위치와 운행 상태를 실시간으로 확인해요
+                </span>
+                <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 ml-4 shadow-xs" />
+              </div>
+            </div>
 
-            {/* Refresh Button */}
-            <button
-              type="button"
-              onClick={() => {
-                haptics.lightTap();
-                fetchOperations();
-              }}
-              disabled={isLoading}
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 hover:bg-slate-200/70 text-slate-600 border border-slate-200/80 cursor-pointer transition-colors shadow-2xs disabled:opacity-50"
-              title="새로고침"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 text-slate-500 ${isLoading ? 'animate-spin' : ''}`} />
-              <span>업데이트 {lastUpdatedTime}</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. Top 5-Card KPI Summary Widget */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        {/* Card 1: 운영 중인 행사 (Active Blue Highlight) */}
-        <div
-          onClick={() => {
-            haptics.lightTap();
-            setActiveTab('running');
-          }}
-          className="p-4 rounded-2xl bg-white border border-gray-200/80 shadow-2xs flex items-center gap-3.5 transition-all duration-200 hover:-translate-y-1 hover:shadow-md cursor-pointer active:translate-y-0 select-none"
-        >
-          <img
-            src="/images/icons/live_dashboard/active_events.png"
-            alt="운영 중인 행사"
-            className="w-11 h-11 sm:w-12 sm:h-12 object-contain shrink-0 drop-shadow-xs"
-          />
-          <div className="min-w-0">
-            <div className="text-xs text-slate-500 font-bold">운영 중인 행사</div>
-            <div className="text-lg sm:text-xl font-black text-slate-900 mt-0.5">
-              {kpiStats.totalEvents}건
+            <div>
+              <span className="text-[11px] font-black tracking-wider text-slate-400 uppercase">
+                OPERATIONS
+              </span>
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-0.5">
+                실시간 행사 운영 보드
+              </h1>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">
+                진행 중인 행사의 차량 위치와 운행 상태를 실시간으로 확인해요
+              </p>
             </div>
           </div>
         </div>
 
-        {/* Card 2: 전체 배차 */}
-        <div
-          onClick={() => {
-            haptics.lightTap();
-            setActiveTab('all');
-          }}
-          className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex items-center gap-3.5 transition-all duration-200 hover:-translate-y-1 hover:shadow-md cursor-pointer active:translate-y-0 select-none"
-        >
-          <img
-            src="/images/icons/live_dashboard/total_dispatch.png"
-            alt="전체 배차"
-            className="w-11 h-11 sm:w-12 sm:h-12 object-contain shrink-0 drop-shadow-xs"
-          />
-          <div className="min-w-0">
-            <div className="text-xs text-slate-500 font-bold">전체 배차</div>
-            <div className="text-lg sm:text-xl font-black text-slate-900 mt-0.5">
-              {kpiStats.totalVehicles}대
-            </div>
-          </div>
-        </div>
+        {/* Divider */}
+        <div className="border-t border-slate-100" />
 
-        {/* Card 3: 운행 중 */}
-        <div
-          onClick={() => {
-            haptics.lightTap();
-            setActiveTab('running');
-          }}
-          className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex items-center gap-3.5 transition-all duration-200 hover:-translate-y-1 hover:shadow-md cursor-pointer active:translate-y-0 select-none"
-        >
-          <img
-            src="/images/icons/live_dashboard/in_operation.png"
-            alt="운행 중"
-            className="w-11 h-11 sm:w-12 sm:h-12 object-contain shrink-0 drop-shadow-xs"
-          />
-          <div className="min-w-0">
-            <div className="text-xs text-slate-500 font-bold">운행 중</div>
-            <div className="text-lg sm:text-xl font-black text-slate-900 mt-0.5">
-              {kpiStats.inTransit}대
-            </div>
-          </div>
-        </div>
-
-        {/* Card 4: 완료 */}
-        <div
-          onClick={() => {
-            haptics.lightTap();
-            setActiveTab('closed');
-          }}
-          className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex items-center gap-3.5 transition-all duration-200 hover:-translate-y-1 hover:shadow-md cursor-pointer active:translate-y-0 select-none"
-        >
-          <img
-            src="/images/icons/live_dashboard/completed.png"
-            alt="완료"
-            className="w-11 h-11 sm:w-12 sm:h-12 object-contain shrink-0 drop-shadow-xs"
-          />
-          <div className="min-w-0">
-            <div className="text-xs text-slate-500 font-bold">완료</div>
-            <div className="text-lg sm:text-xl font-black text-slate-900 mt-0.5">
-              {kpiStats.completed}대
-            </div>
-          </div>
-        </div>
-
-        {/* Card 5: 운영 진행률 */}
-        <div
-          onClick={() => {
-            haptics.lightTap();
-            setActiveTab('all');
-          }}
-          className="col-span-2 sm:col-span-1 p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs flex items-center justify-between gap-3 transition-all duration-200 hover:-translate-y-1 hover:shadow-md cursor-pointer active:translate-y-0 select-none"
-        >
-          <div className="flex items-center gap-3.5 min-w-0">
+        {/* 2. Top 5-Card KPI Summary Grid (Embedded inside the single card) */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          {/* Card 1: 운영 중인 행사 (Active Blue Highlight) */}
+          <div
+            onClick={() => {
+              haptics.lightTap();
+              setActiveTab('running');
+            }}
+            className="p-3.5 sm:p-4 rounded-xl bg-slate-50/70 hover:bg-blue-50/50 border border-slate-200/70 hover:border-blue-200/80 shadow-2xs flex items-center gap-3.5 transition-all duration-200 hover:-translate-y-0.5 cursor-pointer active:translate-y-0 select-none"
+          >
             <img
-              src="/images/icons/live_dashboard/operation_progress.png"
-              alt="운영 진행률"
+              src="/images/icons/live_dashboard/active_events.png"
+              alt="운영 중인 행사"
               className="w-11 h-11 sm:w-12 sm:h-12 object-contain shrink-0 drop-shadow-xs"
             />
-
             <div className="min-w-0">
-              <div className="text-xs text-slate-500 font-bold">운영 진행률</div>
-              <div className="text-lg sm:text-xl font-black text-slate-900 mt-0.5 flex items-baseline gap-1">
-                <span>{kpiStats.progressRate}%</span>
-                <span className="text-[11px] text-slate-400 font-semibold truncate">
-                  ({kpiStats.inTransit}/{kpiStats.totalVehicles}대)
-                </span>
+              <div className="text-xs text-slate-500 font-bold">운영 중인 행사</div>
+              <div className="text-lg sm:text-xl font-black text-slate-900 mt-0.5">
+                {kpiStats.totalEvents}건
               </div>
             </div>
           </div>
 
-          <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
+          {/* Card 2: 전체 배차 */}
+          <div
+            onClick={() => {
+              haptics.lightTap();
+              setActiveTab('all');
+            }}
+            className="p-3.5 sm:p-4 rounded-xl bg-slate-50/70 hover:bg-blue-50/50 border border-slate-200/70 hover:border-blue-200/80 shadow-2xs flex items-center gap-3.5 transition-all duration-200 hover:-translate-y-0.5 cursor-pointer active:translate-y-0 select-none"
+          >
+            <img
+              src="/images/icons/live_dashboard/total_dispatch.png"
+              alt="전체 배차"
+              className="w-11 h-11 sm:w-12 sm:h-12 object-contain shrink-0 drop-shadow-xs"
+            />
+            <div className="min-w-0">
+              <div className="text-xs text-slate-500 font-bold">전체 배차</div>
+              <div className="text-lg sm:text-xl font-black text-slate-900 mt-0.5">
+                {kpiStats.totalVehicles}대
+              </div>
+            </div>
+          </div>
+
+          {/* Card 3: 운행 중 */}
+          <div
+            onClick={() => {
+              haptics.lightTap();
+              setActiveTab('running');
+            }}
+            className="p-3.5 sm:p-4 rounded-xl bg-slate-50/70 hover:bg-blue-50/50 border border-slate-200/70 hover:border-blue-200/80 shadow-2xs flex items-center gap-3.5 transition-all duration-200 hover:-translate-y-0.5 cursor-pointer active:translate-y-0 select-none"
+          >
+            <img
+              src="/images/icons/live_dashboard/in_operation.png"
+              alt="운행 중"
+              className="w-11 h-11 sm:w-12 sm:h-12 object-contain shrink-0 drop-shadow-xs"
+            />
+            <div className="min-w-0">
+              <div className="text-xs text-slate-500 font-bold">운행 중</div>
+              <div className="text-lg sm:text-xl font-black text-slate-900 mt-0.5">
+                {kpiStats.inTransit}대
+              </div>
+            </div>
+          </div>
+
+          {/* Card 4: 완료 */}
+          <div
+            onClick={() => {
+              haptics.lightTap();
+              setActiveTab('closed');
+            }}
+            className="p-3.5 sm:p-4 rounded-xl bg-slate-50/70 hover:bg-blue-50/50 border border-slate-200/70 hover:border-blue-200/80 shadow-2xs flex items-center gap-3.5 transition-all duration-200 hover:-translate-y-0.5 cursor-pointer active:translate-y-0 select-none"
+          >
+            <img
+              src="/images/icons/live_dashboard/completed.png"
+              alt="완료"
+              className="w-11 h-11 sm:w-12 sm:h-12 object-contain shrink-0 drop-shadow-xs"
+            />
+            <div className="min-w-0">
+              <div className="text-xs text-slate-500 font-bold">완료</div>
+              <div className="text-lg sm:text-xl font-black text-slate-900 mt-0.5">
+                {kpiStats.completed}대
+              </div>
+            </div>
+          </div>
+
+          {/* Card 5: 운영 진행률 */}
+          <div
+            onClick={() => {
+              haptics.lightTap();
+              setActiveTab('all');
+            }}
+            className="col-span-2 sm:col-span-1 p-3.5 sm:p-4 rounded-xl bg-slate-50/70 hover:bg-blue-50/50 border border-slate-200/70 hover:border-blue-200/80 shadow-2xs flex items-center justify-between gap-3 transition-all duration-200 hover:-translate-y-0.5 cursor-pointer active:translate-y-0 select-none"
+          >
+            <div className="flex items-center gap-3.5 min-w-0">
+              <img
+                src="/images/icons/live_dashboard/operation_progress.png"
+                alt="운영 진행률"
+                className="w-11 h-11 sm:w-12 sm:h-12 object-contain shrink-0 drop-shadow-xs"
+              />
+
+              <div className="min-w-0">
+                <div className="text-xs text-slate-500 font-bold">운영 진행률</div>
+                <div className="text-lg sm:text-xl font-black text-slate-900 mt-0.5 flex items-baseline gap-1">
+                  <span>{kpiStats.progressRate}%</span>
+                  <span className="text-[11px] text-slate-400 font-semibold truncate">
+                    ({kpiStats.inTransit}/{kpiStats.totalVehicles}대)
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
+          </div>
         </div>
       </div>
 
