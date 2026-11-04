@@ -24,7 +24,7 @@ export function validateReportInput(raw:string):ReportInputCheck{
  // A blank template must not count expense/notes headings as route stops.
  const diaryStart=/^[ \t]*운행일지[ \t]*[:：]?[ \t]*$/m.exec(text);
  const diaryBody=diaryStart?text.slice(diaryStart.index+diaryStart[0].length).replace(/^\n/,'')
-  .split(/^[ \t]*(?:경비\s*지출|특이\s*사항|퇴근\s*시간)\b.*$/m)[0].trim():'';
+  .split(/^[ \t]*(?:경비[ \t]*지출|특이[ \t]*사항|퇴근[ \t]*시간)[ \t]*(?:[:：][^\n]*)?$/m)[0].trim():'';
  const stops=diaryBody.split(/(?:→|➡|➔|⇒|->|\n)/)
   .map(s=>s.replace(/^\s*\d{1,2}:\d{2}\s*/,'').replace(/\s*\/\s*(?:업무\s*종료|종료)\s*$/,'').trim())
   .filter(Boolean);
