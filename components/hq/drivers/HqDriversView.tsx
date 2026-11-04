@@ -1,6 +1,5 @@
 'use client';
 
-import {ReportDeviceManager} from './ReportDeviceManager';
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { HqDriversTableView } from './HqDriversTableView';
@@ -178,7 +177,6 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
         />
       )}
 
-      {viewMode==='detail'&&selectedDriverId&&<ReportDeviceManager key={selectedDriverId} driverId={selectedDriverId}/>}
       {/* Quick Add Driver Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">

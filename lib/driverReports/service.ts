@@ -10,7 +10,7 @@ import type {DriverReportSubmission} from '@/types/driverReportChat';
 export function nightEndHour(){const raw=process.env.REPORT_NIGHT_END_HOUR??'6';if(!/^(?:[0-9]|1[0-9]|2[01])$/.test(raw))throw new Error('심야 종료 설정을 확인해 주세요.');return Number(raw);}
 function check(error:{message:string;code?:string}|null){
  if(!error)return;
- if(['42P01','PGRST202','PGRST205'].includes(error.code||''))throw new Error('운행보고 데이터베이스가 준비되지 않았습니다. 별도 테스트 DB에 보고서 마이그레이션을 적용해 주세요.');
+ if(['42P01','PGRST202','PGRST205'].includes(error.code||''))throw new Error('운행보고 데이터베이스가 준비되지 않았습니다. cockpit 스키마의 보고서 마이그레이션 적용 상태를 확인해 주세요.');
  throw new Error('보고 저장소에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.');
 }
 const bytesFromDb=(value:string)=>new Uint8Array(Buffer.from(value.replace(/^\\x/,''),'hex'));
@@ -67,7 +67,8 @@ export async function submitReport(session:CockpitAuthSession,raw:string,request
  if(session.role!=='driver'||!session.driverId)throw new Error('기사 계정이 필요합니다.');
  let year:number|null=null;try{year=await activeLedgerYear(session.org);}catch{/* Submission remains durable. */}
  const parsed=parseDriverReport(raw,session.driverName,new Date(),{workbookYear:year,nightEndHour:nightEndHour()});
- const fingerprint=createHash('sha256').update((parsed.draft.date||'')+'|'+raw.trim().replace(/\r/g,'')).digest('hex');
+ // Shared public intake deduplicates by requestKey, not by report body: two people may submit identical reports.
+ const fingerprint=createHash('sha256').update(session.userId==='a18a0000-0000-4000-8000-000000000001' ? 'shared|'+requestKey : (parsed.draft.date||'')+'|'+raw.trim().replace(/\r/g,'')).digest('hex');
  const saved=await db.rpc('submit_report',{p_org:session.org,p_driver:session.driverId,p_request:requestKey,p_fingerprint:fingerprint,p_raw:raw,p_parsed:parsed,p_reply:reportReply(parsed)});
  if(saved.error?.code==='40001')throw new Error('같은 전송 번호로 내용이 변경되었습니다. 새 메시지로 보내 주세요.');check(saved.error);
  const result=saved.data as {id:string;duplicate:boolean};try{await runReportWorker(session.org,1,result.id);}catch{/* Cron resumes the durable queue. */}return result;

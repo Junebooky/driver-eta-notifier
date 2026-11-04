@@ -7,7 +7,7 @@ import {amendReportRow,addApprovedMonth} from '../utils/reportWorkbookOperations
 import {unzipSync,strToU8,strFromU8,zipSync} from 'fflate';
 const storage=(b:Uint8Array)=>({hex:Buffer.from(b).toString('hex'),size:b.length});
 export async function verifyReportCompletion(c:Client,url:string){
- for(const f of ['20261104060000_driver_device_invites.sql','20261104061000_report_operations.sql','20261104150000_shared_report_links.sql'])await c.query(readFileSync('supabase/migrations/'+f,'utf8'));
+ for(const f of ['20261104060000_driver_device_invites.sql','20261104061000_report_operations.sql','20261104140000_shared_report_rate_limit.sql','20261104150000_shared_report_links.sql'])await c.query(readFileSync('supabase/migrations/'+f,'utf8'));
  const call=async(db:Client,name:string,args:unknown[])=>{const placeholders=args.map((_,i)=>'$'+(i+1)).join(',');if(name==='claim_report_jobs')return (await db.query(`SELECT * FROM cockpit.${name}(${placeholders})`,args)).rows;const r=await db.query(`SELECT cockpit.${name}(${placeholders}) AS value`,args.map(v=>Array.isArray(v)?JSON.stringify(v):v));return r.rows[0].value;};
  const driver=randomUUID(),actor=randomUUID();await c.query("INSERT INTO cockpit.drivers(id,driver_name,driver_meta) VALUES($1,'격리 기사','{\"status\":\"active\"}')",[driver]);
  const token=newDeviceSecret(),device=newDeviceSecret();await call(c,'issue_report_invite',['vip_limousine_korea',driver,actor,tokenHash(token)]);
