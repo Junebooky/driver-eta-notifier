@@ -167,6 +167,19 @@ export async function verifyReportCompletion(c:Client,url:string){
  assert.equal(finalLedger.manifest[olderId].row,2);assert.equal(finalLedger.manifest[earlyId].row,3);
  assert.equal(finalLedger.manifest[lateId].row,4);
  assert.equal((await c.query('SELECT excel_row_number FROM cockpit.report_submissions WHERE id=$1',[earlyId])).rows[0].excel_row_number,3);
+ const manualOrg='manual_order_'+randomUUID(),manualBlank=addApprovedMonth(kakaoWorkbookFixture(),'4월',11);
+ const manualLate=appendKakaoExcelReport(manualBlank,{...parseDriverReport(olderRaw,undefined,new Date(),{workbookYear:2026}).draft,date:'2026-11-25',customer:'수기 늦은'});
+ const manualEarly=appendKakaoExcelReport(manualLate.bytes,{...parseDriverReport(olderRaw,undefined,new Date(),{workbookYear:2026}).draft,date:'2026-11-03',customer:'수기 이른'});
+ await call(c,'register_report_ledger',[manualOrg,2026,actor,'manual2026.xlsx',storage(manualEarly.bytes)]);
+ const manualActive=(await c.query('SELECT v.* FROM cockpit.report_ledgers l JOIN cockpit.report_workbook_versions v ON v.id=l.active_version WHERE l.org_id=$1 AND l.year=2026',[manualOrg])).rows[0];
+ const manualSorted=organizeManagedMonth(new Uint8Array(manualActive.bytes),'11월',2026,{});
+ assert.equal(manualSorted.changed,true);assert.deepEqual(manualSorted.moves,{});
+ assert.equal(await call(c,'commit_report_hq_reorder',[manualOrg,actor,2026,manualActive.id,storage(manualSorted.bytes),'11월',{}]),true);
+ const savedManual=(await c.query('SELECT v.* FROM cockpit.report_ledgers l JOIN cockpit.report_workbook_versions v ON v.id=l.active_version WHERE l.org_id=$1 AND l.year=2026',[manualOrg])).rows[0];
+ assert.equal(workbookFromFile(new Uint8Array(savedManual.bytes)).Sheets['11월'].cells.D2.v,'수기 이른');
+ assert.equal(workbookFromFile(new Uint8Array(savedManual.bytes)).Sheets['11월'].cells.D3.v,'수기 늦은');
+ assert.deepEqual(savedManual.manifest,{});
+
  console.log('PASS HQ Excel: protected cell edit and CAS, date order compaction with DB row bindings');
  console.log('PASS HQ reading: today-only applied unread badge, read receipts, re-application, secure link retrieval and limited grants');
  console.log('PASS shared report link: token rotation/revoke, no public DB access, unbound intake submission and durable queue');
