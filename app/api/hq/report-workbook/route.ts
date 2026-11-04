@@ -8,6 +8,7 @@ import {isReportServiceType} from '@/utils/reportServiceTypes';
 import {readWorkbook,storeWorkbook} from '@/lib/driverReports/storage';
 import {readWorkbookGrid,patchWorkbookCell} from '@/utils/reportWorkbookGrid';
 import {organizeManagedMonth} from '@/utils/reportWorkbookRowOrder';
+import {refitWorkbookRouteColumns} from '@/utils/reportWorkbookOperations';
 import {boundedBody,UUID,privateJson,failure,sameOrigin} from '@/lib/driverReports/http';
 export const dynamic='force-dynamic';export const runtime='nodejs';
 export async function GET(req:NextRequest){
@@ -31,6 +32,7 @@ export async function GET(req:NextRequest){
   if(req.nextUrl.searchParams.get('download')==='1'){
    if(!w)throw new Error('장부가 없습니다.');let bytes=w.bytes;
    if(version){let q=db.from('report_workbook_versions').select('*').eq('org_id',org).eq('ledger_year',w.year!);q=version==='original'?q.eq('kind','original'):q.eq('id',version);const r=await q.single();check(r.error);bytes=await readWorkbook(r.data!);}
+   if(!version)bytes=refitWorkbookRouteColumns(bytes); // Only the latest download gets presentation widths.
    return new NextResponse(Uint8Array.from(bytes),{headers:{'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','Content-Disposition':`attachment; filename*=UTF-8''${encodeURIComponent(w.filename)}`,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
   }
   let q=db.from('report_workbook_versions').select('id,generation,kind,created_at,byte_size,object_path,ledger_year').eq('org_id',org).order('generation',{ascending:false}).limit(50);if(w?.year)q=q.eq('ledger_year',w.year);
@@ -52,7 +54,10 @@ export async function POST(req:NextRequest){
     const w=await currentWorkbook(s.org,b.year);
     if(!w||w.id!==b.expectedVersion)return privateJson({ok:false,error:'Excel 버전이 변경됐습니다. 새로고침해 주세요.'},409);
     const arranged=organizeManagedMonth(w.bytes,b.month,b.year,w.manifest||{});
-    if(!arranged.changed)return privateJson({ok:true,unchanged:true,message:arranged.reason});
+    if(!arranged.changed){
+     if(arranged.reason!=='이미 날짜순으로 정리돼 있습니다.')return privateJson({ok:false,error:arranged.reason||'안전하게 정렬할 수 없습니다.'},422);
+     return privateJson({ok:true,unchanged:true,message:arranged.reason});
+    }
     const saved=await db.rpc('commit_report_hq_reorder',{
      p_org:s.org,p_actor:s.userId,p_year:b.year,p_expected:w.id,p_storage:await storeWorkbook(s.org,arranged.bytes),
      p_sheet:b.month,p_moves:arranged.moves
