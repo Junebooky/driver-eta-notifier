@@ -1578,6 +1578,7 @@ export default function DriverCockpit() {
         ) : null}
         {/* Keep the same editor mounted so switching tabs preserves unsaved input. */}
         {hasOpenedDrivingLog && <div hidden={activeTab !== 'log'} className="flex-1">
+          <div className="px-4 pt-4"><Link href="/driver/reports" className="flex items-center justify-between rounded-2xl border border-blue-100 bg-blue-50 px-4 py-4 text-sm font-semibold text-[#1E60F3]">VIP리무진코리아에 운행보고 보내기<span aria-hidden="true">↗</span></Link></div>
           <DrivingLogModal presentation="page" isOpen={true}
             onClose={() => selectDriverTab('drive')} driverProfile={profile} bookingId={activeBookingId}
             onOpenLocationSearch={() => { setIsSelectingForSchedule(true); setIsLocationSearchOpen(true); }}

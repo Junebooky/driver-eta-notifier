@@ -25,7 +25,7 @@ export interface KakaoExcelParseResult {
   missing: string[];
 }
 
-export const EXCEL_RECORD_YEAR = 2026;
+export const currentReportYear = () => Number(new Intl.DateTimeFormat('en',{timeZone:'Asia/Seoul',year:'numeric'}).format(new Date()));
 
 export const EXCEL_COLUMN_LABELS = [
   '날짜', '차량번호', '차종', '거래처', '운전자', '타임',
@@ -84,7 +84,7 @@ function dateString(src: string, year: number): string {
   return [y, String(month).padStart(2, '0'), String(day).padStart(2, '0')].join('-');
 }
 
-export function parseKakaoExcelReport(raw: string, assumedYear = 2026): KakaoExcelParseResult {
+export function parseKakaoExcelReport(raw: string, assumedYear = currentReportYear()): KakaoExcelParseResult {
   const src = raw.replace(/\u00a0/g, ' ').replace(/\r/g, '');
   const warnings: string[] = [];
   const ambiguousDate = /\d{1,2}\s*월\s*\d{1,2}\s*일?\s*[~～–—]/.test(src) || /\d\s*(?:일)?\s*[~～–—]\s*(?:\d{1,2}\s*월\s*)?\d/.test(src.split('\n')[0]) || [...src.matchAll(/\d{1,2}\s*월\s*\d{1,2}\s*일/g)].length > 1;
@@ -144,10 +144,10 @@ export function parseKakaoExcelReport(raw: string, assumedYear = 2026): KakaoExc
   return { draft, warnings, missing };
 }
 
-export function validateKakaoExcelDraft(draft: KakaoExcelDraft): string[] {
+export function validateKakaoExcelDraft(draft: KakaoExcelDraft, workbookYear?:number): string[] {
   const errors: string[] = [];
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.date) || dateString(draft.date.replace(/(\d{4})-(\d\d)-(\d\d)/, '$1년 $2월 $3일'), EXCEL_RECORD_YEAR) !== draft.date) errors.push('운행 날짜를 올바르게 입력해 주세요.');
-  else if (!draft.date.startsWith(EXCEL_RECORD_YEAR + '-')) errors.push(EXCEL_RECORD_YEAR + '년 회사 기록부에는 해당 연도 날짜만 입력할 수 있습니다.');
+  if(workbookYear!==undefined&&!draft.date.startsWith(workbookYear+'-'))errors.push(workbookYear+'년 장부와 날짜가 다릅니다.');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.date) || dateString(draft.date.replace(/(\d{4})-(\d\d)-(\d\d)/, '$1년 $2월 $3일'), Number(draft.date.slice(0,4))) !== draft.date) errors.push('운행 날짜를 올바르게 입력해 주세요.');
   if (!draft.plate.trim() || !draft.model.trim() || !draft.customer.trim() || !draft.driver.trim()) errors.push('차량번호, 차종, 거래처, 운전자는 필수입니다.');
   const timeParts = draft.time.match(/^(?:\d+(?:\.\d+)?\()?([0-4]?\d:[0-5]\d)~([0-4]?\d:[0-5]\d)\)?$/);
   if (!timeParts || !checkedTime(timeParts[1]) || !checkedTime(timeParts[2]) || checkedTime(timeParts[2]) <= checkedTime(timeParts[1]) || draft.time.includes('(') !== draft.time.endsWith(')')) errors.push('타임은 09:15~17:20 또는 11(13:20~24:20) 형식으로 입력하고 익일은 24시 이상으로 확인해 주세요.');

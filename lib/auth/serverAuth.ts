@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import {devicePrefix,tokenHash,validSecret} from '@/lib/driverDevices/tokens';
 import { NextRequest } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { cleanVehicleIdentity } from '@/utils/dispatchConflictDetector';
@@ -8,6 +9,7 @@ export interface CockpitAuthSession {
   org: 'vip_limousine_korea';
   role: 'hq_admin' | 'driver';
   isRepresentative?: boolean;
+  reportDevice?: boolean;
   driverId?: string;
   driverName?: string;
   vehicleNo?: string;
@@ -149,6 +151,10 @@ export async function parseAndVerifyToken(token: string): Promise<CockpitAuthSes
   if (!token || typeof token !== 'string') return null;
 
   const trimmed = token.trim();
+  if(trimmed.startsWith(devicePrefix)){
+    const secret=trimmed.slice(devicePrefix.length);if(!validSecret(secret))return null;
+    try{const {data,error}=await supabaseAdmin.rpc('verify_report_device',{p_hash:tokenHash(secret)});return !error&&data?.role==='driver'&&data?.driverId?data as CockpitAuthSession:null;}catch{return null;}
+  }
 
   // Pattern A: Signed Cockpit Session Token (cockpit_s1.<payload>.<signature>)
   if (trimmed.startsWith('cockpit_s1.')) {

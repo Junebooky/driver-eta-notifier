@@ -93,7 +93,7 @@ test('A stated year different from 2026 cannot be silently saved to the 2026 wor
   assert.equal(mismatch.draft.date,'');
   assert.ok(mismatch.warnings.some(w => w.includes('연도')));
   const draft=parseKakaoExcelReport(input).draft;
-  assert.ok(validateKakaoExcelDraft({...draft,date:'2027-10-24'}).some(e=>e.includes('2026년')));
+  assert.ok(validateKakaoExcelDraft({...draft,date:'2027-10-24'},2026).some(e=>e.includes('2026년')));
 });
 
 test('ASCII arrows in a single diary still retain each place in written order', () => {

@@ -1,5 +1,5 @@
 export type LoginPortal = 'driver' | 'hq' | 'representative';
-export interface PortalIdentity { role?: string; isRepresentative?: boolean }
+export interface PortalIdentity { role?: string; isRepresentative?: boolean; reportDevice?:boolean }
 
 export function canAccessPortal(session: PortalIdentity, portal: LoginPortal) {
   if (portal === 'representative' || portal === 'hq') return session.role === 'hq_admin';
@@ -8,7 +8,7 @@ export function canAccessPortal(session: PortalIdentity, portal: LoginPortal) {
 
 export function accountHome(session: PortalIdentity) {
   if (session.role === 'hq_admin') return '/hq?tab=dashboard';
-  return session.role === 'driver' ? '/' : '/login';
+  return session.role === 'driver' ? session.reportDevice ? '/driver/reports' : '/' : '/login';
 }
 
 export function loginDestination(session: PortalIdentity, next?: string | null) {

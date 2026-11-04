@@ -1,12 +1,13 @@
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
-import { createHmac, randomUUID, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHmac, createHash, randomUUID, randomBytes, timingSafeEqual } from 'node:crypto';
 import assert from 'node:assert/strict';
 const port=process.env.TEST_HTTP_PORT || '34063';
 const providerPort=Number(process.env.TEST_AUTH_PORT || '43527');
 const base=`http://127.0.0.1:${port}`;
 const signingKey=randomBytes(32);
 const driverId='a0000000-0000-4000-8000-000000000001';
+const deviceSecret=randomBytes(32).toString('base64url'),deviceHash=createHash('sha256').update(deviceSecret).digest('hex');let deviceRevoked=false;
 const revoked=new Set(),sessions=new Map(),refreshes=new Map(),attempts=new Map();
 const fixtureDriver={id:driverId,driver_name:'격리 테스트 기사',vehicle_no:'테스트호차',car_number:'테스트번호',driver_meta:{status:'active'}};
 function issue(role,oldSession,ttl=3600){
@@ -43,6 +44,8 @@ const provider=createServer(async(req,res)=>{
  const verified=verify(token);
  if(url.pathname==='/auth/v1/user')return verified?json(200,verified.user):json(401,{msg:'invalid token'});
  if(url.pathname==='/auth/v1/logout'){if(verified)for(const [key,value] of refreshes)if(value.id===verified.claims.session_id)refreshes.delete(key);res.writeHead(204).end();return;}
+ if(url.pathname==='/rest/v1/rpc/verify_report_device')return json(200,!deviceRevoked&&body.p_hash===deviceHash?{userId:driverId,driverId,org:'vip_limousine_korea',role:'driver',driverName:'격리 테스트 기사',reportDevice:true,sessionId:'d0000000-0000-4000-8000-000000000001',issuedAt:Math.floor(Date.now()/1000),expiresAt:Math.floor(Date.now()/1000)+3600}:null);
+ if(url.pathname==='/rest/v1/rpc/revoke_report_devices'){deviceRevoked=true;return json(200,null);}
  if(url.pathname==='/rest/v1/rpc/consume_auth_login_attempt'){
   const key=body.p_keys[0],count=(attempts.get(key)||0)+1;attempts.set(key,count);return json(200,count<=8);
  }
@@ -80,6 +83,7 @@ try{
  assert.ok(ready,`Next server did not start: ${logs}`);
  const html=await(await fetch(base+'/login')).text();assert.ok(html.includes('Driver Cockpit')&&html.includes('본사 관리자 로그인')&&html.includes('계정 이메일'));
  const hqHtml=await(await fetch(base+'/hq/login')).text();assert.ok(hqHtml.includes('본사 관리자 로그인')&&hqHtml.includes('계정 이메일'));
+ assert.equal((await fetch(base+'/api/driver-reports')).status,401);assert.equal((await fetch(base+'/api/hq/report-workbook?download=1')).status,401);
  assert.equal((await fetch(base+'/api/driver')).status,401);assert.equal((await fetch(base+'/api/schedules')).status,401);
  assert.equal((await post('/api/auth/session',{action:'dev_switch',target:'admin'})).status,403);
  assert.equal((await post('/api/auth/session',{role:'driver',driverName:'누구나',vehicleNo:'8호차',pin:'shared'})).status,400);
@@ -139,6 +143,9 @@ try{
  const driverLogin=await post('/api/auth/session',{email:'driver@example.invalid',password:'isolated-password',role:'hq'});assert.equal(driverLogin.status,200);
  const driverCookie=cookies(driverLogin);const driverSession=await driverLogin.json();assert.equal(driverSession.session.role,'driver');assert.equal(driverSession.session.driverId,driverId);
  assert.equal((await fetch(base+'/',{headers:{cookie:driverCookie},redirect:'manual'})).status,200,'driver launch remains the existing cockpit');
+ assert.equal((await fetch(base+'/api/hq/report-workbook?download=1',{headers:{cookie:driverCookie}})).status,403);
+ assert.equal((await fetch(base+'/api/driver-reports?driverId=b0000000-0000-4000-8000-000000000002',{headers:{cookie:driverCookie}})).status,403);
+ assert.equal((await fetch(base+'/driver/reports',{headers:{cookie:driverCookie}})).status,200);
  await assertRepresentativeRedirect(driverCookie);
  await assertRepresentativeRedirect('cockpit_session=invalid-token');
  const own=await(await fetch(base+'/api/driver?vehicle_no=another-driver',{headers:{cookie:driverCookie}})).json();assert.equal(own.driver.id,driverId);
@@ -146,6 +153,13 @@ try{
  assert.equal((await post('/api/auth/session',{action:'logout'},driverCookie)).status,200);
  assert.equal((await fetch(base+'/api/driver',{headers:{cookie:driverCookie}})).status,401);
  assert.equal((await fetch(base+'/api/auth/session',{headers:{cookie:driverCookie}})).status,401);
+ const deviceCookie='cockpit_session=cockpit_d1.'+deviceSecret;
+ await assertPageRedirect('/',deviceCookie,'/driver/reports');
+ assert.equal((await fetch(base+'/driver/reports',{headers:{cookie:deviceCookie}})).status,200);
+ assert.equal((await fetch(base+'/api/hq/report-workbook?download=1',{headers:{cookie:deviceCookie}})).status,403);
+ assert.equal((await post('/api/auth/session',{action:'logout'},deviceCookie)).status,200);
+ assert.equal((await fetch(base+'/api/driver-reports',{headers:{cookie:deviceCookie}})).status,401);
+ console.log('PASS passwordless device production HTTP: verified driver UUID → PWA root auto-launch, HQ denial, logout revocation');
  // A short-lived access token is renewed using a rotated refresh token, without extending legacy tokens.
  const short=issue('hq_admin',undefined,60);
  const refresh=await fetch(base+'/api/auth/session',{headers:{cookie:`cockpit_session=${short.access_token}; cockpit_refresh=${short.refresh_token}`}});

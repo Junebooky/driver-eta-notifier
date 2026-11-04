@@ -10,8 +10,8 @@ test('Existing cells, formulas, styles, footer and all other ZIP members survive
  const before=kakaoWorkbookFixture(), copy=Uint8Array.from(before), result=appendKakaoExcelReport(before,draft);
  assert.deepEqual(before,copy); assert.equal(result.rowNumber,245);
  const a=unzipSync(before),b=unzipSync(result.bytes); assert.deepEqual(Object.keys(a),Object.keys(b));
- for(const n of Object.keys(a)) if(n!=='xl/worksheets/sheet1.xml') assert.deepEqual(b[n],a[n],n);
- const strip=(s:string)=>s.replace(/<dimension[^>]*\/>/,'').replace(/<row r="245">[\s\S]*?<\/row>/,'');
+ for(const n of Object.keys(a)) if(n!=='xl/worksheets/sheet1.xml'&&n!=='xl/styles.xml') assert.deepEqual(b[n],a[n],n);
+ const strip=(s:string)=>s.replace(/<dimension[^>]*\/>/,'').replace(/<cols\b[^>]*>[\s\S]*?<\/cols>/,'').replace(/<row\b(?=[^>]*\br="245")[^>]*>[\s\S]*?<\/row>/,'');
  assert.equal(strip(strFromU8(a['xl/worksheets/sheet1.xml'])),strip(strFromU8(b['xl/worksheets/sheet1.xml'])));
  const after=workbookFromFile(result.bytes).Sheets['4월'];
  assert.equal(after.cells.A245.v,46117); assert.equal(after.cells.M245,undefined);
@@ -30,7 +30,8 @@ test('Strings stay literal, optional billing cells absent, leading zero plates a
  const result=appendKakaoExcelReport(bytes,{...draft,customer:'=1+1',plate:'12가0123'});
  const after=workbookFromFile(result.bytes).Sheets['4월'];
  assert.equal(after.cells.D245.v,'=1+1'); assert.equal(after.cells.B245.v,'0123');
- for(const c of ['I','J','K','L']) assert.equal(after.cells[c+'245'],undefined);
+ assert.equal(after.cells.I245.v,''); // Blank OT cell still has the requested 10pt style.
+ for(const c of ['J','K','L']) assert.equal(after.cells[c+'245'],undefined);
  const entries=unzipSync(bytes);entries['xl/workbook.xml']=strToU8(strFromU8(entries['xl/workbook.xml']).replace('<sheets>','<workbookPr date1904="1"/><sheets>'));
  const converted=workbookFromFile(appendKakaoExcelReport(zipSync(entries),draft).bytes);
  assert.equal(converted.Sheets['4월'].cells.A245.v,46117-1462);
