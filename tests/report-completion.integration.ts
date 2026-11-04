@@ -7,7 +7,7 @@ import {amendReportRow,addApprovedMonth} from '../utils/reportWorkbookOperations
 import {unzipSync,strToU8,strFromU8,zipSync} from 'fflate';
 const storage=(b:Uint8Array)=>({hex:Buffer.from(b).toString('hex'),size:b.length});
 export async function verifyReportCompletion(c:Client,url:string){
- for(const f of ['20261104060000_driver_device_invites.sql','20261104061000_report_operations.sql','20261104140000_shared_report_rate_limit.sql','20261104150000_shared_report_links.sql'])await c.query(readFileSync('supabase/migrations/'+f,'utf8'));
+ for(const f of ['20261104060000_driver_device_invites.sql','20261104061000_report_operations.sql','20261104140000_shared_report_rate_limit.sql','20261104150000_shared_report_links.sql','20261104182000_hq_seen_secure_links.sql'])await c.query(readFileSync('supabase/migrations/'+f,'utf8'));
  const call=async(db:Client,name:string,args:unknown[])=>{const placeholders=args.map((_,i)=>'$'+(i+1)).join(',');if(name==='claim_report_jobs')return (await db.query(`SELECT * FROM cockpit.${name}(${placeholders})`,args)).rows;const r=await db.query(`SELECT cockpit.${name}(${placeholders}) AS value`,args.map(v=>Array.isArray(v)?JSON.stringify(v):v));return r.rows[0].value;};
  const driver=randomUUID(),actor=randomUUID();await c.query("INSERT INTO cockpit.drivers(id,driver_name,driver_meta) VALUES($1,'격리 기사','{\"status\":\"active\"}')",[driver]);
  const token=newDeviceSecret(),device=newDeviceSecret();await call(c,'issue_report_invite',['vip_limousine_korea',driver,actor,tokenHash(token)]);
@@ -88,6 +88,29 @@ export async function verifyReportCompletion(c:Client,url:string){
  await c.query('SET ROLE anon');
  await assert.rejects(c.query('SELECT * FROM cockpit.report_shared_links'),{code:'42501'});
  await c.query('RESET ROLE');
+
+ const sealed='abc.def.ghi';
+ await call(c,'manage_report_shared_link_secure',[sharedOrg,actor,'issue',secondHash,expiry,sealed]);
+ let managed=(await c.query('SELECT sealed_token FROM cockpit.report_shared_links WHERE org_id=$1',[sharedOrg])).rows[0];
+ assert.equal(managed.sealed_token,sealed);
+ await call(c,'manage_report_shared_link_secure',[sharedOrg,actor,'remember',secondHash,null,'ijk.lmn.opq']);
+ managed=(await c.query('SELECT sealed_token FROM cockpit.report_shared_links WHERE org_id=$1',[sharedOrg])).rows[0];
+ assert.equal(managed.sealed_token,'ijk.lmn.opq');
+ await assert.rejects(call(c,'manage_report_shared_link_secure',[sharedOrg,actor,'remember',sharedHash,null,'ijk.lmn.opq']),/link does not match/);
+ const unread=(await c.query('SELECT * FROM cockpit.unread_applied_reports($1,$2)',[org,actor])).rows;
+ assert.equal(unread.length,35);
+ assert.equal(await call(c,'mark_report_hq_seen',[org,actor,ids[0]]),true);
+ assert.equal((await c.query('SELECT * FROM cockpit.unread_applied_reports($1,$2)',[org,actor])).rows.length,34);
+ await c.query("INSERT INTO cockpit.report_audit(org_id,actor_id,submission_id,action,detail) VALUES($1,$2,$3,'workbook_committed','{}')",[org,actor,ids[0]]);
+ assert.equal((await c.query('SELECT * FROM cockpit.unread_applied_reports($1,$2)',[org,actor])).rows.length,35);
+ await call(c,'manage_report_shared_link_secure',[sharedOrg,actor,'revoke',null,null,null]);
+ managed=(await c.query('SELECT sealed_token,revoked_at FROM cockpit.report_shared_links WHERE org_id=$1',[sharedOrg])).rows[0];
+ assert.equal(managed.sealed_token,null);assert.ok(managed.revoked_at);
+ await c.query('SET ROLE anon');
+ await assert.rejects(c.query('SELECT * FROM cockpit.report_hq_seen'),{code:'42501'});
+ await assert.rejects(call(c,'unread_applied_reports',[org,actor]),{code:'42501'});
+ await c.query('RESET ROLE');
+ console.log('PASS HQ reading: today-only applied unread badge, read receipts, re-application, secure link retrieval and limited grants');
  console.log('PASS shared report link: token rotation/revoke, no public DB access, unbound intake submission and durable queue');
  console.log('PASS completion: 35 reports, 5 writers, lease crash recovery, bounded retry, same-row correction, automatic recalculation, approved blank month, annual switch and immutable backup');
 }
