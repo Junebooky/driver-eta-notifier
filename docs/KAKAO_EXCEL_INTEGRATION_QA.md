@@ -1,5 +1,7 @@
 # HQ KakaoTalk → Excel integration
 
+> PR #45 follow-up: representative redirect fixed in `85e5b43`; GitHub CI run [41752453599](https://github.com/Junebooky/driver-eta-notifier/actions/runs/41752453599) passed all 50 test files, TypeScript, production build, HTTP Smoke, dependency audit and PostgreSQL dispatch/permission checks. The local dependency limitations below describe earlier local attempts, not the current GitHub CI outcome. See [redirect QA](qa/representative-redirect.md).
+
 Base: latest A02 `fix/comprehensive-repo-audit`, `1cccdeb84de73e9039d465c95d8c39f42fde4e4f`.
 Source: PR #44 `bd1aa259ce9f5c51e448dd5873f942221684d960` and A01 QA comment 6596954948.
 
