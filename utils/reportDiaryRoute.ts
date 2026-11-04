@@ -33,7 +33,7 @@ function clock(minutes:number){
 }
 export function parseDiaryRoute(raw:string):ParsedDiaryRoute{
  const text=raw.replace(/\u00a0/g,' ').replace(/\r/g,'');
- const heading=/(?:^|\n)[ \t]*운행일지[ \t]*[:：]?[ \t]*\n/u.exec(text);
+ const heading=/(?:^|\n|\\n)[ \t]*운행일지[ \t]*[:：]?[ \t]*\n/u.exec(text);
  if(!heading)return {present:false,stops:[],timesOutOfOrder:false,invalidTimes:false};
  const start=(heading.index||0)+heading[0].length;
  const body=text.slice(start).split(/\n[ \t]*(?:경비[ \t]*지출|특이[ \t]*사항|퇴근[ \t]*시간)(?:[ \t]*[:：]?[^\n]*)?(?:\n|$)/u)[0];
