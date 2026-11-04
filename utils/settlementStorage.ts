@@ -554,7 +554,9 @@ let cachedReports: EventSettlementReport[] | null = null;
 let cachedVehiclePresets: VehiclePricingPreset[] | null = null;
 let cachedDriverProfiles: DriverProfilePreset[] | null = null;
 let cachedBookings: HqBooking[] = [];
+let cachedBookingsRaw: string | null = null;
 let cachedCustomers: HqCustomer[] = [...INITIAL_HQ_CUSTOMERS];
+let cachedCustomersRaw: string | null = null;
 const serverFallbackReports: EventSettlementReport[] = buildSeedSettlementReports();
 
 function emitSettlementChange() {
@@ -567,6 +569,10 @@ export function getHqCustomersSnapshot(): HqCustomer[] {
   if (typeof window === 'undefined') return cachedCustomers;
   try {
     const raw = localStorage.getItem(HQ_CUSTOMERS_STORAGE_KEY);
+    if (raw === cachedCustomersRaw) {
+      return cachedCustomers;
+    }
+    cachedCustomersRaw = raw;
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
@@ -581,10 +587,15 @@ export function getHqCustomersSnapshot(): HqCustomer[] {
 }
 
 export function saveHqCustomers(customers: HqCustomer[]): void {
+  const serialized = JSON.stringify(customers);
+  if (serialized === cachedCustomersRaw) {
+    return;
+  }
   cachedCustomers = customers;
+  cachedCustomersRaw = serialized;
   if (typeof window !== 'undefined') {
     try {
-      localStorage.setItem(HQ_CUSTOMERS_STORAGE_KEY, JSON.stringify(customers));
+      localStorage.setItem(HQ_CUSTOMERS_STORAGE_KEY, serialized);
     } catch (err) {
       console.error('Failed to save HQ customers:', err);
     }
@@ -607,6 +618,10 @@ export function getHqBookingsSnapshot(): HqBooking[] {
   if (typeof window === 'undefined') return cachedBookings;
   try {
     const raw = localStorage.getItem(HQ_BOOKINGS_STORAGE_KEY);
+    if (raw === cachedBookingsRaw) {
+      return cachedBookings;
+    }
+    cachedBookingsRaw = raw;
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
@@ -621,10 +636,15 @@ export function getHqBookingsSnapshot(): HqBooking[] {
 }
 
 export function saveHqBookings(bookings: HqBooking[]): void {
+  const serialized = JSON.stringify(bookings);
+  if (serialized === cachedBookingsRaw) {
+    return;
+  }
   cachedBookings = bookings;
+  cachedBookingsRaw = serialized;
   if (typeof window !== 'undefined') {
     try {
-      localStorage.setItem(HQ_BOOKINGS_STORAGE_KEY, JSON.stringify(bookings));
+      localStorage.setItem(HQ_BOOKINGS_STORAGE_KEY, serialized);
     } catch (err) {
       console.error('Failed to save HQ bookings:', err);
     }

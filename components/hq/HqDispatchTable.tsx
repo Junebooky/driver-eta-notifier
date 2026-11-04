@@ -20,6 +20,7 @@ import {
   Send,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   History,
 } from 'lucide-react';
 import { HqMobileBookingList } from './HqMobileBookingList';
@@ -73,8 +74,20 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
   const [driverFilter, setDriverFilter] = useState('all');
   const [vehicleFilter, setVehicleFilter] = useState('all');
   const [customerFilter, setCustomerFilter] = useState('all');
+  const [openDropdown, setOpenDropdown] = useState<'status' | 'driver' | 'vehicle' | 'customer' | null>(null);
+  const filterRowRef = useRef<HTMLDivElement>(null);
   const [remindingId, setRemindingId] = useState<string | null>(null);
   const [dispatchIconError, setDispatchIconError] = useState(false);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (filterRowRef.current && !filterRowRef.current.contains(e.target as Node)) {
+        setOpenDropdown(null);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
 
   // 1. Live DB Drivers (synchronized 1:1 with 기사 관리 via useHqDrivers)
   const { drivers: hqDrivers } = useHqDrivers();
@@ -182,12 +195,16 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
 
   const driverOptions = useMemo(() => {
     const names = new Set<string>();
-    hqDrivers.forEach((d) => {
-      const cleanName = (d.name || '').replace(/\s*기사$/, '').trim();
-      if (cleanName && cleanName !== '-' && cleanName !== '미배정') {
-        names.add(cleanName);
-      }
-    });
+    if (hqDrivers.length > 0) {
+      // 기사 관리 탭(cockpit.drivers)과 1:1로 동일하게 동기화
+      hqDrivers.forEach((d) => {
+        const cleanName = (d.name || '').replace(/\s*기사$/, '').trim();
+        if (cleanName && cleanName !== '-' && cleanName !== '미배정') {
+          names.add(cleanName);
+        }
+      });
+      return Array.from(names);
+    }
     sourceForCounts.forEach((b) => {
       if (b.driverName && b.driverName !== '-' && b.driverName !== '미배정') {
         names.add(b.driverName.replace(/\s*기사$/, '').trim());
@@ -203,13 +220,39 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
         names.add(c.name.trim());
       }
     });
-    sourceForCounts.forEach((b) => {
-      if (b.customerName && b.customerName.trim() && b.customerName !== '-') {
-        names.add(b.customerName.trim());
-      }
-    });
+    if (dbCustomers.length === 0) {
+      sourceForCounts.forEach((b) => {
+        if (b.customerName && b.customerName.trim() && b.customerName !== '-') {
+          names.add(b.customerName.trim());
+        }
+      });
+    }
     return Array.from(names);
   }, [dbCustomers, sourceForCounts]);
+
+  const statusOptions = useMemo(
+    () => [
+      { value: 'all', label: '전체 상태', dotClass: 'bg-slate-400' },
+      { value: '미배정', label: '미배정 (배차대기)', dotClass: 'bg-amber-500' },
+      { value: 'unacked', label: '확인 대기 / 재확인', dotClass: 'bg-orange-500' },
+      { value: '재확인 필요', label: '변경 재확인 필요', dotClass: 'bg-rose-500' },
+      { value: 'conflict', label: '일정 충돌 경고', dotClass: 'bg-red-600' },
+      { value: '배차 완료', label: '배차 완료', dotClass: 'bg-[#1E60F3]' },
+      { value: '작성 중', label: '임시 초안', dotClass: 'bg-slate-400' },
+      { value: '취소', label: '취소됨', dotClass: 'bg-slate-300' },
+    ],
+    []
+  );
+
+  const selectedStatusLabel = useMemo(() => {
+    return statusOptions.find((o) => o.value === statusFilter)?.label || '전체 상태';
+  }, [statusOptions, statusFilter]);
+
+  const selectedVehicleLabel = useMemo(() => {
+    if (vehicleFilter === 'all') return '전체 차량';
+    const found = vehicleOptions.find((v) => v.plate === vehicleFilter);
+    return found ? `${found.plate} · ${found.modelShort}` : vehicleFilter;
+  }, [vehicleOptions, vehicleFilter]);
 
   const handleResetFilters = () => {
     haptics.lightTap();
@@ -218,6 +261,7 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
     setDriverFilter('all');
     setVehicleFilter('all');
     setCustomerFilter('all');
+    setOpenDropdown(null);
   };
 
   const filteredList = useMemo(() => {
@@ -382,7 +426,7 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
       </div>
 
       {/* 2. Operational Tabs (with real live counts) */}
-      <div className="pt-3 flex items-center justify-between gap-2 overflow-x-auto pb-1">
+      <div className="pt-3 flex items-center justify-between gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button
             type="button"
@@ -491,81 +535,314 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
         </div>
       )}
 
-      {/* 3. Filter Row */}
-      <div className="pt-2.5 pb-1 flex flex-wrap items-center gap-2 text-xs">
-        <div className="relative flex-1 min-w-[160px] sm:min-w-[200px]">
-          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+      {/* 3. Filter Row (Responsive Mobile + Smooth White Card Dropdowns) */}
+      <div
+        ref={filterRowRef}
+        className="pt-3 pb-2 flex flex-col lg:flex-row lg:items-center gap-2 text-xs relative z-[90]"
+      >
+        {/* Search Input (Full width on mobile so placeholder never truncates) */}
+        <div className="relative w-full lg:flex-1 lg:min-w-[220px]">
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="고객사, 승객명, 목적지로 찾아보세요"
-            className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 font-medium focus:outline-none focus:bg-white focus:ring-1 focus:ring-blue-500"
+            className="w-full pl-9 pr-3.5 py-2 bg-slate-50/90 border border-slate-200/90 rounded-xl text-slate-800 placeholder:text-slate-400 font-semibold focus:outline-none focus:bg-white focus:border-[#1E60F3] focus:ring-2 focus:ring-[#1E60F3]/15 transition-all"
           />
         </div>
 
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-bold focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-        >
-          <option value="all">전체 상태</option>
-          <option value="미배정">미배정 (배차대기)</option>
-          <option value="unacked">확인 대기 / 재확인</option>
-          <option value="재확인 필요">변경 재확인 필요</option>
-          <option value="conflict">일정 충돌 경고</option>
-          <option value="배차 완료">배차 완료</option>
-          <option value="작성 중">임시 초안</option>
-          <option value="취소">취소됨</option>
-        </select>
+        {/* Filter Buttons Grid on Mobile / Flex Row on Desktop */}
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full lg:w-auto">
+          {/* 3-1. 전체 상태 드롭다운 */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                haptics.lightTap();
+                setOpenDropdown((prev) => (prev === 'status' ? null : 'status'));
+              }}
+              className={`w-full sm:w-auto min-w-[116px] px-3 py-2 rounded-xl border font-bold flex items-center justify-between gap-2 transition-all cursor-pointer shadow-2xs ${
+                statusFilter !== 'all' || openDropdown === 'status'
+                  ? 'bg-[#EBF3FF]/60 border-[#1E60F3]/40 text-[#1E60F3]'
+                  : 'bg-white border-slate-200/90 hover:border-slate-300 text-slate-700'
+              }`}
+            >
+              <span className="truncate">{selectedStatusLabel}</span>
+              <ChevronDown
+                className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${
+                  openDropdown === 'status' ? 'rotate-180 text-[#1E60F3]' : 'text-slate-400'
+                }`}
+              />
+            </button>
 
-        <select
-          value={driverFilter}
-          onChange={(e) => setDriverFilter(e.target.value)}
-          className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-bold focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-        >
-          <option value="all">전체 기사</option>
-          {driverOptions.map((name) => (
-            <option key={name} value={name}>
-              {name} 기사
-            </option>
-          ))}
-        </select>
+            {openDropdown === 'status' && (
+              <div className="absolute left-0 top-full mt-1.5 w-[210px] sm:w-[220px] bg-white rounded-2xl border border-slate-200/90 shadow-[0_16px_40px_rgba(15,23,42,0.14)] p-2 z-[140] max-h-[300px] overflow-y-auto space-y-1 animate-in fade-in zoom-in-95 duration-150">
+                {statusOptions.map((opt) => {
+                  const isSelected = statusFilter === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => {
+                        haptics.lightTap();
+                        setStatusFilter(opt.value);
+                        setOpenDropdown(null);
+                      }}
+                      className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
+                          : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2 truncate">
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${opt.dotClass}`} />
+                        <span className="truncate">{opt.label}</span>
+                      </span>
+                      {isSelected && <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
-        <select
-          value={vehicleFilter}
-          onChange={(e) => setVehicleFilter(e.target.value)}
-          className="hidden sm:block px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-bold focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer max-w-[170px]"
-        >
-          <option value="all">전체 차량</option>
-          {vehicleOptions.map((v) => (
-            <option key={v.id} value={v.plate}>
-              {v.plate} · {v.modelShort}
-            </option>
-          ))}
-        </select>
+          {/* 3-2. 전체 기사 드롭다운 (기사 관리 DB 1:1 연동) */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                haptics.lightTap();
+                setOpenDropdown((prev) => (prev === 'driver' ? null : 'driver'));
+              }}
+              className={`w-full sm:w-auto min-w-[116px] px-3 py-2 rounded-xl border font-bold flex items-center justify-between gap-2 transition-all cursor-pointer shadow-2xs ${
+                driverFilter !== 'all' || openDropdown === 'driver'
+                  ? 'bg-[#EBF3FF]/60 border-[#1E60F3]/40 text-[#1E60F3]'
+                  : 'bg-white border-slate-200/90 hover:border-slate-300 text-slate-700'
+              }`}
+            >
+              <span className="truncate">
+                {driverFilter === 'all' ? '전체 기사' : `${driverFilter} 기사`}
+              </span>
+              <ChevronDown
+                className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${
+                  openDropdown === 'driver' ? 'rotate-180 text-[#1E60F3]' : 'text-slate-400'
+                }`}
+              />
+            </button>
 
-        <select
-          value={customerFilter}
-          onChange={(e) => setCustomerFilter(e.target.value)}
-          className="hidden md:block px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-bold focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer max-w-[160px]"
-        >
-          <option value="all">전체 고객사</option>
-          {customerOptions.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
+            {openDropdown === 'driver' && (
+              <div className="absolute right-0 sm:left-0 sm:right-auto top-full mt-1.5 w-[210px] sm:w-[220px] bg-white rounded-2xl border border-slate-200/90 shadow-[0_16px_40px_rgba(15,23,42,0.14)] p-2 z-[140] max-h-[300px] overflow-y-auto space-y-1 animate-in fade-in zoom-in-95 duration-150">
+                <button
+                  type="button"
+                  onClick={() => {
+                    haptics.lightTap();
+                    setDriverFilter('all');
+                    setOpenDropdown(null);
+                  }}
+                  className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
+                    driverFilter === 'all'
+                      ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
+                      : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
+                  }`}
+                >
+                  <span>전체 기사</span>
+                  {driverFilter === 'all' && <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />}
+                </button>
+                {driverOptions.map((name) => {
+                  const isSelected = driverFilter === name;
+                  const drvObj = hqDrivers.find(
+                    (d) => (d.name || '').replace(/\s*기사$/, '').trim() === name
+                  );
+                  const isEmployed = drvObj ? drvObj.affiliationType === 'employed' : true;
+                  return (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() => {
+                        haptics.lightTap();
+                        setDriverFilter(name);
+                        setOpenDropdown(null);
+                      }}
+                      className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
+                          : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5 min-w-0">
+                        <span className="truncate">{name} 기사</span>
+                        {drvObj && (
+                          <span
+                            className={`px-1.5 py-0.5 rounded-md text-[10px] font-extrabold shrink-0 ${
+                              isEmployed
+                                ? 'bg-blue-50 text-[#1E60F3]'
+                                : 'bg-slate-100 text-slate-500'
+                            }`}
+                          >
+                            {isEmployed ? '소속' : '프리랜서'}
+                          </span>
+                        )}
+                      </span>
+                      {isSelected && <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
-        <button
-          type="button"
-          onClick={handleResetFilters}
-          className="flex items-center gap-1 px-2.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-lg font-bold transition-all cursor-pointer"
-        >
-          <RotateCcw className="w-3 h-3 text-slate-400" />
-          <span>초기화</span>
-        </button>
+          {/* 3-3. 전체 차량 드롭다운 (차량 관리 1:1 연동, 모바일에서도 노출) */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                haptics.lightTap();
+                setOpenDropdown((prev) => (prev === 'vehicle' ? null : 'vehicle'));
+              }}
+              className={`w-full sm:w-auto min-w-[124px] sm:max-w-[180px] px-3 py-2 rounded-xl border font-bold flex items-center justify-between gap-2 transition-all cursor-pointer shadow-2xs ${
+                vehicleFilter !== 'all' || openDropdown === 'vehicle'
+                  ? 'bg-[#EBF3FF]/60 border-[#1E60F3]/40 text-[#1E60F3]'
+                  : 'bg-white border-slate-200/90 hover:border-slate-300 text-slate-700'
+              }`}
+            >
+              <span className="truncate">{selectedVehicleLabel}</span>
+              <ChevronDown
+                className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${
+                  openDropdown === 'vehicle' ? 'rotate-180 text-[#1E60F3]' : 'text-slate-400'
+                }`}
+              />
+            </button>
+
+            {openDropdown === 'vehicle' && (
+              <div className="absolute left-0 top-full mt-1.5 w-[235px] sm:w-[250px] bg-white rounded-2xl border border-slate-200/90 shadow-[0_16px_40px_rgba(15,23,42,0.14)] p-2 z-[140] max-h-[300px] overflow-y-auto space-y-1 animate-in fade-in zoom-in-95 duration-150">
+                <button
+                  type="button"
+                  onClick={() => {
+                    haptics.lightTap();
+                    setVehicleFilter('all');
+                    setOpenDropdown(null);
+                  }}
+                  className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
+                    vehicleFilter === 'all'
+                      ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
+                      : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
+                  }`}
+                >
+                  <span>전체 차량</span>
+                  {vehicleFilter === 'all' && <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />}
+                </button>
+                {vehicleOptions.map((v) => {
+                  const isSelected = vehicleFilter === v.plate;
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => {
+                        haptics.lightTap();
+                        setVehicleFilter(v.plate);
+                        setOpenDropdown(null);
+                      }}
+                      className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
+                          : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
+                      }`}
+                    >
+                      <span className="flex flex-col min-w-0">
+                        <span className="truncate font-extrabold text-slate-900">{v.plate}</span>
+                        <span className="truncate text-[11px] font-medium text-slate-500">
+                          {v.modelShort}
+                        </span>
+                      </span>
+                      {isSelected && <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* 3-4. 전체 고객사 드롭다운 (고객 관리 DB 1:1 연동, 모바일에서도 노출) */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                haptics.lightTap();
+                setOpenDropdown((prev) => (prev === 'customer' ? null : 'customer'));
+              }}
+              className={`w-full sm:w-auto min-w-[120px] sm:max-w-[170px] px-3 py-2 rounded-xl border font-bold flex items-center justify-between gap-2 transition-all cursor-pointer shadow-2xs ${
+                customerFilter !== 'all' || openDropdown === 'customer'
+                  ? 'bg-[#EBF3FF]/60 border-[#1E60F3]/40 text-[#1E60F3]'
+                  : 'bg-white border-slate-200/90 hover:border-slate-300 text-slate-700'
+              }`}
+            >
+              <span className="truncate">
+                {customerFilter === 'all' ? '전체 고객사' : customerFilter}
+              </span>
+              <ChevronDown
+                className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${
+                  openDropdown === 'customer' ? 'rotate-180 text-[#1E60F3]' : 'text-slate-400'
+                }`}
+              />
+            </button>
+
+            {openDropdown === 'customer' && (
+              <div className="absolute right-0 sm:left-0 sm:right-auto top-full mt-1.5 w-[220px] sm:w-[235px] bg-white rounded-2xl border border-slate-200/90 shadow-[0_16px_40px_rgba(15,23,42,0.14)] p-2 z-[140] max-h-[300px] overflow-y-auto space-y-1 animate-in fade-in zoom-in-95 duration-150">
+                <button
+                  type="button"
+                  onClick={() => {
+                    haptics.lightTap();
+                    setCustomerFilter('all');
+                    setOpenDropdown(null);
+                  }}
+                  className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
+                    customerFilter === 'all'
+                      ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
+                      : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
+                  }`}
+                >
+                  <span>전체 고객사</span>
+                  {customerFilter === 'all' && (
+                    <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />
+                  )}
+                </button>
+                {customerOptions.map((c) => {
+                  const isSelected = customerFilter === c;
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => {
+                        haptics.lightTap();
+                        setCustomerFilter(c);
+                        setOpenDropdown(null);
+                      }}
+                      className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
+                          : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
+                      }`}
+                    >
+                      <span className="truncate">{c}</span>
+                      {isSelected && <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* 3-5. 초기화 버튼 */}
+          <button
+            type="button"
+            onClick={handleResetFilters}
+            className="col-span-2 sm:col-span-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200/90 text-slate-600 rounded-xl font-bold transition-all cursor-pointer active:scale-95"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+            <span>초기화</span>
+          </button>
+        </div>
       </div>
 
       <HqMobileBookingList bookings={filteredList} onView={onViewBooking} onAssign={onAssignDriver || onViewBooking} />
