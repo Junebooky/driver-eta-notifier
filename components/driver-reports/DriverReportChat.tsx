@@ -14,6 +14,7 @@ const time=(date:string)=>new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul'
 const dayLabel=(date:string)=>new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',year:'numeric',month:'long',day:'numeric',weekday:'short'}).format(new Date(date+'T12:00:00+09:00'));
 export function DriverReportChat({driverId,driverName='기사님'}:{driverId:string;driverName?:string}) {
  const [messages,setMessages]=useState<ReportChatMessage[]>([]),[outgoing,setOutgoing]=useState<Outgoing[]>([]);
+ const [localGuidance,setLocalGuidance]=useState<Array<{id:string;body:string;reply:string;created_at:string}>>([]);
  const [text,setText]=useState(''),[error,setError]=useState(''),[hasMore,setHasMore]=useState(false),[loading,setLoading]=useState(true);
  const [draftLoaded,setDraftLoaded]=useState(false);
  const frame=useRef<HTMLDivElement>(null);
@@ -46,7 +47,7 @@ export function DriverReportChat({driverId,driverName='기사님'}:{driverId:str
  },[driverId]);
  useEffect(()=>{if(draftLoaded)try{saveChatDraft(localStorage,driverId,text,outgoing);}catch{queueMicrotask(()=>setError('임시 저장 공간이 부족해요. 작성 내용을 복사해 보관해 주세요.'));}},[draftLoaded,driverId,text,outgoing]);
  useEffect(()=>{if(input.current){input.current.style.height='auto';input.current.style.height=Math.min(176,input.current.scrollHeight)+'px';}},[text]);
- useEffect(()=>{const view=scroller.current;if(view&&stick.current)view.scrollTop=view.scrollHeight;},[messages,outgoing]);
+ useEffect(()=>{const view=scroller.current;if(view&&stick.current)view.scrollTop=view.scrollHeight;},[messages,outgoing,localGuidance]);
  useEffect(()=>{
   const guard=(e:BeforeUnloadEvent)=>{if(text||outgoing.length){e.preventDefault();e.returnValue='';}};
   window.addEventListener('beforeunload',guard);return()=>window.removeEventListener('beforeunload',guard);
@@ -60,6 +61,11 @@ export function DriverReportChat({driverId,driverName='기사님'}:{driverId:str
   try{
    const response=await fetch('/api/driver-reports',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:item.body,requestKey:item.id,driverId})});
    const data=await response.json();if(!response.ok)throw new Error(data.error||'전송하지 못했어요.');
+   if(data.accepted===false&&data.needsTemplate){
+    setOutgoing(p=>p.filter(v=>v.id!==item.id));
+    setLocalGuidance(p=>[...p,{id:item.id,body:item.body,reply:data.reply||'아래 + 버튼에서 보고 양식을 불러와 작성해 주세요.',created_at:item.created_at}]);
+    return;
+   }
    await load();setOutgoing(p=>p.filter(v=>v.id!==item.id));
    if(data.duplicate)setError('이미 접수된 보고예요. 기존 대화와 반영 상태를 확인해 주세요.');
   }catch(e){setOutgoing(p=>p.map(v=>v.id===item.id?{...v,failed:true}:v));setError(e instanceof Error?e.message:'연결을 확인해 주세요.');}
@@ -95,6 +101,7 @@ export function DriverReportChat({driverId,driverName='기사님'}:{driverId:str
    {loading&&<p role="status" className="text-center text-xs text-[#566B7C]">이전 대화를 불러오고 있어요…</p>}
    {messages.map((m,i)=><div key={m.id} className="space-y-3">{koreaDate(new Date(m.created_at))!==today&&(i===0||koreaDate(new Date(messages[i-1].created_at))!==koreaDate(new Date(m.created_at)))&&<p className="text-center text-[11px] text-[#566B7C]">{dayLabel(koreaDate(new Date(m.created_at)))}</p>}{bubble(m,m.sender_type==='driver')}</div>)}
    {outgoing.map(m=>bubble(m,true,m))}
+   {localGuidance.map(m=><div key={m.id} className="space-y-3">{bubble({id:m.id+'-sent',body:m.body,created_at:m.created_at},true)}{bubble({id:m.id+'-help',body:m.reply,created_at:m.created_at},false)}</div>)}
   </section>
   {error&&<div role="status" className="flex items-center gap-2 border-t border-white/50 bg-white/90 px-4 py-2.5 text-xs leading-5 text-[#59646D]"><span className="flex-1">{error}</span><button aria-label="대화 다시 불러오기" onClick={()=>void load().catch(e=>setError(e.message))}><RefreshCw size={15}/></button></div>}
   <footer className="shrink-0 bg-white px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-2.5">

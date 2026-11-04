@@ -51,7 +51,7 @@ export function SharedReportPage(){
    });
    const data=await response.json();
    if(!response.ok)throw new Error(data.error||'보고를 전송하지 못했습니다.');
-   setItems(prev=>[...prev,{id:item.id,body:item.body,at:new Date().toISOString(),reply:data.duplicate?'이미 접수된 동일한 보고입니다.':'보고가 접수되었습니다.\nExcel 반영 상태는 HQ에서 확인합니다.'}]);
+   setItems(prev=>[...prev,{id:item.id,body:item.body,at:new Date().toISOString(),reply:data.reply||'운행보고 잘 받았습니다. 감사합니다 ^.^'}]);
    setDraft('');pending.current=null;
   }catch(e){setError(e instanceof Error?e.message:'연결을 확인하고 다시 보내 주세요.');}
   finally{setBusy(false);input.current?.focus();}

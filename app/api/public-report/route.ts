@@ -45,7 +45,7 @@ export async function POST(req:NextRequest){
   };
   if(link.data.org_id!==session.org)return privateJson({ok:false,error:'사용할 수 없는 링크입니다.'},403);
   const submitted=await submitReport(session,body.message.trim(),body.requestKey);
-  return privateJson({ok:true,received:true,duplicate:submitted.duplicate},201);
+  return privateJson({ok:true,received:submitted.accepted,...submitted},submitted.accepted?201:200);
  }catch(e){
   return privateJson({ok:false,error:e instanceof Error?e.message:'보고를 접수하지 못했습니다.'},400);
  }

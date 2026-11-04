@@ -48,6 +48,6 @@ export function parseDriverReport(raw:string,driverName?:string,now=new Date(),o
   return {draft,vehicleUuid:vehicle?.uuid||null,totalWorkMinutes:work?.total??null,otMinutes:work?.ot||0,nightMinutes:work?.night||0,warnings:result.warnings,reviewReasons:[...new Set(reviewReasons)]};
 }
 export function reportReply(parsed:ParsedDriverReport) {
-  if(parsed.reviewReasons.length)return '운행보고가 접수되었습니다. 관리자 확인이 필요한 항목이 있어 Excel 반영을 기다리고 있어요.\n'+parsed.reviewReasons.join('\n');
-  return `운행보고가 접수되었습니다.\n${parsed.draft.plate} · ${parsed.draft.model}\n근무 ${duration(parsed.totalWorkMinutes||0)}${parsed.draft.overtime?' · '+parsed.draft.overtime:''}\nExcel에 반영하고 있어요.`;
+  if(parsed.reviewReasons.length)return '오늘도 수고 많으셨어요.\n보내주신 내용 중 확인할 항목이 있어요. 담당자가 확인할게요.';
+  return '오늘도 수고 많으셨어요.\n운행보고 잘 받았습니다. 감사합니다 ^.^';
 }
