@@ -6,13 +6,18 @@ import {strFromU8,strToU8} from 'fflate';
  * Formatting changes apply only to newly appended A-L cells and the three
  * requested column widths. Existing rows, formulas and template style IDs stay untouched.
  */
-const COLUMN_WIDTHS: Record<number,number>={7:62,8:22,9:29};
-/** Excel column width has a hard limit of 255 character units. */
+const COLUMN_WIDTHS:Record<number,number>={7:32,8:22,9:29};
+/** Excel imposes a 255-character-unit maximum, even for very long routes. */
 export const EXCEL_MAX_COL_WIDTH=255;
-/** Calculate width of route text, accounting for full-width Korean characters. */
+/** Estimate 10pt route text width (Hangul and wide glyphs need more space). */
 export function routeColumnWidth(routes:string[]){
- const longest=Math.max(0,...routes.map(route=>Array.from(route.replace(/[\r\n]+/g,' ')).reduce((sum,ch)=>sum+(/[\u1100-\u11FF\u2E80-\uA4CF\uAC00-\uD7A3\uF900-\uFAFF\uFE10-\uFE6F\uFF01-\uFF60]/u.test(ch)?2:1),0)));
- return Math.min(EXCEL_MAX_COL_WIDTH,Math.max(COLUMN_WIDTHS[7],Math.ceil(longest+6)));
+ const length=(text:string)=>Array.from(text.replace(/[\r\n]+/g,' ')).reduce((sum,ch)=>{
+  if(/[\u1100-\u11FF\u2E80-\uA4CF\uAC00-\uD7A3\uF900-\uFAFF\uFE10-\uFE6F\uFF01-\uFF60]/u.test(ch))return sum+1.72;
+  if(/[\s.,·\-]/.test(ch))return sum+0.55;
+  return sum+1;
+ },0);
+ const longest=Math.max(0,...routes.map(length));
+ return Math.min(EXCEL_MAX_COL_WIDTH,Math.max(COLUMN_WIDTHS[7],Math.ceil(longest+3)));
 }
 
 const parse=(xml:string)=>{
@@ -131,24 +136,24 @@ function setColAttr(tag:string,name:string,value:string){
  if(re.test(tag))return tag.replace(re,name+'="'+value+'"');
  return tag.replace(/\/>$/, ' '+name+'="'+value+'"/>');
 }
-function colSegment(tag:string,min:number,max:number,width?:number){
+function colSegment(tag:string,min:number,max:number,width?:number,refit=false){
  let next=setColAttr(setColAttr(tag,'min',String(min)),'max',String(max));
  if(width!==undefined){
   const existing=Number(tag.match(/\bwidth="([^"]+)"/)?.[1]||0);
-  next=setColAttr(next,'width',String(Math.max(width,Number.isFinite(existing)?existing:0)));
+  next=setColAttr(next,'width',String(refit?width:Math.max(width,Number.isFinite(existing)?existing:0)));
   next=setColAttr(next,'customWidth','1');
  }
  return next;
 }
-/** Increase widths only; never shrink wider custom widths or unrelated columns. */
-export function widenReportColumns(source:string,routeWidth=62){
+/** Refit route G to its current contents; preserve existing wider widths elsewhere. */
+export function widenReportColumns(source:string,routeWidth=32){
  const match=source.match(/<cols\b[^>]*>[\s\S]*?<\/cols>/);
  const specs=match?Array.from(match[0].matchAll(/<col\b[^>]*\/>/g)).map(x=>x[0]):[];
  if(match){
   const content=match[0].replace(/^<cols\b[^>]*>/,'').replace(/<\/cols>$/,'').replace(/<col\b[^>]*\/>/g,'').trim();
   if(content)throw new Error('특수 열 서식이 있어 자동 너비 조정을 중단했습니다.');
  }
- const required:Record<number,number>={...COLUMN_WIDTHS,7:Math.min(EXCEL_MAX_COL_WIDTH,Math.max(62,routeWidth))};
+ const required:Record<number,number>={...COLUMN_WIDTHS,7:Math.min(EXCEL_MAX_COL_WIDTH,Math.max(COLUMN_WIDTHS[7],routeWidth))};
  const pieces:{min:number;max:number;xml:string}[]=[];
  const covered=new Set<number>();
  for(const spec of specs){
@@ -160,7 +165,7 @@ export function widenReportColumns(source:string,routeWidth=62){
   const bounds=[...new Set(cuts)].sort((a,b)=>a-b);
   for(let i=0;i<bounds.length-1;i++){
    const start=bounds[i],end=bounds[i+1]-1;
-   pieces.push({min:start,max:end,xml:start===min&&end===max&&required[start]===undefined?spec:colSegment(spec,start,end,start===end?required[start]:undefined)});
+   pieces.push({min:start,max:end,xml:start===min&&end===max&&required[start]===undefined?spec:colSegment(spec,start,end,start===end?required[start]:undefined,start===7&&end===7)});
   }
  }
  for(const target of [7,8,9])if(!covered.has(target)){
