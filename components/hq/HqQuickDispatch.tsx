@@ -77,6 +77,7 @@ import { ScheduleItem } from '@/data/ferrariSchedules';
 import { VEHICLE_STATUS_LABELS } from '@/utils/fleetVehicleStatus';
 import { useFleetAvailability } from '@/hooks/useFleetAvailability';
 import { validateDispatchInterval } from '@/utils/dispatchInterval';
+import { editedBookingIdentity } from '@/utils/quickDispatchContinuity';
 import { useHqDrivers } from '@/utils/useHqDrivers';
 
 export interface HqQuickDispatchProps {
@@ -914,11 +915,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
     const isEditMode = Boolean(initialBooking);
     const totalVehicles = allocations.length;
     const isMultiVehicleGroup = totalVehicles > 1;
-    const sharedEventId = (isEditMode && initialBooking?.eventId) || `ev-${Date.now()}`;
-    const sharedGroupId = isEditMode
-      ? initialBooking?.groupId
-      : isMultiVehicleGroup ? `grp-${Date.now()}` : undefined;
-    const sharedGroupName = (isEditMode && initialBooking?.eventName)
+    const lineage = editedBookingIdentity(initialBooking, pickupLocation, destination);
+    const sharedEventId = lineage?.eventId || `ev-${Date.now()}`;
+    const sharedGroupId = lineage ? lineage.groupId : isMultiVehicleGroup ? `grp-${Date.now()}` : undefined;
+    const sharedGroupName = lineage?.eventName
       || `${customerName.trim()} ${isMultiVehicleGroup ? `VIP 단체 의전 (${totalVehicles}대)` : 'VIP 의전'}`;
 
     const isMultiDay = Boolean(pickupEndDate && pickupEndDate !== pickupDate);
@@ -981,11 +981,11 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
         billingTarget: 'end_brand',
         billingTargetName: `${customerName.trim()} 귀하`,
         groupId: sharedGroupId,
-        groupName: isEditMode ? initialBooking?.groupName : isMultiVehicleGroup ? sharedGroupName : undefined,
-        groupTotalVehicles: isEditMode ? (initialBooking?.groupTotalVehicles || totalVehicles) : totalVehicles,
-        groupVehicleIndex: isEditMode ? (initialBooking?.groupVehicleIndex || vehicleNum) : vehicleNum,
-        // Keep the original email identity when an unassigned booking is later assigned on mobile.
-        intakeSource: isEditMode ? initialBooking?.intakeSource : mode === 'unassigned' ? 'phone' : 'quick_dispatch',
+        groupName: lineage ? lineage.groupName : isMultiVehicleGroup ? sharedGroupName : undefined,
+        groupTotalVehicles: lineage?.groupTotalVehicles || totalVehicles,
+        groupVehicleIndex: lineage?.groupVehicleIndex || vehicleNum,
+        // Keep original email identity across mobile/desktop assignment and edits.
+        intakeSource: lineage ? lineage.intakeSource : mode === 'unassigned' ? 'phone' : 'quick_dispatch',
         vehicleNo: resolvedPlate || undefined,
         vehicleModel: resolvedModel || undefined,
         vehiclePlate: resolvedPlate || undefined,
@@ -999,13 +999,11 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
         vehicleId: matchedVehicle?.uuid,
         origin: pickupLocation.trim(),
         destination: destination.trim(),
-        // Reuse only previously verified POI coordinates for unchanged email locations.
-        // Changing a place invalidates its old coordinates and requires re-verification.
-        originLat: isEditMode && pickupLocation.trim() === initialBooking?.pickupLocation.trim() ? initialBooking?.pickupLat : undefined,
-        originLng: isEditMode && pickupLocation.trim() === initialBooking?.pickupLocation.trim() ? initialBooking?.pickupLng : undefined,
-        destinationLat: isEditMode && destination.trim() === initialBooking?.destination.trim() ? initialBooking?.destinationLat : undefined,
-        destinationLng: isEditMode && destination.trim() === initialBooking?.destination.trim() ? initialBooking?.destinationLng : undefined,
-        placeVerified: isEditMode ? (pickupLocation.trim() === initialBooking?.pickupLocation.trim() && destination.trim() === initialBooking?.destination.trim() ? initialBooking?.placeVerified : false) : undefined,
+        originLat: lineage?.originLat,
+        originLng: lineage?.originLng,
+        destinationLat: lineage?.destinationLat,
+        destinationLng: lineage?.destinationLng,
+        placeVerified: lineage?.placeVerified,
         passengerName: resolvedPassengerName,
         passengerPhone: resolvedPassengerPhone,
         passengerCount: Math.max(1, commonPassengerCount || 1),
