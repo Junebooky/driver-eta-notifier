@@ -26,7 +26,10 @@ export async function GET(req:NextRequest){
    const month=requested|| (months.includes(todayMonth)?todayMonth:months.at(-1));
    if(!month)throw new Error('월별 Excel 시트가 없습니다.');
    const offset=Number(req.nextUrl.searchParams.get('offset')||'0');if(!Number.isInteger(offset)||offset<0||offset>25000)throw new Error('조회 위치를 확인해 주세요.');
-   return privateJson({ok:true,version:w.id,year:w.year,filename:w.filename,...readWorkbookGrid(w.bytes,month,300,offset)});
+   const focusText=req.nextUrl.searchParams.get('focusRow');
+   const focusRow=focusText===null?undefined:Number(focusText);
+   if(focusRow!==undefined&&(!/^\\d{1,5}$/.test(focusText!)||!Number.isInteger(focusRow)||focusRow<2||focusRow>25000))throw new Error('이동할 Excel 행을 확인해 주세요.');
+   return privateJson({ok:true,version:w.id,year:w.year,filename:w.filename,...readWorkbookGrid(w.bytes,month,300,offset,focusRow)});
   }
   if(version&&version!=='original'&&!UUID.test(version))throw new Error('버전을 확인해 주세요.');
   if(req.nextUrl.searchParams.get('download')==='1'){
