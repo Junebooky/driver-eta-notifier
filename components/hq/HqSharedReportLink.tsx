@@ -9,6 +9,8 @@ type LinkStatus={
  active:boolean;
  issuedAt:string|null;
  expiresAt:string|null;
+ path?:string|null;
+ needsRecovery?:boolean;
  error?:string;
 };
 type Notice={text:string;kind:'success'|'error'};
@@ -27,6 +29,7 @@ const formatExpiry=(value:string)=>{
 export function HqSharedReportLink(){
  const [state,setState]=useState<LinkStatus|null>(null);
  const [link,setLink]=useState('');
+ const [recoveryInput,setRecoveryInput]=useState('');
  const [notice,setNotice]=useState<Notice|null>(null);
  const [busy,setBusy]=useState(false);
  const [refreshing,setRefreshing]=useState(false);
@@ -36,6 +39,7 @@ export function HqSharedReportLink(){
   const data=await res.json();
   if(!res.ok)throw new Error(data.error||'링크 상태를 확인하지 못했어요.');
   setState(data as LinkStatus);
+  setLink(data.path?window.location.origin+data.path:'');
  },[]);
 
  useEffect(()=>{
@@ -49,26 +53,27 @@ export function HqSharedReportLink(){
   finally{setRefreshing(false);}
  }
 
- async function act(action:'issue'|'revoke'){
+ async function act(action:'issue'|'revoke'|'remember'){
   if(action==='issue'&&state?.active&&!window.confirm('기존 링크가 즉시 무효화됩니다. 새 링크를 발급할까요?'))return;
   if(action==='revoke'&&!window.confirm('현재 공유된 운행보고 링크를 폐기할까요?'))return;
+  if(action==='remember'&&!recoveryInput.trim())return;
   setBusy(true);
   setNotice(null);
   try{
    const res=await fetch('/api/hq/report-links',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({action})
+    body:JSON.stringify({action,link:action==='remember'?recoveryInput.trim():undefined})
    });
    const data=await res.json();
    if(!res.ok)throw new Error(data.error||'링크를 관리하지 못했어요.');
-   setLink(data.path?location.origin+data.path:'');
    await refresh();
+   if(action==='remember')setRecoveryInput('');
    setNotice({
     kind:'success',
     text:action==='issue'
-     ?'새 링크를 발급했어요. 이 화면에서 한 번만 확인할 수 있어요.'
-     :'링크를 폐기했어요.'
+     ?'새 링크를 발급했어요. 언제든 다시 복사할 수 있어요.'
+     :action==='remember'?'기존 링크를 다시 확인할 수 있게 보관했어요.':'링크를 폐기했어요.'
    });
   }catch(error){
    setNotice({kind:'error',text:(error as Error).message});
@@ -92,8 +97,8 @@ export function HqSharedReportLink(){
   <div className="flex min-w-0 items-start gap-4 sm:gap-5">
    <HqExcelSectionIcon src="/images/icons/excel/icon_link.png" label="공용 운행 링크"/>
    <div className="min-w-0 space-y-1">
-    <h2 className="text-[21px] font-bold leading-tight tracking-[-0.035em] text-[#263550] sm:text-[24px]">공용 운행 링크</h2>
-    <p className="text-[14px] leading-6 text-[#65738B] sm:text-[15px]">링크로 운행보고를 간편하게 받아보세요.</p>
+    <h2 className="font-bold text-slate-800">공용 운행 링크</h2>
+    <p className="mt-1 text-sm text-slate-500">링크로 운행보고를 간편하게 받아보세요.</p>
    </div>
   </div>
 
@@ -126,7 +131,7 @@ export function HqSharedReportLink(){
    <div className="flex flex-wrap items-start justify-between gap-3">
     <div>
      <h3 className="text-[16px] font-semibold tracking-[-0.025em] text-[#2B3953]">발급된 링크</h3>
-     <p className="mt-1 text-[13px] text-[#7A879A]">이 화면에서 한 번만 확인할 수 있어요.</p>
+     <p className="mt-1 text-[13px] text-[#7A879A]">필요할 때 언제든 다시 복사할 수 있어요.</p>
     </div>
     <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E6EEFC] px-3 py-1.5 text-[12px] font-medium text-[#1E60F3]">
      <ShieldCheck size={15}/>보안 링크
@@ -140,6 +145,17 @@ export function HqSharedReportLink(){
     className="inline-flex min-h-10 items-center gap-2 rounded-xl px-1 text-[14px] font-semibold text-[#1E60F3] transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B7CBFC]">
     <Copy size={18}/>링크 복사
    </button>
+  </div>}
+
+
+  {state?.active&&state.needsRecovery&&!link&&<div className="min-w-0 space-y-3 rounded-[20px] bg-[#F3F6FC] p-4 sm:p-5">
+   <p className="text-sm font-semibold text-[#465775]">기존 링크를 다시 표시할 수 있어요</p>
+   <p className="text-[13px] leading-6 text-[#77869A]">이전에 발급한 주소는 원문을 저장하지 않았어요. 기존에 공유했던 링크를 아래에 붙여넣으면 다시 확인할 수 있어요. 원문을 찾을 수 없다면 새 링크를 발급해 주세요.</p>
+   <form onSubmit={event=>{event.preventDefault();void act('remember');}} className="flex min-w-0 flex-col gap-2 sm:flex-row">
+    <input aria-label="기존 운행보고 링크 붙여넣기" value={recoveryInput} onChange={event=>setRecoveryInput(event.target.value)}
+     placeholder="기존 링크 주소를 붙여넣어 주세요" className="h-11 min-w-0 flex-1 rounded-xl border border-[#DFE7F1] bg-white px-3 text-[14px] text-[#465775] outline-none focus:border-[#1E60F3]"/>
+    <button type="submit" disabled={locked||!recoveryInput.trim()} className={subtleButton}>기존 링크 보관</button>
+   </form>
   </div>}
 
   {notice&&<div role="status" aria-live="polite"
