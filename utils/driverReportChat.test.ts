@@ -37,3 +37,20 @@ test('yearless reports use the active ledger year, never the server calendar; ni
  assert.equal(p.draft.overtime,'OT 2시간 / 심야 2시간');
  assert.deepEqual(workMinutes('20:00','30:00',4),{total:600,ot:0,night:360});
 });
+
+test('odometer and expense lines remain in raw text but are not mapped to Excel A-L billing or route',()=>{
+ const message=raw('07:00~19:00','125호 7665').replace('운행일지',
+  '시작km : 43,780 km\\n종료km : 43,965 km\\n일일운행합 : 185 km\\n운행일지').replace('경비지출',
+  '경비지출\\n통행료 : 4,300원\\n주차비 : 18,000원');
+ const parsed=parseDriverReport(message,'검증 기사',new Date('2026-10-24'),{workbookYear:2026});
+ assert.deepEqual(parsed.reviewReasons,[]);
+ assert.equal(parsed.draft.date,'2026-10-24');
+ assert.equal(parsed.draft.model,'스타리아');
+ assert.equal(parsed.draft.time,'07:00~19:00');
+ assert.equal(parsed.draft.overtime,'OT 2시간');
+ assert.equal(parsed.draft.amount,'');
+ assert.equal(parsed.draft.payment,'');
+ assert.equal(parsed.draft.totalWithVat,'');
+ for(const marker of ['43,780','43,965','185 km','통행료','18,000'])assert.equal(parsed.draft.route.includes(marker),false);
+ assert.ok(message.includes('일일운행합 : 185 km'));
+});

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import {readChatDraft,saveChatDraft,clearChatDrafts} from '@/utils/reportChatDraft';
 import {ArrowLeft,Plus,RefreshCw,ChevronUp} from 'lucide-react';
 import {VipChatAvatar} from './VipChatAvatar';
+import {useChatViewport} from './useChatViewport';
 import type {ReportChatMessage} from '@/types/driverReportChat';
 import {koreaDate} from '@/utils/driverReportChat';
 
@@ -15,6 +16,7 @@ export function DriverReportChat({driverId,driverName='기사님'}:{driverId:str
  const [text,setText]=useState(''),[error,setError]=useState(''),[hasMore,setHasMore]=useState(false),[loading,setLoading]=useState(true);
  const [draftLoaded,setDraftLoaded]=useState(false);
  const frame=useRef<HTMLDivElement>(null);
+ useChatViewport(frame);
  const [today,setToday]=useState(koreaDate()),[templates,setTemplates]=useState(false),[sending,setSending]=useState(false);
  const scroller=useRef<HTMLElement>(null),input=useRef<HTMLTextAreaElement>(null),active=useRef(true),inflight=useRef(false),stick=useRef(true),fetched=useRef(false);
  const load=useCallback(async(before?:number)=>{
@@ -42,11 +44,6 @@ export function DriverReportChat({driverId,driverName='기사님'}:{driverId:str
   window.addEventListener('report-draft-clear',clear);return()=>{alive=false;window.removeEventListener('report-draft-clear',clear);};
  },[driverId]);
  useEffect(()=>{if(draftLoaded)try{saveChatDraft(localStorage,driverId,text,outgoing);}catch{queueMicrotask(()=>setError('임시 저장 공간이 부족해요. 작성 내용을 복사해 보관해 주세요.'));}},[draftLoaded,driverId,text,outgoing]);
- useEffect(()=>{
-  const vv=window.visualViewport;const fit=()=>{if(frame.current)frame.current.style.height=Math.round(vv?.height||window.innerHeight)+'px';};
-  fit();vv?.addEventListener('resize',fit);window.addEventListener('resize',fit);
-  return()=>{vv?.removeEventListener('resize',fit);window.removeEventListener('resize',fit);};
- },[]);
  useEffect(()=>{if(input.current){input.current.style.height='auto';input.current.style.height=Math.min(176,input.current.scrollHeight)+'px';}},[text]);
  useEffect(()=>{const view=scroller.current;if(view&&stick.current)view.scrollTop=view.scrollHeight;},[messages,outgoing]);
  useEffect(()=>{
@@ -85,7 +82,7 @@ export function DriverReportChat({driverId,driverName='기사님'}:{driverId:str
    </div>
   </div>
  </div>;
- return <div ref={frame} className="mx-auto flex h-dvh min-h-0 min-w-0 w-full max-w-full flex-col overflow-x-hidden overflow-y-hidden bg-[#B2C7D9] text-[#30353A] sm:max-w-2xl">
+ return <div ref={frame} className="fixed inset-x-0 top-0 z-40 mx-auto flex h-dvh min-h-0 min-w-0 w-full max-w-full flex-col overflow-x-hidden overflow-y-hidden bg-[#B2C7D9] text-[#30353A] sm:max-w-2xl">
   <header className="z-10 flex shrink-0 items-center gap-2 bg-[#B2C7D9] px-2 pb-3 pt-[max(12px,env(safe-area-inset-top))]">
    <Link href="/" aria-label="기사 홈으로" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg hover:bg-white/15"><ArrowLeft size={24} strokeWidth={1.9}/></Link>
    <div className="min-w-0 flex-1"><h1 className="truncate text-[18px] font-semibold tracking-[-0.025em]">VIP리무진코리아</h1></div>

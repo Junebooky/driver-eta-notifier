@@ -2,6 +2,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {ArrowLeft,Plus,RefreshCw} from 'lucide-react';
 import {VipChatAvatar} from '@/components/driver-reports/VipChatAvatar';
+import {useChatViewport} from '@/components/driver-reports/useChatViewport';
 
 const STORE_KEY='vip_shared_report_link_v1';
 const valid=(s:string)=>/^[A-Za-z0-9_-]{43}$/.test(s);
@@ -16,6 +17,7 @@ export function SharedReportPage(){
  const [error,setError]=useState(''),[busy,setBusy]=useState(false),[templates,setTemplates]=useState(false);
  const pending=useRef<{id:string;body:string}|null>(null);
  const frame=useRef<HTMLElement>(null),scroller=useRef<HTMLElement>(null);
+ useChatViewport(frame);
  const input=useRef<HTMLTextAreaElement>(null);
  useEffect(()=>{
   const incoming=new URLSearchParams(location.hash.slice(1)).get('key')||'';
@@ -28,12 +30,6 @@ export function SharedReportPage(){
   queueMicrotask(()=>{setToken(valid(stored)?stored:'');setReady(true);});
  },[]);
  useEffect(()=>{const view=scroller.current;if(view)view.scrollTop=view.scrollHeight;},[items,error]);
- useEffect(()=>{
-  const viewport=window.visualViewport;
-  const resize=()=>{if(frame.current)frame.current.style.height=Math.round(viewport?.height||window.innerHeight)+'px';};
-  resize();viewport?.addEventListener('resize',resize);window.addEventListener('resize',resize);
-  return()=>{viewport?.removeEventListener('resize',resize);window.removeEventListener('resize',resize);};
- },[]);
  useEffect(()=>{if(input.current){input.current.style.height='auto';input.current.style.height=Math.min(176,input.current.scrollHeight)+'px';}},[draft]);
  function template(){
   const [y,m,d]=today().split('-');
@@ -60,7 +56,7 @@ export function SharedReportPage(){
   finally{setBusy(false);input.current?.focus();}
  }
  function goBack(){if(draft.trim()&&!confirm('작성 중인 보고를 두고 나가시겠어요?'))return;window.history.back();}
- return <main ref={frame} className="mx-auto flex h-dvh min-h-0 min-w-0 w-full max-w-full flex-col overflow-x-hidden overflow-y-hidden bg-[#B2C7D9] text-[#30353A] sm:max-w-2xl">
+ return <main ref={frame} className="fixed inset-x-0 top-0 z-40 mx-auto flex h-dvh min-h-0 min-w-0 w-full max-w-full flex-col overflow-x-hidden overflow-y-hidden bg-[#B2C7D9] text-[#30353A] sm:max-w-2xl">
   <header className="z-10 flex shrink-0 items-center gap-2 bg-[#B2C7D9] px-2 pb-3 pt-[max(12px,env(safe-area-inset-top))]">
    <button type="button" aria-label="뒤로 가기" onClick={goBack} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg hover:bg-white/15"><ArrowLeft size={24} strokeWidth={1.9}/></button>
    <h1 className="min-w-0 flex-1 truncate text-[18px] font-semibold tracking-[-0.025em]">VIP리무진코리아</h1>
