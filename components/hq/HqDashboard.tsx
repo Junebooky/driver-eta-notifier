@@ -27,6 +27,7 @@ import { HqDrivingLogsView } from '@/components/hq/driving-logs/HqDrivingLogsVie
 import { HqExpensesView } from '@/components/hq/expenses/HqExpensesView';
 import { HqEmailInboxView } from '@/components/hq/email/HqEmailInboxView';
 import { HqCustomersView } from '@/components/hq/customers/HqCustomersView';
+import { HqKakaoExcelImportView } from '@/components/hq/HqKakaoExcelImportView';
 import { HqReportsView } from '@/components/hq/reports/HqReportsView';
 import { HqDriversView } from '@/components/hq/drivers/HqDriversView';
 import { HqVehicleManagementView } from '@/components/hq/vehicles/HqVehicleManagementView';
@@ -639,7 +640,7 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
                         ? '고객 이메일 · 예약 접수'
                         : activeSidebarTab === 'customers'
                           ? '고객 관리'
-                          : activeSidebarTab === 'reports'
+                          : activeSidebarTab === 'excel_import' ? '카카오톡 → Excel 자동입력' : activeSidebarTab === 'reports'
                             ? '정산 · 수익성 · 종합 리포트'
                             : activeSidebarTab === 'vehicles'
                               ? '차량 관리'
@@ -664,6 +665,8 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
               <span className="text-slate-500 font-medium">
                 주요 고객사의 담당자, 계약 단가, 청구 내역을 한눈에 확인하고 관리합니다.
               </span>
+            ) : activeSidebarTab === 'excel_import' ? (
+              <span className="text-slate-500 font-medium">카카오톡 운행보고를 검토하고 기존 회사 Excel에 반영합니다.</span>
             ) : activeSidebarTab === 'reports' ? (
               <span className="text-slate-500 font-medium">
                 고객사 서비스 시간 기준 정산 · 기사 인건비 · 배차별 직접이익 분석 및 리포트
@@ -751,6 +754,8 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
               initialSearchQuery={searchQuery}
               onOpenSettlementReport={() => navigateWorkspace('reports')}
             />
+          ) : activeSidebarTab === 'excel_import' ? (
+            <HqKakaoExcelImportView />
           ) : activeSidebarTab === 'reports' ? (
             <HqReportsView initialSearchQuery={searchQuery} />
           ) : activeSidebarTab === 'drivers' ? (
