@@ -27,6 +27,7 @@ import { HqDrivingLogsView } from '@/components/hq/driving-logs/HqDrivingLogsVie
 import { HqExpensesView } from '@/components/hq/expenses/HqExpensesView';
 import { HqEmailInboxView } from '@/components/hq/email/HqEmailInboxView';
 import { HqCustomersView } from '@/components/hq/customers/HqCustomersView';
+import { HqKakaoExcelImportView } from '@/components/hq/HqKakaoExcelImportView';
 import { HqReportsView } from '@/components/hq/reports/HqReportsView';
 import { HqDriversView } from '@/components/hq/drivers/HqDriversView';
 import { HqVehicleManagementView } from '@/components/hq/vehicles/HqVehicleManagementView';
@@ -683,6 +684,8 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
               initialSearchQuery={searchQuery}
               onOpenSettlementReport={() => navigateWorkspace('reports')}
             />
+          ) : activeSidebarTab === 'excel_import' ? (
+            <HqKakaoExcelImportView />
           ) : activeSidebarTab === 'reports' ? (
             <HqReportsView initialSearchQuery={searchQuery} />
           ) : activeSidebarTab === 'drivers' ? (

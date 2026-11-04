@@ -173,6 +173,11 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
       iconSrc: '/images/icons/report/icon_report.png',
     },
     {
+      id: 'excel_import',
+      label: '카카오톡 → Excel',
+      iconSrc: '/images/icons/excel/icon_kakao.png',
+    },
+    {
       id: 'settings',
       label: '설정·권한',
       iconSrc: '/images/icons/settings/icon_setting.png',
@@ -223,6 +228,10 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
     reports: {
       active: 'bg-indigo-50/90 text-indigo-900 border-indigo-200/80 shadow-2xs',
       hover: 'hover:bg-indigo-50/40 hover:text-indigo-900',
+    },
+    excel_import: {
+      active: 'bg-amber-50/90 text-amber-900 border-amber-200/80 shadow-2xs',
+      hover: 'hover:bg-amber-50/40 hover:text-amber-900',
     },
     settings: {
       active: 'bg-slate-100/95 text-slate-800 border-slate-200/80 shadow-2xs',

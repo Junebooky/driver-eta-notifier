@@ -2,6 +2,8 @@ import { Client } from 'pg';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
+import {verifyReportCompletion} from './report-completion.integration';
+import { verifyDriverReportChat } from './driver-report-chat.integration';
 import { verifyReportingFlow } from './reporting-flow.integration';
 
 async function main() {
@@ -32,6 +34,7 @@ async function main() {
     );
     INSERT INTO cockpit.schedules(id,vehicle_no,date,pickup_time,end_date,end_time,passenger_name)
       VALUES('00000000-0000-4000-8000-000000000001',NULL,'2026-12-01','23:00','2026-12-01',NULL,'legacy hold');`);
+    await verifyDriverReportChat(admin,connectionString);
     await admin.query(readFileSync('supabase/migrations/20261030_atomic_dispatch_and_fleet_schema.sql','utf8'));
     // Running the proposal twice must preserve data and remain valid.
     await admin.query(readFileSync('supabase/migrations/20261030_atomic_dispatch_and_fleet_schema.sql','utf8'));
@@ -171,6 +174,7 @@ async function main() {
     await admin.query('RESET ROLE');
     console.log('PASS immutable profile UUID and linked assets across vehicle assignments; public access denied');
     await verifyReportingFlow(admin,a,b);
+    await verifyReportCompletion(admin,connectionString);
 
   } finally { await a.end().catch(()=>{}); await b.end().catch(()=>{}); await admin.end(); }
 }

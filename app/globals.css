@@ -286,3 +286,38 @@ dialog::backdrop {
   .hq-app :is(button, input, select, textarea) { scroll-margin-block-end: calc(96px + env(safe-area-inset-bottom)); }
   .hq-app select { min-height: 44px; }
 }
+
+
+/* HQ Excel: elevation only on pointer devices; touch interactions stay stable. */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .hq-excel-download-lift {
+    transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 220ms ease;
+  }
+  .hq-excel-download-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 9px 20px rgba(53, 84, 136, 0.12);
+  }
+}
+
+/* One brief left-right shake per 30 seconds; no hover reaction or tooltip. */
+@keyframes hq-report-unread-shake {
+  0%, 2.5%, 100% { transform: translateX(0) rotate(0); }
+  0.4% { transform: translateX(-3px) rotate(-5deg); }
+  0.8% { transform: translateX(3px) rotate(5deg); }
+  1.2% { transform: translateX(-3px) rotate(-4deg); }
+  1.6% { transform: translateX(3px) rotate(4deg); }
+  2% { transform: translateX(-1px) rotate(-2deg); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hq-report-unread-wiggle {
+    transform-origin: 50% 75%;
+    animation: hq-report-unread-shake 30s linear infinite;
+  }
+}
+
+/* HQ inline workbook: comfortable horizontal scrollbar on pointer devices. */
+.hq-excel-scroll {scrollbar-width:auto;scrollbar-color:#A9B9CC #EFF3F8;}
+.hq-excel-scroll::-webkit-scrollbar {height:16px;width:13px;}
+.hq-excel-scroll::-webkit-scrollbar-track {background:#EFF3F8;border-radius:12px;}
+.hq-excel-scroll::-webkit-scrollbar-thumb {background:#A9B9CC;border:3px solid #EFF3F8;border-radius:12px;min-width:48px;}
+.hq-excel-scroll::-webkit-scrollbar-thumb:hover {background:#889DB7;}
