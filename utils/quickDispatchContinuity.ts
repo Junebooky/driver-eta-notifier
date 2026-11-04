@@ -29,3 +29,24 @@ export function editedBookingIdentity(
     placeVerified: samePickup && sameDestination ? original.placeVerified : false,
   };
 }
+
+/** Resolve new TMAP selections and previously verified, unchanged legs independently. */
+export function resolveQuickDispatchPlaces(
+  lineage: ReturnType<typeof editedBookingIdentity>,
+  pickupPoi: {lat:number;lng:number}|null,
+  destinationPoi: {lat:number;lng:number}|null,
+) {
+  const valid=(poi:{lat:number;lng:number}|null) =>
+    Boolean(poi && Number.isFinite(poi.lat) && Number.isFinite(poi.lng) && Math.abs(poi.lat)<=90 && Math.abs(poi.lng)<=180);
+  const newPickup=valid(pickupPoi)?pickupPoi:null;
+  const newDestination=valid(destinationPoi)?destinationPoi:null;
+  return {
+    originLat:newPickup?.lat ?? lineage?.originLat,
+    originLng:newPickup?.lng ?? lineage?.originLng,
+    destinationLat:newDestination?.lat ?? lineage?.destinationLat,
+    destinationLng:newDestination?.lng ?? lineage?.destinationLng,
+    placeVerified:lineage || pickupPoi || destinationPoi
+      ? Boolean((newPickup || lineage?.pickupPoiVerified) && (newDestination || lineage?.destinationPoiVerified))
+      : undefined,
+  };
+}
