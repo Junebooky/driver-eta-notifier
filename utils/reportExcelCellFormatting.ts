@@ -148,7 +148,7 @@ export function widenReportColumns(source:string,routeWidth=62){
   const content=match[0].replace(/^<cols\b[^>]*>/,'').replace(/<\/cols>$/,'').replace(/<col\b[^>]*\/>/g,'').trim();
   if(content)throw new Error('특수 열 서식이 있어 자동 너비 조정을 중단했습니다.');
  }
- const required={...COLUMN_WIDTHS,7:Math.min(EXCEL_MAX_COL_WIDTH,Math.max(62,routeWidth))};
+ const required:Record<number,number>={...COLUMN_WIDTHS,7:Math.min(EXCEL_MAX_COL_WIDTH,Math.max(62,routeWidth))};
  const pieces:{min:number;max:number;xml:string}[]=[];
  const covered=new Set<number>();
  for(const spec of specs){
