@@ -148,6 +148,25 @@ export async function verifyReportCompletion(c:Client,url:string){
  assert.equal((await c.query('SELECT excel_row_number FROM cockpit.report_submissions WHERE id=$1',[lateId])).rows[0].excel_row_number,3);
  const serialDate=workbookFromFile(new Uint8Array(ordered.bytes)).Sheets['11월'].cells.A2.v;
  assert.equal(typeof serialDate==='number'?new Date(Date.UTC(1899,11,30)+serialDate*86400000).toISOString().slice(0,10):serialDate,'2026-11-05');
+
+ // A NEW older report must rearrange the cells and all existing DB manifest
+ // references in the same compare-and-swap transaction.
+ const olderRaw='11월 1일\n수행담당 : 김승준\n차량번호 : 700호 1458\n고객명 : 정렬검증\n시작 시간 : 09:00\n종료 시간 : 18:00\n운행일지\n서울 -> 인천 -> 서울';
+ const olderParsed=parseDriverReport(olderRaw,undefined,new Date(),{workbookYear:2026});
+ assert.deepEqual(olderParsed.reviewReasons,[]);
+ const olderId=(await call(c,'submit_report',[sortOrg,randomUUID(),randomUUID(),tokenHash(newDeviceSecret()),olderRaw,olderParsed,'ok'])).id as string;
+ const olderJob=(await call(c,'claim_report_jobs',[1,sortOrg,olderId]))[0];
+ const oldAppend=appendKakaoExcelReport(new Uint8Array(ordered.bytes),olderParsed.draft);
+ const orderedAppend=organizeManagedMonth(oldAppend.bytes,'11월',2026,ordered.manifest,{row:oldAppend.rowNumber,date:'2026-11-01'});
+ assert.equal(orderedAppend.changed,true);assert.equal(orderedAppend.rowNumber,2);
+ assert.equal(orderedAppend.moves[earlyId],3);assert.equal(orderedAppend.moves[lateId],4);
+ assert.equal(await call(c,'commit_report_plan',[sortOrg,olderId,1,olderJob.lease_token,actor,
+  [{year:2026,expected:ordered.id,storage:storage(orderedAppend.bytes),moves:orderedAppend.moves}],
+  '11월',orderedAppend.rowNumber]),true);
+ const finalLedger=(await c.query('SELECT v.* FROM cockpit.report_ledgers l JOIN cockpit.report_workbook_versions v ON v.id=l.active_version WHERE l.org_id=$1 AND l.year=2026',[sortOrg])).rows[0];
+ assert.equal(finalLedger.manifest[olderId].row,2);assert.equal(finalLedger.manifest[earlyId].row,3);
+ assert.equal(finalLedger.manifest[lateId].row,4);
+ assert.equal((await c.query('SELECT excel_row_number FROM cockpit.report_submissions WHERE id=$1',[earlyId])).rows[0].excel_row_number,3);
  console.log('PASS HQ Excel: protected cell edit and CAS, date order compaction with DB row bindings');
  console.log('PASS HQ reading: today-only applied unread badge, read receipts, re-application, secure link retrieval and limited grants');
  console.log('PASS shared report link: token rotation/revoke, no public DB access, unbound intake submission and durable queue');
