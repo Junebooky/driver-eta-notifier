@@ -3,19 +3,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
-  CalendarCheck,
-  Building2,
-  Mail,
-  Car,
-  Users,
-  FileSpreadsheet,
-  Receipt,
-  BookOpen,
-  BarChart3,
-  Settings,
-  Smartphone,
-  Activity,
-  Calculator,
   X,
   LogOut,
   Pin,
@@ -119,32 +106,129 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
 
   const isExpanded = isPinned || isHovered;
 
-  const menuItems: {
+  interface MenuItem {
     id: string;
     label: string;
-    icon: React.ElementType;
+    iconSrc: string;
     badge?: number;
     badgeColor?: string;
-  }[] = [
+  }
+
+  const menuItems: MenuItem[] = [
     {
       id: 'dispatch',
       label: '예약·배차 관리',
-      icon: CalendarCheck,
+      iconSrc: '/images/icons/reservations/icon_reservations.png',
       badge: dispatchActionBadgeCount > 0 ? dispatchActionBadgeCount : undefined,
       badgeColor: 'bg-[#1E60F3] text-white',
     },
-    { id: 'operations', label: '실시간 운영 보드', icon: Activity },
-    { id: 'quotes', label: '견적·가격표', icon: Calculator },
-    { id: 'customers', label: '고객 관리', icon: Building2 },
-    { id: 'emails', label: '고객 이메일', icon: Mail },
-    { id: 'vehicles', label: '차량 관리', icon: Car },
-    { id: 'drivers', label: '기사 관리', icon: Users },
-    { id: 'driving_logs', label: '운행일지 관리', icon: FileSpreadsheet },
-    { id: 'expenses', label: '경비지출', icon: Receipt },
-    { id: 'field_knowledge', label: '현장 지식', icon: BookOpen },
-    { id: 'reports', label: '보고서·통계', icon: BarChart3 },
-    { id: 'settings', label: '설정·권한', icon: Settings },
+    {
+      id: 'operations',
+      label: '실시간 운영 보드',
+      iconSrc: '/images/icons/live_dashboard/icon_live_dashboard.png',
+    },
+    {
+      id: 'quotes',
+      label: '견적·가격표',
+      iconSrc: '/images/icons/calculator.png',
+    },
+    {
+      id: 'customers',
+      label: '고객 관리',
+      iconSrc: '/images/icons/clients/icon_clients.png',
+    },
+    {
+      id: 'emails',
+      label: '고객 이메일',
+      iconSrc: '/images/icons/eemail/icon_email.png',
+    },
+    {
+      id: 'vehicles',
+      label: '차량 관리',
+      iconSrc: '/images/icons/vehicles/icon_vehicle.png',
+    },
+    {
+      id: 'drivers',
+      label: '기사 관리',
+      iconSrc: '/images/icons/drivers/icon_driver.png',
+    },
+    {
+      id: 'driving_logs',
+      label: '운행일지 관리',
+      iconSrc: '/images/icons/driving-logs/icon_driving_log.png',
+    },
+    {
+      id: 'expenses',
+      label: '경비지출',
+      iconSrc: '/images/icons/driver_ui/icon_expense.png',
+    },
+    {
+      id: 'field_knowledge',
+      label: '현장 지식',
+      iconSrc: '/images/icons/knowledge/icon_knowledge.png',
+    },
+    {
+      id: 'reports',
+      label: '보고서·통계',
+      iconSrc: '/images/icons/report/icon_report.png',
+    },
+    {
+      id: 'settings',
+      label: '설정·권한',
+      iconSrc: '/images/icons/settings/icon_setting.png',
+    },
   ];
+
+  const tabColorStyles: Record<string, { active: string; hover: string }> = {
+    dispatch: {
+      active: 'bg-blue-50/90 text-blue-700 border-blue-200/80 shadow-2xs',
+      hover: 'hover:bg-blue-50/40 hover:text-blue-700',
+    },
+    operations: {
+      active: 'bg-sky-50/90 text-sky-800 border-sky-200/80 shadow-2xs',
+      hover: 'hover:bg-sky-50/40 hover:text-sky-800',
+    },
+    quotes: {
+      active: 'bg-amber-50/90 text-amber-900 border-amber-200/80 shadow-2xs',
+      hover: 'hover:bg-amber-50/40 hover:text-amber-900',
+    },
+    customers: {
+      active: 'bg-yellow-50/90 text-yellow-900 border-yellow-200/80 shadow-2xs',
+      hover: 'hover:bg-yellow-50/40 hover:text-yellow-900',
+    },
+    emails: {
+      active: 'bg-blue-50/90 text-blue-800 border-blue-200/80 shadow-2xs',
+      hover: 'hover:bg-blue-50/40 hover:text-blue-800',
+    },
+    vehicles: {
+      active: 'bg-rose-50/90 text-rose-800 border-rose-200/80 shadow-2xs',
+      hover: 'hover:bg-rose-50/40 hover:text-rose-800',
+    },
+    drivers: {
+      active: 'bg-slate-100/95 text-slate-800 border-slate-300/80 shadow-2xs',
+      hover: 'hover:bg-slate-100/50 hover:text-slate-900',
+    },
+    driving_logs: {
+      active: 'bg-cyan-50/90 text-cyan-900 border-cyan-200/80 shadow-2xs',
+      hover: 'hover:bg-cyan-50/40 hover:text-cyan-900',
+    },
+    expenses: {
+      active: 'bg-orange-50/90 text-orange-900 border-orange-200/80 shadow-2xs',
+      hover: 'hover:bg-orange-50/40 hover:text-orange-900',
+    },
+    field_knowledge: {
+      active: 'bg-emerald-50/90 text-emerald-900 border-emerald-200/80 shadow-2xs',
+      hover: 'hover:bg-emerald-50/40 hover:text-emerald-900',
+    },
+    reports: {
+      active: 'bg-indigo-50/90 text-indigo-900 border-indigo-200/80 shadow-2xs',
+      hover: 'hover:bg-indigo-50/40 hover:text-indigo-900',
+    },
+    settings: {
+      active: 'bg-slate-100/95 text-slate-800 border-slate-200/80 shadow-2xs',
+      hover: 'hover:bg-slate-100/50 hover:text-slate-900',
+    },
+  };
 
   const renderSidebarBody = (isMobileDrawer: boolean, expanded: boolean) => (
     <>
@@ -212,8 +296,11 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
       {/* Navigation List */}
       <nav className="flex-1 px-2.5 pt-3 pb-3 space-y-1 overflow-y-auto overflow-x-hidden">
         {menuItems.map((item) => {
-          const Icon = item.icon;
           const isActive = activeTab === item.id;
+          const style = tabColorStyles[item.id] || {
+            active: 'bg-blue-50/90 text-blue-700 border-blue-200/80 shadow-2xs',
+            hover: 'hover:bg-blue-50/40 hover:text-blue-800',
+          };
 
           return (
             <button
@@ -224,24 +311,26 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
                 onSelectTab(item.id);
                 onCloseMobile?.();
               }}
-              className={`w-full h-10 px-2.5 flex items-center rounded-xl text-xs sm:text-sm font-bold transition-colors text-left cursor-pointer active:scale-[0.98] ${
+              className={`w-full h-10 px-2.5 flex items-center rounded-xl text-xs sm:text-sm font-bold transition-all text-left cursor-pointer active:scale-[0.98] border group ${
                 isActive
-                  ? 'bg-blue-50/90 text-[#1E60F3] shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  ? style.active
+                  : `border-transparent text-slate-600 ${style.hover}`
               }`}
               title={!expanded ? item.label : undefined}
             >
               {/* Icon Anchor: Position is 100% stable during expansion */}
               <div className="w-6 h-6 flex items-center justify-center shrink-0 relative">
-                <Icon
-                  className={`w-4 h-4 shrink-0 transition-colors ${
-                    isActive ? 'text-[#1E60F3]' : 'text-slate-400'
+                <img
+                  src={item.iconSrc}
+                  alt={item.label}
+                  className={`w-5.5 h-5.5 object-contain shrink-0 transition-transform duration-150 ${
+                    isActive ? 'scale-110 drop-shadow-2xs' : 'group-hover:scale-110 opacity-90'
                   }`}
                 />
                 {!expanded && item.badge !== undefined && (
                   <span
                     className={`absolute -top-1 -right-1.5 min-w-3.5 h-3.5 px-0.5 rounded-full text-[9px] font-black flex items-center justify-center ${
-                      item.badgeColor || 'bg-blue-100 text-[#1E60F3]'
+                      item.badgeColor || 'bg-[#1E60F3] text-white'
                     }`}
                   >
                     {item.badge}
@@ -264,7 +353,7 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
                 {item.badge !== undefined && (
                   <span
                     className={`min-w-5 h-5 px-1.5 rounded-full text-[10px] font-black flex items-center justify-center shrink-0 ml-1.5 ${
-                      item.badgeColor || 'bg-blue-100 text-[#1E60F3]'
+                      item.badgeColor || 'bg-[#1E60F3] text-white'
                     }`}
                   >
                     {item.badge}
@@ -289,7 +378,11 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
           aria-label="기사 Cockpit 전환"
         >
           <div className="w-6 h-6 flex items-center justify-center shrink-0">
-            <Smartphone className="w-4 h-4 text-slate-400 group-hover:text-[#1E60F3] shrink-0" />
+            <img
+              src="/images/icons/mobile.png"
+              alt="기사 Cockpit"
+              className="w-5 h-5 object-contain shrink-0 group-hover:scale-110 transition-transform drop-shadow-2xs"
+            />
           </div>
           <div
             className={`flex-1 min-w-0 flex items-center justify-between ml-3 overflow-hidden transition-all duration-200 ${
