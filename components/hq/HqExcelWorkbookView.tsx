@@ -16,6 +16,17 @@ export function HqExcelWorkbookView({year,onCommitted}:{year:number;onCommitted:
   setGrid(data);setMonth(data.month);
  },[year]);
  useEffect(()=>{if(open)void load(month).catch(e=>setError((e as Error).message));},[open,month,load]);
+ async function sortMonth(){
+  if(!grid||busy)return;
+  setBusy(true);setError('');
+  try{
+   const r=await fetch('/api/hq/report-workbook',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:'sort_month',year,month:grid.month,expectedVersion:grid.version})});
+   const data=await r.json();if(!r.ok)throw Error(data.error||'날짜순 정리를 완료하지 못했습니다.');
+   if(data.unchanged)setError(data.message||'이미 날짜순으로 정리돼 있습니다.');
+   await load(grid.month);await onCommitted();
+  }catch(e){setError((e as Error).message);}finally{setBusy(false);}
+ }
  async function save(){
   if(!edit||!grid||busy)return;
   setBusy(true);setError('');
@@ -33,8 +44,14 @@ export function HqExcelWorkbookView({year,onCommitted}:{year:number;onCommitted:
    <Pencil size={16}/>Excel 보기·편집{open?<ChevronUp size={16}/>:<ChevronDown size={16}/>}
   </button>
   {open&&<div className="min-w-0 space-y-3 rounded-2xl border border-[#E2E9F3] bg-white p-3 sm:p-4">
-   <div><p className="text-sm font-bold text-[#354868]">{year}년 Excel 작업본</p>
-    <p className="mt-1 text-xs text-[#8796AA]">셀을 눌러 바로 수정하세요. 기존 원본과 수식은 보존됩니다.</p></div>
+   <div className="flex flex-wrap items-center justify-between gap-3">
+    <div><p className="text-sm font-bold text-[#354868]">{year}년 Excel 작업본</p>
+     <p className="mt-1 text-xs text-[#8796AA]">셀을 눌러 바로 수정하세요. 기존 원본과 수식은 보존됩니다.</p></div>
+    <button type="button" disabled={!grid||busy} onClick={()=>void sortMonth()}
+     className="rounded-xl border border-[#DBE5F2] bg-[#F6F9FD] px-3 py-2 text-xs font-semibold text-[#597294] hover:bg-[#EBF2FF] disabled:opacity-40">
+     날짜순 정리
+    </button>
+   </div>
    <div role="tablist" aria-label="월별 시트" className="flex max-w-full gap-1.5 overflow-x-auto pb-1">
     {grid?.months.map(name=><button type="button" role="tab" aria-selected={month===name} key={name} onClick={()=>{setEdit(null);setError('');setMonth(name);}}
      className={'shrink-0 rounded-xl px-3 py-2 text-xs font-semibold '+(month===name?'bg-[#1E60F3] text-white':'bg-[#F2F4F6] text-[#6F809A]')}>{name}</button>)}

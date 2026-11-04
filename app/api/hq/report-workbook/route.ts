@@ -5,6 +5,7 @@ import {check,currentWorkbook,registerWorkbook,drainReports,approveMonth} from '
 import {workbookFromFile} from '@/utils/kakaoExcelWorkbook';
 import {readWorkbook,storeWorkbook} from '@/lib/driverReports/storage';
 import {readWorkbookGrid,patchWorkbookCell} from '@/utils/reportWorkbookGrid';
+import {organizeManagedMonth} from '@/utils/reportWorkbookRowOrder';
 import {boundedBody,UUID,privateJson,failure,sameOrigin} from '@/lib/driverReports/http';
 export const dynamic='force-dynamic';export const runtime='nodejs';
 export async function GET(req:NextRequest){
@@ -43,6 +44,19 @@ export async function POST(req:NextRequest){
   const s=a.session;
   if(req.headers.get('content-type')?.startsWith('application/json')){
    const b=JSON.parse(new TextDecoder().decode(await boundedBody(req,4096)));
+   if(b.action==='sort_month'){
+    if(!Number.isInteger(b.year)||!UUID.test(b.expectedVersion||'')||typeof b.month!=='string')throw new Error('정렬할 Excel 시트를 확인해 주세요.');
+    const w=await currentWorkbook(s.org,b.year);
+    if(!w||w.id!==b.expectedVersion)return privateJson({ok:false,error:'Excel 버전이 변경됐습니다. 새로고침해 주세요.'},409);
+    const arranged=organizeManagedMonth(w.bytes,b.month,b.year,w.manifest||{});
+    if(!arranged.changed)return privateJson({ok:true,unchanged:true,message:arranged.reason});
+    const saved=await db.rpc('commit_report_hq_reorder',{
+     p_org:s.org,p_actor:s.userId,p_year:b.year,p_expected:w.id,p_storage:await storeWorkbook(s.org,arranged.bytes),
+     p_sheet:b.month,p_moves:arranged.moves
+    });check(saved.error);
+    if(!saved.data)return privateJson({ok:false,error:'다른 관리자가 Excel을 변경했습니다. 다시 불러와 주세요.'},409);
+    return privateJson({ok:true,moved:Object.keys(arranged.moves).length});
+   }
    if(b.action==='edit_cell'){
     if(!Number.isInteger(b.year)||b.year<2000||b.year>2099||!UUID.test(b.expectedVersion||''))throw new Error('Excel 버전을 확인해 주세요.');
     if(typeof b.month!=='string'||typeof b.column!=='string'||!Number.isInteger(b.row)||typeof b.value!=='string')throw new Error('편집할 셀을 확인해 주세요.');
