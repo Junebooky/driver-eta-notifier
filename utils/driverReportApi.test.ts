@@ -11,6 +11,7 @@ const session:Omit<CockpitAuthSession,'issuedAt'|'expiresAt'>={userId:id,org:'vi
 const cookie=()=>`cockpit_session=${signCockpitSession(session)}`;
 test('chat APIs enforce authenticated UUID/org and never grant workbook access to a driver',async()=>{
  assert.equal((await GET(new NextRequest('http://localhost/api/driver-reports'))).status,401);
+ assert.equal((await GET(new NextRequest('http://localhost/api/driver-reports',{headers:{cookie:'cockpit_session='+signCockpitSession({...session,driverId:undefined})}}))).status,403);
  assert.equal((await GET(new NextRequest('http://localhost/api/driver-reports?driverId='+other,{headers:{cookie:cookie()}}))).status,403);
  assert.equal((await workbook(new NextRequest('http://localhost/api/hq/report-workbook?download=1',{headers:{cookie:cookie()}}))).status,403);
  assert.equal((await POST(new NextRequest('http://localhost/api/driver-reports',{method:'POST',headers:{cookie:cookie(),origin:'https://other.invalid'},body:'{}'}))).status,403);

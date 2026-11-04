@@ -7,7 +7,8 @@ import {appendKakaoExcelReport,workbookFromFile} from '../utils/kakaoExcelWorkbo
 import {kakaoWorkbookFixture} from '../utils/kakaoExcelFixture';
 export async function verifyDriverReportChat(admin:Client,connectionString:string) {
  await admin.query(readFileSync('supabase/migrations/20261104030000_driver_report_chat.sql','utf8'));
- const org='isolated_report_org',actor=randomUUID(),drivers=Array.from({length:5},()=>randomUUID());
+ await admin.query(readFileSync('supabase/migrations/20261104030000_driver_report_chat.sql','utf8'));
+ const org='isolated_report_org_'+randomUUID(),actor=randomUUID(),drivers=Array.from({length:5},()=>randomUUID());
  const source=kakaoWorkbookFixture();
  const rpc=async(c:Client,name:string,args:unknown[])=>{const r=await c.query(`SELECT cockpit.${name}(${args.map((_,i)=>'$'+(i+1)).join(',')}) AS value`,args);return r.rows[0].value;};
  const raw=(i:number)=>`2026년 4월 5일\n수행담당 : 검증 기사 ${i}\n차량번호 : 700호 1458\n고객명 : 검증 거래처 ${i}\n시작 시간 : 09:15\n종료 시간 : 17:20\n운행일지\n서울 → 인천`;
@@ -49,6 +50,10 @@ export async function verifyDriverReportChat(admin:Client,connectionString:strin
  assert.equal(await rpc(admin,'restore_report_workbook',['other_org',actor,first,active]),false);
  // Failed Excel work does not delete accepted messages or raw submission; retry remains possible.
  const failed=await rpc(admin,'submit_report',[org,drivers[0],randomUUID(),'pending_failure','raw failure',parsed[0],'accepted']);
+ const pointer=(await admin.query('SELECT active_version FROM cockpit.report_workbooks WHERE org_id=$1',[org])).rows[0].active_version;
+ await assert.rejects(rpc(admin,'commit_report_workbook',[org,actor,pointer,Buffer.alloc(0),'company.xlsx',failed.id,1,'4월',250]),{code:'23514'});
+ assert.equal((await admin.query('SELECT excel_status FROM cockpit.report_submissions WHERE id=$1',[failed.id])).rows[0].excel_status,'pending');
+ assert.equal((await admin.query('SELECT active_version FROM cockpit.report_workbooks WHERE org_id=$1',[org])).rows[0].active_version,pointer);
  assert.equal(await rpc(admin,'fail_report',[org,failed.id,1,'missing approved month']),true);
  const saved=(await admin.query('SELECT * FROM cockpit.report_submissions WHERE id=$1',[failed.id])).rows[0];assert.equal(saved.raw_message,'raw failure');assert.equal(saved.excel_status,'error');
  for(const role of ['anon','authenticated']){

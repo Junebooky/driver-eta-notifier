@@ -7,11 +7,12 @@ import {boundedBody,UUID,privateJson,failure,sameOrigin} from '@/lib/driverRepor
 export const dynamic='force-dynamic';
 export async function GET(req:NextRequest) {
  const auth=await requireHqAdmin(req);if(!auth.ok||!auth.session)return privateJson({ok:false,error:'HQ 권한이 필요합니다.'},auth.statusCode||403);
- const org=auth.session.org,driver=req.nextUrl.searchParams.get('driverId');
+ const org=auth.session.org,driver=req.nextUrl.searchParams.get('driverId'),before=req.nextUrl.searchParams.get('before');
+ if(before&&!/^\d{1,15}$/.test(before))return privateJson({ok:false,error:'목록 위치가 올바르지 않습니다.'},400);
  if(driver&&!UUID.test(driver))return privateJson({ok:false,error:'기사를 확인해 주세요.'},400);
  try{
-  let q=db.from('report_submissions').select('*').eq('org_id',org).order('submitted_at',{ascending:false}).limit(100);
-  if(driver)q=q.eq('driver_id',driver);
+  let q=db.from('report_submissions').select('*').eq('org_id',org).order('seq',{ascending:false}).limit(100);
+  if(driver)q=q.eq('driver_id',driver);if(before)q=q.lt('seq',Number(before));
   const result=await q;check(result.error);
   const ids=req.nextUrl.searchParams.get('submissionId');
   if(ids&&!UUID.test(ids))throw new Error('보고 번호를 확인해 주세요.');
@@ -20,7 +21,7 @@ export async function GET(req:NextRequest) {
    const m=await db.from('report_messages').select('*').eq('org_id',org).eq('linked_submission_id',ids).order('seq').limit(100);check(m.error);messages=m.data||[];
    const a=await db.from('report_audit').select('*').eq('org_id',org).eq('submission_id',ids).order('created_at',{ascending:false}).limit(50);check(a.error);audit=a.data||[];
   }
-  return privateJson({ok:true,submissions:result.data,messages,audit});
+  return privateJson({ok:true,submissions:result.data,hasMore:result.data?.length===100,messages,audit});
  }catch(error){return failure(error);}
 }
 export async function POST(req:NextRequest) {

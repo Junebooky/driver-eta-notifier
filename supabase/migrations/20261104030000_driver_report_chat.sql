@@ -1,6 +1,6 @@
 -- Draft migration: apply only through reviewed deployment. No production DB changes in development.
 CREATE TABLE IF NOT EXISTS cockpit.report_submissions (
- id uuid PRIMARY KEY DEFAULT gen_random_uuid(), org_id text NOT NULL, driver_id uuid NOT NULL,
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(), seq bigint GENERATED ALWAYS AS IDENTITY UNIQUE, org_id text NOT NULL, driver_id uuid NOT NULL,
  request_key uuid NOT NULL, fingerprint text NOT NULL, raw_message text NOT NULL CHECK(length(raw_message) BETWEEN 1 AND 20000),
  parsed jsonb NOT NULL,
  parsed_date text GENERATED ALWAYS AS (parsed->'draft'->>'date') STORED,
@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS cockpit.report_submissions (
  submitted_at timestamptz NOT NULL DEFAULT now(),
  UNIQUE(org_id,driver_id,request_key), UNIQUE(org_id,driver_id,fingerprint)
 );
+CREATE INDEX IF NOT EXISTS report_submission_queue ON cockpit.report_submissions(org_id,excel_status,seq);
 CREATE TABLE IF NOT EXISTS cockpit.report_messages (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), seq bigint GENERATED ALWAYS AS IDENTITY UNIQUE,
  org_id text NOT NULL, driver_id uuid NOT NULL,
@@ -54,7 +55,7 @@ ALTER TABLE cockpit.report_workbooks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cockpit.report_audit ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON cockpit.report_submissions,cockpit.report_messages,cockpit.report_workbook_versions,cockpit.report_workbooks,cockpit.report_audit FROM PUBLIC,anon,authenticated;
 GRANT ALL ON cockpit.report_submissions,cockpit.report_messages,cockpit.report_workbook_versions,cockpit.report_workbooks,cockpit.report_audit TO service_role;
-GRANT USAGE,SELECT ON SEQUENCE cockpit.report_messages_seq_seq,cockpit.report_workbook_versions_generation_seq,cockpit.report_audit_id_seq TO service_role;
+GRANT USAGE,SELECT ON SEQUENCE cockpit.report_submissions_seq_seq,cockpit.report_messages_seq_seq,cockpit.report_workbook_versions_generation_seq,cockpit.report_audit_id_seq TO service_role;
 
 CREATE OR REPLACE FUNCTION cockpit.submit_report(p_org text,p_driver uuid,p_request uuid,p_fingerprint text,p_raw text,p_parsed jsonb,p_reply text)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,cockpit AS $$

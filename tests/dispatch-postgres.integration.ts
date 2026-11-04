@@ -36,7 +36,6 @@ async function main() {
     await verifyDriverReportChat(admin,connectionString);
     await admin.query(readFileSync('supabase/migrations/20261030_atomic_dispatch_and_fleet_schema.sql','utf8'));
     // Running the proposal twice must preserve data and remain valid.
-    await verifyDriverReportChat(admin,connectionString);
     await admin.query(readFileSync('supabase/migrations/20261030_atomic_dispatch_and_fleet_schema.sql','utf8'));
     await admin.query(readFileSync('supabase/migrations/20261031024614_cockpit_personal_auth.sql','utf8'));
     await admin.query(readFileSync('supabase/migrations/20261031024614_cockpit_personal_auth.sql','utf8'));

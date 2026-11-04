@@ -9,7 +9,7 @@ export interface ParsedDriverReport {
   otMinutes:number; nightMinutes:number; warnings:string[]; reviewReasons:string[];
 }
 export interface DriverReportSubmission {
-  id:string; driver_id:string; raw_message:string; parsed:ParsedDriverReport;
+  id:string; seq:number; driver_id:string; raw_message:string; parsed:ParsedDriverReport;
   excel_status:ReportExcelStatus; review_status:'pending'|'approved'|'not_required';
   excel_sheet_name:string|null; excel_row_number:number|null; submitted_at:string; revision:number;
   last_error:string|null;

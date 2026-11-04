@@ -39,6 +39,7 @@ export function parseDriverReport(raw:string,driverName?:string,now=new Date()):
   if(!draft.route)reviewReasons.push('운행 경로를 확인해 주세요.');
   // A missing year may cross a year boundary: hold for HQ instead of silently posting.
   if(!/20\d{2}\s*년/.test(raw))reviewReasons.push('보고 연도를 확인해 주세요.');
+  if(result.warnings.some(w=>w.includes('운행총시간과')))reviewReasons.push('보고된 총시간과 시작·종료가 다릅니다. 확인해 주세요.');
   reviewReasons.push(...validateKakaoExcelDraft(draft));
   const times=draft.time.match(/^(\d{2}:\d{2})~(\d{2}:\d{2})$/);
   const work=times?workMinutes(times[1],times[2]):null;
