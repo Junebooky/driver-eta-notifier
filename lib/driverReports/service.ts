@@ -3,6 +3,7 @@ import {createHash} from 'node:crypto';
 import {supabaseAdmin as db} from '@/lib/supabase/server';
 import {appendKakaoExcelReport,workbookFromFile} from '@/utils/kakaoExcelWorkbook';
 import {amendReportRow,removeReportRow,addApprovedMonth,ensureReportMonth} from '@/utils/reportWorkbookOperations';
+import {organizeManagedMonth} from '@/utils/reportWorkbookRowOrder';
 import {parseDriverReport,reportReply} from '@/utils/driverReportChat';
 import {validateReportInput} from '@/utils/reportSubmissionValidation';
 import {isReportServiceType,type ReportServiceType} from '@/utils/reportServiceTypes';
@@ -52,7 +53,14 @@ export async function processReport(org:string,id:string,actor:string,lease?:str
     if(source.year===targetYear)result=amendReportRow(bytes,location.sheet,location.row,s.parsed.draft);
     else{plans.push({year:s.ledger_year,expected:source.id,storage:await storeWorkbook(org,removeReportRow(source.bytes,location.sheet,location.row))});result=appendKakaoExcelReport(bytes,s.parsed.draft);}
    }else result=appendKakaoExcelReport(bytes,s.parsed.draft);
-   plans.push({year:targetYear,expected:target.id,storage:await storeWorkbook(org,result.bytes)});
+   // Only auto-appended submissions are re-ordered. Existing historic workbook
+   // rows, formulas and unrelated tabs are never moved.
+   const normalized=!s.applied_version?organizeManagedMonth(result.bytes,result.sheetName,targetYear,target.manifest||{},
+    {row:result.rowNumber,date:s.parsed.draft.date}):null;
+   const moved=normalized?.changed?normalized.moves:{};
+   if(normalized?.changed)result={...result,bytes:normalized.bytes,rowNumber:normalized.rowNumber};
+   plans.push({year:targetYear,expected:target.id,storage:await storeWorkbook(org,result.bytes),
+    ...(Object.keys(moved).length?{moves:moved}:{})});
    const commit=await db.rpc('commit_report_plan',{p_org:org,p_id:id,p_revision:s.revision,p_lease:lease,p_actor:actor,p_plans:plans,p_sheet:result.sheetName,p_row:result.rowNumber});check(commit.error);if(commit.data===true)return;
   }
   throw new Error('동시 변경이 많아 다시 시도합니다.');
