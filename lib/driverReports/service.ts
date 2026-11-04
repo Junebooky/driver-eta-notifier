@@ -8,7 +8,11 @@ import {readWorkbook,storeWorkbook} from './storage';
 import type {CockpitAuthSession} from '@/lib/auth/serverAuth';
 import type {DriverReportSubmission} from '@/types/driverReportChat';
 export function nightEndHour(){const raw=process.env.REPORT_NIGHT_END_HOUR??'6';if(!/^(?:[0-9]|1[0-9]|2[01])$/.test(raw))throw new Error('심야 종료 설정을 확인해 주세요.');return Number(raw);}
-function check(error:{message:string}|null){if(error)throw new Error('보고 저장소에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.');}
+function check(error:{message:string;code?:string}|null){
+ if(!error)return;
+ if(['42P01','PGRST202','PGRST205'].includes(error.code||''))throw new Error('운행보고 데이터베이스가 준비되지 않았습니다. 별도 테스트 DB에 보고서 마이그레이션을 적용해 주세요.');
+ throw new Error('보고 저장소에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+}
 const bytesFromDb=(value:string)=>new Uint8Array(Buffer.from(value.replace(/^\\x/,''),'hex'));
 export async function currentWorkbook(org:string,year?:number){
  const registry=year?await db.from('report_ledgers').select('active_version,filename').eq('org_id',org).eq('year',year).maybeSingle():await db.from('report_workbooks').select('active_version,filename').eq('org_id',org).maybeSingle();check(registry.error);
