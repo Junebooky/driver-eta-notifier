@@ -46,3 +46,16 @@ test('completion screen counts every saved day and requires the latest real ackn
  assert.equal(emailDispatchProgress(['one'],[{...first,dispatch_status:'cancelled'}]).complete,false);
  assert.equal(emailDispatchProgress([],[]).complete,false);
 });
+
+test('English-language VIP assignment is saved and validated for every vehicle slot',()=>{
+ const english={...draft(),specialRequests:'영어 가능한 기사님 배정 부탁드립니다.'};
+ assert.throws(()=>buildEmailDispatchPlan(english,slots(),'published'),/영어 가능/);
+ const qualified=slots().map(slot=>({...slot,driver:slot.driver && {...slot.driver,languages:['ko','en']}}));
+ const englishPlan=buildEmailDispatchPlan(english,qualified,'published');
+ assert.equal(englishPlan.length,4);
+ assert.ok(englishPlan.every(item=>item.requestedLanguage==='en'));
+ const toAssign=buildEmailDispatchPlan(english,slots().map(slot=>({...slot,driver:null,vehiclePlate:undefined})),'unassigned');
+ assert.ok(toAssign.every(item=>item.requestedLanguage==='en'&&!item.driverId));
+ const manuallyOverridden=buildEmailDispatchPlan({...english,requestedLanguage:'ko'},slots(),'published');
+ assert.ok(manuallyOverridden.every(item=>item.requestedLanguage==='ko'));
+});
