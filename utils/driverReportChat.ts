@@ -1,5 +1,6 @@
 import {parseKakaoExcelReport,normalizedPlate,validateKakaoExcelDraft,checkedTime} from './kakaoExcelImport';
 import {VIP_REAL_VEHICLES} from './vehicleData';
+import {parseDiaryRoute} from './reportDiaryRoute';
 import type {ParsedDriverReport} from '@/types/driverReportChat';
 
 export const koreaDate = (now=new Date()) => new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
@@ -23,9 +24,9 @@ export function standardVehicleModel(model:string) {
   return model.replace(/^(제네시스|벤츠|현대|기아)\s*/,'');
 }
 export function routeFromDiary(raw:string) {
-  const diary=raw.match(/운행일지\s*[:：]?\s*\n([\s\S]*?)(?=\n\s*(?:경비지출|특이사항)|$)/)?.[1]||'';
-  return diary.split(/→|➡|->|\n/).map(p=>p.replace(/\d{1,2}:\d{2}/g,'').replace(/\/?\s*업무\s*종료/g,'').replace(/^[\s·•\-]+|[\s/]+$/g,'').trim()).filter(p=>p&&!/^(경비지출|특이사항)/.test(p)).join(' - ');
+ return parseDiaryRoute(raw).stops.map(stop=>stop.place).join(' - ');
 }
+
 export function parseDriverReport(raw:string,driverName?:string,now=new Date(),options:{workbookYear?:number|null;nightEndHour?:number}={}):ParsedDriverReport {
   const result=parseKakaoExcelReport(raw,options.workbookYear??Number(koreaDate(now).slice(0,4)));
   const draft={...result.draft};const reviewReasons:string[]=[];
@@ -40,6 +41,7 @@ export function parseDriverReport(raw:string,driverName?:string,now=new Date(),o
   // A missing year may cross a year boundary: hold for HQ instead of silently posting.
   if(!/20\d{2}\s*년/.test(raw)&&!options.workbookYear)reviewReasons.push('보고 연도를 확인해 주세요.');
   if(result.warnings.some(w=>w.includes('운행총시간과')))reviewReasons.push('보고된 총시간과 시작·종료가 다릅니다. 확인해 주세요.');
+  if(result.warnings.some(w=>w.includes('올바르지 않은 경유시간')))reviewReasons.push('운행일지 경유시간을 확인해 주세요.');
   reviewReasons.push(...validateKakaoExcelDraft(draft));
   const times=draft.time.match(/^(\d{2}:\d{2})~(\d{2}:\d{2})$/);
   const work=times?workMinutes(times[1],times[2],options.nightEndHour??6):null;
