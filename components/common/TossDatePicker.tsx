@@ -211,17 +211,17 @@ export const TossDatePicker: React.FC<TossDatePickerProps> = ({
           disabled ? 'opacity-60 pointer-events-none' : ''
         }`}
       >
-        <CalendarIcon className="w-4 h-4 text-[#1E60F3] shrink-0" />
+        <CalendarIcon className="w-4 h-4 text-slate-700 shrink-0" />
         <span className="text-sm font-bold text-slate-900 flex-1 truncate">
           {formatKoreanDisplay(value)}
         </span>
       </div>
 
-      {/* Toss-Style Calendar Popover */}
+      {/* Toss-Style Calendar Popover (Clean White) */}
       {isOpen && (
-        <div className="absolute left-0 sm:left-auto right-auto sm:right-0 top-full mt-2 z-50 w-[310px] sm:w-[328px] rounded-3xl bg-gradient-to-b from-blue-50/70 via-white to-white border border-blue-100/90 shadow-[0_20px_60px_rgba(30,96,243,0.14)] p-4 animate-in fade-in zoom-in-95 duration-150 backdrop-blur-md">
+        <div className="absolute left-0 sm:left-auto right-auto sm:right-0 top-full mt-2 z-50 w-[310px] sm:w-[328px] rounded-2xl bg-white border border-slate-200 shadow-xl p-4 animate-in fade-in zoom-in-95 duration-150">
           {/* Header Bar */}
-          <div className="flex items-center justify-between pb-3 mb-2 border-b border-blue-100/60">
+          <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-100">
             <div className="flex items-center gap-1.5">
               <span className="text-base font-extrabold text-slate-900 tracking-tight">
                 {viewYear}년 {viewMonth}월
@@ -233,7 +233,7 @@ export const TossDatePicker: React.FC<TossDatePickerProps> = ({
                 type="button"
                 onClick={handlePrevMonth}
                 aria-label="이전 달"
-                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-white/80 active:scale-95 transition-all cursor-pointer shadow-2xs"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 active:scale-95 transition-all cursor-pointer shadow-2xs"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
@@ -241,7 +241,7 @@ export const TossDatePicker: React.FC<TossDatePickerProps> = ({
                 type="button"
                 onClick={handleNextMonth}
                 aria-label="다음 달"
-                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-white/80 active:scale-95 transition-all cursor-pointer shadow-2xs"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 active:scale-95 transition-all cursor-pointer shadow-2xs"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -249,37 +249,11 @@ export const TossDatePicker: React.FC<TossDatePickerProps> = ({
                 type="button"
                 onClick={() => setIsOpen(false)}
                 aria-label="닫기"
-                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-white/80 active:scale-95 transition-all cursor-pointer ml-1"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 active:scale-95 transition-all cursor-pointer ml-1"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
-          </div>
-
-          {/* Quick Preset Pills */}
-          <div className="flex items-center gap-1.5 mb-3 px-0.5">
-            <button
-              type="button"
-              onClick={() => handleSelectDate(todayIso)}
-              className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                value === todayIso
-                  ? 'bg-[#1E60F3] text-white shadow-xs'
-                  : 'bg-white/90 text-slate-700 hover:bg-blue-50 hover:text-[#1E60F3] border border-slate-200/60'
-              }`}
-            >
-              오늘
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSelectDate(tomorrowIso)}
-              className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                value === tomorrowIso
-                  ? 'bg-[#1E60F3] text-white shadow-xs'
-                  : 'bg-white/90 text-slate-700 hover:bg-blue-50 hover:text-[#1E60F3] border border-slate-200/60'
-              }`}
-            >
-              내일
-            </button>
           </div>
 
           {/* Weekday Row */}
@@ -314,9 +288,9 @@ export const TossDatePicker: React.FC<TossDatePickerProps> = ({
                       isSelected
                         ? 'bg-[#1E60F3] text-white font-extrabold shadow-md shadow-blue-500/35 scale-105 z-10'
                         : isToday
-                        ? 'bg-blue-100/60 text-[#1E60F3] font-black border border-blue-300/50 hover:bg-blue-100'
+                        ? 'bg-blue-50 text-[#1E60F3] font-black border border-blue-200'
                         : item.isCurrentMonth
-                        ? 'text-slate-800 font-semibold hover:bg-white hover:shadow-2xs hover:text-[#1E60F3]'
+                        ? 'text-slate-800 font-semibold hover:bg-slate-100 hover:text-[#1E60F3]'
                         : 'text-slate-300 font-normal hover:bg-slate-100/50'
                     } ${isDisabled ? 'opacity-30 pointer-events-none' : ''}`}
                   >

@@ -1,3 +1,4 @@
+if (process.env.RUN_ISOLATED_E2E !== 'true') throw new Error('Set RUN_ISOLATED_E2E=true only for an isolated test application and database.');
 import assert from 'node:assert';
 
 process.env.DEV_AUTH_ENABLED = 'true';

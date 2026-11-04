@@ -1,9 +1,8 @@
 'use client';
 
-import React from 'react';
-import { Search, X, Bell, ChevronDown, Menu, RefreshCw, PhoneCall, Calculator, Award } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Search, X, ChevronDown, Menu } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
-import { formatKoreanFullDateLabel } from '@/utils/dispatchConflictDetector';
 import { DevAuthSwitcher } from '@/components/DevAuthSwitcher';
 
 export interface HqHeaderProps {
@@ -19,7 +18,9 @@ export interface HqHeaderProps {
   onOpenChauffeurCard?: () => void;
   onOpenAdminLogin?: () => void;
   lastSyncedLabel?: string;
+  /** @deprecated Header title has been removed in UI cleanup */
   title?: string;
+  /** @deprecated Header subtitle has been removed in UI cleanup */
   subtitle?: React.ReactNode;
   searchPlaceholder?: string;
 }
@@ -37,17 +38,53 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
   onOpenChauffeurCard,
   onOpenAdminLogin,
   lastSyncedLabel,
-  title = '예약·배차 관리',
-  subtitle,
   searchPlaceholder = '고객명, 예약번호, 기사명, 차량번호 검색...',
 }) => {
-  const todayLabel = formatKoreanFullDateLabel();
+
+  // 1-minute alert pulse & speech bubble
+  const [isMinutePulsing, setIsMinutePulsing] = useState(false);
+  const [showMinuteBubble, setShowMinuteBubble] = useState(false);
+  const lastMinuteRef = useRef<number>(Math.floor(Date.now() / 60000));
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const currentMinute = Math.floor(Date.now() / 60000);
+      if (currentMinute !== lastMinuteRef.current) {
+        lastMinuteRef.current = currentMinute;
+        setIsMinutePulsing(true);
+        setShowMinuteBubble(true);
+
+        const pulseTimer = setTimeout(() => setIsMinutePulsing(false), 1200);
+        const bubbleTimer = setTimeout(() => setShowMinuteBubble(false), 5000);
+        return () => {
+          clearTimeout(pulseTimer);
+          clearTimeout(bubbleTimer);
+        };
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  const formattedSyncTime = useMemo(() => {
+    if (!lastSyncedLabel) {
+      return new Intl.DateTimeFormat('ko-KR', {
+        timeZone: 'Asia/Seoul',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).format(new Date());
+    }
+    const parts = lastSyncedLabel.split(':');
+    if (parts.length >= 2) return `${parts[0]}:${parts[1]}`;
+    return lastSyncedLabel;
+  }, [lastSyncedLabel]);
 
   return (
-    <header className="bg-white border-b border-slate-100 px-3.5 sm:px-6 py-3 sticky top-0 z-20 space-y-2.5">
-      <div className="flex items-center justify-between gap-2.5">
-        {/* Left: Mobile Menu Button + Title & Live Date */}
-        <div className="flex items-center gap-2.5 min-w-0">
+    <header className="bg-white border-b border-slate-100 px-3.5 sm:px-6 sticky top-0 z-20">
+      <div className="flex items-center justify-between gap-2.5 h-14 sm:h-16">
+        {/* Left: Mobile Menu Button (lg:hidden) */}
+        <div className="flex items-center gap-2">
           {onOpenMobileMenu && (
             <button
               type="button"
@@ -55,136 +92,117 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
                 haptics.lightTap();
                 onOpenMobileMenu();
               }}
-              className="lg:hidden w-9 h-9 rounded-xl border border-slate-200/80 bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-700 shrink-0 cursor-pointer active:scale-95"
+              className="lg:hidden w-10 h-10 rounded-xl border border-slate-200/80 bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-700 shrink-0 cursor-pointer active:scale-95"
               aria-label="전체 메뉴 열기"
             >
               <Menu className="w-4 h-4" />
             </button>
           )}
-
-          <div className="min-w-0">
-            <h1 className="text-base sm:text-xl font-black text-slate-900 tracking-tight truncate">
-              {title}
-            </h1>
-            <div className="flex items-center gap-1.5 mt-0.5 text-[11px] sm:text-xs text-slate-500 font-medium truncate">
-              {subtitle || (
-                <>
-                  <span className="font-bold text-slate-700">{todayLabel}</span>
-                  <span className="text-slate-300">|</span>
-                  <span className="text-slate-400 truncate">사모님(접수) · 대표님(배차) · 기사 실시간 동기화</span>
-                </>
-              )}
-            </div>
-          </div>
         </div>
 
-        {/* Right Actions: Desktop Search + Phone Intake + Sync + Bell + Profile */}
-        <div className="flex items-center gap-2 shrink-0">
-          {/* Desktop Search Bar */}
-          <div className="relative hidden md:block w-60 xl:w-80">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
-              placeholder={searchPlaceholder}
-              className="w-full pl-9 pr-8 py-2 bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-800 placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 transition-all"
-            />
-            {searchQuery ? (
+        {/* Right Actions: Quick Calculator + Sync + Bell + Dev Switcher + Profile */}
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0 ml-auto">
+
+          {/* Quick Quote Calculator Button (Ghost Style) */}
+          {onOpenQuoteModal && (
+            <div className="relative group hidden sm:flex items-center">
               <button
                 type="button"
-                onClick={() => onSearchChange('')}
-                className="w-4 h-4 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 flex items-center justify-center absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer transition-colors"
-                title="검색어 지우기"
+                onClick={() => {
+                  haptics.lightTap();
+                  onOpenQuoteModal();
+                }}
+                aria-label="빠른 견적 계산"
+                className="w-10 h-10 flex items-center justify-center rounded-xl bg-transparent border-0 hover:bg-slate-100 active:bg-slate-200 active:scale-95 transition-all duration-150 cursor-pointer"
               >
-                <X className="w-2.5 h-2.5" />
+                <img
+                  src="/images/icons/calculator.png"
+                  alt="계산기"
+                  className="w-7.5 h-7.5 object-contain shrink-0 transition-transform duration-150 group-hover:scale-110"
+                />
               </button>
-            ) : null}
-          </div>
 
-          {/* Fast Phone Reservation Intake Button (PC & Mobile) */}
-          {onOpenQuickPhoneBooking && (
-            <button
-              type="button"
-              onClick={() => {
-                haptics.lightTap();
-                onOpenQuickPhoneBooking();
-              }}
-              className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-2 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white text-xs font-bold transition-all cursor-pointer shadow-xs"
-              title="전화 문의 즉시 예약 접수 (배차 대기함 등록 가능)"
-            >
-              <PhoneCall className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden sm:inline">전화 예약 접수</span>
-              <span className="sm:hidden">전화접수</span>
-            </button>
+              {/* Hover Tooltip: 빠른 견적 계산 */}
+              <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 hidden group-hover:flex flex-col items-center pointer-events-none z-50">
+                <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 shadow-xs" />
+                <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+                  빠른 견적 계산
+                </span>
+              </div>
+            </div>
           )}
 
-          {/* Quick Quote Calculator Button */}
-          {onOpenQuoteModal && (
-            <button
-              type="button"
-              onClick={() => {
-                haptics.lightTap();
-                onOpenQuoteModal();
-              }}
-              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 active:scale-95 text-amber-700 border border-amber-500/30 text-xs font-bold transition-all cursor-pointer"
-              title="가격표 기반 실시간 견적서 작성"
-            >
-              <Calculator className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-              <span className="hidden sm:inline">견적기</span>
-            </button>
-          )}
 
-          {/* VIP Chauffeur Card Modal Button */}
-          {onOpenChauffeurCard && (
-            <button
-              type="button"
-              onClick={() => {
-                haptics.lightTap();
-                onOpenChauffeurCard();
-              }}
-              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-95 text-amber-300 border border-amber-500/40 text-xs font-bold transition-all cursor-pointer"
-              title="VIP Limousine Korea 공식 배차 소개서 (모바일/인쇄)"
-            >
-              <Award className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              <span className="hidden md:inline">VIP 소개서</span>
-            </button>
-          )}
-
-          {/* Live Server Sync Button */}
+          {/* Live Server Sync Button (Ghost Style with Update Icon & Minute Pulse) */}
           {onRefresh && (
+            <div className="relative group flex items-center">
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.lightTap();
+                  onRefresh();
+                }}
+                disabled={isRefreshing}
+                aria-label="실시간 서버 동기화"
+                className="w-10 h-10 flex items-center justify-center rounded-xl bg-transparent border-0 hover:bg-slate-100 active:bg-slate-200 hover:scale-110 active:scale-95 transition-all duration-150 cursor-pointer disabled:opacity-60 relative"
+                title={lastSyncedLabel ? `최근 업데이트: ${lastSyncedLabel}` : '실시간 서버 동기화'}
+              >
+                <img
+                  src="/images/icons/update.png"
+                  alt="동기화"
+                  className={`w-7.5 h-7.5 object-contain shrink-0 transition-all duration-300 ${
+                    isRefreshing ? 'animate-spin' : ''
+                  } ${isMinutePulsing ? 'scale-125 drop-shadow-md' : 'group-hover:scale-110'}`}
+                />
+              </button>
+
+              {/* Speech Bubble: Hover or 1-minute alert */}
+              <div
+                className={`absolute top-full left-1/2 -translate-x-1/2 pt-2 flex-col items-center pointer-events-none z-50 transition-all duration-200 ${
+                  showMinuteBubble ? 'flex animate-in fade-in zoom-in-95' : 'hidden group-hover:flex'
+                }`}
+              >
+                <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 shadow-xs" />
+                <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg flex items-center gap-1.5 animate-in fade-in-50 duration-150">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping inline-block" />
+                  {formattedSyncTime} 업데이트
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Notifications Alarm (Ghost Style) */}
+          <div className="relative group flex items-center">
             <button
               type="button"
               onClick={() => {
                 haptics.lightTap();
-                onRefresh();
+                onOpenNotifications?.();
               }}
-              disabled={isRefreshing}
-              className="h-9 px-2.5 rounded-xl border border-slate-200/80 bg-white hover:bg-slate-50 flex items-center gap-1.5 text-slate-600 text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-2xs disabled:opacity-60"
-              title={lastSyncedLabel ? `최근 동기화: ${lastSyncedLabel}` : '실시간 서버 동기화'}
+              aria-label="배차 알림 열기"
+              className="w-10 h-10 flex items-center justify-center rounded-xl bg-transparent border-0 hover:bg-slate-100 active:bg-slate-200 active:scale-95 transition-all duration-150 cursor-pointer relative"
+              title="미배정 · 기사 미확인 · 재확인 필요 점검"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-[#1E60F3]' : ''}`} />
-              <span className="hidden xl:inline">{lastSyncedLabel ? `동기화 ${lastSyncedLabel}` : '동기화'}</span>
+              <img
+                src="/images/icons/alarm.png"
+                alt="알림"
+                className="w-7.5 h-7.5 object-contain shrink-0 transition-transform duration-150 group-hover:scale-110"
+              />
+              {unreadAlertsCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-rose-500 text-white rounded-full text-[9px] font-black flex items-center justify-center shadow-xs">
+                  {unreadAlertsCount > 99 ? '99+' : unreadAlertsCount}
+                </span>
+              )}
             </button>
-          )}
 
-          {/* Notifications Bell */}
-          <button
-            type="button"
-            onClick={() => {
-              haptics.lightTap();
-              onOpenNotifications?.();
-            }}
-            className="w-9 h-9 rounded-xl border border-slate-200/80 bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 relative transition-all active:scale-95 cursor-pointer shadow-2xs"
-            title="미배정 · 기사 미확인 · 재확인 필요 점검"
-          >
-            <Bell className="w-4 h-4" />
-            {unreadAlertsCount > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-rose-500 text-white rounded-full text-[9px] font-black flex items-center justify-center shadow-xs">
-                {unreadAlertsCount > 99 ? '99+' : unreadAlertsCount}
+            {/* Hover Tooltip: 배차 알림 */}
+            <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 hidden group-hover:flex flex-col items-center pointer-events-none z-50">
+              <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 shadow-xs" />
+              <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+                배차 알림
               </span>
-            )}
-          </button>
+            </div>
+          </div>
 
           {/* Dev Test Account Switcher (only renders on localhost with DEV_AUTH_ENABLED) */}
           <DevAuthSwitcher />
@@ -214,7 +232,7 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
       </div>
 
       {/* Mobile Compact Search Bar (< md) */}
-      <div className="relative md:hidden">
+      <div className="relative md:hidden pb-2.5">
         <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
         <input
           type="text"

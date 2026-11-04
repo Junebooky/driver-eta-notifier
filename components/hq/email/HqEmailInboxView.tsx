@@ -15,7 +15,7 @@ import {
   AlertCircle,
   CheckCircle2,
   Lock,
-  Layers,
+  X,
 } from 'lucide-react';
 import { HqBooking } from '@/types/hq';
 import {
@@ -23,7 +23,9 @@ import {
   HqEmailDetail,
   HqEmailExtractedDraft,
 } from '@/types/emailHq';
+import { buildEmailDispatchPlan } from '@/utils/emailDispatchPlan';
 import { haptics } from '@/utils/haptics';
+import { createRetryableJsonMutation } from '@/utils/retryableJsonMutation';
 import {
   REFERENCE_EMAILS,
   ReferenceEmailItem,
@@ -43,7 +45,16 @@ import { HqComposeEmailModal } from './HqComposeEmailModal';
 import { HqEmailWorkflowStepper, WorkflowStepId } from './HqEmailWorkflowStepper';
 import { parseVehicleSlotsFromRequestedClass } from '@/utils/vehicleSlotParser';
 import { mapScheduleItemToHqBooking, getKstTodayDateStr } from '@/utils/dispatchConflictDetector';
-import { saveEmailDraft, getEmailDraft, deleteEmailDraft } from '@/utils/emailHqStorage';
+import {
+  saveEmailDraft,
+  getEmailDraft,
+  deleteEmailDraft,
+  getEmailInboxCache,
+  setEmailInboxCache,
+  getCachedEmailDetail,
+  getAllCachedEmailDetails,
+  setCachedEmailDetail,
+} from '@/utils/emailHqStorage';
 
 export interface HqEmailInboxViewProps {
   onCreateBooking?: (booking: HqBooking) => void;
@@ -66,6 +77,7 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
   onCreateBooking,
   onSavedServer,
 }) => {
+  const [dispatchMutation] = useState(() => createRetryableJsonMutation('cockpit_pending_email_dispatch'));
   const searchParams = useSearchParams();
   const urlStep = searchParams?.get('step') as EmailWorkflowStep | null;
   const urlDriverModal = searchParams?.get('driverModal') === 'true';
@@ -76,14 +88,23 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
       : 'any';
   const urlDemo = searchParams?.get('demo') === 'true';
 
-  // 1. Live Inbox State
+  // 1. Live Inbox State (Hydrated from persistent cache to prevent flickering)
   const [emails, setEmails] = useState<HqEmailSummary[]>(() => {
     if (urlDemo) {
       return REFERENCE_EMAILS.map((e) => e.summary);
     }
+    const cached = getEmailInboxCache();
+    if (cached?.data?.emails && cached.data.emails.length > 0) {
+      return cached.data.emails;
+    }
     return [];
   });
-  const [isLoadingInbox, setIsLoadingInbox] = useState<boolean>(!urlDemo);
+  const [isLoadingInbox, setIsLoadingInbox] = useState<boolean>(() => {
+    if (urlDemo) return false;
+    const cached = getEmailInboxCache();
+    return !(cached?.data?.emails && cached.data.emails.length > 0);
+  });
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [inboxError, setInboxError] = useState<string | null>(null);
   const [imapState, setImapState] = useState<ImapConnectionState>(() => {
     if (urlDemo) {
@@ -94,6 +115,10 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
         accountEmail: 'demo@viplimousine.kr (데모 모드)',
         lastSync: '데모 샘플',
       };
+    }
+    const cached = getEmailInboxCache();
+    if (cached?.data?.imapState) {
+      return cached.data.imapState;
     }
     return {
       isConfigured: false,
@@ -111,10 +136,14 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
     if (urlDemo) {
       return REFERENCE_EMAILS[0]?.summary.id || null;
     }
+    const cached = getEmailInboxCache();
+    if (cached?.data?.emails && cached.data.emails.length > 0) {
+      return cached.data.emails[0].id;
+    }
     return null;
   });
 
-  // 4. Email Detail Cache (Read-Only)
+  // 4. Email Detail Cache (Read-Only, hydrated from memory/session cache)
   const [emailDetails, setEmailDetails] = useState<Record<string, HqEmailDetail>>(() => {
     if (urlDemo) {
       const initialDetails: Record<string, HqEmailDetail> = {};
@@ -129,7 +158,7 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
       }
       return initialDetails;
     }
-    return {};
+    return getAllCachedEmailDetails();
   });
   const [isLoadingDetail, setIsLoadingDetail] = useState<boolean>(false);
 
@@ -205,71 +234,114 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
   };
 
   // =========================================================
-  // Live Fetch Inbox via GET /api/email/inbox
+  // Live Fetch Inbox via GET /api/email/inbox (with multi-tier caching)
   // =========================================================
-  const fetchLiveInbox = useCallback(async () => {
-    if (isDemoMode) return;
-    setIsLoadingInbox(true);
-    setInboxError(null);
+  const fetchLiveInbox = useCallback(
+    async (forceRefresh = false) => {
+      if (isDemoMode) return;
 
-    try {
-      const res = await fetch('/api/email/inbox', {
-        method: 'GET',
-        headers: { credentials: 'include' },
-      });
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok || !data.ok) {
-        setImapState({
-          isConfigured: data.isConfigured ?? false,
-          syncStatus: data.syncStatus || 'disconnected',
-          totalCount: 0,
-          accountEmail: data.accountEmail || '',
-          lastSync: data.lastSync || '',
-          error: data.error || 'NAVER 메일함 동기화 실패',
-        });
-        setInboxError(data.error || '이메일 수신함 조회에 실패했습니다.');
-        setEmails([]);
-        setSelectedEmailId(null);
-      } else {
-        const liveEmails: HqEmailSummary[] = data.emails || [];
-        setImapState({
-          isConfigured: true,
-          syncStatus: 'connected',
-          totalCount: data.totalCount ?? liveEmails.length,
-          accountEmail: data.accountEmail || 'NAVER 공식 계정',
-          lastSync: data.lastSync || new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
-        });
-        setEmails(liveEmails);
-        if (liveEmails.length > 0) {
-          setSelectedEmailId((prev) => prev || liveEmails[0].id);
-        } else {
-          setSelectedEmailId(null);
+      // When not forcing refresh, use valid client cache if available
+      if (!forceRefresh) {
+        const cached = getEmailInboxCache();
+        if (cached && !cached.isStale && cached.data.emails.length > 0) {
+          setEmails(cached.data.emails);
+          setImapState(cached.data.imapState);
+          setIsLoadingInbox(false);
+          return;
         }
       }
-    } catch (err: any) {
-      setInboxError(err.message || '네트워크 연결 오류가 발생했습니다.');
-      setImapState({
-        isConfigured: false,
-        syncStatus: 'error',
-        totalCount: 0,
-        error: err.message,
-      });
-      setEmails([]);
-      setSelectedEmailId(null);
-    } finally {
-      setIsLoadingInbox(false);
-    }
-  }, [isDemoMode]);
+
+      if (forceRefresh) {
+        setIsRefreshing(true);
+      } else {
+        // Only show full loading spinner if we don't have any cached emails to display
+        setEmails((prev) => {
+          if (prev.length === 0) {
+            setIsLoadingInbox(true);
+          }
+          return prev;
+        });
+      }
+      setInboxError(null);
+
+      try {
+        const url = forceRefresh ? '/api/email/inbox?refresh=true' : '/api/email/inbox';
+        const res = await fetch(url, {
+          method: 'GET',
+          headers: { credentials: 'include' },
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok || !data.ok) {
+          const nextImapState: ImapConnectionState = {
+            isConfigured: data.isConfigured ?? false,
+            syncStatus: data.syncStatus || 'disconnected',
+            totalCount: 0,
+            accountEmail: data.accountEmail || '',
+            lastSync: data.lastSync || '',
+            error: data.error || 'NAVER 메일함 동기화 실패',
+          };
+          setImapState(nextImapState);
+          setInboxError(data.error || '이메일 수신함 조회에 실패했습니다.');
+          setEmails((prev) => {
+            if (forceRefresh && prev.length > 0) return prev;
+            return [];
+          });
+          if (!forceRefresh) {
+            setSelectedEmailId(null);
+          }
+        } else {
+          const liveEmails: HqEmailSummary[] = data.emails || [];
+          const nextImapState: ImapConnectionState = {
+            isConfigured: true,
+            syncStatus: 'connected',
+            totalCount: data.totalCount ?? liveEmails.length,
+            accountEmail: data.accountEmail || 'NAVER 공식 계정',
+            lastSync:
+              data.lastSync ||
+              new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+          };
+          setImapState(nextImapState);
+          setEmails(liveEmails);
+          setEmailInboxCache(liveEmails, nextImapState);
+
+          if (liveEmails.length > 0) {
+            setSelectedEmailId((prev) => prev || liveEmails[0].id);
+          } else {
+            setSelectedEmailId(null);
+          }
+
+          if (forceRefresh) {
+            showToast('이메일 수신함이 최신 상태로 동기화되었습니다.');
+          }
+        }
+      } catch (err: any) {
+        setInboxError(err.message || '네트워크 연결 오류가 발생했습니다.');
+        setImapState({
+          isConfigured: false,
+          syncStatus: 'error',
+          totalCount: 0,
+          error: err.message,
+        });
+      } finally {
+        setIsLoadingInbox(false);
+        setIsRefreshing(false);
+      }
+    },
+    [isDemoMode]
+  );
 
   useEffect(() => {
     if (!isDemoMode) {
-      fetchLiveInbox();
+      const cached = getEmailInboxCache();
+      if (!cached || cached.isStale || cached.data.emails.length === 0) {
+        fetchLiveInbox(false);
+      }
     }
   }, [fetchLiveInbox, isDemoMode]);
 
   // =========================================================
-  // Fetch Email Detail via GET /api/email/[id]
+  // Fetch Email Detail via GET /api/email/[id] (with memory & session cache)
   // =========================================================
   useEffect(() => {
     if (!selectedEmailId) return;
@@ -298,8 +370,26 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
       return;
     }
 
-    // In Live Mode: check cache first
-    if (emailDetails[selectedEmailId]) return;
+    // In Live Mode: check state and storage cache first
+    if (emailDetails[selectedEmailId]) {
+      return;
+    }
+
+    const cachedDetail = getCachedEmailDetail(selectedEmailId);
+    if (cachedDetail) {
+      setEmailDetails((prev) => ({
+        ...prev,
+        [selectedEmailId]: cachedDetail,
+      }));
+      const cachedDraft = getEmailDraft(selectedEmailId);
+      if (cachedDraft && !draftsByEmailId[selectedEmailId]) {
+        setDraftsByEmailId((prev) => ({
+          ...prev,
+          [selectedEmailId]: cachedDraft,
+        }));
+      }
+      return;
+    }
 
     let active = true;
     setIsLoadingDetail(true);
@@ -316,6 +406,8 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
             ...prev,
             [selectedEmailId]: data.email,
           }));
+          setCachedEmailDetail(data.email);
+
           // Check if previously saved draft exists in localStorage
           const cachedDraft = getEmailDraft(selectedEmailId);
           if (cachedDraft && !draftsByEmailId[selectedEmailId]) {
@@ -337,30 +429,6 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
       active = false;
     };
   }, [selectedEmailId, isDemoMode, emailDetails, draftsByEmailId]);
-
-  // Toggle Demo Mode (for local development preview only)
-  const handleToggleDemoMode = () => {
-    if (!isDemoMode) {
-      setIsDemoMode(true);
-      const demoSummaries = REFERENCE_EMAILS.map((e) => e.summary);
-      setEmails(demoSummaries);
-      setSelectedEmailId(demoSummaries[0]?.id || null);
-      setImapState({
-        isConfigured: true,
-        syncStatus: 'connected',
-        totalCount: demoSummaries.length,
-        accountEmail: 'demo@viplimousine.kr (데모 모드)',
-        lastSync: '데모 샘플',
-      });
-      showToast('데모 샘플 메일함으로 전환되었습니다.');
-    } else {
-      setIsDemoMode(false);
-      setEmails([]);
-      setSelectedEmailId(null);
-      fetchLiveInbox();
-      showToast('실제 NAVER 메일함 동기화 모드로 전환되었습니다.');
-    }
-  };
 
   // Active email summary & detail
   const currentSummary: HqEmailSummary | null = useMemo(() => {
@@ -414,8 +482,8 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
         draft?.status === 'published' || item.draftId
           ? 'completed'
           : draft || item.aiStatus === 'draft_generated'
-          ? 'reviewing'
-          : 'unprocessed';
+            ? 'reviewing'
+            : 'unprocessed';
 
       if (statusFilter !== 'all' && category !== statusFilter) {
         return false;
@@ -513,7 +581,7 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
           emailBody = detailData.email.bodyText;
           setEmailDetails((prev) => ({ ...prev, [currentSummary.id]: detailData.email }));
         }
-      } catch {}
+      } catch { }
     }
 
     if (!emailBody?.trim()) {
@@ -575,168 +643,25 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
   // =========================================================
   // Step 2 -> Step 4 Dispatch Confirmation (Server Real Sync)
   // =========================================================
-  const handleConfirmDispatch = async () => {
-    if (!currentSummary) return;
-
-    // P0 Requirement: Administrator MUST explicitly assign a driver.
-    const assignedSlots = vehicleSlots.filter((slot) => slot.driver !== null);
-    if (assignedSlots.length === 0) {
-      setDispatchError('배차 확정을 진행하려면 1명 이상의 가용 기사를 직접 선택해야 합니다.');
-      haptics.errorAlert();
-      return;
-    }
-
-    const primaryDriver = assignedSlots[0]?.driver;
-    if (!primaryDriver) {
-      setDispatchError('배차할 1호차 기사를 선택해 주세요.');
-      return;
-    }
-
-    // Dynamic Draft Values - Strict Validation (No Arbitrary Defaults or allowUnverified Bypass)
-    const draft = currentDraft;
-    if (!draft) {
-      setDispatchError('예약 정보가 없습니다. 먼저 이메일 AI 추출 또는 수동 입력을 진행해 주세요.');
-      haptics.errorAlert();
-      return;
-    }
-
-    const pickupDate = draft.pickupDate?.trim();
-    if (!pickupDate) {
-      setDispatchError('운행 일자가 지정되지 않았습니다. 예약 일자를 먼저 확인/입력해 주세요.');
-      haptics.errorAlert();
-      return;
-    }
-
-    const pickupTime = draft.pickupTime?.trim();
-    if (!pickupTime) {
-      setDispatchError('픽업 시간이 지정되지 않았습니다. 픽업 시간을 먼저 확인/입력해 주세요.');
-      haptics.errorAlert();
-      return;
-    }
-
-    const passengerName = draft.passengerName?.trim();
-    if (!passengerName) {
-      setDispatchError('탑승객명이 지정되지 않았습니다. 탑승객명을 먼저 확인/입력해 주세요.');
-      haptics.errorAlert();
-      return;
-    }
-
-    const origin = draft.pickupLocation?.trim();
-    const destination = draft.dropoffLocation?.trim();
-    if (!origin || !destination) {
-      setDispatchError('출발지(픽업 위치)와 목적지는 필수 입력 항목입니다.');
-      haptics.errorAlert();
-      return;
-    }
-
-    // TMAP POI candidate confirmation enforcement with coordinates (Issue #33)
-    if (
-      !draft.isPickupPoiConfirmed ||
-      typeof draft.pickupLat !== 'number' ||
-      typeof draft.pickupLng !== 'number'
-    ) {
-      setDispatchError('출발지의 TMAP 위치 후보를 직접 클릭하여 좌표를 확정해야 배차를 최종 등록할 수 있습니다.');
-      haptics.errorAlert();
-      return;
-    }
-
-    if (
-      !draft.isDropoffPoiConfirmed ||
-      typeof draft.dropoffLat !== 'number' ||
-      typeof draft.dropoffLng !== 'number'
-    ) {
-      setDispatchError('목적지의 TMAP 위치 후보를 직접 클릭하여 좌표를 확정해야 배차를 최종 등록할 수 있습니다.');
-      haptics.errorAlert();
-      return;
-    }
-
-    setIsDispatching(true);
-    setDispatchError(null);
-
+  const handleConfirmDispatch = async (status: 'published' | 'unassigned' = 'published') => {
+    if (!currentSummary || !currentDraft || isDispatching) return;
+    setIsDispatching(true); setDispatchError(null);
     try {
-      // Disambiguate passenger phone: NEVER allow an email address!
-      const rawPassengerPhone = draft.passengerPhone?.trim() || '';
-      const safePassengerPhone = rawPassengerPhone.includes('@') ? '' : rawPassengerPhone;
-
-      const bookingPayload = {
-        customerName: draft.companyName?.trim() || '미등록 고객사',
-        contactName: draft.contactName?.trim() || '',
-        contactPhone: draft.contactPhone?.trim() || '',
-        contactEmail: draft.contactEmail?.trim() || '',
-        clientId: draft.clientId || null,
-        contactId: draft.contactId || null,
-        intakeSource: 'email',
-        date: pickupDate,
-        pickupTime: pickupTime,
-        origin: origin,
-        originAddress: origin,
-        originLat: draft.pickupLat,
-        originLng: draft.pickupLng,
-        destination: destination,
-        destinationAddress: destination,
-        destinationLat: draft.dropoffLat,
-        destinationLng: draft.dropoffLng,
-        placeVerified: true,
-        allowUnverified: false, // STRICTLY FALSE: Unverified dispatches are blocked!
-        passengerName: passengerName,
-        passengerPhone: safePassengerPhone,
-        passengerCount: typeof draft.passengerCount === 'number' && draft.passengerCount > 0 ? draft.passengerCount : 1,
-        flightNumber: draft.flightNumber?.trim() || '',
-        notes: draft.specialRequests || `이메일 접수 (편명: ${draft.flightNumber || '미지정'})`,
-        driverId: primaryDriver.id,
-        driverName: primaryDriver.name,
-        driverPhone: primaryDriver.phone,
-        vehicleNo: primaryDriver.plate,
-        vehiclePlate: primaryDriver.plate,
-        vehicleModel: assignedSlots[0].vehicleModel,
-        dispatchStatus: 'published',
-        publishedBy: '대표/관리자 (이메일 배차 확정)',
-      };
-
-      const res = await fetch('/api/schedules/dispatch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bookingPayload),
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      // STRICT VALIDATION: Do NOT show fake success or advance if API failed
-      if (!res.ok || !data.ok || !data.schedule) {
-        throw new Error(data.error || '배차 저장 API가 정상 응답을 반환하지 않았습니다.');
-      }
-
-      // True Success Handlers
-      setDispatchedSchedule(data.schedule);
-      const savedBooking = mapScheduleItemToHqBooking(data.schedule, 0);
-
-      if (draft) {
-        const updatedDraft: HqEmailExtractedDraft = {
-          ...draft,
-          status: 'published',
-          assignedDriver: primaryDriver.name,
-          assignedVehicle: assignedSlots[0]?.vehicleModel || null,
-          assignedVehiclePlate: primaryDriver.plate || null,
-        };
-        saveEmailDraft(updatedDraft);
-        setDraftsByEmailId((prev) => ({
-          ...prev,
-          [currentSummary.id]: updatedDraft,
-        }));
-      }
-
-      onCreateBooking?.(savedBooking);
+      if (currentDraft.savedScheduleIds) throw new Error('이미 저장된 요청입니다. 모바일·PC의 예약 목록에서 날짜별 배정을 진행해 주세요.');
+      const items = buildEmailDispatchPlan(currentDraft, vehicleSlots, status);
+      if (currentDraft.savedScheduleIds && (Object.keys(currentDraft.savedScheduleIds).length !== items.length || items.some(item => !item.scheduleId))) throw new Error('이미 저장한 날짜·차량 구성이 변경되었습니다. 기존 미배정 예약을 먼저 확인·취소해 주세요.');
+      const response = await dispatchMutation.send('/api/schedules/dispatch', { items });
+      const data = await response.json();
+      if (!response.ok || !data.ok || data.schedules?.length !== items.length) throw new Error(data.error || '전체 일정 저장을 확인하지 못했습니다.');
+      const updated = { ...currentDraft, status: status === 'published' ? 'published' as const : 'saved' as const, associatedBookingId: data.schedules[0].id, savedScheduleIds: Object.fromEntries(items.map((item, index) => [`${item.date}:${item.groupVehicleIndex - 1}`, data.schedules[index].id])) };
+      saveEmailDraft(updated); setDraftsByEmailId(previous => ({ ...previous, [currentSummary.id]: updated }));
+      setDispatchedSchedule(data.schedules[0]);
+      data.schedules.forEach((schedule: import('@/data/ferrariSchedules').ScheduleItem, index: number) => onCreateBooking?.(mapScheduleItemToHqBooking(schedule, index)));
       await onSavedServer?.();
-
-      setWorkflowStep('step4_dispatch_done');
-      showToast(`${primaryDriver.name} 기사님 Cockpit에 배차 알림이 실시간 전송되었습니다.`);
-    } catch (err: any) {
-      console.error('Dispatch confirmation failed:', err);
-      setDispatchError(err.message || '서버 통신 실패로 배차 확정이 중단되었습니다.');
-      haptics.errorAlert();
-    } finally {
-      setIsDispatching(false);
-    }
+      if (status === 'published') setWorkflowStep('step4_dispatch_done');
+      showToast(status === 'published' ? `${items.length}건의 날짜별 배차가 저장되었습니다.` : '대표 모바일·PC의 미배정 배차 목록에 지정 요청이 저장되었습니다.');
+    } catch (error) { setDispatchError(error instanceof Error ? error.message : '배차 저장에 실패했습니다.'); }
+    finally { setIsDispatching(false); }
   };
 
   // Reset to Step 1
@@ -817,69 +742,39 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
       )}
 
       {/* Live Connection / IMAP Status Banner */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs ${
-            imapState.syncStatus === 'connected'
-              ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
-              : 'bg-amber-50 text-amber-600 border border-amber-200'
-          }`}>
-            <Mail className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-black text-slate-900">
-                {isDemoMode ? '데모 샘플 메일함' : 'NAVER 공식 메일함'}
+      <div className="bg-white rounded-2xl border border-slate-200/80 px-4 py-3 shadow-xs flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="relative group/naver flex items-center">
+            <img
+              src="/images/icons/icon_naver.png"
+              alt="네이버 메일"
+              className="w-8 h-8 sm:w-8 sm:h-8 object-contain shrink-0 transition-transform duration-150 group-hover/naver:scale-110 cursor-pointer"
+            />
+
+            {/* Hover Tooltip: 위로 향하는 실제 네이버 이메일 강조 말풍선 */}
+            <div className="absolute bottom-full left-0 mb-2 hidden group-hover/naver:flex flex-col items-start pointer-events-none z-[100]">
+              <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#03C75A] inline-block animate-pulse" />
+                실제 네이버 이메일
               </span>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border flex items-center gap-1 ${
-                imapState.syncStatus === 'connected'
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                  : 'bg-amber-50 text-amber-700 border-amber-200'
-              }`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${imapState.syncStatus === 'connected' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                <span>{imapState.syncStatus === 'connected' ? '실시간 동기화 (PEEK Read-Only)' : '미연결 / 설정 확인'}</span>
-              </span>
-            </div>
-            <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-2">
-              <span>계정: {imapState.accountEmail || '미설정'}</span>
-              {imapState.lastSync && (
-                <>
-                  <span>•</span>
-                  <span>동기화: {imapState.lastSync}</span>
-                </>
-              )}
+              <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 ml-3 shadow-xs" />
             </div>
           </div>
+          <span className="text-xs font-bold text-slate-600 truncate">
+            동기화: {imapState.lastSync || '방금 전'}
+          </span>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Explicit Localhost Demo Switch */}
-          <button
-            type="button"
-            onClick={handleToggleDemoMode}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center gap-1.5 ${
-              isDemoMode
-                ? 'bg-blue-50 border-blue-300 text-[#1E60F3]'
-                : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-600'
-            }`}
-            title="개발/테스트용 데모 데이터 토글"
-          >
-            <Layers className="w-3.5 h-3.5" />
-            <span>{isDemoMode ? '실메일 모드로 복귀' : '데모 샘플 메일함 전환'}</span>
-          </button>
-
-          {/* Refresh Button */}
-          <button
-            type="button"
-            onClick={fetchLiveInbox}
-            disabled={isLoadingInbox || isDemoMode}
-            className="px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
-            title="메일함 새로고침"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 text-slate-500 ${isLoadingInbox ? 'animate-spin' : ''}`} />
-            <span>새로고침</span>
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => fetchLiveInbox(true)}
+          disabled={isLoadingInbox || isRefreshing}
+          className="w-8 h-8 flex items-center justify-center rounded-xl bg-transparent border-0 hover:bg-slate-100 active:bg-slate-200 active:scale-95 transition-all duration-150 cursor-pointer disabled:opacity-50 group"
+          title={imapState.lastSync ? `최근 동기화: ${imapState.lastSync}` : '메일함 새로고침'}
+          aria-label="메일함 새로고침"
+        >
+          <RefreshCw className={`w-4 h-4 text-slate-400 group-hover:text-slate-700 transition-transform duration-150 group-hover:scale-110 active:scale-95 ${isRefreshing || isLoadingInbox ? 'animate-spin' : ''}`} />
+        </button>
       </div>
 
       {/* Disconnected / Error Notice */}
@@ -889,7 +784,7 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
           <div className="space-y-1">
             <span className="font-extrabold block">NAVER IMAP 연동 환경변수 미설정</span>
             <p className="text-amber-800 leading-relaxed font-normal">
-              서버 환경에 <code className="bg-amber-100 px-1 py-0.5 rounded font-mono font-bold">NAVER_USER</code> 및 <code className="bg-amber-100 px-1 py-0.5 rounded font-mono font-bold">NAVER_APP_PASSWORD</code>가 등록되지 않았습니다. 실메일 대신 안전하게 공백 상태를 유지하고 있으며, 테스트가 필요하신 경우 우측 상단의 <strong>[데모 샘플 메일함 전환]</strong> 버튼을 이용하세요.
+              서버 환경에 <code className="bg-amber-100 px-1 py-0.5 rounded font-mono font-bold">NAVER_USER</code> 및 <code className="bg-amber-100 px-1 py-0.5 rounded font-mono font-bold">NAVER_APP_PASSWORD</code>가 등록되지 않았습니다. 실메일 대신 안전하게 공백 상태를 유지하고 있습니다.
             </p>
           </div>
         </div>
@@ -900,98 +795,116 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
         {/* ========================================================= */}
         {/* Pinned Left Column: 이메일 목록                           */}
         {/* ========================================================= */}
-        <div className="w-full md:w-80 lg:w-[320px] xl:w-[340px] shrink-0 bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden flex flex-col min-h-[700px] md:sticky md:top-20">
+        <div className="w-full md:w-80 lg:w-[320px] xl:w-[340px] shrink-0 bg-white rounded-2xl border border-slate-200/80 shadow-xs flex flex-col min-h-[700px] md:sticky md:top-20 relative z-20">
           {/* Header Row */}
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white">
-            <div className="flex items-center gap-2">
-              <Mail className="w-4 h-4 text-[#1E60F3]" />
+          <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white rounded-t-2xl">
+            <div className="relative group/email flex items-center gap-2 cursor-pointer">
+              <img
+                src="/images/icons/eemail/icon_email.png"
+                alt="이메일 아이콘"
+                className="w-7 h-7 object-contain shrink-0 transition-transform duration-150 group-hover/email:scale-110"
+              />
               <h2 className="text-sm font-extrabold text-slate-900">
-                이메일 ({counts.total})
+                이메일
               </h2>
+              <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-600">
+                {counts.total}
+              </span>
+
+              {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 (최상단 레이어) */}
+              <div className="absolute bottom-full left-0 mb-2 hidden group-hover/email:flex flex-col items-start pointer-events-none z-[100]">
+                <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+                  실제 관리자님에게 온 이메일 목록이에요
+                </span>
+                <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 ml-[10px] shadow-xs" />
+              </div>
             </div>
             <button
               type="button"
               onClick={() => {
+                haptics.lightTap();
                 setComposeTo('');
                 setComposeSubject('');
                 setComposeBody('');
                 setIsComposeOpen(true);
               }}
-              className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-[#1E60F3] text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1"
+              className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all cursor-pointer shadow-2xs active:scale-95 flex items-center gap-1"
               title="새 이메일 작성"
             >
-              <Plus className="w-3 h-3" />
+              <Plus className="w-3.5 h-3.5 stroke-[2.2] text-slate-500" />
               <span>메일 작성</span>
             </button>
           </div>
 
           {/* Status Filter Badges */}
-          <div className="p-3 border-b border-slate-100 bg-slate-50/50 flex items-center gap-1.5 overflow-x-auto text-xs font-bold">
-            <button
-              type="button"
-              onClick={() => setStatusFilter('all')}
-              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer shrink-0 ${
-                statusFilter === 'all'
-                  ? 'bg-slate-900 text-white shadow-2xs'
-                  : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              전체
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatusFilter('unprocessed')}
-              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer shrink-0 flex items-center gap-1 ${
-                statusFilter === 'unprocessed'
-                  ? 'bg-blue-600 text-white shadow-2xs'
-                  : 'bg-blue-50/70 border border-blue-200/60 text-[#1E60F3] hover:bg-blue-100'
-              }`}
-            >
-              <span>미처리</span>
-              <span className="font-black">{counts.unprocessed}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatusFilter('reviewing')}
-              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer shrink-0 flex items-center gap-1 ${
-                statusFilter === 'reviewing'
-                  ? 'bg-slate-700 text-white shadow-2xs'
-                  : 'bg-slate-100 border border-slate-200 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              <span>검토중</span>
-              <span className="font-black">{counts.reviewing}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatusFilter('completed')}
-              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer shrink-0 flex items-center gap-1 ${
-                statusFilter === 'completed'
-                  ? 'bg-emerald-600 text-white shadow-2xs'
-                  : 'bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100'
-              }`}
-            >
-              <span>예약완료</span>
-              <span className="font-black">{counts.completed}</span>
-            </button>
+          <div className="p-3 border-b border-slate-100 bg-slate-50/50 flex items-center gap-1.5 overflow-x-auto text-xs font-bold scrollbar-none">
+            {[
+              { id: 'all' as const, label: '전체', count: undefined },
+              { id: 'unprocessed' as const, label: '미처리', count: counts.unprocessed },
+              { id: 'reviewing' as const, label: '검토중', count: counts.reviewing },
+              { id: 'completed' as const, label: '예약완료', count: counts.completed },
+            ].map((tab) => {
+              const isSelected = statusFilter === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => {
+                    haptics.selection();
+                    setStatusFilter(tab.id);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1 ${isSelected
+                    ? 'bg-[#0050FF] text-white shadow-2xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                >
+                  <span>{tab.label}</span>
+                  {tab.count !== undefined && (
+                    <span
+                      className={`text-[11px] ${isSelected
+                        ? 'text-white/90 font-black'
+                        : tab.count === 0
+                          ? 'text-slate-400 font-medium'
+                          : 'text-slate-500 font-extrabold'
+                        }`}
+                    >
+                      {tab.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           {/* Search Input */}
-          <div className="p-3 border-b border-slate-100 bg-white space-y-2">
+          <div className="p-3 border-b border-slate-100 bg-white">
             <div className="relative">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="이메일 검색..."
-                className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:ring-1 focus:ring-blue-500 transition-all placeholder:text-slate-400"
+                placeholder="보낸 사람, 제목 또는 내용 검색"
+                className="w-full pl-8 pr-7 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-hidden focus:border-[#0050FF] focus:ring-2 focus:ring-blue-100 transition-all duration-150"
               />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    haptics.lightTap();
+                    setSearchQuery('');
+                  }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-0.5 rounded-md hover:bg-slate-100 transition-colors"
+                  title="검색어 지우기"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
             </div>
           </div>
 
           {/* Scrollable Email Cards List */}
-          <div className="divide-y divide-slate-100 overflow-y-auto max-h-[580px] flex-1">
+          <div className="divide-y divide-slate-100 overflow-y-auto max-h-[580px] flex-1 rounded-b-2xl">
             {isLoadingInbox ? (
               <div className="p-12 text-center text-slate-400 space-y-2">
                 <RefreshCw className="w-7 h-7 mx-auto animate-spin text-[#1E60F3]" />
@@ -1018,11 +931,10 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                   <div
                     key={item.id}
                     onClick={() => handleSelectEmail(item.id)}
-                    className={`p-3.5 transition-all cursor-pointer relative group ${
-                      isSelected
-                        ? 'bg-blue-50/90 border-l-4 border-l-[#1E60F3] shadow-2xs'
-                        : 'hover:bg-slate-50 border-l-4 border-l-transparent'
-                    }`}
+                    className={`p-3.5 transition-all cursor-pointer relative group ${isSelected
+                      ? 'bg-blue-50/90 border-l-4 border-l-[#1E60F3] shadow-2xs'
+                      : 'hover:bg-slate-50 border-l-4 border-l-transparent'
+                      }`}
                   >
                     <div className="flex items-start gap-3">
                       {/* Avatar Initials Badge */}
@@ -1033,11 +945,10 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-1">
                           <span
-                            className={`text-xs truncate ${
-                              isSelected
-                                ? 'font-black text-[#0B1E48]'
-                                : 'font-extrabold text-slate-800'
-                            }`}
+                            className={`text-xs truncate ${isSelected
+                              ? 'font-black text-[#0B1E48]'
+                              : 'font-extrabold text-slate-800'
+                              }`}
                           >
                             {item.from.name || item.from.address}
                           </span>
@@ -1047,11 +958,10 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                         </div>
 
                         <h4
-                          className={`text-xs mt-0.5 line-clamp-1 leading-snug ${
-                            isSelected
-                              ? 'font-extrabold text-blue-950'
-                              : 'font-semibold text-slate-700'
-                          }`}
+                          className={`text-xs mt-0.5 line-clamp-1 leading-snug ${isSelected
+                            ? 'font-extrabold text-blue-950'
+                            : 'font-semibold text-slate-700'
+                            }`}
                         >
                           {item.subject}
                         </h4>
@@ -1091,6 +1001,7 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
         {/* Dynamic Right Column: Sequential Multi-Step Workflow Card */}
         {/* ========================================================= */}
         <div className="flex-1 min-w-0 w-full space-y-4">
+          {dispatchMutation.hasPending && <button type="button" className="rounded-xl border border-blue-200 p-3 text-sm text-blue-700" onClick={async () => { try { const response = await dispatchMutation.retry(); const data = await response.json(); if (!response.ok || !data.ok) throw new Error(data.error || '저장 결과를 확인하지 못했습니다.'); window.location.reload(); } catch (error) { setDispatchError(error instanceof Error ? error.message : '저장 결과를 확인하지 못했습니다.'); } }}>이전 배차 저장 결과 확인</button>}
           {currentSummary && (
             <div className="rounded-2xl border border-slate-200/90 overflow-hidden shadow-xs">
               <HqEmailWorkflowStepper
@@ -1138,7 +1049,8 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                   extractedDraft={currentDraft}
                   vehicleSlots={vehicleSlots}
                   onOpenDriverModal={handleOpenDriverModal}
-                  onConfirmDispatch={handleConfirmDispatch}
+                  onConfirmDispatch={() => void handleConfirmDispatch('published')}
+                  onRequestAssignment={() => void handleConfirmDispatch('unassigned')}
                   onBackToStep1={() => setWorkflowStep('step1_extract')}
                   onUpdateDraft={handleUpdateDraft}
                   onUpdateVehicleSlots={setVehicleSlots}

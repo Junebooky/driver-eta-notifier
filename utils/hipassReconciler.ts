@@ -177,7 +177,7 @@ export function parseHipassText(rawText: string): {
 
   // Locate header row (hipass.co.kr exports sometimes include 1~3 title metadata rows above the header)
   let headerLineIdx = -1;
-  let colMap: {
+  const colMap: {
     datetime?: number;
     date?: number;
     time?: number;

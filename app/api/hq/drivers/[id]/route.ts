@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
-import { verifyServerAuth, requireHqAdmin } from '@/lib/auth/serverAuth';
+import { requireHqAdmin } from '@/lib/auth/serverAuth';
 import { mapDbDriverToHqSummary } from '@/types/driverHq';
+import { createSignedAssetUrl } from '@/lib/assets/driverAssetServerStore';
 
 export async function GET(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await verifyServerAuth(req);
+    const auth = await requireHqAdmin(req);
     if (!auth.ok || !auth.session) {
       return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
     }
@@ -30,11 +31,30 @@ export async function GET(
 
     const { data: dbSchedules } = await supabaseAdmin
       .from('schedules')
-      .select('id, vehicle_no, date, pickup_time, end_time, origin, destination, passenger_name, flight_number, passenger_note, status')
-      .eq('vehicle_no', dbDriver.vehicle_no)
+      .select('*')
+      .eq('driver_id', id)
       .order('date', { ascending: false });
 
     const driverSummary = mapDbDriverToHqSummary(dbDriver, dbSchedules || []);
+
+    try {
+      const { data: profileAsset } = await supabaseAdmin
+        .from('driver_profile_assets')
+        .select('file_path')
+        .eq('driver_id', id)
+        .eq('status', 'active')
+        .maybeSingle();
+
+      if (profileAsset?.file_path) {
+        const signedUrl = await createSignedAssetUrl(profileAsset.file_path);
+        if (signedUrl) {
+          driverSummary.avatarUrl = signedUrl;
+        }
+      }
+    } catch {
+      // Ignore
+    }
+
     return NextResponse.json({ ok: true, driver: driverSummary });
   } catch (err: any) {
     console.error('[HQ Drivers API] Error in GET [id]:', err);
@@ -115,14 +135,63 @@ export async function PATCH(
     // Fetch schedules to return complete updated summary
     const { data: dbSchedules } = await supabaseAdmin
       .from('schedules')
-      .select('id, vehicle_no, date, pickup_time, end_time, origin, destination, passenger_name, flight_number, passenger_note, status')
-      .eq('vehicle_no', updatedDriver.vehicle_no)
+      .select('*')
+      .eq('driver_id', id)
       .order('date', { ascending: false });
 
     const driverSummary = mapDbDriverToHqSummary(updatedDriver, dbSchedules || []);
     return NextResponse.json({ ok: true, driver: driverSummary });
   } catch (err: any) {
     console.error('[HQ Drivers API] Error in PATCH [id]:', err);
+    return NextResponse.json({ ok: false, error: err.message || '서버 오류' }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  try {
+    const auth = await requireHqAdmin(req);
+    if (!auth.ok) {
+      return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
+    }
+
+    const { id } = await context.params;
+    if (!id) {
+      return NextResponse.json({ ok: false, error: 'Driver ID is required' }, { status: 400 });
+    }
+
+    // 1. Unlink driver from any schedules so schedules remain safe
+    await supabaseAdmin
+      .from('schedules')
+      .update({ driver_id: null })
+      .eq('driver_id', id);
+
+    // 2. Clean up profile asset db entries if any
+    try {
+      await supabaseAdmin
+        .from('driver_profile_assets')
+        .delete()
+        .eq('driver_id', id);
+    } catch {
+      // Ignore
+    }
+
+    // 3. Delete driver from drivers table
+    const { error: deleteErr } = await supabaseAdmin
+      .from('drivers')
+      .delete()
+      .eq('id', id);
+
+    if (deleteErr) {
+      console.error('[HQ Drivers API] Delete error:', deleteErr);
+      return NextResponse.json({ ok: false, error: deleteErr.message }, { status: 400 });
+    }
+
+    return NextResponse.json({ ok: true, deletedId: id });
+  } catch (err: any) {
+    console.error('[HQ Drivers API] Error in DELETE [id]:', err);
     return NextResponse.json({ ok: false, error: err.message || '서버 오류' }, { status: 500 });
   }
 }

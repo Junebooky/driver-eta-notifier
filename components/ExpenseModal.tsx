@@ -21,7 +21,7 @@ import {
   Send,
   Loader2,
 } from 'lucide-react';
-import { submitDriverExpensesToHq, submitDriverExpensesToHqDb } from '@/utils/expenseHqStorage';
+import { submitDriverExpensesToHqDb } from '@/utils/expenseHqStorage';
 import {
   ExpenseItem,
   ExpenseSortOption,
@@ -41,6 +41,8 @@ import { AddExpenseModal, renderCategoryIcon } from './AddExpenseModal';
 import { autoEnsureUprightReceipt } from '@/utils/imageRotate';
 import { haptics } from '@/utils/haptics';
 import { DriverProfile } from '@/types';
+import { isReportingUuid,prepareExpenseReceipt } from '@/utils/receiptSubmission';
+import { getKstTodayDateStr } from '@/utils/dispatchConflictDetector';
 
 interface ExpenseModalProps {
   isOpen: boolean;
@@ -58,12 +60,44 @@ const ExpenseModalContent: React.FC<{
   const quickFileInputRef = useRef<HTMLInputElement>(null);
 
   // Purely initialized states
-  const [{ items: initialItems, isDemo: initialIsDemo }] = useState(loadExpenses);
+  const [{ items: initialItems, isDemo: initialIsDemo }] = useState(()=>{const loaded=loadExpenses(driverProfile?.driverId || 'unlinked');return {...loaded,items:loaded.items.map(item=>({...item,id:isReportingUuid(item.id)?item.id:crypto.randomUUID()}))};});
   const [expenseList, setExpenseList] = useState<ExpenseItem[]>(initialItems);
   const [isDemoMode, setIsDemoMode] = useState<boolean>(initialIsDemo);
 
+  const [serverLoadError,setServerLoadError]=useState('');
+  useEffect(()=>{
+    let active=true;let running=false;
+    const recover=async()=>{
+      if(running)return;running=true;
+      try{
+        const response=await fetch(`/api/expenses${bookingId?`?bookingId=${encodeURIComponent(bookingId)}`:''}`,{cache:'no-store',credentials:'include'});
+        const data=await response.json();
+        if(!response.ok || !data.ok)throw new Error(data.error || '서버 경비 내역을 불러오지 못했습니다.');
+        if(!active || isDemoMode)return;
+        setServerLoadError('');
+        setExpenseList(previous=>{
+          const rows:ExpenseItem[]=data.expenses.map((row:import('@/types/expenseHq').HqExpenseRecord)=>({id:row.id,category:row.category,date:row.rawDate,time:row.time,merchant:row.merchant,address:row.address,amount:row.amount,paymentMethod:row.paymentMethod,memo:row.memo,receiptUrl:row.receiptUrl,receiptStoragePath:row.receiptStoragePath,bookingId:row.bookingId,driverId:row.driverId,hqStatus:row.status,submittedToHqAt:row.submittedAt,createdAt:row.rawDate,updatedAt:row.rawDate,ocrExtracted:row.ocrExtracted,ocrSummary:row.ocrSummary}));
+          const unsent=previous.filter(item=>{
+            if(item.submittedToHqAt)return false;
+            const remote=rows.find(row=>row.id===item.id);
+            if(!remote)return true;
+            if(remote.hqStatus==='승인 완료' || remote.hqStatus==='반려')return false;
+            return (['amount','merchant','category','date','time','memo','receiptStoragePath'] as const).some(key=>(item[key] ?? '')!==(remote[key] ?? ''));
+          });
+          const pendingIds=new Set(unsent.map(item=>item.id));
+          const merged=[...unsent,...rows.filter(row=>!pendingIds.has(row.id))];
+          saveExpenses(merged,false,driverProfile?.driverId || 'unlinked');return merged;
+        });
+      }catch(error){if(active)setServerLoadError(error instanceof Error?error.message:'서버 경비 조회에 실패했습니다.');}
+      finally{running=false;}
+    };
+    void recover();const timer=setInterval(()=>{if(document.visibilityState==='visible')void recover();},20_000);
+    const resume=()=>void recover();window.addEventListener('online',resume);window.addEventListener('focus',resume);
+    return()=>{active=false;clearInterval(timer);window.removeEventListener('online',resume);window.removeEventListener('focus',resume);};
+  },[bookingId,driverProfile?.driverId,isDemoMode]);
+
   // Date navigation: default to 2026-10-24 matching reference screenshot
-  const [selectedDate, setSelectedDate] = useState<string>('2026-10-24');
+  const [selectedDate, setSelectedDate] = useState<string>(getKstTodayDateStr);
   const [viewScope, setViewScope] = useState<'selected_date' | 'all'>(() =>
     initialIsDemo ? 'all' : 'selected_date'
   );
@@ -103,14 +137,14 @@ const ExpenseModalContent: React.FC<{
   const updateExpenseList = (newItems: ExpenseItem[], isDemo: boolean = false) => {
     setExpenseList(newItems);
     setIsDemoMode(isDemo);
-    saveExpenses(newItems, isDemo);
+    saveExpenses(newItems, isDemo, driverProfile?.driverId || 'unlinked');
   };
 
   // Switch between Reference Demo Fixture and Fresh Draft
   const handleResetToRealDraft = () => {
     haptics.warningPulse();
     updateExpenseList([], false);
-    showToast('실제 빈 경비지출 내역으로 전환되었습니다.');
+    showToast('실제 경비 내역으로 전환했습니다. 서버 내역을 다시 확인합니다.');
   };
 
   const handleLoadDemoFixture = () => {
@@ -135,27 +169,30 @@ const ExpenseModalContent: React.FC<{
   const isSelectedDateOct24 = selectedDate === '2026-10-24';
 
   // Add / Edit save handler
-  const handleSaveExpense = (savedItem: ExpenseItem) => {
-    haptics.success();
-    const existingIndex = expenseList.findIndex((i) => i.id === savedItem.id);
-    let updated: ExpenseItem[];
-    if (existingIndex >= 0) {
-      updated = [...expenseList];
-      updated[existingIndex] = savedItem;
-      showToast('지출 내역이 수정되었습니다.');
-    } else {
-      updated = [savedItem, ...expenseList];
-      showToast('새 지출 내역이 등록되었습니다.');
+  const handleSaveExpense = async (savedItem: ExpenseItem, submitToHq=true) => {
+    if(isDemoMode && submitToHq)throw new Error('샘플 내역은 제출할 수 없습니다. 실제 빈 경비로 전환해 주세요.');
+    if(!driverProfile?.driverId)throw new Error('개인 기사 계정을 확인한 뒤 다시 저장해 주세요.');
+    if(expenseList.find(item=>item.id===savedItem.id)?.hqStatus==='승인 완료')throw new Error('승인된 경비는 수정할 수 없습니다.');
+    let item:ExpenseItem={...savedItem,hqStatus:'미제출',submittedToHqAt:undefined,driverId:driverProfile.driverId,bookingId:savedItem.bookingId || bookingId};
+    const put=(value:ExpenseItem)=>{setIsDemoMode(false);setExpenseList(previous=>{const next=[value,...previous.filter(e=>e.id!==value.id)];saveExpenses(next,false,driverProfile.driverId);return next;});};
+    put(item); // Keep a retryable draft even when upload/network fails.
+    if(submitToHq){
+      item=await prepareExpenseReceipt(item);put(item);
+      const result=await submitDriverExpensesToHqDb([item],driverProfile.driverName,driverProfile.carNumber || '',driverProfile.carModel || '',item.bookingId);
+      if(!result.ok || !result.expenses?.[0])throw new Error(result.error || '서버 경비 저장을 확인하지 못했습니다.');
+      const saved=result.expenses[0];
+      item={...item,id:saved.id,receiptStoragePath:saved.receiptStoragePath,hqStatus:saved.status as ExpenseItem['hqStatus'],submittedToHqAt:new Date().toISOString()};
+      put(item);
     }
-    updateExpenseList(updated, false);
-    setIsAddModalOpen(false);
-    setEditingItem(null);
-    setUploadedReceiptUrl(undefined);
+    setSelectedDate(item.date);
+    haptics.success();showToast(submitToHq?'영수증과 경비가 본사에 저장되었습니다.':'기기에 임시 저장했습니다.');
+    setIsAddModalOpen(false);setEditingItem(null);setUploadedReceiptUrl(undefined);
   };
 
   // Delete item handler
   const handleDeleteConfirm = () => {
     if (!deletingItemId) return;
+    if(expenseList.find(item=>item.id===deletingItemId)?.submittedToHqAt){showToast('제출된 경비는 삭제할 수 없습니다. 본사에서 검수·반려를 처리해 주세요.');setDeletingItemId(null);return;}
     haptics.mediumTap();
     const updated = expenseList.filter((i) => i.id !== deletingItemId);
     updateExpenseList(updated, false);
@@ -166,16 +203,19 @@ const ExpenseModalContent: React.FC<{
   // Submit all currently displayed items to HQ Dashboard via DB API
   const handleSubmitAllToHq = async () => {
     if (displayedItems.length === 0 || isSubmittingToHq) return;
+    const pendingItems=displayedItems.filter(item=>!item.submittedToHqAt);
+    if(!pendingItems.length){showToast('모두 서버에 제출된 내역입니다.');return;}
     setIsSubmittingToHq(true);
     haptics.selection();
 
-    const targetDriverName = driverProfile?.driverName || '윤태준';
-    const targetPlate = driverProfile?.plateNumber || driverProfile?.carNumber || '116허 1514';
-    const targetModel = driverProfile?.carModel || '현대 스타리아 리무진';
+    if(isDemoMode){setIsSubmittingToHq(false);showToast('샘플 내역은 본사에 제출할 수 없습니다.');return;}
+    const targetDriverName = driverProfile?.driverName || '';
+    const targetPlate = driverProfile?.plateNumber || driverProfile?.carNumber || '';
+    const targetModel = driverProfile?.carModel || '';
 
     try {
       const result = await submitDriverExpensesToHqDb(
-        displayedItems,
+        await Promise.all(pendingItems.map(async item=>{const prepared=await prepareExpenseReceipt({...item,bookingId:item.bookingId || bookingId});return prepared;})),
         targetDriverName,
         targetPlate,
         targetModel,
@@ -190,9 +230,11 @@ const ExpenseModalContent: React.FC<{
       haptics.success();
       const nowIso = new Date().toISOString();
       const updated = expenseList.map((item) => {
-        if (displayedItems.some((d) => d.id === item.id)) {
+        if (pendingItems.some((d) => d.id === item.id)) {
           return {
             ...item,
+            id:result.expenses?.find(saved=>saved.id===item.id)?.id || item.id,
+            receiptStoragePath:result.expenses?.find(saved=>saved.id===item.id)?.receiptStoragePath || item.receiptStoragePath,
             hqStatus: '검수 대기' as const,
             submittedToHqAt: nowIso,
           };
@@ -227,6 +269,7 @@ const ExpenseModalContent: React.FC<{
       setIsAddModalOpen(true);
     };
     reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
   return (
@@ -243,7 +286,8 @@ const ExpenseModalContent: React.FC<{
         className="w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[92dvh] h-[92dvh] sm:h-auto sm:max-h-[90vh] animate-in slide-in-from-bottom-6 sm:animate-scale-up duration-300 relative"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* 1. Modal Header */}
+        {serverLoadError && <p role="status" className="px-5 py-2 text-xs text-amber-700">{serverLoadError} · 기기 초안은 유지됩니다.</p>}
+      {/* 1. Modal Header */}
         <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
           <div className="flex items-center space-x-2.5">
             <div className="w-8 h-8 rounded-xl bg-[#1E60F3] text-white flex items-center justify-center shadow-xs shrink-0">
@@ -391,9 +435,7 @@ const ExpenseModalContent: React.FC<{
           tabIndex={0}
           onClick={() => {
             haptics.selection();
-            setUploadedReceiptUrl('/images/receipt_sample_hangang.jpg');
-            setEditingItem(null);
-            setIsAddModalOpen(true);
+            quickFileInputRef.current?.click();
           }}
           className="relative bg-gradient-to-b from-[#F2F7FF] via-[#EBF3FF] to-[#E3EFFF] border border-[#D5E5FE] hover:border-blue-300 rounded-2xl p-5 text-center shadow-xs cursor-pointer active:scale-99 transition-all group overflow-hidden"
         >
@@ -403,7 +445,8 @@ const ExpenseModalContent: React.FC<{
           {/* 3D Receipt Upload Illustration */}
           <div className="relative w-16 h-16 sm:w-18 sm:h-18 mx-auto mb-2 flex items-center justify-center">
             <Image
-              src="/images/receipt_upload_icon.png"
+              unoptimized
+              src="/images/icons/driver_ui/icon_upload_receipt.png"
               alt="영수증 업로드 아이콘"
               width={72}
               height={72}
@@ -426,10 +469,24 @@ const ExpenseModalContent: React.FC<{
                 haptics.selection();
                 quickFileInputRef.current?.click();
               }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/90 hover:bg-white text-slate-700 hover:text-[#1E60F3] border border-blue-200/80 rounded-full text-[11px] font-bold shadow-2xs transition-all"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/90 hover:bg-white text-slate-700 hover:text-[#1E60F3] border border-blue-200/80 rounded-full text-[11px] font-bold shadow-2xs transition-all cursor-pointer"
             >
               <Camera className="w-3.5 h-3.5 text-[#1E60F3]" />
               <span>사진 직접 촬영 / 앨범</span>
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                haptics.lightTap();
+                setEditingItem(null);
+                setUploadedReceiptUrl(undefined);
+                setIsAddModalOpen(true);
+              }}
+              className="inline-flex items-center gap-1 px-3 py-1.5 bg-white/90 hover:bg-white text-slate-600 hover:text-slate-900 border border-slate-200 rounded-full text-[11px] font-semibold shadow-2xs transition-all cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5 text-slate-500" />
+              <span>직접 입력</span>
             </button>
           </div>
 
@@ -445,13 +502,14 @@ const ExpenseModalContent: React.FC<{
         {/* 4. Hero Summary Card: "오늘 총 지출" */}
         <section className="bg-gradient-to-r from-[#EBF3FF] via-[#F1F6FF] to-[#E6F0FF] border border-[#D6E5FE] rounded-2xl p-4 sm:p-5 relative overflow-hidden shadow-xs">
           {/* Background coins and receipt illustration */}
-          <div className="absolute right-2 -bottom-1 w-24 h-20 opacity-80 pointer-events-none sm:w-28 sm:h-22">
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 w-16 h-16 sm:w-20 sm:h-20 opacity-90 pointer-events-none flex items-center justify-center">
             <Image
-              src="/images/expense_hero_coins.png"
+              unoptimized
+              src="/images/icons/driver_ui/icon_expense.png"
               alt="지출 코인 그래픽"
-              width={95}
-              height={70}
-              className="object-contain object-bottom"
+              width={80}
+              height={80}
+              className="object-contain drop-shadow-xs"
             />
           </div>
 
@@ -638,9 +696,9 @@ const ExpenseModalContent: React.FC<{
                   >
                     {/* Left: Category Icon Badge */}
                     <div
-                      className={`w-11 h-11 rounded-full ${catMeta.badgeBg} ${catMeta.badgeTextColor} border ${catMeta.badgeBorder} flex items-center justify-center shrink-0 shadow-2xs`}
+                      className={`w-11 h-11 rounded-full ${catMeta.badgeBg} flex items-center justify-center shrink-0 shadow-2xs`}
                     >
-                      {renderCategoryIcon(catMeta.iconName, 'w-5 h-5')}
+                      {renderCategoryIcon(catMeta.iconName, 'w-6 h-6')}
                     </div>
 
                     {/* Middle: Details */}
@@ -720,31 +778,31 @@ const ExpenseModalContent: React.FC<{
         </section>
       </main>
 
-      {/* Sticky Bottom Submission Bar */}
-      <div className="p-3.5 sm:p-4 border-t border-slate-100 bg-white shrink-0">
-        <button
-          type="button"
-          onClick={handleSubmitAllToHq}
-          disabled={isSubmittingToHq || displayedItems.length === 0}
-          className="w-full py-3.5 bg-[#1E60F3] hover:bg-blue-600 active:scale-98 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl text-sm sm:text-base shadow-[0_4px_16px_rgba(30,96,243,0.3)] transition-all flex items-center justify-center gap-2 cursor-pointer"
-        >
-          {isSubmittingToHq ? (
-            <>
-              <Loader2 className="w-5 h-5 animate-spin" />
-              <span>본사 대시보드로 전송 중...</span>
-            </>
-          ) : (
-            <>
-              <Send className="w-5 h-5" />
-              <span>
-                {displayedItems.length > 0
-                  ? `본사(HQ) 대시보드로 경비 제출하기 (${displayedItems.length}건 · ${formatKRW(totalAmount)})`
-                  : '본사(HQ) 대시보드로 경비 제출하기'}
-              </span>
-            </>
-          )}
-        </button>
-      </div>
+      {/* Sticky Bottom Submission Bar: Only shown when there are unsubmitted/offline items */}
+      {displayedItems.some((item) => !item.submittedToHqAt) && (
+        <div className="p-3.5 sm:p-4 border-t border-slate-100 bg-white shrink-0">
+          <button
+            type="button"
+            onClick={handleSubmitAllToHq}
+            disabled={isSubmittingToHq}
+            className="w-full py-3.5 bg-[#1E60F3] hover:bg-blue-600 active:scale-98 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl text-sm sm:text-base shadow-[0_4px_16px_rgba(30,96,243,0.3)] transition-all flex items-center justify-center gap-2 cursor-pointer"
+          >
+            {isSubmittingToHq ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span>본사 대시보드로 전송 중...</span>
+              </>
+            ) : (
+              <>
+                <Send className="w-5 h-5" />
+                <span>
+                  미전송 경비 본사 제출하기 ({displayedItems.filter((item) => !item.submittedToHqAt).length}건)
+                </span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
 
       {/* Floating Success Toast */}
       {hqSubmitSuccessToast && (
@@ -840,9 +898,9 @@ const ExpenseModalContent: React.FC<{
                   >
                     <div className="flex items-center gap-2.5">
                       <div
-                        className={`w-8 h-8 rounded-full ${catMeta.badgeBg} ${catMeta.badgeTextColor} border ${catMeta.badgeBorder} flex items-center justify-center`}
+                        className={`w-9 h-9 rounded-full ${catMeta.badgeBg} flex items-center justify-center shrink-0 shadow-2xs`}
                       >
-                        {renderCategoryIcon(catMeta.iconName, 'w-4 h-4')}
+                        {renderCategoryIcon(catMeta.iconName, 'w-5 h-5')}
                       </div>
                       <div>
                         <div className="text-xs font-bold text-slate-800">{catMeta.label}</div>
@@ -932,6 +990,7 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
 
   return (
     <ExpenseModalContent
+      key={`${driverProfile?.driverId || 'unlinked'}:${bookingId || 'daily'}`}
       onClose={onClose}
       driverProfile={driverProfile}
       bookingId={bookingId}

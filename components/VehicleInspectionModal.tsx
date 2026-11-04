@@ -1,7 +1,13 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, startTransition } from 'react';
 import { DriverProfile } from '@/types';
+import { useVehicleCustody } from '@/hooks/useVehicleCustody';
+import { VIP_REAL_VEHICLES } from '@/utils/vehicleData';
+import { isReportingUuid } from '@/utils/receiptSubmission';
+import { createRetryableJsonMutation } from '@/utils/retryableJsonMutation';
+import { inspectionPhotoForSubmission } from '@/utils/vehicleCustody';
+import type { CustodyWriteResult } from '@/types/vehicleCustody';
 import {
   generateReceiptReport,
   generateReturnReport,
@@ -39,6 +45,7 @@ interface VehicleInspectionModalProps {
   profilePlateNumber?: string;
   initialMode?: 'pickup' | 'daily' | 'return' | 'receipt';
   bookingId?: string;
+  onCustodySaved?: (bookingId: string) => void;
 }
 
 const DAMAGE_PART_CHIPS = [
@@ -80,9 +87,26 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
   profilePlateNumber,
   initialMode = 'pickup',
   bookingId,
+  onCustodySaved,
 }) => {
   const normalizedInitialMode = initialMode === 'receipt' ? 'pickup' : (initialMode || 'pickup');
   const [activeTab, setActiveTab] = useState<'pickup' | 'daily' | 'return'>(normalizedInitialMode);
+  const serverMode = isReportingUuid(profile.driverId);
+  const custody = useVehicleCustody(isOpen && serverMode);
+  const [selectedBookingId, setSelectedBookingId] = useState(bookingId || '');
+  const selectedBooking = custody.data?.bookings.find(row => row.id === selectedBookingId) || custody.data?.bookings[0];
+  const activeCustody = custody.data?.custodies.find(row => !row.returned_at);
+  const [custodyConfirmed, setCustodyConfirmed] = useState(false);
+  const [mismatchReason, setMismatchReason] = useState('');
+  const [custodyMessage, setCustodyMessage] = useState<string | null>(null);
+  const [custodySaving, setCustodySaving] = useState(false);
+  const custodyLock = useRef(false);
+  const mutation = useMemo(() => createRetryableJsonMutation(`cockpit_custody_pending_${profile.driverId || 'unlinked'}`), [profile.driverId]);
+  const [pendingCustody, setPendingCustody] = useState(mutation.hasPending);
+  const initialBinding = useRef('');
+  const serverAssignmentPlate = selectedBooking?.vehicle_plate || activeCustody?.vehicle_plate || '';
+  const inspectionDraftKey = serverMode ? `cockpit_inspection_draft_${profile.driverId}_${selectedBooking?.id || bookingId || 'unselected'}` : getInspectionStorageKey(profile.vehicleNo);
+
 
   // Profile hocha and car number defaults
   const detectedHocha = useMemo(() => {
@@ -133,6 +157,26 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
   const dailyPhotoInputRef = useRef<HTMLInputElement>(null);
   const returnPhotoInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    if (!serverMode || !custody.ready) return;
+    const binding = activeTab === 'return' && activeCustody ? activeCustody.id : selectedBooking?.id || '';
+    if (!binding || initialBinding.current === binding) return;
+    initialBinding.current = binding;
+    startTransition(() => {
+      setCustodyConfirmed(false);
+      if (activeTab === 'return' && activeCustody) {
+        setCarNumber(activeCustody.vehicle_plate);
+        setInitialData({ initialTotalKm: activeCustody.pickup_odometer, initialDte: activeCustody.pickup_details.dte || 0,
+          inspectionDate: formatInspectionDate(), vehicleHocha: '', carNumber: activeCustody.vehicle_plate,
+          outerDamage: activeCustody.pickup_details.damage, selectedParts: activeCustody.pickup_details.parts, savedAt: activeCustody.picked_up_at });
+      } else if (selectedBooking) {
+        setSelectedBookingId(selectedBooking.id);
+        setCarNumber(selectedBooking.vehicle_plate);
+        setReceiptTotalKm(''); setReturnTotalKm(''); setInitialData(null);
+      }
+    });
+  }, [serverMode, custody.ready, activeTab, activeCustody, selectedBooking]);
+
   // Existing damage parts inherited from initial receipt inspection or current receipt state
   const existingDamageParts = useMemo(() => {
     if (initialData?.selectedParts && initialData.selectedParts.length > 0) {
@@ -177,7 +221,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
   // Persist current inspection data to vehicle-specific isolated storage key
   const saveVehicleInspectionData = (overrides?: Record<string, any>) => {
     if (typeof window === 'undefined') return;
-    const currentKey = getInspectionStorageKey(profile.vehicleNo || vehicleHocha);
+    const currentKey = inspectionDraftKey;
 
     const initialKmNum = parseFloat(sanitizeNumericInput(receiptTotalKm)) || 0;
     const initialDteNum = parseFloat(sanitizeNumericInput(receiptDte)) || 0;
@@ -230,7 +274,9 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
       keyLocation,
       // Initial Data snapshot for return calculation
       initialData: currentInitialData,
-      bookingId: bookingId || overrides?.bookingId,
+      bookingId: (serverMode ? selectedBooking?.id : bookingId) || overrides?.bookingId,
+      driverId: profile.driverId,
+      mismatchReason,
       savedAt: new Date().toISOString(),
       ...overrides,
     };
@@ -266,14 +312,16 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
       return;
     }
 
-    const currentKey = getInspectionStorageKey(profile.vehicleNo);
+    if (serverMode && !custody.ready) return;
+    const defaultPlate = serverMode ? serverAssignmentPlate : detectedCarNumber;
+    const currentKey = inspectionDraftKey;
     let rawData: string | null = null;
     try {
       rawData = localStorage.getItem(currentKey);
-      if (!rawData && profile.vehicleNo) {
+      if (!serverMode && !rawData && profile.vehicleNo) {
         rawData = localStorage.getItem(`cockpit_vehicle_inspection_${profile.vehicleNo.trim()}`);
       }
-      if (!rawData) {
+      if (!rawData && !serverMode) {
         // Fallback: Check if legacy initial inspection exists and belongs to this vehicle
         const legacyRaw = localStorage.getItem(STORAGE_KEY_INITIAL_INSPECTION);
         if (legacyRaw) {
@@ -305,7 +353,8 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
       try {
         const parsed = JSON.parse(rawData);
         setVehicleHocha(parsed.vehicleHocha || detectedHocha);
-        setCarNumber(detectedCarNumber || parsed.carNumber || '');
+        setCarNumber(serverMode ? parsed.carNumber || defaultPlate : detectedCarNumber || parsed.carNumber || '');
+        if (serverMode) setMismatchReason(parsed.mismatchReason || '');
 
         // Pickup (Receipt) Data
         const pOdo = parsed.pickupOdo || parsed.receiptTotalKm || '';
@@ -367,20 +416,21 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
         console.error('점검 데이터 파싱 실패:', e);
         resetToCleanState();
         setVehicleHocha(detectedHocha);
-        setCarNumber(detectedCarNumber);
+        setCarNumber(defaultPlate);
       }
     } else {
       // 해당 호차의 점검 기록이 없으면 깨끗한 초기 상태(Clean State)로 리셋
       resetToCleanState();
       setVehicleHocha(detectedHocha);
-      setCarNumber(detectedCarNumber);
+      setCarNumber(defaultPlate);
     }
 
     isLoadedRef.current = true;
-  }, [isOpen, profile.vehicleNo, detectedHocha, detectedCarNumber]);
+  }, [isOpen, profile.vehicleNo, detectedHocha, detectedCarNumber, inspectionDraftKey, serverMode, custody.ready, serverAssignmentPlate]);
 
   // Task 2: Real-time synchronization of profilePlateNumber / profile.plateNumber to carNumber when modal is open or profile updates
   useEffect(() => {
+    if (serverMode) return;
     const targetPlate = profilePlateNumber?.trim() || profile.plateNumber?.trim() || detectedCarNumber;
     if (isOpen && targetPlate) {
       setCarNumber(targetPlate);
@@ -522,6 +572,7 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
     if (!file) return;
 
     haptics.lightTap();
+    setCustodyConfirmed(false);
     const objectUrl = URL.createObjectURL(file);
     if (mode === 'pickup') {
       if (receiptMeterPhoto) URL.revokeObjectURL(receiptMeterPhoto);
@@ -669,19 +720,53 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Handle Save (Confirm button) - saves to vehicle-isolated localStorage and closes
+  const saveServerCustody = async (retry = false) => {
+    if (custodyLock.current) return;
+    custodyLock.current = true; setCustodySaving(true); setCustodyMessage(null);
+    try {
+      let response: Response;
+      if (retry) response = await mutation.retry();
+      else {
+        if (!custody.ready || isOcrAnalyzing) throw new Error('최신 서버 기록과 계기판을 먼저 확인해 주세요.');
+        const returning = activeTab === 'return';
+        const vehicle = VIP_REAL_VEHICLES.find(row => row.plate.replace(/\s/g, '') === carNumber.replace(/\s/g, ''));
+        const odometerInput = returning ? returnTotalKm : receiptTotalKm;
+        if (!vehicle || !custodyConfirmed || !odometerInput.trim()) throw new Error('실제 전체 차량번호와 계기판 주행거리를 확인하고 체크해 주세요.');
+        if (returning && !activeCustody) throw new Error('반납할 인수 기록이 없습니다. 서버 기록을 새로고침해 주세요.');
+        if (!returning && !selectedBooking) throw new Error('확정 배정된 일정을 먼저 선택해 주세요. 차량 미배정은 관리자에게 요청해 주세요.');
+        const photo = await inspectionPhotoForSubmission(returning ? returnMeterPhoto : receiptMeterPhoto);
+        response = await mutation.send('/api/vehicle-custody', {
+          action: returning ? 'return' : 'pickup', bookingId: returning ? undefined : selectedBooking?.id,
+          expectedVersion: returning ? undefined : selectedBooking?.version, custodyId: returning ? activeCustody?.id : undefined,
+          vehicleId: vehicle.uuid, confirmed: custodyConfirmed, reason: mismatchReason,
+          inspection: { odometer: Number(sanitizeNumericInput(odometerInput)),
+            dte: (returning ? returnDte : receiptDte).trim() ? Number(sanitizeNumericInput(returning ? returnDte : receiptDte)) : undefined,
+            damage: returning ? returnDamage : receiptDamage, parts: returning ? returnSelectedParts : receiptSelectedParts,
+            parkingLocation: returning ? parkingLocation : undefined, keyLocation: returning ? keyLocation : undefined }, photo,
+        });
+      }
+      const result: CustodyWriteResult & { error?: string } = await response.json();
+      if (!response.ok || result.ok !== true) throw new Error(result.error || '서버 저장 결과를 확인하지 못했습니다.');
+      const fresh = await custody.refresh(true);
+      window.dispatchEvent(new Event('vip_vehicle_custody_updated'));
+      setCustodyConfirmed(false);
+      if (result.outcome === 'mismatch') {
+        setCustodyMessage(`차량 불일치 확인 요청을 저장했습니다. 배정 ${result.assignedPlate} / 실제 선택 ${result.actualPlate}. 관리자 확인 전까지 인수 완료가 아닙니다.`);
+        haptics.warningPulse();
+      } else {
+        setCustodyMessage(`${result.outcome === 'returned' ? '반납' : '인수'} 기록이 서버에 저장되었습니다.${fresh ? '' : ' 최신 상태 재조회에 실패했습니다. 새로고침해 확인해 주세요.'}`);
+        haptics.success();
+        if (result.outcome === 'picked_up' && result.custody) onCustodySaved?.(result.custody.booking_id);
+      }
+    } catch (error) {
+      setCustodyMessage(error instanceof Error ? error.message : '서버 저장에 실패했습니다. 입력은 보존되어 있습니다.');
+      haptics.errorAlert();
+    } finally { custodyLock.current = false; setCustodySaving(false); setPendingCustody(mutation.hasPending); }
+  };
+
   const handleConfirmSave = () => {
-    haptics.lightTap();
-    const effectiveCarNumber =
-      carNumber?.trim() ||
-      profilePlateNumber?.trim() ||
-      profile.plateNumber?.trim() ||
-      profile.carNumber?.trim() ||
-      detectedCarNumber;
-    if (!carNumber?.trim() && effectiveCarNumber) {
-      setCarNumber(effectiveCarNumber);
-    }
-    saveVehicleInspectionData({ carNumber: effectiveCarNumber });
+    if (serverMode && activeTab !== 'daily') { void saveServerCustody(); return; }
+    saveVehicleInspectionData();
     onClose();
   };
 
@@ -839,15 +924,39 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
               <label className="block text-[13px] font-semibold text-slate-600 mb-1 truncate">
                 차량번호
               </label>
-              <input
+              {serverMode ? <select aria-label="실제 차량번호" value={carNumber} disabled={custodySaving || pendingCustody || (activeTab === 'return' && Boolean(activeCustody))} onChange={event => { setCarNumber(event.target.value); setCustodyConfirmed(false); }} className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-2 text-base font-bold">
+                {!VIP_REAL_VEHICLES.some(row => row.plate === carNumber) && <option value={carNumber}>{carNumber || '전체 차량번호 선택'}</option>}
+                {VIP_REAL_VEHICLES.map(row => <option key={row.uuid} value={row.plate}>{row.plate} · {row.modelShort}</option>)}
+              </select> : <input
                 type="text"
                 value={carNumber}
                 onChange={(e) => setCarNumber(e.target.value)}
                 placeholder="142호 7811"
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:bg-white focus:border-[#1E60F3] outline-none transition-colors text-base"
-              />
+              />}
             </div>
           </div>
+
+          {serverMode && <section aria-label="서버 차량 인수 상태" className="space-y-3 rounded-2xl border border-blue-100 bg-blue-50/50 p-3">
+            <p className="text-sm font-bold text-slate-900">배정 차량 확인 · 인수·반납 공유</p>
+            <p className="text-xs text-slate-600">계기판 입력을 기존 점검 양식과 함께 사용합니다. 일일점검·복사·카톡은 이 기기의 초안이며 서버 인수 완료와 별도입니다.</p>
+            {custody.error && <p role="alert" className="text-sm text-rose-700">{custody.error}</p>}
+            {!custody.data && !custody.error && <p role="status" className="text-sm text-slate-600">최신 배정과 인수 기록을 확인하고 있습니다.</p>}
+            {activeTab !== 'return' && <label className="block text-xs font-bold text-slate-600">배정 일정
+              <select aria-label="인수할 배정 일정" disabled={custodySaving || pendingCustody || Boolean(activeCustody)} value={selectedBooking?.id || ''} onChange={event => { setSelectedBookingId(event.target.value); setCustodyMessage(null); }} className="mt-1 min-h-12 w-full rounded-xl border border-slate-200 bg-white p-2 text-base">
+                {!custody.data?.bookings.length && <option value="">확정된 기사·차량 배정 필요</option>}
+                {custody.data?.bookings.map(row => <option key={row.id} value={row.id}>{row.date} {row.pickup_time.slice(0,5)} · {row.vehicle_plate || '차량 미배정'} · {row.origin}</option>)}
+              </select>
+            </label>}
+            {selectedBooking && activeTab !== 'return' && <p className="text-sm">등록된 배정 차량: <strong>{selectedBooking.vehicle_plate || '미배정'}</strong><br />실제 선택 차량: <strong>{carNumber || '선택 필요'}</strong></p>}
+            {activeCustody && <p className="rounded-xl bg-white p-3 text-sm font-bold text-[#1E60F3]">인수 중 · {activeCustody.vehicle_plate}<span className="mt-1 block text-xs font-normal">{activeCustody.pickup_odometer.toLocaleString()} km · {new Date(activeCustody.picked_up_at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}<br />이 차량을 계속 사용 중이면 다시 인수하지 않아도 됩니다. 반납 탭에서 기록을 마쳐주세요.</span></p>}
+            {custody.data?.mismatches.map(row => <p key={row.request_id} className="rounded-xl bg-amber-50 p-3 text-xs text-amber-900">관리자 확인 대기 · {row.result.assignedPlate} → {row.result.actualPlate} · {row.result.reason}</p>)}
+            {activeTab === 'pickup' && selectedBooking && carNumber.replace(/\s/g, '') !== selectedBooking.vehicle_plate.replace(/\s/g, '') && <label className="block text-sm font-bold text-amber-900">다른 차량을 선택한 사유<input aria-label="차량 불일치 사유" value={mismatchReason} onChange={event => setMismatchReason(event.target.value)} maxLength={1000} className="mt-1 min-h-11 w-full rounded-xl border border-amber-200 bg-white p-2 text-base" /><span className="mt-1 block text-xs font-normal">확인 요청만 저장합니다. 관리자 배차 변경 전에는 이 차량을 인수 완료로 처리하지 않습니다.</span></label>}
+            {activeTab !== 'daily' && <label className="flex items-start gap-2 text-sm font-semibold text-slate-700"><input type="checkbox" checked={custodyConfirmed} disabled={custodySaving || pendingCustody} onChange={event => setCustodyConfirmed(event.target.checked)} className="mt-1" /><span>실제 전체 차량번호와 계기판 주행거리를 직접 확인했습니다.</span></label>}
+            {custodyMessage && <p role="status" className="break-words text-sm font-bold text-slate-800">{custodyMessage}</p>}
+            <button type="button" disabled={custodySaving} onClick={() => void custody.refresh(true)} className="min-h-11 text-sm font-bold text-[#1E60F3]">서버 기록 새로고침</button>
+            {pendingCustody && <button type="button" disabled={custodySaving} onClick={() => void saveServerCustody(true)} className="ml-2 min-h-11 text-sm font-bold text-[#1E60F3]">이전 저장 결과 재확인</button>}
+          </section>}
 
           {/* TAB 1: PICKUP MODE */}
           {activeTab === 'pickup' && (
@@ -1433,9 +1542,10 @@ export const VehicleInspectionModal: React.FC<VehicleInspectionModalProps> = ({
           <button
             type="button"
             onClick={handleConfirmSave}
+            disabled={custodySaving || (serverMode && activeTab !== 'daily' && (pendingCustody || !custody.ready || isOcrAnalyzing || (activeTab === 'return' ? !activeCustody : Boolean(activeCustody))))}
             className="flex-[2] py-3.5 rounded-xl bg-[#1E60F3] hover:bg-[#1650D6] text-white font-bold text-sm transition-all shadow-md shadow-blue-500/20 active:scale-[0.98] cursor-pointer text-center flex items-center justify-center"
           >
-            점검 완료
+            {custodySaving ? '서버 저장 확인 중…' : serverMode && activeTab !== 'daily' ? (activeTab === 'return' ? '반납 기록 저장' : selectedBooking && carNumber.replace(/\s/g, '') !== selectedBooking.vehicle_plate.replace(/\s/g, '') ? '차량 불일치 확인 요청' : '이 차량이 맞아요 · 인수 저장') : '이 기기에 점검 저장'}
           </button>
 
           {/* Right: '카톡' Button (Compact Brand Button) */}

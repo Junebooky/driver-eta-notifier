@@ -65,19 +65,19 @@ export function mapDbDriverToHqSummary(
     : {};
 
   const isEnglish = Boolean(dbDriver.english_available);
-  const rawAffiliation = meta.affiliation || (
-    dbDriver.vehicle_no?.includes('프리') || dbDriver.driver_name?.includes('프리')
-      ? 'freelance'
-      : 'employed'
-  );
-  const affiliationType: 'employed' | 'freelance' = rawAffiliation === 'freelance' ? 'freelance' : 'employed';
+  const cleanName = (dbDriver.driver_name || '').trim();
+  // Default rule: QA 테스트 and 지용주 are employed by default; all others are freelance by default
+  const isDefaultEmployed = cleanName === '지용주' || cleanName.includes('지용주') || cleanName.includes('QA 테스트');
+  // Honor explicit affiliation saved in driver_meta; otherwise fall back to default rule
+  const affiliationType: 'employed' | 'freelance' = (meta.affiliation === 'employed' || meta.affiliation === 'freelance')
+    ? meta.affiliation
+    : (isDefaultEmployed ? 'employed' : 'freelance');
   const affiliationLabel = affiliationType === 'employed' ? '소속' : '프리랜서';
 
   // Find real schedules associated with this driver's vehicle_no or driver_id
   const driverSchedules = allSchedules.filter((s: any) => {
-    if (s.driver_id && s.driver_id === dbDriver.id) return true;
-    if (dbDriver.vehicle_no && s.vehicle_no === dbDriver.vehicle_no) return true;
-    return false;
+    if (s.schedule_meta?.serviceMode === 'vehicle_only') return false;
+    return Boolean((s.driver_id || s.schedule_meta?.driverId) === dbDriver.id);
   });
 
   // Sort schedules descending by date and pickup_time
@@ -171,6 +171,6 @@ export function mapDbDriverToHqSummary(
     languageLabels,
     isAvailable: dbDriver.vehicle_status !== 'maintenance' && dbDriver.vehicle_status !== 'unavailable',
     schedules: mappedSchedules,
-    createdAt: dbDriver.created_at || new Date().toISOString(),
+    createdAt: dbDriver.created_at || undefined,
   };
 }

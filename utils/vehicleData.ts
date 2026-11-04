@@ -9,7 +9,7 @@
  * [기아 카니발 하이리무진] 1대: 193호 5336
  * [제네시스 GV80] 1대: 203호 5947
  * [제네시스 G90 리무진] 1대: 102부 4280
- * [제네시스 G90L] 1대: 208호 2269
+ * [제네시스 G90L] 1대: 116호 1336
  * [제네시스 G90] 1대: 125호 8839
  * [벤츠 S560] 1대: 01호 3343
  *
@@ -65,6 +65,7 @@ export interface VipRealVehicle {
   color?: string;
   adminMemo?: string;
   chargingSpecs?: VehicleChargingSpecs;
+  imageUrl?: string;
 }
 
 /**
@@ -146,6 +147,7 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     capacity: '13인승',
     status: '운행 중',
     fuelType: '디젤',
+    imageUrl: '/images/vehicles/sprinter_319.webp',
   },
 
   // 2. [벤츠 스프린터 319 CDI] 2대
@@ -163,6 +165,7 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     capacity: '11인승',
     status: '운행 중',
     fuelType: '디젤',
+    imageUrl: '/images/vehicles/sprinter_319.webp',
   },
   {
     id: 'veh-sp-8040',
@@ -178,6 +181,7 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     capacity: '11인승',
     status: '차고지 대기',
     fuelType: '디젤',
+    imageUrl: '/images/vehicles/sprinter_319.webp',
   },
 
   // 3. [벤츠 스프린터 519 CDI] 6대
@@ -195,6 +199,7 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     capacity: '15인승',
     status: '운행 중',
     fuelType: '디젤',
+    imageUrl: '/images/vehicles/sprinter_519.webp',
   },
   {
     id: 'veh-sp-3864',
@@ -210,6 +215,7 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     capacity: '15인승',
     status: '운행 중',
     fuelType: '디젤',
+    imageUrl: '/images/vehicles/sprinter_519.webp',
   },
   {
     id: 'veh-sp-3338',
@@ -225,6 +231,7 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     capacity: '15인승',
     status: '운행 중',
     fuelType: '디젤',
+    imageUrl: '/images/vehicles/sprinter_519.webp',
   },
   {
     id: 'veh-sp-2553',
@@ -240,6 +247,7 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     capacity: '15인승',
     status: '운행 중',
     fuelType: '디젤',
+    imageUrl: '/images/vehicles/sprinter_519.webp',
   },
   {
     id: 'veh-sp-3285',
@@ -255,6 +263,7 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     capacity: '15인승',
     status: '차고지 대기',
     fuelType: '디젤',
+    imageUrl: '/images/vehicles/sprinter_519.webp',
   },
   {
     id: 'veh-sp-1058',
@@ -270,6 +279,7 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     capacity: '15인승',
     status: '운행 중',
     fuelType: '디젤',
+    imageUrl: '/images/vehicles/sprinter_519.webp',
   },
 
   // 4. [현대 스타리아 리무진] 4대
@@ -287,6 +297,7 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     capacity: '7인승',
     status: '운행 중',
     fuelType: '디젤',
+    imageUrl: '/images/vehicles/staria.webp',
   },
   {
     id: 'veh-st-9037',
@@ -302,6 +313,7 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     capacity: '7인승',
     status: '운행 중',
     fuelType: '디젤',
+    imageUrl: '/images/vehicles/staria.webp',
   },
   {
     id: 'veh-st-8407',
@@ -317,6 +329,7 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     capacity: '7인승',
     status: '차고지 대기',
     fuelType: '디젤',
+    imageUrl: '/images/vehicles/staria.webp',
   },
   {
     id: 'veh-st-1514',
@@ -333,6 +346,7 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     status: '운행 중',
     defaultDriver: '윤태준',
     fuelType: '디젤',
+    imageUrl: '/images/vehicles/staria.webp',
   },
 
   // 5. [기아 카니발 리무진] 1대 (충전 스펙 미확인 - 관리자 현장 확인 필요)
@@ -350,6 +364,7 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     capacity: '7인승',
     status: '운행 중',
     fuelType: '가솔린',
+    imageUrl: '/images/thumb_carnival.jpg',
   },
 
   // 6. [기아 카니발 하이리무진] 1대 (사용자 스크린샷 193호 5336 확인 완료)
@@ -367,6 +382,7 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     capacity: '7인승',
     status: '운행 중',
     fuelType: '가솔린',
+    imageUrl: '/images/vehicles/carnival_high.webp',
     chargingSpecs: {
       front: {
         status: 'confirmed',
@@ -394,6 +410,7 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     capacity: '4인승',
     status: '운행 중',
     fuelType: '가솔린',
+    imageUrl: '/images/vehicles/gv80.webp',
   },
 
   // 8. [제네시스 G90 리무진] 1대
@@ -411,14 +428,15 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     capacity: '4인승',
     status: '운행 중',
     fuelType: '가솔린',
+    imageUrl: '/images/vehicles/g90_black.webp',
   },
 
   // 9. [제네시스 G90L] 1대
   {
     id: 'veh-gn-2269',
     uuid: 'e0f7c22a-0001-4c12-8800-000000002269',
-    plate: '208호 2269',
-    plateShort: '2269',
+    plate: '116호 1336',
+    plateShort: '1336',
     model: '제네시스 G90L',
     modelShort: 'G90L (롱휠베이스)',
     brand: '제네시스',
@@ -428,6 +446,7 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     capacity: '4인승',
     status: '운행 중',
     fuelType: '가솔린',
+    imageUrl: '/images/vehicles/g90_lwb.webp',
   },
 
   // 10. [제네시스 G90] 1대
@@ -445,6 +464,7 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     capacity: '4인승',
     status: '차고지 대기',
     fuelType: '가솔린',
+    imageUrl: '/images/vehicles/g90_black.webp',
   },
 
   // 11. [벤츠 S560] 1대
@@ -462,6 +482,7 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     capacity: '4인승',
     status: '운행 중',
     fuelType: '가솔린',
+    imageUrl: '/images/vehicles/s560.webp',
   },
 ];
 
@@ -501,7 +522,7 @@ export const VIP_VEHICLE_FLEET_CATEGORIES = [
     activeCount: 3,
     availableCount: 1,
     details: 'GV80 1대 · G90 리무진 1대 · G90L 1대 · G90 1대',
-    plates: ['203호 5947', '102부 4280', '208호 2269', '125호 8839'],
+    plates: ['203호 5947', '102부 4280', '116호 1336', '125호 8839'],
   },
   {
     id: 's_class',
@@ -585,14 +606,14 @@ export function resolveVehicleEntity(plateOrId: string, fallbackModel?: string):
   const category: VehicleCategoryKey = /스프린터|sprinter/i.test(resolvedModel)
     ? 'sprinter'
     : /스타리아|staria/i.test(resolvedModel)
-    ? 'staria'
-    : /카니발|carnival/i.test(resolvedModel)
-    ? 'carnival'
-    : /g90|gv80|제네시스|genesis/i.test(resolvedModel)
-    ? 'genesis'
-    : /s560|s-class|s클래스/i.test(resolvedModel)
-    ? 's_class'
-    : 'sprinter';
+      ? 'staria'
+      : /카니발|carnival/i.test(resolvedModel)
+        ? 'carnival'
+        : /g90|gv80|제네시스|genesis/i.test(resolvedModel)
+          ? 'genesis'
+          : /s560|s-class|s클래스/i.test(resolvedModel)
+            ? 's_class'
+            : 'sprinter';
 
   return {
     id: `veh-custom-${cleanPlate.replace(/\s+/g, '')}`,
@@ -611,4 +632,121 @@ export function resolveVehicleEntity(plateOrId: string, fallbackModel?: string):
     isCustom: true,
   };
 }
+
+/**
+ * Single source of truth for vehicle model images.
+ * Adheres strictly to Owner Decision (Issue #10 - 2026-11-02):
+ * - Shared model WebP assets (/images/vehicles/*.webp) for verified models.
+ * - Dedicated UUID/plate identification maintained in state; image paths centralized.
+ * - Does NOT force unverified models (Carnival, G90 standard sedan) to share inappropriate assets.
+ * - G90L/G90 Limousine uses g90_lwb.webp; standard G90 maintains legacy placeholder.
+ */
+export function getVehicleImage(
+  vehicle?: VipRealVehicle | { plate?: string; model?: string; category?: string; plateShort?: string; subType?: string; imageUrl?: string } | null
+): string {
+  if (!vehicle) return '/images/thumb_g90.jpg';
+  if ((vehicle as VipRealVehicle).imageUrl) return (vehicle as VipRealVehicle).imageUrl!;
+
+  const plate = vehicle.plate || '';
+  const plateShort = vehicle.plateShort || plate.split(' ').pop() || '';
+  const model = vehicle.model || '';
+  const category = vehicle.category || '';
+  const subType = (vehicle as any).subType || '';
+
+  // 1. Sprinter 519 CDI (6 vehicles: 2658, 3864, 3338, 2553, 3285, 1058)
+  if (
+    plateShort === '2658' ||
+    plateShort === '3864' ||
+    plateShort === '3338' ||
+    plateShort === '2553' ||
+    plateShort === '3285' ||
+    plateShort === '1058' ||
+    (category === 'sprinter' && (model.includes('519') || subType.includes('519')))
+  ) {
+    return '/images/vehicles/sprinter_519.webp';
+  }
+
+  // 2. Sprinter 319 CDI & Tourer (3 vehicles: 1458, 8040, 9982)
+  if (
+    plateShort === '1458' ||
+    plateShort === '8040' ||
+    plateShort === '9982' ||
+    (category === 'sprinter' && (model.includes('319') || subType.includes('319')))
+  ) {
+    return '/images/vehicles/sprinter_319.webp';
+  }
+
+  // 3. Staria Limousine (4 vehicles: 7665, 9037, 8407, 1514)
+  if (
+    category === 'staria' ||
+    model.includes('스타리아') ||
+    plateShort === '7665' ||
+    plateShort === '9037' ||
+    plateShort === '8407' ||
+    plateShort === '1514'
+  ) {
+    return '/images/vehicles/staria.webp';
+  }
+
+  // 4. Benz S560 (1 vehicle: 3343)
+  if (
+    category === 's_class' ||
+    model.includes('S560') ||
+    model.includes('S 560') ||
+    plateShort === '3343'
+  ) {
+    return '/images/vehicles/s560.webp';
+  }
+
+  // 5. Genesis GV80 (1 vehicle: 5947)
+  if (
+    model.includes('GV80') ||
+    plateShort === '5947'
+  ) {
+    return '/images/vehicles/gv80.webp';
+  }
+
+  // 6. Genesis G90 Black (2 vehicles: 102부 4280, 125호 8839)
+  if (
+    plateShort === '4280' ||
+    plateShort === '8839'
+  ) {
+    return '/images/vehicles/g90_black.webp';
+  }
+
+  // 7. Genesis G90L (1 vehicle: 116호 1336 / legacy 208호 2269)
+  if (
+    plateShort === '1336' ||
+    plateShort === '2269' ||
+    (category === 'genesis' && (model.includes('G90L') || subType.includes('G90L')))
+  ) {
+    return '/images/vehicles/g90_lwb.webp';
+  }
+
+  // 8. Carnival Hi-Limousine (193호 5336)
+  if (
+    plateShort === '5336' ||
+    (category === 'carnival' && (model.includes('하이리무진') || subType.includes('하이리무진')))
+  ) {
+    return '/images/vehicles/carnival_high.webp';
+  }
+
+  // 9. Standard Carnival (101호 7681)
+  if (category === 'carnival' || model.includes('카니발')) {
+    return '/images/thumb_carnival.jpg';
+  }
+
+  // 10. Fallback Genesis G90
+  if (category === 'genesis' && model.includes('G90')) {
+    return '/images/vehicles/g90_black.webp';
+  }
+
+  // 11. Bus (45-seat, 28-seat limo, 22-seat premium limo)
+  if (category === 'bus' || model.includes('버스') || subType.includes('버스')) {
+    return '/images/vehicles/bus.webp';
+  }
+
+  return '/images/thumb_g90.jpg';
+}
+
 

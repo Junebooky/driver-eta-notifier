@@ -1,4 +1,5 @@
 'use client';
+import { scheduleOverlapsInterval } from '@/utils/dispatchInterval';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Image from 'next/image';
@@ -10,6 +11,8 @@ import {
   Check,
   X,
   ChevronRight,
+  ChevronDown,
+  RotateCw,
   Edit2,
   Calendar,
   Users,
@@ -25,12 +28,15 @@ import {
   Sparkles,
   AlertTriangle,
   RefreshCw,
+  Minus,
+  Trash2,
 } from 'lucide-react';
 import {
   VIP_REAL_VEHICLES,
   VipRealVehicle,
   VehicleUiCategoryKey,
   mapVehicleToUiCategory,
+  getVehicleImage,
 } from '@/utils/vehicleData';
 import {
   getKstTodayDateStr,
@@ -39,8 +45,10 @@ import {
   isBookingActiveForConflict,
 } from '@/utils/dispatchConflictDetector';
 import { HqBooking } from '@/types/hq';
-import { FleetAvailabilityResult } from '@/utils/availabilityEngine';
+import type { FleetAvailabilityResult } from '@/utils/availabilityEngine';
+import { VEHICLE_STATUS_LABELS } from '@/utils/fleetVehicleStatus';
 import { haptics } from '@/utils/haptics';
+import { NewVehicleModal, NewVehicleFormData } from './NewVehicleModal';
 
 export interface HqVehicleManagementViewProps {
   initialSearchQuery?: string;
@@ -57,24 +65,12 @@ export type AvailabilityDayStatus =
   | '확인 불가'
   | '미확인';
 
-// Helper to get thumbnail image matching the mockup
-function getVehicleThumb(v: VipRealVehicle): string {
-  if (v.plateShort === '5336') return '/images/thumb_carnival.jpg';
-  if (v.category === 'carnival') return '/images/thumb_carnival.jpg';
-  if (v.category === 'staria') return '/images/thumb_staria.jpg';
-  if (v.category === 'sprinter') return '/images/thumb_sprinter.jpg';
-  if (v.category === 'genesis' && v.model.includes('GV80')) return '/images/thumb_gv80.jpg';
-  return '/images/thumb_g90.jpg';
+// Preserved resolver aliases adhering to centralized mapping (Issue #10)
+export function getVehicleHero(v: VipRealVehicle): string {
+  return getVehicleImage(v);
 }
-
-// Helper to get Hero image matching the mockup
-function getVehicleHero(v: VipRealVehicle): string {
-  if (v.plateShort === '5336') return '/images/carnival_hero.jpg';
-  if (v.category === 'carnival') return '/images/thumb_carnival.jpg';
-  if (v.category === 'staria') return '/images/thumb_staria.jpg';
-  if (v.category === 'sprinter') return '/images/thumb_sprinter.jpg';
-  if (v.category === 'genesis' && v.model.includes('GV80')) return '/images/thumb_gv80.jpg';
-  return '/images/thumb_g90.jpg';
+export function getVehicleThumb(v: VipRealVehicle): string {
+  return getVehicleImage(v);
 }
 
 // Specific vehicle tips strictly following verified real data
@@ -99,6 +95,16 @@ function getVehicleTips(v: VipRealVehicle) {
   };
 }
 
+// Status display formatter (대기 중 -> 배차 가능)
+const formatVehicleStatus = (st: string) => (st === '대기 중' ? '배차 가능' : st);
+
+const STATUS_OPTIONS: Array<{ value: '확인 필요' | '대기 중' | '운행 중' | '정비 중'; label: string }> = [
+  { value: '대기 중', label: '배차 가능' },
+  { value: '운행 중', label: '운행 중' },
+  { value: '정비 중', label: '정비 중' },
+  { value: '확인 필요', label: '확인 필요' },
+];
+
 export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = ({
   initialSearchQuery = '',
   bookings,
@@ -108,33 +114,56 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [fuelFilter, setFuelFilter] = useState<FuelTypeFilter>('all');
 
-  // 2. Selected Vehicle - Defaults to 193호 5336 (Carnival Limousine from mockup)
+  // 2. Selected Vehicle - Defaults to 125호 9982 (Benz Sprinter Tourer 319 CDI from mockup)
   const defaultCarId = useMemo(() => {
-    const carnival5336 = VIP_REAL_VEHICLES.find((v) => v.plateShort === '5336');
-    return carnival5336 ? carnival5336.id : VIP_REAL_VEHICLES[0].id;
+    return VIP_REAL_VEHICLES[0].id;
   }, []);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>(defaultCarId);
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
 
   // 3. Tab State inside Detail View
   const [activeDetailTab, setActiveDetailTab] = useState<'info' | 'calendar' | 'tips' | 'memo'>('info');
 
   // 4. Overrides (Status, Color, Year, Memo) synced with server store
-  const [statusOverrides, setStatusOverrides] = useState<Record<string, '대기 중' | '운행 중' | '정비 중'>>({});
+  const [statusOverrides, setStatusOverrides] = useState<Record<string, '확인 필요' | '대기 중' | '운행 중' | '정비 중'>>({});
   const [memos, setMemos] = useState<Record<string, string>>({});
   const [serverColors, setServerColors] = useState<Record<string, string>>({});
+  const [vehicleIconError, setVehicleIconError] = useState(false);
+
+  const fetchServerStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/fleet/status');
+      const data = await res.json();
+      if (data.ok) {
+        if (data.statuses) setStatusOverrides(data.statuses);
+        if (data.memos) setMemos(data.memos);
+        if (data.colors) setServerColors(data.colors);
+      }
+    } catch (err) {
+      console.warn('Notice fetching /api/fleet/status:', err);
+    }
+  }, []);
 
   useEffect(() => {
-    fetch('/api/fleet/status')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.ok) {
-          if (data.statuses) setStatusOverrides(data.statuses);
-          if (data.memos) setMemos(data.memos);
-          if (data.colors) setServerColors(data.colors);
-        }
-      })
-      .catch((err) => console.warn('Notice fetching /api/fleet/status:', err));
-  }, []);
+    void fetchServerStatus();
+  }, [fetchServerStatus]);
+
+  const handleQuickChangeStatus = async (vehicleId: string, newStatus: '확인 필요' | '대기 중' | '운행 중' | '정비 중') => {
+    haptics.selection();
+    setStatusOverrides((prev) => ({ ...prev, [vehicleId]: newStatus }));
+    try {
+      await fetch('/api/fleet/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          statuses: { [vehicleId]: newStatus },
+        }),
+      });
+      void fetchAvailability();
+    } catch (err) {
+      console.warn('Failed to save status change:', err);
+    }
+  };
 
   // 5. Fail-Closed Real Availability State
   const [fleetResult, setFleetResult] = useState<FleetAvailabilityResult | null>(null);
@@ -149,7 +178,6 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
     const controller = new AbortController();
     activeAbortRef.current = controller;
 
-    setAvailabilityState('loading');
     setAvailabilityError(null);
 
     const todayIso = getKstTodayDateStr();
@@ -162,13 +190,11 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
         `/api/fleet/availability?startDate=${todayIso}&endDate=${endIso}&startTime=00:00&endTime=23:59`,
         { signal: controller.signal, cache: 'no-store' }
       );
-      if (!res.ok) {
-        throw new Error(`서버 응답 에러 (${res.status})`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || `서버 응답 에러 (${res.status})`);
       }
-      const data = await res.json();
-      if (!data.ok) {
-        throw new Error(data.error || '가용성 조회 실패');
-      }
+      if (controller.signal.aborted) return;
       setFleetResult(data);
       setAvailabilityState('success');
     } catch (err: any) {
@@ -181,18 +207,105 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
 
   useEffect(() => {
     fetchAvailability();
+    const refresh = () => { if (document.visibilityState === 'visible') void fetchAvailability(); };
+    const timer = setInterval(refresh, 8000);
+    window.addEventListener('focus', refresh);
+    window.addEventListener('online', refresh);
+    window.addEventListener('vip_hq_schedules_updated', refresh);
+    document.addEventListener('visibilitychange', refresh);
     return () => {
+      clearInterval(timer); window.removeEventListener('focus', refresh);
+      window.removeEventListener('online', refresh);
+      window.removeEventListener('vip_hq_schedules_updated', refresh);
+      document.removeEventListener('visibilitychange', refresh);
       if (activeAbortRef.current) activeAbortRef.current.abort();
     };
   }, [fetchAvailability]);
 
-  // 6. Modals State
+  // 6. Modals & Toast State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
+  const [isNewVehicleModalOpen, setIsNewVehicleModalOpen] = useState(false);
+  const [vehicleToDelete, setVehicleToDelete] = useState<VipRealVehicle | null>(null);
   const [copiedToast, setCopiedToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = useCallback((msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3200);
+  }, []);
+
+  // Custom vehicles dynamically added via NewVehicleModal (persisted to localStorage)
+  const [customVehicles, setCustomVehicles] = useState<VipRealVehicle[]>([]);
+  // Deleted vehicle IDs (persisted to localStorage)
+  const [deletedVehicleIds, setDeletedVehicleIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    let customList: VipRealVehicle[] = [];
+    try {
+      const stored = localStorage.getItem('vip_hq_custom_vehicles');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          customList = parsed;
+          setCustomVehicles(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to parse cached custom vehicles', e);
+    }
+
+    try {
+      const storedDeleted = localStorage.getItem('vip_hq_deleted_vehicle_ids');
+      if (storedDeleted) {
+        const parsedDeleted = JSON.parse(storedDeleted);
+        if (Array.isArray(parsedDeleted)) {
+          // Self-heal: Any plate that the user has explicitly registered should NOT remain deleted
+          const customPlates = new Set(customList.map((cv) => cv.plate?.trim().replace(/\s+/g, '')));
+          const cleaned = parsedDeleted.filter((id) => !customPlates.has(String(id).trim().replace(/\s+/g, '')));
+          setDeletedVehicleIds(cleaned);
+          if (cleaned.length !== parsedDeleted.length) {
+            localStorage.setItem('vip_hq_deleted_vehicle_ids', JSON.stringify(cleaned));
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to parse cached deleted vehicle ids', e);
+    }
+  }, []);
+
+  const allBaseVehicles = useMemo(() => {
+    // 1. Plates in customVehicles (user explicitly registered these, so they take highest priority)
+    const customPlates = new Set(customVehicles.map((v) => v.plate.trim().replace(/\s+/g, '')));
+
+    // 2. Active deleted set, excluding any plate that exists in customVehicles
+    const activeDeletedSet = new Set(
+      deletedVehicleIds
+        .map((id) => id.trim().replace(/\s+/g, ''))
+        .filter((cleanId) => !customPlates.has(cleanId))
+    );
+
+    const isNotDeleted = (v: VipRealVehicle) => {
+      const cleanPlate = v.plate.trim().replace(/\s+/g, '');
+      const cleanId = v.id.trim().replace(/\s+/g, '');
+      if (activeDeletedSet.has(cleanPlate) || activeDeletedSet.has(cleanId)) {
+        return false;
+      }
+      return true;
+    };
+
+    const validCustom = customVehicles.filter(isNotDeleted);
+
+    // Filter default vehicles: not deleted AND not superseded by a custom vehicle with same plate
+    const validDefault = VIP_REAL_VEHICLES.filter(
+      (v) => isNotDeleted(v) && !customPlates.has(v.plate.trim().replace(/\s+/g, ''))
+    );
+
+    return [...validCustom, ...validDefault];
+  }, [customVehicles, deletedVehicleIds]);
 
   // Edit Modal Form State
-  const [editStatus, setEditStatus] = useState<'대기 중' | '운행 중' | '정비 중'>('대기 중');
+  const [editStatus, setEditStatus] = useState<'확인 필요' | '대기 중' | '운행 중' | '정비 중'>('확인 필요');
   const [editMemo, setEditMemo] = useState('');
   const [editColor, setEditColor] = useState('');
   const [isSavingEdit, setIsSavingEdit] = useState(false);
@@ -200,15 +313,25 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
 
   // Enriched vehicles with category, fuel normalization, and verified attributes
   const enrichedVehicles = useMemo(() => {
-    return VIP_REAL_VEHICLES.map((v) => {
+    return allBaseVehicles.map((v) => {
       const uiCategory = mapVehicleToUiCategory(v);
-      const effectiveStatus = statusOverrides[v.id] || (v.status === '운행 중' ? '운행 중' : v.status === '정비 중' ? '정비 중' : '대기 중');
-      // 연식/색상 추정 금지: 오직 확인된 값만 노출 (5336은 디자인 시안 기준 2023년/오로라 블랙 펄, 그 외는 '미확인')
-      const year = v.year || (v.plateShort === '5336' ? '2023년' : '미확인');
+      const override = statusOverrides[v.id] || statusOverrides[v.plate];
+      const live = availabilityState === 'success' ? fleetResult?.vehicles.find(row => row.uuid === v.uuid) : undefined;
+      const effectiveStatus = override
+        ? override
+        : live
+          ? VEHICLE_STATUS_LABELS[live.currentStatus]
+          : availabilityState === 'loading'
+            ? '확인 중...'
+            : availabilityState === 'error'
+              ? '확인 불가'
+              : '대기 중';
+      // 연식과 색상은 확인된 값만 표시합니다.
+      const year = v.year || '미확인';
       const color =
         serverColors[v.id] ||
         v.color ||
-        (v.plateShort === '5336' ? '오로라 블랙 펄' : '미확인');
+        '미확인';
       const fuel = v.fuelType === '디젤' ? '경유' : '휘발유';
       return {
         ...v,
@@ -219,7 +342,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
         fuelDisplay: fuel,
       };
     });
-  }, [statusOverrides, serverColors]);
+  }, [allBaseVehicles, availabilityState, fleetResult, serverColors, statusOverrides]);
 
   // Filtered vehicles for Center Column
   const filteredVehicles = useMemo(() => {
@@ -270,8 +393,8 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
   // Open Edit Modal
   const handleOpenEdit = () => {
     if (!selectedVehicle) return;
-    setEditStatus(selectedVehicle.effectiveStatus);
-    setEditMemo(memos[selectedVehicle.id] || selectedVehicle.adminMemo || '');
+    setEditStatus(statusOverrides[selectedVehicle.id] || '대기 중');
+    setEditMemo(memos[selectedVehicle.id] || '');
     setEditColor(selectedVehicle.color === '미확인' ? '' : selectedVehicle.color);
     setSaveEditError(null);
     setIsEditModalOpen(true);
@@ -301,13 +424,16 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
         throw new Error(data.error || '서버 상태 저장에 실패했습니다.');
       }
 
-      const newStatuses = { ...statusOverrides, [selectedVehicle.id]: editStatus };
-      const newMemos = { ...memos, [selectedVehicle.id]: editMemo };
-      const newColors = { ...serverColors, [selectedVehicle.id]: editColor || '미확인' };
+      const saved = await res.json();
+      if (!saved.ok) throw new Error(saved.error || '저장 확인 실패');
+      const newStatuses = { ...statusOverrides, ...saved.statuses };
+      const newMemos = { ...memos, ...saved.memos };
+      const newColors = { ...serverColors, ...saved.colors };
       setStatusOverrides(newStatuses);
       setMemos(newMemos);
       setServerColors(newColors);
       setIsEditModalOpen(false);
+      void fetchAvailability();
       haptics.success();
     } catch (err: any) {
       console.error('Error saving vehicle status to server:', err);
@@ -330,37 +456,9 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
       }
 
       // 2. Server/local maintenance override or data
-      const isMaint = statusOverrides[v.id] === '정비 중' || v.status === '정비 중';
+      const isMaint = fleetResult?.vehicles.find(row => row.uuid === v.uuid)?.currentStatus === 'maintenance';
       if (isMaint) {
         return { status: '정비 중', detail: '차량 정비/점검' };
-      }
-
-      // 3. Live bookings prop cross-check if provided
-      if (bookings && bookings.length > 0) {
-        const cleanPlate = cleanVehicleIdentity(v.plate);
-        const booked = bookings.find((b) => {
-          if (!isBookingActiveForConflict(b)) return false;
-          const bPlate = cleanVehicleIdentity(b.vehiclePlate || b.vehicleNoKey);
-          const matchPlate = Boolean(bPlate && cleanPlate && bPlate === cleanPlate);
-          const matchId = Boolean(v.uuid && b.vehicleId && v.uuid === b.vehicleId);
-          if (!matchPlate && !matchId) return false;
-          const bStart = normalizeDateToIso(b.pickupDate);
-          const bEnd = normalizeDateToIso(b.endDate) || bStart;
-          return targetDateIso >= bStart && targetDateIso <= bEnd;
-        });
-
-        if (booked) {
-          const isToday = targetDateIso === getKstTodayDateStr();
-          const inTransit =
-            isToday &&
-            (booked.operationStatus === 'in_transit' ||
-              booked.operationStatus === 'boarded' ||
-              statusOverrides[v.id] === '운행 중');
-          return {
-            status: inTransit ? '운행 중' : '예약 있음',
-            detail: `${booked.customerName} (${booked.pickupTime})`,
-          };
-        }
       }
 
       // 4. Check fleetResult from API with exact per-day activeSchedules match
@@ -379,24 +477,21 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
           return { status: '정비 중', detail: '정비 중' };
         }
 
+        if (targetDateIso === getKstTodayDateStr() && detail.currentStatus === 'in_service') {
+          return { status: '운행 중', detail: '일정·기사 상태·차량 인수 기록 반영' };
+        }
+
+        if (detail.requestedIntervalStatus === 'custody_hold') return { status: '미확인', detail: '차량 인수 중 · 반납 확인 필요' };
+
         // Check if this vehicle has an active schedule overlapping targetDateIso specifically
         if (detail.activeSchedules && detail.activeSchedules.length > 0) {
           const daySchedule = detail.activeSchedules.find((s) => {
-            const sStart = normalizeDateToIso(s.startDate);
-            const sEnd = normalizeDateToIso(s.endDate) || sStart;
-            return targetDateIso >= sStart && targetDateIso <= sEnd;
+            return scheduleOverlapsInterval(s, { startDate: targetDateIso, startTime: '00:00', endDate: targetDateIso, endTime: '23:59' });
           });
 
           if (daySchedule) {
-            const isToday = targetDateIso === getKstTodayDateStr();
-            const inTransit =
-              isToday &&
-              (daySchedule.operationStatus === 'in_transit' ||
-                daySchedule.operationStatus === 'boarded' ||
-                statusOverrides[v.id] === '운행 중' ||
-                v.status === '운행 중');
             return {
-              status: inTransit ? '운행 중' : '예약 있음',
+              status: !daySchedule.endTime ? '미확인' : '예약 있음',
               detail: `${daySchedule.customerName || '고객사'} (${daySchedule.pickupTime})`,
             };
           }
@@ -408,7 +503,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
       // Default fallback: Fail-closed
       return { status: '확인 불가', detail: '가용성 데이터 부재' };
     },
-    [availabilityState, availabilityError, statusOverrides, bookings, fleetResult]
+    [availabilityState, availabilityError, fleetResult]
   );
 
   // 5 Days Strip computation starting from today with real fail-closed statuses
@@ -470,171 +565,351 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
   }, [selectedVehicle]);
 
 
-  // Category counts
+  // Dynamic Category counts
   const categoryCounts = useMemo(() => {
-    const counts = { all: 20, sedan: 4, suv: 1, van: 6, sprinter: 9 };
-    return counts;
-  }, []);
+    return {
+      all: enrichedVehicles.length,
+      sedan: enrichedVehicles.filter((v) => v.uiCategory === 'sedan').length,
+      suv: enrichedVehicles.filter((v) => v.uiCategory === 'suv').length,
+      van: enrichedVehicles.filter((v) => v.uiCategory === 'van').length,
+      sprinter: enrichedVehicles.filter((v) => v.uiCategory === 'sprinter').length,
+    };
+  }, [enrichedVehicles]);
 
-  // Fuel counts
+  // Dynamic Fuel counts
   const fuelCounts = useMemo(() => {
     return {
-      all: 20,
+      all: enrichedVehicles.length,
       gasoline: enrichedVehicles.filter((v) => v.fuelDisplay === '휘발유').length,
       diesel: enrichedVehicles.filter((v) => v.fuelDisplay === '경유').length,
       hybrid: enrichedVehicles.filter((v) => v.fuelType === '하이브리드').length,
     };
   }, [enrichedVehicles]);
 
+  // Register New Vehicle Handler
+  const handleCreateVehicle = (data: NewVehicleFormData) => {
+    const normalizedPlate = data.plate.trim();
+    const cleanPlate = normalizedPlate.replace(/\s+/g, '');
+
+    const newVehicle: VipRealVehicle = {
+      id: `vehicle-custom-${Date.now()}`,
+      uuid: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `custom-${Date.now()}`,
+      plate: normalizedPlate,
+      plateShort: normalizedPlate.split(/\s+/).pop() || normalizedPlate.slice(-4),
+      model: data.model.trim(),
+      modelShort: data.model.trim().replace(/^(벤츠|현대|기아|제네시스)\s+/, ''),
+      brand: (
+        data.model.includes('벤츠') ? '벤츠' :
+          data.model.includes('현대') ? '현대' :
+            data.model.includes('기아') ? '기아' :
+              data.model.includes('제네시스') ? '제네시스' :
+                data.category === 'sprinter' ? '벤츠' :
+                  data.category === 'sedan' ? '제네시스' :
+                    data.category === 'suv' ? '제네시스' : '현대'
+      ),
+      category: (
+        data.category === 'sprinter' ? 'sprinter' :
+          data.category === 'suv' ? 'genesis' :
+            data.category === 'van' ? 'carnival' :
+              data.model.includes('벤츠') || data.model.includes('S') ? 's_class' : 'genesis'
+      ),
+      categoryLabel: (
+        data.category === 'sprinter' ? '스프린터' :
+          data.category === 'suv' ? 'SUV' :
+            data.category === 'van' ? '밴' : '세단'
+      ),
+      subType: data.model.trim(),
+      capacity: data.capacity,
+      status: '차고지 대기', // Initial status: displays as '배차 가능'
+      fuelType: data.fuelType === '경유' ? '디젤' : data.fuelType === '휘발유' ? '가솔린' : '하이브리드',
+      year: '2026',
+      color: '블랙 (기본)',
+      imageUrl: data.imageUrl,
+    };
+
+    // 1. Immediately un-delete this plate if it was previously marked deleted
+    setDeletedVehicleIds((prev) => {
+      const next = prev.filter((id) => {
+        const cleanId = id.trim().replace(/\s+/g, '');
+        if (cleanId === cleanPlate || id === normalizedPlate) return false;
+        const matchingDefault = VIP_REAL_VEHICLES.find(
+          (dv) => dv.plate.replace(/\s+/g, '') === cleanPlate
+        );
+        if (matchingDefault && (matchingDefault.id === id || matchingDefault.plate === id)) {
+          return false;
+        }
+        return true;
+      });
+      try {
+        localStorage.setItem('vip_hq_deleted_vehicle_ids', JSON.stringify(next));
+      } catch (err) {
+        console.warn('Failed to update deleted vehicle ids in localStorage', err);
+      }
+      return next;
+    });
+
+    // 2. Add to customVehicles state and localStorage (replace duplicate if exists)
+    setCustomVehicles((prev) => {
+      const filteredPrev = prev.filter((v) => v.plate.trim().replace(/\s+/g, '') !== cleanPlate);
+      const next = [newVehicle, ...filteredPrev];
+      try {
+        localStorage.setItem('vip_hq_custom_vehicles', JSON.stringify(next));
+      } catch (err) {
+        console.warn('Failed to save custom vehicles to localStorage', err);
+      }
+      return next;
+    });
+
+    // 3. Reset filters so the new vehicle is immediately visible
+    setSelectedCategory('all');
+    setFuelFilter('all');
+    setSearchQuery('');
+
+    // 4. Focus on the new vehicle
+    setSelectedVehicleId(newVehicle.id);
+    setIsNewVehicleModalOpen(false);
+    showToast(`차량 '${normalizedPlate}'이(가) 등록되었습니다.`);
+    haptics.success();
+  };
+
+  // Delete Vehicle Handler
+  const handleConfirmDeleteVehicle = (vehicle: VipRealVehicle) => {
+    haptics.warningPulse();
+
+    const cleanPlate = vehicle.plate.trim().replace(/\s+/g, '');
+
+    // 1. Remove from custom vehicles state if present
+    setCustomVehicles((prev) => {
+      const next = prev.filter(
+        (v) => v.id !== vehicle.id && v.plate.trim().replace(/\s+/g, '') !== cleanPlate
+      );
+      try {
+        localStorage.setItem('vip_hq_custom_vehicles', JSON.stringify(next));
+      } catch (e) {
+        console.warn('Failed to update custom vehicles in localStorage', e);
+      }
+      return next;
+    });
+
+    // 2. Add to deleted vehicle IDs
+    setDeletedVehicleIds((prev) => {
+      const next = Array.from(new Set([...prev, vehicle.id, vehicle.plate.trim(), cleanPlate]));
+      try {
+        localStorage.setItem('vip_hq_deleted_vehicle_ids', JSON.stringify(next));
+      } catch (e) {
+        console.warn('Failed to save deleted vehicle ids to localStorage', e);
+      }
+      return next;
+    });
+
+    // 3. Clear modal
+    setVehicleToDelete(null);
+
+    // 4. Update selected vehicle to next available vehicle
+    const remaining = enrichedVehicles.filter(
+      (v) => v.id !== vehicle.id && v.plate.trim().replace(/\s+/g, '') !== cleanPlate
+    );
+    if (remaining.length > 0) {
+      setSelectedVehicleId(remaining[0].id);
+    }
+
+    // 5. Toast & haptics
+    showToast(`차량 '${vehicle.plate}' (${vehicle.model})이(가) 삭제되었습니다.`);
+    haptics.success();
+  };
+
   return (
     <div className="space-y-4">
-      {/* Page Header */}
-      <div>
-        <h1 className="text-2xl font-black text-slate-900 tracking-tight">차량관리</h1>
-        <p className="text-xs text-slate-500 font-medium mt-0.5">
-          차량 이미지, 차량번호, 차량별 운영 팁을 한눈에 관리합니다.
-        </p>
+      {/* Top Header Card: Icon + Title + Count */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:px-5 shadow-2xs flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          {/* 차량관리 아이콘 & 마우스 호버 툴팁 */}
+          <div className="relative group/vehicles inline-flex items-center justify-center cursor-pointer shrink-0">
+            {!vehicleIconError ? (
+              <img
+                src="/images/icons/vehicles/icon_vehicle.png"
+                alt="차량 관리"
+                onError={() => setVehicleIconError(true)}
+                className="w-8 h-8 sm:w-9 sm:h-9 object-contain shrink-0 transition-transform duration-150 group-hover/vehicles:scale-110"
+              />
+            ) : (
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-blue-50 border border-blue-100 text-[#1E60F3] flex items-center justify-center shrink-0 transition-transform duration-150 group-hover/vehicles:scale-110 shadow-2xs">
+                <Car className="w-4 h-4 sm:w-5 sm:h-5" />
+              </div>
+            )}
+
+            {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 (최상단 레이어) */}
+            <div className="absolute bottom-full left-0 mb-2 hidden group-hover/vehicles:flex flex-col items-start pointer-events-none z-[100]">
+              <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+                VIP 의전 세단·SUV·밴·스프린터의 실시간 배차 및 제원을 관리해요
+              </span>
+              <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 ml-3.5 shadow-xs" />
+            </div>
+          </div>
+
+          <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+            차량 관리
+          </h2>
+          <span className="bg-slate-100 text-slate-500 font-bold px-2 py-0.5 rounded-full text-xs">
+            {allBaseVehicles.length}대
+          </span>
+        </div>
+
+        {/* + 차량 등록 Button */}
+        <button
+          type="button"
+          onClick={() => {
+            haptics.lightTap();
+            setIsNewVehicleModalOpen(true);
+          }}
+          className="bg-[#0050FF] hover:bg-blue-700 text-white font-semibold text-xs px-3.5 py-2 rounded-xl shadow-xs transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer active:scale-95 shrink-0"
+          title="신규 차량 등록"
+        >
+          <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+          <span>차량 등록</span>
+        </button>
       </div>
 
-      {/* Main 3-Column Layout Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-        {/* ============================================================== */}
-        {/* COLUMN 1 (Left 2.5 cols / lg:col-span-3): Filter Sidebar      */}
-        {/* ============================================================== */}
-        <div className="lg:col-span-3 space-y-4">
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs space-y-5">
-            {/* 1. 차량 분류 */}
-            <div className="space-y-2">
-              <h2 className="text-xs font-black text-slate-900">차량 분류</h2>
-              <div className="space-y-1">
-                {[
-                  { key: 'all', label: '전체', count: categoryCounts.all, icon: Car },
-                  { key: 'sedan', label: '세단', count: categoryCounts.sedan, icon: Car },
-                  { key: 'suv', label: 'SUV', count: categoryCounts.suv, icon: Car },
-                  { key: 'van', label: '밴', count: categoryCounts.van, icon: Truck },
-                  { key: 'sprinter', label: '스프린터', count: categoryCounts.sprinter, icon: Bus },
-                ].map((cat) => {
-                  const isSelected = selectedCategory === cat.key;
-                  const IconComp = cat.icon;
-                  return (
-                    <button
-                      key={cat.key}
-                      type="button"
-                      onClick={() => {
-                        haptics.selection();
-                        setSelectedCategory(cat.key as VehicleUiCategoryKey);
-                      }}
-                      className={`w-full px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
-                        isSelected
-                          ? 'bg-[#1E60F3] text-white shadow-xs'
-                          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+      {/* Top Horizontal Filter Bar */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-3 sm:p-3.5 shadow-2xs">
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+          {/* 1. 차량 분류 (Category Pills) - 가로 스크롤 및 충분한 간격 확보 */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 xl:pb-0 scrollbar-none flex-1 min-w-0">
+            {[
+              { key: "all", label: "전체", count: categoryCounts.all, icon: Car },
+              { key: "sedan", label: "세단", count: categoryCounts.sedan, icon: Car },
+              { key: "suv", label: "SUV", count: categoryCounts.suv, icon: Car },
+              { key: "van", label: "밴", count: categoryCounts.van, icon: Truck },
+              { key: "sprinter", label: "스프린터", count: categoryCounts.sprinter, icon: Bus },
+            ].map((cat) => {
+              const isSelected = selectedCategory === cat.key;
+              const IconComp = cat.icon;
+              return (
+                <button
+                  key={cat.key}
+                  type="button"
+                  onClick={() => {
+                    haptics.selection();
+                    setSelectedCategory(cat.key as VehicleUiCategoryKey);
+                  }}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer shrink-0 ${isSelected
+                    ? "bg-[#0050FF] text-white shadow-xs"
+                    : "bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-slate-200"
+                    }`}
+                >
+                  <IconComp className={`w-3.5 h-3.5 ${isSelected ? "text-white" : "text-slate-400"}`} />
+                  <span>{cat.label}</span>
+                  <span
+                    className={`text-[11px] font-bold px-1.5 py-0.2 rounded-full ${isSelected ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
                       }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <IconComp className={`w-4 h-4 ${isSelected ? 'text-white' : 'text-slate-400'}`} />
-                        <span>{cat.label}</span>
-                      </div>
-                      <span
-                        className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                          isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
-                        }`}
-                      >
-                        {cat.count}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* 2. 검색 */}
-            <div className="space-y-2 pt-2 border-t border-slate-100">
-              <h2 className="text-xs font-black text-slate-900">검색</h2>
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
-                <input
-                  type="text"
-                  placeholder="차량, 차량번호로 검색"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-8 py-2 text-xs font-medium border border-slate-200 rounded-xl bg-slate-50/50 focus:bg-white focus:outline-none focus:border-[#1E60F3] placeholder:text-slate-400 transition-all"
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
                   >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
+                    {cat.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* 2. Right: Fuel Dropdown & Search & + 차량 등록 */}
+          <div className="flex items-center gap-2.5 shrink-0 flex-wrap sm:flex-nowrap">
+            {/* 세로 구분선 (데스크톱) */}
+            <div className="hidden xl:block w-px h-6 bg-slate-200 shrink-0" />
+
+            {/* Fuel Type Compact Dropdown */}
+            <div className="relative shrink-0">
+              <select
+                value={fuelFilter}
+                onChange={(e) => {
+                  haptics.selection();
+                  setFuelFilter(e.target.value as FuelTypeFilter);
+                }}
+                className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs transition-colors"
+              >
+                <option value="all">유종: 전체</option>
+                <option value="휘발유">휘발유 ({fuelCounts.gasoline})</option>
+                <option value="경유">경유 ({fuelCounts.diesel})</option>
+                {fuelCounts.hybrid > 0 && <option value="하이브리드">하이브리드 ({fuelCounts.hybrid})</option>}
+              </select>
             </div>
 
-            {/* 3. 연료 타입 */}
-            <div className="space-y-2.5 pt-2 border-t border-slate-100">
-              <h2 className="text-xs font-black text-slate-900">연료 타입</h2>
-              <div className="space-y-2 text-xs">
-                {[
-                  { key: 'all', label: '전체', count: fuelCounts.all },
-                  { key: '휘발유', label: '휘발유', count: fuelCounts.gasoline },
-                  { key: '경유', label: '경유', count: fuelCounts.diesel },
-                  { key: '하이브리드', label: '하이브리드', count: fuelCounts.hybrid },
-                ].map((fuel) => {
-                  const isChecked = fuelFilter === fuel.key;
-                  return (
-                    <div
-                      key={fuel.key}
-                      onClick={() => {
-                        haptics.selection();
-                        setFuelFilter(fuel.key as FuelTypeFilter);
-                      }}
-                      className="flex items-center justify-between cursor-pointer group py-0.5"
-                    >
-                      <div className="flex items-center gap-2">
-                        <div
-                          className={`w-4 h-4 rounded flex items-center justify-center transition-colors ${
-                            isChecked
-                              ? 'bg-[#1E60F3] text-white'
-                              : 'border border-slate-300 bg-white group-hover:border-slate-400'
-                          }`}
-                        >
-                          {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
-                        </div>
-                        <span className={`font-medium ${isChecked ? 'text-slate-900 font-bold' : 'text-slate-600'}`}>
-                          {fuel.label}
-                        </span>
-                      </div>
-                      {fuel.key !== 'all' && (
-                        <span className="text-[11px] text-slate-400 font-medium">
-                          {fuel.count}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+            {/* Search Input */}
+            <div className="relative w-44 sm:w-56">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="차량명이나 번호로 검색"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-7 py-1.5 text-xs font-medium border border-slate-200 rounded-xl bg-slate-50/50 focus:bg-white focus:outline-none focus:border-[#0050FF] placeholder:text-slate-400 transition-all"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2 top-2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
           </div>
         </div>
+      </div>
 
+      {/* Main 2-Column Layout Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         {/* ============================================================== */}
-        {/* COLUMN 2 (Center 3.5 cols / lg:col-span-4): Vehicle List Cards */}
+        {/* COLUMN 1 (Left): Vehicle List Cards                           */}
         {/* ============================================================== */}
-        <div className="lg:col-span-4 space-y-3">
+        <div className="lg:col-span-5 xl:col-span-4 space-y-3">
           {/* Header */}
           <div className="flex items-center justify-between px-1">
-            <h2 className="text-sm font-black text-slate-900">차량 목록</h2>
-            <span className="text-xs text-slate-400 font-bold">
-              총 {filteredVehicles.length}대
-            </span>
+            <div>
+              <h2 className="text-sm font-black text-slate-900">차량 목록</h2>
+              <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-medium mt-0.5">
+                <span>실시간 반영 중</span>
+                <button
+                  type="button"
+                  onClick={fetchServerStatus}
+                  className="hover:text-slate-600 transition-colors cursor-pointer"
+                  title="새로고침"
+                >
+                  <RotateCw className="w-2.5 h-2.5" />
+                </button>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {deletedVehicleIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    haptics.impactMedium();
+                    setDeletedVehicleIds([]);
+                    try {
+                      localStorage.removeItem("vip_hq_deleted_vehicle_ids");
+                    } catch (e) {
+                      console.warn(e);
+                    }
+                    showToast("삭제된 모든 차량이 복구되었습니다.");
+                  }}
+                  className="text-[11px] font-bold text-slate-600 hover:text-[#0050FF] flex items-center gap-1 transition-colors cursor-pointer bg-slate-100/80 hover:bg-blue-50 px-2 py-0.5 rounded-lg border border-slate-200"
+                  title="삭제된 차량 초기화 및 복구"
+                >
+                  <RefreshCw className="w-2.5 h-2.5 text-slate-400" />
+                  <span>복구</span>
+                </button>
+              )}
+              <span className="text-xs text-slate-400 font-bold">
+                {filteredVehicles.length}대
+              </span>
+            </div>
           </div>
 
           {/* Cards Stack */}
           <div className="space-y-2.5 max-h-[calc(100vh-210px)] overflow-y-auto pr-1">
             {filteredVehicles.map((vehicle) => {
               const isSelected = vehicle.id === selectedVehicle?.id;
-              const thumbUrl = getVehicleThumb(vehicle);
+              const thumbUrl = getVehicleImage(vehicle);
 
               return (
                 <div
@@ -643,70 +918,58 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                     haptics.selection();
                     setSelectedVehicleId(vehicle.id);
                   }}
-                  className={`bg-white border rounded-2xl p-3 hover:border-slate-300 transition-all cursor-pointer flex items-center gap-3 relative shadow-2xs ${
-                    isSelected
-                      ? 'border-[#1E60F3] ring-2 ring-[#1E60F3] bg-blue-50/20'
-                      : 'border-slate-200/80'
-                  }`}
+                  className={`rounded-2xl p-3 sm:p-3.5 transition-all cursor-pointer flex items-center gap-3 relative shadow-2xs group border ${isSelected
+                    ? "bg-blue-50/70 border-blue-200/90 border-l-4 border-l-[#0050FF] shadow-xs"
+                    : "bg-white hover:bg-slate-50/80 border-slate-200/80 hover:border-slate-300"
+                    }`}
                 >
                   {/* Left Thumbnail Image */}
-                  <div className="relative w-20 h-14 rounded-xl overflow-hidden bg-slate-100 shrink-0 border border-slate-100">
+                  <div className="relative w-20 sm:w-24 h-14 sm:h-16 shrink-0 flex items-center justify-center">
                     <Image
                       src={thumbUrl}
                       alt={vehicle.model}
                       fill
-                      className="object-cover"
-                      sizes="80px"
+                      className="object-contain filter drop-shadow-[0_8px_12px_rgba(0,0,0,0.16)] transition-transform duration-200 group-hover:scale-105"
+                      sizes="96px"
                     />
                   </div>
 
-                  {/* Center Info */}
-                  <div className="flex-1 min-w-0 space-y-0.5">
-                    <h3 className="text-xs font-black text-slate-900 tracking-tight truncate">
-                      {vehicle.model}
-                    </h3>
-                    <div className="flex items-center gap-1.5 pt-0.5">
-                      <span className="bg-blue-50 text-[#1E60F3] text-[10px] font-bold px-1.5 py-0.2 rounded">
-                        {vehicle.uiCategory === 'sprinter'
-                          ? '스프린터'
-                          : vehicle.uiCategory === 'van'
-                          ? '밴'
-                          : vehicle.uiCategory === 'suv'
-                          ? 'SUV'
-                          : '세단'}
+                  {/* Center & Right Info */}
+                  <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5 self-stretch">
+                    {/* Top: Model & Chevron */}
+                    <div className="flex items-start justify-between gap-1">
+                      <h3 className="text-xs sm:text-[13px] font-bold text-slate-900 tracking-tight truncate">
+                        {vehicle.model}
+                      </h3>
+                      <ChevronRight className="w-4 h-4 text-slate-300 shrink-0 mt-0.5" />
+                    </div>
+
+                    {/* Middle: Badges */}
+                    <div className="flex items-center gap-1.5 my-1">
+                      <span className="bg-blue-50 text-[#0050FF] text-[10px] font-bold px-1.5 py-0.2 rounded">
+                        {vehicle.uiCategory === "sprinter"
+                          ? "스프린터"
+                          : vehicle.uiCategory === "van"
+                            ? "밴"
+                            : vehicle.uiCategory === "suv"
+                              ? "SUV"
+                              : "세단"}
                       </span>
                       <span className="bg-slate-100 text-slate-600 text-[10px] font-medium px-1.5 py-0.2 rounded">
                         {vehicle.fuelDisplay}
                       </span>
                     </div>
-                    <p className="text-xs font-black text-slate-900 tracking-tight pt-0.5">
-                      {vehicle.plate}
-                    </p>
-                  </div>
 
-                  {/* Right Status & Arrow */}
-                  <div className="flex flex-col items-end justify-between h-14 shrink-0 py-0.5">
-                    <ChevronRight className="w-4 h-4 text-slate-300" />
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${
-                        vehicle.effectiveStatus === '대기 중'
-                          ? 'bg-emerald-50 text-emerald-600 border border-emerald-200/70'
-                          : vehicle.effectiveStatus === '운행 중'
-                          ? 'bg-blue-50 text-[#1E60F3] border border-blue-200/70'
-                          : 'bg-slate-100 text-slate-600 border border-slate-200'
-                      }`}
-                    >
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          vehicle.effectiveStatus === '대기 중'
-                            ? 'bg-emerald-500'
-                            : vehicle.effectiveStatus === '운행 중'
-                            ? 'bg-[#1E60F3]'
-                            : 'bg-slate-400'
-                        }`}
-                      />
-                      {vehicle.effectiveStatus}
-                    </span>
+                    {/* Bottom: Plate (Tag Style) & Status Pill */}
+                    <div className="flex items-center justify-between gap-2 pt-0.5">
+                      <span className="text-xs sm:text-[13px] font-black text-slate-900 tracking-tight px-1.5 py-0.5 rounded-md bg-slate-100/90 border border-slate-200/80">
+                        {vehicle.plate}
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-600 bg-white px-2 py-0.5 rounded-md border border-slate-200/60 shrink-0">
+                        <Calendar className="w-2.5 h-2.5 text-slate-400" />
+                        <span>{formatVehicleStatus(vehicle.effectiveStatus)}</span>
+                      </span>
+                    </div>
                   </div>
                 </div>
               );
@@ -717,378 +980,441 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                 <Car className="w-8 h-8 text-slate-300 mx-auto" />
                 <p className="text-xs font-bold text-slate-700">검색된 차량이 없습니다.</p>
                 <p className="text-[11px] text-slate-400">필터나 검색어를 변경해 보세요.</p>
+                {deletedVehicleIds.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      haptics.impactMedium();
+                      setDeletedVehicleIds([]);
+                      try {
+                        localStorage.removeItem("vip_hq_deleted_vehicle_ids");
+                      } catch (e) {
+                        console.warn(e);
+                      }
+                      showToast("삭제된 모든 차량이 복구되었습니다.");
+                    }}
+                    className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
+                    <span>삭제된 차량 복구</span>
+                  </button>
+                )}
               </div>
             )}
           </div>
         </div>
 
         {/* ============================================================== */}
-        {/* COLUMN 3 (Right 5 cols / lg:col-span-5): Vehicle Detail Panel  */}
+        {/* COLUMN 2 (Right): Selected Vehicle Details                    */}
         {/* ============================================================== */}
-        <div className="lg:col-span-5 space-y-4">
+        <div className="lg:col-span-7 xl:col-span-8 space-y-4">
           {selectedVehicle ? (
             <>
-              {/* Top Hero Header Card */}
+              {/* Top Hero Header Card (Streamlined, no redundant quick specs) */}
               <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
-                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
-                  {/* Left Hero Photo */}
-                  <div className="relative w-full sm:w-[220px] h-[135px] rounded-xl overflow-hidden bg-slate-100 shrink-0 border border-slate-100">
+                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+                  {/* Left Hero Photo - Transparent background with floating 3D drop-shadow */}
+                  <div className="relative w-full sm:w-[240px] md:w-[260px] h-[145px] shrink-0 flex items-center justify-center p-2">
                     <Image
                       src={getVehicleHero(selectedVehicle)}
                       alt={selectedVehicle.model}
                       fill
-                      className="object-cover"
+                      className="object-contain filter drop-shadow-[0_12px_22px_rgba(0,0,0,0.20)] transition-transform duration-300 hover:scale-[1.03]"
                       priority
                     />
                   </div>
 
                   {/* Right Header Info */}
-                  <div className="flex-1 w-full space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h2 className="text-xl font-black text-slate-950 tracking-tight">
-                          {selectedVehicle.model}
-                        </h2>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-base font-black text-slate-900 tracking-tight">
-                            {selectedVehicle.plate}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={handleCopyPlate}
-                            title="차량번호 복사"
-                            className="text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
-                          >
-                            <Copy className="w-3.5 h-3.5" />
-                          </button>
-                          {copiedToast && (
-                            <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded">
-                              복사됨!
-                            </span>
-                          )}
-                        </div>
-                      </div>
+                  <div className="flex-1 w-full min-w-0 space-y-2.5">
+                    {/* Row 1: Model Title & Minimal Icon Actions */}
+                    <div className="flex flex-wrap sm:flex-nowrap items-start justify-between gap-3">
+                      <h2 className="text-lg sm:text-xl font-black text-slate-950 tracking-tight break-keep">
+                        {selectedVehicle.model}
+                      </h2>
 
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <span
-                          className={`text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1 ${
-                            selectedVehicle.effectiveStatus === '대기 중'
-                              ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
-                              : selectedVehicle.effectiveStatus === '운행 중'
-                              ? 'bg-blue-50 text-[#1E60F3] border border-blue-200'
-                              : 'bg-slate-100 text-slate-600 border border-slate-200'
-                          }`}
-                        >
-                          <Check className="w-3 h-3" />
-                          {selectedVehicle.effectiveStatus}
-                        </span>
+                        {/* Status Dropdown Button */}
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 cursor-pointer shadow-2xs"
+                          >
+                            <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                            <span>{formatVehicleStatus(selectedVehicle.effectiveStatus)}</span>
+                            <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                          </button>
+                          {isStatusDropdownOpen && (
+                            <div className="absolute right-0 mt-1 w-32 bg-white rounded-xl shadow-lg border border-slate-200 py-1 z-30">
+                              {STATUS_OPTIONS.map((st) => (
+                                <button
+                                  key={st.value}
+                                  type="button"
+                                  onClick={() => {
+                                    handleQuickChangeStatus(selectedVehicle.id, st.value);
+                                    setIsStatusDropdownOpen(false);
+                                  }}
+                                  className={`w-full text-left px-3 py-1.5 text-xs font-bold flex items-center justify-between hover:bg-slate-50 cursor-pointer ${selectedVehicle.effectiveStatus === st.value ? "text-[#0050FF] bg-blue-50/50" : "text-slate-700"
+                                    }`}
+                                >
+                                  <span>{st.label}</span>
+                                  {selectedVehicle.effectiveStatus === st.value && <Check className="w-3 h-3 text-[#0050FF]" />}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
 
+                        {/* Minimal Edit Icon Button */}
                         <button
                           type="button"
                           onClick={handleOpenEdit}
-                          className="bg-[#1E60F3] hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1 shadow-xs cursor-pointer transition-colors"
+                          className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-2 rounded-xl transition-colors cursor-pointer shadow-2xs border border-transparent hover:border-slate-200"
+                          title="정보 수정"
+                          aria-label="정보 수정"
                         >
-                          <Edit2 className="w-3 h-3" />
-                          <span>수정하기</span>
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+
+                        {/* Minimal Delete Icon Button */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            haptics.warningPulse();
+                            setVehicleToDelete(selectedVehicle);
+                          }}
+                          className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 p-2 rounded-xl transition-colors cursor-pointer shadow-2xs border border-transparent hover:border-rose-100"
+                          title="차량 삭제"
+                          aria-label="차량 삭제"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5 pt-0.5">
-                      <span className="bg-blue-50 text-[#1E60F3] text-[10px] font-bold px-1.5 py-0.5 rounded">
-                        {selectedVehicle.uiCategory === 'sprinter'
-                          ? '스프린터'
-                          : selectedVehicle.uiCategory === 'van'
-                          ? '밴'
-                          : selectedVehicle.uiCategory === 'suv'
-                          ? 'SUV'
-                          : '세단'}
+                    {/* Row 2: Plate & Copy Button */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                        {selectedVehicle.plate}
                       </span>
-                      <span className="bg-slate-100 text-slate-600 text-[10px] font-medium px-1.5 py-0.5 rounded">
+                      <button
+                        type="button"
+                        onClick={handleCopyPlate}
+                        title="차량번호 복사"
+                        className="text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+                      {copiedToast && (
+                        <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded">
+                          복사됨!
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Row 3: Badges */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="bg-blue-50 text-[#0050FF] text-[10px] font-bold px-2 py-0.5 rounded">
+                        {selectedVehicle.uiCategory === "sprinter"
+                          ? "스프린터"
+                          : selectedVehicle.uiCategory === "van"
+                            ? "밴"
+                            : selectedVehicle.uiCategory === "suv"
+                              ? "SUV"
+                              : "세단"}
+                      </span>
+                      <span className="bg-slate-100 text-slate-600 text-[10px] font-medium px-2 py-0.5 rounded">
                         {selectedVehicle.fuelDisplay}
                       </span>
                     </div>
-
-                    {/* Quick Specs 3 Items */}
-                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-[11px]">
-                      <div className="flex items-center gap-1.5 text-slate-600">
-                        <Car className="w-3.5 h-3.5 text-slate-400" />
-                        <div>
-                          <span className="text-[10px] text-slate-400 block font-normal">제조사</span>
-                          <span className="font-bold text-slate-800">{selectedVehicle.brand}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1.5 text-slate-600">
-                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                        <div>
-                          <span className="text-[10px] text-slate-400 block font-normal">연식</span>
-                          <span className="font-bold text-slate-800">{selectedVehicle.year}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1.5 text-slate-600">
-                        <Users className="w-3.5 h-3.5 text-slate-400" />
-                        <div>
-                          <span className="text-[10px] text-slate-400 block font-normal">승차정원</span>
-                          <span className="font-bold text-slate-800">{selectedVehicle.capacity}</span>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Navigation Tabs */}
+              {/* Navigation Tabs (4 distinct tabs) */}
               <div className="flex items-center gap-6 border-b border-slate-200 px-1 text-xs font-bold text-slate-500">
-                <button
-                  type="button"
-                  onClick={() => {
-                    haptics.lightTap();
-                    setActiveDetailTab('info');
-                  }}
-                  className={`pb-2.5 transition-all cursor-pointer relative ${
-                    activeDetailTab === 'info'
-                      ? 'text-[#1E60F3] font-black after:content-[""] after:absolute after:bottom-0 after:inset-x-0 after:h-[2px] after:bg-[#1E60F3]'
-                      : 'hover:text-slate-800'
-                  }`}
-                >
-                  기본 정보
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    haptics.lightTap();
-                    setActiveDetailTab('calendar');
-                  }}
-                  className={`pb-2.5 transition-all cursor-pointer relative ${
-                    activeDetailTab === 'calendar'
-                      ? 'text-[#1E60F3] font-black after:content-[""] after:absolute after:bottom-0 after:inset-x-0 after:h-[2px] after:bg-[#1E60F3]'
-                      : 'hover:text-slate-800'
-                  }`}
-                >
-                  날짜별 예약 가능 여부
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    haptics.lightTap();
-                    setActiveDetailTab('tips');
-                  }}
-                  className={`pb-2.5 transition-all cursor-pointer relative ${
-                    activeDetailTab === 'tips'
-                      ? 'text-[#1E60F3] font-black after:content-[""] after:absolute after:bottom-0 after:inset-x-0 after:h-[2px] after:bg-[#1E60F3]'
-                      : 'hover:text-slate-800'
-                  }`}
-                >
-                  차량 꿀팁
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    haptics.lightTap();
-                    setActiveDetailTab('memo');
-                  }}
-                  className={`pb-2.5 transition-all cursor-pointer relative ${
-                    activeDetailTab === 'memo'
-                      ? 'text-[#1E60F3] font-black after:content-[""] after:absolute after:bottom-0 after:inset-x-0 after:h-[2px] after:bg-[#1E60F3]'
-                      : 'hover:text-slate-800'
-                  }`}
-                >
-                  관리자 메모
-                </button>
+                {[
+                  { key: "info", label: "기본 제원" },
+                  { key: "calendar", label: "예약 일정" },
+                  { key: "tips", label: "편의 사양" },
+                  { key: "memo", label: "운영 메모" },
+                ].map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => {
+                      haptics.lightTap();
+                      setActiveDetailTab(tab.key as any);
+                    }}
+                    className={`pb-2.5 transition-all cursor-pointer relative ${activeDetailTab === tab.key
+                      ? "text-[#0050FF] font-black after:content-[''] after:absolute after:bottom-0 after:inset-x-0 after:h-[2px] after:bg-[#0050FF]"
+                      : "hover:text-slate-800"
+                      }`}
+                  >
+                    <span>{tab.label}</span>
+                  </button>
+                ))}
               </div>
 
-              {/* Grid with Left Box (기본 정보) & Right Side (날짜별 예약 가능 여부 + 차량 꿀팁) */}
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
-                {/* -------------------------------------------------------- */}
-                {/* LEFT BOX: ⚙ 기본 정보 (5.5 cols)                         */}
-                {/* -------------------------------------------------------- */}
-                <div className="md:col-span-6 bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs space-y-3">
-                  <div className="flex items-center gap-1.5 pb-2 border-b border-slate-100">
-                    <Info className="w-3.5 h-3.5 text-[#1E60F3]" />
-                    <h3 className="text-xs font-black text-slate-900">기본 정보</h3>
+              {/* Tab Content 1: 기본 제원 (단독 뷰) */}
+              {activeDetailTab === "info" && (
+                <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <Info className="w-4 h-4 text-[#0050FF]" />
+                      <h3 className="text-sm font-bold text-slate-900">
+                        {selectedVehicle.model} ({selectedVehicle.plate}) 기본 제원
+                      </h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleOpenEdit}
+                      className="text-xs font-semibold text-[#0050FF] hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                      <span>정보 수정</span>
+                    </button>
                   </div>
 
-                  <div className="space-y-2 text-xs">
-                    <div className="flex items-center justify-between py-0.5">
-                      <span className="text-slate-400 font-medium">차종</span>
-                      <span className="font-bold text-slate-800">{selectedVehicle.model}</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+                    <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-100">
+                      <span className="text-[11px] text-slate-400 font-medium block">제조사</span>
+                      <span className="font-bold text-slate-900 mt-0.5 block">{selectedVehicle.brand}</span>
                     </div>
-                    <div className="flex items-center justify-between py-0.5">
-                      <span className="text-slate-400 font-medium">차량번호</span>
-                      <span className="font-bold text-slate-800">{selectedVehicle.plate}</span>
+                    <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-100">
+                      <span className="text-[11px] text-slate-400 font-medium block">차량 모델</span>
+                      <span className="font-bold text-slate-900 mt-0.5 block">{selectedVehicle.model}</span>
                     </div>
-                    <div className="flex items-center justify-between py-0.5">
-                      <span className="text-slate-400 font-medium">차량 분류</span>
-                      <span className="font-bold text-slate-800">
-                        {selectedVehicle.uiCategory === 'sprinter'
-                          ? '스프린터'
-                          : selectedVehicle.uiCategory === 'van'
-                          ? '밴'
-                          : selectedVehicle.uiCategory === 'suv'
-                          ? 'SUV'
-                          : '세단'}
+                    <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-100">
+                      <span className="text-[11px] text-slate-400 font-medium block">차량 번호판</span>
+                      <span className="font-bold text-slate-900 mt-0.5 block">{selectedVehicle.plate}</span>
+                    </div>
+                    <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-100">
+                      <span className="text-[11px] text-slate-400 font-medium block">차급 분류</span>
+                      <span className="font-bold text-slate-900 mt-0.5 block">
+                        {selectedVehicle.uiCategory === "sprinter"
+                          ? "스프린터"
+                          : selectedVehicle.uiCategory === "van"
+                            ? "밴"
+                            : selectedVehicle.uiCategory === "suv"
+                              ? "SUV"
+                              : "세단"}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between py-0.5">
-                      <span className="text-slate-400 font-medium">연료 타입</span>
-                      <span className="font-bold text-slate-800">{selectedVehicle.fuelDisplay}</span>
+                    <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-100">
+                      <span className="text-[11px] text-slate-400 font-medium block">연식</span>
+                      <span className="font-bold text-slate-900 mt-0.5 block">{selectedVehicle.year}</span>
                     </div>
-                    <div className="flex items-center justify-between py-0.5">
-                      <span className="text-slate-400 font-medium">현재 운행 상태</span>
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${
-                          selectedVehicle.effectiveStatus === '대기 중'
-                            ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
-                            : selectedVehicle.effectiveStatus === '운행 중'
-                            ? 'bg-blue-50 text-[#1E60F3] border border-blue-200'
-                            : 'bg-slate-100 text-slate-600 border border-slate-200'
-                        }`}
-                      >
-                        <Check className="w-2.5 h-2.5" />
-                        {selectedVehicle.effectiveStatus}
-                      </span>
+                    <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-100">
+                      <span className="text-[11px] text-slate-400 font-medium block">승차 정원</span>
+                      <span className="font-bold text-slate-900 mt-0.5 block">{selectedVehicle.capacity}</span>
                     </div>
-                    <div className="flex items-center justify-between py-0.5">
-                      <span className="text-slate-400 font-medium">승차 정원</span>
-                      <span className="font-bold text-slate-800">{selectedVehicle.capacity}</span>
+                    <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-100">
+                      <span className="text-[11px] text-slate-400 font-medium block">차량 색상</span>
+                      <span className="font-bold text-slate-900 mt-0.5 block">{selectedVehicle.color}</span>
                     </div>
-                    <div className="flex items-center justify-between py-0.5">
-                      <span className="text-slate-400 font-medium">제조사</span>
-                      <span className="font-bold text-slate-800">{selectedVehicle.brand}</span>
+                    <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-100">
+                      <span className="text-[11px] text-slate-400 font-medium block">사용 연료</span>
+                      <span className="font-bold text-slate-900 mt-0.5 block">{selectedVehicle.fuelDisplay}</span>
                     </div>
-                    <div className="flex items-center justify-between py-0.5">
-                      <span className="text-slate-400 font-medium">연식</span>
-                      <span className="font-bold text-slate-800">{selectedVehicle.year}</span>
-                    </div>
-                    <div className="flex items-center justify-between py-0.5">
-                      <span className="text-slate-400 font-medium">색상</span>
-                      <span className="font-bold text-slate-800">{selectedVehicle.color}</span>
+                    <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-100">
+                      <span className="text-[11px] text-slate-400 font-medium block">운행 상태</span>
+                      <span className="font-bold text-blue-600 mt-0.5 block">{formatVehicleStatus(selectedVehicle.effectiveStatus)}</span>
                     </div>
                   </div>
                 </div>
+              )}
 
-                {/* -------------------------------------------------------- */}
-                {/* RIGHT SIDE (6 cols): 날짜별 예약 가능 여부 + 차량 꿀팁      */}
-                {/* -------------------------------------------------------- */}
-                <div className="md:col-span-6 space-y-4">
-                  {/* Card 1: 📅 날짜별 예약 가능 여부 */}
-                  <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <CalendarDays className="w-3.5 h-3.5 text-[#1E60F3]" />
-                        <h3 className="text-xs font-black text-slate-900">날짜별 예약 가능 여부</h3>
+              {/* Tab Content 2: 예약 일정 (단독 뷰) */}
+              {activeDetailTab === "calendar" && (
+                <div className="space-y-4">
+                  {/* 5-Day Quick Strip */}
+                  <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-[#0050FF]" />
+                        <h3 className="text-sm font-bold text-slate-900">5일간 단기 배차 일정</h3>
                       </div>
                       <button
                         type="button"
                         onClick={() => setIsCalendarModalOpen(true)}
-                        className="text-[11px] font-bold text-[#1E60F3] hover:underline flex items-center gap-0.5 cursor-pointer"
+                        className="text-xs font-semibold text-[#0050FF] hover:underline flex items-center gap-1 cursor-pointer"
                       >
                         <span>전체 달력 보기</span>
-                        <ChevronRight className="w-3 h-3" />
+                        <ChevronRight className="w-3.5 h-3.5" />
                       </button>
                     </div>
 
-                    {/* 5-Day Strip */}
-                    <div className="grid grid-cols-5 gap-1.5 text-center pt-1">
-                      {fiveDays.map((d, idx) => {
-                        const badgeStyle =
-                          d.status === '예약 있음'
-                            ? 'bg-rose-50 text-rose-600 border-rose-200'
-                            : d.status === '운행 중'
-                            ? 'bg-blue-50 text-[#1E60F3] border-blue-200'
-                            : d.status === '정비 중'
-                            ? 'bg-amber-50 text-amber-700 border-amber-200'
-                            : d.status === '확인 중...'
-                            ? 'bg-slate-100 text-slate-500 border-slate-200 animate-pulse'
-                            : d.status === '확인 불가'
-                            ? 'bg-rose-100 text-rose-700 border-rose-300'
-                            : d.status === '미확인'
-                            ? 'bg-slate-100 text-slate-600 border-slate-300'
-                            : 'bg-emerald-50 text-emerald-600 border-emerald-200';
-
+                    <div className="grid grid-cols-5 gap-2 text-center">
+                      {fiveDays.map((d, i) => {
+                        const isAvail = d.status === "예약 가능";
                         return (
-                          <div key={idx} className="space-y-1">
-                            <div className="text-[10px] font-bold text-slate-600 leading-tight">
-                              <div>{d.label}</div>
-                              <div className="text-[9px] text-slate-400">{d.dayOfWeek}</div>
-                            </div>
-                            <div
-                              className={`text-[9px] font-bold py-0.5 rounded border transition-colors ${badgeStyle}`}
-                              title={d.detail || d.status}
+                          <div
+                            key={i}
+                            className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all ${isAvail
+                              ? "bg-blue-50/40 border-blue-100"
+                              : "bg-slate-50 border-slate-100"
+                              }`}
+                            title={d.detail || d.status}
+                          >
+                            <span className="text-xs font-bold text-slate-700">
+                              {d.label} {d.dayOfWeek}
+                            </span>
+                            <span
+                              className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${isAvail
+                                ? "bg-blue-50 text-[#0050FF] border border-blue-200/60"
+                                : "bg-slate-200/80 text-slate-700"
+                                }`}
                             >
                               {d.status}
-                            </div>
+                            </span>
+                            {d.detail && (
+                              <span className="text-[10px] text-slate-400 truncate max-w-full">
+                                {d.detail}
+                              </span>
+                            )}
                           </div>
                         );
                       })}
                     </div>
                   </div>
 
-                  {/* Card 2: 💡 차량 꿀팁 */}
-                  <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-xs space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5 text-[#1E60F3]" />
-                        <h3 className="text-xs font-black text-slate-900">차량 꿀팁</h3>
+                  {/* 2-Week Full Calendar */}
+                  <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                      <div className="flex items-center gap-2">
+                        <CalendarDays className="w-4 h-4 text-[#0050FF]" />
+                        <h3 className="text-sm font-bold text-slate-900">2주간 일자별 가용성 현황</h3>
                       </div>
-                      {!tips.isVerified && (
-                        <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
-                          <AlertTriangle className="w-2.5 h-2.5" />
-                          현장 실차 확인 필요
-                        </span>
-                      )}
+                      <span className="text-xs text-slate-400 font-medium">실시간 스케줄</span>
                     </div>
 
-                    <div className="space-y-2.5 text-xs">
-                      {/* 앞자리 충전단자 */}
-                      <div className="flex items-start gap-2.5">
-                        <Plug className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                        <div>
-                          <div className="font-black text-slate-800 text-[11px]">앞자리 충전단자</div>
-                          <div className={`text-[11px] font-medium ${tips.isVerified ? 'text-slate-500' : 'text-slate-400 italic'}`}>
-                            {tips.frontCharging}
-                          </div>
+                    <div className="grid grid-cols-7 gap-2 text-center">
+                      {["일", "월", "화", "수", "목", "금", "토"].map((dw, i) => (
+                        <div key={i} className="text-xs font-bold text-slate-400 pb-1">
+                          {dw}
                         </div>
-                      </div>
-
-                      {/* 뒷자리 충전단자 */}
-                      <div className="flex items-start gap-2.5">
-                        <Plug className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                        <div>
-                          <div className="font-black text-slate-800 text-[11px]">뒷자리 충전단자</div>
-                          <div className={`text-[11px] font-medium ${tips.isVerified ? 'text-slate-500' : 'text-slate-400 italic'}`}>
-                            {tips.rearCharging}
+                      ))}
+                      {fourteenDays.map((d, i) => {
+                        const isAvailable = d.status === "예약 가능";
+                        return (
+                          <div
+                            key={i}
+                            className="p-3 rounded-xl border border-slate-100 bg-slate-50/60 flex flex-col items-center gap-1.5"
+                            title={d.detail || d.status}
+                          >
+                            <span className="text-xs font-bold text-slate-700">{d.label}</span>
+                            {isAvailable ? (
+                              <div className="w-6 h-6 rounded-full bg-blue-50 border border-blue-200/70 flex items-center justify-center text-[#0050FF]">
+                                <Check className="w-3 h-3 stroke-[2.5]" />
+                              </div>
+                            ) : (
+                              <div className="w-6 h-6 rounded-full bg-slate-100 border border-slate-200/70 flex items-center justify-center text-slate-400">
+                                <Minus className="w-3 h-3 stroke-[2.5]" />
+                              </div>
+                            )}
+                            <span className="text-[10px] font-bold text-slate-500 truncate max-w-full">
+                              {d.status}
+                            </span>
                           </div>
-                        </div>
-                      </div>
-
-                      {/* 연료 팁 */}
-                      <div className="flex items-start gap-2.5">
-                        <Fuel className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                        <div>
-                          <div className="font-black text-slate-800 text-[11px]">
-                            연료: {selectedVehicle.fuelDisplay}
-                          </div>
-                          <div className={`text-[11px] font-medium ${tips.isVerified ? 'text-slate-500' : 'text-slate-400 italic'}`}>
-                            {tips.fuelTip}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* 220V 전원 */}
-                      <div className="flex items-start gap-2.5">
-                        <Zap className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                        <div>
-                          <div className="font-black text-slate-800 text-[11px]">220V 전원 사용 가능</div>
-                          <div className={`text-[11px] font-medium ${tips.isVerified ? 'text-slate-500' : 'text-slate-400 italic'}`}>
-                            {tips.powerTip}
-                          </div>
-                        </div>
-                      </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
+
+              {/* Tab Content 3: 편의 사양 (단독 뷰) */}
+              {activeDetailTab === "tips" && (
+                <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-[#0050FF]" />
+                      <h3 className="text-sm font-bold text-slate-900">
+                        {selectedVehicle.model} 탑승 편의 사양
+                      </h3>
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-500 bg-slate-100/90 px-2 py-0.5 rounded-md border border-slate-200/60 flex items-center gap-1">
+                      <Info className="w-2.5 h-2.5 text-slate-400" />
+                      실차 기준
+                    </span>
+                  </div>
+
+                  {tips.isVerified ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="p-3.5 rounded-xl border border-slate-100 bg-slate-50/50 space-y-1">
+                        <div className="flex items-center gap-2 text-slate-900 font-bold text-xs">
+                          <Zap className="w-4 h-4 text-[#0050FF]" />
+                          <span>1열 충전 포트</span>
+                        </div>
+                        <p className="text-xs text-slate-600 font-medium pl-6">{tips.frontCharging}</p>
+                      </div>
+                      <div className="p-3.5 rounded-xl border border-slate-100 bg-slate-50/50 space-y-1">
+                        <div className="flex items-center gap-2 text-slate-900 font-bold text-xs">
+                          <Zap className="w-4 h-4 text-[#0050FF]" />
+                          <span>VIP석 충전 포트</span>
+                        </div>
+                        <p className="text-xs text-slate-600 font-medium pl-6">{tips.rearCharging}</p>
+                      </div>
+                      <div className="p-3.5 rounded-xl border border-slate-100 bg-slate-50/50 space-y-1">
+                        <div className="flex items-center gap-2 text-slate-900 font-bold text-xs">
+                          <Fuel className="w-4 h-4 text-[#0050FF]" />
+                          <span>사용 연료: {selectedVehicle.fuelDisplay}</span>
+                        </div>
+                        <p className="text-xs text-slate-600 font-medium pl-6">{tips.fuelTip}</p>
+                      </div>
+                      <div className="p-3.5 rounded-xl border border-slate-100 bg-slate-50/50 space-y-1">
+                        <div className="flex items-center gap-2 text-slate-900 font-bold text-xs">
+                          <Plug className="w-4 h-4 text-[#0050FF]" />
+                          <span>220V 파워 아울렛</span>
+                        </div>
+                        <p className="text-xs text-slate-600 font-medium pl-6">{tips.powerTip}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-8 rounded-xl border border-dashed border-slate-200 bg-slate-50/50 flex flex-col items-center justify-center text-center space-y-2.5">
+                      <Zap className="w-6 h-6 text-slate-400" />
+                      <p className="text-xs text-slate-600 font-semibold">
+                        아직 {selectedVehicle.model}의 충전 포트 및 편의 사양이 등록되지 않았습니다.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleOpenEdit}
+                        className="px-3.5 py-2 rounded-xl bg-[#0050FF] hover:bg-blue-600 text-white text-xs font-bold transition-all shadow-2xs cursor-pointer inline-flex items-center gap-1.5"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>+ 충전 단자 정보 입력하기</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Tab Content 4: 운영 메모 (단독 뷰) */}
+              {activeDetailTab === "memo" && (
+                <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <Edit2 className="w-4 h-4 text-[#0050FF]" />
+                      <h3 className="text-sm font-bold text-slate-900">
+                        {selectedVehicle.model} ({selectedVehicle.plate}) 운영 메모
+                      </h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleOpenEdit}
+                      className="text-xs font-semibold text-[#0050FF] hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                      <span>정보 수정</span>
+                    </button>
+                  </div>
+
+                  <div className="p-4 rounded-xl border border-slate-100 bg-slate-50/60 min-h-[120px] text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">
+                    {memos[selectedVehicle.id] || selectedVehicle.adminMemo || "등록된 운영 메모가 없습니다. [정보 수정] 버튼을 눌러 메모를 작성해 보세요."}
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             <div className="bg-white rounded-2xl p-10 border border-slate-200 text-center space-y-2">
@@ -1099,8 +1425,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
         </div>
       </div>
 
-      {/* ============================================================== */}
-      {/* MODAL 1: 차량 정보 수정 Modal (✎ 수정하기)                      */}
+      {/* MODAL 1: 차량 정보 수정 Modal (✎ 정보 수정)                      */}
       {/* ============================================================== */}
       {isEditModalOpen && selectedVehicle && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
@@ -1121,19 +1446,18 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
             <div className="space-y-3 text-xs">
               <div>
                 <label className="font-bold text-slate-700 block mb-1">운행 상태</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['대기 중', '운행 중', '정비 중'] as const).map((st) => (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {STATUS_OPTIONS.map((st) => (
                     <button
-                      key={st}
+                      key={st.value}
                       type="button"
-                      onClick={() => setEditStatus(st)}
-                      className={`py-2 rounded-xl font-bold cursor-pointer transition-all border ${
-                        editStatus === st
-                          ? 'bg-[#1E60F3] text-white border-[#1E60F3]'
-                          : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200'
-                      }`}
+                      onClick={() => setEditStatus(st.value)}
+                      className={`py-2 px-2 rounded-xl font-bold cursor-pointer transition-all border text-center text-xs ${editStatus === st.value
+                        ? 'bg-[#1E60F3] text-white border-[#1E60F3]'
+                        : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200'
+                        }`}
                     >
-                      {st}
+                      {st.label}
                     </button>
                   ))}
                 </div>
@@ -1151,12 +1475,12 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">관리자 메모</label>
+                <label className="font-bold text-slate-700 block mb-1">운영 메모</label>
                 <textarea
                   rows={3}
                   value={editMemo}
                   onChange={(e) => setEditMemo(e.target.value)}
-                  placeholder="특이사항, 하이패스 단말기 번호, 세차 주기 등..."
+                  placeholder="특이사항, 충전 단자 규격, 하이패스 단말기 번호, 세차 주기 등..."
                   className="w-full p-2.5 border border-slate-300 rounded-xl focus:outline-none focus:border-[#1E60F3]"
                 />
               </div>
@@ -1167,24 +1491,39 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
               )}
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
               <button
                 type="button"
                 disabled={isSavingEdit}
-                onClick={() => setIsEditModalOpen(false)}
-                className="px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer disabled:opacity-50"
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  haptics.warningPulse();
+                  setVehicleToDelete(selectedVehicle);
+                }}
+                className="px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-xl cursor-pointer disabled:opacity-50 flex items-center gap-1.5 transition-colors"
               >
-                취소
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>차량 삭제</span>
               </button>
-              <button
-                type="button"
-                disabled={isSavingEdit}
-                onClick={handleSaveEdit}
-                className="px-4 py-2 text-xs font-bold bg-[#1E60F3] hover:bg-blue-700 text-white rounded-xl cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
-              >
-                {isSavingEdit && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                <span>저장하기</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={isSavingEdit}
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer disabled:opacity-50"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  disabled={isSavingEdit}
+                  onClick={handleSaveEdit}
+                  className="px-4 py-2 text-xs font-bold bg-[#1E60F3] hover:bg-blue-700 text-white rounded-xl cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isSavingEdit && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                  <span>저장하기</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1228,31 +1567,31 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                     d.status === '예약 있음'
                       ? 'bg-rose-50 text-rose-600 border-rose-200'
                       : d.status === '운행 중'
-                      ? 'bg-blue-50 text-[#1E60F3] border-blue-200'
-                      : d.status === '정비 중'
-                      ? 'bg-amber-50 text-amber-700 border-amber-200'
-                      : d.status === '확인 중...'
-                      ? 'bg-slate-100 text-slate-500 border-slate-200 animate-pulse'
-                      : d.status === '확인 불가'
-                      ? 'bg-rose-100 text-rose-700 border-rose-300'
-                      : d.status === '미확인'
-                      ? 'bg-slate-100 text-slate-600 border-slate-300'
-                      : 'bg-emerald-50 text-emerald-600 border-emerald-200';
+                        ? 'bg-blue-50 text-[#1E60F3] border-blue-200'
+                        : d.status === '정비 중'
+                          ? 'bg-amber-50 text-amber-700 border-amber-200'
+                          : d.status === '확인 중...'
+                            ? 'bg-slate-100 text-slate-500 border-slate-200 animate-pulse'
+                            : d.status === '확인 불가'
+                              ? 'bg-rose-100 text-rose-700 border-rose-300'
+                              : d.status === '미확인'
+                                ? 'bg-slate-100 text-slate-600 border-slate-300'
+                                : 'bg-emerald-50 text-emerald-600 border-emerald-200';
 
                   const label =
                     d.status === '확인 중...'
                       ? '조회중'
                       : d.status === '확인 불가'
-                      ? '오류'
-                      : d.status === '예약 있음'
-                      ? '예약있음'
-                      : d.status === '운행 중'
-                      ? '운행중'
-                      : d.status === '정비 중'
-                      ? '정비중'
-                      : d.status === '미확인'
-                      ? '미확인'
-                      : '가능';
+                        ? '오류'
+                        : d.status === '예약 있음'
+                          ? '예약있음'
+                          : d.status === '운행 중'
+                            ? '운행중'
+                            : d.status === '정비 중'
+                              ? '정비중'
+                              : d.status === '미확인'
+                                ? '미확인'
+                                : '가능';
 
                   return (
                     <div
@@ -1280,6 +1619,87 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Delete Vehicle Confirmation Modal */}
+      {vehicleToDelete && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-2xl border border-slate-150 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-100 shrink-0">
+                <Trash2 className="w-5 h-5 stroke-[2.2]" />
+              </div>
+              <div className="space-y-0.5 min-w-0">
+                <h3 className="text-base font-black text-slate-900 tracking-tight">차량 삭제</h3>
+                <p className="text-xs text-slate-500 break-keep">
+                  정말로 이 차량을 목록에서 삭제하시겠습니까?
+                </p>
+              </div>
+            </div>
+
+            {/* Target Vehicle Summary Card */}
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center gap-3">
+              <div className="relative w-16 h-12 shrink-0 flex items-center justify-center">
+                <Image
+                  src={getVehicleHero(vehicleToDelete)}
+                  alt={vehicleToDelete.model}
+                  fill
+                  className="object-contain filter drop-shadow-xs"
+                />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-xs font-black text-slate-900 truncate">
+                  {vehicleToDelete.model}
+                </div>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="text-[11px] font-bold text-slate-700 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                    {vehicleToDelete.plate}
+                  </span>
+                  <span className="text-[10px] text-slate-500">
+                    {(vehicleToDelete as any).fuelDisplay || vehicleToDelete.fuelType}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-slate-400 bg-slate-50/70 p-2.5 rounded-lg border border-slate-100 leading-relaxed">
+              * 삭제된 차량은 목록 및 통계에서 즉시 제외되며, 필요시 언제든지 복구할 수 있습니다.
+            </p>
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setVehicleToDelete(null)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 cursor-pointer transition-colors"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={() => handleConfirmDeleteVehicle(vehicleToDelete)}
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs cursor-pointer transition-all flex items-center justify-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>삭제 완료</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Vehicle Registration Modal */}
+      <NewVehicleModal
+        isOpen={isNewVehicleModalOpen}
+        onClose={() => setIsNewVehicleModalOpen(false)}
+        onSubmit={handleCreateVehicle}
+      />
+
+      {/* Toast Alert Banner */}
+      {toastMessage && (
+        <div className="fixed top-20 right-6 z-50 bg-[#0B1E48] text-white px-4 py-3 rounded-2xl shadow-xl border border-blue-500/30 flex items-center gap-2.5 text-xs font-bold animate-slide-up">
+          <span className="w-2 h-2 rounded-full bg-[#1E60F3] animate-ping" />
+          <span>{toastMessage}</span>
         </div>
       )}
     </div>

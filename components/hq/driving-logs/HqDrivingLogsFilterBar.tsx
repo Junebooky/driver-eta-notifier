@@ -6,7 +6,6 @@ import {
   ChevronDown,
   Search,
   X,
-  FileSpreadsheet,
 } from 'lucide-react';
 import { HqDrivingLogStatus } from '@/types/drivingLogHq';
 import { haptics } from '@/utils/haptics';
@@ -173,19 +172,33 @@ export const HqDrivingLogsFilterBar: React.FC<HqDrivingLogsFilterBarProps> = ({
             )}
           </div>
 
-          {/* 엑셀 내보내기 Button */}
-          <button
-            type="button"
-            onClick={() => {
-              haptics.success();
-              onExportExcel();
-            }}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-[#1E60F3] hover:bg-blue-600 text-white rounded-xl text-xs font-bold transition-all shadow-xs shrink-0 cursor-pointer active:scale-98"
-            title="현재 목록 엑셀(CSV) 다운로드"
-          >
-            <FileSpreadsheet className="w-3.5 h-3.5 stroke-[2.2]" />
-            <span>엑셀 내보내기</span>
-          </button>
+          {/* 엑셀 내보내기 Button & Tooltip */}
+          <div className="relative group/excel shrink-0 flex items-center">
+            <button
+              type="button"
+              onClick={() => {
+                haptics.success();
+                onExportExcel();
+              }}
+              className="p-1 rounded-xl hover:bg-slate-100/90 transition-all cursor-pointer active:scale-95 flex items-center justify-center"
+              aria-label="엑셀파일로 내보내기"
+            >
+              <img
+                src="/images/icons/icon_excel.png"
+                alt="엑셀"
+                className="w-8 h-8 object-contain shrink-0 transition-transform duration-150 group-hover/excel:scale-110 drop-shadow-2xs"
+              />
+            </button>
+
+            {/* 마우스 호버 말풍선 Tooltip: 위로 향하는 블랙 말풍선 규격 (최상단 레이어) */}
+            <div className="absolute right-0 bottom-full mb-2 hidden group-hover/excel:flex flex-col items-end pointer-events-none z-[100]">
+              <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+                운행일지 목록을 엑셀로 내보내요
+              </span>
+              {/* 말풍선 꼬리표 화살표 */}
+              <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 mr-3.5 shadow-xs" />
+            </div>
+          </div>
         </div>
       </div>
     </div>

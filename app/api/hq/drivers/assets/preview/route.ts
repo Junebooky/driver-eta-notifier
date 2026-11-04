@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
     // Driver boundary check: drivers can only preview paths containing their own driverId UUID
     if (auth.session.role === 'driver') {
       const driverId = auth.session.driverId || auth.session.userId;
-      if (!driverId || !storagePath.includes(`/${driverId}/`)) {
+      if (!driverId || !(storagePath.startsWith(`${org}/drivers/profiles/${driverId}/`) || storagePath.startsWith(`${org}/drivers/info/${driverId}/`))) {
         return NextResponse.json({ ok: false, error: '본인 안내자료만 열람할 수 있습니다. (403 Forbidden)' }, { status: 403 });
       }
     }

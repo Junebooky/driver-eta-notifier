@@ -23,6 +23,7 @@ import {
   NotebookPen,
 } from 'lucide-react';
 import { DriverProfile } from '@/types';
+import { CustodyMileageLink } from './CustodyMileageLink';
 import {
   RouteStopItem,
   DrivingLogData,
@@ -39,11 +40,11 @@ import {
 import Link from 'next/link';
 import { AddScheduleModal } from './AddScheduleModal';
 import { haptics } from '@/utils/haptics';
-import { submitDriverLogToHq, submitDriverLogToHqDb } from '@/utils/drivingLogHqStorage';
+import { submitDriverLogToHqDb } from '@/utils/drivingLogHqStorage';
 import { HqDrivingLog } from '@/types/drivingLogHq';
-import { getHqExpenses } from '@/utils/expenseHqStorage';
 
 interface DrivingLogModalProps {
+  presentation?: 'modal' | 'page';
   isOpen: boolean;
   onClose: () => void;
   driverProfile: DriverProfile;
@@ -53,18 +54,32 @@ interface DrivingLogModalProps {
 }
 
 const DrivingLogModalContent: React.FC<{
+  presentation: 'modal' | 'page';
   onClose: () => void;
   driverProfile: DriverProfile;
   bookingId?: string;
   onOpenLocationSearch?: () => void;
   selectedLocationFromMap?: { name: string; address?: string } | null;
-}> = ({ onClose, driverProfile, bookingId, onOpenLocationSearch, selectedLocationFromMap }) => {
+}> = ({ presentation, onClose, driverProfile, bookingId, onOpenLocationSearch, selectedLocationFromMap }) => {
   const scrollContainerRef = useRef<HTMLElement>(null);
 
   // Master driving log state initialized purely (booking-aware)
   const [logData, setLogData] = useState<DrivingLogData>(() =>
     loadDrivingLogDraft(driverProfile, undefined, undefined, bookingId)
   );
+
+  useEffect(()=>{
+    const abort=new AbortController();
+    const query=new URLSearchParams({date:logData.rawDate});if(bookingId)query.set('bookingId',bookingId);
+    fetch(`/api/driving-logs?${query}`,{cache:'no-store',credentials:'include',signal:abort.signal})
+      .then(async response=>{if(!response.ok)return;const data=await response.json();const row=data.logs?.find((entry:HqDrivingLog)=>(entry.bookingId || null)===(bookingId || null));if(!row || abort.signal.aborted)return;
+        setLogData(previous=>{
+          if(previous.stops.length || previous.startKm)return {...previous,submissionId:row.id,hqStatus:row.status};
+          return {...previous,submissionId:row.id,hqStatus:row.status,driverId:row.driverId,clientName:row.customerName,passengerCount:String(row.passengerCount || ''),clockIn:row.clockIn,clockOut:row.clockOut,startKm:row.startKm,endKm:row.endKm,totalDutyHours:row.totalDutyHours,distanceKm:row.distanceKm,notes:row.notes,stops:row.stops.map((stop:HqDrivingLog['stops'][number])=>({...stop,memo:stop.note})),status:row.status==='draft'?'draft':'submitted'};
+        });
+      }).catch(()=>{});
+    return()=>abort.abort();
+  },[bookingId,driverProfile.driverId,logData.rawDate]);
 
   // Auto-scroll to top when modal mounts
   useEffect(() => {
@@ -156,6 +171,7 @@ const DrivingLogModalContent: React.FC<{
       distanceKm: formatted,
       isOdoManualOverride: true,
       odoSource: 'manual',
+      custodyId: undefined,
     }));
     setIsEditingMileage(false);
     haptics.success();
@@ -220,6 +236,7 @@ const DrivingLogModalContent: React.FC<{
 
   // Submit Driving Log to HQ Operations system
   const handleSubmitLog = async () => {
+    if(logData.isDemoFixture){alert('샘플 운행일지는 본사에 제출할 수 없습니다. 실제 운행 기록으로 전환해 주세요.');return;}
     if (isSubmittingLog) return;
     setIsSubmittingLog(true);
     haptics.selection();
@@ -233,29 +250,23 @@ const DrivingLogModalContent: React.FC<{
       address: s.address,
     }));
 
-    // Calculate current expenses for this driver
-    const currentDriverName = logData.driverName || driverProfile.driverName || '윤태준';
-    const currentVehiclePlate = logData.carNumber || driverProfile.plateNumber || '116허 1514';
-    const currentHqExpenses = getHqExpenses().filter(
-      (e) => e.driverName === currentDriverName || (Boolean(currentVehiclePlate) && e.vehiclePlate === currentVehiclePlate)
-    );
-    const calculatedExpenseAmount = currentHqExpenses.reduce((sum, e) => sum + e.amount, 0);
-    const calculatedExpenseCount = currentHqExpenses.length;
+    const currentDriverName = logData.driverName || driverProfile.driverName || '';
+    const currentVehiclePlate = logData.carNumber || driverProfile.carNumber || '';
 
     try {
       const payload: Partial<HqDrivingLog> = {
+        id:logData.submissionId,
         driverName: currentDriverName,
-        customerName: logData.clientName || '인터코스',
+        customerName: logData.clientName || '',
         vehicleModel: driverProfile.carModel || currentVehiclePlate,
         vehiclePlate: currentVehiclePlate,
-        clockIn: logData.clockIn || '06:40',
-        clockOut: logData.clockOut || '21:50',
-        totalDutyHours: logData.totalDutyHours || '15시간 10분',
-        startKm: logData.startKm || '154,725',
-        endKm: logData.endKm || '154,861',
-        distanceKm: logData.distanceKm || '136 km',
-        expenseAmount: calculatedExpenseAmount,
-        expenseCount: calculatedExpenseCount,
+        clockIn: logData.clockIn,
+        clockOut: logData.clockOut,
+        totalDutyHours: logData.totalDutyHours,
+        passengerCount:logData.passengerCount ? Number(logData.passengerCount) : undefined,
+        startKm: logData.startKm,
+        endKm: logData.endKm,
+        distanceKm: logData.distanceKm,
         stops: stopsMapped,
         notes: logData.notes || '',
         status: '검토 대기',
@@ -264,6 +275,7 @@ const DrivingLogModalContent: React.FC<{
         bookingId: logData.bookingId || bookingId,
         driverId: logData.driverId,
         vehicleId: logData.vehicleId,
+        custodyId: logData.custodyId,
       };
 
       const res = await submitDriverLogToHqDb(payload);
@@ -273,7 +285,8 @@ const DrivingLogModalContent: React.FC<{
       }
 
       haptics.success();
-      saveDrivingLogDraft({ ...logData, status: 'submitted' });
+      const saved={...logData,submissionId:res.log?.id || logData.submissionId,hqStatus:res.log?.status,carNumber:res.log?.vehiclePlate || logData.carNumber,vehicleId:res.log?.vehicleId || logData.vehicleId,status:'submitted' as const};
+      setLogData(saved);saveDrivingLogDraft(saved);
       setIsPreviewSubmitModalOpen(true);
     } catch (err: any) {
       alert(`운행일지 제출 중 오류: ${err.message}`);
@@ -307,7 +320,7 @@ const DrivingLogModalContent: React.FC<{
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in select-none overscroll-contain"
+      className={presentation === 'page' ? "w-full select-none" : "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in select-none overscroll-contain"}
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           haptics.lightTap();
@@ -316,7 +329,7 @@ const DrivingLogModalContent: React.FC<{
       }}
     >
       <div
-        className="w-full max-w-lg bg-[#F8FAFC] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[92dvh] h-[92dvh] sm:h-auto sm:max-h-[90vh] animate-in slide-in-from-bottom-6 sm:animate-scale-up duration-300 relative"
+        className={presentation === 'page' ? "relative flex min-h-[70dvh] w-full flex-col bg-[#F8FAFC]" : "w-full max-w-lg bg-[#F8FAFC] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[92dvh] h-[92dvh] sm:h-auto sm:max-h-[90vh] animate-in slide-in-from-bottom-6 sm:animate-scale-up duration-300 relative"}
         onClick={(e) => e.stopPropagation()}
       >
         {/* 1. Modal Header */}
@@ -380,10 +393,12 @@ const DrivingLogModalContent: React.FC<{
         </div>
 
         {/* Main Scrollable Content */}
-        <main
+        <section
+          aria-label="운행일지 작성"
           ref={scrollContainerRef}
           className="flex-1 overflow-y-auto px-4 py-4 space-y-4 w-full pb-4"
         >
+        {logData.hqStatus && <p role="status" className="mb-3 rounded-xl bg-blue-50 p-3 text-xs text-blue-800">본사 검토 상태: {logData.hqStatus==='draft'?'임시 기록':logData.hqStatus}</p>}
         {/* Notice Banner for Demo Fixture or Empty Report */}
         {logData.isDemoFixture && (
           <div className="bg-blue-50/70 border border-blue-100 rounded-xl px-3 py-2 flex items-center justify-between text-xs text-blue-700">
@@ -537,6 +552,12 @@ const DrivingLogModalContent: React.FC<{
             <Navigation className="w-4 h-4 text-[#1E60F3] stroke-[2.2]" />
             <h2 className="text-sm font-bold text-slate-900 tracking-tight">주행거리</h2>
           </div>
+
+          <CustodyMileageLink driverId={driverProfile.driverId} bookingId={bookingId} date={logData.rawDate} onApply={value => {
+            const distance = calculateDrivingDistance(value.startKm, value.endKm);
+            setLogData(previous => ({ ...previous, ...value, startKm: formatOdometer(value.startKm), endKm: formatOdometer(value.endKm), distanceKm: distance.formatted, odoSource: 'inspection_verified', isOdoManualOverride: false }));
+            showToast('서버 인수·반납 계기판 값을 적용했습니다.');
+          }} />
 
           {/* Improved hierarchy with directional arrow and emphasized 오늘 운행 box */}
           <div className="flex items-center gap-2">
@@ -763,7 +784,7 @@ const DrivingLogModalContent: React.FC<{
             </span>
           </div>
         </section>
-      </main>
+      </section>
 
         {/* 8. Bottom Action Buttons inside Modal Card */}
         <div className="p-3.5 bg-white/95 backdrop-blur-md border-t border-slate-100 shrink-0">
@@ -1050,6 +1071,7 @@ const DrivingLogModalContent: React.FC<{
 };
 
 export const DrivingLogModal: React.FC<DrivingLogModalProps> = ({
+  presentation = 'modal',
   isOpen,
   onClose,
   driverProfile,
@@ -1059,19 +1081,20 @@ export const DrivingLogModal: React.FC<DrivingLogModalProps> = ({
 }) => {
   // Lock body scroll when modal is open
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || presentation === 'page') return;
     const origOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = origOverflow;
     };
-  }, [isOpen]);
+  }, [isOpen, presentation]);
 
   if (!isOpen) return null;
 
   return (
     <DrivingLogModalContent
-      key={`${driverProfile.vehicleNo || 'default'}-${bookingId || 'none'}-${isOpen}`}
+      presentation={presentation}
+      key={`${driverProfile.driverId || 'default'}-${bookingId || 'none'}-${isOpen}`}
       onClose={onClose}
       driverProfile={driverProfile}
       bookingId={bookingId}

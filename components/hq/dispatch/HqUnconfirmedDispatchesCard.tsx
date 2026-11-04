@@ -37,7 +37,7 @@ export const HqUnconfirmedDispatchesCard: React.FC<HqUnconfirmedDispatchesCardPr
             {criticalCount > 0 ? <BellRing className="w-3.5 h-3.5" /> : <Info className="w-3.5 h-3.5" />}
           </div>
           <h3 className="text-sm font-black text-slate-900 tracking-tight">
-            미확인 배차 자동 추적
+            아직 확인하지 않은 배차
           </h3>
           <span className="w-5 h-5 rounded-full bg-rose-100 text-rose-600 text-[10px] font-black flex items-center justify-center">
             {items.length}
@@ -57,7 +57,7 @@ export const HqUnconfirmedDispatchesCard: React.FC<HqUnconfirmedDispatchesCardPr
           }}
           className="text-[11px] font-bold text-[#1E60F3] hover:underline flex items-center gap-0.5 cursor-pointer"
         >
-          <span>경보 센터</span>
+          <span>알림 센터</span>
           <ChevronRight className="w-3 h-3" />
         </button>
       </div>
@@ -70,7 +70,7 @@ export const HqUnconfirmedDispatchesCard: React.FC<HqUnconfirmedDispatchesCardPr
               <th className="py-2 px-2">픽업 시간</th>
               <th className="py-2 px-2">고객명</th>
               <th className="py-2 px-2">기사명</th>
-              <th className="py-2 px-2">대기·임박도</th>
+              <th className="py-2 px-2">대기 시간</th>
               <th className="py-2 px-2 text-right">재알림</th>
             </tr>
           </thead>
@@ -141,7 +141,7 @@ export const HqUnconfirmedDispatchesCard: React.FC<HqUnconfirmedDispatchesCardPr
                         className="inline-flex items-center gap-1 rounded-lg bg-rose-600 hover:bg-rose-700 px-2 py-1 text-[10px] font-extrabold text-white cursor-pointer"
                       >
                         <Send className="w-2.5 h-2.5" />
-                        <span>재알림</span>
+                        <span>다시 알리기</span>
                       </button>
                     )}
                   </td>

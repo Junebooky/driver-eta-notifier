@@ -5,7 +5,7 @@ import { signCockpitSession } from '@/lib/auth/serverAuth';
 import { GET as getDrivingLogs, POST as postDrivingLogs, PUT as putDrivingLogs } from '@/app/api/driving-logs/route';
 import { GET as getExpenses, POST as postExpenses, PUT as putExpenses } from '@/app/api/expenses/route';
 import { GET as getReceipt, POST as postReceipt } from '@/app/api/expenses/receipt/route';
-import { getVerifiedInspectionOdometer } from '@/utils/drivingLog';
+import { getVerifiedInspectionOdometer, formatIsoDate } from '@/utils/drivingLog';
 import { NextRequest } from 'next/server';
 
 // Ensure test environment auth secret
@@ -65,8 +65,8 @@ interface MockExpenseRow {
 }
 
 test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () => {
-  let mockDrivingLogs: MockDrivingLogRow[] = [];
-  let mockExpenses: MockExpenseRow[] = [];
+  const mockDrivingLogs: MockDrivingLogRow[] = [];
+  const mockExpenses: MockExpenseRow[] = [];
   let simulateDbError = false;
   let simulateStorageError = false;
 
@@ -170,7 +170,7 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
   const mockFrom = (table: string) => {
     let filterField: string | null = null;
     let filterVal: any = null;
-    let filters: Array<{ field: string; val: any }> = [];
+    const filters: Array<{ field: string; val: any }> = [];
 
     let activeRows: any[] = [];
     if (table === 'driving_logs') {
@@ -184,6 +184,7 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
     const builder: any = {
       select: (_fields: string = '*') => builder,
       order: (_col: string, _opts?: any) => builder,
+      is: (field: string, val: any) => {filters.push({field,val});return builder;},
       eq: (field: string, val: any) => {
         filterField = field;
         filterVal = val;
@@ -651,7 +652,7 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
     (global as any).window = {};
     (global as any).localStorage = mockLocalStorage;
 
-    const todayIso = new Date().toISOString().split('T')[0];
+    const todayIso = formatIsoDate();
 
     mockLocalStorage.setItem(
       'cockpit_vehicle_inspection_116허 1514_booking-101',
@@ -725,7 +726,7 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
     });
     const authReceiptRes = await getReceipt(authReceiptReq);
     assert.strictEqual(authReceiptRes.status, 200, 'Owner driver must be able to view their receipt');
-    assert.strictEqual(authReceiptRes.headers.get('Cache-Control'), 'private, max-age=3600');
+    assert.strictEqual(authReceiptRes.headers.get('Cache-Control'), 'private, no-store');
 
     // 7.3: Driver B tries to access Driver A's receipt -> 403 Forbidden
     const unauthReceiptReq = new NextRequest(`http://localhost:3000/api/expenses/receipt?expenseId=${EXPENSE_RECEIPT_UUID}`, {
@@ -814,7 +815,7 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
   // --------------------------------------------------------------------------
   // 9. [Item 1] JWT user_metadata privilege escalation vulnerability defense
   // --------------------------------------------------------------------------
-  await test('9. Attacker manipulating user_metadata.cockpit_role: "hq_admin" strictly rejected with 403 on HQ endpoints', async () => {
+  await test('9. Unverified or unauthorized provider token is rejected before HQ mutations', async () => {
     // Attacker token has user_metadata: { cockpit_role: 'hq_admin' } but app_metadata: { cockpit_role: 'driver' }
     const attackerPutReq = new NextRequest('http://localhost:3000/api/driving-logs', {
       method: 'PUT',
@@ -828,7 +829,7 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
       }),
     });
     const attackerPutRes = await putDrivingLogs(attackerPutReq);
-    assert.strictEqual(attackerPutRes.status, 403, 'Privilege escalation via user_metadata MUST return 403 Forbidden');
+    assert.strictEqual(attackerPutRes.status, 401, 'Malformed provider tokens must be rejected before role checks');
 
     const attackerExpPutReq = new NextRequest('http://localhost:3000/api/expenses', {
       method: 'PUT',
@@ -842,7 +843,7 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
       }),
     });
     const attackerExpPutRes = await putExpenses(attackerExpPutReq);
-    assert.strictEqual(attackerExpPutRes.status, 403, 'Privilege escalation on expenses PUT MUST return 403 Forbidden');
+    assert.strictEqual(attackerExpPutRes.status, 401, 'Privilege escalation on expenses PUT MUST return 403 Forbidden');
 
     // Attacker attempting cross-organization spoofing via user_metadata
     const evilOrgReq = new NextRequest('http://localhost:3000/api/driving-logs', {
@@ -917,6 +918,8 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
       body: JSON.stringify({
         items: [
           {
+            id:'e0000000-0000-4000-8000-000000000009',
+            time:'10:00',
             bookingId: BOOKING_SPOOFED_NAME_UUID,
             date: '2026-11-09',
             category: 'gas',

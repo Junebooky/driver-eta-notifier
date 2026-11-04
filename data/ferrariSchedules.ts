@@ -66,7 +66,7 @@ export interface ScheduleItem {
   group_vehicle_index?: number;
   passenger_count?: number;
   intake_source?: 'phone' | 'email' | 'quick_dispatch' | 'manual' | 'seed';
-  customer_brochure?: '미생성' | '미발송' | '발송됨' | '재발송 필요' | '실패';
+  customer_brochure?: '미생성' | '미발송' | '준비완료' | '수동 발송 기록' | '발송됨' | '재발송 필요' | '실패';
   requested_language?: 'ko' | 'en' | 'other';
   language_override_confirmed?: boolean;
   service_mode?: 'with_driver' | 'vehicle_only';

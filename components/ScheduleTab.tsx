@@ -1,4 +1,5 @@
 'use client';
+import { createRetryableJsonMutation } from '@/utils/retryableJsonMutation';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { DriverProfile, LocationPreset } from '@/types';
@@ -114,6 +115,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
 }) => {
   // Schedules state (starts with empty state by default, populated dynamically per vehicle)
   const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
+  const [scheduleSaveError,setScheduleSaveError]=useState('');
   const [scheduleTitle, setScheduleTitle] = useState<string>('페라리 VIP 의전 배차표');
   const [inputText, setInputText] = useState('');
   const [selectedDateFilter, setSelectedDateFilter] = useState<string>('all');
@@ -139,21 +141,8 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
   };
 
   const handleSaveNewSchedule = async (newSchedule: ScheduleItem) => {
-    setSchedules((prev) => {
-      const updated = sortSchedulesChronologically([newSchedule, ...prev.filter((s) => s.id !== newSchedule.id)]);
-      try {
-        localStorage.setItem('cockpit_schedules', JSON.stringify(updated));
-      } catch (e) {
-        console.warn('Failed to cache new schedule to storage:', e);
-      }
-      return updated;
-    });
-
     try {
-      await fetch('/api/schedules', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const response = await scheduleMutation.send('/api/schedules', {
           vehicle_no: newSchedule.vehicle_no,
           date: newSchedule.date,
           pickup_time: newSchedule.pickup_time,
@@ -170,15 +159,19 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
           flight_number: newSchedule.flight,
           protocol_notes: newSchedule.notes,
           status: newSchedule.status,
-        }),
       });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || '일정을 저장하지 못했습니다.');
+      setSchedules(prev => sortSchedulesChronologically([result.schedule || newSchedule,...prev.filter(s => s.id !== newSchedule.id)]));
     } catch (err) {
-      console.warn('Failed to persist new schedule to Supabase:', err);
+      setScheduleSaveError(err instanceof Error ? err.message : '저장 결과를 확인하지 못했습니다.');
+      throw err;
     }
   };
 
   // Vehicle Isolation & Fleet Switcher State (Dev Mode enables switching between vehicles & All)
   const initialVehicle = profile.vehicleNo?.match(/(\d+호차)/)?.[1] || '4호차';
+  const [scheduleMutation]=useState(()=>createRetryableJsonMutation('cockpit_pending_schedule_edit'));
   const [selectedVehicleFilter, setSelectedVehicleFilter] = useState<string>(initialVehicle);
   const [availableVehicles, setAvailableVehicles] = useState<string[]>(['1호차', '2호차', '4호차', '8호차']);
   const [vehicleCounts, setVehicleCounts] = useState<Record<string, number>>({
@@ -842,6 +835,8 @@ ${scheduleItemsFormatted}`.trim();
 
   return (
     <div className="w-full min-h-[calc(100dvh-130px)] flex flex-col justify-between relative pb-6 select-none">
+      {scheduleSaveError && <p role="alert" className="p-3 text-sm text-rose-600">{scheduleSaveError}</p>}
+      {scheduleMutation.hasPending && <button type="button" className="rounded-xl border p-3 text-sm text-blue-700" onClick={async()=>{try{const response=await scheduleMutation.retry();const data=await response.json();if(!response.ok)throw new Error(data.error || '저장 결과를 확인하지 못했습니다.');window.location.reload();}catch(error){setScheduleSaveError(error instanceof Error?error.message:'저장 결과를 확인하지 못했습니다.');}}}>이전 일정 저장 결과 확인</button>}
       {/* Hidden File Input for Image/PDF Upload (multiple enabled) */}
       <input
         type="file"
@@ -1404,22 +1399,22 @@ ${scheduleItemsFormatted}`.trim();
         }}
         schedule={editingSchedule}
         onSave={async (updated) => {
-          setSchedules((prev) => sortSchedulesChronologically(prev.map((s) => (s.id === updated.id ? updated : s))));
           try {
-            await fetch('/api/schedules', {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
+            const response = await scheduleMutation.send('/api/schedules', {
                 id: updated.id,
                 time_display: updated.time_display,
+                pickup_time: updated.pickup_time,
                 passenger_name: updated.passenger,
                 flight_number: updated.flight,
                 protocol_notes: updated.notes,
                 status: updated.status,
-              }),
-            });
+            }, {method:'PUT'});
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || '일정을 수정하지 못했습니다.');
+            setSchedules(prev => sortSchedulesChronologically(prev.map(s => s.id === updated.id ? (result.schedule || updated) : s)));
           } catch (err) {
-            console.warn('Failed to persist schedule update to Supabase:', err);
+            setScheduleSaveError(err instanceof Error ? err.message : '저장 결과를 확인하지 못했습니다.');
+            throw err;
           }
         }}
       />

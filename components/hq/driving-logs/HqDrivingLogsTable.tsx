@@ -2,12 +2,7 @@
 
 import React, { useState } from 'react';
 import {
-  FileText,
-  Clock,
-  CheckCircle2,
-  AlertTriangle,
   XCircle,
-  MoreHorizontal,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -19,10 +14,21 @@ export interface HqDrivingLogsTableProps {
   totalCount: number;
   selectedLogId: string | null;
   onSelectLog: (log: HqDrivingLog) => void;
+  onOpenExpenseDetail?: (log: HqDrivingLog) => void;
   pageSize: number;
   onPageSizeChange: (size: number) => void;
   currentPage: number;
   onPageChange: (page: number) => void;
+  kpiCounts?: {
+    totalToday: number;
+    pending: number;
+    approved: number;
+    revision: number;
+    rejected?: number;
+    inProgressDrafts?: number;
+  };
+  selectedStatus?: HqDrivingLogStatus | '전체';
+  onSelectStatus?: (status: HqDrivingLogStatus | '전체') => void;
 }
 
 export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
@@ -30,10 +36,14 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
   totalCount,
   selectedLogId,
   onSelectLog,
+  onOpenExpenseDetail,
   pageSize,
   onPageSizeChange,
   currentPage,
   onPageChange,
+  kpiCounts,
+  selectedStatus,
+  onSelectStatus,
 }) => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
@@ -57,70 +67,122 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
-  // Render Status Badge matching Image 1
+  // Render Status Badge as Icon-only with hover tooltip (matching Apple/Toss black bubble standard)
   const renderStatusBadge = (status: HqDrivingLogStatus) => {
+    let iconNode: React.ReactNode;
+    let label = '';
+
     switch (status) {
       case 'draft':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border border-amber-300 bg-amber-50 text-amber-700">
-            <Clock className="w-3 h-3 stroke-[2.2]" />
-            <span>진행 중 (초안)</span>
-          </span>
+        iconNode = (
+          <img
+            src="/images/icons/icon_submitted_today.png"
+            alt="작성 중 (초안)"
+            className="w-5.5 h-5.5 object-contain transition-transform duration-150 group-hover/status:scale-110 drop-shadow-2xs"
+          />
         );
+        label = '작성 중 (초안)';
+        break;
       case '검토 대기':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border border-blue-200 bg-blue-50/70 text-[#1E60F3]">
-            <Clock className="w-3 h-3 stroke-[2.2]" />
-            <span>검토 대기</span>
-          </span>
+        iconNode = (
+          <img
+            src="/images/icons/icon_review_pending.png"
+            alt="검토 대기"
+            className="w-5.5 h-5.5 object-contain transition-transform duration-150 group-hover/status:scale-110 drop-shadow-2xs"
+          />
         );
+        label = '검토 대기 중';
+        break;
       case '검토 중':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border border-sky-300 bg-sky-50 text-sky-700">
-            <Clock className="w-3 h-3 stroke-[2.2]" />
-            <span>검토 중</span>
-          </span>
+        iconNode = (
+          <img
+            src="/images/icons/icon_review_pending.png"
+            alt="검토 중"
+            className="w-5.5 h-5.5 object-contain transition-transform duration-150 group-hover/status:scale-110 drop-shadow-2xs"
+          />
         );
+        label = '관리자 검토 중';
+        break;
       case '승인 완료':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border border-emerald-300 bg-emerald-50 text-emerald-700">
-            <CheckCircle2 className="w-3 h-3 stroke-[2.2]" />
-            <span>승인 완료</span>
-          </span>
+        iconNode = (
+          <img
+            src="/images/icons/icon_approved.png"
+            alt="승인 완료"
+            className="w-5.5 h-5.5 object-contain transition-transform duration-150 group-hover/status:scale-110 drop-shadow-2xs"
+          />
         );
+        label = '승인 완료!';
+        break;
       case '보완 필요':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border border-rose-300 bg-rose-50 text-rose-600">
-            <AlertTriangle className="w-3 h-3 stroke-[2.2]" />
-            <span>보완 필요</span>
-          </span>
+        iconNode = (
+          <img
+            src="/images/icons/icon_revision_needed.png"
+            alt="보완 필요"
+            className="w-5.5 h-5.5 object-contain transition-transform duration-150 group-hover/status:scale-110 drop-shadow-2xs"
+          />
         );
+        label = '기사 보완 필요';
+        break;
       case '반려':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border border-red-300 bg-red-50 text-red-600">
-            <XCircle className="w-3 h-3 stroke-[2.2]" />
-            <span>반려</span>
-          </span>
+        iconNode = (
+          <div className="w-5.5 h-5.5 rounded-full bg-rose-50 border border-rose-300 flex items-center justify-center transition-transform duration-150 group-hover/status:scale-110 drop-shadow-2xs">
+            <XCircle className="w-4 h-4 text-rose-600 stroke-[2.2]" />
+          </div>
         );
+        label = '반려됨';
+        break;
       default:
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600">
-            {status}
+        iconNode = (
+          <span className="w-5.5 h-5.5 rounded-full bg-slate-100 border border-slate-200 text-slate-600 text-[10px] font-bold flex items-center justify-center transition-transform duration-150 group-hover/status:scale-110">
+            -
           </span>
         );
+        label = status;
+        break;
     }
+
+    return (
+      <div className="relative group/status inline-flex items-center justify-center cursor-help">
+        {iconNode}
+        {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 (아이콘 근접 시에만 노출, 최상단 레이어) */}
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/status:flex flex-col items-center pointer-events-none z-[100]">
+          <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+            {label}
+          </span>
+          {/* 말풍선 꼬리표 화살표 */}
+          <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 shadow-xs" />
+        </div>
+      </div>
+    );
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden flex flex-col">
-      {/* Table Header / Title */}
-      <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col relative z-20">
+      {/* Table Header: Icon + Title + Count */}
+      <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between rounded-t-2xl">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#1E60F3] flex items-center justify-center">
-            <FileText className="w-4 h-4" />
+          {/* 운행일지 아이콘 & 마우스 호버 툴팁 */}
+          <div className="group/icon relative flex items-center cursor-help">
+            <img
+              src="/images/icons/driving-logs/icon_driving_log.png"
+              alt="운행일지"
+              className="w-8 h-8 sm:w-9 sm:h-9 object-contain shrink-0 transition-transform duration-200 group-hover/icon:scale-110"
+            />
+
+            {/* 마우스 호버 말풍선 Tooltip: 위로 향하는 블랙 말풍선 규격 (최상단 레이어) */}
+            <div className="absolute left-0 bottom-full mb-2 hidden group-hover/icon:flex flex-col items-start pointer-events-none z-[100]">
+              <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+                기사의 실제 운행 기록과 영수증을 대조 검수하고 승인해요
+              </span>
+              {/* 말풍선 꼬리표 화살표 */}
+              <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 ml-3.5 shadow-xs" />
+            </div>
           </div>
+
           <h2 className="text-sm font-bold text-slate-900 tracking-tight">운행일지 목록</h2>
-          <span className="text-xs font-black text-[#1E60F3] ml-1">총 {totalCount}건</span>
+          <span className="bg-slate-100 text-slate-500 font-bold px-2 py-0.5 rounded-full text-xs">
+            {totalCount}건
+          </span>
         </div>
 
         {selectedIds.length > 0 && (
@@ -130,8 +192,87 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
         )}
       </div>
 
+      {/* Subheader: Guide & Counters (Matching Expenses pattern) */}
+      <div className="px-5 py-2.5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+        <div className="text-slate-400 font-medium">
+          행을 누르면 운행 상세 정보와 영수증 내역 모달이 열려 편리하게 검수할 수 있어요.
+        </div>
+        {kpiCounts && (
+          <div className="flex flex-wrap items-center gap-3.5 text-slate-500 font-medium shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                haptics.selection();
+                onSelectStatus?.('전체');
+              }}
+              className={`flex items-center gap-1.5 transition-colors cursor-pointer ${selectedStatus === '전체' ? 'text-[#1E60F3] font-bold' : 'hover:text-slate-800'
+                }`}
+              title="전체 운행일지 보기"
+            >
+              <img
+                src="/images/icons/icon_submitted_today.png"
+                alt="오늘 제출"
+                className="w-3.5 h-3.5 object-contain shrink-0"
+              />
+              <span>오늘 제출 <strong className="text-slate-700 font-bold">{kpiCounts.totalToday}</strong></span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                haptics.selection();
+                onSelectStatus?.(selectedStatus === '검토 대기' ? '전체' : '검토 대기');
+              }}
+              className={`flex items-center gap-1.5 transition-colors cursor-pointer ${selectedStatus === '검토 대기' ? 'text-[#1E60F3] font-bold' : 'hover:text-slate-800'
+                }`}
+              title="검토 대기 필터"
+            >
+              <img
+                src="/images/icons/icon_review_pending.png"
+                alt="검토 대기"
+                className="w-3.5 h-3.5 object-contain shrink-0"
+              />
+              <span>검토 대기 <strong className="text-slate-700 font-bold">{kpiCounts.pending}</strong></span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                haptics.selection();
+                onSelectStatus?.(selectedStatus === '승인 완료' ? '전체' : '승인 완료');
+              }}
+              className={`flex items-center gap-1.5 transition-colors cursor-pointer ${selectedStatus === '승인 완료' ? 'text-emerald-600 font-bold' : 'hover:text-slate-800'
+                }`}
+              title="승인 완료 필터"
+            >
+              <img
+                src="/images/icons/icon_approved.png"
+                alt="승인 완료"
+                className="w-3.5 h-3.5 object-contain shrink-0"
+              />
+              <span>승인 완료 <strong className="text-slate-700 font-bold">{kpiCounts.approved}</strong></span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                haptics.selection();
+                onSelectStatus?.(selectedStatus === '보완 필요' ? '전체' : '보완 필요');
+              }}
+              className={`flex items-center gap-1.5 transition-colors cursor-pointer ${selectedStatus === '보완 필요' || selectedStatus === '반려' ? 'text-rose-600 font-bold' : 'hover:text-slate-800'
+                }`}
+              title="보완 필요/반려 필터"
+            >
+              <img
+                src="/images/icons/icon_revision_needed.png"
+                alt="보완 필요"
+                className="w-3.5 h-3.5 object-contain shrink-0"
+              />
+              <span>보완 필요 <strong className="text-slate-700 font-bold">{kpiCounts.revision}</strong></span>
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Table Container with Horizontal Scroll */}
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto rounded-b-2xl">
         <table className="w-full text-left border-collapse text-xs whitespace-nowrap">
           <thead>
             <tr className="bg-slate-50/75 border-b border-slate-100 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
@@ -155,15 +296,14 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
               <th className="py-3 px-2 text-right">시작 km</th>
               <th className="py-3 px-2 text-right">종료 km</th>
               <th className="py-3 px-3 text-right">운행합</th>
-              <th className="py-3 px-3 text-right">경비지출</th>
+              <th className="py-3 px-3 text-center">경비지출</th>
               <th className="py-3 px-3 text-center">상태</th>
-              <th className="py-3 px-3 text-center">작업</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100/90 text-slate-700 font-medium">
             {logs.length === 0 ? (
               <tr>
-                <td colSpan={16} className="py-12 text-center text-slate-400 text-xs">
+                <td colSpan={15} className="py-12 text-center text-slate-400 text-xs">
                   조건에 해당하는 운행일지가 없습니다.
                 </td>
               </tr>
@@ -179,9 +319,8 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
                       haptics.selection();
                       onSelectLog(log);
                     }}
-                    className={`transition-colors cursor-pointer hover:bg-blue-50/40 ${
-                      isSelected ? 'bg-blue-50/80 font-semibold text-slate-900 ring-1 ring-inset ring-[#1E60F3]/30' : ''
-                    }`}
+                    className={`transition-colors cursor-pointer hover:bg-blue-50/40 ${isSelected ? 'bg-blue-50/80 font-semibold text-slate-900 ring-1 ring-inset ring-[#1E60F3]/30' : ''
+                      }`}
                   >
                     {/* Checkbox */}
                     <td className="py-3 px-3 text-center">
@@ -189,7 +328,7 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
                         type="checkbox"
                         checked={isChecked}
                         onClick={(e) => handleToggleSelectOne(log.id, e)}
-                        onChange={() => {}}
+                        onChange={() => { }}
                         className="rounded border-slate-300 text-[#1E60F3] focus:ring-[#1E60F3] cursor-pointer"
                       />
                     </td>
@@ -250,50 +389,37 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
                       {log.distanceKm}
                     </td>
 
-                    {/* 경비지출 */}
-                    <td className="py-3 px-3 text-right font-bold text-slate-800">
-                      {log.expenseAmount > 0 ? (
-                        <div className="flex flex-col items-end">
-                          <span className="text-[#1E60F3] font-black">{log.expenseAmount.toLocaleString()}원</span>
-                          {log.expenseCount && log.expenseCount > 0 ? (
-                            <span className="text-[10px] text-slate-400 font-medium">({log.expenseCount}건)</span>
-                          ) : null}
-                        </div>
+                    {/* 경비지출: 건수 위(중앙), 금액 아래(중앙) */}
+                    <td className="py-3 px-3 text-center">
+                      {log.expenseAmount > 0 || (log.expenseCount && log.expenseCount > 0) ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            haptics.lightTap();
+                            if (onOpenExpenseDetail) {
+                              onOpenExpenseDetail(log);
+                            } else {
+                              onSelectLog(log);
+                            }
+                          }}
+                          className="inline-flex flex-col items-center justify-center px-2.5 py-1 rounded-xl hover:bg-blue-100 transition-all cursor-pointer group shadow-2xs hover:scale-105 active:scale-95"
+                          title="경비 지출 상세 내역 확인하기"
+                        >
+                          <span className="text-[11px] font-extrabold text-slate-700 group-hover:text-slate-900 leading-tight">
+                            {log.expenseCount ? `${log.expenseCount}건` : '1건'}
+                          </span>
+                          <span className="text-[11px] font-black text-[#1E60F3] group-hover:text-blue-700 leading-tight mt-0.5">
+                            {log.expenseAmount.toLocaleString()}원
+                          </span>
+                        </button>
                       ) : (
-                        <span className="text-slate-400 font-medium">-</span>
+                        <span className="text-slate-400 font-medium text-xs">-</span>
                       )}
                     </td>
 
                     {/* 상태 */}
                     <td className="py-3 px-3 text-center">{renderStatusBadge(log.status)}</td>
-
-                    {/* 작업 */}
-                    <td className="py-3 px-3 text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            haptics.lightTap();
-                            onSelectLog(log);
-                          }}
-                          className="px-2 py-0.5 border border-slate-200 hover:border-[#1E60F3] hover:text-[#1E60F3] rounded text-[11px] font-bold text-slate-600 transition-colors"
-                        >
-                          보기
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            haptics.lightTap();
-                            onSelectLog(log);
-                          }}
-                          className="p-1 text-slate-400 hover:text-slate-600 rounded transition-colors"
-                        >
-                          <MoreHorizontal className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
                   </tr>
                 );
               })
@@ -346,11 +472,10 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
                   haptics.selection();
                   onPageChange(pageNum);
                 }}
-                className={`w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  isCurrent
-                    ? 'bg-[#1E60F3] text-white shadow-xs'
-                    : 'border border-slate-200 text-slate-600 hover:bg-slate-50'
-                }`}
+                className={`w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${isCurrent
+                  ? 'bg-[#1E60F3] text-white shadow-xs'
+                  : 'border border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}
               >
                 {pageNum}
               </button>

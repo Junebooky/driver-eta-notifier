@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useState, useMemo, useEffect, useSyncExternalStore } from 'react';
+import { useReportingRefresh } from '@/hooks/useReportingRefresh';
+import React, { useState, useMemo, useSyncExternalStore } from 'react';
 import {
+  HqDrivingLog,
   HqDrivingLogStatus,
 } from '@/types/drivingLogHq';
 import {
@@ -13,11 +15,11 @@ import {
   fetchHqDrivingLogsFromDb,
   exportDrivingLogsToCsv,
 } from '@/utils/drivingLogHqStorage';
-import { HqDrivingLogsKpi } from './HqDrivingLogsKpi';
 import { HqDrivingLogsFilterBar } from './HqDrivingLogsFilterBar';
 import { HqDrivingLogsTable } from './HqDrivingLogsTable';
 import { HqDrivingLogDetailPanel } from './HqDrivingLogDetailPanel';
-import { CheckCircle2, CreditCard, AlertCircle, RotateCw } from 'lucide-react';
+import { HqLogExpenseDetailModal } from './HqLogExpenseDetailModal';
+import { CheckCircle2, AlertCircle, RotateCw } from 'lucide-react';
 import { HqBooking } from '@/types/hq';
 import HqHipassImportModal from '../expenses/HqHipassImportModal';
 
@@ -38,34 +40,12 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
     getHqDrivingLogsServerSnapshot
   );
   const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
-  const [dbError, setDbError] = useState<string | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-
-  // Fetch real authoritative logs from Supabase DB on mount and periodic interval
-  const handleRefreshLogs = async () => {
-    setIsRefreshing(true);
-    try {
-      const result = await fetchHqDrivingLogsFromDb();
-      if (!result.ok && result.error) {
-        setDbError(result.error);
-      } else {
-        setDbError(null);
-      }
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-    handleRefreshLogs();
-    const intervalId = setInterval(() => {
-      fetchHqDrivingLogsFromDb();
-    }, 20000);
-    return () => clearInterval(intervalId);
-  }, []);
+  const [selectedExpenseLog, setSelectedExpenseLog] = useState<HqDrivingLog | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const {error:dbError,refreshing:isRefreshing,refresh:handleRefreshLogs}=useReportingRefresh(fetchHqDrivingLogsFromDb);
 
   // Filters
-  const [dateRange] = useState('2024. 10. 24 (목) ~ 2024. 10. 24 (목)');
+  const [dateRange] = useState('전체 기간');
   const [selectedDriver, setSelectedDriver] = useState<string>('전체');
   const [selectedVehicle, setSelectedVehicle] = useState<string>('전체');
   const [selectedCustomer, setSelectedCustomer] = useState<string>('전체');
@@ -104,7 +84,8 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
     const pending = logs.filter((l) => l.status === '검토 대기').length;
     const approved = logs.filter((l) => l.status === '승인 완료').length;
     const revision = logs.filter((l) => l.status === '보완 필요').length;
-    const totalToday = logs.length;
+    const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+    const totalToday = logs.filter(log=>log.rawDate===today && log.status!=='draft').length;
 
     return {
       totalToday,
@@ -167,8 +148,8 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
 
   // Selected Log Object
   const selectedLog = useMemo(() => {
-    return logs.find((l) => l.id === selectedLogId) || filteredLogs[0] || null;
-  }, [logs, selectedLogId, filteredLogs]);
+    return logs.find((l) => l.id === selectedLogId) || null;
+  }, [logs, selectedLogId]);
 
   // Status Action Handlers (strictly syncs to DB)
   const handleApprove = async (logId: string) => {
@@ -215,10 +196,7 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
           <button
             type="button"
             onClick={() => {
-              setDbError(null);
-              fetchHqDrivingLogsFromDb().then((result) => {
-                if (!result.ok && result.error) setDbError(result.error);
-              });
+              void handleRefreshLogs();
             }}
             className="text-xs font-bold text-rose-700 bg-white border border-rose-200 px-3 py-1.5 rounded-xl hover:bg-rose-100 transition shrink-0 cursor-pointer"
           >
@@ -252,36 +230,7 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
         </button>
       </div>
 
-      {/* Hi-Pass Auto-Link Strip */}
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-emerald-200/80 bg-emerald-50/60 px-4 py-3">
-        <div className="text-xs text-slate-700">
-          <span className="font-extrabold text-emerald-900">하이패스 통행료 자동 연결:</span>{' '}
-          차량별 하이패스 CSV·엑셀 내역을 불러오면 해당 날짜 운행일지의 지출 합계와 경비 내역에 자동 반영됩니다.
-        </div>
-        <button
-          type="button"
-          onClick={() => setIsHipassModalOpen(true)}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3.5 py-2 text-xs font-extrabold text-white shadow-xs cursor-pointer"
-        >
-          <CreditCard className="w-3.5 h-3.5" />
-          <span>하이패스 통행료 가져오기</span>
-        </button>
-      </div>
-
-      {/* 1. Top 4 KPI Metric Cards */}
-      <HqDrivingLogsKpi
-        todaySubmittedCount={kpiCounts.totalToday}
-        pendingCount={kpiCounts.pending}
-        approvedCount={kpiCounts.approved}
-        revisionNeededCount={kpiCounts.revision}
-        activeStatusFilter={selectedStatus}
-        onSelectStatusFilter={(status) => {
-          setSelectedStatus(status);
-          setCurrentPage(1);
-        }}
-      />
-
-      {/* 2. Filter Bar */}
+      {/* 1. Filter Bar */}
       <HqDrivingLogsFilterBar
         dateRange={dateRange}
         driverOptions={driverOptions}
@@ -315,35 +264,58 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
         onExportExcel={handleExportExcel}
       />
 
-      {/* 3. Main Working Area: Left Table (60-65%) + Right Detail Panel (35-40%) */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start">
-        {/* Left Column: 운행일지 목록 Table */}
-        <div className="xl:col-span-8">
-          <HqDrivingLogsTable
-            logs={paginatedLogs}
-            totalCount={filteredLogs.length}
-            selectedLogId={selectedLog?.id || null}
-            onSelectLog={(log) => setSelectedLogId(log.id)}
-            pageSize={pageSize}
-            onPageSizeChange={(size) => {
-              setPageSize(size);
-              setCurrentPage(1);
-            }}
-            currentPage={currentPage}
-            onPageChange={setCurrentPage}
-          />
-        </div>
-
-        {/* Right Column: 선택된 운행일지 상세 정보 Panel */}
-        <div className="xl:col-span-4 sticky top-20">
-          <HqDrivingLogDetailPanel
-            log={selectedLog}
-            onApprove={handleApprove}
-            onRequestRevision={handleRequestRevision}
-            onReject={handleReject}
-          />
-        </div>
+      {/* 2. Main Working Area: Full-width Driving Logs Table */}
+      <div className="w-full">
+        <HqDrivingLogsTable
+          logs={paginatedLogs}
+          totalCount={filteredLogs.length}
+          selectedLogId={selectedLog?.id || null}
+          onSelectLog={(log) => {
+            setSelectedLogId(log.id);
+            setIsDetailModalOpen(true);
+          }}
+          onOpenExpenseDetail={(log) => {
+            setSelectedExpenseLog(log);
+          }}
+          pageSize={pageSize}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setCurrentPage(1);
+          }}
+          currentPage={currentPage}
+          onPageChange={setCurrentPage}
+          kpiCounts={kpiCounts}
+          selectedStatus={selectedStatus}
+          onSelectStatus={(status) => {
+            setSelectedStatus(status);
+            setCurrentPage(1);
+          }}
+        />
       </div>
+
+      {/* 3. Detailed Info Modal (Opens on row click or '보기' action) */}
+      {isDetailModalOpen && selectedLog && (
+        <HqDrivingLogDetailPanel
+          log={selectedLog}
+          onApprove={handleApprove}
+          onRequestRevision={handleRequestRevision}
+          onReject={handleReject}
+          onClose={() => setIsDetailModalOpen(false)}
+          isModal
+        />
+      )}
+
+      {/* 4. Dedicated Expense Details Modal (Opens on clicking 경비지출 cell) */}
+      {selectedExpenseLog && (
+        <HqLogExpenseDetailModal
+          log={selectedExpenseLog}
+          onClose={() => setSelectedExpenseLog(null)}
+          onNavigateToExpenses={() => {
+            setSelectedExpenseLog(null);
+            window.location.assign('/hq?tab=expenses');
+          }}
+        />
+      )}
 
       <HqHipassImportModal
         isOpen={isHipassModalOpen}

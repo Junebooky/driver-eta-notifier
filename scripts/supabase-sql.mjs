@@ -25,9 +25,10 @@ function loadEnvLocal() {
 loadEnvLocal();
 
 const SUPABASE_ACCESS_TOKEN = process.env.SUPABASE_ACCESS_TOKEN;
-const DEFAULT_PROJECT_ID = process.env.SUPABASE_PROJECT_ID || 'rvaowhriekibxtcpyalu';
+const DEFAULT_PROJECT_ID = process.env.SUPABASE_PROJECT_ID;
 
 export async function executeSupabaseSql(query, projectId = DEFAULT_PROJECT_ID) {
+  if (!projectId || !SUPABASE_ACCESS_TOKEN) throw new Error('Explicit SUPABASE_PROJECT_ID and SUPABASE_ACCESS_TOKEN are required.');
   const res = await fetch(`https://api.supabase.com/v1/projects/${projectId}/database/query`, {
     method: 'POST',
     headers: {

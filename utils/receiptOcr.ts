@@ -170,8 +170,8 @@ export function matchSampleReceipt(identifier: string): ReceiptScanResult | null
     matchedPath = SAMPLE_RECEIPT_HASHES[lower];
   } else if (SAMPLE_RECEIPT_PRESETS[identifier]) {
     matchedPath = identifier;
-  } else if (lower.includes('hangang') || lower.includes('한강')) {
-    matchedPath = '/images/receipt_sample_hangang.jpg';
+
+
   } else if (lower.includes('receipt_sample_fuel') || lower.includes('만남의광장')) {
     matchedPath = '/images/receipt_sample_fuel.jpg';
   } else if (lower.includes('receipt_sample_cu') || lower.includes('고양강매')) {
@@ -219,13 +219,14 @@ export function normalizeCategory(cat: unknown): ExpenseCategoryKey {
   if ((validKeys as string[]).includes(trimmed)) {
     return trimmed as ExpenseCategoryKey;
   }
-  // Mapping synonyms
-  if (trimmed === 'gas' || trimmed === 'oil' || trimmed === '주유') return 'fuel';
-  if (trimmed === 'food' || trimmed === 'cafe' || trimmed === '식대') return 'meal';
-  if (trimmed === 'accommodation' || trimmed === 'hotel' || trimmed === '숙박') return 'stay';
-  if (trimmed === 'tollgate' || trimmed === '통행') return 'toll';
-  if (trimmed === 'carwash' || trimmed === '세차') return 'wash';
-  if (trimmed === 'subway' || trimmed === 'taxi' || trimmed === '교통') return 'transit';
+// Mapping synonyms & Korean terms
+  if (trimmed.includes('주유') || trimmed.includes('휘발유') || trimmed.includes('경유') || trimmed.includes('lpg') || trimmed === 'gas' || trimmed === 'oil') return 'fuel';
+  if (trimmed.includes('통행') || trimmed.includes('고속도로') || trimmed.includes('하이패스') || trimmed.includes('도로공사') || trimmed === 'toll' || trimmed === 'tollgate') return 'toll';
+  if (trimmed.includes('주차') || trimmed === 'parking') return 'parking';
+  if (trimmed.includes('식대') || trimmed.includes('식비') || trimmed.includes('식사') || trimmed.includes('음식') || trimmed.includes('식당') || trimmed.includes('카페') || trimmed.includes('커피') || trimmed === 'food' || trimmed === 'cafe') return 'meal';
+  if (trimmed.includes('세차') || trimmed === 'carwash') return 'wash';
+  if (trimmed.includes('숙박') || trimmed.includes('호텔') || trimmed.includes('모텔') || trimmed === 'accommodation' || trimmed === 'stay') return 'stay';
+  if (trimmed.includes('교통') || trimmed.includes('택시') || trimmed.includes('지하철') || trimmed.includes('철도') || trimmed.includes('ktx') || trimmed.includes('srt') || trimmed === 'subway' || trimmed === 'transit' || trimmed === 'taxi') return 'transit';
   return 'other';
 }
 
@@ -263,6 +264,24 @@ export function normalizeDate(dateStr: unknown): string | null {
     const y = parseInt(match[1], 10);
     const m = parseInt(match[2], 10);
     const d = parseInt(match[3], 10);
+    if (y >= 2020 && y <= 2035 && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }
+  }
+  const matchKr = trimmed.match(/^(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일?$/);
+  if (matchKr) {
+    const y = parseInt(matchKr[1], 10);
+    const m = parseInt(matchKr[2], 10);
+    const d = parseInt(matchKr[3], 10);
+    if (y >= 2020 && y <= 2035 && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }
+  }
+  const match2Digit = trimmed.match(/^(\d{2})[./-](\d{1,2})[./-](\d{1,2})$/);
+  if (match2Digit) {
+    const y = 2000 + parseInt(match2Digit[1], 10);
+    const m = parseInt(match2Digit[2], 10);
+    const d = parseInt(match2Digit[3], 10);
     if (y >= 2020 && y <= 2035 && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
       return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     }

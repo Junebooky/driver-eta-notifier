@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback, startTransition } from 'react';
 import {
   X,
   User,
@@ -15,19 +15,18 @@ import {
   Loader2,
   Clock,
   ShieldCheck,
-  RefreshCw,
 } from 'lucide-react';
-import { HqBooking } from '@/types/hq';
-import { DriverVehicleAssetBundle } from '@/types/driverVehicleAsset';
-import { resolveVehicleEntity } from '@/utils/vehicleData';
+import { HqBooking, CustomerBrochureStatus } from '@/types/hq';
+import { DriverVehicleAssetBundle, DriverInfoDispatchLog } from '@/types/driverVehicleAsset';
 import { haptics } from '@/utils/haptics';
+import { formatPhoneNumber } from '@/utils/formatters';
 
 export interface HqDriverVehicleInfoModalProps {
   isOpen: boolean;
   booking: HqBooking | null;
   onClose: () => void;
   onOpenAssetManager?: (driverId: string, vehiclePlate: string) => void;
-  onDispatchRecorded?: () => void;
+  onDispatchRecorded?: (status: CustomerBrochureStatus, scheduleSynced: boolean) => void;
 }
 
 export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> = ({
@@ -39,83 +38,88 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
 }) => {
   const [activeTab, setActiveTab] = useState<'pc' | 'mobile'>('pc');
   const [bundle, setBundle] = useState<DriverVehicleAssetBundle | null>(null);
-  const [latestDispatchLog, setLatestDispatchLog] = useState<any>(null);
+  const [latestDispatchLog, setLatestDispatchLog] = useState<DriverInfoDispatchLog | null>(null);
   const [hasMismatch, setHasMismatch] = useState(false);
   const [mismatchReason, setMismatchReason] = useState<string | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [recipient, setRecipient] = useState('');
+  const [recipient, setRecipient] = useState(booking?.passengerPhone || '');
+  const [manualDeliveryConfirmed, setManualDeliveryConfirmed] = useState(false);
+  const submittingRef = useRef(false);
+  const loadGeneration = useRef(0);
   const [channel, setChannel] = useState<'manual_copy' | 'email' | 'download'>('manual_copy');
   const [feedback, setFeedback] = useState<{
     type: 'success' | 'warning' | 'error';
     message: string;
   } | null>(null);
 
-  // Initialize recipient when booking opens
-  useEffect(() => {
-    if (booking) {
-      setRecipient(booking.passengerPhone || '');
-      setFeedback(null);
-    }
-  }, [booking, isOpen]);
+  const currentBookingId = booking?.scheduleId || booking?.id;
+  const currentDriverId = booking?.driverId;
+  const currentVehiclePlate = booking?.vehiclePlate;
+  const currentDriverName = booking?.driverName;
+  const currentVersion = booking?.version;
 
   // Load bundle and dispatch status
-  const loadData = async () => {
-    if (!booking) return;
+  const loadData = useCallback(async () => {
+    if (!currentBookingId) return;
 
     const isAssigned =
-      booking.vehiclePlate &&
-      booking.vehiclePlate !== '미배정' &&
-      booking.vehiclePlate !== '-' &&
-      booking.driverName &&
-      booking.driverName !== '미배정';
+      currentVehiclePlate &&
+      currentVehiclePlate !== '미배정' &&
+      currentVehiclePlate !== '-' &&
+      currentDriverName &&
+      currentDriverName !== '미배정';
 
     if (!isAssigned) {
       setBundle(null);
       return;
     }
 
+    const generation = ++loadGeneration.current;
     setIsLoading(true);
-    setFeedback(null);
+    setBundle(null);
+    setLatestDispatchLog(null);
+    setHasMismatch(false);
     try {
-      const vPlate = booking.vehiclePlate || '';
-      const driverId = booking.driverId || '';
+      const vPlate = currentVehiclePlate || '';
+      const driverId = currentDriverId || '';
 
       // 1. Fetch asset bundle
       const bundleRes = await fetch(
         `/api/hq/drivers/assets?driverId=${encodeURIComponent(driverId)}&vehiclePlate=${encodeURIComponent(vPlate)}&type=bundle`
       );
       const bundleJson = await bundleRes.json();
-      if (bundleRes.ok && bundleJson.ok) {
-        setBundle(bundleJson.bundle);
-      }
+      if (!bundleRes.ok || !bundleJson.ok) throw new Error(bundleJson.error || '안내자료 조회 실패');
+      if (generation !== loadGeneration.current) return;
 
       // 2. Fetch dispatch log & check for mismatches
-      const bookingId = booking.scheduleId || booking.id;
+      const bookingId = currentBookingId;
       const dispatchRes = await fetch(
         `/api/hq/drivers/assets/dispatch?bookingId=${encodeURIComponent(bookingId)}&currentDriverId=${encodeURIComponent(
           driverId
-        )}&currentVehiclePlate=${encodeURIComponent(vPlate)}`
+        )}&currentVehiclePlate=${encodeURIComponent(vPlate)}&version=${currentVersion || ''}`
       );
       const dispatchJson = await dispatchRes.json();
       if (dispatchRes.ok && dispatchJson.ok) {
+        if (generation !== loadGeneration.current) return;
+        setBundle(bundleJson.bundle);
         setLatestDispatchLog(dispatchJson.latestLog);
         setHasMismatch(Boolean(dispatchJson.hasMismatch));
         setMismatchReason(dispatchJson.mismatchReason || null);
-      }
-    } catch (err: any) {
-      setFeedback({ type: 'error', message: err?.message || '자료 조회 실패' });
+      } else throw new Error(dispatchJson.error || '안내자료 기록 조회 실패');
+    } catch (err: unknown) {
+      if (generation === loadGeneration.current) setFeedback({ type: 'error', message: err instanceof Error ? err.message : '자료 조회 실패' });
     } finally {
-      setIsLoading(false);
+      if (generation === loadGeneration.current) setIsLoading(false);
     }
-  };
+  }, [currentBookingId, currentDriverId, currentVehiclePlate, currentDriverName, currentVersion]);
 
   useEffect(() => {
-    if (isOpen && booking) {
-      loadData();
-    }
-  }, [isOpen, booking?.scheduleId, booking?.driverId, booking?.vehiclePlate]);
+    if (isOpen) startTransition(() => { void loadData(); });
+    const generation = loadGeneration;
+    return () => { generation.current++; };
+  }, [isOpen, loadData]);
 
   if (!isOpen || !booking) return null;
 
@@ -143,8 +147,8 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
 
   // Handle Record Dispatch
   const handleRecordDispatch = async () => {
-    if (!isAssigned || !bundle?.isReadyForCustomerDispatch) return;
-
+    if (!isAssigned || !bundle?.isReadyForCustomerDispatch || submittingRef.current) return;
+    submittingRef.current = true;
     setIsSubmitting(true);
     setFeedback(null);
     try {
@@ -158,7 +162,10 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
           vehiclePlate: booking.vehiclePlate,
           vehicleModel: booking.vehicleModel,
           channel,
-          recipient: recipient.trim() || '고객사 담당자',
+          recipient: recipient.trim(),
+          expectedVersion: booking.version,
+          manualDeliveryConfirmed,
+          isPreparationOnly: !manualDeliveryConfirmed,
         }),
       });
 
@@ -169,18 +176,17 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
         return;
       }
 
-      haptics.success();
-      setFeedback({
-        type: 'success',
-        message: '고객사 안내자료 발송 기록이 Supabase에 안전하게 보존되었습니다.',
-      });
-      setHasMismatch(false);
       await loadData();
-      onDispatchRecorded?.();
-    } catch (err: any) {
-      setFeedback({ type: 'error', message: err?.message || '네트워크 오류' });
+      if (json.scheduleSynced) haptics.success();
+      else haptics.errorAlert();
+      setFeedback({ type: json.scheduleSynced ? 'success' : 'warning', message: json.warning || json.message });
+      setManualDeliveryConfirmed(false);
+      onDispatchRecorded?.(json.brochureStatus, json.scheduleSynced === true);
+    } catch (err: unknown) {
+      setFeedback({ type: 'error', message: err instanceof Error ? err.message : '네트워크 오류' });
       haptics.errorAlert();
     } finally {
+      submittingRef.current = false;
       setIsSubmitting(false);
     }
   };
@@ -233,7 +239,7 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
           {latestDispatchLog?.dispatchedAt && (
             <div className="flex items-center gap-1.5 text-slate-400 text-[11px] font-medium">
               <Clock className="w-3.5 h-3.5 text-slate-400" />
-              <span>최종 발송 기록: {String(latestDispatchLog.dispatchedAt).slice(0, 16).replace('T', ' ')}</span>
+              <span>{latestDispatchLog.snapshot?.status === 'prepared' ? '준비 완료' : latestDispatchLog.snapshot?.status === 'manual_recorded' ? '수동 발송 기록' : '이전 발송 기록'}: {String(latestDispatchLog.dispatchedAt).slice(0, 16).replace('T', ' ')}</span>
             </div>
           )}
         </div>
@@ -245,7 +251,7 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
             <div className="flex-1">
               <span>{mismatchReason || '배차 정보가 변경되어 기존 발송 자료와 불일치합니다.'}</span>
               <span className="block text-[11px] font-normal text-amber-700">
-                새 배차 조합의 안내자료를 확인한 뒤 다시 발송 완료 처리해주세요.
+                새 배차 조합의 안내자료를 확인한 뒤 준비하거나 직접 전달한 기록을 남겨주세요.
               </span>
             </div>
           </div>
@@ -254,9 +260,11 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
         {/* Feedback Alert */}
         {feedback && (
           <div
+            role={feedback.type === 'success' ? 'status' : 'alert'}
             className={`px-5 py-2.5 text-xs font-bold flex items-center gap-2 ${
               feedback.type === 'success'
                 ? 'bg-emerald-50 text-emerald-800 border-b border-emerald-100'
+                : feedback.type === 'warning' ? 'bg-amber-50 text-amber-900 border-b border-amber-200'
                 : 'bg-rose-50 text-rose-800 border-b border-rose-100'
             }`}
           >
@@ -271,7 +279,9 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
 
         {/* Body Content */}
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
-          {!isAssigned ? (
+          {isLoading ? (
+            <div role="status" className="py-12 text-center text-sm text-slate-600">최신 배차와 안내자료를 확인하고 있습니다.</div>
+          ) : !isAssigned ? (
             /* Condition 1: Dispatch Not Confirmed */
             <div className="py-12 px-6 text-center bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
               <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mx-auto">
@@ -418,8 +428,11 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
                     <input
                       type="text"
                       value={recipient}
-                      onChange={(e) => setRecipient(e.target.value)}
-                      placeholder="수신 전화번호 또는 이메일 주소"
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setRecipient(val.includes('@') ? val : formatPhoneNumber(val));
+                      }}
+                      placeholder="010-0000-0000 또는 이메일 주소"
                       className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-900"
                     />
                   </div>
@@ -430,20 +443,25 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
                     </label>
                     <select
                       value={channel}
-                      onChange={(e) => setChannel(e.target.value as any)}
+                      onChange={(e) => { const value = e.target.value; if (value === 'manual_copy' || value === 'email' || value === 'download') { setChannel(value); setManualDeliveryConfirmed(false); } }}
                       className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900"
                     >
-                      <option value="manual_copy">문자 / 카카오톡 메신저 첨부 발송 준비</option>
-                      <option value="email">이메일 첨부 발송 기록</option>
-                      <option value="download">안전 파일 다운로드 후 직접 전달</option>
+                      <option value="manual_copy">문자 / 카카오톡 직접 전달</option>
+                      <option value="email">외부 이메일 직접 전달</option>
+                      <option value="download">다운로드 준비 기록</option>
                     </select>
                   </div>
                 </div>
 
+                <p className="text-xs text-slate-600">이 화면은 준비 상태와 직접 전달한 이력을 저장합니다. 이메일·문자를 자동으로 보내거나 고객 수신을 확인하지 않습니다.</p>
+                {channel !== 'download' && <label className="flex items-start gap-2 text-xs text-slate-700">
+                  <input type="checkbox" checked={manualDeliveryConfirmed} onChange={e => setManualDeliveryConfirmed(e.target.checked)} className="mt-0.5" />
+                  <span>위 수신처에 안내자료를 직접 전달했으며 수동 발송 기록을 남깁니다.</span>
+                </label>}
                 <div className="pt-2 flex items-center gap-3">
                   <button
                     type="button"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || (manualDeliveryConfirmed && channel !== 'download' && !recipient.trim())}
                     onClick={handleRecordDispatch}
                     className="flex-1 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                   >
@@ -452,7 +470,7 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
                     ) : (
                       <CheckCircle2 className="w-3.5 h-3.5" />
                     )}
-                    <span>고객사 안내자료 발송 완료 기록</span>
+                    <span>{manualDeliveryConfirmed && channel !== 'download' ? '직접 전달한 수동 발송 기록 저장' : '안내자료 준비 상태 저장'}</span>
                   </button>
                 </div>
               </div>

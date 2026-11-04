@@ -1,3 +1,4 @@
+import { verifyServerAuth } from '@/lib/auth/serverAuth';
 import { NextRequest, NextResponse } from 'next/server';
 
 export interface LocationPoint {
@@ -193,6 +194,8 @@ async function fetchTmapPredictionSlot(
 }
 
 export async function POST(req: NextRequest) {
+  const apiAuth = await verifyServerAuth(req);
+  if (!apiAuth.ok) return NextResponse.json({ ok: false, error: apiAuth.error }, { status: apiAuth.statusCode });
   try {
     const body = await req.json().catch(() => ({}));
     const departure: LocationPoint = body.departure || {

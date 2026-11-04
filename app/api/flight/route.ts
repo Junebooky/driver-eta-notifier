@@ -1,3 +1,4 @@
+import { verifyServerAuth, isDevAuthAllowed } from '@/lib/auth/serverAuth';
 import { NextRequest, NextResponse } from 'next/server';
 import { FlightInfo, FlightType } from '@/types';
 import {
@@ -401,7 +402,7 @@ async function fetchGimpoFlights(
   // Test fixture is allowed ONLY during unit tests (NODE_ENV === 'test') or local dev with DEV_AUTH_ENABLED=true.
   const isLocalDevOrTest =
     process.env.NODE_ENV === 'test' ||
-    (process.env.DEV_AUTH_ENABLED === 'true' && process.env.VERCEL !== '1');
+    isDevAuthAllowed();
 
   if (!isLocalDevOrTest) {
     // In production or preview: If live KAC data is unavailable or key pending, do not generate fake mock flights!
@@ -515,6 +516,8 @@ async function fetchGimpoFlights(
 }
 
 export async function GET(req: NextRequest) {
+  const apiAuth = await verifyServerAuth(req);
+  if (!apiAuth.ok) return NextResponse.json({ ok: false, error: apiAuth.error }, { status: apiAuth.statusCode });
   const { searchParams } = new URL(req.url);
 
   const rawType = searchParams.get('type')?.toLowerCase();

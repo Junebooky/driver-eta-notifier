@@ -1,216 +1,69 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
-import { verifyServerAuth, requireHqAdmin } from '@/lib/auth/serverAuth';
-
-const DRIVER_DEFAULTS: Record<string, any> = {
-  '1호차': {
-    vehicle_no: '1호차',
-    car_number: '142호 7814',
-    driver_name: '배선만',
-    phone: '010-8806-9758',
-    passenger_name: 'VIP 게스트 A',
-    default_navi: 'tmap',
-  },
-  '2호차': {
-    vehicle_no: '2호차',
-    car_number: '112하 3456',
-    driver_name: '홍승범',
-    phone: '010-3333-4444',
-    passenger_name: 'VIP 게스트 B',
-    default_navi: 'tmap',
-  },
-  '4호차': {
-    vehicle_no: '4호차',
-    car_number: '142호 7811',
-    driver_name: '윤태준',
-    phone: '010-6348-8726',
-    passenger_name: 'SOYFAN 외 1명',
-    default_navi: 'tmap',
-  },
-  '8호차': {
-    vehicle_no: '8호차',
-    car_number: '142호 7815',
-    driver_name: '민성호',
-    phone: '010-7231-8340',
-    passenger_name: 'VIP 게스트 C',
-    default_navi: 'tmap',
-  },
-};
-
-function maskPhoneNumber(phone?: string | null): string {
-  if (!phone) return '';
-  const trimmed = phone.trim();
-  if (trimmed.length < 8) return '010-****-****';
-  return trimmed.replace(/^(\d{3})-?(\d{3,4})-?(\d{4})$/, '$1-****-$3');
-}
+import { verifyServerAuth } from '@/lib/auth/serverAuth';
 
 export async function GET(req: NextRequest) {
-  try {
-    const auth = await verifyServerAuth(req);
-    if (!auth.ok || !auth.session) {
-      return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
-    }
-
-    const isHqAdmin = auth.session.role === 'hq_admin';
-    const { searchParams } = new URL(req.url);
-    const isAll = searchParams.get('all') === 'true' || searchParams.get('vehicle_no') === 'all';
-
-    if (isAll) {
-      const { data, error } = await supabaseAdmin
-        .from('drivers')
-        .select('*')
-        .order('vehicle_no', { ascending: true });
-
-      if (error || !data || data.length === 0) {
-        return NextResponse.json({ drivers: Object.values(DRIVER_DEFAULTS), fallback: true });
-      }
-
-      const enriched = data
-        .filter(
-          (d: any) =>
-            d.vehicle_no &&
-            d.vehicle_no !== '미배정' &&
-            d.vehicle_no !== 'unassigned'
-        )
-        .map((d: any) => {
-          const isOwnDriver = !isHqAdmin && (
-            d.driver_name === auth.session?.driverName ||
-            d.vehicle_no === auth.session?.vehicleNo
-          );
-
-          return {
-            ...d,
-            passenger_name: d.passenger_name ?? null,
-            // PII protection: Mask phone numbers of other drivers unless HQ Admin
-            phone: isHqAdmin || isOwnDriver ? d.phone : maskPhoneNumber(d.phone),
-          };
-        });
-
-      return NextResponse.json({ drivers: enriched, fallback: false });
-    }
-
-    const rawVehicleNo = searchParams.get('vehicle_no') || searchParams.get('id') || '4호차';
-
-    let targetVehicleNo = '4호차';
-    const hochaMatch = rawVehicleNo.match(/(\d+)호차/);
-    if (hochaMatch) {
-      targetVehicleNo = `${hochaMatch[1]}호차`;
-    } else {
-      const digitMatch = rawVehicleNo.match(/^(\d+)$/);
-      if (digitMatch) {
-        targetVehicleNo = `${digitMatch[1]}호차`;
-      } else {
-        targetVehicleNo = rawVehicleNo.trim() || '4호차';
-      }
-    }
-
-    const { data, error } = await supabaseAdmin
-      .from('drivers')
-      .select('*')
-      .eq('vehicle_no', targetVehicleNo)
-      .maybeSingle();
-
-    if (error || !data) {
-      const fallbackDriver = DRIVER_DEFAULTS[targetVehicleNo] || {
-        vehicle_no: targetVehicleNo,
-        car_number: '',
-        driver_name: '',
-        phone: '',
-        passenger_name: null,
-        default_navi: 'tmap',
-      };
-      return NextResponse.json({ driver: fallbackDriver, fallback: true });
-    }
-
-    const isOwnDriver = !isHqAdmin && (
-      data.driver_name === auth.session?.driverName ||
-      data.vehicle_no === auth.session?.vehicleNo
-    );
-
-    const driverWithPassenger = {
-      ...data,
-      passenger_name: data.passenger_name ?? null,
-      phone: isHqAdmin || isOwnDriver ? data.phone : maskPhoneNumber(data.phone),
-    };
-
-    return NextResponse.json({ driver: driverWithPassenger, fallback: false });
-  } catch (err: any) {
-    console.error('Error fetching driver from Supabase:', err);
-    return NextResponse.json({ driver: DRIVER_DEFAULTS['4호차'], fallback: true, error: err?.message });
+  const auth = await verifyServerAuth(req);
+  if (!auth.ok || !auth.session) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
+  const params = new URL(req.url).searchParams;
+  const isAll = params.get('all') === 'true' || params.get('vehicle_no') === 'all';
+  if (isAll && auth.session.role !== 'hq_admin') return NextResponse.json({ ok: false, error: '관리자 전용 목록입니다.' }, { status: 403 });
+  let query = supabaseAdmin.from('drivers').select('*');
+  if (auth.session.role === 'driver') {
+    if (!auth.session.driverId) return NextResponse.json({ ok: false, error: '기사 계정 연결이 필요합니다.' }, { status: 403 });
+    query = query.eq('id', auth.session.driverId);
+  } else if (!isAll) {
+    const vehicle = params.get('vehicle_no') || params.get('id');
+    if (!vehicle) return NextResponse.json({ ok: false, error: '차량번호가 필요합니다.' }, { status: 400 });
+    query = query.eq('vehicle_no', /^\d+$/.test(vehicle) ? `${vehicle}호차` : vehicle);
   }
+  const { data, error } = await query;
+  if (error) return NextResponse.json({ ok: false, error: '기사 정보 조회에 실패했습니다.' }, { status: 503 });
+  if (isAll) return NextResponse.json({ drivers: data || [], fallback: false });
+  if (!data?.length) return NextResponse.json({ ok: false, error: '기사 정보를 찾을 수 없습니다.' }, { status: 404 });
+  return NextResponse.json({ driver: data[0], fallback: false });
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const auth = await requireHqAdmin(req);
-    if (!auth.ok) {
-      return NextResponse.json({ error: auth.error }, { status: auth.statusCode });
-    }
-
+    const auth = await verifyServerAuth(req);
+    if (!auth.ok || !auth.session) return NextResponse.json({ok:false,error:auth.error},{status:auth.statusCode});
     const body = await req.json();
-    const rawVehicleNo = body.vehicle_no || body.vehicleNo || '';
-    const rawDriverName = body.driver_name || body.driverName || '';
-    let rawCarNumber = body.car_number || body.carNumber || '';
-    const rawPhone = body.phone || '';
-    const rawPassengerName = body.passenger_name !== undefined ? body.passenger_name : body.passengerName;
-    const rawDefaultNavi = body.default_navi || body.defaultNavi || 'tmap';
-
-    if (!rawVehicleNo && (body.presetOrder || body.homeLocation)) {
-      return NextResponse.json({ success: true, message: 'Metadata updated' });
+    const requestedId = body.driverId || body.driver_id;
+    const driverId = auth.session.role === 'driver' ? auth.session.driverId : requestedId;
+    if (!driverId || !/^[0-9a-f-]{36}$/i.test(driverId)) return NextResponse.json({ok:false,error:'기사 UUID가 필요합니다. 차량번호로 기사 계정을 만들거나 바꿀 수 없습니다.'},{status:400});
+    if (auth.session.role === 'driver' && requestedId && requestedId !== driverId) return NextResponse.json({ok:false,error:'본인 프로필만 수정할 수 있습니다.'},{status:403});
+    const {data:existing,error:readError}=await supabaseAdmin.from('drivers').select('*').eq('id',driverId).maybeSingle();
+    if (readError) return NextResponse.json({ok:false,error:'기사 정보를 조회하지 못했습니다.'},{status:503});
+    if (!existing) return NextResponse.json({ok:false,error:'기사 정보를 찾을 수 없습니다.'},{status:404});
+    // Legacy labels are read-only on this endpoint. Real trip assignments belong to bookings.
+    for (const [field,current] of [['vehicle_no',existing.vehicle_no],['car_number',existing.car_number]] as const) {
+      const value=body[field] ?? body[field==='vehicle_no'?'vehicleNo':'carNumber'];
+      if (value!==undefined && value!==current && value!==`${existing.vehicle_no} ${existing.car_number}`) return NextResponse.json({ok:false,code:'ASSIGN_VEHICLE_THROUGH_BOOKING',error:'차량 변경은 HQ 예약·배차에서 처리해 주세요. 기사 계정 정보는 유지됩니다.'},{status:409});
     }
-
-    if (!rawVehicleNo) {
-      return NextResponse.json({ error: 'vehicle_no is required' }, { status: 400 });
-    }
-
-    let normalizedVehicleNo = rawVehicleNo.trim();
-    const hochaMatch = normalizedVehicleNo.match(/(\d+호차)/);
-    if (hochaMatch) {
-      const hocha = hochaMatch[1];
-      const remainder = normalizedVehicleNo.replace(hocha, '').trim();
-      normalizedVehicleNo = hocha;
-      if (!rawCarNumber && remainder) {
-        rawCarNumber = remainder;
+    const patch: Record<string,unknown>={};
+    for (const [column,alias] of [['driver_name','driverName'],['phone','mobile'],['passenger_name','passengerName'],['default_navi','defaultNavi']] as const) {
+      const value=body[column]!==undefined ? body[column] : body[alias];
+      if (value!==undefined) {
+        if (value!==null && (typeof value!=='string'||value.length>200)) return NextResponse.json({ok:false,error:'프로필 입력값을 확인해 주세요.'},{status:400});
+        patch[column]=typeof value==='string' ? value.trim() : null;
       }
     }
-
-    if (!rawCarNumber) {
-      const { data: existing } = await supabaseAdmin
-        .from('drivers')
-        .select('car_number')
-        .eq('vehicle_no', normalizedVehicleNo)
-        .maybeSingle();
-
-      rawCarNumber = existing?.car_number || (DRIVER_DEFAULTS[normalizedVehicleNo]?.car_number || '142호 7811');
+    if (patch.default_navi!==undefined && !['tmap','kakao','naver'].includes(String(patch.default_navi))) return NextResponse.json({ok:false,error:'내비 앱을 확인해 주세요.'},{status:400});
+    if (patch.driver_name===null || patch.driver_name==='') return NextResponse.json({ok:false,error:'성함을 입력해 주세요.'},{status:400});
+    const preferences: Record<string,unknown>={};
+    if (body.presetOrder!==undefined) {
+      if (!Array.isArray(body.presetOrder)||body.presetOrder.length>500||body.presetOrder.some((id:unknown)=>typeof id!=='string'||id.length>100)) return NextResponse.json({ok:false,error:'즐겨찾기 순서를 확인해 주세요.'},{status:400});
+      preferences.presetOrder=body.presetOrder;
     }
-
-    const payload: any = {
-      vehicle_no: normalizedVehicleNo,
-      car_number: rawCarNumber,
-    };
-
-    if (rawDriverName) payload.driver_name = rawDriverName;
-    if (rawPhone) payload.phone = rawPhone;
-    if (rawPassengerName !== undefined) {
-      const normalized = typeof rawPassengerName === 'string' ? rawPassengerName.trim() : rawPassengerName;
-      payload.passenger_name = normalized && normalized.length > 0 ? normalized : null;
+    if (body.homeLocation!==undefined) {
+      const home=body.homeLocation;
+      if (home!==null && (typeof home.name!=='string'||home.name.length>100||typeof home.address!=='string'||home.address.length>500||!Number.isFinite(home.lat)||Math.abs(home.lat)>90||!Number.isFinite(home.lng)||Math.abs(home.lng)>180)) return NextResponse.json({ok:false,error:'자택 주소를 확인해 주세요.'},{status:400});
+      preferences.homeLocation=home;
     }
-    if (rawDefaultNavi) payload.default_navi = rawDefaultNavi;
-
-    const { data, error } = await supabaseAdmin
-      .from('drivers')
-      .upsert(payload, { onConflict: 'vehicle_no' })
-      .select()
-      .single();
-
-    if (error) {
-      console.warn('Supabase driver upsert error:', error);
-      return NextResponse.json({ error: error.message, fallback: true }, { status: 400 });
-    }
-
-    return NextResponse.json({ driver: data, fallback: false });
-  } catch (err: any) {
-    console.error('Error upserting driver in Supabase:', err);
-    return NextResponse.json({ error: err?.message, fallback: true }, { status: 500 });
-  }
+    if (!Object.keys(patch).length && !Object.keys(preferences).length) return NextResponse.json({ok:false,error:'저장할 변경사항이 없습니다.'},{status:400});
+    const {data,error}=await supabaseAdmin.rpc('update_driver_profile_by_id',{p_driver_id:driverId,p_patch:patch,p_preferences:preferences});
+    if (error || !data) return NextResponse.json({ok:false,error:'프로필이 저장되지 않았습니다. DB 연결과 프로필 저장 기능을 확인해 주세요.'},{status:503});
+    return NextResponse.json({ok:true,driver:data,fallback:false});
+  } catch { return NextResponse.json({ok:false,error:'프로필 저장에 실패했습니다.'},{status:503}); }
 }

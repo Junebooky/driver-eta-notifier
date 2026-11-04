@@ -23,7 +23,7 @@ if (!process.env.COCKPIT_AUTH_SECRET) {
 
 test('CRM Full Round-Trip & Quality Gate Test Suite (Zero Live DB Mutation)', async () => {
   // In-memory isolated DB seed - guarantees ZERO network requests to live Supabase DB
-  let mockRows: MockCustomerRow[] = [
+  const mockRows: MockCustomerRow[] = [
     {
       id: 'cust-chanel',
       name: 'CHANEL',
@@ -344,7 +344,7 @@ test('CRM Full Round-Trip & Quality Gate Test Suite (Zero Live DB Mutation)', as
       (process.env as any).NODE_ENV = 'production';
       const demoReq = makeReq('GET', undefined, adminToken, 'demo=true');
       const demoRes = await GET(demoReq);
-      assert.strictEqual(demoRes.status, 403, 'Demo mode must be blocked in production');
+      assert.strictEqual(demoRes.status, 401, 'Production must reject legacy shared-credential tokens before reading demo data');
     } finally {
       (process.env as any).NODE_ENV = prevEnv;
     }

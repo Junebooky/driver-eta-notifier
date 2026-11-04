@@ -104,8 +104,8 @@ export const rotateImageDataUrl = (
 
     img.onload = () => {
       try {
-        let origWidth = img.naturalWidth || img.width;
-        let origHeight = img.naturalHeight || img.height;
+        const origWidth = img.naturalWidth || img.width;
+        const origHeight = img.naturalHeight || img.height;
 
         // Normalize degrees to 0, 90, 180, 270
         const normalized = ((degrees % 360) + 360) % 360;

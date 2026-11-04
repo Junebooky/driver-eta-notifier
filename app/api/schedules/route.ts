@@ -1,3 +1,4 @@
+import { dispatchRequestContext } from '@/lib/dispatch/requestContext';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import {
@@ -52,7 +53,7 @@ export async function GET(req: NextRequest) {
     });
 
     if (error) {
-      return NextResponse.json({ schedules: [], fallback: false, error });
+      return NextResponse.json({ schedules: [], fallback: false, error }, { status: 503 });
     }
 
     return NextResponse.json({ schedules, fallback: false });
@@ -102,6 +103,8 @@ export async function POST(req: NextRequest) {
     } = body;
 
     const candInput: DispatchUpsertInput = {
+      vehicleId: body.vehicle_id || body.vehicleId,
+      serviceMode: body.service_mode || body.serviceMode,
       vehicleNo: vehicle_no,
       vehiclePlate: body.vehicle_plate || body.vehiclePlate,
       driverId: driver_id,
@@ -129,22 +132,9 @@ export async function POST(req: NextRequest) {
       allowUnverified: allow_unverified,
     };
 
-    if (dispatch_status === 'published') {
-      const conflicts = await checkServerDispatchConflicts([candInput]);
-      if (conflicts.length > 0) {
-        return NextResponse.json(
-          {
-            ok: false,
-            code: 'SCHEDULE_CONFLICT',
-            error: conflicts[0].message,
-            conflicts,
-          },
-          { status: 409 }
-        );
-      }
-    }
-
-    const result = await upsertServerDispatchSchedule(candInput);
+    const context=dispatchRequestContext(req,auth.session!,body);
+    if(!context)return NextResponse.json({ok:false,error:'저장 요청 번호가 필요합니다.'},{status:400});
+    const result = await upsertServerDispatchSchedule(candInput,context.requestId,context.fingerprint);
 
     if (result.error) {
       return NextResponse.json({ error: result.error }, { status: result.statusCode || 400 });
@@ -224,6 +214,8 @@ export async function PUT(req: NextRequest) {
 
     const candInput: DispatchUpsertInput = {
       scheduleId: id,
+      vehicleId: body.vehicle_id ?? hydrated.vehicle_id ?? undefined,
+      serviceMode: body.service_mode ?? hydrated._meta.serviceMode,
       vehicleNo: vehicle_no ?? hydrated.vehicle_no,
       vehiclePlate: vehicle_plate ?? hydrated._meta.vehiclePlate ?? undefined,
       vehicleModel: vehicle_model ?? hydrated._meta.vehicleModel ?? undefined,
@@ -235,6 +227,13 @@ export async function PUT(req: NextRequest) {
       endTime: effectiveEndTime,
       timeDisplay: time_display || hydrated.time_display,
       origin: origin || hydrated.origin,
+      originAddress: body.origin_address ?? hydrated.origin_address,
+      originLat: body.origin_lat ?? hydrated.origin_lat,
+      originLng: body.origin_lng ?? hydrated.origin_lng,
+      destinationAddress: body.destination_address ?? hydrated.destination_address,
+      destinationLat: body.destination_lat ?? hydrated.destination_lat,
+      destinationLng: body.destination_lng ?? hydrated.destination_lng,
+      passengerCount: body.passenger_count ?? hydrated.passenger_count,
       destination: destination || hydrated.destination,
       passengerName: passenger_name !== undefined ? passenger_name : hydrated.passenger_name ?? undefined,
       passengerPhone: passenger_phone !== undefined ? passenger_phone : hydrated.passenger_phone ?? undefined,
@@ -244,17 +243,9 @@ export async function PUT(req: NextRequest) {
       allowUnverified: true,
     };
 
-    if (effectiveDispatchStatus === 'published') {
-      const conflicts = await checkServerDispatchConflicts([candInput]);
-      if (conflicts.length > 0) {
-        return NextResponse.json(
-          { ok: false, code: 'SCHEDULE_CONFLICT', error: conflicts[0].message, conflicts },
-          { status: 409 }
-        );
-      }
-    }
-
-    const result = await upsertServerDispatchSchedule(candInput);
+    const context=dispatchRequestContext(req,auth.session!,body);
+    if(!context)return NextResponse.json({ok:false,error:'저장 요청 번호가 필요합니다.'},{status:400});
+    const result = await upsertServerDispatchSchedule(candInput,context.requestId,context.fingerprint);
 
     if (result.error) {
       return NextResponse.json({ error: result.error }, { status: result.statusCode || 400 });

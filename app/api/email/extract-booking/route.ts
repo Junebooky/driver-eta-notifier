@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     let subject = body.subject || body.emailSubject || '';
     let sender = body.sender || body.emailFrom || '';
     let senderName = body.senderName || '';
-    let replyTo = body.replyTo || '';
+    const replyTo = body.replyTo || '';
     let bodyText = body.bodyText || body.emailText || '';
 
     if (!emailId) {

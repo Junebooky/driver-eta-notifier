@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { MapPin, Flag, Loader2, X, Navigation, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { MapPin, Flag, Loader2, X, Navigation, CheckCircle2 } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 export interface PoiResult {
@@ -228,33 +228,24 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
           <label className="block text-xs font-bold text-slate-800">
             {label} {required && <span className="text-red-500 font-bold ml-0.5">*</span>}
           </label>
-          {value && value.trim().length >= 2 && (
-            isConfirmed ? (
-              <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                <span>TMAP 좌표 확정</span>
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 animate-pulse">
-                <AlertTriangle className="w-3 h-3 text-amber-600" />
-                <span>후보 선택 필요</span>
-              </span>
-            )
+          {isConfirmed && value && value.trim().length >= 2 && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+              <span>TMAP 좌표 확정</span>
+            </span>
           )}
         </div>
       )}
 
       <div
-        className={`w-full ${heightClass} bg-white border ${
-          isConfirmed ? 'border-slate-200 hover:border-blue-400' : value ? 'border-amber-300 ring-1 ring-amber-100' : 'border-slate-200 hover:border-blue-400'
-        } focus-within:border-[#1E60F3] focus-within:ring-2 focus-within:ring-blue-100 rounded-xl px-3.5 flex items-center gap-2.5 transition-all shadow-2xs ${
+        className={`w-full ${heightClass} bg-white border border-slate-200 hover:border-[#1E60F3]/60 focus-within:border-[#1E60F3] focus-within:ring-2 focus-within:ring-blue-100 rounded-xl px-3.5 flex items-center gap-2.5 transition-all shadow-2xs ${
           disabled ? 'opacity-60 pointer-events-none' : ''
         }`}
       >
         {icon === 'mapPin' ? (
-          <MapPin className={`w-5 h-5 shrink-0 ${isConfirmed ? 'text-[#1E60F3]' : 'text-slate-700'}`} />
+          <MapPin className="w-5 h-5 shrink-0 text-[#1E60F3]" />
         ) : (
-          <Flag className={`w-5 h-5 shrink-0 ${isConfirmed ? 'text-[#1E60F3]' : 'text-slate-700'}`} />
+          <Flag className="w-5 h-5 shrink-0 text-[#1E60F3]" />
         )}
 
         <input

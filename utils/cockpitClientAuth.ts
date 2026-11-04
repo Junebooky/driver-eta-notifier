@@ -6,6 +6,7 @@
 export interface ClientSessionInfo {
   authenticated: boolean;
   role?: 'hq_admin' | 'driver';
+  isRepresentative?: boolean;
   userId?: string;
   driverName?: string;
   vehicleNo?: string;
@@ -14,6 +15,8 @@ export interface ClientSessionInfo {
 }
 
 let sessionCache: ClientSessionInfo | null = null;
+let sessionCheck: Promise<ClientSessionInfo> | null = null;
+let generation=0;
 let lastSessionCheckTime = 0;
 const SESSION_CACHE_TTL_MS = 15_000; // 15s cache to avoid rapid duplicate session queries
 
@@ -24,17 +27,21 @@ const SESSION_CACHE_TTL_MS = 15_000; // 15s cache to avoid rapid duplicate sessi
  */
 export async function ensureClientAuth(
   _role?: 'hq' | 'driver',
-  _params?: { driverName?: string; vehicleNo?: string }
+  _params?: { driverName?: string; vehicleNo?: string },
+  options?: { force?: boolean }
 ): Promise<ClientSessionInfo> {
   if (typeof window === 'undefined') {
     return { authenticated: false };
   }
 
   const now = Date.now();
-  if (sessionCache && sessionCache.authenticated && now - lastSessionCheckTime < SESSION_CACHE_TTL_MS) {
+  if (!options?.force && sessionCache && sessionCache.authenticated && now - lastSessionCheckTime < SESSION_CACHE_TTL_MS) {
     return sessionCache;
   }
 
+  if (sessionCheck) return sessionCheck;
+  const currentGeneration=generation;
+  sessionCheck=(async()=>{
   try {
     const res = await fetch('/api/auth/session', {
       method: 'GET',
@@ -43,11 +50,13 @@ export async function ensureClientAuth(
 
     if (res.ok) {
       const data = await res.json();
+      if (generation !== currentGeneration) return {authenticated:false};
       if (data.authenticated && data.session) {
         lastSessionCheckTime = Date.now();
         sessionCache = {
           authenticated: true,
           role: data.session.role,
+          isRepresentative: data.session.isRepresentative === true,
           userId: data.session.userId,
           driverName: data.session.driverName,
           vehicleNo: data.session.vehicleNo,
@@ -61,15 +70,20 @@ export async function ensureClientAuth(
     console.warn('[CockpitAuth] Failed to verify session:', err);
   }
 
+  if (generation !== currentGeneration) return {authenticated:false};
   sessionCache = { authenticated: false };
   lastSessionCheckTime = 0;
   return sessionCache;
+  })().finally(()=>{if(generation===currentGeneration)sessionCheck=null;});
+  return sessionCheck;
 }
 
 /**
  * Clears client state and session caches.
  */
 export function purgeLocalCaches() {
+  generation++;
+  sessionCheck=null;
   sessionCache = null;
   lastSessionCheckTime = 0;
   if (typeof window === 'undefined') return;
@@ -78,6 +92,8 @@ export function purgeLocalCaches() {
     localStorage.removeItem('cockpit_auth_token');
     localStorage.removeItem('cockpit_schedules_cache');
     localStorage.removeItem('cockpit_offline_actions');
+    localStorage.removeItem('cockpit_submitted_driving_logs_v1');
+    localStorage.removeItem('cockpit_hq_expenses_v2');
     sessionStorage.clear();
   } catch {
     // Ignore storage errors
@@ -88,7 +104,7 @@ export function purgeLocalCaches() {
  * Switches the active development test profile (admin, driver_a, driver_b).
  * Only works when DEV_AUTH_ENABLED=true on localhost.
  */
-export async function switchDevAccount(target: 'admin' | 'driver_a' | 'driver_b'): Promise<boolean> {
+export async function switchDevAccount(target: 'admin' | 'driver' | 'driver_a' | 'driver_b'): Promise<boolean> {
   if (typeof window === 'undefined') return false;
 
   try {
@@ -121,17 +137,19 @@ export async function logoutClientSession(): Promise<boolean> {
   if (typeof window === 'undefined') return false;
 
   try {
-    await fetch('/api/auth/session', {
+    const response = await fetch('/api/auth/session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
       body: JSON.stringify({ action: 'logout' }),
     });
+    purgeLocalCaches();
+    return response.ok;
   } catch {
     // Ignore
   }
 
   purgeLocalCaches();
   sessionCache = null;
-  return true;
+  return false;
 }

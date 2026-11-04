@@ -8,6 +8,7 @@ import { Plus, X, User, Phone, MapPin, Check, Loader2, AlertTriangle, ShieldAler
 import { useHqDrivers } from '@/utils/useHqDrivers';
 import { HqAdminLoginModal } from '@/components/hq/auth/HqAdminLoginModal';
 import { haptics } from '@/utils/haptics';
+import { formatPhoneNumber } from '@/utils/formatters';
 
 export interface HqDriversViewProps {
   initialSearchQuery?: string;
@@ -20,7 +21,7 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
   const urlDriverId = searchParams?.get('driverId');
   const urlView = searchParams?.get('view') as 'table' | 'detail' | null;
 
-  const { drivers, counts, isLoading, error, statusCode, refetch, updateDriver, createDriver } = useHqDrivers();
+  const { drivers, counts, isLoading, error, statusCode, refetch, updateDriver, deleteDriver, createDriver } = useHqDrivers();
 
   const urlAdd = searchParams?.get('add') === 'true';
 
@@ -160,6 +161,8 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
           statusCode={statusCode}
           onRetry={refetch}
           onOpenLogin={() => setIsLoginModalOpen(true)}
+          onUpdateDriver={updateDriver}
+          onDeleteDriver={deleteDriver}
         />
       ) : (
         <HqDriverDetailSplitView
@@ -170,6 +173,7 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
           counts={counts}
           isLoading={isLoading}
           onUpdateDriver={updateDriver}
+          onRefreshDrivers={refetch}
         />
       )}
 
@@ -305,8 +309,9 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
                   type="tel"
                   required
                   value={newPhone}
-                  onChange={(e) => setNewPhone(e.target.value)}
+                  onChange={(e) => setNewPhone(formatPhoneNumber(e.target.value))}
                   placeholder="예: 010-1234-5678"
+                  maxLength={13}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:ring-2 focus:ring-[#1E60F3] transition-all font-mono"
                 />
               </div>

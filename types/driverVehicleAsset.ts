@@ -83,7 +83,9 @@ export interface DriverInfoDispatchSnapshot {
   dispatchedBy: string;
   channel: 'sms' | 'email' | 'manual_copy' | 'download';
   recipient: string;
-  status: 'sent' | 'downloaded' | 'prepared';
+  status: 'sent' | 'downloaded' | 'prepared' | 'manual_recorded';
+  scheduleVersion?: number;
+  deliveryEvidence?: 'prepared' | 'operator_attested' | 'smtp_accepted';
 }
 
 export interface DriverInfoDispatchLog {

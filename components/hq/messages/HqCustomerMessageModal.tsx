@@ -6,7 +6,8 @@ import {
   Check,
   CheckCircle2,
   Copy,
-  Globe,
+  ChevronDown,
+  ChevronUp,
   History,
   Mail,
   MessageSquareText,
@@ -18,10 +19,11 @@ import {
 import { CustomerNotificationTrigger, HqBooking } from '@/types/hq';
 import { HqCustomer } from '@/types/customerHq';
 import {
-  CUSTOMER_TRIGGER_LABELS,
   generateCustomerNotificationDraft,
   formatSmsAppUrl,
 } from '@/utils/customerMessageGenerator';
+import { formatPhoneNumber } from '@/utils/formatters';
+import { haptics } from '@/utils/haptics';
 
 interface HqCustomerMessageModalProps {
   isOpen: boolean;
@@ -31,6 +33,12 @@ interface HqCustomerMessageModalProps {
   onClose: () => void;
   onSentSuccess?: () => void;
 }
+
+const TRIGGER_LABELS: Record<CustomerNotificationTrigger, string> = {
+  dispatch_confirmed: '배차 확정',
+  driver_changed: '배차 변경',
+  arrived_pickup: '도착 안내',
+};
 
 export default function HqCustomerMessageModal({
   isOpen,
@@ -55,6 +63,7 @@ export default function HqCustomerMessageModal({
 
   const [copiedFlag, setCopiedFlag] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(true);
   const [feedback, setFeedback] = useState<{
     type: 'success' | 'warning' | 'error';
     message: string;
@@ -144,6 +153,7 @@ export default function HqCustomerMessageModal({
     setLanguage(defaultLang);
     setFeedback(null);
     setCopiedFlag(false);
+    setIsHistoryOpen(true);
 
     const initialDraft = generateCustomerNotificationDraft({
       booking,
@@ -160,6 +170,7 @@ export default function HqCustomerMessageModal({
   }, [booking, isOpen, initialTrigger, matchedCustomer]);
 
   const handleSelectTrigger = (nextTrigger: CustomerNotificationTrigger) => {
+    haptics.selection();
     setTrigger(nextTrigger);
     if (!booking) return;
     const nextDraft = generateCustomerNotificationDraft({
@@ -180,6 +191,7 @@ export default function HqCustomerMessageModal({
   };
 
   const handleSelectLanguage = (nextLang: 'ko' | 'en') => {
+    haptics.selection();
     setLanguage(nextLang);
     if (!booking) return;
     const nextDraft = generateCustomerNotificationDraft({
@@ -265,6 +277,7 @@ export default function HqCustomerMessageModal({
   const scheduleId = booking.scheduleId || booking.id;
 
   const handleCopy = async () => {
+    haptics.lightTap();
     const textToCopy =
       channel === 'sms' ? smsBody : `제목: ${emailSubject}\n\n${emailBody}`;
     try {
@@ -277,6 +290,7 @@ export default function HqCustomerMessageModal({
   };
 
   const handleRecordSent = async (deliveryMethod: 'manual_copy' | 'sms_app') => {
+    haptics.lightTap();
     setSubmitting(true);
     setFeedback(null);
     try {
@@ -308,8 +322,8 @@ export default function HqCustomerMessageModal({
         type: 'success',
         message:
           deliveryMethod === 'sms_app'
-            ? `${recipientVal || '수신처'} 번호로 문자앱을 열었으며 발송 이력이 Supabase에 기록되었습니다.`
-            : '고객사 안내 메시지 발송 완료 내역이 Supabase에 기록되었으며 대기 알림이 해제되었습니다.',
+            ? `${recipientVal || '수신처'} 번호로 문자 앱을 열었으며 발송 이력이 기록되었습니다.`
+            : '고객 안내 메시지 발송 완료 처리가 기록되었습니다.',
       });
       onSentSuccess?.();
     } catch (err: any) {
@@ -320,6 +334,7 @@ export default function HqCustomerMessageModal({
   };
 
   const handleSendSmtpEmail = async () => {
+    haptics.lightTap();
     setSubmitting(true);
     setFeedback(null);
     try {
@@ -359,6 +374,7 @@ export default function HqCustomerMessageModal({
   };
 
   const handleDismissPending = async () => {
+    haptics.lightTap();
     setSubmitting(true);
     try {
       const res = await fetch('/api/schedules/customer-notify', {
@@ -379,9 +395,7 @@ export default function HqCustomerMessageModal({
     }
   };
 
-  const cleanSmsHref = useMemo(() => {
-    return formatSmsAppUrl(recipientPhone, smsBody);
-  }, [recipientPhone, smsBody]);
+  const cleanSmsHref = formatSmsAppUrl(recipientPhone, smsBody);
 
   const handleOpenSmsAppClick = async (e: React.MouseEvent<HTMLAnchorElement>) => {
     const cleanDigits = recipientPhone.replace(/[^0-9+]/g, '');
@@ -389,7 +403,7 @@ export default function HqCustomerMessageModal({
       e.preventDefault();
       setFeedback({
         type: 'warning',
-        message: '수신 연락처(전화번호)를 먼저 입력해주세요. 번호가 있어야 문자앱으로 바로 전송할 수 있습니다.',
+        message: '받는 분 번호(전화번호)를 먼저 입력해주세요. 번호가 있어야 문자 앱으로 바로 전송할 수 있습니다.',
       });
       phoneInputRef.current?.focus();
       return;
@@ -404,27 +418,19 @@ export default function HqCustomerMessageModal({
       ref={dialogRef}
       aria-labelledby={titleId}
       {...({ closedby: 'any' } as any)}
-      className="m-auto w-[calc(100%-1.5rem)] max-w-2xl rounded-2xl border border-slate-200 bg-white p-0 text-slate-900 shadow-2xl"
+      className="m-auto w-[calc(100%-1.5rem)] max-w-xl rounded-3xl border border-slate-200/90 bg-white p-0 text-slate-900 shadow-2xl overflow-hidden backdrop:bg-black/40 backdrop:backdrop-blur-xs"
     >
-      <div className="flex max-h-[88vh] flex-col">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3 border-b border-slate-200 bg-indigo-950 px-5 py-4 text-white">
+      <div className="flex max-h-[90vh] flex-col">
+        {/* 1. Header (Clean White Header matching Reference) */}
+        <div className="flex items-center justify-between border-b border-slate-100 bg-white px-5 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-500/25 text-indigo-200 border border-indigo-400/30">
-              <MessageSquareText className="h-5 w-5" />
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 border border-blue-100/80 text-[#0050FF]">
+              <MessageSquareText className="h-4.5 w-4.5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h2 id={titleId} className="text-base sm:text-lg font-extrabold tracking-tight">
-                  고객사 자동 안내 메시지 확인 · 발송
-                </h2>
-                <span className="rounded-full bg-indigo-500/30 border border-indigo-300/30 px-2 py-0.5 text-[10px] font-bold text-indigo-100">
-                  관리자 승인 후 발송
-                </span>
-              </div>
-              <p className="text-xs text-indigo-200 mt-0.5">
-                기사·차량 프로필 소개서와는 별도로, 실제 배차·변경·픽업지 도착 상태를 반영한 단문/이메일 안내문입니다.
-              </p>
+              <h2 id={titleId} className="text-base font-extrabold text-slate-900 tracking-tight">
+                고객 안내 메시지
+              </h2>
             </div>
           </div>
           <form method="dialog">
@@ -432,36 +438,36 @@ export default function HqCustomerMessageModal({
               type="submit"
               value="close"
               autoFocus
-              aria-label="고객 안내 모달 닫기"
-              className="rounded-lg p-1.5 text-indigo-200 hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+              aria-label="모달 닫기"
+              className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
             >
-              <X className="h-5 w-5" />
+              <X className="h-4.5 w-4.5" />
             </button>
           </form>
         </div>
 
-        {/* Body */}
+        {/* 2. Scrollable Body */}
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {/* Booking Summary Strip */}
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-extrabold text-slate-900">{booking.customerName}</span>
-              <span className="text-slate-400">|</span>
-              <span className="font-semibold text-slate-700">
+          {/* Booking Summary Card (3 Structured Lines) */}
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-3.5 space-y-1 text-xs">
+            <div className="flex items-center gap-1.5 font-bold text-slate-900">
+              <span>{booking.customerName}</span>
+              <span className="text-slate-300 font-normal">|</span>
+              <span className="font-mono text-slate-700 font-semibold">
                 {booking.pickupDate} {booking.pickupTime}
               </span>
-              <span className="text-slate-400">|</span>
-              <span className="text-slate-600">
-                {booking.pickupLocation} ➔ {booking.destination}
-              </span>
             </div>
-            <span className="font-bold text-indigo-700">
+            <div className="text-slate-600 font-medium truncate">
+              {booking.pickupLocation} ➔ {booking.destination}
+            </div>
+            <div className="text-[#0050FF] font-bold">
               {booking.vehicleModel} ({booking.vehiclePlate || '미배정'}) · {booking.driverName}
-            </span>
+            </div>
           </div>
 
-          {/* Trigger & Language Controls */}
+          {/* Trigger Tabs & Language Selection */}
           <div className="flex flex-wrap items-center justify-between gap-2">
+            {/* Trigger Pill Tabs */}
             <div className="flex flex-wrap items-center gap-1.5">
               {(
                 ['dispatch_confirmed', 'driver_changed', 'arrived_pickup'] as CustomerNotificationTrigger[]
@@ -473,119 +479,126 @@ export default function HqCustomerMessageModal({
                     key={t}
                     type="button"
                     onClick={() => handleSelectTrigger(t)}
-                    className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors cursor-pointer ${
+                    className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer ${
                       isSelected
-                        ? 'bg-indigo-600 text-white shadow-xs'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                        ? 'bg-[#0050FF] text-white shadow-2xs font-extrabold'
+                        : 'bg-slate-100/80 text-slate-700 hover:bg-slate-200/80'
                     }`}
                   >
                     {isPendingMatch && <Sparkles className="h-3 w-3 text-blue-200" />}
-                    <span>{CUSTOMER_TRIGGER_LABELS[t]}</span>
+                    <span>{TRIGGER_LABELS[t]}</span>
                   </button>
                 );
               })}
             </div>
 
-            <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5">
+            {/* Language Capsule: 🇰🇷 한국어 | 🇺🇸 English */}
+            <div className="inline-flex rounded-xl border border-slate-200/80 bg-slate-100 p-0.5 text-xs font-bold">
               <button
                 type="button"
                 onClick={() => handleSelectLanguage('ko')}
-                className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-bold cursor-pointer ${
-                  language === 'ko' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600'
+                className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 transition-all cursor-pointer ${
+                  language === 'ko' ? 'bg-white text-slate-900 shadow-2xs font-extrabold' : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
-                국문
+                <span>🇰🇷 한국어</span>
               </button>
               <button
                 type="button"
                 onClick={() => handleSelectLanguage('en')}
-                className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-bold cursor-pointer ${
-                  language === 'en' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600'
+                className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 transition-all cursor-pointer ${
+                  language === 'en' ? 'bg-white text-slate-900 shadow-2xs font-extrabold' : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <Globe className="h-3 w-3" />
-                English
+                <span>🇺🇸 English</span>
               </button>
             </div>
           </div>
 
           {missingFieldsWarning && (
-            <div className="flex items-center gap-2 rounded-xl border border-slate-300 bg-slate-100 px-3.5 py-2.5 text-xs font-bold text-slate-800">
-              <AlertCircle className="h-4 w-4 shrink-0 text-[#1E60F3]" />
-              <span>{missingFieldsWarning} — 발송 전 내용을 반드시 확인해주세요.</span>
+            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-800">
+              <AlertCircle className="h-4 w-4 shrink-0 text-[#0050FF]" />
+              <span>{missingFieldsWarning} — 발송 전 내용을 확인해주세요.</span>
             </div>
           )}
 
-          {/* Channel Tabs */}
-          <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1">
+          {/* Channel Tabs: 문자 · 알림톡 vs 이메일 */}
+          <div className="grid grid-cols-2 gap-1.5 rounded-2xl bg-slate-100 p-1">
             <button
               type="button"
-              onClick={() => setChannel('sms')}
-              className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-extrabold transition-all cursor-pointer ${
+              onClick={() => {
+                haptics.selection();
+                setChannel('sms');
+              }}
+              className={`flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-extrabold transition-all cursor-pointer ${
                 channel === 'sms'
-                  ? 'bg-white text-slate-900 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-white text-slate-900 shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-900'
               }`}
             >
-              <Smartphone className="h-3.5 w-3.5 text-indigo-600" />
-              문자 · 알림톡용 짧은 메시지
+              <Smartphone className={`h-3.5 w-3.5 ${channel === 'sms' ? 'text-[#0050FF]' : 'text-slate-400'}`} />
+              <span>문자 · 알림톡</span>
             </button>
             <button
               type="button"
-              onClick={() => setChannel('email')}
-              className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-extrabold transition-all cursor-pointer ${
+              onClick={() => {
+                haptics.selection();
+                setChannel('email');
+              }}
+              className={`flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-extrabold transition-all cursor-pointer ${
                 channel === 'email'
-                  ? 'bg-white text-slate-900 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-white text-slate-900 shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-900'
               }`}
             >
-              <Mail className="h-3.5 w-3.5 text-indigo-600" />
-              고객사 이메일 안내문
+              <Mail className={`h-3.5 w-3.5 ${channel === 'email' ? 'text-[#0050FF]' : 'text-slate-400'}`} />
+              <span>이메일</span>
             </button>
           </div>
 
-          {/* Editor */}
+          {/* Editor Area */}
           {channel === 'sms' ? (
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  수신 연락처 (고객사 담당자 / 탑승객 휴대폰)
+                <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                  받는 분 번호
                 </label>
                 <input
                   ref={phoneInputRef}
                   type="tel"
                   value={recipientPhone}
                   onChange={(e) => {
-                    setRecipientPhone(e.target.value);
+                    setRecipientPhone(formatPhoneNumber(e.target.value));
                     isPhoneEditedRef.current = true;
                   }}
-                  placeholder="예: 010-1234-5678"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium focus:border-indigo-500 focus:outline-hidden"
+                  placeholder="예: 010-1234-5678 또는 +82..."
+                  maxLength={16}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-mono font-bold text-slate-900 placeholder:text-slate-400 focus:border-[#0050FF] focus:ring-1 focus:ring-[#0050FF] focus:outline-hidden transition-all shadow-2xs"
                 />
               </div>
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-bold text-slate-700">
-                    문자 안내 본문 (발송 전 자유 수정 가능)
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-bold text-slate-800">
+                    메시지 내용
                   </label>
-                  <span className="text-[11px] text-slate-400">{smsBody.length}자</span>
+                  <span className="text-[11px] font-mono text-slate-400">{smsBody.length}자</span>
                 </div>
                 <textarea
-                  rows={7}
+                  rows={8}
                   value={smsBody}
                   onChange={(e) => {
                     setSmsBody(e.target.value);
                     isSmsBodyEditedRef.current = true;
                   }}
-                  className="w-full rounded-xl border border-slate-300 bg-slate-50/50 p-3 text-xs leading-relaxed font-medium text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-hidden"
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 p-3.5 text-xs leading-relaxed font-mono font-medium text-slate-900 focus:bg-white focus:border-[#0050FF] focus:ring-1 focus:ring-[#0050FF] focus:outline-hidden transition-all shadow-2xs"
                 />
               </div>
             </div>
           ) : (
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  수신 이메일 주소
+                <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                  받는 분 이메일
                 </label>
                 <input
                   ref={emailInputRef}
@@ -596,11 +609,11 @@ export default function HqCustomerMessageModal({
                     isEmailEditedRef.current = true;
                   }}
                   placeholder="customer@company.com"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium focus:border-indigo-500 focus:outline-hidden"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-900 placeholder:text-slate-400 focus:border-[#0050FF] focus:ring-1 focus:ring-[#0050FF] focus:outline-hidden transition-all shadow-2xs"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
+                <label className="block text-xs font-bold text-slate-800 mb-1.5">
                   이메일 제목
                 </label>
                 <input
@@ -610,13 +623,16 @@ export default function HqCustomerMessageModal({
                     setEmailSubject(e.target.value);
                     isEmailSubjectEditedRef.current = true;
                   }}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold text-slate-900 focus:border-indigo-500 focus:outline-hidden"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-900 focus:border-[#0050FF] focus:ring-1 focus:ring-[#0050FF] focus:outline-hidden transition-all shadow-2xs"
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  이메일 본문 (발송 전 자유 수정 가능)
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-bold text-slate-800">
+                    메시지 내용
+                  </label>
+                  <span className="text-[11px] font-mono text-slate-400">{emailBody.length}자</span>
+                </div>
                 <textarea
                   rows={9}
                   value={emailBody}
@@ -624,7 +640,7 @@ export default function HqCustomerMessageModal({
                     setEmailBody(e.target.value);
                     isEmailBodyEditedRef.current = true;
                   }}
-                  className="w-full rounded-xl border border-slate-300 bg-slate-50/50 p-3 text-xs leading-relaxed font-medium text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-hidden"
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50/50 p-3.5 text-xs leading-relaxed font-mono font-medium text-slate-900 focus:bg-white focus:border-[#0050FF] focus:ring-1 focus:ring-[#0050FF] focus:outline-hidden transition-all shadow-2xs"
                 />
               </div>
             </div>
@@ -632,7 +648,7 @@ export default function HqCustomerMessageModal({
 
           {feedback && (
             <div
-              className={`rounded-xl border px-3.5 py-2.5 text-xs font-bold ${
+              className={`rounded-2xl border px-3.5 py-2.5 text-xs font-bold ${
                 feedback.type === 'success'
                   ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
                   : feedback.type === 'warning'
@@ -644,116 +660,136 @@ export default function HqCustomerMessageModal({
             </div>
           )}
 
-          {/* Sent History */}
+          {/* 3. Sent History Accordion (최근 발송 내역) */}
           {historyList.length > 0 && (
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-700 mb-2">
-                <History className="h-3.5 w-3.5 text-slate-500" />
-                이전 고객 안내 발송 이력 ({historyList.length}건)
-              </div>
-              <div className="space-y-1.5 max-h-28 overflow-y-auto">
-                {historyList.map((rec) => (
-                  <div
-                    key={rec.id}
-                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white px-2.5 py-1.5 text-[11px] border border-slate-100"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span className="rounded bg-indigo-50 px-1.5 py-0.5 font-bold text-indigo-700">
-                        {CUSTOMER_TRIGGER_LABELS[rec.trigger] || rec.trigger}
+            <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 overflow-hidden shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setIsHistoryOpen(!isHistoryOpen)}
+                className="w-full flex items-center justify-between px-3.5 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100/70 transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-1.5">
+                  <History className="h-3.5 w-3.5 text-slate-500" />
+                  <span>최근 발송 내역 ({historyList.length}건)</span>
+                </div>
+                {isHistoryOpen ? (
+                  <ChevronUp className="h-3.5 w-3.5 text-slate-400" />
+                ) : (
+                  <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                )}
+              </button>
+              {isHistoryOpen && (
+                <div className="px-3.5 pb-3 pt-1 space-y-1.5 max-h-32 overflow-y-auto">
+                  {historyList.map((rec) => (
+                    <div
+                      key={rec.id}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 text-xs border border-slate-100 shadow-2xs"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="rounded-md bg-blue-50 text-[#0050FF] border border-blue-100 px-2 py-0.5 text-[10.5px] font-bold shrink-0">
+                          {TRIGGER_LABELS[rec.trigger] || rec.trigger}
+                        </span>
+                        <span className="font-bold text-slate-700 truncate">
+                          {rec.channel === 'email' ? '이메일' : '문자'} ({rec.language.toUpperCase()})
+                          <span className="text-slate-400 font-normal ml-1">➔ {rec.recipient}</span>
+                        </span>
+                      </div>
+                      <span className="text-[11px] font-mono text-slate-400 shrink-0">
+                        {new Date(rec.sentAt).toLocaleString('ko-KR', {
+                          month: '2-digit',
+                          day: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
                       </span>
-                      <span className="font-semibold text-slate-700">
-                        {rec.channel === 'email' ? '이메일' : '문자'} ({rec.language.toUpperCase()})
-                      </span>
-                      <span className="text-slate-500">→ {rec.recipient}</span>
                     </div>
-                    <span className="text-slate-400">
-                      {new Date(rec.sentAt).toLocaleString('ko-KR', {
-                        month: '2-digit',
-                        day: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </span>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        {/* Footer Actions */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3.5">
+        {/* 4. Footer Actions (Clear Hierarchy: 내용 복사 | 문자 앱으로 열기 | 발송 완료 처리) */}
+        <div className="flex flex-wrap items-center justify-between gap-2.5 border-t border-slate-100 bg-white px-5 py-3.5">
           <div className="flex items-center gap-2">
             {booking.pendingCustomerTrigger && (
               <button
                 type="button"
                 disabled={submitting}
                 onClick={handleDismissPending}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer"
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-50 cursor-pointer transition-colors"
               >
-                이번 안내 생략(대기 해제)
+                안내 대기 해제
               </button>
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2.5 ml-auto">
+            {/* 좌측 서브 버튼: 내용 복사 (화이트 배경 + 테두리) */}
             <button
               type="button"
               onClick={handleCopy}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-bold text-slate-800 hover:bg-slate-100 cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700 shadow-2xs transition-all cursor-pointer active:scale-95"
             >
               {copiedFlag ? (
                 <>
-                  <Check className="h-3.5 w-3.5 text-emerald-600" />
-                  복사 완료!
+                  <Check className="h-3.5 w-3.5 text-[#0050FF]" />
+                  <span>복사 완료!</span>
                 </>
               ) : (
                 <>
-                  <Copy className="h-3.5 w-3.5 text-slate-600" />
-                  안내문 복사
+                  <Copy className="h-3.5 w-3.5 text-slate-500" />
+                  <span>내용 복사</span>
                 </>
               )}
             </button>
 
             {channel === 'sms' ? (
               <>
+                {/* 중앙 서브 버튼: 문자 앱으로 열기 (녹색 제거 ➔ 연한 슬레이트 그레이) */}
                 <a
                   href={cleanSmsHref}
                   onClick={handleOpenSmsAppClick}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-xs font-extrabold text-white hover:bg-emerald-700"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 border border-slate-200/70 px-4 py-2.5 text-xs font-bold text-slate-700 transition-all cursor-pointer active:scale-95"
                 >
-                  <Smartphone className="h-3.5 w-3.5" />
-                  문자앱 열기 및 발송기록
+                  <Smartphone className="h-3.5 w-3.5 text-slate-600" />
+                  <span>문자 앱으로 열기</span>
                 </a>
+
+                {/* 우측 메인 액션 버튼: 발송 완료 처리 (시그니처 코발트 블루 bg-[#0050FF]) */}
                 <button
                   type="button"
                   disabled={submitting}
                   onClick={() => handleRecordSent('manual_copy')}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-xs font-extrabold text-white hover:bg-indigo-700 disabled:opacity-50 cursor-pointer"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#0050FF] hover:bg-blue-600 disabled:opacity-50 text-white px-4 py-2.5 text-xs font-extrabold shadow-sm transition-all cursor-pointer active:scale-95"
                 >
                   <CheckCircle2 className="h-3.5 w-3.5" />
-                  복사 발송 완료 기록
+                  <span>{submitting ? '처리 중...' : '발송 완료 처리'}</span>
                 </button>
               </>
             ) : (
               <>
+                {/* 이메일 채널 시 중앙 서브 버튼: 수동 발송 완료 */}
                 <button
                   type="button"
                   disabled={submitting}
                   onClick={() => handleRecordSent('manual_copy')}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3.5 py-2 text-xs font-bold text-indigo-800 hover:bg-indigo-100 disabled:opacity-50 cursor-pointer"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 border border-slate-200/70 px-4 py-2.5 text-xs font-bold text-slate-700 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
                 >
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  수동 발송 완료 기록
+                  <CheckCircle2 className="h-3.5 w-3.5 text-slate-600" />
+                  <span>수동 발송 완료</span>
                 </button>
+
+                {/* 이메일 채널 시 우측 메인 액션 버튼: 이메일 즉시 발송 */}
                 <button
                   type="button"
                   disabled={submitting}
                   onClick={handleSendSmtpEmail}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-extrabold text-white hover:bg-indigo-700 disabled:opacity-50 cursor-pointer"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#0050FF] hover:bg-blue-600 disabled:opacity-50 text-white px-4 py-2.5 text-xs font-extrabold shadow-sm transition-all cursor-pointer active:scale-95"
                 >
                   <Send className="h-3.5 w-3.5" />
-                  {submitting ? '처리 중...' : '이메일 즉시 발송'}
+                  <span>{submitting ? '발송 중...' : '이메일 즉시 발송'}</span>
                 </button>
               </>
             )}

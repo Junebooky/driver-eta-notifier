@@ -45,7 +45,7 @@ export const HqDriverAllocationDonutCard: React.FC<HqDriverAllocationDonutCardPr
             <Users className="w-3.5 h-3.5" />
           </div>
           <h3 className="text-sm font-black text-slate-900 tracking-tight">
-            오늘 기사 배정 현황
+            오늘 기사님 현황
           </h3>
         </div>
 

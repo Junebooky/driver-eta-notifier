@@ -28,14 +28,18 @@ export async function GET(req: NextRequest) {
       getOfficialPriceRules(version),
     ]);
 
+    const allApproved = cards.length > 0 && cards.every((c) => c.publicationStatus === 'approved');
+
     return NextResponse.json({
       ok: true,
       tariffVersion: version,
-      publicationStatus: 'draft',
+      publicationStatus: allApproved ? 'approved' : 'draft',
       cards,
       rules,
       skuMappings: STANDARD_VEHICLE_SKU_MAPPINGS,
-      notice: '회사 공식 2026 VIP 의전 요금표 (초안 상태, 승인 전 내부 검토 전용)',
+      notice: allApproved
+        ? '회사 공식 2026 VIP 의전 요금표 (공식 승인 요율)'
+        : '회사 공식 2026 VIP 의전 요금표 (초안 상태, 승인 전 내부 검토 전용)',
     });
   } catch (err: any) {
     console.error('[OfficialPricing API] Error:', err);

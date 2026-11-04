@@ -1,7 +1,10 @@
+import { requireHqAdmin } from '@/lib/auth/serverAuth';
 import { NextRequest, NextResponse } from 'next/server';
 import { saveConfirmedPlace } from '@/services/placeResolutionService';
 
 export async function POST(req: NextRequest) {
+  const apiAuth = await requireHqAdmin(req);
+  if (!apiAuth.ok) return NextResponse.json({ ok: false, error: apiAuth.error }, { status: apiAuth.statusCode });
   try {
     const body = await req.json().catch(() => ({}));
     const { name, aliases, road_address, lat, lng, entry_gate_notes, org_id, verified_by } = body;

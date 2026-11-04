@@ -30,6 +30,7 @@ export interface CategoryMeta {
   badgeTextColor: string;
   badgeBorder: string;
   iconName: string;
+  iconPath: string;
   desc: string;
 }
 
@@ -37,46 +38,51 @@ export const EXPENSE_CATEGORIES: Record<ExpenseCategoryKey, CategoryMeta> = {
   meal: {
     key: 'meal',
     label: '식비',
-    badgeBg: 'bg-[#FFF2E8]',
-    badgeTextColor: 'text-[#FF7A00]',
-    badgeBorder: 'border-[#FFE3CC]',
+    badgeBg: 'bg-[#FFF8E2]',
+    badgeTextColor: 'text-[#D9822B]',
+    badgeBorder: 'border-transparent',
     iconName: 'utensils',
+    iconPath: '/images/icons/expense_driver/icon-expense-meal.png',
     desc: '운행 중 기사 식대 및 음료 영수증',
   },
   fuel: {
     key: 'fuel',
     label: '주유비',
-    badgeBg: 'bg-[#EBF3FF]',
-    badgeTextColor: 'text-[#1E60F3]',
-    badgeBorder: 'border-[#D4E4FD]',
+    badgeBg: 'bg-[#FFEAEB]',
+    badgeTextColor: 'text-[#E03137]',
+    badgeBorder: 'border-transparent',
     iconName: 'car',
+    iconPath: '/images/icons/expense_driver/icon-expense-fuel.png',
     desc: '주유소 유류비 및 전기차 충전비 영수증',
   },
   parking: {
     key: 'parking',
     label: '주차비',
-    badgeBg: 'bg-[#E8F8F0]',
-    badgeTextColor: 'text-[#00B060]',
-    badgeBorder: 'border-[#C8F0DC]',
+    badgeBg: 'bg-[#EBF5FF]',
+    badgeTextColor: 'text-[#1E60F3]',
+    badgeBorder: 'border-transparent',
     iconName: 'parking',
+    iconPath: '/images/icons/expense_driver/icon-expense-parking.png',
     desc: '호텔, 공항, 빌딩 주차장 정산 영수증',
   },
   stay: {
     key: 'stay',
     label: '숙박비',
-    badgeBg: 'bg-[#FFEBF4]',
-    badgeTextColor: 'text-[#FF3B8A]',
-    badgeBorder: 'border-[#FFD1E6]',
+    badgeBg: 'bg-[#E0F9F0]',
+    badgeTextColor: 'text-[#00A86B]',
+    badgeBorder: 'border-transparent',
     iconName: 'bed',
+    iconPath: '/images/icons/expense_driver/icon-expense-lodging.png',
     desc: '장거리 일정 숙박비 영수증',
   },
   toll: {
     key: 'toll',
     label: '통행료',
-    badgeBg: 'bg-[#F3EBFF]',
+    badgeBg: 'bg-[#F3EAFF]',
     badgeTextColor: 'text-[#8B3DFF]',
-    badgeBorder: 'border-[#E2D1FE]',
+    badgeBorder: 'border-transparent',
     iconName: 'milestone',
+    iconPath: '/images/icons/expense_driver/icon-expense-toll.png',
     desc: '고속도로 및 유료도로 통행료/하이패스 영수증',
   },
   wash: {
@@ -84,26 +90,29 @@ export const EXPENSE_CATEGORIES: Record<ExpenseCategoryKey, CategoryMeta> = {
     label: '세차비',
     badgeBg: 'bg-[#E6F9FF]',
     badgeTextColor: 'text-[#0099CC]',
-    badgeBorder: 'border-[#BAEFFF]',
+    badgeBorder: 'border-transparent',
     iconName: 'sparkles',
+    iconPath: '/images/icons/expense_driver/icon-expense-carwash.png',
     desc: '의전 전/후 차량 세차 및 디테일링 영수증',
   },
   transit: {
     key: 'transit',
     label: '교통비',
-    badgeBg: 'bg-[#FFFBE6]',
-    badgeTextColor: 'text-[#D48806]',
-    badgeBorder: 'border-[#FFE58F]',
+    badgeBg: 'bg-[#EDF6FD]',
+    badgeTextColor: 'text-[#2563EB]',
+    badgeBorder: 'border-transparent',
     iconName: 'bus',
+    iconPath: '/images/icons/expense_driver/icon-expense-transit.png',
     desc: '복귀 대중교통 및 택시비 영수증',
   },
   other: {
     key: 'other',
     label: '기타',
-    badgeBg: 'bg-[#F1F5F9]',
-    badgeTextColor: 'text-[#64748B]',
-    badgeBorder: 'border-[#E2E8F0]',
+    badgeBg: 'bg-[#FDF0F8]',
+    badgeTextColor: 'text-[#DB2777]',
+    badgeBorder: 'border-transparent',
     iconName: 'more',
+    iconPath: '/images/icons/expense_driver/icon-expense-misc.png',
     desc: '기타 부대비용 및 소모품 영수증',
   },
   unclassified: {
@@ -111,8 +120,9 @@ export const EXPENSE_CATEGORIES: Record<ExpenseCategoryKey, CategoryMeta> = {
     label: '미분류',
     badgeBg: 'bg-slate-100',
     badgeTextColor: 'text-slate-500',
-    badgeBorder: 'border-dashed border-slate-300',
+    badgeBorder: 'border-transparent',
     iconName: 'help',
+    iconPath: '/images/icons/expense_driver/icon-expense-misc.png',
     desc: '항목 확인 필요',
   },
 };
@@ -146,6 +156,8 @@ export interface ExpenseItem {
   vehicleId?: string;
   organizationId?: string;
   receiptStoragePath?: string;
+  ocrExtracted?: boolean;
+  ocrSummary?: string;
 }
 
 export type ExpenseSortOption = 'newest' | 'oldest' | 'highest_amount' | 'lowest_amount';
@@ -398,14 +410,14 @@ export function validateExpenseInput(item: {
 /**
  * Pure loader for expenses with localStorage fallback
  */
-export function loadExpenses(): { items: ExpenseItem[]; isDemo: boolean } {
+export function loadExpenses(driverId?: string): { items: ExpenseItem[]; isDemo: boolean } {
   if (typeof window === 'undefined') {
-    return { items: REFERENCE_DEMO_EXPENSES, isDemo: true };
+    return { items: [], isDemo: false };
   }
 
   try {
-    const rawDemo = localStorage.getItem(EXPENSE_DEMO_FLAG_KEY);
-    const rawItems = localStorage.getItem(EXPENSE_STORAGE_KEY);
+    const rawDemo = localStorage.getItem(driverId ? `${EXPENSE_DEMO_FLAG_KEY}_${driverId}` : EXPENSE_DEMO_FLAG_KEY);
+    const rawItems = localStorage.getItem(driverId ? `${EXPENSE_STORAGE_KEY}_${driverId}` : EXPENSE_STORAGE_KEY);
 
     if (rawDemo === 'false' && rawItems) {
       const parsed = JSON.parse(rawItems);
@@ -422,23 +434,23 @@ export function loadExpenses(): { items: ExpenseItem[]; isDemo: boolean } {
     }
 
     // Default to reference demo fixture
-    return { items: REFERENCE_DEMO_EXPENSES, isDemo: true };
+    return { items: [], isDemo: false };
   } catch (err) {
     console.error('Failed to load expenses from localStorage:', err);
-    return { items: REFERENCE_DEMO_EXPENSES, isDemo: true };
+    return { items: [], isDemo: false };
   }
 }
 
 /**
  * Pure saver for expenses to localStorage with multi-tier quota defense
  */
-export function saveExpenses(items: ExpenseItem[], isDemo: boolean = false): void {
+export function saveExpenses(items: ExpenseItem[], isDemo: boolean = false, driverId?: string): void {
   if (typeof window === 'undefined') return;
 
   const tryPersist = (records: ExpenseItem[]): boolean => {
     try {
-      localStorage.setItem(EXPENSE_STORAGE_KEY, JSON.stringify(records));
-      localStorage.setItem(EXPENSE_DEMO_FLAG_KEY, isDemo ? 'true' : 'false');
+      localStorage.setItem(driverId ? `${EXPENSE_STORAGE_KEY}_${driverId}` : EXPENSE_STORAGE_KEY, JSON.stringify(records));
+      localStorage.setItem(driverId ? `${EXPENSE_DEMO_FLAG_KEY}_${driverId}` : EXPENSE_DEMO_FLAG_KEY, isDemo ? 'true' : 'false');
       return true;
     } catch {
       return false;

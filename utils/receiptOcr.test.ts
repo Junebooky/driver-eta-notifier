@@ -75,13 +75,20 @@ assert(v3.result.amount === 4500, 'String with comma and won symbol must parse t
 // 4. Date & Time Normalization
 assert(normalizeDate('2026.10.24') === '2026-10-24', 'Normalize dot date');
 assert(normalizeDate('2026/10/24') === '2026-10-24', 'Normalize slash date');
+assert(normalizeDate('2026년 10월 26일') === '2026-10-26', 'Normalize Korean date');
+assert(normalizeDate('26/10/26') === '2026-10-26', 'Normalize 2-digit year slash date');
 assert(normalizeDate('9999-99-99') === null, 'Reject invalid date');
 assert(normalizeTime('14:30:45') === '14:30', 'Strip seconds from time');
 assert(normalizeTime('25:60') === null, 'Reject impossible time');
 
 // 5. Category and Payment Method Normalization
 assert(normalizeCategory('주유') === 'fuel', 'Category syn gas/주유');
+assert(normalizeCategory('주유비') === 'fuel', 'Category syn 주유비');
+assert(normalizeCategory('통행료') === 'toll', 'Category syn 통행료');
+assert(normalizeCategory('주차비') === 'parking', 'Category syn 주차비');
 assert(normalizeCategory('식대') === 'meal', 'Category syn 식대');
+assert(normalizeCategory('식비') === 'meal', 'Category syn 식비');
+assert(normalizeCategory('세차비') === 'wash', 'Category syn 세차비');
 assert(normalizeCategory('unknown_xyz') === 'other', 'Fallback unknown category to other');
 assert(normalizePaymentMethod('현금영수증') === 'cash', 'Payment method 현금');
 assert(normalizePaymentMethod('신용승인') === 'company_card', 'Payment method 신용');

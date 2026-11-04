@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Users,
   ChevronLeft,
@@ -10,16 +10,21 @@ import {
   Star,
   Plane,
   Edit2,
+  Edit3,
   Check,
   ArrowLeft,
   Loader2,
   Calendar,
   Image as ImageIcon,
+  Pencil,
+  IdCard,
 } from 'lucide-react';
 import { HqDriverSummary, DriverScheduleItem } from '@/types/driverHq';
 import { useHqDrivers } from '@/utils/useHqDrivers';
 import { haptics } from '@/utils/haptics';
+import { formatPhoneNumber } from '@/utils/formatters';
 import { HqDriverAssetManagerModal } from './HqDriverAssetManagerModal';
+import { HqDriverEditModal } from './HqDriverEditModal';
 import { getKstTodayDateStr } from '@/utils/dispatchConflictDetector';
 
 interface HqDriverDetailSplitViewProps {
@@ -35,6 +40,7 @@ interface HqDriverDetailSplitViewProps {
   };
   isLoading?: boolean;
   onUpdateDriver?: (id: string, updates: Record<string, any>) => Promise<boolean>;
+  onRefreshDrivers?: () => Promise<void> | void;
 }
 
 export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = ({
@@ -45,6 +51,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
   counts: propCounts,
   isLoading: propIsLoading,
   onUpdateDriver: propOnUpdateDriver,
+  onRefreshDrivers,
 }) => {
   const hookState = useHqDrivers();
   const drivers = propDrivers ?? hookState.drivers;
@@ -58,11 +65,51 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
   const [memoDraft, setMemoDraft] = useState('');
   const [weekOffset, setWeekOffset] = useState<number>(0);
   const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isUpdatingAffiliation, setIsUpdatingAffiliation] = useState(false);
+  const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | null>(null);
+  const [avatarLoadError, setAvatarLoadError] = useState(false);
 
   // Active Driver
   const activeDriver = useMemo(() => {
     return drivers.find((d) => d.id === selectedDriverId) || drivers[0] || null;
   }, [drivers, selectedDriverId]);
+
+  // Synchronize and fetch profile photo whenever active driver changes
+  useEffect(() => {
+    let isMounted = true;
+    setAvatarLoadError(false);
+
+    if (!activeDriver?.id) {
+      setProfileAvatarUrl(null);
+      return;
+    }
+
+    if (activeDriver.avatarUrl) {
+      setProfileAvatarUrl(activeDriver.avatarUrl);
+    }
+
+    // Always query latest active profile asset from cockpit storage
+    fetch(`/api/hq/drivers/assets?driverId=${encodeURIComponent(activeDriver.id)}&type=profile`, {
+      headers: { 'Cache-Control': 'no-cache' },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!isMounted) return;
+        if (data?.ok && data.profile?.signedUrl) {
+          setProfileAvatarUrl(data.profile.signedUrl);
+        } else if (data?.ok && !data.profile) {
+          setProfileAvatarUrl(null);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeDriver?.id, activeDriver?.avatarUrl]);
+
+  const effectiveAvatarUrl = profileAvatarUrl || activeDriver?.avatarUrl || null;
 
   // Sync memo draft when active driver changes
   const currentMemo = activeDriver?.memo || '';
@@ -88,11 +135,19 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
     }
   };
 
-  // Filtered driver list for left column
+  // Filtered driver list for left column (소속 기사 우선 노출)
   const filteredDrivers = useMemo(() => {
-    return drivers.filter((d) => {
+    const list = drivers.filter((d) => {
       if (filterAffiliation === 'all') return true;
       return d.affiliationType === filterAffiliation;
+    });
+
+    // 소속(employed) 기사를 최상단에 먼저 노출
+    return list.slice().sort((a, b) => {
+      if (a.affiliationType !== b.affiliationType) {
+        return a.affiliationType === 'employed' ? -1 : 1;
+      }
+      return a.name.localeCompare(b.name, 'ko');
     });
   }, [drivers, filterAffiliation]);
 
@@ -175,12 +230,8 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
           className="px-3.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs group"
         >
           <ArrowLeft className="w-3.5 h-3.5 text-slate-500 group-hover:-translate-x-0.5 transition-transform" />
-          <span>전체 기사 목록으로 돌아가기</span>
+          <span>표 목록으로 보기</span>
         </button>
-
-        <span className="text-xs text-slate-400 font-medium">
-          선택된 기사: <strong className="text-slate-900">{activeDriver.name}</strong> ({activeDriver.affiliationLabel})
-        </span>
       </div>
 
       {/* Main 3-Column Split Layout */}
@@ -197,7 +248,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
             <div className="w-7 h-7 rounded-lg bg-blue-50 text-[#1E60F3] flex items-center justify-center">
               <Users className="w-4 h-4" />
             </div>
-            <h2 className="text-sm font-black text-slate-900">기사 관리</h2>
+            <h2 className="text-sm font-black text-slate-900">기사 목록</h2>
           </div>
 
           {/* Filter Pills */}
@@ -224,17 +275,19 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
             >
               소속 {counts.employed}
             </button>
-            <button
-              type="button"
-              onClick={() => setFilterAffiliation('freelance')}
-              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
-                filterAffiliation === 'freelance'
-                  ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 font-extrabold shadow-2xs'
-                  : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              프리 {counts.freelance}
-            </button>
+            {counts.freelance > 0 && (
+              <button
+                type="button"
+                onClick={() => setFilterAffiliation('freelance')}
+                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                  filterAffiliation === 'freelance'
+                    ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 font-extrabold shadow-2xs'
+                    : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                프리랜서 {counts.freelance}
+              </button>
+            )}
           </div>
 
           {/* Driver List */}
@@ -256,9 +309,9 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
-                    {driver.avatarUrl ? (
+                    {driver.avatarUrl || (driver.id === activeDriver?.id && effectiveAvatarUrl) ? (
                       <img
-                        src={driver.avatarUrl}
+                        src={(driver.id === activeDriver?.id && effectiveAvatarUrl) || driver.avatarUrl}
                         alt={driver.name}
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = 'none';
@@ -281,27 +334,22 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                           {driver.name}
                         </span>
 
-                        {driver.affiliationType === 'employed' ? (
+                        {driver.affiliationType === 'employed' && (
                           <span className="px-1.5 py-0.2 rounded bg-blue-100 text-[#1E60F3] text-[9.5px] font-black shrink-0">
                             소속
-                          </span>
-                        ) : (
-                          <span className="px-1.5 py-0.2 rounded bg-sky-100 text-sky-700 text-[9.5px] font-black shrink-0">
-                            프리
                           </span>
                         )}
                       </div>
 
                       <div className="flex items-center justify-between text-[10.5px] text-slate-400 mt-1">
-                        {driver.rating !== undefined && driver.rating !== null ? (
-                          <div className="flex items-center gap-1 text-amber-500 font-bold">
-                            <Star className="w-2.5 h-2.5 fill-amber-400 shrink-0" />
-                            <span>{driver.rating.toFixed(1)}</span>
-                          </div>
+                        {driver.vehicleModel && driver.vehicleModel !== '차량 미지정' ? (
+                          <span className="truncate max-w-[85px] text-slate-500 font-medium">
+                            {driver.vehicleModel}
+                          </span>
                         ) : (
-                          <span className="text-slate-400 font-bold">-</span>
+                          <span />
                         )}
-                        <span className="font-mono truncate ml-1">{driver.phone || '-'}</span>
+                        <span className="font-mono truncate ml-1">{formatPhoneNumber(driver.phone)}</span>
                       </div>
                     </div>
                   </div>
@@ -326,118 +374,146 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
 
           {/* Driver Profile Header Card */}
           <div className="flex items-start gap-4 p-3 bg-slate-50/70 rounded-2xl border border-slate-100">
-            {activeDriver.avatarUrl ? (
-              <img
-                src={activeDriver.avatarUrl}
-                alt={activeDriver.name}
-                onError={(e) => {
-                  (e.target as HTMLElement).style.display = 'none';
-                }}
-                className="w-16 h-16 rounded-2xl object-cover border-2 border-white shadow-xs shrink-0"
-              />
-            ) : (
-              <div className="w-16 h-16 rounded-2xl bg-blue-50 text-[#1E60F3] border-2 border-blue-100 font-black text-xl flex items-center justify-center shadow-xs shrink-0">
-                {activeDriver.name.slice(0, 1)}
+            {effectiveAvatarUrl && !avatarLoadError ? (
+              <div
+                className="relative group/avatar cursor-pointer shrink-0"
+                onClick={() => setIsAssetModalOpen(true)}
+                title="배차 안내 카드 설정"
+              >
+                <img
+                  key={effectiveAvatarUrl}
+                  src={effectiveAvatarUrl}
+                  alt={activeDriver.name}
+                  onError={() => setAvatarLoadError(true)}
+                  className="w-16 h-16 rounded-full object-cover border border-slate-200 shadow-xs ring-2 ring-white transition-transform group-hover/avatar:scale-105"
+                />
+                <div className="absolute inset-0 rounded-full bg-black/30 opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center text-white">
+                  <ImageIcon className="w-4 h-4" />
+                </div>
               </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsAssetModalOpen(true)}
+                title="프로필 사진 등록하기"
+                className="w-16 h-16 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-black text-xl flex items-center justify-center shadow-xs shrink-0 cursor-pointer transition-colors"
+              >
+                {activeDriver.name.slice(0, 1)}
+              </button>
             )}
 
             <div className="min-w-0 flex-1">
+              {/* 1행: 이름 + 소속 뱃지 + 연필 수정 아이콘 */}
               <div className="flex items-center gap-2">
-                <h4 className="text-base font-black text-slate-900">
-                  {activeDriver.name}
-                </h4>
-                {activeDriver.affiliationType === 'employed' ? (
-                  <span className="px-2 py-0.5 rounded-md bg-blue-100 text-[#1E60F3] text-[10px] font-black">
+                <h3 className="text-xl font-bold text-slate-900 truncate">{activeDriver.name}</h3>
+                {activeDriver.affiliationType === 'employed' && (
+                  <span className="px-2 py-0.5 text-xs font-semibold rounded-md bg-blue-50 text-[#0050FF] shrink-0">
                     소속
                   </span>
+                )}
+                <button
+                  type="button"
+                  title="기사 정보 수정"
+                  onClick={() => {
+                    haptics.selection();
+                    setIsEditModalOpen(true);
+                  }}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors ml-auto cursor-pointer shrink-0"
+                >
+                  <Pencil className="w-3.5 h-3.5 stroke-[2.2]" />
+                </button>
+              </div>
+
+              {/* 2행: 언어 뱃지 및 연락처 */}
+              <div className="flex items-center gap-1.5 text-xs text-slate-600 mt-1 flex-wrap">
+                <span className="bg-slate-100 px-2 py-0.5 rounded-full text-[11px] font-medium">🇰🇷 한국어</span>
+                {activeDriver.englishAvailable && (
+                  <span className="bg-slate-100 px-2 py-0.5 rounded-full text-[11px] font-medium">🇺🇸 영어</span>
+                )}
+                <span className="text-slate-400">·</span>
+                {activeDriver.phone ? (
+                  <a
+                    href={`tel:${activeDriver.phone}`}
+                    className="font-mono hover:text-[#0050FF] hover:underline transition-colors"
+                  >
+                    {formatPhoneNumber(activeDriver.phone)}
+                  </a>
                 ) : (
-                  <span className="px-2 py-0.5 rounded-md bg-sky-100 text-sky-700 text-[10px] font-black">
-                    프리랜서
-                  </span>
+                  <span className="text-slate-400">연락처 미등록</span>
                 )}
               </div>
 
-              {/* Rating and badges */}
-              <div className="flex items-center gap-1.5 mt-1 text-xs">
-                {activeDriver.rating !== undefined && activeDriver.rating !== null ? (
-                  <div className="flex items-center gap-1 text-amber-500 font-extrabold">
-                    <Star className="w-3.5 h-3.5 fill-amber-400 shrink-0" />
-                    <span>{activeDriver.rating.toFixed(1)}</span>
-                    {activeDriver.reviewCount !== undefined && (
-                      <span className="text-slate-400 font-medium">({activeDriver.reviewCount}건)</span>
-                    )}
-                  </div>
-                ) : (
-                  <span className="text-slate-400 font-semibold text-xs">평점 없음</span>
-                )}
-                <span className="text-slate-300">•</span>
-                <div className="flex items-center gap-1 text-sm">
-                  {activeDriver.flags.map((flag, idx) => (
-                    <span key={idx} title={flag === '🇺🇸' ? '영어 가능' : '한국어'}>
-                      {flag}
-                    </span>
-                  ))}
-                </div>
-              </div>
+              {/* 3행: VIP 의전 카드 메인 버튼 */}
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.lightTap();
+                  setIsAssetModalOpen(true);
+                }}
+                className="mt-3 w-full inline-flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-[#0050FF] bg-blue-50/40 hover:bg-blue-100/60 text-[#0050FF] text-xs font-bold transition-all cursor-pointer shadow-2xs"
+              >
+                <IdCard className="w-4 h-4" />
+                <span>VIP 의전 카드 관리</span>
+              </button>
             </div>
           </div>
-
-          {/* Quick Contact Action Buttons */}
-          <div className="flex items-center gap-2">
-            <a
-              href={`tel:${activeDriver.phone}`}
-              className="flex-1 py-2 px-3 rounded-xl bg-blue-50/70 hover:bg-blue-100 border border-blue-200/80 text-[#1E60F3] text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
-            >
-              <Phone className="w-3.5 h-3.5" />
-              <span className="font-mono">{activeDriver.phone || '연락처 미등록'}</span>
-            </a>
-
-            {activeDriver.phone && (
-              <>
-                <a
-                  href={`tel:${activeDriver.phone}`}
-                  className="w-9 h-9 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 flex items-center justify-center transition-all cursor-pointer shadow-2xs"
-                  title="전화 걸기"
-                >
-                  <Phone className="w-3.5 h-3.5" />
-                </a>
-
-                <a
-                  href={`sms:${activeDriver.phone}`}
-                  className="w-9 h-9 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 flex items-center justify-center transition-all cursor-pointer shadow-2xs"
-                  title="문자 발송"
-                >
-                  <MessageSquare className="w-3.5 h-3.5" />
-                </a>
-              </>
-            )}
-          </div>
-
-          {/* Button: Driver Profile & Vehicle Info Management */}
-          <button
-            type="button"
-            onClick={() => {
-              haptics.lightTap();
-              setIsAssetModalOpen(true);
-            }}
-            className="w-full py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-black transition-all flex items-center justify-between cursor-pointer shadow-2xs group"
-          >
-            <div className="flex items-center gap-2">
-              <ImageIcon className="w-3.5 h-3.5 text-blue-400 group-hover:scale-110 transition-transform" />
-              <span>프로필 및 차량별 Info 관리</span>
-            </div>
-            <span className="px-1.5 py-0.5 rounded bg-blue-500/30 text-blue-200 text-[9.5px] font-black">
-              PC · Mobile
-            </span>
-          </button>
 
           {/* Profile Details List */}
           <div className="bg-slate-50/60 rounded-2xl border border-slate-100 p-4 space-y-2.5 text-xs">
-            <div className="flex items-center justify-between">
-              <span className="text-slate-400 font-semibold">소속</span>
-              <span className="font-extrabold text-slate-800">
-                {activeDriver.affiliationLabel}
-              </span>
+            <div className="flex items-center justify-between py-0.5">
+              <span className="text-slate-500 font-bold">소속 변경</span>
+              <div className="inline-flex items-center bg-slate-200/60 p-0.5 rounded-lg border border-slate-200 shadow-2xs text-[11px]">
+                <button
+                  type="button"
+                  disabled={isUpdatingAffiliation}
+                  onClick={async () => {
+                    if (activeDriver.affiliationType !== 'employed') {
+                      haptics.selection();
+                      setIsUpdatingAffiliation(true);
+                      try {
+                        const ok = await updateDriver(activeDriver.id, { affiliationType: 'employed' });
+                        if (ok) {
+                          onRefreshDrivers?.();
+                        }
+                      } finally {
+                        setIsUpdatingAffiliation(false);
+                      }
+                    }
+                  }}
+                  className={`px-2 py-0.5 rounded-md text-[11px] font-extrabold transition-all cursor-pointer ${
+                    activeDriver.affiliationType === 'employed'
+                      ? 'bg-[#0050FF] text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                  }`}
+                >
+                  소속
+                </button>
+                <button
+                  type="button"
+                  disabled={isUpdatingAffiliation}
+                  onClick={async () => {
+                    if (activeDriver.affiliationType !== 'freelance') {
+                      haptics.selection();
+                      setIsUpdatingAffiliation(true);
+                      try {
+                        const ok = await updateDriver(activeDriver.id, { affiliationType: 'freelance' });
+                        if (ok) {
+                          onRefreshDrivers?.();
+                        }
+                      } finally {
+                        setIsUpdatingAffiliation(false);
+                      }
+                    }
+                  }}
+                  className={`px-2 py-0.5 rounded-md text-[11px] font-extrabold transition-all cursor-pointer ${
+                    activeDriver.affiliationType === 'freelance'
+                      ? 'bg-slate-700 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                  }`}
+                >
+                  프리랜서
+                </button>
+              </div>
             </div>
 
             <div className="flex items-center justify-between">
@@ -455,24 +531,21 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
             </div>
 
             <div className="flex items-center justify-between">
-              <span className="text-slate-400 font-semibold">언어 가능</span>
+              <span className="text-slate-400 font-semibold">지원 언어</span>
               <div className="flex items-center gap-1.5 font-bold text-slate-800">
-                {activeDriver.englishAvailable ? (
-                  <span className="flex items-center gap-1 text-[#1E60F3] bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 font-black">
-                    <span>🇺🇸</span>
-                    <span>영어 가능</span>
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1 text-slate-700">
-                    <span>🇰🇷</span>
-                    <span>한국어</span>
+                <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-xs font-semibold">
+                  한국어
+                </span>
+                {activeDriver.englishAvailable && (
+                  <span className="px-2 py-0.5 rounded bg-blue-50 text-[#0050FF] border border-blue-200/60 text-xs font-bold">
+                    영어
                   </span>
                 )}
               </div>
             </div>
 
             <div className="flex items-center justify-between">
-              <span className="text-slate-400 font-semibold">가입/등록일</span>
+              <span className="text-slate-400 font-semibold">등록일</span>
               <span className="font-mono font-bold text-slate-700">
                 {activeDriver.joinedDate || '미등록'}
               </span>
@@ -493,11 +566,11 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
             <h4 className="text-xs font-black text-slate-900">최근 운행일</h4>
             {activeDriver.recentTripDate ? (
               <div className="p-3 bg-blue-50/40 rounded-xl border border-blue-100 flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-blue-100 text-[#1E60F3] flex items-center justify-center shrink-0">
+                <div className="w-7 h-7 rounded-lg bg-blue-100 text-[#0050FF] flex items-center justify-center shrink-0">
                   <Plane className="w-3.5 h-3.5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-[11px] font-mono font-extrabold text-[#1E60F3]">
+                  <div className="text-[11px] font-mono font-extrabold text-[#0050FF]">
                     {activeDriver.recentTripDate}
                   </div>
                   <div className="text-xs font-black text-slate-800 truncate mt-0.5">
@@ -506,9 +579,9 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                 </div>
               </div>
             ) : (
-              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-400 font-medium">
-                배정된 운행 이력이 없습니다.
-              </div>
+              <p className="text-xs text-slate-400 font-medium py-1">
+                배정된 운행 이력이 없어요
+              </p>
             )}
           </div>
 
@@ -517,14 +590,16 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
             <div className="flex items-center justify-between">
               <h4 className="text-xs font-black text-slate-900">관리자 메모</h4>
               {!isEditingMemo ? (
-                <button
-                  type="button"
-                  onClick={handleStartEditMemo}
-                  className="px-2 py-0.5 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-[11px] font-bold text-slate-600 cursor-pointer flex items-center gap-1 shadow-2xs"
-                >
-                  <Edit2 className="w-3 h-3 text-slate-400" />
-                  <span>수정</span>
-                </button>
+                currentMemo ? (
+                  <button
+                    type="button"
+                    onClick={handleStartEditMemo}
+                    className="px-2 py-0.5 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-[11px] font-bold text-slate-600 cursor-pointer flex items-center gap-1 shadow-2xs"
+                  >
+                    <Edit2 className="w-3 h-3 text-slate-400" />
+                    <span>수정</span>
+                  </button>
+                ) : null
               ) : (
                 <button
                   type="button"
@@ -549,7 +624,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                   type="button"
                   onClick={handleSaveMemo}
                   disabled={isSavingMemo}
-                  className="w-full py-1.5 rounded-lg bg-[#1E60F3] text-white text-xs font-bold shadow-2xs hover:bg-blue-600 disabled:opacity-50 transition-colors cursor-pointer flex items-center justify-center gap-1"
+                  className="w-full py-1.5 rounded-lg bg-[#0050FF] text-white text-xs font-bold shadow-2xs hover:bg-blue-700 disabled:opacity-50 transition-colors cursor-pointer flex items-center justify-center gap-1"
                 >
                   {isSavingMemo ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -559,10 +634,18 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                   <span>{isSavingMemo ? '저장 중...' : '저장 완료'}</span>
                 </button>
               </div>
-            ) : (
+            ) : currentMemo ? (
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-xs font-medium text-slate-700 leading-relaxed min-h-[50px]">
-                {currentMemo || '(등록된 메모가 없습니다)'}
+                {currentMemo}
               </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleStartEditMemo}
+                className="text-xs text-[#0050FF] hover:underline font-semibold flex items-center gap-1 py-1 cursor-pointer"
+              >
+                + 메모 추가하기
+              </button>
             )}
           </div>
         </div>
@@ -575,7 +658,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
           {/* Header Bar: Title + Week Navigator */}
           <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100 shrink-0">
             <h3 className="text-sm font-black text-slate-900">
-              {activeDriver.name}의 주간 스케줄
+              {activeDriver.name} 기사님의 주간 일정
             </h3>
 
             <div className="flex items-center gap-2">
@@ -631,7 +714,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                   }`}
                 >
                   <div className="text-xs font-black">
-                    {day.dateNum} ({day.dayName})
+                    {day.dateNum}일 ({day.dayName})
                   </div>
                   {day.isToday && (
                     <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#1E60F3] mt-0.5" />
@@ -723,21 +806,15 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
           </div>
 
           {/* Schedule Footer Legend */}
-          <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded bg-blue-500" />
-                <span>공항 / VIP 의전</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded bg-slate-400" />
-                <span>일반 미팅 / 대기</span>
-              </div>
+          <div className="flex items-center gap-4 text-[11px] text-slate-500 pt-1 shrink-0">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded bg-blue-500" />
+              <span>VIP 의전</span>
             </div>
-
-            <span className="text-[10.5px] text-slate-400">
-              * 기사 스마트폰 Cockpit과 실시간 양방향 동기화됨
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded bg-slate-400" />
+              <span>일반 운행</span>
+            </div>
           </div>
         </div>
       </div>
@@ -750,6 +827,40 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
           drivers={drivers}
           initialDriverId={activeDriver.id}
           initialVehiclePlate={activeDriver.plate || activeDriver.carNumber}
+          onAssetUpdated={async () => {
+            // 1. Immediately refresh active driver's profile asset
+            try {
+              const res = await fetch(
+                `/api/hq/drivers/assets?driverId=${encodeURIComponent(activeDriver.id)}&type=profile`,
+                { headers: { 'Cache-Control': 'no-cache' } }
+              );
+              const data = await res.json();
+              if (data?.ok) {
+                setProfileAvatarUrl(data.profile?.signedUrl || null);
+                setAvatarLoadError(false);
+              }
+            } catch {}
+            // 2. Refetch full driver roster
+            onRefreshDrivers?.();
+            hookState.refetch();
+          }}
+        />
+      )}
+
+      {/* Driver Profile Edit Modal */}
+      {isEditModalOpen && activeDriver && (
+        <HqDriverEditModal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          driver={activeDriver}
+          onSave={async (id, updates) => {
+            const ok = await updateDriver(id, updates);
+            if (ok) {
+              onRefreshDrivers?.();
+              hookState.refetch();
+            }
+            return ok;
+          }}
         />
       )}
     </div>

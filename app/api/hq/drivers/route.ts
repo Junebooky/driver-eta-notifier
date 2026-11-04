@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { verifyServerAuth, requireHqAdmin } from '@/lib/auth/serverAuth';
 import { mapDbDriverToHqSummary, HqDriverSummary } from '@/types/driverHq';
+import { createSignedAssetUrl } from '@/lib/assets/driverAssetServerStore';
 
 export async function GET(req: NextRequest) {
   try {
@@ -34,10 +35,47 @@ export async function GET(req: NextRequest) {
 
     const allSchedules = dbSchedules || [];
 
+    // 3.5. Fetch active driver profile assets to link profile pictures to drivers
+    const profileUrlMap = new Map<string, string>();
+    try {
+      const { data: activeProfiles } = await supabaseAdmin
+        .from('driver_profile_assets')
+        .select('driver_id, file_path')
+        .eq('status', 'active');
+
+      if (activeProfiles && activeProfiles.length > 0) {
+        await Promise.all(
+          activeProfiles.map(async (p) => {
+            if (p.driver_id && p.file_path) {
+              const signedUrl = await createSignedAssetUrl(p.file_path);
+              if (signedUrl) {
+                profileUrlMap.set(p.driver_id, signedUrl);
+              }
+            }
+          })
+        );
+      }
+    } catch (profileErr) {
+      console.warn('[HQ Drivers API] Note: could not load profile assets:', profileErr);
+    }
+
     // 4. Map to unified HqDriverSummary using common mapper
-    const mappedDrivers: HqDriverSummary[] = (dbDrivers || []).map((d) =>
-      mapDbDriverToHqSummary(d, allSchedules)
-    );
+    const mappedDrivers: HqDriverSummary[] = (dbDrivers || []).map((d) => {
+      const summary = mapDbDriverToHqSummary(d, allSchedules);
+      const assetUrl = profileUrlMap.get(d.id);
+      if (assetUrl) {
+        summary.avatarUrl = assetUrl;
+      }
+      return summary;
+    });
+
+    // 4.5. Sort: Employed (소속) drivers appear first, followed by freelancers, then alphabetically by name
+    mappedDrivers.sort((a, b) => {
+      if (a.affiliationType !== b.affiliationType) {
+        return a.affiliationType === 'employed' ? -1 : 1;
+      }
+      return a.name.localeCompare(b.name, 'ko');
+    });
 
     // 5. Calculate real KPI counts
     const total = mappedDrivers.length;

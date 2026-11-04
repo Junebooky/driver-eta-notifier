@@ -40,21 +40,30 @@ export const DevAuthSwitcher: React.FC<DevAuthSwitcherProps> = ({ className = ''
     return null;
   }
 
-  const handleSelectAccount = async (target: 'admin' | 'driver_a' | 'driver_b') => {
+  const handleSelectAccount = async (target: 'admin' | 'driver' | 'driver_a' | 'driver_b') => {
     setIsSwitching(true);
     setIsOpen(false);
     try {
       const ok = await switchDevAccount(target);
       if (ok) {
-        // Refresh session state and hard-reload page to purge any in-memory component caches
-        window.location.reload();
+        if (target === 'admin') {
+          window.location.assign('/hq?tab=dispatch');
+        } else {
+          window.location.assign('/');
+        }
       }
     } finally {
       setIsSwitching(false);
     }
   };
 
-  const currentRole = session.role === 'hq_admin' ? 'admin' : session.driverName === '박기사' ? 'driver_b' : 'driver_a';
+  const currentRole = session.role === 'hq_admin'
+    ? 'admin'
+    : session.driverName === '박기사'
+      ? 'driver_b'
+      : session.driverName === '윤기사'
+        ? 'driver_a'
+        : 'driver';
 
   return (
     <div className={`relative inline-block ${className}`} ref={dropdownRef}>
@@ -121,7 +130,27 @@ export const DevAuthSwitcher: React.FC<DevAuthSwitcherProps> = ({ className = ''
               {currentRole === 'admin' && <Check className="w-4 h-4 text-amber-600" />}
             </button>
 
-            {/* 2. Driver A */}
+            {/* 2. QA Test Driver */}
+            <button
+              type="button"
+              onClick={() => handleSelectAccount('driver')}
+              className={`w-full px-2.5 py-2 rounded-xl text-left flex items-center justify-between text-xs font-bold transition-colors cursor-pointer ${
+                currentRole === 'driver'
+                  ? 'bg-emerald-50 text-emerald-900 border border-emerald-200/60'
+                  : 'text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <UserCheck className="w-4 h-4 text-emerald-600" />
+                <div>
+                  <div className="font-bold">🚗 QA 테스트 기사</div>
+                  <div className="text-[10px] text-slate-400 font-normal">99호차 (서울99바9999)</div>
+                </div>
+              </div>
+              {currentRole === 'driver' && <Check className="w-4 h-4 text-emerald-600" />}
+            </button>
+
+            {/* 3. Driver A */}
             <button
               type="button"
               onClick={() => handleSelectAccount('driver_a')}
@@ -134,14 +163,14 @@ export const DevAuthSwitcher: React.FC<DevAuthSwitcherProps> = ({ className = ''
               <div className="flex items-center gap-2">
                 <UserCheck className="w-4 h-4 text-[#1E60F3]" />
                 <div>
-                  <div className="font-bold">🚗 기사 A (윤기사)</div>
+                  <div className="font-bold">🚙 기사 A (윤기사)</div>
                   <div className="text-[10px] text-slate-400 font-normal">7호차 (서울31가7777)</div>
                 </div>
               </div>
               {currentRole === 'driver_a' && <Check className="w-4 h-4 text-[#1E60F3]" />}
             </button>
 
-            {/* 3. Driver B */}
+            {/* 4. Driver B */}
             <button
               type="button"
               onClick={() => handleSelectAccount('driver_b')}

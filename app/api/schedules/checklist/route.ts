@@ -1,3 +1,4 @@
+import { requireHqAdmin } from '@/lib/auth/serverAuth';
 import { NextRequest, NextResponse } from 'next/server';
 import { queryServerSchedules } from '@/lib/dispatch/scheduleServerStore';
 import {
@@ -7,6 +8,8 @@ import {
 } from '@/utils/dispatchConflictDetector';
 
 export async function GET(req: NextRequest) {
+  const apiAuth = await requireHqAdmin(req);
+  if (!apiAuth.ok) return NextResponse.json({ ok: false, error: apiAuth.error }, { status: apiAuth.statusCode });
   try {
     const { searchParams } = new URL(req.url);
     const date = searchParams.get('date');

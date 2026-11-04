@@ -3,26 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { NextRequest } from 'next/server';
 
-// Load .env.local if running standalone outside Next.js runtime
-if (!process.env.TMAP_API_KEY) {
-  try {
-    const envPath = path.resolve(process.cwd(), '.env.local');
-    if (fs.existsSync(envPath)) {
-      const content = fs.readFileSync(envPath, 'utf8');
-      content.split('\n').forEach((line) => {
-        const match = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
-        if (match) {
-          const key = match[1];
-          let value = match[2] || '';
-          if (value.startsWith('"') && value.endsWith('"')) value = value.slice(1, -1);
-          if (!process.env[key]) process.env[key] = value;
-        }
-      });
-    }
-  } catch {
-    // fallback
-  }
-}
+process.env.DEV_AUTH_ENABLED = 'true';
+process.env.NEXT_PUBLIC_USE_MOCK = 'true';
 
 async function runTollTests() {
   console.log('🧪 Starting P2 Estimated Toll (Phase H1) Test Suite...');
@@ -65,7 +47,29 @@ async function runTollTests() {
     }
   }
 
-  // Test 2: Toll fee formatting logic
+  // Test 2: Same location route (departure === destination)
+  const sameReq = new NextRequest(
+    'http://localhost:3000/api/route?startLat=37.5042&startLng=127.0425&endLat=37.5042&endLng=127.0425'
+  );
+  const sameRes = await GET(sameReq);
+  const sameData = await sameRes.json();
+  assert.strictEqual(sameRes.status, 200, 'Same location route should return HTTP 200');
+  assert.strictEqual(sameData.durationMinutes, 0, 'Same location duration must be 0 minutes');
+  assert.strictEqual(sameData.distanceKm, 0, 'Same location distance must be 0 km');
+  assert.strictEqual(sameData.trafficSummary, '출발지와 도착지가 동일합니다');
+  console.log('✅ Same location route gracefully verified (0 min, 0 km).');
+
+  // Test 3: Undefined string coordinates sanitization
+  const undefReq = new NextRequest(
+    'http://localhost:3000/api/route?startX=undefined&startY=undefined&endX=126.4512&endY=37.4495'
+  );
+  const undefRes = await GET(undefReq);
+  const undefData = await undefRes.json();
+  assert.strictEqual(undefRes.status, 200, 'Undefined coordinates should be sanitized and return HTTP 200');
+  assert.ok(typeof undefData.durationMinutes === 'number' && undefData.durationMinutes >= 0);
+  console.log('✅ Undefined coordinates sanitization verified without 400/502 error.');
+
+  // Test 4: Toll fee formatting logic
   const formatTollDisplay = (toll: number | null | undefined): string => {
     if (toll === null || toll === undefined) return '-';
     if (toll === 0) return '0원 (무료)';

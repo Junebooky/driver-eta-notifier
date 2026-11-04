@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Send, Mail, Sparkles, Check, AlertCircle, Loader2 } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
@@ -202,22 +202,20 @@ const EmailTagInput: React.FC<EmailTagInputProps> = ({
   return (
     <div
       onClick={() => inputRef.current?.focus()}
-      className={`w-full min-h-[42px] px-2.5 py-1.5 rounded-xl border bg-white shadow-2xs flex flex-wrap items-center gap-1.5 cursor-text transition-all ${
-        hasError
-          ? 'border-red-300 ring-2 ring-red-100'
-          : 'border-slate-200 focus-within:border-[#1E60F3] focus-within:ring-2 focus-within:ring-[#1E60F3]/20'
-      }`}
+      className={`w-full min-h-[42px] px-2.5 py-1.5 rounded-xl border bg-white shadow-2xs flex flex-wrap items-center gap-1.5 cursor-text transition-all ${hasError
+        ? 'border-red-300 ring-2 ring-red-100'
+        : 'border-slate-200 focus-within:border-[#1E60F3] focus-within:ring-2 focus-within:ring-[#1E60F3]/20'
+        }`}
     >
       {emails.map((email, idx) => {
         const valid = isValidEmail(email);
         return (
           <span
             key={`${email}-${idx}`}
-            className={`inline-flex items-center gap-1.5 pl-2.5 pr-1 py-1 rounded-lg text-xs font-semibold shadow-2xs transition-all animate-in zoom-in-95 duration-100 ${
-              valid
-                ? 'bg-blue-50/90 text-blue-900 border border-blue-200/90 hover:bg-blue-100/90'
-                : 'bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100'
-            }`}
+            className={`inline-flex items-center gap-1.5 pl-2.5 pr-1 py-1 rounded-lg text-xs font-semibold shadow-2xs transition-all animate-in zoom-in-95 duration-100 ${valid
+              ? 'bg-blue-50/90 text-blue-900 border border-blue-200/90 hover:bg-blue-100/90'
+              : 'bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100'
+              }`}
           >
             <Mail className={`w-3 h-3 shrink-0 ${valid ? 'text-[#1E60F3]' : 'text-amber-600'}`} />
             <span className="truncate max-w-[240px] select-all font-mono text-[11.5px]">{email}</span>
@@ -258,6 +256,7 @@ const EmailTagInput: React.FC<EmailTagInputProps> = ({
 };
 
 const HqComposeEmailModalContent: React.FC<HqComposeEmailModalProps> = ({
+  isOpen,
   onClose,
   initialTo = '',
   initialSubject = '',
@@ -277,6 +276,25 @@ const HqComposeEmailModalContent: React.FC<HqComposeEmailModalProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successToast, setSuccessToast] = useState<string | null>(null);
   const [isConfirmedRealSend, setIsConfirmedRealSend] = useState(false);
+
+  // Lock background scroll and handle Escape key while modal is open
+  useEffect(() => {
+    if (!isOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
 
   // Handle template insertion
   const handleApplyTemplate = (tmpl: (typeof EMAIL_TEMPLATES)[0]) => {
@@ -377,8 +395,7 @@ const HqComposeEmailModalContent: React.FC<HqComposeEmailModalProps> = ({
 
       haptics.success();
       setSuccessToast(
-        `성공적으로 발송되었습니다: 총 ${finalTo.length}명 (${finalTo[0]}${
-          finalTo.length > 1 ? ` 외 ${finalTo.length - 1}명` : ''
+        `성공적으로 발송되었습니다: 총 ${finalTo.length}명 (${finalTo[0]}${finalTo.length > 1 ? ` 외 ${finalTo.length - 1}명` : ''
         })`
       );
 
@@ -401,8 +418,8 @@ const HqComposeEmailModalContent: React.FC<HqComposeEmailModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden max-h-[92vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 overscroll-contain">
+      <div className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden max-h-[92vh] overscroll-contain">
         {/* Header */}
         <div className="px-6 py-4 bg-gradient-to-r from-[#0B1E48] to-[#123485] text-white flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -428,7 +445,7 @@ const HqComposeEmailModalContent: React.FC<HqComposeEmailModalProps> = ({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSendEmail} className="flex-1 overflow-y-auto p-6 space-y-4">
+        <form onSubmit={handleSendEmail} className="flex-1 overflow-y-auto p-6 space-y-4 overscroll-contain">
           {/* Success Banner */}
           {successToast && (
             <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2 text-emerald-800 text-xs font-bold animate-in fade-in">
@@ -498,11 +515,10 @@ const HqComposeEmailModalContent: React.FC<HqComposeEmailModalProps> = ({
                     key={c.email}
                     type="button"
                     onClick={() => handleAddRecipient(c.email)}
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-all cursor-pointer ${
-                      isSelected
-                        ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
-                        : 'bg-slate-100 hover:bg-blue-50 hover:text-blue-600 text-slate-600 border-slate-200/60'
-                    }`}
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-all cursor-pointer ${isSelected
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                      : 'bg-slate-100 hover:bg-blue-50 hover:text-blue-600 text-slate-600 border-slate-200/60'
+                      }`}
                   >
                     {isSelected ? '✓ ' : '+ '}
                     {c.label}
@@ -591,25 +607,6 @@ const HqComposeEmailModalContent: React.FC<HqComposeEmailModalProps> = ({
               required
             />
           </div>
-
-          {/* Real Customer Send Safety Confirmation */}
-          <div className="p-3 bg-amber-50/80 border border-amber-200/90 rounded-xl">
-            <label className="flex items-start gap-2.5 text-xs text-amber-950 font-bold cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={isConfirmedRealSend}
-                onChange={(e) => setIsConfirmedRealSend(e.target.checked)}
-                className="mt-0.5 w-4 h-4 rounded border-amber-300 text-[#1E60F3] focus:ring-[#1E60F3] cursor-pointer"
-              />
-              <div className="space-y-0.5">
-                <span>[실제 발송 관리자 승인] 실제 수신자에게 이메일이 즉시 전송됨을 확인했습니다.</span>
-                <p className="text-[10px] text-amber-800/80 font-normal">
-                  승인되지 않은 임의 발송이나 오발송을 방지하기 위해 관리자의 명시적 승인이 필요합니다.
-                </p>
-              </div>
-            </label>
-          </div>
-
           {/* Modal Actions */}
           <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
             <span className="text-[11px] text-slate-400 font-medium">

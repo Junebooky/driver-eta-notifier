@@ -1,3 +1,4 @@
+import { verifyServerAuth } from '@/lib/auth/serverAuth';
 import { NextRequest, NextResponse } from 'next/server';
 import { calculateHaversineEstimate } from '@/utils/navigation';
 
@@ -44,12 +45,21 @@ function parsePassListToWaypoints(passList?: string): Array<{ lat: number; lng: 
       const [lngStr, latStr] = pointStr.split(',');
       const lat = parseFloat(latStr);
       const lng = parseFloat(lngStr);
-      if (!isNaN(lat) && !isNaN(lng)) {
+      if (!isNaN(lat) && !isNaN(lng) && lat >= 33.0 && lat <= 39.0 && lng >= 124.0 && lng <= 132.0) {
         return { lat, lng };
       }
       return null;
     })
     .filter(Boolean) as Array<{ lat: number; lng: number }>;
+}
+
+export function sanitizeCoord(val: unknown, fallback: number, min: number, max: number): number {
+  if (typeof val === 'number' && Number.isFinite(val) && val >= min && val <= max) return val;
+  if (typeof val === 'string' && val.trim() !== '' && val !== 'undefined' && val !== 'null') {
+    const parsed = parseFloat(val);
+    if (Number.isFinite(parsed) && parsed >= min && parsed <= max) return parsed;
+  }
+  return fallback;
 }
 
 async function handleRouteCalculation(
@@ -73,6 +83,28 @@ async function handleRouteCalculation(
     ? options.clientTimestamp
     : Date.now();
   const parsedWaypoints = parsePassListToWaypoints(passList);
+
+  // 0. Same start & end location handling (< 50m distance without waypoints)
+  const isSameLocation = Math.hypot(startLat - endLat, startLng - endLng) < 0.0005 && parsedWaypoints.length === 0;
+  if (isSameLocation) {
+    const now = new Date(nowTimestamp);
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    return NextResponse.json({
+      distanceKm: 0,
+      durationMinutes: 0,
+      etaFormatted: `${hours}:${minutes}`,
+      trafficSummary: '출발지와 도착지가 동일합니다',
+      estimatedTollWon: 0,
+      isMock: false,
+      isFallback: false,
+      isCached: false,
+      isFresh: true,
+      source: 'same_location',
+      computedAt: new Date(nowTimestamp).toISOString(),
+      routeFingerprint: cacheKey,
+    });
+  }
 
   // 1. Quota Defense: Check 3-minute Cache first (only if NOT bypassed for action)
   if (!bypassCache && routeCache.has(cacheKey)) {
@@ -123,22 +155,28 @@ async function handleRouteCalculation(
   }
 
   if (!apiKey || apiKey === 'your_tmap_api_key') {
-    return NextResponse.json(
-      {
-        error: 'TMAP API 키가 설정되지 않아 실시간 경로를 조회할 수 없습니다.',
-        isUnavailable: true,
-        isFresh: false,
-        source: 'tmap_key_missing',
-      },
-      { status: 500 }
-    );
+    // API key unconfigured: Fallback to Haversine estimate with notice
+    const fallbackData = calculateHaversineEstimate(startLat, startLng, endLat, endLng, parsedWaypoints);
+    return NextResponse.json({
+      ...fallbackData,
+      trafficSummary: '직선 추정 (TMAP 키 미설정)',
+      estimatedTollWon: null,
+      isMock: false,
+      isFallback: true,
+      fallbackNotice: 'TMAP API 키 미설정으로 직선 거리 기반 추정치가 적용되었습니다.',
+      isCached: false,
+      isFresh: false,
+      source: 'haversine_fallback',
+      computedAt: new Date(nowTimestamp).toISOString(),
+      routeFingerprint: cacheKey,
+    });
   }
 
-  // 4. Server-Side TMAP API Call with In-Flight Deduplication (Key strictly hidden from client)
+  // 4. Server-Side TMAP API Call with In-Flight Deduplication & Haversine Graceful Fallback
   const fetchPromise = (async () => {
     const tmapUrl = `https://apis.openapi.sk.com/tmap/routes?version=1&format=json`;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4500); // 4.5s timeout threshold
+    const timeoutId = setTimeout(() => controller.abort(), 7000); // 7.0s timeout threshold
 
     try {
       const requestPayload: {
@@ -181,13 +219,20 @@ async function handleRouteCalculation(
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        console.warn(`TMAP Route API error HTTP ${response.status}`);
+        console.warn(`TMAP Route API error HTTP ${response.status}, gracefully falling back to Haversine estimate`);
+        const fallbackData = calculateHaversineEstimate(startLat, startLng, endLat, endLng, parsedWaypoints);
         return {
-          status: response.status === 504 ? 504 : 502,
-          error: `TMAP 실시간 경로 API 오류 (HTTP ${response.status})`,
-          isUnavailable: true,
+          ...fallbackData,
+          trafficSummary: '직선 추정 (TMAP 일시 지연)',
+          estimatedTollWon: null,
+          isMock: false,
+          isFallback: true,
+          fallbackNotice: 'TMAP 일시 지연으로 직선 거리 기반 추정치가 반영되었습니다.',
+          isCached: false,
           isFresh: false,
-          source: 'tmap_api_error',
+          source: 'haversine_fallback',
+          computedAt: new Date(nowTimestamp).toISOString(),
+          routeFingerprint: cacheKey,
         };
       }
 
@@ -195,18 +240,25 @@ async function handleRouteCalculation(
       const totalTimeSeconds = data?.features?.[0]?.properties?.totalTime;
       const totalDistanceMeters = data?.features?.[0]?.properties?.totalDistance;
 
-      if (typeof totalTimeSeconds !== 'number' || totalTimeSeconds <= 0) {
-        console.warn('TMAP Route API response missing valid totalTime:', data);
+      if (typeof totalTimeSeconds !== 'number' || (totalTimeSeconds <= 0 && (totalDistanceMeters || 0) > 100)) {
+        console.warn('TMAP Route API response missing valid totalTime, falling back to Haversine estimate:', data);
+        const fallbackData = calculateHaversineEstimate(startLat, startLng, endLat, endLng, parsedWaypoints);
         return {
-          status: 502,
-          error: 'TMAP 경로 소요 시간 데이터가 유효하지 않습니다.',
-          isUnavailable: true,
+          ...fallbackData,
+          trafficSummary: '직선 추정 (TMAP 경로 이상)',
+          estimatedTollWon: null,
+          isMock: false,
+          isFallback: true,
+          fallbackNotice: 'TMAP 데이터 이상으로 거점 직선거리 기반 추정치가 반영되었습니다.',
+          isCached: false,
           isFresh: false,
-          source: 'tmap_invalid_response',
+          source: 'haversine_fallback',
+          computedAt: new Date(nowTimestamp).toISOString(),
+          routeFingerprint: cacheKey,
         };
       }
 
-      const durationMinutes = Math.max(1, Math.round(totalTimeSeconds / 60));
+      const durationMinutes = totalTimeSeconds <= 0 ? 0 : Math.max(1, Math.round(totalTimeSeconds / 60));
       const distanceKm = typeof totalDistanceMeters === 'number'
         ? Math.round((totalDistanceMeters / 1000) * 10) / 10
         : 0;
@@ -242,13 +294,20 @@ async function handleRouteCalculation(
       return resultData;
     } catch (error: unknown) {
       clearTimeout(timeoutId);
-      console.warn('TMAP Route API call failed or timed out:', error instanceof Error ? error.message : error);
+      console.warn('TMAP Route API call failed or timed out, gracefully falling back to Haversine estimate:', error instanceof Error ? error.message : error);
+      const fallbackData = calculateHaversineEstimate(startLat, startLng, endLat, endLng, parsedWaypoints);
       return {
-        status: 504,
-        error: 'TMAP 실시간 경로 요청 시간이 초과되었거나 연결에 실패했습니다.',
-        isUnavailable: true,
+        ...fallbackData,
+        trafficSummary: '직선 추정 (TMAP 응답 지연)',
+        estimatedTollWon: null,
+        isMock: false,
+        isFallback: true,
+        fallbackNotice: 'TMAP 응답 지연으로 거점 직선거리 기반 추정치가 반영되었습니다.',
+        isCached: false,
         isFresh: false,
-        source: 'tmap_timeout',
+        source: 'haversine_fallback',
+        computedAt: new Date(nowTimestamp).toISOString(),
+        routeFingerprint: cacheKey,
       };
     }
   })();
@@ -268,13 +327,15 @@ async function handleRouteCalculation(
 
 // Support GET requests (query params: startX, startY, endX, endY or startLat, startLng, endLat, endLng, passList, bypassCache, purpose, clientTimestamp)
 export async function GET(req: NextRequest) {
+  const apiAuth = await verifyServerAuth(req);
+  if (!apiAuth.ok) return NextResponse.json({ ok: false, error: apiAuth.error }, { status: apiAuth.statusCode });
   try {
     const { searchParams } = new URL(req.url);
 
-    const startLng = parseFloat(searchParams.get('startX') || searchParams.get('startLng') || '127.0425');
-    const startLat = parseFloat(searchParams.get('startY') || searchParams.get('startLat') || '37.5042');
-    const endLng = parseFloat(searchParams.get('endX') || searchParams.get('endLng') || '126.4512');
-    const endLat = parseFloat(searchParams.get('endY') || searchParams.get('endLat') || '37.4495');
+    const startLng = sanitizeCoord(searchParams.get('startX') || searchParams.get('startLng'), 127.0425, 124.0, 132.0);
+    const startLat = sanitizeCoord(searchParams.get('startY') || searchParams.get('startLat'), 37.5042, 33.0, 39.0);
+    const endLng = sanitizeCoord(searchParams.get('endX') || searchParams.get('endLng'), 126.4512, 124.0, 132.0);
+    const endLat = sanitizeCoord(searchParams.get('endY') || searchParams.get('endLat'), 37.4495, 33.0, 39.0);
     const passList = searchParams.get('passList') || undefined;
 
     const bypassCache = searchParams.get('bypassCache') === 'true' || searchParams.get('purpose') === 'action';
@@ -295,13 +356,15 @@ export async function GET(req: NextRequest) {
 
 // Support POST requests (body: { startLat, startLng, endLat, endLng, passList, bypassCache, purpose, clientTimestamp } or { startX, startY, endX, endY, passList, ... })
 export async function POST(req: NextRequest) {
+  const apiAuth = await verifyServerAuth(req);
+  if (!apiAuth.ok) return NextResponse.json({ ok: false, error: apiAuth.error }, { status: apiAuth.statusCode });
   try {
     const body = await req.json().catch(() => ({}));
 
-    const startLng = parseFloat(String(body.startLng ?? body.startX ?? '127.0425'));
-    const startLat = parseFloat(String(body.startLat ?? body.startY ?? '37.5042'));
-    const endLng = parseFloat(String(body.endLng ?? body.endX ?? '126.4512'));
-    const endLat = parseFloat(String(body.endLat ?? body.endY ?? '37.4495'));
+    const startLng = sanitizeCoord(body.startLng ?? body.startX, 127.0425, 124.0, 132.0);
+    const startLat = sanitizeCoord(body.startLat ?? body.startY, 37.5042, 33.0, 39.0);
+    const endLng = sanitizeCoord(body.endLng ?? body.endX, 126.4512, 124.0, 132.0);
+    const endLat = sanitizeCoord(body.endLat ?? body.endY, 37.4495, 33.0, 39.0);
     const passList = body.passList || undefined;
 
     const bypassCache = body.bypassCache === true || body.purpose === 'action';

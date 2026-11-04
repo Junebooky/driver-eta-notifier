@@ -35,7 +35,7 @@ import {
   autoEnsureUprightReceipt,
   compressReceiptImage,
 } from '@/utils/imageRotate';
-import { submitSingleExpenseToHq } from '@/utils/expenseHqStorage';
+
 import {
   ExpenseItem,
   ExpenseCategoryKey,
@@ -51,6 +51,7 @@ import {
   SAMPLE_RECEIPT_PRESETS,
   ReceiptScanResult,
 } from '@/utils/receiptOcr';
+import { useDriverProfile } from '@/hooks/useDriverProfile';
 import { haptics } from '@/utils/haptics';
 
 export { SAMPLE_RECEIPT_PRESETS };
@@ -71,21 +72,15 @@ interface CachedOcrResult {
 const clientOcrCache = new Map<string, CachedOcrResult>();
 
 // Collision-free client cache key computation
-function computeClientCacheKey(str: string): string {
-  if (!str) return '';
-  if (str.startsWith('/')) return str;
-  let hash = 0;
-  for (let i = 0; i < Math.min(str.length, 2048); i++) {
-    hash = ((hash << 5) - hash) + str.charCodeAt(i);
-    hash |= 0;
-  }
-  return `${str.length}_${hash}_${str.slice(-32)}`;
+async function computeClientCacheKey(value:string):Promise<string>{
+  const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,'0')).join('');
 }
 
 interface AddExpenseModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (item: ExpenseItem) => void;
+  onSave: (item: ExpenseItem, submitToHq?: boolean) => void | Promise<void>;
   editingItem?: ExpenseItem | null;
   initialPhotoUrl?: string;
   defaultDate?: string; // YYYY-MM-DD
@@ -93,36 +88,49 @@ interface AddExpenseModalProps {
 
 // Helper to render category icon component
 export const renderCategoryIcon = (iconName: string, className = 'w-5 h-5') => {
-  switch (iconName) {
-    case 'utensils':
-      return <Utensils className={className} />;
-    case 'car':
-      return <Car className={className} />;
-    case 'parking':
-      return <ParkingSquare className={className} />;
-    case 'bed':
-      return <Bed className={className} />;
-    case 'milestone':
-      return <Milestone className={className} />;
-    case 'sparkles':
-      return <Sparkles className={className} />;
-    case 'bus':
-      return <Bus className={className} />;
-    case 'more':
-      return <MoreHorizontal className={className} />;
-    default:
-      return <HelpCircle className={className} />;
-  }
+  const iconMap: Record<string, string> = {
+    utensils: '/images/icons/expense_driver/icon-expense-meal.png',
+    meal: '/images/icons/expense_driver/icon-expense-meal.png',
+    car: '/images/icons/expense_driver/icon-expense-fuel.png',
+    fuel: '/images/icons/expense_driver/icon-expense-fuel.png',
+    parking: '/images/icons/expense_driver/icon-expense-parking.png',
+    bed: '/images/icons/expense_driver/icon-expense-lodging.png',
+    stay: '/images/icons/expense_driver/icon-expense-lodging.png',
+    milestone: '/images/icons/expense_driver/icon-expense-toll.png',
+    toll: '/images/icons/expense_driver/icon-expense-toll.png',
+    sparkles: '/images/icons/expense_driver/icon-expense-carwash.png',
+    wash: '/images/icons/expense_driver/icon-expense-carwash.png',
+    bus: '/images/icons/expense_driver/icon-expense-transit.png',
+    transit: '/images/icons/expense_driver/icon-expense-transit.png',
+    more: '/images/icons/expense_driver/icon-expense-misc.png',
+    other: '/images/icons/expense_driver/icon-expense-misc.png',
+    unclassified: '/images/icons/expense_driver/icon-expense-misc.png',
+  };
+
+  const src = iconMap[iconName] || '/images/icons/expense_driver/icon-expense-misc.png';
+
+  return (
+    <img
+      src={src}
+      alt={iconName}
+      className={`${className} object-contain select-none`}
+    />
+  );
 };
 
 const AddExpenseModalContent: React.FC<{
   onClose: () => void;
-  onSave: (item: ExpenseItem) => void;
+  onSave: (item: ExpenseItem, submitToHq?: boolean) => void | Promise<void>;
   editingItem?: ExpenseItem | null;
   initialPhotoUrl?: string;
   defaultDate?: string;
 }> = ({ onClose, onSave, editingItem, initialPhotoUrl, defaultDate }) => {
+  const { profile } = useDriverProfile();
+  const currentDriverName = profile?.driverName || '윤태준';
+  const currentCarModel = profile?.carModel || profile?.carNumber || profile?.vehicleNo || '116허 1514';
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [expenseId]=useState(()=>editingItem?.id || crypto.randomUUID());
 
   // Form states initialized purely
   const initialPreset = initialPhotoUrl ? SAMPLE_RECEIPT_PRESETS[initialPhotoUrl] : null;
@@ -204,7 +212,7 @@ const AddExpenseModalContent: React.FC<{
     }
     return null;
   });
-  const [autoSubmitToHq, setAutoSubmitToHq] = useState(true);
+  const autoSubmitToHq = true;
   const hasAutoScannedRef = useRef(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -245,11 +253,11 @@ const AddExpenseModalContent: React.FC<{
   }, [receiptUrl]);
 
   // Vision AI Receipt Scanner with intelligent sample & client caching (Zero Fee Waste)
-  const runVisionAiScan = useCallback(async (imageUrl: string) => {
+  const runVisionAiScan = useCallback(async (imageUrl: string, forceRefresh: boolean = false) => {
     if (!imageUrl) return;
 
-    // Step 1: Check known sample presets (Zero Gemini API call)
-    if (SAMPLE_RECEIPT_PRESETS[imageUrl]) {
+    // Step 1: Check known sample presets (Zero Gemini API call) unless forceRefresh
+    if (!forceRefresh && SAMPLE_RECEIPT_PRESETS[imageUrl]) {
       const p = SAMPLE_RECEIPT_PRESETS[imageUrl];
       setMerchant(p.merchant);
       setAddress(p.address || '');
@@ -267,37 +275,39 @@ const AddExpenseModalContent: React.FC<{
         isZeroCost: true,
       });
       haptics.success();
-      showToast('✨ 샘플 영수증 정보가 즉시 적용되었습니다. (API 비용 0원)');
       return;
     }
 
-    // Step 2: Check client-side cache (Zero Gemini API call)
-    const cacheKey = computeClientCacheKey(imageUrl);
-    const cached = clientOcrCache.get(cacheKey);
-    if (cached) {
-      if (cached.merchant) setMerchant(cached.merchant);
-      if (cached.address) setAddress(cached.address);
-      if (typeof cached.amount === 'number' && cached.amount > 0) {
-        setAmountRaw(formatKRW(cached.amount, false));
-        setErrors((prev) => ({ ...prev, amount: '' }));
+    // Step 2: Check client-side cache (Zero Gemini API call) unless forceRefresh
+    const cacheKey = await computeClientCacheKey(imageUrl);
+    if (forceRefresh) {
+      clientOcrCache.delete(cacheKey);
+    } else {
+      const cached = clientOcrCache.get(cacheKey);
+      if (cached) {
+        if (cached.merchant) setMerchant(cached.merchant);
+        if (cached.address) setAddress(cached.address);
+        if (typeof cached.amount === 'number' && cached.amount > 0) {
+          setAmountRaw(formatKRW(cached.amount, false));
+          setErrors((prev) => ({ ...prev, amount: '' }));
+        }
+        if (cached.category && EXPENSE_CATEGORIES[cached.category as ExpenseCategoryKey]) {
+          setCategory(cached.category as ExpenseCategoryKey);
+        }
+        if (cached.date) setDate(cached.date);
+        if (cached.time) setTime(cached.time);
+        if (cached.paymentMethod) setPaymentMethod(cached.paymentMethod);
+        setOcrBannerInfo({
+          merchant: cached.merchant || '상호 미확인 가맹점',
+          amount: cached.amount ?? null,
+          category: EXPENSE_CATEGORIES[cached.category as ExpenseCategoryKey]?.label || '기타',
+          summary: cached.summary || '캐시된 영수증 정보입니다.',
+          modelName: cached.modelUsed || 'Gemini 3.1 Flash-Lite (비용 0원 · 캐시)',
+          isZeroCost: true,
+        });
+        haptics.success();
+        return;
       }
-      if (cached.category && EXPENSE_CATEGORIES[cached.category as ExpenseCategoryKey]) {
-        setCategory(cached.category as ExpenseCategoryKey);
-      }
-      if (cached.date) setDate(cached.date);
-      if (cached.time) setTime(cached.time);
-      if (cached.paymentMethod) setPaymentMethod(cached.paymentMethod);
-      setOcrBannerInfo({
-        merchant: cached.merchant || '상호 미확인 가맹점',
-        amount: cached.amount ?? null,
-        category: EXPENSE_CATEGORIES[cached.category as ExpenseCategoryKey]?.label || '기타',
-        summary: cached.summary || '캐시된 영수증 정보입니다.',
-        modelName: cached.modelUsed || 'Gemini 3.1 Flash-Lite (비용 0원 · 캐시)',
-        isZeroCost: true,
-      });
-      haptics.success();
-      showToast('✨ 캐시된 영수증 판독 정보를 즉시 불러왔습니다. (API 비용 0원)');
-      return;
     }
 
     setIsAiScanning(true);
@@ -308,12 +318,15 @@ const AddExpenseModalContent: React.FC<{
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           image: imageUrl,
-          driverName: '윤태준',
-          carModel: '116허 1514',
+          driverName: currentDriverName,
+          carModel: currentCarModel,
         }),
       });
-      const data: ReceiptScanResult = await res.json();
-      if (data && data.success) {
+      const data: ReceiptScanResult = await res.json().catch(() => ({
+        success: false,
+        error: '서버 응답을 처리하지 못했습니다.',
+      }));
+      if (res.ok && data && data.success) {
         clientOcrCache.set(cacheKey, data);
         if (data.merchant) setMerchant(data.merchant);
         if (data.address) setAddress(data.address);
@@ -349,19 +362,21 @@ const AddExpenseModalContent: React.FC<{
         });
 
         haptics.success();
-        showToast(isZeroFee
-          ? '✨ 샘플/캐시 영수증 정보가 즉시 적용되었습니다. (API 비용 0원)'
-          : `✨ Vision AI (${modelDisplayName})가 영수증 정보를 자동 판독했습니다!`);
       } else {
-        showToast('영수증 분석을 완료하지 못했습니다. 직접 입력해 주세요.');
+        const errorMsg = data?.error || (data?.summary && data.summary !== '영수증이 업로드되었습니다. 세부 금액과 거래처를 확인해 주세요.' ? data.summary : null);
+        if (errorMsg) {
+          showToast(`⚠️ ${errorMsg}`);
+        } else {
+          showToast('영수증에서 글자를 명확히 인식하지 못했습니다. 상호명과 금액을 직접 입력해 주세요.');
+        }
       }
     } catch (err) {
       console.warn('Vision AI Scan Error:', err);
-      showToast('영수증 분석 중 오류가 발생했습니다.');
+      showToast('영수증 분석 중 네트워크 오류가 발생했습니다. 직접 입력해 주세요.');
     } finally {
       setIsAiScanning(false);
     }
-  }, []);
+  }, [currentDriverName, currentCarModel]);
 
   // Auto scan sample receipt or initial photo once on load (Skips Gemini if already a sample preset or editing an item)
   useEffect(() => {
@@ -401,7 +416,7 @@ const AddExpenseModalContent: React.FC<{
       }
     } catch (err) {
       console.error('Failed to rotate receipt image:', err);
-      showToast('이미지 회전에 실패했습니다.');
+      showToast(err instanceof Error ? err.message : '영수증 저장에 실패했습니다.');
     } finally {
       setIsRotating(false);
     }
@@ -429,38 +444,6 @@ const AddExpenseModalContent: React.FC<{
 
       if (wasRotated) {
         showToast('🔄 영수증이 가로로 누워있어 바르게(90° 세우기) 자동 회전했습니다.');
-      }
-
-      // 2. Check if file matches known sample receipt (Zero Gemini API call)
-      const lowerName = file.name.toLowerCase();
-      let matchedPresetKey: string | null = null;
-      if (lowerName.includes('hangang') || lowerName.includes('한강') || file.size === 22307) {
-        matchedPresetKey = '/images/receipt_sample_hangang.jpg';
-      } else if (lowerName.includes('fuel') || lowerName.includes('만남의광장') || file.size === 25451) {
-        matchedPresetKey = '/images/receipt_sample_fuel.jpg';
-      } else if (lowerName.includes('cu') || lowerName.includes('고양강매') || file.size === 22426) {
-        matchedPresetKey = '/images/receipt_sample_cu.jpg';
-      }
-
-      if (matchedPresetKey && SAMPLE_RECEIPT_PRESETS[matchedPresetKey]) {
-        const p = SAMPLE_RECEIPT_PRESETS[matchedPresetKey];
-        setMerchant(p.merchant);
-        setAddress(p.address || '');
-        setAmountRaw(formatKRW(p.amount, false));
-        setCategory(p.category);
-        setDate(p.date);
-        setTime(p.time);
-        setMemo(p.memo);
-        setOcrBannerInfo({
-          merchant: p.merchant,
-          amount: p.amount,
-          category: EXPENSE_CATEGORIES[p.category]?.label || '기타',
-          summary: p.summary,
-          isZeroCost: true,
-        });
-        haptics.success();
-        showToast('✨ 샘플 영수증이 감지되어 자동 적용되었습니다. (API 비용 0원)');
-        return;
       }
 
       // 3. Otherwise run Vision AI scan
@@ -527,7 +510,8 @@ const AddExpenseModalContent: React.FC<{
 
     const nowIso = new Date().toISOString();
     const finalItem: ExpenseItem = {
-      id: editingItem?.id || `exp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      ...editingItem,
+      id: expenseId,
       category,
       date,
       time,
@@ -537,17 +521,18 @@ const AddExpenseModalContent: React.FC<{
       paymentMethod,
       memo: memo.trim() || undefined,
       receiptUrl: safeReceiptUrl,
+      receiptStoragePath:safeReceiptUrl===editingItem?.receiptUrl?editingItem?.receiptStoragePath:undefined,
       createdAt: editingItem?.createdAt || nowIso,
       updatedAt: nowIso,
-      hqStatus: autoSubmitToHq ? '검수 대기' : (editingItem?.hqStatus || '미제출'),
-      submittedToHqAt: autoSubmitToHq ? nowIso : editingItem?.submittedToHqAt,
+      hqStatus: '미제출',
+      submittedToHqAt: undefined,
+      ocrExtracted: Boolean(ocrBannerInfo),
+      ocrSummary: ocrBannerInfo?.summary,
     };
 
-    if (autoSubmitToHq) {
-      submitSingleExpenseToHq(finalItem, '윤태준', '116허 1514', '현대 스타리아 리무진');
-    }
-
-    onSave(finalItem);
+    try { await onSave(finalItem,autoSubmitToHq); }
+    catch(error) { showToast(error instanceof Error ? error.message : '경비 저장에 실패했습니다.'); }
+    finally { setIsSaving(false); }
   };
 
   // One-click Auto Fix Orientation and immediately save to HQ
@@ -580,7 +565,8 @@ const AddExpenseModalContent: React.FC<{
       haptics.success();
       const nowIso = new Date().toISOString();
       const finalItem: ExpenseItem = {
-        id: editingItem?.id || `exp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        ...editingItem,
+      id: expenseId,
         category,
         date,
         time,
@@ -590,20 +576,19 @@ const AddExpenseModalContent: React.FC<{
         paymentMethod,
         memo: memo.trim() || undefined,
         receiptUrl: rotated,
+        receiptStoragePath:undefined,
         createdAt: editingItem?.createdAt || nowIso,
         updatedAt: nowIso,
-        hqStatus: autoSubmitToHq ? '검수 대기' : (editingItem?.hqStatus || '미제출'),
-        submittedToHqAt: autoSubmitToHq ? nowIso : editingItem?.submittedToHqAt,
+        hqStatus: '미제출',
+        submittedToHqAt: undefined,
+        ocrExtracted: Boolean(ocrBannerInfo),
+        ocrSummary: ocrBannerInfo?.summary,
       };
 
-      if (autoSubmitToHq) {
-        submitSingleExpenseToHq(finalItem, '윤태준', '116허 1514', '현대 스타리아 리무진');
-      }
-
-      onSave(finalItem);
+      await onSave(finalItem,autoSubmitToHq);
     } catch (err) {
       console.error('Failed to auto-rotate and save:', err);
-      showToast('이미지 회전에 실패했습니다.');
+      showToast(err instanceof Error ? err.message : '영수증 저장에 실패했습니다.');
     } finally {
       setIsRotating(false);
     }
@@ -658,7 +643,7 @@ const AddExpenseModalContent: React.FC<{
                 <div className="flex items-center gap-1.5 sm:gap-2">
                   <button
                     type="button"
-                    onClick={() => runVisionAiScan(receiptUrl)}
+                    onClick={() => runVisionAiScan(receiptUrl, true)}
                     disabled={isAiScanning || isRotating}
                     className="text-[11px] text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-50 px-2.5 py-1 rounded-full font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer"
                     title="Vision AI 영수증 재분석"
@@ -863,45 +848,7 @@ const AddExpenseModalContent: React.FC<{
               accept="image/*"
               className="hidden"
               onChange={handlePhotoUpload}
-            />
-
-            {/* AI OCR Recognition Result Banner */}
-            {ocrBannerInfo && (
-              <div className="bg-gradient-to-r from-blue-50/90 via-indigo-50/40 to-blue-50/90 border border-blue-200/90 rounded-2xl p-3.5 flex items-start gap-3 animate-in fade-in slide-in-from-top-1 duration-200 shadow-2xs">
-                <div className="w-7 h-7 rounded-xl bg-[#1E60F3] text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <div className="flex-1 min-w-0 text-xs">
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="font-extrabold text-[#1E60F3] tracking-tight">
-                      Vision AI 자동 인식 및 분류 완료
-                    </span>
-                    <span
-                      className={`text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 ${
-                        ocrBannerInfo.isZeroCost
-                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                          : 'bg-blue-100 text-[#1E60F3]'
-                      }`}
-                    >
-                      {ocrBannerInfo.isZeroCost ? (
-                        <>
-                          <Sparkles className="w-2.5 h-2.5 text-emerald-600" />
-                          <span>{ocrBannerInfo.modelName || 'Gemini 3.1 Flash-Lite (비용 0원 · 캐시)'}</span>
-                        </>
-                      ) : (
-                        <span>{ocrBannerInfo.modelName || 'Gemini 3.1 Flash-Lite'}</span>
-                      )}
-                    </span>
-                  </div>
-                  <div className="text-slate-900 font-bold mt-1 text-xs truncate">
-                    {ocrBannerInfo.merchant} · {formatKRW(ocrBannerInfo.amount || 0)} ({ocrBannerInfo.category})
-                  </div>
-                  <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
-                    {ocrBannerInfo.summary}
-                  </p>
-                </div>
-              </div>
-            )}
+            />      
           </section>
 
           {/* 2. 지출 항목 (Category Selector) */}
@@ -919,9 +866,9 @@ const AddExpenseModalContent: React.FC<{
             >
               <div className="flex items-center gap-3">
                 <div
-                  className={`w-8 h-8 rounded-full ${selectedCategoryMeta.badgeBg} ${selectedCategoryMeta.badgeTextColor} border ${selectedCategoryMeta.badgeBorder} flex items-center justify-center shrink-0`}
+                  className={`w-9 h-9 rounded-full ${selectedCategoryMeta.badgeBg} flex items-center justify-center shrink-0 shadow-2xs`}
                 >
-                  {renderCategoryIcon(selectedCategoryMeta.iconName, 'w-4 h-4')}
+                  {renderCategoryIcon(selectedCategoryMeta.iconName, 'w-5 h-5')}
                 </div>
                 <span className="text-sm font-bold text-slate-800">
                   {selectedCategoryMeta.label}
@@ -1105,30 +1052,6 @@ const AddExpenseModalContent: React.FC<{
               />
             </div>
           </section>
-
-          {/* 9. Direct HQ Dashboard Submission Toggle */}
-          <section className="pt-1">
-            <label className="flex items-start gap-3 p-3.5 rounded-2xl bg-blue-50/70 border border-blue-200 hover:bg-blue-50/90 transition-all cursor-pointer">
-              <input
-                type="checkbox"
-                checked={autoSubmitToHq}
-                onChange={(e) => setAutoSubmitToHq(e.target.checked)}
-                className="w-4 h-4 mt-0.5 text-[#1E60F3] rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
-              />
-              <div className="flex-1 text-xs">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-extrabold text-slate-900">본사(HQ) 대시보드로 즉시 전송</span>
-                  <span className="text-[10px] font-bold bg-[#1E60F3] text-white px-1.5 py-0.2 rounded">
-                    권장
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  저장과 동시에 본사 경비 검수 시스템에 &apos;검수 대기&apos;로 즉시 등록되어 관리자에게 제출됩니다.
-                </p>
-              </div>
-              <Send className="w-4 h-4 text-[#1E60F3] shrink-0 mt-0.5" />
-            </label>
-          </section>
         </div>
 
         {/* Sticky Footer */}
@@ -1171,15 +1094,10 @@ const AddExpenseModalContent: React.FC<{
                 <RotateCw className="w-5 h-5" />
                 <span>영수증 90° 세우기 후 제출 가능</span>
               </>
-            ) : autoSubmitToHq ? (
+            ) : (
               <>
                 <Send className="w-5 h-5" />
                 <span>{editingItem ? '수정 후 본사 제출' : '지출 저장 및 본사 제출'}</span>
-              </>
-            ) : (
-              <>
-                <Check className="w-5 h-5" />
-                <span>{editingItem ? '지출 수정 완료' : '기기 내 저장'}</span>
               </>
             )}
           </button>
@@ -1225,9 +1143,9 @@ const AddExpenseModalContent: React.FC<{
                     >
                       <div className="flex items-center gap-3">
                         <div
-                          className={`w-9 h-9 rounded-full ${itemMeta.badgeBg} ${itemMeta.badgeTextColor} border ${itemMeta.badgeBorder} flex items-center justify-center shrink-0`}
+                          className={`w-10 h-10 rounded-full ${itemMeta.badgeBg} flex items-center justify-center shrink-0 shadow-2xs`}
                         >
-                          {renderCategoryIcon(itemMeta.iconName, 'w-4 h-4')}
+                          {renderCategoryIcon(itemMeta.iconName, 'w-6 h-6')}
                         </div>
                         <div>
                           <div className="font-bold text-sm text-slate-900">{itemMeta.label}</div>

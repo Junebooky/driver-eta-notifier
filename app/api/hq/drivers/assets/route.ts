@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireHqAdmin, verifyServerAuth } from '@/lib/auth/serverAuth';
+import { supabaseAdmin } from '@/lib/supabase/server';
 import {
   checkDriverAssetDbReady,
   deleteDriverProfileAsset,
@@ -7,6 +8,7 @@ import {
   getDriverProfileAsset,
   getDriverVehicleBundle,
   getDriverVehicleInfoAsset,
+  getDriverVehicleAssetSummary,
 } from '@/lib/assets/driverAssetServerStore';
 import { resolveVehicleEntity } from '@/utils/vehicleData';
 
@@ -117,12 +119,16 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const bundle = await getDriverVehicleBundle(driverId, resolvedVehicle.uuid, undefined, org);
+    const [bundle, vehicleAssetSummary] = await Promise.all([
+      getDriverVehicleBundle(driverId, resolvedVehicle.uuid, undefined, org),
+      getDriverVehicleAssetSummary(driverId, org),
+    ]);
     return NextResponse.json({
       ok: true,
       isDbReady: dbCheck.isReady,
       dbReason: dbCheck.reason,
       bundle,
+      vehicleAssetSummary,
     });
   } catch (err: any) {
     return NextResponse.json(
@@ -157,6 +163,25 @@ export async function DELETE(req: NextRequest) {
 
     if (type === 'profile') {
       await deleteDriverProfileAsset(driverId, org);
+      try {
+        const { data: curDriver } = await supabaseAdmin
+          .from('drivers')
+          .select('driver_meta')
+          .eq('id', driverId)
+          .maybeSingle();
+
+        if (curDriver?.driver_meta && typeof curDriver.driver_meta === 'object') {
+          const currentMeta = { ...curDriver.driver_meta };
+          delete currentMeta.avatar_url;
+          delete currentMeta.avatar_storage_path;
+          await supabaseAdmin
+            .from('drivers')
+            .update({ driver_meta: currentMeta })
+            .eq('id', driverId);
+        }
+      } catch (metaErr) {
+        console.warn('[Profile Delete] Note: could not clear drivers.driver_meta:', metaErr);
+      }
       return NextResponse.json({ ok: true, message: '기사 프로필 사진이 삭제(보관)되었습니다.' });
     }
 
