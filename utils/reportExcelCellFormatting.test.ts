@@ -38,7 +38,7 @@ test('New A-L report row uses 10pt G/H/I, non-wrapped G and 11pt elsewhere, with
   assert.equal(cellStyle(output.bytes,col,245).size,11,col);
  }
  const sheet=strFromU8(unzipSync(output.bytes)['xl/worksheets/sheet1.xml']);
- assert.match(sheet,/<col min="7" max="7" width="62" customWidth="1"\/>/);
+ assert.match(sheet,new RegExp('<col min="7" max="7" width="'+routeColumnWidth([report.route])+'" customWidth="1"\\/>'));
  assert.match(sheet,/<col min="8" max="8" width="22" customWidth="1"\/>/);
  assert.match(sheet,/<col min="9" max="9" width="29" customWidth="1"\/>/);
  assert.match(sheet,/<col min="1" max="1" width="22" customWidth="1"\/>/);
@@ -58,7 +58,7 @@ test('Existing wider width is not reduced; overlapping groups are split without 
  entries['xl/worksheets/sheet1.xml']=strToU8(sheet.replace('</cols>','<col min="5" max="10" width="75" customWidth="1"/></cols>'));
  const output=appendKakaoExcelReport(zipSync(entries),report);
  const after=strFromU8(unzipSync(output.bytes)['xl/worksheets/sheet1.xml']);
- for(const col of [7,8,9])assert.match(after,new RegExp('<col[^>]*min="'+col+'"[^>]*max="'+col+'"[^>]*width="75"'));
+ for(const col of [7,8,9])assert.match(after,new RegExp('<col[^>]*min="'+col+'"[^>]*max="'+col+'"[^>]*width="'+(col===7?Math.max(75,routeColumnWidth([report.route])):75)+'"'));
  assert.match(after,/<col min="5" max="6" width="75" customWidth="1"\/>/);
  assert.match(after,/<col min="10" max="10" width="75" customWidth="1"\/>/);
 });
