@@ -33,12 +33,15 @@ export async function POST(req:NextRequest) {
   if(!UUID.test(b.id||''))throw new Error('보고 번호를 확인해 주세요.');
   if(b.action==='review'){
    if(typeof b.correctedMessage!=='string'||!b.correctedMessage.trim()||b.correctedMessage.length>20000||!Number.isInteger(b.revision))throw new Error('확인할 내용을 입력해 주세요.');
-   const w=await currentWorkbook(s.org);
-   const parsed=parseDriverReport(b.correctedMessage,undefined,new Date(),{workbookYear:w?.year,nightEndHour:nightEndHour()});
+   const explicit=b.correctedMessage.match(/(20\d{2})\s*년/);
+   const previous=await db.from('report_submissions').select('parsed_date').eq('org_id',s.org).eq('id',b.id).single();check(previous.error);
+   const requestedYear=explicit?Number(explicit[1]):Number(previous.data!.parsed_date.slice(0,4));
+   const w=await currentWorkbook(s.org,requestedYear);
+   const parsed=parseDriverReport(b.correctedMessage,undefined,new Date(),{workbookYear:w?.year??requestedYear,nightEndHour:nightEndHour()});
    if(parsed.reviewReasons.length)throw new Error(parsed.reviewReasons.join(' '));
    const r=await db.rpc('review_report',{p_org:s.org,p_actor:s.userId,p_id:b.id,p_revision:b.revision,p_parsed:parsed,p_note:String(b.note||'확인 후 재처리합니다.').slice(0,500)});check(r.error);
    if(!r.data)return privateJson({ok:false,error:'다른 담당자가 변경했습니다. 새로고침해 주세요.'},409);
-  }else if(b.action!=='retry')throw new Error('지원하지 않는 요청입니다.');
+  }else if(b.action==='retry'){const retry=await db.rpc('retry_report_job',{p_org:s.org,p_id:b.id});check(retry.error);}else throw new Error('지원하지 않는 요청입니다.');
   await processReport(s.org,b.id,s.userId);
   return privateJson({ok:true});
  }catch(error){return failure(error);}

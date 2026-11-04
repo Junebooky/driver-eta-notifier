@@ -2,61 +2,73 @@ import {reportWorkbookYear} from '@/utils/reportWorkbookYear';
 import {createHash} from 'node:crypto';
 import {supabaseAdmin as db} from '@/lib/supabase/server';
 import {appendKakaoExcelReport,workbookFromFile} from '@/utils/kakaoExcelWorkbook';
+import {amendReportRow,removeReportRow,addApprovedMonth} from '@/utils/reportWorkbookOperations';
 import {parseDriverReport,reportReply} from '@/utils/driverReportChat';
+import {readWorkbook,storeWorkbook} from './storage';
 import type {CockpitAuthSession} from '@/lib/auth/serverAuth';
 import type {DriverReportSubmission} from '@/types/driverReportChat';
-
 export function nightEndHour(){const raw=process.env.REPORT_NIGHT_END_HOUR??'6';if(!/^(?:[0-9]|1[0-9]|2[01])$/.test(raw))throw new Error('심야 종료 설정을 확인해 주세요.');return Number(raw);}
-function check(error:{message:string}|null) {if(error)throw new Error('보고 저장소에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.');}
+function check(error:{message:string}|null){if(error)throw new Error('보고 저장소에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.');}
 const bytesFromDb=(value:string)=>new Uint8Array(Buffer.from(value.replace(/^\\x/,''),'hex'));
-const hex=(bytes:Uint8Array)=>'\\x'+Buffer.from(bytes).toString('hex');
-export async function currentWorkbook(org:string) {
-  const {data,error}=await db.from('report_workbooks').select('active_version,filename').eq('org_id',org).maybeSingle();check(error);
-  if(!data)return null;
-  const version=await db.from('report_workbook_versions').select('id,bytes,generation').eq('org_id',org).eq('id',data.active_version).single();check(version.error);
-  return {...data,id:version.data!.id,bytes:bytesFromDb(version.data!.bytes),generation:version.data!.generation,year:reportWorkbookYear(bytesFromDb(version.data!.bytes),data.filename)};
+export async function currentWorkbook(org:string,year?:number){
+ const registry=year?await db.from('report_ledgers').select('active_version,filename').eq('org_id',org).eq('year',year).maybeSingle():await db.from('report_workbooks').select('active_version,filename').eq('org_id',org).maybeSingle();check(registry.error);
+ if(!registry.data)return null;
+ const version=await db.from('report_workbook_versions').select('*').eq('org_id',org).eq('id',registry.data.active_version).single();check(version.error);
+ const bytes=await readWorkbook(version.data),resolvedYear=version.data.ledger_year??reportWorkbookYear(bytes,registry.data.filename);
+ if(resolvedYear&&!version.data.ledger_year){const b=await db.rpc('bind_legacy_report_ledger',{p_org:org,p_year:resolvedYear,p_expected:version.data.id});check(b.error);}
+ return {...registry.data,id:version.data.id,bytes,generation:version.data.generation,year:resolvedYear as number|null,manifest:version.data.manifest as Record<string,{sheet:string;row:number}>};
 }
-export async function processReport(org:string,id:string,actor:string) {
-  for(let attempt=0;attempt<12;attempt++) {
-    const read=await db.from('report_submissions').select('*').eq('org_id',org).eq('id',id).single();check(read.error);
-    const s=read.data as DriverReportSubmission;
-    if(!['pending','error'].includes(s.excel_status))return;
-    try {
-      const workbook=await currentWorkbook(org);
-      if(!workbook)throw new Error('HQ에서 회사 Excel 원본을 먼저 등록해 주세요.');
-      if(workbook.year===null||Number(s.parsed.draft.date.slice(0,4))!==workbook.year)throw new Error('활성 장부 연도와 보고 연도를 확인해 주세요.');
-      const result=appendKakaoExcelReport(workbook.bytes,s.parsed.draft);
-      const commit=await db.rpc('commit_report_workbook',{p_org:org,p_actor:actor,p_expected:workbook.id,p_bytes:hex(result.bytes),p_filename:workbook.filename,p_submission:id,p_revision:s.revision,p_sheet:result.sheetName,p_row:result.rowNumber});check(commit.error);
-      if(commit.data===true)return;
-      // Another request committed first; read its bytes and append again, never overwrite.
-    } catch(error) {
-      const reason=error instanceof Error?error.message:'Excel 반영 오류';
-      const failed=await db.rpc('fail_report',{p_org:org,p_id:id,p_revision:s.revision,p_reason:reason});check(failed.error);return;
-    }
+export async function processReport(org:string,id:string,actor:string,lease?:string){
+ if(!lease){await runReportWorker(org,1,id);return;}
+ try{
+  for(let attempt=0;attempt<12;attempt++){
+   const r=await db.from('report_submissions').select('*').eq('org_id',org).eq('id',id).single();check(r.error);const s=r.data as DriverReportSubmission & {ledger_year:number|null};
+   if(!['pending','error'].includes(s.excel_status))return;
+   const targetYear=Number(s.parsed.draft.date.slice(0,4));let target=await currentWorkbook(org,targetYear);
+   if(!target){await currentWorkbook(org);target=await currentWorkbook(org,targetYear);} // Bind a verified legacy annual ledger once.
+   if(!target||target.year!==targetYear)throw new Error('해당 연도 장부를 HQ에서 등록해 주세요.');
+   let bytes=target.bytes;
+   const month=Number(s.parsed.draft.date.slice(5,7));
+   if(!workbookFromFile(bytes).Sheets[month+'월']){
+    const t=await db.from('report_month_templates').select('source_month').eq('org_id',org).eq('year',targetYear).eq('month',month).maybeSingle();check(t.error);
+    if(!t.data)throw new Error('회사에서 승인한 빈 월별 양식이 필요합니다.');bytes=addApprovedMonth(bytes,t.data.source_month,month);
+   }
+   const plans:{year:number;expected:string;storage:Awaited<ReturnType<typeof storeWorkbook>>}[]=[];
+   let result;
+   if(s.applied_version&&s.ledger_year){
+    const source=s.ledger_year===targetYear?target:await currentWorkbook(org,s.ledger_year);
+    const location=source?.manifest[id];if(!source||!location)throw new Error('이전 반영 위치를 확인해 주세요.');
+    if(source.year===targetYear)result=amendReportRow(bytes,location.sheet,location.row,s.parsed.draft);
+    else{plans.push({year:s.ledger_year,expected:source.id,storage:await storeWorkbook(org,removeReportRow(source.bytes,location.sheet,location.row))});result=appendKakaoExcelReport(bytes,s.parsed.draft);}
+   }else result=appendKakaoExcelReport(bytes,s.parsed.draft);
+   plans.push({year:targetYear,expected:target.id,storage:await storeWorkbook(org,result.bytes)});
+   const commit=await db.rpc('commit_report_plan',{p_org:org,p_id:id,p_revision:s.revision,p_lease:lease,p_actor:actor,p_plans:plans,p_sheet:result.sheetName,p_row:result.rowNumber});check(commit.error);if(commit.data===true)return;
   }
-  // Leave durable pending state for the HQ retry queue rather than losing the submission.
+  throw new Error('동시 변경이 많아 다시 시도합니다.');
+ }catch(error){const f=await db.rpc('finish_report_failure',{p_org:org,p_id:id,p_lease:lease,p_reason:error instanceof Error?error.message:'Excel 반영 오류'});check(f.error);}
 }
-export async function submitReport(session:CockpitAuthSession,raw:string,requestKey:string) {
-  if(session.role!=='driver'||!session.driverId)throw new Error('기사 계정이 필요합니다.');
-  let year:number|null=null;try{year=(await currentWorkbook(session.org))?.year??null;}catch{/* Persist submission even if workbook lookup fails. */}
-  const parsed=parseDriverReport(raw,session.driverName,new Date(),{workbookYear:year,nightEndHour:nightEndHour()});
-  const fingerprint=createHash('sha256').update(raw.trim().replace(/\r/g,'')).digest('hex');
-  const saved=await db.rpc('submit_report',{p_org:session.org,p_driver:session.driverId,p_request:requestKey,p_fingerprint:fingerprint,p_raw:raw,p_parsed:parsed,p_reply:reportReply(parsed)});
-  if(saved.error?.code==='40001')throw new Error('같은 전송 번호로 내용이 변경되었습니다. 새 메시지로 보내 주세요.');
-  check(saved.error);const result=saved.data as {id:string;duplicate:boolean};
-  // Submission/messages are already committed; Excel failure must never report submission failure.
-  try {await processReport(session.org,result.id,session.userId);}catch {/* HQ queue retains the pending submission. */}
-  return result;
+export async function runReportWorker(org?:string,limit=15,id?:string){
+ const claim=await db.rpc('claim_report_jobs',{p_limit:limit,p_org:org||null,p_id:id||null});check(claim.error);
+ for(const job of claim.data||[])await processReport(job.org_id,job.submission_id,'00000000-0000-4000-8000-000000000001',job.lease_token);
+ return claim.data?.length||0;
 }
-export async function registerWorkbook(session:CockpitAuthSession,bytes:Uint8Array,filename:string) {
-  workbookFromFile(bytes);
-  if(reportWorkbookYear(bytes,filename)===null)throw new Error('장부 연도를 확인할 수 없습니다. 파일명에 2026처럼 연도를 명시해 주세요.');
-  const saved=await db.rpc('commit_report_workbook',{p_org:session.org,p_actor:session.userId,p_expected:null,p_bytes:hex(bytes),p_filename:filename});check(saved.error);
-  if(!saved.data)throw new Error('Excel 원본이 이미 등록되어 있습니다.');
+export async function submitReport(session:CockpitAuthSession,raw:string,requestKey:string){
+ if(session.role!=='driver'||!session.driverId)throw new Error('기사 계정이 필요합니다.');
+ let year:number|null=null;try{year=(await currentWorkbook(session.org))?.year??null;}catch{/* Submission remains durable. */}
+ const parsed=parseDriverReport(raw,session.driverName,new Date(),{workbookYear:year,nightEndHour:nightEndHour()});
+ const fingerprint=createHash('sha256').update((parsed.draft.date||'')+'|'+raw.trim().replace(/\r/g,'')).digest('hex');
+ const saved=await db.rpc('submit_report',{p_org:session.org,p_driver:session.driverId,p_request:requestKey,p_fingerprint:fingerprint,p_raw:raw,p_parsed:parsed,p_reply:reportReply(parsed)});
+ if(saved.error?.code==='40001')throw new Error('같은 전송 번호로 내용이 변경되었습니다. 새 메시지로 보내 주세요.');check(saved.error);
+ const result=saved.data as {id:string;duplicate:boolean};try{await runReportWorker(session.org,1,result.id);}catch{/* Cron resumes the durable queue. */}return result;
 }
-export async function drainReports(session:CockpitAuthSession) {
-  const {data,error}=await db.from('report_submissions').select('id').eq('org_id',session.org).in('excel_status',['pending','error']).order('submitted_at').limit(20);check(error);
-  for(const row of data||[])await processReport(session.org,row.id,session.userId);
-  return data?.length||0;
+export async function registerWorkbook(session:CockpitAuthSession,bytes:Uint8Array,filename:string){
+ workbookFromFile(bytes);const year=reportWorkbookYear(bytes,filename);if(year===null)throw new Error('파일명과 날짜의 연도가 다르거나 혼합되어 있습니다. 장부를 확인해 주세요.');
+ const saved=await db.rpc('register_report_ledger',{p_org:session.org,p_year:year,p_actor:session.userId,p_filename:filename,p_storage:await storeWorkbook(session.org,bytes)});check(saved.error);
 }
+export async function approveMonth(session:CockpitAuthSession,year:number,month:number,source:string){
+ const w=await currentWorkbook(session.org,year);if(!w)throw new Error('해당 장부가 없습니다.');
+ const bytes=addApprovedMonth(w.bytes,source,month);const r=await db.rpc('commit_report_template',{p_org:session.org,p_year:year,p_month:month,p_source:source,p_actor:session.userId,p_expected:w.id,p_storage:await storeWorkbook(session.org,bytes)});check(r.error);if(!r.data)throw new Error('장부가 변경되었습니다. 새로고침해 주세요.');
+ await runReportWorker(session.org);
+}
+export async function drainReports(session:CockpitAuthSession){return runReportWorker(session.org,20);}
 export {check,bytesFromDb};

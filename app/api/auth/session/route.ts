@@ -62,6 +62,11 @@ export async function POST(req: NextRequest) {
       const token=extractAuthToken(req);
       const session=token ? await parseAndVerifyToken(token) : null;
       if (token && !session) return clearCookies(NextResponse.json({ok:false,error:'세션이 만료되었거나 서버 로그아웃을 확인하지 못했습니다. 다시 로그인해 주세요.'},{status:503}));
+      if(session?.reportDevice&&session.driverId){
+        const r=await supabaseAdmin.rpc('revoke_report_devices',{p_org:session.org,p_driver:session.driverId,p_actor:session.userId,p_device:session.sessionId});
+        if(r.error)return clearCookies(NextResponse.json({ok:false,error:'기기 연결 해제를 확인하지 못했습니다.'},{status:503}));
+        return clearCookies(NextResponse.json({ok:true,authenticated:false}));
+      }
       if (session?.sessionId) {
         // Immediate local revocation also denies a copied access token before its natural expiry.
         const {error}=await supabaseAdmin.from('revoked_auth_sessions').upsert({session_id:session.sessionId,user_id:session.userId},{onConflict:'session_id'});

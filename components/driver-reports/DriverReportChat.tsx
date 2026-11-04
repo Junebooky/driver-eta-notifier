@@ -1,6 +1,7 @@
 'use client';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import Link from 'next/link';
+import {readChatDraft,saveChatDraft,clearChatDrafts} from '@/utils/reportChatDraft';
 import {ArrowLeft,ArrowUp,Plus,RefreshCw,MessageCircle,ChevronUp} from 'lucide-react';
 import type {ReportChatMessage} from '@/types/driverReportChat';
 import {koreaDate} from '@/utils/driverReportChat';
@@ -11,12 +12,14 @@ const dayLabel=(date:string)=>new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Se
 export function DriverReportChat({driverId,driverName='기사님'}:{driverId:string;driverName?:string}) {
  const [messages,setMessages]=useState<ReportChatMessage[]>([]),[outgoing,setOutgoing]=useState<Outgoing[]>([]);
  const [text,setText]=useState(''),[error,setError]=useState(''),[hasMore,setHasMore]=useState(false),[loading,setLoading]=useState(true);
+ const [draftLoaded,setDraftLoaded]=useState(false);
+ const frame=useRef<HTMLDivElement>(null);
  const [today,setToday]=useState(koreaDate()),[templates,setTemplates]=useState(false),[sending,setSending]=useState(false);
  const tail=useRef<HTMLDivElement>(null),input=useRef<HTMLTextAreaElement>(null),active=useRef(true),inflight=useRef(false),stick=useRef(true),fetched=useRef(false);
  const load=useCallback(async(before?:number)=>{
   const res=await fetch('/api/driver-reports?driverId='+encodeURIComponent(driverId)+(before?'&before='+before:''),{cache:'no-store'});
   const data=await res.json();
-  if(res.status===401||res.status===403){setMessages([]);setOutgoing([]);window.location.replace('/driver/reports');return;}
+  if(res.status===401||res.status===403){setMessages([]);setOutgoing([]);clearChatDrafts(localStorage);window.location.replace('/driver/reports');return;}
   if(!res.ok)throw new Error(data.error||'대화를 불러오지 못했어요.');
   if(!active.current)return;
   setMessages(previous=>{
@@ -32,6 +35,15 @@ export function DriverReportChat({driverId,driverName='기사님'}:{driverId:str
   const poll=window.setInterval(()=>{setToday(koreaDate());if(document.visibilityState==='visible')void load().catch(()=>{});},12000);
   return()=>{active.current=false;window.clearInterval(poll);};
  },[load]);
+ useEffect(()=>{
+  let alive=true;queueMicrotask(()=>{if(!alive)return;try{const d=readChatDraft(localStorage,driverId);if(d){setText(d.text);setOutgoing(d.outgoing);}}catch{setError('이 기기에 임시 저장할 수 없어요.');}setDraftLoaded(true);});
+  const clear=()=>{setText('');setOutgoing([]);clearChatDrafts(localStorage);};
+  window.addEventListener('report-draft-clear',clear);return()=>{alive=false;window.removeEventListener('report-draft-clear',clear);};
+ },[driverId]);
+ useEffect(()=>{if(draftLoaded)try{saveChatDraft(localStorage,driverId,text,outgoing);}catch{queueMicrotask(()=>setError('임시 저장 공간이 부족해요. 작성 내용을 복사해 보관해 주세요.'));}},[draftLoaded,driverId,text,outgoing]);
+ useEffect(()=>{
+  const vv=window.visualViewport;const fit=()=>{if(frame.current)frame.current.style.height=(vv?.height||window.innerHeight)+'px';};fit();vv?.addEventListener('resize',fit);return()=>vv?.removeEventListener('resize',fit);
+ },[]);
  useEffect(()=>{if(input.current){input.current.style.height='auto';input.current.style.height=Math.min(176,input.current.scrollHeight)+'px';}},[text]);
  useEffect(()=>{if(stick.current)tail.current?.scrollIntoView({block:'end'});},[messages,outgoing]);
  useEffect(()=>{
@@ -64,7 +76,7 @@ export function DriverReportChat({driverId,driverName='기사님'}:{driverId:str
    <div className="mt-1.5 flex items-center gap-2 px-1 text-[10px] text-slate-400"><time dateTime={m.created_at}>{time(m.created_at)}</time>{status&&(status.failed?<button onClick={()=>void send(status)} disabled={sending} className="flex items-center gap-1 text-[#1E60F3]"><RefreshCw size={11}/>다시 보내기</button>:<span>보내는 중</span>)}</div>
   </div>
  </div>;
- return <div className="mx-auto flex h-dvh w-full max-w-2xl flex-col overflow-hidden bg-[#F3F5F8] text-slate-800">
+ return <div ref={frame} className="mx-auto flex h-dvh w-full max-w-2xl flex-col overflow-hidden bg-[#F3F5F8] text-slate-800">
   <header className="z-10 flex shrink-0 items-center gap-3 border-b border-slate-200/60 bg-[#F3F5F8]/95 px-4 pb-4 pt-[max(16px,env(safe-area-inset-top))]">
    <Link href="/" aria-label="기사 홈으로" className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-white"><ArrowLeft size={23}/></Link>
    <div className="flex-1"><h1 className="text-[17px] font-bold tracking-tight">VIP리무진코리아</h1><p className="mt-0.5 text-xs text-slate-400">운행보고 대화방</p></div>

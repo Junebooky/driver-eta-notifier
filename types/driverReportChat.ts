@@ -12,5 +12,6 @@ export interface DriverReportSubmission {
   id:string; seq:number; driver_id:string; raw_message:string; parsed:ParsedDriverReport;
   excel_status:ReportExcelStatus; review_status:'pending'|'approved'|'not_required';
   excel_sheet_name:string|null; excel_row_number:number|null; submitted_at:string; revision:number;
+  applied_version:string|null; ledger_year:number|null;
   last_error:string|null;
 }

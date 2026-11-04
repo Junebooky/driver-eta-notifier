@@ -2,6 +2,7 @@ import { Client } from 'pg';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
+import {verifyReportCompletion} from './report-completion.integration';
 import { verifyDriverReportChat } from './driver-report-chat.integration';
 import { verifyReportingFlow } from './reporting-flow.integration';
 
@@ -173,6 +174,7 @@ async function main() {
     await admin.query('RESET ROLE');
     console.log('PASS immutable profile UUID and linked assets across vehicle assignments; public access denied');
     await verifyReportingFlow(admin,a,b);
+    await verifyReportCompletion(admin,connectionString);
 
   } finally { await a.end().catch(()=>{}); await b.end().catch(()=>{}); await admin.end(); }
 }

@@ -7,7 +7,7 @@ import {
   FolderOpen, Info, Save, ShieldCheck,
 } from 'lucide-react';
 import {
-  EXCEL_COLUMN_LABELS, EXCEL_RECORD_YEAR, excelVehicleModel, parseKakaoExcelReport,
+  EXCEL_COLUMN_LABELS, currentReportYear, excelVehicleModel, parseKakaoExcelReport,
   validateKakaoExcelDraft, type KakaoExcelDraft,
 } from '@/utils/kakaoExcelImport';
 
@@ -36,6 +36,7 @@ const optionalFields: Array<{key:keyof KakaoExcelDraft;label:string}> = [
 ];
 
 export function HqKakaoExcelImportView() {
+  const [selectedYear,setSelectedYear]=useState(currentReportYear);
   const [raw, setRaw] = useState('');
   const [reviewed, setReviewed] = useState(false);
   const sourceBytes = useRef<Uint8Array | null>(null);
@@ -50,7 +51,7 @@ export function HqKakaoExcelImportView() {
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
-  const requiredErrors = useMemo(() => draft ? validateKakaoExcelDraft(draft) : [], [draft]);
+  const requiredErrors = useMemo(() => draft ? validateKakaoExcelDraft(draft,selectedYear) : [], [draft,selectedYear]);
 
   useEffect(() => {
     const guard = (event: BeforeUnloadEvent) => { if (hasChanges) {event.preventDefault(); event.returnValue = '';}};
@@ -59,7 +60,7 @@ export function HqKakaoExcelImportView() {
   });
 
   function extract() {
-    const result = parseKakaoExcelReport(raw, EXCEL_RECORD_YEAR);
+    const result = parseKakaoExcelReport(raw, selectedYear);
     setReviewed(false);
     setDraft(result.draft);
     setWarnings(result.warnings);
@@ -197,7 +198,7 @@ export function HqKakaoExcelImportView() {
     <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 space-y-4">
       <div className="flex items-center justify-between gap-3">
         <h3 className="flex items-center gap-2 text-sm font-bold text-slate-800"><ClipboardPaste size={17}/> 카카오톡 운행보고 붙여넣기</h3>
-        <span className="rounded-lg bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">{EXCEL_RECORD_YEAR}년 기록부</span>
+        <label className="text-xs text-slate-600">기록부 연도 <input aria-label="기록부 연도" type="number" min="2000" max="2099" value={selectedYear} onChange={e=>{setSelectedYear(Number(e.target.value));setDraft(null);}} className="w-20 rounded-lg border border-slate-200 p-2"/></label>
       </div>
       <textarea value={raw} onChange={e => {setRaw(e.target.value); setDraft(null); setReviewed(false);}} aria-label="카카오톡 운행보고 원문" rows={8} placeholder={'10월 24일(토)\n수행담당 : 윤태준\n차량번호 : 700호 1458\n고객명 : 샤넬\n시작 시간 : 09:15\n종료 시간 : 17:20\n출발지 : 안다즈 호텔\n최종도착지 : 차고지'} className="w-full resize-y text-slate-700 rounded-xl border border-slate-200 p-4 text-sm leading-6 outline-none focus:border-[#1E60F3]"/>
       <button type="button" disabled={!raw.trim() || busy} onClick={extract} className="rounded-xl bg-[#1E60F3] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-40">항목 추출 및 검토</button>
