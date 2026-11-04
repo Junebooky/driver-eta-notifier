@@ -66,7 +66,7 @@ async function assertPageRedirect(path,cookie,target){
  const html=await response.text();
  const location=response.headers.get('location');
  assert.ok((response.status===307 && location && new URL(location,base).href===new URL(target,base).href) ||
-   (response.status===200 && (html.includes(`url=${target}`) || html.includes(`NEXT_REDIRECT;replace;${target};307;`))),`expected ${path} to redirect to ${target}`);
+   (response.status===200 && (html.includes(`url=${target}`) || html.includes(`NEXT_REDIRECT;replace;${target};307;`))),`expected ${path} to redirect to ${target}; received status=${response.status}, location=${location}`);
  return response;
 }
 const assertRepresentativeRedirect=(cookie,target='/hq/login')=>assertPageRedirect('/representative',cookie,target);
@@ -100,6 +100,8 @@ try{
  assert.equal((await(await fetch(base+'/api/auth/session',{headers:{cookie:repCookie}})).json()).session.isRepresentative,true);
 
  const expiredRep=issue('representative',undefined,-1);
+ const expiredRepCookie=`cockpit_session=${expiredRep.access_token}; cockpit_refresh=${expiredRep.refresh_token}`;
+ await assertRepresentativeRedirect(expiredRepCookie,'/api/auth/representative-session');
  const renewedRep=await fetch(base+'/api/auth/representative-session',{redirect:'manual',headers:{cookie:`cockpit_session=${expiredRep.access_token}; cockpit_refresh=${expiredRep.refresh_token}`}});
  assert.equal(renewedRep.status,307);assert.equal(new URL(renewedRep.headers.get('location'),base).href,base+'/hq?tab=dashboard');assert.ok(renewedRep.headers.getSetCookie().some(value=>value.startsWith('cockpit_refresh=')&&!value.includes(expiredRep.refresh_token)));
  assert.equal((await fetch(base+'/hq?tab=dashboard',{redirect:'manual',headers:{cookie:cookies(renewedRep)}})).status,200);
@@ -121,6 +123,12 @@ try{
    const resumedPage=await fetch(base+home,{headers:{cookie:cookies(resumed)},redirect:'manual'});assert.equal(resumedPage.status,200);
  }
  const revokedLaunch=issue('representative');revoked.add(verify(revokedLaunch.access_token).claims.session_id);
+ const revokedCookie=`cockpit_session=${revokedLaunch.access_token}; cockpit_refresh=${revokedLaunch.refresh_token}`;
+ await assertRepresentativeRedirect(revokedCookie,'/api/auth/representative-session');
+ const deniedRepresentative=await fetch(base+'/api/auth/representative-session',{headers:{cookie:revokedCookie},redirect:'manual'});
+ assert.equal(deniedRepresentative.status,307);assert.equal(new URL(deniedRepresentative.headers.get('location'),base).href,base+'/hq/login');
+ assert.ok(deniedRepresentative.headers.getSetCookie().length>0);
+ assert.ok(deniedRepresentative.headers.getSetCookie().every(value=>value.includes('Max-Age=0')));
  const deniedLaunch=await fetch(base+'/api/auth/launch',{headers:{cookie:`cockpit_session=${revokedLaunch.access_token}; cockpit_refresh=${revokedLaunch.refresh_token}`},redirect:'manual'});
  assert.equal(new URL(deniedLaunch.headers.get('location'),base).href,base+'/login');assert.ok(deniedLaunch.headers.getSetCookie().every(value=>value.includes('Max-Age=0')));
  console.log('PASS PWA HTTP: root → HQ/driver by trusted role, expired access → rotated cookies → correct home, revoked session → login, private responses and unchanged manifest start URL');
@@ -131,6 +139,8 @@ try{
  const driverLogin=await post('/api/auth/session',{email:'driver@example.invalid',password:'isolated-password',role:'hq'});assert.equal(driverLogin.status,200);
  const driverCookie=cookies(driverLogin);const driverSession=await driverLogin.json();assert.equal(driverSession.session.role,'driver');assert.equal(driverSession.session.driverId,driverId);
  assert.equal((await fetch(base+'/',{headers:{cookie:driverCookie},redirect:'manual'})).status,200,'driver launch remains the existing cockpit');
+ await assertRepresentativeRedirect(driverCookie);
+ await assertRepresentativeRedirect('cockpit_session=invalid-token');
  const own=await(await fetch(base+'/api/driver?vehicle_no=another-driver',{headers:{cookie:driverCookie}})).json();assert.equal(own.driver.id,driverId);
  assert.equal((await fetch(base+`/api/hq/drivers/${driverId}`,{headers:{cookie:driverCookie}})).status,403);
  assert.equal((await post('/api/auth/session',{action:'logout'},driverCookie)).status,200);
