@@ -53,7 +53,6 @@ import { ScheduleItem } from '@/data/ferrariSchedules';
 import {
   annotateBookingsWithConflicts,
   cleanDriverIdentity,
-  formatKoreanFullDateLabel,
   formatShortAckTime,
   getKstTodayDateStr,
   getKstTomorrowDateStr,
@@ -593,8 +592,6 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
     }
   };
 
-  const todayFullLabel = formatKoreanFullDateLabel();
-
   return (
     <div className="hq-app min-h-dvh bg-[#F8FAFC] flex font-sans antialiased text-slate-800 pb-[calc(88px+env(safe-area-inset-bottom))] lg:pb-0">
       {/* 1. Desktop Sidebar + Mobile Slide-over Drawer */}
@@ -624,70 +621,6 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
           onOpenChauffeurCard={() => setIsChauffeurCardOpen(true)}
           onOpenAdminLogin={() => setIsAdminLoginOpen(true)}
           onOpenNotifications={() => setIsAlertDrawerOpen(true)}
-          title={
-            activeSidebarTab === 'operations'
-              ? '실시간 행사 운영 보드'
-              : activeSidebarTab === 'quotes'
-                ? '표준 요금표'
-                : activeSidebarTab === 'field_knowledge'
-                  ? '현장 지식'
-                  : activeSidebarTab === 'driving_logs'
-                    ? '운행일지 관리'
-                    : activeSidebarTab === 'expenses' || activeSidebarTab === 'receipts'
-                      ? '경비지출 · 영수증 검수'
-                      : activeSidebarTab === 'emails'
-                        ? '고객 이메일 · 예약 접수'
-                        : activeSidebarTab === 'customers'
-                          ? '고객 관리'
-                          : activeSidebarTab === 'reports'
-                            ? '정산 · 수익성 · 종합 리포트'
-                            : activeSidebarTab === 'vehicles'
-                              ? '차량 관리'
-                              : activeSidebarTab === 'drivers'
-                                ? '기사 관리'
-                                : '실시간 배차 관제'
-          }
-          subtitle={
-            activeSidebarTab === 'operations' ? (
-              <span className="text-slate-500 font-medium">
-                진행 중인 행사의 차량 위치와 운행 상태를 실시간으로 확인해요
-              </span>
-            ) : activeSidebarTab === 'quotes' ? (
-              <span className="text-slate-500 font-medium">
-                차량별 기본 요금을 확인하고 바로 견적서를 만들 수 있어요.
-              </span>
-            ) : activeSidebarTab === 'field_knowledge' ? (
-              <span className="text-slate-500 font-medium">
-                VIP 의전 현장 특이사항, 호텔·공항 진입 동선 및 거점 정보를 관리하고 기사 앱에 실시간 공유합니다.
-              </span>
-            ) : activeSidebarTab === 'customers' ? (
-              <span className="text-slate-500 font-medium">
-                주요 고객사의 담당자, 계약 단가, 청구 내역을 한눈에 확인하고 관리합니다.
-              </span>
-            ) : activeSidebarTab === 'reports' ? (
-              <span className="text-slate-500 font-medium">
-                고객사 서비스 시간 기준 정산 · 기사 인건비 · 배차별 직접이익 분석 및 리포트
-              </span>
-            ) : activeSidebarTab === 'vehicles' ? (
-              <span className="text-slate-500 font-medium">
-                총 20대의 차량이 등록되어 있어요
-              </span>
-            ) : activeSidebarTab === 'drivers' ? null : activeSidebarTab === 'expenses' || activeSidebarTab === 'receipts' ? (
-              <>
-                <span className="font-bold text-slate-700">{todayFullLabel}</span>
-                <span className="text-slate-300">|</span>
-                <span className="text-slate-400">기사 Cockpit 경비 및 영수증 실시간 대조 검수</span>
-              </>
-            ) : (
-              <>
-                <span className="font-bold text-slate-700">{todayFullLabel}</span>
-                <span className="text-slate-300">|</span>
-                <span className="text-slate-500">
-                  예약 접수부터 기사님 배정까지 실시간으로 연결돼요
-                </span>
-              </>
-            )
-          }
           searchPlaceholder={
             activeSidebarTab === 'field_knowledge'
               ? '검색어를 입력하세요...'
@@ -707,9 +640,8 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
           }
         />
 
-
         {/* Scrollable Body */}
-        <main className="flex-1 p-3.5 sm:p-5 lg:p-6 space-y-4 sm:space-y-5 overflow-y-auto">
+        <main className="flex-1 p-3 sm:p-4.5 lg:p-5 space-y-4 sm:space-y-5 overflow-y-auto">
           {/* Dedicated 고객 이메일 View - persistently mounted for instant switching without re-fetch */}
           <div className={activeSidebarTab === 'emails' ? 'block' : 'hidden'}>
             <HqEmailInboxView

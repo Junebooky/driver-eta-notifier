@@ -1,9 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, X, ChevronDown, Menu, RefreshCw, PhoneCall, Award } from 'lucide-react';
+import { Search, X, ChevronDown, Menu } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
-import { formatKoreanFullDateLabel } from '@/utils/dispatchConflictDetector';
 import { DevAuthSwitcher } from '@/components/DevAuthSwitcher';
 
 export interface HqHeaderProps {
@@ -19,7 +18,9 @@ export interface HqHeaderProps {
   onOpenChauffeurCard?: () => void;
   onOpenAdminLogin?: () => void;
   lastSyncedLabel?: string;
+  /** @deprecated Header title has been removed in UI cleanup */
   title?: string;
+  /** @deprecated Header subtitle has been removed in UI cleanup */
   subtitle?: React.ReactNode;
   searchPlaceholder?: string;
 }
@@ -37,11 +38,8 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
   onOpenChauffeurCard,
   onOpenAdminLogin,
   lastSyncedLabel,
-  title = '예약·배차 관리',
-  subtitle,
   searchPlaceholder = '고객명, 예약번호, 기사명, 차량번호 검색...',
 }) => {
-  const todayLabel = formatKoreanFullDateLabel();
 
   // 1-minute alert pulse & speech bubble
   const [isMinutePulsing, setIsMinutePulsing] = useState(false);
@@ -83,10 +81,10 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
   }, [lastSyncedLabel]);
 
   return (
-    <header className="bg-white border-b border-slate-100 px-3.5 sm:px-6 py-3 sticky top-0 z-20 space-y-2.5">
-      <div className="flex items-center justify-between gap-2.5">
-        {/* Left: Mobile Menu Button + Title & Live Date */}
-        <div className="flex items-center gap-2.5 min-w-0">
+    <header className="bg-white border-b border-slate-100 px-3.5 sm:px-6 sticky top-0 z-20">
+      <div className="flex items-center justify-between gap-2.5 h-14 sm:h-16">
+        {/* Left: Mobile Menu Button (lg:hidden) */}
+        <div className="flex items-center gap-2">
           {onOpenMobileMenu && (
             <button
               type="button"
@@ -94,33 +92,16 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
                 haptics.lightTap();
                 onOpenMobileMenu();
               }}
-              className="lg:hidden w-11 h-11 rounded-xl border border-slate-200/80 bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-700 shrink-0 cursor-pointer active:scale-95"
+              className="lg:hidden w-10 h-10 rounded-xl border border-slate-200/80 bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-700 shrink-0 cursor-pointer active:scale-95"
               aria-label="전체 메뉴 열기"
             >
               <Menu className="w-4 h-4" />
             </button>
           )}
-
-          <div className="min-w-0">
-            <h1 className="text-base sm:text-xl font-black text-slate-900 tracking-tight truncate">
-              {title}
-            </h1>
-            {subtitle !== null && (
-              <div className="flex items-center gap-1.5 mt-0.5 text-[11px] sm:text-xs text-slate-500 font-medium truncate">
-                {subtitle ?? (
-                  <>
-                    <span className="font-bold text-slate-700">{todayLabel}</span>
-                    <span className="text-slate-300">|</span>
-                    <span className="text-slate-400 truncate">예약 접수부터 기사님 배정까지 실시간으로 연결돼요</span>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
         </div>
 
-        {/* Right Actions: Desktop Search + Phone Intake + Sync + Bell + Profile */}
-        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+        {/* Right Actions: Quick Calculator + Sync + Bell + Dev Switcher + Profile */}
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0 ml-auto">
 
           {/* Quick Quote Calculator Button (Ghost Style) */}
           {onOpenQuoteModal && (
@@ -251,7 +232,7 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
       </div>
 
       {/* Mobile Compact Search Bar (< md) */}
-      <div className="relative md:hidden">
+      <div className="relative md:hidden pb-2.5">
         <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
         <input
           type="text"
