@@ -9,7 +9,7 @@ test('applied corrections edit the same owned cells without adding a duplicate r
  const initial=appendKakaoExcelReport(kakaoWorkbookFixture(),draft);const corrected=amendReportRow(initial.bytes,'4월',245,{...draft,time:'10:00~23:00',overtime:'OT 2시간 / 심야 1시간'});
  assert.equal(corrected.rowNumber,245);const wb=workbookFromFile(corrected.bytes);assert.equal(wb.Sheets['4월'].cells.F245.v,'10:00~23:00');assert.equal(wb.Sheets['4월'].cells.F246,undefined);assert.equal(wb.Sheets['4월'].cells.I245.v,'OT 2시간 / 심야 1시간');
  const a=unzipSync(initial.bytes),b=unzipSync(corrected.bytes);for(const n of Object.keys(a))if(n!=='xl/worksheets/sheet1.xml')assert.deepEqual(a[n],b[n]);
- const strip=(s:string)=>s.replace(/<row r="245">[\s\S]*?<\/row>/,'');assert.equal(strip(strFromU8(a['xl/worksheets/sheet1.xml'])),strip(strFromU8(b['xl/worksheets/sheet1.xml'])));
+ const strip=(s:string)=>s.replace(/<row\b(?=[^>]*\br="245")[^>]*>[\s\S]*?<\/row>/,'');assert.equal(strip(strFromU8(a['xl/worksheets/sheet1.xml'])),strip(strFromU8(b['xl/worksheets/sheet1.xml'])));
  assert.equal(workbookFromFile(removeReportRow(corrected.bytes,'4월',245)).Sheets['4월'].cells.D245,undefined);
 });
 test('approved blank month keeps styles/formulas and original records but copies no historical records',()=>{

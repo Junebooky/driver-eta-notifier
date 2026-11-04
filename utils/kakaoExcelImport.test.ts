@@ -19,6 +19,7 @@ test('A01 report → approved monthly sheet, only A–L, duplicate protection',(
  const cells=workbookFromFile(result.bytes).Sheets['4월'].cells;
  assert.equal(cells.B245.v,1458); assert.equal(cells.C245.v,'스프린터');
  assert.equal(cells.D245.v,'샤넬'); assert.equal(cells.H245.v,'의전');
- for(const col of ['I','J','K','L','M']) assert.equal(cells[col+'245'],undefined);
+ assert.equal(cells.I245.v,'');
+ for(const col of ['J','K','L','M']) assert.equal(cells[col+'245'],undefined);
  assert.throws(()=>appendKakaoExcelReport(result.bytes,draft),/중복/);
 });
