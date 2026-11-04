@@ -2,6 +2,7 @@ import {NextRequest} from 'next/server';
 import {supabaseAdmin as db} from '@/lib/supabase/server';
 import {tokenHash,validSecret} from '@/lib/driverDevices/tokens';
 import {submitReport} from '@/lib/driverReports/service';
+import {isReportServiceType} from '@/utils/reportServiceTypes';
 import type {CockpitAuthSession} from '@/lib/auth/serverAuth';
 import {boundedBody,privateJson,sameOrigin,UUID} from '@/lib/driverReports/http';
 
@@ -44,7 +45,7 @@ export async function POST(req:NextRequest){
    org:'vip_limousine_korea',issuedAt:0,expiresAt:0
   };
   if(link.data.org_id!==session.org)return privateJson({ok:false,error:'사용할 수 없는 링크입니다.'},403);
-  const submitted=await submitReport(session,body.message.trim(),body.requestKey);
+  const submitted=await submitReport(session,body.message.trim(),body.requestKey,isReportServiceType(body.serviceType)?body.serviceType:undefined);
   return privateJson({ok:true,received:submitted.accepted,...submitted},submitted.accepted?201:200);
  }catch(e){
   return privateJson({ok:false,error:e instanceof Error?e.message:'보고를 접수하지 못했습니다.'},400);

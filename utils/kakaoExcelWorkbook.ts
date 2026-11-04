@@ -1,7 +1,7 @@
 import { unzipSync, zipSync, strFromU8, strToU8 } from 'fflate';
 import { DOMParser } from '@xmldom/xmldom';
 import { normalizedPlate, validateKakaoExcelDraft, type KakaoExcelDraft } from '@/utils/kakaoExcelImport';
-import {reportRowCellStyles,widenReportColumns,reportRowHeight} from '@/utils/reportExcelCellFormatting';
+import {reportRowCellStyles,widenReportColumns,reportRowHeight,routeColumnWidth} from '@/utils/reportExcelCellFormatting';
 
 const MAX_BYTES = 12 * 1024 * 1024;
 export interface KakaoWorkbookResult { bytes: Uint8Array; sheetName: string; rowNumber: number; createdMonth: boolean }
@@ -142,7 +142,7 @@ export function appendKakaoExcelReport(bytes: Uint8Array, draft: KakaoExcelDraft
   if (patched === source) throw new Error('지원하지 않는 빈 시트입니다. 승인된 템플릿을 확인해 주세요.');
   const range = {s:{...sheet.ref.s},e:{...sheet.ref.e}}; range.e.r = rowNumber-1; range.e.c = Math.max(range.e.c,11);
   patched = patched.replace(/<dimension\b[^>]*\bref="[^"]*"[^>]*\/>/,`<dimension ref="${rangeName(range)}"/>`);
-  patched=widenReportColumns(patched);
+  patched=widenReportColumns(patched,routeColumnWidth([draft.route,...Object.entries(sheet.cells).filter(([address])=>/^G[1-9]\\d*$/.test(address)).map(([,cell])=>String(cell.v??''))]));
   entries[path] = strToU8(patched);
   // Existing cells, formulas, drawings and unrelated ZIP members are unchanged.
   // styles.xml is extended only when new report fonts/cell styles are needed.

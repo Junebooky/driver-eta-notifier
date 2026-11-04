@@ -7,6 +7,13 @@ import {strFromU8,strToU8} from 'fflate';
  * requested column widths. Existing rows, formulas and template style IDs stay untouched.
  */
 const COLUMN_WIDTHS: Record<number,number>={7:62,8:22,9:29};
+/** Excel column width has a hard limit of 255 character units. */
+export const EXCEL_MAX_COL_WIDTH=255;
+/** Calculate width of route text, accounting for full-width Korean characters. */
+export function routeColumnWidth(routes:string[]){
+ const longest=Math.max(0,...routes.map(route=>Array.from(route.replace(/[\r\n]+/g,' ')).reduce((sum,ch)=>sum+(/[\u1100-\u11FF\u2E80-\uA4CF\uAC00-\uD7A3\uF900-\uFAFF\uFE10-\uFE6F\uFF01-\uFF60]/u.test(ch)?2:1),0)));
+ return Math.min(EXCEL_MAX_COL_WIDTH,Math.max(COLUMN_WIDTHS[7],Math.ceil(longest+6)));
+}
 
 const parse=(xml:string)=>{
  if(/<!DOCTYPE|<!ENTITY/i.test(xml))throw new Error('지원하지 않는 Excel 스타일 XML입니다.');
@@ -47,7 +54,8 @@ export function reportRowCellStyles(entries:Record<string,Uint8Array>,templateSt
  for(let column=0;column<12;column++){
   const letter=String.fromCharCode(65+column);
   const wanted=column>=6&&column<=8?10:11;
-  const wrap=column>=6&&column<=8;
+  const wrap=column===7||column===8;
+  const noWrap=column===6;
   const index=Number(templateStyles.get(letter)??0);
   if(!Number.isInteger(index)||index<0||index>=xfs.length)throw new Error('기준 행의 Excel 셀 서식을 확인해 주세요.');
   const oldXf=xfs[index];
@@ -55,10 +63,11 @@ export function reportRowCellStyles(entries:Record<string,Uint8Array>,templateSt
   const oldFont=fonts[originalFontId]||fonts[0];
   const oldAlignment=oldXf.getElementsByTagName('alignment')[0];
   const alreadyWrapped=oldAlignment?.getAttribute('wrapText')==='1';
-  if(fontSize(oldFont)===wanted&&(!wrap||alreadyWrapped)){
+  const alreadyShrink=oldAlignment?.getAttribute('shrinkToFit')==='1';
+  if(fontSize(oldFont)===wanted&&(!wrap||alreadyWrapped)&&(!noWrap||(!alreadyWrapped&&alreadyShrink))){
    styleIds.push(index);continue;
   }
-  const styleKey=index+'|'+wanted+'|'+(wrap?'wrap':'normal');
+  const styleKey=index+'|'+wanted+'|'+(wrap?'wrap':noWrap?'single-line':'normal');
   const found=styleCache.get(styleKey);
   if(found!==undefined){styleIds.push(found);continue;}
   let newFontId=originalFontId;
@@ -85,13 +94,14 @@ export function reportRowCellStyles(entries:Record<string,Uint8Array>,templateSt
   const xf=oldXf.cloneNode(true) as XmlElement;
   xf.setAttribute('fontId',String(newFontId));
   xf.setAttribute('applyFont','1');
-  if(wrap){
+  if(wrap||noWrap){
    let alignment=xf.getElementsByTagName('alignment')[0];
    if(!alignment){
     alignment=parsed.createElementNS(xf.namespaceURI,'alignment');
     xf.appendChild(alignment);
    }
-   alignment.setAttribute('wrapText','1');
+   alignment.setAttribute('wrapText',wrap?'1':'0');
+   if(noWrap)alignment.setAttribute('shrinkToFit','1');
    xf.setAttribute('applyAlignment','1');
   }
   const markup=xf.toString();
@@ -131,13 +141,14 @@ function colSegment(tag:string,min:number,max:number,width?:number){
  return next;
 }
 /** Increase widths only; never shrink wider custom widths or unrelated columns. */
-export function widenReportColumns(source:string){
+export function widenReportColumns(source:string,routeWidth=62){
  const match=source.match(/<cols\b[^>]*>[\s\S]*?<\/cols>/);
  const specs=match?Array.from(match[0].matchAll(/<col\b[^>]*\/>/g)).map(x=>x[0]):[];
  if(match){
   const content=match[0].replace(/^<cols\b[^>]*>/,'').replace(/<\/cols>$/,'').replace(/<col\b[^>]*\/>/g,'').trim();
   if(content)throw new Error('특수 열 서식이 있어 자동 너비 조정을 중단했습니다.');
  }
+ const required={...COLUMN_WIDTHS,7:Math.min(EXCEL_MAX_COL_WIDTH,Math.max(62,routeWidth))};
  const pieces:{min:number;max:number;xml:string}[]=[];
  const covered=new Set<number>();
  for(const spec of specs){
@@ -149,11 +160,11 @@ export function widenReportColumns(source:string){
   const bounds=[...new Set(cuts)].sort((a,b)=>a-b);
   for(let i=0;i<bounds.length-1;i++){
    const start=bounds[i],end=bounds[i+1]-1;
-   pieces.push({min:start,max:end,xml:start===min&&end===max&&COLUMN_WIDTHS[start]===undefined?spec:colSegment(spec,start,end,start===end?COLUMN_WIDTHS[start]:undefined)});
+   pieces.push({min:start,max:end,xml:start===min&&end===max&&required[start]===undefined?spec:colSegment(spec,start,end,start===end?required[start]:undefined)});
   }
  }
  for(const target of [7,8,9])if(!covered.has(target)){
-  pieces.push({min:target,max:target,xml:'<col min="'+target+'" max="'+target+'" width="'+COLUMN_WIDTHS[target]+'" customWidth="1"/>'});
+  pieces.push({min:target,max:target,xml:'<col min="'+target+'" max="'+target+'" width="'+required[target]+'" customWidth="1"/>'});
  }
  pieces.sort((a,b)=>a.min-b.min||a.max-b.max);
  const cols='<cols>'+pieces.map(p=>p.xml).join('')+'</cols>';
@@ -161,9 +172,9 @@ export function widenReportColumns(source:string){
  if(/<cols\b[^>]*\/>/.test(source))return source.replace(/<cols\b[^>]*\/>/,cols);
  return source.replace(/<sheetData\b/,cols+'<sheetData');
 }
-/** Approximate rows needed for long wrapped route text, capped to avoid huge rows. */
+/** G is one single horizontal line. Only H/I may need vertical space. */
 export function reportRowHeight(route:string,service:string,overtime:string){
  const width=(v:string)=>Array.from(v).reduce((sum,ch)=>sum+(ch.charCodeAt(0)>255?1.9:1),0);
- const lines=Math.max(1,Math.ceil(width(route)/58),Math.ceil(width(service)/20),Math.ceil(width(overtime)/27));
+ const lines=Math.max(1,Math.ceil(width(service)/20),Math.ceil(width(overtime)/27));
  return Math.min(82,Math.max(24,lines*15+5));
 }

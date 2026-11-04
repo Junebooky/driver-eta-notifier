@@ -3,6 +3,7 @@ import {NextRequest} from 'next/server';
 import {verifyServerAuth} from '@/lib/auth/serverAuth';
 import {supabaseAdmin as db} from '@/lib/supabase/server';
 import {check,submitReport} from '@/lib/driverReports/service';
+import {isReportServiceType} from '@/utils/reportServiceTypes';
 import {boundedBody,UUID,privateJson,failure,sameOrigin} from '@/lib/driverReports/http';
 export const dynamic='force-dynamic';
 export async function GET(req:NextRequest) {
@@ -29,7 +30,7 @@ export async function POST(req:NextRequest) {
     const body=JSON.parse(new TextDecoder().decode(await boundedBody(req,90000)));
     if(body.driverId&&body.driverId!==auth.session.driverId)return privateJson({ok:false,error:'기사 계정이 변경되었습니다. 대화방을 다시 열어 주세요.'},403);
     if(typeof body.message!=='string'||!body.message.trim()||body.message.length>20000||!UUID.test(body.requestKey||''))throw new Error('운행보고와 전송 번호를 확인해 주세요.');
-    const result=await submitReport(auth.session,body.message.trim(),body.requestKey);
+    const result=await submitReport(auth.session,body.message.trim(),body.requestKey,isReportServiceType(body.serviceType)?body.serviceType:undefined);
     return privateJson({ok:true,...result},result.accepted?201:200);
   }catch(error){return failure(error);}
 }

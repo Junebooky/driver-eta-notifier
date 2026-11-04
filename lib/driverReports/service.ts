@@ -5,6 +5,7 @@ import {appendKakaoExcelReport,workbookFromFile} from '@/utils/kakaoExcelWorkboo
 import {amendReportRow,removeReportRow,addApprovedMonth,ensureReportMonth} from '@/utils/reportWorkbookOperations';
 import {parseDriverReport,reportReply} from '@/utils/driverReportChat';
 import {validateReportInput} from '@/utils/reportSubmissionValidation';
+import {isReportServiceType,type ReportServiceType} from '@/utils/reportServiceTypes';
 import {readWorkbook,storeWorkbook} from './storage';
 import type {CockpitAuthSession} from '@/lib/auth/serverAuth';
 import type {DriverReportSubmission} from '@/types/driverReportChat';
@@ -67,14 +68,16 @@ export async function activeLedgerYear(org:string){
  const version=await db.from('report_workbook_versions').select('ledger_year').eq('org_id',org).eq('id',registry.data.active_version).single();check(version.error);
  return version.data?.ledger_year??(await currentWorkbook(org))?.year??null;
 }
-export async function submitReport(session:CockpitAuthSession,raw:string,requestKey:string){
+export async function submitReport(session:CockpitAuthSession,raw:string,requestKey:string,serviceType?:ReportServiceType){
  if(session.role!=='driver'||!session.driverId)throw new Error('기사 계정이 필요합니다.');
  const gate=validateReportInput(raw);
  if(!gate.accepted)return {accepted:false as const,needsTemplate:true as const,reply:gate.reply,missing:gate.missing,duplicate:false};
+ if(!isReportServiceType(serviceType))return {accepted:false as const,needsServiceType:true as const,reply:'운행 유형을 먼저 선택해 주세요.\n김포공항 샌딩 · 인천공항 샌딩 · 의전 중 하나를 눌러주세요.',duplicate:false};
  let year:number|null=null;try{year=await activeLedgerYear(session.org);}catch{/* Submission remains durable. */}
  const parsed=parseDriverReport(raw,session.driverName,new Date(),{workbookYear:year,nightEndHour:nightEndHour()});
+ parsed.draft.serviceType=serviceType;
  // Shared public intake deduplicates by requestKey, not by report body: two people may submit identical reports.
- const fingerprint=createHash('sha256').update(session.userId==='a18a0000-0000-4000-8000-000000000001' ? 'shared|'+requestKey : (parsed.draft.date||'')+'|'+raw.trim().replace(/\r/g,'')).digest('hex');
+ const fingerprint=createHash('sha256').update(session.userId==='a18a0000-0000-4000-8000-000000000001' ? 'shared|'+requestKey : (parsed.draft.date||'')+'|'+serviceType+'|'+raw.trim().replace(/\r/g,'')).digest('hex');
  const saved=await db.rpc('submit_report',{p_org:session.org,p_driver:session.driverId,p_request:requestKey,p_fingerprint:fingerprint,p_raw:raw,p_parsed:parsed,p_reply:reportReply(parsed)});
  if(saved.error?.code==='40001')throw new Error('같은 전송 번호로 내용이 변경되었습니다. 새 메시지로 보내 주세요.');check(saved.error);
  const result=saved.data as {id:string;duplicate:boolean};
