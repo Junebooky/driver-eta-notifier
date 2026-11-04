@@ -9,7 +9,7 @@ export function SessionGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [checked, setChecked] = useState<{ path: string; session: ClientSessionInfo } | null>(null);
   useEffect(() => {
-    if(pathname==='/driver/connect')return;
+    if(pathname==='/driver/connect'||pathname==='/report')return;
     let active = true;
     const check=()=>ensureClientAuth(undefined, undefined, {force:true}).then(session => { if (active) setChecked({ path: pathname, session }); });
     void check();
@@ -30,7 +30,7 @@ export function SessionGate({ children }: { children: React.ReactNode }) {
   const destination = checked?.path === pathname && checked.session.authenticated && pathname === '/'
     ? accountHome(checked.session) : '/';
   useEffect(() => { if (destination !== '/') window.location.replace(destination); }, [destination]);
-  if (pathname === '/driver/connect') return children;
+  if (pathname === '/driver/connect' || pathname === '/report') return children;
   if (pathname === '/login' || pathname === '/hq/login' || pathname === '/representative/login') return children;
   if (checked?.path !== pathname) return <div role="status" className="m-auto p-8 text-slate-500">로그인을 확인하고 있습니다.</div>;
   if (destination !== '/') return <div role="status" className="m-auto p-8 text-slate-500">전용 화면으로 이동하고 있습니다.</div>;

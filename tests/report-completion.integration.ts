@@ -7,7 +7,7 @@ import {amendReportRow,addApprovedMonth} from '../utils/reportWorkbookOperations
 import {unzipSync,strToU8,strFromU8,zipSync} from 'fflate';
 const storage=(b:Uint8Array)=>({hex:Buffer.from(b).toString('hex'),size:b.length});
 export async function verifyReportCompletion(c:Client,url:string){
- for(const f of ['20261104060000_driver_device_invites.sql','20261104061000_report_operations.sql'])await c.query(readFileSync('supabase/migrations/'+f,'utf8'));
+ for(const f of ['20261104060000_driver_device_invites.sql','20261104061000_report_operations.sql','20261104150000_shared_report_links.sql'])await c.query(readFileSync('supabase/migrations/'+f,'utf8'));
  const call=async(db:Client,name:string,args:unknown[])=>{const placeholders=args.map((_,i)=>'$'+(i+1)).join(',');if(name==='claim_report_jobs')return (await db.query(`SELECT * FROM cockpit.${name}(${placeholders})`,args)).rows;const r=await db.query(`SELECT cockpit.${name}(${placeholders}) AS value`,args.map(v=>Array.isArray(v)?JSON.stringify(v):v));return r.rows[0].value;};
  const driver=randomUUID(),actor=randomUUID();await c.query("INSERT INTO cockpit.drivers(id,driver_name,driver_meta) VALUES($1,'격리 기사','{\"status\":\"active\"}')",[driver]);
  const token=newDeviceSecret(),device=newDeviceSecret();await call(c,'issue_report_invite',['vip_limousine_korea',driver,actor,tokenHash(token)]);
@@ -67,5 +67,27 @@ export async function verifyReportCompletion(c:Client,url:string){
  assert.equal(await call(c,'activate_report_ledger',[org,2026,actor]),true);
  const original=(await c.query("SELECT bytes FROM cockpit.report_workbook_versions WHERE org_id=$1 AND ledger_year=2026 AND kind='original'",[org])).rows[0].bytes;assert.deepEqual(original,Buffer.from(source));
  for(const role of ['anon','authenticated']){await c.query('SET ROLE '+role);await assert.rejects(c.query('SELECT * FROM cockpit.report_jobs'),{code:'42501'});await assert.rejects(call(c,'claim_report_jobs',[1,org,null]),{code:'42501'});await c.query('RESET ROLE');}
+ const sharedOrg='shared_'+randomUUID(),sharedHash=tokenHash(newDeviceSecret()),secondHash=tokenHash(newDeviceSecret());
+ const expiry=new Date(Date.now()+86400000).toISOString();
+ await call(c,'manage_report_shared_link',[sharedOrg,actor,'issue',sharedHash,expiry]);
+ let sharedRow=(await c.query('SELECT * FROM cockpit.report_shared_links WHERE org_id=$1',[sharedOrg])).rows[0];
+ assert.equal(sharedRow.token_hash,sharedHash);assert.equal(sharedRow.revoked_at,null);
+ await call(c,'manage_report_shared_link',[sharedOrg,actor,'issue',secondHash,expiry]);
+ sharedRow=(await c.query('SELECT * FROM cockpit.report_shared_links WHERE org_id=$1',[sharedOrg])).rows[0];
+ assert.equal(sharedRow.token_hash,secondHash);assert.notEqual(sharedRow.token_hash,sharedHash);
+ const guestSource='a18a0000-0000-4000-8000-000000000001';
+ const guestRaw=raw(987),guestParsed=parseDriverReport(guestRaw,undefined,new Date(),{workbookYear:2026});
+ assert.deepEqual(guestParsed.reviewReasons,[]);
+ const guestId=(await call(c,'submit_report',[sharedOrg,guestSource,randomUUID(),'shared-test-987',guestRaw,guestParsed,'accepted'])).id;
+ assert.equal((await c.query('SELECT driver_id FROM cockpit.report_submissions WHERE id=$1',[guestId])).rows[0].driver_id,guestSource);
+ assert.equal((await c.query('SELECT count(*)::int AS n FROM cockpit.report_messages WHERE linked_submission_id=$1',[guestId])).rows[0].n,2);
+ assert.equal((await c.query('SELECT count(*)::int AS n FROM cockpit.report_jobs WHERE submission_id=$1',[guestId])).rows[0].n,1);
+ await call(c,'manage_report_shared_link',[sharedOrg,actor,'revoke',null,null]);
+ sharedRow=(await c.query('SELECT * FROM cockpit.report_shared_links WHERE org_id=$1',[sharedOrg])).rows[0];
+ assert.ok(sharedRow.revoked_at);
+ await c.query('SET ROLE anon');
+ await assert.rejects(c.query('SELECT * FROM cockpit.report_shared_links'),{code:'42501'});
+ await c.query('RESET ROLE');
+ console.log('PASS shared report link: token rotation/revoke, no public DB access, unbound intake submission and durable queue');
  console.log('PASS completion: 35 reports, 5 writers, lease crash recovery, bounded retry, same-row correction, automatic recalculation, approved blank month, annual switch and immutable backup');
 }
