@@ -83,7 +83,10 @@ export async function POST(req:NextRequest){
      const parsed=parseDriverReport(corrected,undefined,new Date(),{workbookYear:w.year,nightEndHour:nightEndHour()});parsed.draft={...parsed.draft,serviceType:d.serviceType,amount:d.amount,payment:d.payment,totalWithVat:d.totalWithVat};
      if(parsed.reviewReasons.length)throw new Error(parsed.reviewReasons.join(' '));
      const reviewed=await db.rpc('review_report',{p_org:s.org,p_actor:s.userId,p_id:linked,p_revision:record.data.revision,p_parsed:parsed,p_note:'Excel 셀 편집 · 차량 매핑/OT·심야 재계산'});check(reviewed.error);if(!reviewed.data)return privateJson({ok:false,error:'보고가 변경됐습니다. 다시 불러와 주세요.'},409);
-     await processReport(s.org,linked,s.userId);return privateJson({ok:true});
+     await processReport(s.org,linked,s.userId);
+     const status=await db.from('report_submissions').select('excel_status,last_error').eq('org_id',s.org).eq('id',linked).single();check(status.error);
+     if(status.data?.excel_status!=='applied')return privateJson({ok:true,pending:true,message:'수정 내용을 보관했습니다. Excel 반영은 아직 완료되지 않았습니다. HQ에서 재처리 상태를 확인해 주세요.'});
+     return privateJson({ok:true});
     }
 
     const saved=await db.rpc('commit_report_hq_cell_edit',{
