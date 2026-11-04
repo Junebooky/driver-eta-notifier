@@ -119,9 +119,9 @@ export function appendKakaoExcelReport(bytes: Uint8Array, draft: KakaoExcelDraft
   // formulas at row 113 and formatting through row 244. Fill the FIRST blank
   // report row instead of treating those template rows as customer records.
   const hasLiveRecord=Object.entries(sheet.cells).some(([addr,cell])=>{
-   if(!/^[A-L](?:[2-9]|[1-9]\\d+)$/.test(addr)||String(cell.v??'')==='')return false;
-   const found=source.match(new RegExp('<c\\b(?=[^>]*\\br="'+addr+'")[^>]*(?:\\/>|>[\\s\\S]*?<\\/c>)'))?.[0]||'';
-   return !/<f(?:\\s|>)/.test(found);
+   if(!/^[A-L](?:[2-9]|[1-9]\d+)$/.test(addr)||String(cell.v??'')==='')return false;
+   const found=source.match(new RegExp('<c\\b(?=[^>]*\\br="'+addr+'")[^>]*?(?:\\/>|>[\\s\\S]*?<\\/c>)'))?.[0]||'';
+   return !/<f(?:\s|>)/.test(found);
   });
   const firstRow=rows.find(r=>r.getAttribute('r')==='2');
   const firstHasFormula=firstRow&&Array.from(firstRow.getElementsByTagName('f')).length>0;
@@ -131,8 +131,8 @@ export function appendKakaoExcelReport(bytes: Uint8Array, draft: KakaoExcelDraft
   // normalized separately with atomic manifest/DB row-number updates.
   // Reuse only explicit column styles of the last actual data row, never formulas.
   const template = [...rows].reverse().find(r => {
-    const n = r.getAttribute('r'); return n !== '1' && sheet.cells['B'+n]?.v != null && sheet.cells['D'+n]?.v != null;
-  });
+    const n = r.getAttribute('r'); return n !== '1' && String(sheet.cells['B'+n]?.v??'').trim()!=='' && String(sheet.cells['D'+n]?.v??'').trim()!=='';
+  }) || rows.find(r=>{const n=r.getAttribute('r');return n!=='1'&&sheet.cells['B'+n]!==undefined&&sheet.cells['D'+n]!==undefined;});
   const styles = new Map<string,string|null>();
   for(const c of Array.from(template?.getElementsByTagName('c') || [])){
     const key=c.getAttribute('r')?.replace(/\d/g,'');if(key)styles.set(key,c.getAttribute('s'));
@@ -154,16 +154,16 @@ export function appendKakaoExcelReport(bytes: Uint8Array, draft: KakaoExcelDraft
   const oldRow=rows.find(r=>Number(r.getAttribute('r'))===rowNumber);
   const freshRow='<row r="'+rowNumber+'" ht="'+height+'" customHeight="1">'+cells+'</row>';
   if(oldRow){
-   const original=source.match(new RegExp('<row\\b(?=[^>]*\\br="'+rowNumber+'")[^>]*(?:\\/>|>[\\s\\S]*?<\\/row>)'))?.[0];
+   const original=source.match(new RegExp('<row\\b(?=[^>]*\\br="'+rowNumber+'")[^>]*?(?:\\/>|>[\\s\\S]*?<\\/row>)'))?.[0];
    if(!original)throw new Error('템플릿 행의 구조를 확인해 주세요.');
-   const start=original.match(/^<row\b[^>]*>/)?.[0]||'<row r="'+rowNumber+'">';
+   const start=(original.match(/^<row\b[^>]*>/)?.[0]||'<row r="'+rowNumber+'">').replace(/\/>$/, '>');
    const body=original.endsWith('/>')?'':original.slice(start.length,-6);
    if(/<f(?:\s|>)/.test(body))throw new Error('수식이 있는 행에는 자동으로 기록하지 않습니다.');
-   const keep=body.replace(/<c\b(?=[^>]*\br="[A-L]\d+")[^>]*(?:\/>|>[\s\S]*?<\/c>)/g,'');
+   const keep=body.replace(/<c\b(?=[^>]*\br="[A-L]\d+")[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g,'');
    patched=source.replace(original,start+keep+cells+'</row>');
   }else{
    const next=rows.find(r=>Number(r.getAttribute('r'))>rowNumber);
-   const following=next?source.match(new RegExp('<row\\b(?=[^>]*\\br="'+next.getAttribute('r')+'")[^>]*(?:\\/>|>[\\s\\S]*?<\\/row>)'))?.[0]:null;
+   const following=next?source.match(new RegExp('<row\\b(?=[^>]*\\br="'+next.getAttribute('r')+'")[^>]*?(?:\\/>|>[\\s\\S]*?<\\/row>)'))?.[0]:null;
    if(following)patched=source.replace(following,freshRow+following);
    else patched=source.replace(/<\/sheetData\s*>/,freshRow+'</sheetData>');
   }

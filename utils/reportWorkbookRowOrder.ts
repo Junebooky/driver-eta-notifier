@@ -5,8 +5,8 @@ import {workbookFromFile} from './kakaoExcelWorkbook';
 type Location={sheet:string;row:number};
 export type ReportManifest=Record<string,Location>;
 export type ReorderedMonth={bytes:Uint8Array;rowNumber:number; moves:Record<string,number>;changed:boolean;reason?:string};
-const rowMatcher=/<row\b[^>]*(?:\/>|>[\s\S]*?<\/row>)/g;
-const cellMatcher=/<c\b[^>]*(?:\/>|>[\s\S]*?<\/c>)/g;
+const rowMatcher=/<row\b[^>]*?(?:\/>|>[\s\S]*?<\/row>)/g;
+const cellMatcher=/<c\b[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g;
 const validMonth=/^(?:[1-9]|1[0-2])월$/;
 function sheetPath(entries:Record<string,Uint8Array>,month:string){
  const p=new DOMParser(),book=p.parseFromString(strFromU8(entries['xl/workbook.xml']),'application/xml');
@@ -50,7 +50,7 @@ export function organizeManagedMonth(bytes:Uint8Array,month:string,year:number,m
  for(const [address,cell] of Object.entries(sheet.cells)){
   const m=address.match(/^([A-L])(\d+)$/);
   if(m&&Number(m[2])>1&&!positions.has(Number(m[2]))&&String(cell.v??'')!==''){
-   const content=source.match(new RegExp('<c\\b(?=[^>]*\\br="'+address+'")[^>]*(?:\\/>|>[\\s\\S]*?<\\/c>)'))?.[0]||'';
+   const content=source.match(new RegExp('<c\\b(?=[^>]*\\br="'+address+'")[^>]*?(?:\\/>|>[\\s\\S]*?<\\/c>)'))?.[0]||'';
    if(!/<f(?:\s|>)/.test(content))return unchanged('기존 수기 기록이 있어 자동으로 행을 옮기지 않았습니다.');
   }
  }
@@ -97,7 +97,7 @@ export function organizeManagedMonth(bytes:Uint8Array,month:string,year:number,m
  }
  for(const n of touches){
   const old=rowMap.get(n)||'<row r="'+n+'"></row>';
-  const opening=old.match(/^<row\b[^>]*>/)?.[0]||'<row r="'+n+'">';
+  const opening=(old.match(/^<row\b[^>]*>/)?.[0]||'<row r="'+n+'">').replace(/\/>$/, '>');
   const body=old.endsWith('/>')?'':old.slice(opening.length,-6);
   const kept=body.replace(cellMatcher,m=>/\br="[A-L]\d+"/.test(m)?'':m);
   rowMap.set(n,opening+kept+(replacementCells.get(n)||'')+'</row>');

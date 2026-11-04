@@ -4,8 +4,8 @@ import {workbookFromFile} from './kakaoExcelWorkbook';
 
 const MAX_VALUE=2400;
 const COLS='ABCDEFGHIJKL';
-const rowExpression=(row:number)=>new RegExp('<row\\b(?=[^>]*\\br="'+row+'")[^>]*(?:/>|>[\\s\\S]*?<\\/row>)');
-const cellExpression=(name:string)=>new RegExp('<c\\b(?=[^>]*\\br="'+name+'")[^>]*(?:/>|>[\\s\\S]*?<\\/c>)');
+const rowExpression=(row:number)=>new RegExp('<row\\b(?=[^>]*\\br="'+row+'")[^>]*?(?:/>|>[\\s\\S]*?<\\/row>)');
+const cellExpression=(name:string)=>new RegExp('<c\\b(?=[^>]*\\br="'+name+'")[^>]*?(?:/>|>[\\s\\S]*?<\\/c>)');
 const xml=(value:string)=>value.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 function sheetEntry(entries:Record<string,Uint8Array>,sheet:string){
  const parser=new DOMParser();
@@ -20,23 +20,23 @@ function sheetEntry(entries:Record<string,Uint8Array>,sheet:string){
 }
 export const excelCellColumn=(col:string)=>COLS.includes(col)&&col.length===1;
 export type WorkbookViewRow={row:number;cells:string[];locked:string[]};
-export function readWorkbookGrid(bytes:Uint8Array,month:string,limit=300){
+export function readWorkbookGrid(bytes:Uint8Array,month:string,limit=300,offset=0){
  if(!/^(?:[1-9]|1[0-2])월$/.test(month))throw new Error('월별 시트를 선택해 주세요.');
  const book=workbookFromFile(bytes),sheet=book.Sheets[month];
  if(!sheet)throw new Error('선택한 월 시트가 없습니다.');
  const entries=unzipSync(bytes),path=sheetEntry(entries,month),source=strFromU8(entries[path]);
- const formulas=new Set([...source.matchAll(/<c\b([^>]*\br="([A-L]\d+)"[^>]*)>([\s\S]*?)<\/c>/g)]
-  .filter(m=>/<f(?:\s|>)/.test(m[3])).map(m=>m[2]));
+ const parsed=new DOMParser().parseFromString(source,'application/xml');
+ const formulas=new Set(Array.from(parsed.getElementsByTagName('c')).filter(c=>c.getElementsByTagName('f').length>0).map(c=>c.getAttribute('r')||''));
  const rowIds=[...new Set(Object.keys(sheet.cells).map(address=>Number(address.match(/\d+$/)?.[0])).filter(n=>n>=2&&Number.isInteger(n)))].sort((a,b)=>a-b);
  const live=rowIds.filter(n=>COLS.split('').some(col=>{
   const v=sheet.cells[col+n]?.v;
-  return v!==undefined&&v!==null&&String(v)!==''&&!formulas.has(col+n);
+  return formulas.has(col+n)||v!==undefined&&v!==null&&String(v)!=='';
  }));
- const rows:WorkbookViewRow[]=live.slice(0,limit).map(row=>({
-  row,cells:COLS.split('').map(col=>String(sheet.cells[col+row]?.v??'')),
+ const rows:WorkbookViewRow[]=live.slice(offset,offset+limit).map(row=>({
+  row,cells:COLS.split('').map(col=>{const value=sheet.cells[col+row]?.v;if(col==='A'&&typeof value==='number'&&value>20000&&value<100000){return new Date((book.date1904?Date.UTC(1904,0,1):Date.UTC(1899,11,30))+value*86400000).toISOString().slice(0,10);}return String(value??'');}),
   locked:COLS.split('').filter(col=>formulas.has(col+row))
  }));
- return {months:book.SheetNames.filter(m=>/^(?:[1-9]|1[0-2])월$/.test(m)),month,rows,total:live.length,columns:COLS.split('')};
+ return {months:book.SheetNames.filter(m=>/^(?:[1-9]|1[0-2])월$/.test(m)),month,rows,total:live.length,offset,limit,columns:COLS.split('')};
 }
 export function patchWorkbookCell(bytes:Uint8Array,month:string,row:number,col:string,value:string){
  if(!/^(?:[1-9]|1[0-2])월$/.test(month)||!excelCellColumn(col)||!Number.isInteger(row)||row<2||row>25000)throw new Error('편집할 셀 위치를 확인해 주세요.');
@@ -75,7 +75,7 @@ export function patchWorkbookCell(bytes:Uint8Array,month:string,row:number,col:s
  const newCell=trimmed===''?'<c'+attrs+'/>':numeric?
   '<c'+attrs+'><v>'+renderValue.replace(/,/g,'')+'</v></c>':
   '<c'+attrs+' t="inlineStr"><is><t xml:space="preserve">'+xml(trimmed)+'</t></is></c>';
- let revisedRow=existing?original.replace(existing,newCell):original.replace(/<\/row>$/,newCell+'</row>');
+ const revisedRow=existing?original.replace(existing,newCell):original.replace(/<\/row>$/,newCell+'</row>');
  if(revisedRow===original)throw new Error('셀 값을 변경하지 못했습니다.');
  const changedSource=source.replace(original,revisedRow);
  entries[path]=strToU8(changedSource);

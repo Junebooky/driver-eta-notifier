@@ -2,20 +2,21 @@
 import {useCallback,useEffect,useState} from 'react';
 import {ChevronDown,ChevronUp,Pencil,Save,X} from 'lucide-react';
 type Row={row:number;cells:string[];locked:string[]};
-type Grid={version:string;year:number;filename:string;month:string;months:string[];total:number;rows:Row[];columns:string[]};
+type Grid={version:string;year:number;filename:string;month:string;months:string[];total:number;offset:number;limit:number;rows:Row[];columns:string[]};
 const headers=['날짜','차량번호','차종','거래처','운전자','타임','운행경로','셀프/의전','OT Hours','금액','결제방법','합계'];
 export function HqExcelWorkbookView({year,onCommitted}:{year:number;onCommitted:()=>Promise<void>}){
  const [open,setOpen]=useState(false),[month,setMonth]=useState(''),[grid,setGrid]=useState<Grid|null>(null);
+ const [offset,setOffset]=useState(0);
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[edit,setEdit]=useState<{row:number;col:string;value:string}|null>(null);
  const load=useCallback(async(target:string)=>{
   const params=new URLSearchParams({view:'1',year:String(year)});
-  if(target)params.set('month',target);
+  if(target)params.set('month',target);params.set('offset',String(offset));
   const r=await fetch('/api/hq/report-workbook?'+params,{cache:'no-store'});
   const data=await r.json();
   if(!r.ok)throw Error(data.error||'Excel을 불러올 수 없습니다.');
   setGrid(data);setMonth(data.month);
- },[year]);
- useEffect(()=>{if(open)void load(month).catch(e=>setError((e as Error).message));},[open,month,load]);
+ },[year,offset]);
+ useEffect(()=>{if(open)void Promise.resolve().then(()=>load(month)).catch(e=>setError((e as Error).message));},[open,month,load]);
  async function sortMonth(){
   if(!grid||busy)return;
   setBusy(true);setError('');
@@ -53,7 +54,7 @@ export function HqExcelWorkbookView({year,onCommitted}:{year:number;onCommitted:
     </button>
    </div>
    <div role="tablist" aria-label="월별 시트" className="flex max-w-full gap-1.5 overflow-x-auto pb-1">
-    {grid?.months.map(name=><button type="button" role="tab" aria-selected={month===name} key={name} onClick={()=>{setEdit(null);setError('');setMonth(name);}}
+    {grid?.months.map(name=><button type="button" role="tab" aria-selected={month===name} key={name} onClick={()=>{setEdit(null);setError('');setOffset(0);setMonth(name);}}
      className={'shrink-0 rounded-xl px-3 py-2 text-xs font-semibold '+(month===name?'bg-[#1E60F3] text-white':'bg-[#F2F4F6] text-[#6F809A]')}>{name}</button>)}
    </div>
    {error&&<p role="alert" className="rounded-xl bg-[#F3F6FC] p-3 text-sm text-[#65758A]">{error}</p>}
@@ -71,7 +72,7 @@ export function HqExcelWorkbookView({year,onCommitted}:{year:number;onCommitted:
         {active?<div className="flex min-w-[180px] items-center gap-1 p-1">
          <input autoFocus aria-label={col+row.row+' 편집'} value={edit.value} onChange={e=>setEdit({...edit,value:e.target.value})}
           onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();void save();}if(e.key==='Escape')setEdit(null);}}
-          className="min-w-0 flex-1 rounded-lg border border-[#1E60F3] bg-white px-2 py-2 text-xs outline-none"/>
+          className="min-w-0 flex-1 rounded-lg border border-[#1E60F3] bg-white px-2 py-2 text-base outline-none"/>
          <button type="button" aria-label="저장" disabled={busy} onClick={()=>void save()} className="p-1.5 text-[#1E60F3]"><Save size={16}/></button>
          <button type="button" aria-label="취소" onClick={()=>setEdit(null)} className="p-1.5 text-[#8A97A9]"><X size={16}/></button>
         </div>:
@@ -85,6 +86,7 @@ export function HqExcelWorkbookView({year,onCommitted}:{year:number;onCommitted:
     {grid.rows.length===0&&<p className="p-8 text-center text-xs text-[#8F9BAA]">이 시트에는 아직 보고가 없습니다.</p>}
    </div>}
    <p className="text-xs text-[#8392A6]">{grid?'표시 '+grid.rows.length+'행 · 전체 '+grid.total+'행':'Excel을 불러오는 중'}</p>
+   {grid&&grid.total>grid.limit&&<div className="flex gap-3"><button type="button" disabled={offset===0||busy} onClick={()=>{setEdit(null);setOffset(Math.max(0,offset-grid.limit));}} className="min-h-11 px-3 text-sm text-[#1E60F3] disabled:opacity-40">이전 행</button><button type="button" disabled={offset+grid.limit>=grid.total||busy} onClick={()=>{setEdit(null);setOffset(offset+grid.limit);}} className="min-h-11 px-3 text-sm text-[#1E60F3] disabled:opacity-40">다음 행</button></div>}
    {busy&&<p className="text-xs text-[#1E60F3]">저장 중...</p>}
   </div>}
  </div>;

@@ -1,8 +1,10 @@
 import {NextRequest,NextResponse} from 'next/server';
 import {requireHqAdmin} from '@/lib/auth/serverAuth';
 import {supabaseAdmin as db} from '@/lib/supabase/server';
-import {check,currentWorkbook,registerWorkbook,drainReports,approveMonth} from '@/lib/driverReports/service';
+import {check,currentWorkbook,registerWorkbook,drainReports,approveMonth,processReport,nightEndHour} from '@/lib/driverReports/service';
 import {workbookFromFile} from '@/utils/kakaoExcelWorkbook';
+import {parseDriverReport} from '@/utils/driverReportChat';
+import {isReportServiceType} from '@/utils/reportServiceTypes';
 import {readWorkbook,storeWorkbook} from '@/lib/driverReports/storage';
 import {readWorkbookGrid,patchWorkbookCell} from '@/utils/reportWorkbookGrid';
 import {organizeManagedMonth} from '@/utils/reportWorkbookRowOrder';
@@ -22,7 +24,8 @@ export async function GET(req:NextRequest){
    const todayMonth=new Intl.DateTimeFormat('ko-KR',{month:'numeric',timeZone:'Asia/Seoul'}).format(new Date()).replace(/[^0-9]/g,'')+'월';
    const month=requested|| (months.includes(todayMonth)?todayMonth:months.at(-1));
    if(!month)throw new Error('월별 Excel 시트가 없습니다.');
-   return privateJson({ok:true,version:w.id,year:w.year,filename:w.filename,...readWorkbookGrid(w.bytes,month)});
+   const offset=Number(req.nextUrl.searchParams.get('offset')||'0');if(!Number.isInteger(offset)||offset<0||offset>25000)throw new Error('조회 위치를 확인해 주세요.');
+   return privateJson({ok:true,version:w.id,year:w.year,filename:w.filename,...readWorkbookGrid(w.bytes,month,300,offset)});
   }
   if(version&&version!=='original'&&!UUID.test(version))throw new Error('버전을 확인해 주세요.');
   if(req.nextUrl.searchParams.get('download')==='1'){
@@ -62,8 +65,22 @@ export async function POST(req:NextRequest){
     if(typeof b.month!=='string'||typeof b.column!=='string'||!Number.isInteger(b.row)||typeof b.value!=='string')throw new Error('편집할 셀을 확인해 주세요.');
     const w=await currentWorkbook(s.org,b.year);
     if(!w||w.id!==b.expectedVersion)return privateJson({ok:false,error:'Excel이 다른 관리자에 의해 변경되었습니다. 다시 불러와 주세요.'},409);
+    if(b.column==='A'&&Number(b.value.slice(0,4))!==w.year)throw new Error('장부와 같은 연도의 날짜만 입력해 주세요.');
     const edit=patchWorkbookCell(w.bytes,b.month,b.row,b.column,b.value);
     if(!edit.changed)return privateJson({ok:true,unchanged:true,version:w.id});
+    const linked=Object.entries(w.manifest||{}).find(([,p])=>p.sheet===b.month&&p.row===b.row)?.[0];
+    if(linked&&b.column==='H'&&!isReportServiceType(b.value))throw new Error('김포공항 샌딩 · 인천공항 샌딩 · 의전 중 선택해 주세요.');
+    if(linked&&['F','B'].includes(b.column)){
+     const record=await db.from('report_submissions').select('*').eq('org_id',s.org).eq('id',linked).single();check(record.error);
+     const d=record.data.parsed.draft,time=b.column==='F'?b.value:d.time,plate=b.column==='B'?b.value:d.plate;
+     if(!/^\d{2}:\d{2}~\d{2}:\d{2}$/.test(time))throw new Error('시간은 10:00~23:00 형식으로 입력해 주세요.');
+     const corrected=`${d.date.replace(/(\d{4})-(\d{2})-(\d{2})/,'$1년 $2월 $3일')}\n수행담당 : ${d.driver}\n차량번호 : ${plate}\n고객명 : ${d.customer}\n시작 시간 : ${time.split('~')[0]}\n종료 시간 : ${time.split('~')[1]}\n운행일지\n${d.route.split(' - ').join(' → ')}`;
+     const parsed=parseDriverReport(corrected,undefined,new Date(),{workbookYear:w.year,nightEndHour:nightEndHour()});parsed.draft={...parsed.draft,serviceType:d.serviceType,amount:d.amount,payment:d.payment,totalWithVat:d.totalWithVat};
+     if(parsed.reviewReasons.length)throw new Error(parsed.reviewReasons.join(' '));
+     const reviewed=await db.rpc('review_report',{p_org:s.org,p_actor:s.userId,p_id:linked,p_revision:record.data.revision,p_parsed:parsed,p_note:'Excel 셀 편집 · 차량 매핑/OT·심야 재계산'});check(reviewed.error);if(!reviewed.data)return privateJson({ok:false,error:'보고가 변경됐습니다. 다시 불러와 주세요.'},409);
+     await processReport(s.org,linked,s.userId);return privateJson({ok:true});
+    }
+
     const saved=await db.rpc('commit_report_hq_cell_edit',{
      p_org:s.org,p_actor:s.userId,p_year:w.year,p_expected:w.id,
      p_storage:await storeWorkbook(s.org,edit.bytes),p_sheet:b.month,

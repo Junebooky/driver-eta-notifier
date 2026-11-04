@@ -22,3 +22,12 @@ test('HQ grid cannot overwrite formulas, merged cells or create fake rows',()=>{
  assert.throws(()=>patchWorkbookCell(bytes,'4월',2,'A','2026-05-05'),/동일한 월/);
  assert.throws(()=>patchWorkbookCell(bytes,'4월',2,'D','=HYPERLINK()'),/수식/);
 });
+
+test('HQ preview paginates beyond the first range, includes protected totals, and does not consume the next cell after an empty cell',async()=>{
+ const {zipSync,strToU8}=await import('fflate');const bytes=kakaoWorkbookFixture();
+ const second=readWorkbookGrid(bytes,'4월',1,1);assert.equal(second.rows[0].row,3);assert.equal(second.offset,1);
+ const footer=readWorkbookGrid(bytes,'4월').rows.find(r=>r.row===113);assert.ok(footer?.locked.includes('L'));
+ const entries=unzipSync(bytes),path='xl/worksheets/sheet1.xml';let source=strFromU8(entries[path]);source=source.replace(/<c\b(?=[^>]*\br="D2")[^>]*?>[\s\S]*?<\/c>/,'<c r="D2" s="0"/>');entries[path]=strToU8(source);
+ const blank=zipSync(entries),oldDriver=workbookFromFile(blank).Sheets['4월'].cells.E2.v;
+ const out=patchWorkbookCell(blank,'4월',2,'D','빈 셀 수정');assert.equal(workbookFromFile(out.bytes).Sheets['4월'].cells.E2.v,oldDriver);assert.equal(workbookFromFile(out.bytes).Sheets['4월'].cells.D2.v,'빈 셀 수정');
+});

@@ -11,8 +11,8 @@ function pathFor(entries:Record<string,Uint8Array>,sheet:string){
  const target=Array.from(r.getElementsByTagName('Relationship')).find(n=>n.getAttribute('Id')===id)?.getAttribute('Target');
  if(!target||/\.\.|\\/.test(target))throw new Error('시트를 확인해 주세요.');return target.startsWith('/')?target.slice(1):'xl/'+target;
 }
-const rowRE=(row:number)=>new RegExp(`<row\\b(?=[^>]*\\br="${row}")[^>]*(?:/>|>[\\s\\S]*?<\\/row>)`);
-function clearCells(rowXml:string){return rowXml.replace(/<c\b(?=[^>]*\br="[A-L]\d+")[^>]*(?:\/>|>[\s\S]*?<\/c>)/g,'');}
+const rowRE=(row:number)=>new RegExp(`<row\\b(?=[^>]*\\br="${row}")[^>]*?(?:/>|>[\\s\\S]*?<\\/row>)`);
+function clearCells(rowXml:string){return rowXml.replace(/<c\b(?=[^>]*\br="[A-L]\d+")[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g,'');}
 export function removeReportRow(bytes:Uint8Array,sheet:string,row:number){
  workbookFromFile(bytes);if(row<2||!Number.isInteger(row))throw new Error('반영 위치가 올바르지 않습니다.');
  const entries=unzipSync(bytes),path=pathFor(entries,sheet),source=strFromU8(entries[path]);
@@ -38,9 +38,9 @@ export function addApprovedMonth(bytes:Uint8Array,sourceMonth:string,targetMonth
  if(wb.Sheets[name])return bytes;
  const entries=unzipSync(bytes),sourcePath=pathFor(entries,sourceMonth);let sheet=strFromU8(entries[sourcePath]);
  // Drawings/comments contain old report data and are not portable template content.
- sheet=sheet.replace(/<(?:legacyDrawing|drawing|hyperlinks|extLst)\b[^>]*(?:\/>|>[\s\S]*?<\/(?:legacyDrawing|drawing|hyperlinks|extLst)>)/g,'');
+ sheet=sheet.replace(/<(?:legacyDrawing|drawing|hyperlinks|extLst)\b[^>]*?(?:\/>|>[\s\S]*?<\/(?:legacyDrawing|drawing|hyperlinks|extLst)>)/g,'');
  const parsed=doc(sheet);for(const node of Array.from(parsed.getElementsByTagName('*')))if(node.hasAttribute('r:id')&&node.tagName!=='pageSetup')throw new Error('이 양식의 외부 연결을 먼저 확인해 주세요.');for(const f of Array.from(parsed.getElementsByTagName('f')))if((f.textContent||'').includes('!')||['shared','array'].includes(f.getAttribute('t')||''))throw new Error('다른 시트를 참조하는 수식이 있습니다. 승인된 독립 양식을 준비해 주세요.');
- sheet=sheet.replace(/<c\b([^>]*\br="([A-Z]+)(\d+)"[^>]*)(?:\/>|>([\s\S]*?)<\/c>)/g,(all,attrs,col,r,body='')=>{
+ sheet=sheet.replace(/<c\b([^>]*\br="([A-Z]+)(\d+)"[^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g,(all,attrs,col,r,body='')=>{
   if(Number(r)===1)return all;
   const style=attrs.match(/\bs="\d+"/)?.[0]||'';
   const formula=body.match(/<f\b[^>]*>[\s\S]*?<\/f>/)?.[0]||'';
