@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {unzipSync,strFromU8} from 'fflate';
+import {unzipSync,strFromU8,strToU8,zipSync} from 'fflate';
 import {kakaoWorkbookFixture} from './kakaoExcelFixture';
 import {amendReportRow,addApprovedMonth,ensureReportMonth,removeReportRow} from './reportWorkbookOperations';
 import {appendKakaoExcelReport,workbookFromFile} from './kakaoExcelWorkbook';
