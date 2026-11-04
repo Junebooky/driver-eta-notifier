@@ -1,6 +1,6 @@
 'use client';
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {Upload,Download,RefreshCw,History,ArrowRight} from 'lucide-react';
+import {Upload,Download,RefreshCw,History,ArrowRight,Check} from 'lucide-react';
 import {HqExcelSectionIcon} from './HqExcelSectionIcon';
 import type {DriverReportSubmission,ReportChatMessage} from '@/types/driverReportChat';
 import {reportDisplayStatus,reportMatchesFilter,visibleHqReportMessages,type ReportHqFilter} from '@/utils/reportHqPresentation';
@@ -11,15 +11,39 @@ export function HqDriverReportInbox() {
  const [workbook,setWorkbook]=useState<{active_version:string;filename:string;year:number}|null>(null);
  const [message,setMessage]=useState(''),[busy,setBusy]=useState(false),[selected,setSelected]=useState<DriverReportSubmission|null>(null);
  const [isExpanded,setIsExpanded]=useState(false),[unreadIds,setUnreadIds]=useState<string[]>([]);
+ const [refreshing,setRefreshing]=useState(false),[refreshComplete,setRefreshComplete]=useState(false);
+ const refreshFeedbackTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
  const [chat,setChat]=useState<ReportChatMessage[]>([]),[audit,setAudit]=useState<{id:string;action:string;created_at:string}[]>([]);
  const [corrected,setCorrected]=useState(''),[note,setNote]=useState(''),[version,setVersion]=useState('');
  const [search,setSearch]=useState('');
  const [filter,setFilter]=useState<ReportHqFilter>('all'),[driverFilter,setDriverFilter]=useState('all'),[more,setMore]=useState(false);const file=useRef<HTMLInputElement>(null),selection=useRef<string|null>(null);
  const refresh=useCallback(async()=>{
   const [r,w,reads]=await Promise.all([json('/api/hq/driver-reports'),json('/api/hq/report-workbook'),json('/api/hq/report-reads')]);
-  setReports(previous=>{const merged=new Map(previous.map(s=>[s.id,s]));for(const s of r.submissions)merged.set(s.id,s);return [...merged.values()].sort((a,b)=>b.seq-a.seq);});setMore(r.hasMore);setVersions(w.versions);setWorkbook(w.workbook);setUnreadIds(reads.unreadIds||[]);
+  setReports(previous=>{const merged=new Map(previous.map(s=>[s.id,s]));for(const s of r.submissions)merged.set(s.id,s);return [...merged.values()].sort((a,b)=>b.seq-a.seq);});
+  setSelected(current=>current?r.submissions.find((item:DriverReportSubmission)=>item.id===current.id)||current:null);
+  setMore(r.hasMore);setVersions(w.versions);setWorkbook(w.workbook);setUnreadIds(reads.unreadIds||[]);
  },[]);
  useEffect(()=>{void Promise.resolve().then(refresh).catch(e=>setMessage(e.message));const timer=setInterval(()=>{if(document.visibilityState==='visible')void refresh().catch(()=>{});},15000);return()=>clearInterval(timer);},[refresh]);
+ useEffect(()=>()=>{if(refreshFeedbackTimer.current)clearTimeout(refreshFeedbackTimer.current);},[]);
+ async function manualRefresh(){
+  if(refreshing||busy)return;
+  if(refreshFeedbackTimer.current)clearTimeout(refreshFeedbackTimer.current);
+  setRefreshing(true);setRefreshComplete(false);
+  try{
+   // This queries reports, the active Excel version and today's unread count.
+   await refresh();
+   // Also refresh the currently open report details without closing the card.
+   const currentId=isExpanded?selection.current:null;
+   if(currentId){
+    const details=await json('/api/hq/driver-reports?submissionId='+encodeURIComponent(currentId));
+    if(selection.current===currentId){setChat(details.messages);setAudit(details.audit);}
+   }
+   setMessage('');
+   setRefreshComplete(true);
+   refreshFeedbackTimer.current=setTimeout(()=>setRefreshComplete(false),2600);
+  }catch(error){setMessage((error as Error).message);}
+  finally{setRefreshing(false);}
+ }
  async function detail(s:DriverReportSubmission) {
   if(selected?.id===s.id&&isExpanded){setIsExpanded(false);return;}
   selection.current=s.id;setIsExpanded(true);
@@ -35,10 +59,10 @@ export function HqDriverReportInbox() {
  const btn='inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 disabled:opacity-40';
  async function older(){try{const r=await json('/api/hq/driver-reports?before='+reports[reports.length-1]?.seq);setReports(p=>[...p,...r.submissions.filter((s:DriverReportSubmission)=>!p.some(a=>a.id===s.id))]);setMore(r.hasMore);}catch(e){setMessage((e as Error).message);}}
  return <section aria-label="기사 운행보고 자동 누적" className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
-  <div className="flex flex-wrap items-start gap-3"><HqExcelSectionIcon src="/images/icons/excel/icon_kakao.png" label="기사 운행보고" count={unreadIds.length}/><div className="flex-1"><h2 className="font-bold text-slate-800">기사 운행보고 · 자동 누적</h2><p className="mt-1 text-sm text-slate-500">기사 대화방에서 접수한 보고와 회사 Excel 작업본을 관리합니다.</p></div><button aria-label="제출 현황 새로고침" onClick={()=>void refresh().catch(e=>setMessage(e.message))} className={btn}><RefreshCw size={16}/></button></div>
+  <div className="flex flex-wrap items-start gap-3"><HqExcelSectionIcon src="/images/icons/excel/icon_kakao.png" label="기사 운행보고" count={unreadIds.length}/><div className="flex-1"><h2 className="font-bold text-slate-800">기사 운행보고 · 자동 누적</h2><p className="mt-1 text-sm text-slate-500">기사 대화방에서 접수한 보고와 회사 Excel 작업본을 관리합니다.</p></div><div className="flex shrink-0 items-center gap-2"><span role="status" aria-live="polite" className="text-[12px] text-[#72829A]">{refreshComplete?'업데이트됨':''}</span><button type="button" aria-label="제출 현황 새로고침" title="보고·Excel·미열람 현황 다시 불러오기" disabled={busy||refreshing} onClick={()=>void manualRefresh()} className={btn+' min-h-10 min-w-10'}>{refreshComplete?<Check size={16} className="text-[#1E60F3]"/>:<RefreshCw size={16} className={refreshing?'animate-spin':''}/>}</button></div></div>
   <div className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 p-4">
    <div className="mr-auto"><p className="text-xs text-slate-400">회사 Excel 작업본</p><p className="mt-1 text-sm font-semibold text-slate-700">{workbook?.filename||'등록된 원본이 없습니다'}</p></div>
-   {!workbook&&<button disabled={busy} onClick={()=>file.current?.click()} className={btn}><Upload size={16}/>원본 등록</button>}{workbook&&<><a className={btn} href={'/api/hq/report-workbook?download=1&year='+workbook.year}><Download size={16}/>최신 Excel</a><a className={btn} href={'/api/hq/report-workbook?download=1&version=original&year='+workbook.year}>원본 백업</a></>}
+   {!workbook&&<button disabled={busy} onClick={()=>file.current?.click()} className={btn}><Upload size={16}/>원본 등록</button>}{workbook&&<a className={btn+' hq-excel-download-lift min-h-11 w-full sm:w-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/40 active:bg-[#EFF4FF]'} href={'/api/hq/report-workbook?download=1&year='+workbook.year}><Download size={16}/>최신 Excel</a>}
    <input ref={file} type="file" accept=".xlsx" className="hidden" aria-label="회사 Excel 원본 등록" onChange={e=>{
     const f=e.target.files?.[0];e.target.value='';if(!f)return;
     if(f.size>12*1024*1024){setMessage('Excel은 12MB 이하만 등록할 수 있습니다.');return;}
