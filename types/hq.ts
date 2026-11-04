@@ -35,6 +35,11 @@ export interface HqBooking {
   endTime?: string;
   pickupLocation: string;
   destination: string;
+  pickupLat?: number;
+  pickupLng?: number;
+  destinationLat?: number;
+  destinationLng?: number;
+  placeVerified?: boolean;
   driverName: string;
   driverId?: string;
   driverPhone?: string;
