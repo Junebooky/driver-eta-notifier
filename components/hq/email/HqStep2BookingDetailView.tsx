@@ -80,20 +80,25 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
   const fleet = useFleetAvailabilityWindows(availabilityWindows);
   const [activeSubTab, setActiveSubTab] = useState<'assign' | 'schedule' | 'history'>('assign');
   const [selectedLanguage, setSelectedLanguage] = useState<'any' | 'english'>(() => {
-    const sr = extractedDraft?.specialRequests || '';
-    if (/영어|english|외국인/i.test(sr)) return 'english';
-    return 'any';
+    if (extractedDraft?.requestedLanguage) return extractedDraft.requestedLanguage === 'en' ? 'english' : 'any';
+    return /영어|english|외국인/i.test(extractedDraft?.specialRequests || '') ? 'english' : 'any';
   });
   const [isSavingCrm, setIsSavingCrm] = useState(false);
   const [crmSavedNotice, setCrmSavedNotice] = useState<string | null>(null);
 
   // Auto-sync language if draft specialRequests updates
   React.useEffect(() => {
-    const sr = extractedDraft?.specialRequests || '';
-    if (/영어|english|외국인/i.test(sr)) {
-      setSelectedLanguage('english');
+    if (extractedDraft?.requestedLanguage) {
+      setSelectedLanguage(extractedDraft.requestedLanguage === 'en' ? 'english' : 'any');
+      return;
     }
-  }, [extractedDraft?.specialRequests]);
+    setSelectedLanguage(/영어|english|외국인/i.test(extractedDraft?.specialRequests || '') ? 'english' : 'any');
+  }, [extractedDraft?.requestedLanguage, extractedDraft?.specialRequests]);
+
+  const changeDriverLanguage = (value:'any'|'english') => {
+    setSelectedLanguage(value);
+    if (extractedDraft) onUpdateDraft?.({...extractedDraft, requestedLanguage:value==='english'?'en':'ko'});
+  };
 
   // Vehicle slot manipulation handlers
   const handleAddVehicleSlot = () => {
@@ -157,7 +162,7 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
     : `BK-${(emailSummary?.id || 'REF01').slice(-6).toUpperCase()}`;
 
   // Check if at least one driver is assigned
-  const hasAssignedDriver = vehicleSlots.some((slot) => slot.driver !== null);
+  const hasAssignedDriver = vehicleSlots.length > 0 && vehicleSlots.every((slot) => slot.driver !== null);
 
   // Handle Save To CRM (#21) - Requires verified company & contact (Awaits server DB confirmation)
   const handleSaveToCrm = async () => {
@@ -624,26 +629,24 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={() => setSelectedLanguage('any')}
+                  onClick={() => changeDriverLanguage('any')}
                   className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                     selectedLanguage === 'any'
                       ? 'border-[#1E60F3] bg-blue-50/80 text-[#1E60F3] shadow-2xs'
                       : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
                   }`}
                 >
-                  <span>🇰🇷</span>
                   <span>무관</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => setSelectedLanguage('english')}
+                  onClick={() => changeDriverLanguage('english')}
                   className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                     selectedLanguage === 'english'
                       ? 'border-[#1E60F3] bg-blue-50/80 text-[#1E60F3] shadow-2xs'
                       : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
                   }`}
                 >
-                  <span>🇺🇸</span>
                   <span>영어 가능</span>
                 </button>
               </div>
