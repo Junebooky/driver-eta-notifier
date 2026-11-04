@@ -19,7 +19,10 @@ export interface ParsedDiaryRoute {
  invalidTimes:boolean;
 }
 
-const ROUTE_SEPARATOR=/[ \t]*(?:→|➡|➔|⇒|➞|->|>|＞)[ \t]*|[ \t]+-[ \t]+|\n+/u;
+// In a timestamped diary, a spaced dash inside a hotel/place name is not a
+// separator unless another clock follows it. Untimed diaries may use " - ".
+const ARROWS_AND_TIMED_DASH=/[ \\t]*(?:→|➡|➔|⇒|➞|->|>|＞)[ \\t]*|[ \\t]*-[ \\t]*(?=(?:(?:익일|다음날)[ \\t]*)?\\d{1,2}:\\d{2})|\\n+/u;
+const ROUTE_SEPARATOR=/[ \\t]*(?:→|➡|➔|⇒|➞|->|>|＞)[ \\t]*|[ \\t]+-[ \\t]+|\\n+/u;
 const ROUTE_TIME=/^(?:(익일|다음날)[ \t]*)?(\d{1,2}):(\d{2})(?!\d)[ \t]*/u;
 const STANDALONE_END=/^(?:업무[ \t]*종료|운행[ \t]*종료|종료)$/u;
 const TRAILING_END=/[ \t]*\/[ \t]*(?:업무[ \t]*종료|운행[ \t]*종료|종료)[ \t]*$/u;
@@ -34,7 +37,8 @@ export function parseDiaryRoute(raw:string):ParsedDiaryRoute{
  if(!heading)return {present:false,stops:[],timesOutOfOrder:false,invalidTimes:false};
  const start=(heading.index||0)+heading[0].length;
  const body=text.slice(start).split(/\n[ \t]*(?:경비[ \t]*지출|특이[ \t]*사항|퇴근[ \t]*시간)(?:[ \t]*[:：]?[^\n]*)?(?:\n|$)/u)[0];
- const chunks=body.split(ROUTE_SEPARATOR);
+ const clocks=body.match(/\d{1,2}:\d{2}/g)||[];
+ const chunks=body.split(clocks.length>=2?ARROWS_AND_TIMED_DASH:ROUTE_SEPARATOR);
  const stops:DiaryWaypoint[]=[];
  let nextDay=false,previous:number|null=null,timesOutOfOrder=false,invalidTimes=false;
  for(const chunk of chunks){
