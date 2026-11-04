@@ -45,7 +45,7 @@ test('Mixed manual + managed November records sort together, moving whole rows a
  const blank=addApprovedMonth(kakaoWorkbookFixture(),'4월',11);
  const manual=appendKakaoExcelReport(blank,{...draft,date:'2026-11-12',customer:'기존 수기',amount:'12000'});
  const files=unzipSync(manual.bytes),path='xl/worksheets/sheet3.xml';
- files[path]=strToU8(strFromU8(files[path]).replace('</row><row r="113">','<c r="M2" t="inlineStr"><is><t>수기 메모</t></is></c></row><row r="113">'));
+ files[path]=strToU8(strFromU8(files[path]).replace(/(<row\\b(?=[^>]*\\br="2")[^>]*>[\\s\\S]*?)(<\\/row>)/,'$1<c r="M2" t="inlineStr"><is><t>수기 메모</t></is></c>$2'));
  const manualWithNote=zipSync(files);
  const managed=appendKakaoExcelReport(manualWithNote,{...draft,date:'2026-11-05',customer:'자동 추가'});
  const reportId='00000000-0000-4000-8000-000000000059';
