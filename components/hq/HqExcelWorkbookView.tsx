@@ -46,7 +46,8 @@ export function HqExcelWorkbookView({year,onCommitted}:{year:number;onCommitted:
    const data=await r.json();if(!r.ok)throw Error(data.error||'저장하지 못했습니다.');
    const dateChanged=edit.col==='A';
    setEdit(null);await load(grid.month);await onCommitted();
-   if(dateChanged)setError('날짜를 수정했습니다. 날짜순 정리를 눌러 기록 순서를 다시 맞춰 주세요.');
+   if(data.pending)setError(data.message||'셀 수정은 접수됐지만 Excel 반영은 아직 완료되지 않았습니다.');
+   else if(dateChanged)setError('날짜를 수정했습니다. 날짜순 정리를 눌러 기록 순서를 다시 맞춰 주세요.');
   }catch(e){setError((e as Error).message);}finally{setBusy(false);}
  }
  return <div className={zoom?'fixed inset-0 z-[150] flex min-w-0 flex-col bg-[#F4F7FC] p-2 sm:p-5':'min-w-0 space-y-3'}>
