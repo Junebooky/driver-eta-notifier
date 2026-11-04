@@ -73,8 +73,11 @@ export function reportRowCellStyles(entries:Record<string,Uint8Array>,templateSt
      clone.insertBefore(size,clone.firstChild);
     }
     size.setAttribute('val',String(wanted));
-    newFontId=fonts.length+addedFonts.length;
-    addedFonts.push(clone.toString());
+    const markup=clone.toString();
+    const existing=fonts.findIndex(node=>node.toString()===markup);
+    const pending=addedFonts.indexOf(markup);
+    newFontId=existing>=0?existing:pending>=0?fonts.length+pending:fonts.length+addedFonts.length;
+    if(existing<0&&pending<0)addedFonts.push(markup);
     fontCache.set(fontKey,newFontId);
    }
   }
@@ -90,8 +93,11 @@ export function reportRowCellStyles(entries:Record<string,Uint8Array>,templateSt
    alignment.setAttribute('wrapText','1');
    xf.setAttribute('applyAlignment','1');
   }
-  const styleId=xfs.length+addedXfs.length;
-  addedXfs.push(xf.toString());
+  const markup=xf.toString();
+  const existing=xfs.findIndex(node=>node.toString()===markup);
+  const pending=addedXfs.indexOf(markup);
+  const styleId=existing>=0?existing:pending>=0?xfs.length+pending:xfs.length+addedXfs.length;
+  if(existing<0&&pending<0)addedXfs.push(markup);
   styleCache.set(styleKey,styleId);
   styleIds.push(styleId);
  }
