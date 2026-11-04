@@ -17,7 +17,6 @@ import {
   Calendar,
   Image as ImageIcon,
   Pencil,
-  IdCard,
 } from 'lucide-react';
 import { HqDriverSummary, DriverScheduleItem } from '@/types/driverHq';
 import { useHqDrivers } from '@/utils/useHqDrivers';
@@ -102,7 +101,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
           setProfileAvatarUrl(null);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
 
     return () => {
       isMounted = false;
@@ -256,22 +255,20 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
             <button
               type="button"
               onClick={() => setFilterAffiliation('all')}
-              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
-                filterAffiliation === 'all'
+              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${filterAffiliation === 'all'
                   ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 font-extrabold shadow-2xs'
                   : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900'
-              }`}
+                }`}
             >
               전체 {counts.total}
             </button>
             <button
               type="button"
               onClick={() => setFilterAffiliation('employed')}
-              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
-                filterAffiliation === 'employed'
+              className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${filterAffiliation === 'employed'
                   ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 font-extrabold shadow-2xs'
                   : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900'
-              }`}
+                }`}
             >
               소속 {counts.employed}
             </button>
@@ -279,11 +276,10 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
               <button
                 type="button"
                 onClick={() => setFilterAffiliation('freelance')}
-                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
-                  filterAffiliation === 'freelance'
+                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${filterAffiliation === 'freelance'
                     ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 font-extrabold shadow-2xs'
                     : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900'
-                }`}
+                  }`}
               >
                 프리랜서 {counts.freelance}
               </button>
@@ -302,11 +298,10 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                     haptics.lightTap();
                     onSelectDriver(driver.id);
                   }}
-                  className={`p-3 transition-all cursor-pointer relative ${
-                    isSelected
+                  className={`p-3 transition-all cursor-pointer relative ${isSelected
                       ? 'bg-blue-50/80 border-l-4 border-l-[#1E60F3] shadow-2xs'
                       : 'hover:bg-slate-50 border-l-4 border-l-transparent'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center gap-2.5">
                     {driver.avatarUrl || (driver.id === activeDriver?.id && effectiveAvatarUrl) ? (
@@ -327,9 +322,8 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
                         <span
-                          className={`text-xs truncate ${
-                            isSelected ? 'font-black text-slate-900' : 'font-extrabold text-slate-800'
-                          }`}
+                          className={`text-xs truncate ${isSelected ? 'font-black text-slate-900' : 'font-extrabold text-slate-800'
+                            }`}
                         >
                           {driver.name}
                         </span>
@@ -373,7 +367,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
           </div>
 
           {/* Driver Profile Header Card */}
-          <div className="flex items-start gap-4 p-3 bg-slate-50/70 rounded-2xl border border-slate-100">
+          <div className="relative flex items-start gap-3.5 p-3.5 bg-slate-50/70 rounded-2xl border border-slate-100 min-h-[96px]">
             {effectiveAvatarUrl && !avatarLoadError ? (
               <div
                 className="relative group/avatar cursor-pointer shrink-0"
@@ -402,7 +396,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
               </button>
             )}
 
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 pr-12">
               {/* 1행: 이름 + 소속 뱃지 + 연필 수정 아이콘 */}
               <div className="flex items-center gap-2">
                 <h3 className="text-xl font-bold text-slate-900 truncate">{activeDriver.name}</h3>
@@ -442,19 +436,37 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                   <span className="text-slate-400">연락처 미등록</span>
                 )}
               </div>
+            </div>
 
-              {/* 3행: VIP 의전 카드 메인 버튼 */}
-              <button
-                type="button"
-                onClick={() => {
-                  haptics.lightTap();
-                  setIsAssetModalOpen(true);
-                }}
-                className="mt-3 w-full inline-flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-[#0050FF] bg-blue-50/40 hover:bg-blue-100/60 text-[#0050FF] text-xs font-bold transition-all cursor-pointer shadow-2xs"
-              >
-                <IdCard className="w-4 h-4" />
-                <span>VIP 의전 카드 관리</span>
-              </button>
+            {/* 프로필 카드 관리 아이콘 (맨 우측 하단) */}
+            <div className="absolute right-2.5 bottom-2.5">
+              <div className="relative group/profile inline-flex items-center justify-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    haptics.lightTap();
+                    setIsAssetModalOpen(true);
+                  }}
+                  className="cursor-pointer transition-transform duration-150 group-hover/profile:scale-110 active:scale-95 flex items-center justify-center"
+                  aria-label="프로필 카드를 관리해요"
+                  title="프로필 카드를 관리해요"
+                >
+                  <img
+                    src="/images/icons/drivers/icon_profile_card.png"
+                    alt="프로필 카드를 관리해요"
+                    className="w-12 h-12 object-contain drop-shadow-2xs select-none"
+                    draggable={false}
+                  />
+                </button>
+
+                {/* Hover Tooltip: 프로필 카드를 관리해요 (아래로 향하는 말풍선) */}
+                <div className="absolute top-full right-0 pt-2 hidden group-hover/profile:flex flex-col items-end pointer-events-none z-50">
+                  <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 mr-5 shadow-xs" />
+                  <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+                    프로필 카드를 관리해요
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -480,11 +492,10 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                       }
                     }
                   }}
-                  className={`px-2 py-0.5 rounded-md text-[11px] font-extrabold transition-all cursor-pointer ${
-                    activeDriver.affiliationType === 'employed'
+                  className={`px-2 py-0.5 rounded-md text-[11px] font-extrabold transition-all cursor-pointer ${activeDriver.affiliationType === 'employed'
                       ? 'bg-[#0050FF] text-white shadow-xs'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-                  }`}
+                    }`}
                 >
                   소속
                 </button>
@@ -505,11 +516,10 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                       }
                     }
                   }}
-                  className={`px-2 py-0.5 rounded-md text-[11px] font-extrabold transition-all cursor-pointer ${
-                    activeDriver.affiliationType === 'freelance'
+                  className={`px-2 py-0.5 rounded-md text-[11px] font-extrabold transition-all cursor-pointer ${activeDriver.affiliationType === 'freelance'
                       ? 'bg-slate-700 text-white shadow-xs'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-                  }`}
+                    }`}
                 >
                   프리랜서
                 </button>
@@ -709,9 +719,8 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
               {weekInfo.days.map((day) => (
                 <div
                   key={day.fullDate}
-                  className={`py-2 px-1 text-center transition-colors ${
-                    day.isToday ? 'bg-blue-50/90 text-[#1E60F3]' : 'text-slate-700'
-                  }`}
+                  className={`py-2 px-1 text-center transition-colors ${day.isToday ? 'bg-blue-50/90 text-[#1E60F3]' : 'text-slate-700'
+                    }`}
                 >
                   <div className="text-xs font-black">
                     {day.dateNum}일 ({day.dayName})
@@ -751,9 +760,8 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                   return (
                     <div
                       key={day.fullDate}
-                      className={`relative border-r border-slate-100 divide-y divide-slate-100/70 ${
-                        day.isToday ? 'bg-blue-50/20' : ''
-                      }`}
+                      className={`relative border-r border-slate-100 divide-y divide-slate-100/70 ${day.isToday ? 'bg-blue-50/20' : ''
+                        }`}
                     >
                       {/* Background horizontal hour guide lines */}
                       {timeHours.map((hour) => (
@@ -776,11 +784,10 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                               left: '3px',
                               right: '3px',
                             }}
-                            className={`absolute rounded-xl p-2 border shadow-xs text-left cursor-pointer transition-all hover:scale-[1.02] flex flex-col justify-between overflow-hidden z-10 ${
-                              isAirport || isEvent
+                            className={`absolute rounded-xl p-2 border shadow-xs text-left cursor-pointer transition-all hover:scale-[1.02] flex flex-col justify-between overflow-hidden z-10 ${isAirport || isEvent
                                 ? 'bg-blue-50/95 border-blue-300 text-blue-950 border-l-4 border-l-[#1E60F3]'
                                 : 'bg-slate-100/95 border-slate-200 text-slate-800 border-l-4 border-l-slate-400'
-                            }`}
+                              }`}
                           >
                             <div className="min-w-0 flex-1 flex flex-col justify-between">
                               <div>
@@ -839,7 +846,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                 setProfileAvatarUrl(data.profile?.signedUrl || null);
                 setAvatarLoadError(false);
               }
-            } catch {}
+            } catch { }
             // 2. Refetch full driver roster
             onRefreshDrivers?.();
             hookState.refetch();
