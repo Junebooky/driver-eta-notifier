@@ -36,47 +36,26 @@ import { HqOperationsBoard } from '@/components/hq/operations/HqOperationsBoard'
 import { HqQuoteModal } from '@/components/hq/quotes/HqQuoteModal';
 import { HqOfficialPricingView } from '@/components/hq/quotes/HqOfficialPricingView';
 import { VipChauffeurCardModal } from '@/components/cards/VipChauffeurCardModal';
-import { HqUnconfirmedDispatchesCard } from '@/components/hq/dispatch/HqUnconfirmedDispatchesCard';
-import { HqUnsentDraftsCard } from '@/components/hq/dispatch/HqUnsentDraftsCard';
-import { HqDriverAllocationDonutCard } from '@/components/hq/dispatch/HqDriverAllocationDonutCard';
 import HqDispatchAlertDrawer from '@/components/hq/dispatch/HqDispatchAlertDrawer';
 import HqCustomerMessageModal from '@/components/hq/messages/HqCustomerMessageModal';
 import { HqAdminLoginModal } from '@/components/hq/auth/HqAdminLoginModal';
 import {
   CustomerNotificationTrigger,
   HqBooking,
-  HqDriverAllocationStats,
   HqKpiMetric,
-  HqUnconfirmedDispatchItem,
-  HqUnsentDraftItem,
 } from '@/types/hq';
 import { ScheduleItem } from '@/data/ferrariSchedules';
 import {
   annotateBookingsWithConflicts,
-  cleanDriverIdentity,
-  formatShortAckTime,
   getKstTodayDateStr,
   getKstTomorrowDateStr,
   isBookingInPast,
   mapScheduleItemToHqBooking,
 } from '@/utils/dispatchConflictDetector';
 import { ensureClientAuth } from '@/utils/cockpitClientAuth';
-import { DEFAULT_DRIVER_PROFILES } from '@/utils/settlementCalculator';
-import { stripManufacturerName } from '@/utils/vehicleData';
-import { evaluateDispatchEscalationAlerts, formatMinutesCountdown, parseKstPickupEpochMs } from '@/utils/unackAlertEngine';
+import { evaluateDispatchEscalationAlerts } from '@/utils/unackAlertEngine';
 import { getHqCustomersSnapshot, subscribeSettlementReports } from '@/utils/settlementStorage';
 import { INITIAL_HQ_CUSTOMERS } from '@/utils/customerHqData';
-
-function formatElapsedWait(isoStr?: string): { label: string; isUrgent: boolean } {
-  if (!isoStr) return { label: '확인 대기', isUrgent: true };
-  const diffMs = Date.now() - new Date(isoStr).getTime();
-  if (isNaN(diffMs) || diffMs < 0) return { label: '방금 발송', isUrgent: false };
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return { label: '방금 발송', isUrgent: false };
-  if (mins < 60) return { label: `${mins}분 경과`, isUrgent: mins >= 20 };
-  const hrs = Math.floor(mins / 60);
-  return { label: `${hrs}시간 ${mins % 60}분 경과`, isUrgent: true };
-}
 
 function HqDashboardInner({ representativeMode }: { representativeMode: boolean }) {
   const searchParams = useSearchParams();
@@ -390,101 +369,7 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
     [fetchSharedBookings]
   );
 
-  // Live Unconfirmed Dispatches Card Data (Sorted by pickup imminence!)
-  const liveUnconfirmedItems: HqUnconfirmedDispatchItem[] = useMemo(() => {
-    return bookings
-      .filter(
-        (b) =>
-          b.dispatchStatus !== '취소' &&
-          (b.driverAck === '미확인' || b.driverAck === '재확인 필요')
-      )
-      .sort((a, b) => {
-        const msA = parseKstPickupEpochMs(a.pickupDate, a.pickupTime) ?? Number.MAX_SAFE_INTEGER;
-        const msB = parseKstPickupEpochMs(b.pickupDate, b.pickupTime) ?? Number.MAX_SAFE_INTEGER;
-        return msA - msB;
-      })
-      .slice(0, 6)
-      .map((b) => {
-        const wait = formatElapsedWait(b.publishedAt || b.updatedAt);
-        const pMs = parseKstPickupEpochMs(b.pickupDate, b.pickupTime);
-        const minsLeft = pMs !== null ? Math.round((pMs - nowTick) / 60000) : null;
-        const isCritical = minsLeft !== null && minsLeft <= 60 && minsLeft >= -720;
-        return {
-          id: b.id,
-          scheduleId: b.scheduleId || b.id,
-          pickupTime: `${b.pickupDate.slice(5)} ${b.pickupTime}`,
-          pickupCountdownLabel: minsLeft !== null ? formatMinutesCountdown(minsLeft) : undefined,
-          customerName: b.customerName,
-          driverName: b.driverName,
-          driverPhone: b.driverPhone,
-          vehicleModel: stripManufacturerName(b.vehicleModel),
-          destination: b.destination,
-          waitingTime: b.driverAck === '재확인 필요' ? `재확인(v${b.version})` : wait.label,
-          isUrgent: isCritical || b.driverAck === '재확인 필요' || wait.isUrgent,
-          severity: isCritical ? 'critical' : b.driverAck === '재확인 필요' ? 'urgent' : 'warning',
-          reminderCount: b.reminderCount || 0,
-        };
-      });
-  }, [bookings, nowTick]);
 
-  // Live Unassigned Queue & Drafts Card Data
-  const liveUnsentItems: HqUnsentDraftItem[] = useMemo(() => {
-    return bookings
-      .filter((b) => b.dispatchStatus === '미배정' || b.dispatchStatus === '작성 중')
-      .slice(0, 6)
-      .map((b) => ({
-        id: b.id,
-        createdAt: formatShortAckTime(b.createdAt || b.updatedAt) || b.pickupDate.slice(5),
-        customerName: b.customerName,
-        pickupTime: `${b.pickupDate.slice(5)} ${b.pickupTime}`,
-        destination: b.destination,
-        status: b.dispatchStatus === '미배정' ? '배차 대기(미배정)' : '임시 초안',
-      }));
-  }, [bookings]);
-
-  // Live Driver Allocation Stats
-  const liveDriverStats: HqDriverAllocationStats = useMemo(() => {
-    const total = DEFAULT_DRIVER_PROFILES.length;
-    const assignedTodaySet = new Set(
-      bookings
-        .filter((b) => b.isToday && b.dispatchStatus === '배차 완료')
-        .map((b) => cleanDriverIdentity(b.driverName))
-        .filter(Boolean)
-    );
-    const activeCount = Math.min(total, assignedTodaySet.size);
-    const unassignedQueueCount = Math.min(total - activeCount, operationalCounts.unassignedCount);
-    const standbyCount = Math.max(0, total - activeCount - unassignedQueueCount);
-
-    const pct = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0);
-
-    return {
-      totalDrivers: total,
-      active: {
-        label: '운행 중',
-        count: activeCount,
-        percentage: pct(activeCount),
-        color: '#1E60F3',
-      },
-      standby: {
-        label: '배차 가능',
-        count: standbyCount,
-        percentage: pct(standbyCount),
-        color: '#60A5FA',
-      },
-      offDuty: {
-        label: '휴무·정비',
-        count: 0,
-        percentage: 0,
-        color: '#94A3B8',
-      },
-      unassigned: {
-        label: '대기 중인 예약',
-        count: operationalCounts.unassignedCount,
-        percentage: pct(unassignedQueueCount),
-        color: '#F59E0B',
-      },
-    };
-  }, [bookings, operationalCounts.unassignedCount]);
 
   // Open Fast Phone Intake Modal (usable from Header or Table on both PC & Mobile)
   const handleOpenQuickPhoneBookingModal = useCallback(() => {
@@ -745,49 +630,7 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
                     />
                   </section>
 
-                  {/* Section 3: Live Bottom Summary Cards */}
-                  <section
-                    aria-label="미확인 배차, 배차 대기함 및 기사 배정 현황"
-                    className="hidden lg:grid grid-cols-1 lg:grid-cols-3 gap-5"
-                  >
-                    <HqUnconfirmedDispatchesCard
-                      items={liveUnconfirmedItems}
-                      onViewAll={() => setIsAlertDrawerOpen(true)}
-                      onSelectItem={(item) => {
-                        const target = bookings.find((b) => b.id === item.id);
-                        if (target) {
-                          setQuickDispatchBooking(target);
-                          setIsQuickDispatchModalOpen(true);
-                        }
-                      }}
-                      onRemindItem={async (item) => {
-                        await handleSendDriverReminder(item.scheduleId || item.id);
-                      }}
-                    />
 
-                    <HqUnsentDraftsCard
-                      items={liveUnsentItems}
-                      onViewAll={() => {
-                        setActiveKpiFilter('kpi_unassigned');
-                        setActiveDispatchTab('all');
-                      }}
-                      onSelectItem={(item) => {
-                        const target = bookings.find((b) => b.id === item.id);
-                        if (target) {
-                          setQuickDispatchBooking(target);
-                          setIsQuickDispatchModalOpen(true);
-                        }
-                      }}
-                    />
-
-                    <HqDriverAllocationDonutCard
-                      stats={liveDriverStats}
-                      onViewAll={() => {
-                        setActiveKpiFilter(null);
-                        setActiveDispatchTab('today');
-                      }}
-                    />
-                  </section>
                 </>
               )}
         </main>

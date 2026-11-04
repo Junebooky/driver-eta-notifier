@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, User, Phone, MapPin, Globe, FileText, Check, Loader2 } from 'lucide-react';
+import { X, User, Phone, MapPin, FileText, Check, Loader2 } from 'lucide-react';
 import { HqDriverSummary } from '@/types/driverHq';
 import { formatPhoneNumber } from '@/utils/formatters';
 import { haptics } from '@/utils/haptics';
@@ -120,11 +120,10 @@ export const HqDriverEditModal: React.FC<HqDriverEditModalProps> = ({
                   haptics.selection();
                   setAffiliationType('employed');
                 }}
-                className={`p-2.5 rounded-xl border text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                  affiliationType === 'employed'
+                className={`p-2.5 rounded-xl border text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer ${affiliationType === 'employed'
                     ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
                     : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
-                }`}
+                  }`}
               >
                 {affiliationType === 'employed' && <Check className="w-3.5 h-3.5" />}
                 <span>본사 소속</span>
@@ -136,11 +135,10 @@ export const HqDriverEditModal: React.FC<HqDriverEditModalProps> = ({
                   haptics.selection();
                   setAffiliationType('freelance');
                 }}
-                className={`p-2.5 rounded-xl border text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                  affiliationType === 'freelance'
+                className={`p-2.5 rounded-xl border text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer ${affiliationType === 'freelance'
                     ? 'bg-slate-700 text-white border-slate-700 shadow-xs'
                     : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
-                }`}
+                  }`}
               >
                 {affiliationType === 'freelance' && <Check className="w-3.5 h-3.5" />}
                 <span>프리랜서</span>
@@ -211,7 +209,6 @@ export const HqDriverEditModal: React.FC<HqDriverEditModalProps> = ({
                   className="rounded text-[#1E60F3] focus:ring-blue-500 w-4 h-4 cursor-pointer"
                 />
                 <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
-                  <Globe className="w-3.5 h-3.5 text-[#1E60F3]" />
                   <span>영어 가능 🇺🇸</span>
                 </span>
               </label>

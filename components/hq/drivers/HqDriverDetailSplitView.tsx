@@ -380,104 +380,149 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
           </div>
 
           {/* Driver Profile Header Card */}
-          <div className="relative flex items-start gap-3.5 p-3.5 bg-slate-50/70 rounded-2xl border border-slate-100 min-h-[96px]">
-            {effectiveAvatarUrl && !avatarLoadError ? (
-              <div
-                className="relative group/avatar cursor-pointer shrink-0"
-                onClick={() => setIsAssetModalOpen(true)}
-                title="배차 안내 카드 설정"
-              >
-                <img
-                  key={effectiveAvatarUrl}
-                  src={effectiveAvatarUrl}
-                  alt={activeDriver.name}
-                  onError={() => setAvatarLoadError(true)}
-                  className="w-16 h-16 rounded-full object-cover border border-slate-200 shadow-xs ring-2 ring-white transition-transform group-hover/avatar:scale-105"
-                />
-                <div className="absolute inset-0 rounded-full bg-black/30 opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center text-white">
-                  <ImageIcon className="w-4 h-4" />
+          <div className="relative p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-3">
+            {/* 1행: 아바타 + 기사 풀네임 + 소속 뱃지 + 수정(연필) 버튼 */}
+            <div className="flex items-center gap-3">
+              {effectiveAvatarUrl && !avatarLoadError ? (
+                <div
+                  className="relative group/avatar cursor-pointer shrink-0"
+                  onClick={() => setIsAssetModalOpen(true)}
+                  title="배차 안내 카드 설정"
+                >
+                  <img
+                    key={effectiveAvatarUrl}
+                    src={effectiveAvatarUrl}
+                    alt={activeDriver.name}
+                    onError={() => setAvatarLoadError(true)}
+                    className="w-14 h-14 rounded-full object-cover border border-slate-200 shadow-xs ring-2 ring-white transition-transform group-hover/avatar:scale-105"
+                  />
+                  <div className="absolute inset-0 rounded-full bg-black/30 opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center text-white">
+                    <ImageIcon className="w-4 h-4" />
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setIsAssetModalOpen(true)}
-                title="프로필 사진 등록하기"
-                className="w-16 h-16 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-black text-xl flex items-center justify-center shadow-xs shrink-0 cursor-pointer transition-colors"
-              >
-                {activeDriver.name.slice(0, 1)}
-              </button>
-            )}
-
-            <div className="min-w-0 flex-1 pr-12">
-              {/* 1행: 이름 + 소속 뱃지 + 연필 수정 아이콘 */}
-              <div className="flex items-center gap-2">
-                <h3 className="text-xl font-bold text-slate-900 truncate">{activeDriver.name}</h3>
-                {activeDriver.affiliationType === 'employed' && (
-                  <span className="px-2 py-0.5 text-xs font-semibold rounded-md bg-blue-50 text-[#0050FF] shrink-0">
-                    소속
-                  </span>
-                )}
+              ) : (
                 <button
                   type="button"
-                  title="기사 정보 수정"
-                  onClick={() => {
-                    haptics.selection();
-                    setIsEditModalOpen(true);
-                  }}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors ml-auto cursor-pointer shrink-0"
+                  onClick={() => setIsAssetModalOpen(true)}
+                  title="프로필 사진 등록하기"
+                  className="w-14 h-14 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-black text-lg flex items-center justify-center shadow-xs shrink-0 cursor-pointer transition-colors"
                 >
-                  <Pencil className="w-3.5 h-3.5 stroke-[2.2]" />
+                  {activeDriver.name.slice(0, 1)}
                 </button>
-              </div>
+              )}
 
-              {/* 2행: 언어 뱃지 및 연락처 */}
-              <div className="flex items-center gap-1.5 text-xs text-slate-600 mt-1 flex-wrap">
-                <span className="bg-slate-100 px-2 py-0.5 rounded-full text-[11px] font-medium">🇰🇷 한국어</span>
-                {activeDriver.englishAvailable && (
-                  <span className="bg-slate-100 px-2 py-0.5 rounded-full text-[11px] font-medium">🇺🇸 영어</span>
-                )}
-                <span className="text-slate-400">·</span>
-                {activeDriver.phone ? (
-                  <a
-                    href={`tel:${activeDriver.phone}`}
-                    className="font-mono hover:text-[#0050FF] hover:underline transition-colors"
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <h3 className="text-lg font-bold text-slate-900 break-keep">{activeDriver.name}</h3>
+                  {activeDriver.affiliationType === 'employed' && (
+                    <span className="px-2 py-0.5 text-[11px] font-bold rounded-md bg-blue-50 text-[#0050FF] shrink-0">
+                      소속
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    title="기사 정보 수정"
+                    onClick={() => {
+                      haptics.selection();
+                      setIsEditModalOpen(true);
+                    }}
+                    className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer shrink-0"
                   >
-                    {formatPhoneNumber(activeDriver.phone)}
-                  </a>
-                ) : (
-                  <span className="text-slate-400">연락처 미등록</span>
-                )}
+                    <Pencil className="w-3.5 h-3.5 stroke-[2.2]" />
+                  </button>
+                </div>
+                <p className="text-[11.5px] text-slate-500 mt-0.5 truncate">
+                  {activeDriver.residence ? `${activeDriver.residence} 거주` : '거주지 미등록'}
+                </p>
               </div>
             </div>
 
-            {/* 프로필 카드 관리 아이콘 (맨 우측 하단) */}
-            <div className="absolute right-2.5 bottom-2.5">
-              <div className="relative group/profile inline-flex items-center justify-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    haptics.lightTap();
-                    setIsAssetModalOpen(true);
-                  }}
-                  className="cursor-pointer transition-transform duration-150 group-hover/profile:scale-110 active:scale-95 flex items-center justify-center"
-                  aria-label="프로필 카드를 관리해요"
-                  title="프로필 카드를 관리해요"
-                >
-                  <img
-                    src="/images/icons/drivers/icon_profile_card.png"
-                    alt="프로필 카드를 관리해요"
-                    className="w-12 h-12 object-contain drop-shadow-2xs select-none"
-                    draggable={false}
-                  />
-                </button>
-
-                {/* Hover Tooltip: 프로필 카드를 관리해요 (아래로 향하는 말풍선) */}
-                <div className="absolute top-full right-0 pt-2 hidden group-hover/profile:flex flex-col items-end pointer-events-none z-50">
-                  <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 mr-5 shadow-xs" />
-                  <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
-                    프로필 카드를 관리해요
+            {/* 2행: 지원 언어 뱃지 (좌측) + 전화 & VIP의전카드 3D 아이콘 나란히 (우측) */}
+            <div className="flex items-center justify-between pt-2.5 border-t border-slate-200/60">
+              {/* 언어 뱃지 */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="bg-white border border-slate-200/80 px-2 py-0.5 rounded-full text-[11px] font-medium text-slate-700 shadow-2xs">
+                  🇰🇷 한국어
+                </span>
+                {activeDriver.englishAvailable && (
+                  <span className="bg-blue-50 text-[#0050FF] border border-blue-100 px-2 py-0.5 rounded-full text-[11px] font-bold shadow-2xs">
+                    🇺🇸 영어
                   </span>
+                )}
+              </div>
+
+              {/* 액션 아이콘: 전화 & VIP 의전카드 나란히 */}
+              <div className="flex items-center gap-2 shrink-0">
+                {/* 1. 전화 걸기 아이콘 */}
+                <div className="relative group/phone inline-flex items-center justify-center">
+                  {activeDriver.phone ? (
+                    <a
+                      href={`tel:${activeDriver.phone}`}
+                      onClick={() => haptics.lightTap()}
+                      className="cursor-pointer transition-transform duration-150 group-hover/phone:scale-110 active:scale-95 flex items-center justify-center"
+                      aria-label={`전화 걸기: ${formatPhoneNumber(activeDriver.phone)}`}
+                      title={`전화 걸기: ${formatPhoneNumber(activeDriver.phone)}`}
+                    >
+                      <img
+                        src="/images/icons/drivers/icon_phone.png"
+                        alt="전화 걸기"
+                        className="w-11 h-11 object-contain drop-shadow-2xs select-none"
+                        draggable={false}
+                      />
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled
+                      className="opacity-35 cursor-not-allowed flex items-center justify-center"
+                      aria-label="연락처 미등록"
+                      title="연락처 미등록"
+                    >
+                      <img
+                        src="/images/icons/drivers/icon_phone.png"
+                        alt="연락처 미등록"
+                        className="w-11 h-11 object-contain select-none grayscale"
+                        draggable={false}
+                      />
+                    </button>
+                  )}
+
+                  {/* 전화 Hover Tooltip (아래로 향하는 말풍선) */}
+                  <div className="absolute top-full right-1/2 translate-x-1/2 pt-2 hidden group-hover/phone:flex flex-col items-center pointer-events-none z-50">
+                    <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 shadow-xs" />
+                    <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+                      {activeDriver.phone ? `${formatPhoneNumber(activeDriver.phone)} 통화` : '연락처 미등록'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 2. VIP 의전카드 관리 아이콘 */}
+                <div className="relative group/profile inline-flex items-center justify-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      haptics.lightTap();
+                      setIsAssetModalOpen(true);
+                    }}
+                    className="cursor-pointer transition-transform duration-150 group-hover/profile:scale-110 active:scale-95 flex items-center justify-center"
+                    aria-label="프로필 카드를 관리해요"
+                    title="프로필 카드를 관리해요"
+                  >
+                    <img
+                      src="/images/icons/drivers/icon_profile_card.png"
+                      alt="프로필 카드를 관리해요"
+                      className="w-11 h-11 object-contain drop-shadow-2xs select-none"
+                      draggable={false}
+                    />
+                  </button>
+
+                  {/* VIP의전카드 Hover Tooltip (아래로 향하는 말풍선) */}
+                  <div className="absolute top-full right-0 pt-2 hidden group-hover/profile:flex flex-col items-end pointer-events-none z-50">
+                    <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 mr-4 shadow-xs" />
+                    <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+                      프로필 카드를 관리해요
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -550,6 +595,19 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
               <span className="text-slate-400 font-semibold">거주 지역</span>
               <span className="font-bold text-slate-800">
                 {activeDriver.residence}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-slate-400 font-semibold">연락처</span>
+              <span className="font-mono font-bold text-slate-800">
+                {activeDriver.phone ? (
+                  <a href={`tel:${activeDriver.phone}`} className="hover:text-[#0050FF] hover:underline transition-colors">
+                    {formatPhoneNumber(activeDriver.phone)}
+                  </a>
+                ) : (
+                  '미등록'
+                )}
               </span>
             </div>
 
