@@ -52,12 +52,12 @@ export const HqStep4DispatchDoneView: React.FC<HqStep4DispatchDoneViewProps> = (
       {/* 1. Header Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
             <CheckCircle2 className="w-4 h-4" />
           </div>
           <h2 className="text-base font-black text-slate-900">예약 상세</h2>
-          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-50 text-slate-700 border border-slate-200 flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#1E60F3]" />
             <span>배차 완료</span>
           </span>
         </div>
@@ -124,12 +124,12 @@ export const HqStep4DispatchDoneView: React.FC<HqStep4DispatchDoneViewProps> = (
 
               {/* Step 3: 기사 확인 */}
               <div className="relative">
-                <span className="absolute -left-6 top-0.5 w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] shadow-xs">
-                  ✓
+                <span className={`absolute -left-6 top-0.5 w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${driverAccepted ? 'bg-[#1E60F3] text-white' : 'border border-slate-300 bg-white text-slate-500'}`}>
+                  {driverAccepted ? '✓' : '3'}
                 </span>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-extrabold text-slate-900">기사 Cockpit 알림</span>
-                  <span className="text-emerald-600 font-bold">{syncError?'조회 실패':driverAccepted?'전체 기사 확인 완료':'기사 확인 대기'}</span>
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <span className="font-semibold text-slate-800">기사 배차 확인</span>
+                  <span className={driverAccepted ? 'font-semibold text-[#1E60F3]' : 'font-medium text-slate-500'}>{syncError?'조회 실패':driverAccepted?'전체 기사 확인 완료':'기사 확인 대기'}</span>
                 </div>
               </div>
 
