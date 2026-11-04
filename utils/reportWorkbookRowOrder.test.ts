@@ -19,10 +19,16 @@ test('Nov 11/12 then 11/05 inserts earlier date above, preserving manifest moves
  assert.equal(iso(sheet.cells.A3.v),'2026-11-12');
  assert.equal(sheet.cells.L113.v,'');
 });
-test('Any unowned historical entry blocks automatic compaction and leaves byte-for-byte source untouched',()=>{
+test('Undated manual notes and period rows remain in place while dated records compact',()=>{
  const old=appendKakaoExcelReport(kakaoWorkbookFixture(),{...draft,date:'2026-04-05'});
  const out=organizeManagedMonth(old.bytes,'4월',2026,{}, {row:old.rowNumber,date:'2026-04-05'});
- assert.equal(out.changed,false);assert.deepEqual(out.bytes,old.bytes);
+ assert.equal(out.changed,true);
+ const original=workbookFromFile(old.bytes).Sheets['4월'];
+ const after=workbookFromFile(out.bytes).Sheets['4월'];
+ assert.equal(after.cells.A2.v,original.cells.A2.v);
+ assert.equal(after.cells.B244.v,'원본 비표준 메모');
+ assert.equal(out.rowNumber,4);
+ assert.deepEqual(out.moves,{});
 });
 
 test('self-closing styled template rows remain valid when filled and compacted; protected cached formulas are retained',async()=>{
@@ -74,14 +80,17 @@ test('Manual-only rows can be sorted without manifest UUID moves and original fi
  const original=unzipSync(early.bytes);
  for(const name of Object.keys(before))assert.deepEqual(original[name],before[name]);
 });
-test('Date sort safely refuses undated manual records instead of deleting them',()=>{
+test('Unknown-date notes remain at their original row after automatic chronological sort',()=>{
  const blank=addApprovedMonth(kakaoWorkbookFixture(),'4월',11);
- const late=appendKakaoExcelReport(blank,{...draft,date:'2026-11-22'});
+ const late=appendKakaoExcelReport(blank,{...draft,date:'2026-11-22',customer:'늦은 기록'});
  const files=unzipSync(late.bytes),path='xl/worksheets/sheet3.xml';
- files[path]=strToU8(strFromU8(files[path]).replace('</sheetData>','<row r="4"><c r="B4" t="inlineStr"><is><t>날짜 없는 수기</t></is></c></row></sheetData>'));
- const source=zipSync(files);
- const result=organizeManagedMonth(source,'11월',2026,{});
- assert.equal(result.changed,false);
- assert.match(result.reason||'',/날짜/);
- assert.deepEqual(result.bytes,source);
+ files[path]=strToU8(strFromU8(files[path]).replace('</sheetData>','<row r="4"><c r="B4" t="inlineStr"><is><t>날짜 없는 수기 메모</t></is></c></row></sheetData>'));
+ const withNote=zipSync(files);
+ const early=appendKakaoExcelReport(withNote,{...draft,date:'2026-11-02',customer:'이른 기록'});
+ const sorted=organizeManagedMonth(early.bytes,'11월',2026,{});
+ assert.equal(sorted.changed,true);
+ const after=workbookFromFile(sorted.bytes).Sheets['11월'];
+ assert.equal(after.cells.D2.v,'이른 기록');
+ assert.equal(after.cells.D3.v,'늦은 기록');
+ assert.equal(after.cells.B4.v,'날짜 없는 수기 메모');
 });
