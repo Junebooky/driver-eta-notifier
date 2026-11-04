@@ -217,6 +217,8 @@ export function HqKakaoExcelImportView() {
             ? <select value={draft[key]} onChange={e => applyField(key,e.target.value)} className="w-full rounded-lg border border-slate-200 bg-white p-2.5 text-sm text-slate-800">
                 <option value="">분류 선택 (미확정)</option><option value="의전">의전</option><option value="셀프">셀프</option><option value="인천픽업">인천픽업</option><option value="인천센딩">인천센딩</option><option value="김포픽업">김포픽업</option><option value="김포센딩">김포센딩</option><option value="차량관리">차량관리</option>
               </select>
+            : key === 'route'
+            ? <textarea rows={3} value={draft.route} onChange={e => applyField(key,e.target.value)} className="w-full resize-y rounded-lg border border-slate-200 p-2.5 text-sm font-normal leading-6 text-slate-800 outline-none focus:border-[#1E60F3]"/>
             : <input type={type||'text'} value={draft[key]} onChange={e => applyField(key,e.target.value)} className="w-full rounded-lg border border-slate-200 p-2.5 text-sm font-normal text-slate-800 outline-none focus:border-[#1E60F3]"/>}
         </label>)}
       </div>
