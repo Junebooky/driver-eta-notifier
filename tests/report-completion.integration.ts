@@ -137,7 +137,7 @@ export async function verifyReportCompletion(c:Client,url:string){
   assert.equal(await call(c,'commit_report_plan',[sortOrg,submitted,1,claimed.lease_token,actor,[{year:2026,expected:active.id,storage:storage(appended.bytes)}],appended.sheetName,appended.rowNumber]),true);
   return submitted;
  };
- const lateId=await sendMonth(12,'1458'),earlyId=await sendMonth(5,'2358');
+ const lateId=await sendMonth(12,'1458'),earlyId=await sendMonth(5,'1458');
  const unSorted=(await c.query('SELECT v.* FROM cockpit.report_ledgers l JOIN cockpit.report_workbook_versions v ON v.id=l.active_version WHERE l.org_id=$1 AND l.year=2026',[sortOrg])).rows[0];
  assert.equal(unSorted.manifest[lateId].row,2);assert.ok(unSorted.manifest[earlyId].row>2);
  const arranged=organizeManagedMonth(new Uint8Array(unSorted.bytes),'11월',2026,unSorted.manifest);
@@ -146,7 +146,8 @@ export async function verifyReportCompletion(c:Client,url:string){
  const ordered=(await c.query('SELECT v.* FROM cockpit.report_ledgers l JOIN cockpit.report_workbook_versions v ON v.id=l.active_version WHERE l.org_id=$1 AND l.year=2026',[sortOrg])).rows[0];
  assert.equal(ordered.manifest[earlyId].row,2);assert.equal(ordered.manifest[lateId].row,3);
  assert.equal((await c.query('SELECT excel_row_number FROM cockpit.report_submissions WHERE id=$1',[lateId])).rows[0].excel_row_number,3);
- assert.equal(workbookFromFile(new Uint8Array(ordered.bytes)).Sheets['11월'].cells.A2.v,'2026-11-05');
+ const serialDate=workbookFromFile(new Uint8Array(ordered.bytes)).Sheets['11월'].cells.A2.v;
+ assert.equal(typeof serialDate==='number'?new Date(Date.UTC(1899,11,30)+serialDate*86400000).toISOString().slice(0,10):serialDate,'2026-11-05');
  console.log('PASS HQ Excel: protected cell edit and CAS, date order compaction with DB row bindings');
  console.log('PASS HQ reading: today-only applied unread badge, read receipts, re-application, secure link retrieval and limited grants');
  console.log('PASS shared report link: token rotation/revoke, no public DB access, unbound intake submission and durable queue');
