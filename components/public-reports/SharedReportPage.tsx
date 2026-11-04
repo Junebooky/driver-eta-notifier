@@ -57,7 +57,6 @@ export function SharedReportPage(){
   const item=pending.current||{id:crypto.randomUUID(),body:draft.trim(),serviceType};
   pending.current=item;
   setBusy(true);setError('');
-  const typingStarted=Date.now();
   setPendingVisual({id:item.id,body:item.body,at:new Date().toISOString()});
   try{
    const response=await fetch('/api/public-report',{
@@ -66,7 +65,8 @@ export function SharedReportPage(){
    });
    const data=await response.json();
    if(!response.ok)throw new Error(data.error||'보고를 전송하지 못했습니다.');
-   await waitForChatTyping(typingStarted);
+   // Start the 2-second typing display after the server acknowledges the report.
+   await waitForChatTyping();
    setItems(prev=>[...prev,{id:item.id,body:item.body,at:new Date().toISOString(),reply:data.reply||'운행보고 잘 받았습니다. 감사합니다 ^.^'}]);
    setDraft('');pending.current=null;
    if(data.accepted){
