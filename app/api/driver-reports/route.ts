@@ -30,6 +30,6 @@ export async function POST(req:NextRequest) {
     if(body.driverId&&body.driverId!==auth.session.driverId)return privateJson({ok:false,error:'기사 계정이 변경되었습니다. 대화방을 다시 열어 주세요.'},403);
     if(typeof body.message!=='string'||!body.message.trim()||body.message.length>20000||!UUID.test(body.requestKey||''))throw new Error('운행보고와 전송 번호를 확인해 주세요.');
     const result=await submitReport(auth.session,body.message.trim(),body.requestKey);
-    return privateJson({ok:true,...result},201);
+    return privateJson({ok:true,...result},result.accepted?201:200);
   }catch(error){return failure(error);}
 }

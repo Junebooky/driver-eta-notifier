@@ -1,5 +1,3 @@
-import {routeFromDiary} from './driverReportChat';
-
 export type ReportInputCheck={accepted:boolean;needsTemplate:boolean;reply:string;missing:string[]};
 const LABELS=[
  ['수행담당',/^[ \t]*수행\s*담당[ \t]*[:：][ \t]*(\S[^\r\n]*)[ \t]*$/m],
@@ -22,11 +20,15 @@ export function validateReportInput(raw:string):ReportInputCheck{
  const anyReportField=/(?:수행\s*담당|차량\s*번호|고객명|시작\s*시간|종료\s*시간|운행일지)\s*[:：\n]/m.test(text);
  if(!/(?:20\d{2}\s*년\s*)?\d{1,2}\s*월\s*\d{1,2}\s*일/.test(text))missing.push('날짜');
  for(const [label,pattern] of LABELS)if(!pattern.test(text))missing.push(label);
- const route=routeFromDiary(text);
- const stops=route.split(/\s+-\s+/).map(s=>s.trim()).filter(Boolean);
- // A one-word chat, blank diary, or plain "안녕하세요" is never a route.
- const hasDiary=/^[ \t]*운행일지\s*[:：]?\s*$/m.test(text);
- if(!hasDiary||stops.length<2||stops.some(s=>!/[\p{L}0-9]/u.test(s)))missing.push('운행일지(경유지 2곳 이상)');
+ // Inspect ONLY lines between the 운행일지 and next section heading.
+ // A blank template must not count expense/notes headings as route stops.
+ const diaryStart=/^[ \t]*운행일지[ \t]*[:：]?[ \t]*$/m.exec(text);
+ const diaryBody=diaryStart?text.slice(diaryStart.index+diaryStart[0].length).replace(/^\n/,'')
+  .split(/^[ \t]*(?:경비\s*지출|특이\s*사항|퇴근\s*시간)\b.*$/m)[0].trim():'';
+ const stops=diaryBody.split(/(?:→|➡|➔|⇒|->|\n)/)
+  .map(s=>s.replace(/^\s*\d{1,2}:\d{2}\s*/,'').replace(/\s*\/\s*(?:업무\s*종료|종료)\s*$/,'').trim())
+  .filter(Boolean);
+ if(!diaryStart||stops.length<2||stops.some(s=>!/[\p{L}0-9]/u.test(s)))missing.push('운행일지(경유지 2곳 이상)');
  if(!missing.length)return {accepted:true,needsTemplate:false,reply:'',missing:[]};
  const detail=anyReportField?'필요한 항목: '+missing.slice(0,7).join(' · ')+(missing.length>7?' 외':'')+'\n':'';
  return {accepted:false,needsTemplate:true,missing,reply:detail+SIMPLE};
