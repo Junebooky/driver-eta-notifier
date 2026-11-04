@@ -314,3 +314,10 @@ dialog::backdrop {
     animation: hq-report-unread-shake 30s linear infinite;
   }
 }
+
+/* HQ inline workbook: comfortable horizontal scrollbar on pointer devices. */
+.hq-excel-scroll {scrollbar-width:auto;scrollbar-color:#A9B9CC #EFF3F8;}
+.hq-excel-scroll::-webkit-scrollbar {height:16px;width:13px;}
+.hq-excel-scroll::-webkit-scrollbar-track {background:#EFF3F8;border-radius:12px;}
+.hq-excel-scroll::-webkit-scrollbar-thumb {background:#A9B9CC;border:3px solid #EFF3F8;border-radius:12px;min-width:48px;}
+.hq-excel-scroll::-webkit-scrollbar-thumb:hover {background:#889DB7;}
