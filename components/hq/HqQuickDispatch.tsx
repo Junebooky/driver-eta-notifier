@@ -78,6 +78,7 @@ import { VEHICLE_STATUS_LABELS } from '@/utils/fleetVehicleStatus';
 import { useFleetAvailability } from '@/hooks/useFleetAvailability';
 import { validateDispatchInterval } from '@/utils/dispatchInterval';
 import { editedBookingIdentity } from '@/utils/quickDispatchContinuity';
+import { driverDispatchSmsHref } from '@/utils/driverDispatchSms';
 import { useHqDrivers } from '@/utils/useHqDrivers';
 
 export interface HqQuickDispatchProps {
@@ -1157,6 +1158,8 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
   };
 
   if (isModal && !isOpen) return null;
+  const driverSmsHref = initialBooking && ['배차 완료','재확인 필요'].includes(initialBooking.dispatchStatus)
+    ? driverDispatchSmsHref(initialBooking) : null;
 
   const content = (
     <div
@@ -1295,6 +1298,18 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                   <BellRing className={`w-3.5 h-3.5 ${isReminding ? 'animate-bounce text-[#1E60F3]' : ''}`} />
                   <span>{remindSuccess ? '앱 내 확인 요청 갱신됨' : isReminding ? '처리 중...' : '기사 확인 재요청'}</span>
                 </button>
+              )}
+
+              {/* Optional native SMS handoff. Opening a composer is NOT a delivery confirmation. */}
+              {driverSmsHref && (
+                <a
+                  href={driverSmsHref}
+                  className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20"
+                  title="스마트폰 문자앱을 열어 기사님께 직접 보냅니다. 자동 발송이 아닙니다."
+                >
+                  <MessageSquareText className="h-4 w-4 text-slate-500" />
+                  기사 문자 작성
+                </a>
               )}
 
               {/* 2. 고객사 자동 안내문자 */}
