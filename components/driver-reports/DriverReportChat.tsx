@@ -4,6 +4,8 @@ import Link from 'next/link';
 import {readChatDraft,saveChatDraft,clearChatDrafts} from '@/utils/reportChatDraft';
 import {ArrowLeft,Plus,RefreshCw,ChevronUp} from 'lucide-react';
 import {VipChatAvatar} from './VipChatAvatar';
+import {ChatTypingBubble} from './ChatTypingBubble';
+import {waitForChatTyping} from '@/utils/reportChatTyping';
 import {useChatViewport} from './useChatViewport';
 import {buildDriverReportTemplate} from '@/utils/reportChatTemplate';
 import {ReportServicePicker} from './ReportServicePicker';
@@ -23,7 +25,7 @@ export function DriverReportChat({driverId,driverName='기사님'}:{driverId:str
  const [reportActive,setReportActive]=useState(true);
  const frame=useRef<HTMLDivElement>(null);
  useChatViewport(frame);
- const [today,setToday]=useState(koreaDate()),[templates,setTemplates]=useState(false),[sending,setSending]=useState(false);
+ const [today,setToday]=useState(koreaDate()),[templates,setTemplates]=useState(false),[sending,setSending]=useState(false),[typing,setTyping]=useState(false);
  const scroller=useRef<HTMLElement>(null),input=useRef<HTMLTextAreaElement>(null),active=useRef(true),inflight=useRef(false),stick=useRef(true),fetched=useRef(false);
  const load=useCallback(async(before?:number)=>{
   const res=await fetch('/api/driver-reports?driverId='+encodeURIComponent(driverId)+(before?'&before='+before:''),{cache:'no-store'});
@@ -41,7 +43,7 @@ export function DriverReportChat({driverId,driverName='기사님'}:{driverId:str
  useEffect(()=>{
   active.current=true;
   void Promise.resolve().then(()=>load()).catch(e=>active.current&&setError(e.message)).finally(()=>active.current&&setLoading(false));
-  const poll=window.setInterval(()=>{setToday(koreaDate());if(document.visibilityState==='visible')void load().catch(()=>{});},12000);
+  const poll=window.setInterval(()=>{setToday(koreaDate());if(document.visibilityState==='visible'&&!inflight.current)void load().catch(()=>{});},12000);
   return()=>{active.current=false;window.clearInterval(poll);};
  },[load]);
  useEffect(()=>{
@@ -60,7 +62,7 @@ export function DriverReportChat({driverId,driverName='기사님'}:{driverId:str
  },[driverId]);
  useEffect(()=>{if(draftLoaded)try{saveChatDraft(localStorage,driverId,text,outgoing,serviceType);}catch{queueMicrotask(()=>setError('임시 저장 공간이 부족해요. 작성 내용을 복사해 보관해 주세요.'));}},[draftLoaded,driverId,text,outgoing,serviceType]);
  useEffect(()=>{if(input.current){input.current.style.height='auto';input.current.style.height=Math.min(176,input.current.scrollHeight)+'px';}},[text]);
- useEffect(()=>{const view=scroller.current;if(view&&stick.current)view.scrollTop=view.scrollHeight;},[messages,outgoing,localGuidance,serviceType]);
+ useEffect(()=>{const view=scroller.current;if(view&&stick.current)view.scrollTop=view.scrollHeight;},[messages,outgoing,localGuidance,serviceType,typing]);
  useEffect(()=>{
   const guard=(e:BeforeUnloadEvent)=>{if(text||outgoing.length){e.preventDefault();e.returnValue='';}};
   window.addEventListener('beforeunload',guard);return()=>window.removeEventListener('beforeunload',guard);
@@ -70,12 +72,15 @@ export function DriverReportChat({driverId,driverName='기사님'}:{driverId:str
   if(!retry&&!serviceType){setError('먼저 운행 유형을 선택해 주세요.');return;}
   if(retry&&!retry.serviceType&&!serviceType){setError('운행 유형을 선택한 뒤 다시 보내주세요.');return;}
   if(!retry&&outgoing.length>=10){setError('미전송 보고가 10건 있어요. 먼저 다시 보내기를 눌러 주세요.');return;}
-  inflight.current=true;setSending(true);stick.current=true;
+  inflight.current=true;setSending(true);setTyping(true);stick.current=true;
+  const typingStarted=Date.now();
   const item=retry||{id:crypto.randomUUID(),body:text.trim(),created_at:new Date().toISOString(),failed:false,serviceType:serviceType??undefined};
   setOutgoing(p=>[...p.filter(v=>v.id!==item.id),{...item,failed:false}]);if(!retry)setText('');
   try{
    const response=await fetch('/api/driver-reports',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:item.body,requestKey:item.id,driverId,serviceType:item.serviceType??serviceType})});
    const data=await response.json();if(!response.ok)throw new Error(data.error||'전송하지 못했어요.');
+   // Never delay storage or the network; only delay displaying the bot response.
+   await waitForChatTyping(typingStarted);
    if(data.accepted===false&&data.needsTemplate){
     setOutgoing(p=>p.filter(v=>v.id!==item.id));
     setLocalGuidance(p=>[...p,{id:item.id,body:item.body,reply:data.reply||'아래 + 버튼에서 보고 양식을 불러와 작성해 주세요.',created_at:item.created_at}]);
@@ -93,7 +98,7 @@ export function DriverReportChat({driverId,driverName='기사님'}:{driverId:str
    }
    if(data.duplicate)setError('이미 접수된 보고예요. 기존 대화와 반영 상태를 확인해 주세요.');
   }catch(e){setOutgoing(p=>p.map(v=>v.id===item.id?{...v,failed:true}:v));setError(e instanceof Error?e.message:'연결을 확인해 주세요.');}
-  finally{inflight.current=false;setSending(false);input.current?.focus();}
+  finally{inflight.current=false;setSending(false);setTyping(false);input.current?.focus();}
  }
  function startNextReport(){
   setReportActive(true);setServiceType(null);setTemplates(false);setError('');
@@ -129,6 +134,7 @@ export function DriverReportChat({driverId,driverName='기사님'}:{driverId:str
    {loading&&<p role="status" className="text-center text-xs text-[#566B7C]">이전 대화를 불러오고 있어요…</p>}
    {messages.map((m,i)=><div key={m.id} className="space-y-3">{koreaDate(new Date(m.created_at))!==today&&(i===0||koreaDate(new Date(messages[i-1].created_at))!==koreaDate(new Date(m.created_at)))&&<p className="text-center text-[11px] text-[#566B7C]">{dayLabel(koreaDate(new Date(m.created_at)))}</p>}{bubble(m,m.sender_type==='driver')}</div>)}
    {outgoing.map(m=>bubble(m,true,m))}
+   {typing&&<ChatTypingBubble/>}
    {localGuidance.map(m=><div key={m.id} className="space-y-3">{bubble({id:m.id+'-sent',body:m.body,created_at:m.created_at},true)}{bubble({id:m.id+'-help',body:m.reply,created_at:m.created_at},false)}</div>)}
    {draftLoaded&&reportActive&&<div className="px-3 sm:px-5"><ReportServicePicker value={serviceType} onChange={v=>{setServiceType(v);setError('');}}/></div>}
   </section>
