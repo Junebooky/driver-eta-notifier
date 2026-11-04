@@ -2,7 +2,7 @@ import {reportWorkbookYear} from '@/utils/reportWorkbookYear';
 import {createHash} from 'node:crypto';
 import {supabaseAdmin as db} from '@/lib/supabase/server';
 import {appendKakaoExcelReport,workbookFromFile} from '@/utils/kakaoExcelWorkbook';
-import {amendReportRow,removeReportRow,addApprovedMonth} from '@/utils/reportWorkbookOperations';
+import {amendReportRow,removeReportRow,addApprovedMonth,ensureReportMonth} from '@/utils/reportWorkbookOperations';
 import {parseDriverReport,reportReply} from '@/utils/driverReportChat';
 import {readWorkbook,storeWorkbook} from './storage';
 import type {CockpitAuthSession} from '@/lib/auth/serverAuth';
@@ -36,8 +36,11 @@ export async function processReport(org:string,id:string,actor:string,lease?:str
    let bytes=target.bytes;
    const month=Number(s.parsed.draft.date.slice(5,7));
    if(!workbookFromFile(bytes).Sheets[month+'월']){
+    // Use an HQ-approved source when it exists; otherwise clone the most recent
+    // earlier monthly sheet as an EMPTY template (e.g. 10월 -> 11월).
+    // The cloned month and the new record commit atomically with the CAS version.
     const t=await db.from('report_month_templates').select('source_month').eq('org_id',org).eq('year',targetYear).eq('month',month).maybeSingle();check(t.error);
-    if(!t.data)throw new Error('회사에서 승인한 빈 월별 양식이 필요합니다.');bytes=addApprovedMonth(bytes,t.data.source_month,month);
+    bytes=ensureReportMonth(bytes,month,t.data?.source_month??undefined).bytes;
    }
    const plans:{year:number;expected:string;storage:Awaited<ReturnType<typeof storeWorkbook>>}[]=[];
    let result;

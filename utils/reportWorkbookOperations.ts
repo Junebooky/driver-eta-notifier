@@ -70,3 +70,30 @@ export function addApprovedMonth(bytes:Uint8Array,sourceMonth:string,targetMonth
  const types=strFromU8(entries['[Content_Types].xml']);entries['[Content_Types].xml']=strToU8(types.replace('</Types>',`<Override PartName="/${newPath}" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>`));
  const result=zipSync(entries);workbookFromFile(result);return result;
 }
+
+/**
+ * For a reported month that is not in the annual workbook, copy the nearest
+ * existing monthly SHEET as a *blank* template. Prefer the most recent earlier
+ * month (e.g. October -> November); otherwise use the earliest later month.
+ * Do not copy customer records or invent an annual workbook.
+ *
+ * A separately approved source month, when present, always takes precedence.
+ * The caller commits the new month + submitted report together through the
+ * existing version compare-and-swap transaction (no half-created month).
+ */
+export function ensureReportMonth(bytes:Uint8Array,targetMonth:number,approvedSourceMonth?:string){
+ if(!Number.isInteger(targetMonth)||targetMonth<1||targetMonth>12)throw new Error('운행보고의 월을 확인해 주세요.');
+ const wb=workbookFromFile(bytes),month=targetMonth+'월';
+ if(wb.Sheets[month])return {bytes,created:false,sourceMonth:null as string|null};
+ const months=wb.SheetNames.map(name=>{
+  const m=name.match(/^(1[0-2]|[1-9])월$/);
+  return m?{name,number:Number(m[1])}:null;
+ }).filter((x):x is {name:string;number:number}=>x!==null).sort((a,b)=>a.number-b.number);
+ if(!months.length)throw new Error('월별 시트가 없는 Excel 원본입니다. HQ에서 월별 양식을 먼저 등록해 주세요.');
+ const source=approvedSourceMonth??([...months].reverse().find(m=>m.number<targetMonth)??months.find(m=>m.number>targetMonth))?.name;
+ if(!source||!wb.Sheets[source])throw new Error('자동생성에 사용할 기존 월별 양식이 없습니다. HQ에서 확인해 주세요.');
+ // addApprovedMonth clears ALL prior report values before creating the new sheet.
+ // Unsupported formulas or external references fail closed rather than corrupt data.
+ const next=addApprovedMonth(bytes,source,targetMonth);
+ return {bytes:next,created:true,sourceMonth:source};
+}
