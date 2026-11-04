@@ -1028,7 +1028,12 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
                               {/* 3. 이동 경로 */}
                               <td className="py-3.5 px-5">
                                 <div className="flex items-center gap-1.5 text-xs text-slate-700 font-medium">
-                                  <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                  <img
+                                    src="/images/icons/excel/icon_position.png"
+                                    alt="위치"
+                                    className="w-5 h-5 object-contain shrink-0 select-none"
+                                    draggable={false}
+                                  />
                                   <span className="font-bold text-slate-900">{item.pickupLocation}</span>
                                   <span className="text-slate-400 font-bold">➔</span>
                                   <span className="text-slate-700">{item.dropoffLocation}</span>

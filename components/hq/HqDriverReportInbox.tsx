@@ -124,7 +124,7 @@ export function HqDriverReportInbox() {
       ? `${report.parsed.draft.date} · ${report.parsed.draft.customer}`
       : [report.parsed.draft.date, report.parsed.draft.customer].filter(Boolean).join(' · ') || '기사 및 거래처 정보 미확인';
     return <div key={report.id} className="min-w-0">
-    <div className={'flex w-full items-center gap-3 sm:gap-4 rounded-[20px] border px-5 py-4 sm:px-6 sm:py-[18px] text-left transition-all duration-200 '+(selected?.id===report.id&&isExpanded?'border-[#C8DAFA] bg-[linear-gradient(110deg,#FFFFFF_45%,#F2F7FF_100%)] shadow-[0_6px_24px_rgba(30,96,243,0.08)]':'border-[#EDF1F7] bg-[linear-gradient(110deg,#FFFFFF_52%,#F6F9FF_100%)] shadow-[0_4px_20px_rgba(15,23,42,0.035)] hover:border-[#DCE5F2] hover:shadow-[0_6px_24px_rgba(15,23,42,0.06)]')}>
+    <div className={'group/card flex w-full items-center gap-3 sm:gap-4 rounded-[20px] border px-5 py-4 sm:px-6 sm:py-[18px] text-left transition-all duration-200 '+(selected?.id===report.id&&isExpanded?'border-[#C8DAFA] bg-[linear-gradient(110deg,#FFFFFF_45%,#F2F7FF_100%)] shadow-[0_6px_24px_rgba(30,96,243,0.08)]':'border-[#EDF1F7] bg-[linear-gradient(110deg,#FFFFFF_52%,#F6F9FF_100%)] shadow-[0_4px_20px_rgba(15,23,42,0.035)] hover:border-[#DCE5F2] hover:shadow-[0_6px_24px_rgba(15,23,42,0.06)]')}>
      <button type="button" aria-expanded={selected?.id===report.id&&isExpanded} aria-controls={'report-details-'+report.id}
       onClick={()=>void detail(report)} className="min-w-0 flex-1 text-left focus:outline-none cursor-pointer">
       <p className="text-[15px] sm:text-[15.5px] font-bold tracking-[-0.02em] text-[#222E42] leading-snug">{title}</p>
@@ -132,15 +132,14 @@ export function HqDriverReportInbox() {
      </button>
 
      <div className="flex shrink-0 items-center gap-3 sm:gap-3.5">
-      {/* 위치 찾기 3D 아이콘 (반영 완료 바로 왼쪽) */}
+      {/* 위치 찾기 3D 아이콘 (카드 호버 시 스무스하게 등장 · 반영 완료 바로 왼쪽) */}
       {report.excel_status==='applied'&&report.excel_sheet_name&&report.excel_row_number&&(
-       <div className="relative group/pos inline-flex items-center justify-center shrink-0">
+       <div className="relative group/pos inline-flex items-center justify-center shrink-0 opacity-0 translate-x-1.5 scale-90 pointer-events-none transition-all duration-200 ease-out group-hover/card:opacity-100 group-hover/card:translate-x-0 group-hover/card:scale-100 group-hover/card:pointer-events-auto focus-within:opacity-100 focus-within:translate-x-0 focus-within:scale-100 focus-within:pointer-events-auto">
         <button
          type="button"
          onClick={(e)=>{e.stopPropagation(); viewExcelLocation(report);}}
          className="cursor-pointer transition-transform duration-150 group-hover/pos:scale-110 active:scale-95 flex items-center justify-center p-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/30 rounded-lg"
          aria-label="해당 시트를 찾아드려요!"
-         title="해당 시트를 찾아드려요!"
         >
          <img
           src="/images/icons/excel/icon_position.png"

@@ -456,12 +456,14 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                 {/* 1. 전화 걸기 아이콘 */}
                 <div className="relative group/phone inline-flex items-center justify-center">
                   {activeDriver.phone ? (
-                    <a
-                      href={`tel:${activeDriver.phone}`}
-                      onClick={() => haptics.lightTap()}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        haptics.lightTap();
+                        window.location.href = `tel:${activeDriver.phone}`;
+                      }}
                       className="cursor-pointer transition-transform duration-150 group-hover/phone:scale-110 active:scale-95 flex items-center justify-center"
-                      aria-label={`전화 걸기: ${formatPhoneNumber(activeDriver.phone)}`}
-                      title={`전화 걸기: ${formatPhoneNumber(activeDriver.phone)}`}
+                      aria-label={formatPhoneNumber(activeDriver.phone)}
                     >
                       <img
                         src="/images/icons/drivers/icon_phone.png"
@@ -469,14 +471,13 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                         className="w-9 h-9 object-contain drop-shadow-2xs select-none"
                         draggable={false}
                       />
-                    </a>
+                    </button>
                   ) : (
                     <button
                       type="button"
                       disabled
                       className="opacity-35 cursor-not-allowed flex items-center justify-center"
                       aria-label="연락처 미등록"
-                      title="연락처 미등록"
                     >
                       <img
                         src="/images/icons/drivers/icon_phone.png"
@@ -491,7 +492,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                   <div className="absolute top-full right-1/2 translate-x-1/2 pt-2 hidden group-hover/phone:flex flex-col items-center pointer-events-none z-50">
                     <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 shadow-xs" />
                     <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
-                      {activeDriver.phone ? `${formatPhoneNumber(activeDriver.phone)} 통화` : '연락처 미등록'}
+                      {activeDriver.phone ? formatPhoneNumber(activeDriver.phone) : '연락처 미등록'}
                     </span>
                   </div>
                 </div>
@@ -506,7 +507,6 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                     }}
                     className="cursor-pointer transition-transform duration-150 group-hover/profile:scale-110 active:scale-95 flex items-center justify-center"
                     aria-label="프로필 카드를 관리해요"
-                    title="프로필 카드를 관리해요"
                   >
                     <img
                       src="/images/icons/drivers/icon_profile_card.png"
