@@ -80,6 +80,11 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
   const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'driving' | 'off' | 'active' | 'vacation'>('all');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [menuOpenDriverId, setMenuOpenDriverId] = useState<string | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{
+    top?: number;
+    bottom?: number;
+    right: number;
+  } | null>(null);
   const [editingDriver, setEditingDriver] = useState<HqDriverSummary | null>(null);
   const [driverIconError, setDriverIconError] = useState(false);
   const pageSize = 10;
@@ -573,9 +578,22 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                       <div className="flex items-center justify-end relative">
                         <button
                           type="button"
-                          onClick={() => {
+                          onClick={(e) => {
                             haptics.lightTap();
-                            setMenuOpenDriverId((prev) => (prev === driver.id ? null : driver.id));
+                            if (menuOpenDriverId === driver.id) {
+                              setMenuOpenDriverId(null);
+                              setMenuPosition(null);
+                              return;
+                            }
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const right = Math.max(12, window.innerWidth - rect.right);
+                            const openUpward = rect.bottom + 185 > window.innerHeight;
+                            setMenuPosition(
+                              openUpward
+                                ? { bottom: window.innerHeight - rect.top + 6, right }
+                                : { top: rect.bottom + 6, right }
+                            );
+                            setMenuOpenDriverId(driver.id);
                           }}
                           className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${menuOpenDriverId === driver.id
                             ? 'bg-blue-50 text-[#1E60F3]'
@@ -586,24 +604,35 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                           <MoreHorizontal className="w-4 h-4" />
                         </button>
 
-                        {/* Dropdown Menu */}
-                        {menuOpenDriverId === driver.id && (
+                        {/* Dropdown Menu (Fixed Top-Layer Portal Style so it is never clipped by overflow or covered by footer) */}
+                        {menuOpenDriverId === driver.id && menuPosition && (
                           <>
                             <div
-                              className="fixed inset-0 z-40"
-                              onClick={() => setMenuOpenDriverId(null)}
+                              className="fixed inset-0 z-[9990]"
+                              onClick={() => {
+                                setMenuOpenDriverId(null);
+                                setMenuPosition(null);
+                              }}
                             />
-                            <div className="absolute right-0 top-9 z-50 w-44 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 text-xs text-left animate-in fade-in zoom-in-95 duration-100">
+                            <div
+                              style={{
+                                top: menuPosition.top,
+                                bottom: menuPosition.bottom,
+                                right: menuPosition.right,
+                              }}
+                              className="fixed z-[9999] w-44 bg-white rounded-2xl shadow-[0_14px_36px_rgba(15,23,42,0.16)] border border-slate-200/90 p-1.5 text-xs text-left animate-in fade-in zoom-in-95 duration-100"
+                            >
                               <button
                                 type="button"
                                 onClick={() => {
                                   setMenuOpenDriverId(null);
+                                  setMenuPosition(null);
                                   handleRowClick(driver.id);
                                 }}
-                                className="w-full px-3 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 font-bold cursor-pointer transition-colors"
+                                className="w-full py-2 px-3 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer transition-colors"
                               >
-                                <User className="w-3.5 h-3.5 text-slate-400" />
-                                <span>상세 프로필</span>
+                                <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                <span>프로필 보기</span>
                               </button>
 
                               <button
@@ -611,37 +640,37 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                                 onClick={async () => {
                                   haptics.selection();
                                   setMenuOpenDriverId(null);
+                                  setMenuPosition(null);
                                   const targetAffiliation = driver.affiliationType === 'employed' ? 'freelance' : 'employed';
                                   await updateDriver(driver.id, { affiliationType: targetAffiliation });
                                 }}
-                                className="w-full px-3 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 font-bold cursor-pointer transition-colors"
+                                className="w-full py-2 px-3 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer transition-colors"
                               >
                                 {driver.affiliationType === 'employed' ? (
                                   <>
-                                    <UserMinus className="w-3.5 h-3.5 text-slate-500" />
-                                    <span>프리랜서로 전환</span>
+                                    <UserMinus className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                    <span>프리랜서로 변경</span>
                                   </>
                                 ) : (
                                   <>
-                                    <UserCheck className="w-3.5 h-3.5 text-[#1E60F3]" />
-                                    <span className="text-[#1E60F3]">소속 기사로 전환</span>
+                                    <UserCheck className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                    <span>소속 기사로 변경</span>
                                   </>
                                 )}
                               </button>
-
-                              <div className="my-1 border-t border-slate-100" />
 
                               <button
                                 type="button"
                                 onClick={() => {
                                   haptics.lightTap();
                                   setMenuOpenDriverId(null);
+                                  setMenuPosition(null);
                                   setEditingDriver(driver);
                                 }}
-                                className="w-full px-3 py-2 text-slate-700 hover:bg-slate-50 flex items-center gap-2 font-bold cursor-pointer transition-colors"
+                                className="w-full py-2 px-3 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer transition-colors"
                               >
-                                <Edit3 className="w-3.5 h-3.5 text-slate-400" />
-                                <span>기사 정보 수정</span>
+                                <Edit3 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                <span>정보 수정</span>
                               </button>
 
                               <div className="my-1 border-t border-slate-100" />
@@ -651,22 +680,23 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                                 onClick={async () => {
                                   haptics.warningPulse();
                                   setMenuOpenDriverId(null);
+                                  setMenuPosition(null);
                                   const confirmed = window.confirm(
-                                    `'${driver.name}' 기사님을 목록에서 삭제하시겠습니까?\n배정된 운행 기록이 있는 경우 기사 배정만 해제됩니다.`
+                                    `'${driver.name}' 기사님을 목록에서 등록 해제하시겠습니까?\n배정된 운행 기록이 있는 경우 기사 배정만 해제됩니다.`
                                   );
                                   if (confirmed) {
                                     const ok = await deleteDriver(driver.id);
                                     if (ok) {
                                       haptics.success();
                                     } else {
-                                      alert('기사 삭제에 실패했습니다.');
+                                      alert('등록 해제에 실패했습니다.');
                                     }
                                   }
                                 }}
-                                className="w-full px-3 py-2 text-rose-600 hover:bg-rose-50 flex items-center gap-2 font-bold cursor-pointer transition-colors"
+                                className="w-full py-2 px-3 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2 cursor-pointer transition-colors"
                               >
-                                <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-                                <span>기사 삭제</span>
+                                <Trash2 className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                                <span>등록 해제</span>
                               </button>
                             </div>
                           </>
