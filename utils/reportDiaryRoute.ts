@@ -21,8 +21,8 @@ export interface ParsedDiaryRoute {
 
 // In a timestamped diary, a spaced dash inside a hotel/place name is not a
 // separator unless another clock follows it. Untimed diaries may use " - ".
-const ARROWS_AND_TIMED_DASH=/[ \\t]*(?:→|➡|➔|⇒|➞|->|>|＞)[ \\t]*|[ \\t]*-[ \\t]*(?=(?:(?:익일|다음날)[ \\t]*)?\\d{1,2}:\\d{2})|\\n+/u;
-const ROUTE_SEPARATOR=/[ \\t]*(?:→|➡|➔|⇒|➞|->|>|＞)[ \\t]*|[ \\t]+-[ \\t]+|\\n+/u;
+const ARROWS_AND_TIMED_DASH=/[ \t]*(?:→|➡|➔|⇒|➞|->|>|＞)[ \t]*|[ \t]*-[ \t]*(?=(?:(?:익일|다음날)[ \t]*)?\d{1,2}:\d{2})|\n+/u;
+const ROUTE_SEPARATOR=/[ \t]*(?:→|➡|➔|⇒|➞|->|>|＞)[ \t]*|[ \t]+-[ \t]+|\n+/u;
 const ROUTE_TIME=/^(?:(익일|다음날)[ \t]*)?(\d{1,2}):(\d{2})(?!\d)[ \t]*/u;
 const STANDALONE_END=/^(?:업무[ \t]*종료|운행[ \t]*종료|종료)$/u;
 const TRAILING_END=/[ \t]*\/[ \t]*(?:업무[ \t]*종료|운행[ \t]*종료|종료)[ \t]*$/u;
