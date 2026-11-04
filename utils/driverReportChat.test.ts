@@ -30,3 +30,10 @@ test('uncertain plate, period, year, overnight and impersonated names require re
  assert.equal(koreaDate(new Date('2026-11-03T16:00:00Z')),'2026-11-04');
  assert.equal(routeFromDiary('운행일지\n서울 → 업무종료 → 서울\n특이사항\n경비'),'서울 - 서울');
 });
+test('yearless reports use the active ledger year, never the server calendar; night end is configurable',()=>{
+ const message=raw('10:00~24:00').replace('2026년 ','');
+ const p=parseDriverReport(message,'검증 기사',new Date('2030-01-01'),{workbookYear:2026,nightEndHour:6});
+ assert.deepEqual(p.reviewReasons,[]);assert.equal(p.draft.date,'2026-10-24');assert.equal(p.draft.model,'스프린터 319');
+ assert.equal(p.draft.overtime,'OT 2시간 / 심야 2시간');
+ assert.deepEqual(workMinutes('20:00','30:00',4),{total:600,ot:0,night:360});
+});
