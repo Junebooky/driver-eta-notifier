@@ -4,6 +4,7 @@ import {NextRequest} from 'next/server';
 import {signCockpitSession,type CockpitAuthSession} from '../lib/auth/serverAuth';
 import {supabaseAdmin as db} from '../lib/supabase/server';
 import {sameOrigin} from '../lib/driverReports/http';
+import {isReportServiceType} from '../utils/reportServiceTypes';
 import {GET,POST} from '../app/api/driver-reports/route';
 import {GET as workbook} from '../app/api/hq/report-workbook/route';
 const id='a0000000-0000-4000-8000-000000000001',other='b0000000-0000-4000-8000-000000000001';
@@ -27,8 +28,12 @@ test('chat APIs enforce authenticated UUID/org and never grant workbook access t
   const junk=await POST(new NextRequest('http://localhost/api/driver-reports',{method:'POST',headers:{cookie:cookie(),'content-type':'application/json'},body:JSON.stringify({message:'ㅎㅎ',requestKey:other})}));
   assert.equal(junk.status,200);assert.equal((await junk.json()).accepted,false);assert.equal(Boolean(saved),false);
   const completed='2026년 11월 4일\n수행담당 : 본인\n차량번호 : 700호 1458\n고객명 : 샤넬\n시작 시간 : 09:00\n종료 시간 : 17:00\n운행일지\n09:00 차고지 -> 10:00 호텔 -> 17:00 차고지\n경비지출\n통행료 : 1,000원';
-  const submitted=await POST(new NextRequest('http://localhost/api/driver-reports',{method:'POST',headers:{cookie:cookie(),'content-type':'application/json'},body:JSON.stringify({message:completed,requestKey:other,org_id:'forged-org'})}));
+  const noCategory=await POST(new NextRequest('http://localhost/api/driver-reports',{method:'POST',headers:{cookie:cookie(),'content-type':'application/json'},body:JSON.stringify({message:completed,requestKey:other})}));
+  assert.equal(noCategory.status,200);assert.equal((await noCategory.json()).needsServiceType,true);assert.equal(Boolean(saved),false);
+  const submitted=await POST(new NextRequest('http://localhost/api/driver-reports',{method:'POST',headers:{cookie:cookie(),'content-type':'application/json'},body:JSON.stringify({message:completed,requestKey:other,org_id:'forged-org',serviceType:'인천공항 샌딩'})}));
   assert.equal(submitted.status,201);assert.equal(saved?.p_driver,id);assert.equal(saved?.p_org,'vip_limousine_korea');
+  assert.equal((saved?.p_parsed as {draft:{serviceType:string}}).draft.serviceType,'인천공항 샌딩');
+  assert.equal(isReportServiceType('임의 입력'),false);
  }finally{db.from=originalFrom;db.rpc=originalRpc;}
 });
 

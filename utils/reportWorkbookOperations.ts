@@ -29,7 +29,7 @@ export function amendReportRow(bytes:Uint8Array,sheet:string,row:number,draft:Ka
  const old=source.match(rowRE(row))?.[0];if(!old)throw new Error('정정 위치가 없습니다.');
  const kept=clearCells(old);const replacement=kept.endsWith('/>')?kept.slice(0,-2)+'>'+cells+'</row>':kept.replace('</row>',cells+'</row>');
  // Restore original dimension and all other worksheet contents; only owned A–L cells change.
- after[path]=strToU8(widenReportColumns(source.replace(rowRE(row),replacement),routeColumnWidth([draft.route,...Object.entries(workbookFromFile(bytes).Sheets[sheet].cells).filter(([address])=>/^G[1-9]\\d*$/.test(address)).map(([,cell])=>String(cell.v??''))])));
+ after[path]=strToU8(widenReportColumns(source.replace(rowRE(row),replacement),routeColumnWidth([draft.route,...Object.entries(workbookFromFile(bytes).Sheets[sheet].cells).filter(([address])=>/^G[1-9]\d*$/.test(address)).map(([,cell])=>String(cell.v??''))])));
  return {...out,bytes:zipSync(after),rowNumber:row};
 }
 /** HQ approves a blank template derived from an existing company month, not its records. */

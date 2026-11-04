@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {DOMParser} from '@xmldom/xmldom';
 import {unzipSync,strFromU8,strToU8,zipSync} from 'fflate';
 import {kakaoWorkbookFixture} from './kakaoExcelFixture';
-import {appendKakaoExcelReport} from './kakaoExcelWorkbook';
+import {appendKakaoExcelReport,workbookFromFile} from './kakaoExcelWorkbook';
+import {routeColumnWidth,EXCEL_MAX_COL_WIDTH} from './reportExcelCellFormatting';
 import {amendReportRow} from './reportWorkbookOperations';
 import {blankKakaoExcelDraft} from './kakaoExcelImport';
 const parser=new DOMParser();
@@ -24,13 +25,14 @@ const cellStyle=(bytes:Uint8Array,col:string,row:number)=>{
  const fontId=Number(xf.getAttribute('fontId')||0);
  const font=styles.getElementsByTagName('fonts')[0].getElementsByTagName('font')[fontId];
  assert.ok(font,'Expected font '+fontId);
- return {size:Number(font.getElementsByTagName('sz')[0]?.getAttribute('val')),wrap:xf.getElementsByTagName('alignment')[0]?.getAttribute('wrapText')};
+ return {size:Number(font.getElementsByTagName('sz')[0]?.getAttribute('val')),wrap:xf.getElementsByTagName('alignment')[0]?.getAttribute('wrapText'),shrink:xf.getElementsByTagName('alignment')[0]?.getAttribute('shrinkToFit')};
 };
-test('New A-L report row uses 10pt G/H/I with wrapping, 11pt elsewhere, with widened columns',()=>{
+test('New A-L report row uses 10pt G/H/I, non-wrapped G and 11pt elsewhere, with wider columns',()=>{
  const output=appendKakaoExcelReport(kakaoWorkbookFixture(),report);
  for(const col of ['G','H','I']){
   const style=cellStyle(output.bytes,col,245);
-  assert.equal(style.size,10,col);assert.equal(style.wrap,'1',col);
+  assert.equal(style.size,10,col);assert.equal(style.wrap,col==='G'?'0':'1',col);
+  if(col==='G')assert.equal(style.shrink,'1');
  }
  for(const col of ['A','B','C','D','E','F','J','K','L']){
   assert.equal(cellStyle(output.bytes,col,245).size,11,col);
@@ -65,4 +67,36 @@ test('Corrected report row remains 10pt G/H/I without growing style definitions'
  const adjusted=amendReportRow(first.bytes,'4월',245,{...report,time:'10:00~18:00'});
  for(const col of ['G','H','I'])assert.equal(cellStyle(adjusted.bytes,col,245).size,10);
  assert.deepEqual(unzipSync(first.bytes)['xl/styles.xml'],unzipSync(adjusted.bytes)['xl/styles.xml']);
+});
+
+test('G expands to the longest service route in the month, remains one line, and H has the chosen category',()=>{
+ const firstRoute=Array.from({length:55},()=> '서울호텔').join(' → ');
+ const secondRoute=Array.from({length:60},()=> '인천공항').join(' → ');
+ const first=appendKakaoExcelReport(kakaoWorkbookFixture(),{...report,route:firstRoute,serviceType:'김포공항 샌딩'});
+ const output=appendKakaoExcelReport(first.bytes,{...report,date:'2026-04-07',route:secondRoute,serviceType:'인천공항 샌딩'});
+ const sheet=strFromU8(unzipSync(output.bytes)['xl/worksheets/sheet1.xml']);
+ const col=sheet.match(/<col min="7" max="7" width="([^"]+)"/)?.[1];
+ assert.equal(Number(col),routeColumnWidth([firstRoute,secondRoute]));
+ assert.equal(Number(col),EXCEL_MAX_COL_WIDTH);
+ const book=workbookFromFile(output.bytes);
+ assert.equal(book.Sheets['4월'].cells.G245.v,firstRoute);
+ assert.equal(book.Sheets['4월'].cells.H245.v,'김포공항 샌딩');
+ assert.equal(book.Sheets['4월'].cells.G246.v,secondRoute);
+ assert.equal(book.Sheets['4월'].cells.H246.v,'인천공항 샌딩');
+ assert.equal(cellStyle(output.bytes,'G',245).wrap,'0');
+ assert.equal(cellStyle(output.bytes,'G',246).wrap,'0');
+});
+test('G grows between 62 and 255 and does not shrink when a short report is appended or corrected',()=>{
+ const longRoute=Array.from({length:24},()=> '호텔').join(' → ');
+ const first=appendKakaoExcelReport(kakaoWorkbookFixture(),{...report,route:longRoute,serviceType:'의전'});
+ const firstWidth=Number(strFromU8(unzipSync(first.bytes)['xl/worksheets/sheet1.xml']).match(/<col min="7" max="7" width="([^"]+)"/)?.[1]);
+ assert.equal(firstWidth,routeColumnWidth([longRoute]));
+ assert.ok(firstWidth>62&&firstWidth<EXCEL_MAX_COL_WIDTH);
+ const second=appendKakaoExcelReport(first.bytes,{...report,date:'2026-04-07',route:'차고지 → 호텔'});
+ const secondWidth=Number(strFromU8(unzipSync(second.bytes)['xl/worksheets/sheet1.xml']).match(/<col min="7" max="7" width="([^"]+)"/)?.[1]);
+ assert.equal(secondWidth,firstWidth);
+ const adjusted=amendReportRow(second.bytes,'4월',246,{...report,date:'2026-04-07',route:longRoute+' → 차고지'});
+ const amendedWidth=Number(strFromU8(unzipSync(adjusted.bytes)['xl/worksheets/sheet1.xml']).match(/<col min="7" max="7" width="([^"]+)"/)?.[1]);
+ assert.ok(amendedWidth>=firstWidth);
+ assert.equal(cellStyle(adjusted.bytes,'G',246).wrap,'0');
 });
