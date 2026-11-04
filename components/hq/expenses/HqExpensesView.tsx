@@ -250,26 +250,29 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
         {/* Card Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           {/* Left: Icon + Title + Count */}
-          <div className="relative group/expense flex items-center gap-2.5 cursor-pointer">
-            <img
-              src="/images/icons/driver_ui/icon_expense.png"
-              alt="경비지출 아이콘"
-              className="w-8 h-8 object-contain shrink-0 transition-transform duration-150 group-hover/expense:scale-110"
-            />
+          <div className="flex items-center gap-2.5">
+            <div className="relative group/expense inline-flex items-center justify-center cursor-pointer shrink-0">
+              <img
+                src="/images/icons/driver_ui/icon_expense.png"
+                alt="경비지출 아이콘"
+                className="w-8 h-8 object-contain shrink-0 transition-transform duration-150 group-hover/expense:scale-110"
+              />
+
+              {/* Hover Tooltip: 최상단 내브바와 동일한 블랙 말풍선 규격 (아이콘 근접 시에만 노출) */}
+              <div className="absolute top-full left-0 pt-2 hidden group-hover/expense:flex flex-col items-start pointer-events-none z-50">
+                <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 ml-3 shadow-xs" />
+                <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+                  기사님이 제출한 유류비·통행료 등 실비 영수증 목록이에요
+                </span>
+              </div>
+            </div>
+
             <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
               경비지출 제출 목록
             </h3>
             <span className="bg-slate-100 text-slate-500 font-bold px-2 py-0.5 rounded-full text-xs">
               {filteredExpenses.length}건
             </span>
-
-            {/* Hover Tooltip: 최상단 내브바와 동일한 블랙 말풍선 규격 */}
-            <div className="absolute top-full left-0 pt-2 hidden group-hover/expense:flex flex-col items-start pointer-events-none z-50">
-              <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 ml-3 shadow-xs" />
-              <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
-                기사님이 제출한 유류비·통행료 등 실비 영수증 목록이에요
-              </span>
-            </div>
           </div>
 
           {/* Right: CSV Button + Search + Filter button */}

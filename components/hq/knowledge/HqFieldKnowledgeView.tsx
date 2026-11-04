@@ -605,12 +605,23 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
     <div className="space-y-4 max-w-6xl mx-auto">
       {/* Top Header & Search Bar (Reference 1) */}
       <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="relative group/knowledge flex items-center gap-3 cursor-pointer">
-          <img
-            src="/images/icons/knowledge/icon_knowledge.png"
-            alt="현장지식 아이콘"
-            className="w-12 h-12 object-contain shrink-0 transition-transform duration-150 group-hover/knowledge:scale-110"
-          />
+        <div className="flex items-center gap-3">
+          <div className="relative group/knowledge inline-flex items-center justify-center cursor-pointer shrink-0">
+            <img
+              src="/images/icons/knowledge/icon_knowledge.png"
+              alt="현장지식 아이콘"
+              className="w-12 h-12 object-contain shrink-0 transition-transform duration-150 group-hover/knowledge:scale-110"
+            />
+
+            {/* Hover Tooltip: 최상단 내브바와 동일한 블랙 말풍선 규격 (아이콘 근접 시에만 노출) */}
+            <div className="absolute top-full left-0 pt-2 hidden group-hover/knowledge:flex flex-col items-start pointer-events-none z-50">
+              <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 ml-5 shadow-xs" />
+              <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+                VIP 의전 현장의 주차장·동선·진입 노하우가 모여있어요
+              </span>
+            </div>
+          </div>
+
           <div>
             <h1 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
               <span>현장 지식</span>
@@ -621,14 +632,6 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
             <p className="text-xs text-slate-500 font-medium">
               호텔, 공항, 쇼핑, 미팅포인트 등 VIP 의전 현장 특이사항 및 주차·진입 가이드
             </p>
-          </div>
-
-          {/* Hover Tooltip: 최상단 내브바와 동일한 블랙 말풍선 규격 */}
-          <div className="absolute top-full left-0 pt-2 hidden group-hover/knowledge:flex flex-col items-start pointer-events-none z-50">
-            <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 ml-5 shadow-xs" />
-            <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
-              VIP 의전 현장의 주차장·동선·진입 노하우가 모여있어요
-            </span>
           </div>
         </div>
 
