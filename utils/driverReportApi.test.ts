@@ -23,7 +23,8 @@ test('chat APIs enforce authenticated UUID/org and never grant workbook access t
   db.from=(()=>builder) as unknown as typeof db.from;
   db.rpc=(async(_fn:string,args:Record<string,unknown>)=>{saved=args;return {data:{id,duplicate:false},error:null};}) as unknown as typeof db.rpc;
   const response=await GET(new NextRequest('http://localhost/api/driver-reports',{headers:{cookie:cookie()}}));assert.equal(response.status,200);assert.equal(predicates.driver_id,id);assert.equal(predicates.org_id,'vip_limousine_korea');assert.match(response.headers.get('cache-control')||'',/no-store/);
-  const submitted=await POST(new NextRequest('http://localhost/api/driver-reports',{method:'POST',headers:{cookie:cookie(),'content-type':'application/json'},body:JSON.stringify({message:'未확정 보고',requestKey:other,driverId:other,org_id:'forged-org'})}));
+  const wrongThread=await POST(new NextRequest('http://localhost/api/driver-reports',{method:'POST',headers:{cookie:cookie(),'content-type':'application/json'},body:JSON.stringify({message:'다른 대화방',requestKey:other,driverId:other})}));assert.equal(wrongThread.status,403);
+  const submitted=await POST(new NextRequest('http://localhost/api/driver-reports',{method:'POST',headers:{cookie:cookie(),'content-type':'application/json'},body:JSON.stringify({message:'未확정 보고',requestKey:other,org_id:'forged-org'})}));
   assert.equal(submitted.status,201);assert.equal(saved?.p_driver,id);assert.equal(saved?.p_org,'vip_limousine_korea');
  }finally{db.from=originalFrom;db.rpc=originalRpc;}
 });

@@ -15,7 +15,9 @@ export function DriverReportChat({driverId,driverName='기사님'}:{driverId:str
  const tail=useRef<HTMLDivElement>(null),input=useRef<HTMLTextAreaElement>(null),active=useRef(true),inflight=useRef(false),stick=useRef(true),fetched=useRef(false);
  const load=useCallback(async(before?:number)=>{
   const res=await fetch('/api/driver-reports?driverId='+encodeURIComponent(driverId)+(before?'&before='+before:''),{cache:'no-store'});
-  const data=await res.json();if(!res.ok)throw new Error(data.error||'대화를 불러오지 못했어요.');
+  const data=await res.json();
+  if(res.status===401||res.status===403){setMessages([]);setOutgoing([]);window.location.replace('/driver/reports');return;}
+  if(!res.ok)throw new Error(data.error||'대화를 불러오지 못했어요.');
   if(!active.current)return;
   setMessages(previous=>{
    const joined=new Map(previous.map(m=>[m.id,m]));for(const m of data.messages as ReportChatMessage[])joined.set(m.id,m);
@@ -42,7 +44,7 @@ export function DriverReportChat({driverId,driverName='기사님'}:{driverId:str
   const item=retry||{id:crypto.randomUUID(),body:text.trim(),created_at:new Date().toISOString(),failed:false};
   setOutgoing(p=>[...p.filter(v=>v.id!==item.id),{...item,failed:false}]);if(!retry)setText('');
   try{
-   const response=await fetch('/api/driver-reports',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:item.body,requestKey:item.id})});
+   const response=await fetch('/api/driver-reports',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:item.body,requestKey:item.id,driverId})});
    const data=await response.json();if(!response.ok)throw new Error(data.error||'전송하지 못했어요.');
    await load();setOutgoing(p=>p.filter(v=>v.id!==item.id));
    if(data.duplicate)setError('이미 접수된 보고예요. 기존 대화와 반영 상태를 확인해 주세요.');
