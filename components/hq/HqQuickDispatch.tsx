@@ -57,7 +57,7 @@ import {
   upsertEventSettlementFromBookings,
 } from '@/utils/settlementStorage';
 import { ensureClientAuth } from '@/utils/cockpitClientAuth';
-import { HqPlaceSearchInput } from './HqPlaceSearchInput';
+import { HqPlaceSearchInput, type PoiResult } from './HqPlaceSearchInput';
 import { TossDateRangePicker } from '@/components/common/TossDateRangePicker';
 import { formatPhoneNumber } from '@/utils/formatters';
 import {
@@ -406,6 +406,8 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
   // 4. Locations
   const [pickupLocation, setPickupLocation] = useState(() => initialBooking?.pickupLocation || '');
   const [destination, setDestination] = useState(() => initialBooking?.destination || '');
+  const [pickupPoi, setPickupPoi] = useState<PoiResult | null>(null);
+  const [destinationPoi, setDestinationPoi] = useState<PoiResult | null>(null);
 
   // 5. Vehicle Model Selection
   const [selectedVehicleModel, setSelectedVehicleModel] = useState(() => (initialBooking?.vehicleModel && initialBooking.vehicleModel !== '-' ? initialBooking.vehicleModel : ''));
@@ -532,6 +534,8 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
       setCommonLanguage('ko');
       setAllocations([createInitialAllocation(1, 'ko', false)]);
     }
+    setPickupPoi(null);
+    setDestinationPoi(null);
     setErrorMsg(null);
     setNotificationMsg(null);
   }, [initialBooking]);
@@ -1000,11 +1004,14 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
         vehicleId: matchedVehicle?.uuid,
         origin: pickupLocation.trim(),
         destination: destination.trim(),
-        originLat: lineage?.originLat,
-        originLng: lineage?.originLng,
-        destinationLat: lineage?.destinationLat,
-        destinationLng: lineage?.destinationLng,
-        placeVerified: lineage?.placeVerified,
+        originLat: pickupPoi?.lat ?? lineage?.originLat,
+        originLng: pickupPoi?.lng ?? lineage?.originLng,
+        destinationLat: destinationPoi?.lat ?? lineage?.destinationLat,
+        destinationLng: destinationPoi?.lng ?? lineage?.destinationLng,
+        // Once an emailed place changes, both legs need independently verified POIs.
+        placeVerified: lineage || pickupPoi || destinationPoi
+          ? Boolean((pickupPoi || lineage?.pickupPoiVerified) && (destinationPoi || lineage?.destinationPoiVerified))
+          : undefined,
         passengerName: resolvedPassengerName,
         passengerPhone: resolvedPassengerPhone,
         passengerCount: Math.max(1, commonPassengerCount || 1),
@@ -2010,8 +2017,16 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
               label="출발지"
               required
               value={pickupLocation}
+              autoSearch={initialBooking?.intakeSource === 'email'}
+              isConfirmed={Boolean(pickupPoi || (initialBooking?.placeVerified && pickupLocation.trim() === initialBooking.pickupLocation.trim()))}
               onChange={(val) => {
                 setPickupLocation(val);
+                setPickupPoi(null);
+                setErrorMsg(null);
+              }}
+              onSelectPoi={(poi) => {
+                setPickupLocation(poi.name);
+                setPickupPoi(poi);
                 setErrorMsg(null);
               }}
               placeholder="위치 검색 또는 입력"
@@ -2023,8 +2038,16 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
               label="도착지"
               required
               value={destination}
+              autoSearch={initialBooking?.intakeSource === 'email'}
+              isConfirmed={Boolean(destinationPoi || (initialBooking?.placeVerified && destination.trim() === initialBooking.destination.trim()))}
               onChange={(val) => {
                 setDestination(val);
+                setDestinationPoi(null);
+                setErrorMsg(null);
+              }}
+              onSelectPoi={(poi) => {
+                setDestination(poi.name);
+                setDestinationPoi(poi);
                 setErrorMsg(null);
               }}
               placeholder="목적지 검색 또는 입력"
