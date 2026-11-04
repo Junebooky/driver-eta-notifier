@@ -2,10 +2,6 @@
 
 import React, { useState } from 'react';
 import {
-  FileText,
-  Clock,
-  CheckCircle2,
-  AlertTriangle,
   XCircle,
   ChevronLeft,
   ChevronRight,
@@ -71,58 +67,93 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
-  // Render Status Badge matching Image 1
+  // Render Status Badge as Icon-only with hover tooltip (matching Apple/Toss black bubble standard)
   const renderStatusBadge = (status: HqDrivingLogStatus) => {
+    let iconNode: React.ReactNode;
+    let label = '';
+
     switch (status) {
       case 'draft':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border border-amber-300 bg-amber-50 text-amber-700">
-            <Clock className="w-3 h-3 stroke-[2.2]" />
-            <span>진행 중 (초안)</span>
-          </span>
+        iconNode = (
+          <img
+            src="/images/icons/icon_submitted_today.png"
+            alt="작성 중 (초안)"
+            className="w-5.5 h-5.5 object-contain transition-transform duration-150 group-hover/status:scale-110 drop-shadow-2xs"
+          />
         );
+        label = '작성 중 (초안)';
+        break;
       case '검토 대기':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border border-blue-200 bg-blue-50/70 text-[#1E60F3]">
-            <Clock className="w-3 h-3 stroke-[2.2]" />
-            <span>검토 대기</span>
-          </span>
+        iconNode = (
+          <img
+            src="/images/icons/icon_review_pending.png"
+            alt="검토 대기"
+            className="w-5.5 h-5.5 object-contain transition-transform duration-150 group-hover/status:scale-110 drop-shadow-2xs"
+          />
         );
+        label = '검토 대기 중';
+        break;
       case '검토 중':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border border-sky-300 bg-sky-50 text-sky-700">
-            <Clock className="w-3 h-3 stroke-[2.2]" />
-            <span>검토 중</span>
-          </span>
+        iconNode = (
+          <img
+            src="/images/icons/icon_review_pending.png"
+            alt="검토 중"
+            className="w-5.5 h-5.5 object-contain transition-transform duration-150 group-hover/status:scale-110 drop-shadow-2xs"
+          />
         );
+        label = '관리자 검토 중';
+        break;
       case '승인 완료':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border border-emerald-300 bg-emerald-50 text-emerald-700">
-            <CheckCircle2 className="w-3 h-3 stroke-[2.2]" />
-            <span>승인 완료</span>
-          </span>
+        iconNode = (
+          <img
+            src="/images/icons/icon_approved.png"
+            alt="승인 완료"
+            className="w-5.5 h-5.5 object-contain transition-transform duration-150 group-hover/status:scale-110 drop-shadow-2xs"
+          />
         );
+        label = '승인 완료!';
+        break;
       case '보완 필요':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border border-rose-300 bg-rose-50 text-rose-600">
-            <AlertTriangle className="w-3 h-3 stroke-[2.2]" />
-            <span>보완 필요</span>
-          </span>
+        iconNode = (
+          <img
+            src="/images/icons/icon_revision_needed.png"
+            alt="보완 필요"
+            className="w-5.5 h-5.5 object-contain transition-transform duration-150 group-hover/status:scale-110 drop-shadow-2xs"
+          />
         );
+        label = '기사 보완 필요';
+        break;
       case '반려':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border border-red-300 bg-red-50 text-red-600">
-            <XCircle className="w-3 h-3 stroke-[2.2]" />
-            <span>반려</span>
-          </span>
+        iconNode = (
+          <div className="w-5.5 h-5.5 rounded-full bg-rose-50 border border-rose-300 flex items-center justify-center transition-transform duration-150 group-hover/status:scale-110 drop-shadow-2xs">
+            <XCircle className="w-4 h-4 text-rose-600 stroke-[2.2]" />
+          </div>
         );
+        label = '반려됨';
+        break;
       default:
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600">
-            {status}
+        iconNode = (
+          <span className="w-5.5 h-5.5 rounded-full bg-slate-100 border border-slate-200 text-slate-600 text-[10px] font-bold flex items-center justify-center transition-transform duration-150 group-hover/status:scale-110">
+            -
           </span>
         );
+        label = status;
+        break;
     }
+
+    return (
+      <div className="relative group/status inline-flex items-center justify-center cursor-help">
+        {iconNode}
+        {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 (아이콘 근접 시에만 노출, 최상단 레이어) */}
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/status:flex flex-col items-center pointer-events-none z-[100]">
+          <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+            {label}
+          </span>
+          {/* 말풍선 꼬리표 화살표 */}
+          <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 shadow-xs" />
+        </div>
+      </div>
+    );
   };
 
   return (
