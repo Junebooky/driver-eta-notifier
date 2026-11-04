@@ -47,7 +47,7 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
   initialSearchQuery = '',
   bookings = [],
 }) => {
-  const {error:dbError,refresh}=useReportingRefresh(fetchHqExpensesFromDb);
+  const { error: dbError, refresh } = useReportingRefresh(fetchHqExpensesFromDb);
 
   // Live master expenses list via useSyncExternalStore (SSR and Hydration safe)
   const expenses = useSyncExternalStore(
@@ -250,33 +250,53 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
         {/* Card Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           {/* Left: Icon + Title + Count */}
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#1E60F3] text-white flex items-center justify-center shrink-0 shadow-xs">
-              <ReceiptText className="w-4 h-4 sm:w-5 sm:h-5" />
-            </div>
+          <div className="relative group/expense flex items-center gap-2.5 cursor-pointer">
+            <img
+              src="/images/icons/driver_ui/icon_expense.png"
+              alt="경비지출 아이콘"
+              className="w-8 h-8 object-contain shrink-0 transition-transform duration-150 group-hover/expense:scale-110"
+            />
             <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
               경비지출 제출 목록
             </h3>
             <span className="bg-slate-100 text-slate-500 font-bold px-2 py-0.5 rounded-full text-xs">
               {filteredExpenses.length}건
             </span>
+
+            {/* Hover Tooltip: 최상단 내브바와 동일한 블랙 말풍선 규격 */}
+            <div className="absolute top-full left-0 pt-2 hidden group-hover/expense:flex flex-col items-start pointer-events-none z-50">
+              <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 ml-3 shadow-xs" />
+              <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+                기사님이 제출한 유류비·통행료 등 실비 영수증 목록이에요
+              </span>
+            </div>
           </div>
 
           {/* Right: CSV Button + Search + Filter button */}
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleExportCsv}
-              className="group px-2.5 sm:px-3 py-1.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 shadow-2xs hover:border-emerald-300 hover:text-emerald-700 active:scale-95"
-              title="경비 지출 내역 CSV 다운로드"
-            >
-              <img
-                src="/images/icons/icon_excel.png"
-                alt="CSV"
-                className="w-4 h-4 object-contain shrink-0 transition-transform duration-150 group-hover:scale-110"
-              />
-              <span>CSV</span>
-            </button>
+            {/* 엑셀/CSV 내보내기 Button & Tooltip (아이콘 단독형) */}
+            <div className="relative group/csv shrink-0 flex items-center">
+              <button
+                type="button"
+                onClick={handleExportCsv}
+                className="p-1 rounded-xl hover:bg-slate-100/90 transition-all cursor-pointer active:scale-95 flex items-center justify-center shrink-0"
+                aria-label="경비 지출 내역 엑셀(CSV) 다운로드"
+              >
+                <img
+                  src="/images/icons/icon_excel.png"
+                  alt="CSV"
+                  className="w-7.5 h-7.5 sm:w-8 sm:h-8 object-contain shrink-0 transition-transform duration-150 group-hover/csv:scale-110 drop-shadow-2xs"
+                />
+              </button>
+
+              {/* Hover Tooltip: 최상단 내브바와 동일한 블랙 말풍선 규격 */}
+              <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 hidden group-hover/csv:flex flex-col items-center pointer-events-none z-50">
+                <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 shadow-xs" />
+                <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+                  경비 내역을 엑셀(CSV)로 내보내요
+                </span>
+              </div>
+            </div>
 
             <div className="relative w-full sm:w-64">
               <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
@@ -304,11 +324,10 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
                 haptics.selection();
                 setIsFilterOpen((prev) => !prev);
               }}
-              className={`px-3 py-1.5 border rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 ${
-                isFilterOpen || selectedStatus !== '전체' || selectedCategory !== '전체'
-                  ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
-                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-              }`}
+              className={`px-3 py-1.5 border rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 ${isFilterOpen || selectedStatus !== '전체' || selectedCategory !== '전체'
+                ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                }`}
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
               <span>필터</span>
@@ -331,9 +350,8 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
                 haptics.selection();
                 setSelectedStatus(selectedStatus === '검수 대기' ? '전체' : '검수 대기');
               }}
-              className={`flex items-center gap-1 transition-colors cursor-pointer ${
-                selectedStatus === '검수 대기' ? 'text-[#1E60F3] font-bold' : 'hover:text-slate-700'
-              }`}
+              className={`flex items-center gap-1 transition-colors cursor-pointer ${selectedStatus === '검수 대기' ? 'text-[#1E60F3] font-bold' : 'hover:text-slate-700'
+                }`}
             >
               <Clock className="w-3.5 h-3.5 text-slate-400" />
               <span>검수 대기 {kpi.pendingCount}</span>
@@ -344,9 +362,8 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
                 haptics.selection();
                 setSelectedStatus(selectedStatus === '승인 완료' ? '전체' : '승인 완료');
               }}
-              className={`flex items-center gap-1 transition-colors cursor-pointer ${
-                selectedStatus === '승인 완료' ? 'text-emerald-600 font-bold' : 'hover:text-slate-700'
-              }`}
+              className={`flex items-center gap-1 transition-colors cursor-pointer ${selectedStatus === '승인 완료' ? 'text-emerald-600 font-bold' : 'hover:text-slate-700'
+                }`}
             >
               <Check className="w-3.5 h-3.5 text-slate-400" />
               <span>승인 완료 {kpi.approvedCount}</span>
@@ -357,9 +374,8 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
                 haptics.selection();
                 setSelectedStatus(selectedStatus === '금액 확인' ? '전체' : '금액 확인');
               }}
-              className={`flex items-center gap-1 transition-colors cursor-pointer ${
-                selectedStatus === '금액 확인' || selectedStatus === '반려' ? 'text-rose-600 font-bold' : 'hover:text-slate-700'
-              }`}
+              className={`flex items-center gap-1 transition-colors cursor-pointer ${selectedStatus === '금액 확인' || selectedStatus === '반려' ? 'text-rose-600 font-bold' : 'hover:text-slate-700'
+                }`}
             >
               <AlertCircle className="w-3.5 h-3.5 text-slate-400" />
               <span>확인 필요 / 반려 {kpi.actionNeededCount}</span>
@@ -380,11 +396,10 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
                     haptics.selection();
                     setSelectedStatus(status);
                   }}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                    selectedStatus === status
-                      ? 'bg-[#1E60F3] text-white shadow-2xs'
-                      : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/60'
-                  }`}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${selectedStatus === status
+                    ? 'bg-[#1E60F3] text-white shadow-2xs'
+                    : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/60'
+                    }`}
                 >
                   {status}
                 </button>
@@ -400,11 +415,10 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
                     haptics.selection();
                     setSelectedCategory(cat);
                   }}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-                    selectedCategory === cat
-                      ? 'bg-slate-900 text-white shadow-2xs'
-                      : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/60'
-                  }`}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${selectedCategory === cat
+                    ? 'bg-slate-900 text-white shadow-2xs'
+                    : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/60'
+                    }`}
                 >
                   {cat}
                 </button>
@@ -461,9 +475,8 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
                         setSelectedExpenseId(item.id);
                         setReviewQueue(filteredExpenses.map((row) => row.id));
                       }}
-                      className={`group cursor-pointer transition-colors ${
-                        isSelected ? 'bg-blue-50/50' : 'hover:bg-slate-50/80'
-                      }`}
+                      className={`group cursor-pointer transition-colors ${isSelected ? 'bg-blue-50/50' : 'hover:bg-slate-50/80'
+                        }`}
                     >
                       <td className="py-3.5 px-3 text-slate-400 text-center font-medium text-xs">
                         {rowNumber}
@@ -519,7 +532,7 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
           const next = nextPendingReceiptId(reviewQueue, approved.id, getHqExpenses());
           setSelectedExpenseId(next);
           if (!next) showToast('현재 검수 목록을 모두 확인했습니다.');
-        }}/>}
+        }} />}
 
 
       {/* Floating Toast Notification */}
