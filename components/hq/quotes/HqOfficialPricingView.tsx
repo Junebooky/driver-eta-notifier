@@ -370,47 +370,74 @@ export const HqOfficialPricingView: React.FC<HqOfficialPricingViewProps> = ({
         </div>
       )}
 
-      {/* 1. Top Segmented Capsule Tabs & Action Toolbar */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 p-3 sm:px-5 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
-        {/* Category Pill Tabs */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-          {CATEGORY_TABS.map((tab) => {
-            const isSelected = activeTab === tab.id;
-            const count = tabCounts[tab.id];
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => {
-                  haptics.selection();
-                  setActiveTab(tab.id);
-                }}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${isSelected
-                  ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 shadow-2xs font-bold'
-                  : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300'
-                  }`}
-              >
-                <span>{tab.label}</span>
-                <span
-                  className={`text-[11px] ${isSelected ? 'font-black text-[#1E60F3]' : 'text-slate-400 font-medium'
-                    }`}
-                >
-                  {count}
-                </span>
-              </button>
-            );
-          })}
+      {/* Top Header Card: Icon + Title + Count */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:px-5 shadow-2xs flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          {/* 견적서 아이콘 & 마우스 호버 툴팁 */}
+          <div className="relative group/quotes inline-flex items-center justify-center cursor-pointer shrink-0">
+            <img
+              src="/images/icons/calculator.png"
+              alt="견적서"
+              className="w-8 h-8 sm:w-9 sm:h-9 object-contain shrink-0 transition-transform duration-150 group-hover/quotes:scale-110"
+            />
+
+            {/* Hover Tooltip: 최상단 내브바와 동일한 블랙 말풍선 규격 */}
+            <div className="absolute top-full left-0 pt-2 hidden group-hover/quotes:flex flex-col items-start pointer-events-none z-50">
+              <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 ml-3.5 shadow-xs" />
+              <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+                차종별 공식 표준 요율을 확인하고 맞춤 견적서를 생성해요
+              </span>
+            </div>
+          </div>
+
+          <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+            표준 요금표 · 견적서
+          </h2>
+          <span className="bg-slate-100 text-slate-500 font-bold px-2 py-0.5 rounded-full text-xs">
+            {tabCounts.all}개 차종
+          </span>
         </div>
 
         {/* Quick Quote Calculator Trigger */}
         <button
           type="button"
           onClick={() => onOpenQuoteModal()}
-          className="px-4 py-2 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white text-xs font-extrabold shadow-sm transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ml-auto"
+          className="px-4 py-2 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white text-xs font-extrabold shadow-sm transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
         >
           <Calculator className="w-3.5 h-3.5" />
           <span>견적서 작성</span>
         </button>
+      </div>
+
+      {/* 1. Top Segmented Capsule Tabs */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 p-3 sm:px-5 flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-3 shadow-2xs">
+        {/* Category Pill Tabs */}
+        {CATEGORY_TABS.map((tab) => {
+          const isSelected = activeTab === tab.id;
+          const count = tabCounts[tab.id];
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => {
+                haptics.selection();
+                setActiveTab(tab.id);
+              }}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${isSelected
+                ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 shadow-2xs font-bold'
+                : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300'
+                }`}
+            >
+              <span>{tab.label}</span>
+              <span
+                className={`text-[11px] ${isSelected ? 'font-black text-[#1E60F3]' : 'text-slate-400 font-medium'
+                  }`}
+              >
+                {count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* 2. Unified Pricing Table (Single Clean Table Container) */}
@@ -491,7 +518,7 @@ export const HqOfficialPricingView: React.FC<HqOfficialPricingViewProps> = ({
                     <td colSpan={4} className="py-3.5 px-3 text-center bg-slate-50/50">
                       <div className="inline-flex items-center justify-center group/call cursor-pointer" title="별도 상담 (전화 문의)">
                         <img
-                          src="/images/icons/call.png"
+                          src="/images/icons/quotes/call.png"
                           alt="별도 상담"
                           className="w-10 h-10 object-contain transition-transform duration-200 group-hover/call:scale-125 drop-shadow-xs"
                         />

@@ -81,6 +81,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [menuOpenDriverId, setMenuOpenDriverId] = useState<string | null>(null);
   const [editingDriver, setEditingDriver] = useState<HqDriverSummary | null>(null);
+  const [driverIconError, setDriverIconError] = useState(false);
   const pageSize = 10;
 
   // Helper to determine real-time operation status:
@@ -184,8 +185,54 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
-      {/* 1. Control & Filter Toolbar (Compact single bar without duplicate title/desc) */}
-      <div className="p-4 sm:px-6 bg-white border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
+      {/* Card Header: Icon + Title + Count */}
+      <div className="p-4 sm:px-6 border-b border-slate-100 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          {/* 기사관리 아이콘 & 마우스 호버 툴팁 */}
+          <div className="relative group/drivers inline-flex items-center justify-center cursor-pointer shrink-0">
+            {!driverIconError ? (
+              <img
+                src="/images/icons/drivers/icon_driver.png"
+                alt="기사 관리"
+                onError={() => setDriverIconError(true)}
+                className="w-8 h-8 sm:w-9 sm:h-9 object-contain shrink-0 transition-transform duration-150 group-hover/drivers:scale-110"
+              />
+            ) : (
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-blue-50 border border-blue-100 text-[#1E60F3] flex items-center justify-center shrink-0 transition-transform duration-150 group-hover/drivers:scale-110 shadow-2xs">
+                <Users className="w-4 h-4 sm:w-5 sm:h-5" />
+              </div>
+            )}
+
+            {/* Hover Tooltip: 최상단 내브바와 동일한 블랙 말풍선 규격 */}
+            <div className="absolute top-full left-0 pt-2 hidden group-hover/drivers:flex flex-col items-start pointer-events-none z-50">
+              <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 ml-3.5 shadow-xs" />
+              <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+                소속 및 프리랜서 기사님들의 프로필과 배차 자격을 관리해요
+              </span>
+            </div>
+          </div>
+
+          <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+            기사 관리
+          </h2>
+          <span className="bg-slate-100 text-slate-500 font-bold px-2 py-0.5 rounded-full text-xs">
+            {counts.total}명
+          </span>
+        </div>
+
+        {/* Quick Add Driver Action */}
+        <button
+          type="button"
+          onClick={onOpenAddDriver}
+          className="px-3.5 py-1.5 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white text-xs font-extrabold shadow-sm transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>기사 등록</span>
+        </button>
+      </div>
+
+      {/* 1. Control & Filter Toolbar */}
+      <div className="p-4 sm:px-6 bg-slate-50/50 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
         {/* Left: Affiliation & Dropdown Filters */}
         <div className="flex flex-wrap items-center gap-2">
           {/* Affiliation Tabs */}
@@ -282,7 +329,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
           </div>
         </div>
 
-        {/* Right: Search & Register Driver Button */}
+        {/* Right: Search */}
         <div className="flex items-center gap-2.5">
           {/* Search Bar */}
           <div className="relative w-56 sm:w-64">
@@ -295,19 +342,9 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                 setCurrentPage(1);
               }}
               placeholder="기사명, 차종, 연락처로 검색"
-              className="w-full pl-9 pr-3.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1E60F3] focus:bg-white transition-all shadow-2xs"
+              className="w-full pl-9 pr-3.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#1E60F3] focus:bg-white transition-all shadow-2xs"
             />
           </div>
-
-          {/* Add Driver Button */}
-          <button
-            type="button"
-            onClick={onOpenAddDriver}
-            className="px-3.5 py-1.5 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white text-xs font-extrabold shadow-sm transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>기사 등록</span>
-          </button>
         </div>
       </div>
 

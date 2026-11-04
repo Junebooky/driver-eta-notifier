@@ -128,6 +128,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
   const [statusOverrides, setStatusOverrides] = useState<Record<string, '확인 필요' | '대기 중' | '운행 중' | '정비 중'>>({});
   const [memos, setMemos] = useState<Record<string, string>>({});
   const [serverColors, setServerColors] = useState<Record<string, string>>({});
+  const [vehicleIconError, setVehicleIconError] = useState(false);
 
   const fetchServerStatus = useCallback(async () => {
     try {
@@ -206,17 +207,17 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
 
   useEffect(() => {
     fetchAvailability();
-    const refresh=()=>{if(document.visibilityState==='visible')void fetchAvailability();};
-    const timer=setInterval(refresh,8000);
-    window.addEventListener('focus',refresh);
-    window.addEventListener('online',refresh);
-    window.addEventListener('vip_hq_schedules_updated',refresh);
-    document.addEventListener('visibilitychange',refresh);
+    const refresh = () => { if (document.visibilityState === 'visible') void fetchAvailability(); };
+    const timer = setInterval(refresh, 8000);
+    window.addEventListener('focus', refresh);
+    window.addEventListener('online', refresh);
+    window.addEventListener('vip_hq_schedules_updated', refresh);
+    document.addEventListener('visibilitychange', refresh);
     return () => {
-      clearInterval(timer);window.removeEventListener('focus',refresh);
-      window.removeEventListener('online',refresh);
-      window.removeEventListener('vip_hq_schedules_updated',refresh);
-      document.removeEventListener('visibilitychange',refresh);
+      clearInterval(timer); window.removeEventListener('focus', refresh);
+      window.removeEventListener('online', refresh);
+      window.removeEventListener('vip_hq_schedules_updated', refresh);
+      document.removeEventListener('visibilitychange', refresh);
       if (activeAbortRef.current) activeAbortRef.current.abort();
     };
   }, [fetchAvailability]);
@@ -319,12 +320,12 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
       const effectiveStatus = override
         ? override
         : live
-        ? VEHICLE_STATUS_LABELS[live.currentStatus]
-        : availabilityState === 'loading'
-        ? '확인 중...'
-        : availabilityState === 'error'
-        ? '확인 불가'
-        : '대기 중';
+          ? VEHICLE_STATUS_LABELS[live.currentStatus]
+          : availabilityState === 'loading'
+            ? '확인 중...'
+            : availabilityState === 'error'
+              ? '확인 불가'
+              : '대기 중';
       // 연식과 색상은 확인된 값만 표시합니다.
       const year = v.year || '미확인';
       const color =
@@ -599,23 +600,23 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
       modelShort: data.model.trim().replace(/^(벤츠|현대|기아|제네시스)\s+/, ''),
       brand: (
         data.model.includes('벤츠') ? '벤츠' :
-        data.model.includes('현대') ? '현대' :
-        data.model.includes('기아') ? '기아' :
-        data.model.includes('제네시스') ? '제네시스' :
-        data.category === 'sprinter' ? '벤츠' :
-        data.category === 'sedan' ? '제네시스' :
-        data.category === 'suv' ? '제네시스' : '현대'
+          data.model.includes('현대') ? '현대' :
+            data.model.includes('기아') ? '기아' :
+              data.model.includes('제네시스') ? '제네시스' :
+                data.category === 'sprinter' ? '벤츠' :
+                  data.category === 'sedan' ? '제네시스' :
+                    data.category === 'suv' ? '제네시스' : '현대'
       ),
       category: (
         data.category === 'sprinter' ? 'sprinter' :
-        data.category === 'suv' ? 'genesis' :
-        data.category === 'van' ? 'carnival' :
-        data.model.includes('벤츠') || data.model.includes('S') ? 's_class' : 'genesis'
+          data.category === 'suv' ? 'genesis' :
+            data.category === 'van' ? 'carnival' :
+              data.model.includes('벤츠') || data.model.includes('S') ? 's_class' : 'genesis'
       ),
       categoryLabel: (
         data.category === 'sprinter' ? '스프린터' :
-        data.category === 'suv' ? 'SUV' :
-        data.category === 'van' ? '밴' : '세단'
+          data.category === 'suv' ? 'SUV' :
+            data.category === 'van' ? '밴' : '세단'
       ),
       subType: data.model.trim(),
       capacity: data.capacity,
@@ -719,6 +720,56 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
 
   return (
     <div className="space-y-4">
+      {/* Top Header Card: Icon + Title + Count */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:px-5 shadow-2xs flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          {/* 차량관리 아이콘 & 마우스 호버 툴팁 */}
+          <div className="relative group/vehicles inline-flex items-center justify-center cursor-pointer shrink-0">
+            {!vehicleIconError ? (
+              <img
+                src="/images/icons/vehicles/icon_vehicle.png"
+                alt="차량 관리"
+                onError={() => setVehicleIconError(true)}
+                className="w-8 h-8 sm:w-9 sm:h-9 object-contain shrink-0 transition-transform duration-150 group-hover/vehicles:scale-110"
+              />
+            ) : (
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-blue-50 border border-blue-100 text-[#1E60F3] flex items-center justify-center shrink-0 transition-transform duration-150 group-hover/vehicles:scale-110 shadow-2xs">
+                <Car className="w-4 h-4 sm:w-5 sm:h-5" />
+              </div>
+            )}
+
+            {/* Hover Tooltip: 최상단 내브바와 동일한 블랙 말풍선 규격 */}
+            <div className="absolute top-full left-0 pt-2 hidden group-hover/vehicles:flex flex-col items-start pointer-events-none z-50">
+              <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 ml-3.5 shadow-xs" />
+              <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+                VIP 의전 세단·SUV·밴·스프린터의 실시간 배차 및 제원을 관리해요
+              </span>
+            </div>
+          </div>
+
+          <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+            차량 관리
+          </h2>
+          <span className="bg-slate-100 text-slate-500 font-bold px-2 py-0.5 rounded-full text-xs">
+            {allBaseVehicles.length}대
+          </span>
+        </div>
+
+        {/* + 차량 등록 Button */}
+        <button
+          type="button"
+          onClick={() => {
+            haptics.lightTap();
+            setIsNewVehicleModalOpen(true);
+          }}
+          className="bg-[#0050FF] hover:bg-blue-700 text-white font-semibold text-xs px-3.5 py-2 rounded-xl shadow-xs transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer active:scale-95 shrink-0"
+          title="신규 차량 등록"
+        >
+          <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+          <span>차량 등록</span>
+        </button>
+      </div>
+
       {/* Top Horizontal Filter Bar */}
       <div className="bg-white rounded-2xl border border-slate-200/80 p-3 sm:p-3.5 shadow-2xs">
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
@@ -741,18 +792,16 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                     haptics.selection();
                     setSelectedCategory(cat.key as VehicleUiCategoryKey);
                   }}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer shrink-0 ${
-                    isSelected
-                      ? "bg-[#0050FF] text-white shadow-xs"
-                      : "bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-slate-200"
-                  }`}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer shrink-0 ${isSelected
+                    ? "bg-[#0050FF] text-white shadow-xs"
+                    : "bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-slate-200"
+                    }`}
                 >
                   <IconComp className={`w-3.5 h-3.5 ${isSelected ? "text-white" : "text-slate-400"}`} />
                   <span>{cat.label}</span>
                   <span
-                    className={`text-[11px] font-bold px-1.5 py-0.2 rounded-full ${
-                      isSelected ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
-                    }`}
+                    className={`text-[11px] font-bold px-1.5 py-0.2 rounded-full ${isSelected ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
+                      }`}
                   >
                     {cat.count}
                   </span>
@@ -803,20 +852,6 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                 </button>
               )}
             </div>
-
-            {/* + 차량 등록 Button */}
-            <button
-              type="button"
-              onClick={() => {
-                haptics.lightTap();
-                setIsNewVehicleModalOpen(true);
-              }}
-              className="bg-[#0050FF] hover:bg-blue-700 text-white font-semibold text-xs px-3.5 py-2 rounded-xl shadow-xs transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer active:scale-95 shrink-0"
-              title="신규 차량 등록"
-            >
-              <Plus className="w-4 h-4 stroke-[2.2]" />
-              <span>+ 차량 등록</span>
-            </button>
           </div>
         </div>
       </div>
@@ -883,11 +918,10 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                     haptics.selection();
                     setSelectedVehicleId(vehicle.id);
                   }}
-                  className={`rounded-2xl p-3 sm:p-3.5 transition-all cursor-pointer flex items-center gap-3 relative shadow-2xs group border ${
-                    isSelected
-                      ? "bg-blue-50/70 border-blue-200/90 border-l-4 border-l-[#0050FF] shadow-xs"
-                      : "bg-white hover:bg-slate-50/80 border-slate-200/80 hover:border-slate-300"
-                  }`}
+                  className={`rounded-2xl p-3 sm:p-3.5 transition-all cursor-pointer flex items-center gap-3 relative shadow-2xs group border ${isSelected
+                    ? "bg-blue-50/70 border-blue-200/90 border-l-4 border-l-[#0050FF] shadow-xs"
+                    : "bg-white hover:bg-slate-50/80 border-slate-200/80 hover:border-slate-300"
+                    }`}
                 >
                   {/* Left Thumbnail Image */}
                   <div className="relative w-20 sm:w-24 h-14 sm:h-16 shrink-0 flex items-center justify-center">
@@ -916,10 +950,10 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                         {vehicle.uiCategory === "sprinter"
                           ? "스프린터"
                           : vehicle.uiCategory === "van"
-                          ? "밴"
-                          : vehicle.uiCategory === "suv"
-                          ? "SUV"
-                          : "세단"}
+                            ? "밴"
+                            : vehicle.uiCategory === "suv"
+                              ? "SUV"
+                              : "세단"}
                       </span>
                       <span className="bg-slate-100 text-slate-600 text-[10px] font-medium px-1.5 py-0.2 rounded">
                         {vehicle.fuelDisplay}
@@ -1020,9 +1054,8 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                                     handleQuickChangeStatus(selectedVehicle.id, st.value);
                                     setIsStatusDropdownOpen(false);
                                   }}
-                                  className={`w-full text-left px-3 py-1.5 text-xs font-bold flex items-center justify-between hover:bg-slate-50 cursor-pointer ${
-                                    selectedVehicle.effectiveStatus === st.value ? "text-[#0050FF] bg-blue-50/50" : "text-slate-700"
-                                  }`}
+                                  className={`w-full text-left px-3 py-1.5 text-xs font-bold flex items-center justify-between hover:bg-slate-50 cursor-pointer ${selectedVehicle.effectiveStatus === st.value ? "text-[#0050FF] bg-blue-50/50" : "text-slate-700"
+                                    }`}
                                 >
                                   <span>{st.label}</span>
                                   {selectedVehicle.effectiveStatus === st.value && <Check className="w-3 h-3 text-[#0050FF]" />}
@@ -1085,10 +1118,10 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                         {selectedVehicle.uiCategory === "sprinter"
                           ? "스프린터"
                           : selectedVehicle.uiCategory === "van"
-                          ? "밴"
-                          : selectedVehicle.uiCategory === "suv"
-                          ? "SUV"
-                          : "세단"}
+                            ? "밴"
+                            : selectedVehicle.uiCategory === "suv"
+                              ? "SUV"
+                              : "세단"}
                       </span>
                       <span className="bg-slate-100 text-slate-600 text-[10px] font-medium px-2 py-0.5 rounded">
                         {selectedVehicle.fuelDisplay}
@@ -1113,11 +1146,10 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                       haptics.lightTap();
                       setActiveDetailTab(tab.key as any);
                     }}
-                    className={`pb-2.5 transition-all cursor-pointer relative ${
-                      activeDetailTab === tab.key
-                        ? "text-[#0050FF] font-black after:content-[''] after:absolute after:bottom-0 after:inset-x-0 after:h-[2px] after:bg-[#0050FF]"
-                        : "hover:text-slate-800"
-                    }`}
+                    className={`pb-2.5 transition-all cursor-pointer relative ${activeDetailTab === tab.key
+                      ? "text-[#0050FF] font-black after:content-[''] after:absolute after:bottom-0 after:inset-x-0 after:h-[2px] after:bg-[#0050FF]"
+                      : "hover:text-slate-800"
+                      }`}
                   >
                     <span>{tab.label}</span>
                   </button>
@@ -1163,10 +1195,10 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                         {selectedVehicle.uiCategory === "sprinter"
                           ? "스프린터"
                           : selectedVehicle.uiCategory === "van"
-                          ? "밴"
-                          : selectedVehicle.uiCategory === "suv"
-                          ? "SUV"
-                          : "세단"}
+                            ? "밴"
+                            : selectedVehicle.uiCategory === "suv"
+                              ? "SUV"
+                              : "세단"}
                       </span>
                     </div>
                     <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-100">
@@ -1219,22 +1251,20 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                         return (
                           <div
                             key={i}
-                            className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all ${
-                              isAvail
-                                ? "bg-blue-50/40 border-blue-100"
-                                : "bg-slate-50 border-slate-100"
-                            }`}
+                            className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all ${isAvail
+                              ? "bg-blue-50/40 border-blue-100"
+                              : "bg-slate-50 border-slate-100"
+                              }`}
                             title={d.detail || d.status}
                           >
                             <span className="text-xs font-bold text-slate-700">
                               {d.label} {d.dayOfWeek}
                             </span>
                             <span
-                              className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                                isAvail
-                                  ? "bg-blue-50 text-[#0050FF] border border-blue-200/60"
-                                  : "bg-slate-200/80 text-slate-700"
-                              }`}
+                              className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${isAvail
+                                ? "bg-blue-50 text-[#0050FF] border border-blue-200/60"
+                                : "bg-slate-200/80 text-slate-700"
+                                }`}
                             >
                               {d.status}
                             </span>
@@ -1422,11 +1452,10 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                       key={st.value}
                       type="button"
                       onClick={() => setEditStatus(st.value)}
-                      className={`py-2 px-2 rounded-xl font-bold cursor-pointer transition-all border text-center text-xs ${
-                        editStatus === st.value
-                          ? 'bg-[#1E60F3] text-white border-[#1E60F3]'
-                          : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200'
-                      }`}
+                      className={`py-2 px-2 rounded-xl font-bold cursor-pointer transition-all border text-center text-xs ${editStatus === st.value
+                        ? 'bg-[#1E60F3] text-white border-[#1E60F3]'
+                        : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200'
+                        }`}
                     >
                       {st.label}
                     </button>
@@ -1538,31 +1567,31 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                     d.status === '예약 있음'
                       ? 'bg-rose-50 text-rose-600 border-rose-200'
                       : d.status === '운행 중'
-                      ? 'bg-blue-50 text-[#1E60F3] border-blue-200'
-                      : d.status === '정비 중'
-                      ? 'bg-amber-50 text-amber-700 border-amber-200'
-                      : d.status === '확인 중...'
-                      ? 'bg-slate-100 text-slate-500 border-slate-200 animate-pulse'
-                      : d.status === '확인 불가'
-                      ? 'bg-rose-100 text-rose-700 border-rose-300'
-                      : d.status === '미확인'
-                      ? 'bg-slate-100 text-slate-600 border-slate-300'
-                      : 'bg-emerald-50 text-emerald-600 border-emerald-200';
+                        ? 'bg-blue-50 text-[#1E60F3] border-blue-200'
+                        : d.status === '정비 중'
+                          ? 'bg-amber-50 text-amber-700 border-amber-200'
+                          : d.status === '확인 중...'
+                            ? 'bg-slate-100 text-slate-500 border-slate-200 animate-pulse'
+                            : d.status === '확인 불가'
+                              ? 'bg-rose-100 text-rose-700 border-rose-300'
+                              : d.status === '미확인'
+                                ? 'bg-slate-100 text-slate-600 border-slate-300'
+                                : 'bg-emerald-50 text-emerald-600 border-emerald-200';
 
                   const label =
                     d.status === '확인 중...'
                       ? '조회중'
                       : d.status === '확인 불가'
-                      ? '오류'
-                      : d.status === '예약 있음'
-                      ? '예약있음'
-                      : d.status === '운행 중'
-                      ? '운행중'
-                      : d.status === '정비 중'
-                      ? '정비중'
-                      : d.status === '미확인'
-                      ? '미확인'
-                      : '가능';
+                        ? '오류'
+                        : d.status === '예약 있음'
+                          ? '예약있음'
+                          : d.status === '운행 중'
+                            ? '운행중'
+                            : d.status === '정비 중'
+                              ? '정비중'
+                              : d.status === '미확인'
+                                ? '미확인'
+                                : '가능';
 
                   return (
                     <div

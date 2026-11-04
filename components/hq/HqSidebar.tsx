@@ -66,7 +66,7 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
     });
   };
 
-  // 2. Intent Delay on Hover (150ms debounce)
+  // 2. Intent Delay on Hover (120ms debounce for smooth responsiveness)
   const [isHovered, setIsHovered] = useState(false);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -75,7 +75,7 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
     hoverTimeoutRef.current = setTimeout(() => {
       setIsHovered(true);
-    }, 150);
+    }, 120);
   };
 
   const handleMouseLeave = () => {
@@ -149,61 +149,59 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
   const renderSidebarBody = (isMobileDrawer: boolean, expanded: boolean) => (
     <>
       {/* Brand Header Card with Logo and Pin button */}
-      <div className="h-16 flex items-center justify-between px-3.5 border-b border-slate-100/80 relative shrink-0">
-        {expanded ? (
-          <div className="flex items-center justify-between w-full min-w-0">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <img
-                src="/logo.png"
-                alt="VIP Limousine Logo"
-                className="w-8 h-8 object-contain shrink-0 drop-shadow-xs"
-              />
-              <div className="flex flex-col min-w-0">
-                <span className="text-xs font-black text-slate-900 tracking-tight truncate">
-                  VIP LIMOUSINE
-                </span>
-                <span className="text-[10px] text-slate-400 font-semibold truncate leading-none">
-                  KOREA HQ
-                </span>
-              </div>
-            </div>
+      <div className="h-16 px-3 flex items-center border-b border-slate-100/80 relative shrink-0 overflow-hidden">
+        {/* Logo Anchor: Stays strictly in position */}
+        <div className="w-10 h-10 flex items-center justify-center shrink-0">
+          <img
+            src="/logo.png"
+            alt="VIP Limousine Logo"
+            className="w-8 h-8 object-contain shrink-0 drop-shadow-xs"
+          />
+        </div>
 
-            {/* Desktop Pin Toggle Button */}
-            {!isMobileDrawer && (
-              <button
-                type="button"
-                onClick={togglePin}
-                className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                  isPinned
-                    ? 'text-[#1E60F3] bg-blue-50 hover:bg-blue-100 shadow-2xs'
-                    : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
-                }`}
-                title={isPinned ? '사이드바 고정 해제 (Cmd+B)' : '사이드바 고정 (Cmd+B)'}
-                aria-label={isPinned ? '사이드바 고정 해제' : '사이드바 고정'}
-              >
-                {isPinned ? (
-                  <PinOff className="w-4 h-4" />
-                ) : (
-                  <Pin className="w-4 h-4" />
-                )}
-              </button>
-            )}
+        {/* Text & Pin Button: smoothly unclips to the right */}
+        <div
+          className={`flex-1 min-w-0 flex items-center justify-between ml-2.5 overflow-hidden transition-all duration-200 ${
+            expanded
+              ? 'opacity-100 translate-x-0'
+              : 'opacity-0 -translate-x-2 pointer-events-none'
+          }`}
+        >
+          <div className="flex flex-col min-w-0">
+            <span className="text-xs font-black text-slate-900 tracking-tight truncate">
+              VIP LIMOUSINE
+            </span>
+            <span className="text-[10px] text-slate-400 font-semibold truncate leading-none">
+              KOREA HQ
+            </span>
           </div>
-        ) : (
-          <div className="w-full flex items-center justify-center">
-            <img
-              src="/logo.png"
-              alt="VIP Limousine Logo"
-              className="w-8 h-8 object-contain shrink-0 drop-shadow-xs"
-            />
-          </div>
-        )}
+
+          {!isMobileDrawer && (
+            <button
+              type="button"
+              onClick={togglePin}
+              className={`p-1.5 rounded-lg transition-all cursor-pointer shrink-0 ml-1.5 ${
+                isPinned
+                  ? 'text-[#1E60F3] bg-blue-50 hover:bg-blue-100 shadow-2xs'
+                  : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
+              }`}
+              title={isPinned ? '사이드바 고정 해제 (Cmd+B)' : '사이드바 고정 (Cmd+B)'}
+              aria-label={isPinned ? '사이드바 고정 해제' : '사이드바 고정'}
+            >
+              {isPinned ? (
+                <PinOff className="w-4 h-4" />
+              ) : (
+                <Pin className="w-4 h-4" />
+              )}
+            </button>
+          )}
+        </div>
 
         {isMobileDrawer && (
           <button
             type="button"
             onClick={onCloseMobile}
-            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center cursor-pointer transition-colors shrink-0 ml-2"
+            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center cursor-pointer transition-colors shrink-0 ml-auto"
             aria-label="메뉴 닫기"
           >
             <X className="w-4 h-4" />
@@ -226,31 +224,23 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
                 onSelectTab(item.id);
                 onCloseMobile?.();
               }}
-              className={`w-full flex items-center rounded-xl text-xs sm:text-sm font-bold transition-all text-left cursor-pointer active:scale-[0.98] ${
-                expanded
-                  ? 'px-3 py-2.5 justify-between'
-                  : 'h-10 w-10 mx-auto justify-center'
-              } ${
+              className={`w-full h-10 px-2.5 flex items-center rounded-xl text-xs sm:text-sm font-bold transition-colors text-left cursor-pointer active:scale-[0.98] ${
                 isActive
                   ? 'bg-blue-50/90 text-[#1E60F3] shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
               }`}
               title={!expanded ? item.label : undefined}
             >
-              <div className={`flex items-center ${expanded ? 'gap-3 min-w-0' : 'justify-center'} relative`}>
+              {/* Icon Anchor: Position is 100% stable during expansion */}
+              <div className="w-6 h-6 flex items-center justify-center shrink-0 relative">
                 <Icon
                   className={`w-4 h-4 shrink-0 transition-colors ${
                     isActive ? 'text-[#1E60F3]' : 'text-slate-400'
                   }`}
                 />
-                {expanded && (
-                  <span className="truncate whitespace-nowrap animate-in fade-in duration-150">
-                    {item.label}
-                  </span>
-                )}
                 {!expanded && item.badge !== undefined && (
                   <span
-                    className={`absolute -top-1.5 -right-2 min-w-3.5 h-3.5 px-0.5 rounded-full text-[9px] font-black flex items-center justify-center ${
+                    className={`absolute -top-1 -right-1.5 min-w-3.5 h-3.5 px-0.5 rounded-full text-[9px] font-black flex items-center justify-center ${
                       item.badgeColor || 'bg-blue-100 text-[#1E60F3]'
                     }`}
                   >
@@ -259,97 +249,101 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
                 )}
               </div>
 
-              {expanded && item.badge !== undefined && (
-                <span
-                  className={`min-w-5 h-5 px-1.5 rounded-full text-[10px] font-black flex items-center justify-center shrink-0 ${
-                    item.badgeColor || 'bg-blue-100 text-[#1E60F3]'
-                  }`}
-                >
-                  {item.badge}
+              {/* Text Label & Badge: Smoothly reveals to the right */}
+              <div
+                className={`flex-1 min-w-0 flex items-center justify-between ml-3 overflow-hidden transition-all duration-200 ${
+                  expanded
+                    ? 'opacity-100 translate-x-0'
+                    : 'opacity-0 -translate-x-2 pointer-events-none'
+                }`}
+              >
+                <span className="truncate whitespace-nowrap">
+                  {item.label}
                 </span>
-              )}
+
+                {item.badge !== undefined && (
+                  <span
+                    className={`min-w-5 h-5 px-1.5 rounded-full text-[10px] font-black flex items-center justify-center shrink-0 ml-1.5 ${
+                      item.badgeColor || 'bg-blue-100 text-[#1E60F3]'
+                    }`}
+                  >
+                    {item.badge}
+                  </span>
+                )}
+              </div>
             </button>
           );
         })}
       </nav>
 
       {/* Switch to Driver Cockpit shortcut & Admin Logout */}
-      {expanded ? (
-        <div className="p-3 border-t border-slate-100 space-y-1 shrink-0 animate-in fade-in duration-150">
-          <Link
-            href="/"
-            onClick={() => {
-              haptics.lightTap();
-              onCloseMobile?.();
-            }}
-            className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 hover:bg-blue-50/70 border border-slate-200/80 text-slate-600 hover:text-[#1E60F3] text-xs font-bold transition-all group"
-            title="기사용 Cockpit 화면으로 전환"
+      <div className="p-2.5 border-t border-slate-100 space-y-1 shrink-0 overflow-hidden">
+        <Link
+          href="/"
+          onClick={() => {
+            haptics.lightTap();
+            onCloseMobile?.();
+          }}
+          className="h-10 px-2.5 flex items-center rounded-xl bg-slate-50 hover:bg-blue-50/70 border border-slate-200/80 text-slate-600 hover:text-[#1E60F3] text-xs font-bold transition-colors group cursor-pointer"
+          title={!expanded ? '기사 Cockpit 전환' : undefined}
+          aria-label="기사 Cockpit 전환"
+        >
+          <div className="w-6 h-6 flex items-center justify-center shrink-0">
+            <Smartphone className="w-4 h-4 text-slate-400 group-hover:text-[#1E60F3] shrink-0" />
+          </div>
+          <div
+            className={`flex-1 min-w-0 flex items-center justify-between ml-3 overflow-hidden transition-all duration-200 ${
+              expanded
+                ? 'opacity-100 translate-x-0'
+                : 'opacity-0 -translate-x-2 pointer-events-none'
+            }`}
           >
-            <div className="flex items-center gap-2">
-              <Smartphone className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#1E60F3]" />
-              <span>기사 Cockpit 전환</span>
-            </div>
-            <span className="text-[10px] text-slate-400 group-hover:text-[#1E60F3]">➔</span>
-          </Link>
+            <span className="truncate whitespace-nowrap">기사 Cockpit 전환</span>
+            <span className="text-[10px] text-slate-400 group-hover:text-[#1E60F3] shrink-0">➔</span>
+          </div>
+        </Link>
 
-          <button
-            type="button"
-            onClick={async () => {
-              haptics.lightTap();
-              await logoutClientSession();
-              window.location.assign('/hq/login');
-            }}
-            className="w-full flex items-center justify-between p-2.5 rounded-xl text-slate-500 hover:text-rose-600 hover:bg-rose-50 text-xs font-bold transition-all cursor-pointer"
-            title="본사 관리자 세션 로그아웃"
+        <button
+          type="button"
+          onClick={async () => {
+            haptics.lightTap();
+            await logoutClientSession();
+            window.location.assign('/hq/login');
+          }}
+          className="w-full h-10 px-2.5 flex items-center rounded-xl text-slate-500 hover:text-rose-600 hover:bg-rose-50 text-xs font-bold transition-colors cursor-pointer"
+          title={!expanded ? '관리자 로그아웃' : undefined}
+          aria-label="관리자 로그아웃"
+        >
+          <div className="w-6 h-6 flex items-center justify-center shrink-0">
+            <LogOut className="w-4 h-4 text-slate-400 shrink-0" />
+          </div>
+          <div
+            className={`flex-1 min-w-0 flex items-center justify-start ml-3 overflow-hidden transition-all duration-200 ${
+              expanded
+                ? 'opacity-100 translate-x-0'
+                : 'opacity-0 -translate-x-2 pointer-events-none'
+            }`}
           >
-            <div className="flex items-center gap-2">
-              <LogOut className="w-3.5 h-3.5 text-slate-400" />
-              <span>관리자 로그아웃</span>
-            </div>
-          </button>
-        </div>
-      ) : (
-        <div className="p-2 border-t border-slate-100 flex flex-col items-center gap-1.5 shrink-0">
-          <Link
-            href="/"
-            onClick={() => {
-              haptics.lightTap();
-              onCloseMobile?.();
-            }}
-            className="w-10 h-10 rounded-xl bg-slate-50 hover:bg-blue-50/70 border border-slate-200/80 text-slate-600 hover:text-[#1E60F3] flex items-center justify-center transition-all cursor-pointer"
-            title="기사 Cockpit 전환"
-            aria-label="기사 Cockpit 전환"
-          >
-            <Smartphone className="w-4 h-4 text-slate-400 hover:text-[#1E60F3]" />
-          </Link>
-
-          <button
-            type="button"
-            onClick={async () => {
-              haptics.lightTap();
-              await logoutClientSession();
-              window.location.assign('/hq/login');
-            }}
-            className="w-10 h-10 rounded-xl text-slate-500 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-all cursor-pointer"
-            title="관리자 로그아웃"
-            aria-label="관리자 로그아웃"
-          >
-            <LogOut className="w-4 h-4 text-slate-400" />
-          </button>
-        </div>
-      )}
+            <span className="truncate whitespace-nowrap">관리자 로그아웃</span>
+          </div>
+        </button>
+      </div>
 
       {/* Footer Watermark */}
-      {expanded && (
-        <div className="p-3 pt-1 pb-3 text-center shrink-0 animate-in fade-in duration-150">
-          <p className="text-[10px] text-slate-400 font-semibold tracking-tight">
-            VIP LIMOUSINE KOREA
-          </p>
-          <p className="text-[9px] text-slate-400/80 font-medium">
-            PC · 모바일 실시간 공유 관제
-          </p>
-        </div>
-      )}
+      <div
+        className={`px-3 pt-1 pb-3 text-center shrink-0 overflow-hidden transition-all duration-200 ${
+          expanded
+            ? 'opacity-100 h-auto'
+            : 'opacity-0 h-0 pointer-events-none'
+        }`}
+      >
+        <p className="text-[10px] text-slate-400 font-semibold tracking-tight whitespace-nowrap">
+          VIP LIMOUSINE KOREA
+        </p>
+        <p className="text-[9px] text-slate-400/80 font-medium whitespace-nowrap">
+          PC · 모바일 실시간 공유 관제
+        </p>
+      </div>
     </>
   );
 
@@ -357,7 +351,7 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
     <>
       {/* Desktop Sidebar Rail Placeholder (Preserves document flow for main content) */}
       <div
-        className={`hidden lg:block shrink-0 transition-[width] duration-200 ease-out ${
+        className={`hidden lg:block shrink-0 transition-[width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
           isPinned ? 'w-60' : 'w-16'
         }`}
         aria-hidden="true"
@@ -367,11 +361,11 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
       <aside
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className={`hidden lg:flex fixed top-0 left-0 bottom-0 h-dvh flex-col shrink-0 select-none overflow-x-hidden transition-[width,box-shadow,background-color] duration-200 ease-out ${
+        className={`hidden lg:flex fixed top-0 left-0 bottom-0 h-dvh flex-col shrink-0 select-none overflow-hidden transition-[width,box-shadow,background-color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
           isExpanded ? 'w-60' : 'w-16'
         } ${
           isHovered && !isPinned
-            ? 'z-50 bg-white/95 backdrop-blur-md border-r border-slate-200/80 shadow-2xl'
+            ? 'z-50 bg-white/95 backdrop-blur-md border-r border-slate-200/90 shadow-2xl'
             : 'z-30 bg-white border-r border-slate-100'
         }`}
       >
