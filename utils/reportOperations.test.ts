@@ -31,7 +31,7 @@ test('November is automatically created from October as an empty sheet, then the
  const applied=appendKakaoExcelReport(auto.bytes,novemberDraft);
  const result=workbookFromFile(applied.bytes);
  assert.equal(applied.sheetName,'11월');
- assert.equal(result.Sheets['11월'].cells.D245.v,'11월 자동생성 검증');
+ assert.equal(result.Sheets['11월'].cells.D2.v,'11월 자동생성 검증');
  assert.equal(result.Sheets['10월'].cells.D245,undefined);
  assert.deepEqual(unzipSync(applied.bytes)['xl/worksheets/sheet1.xml'],before['xl/worksheets/sheet1.xml']);
  const again=ensureReportMonth(applied.bytes,11);

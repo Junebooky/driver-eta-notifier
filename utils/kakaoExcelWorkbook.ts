@@ -115,8 +115,20 @@ export function appendKakaoExcelReport(bytes: Uint8Array, draft: KakaoExcelDraft
   }
   for (const merge of sheet.merges) last = Math.max(last,merge.e.r+1);
   if (last >= 25000) throw new Error('안전하게 추가할 수 있는 행 범위를 초과했습니다.');
-  const rowNumber = last+1;
-  // Append AFTER every used/styled/footer/merged row. Never shift or overwrite cells.
+  // A newly generated month is a blank styled template, possibly with footer
+  // formulas at row 113 and formatting through row 244. Fill the FIRST blank
+  // report row instead of treating those template rows as customer records.
+  const hasLiveRecord=Object.entries(sheet.cells).some(([addr,cell])=>{
+   if(!/^[A-L](?:[2-9]|[1-9]\\d+)$/.test(addr)||String(cell.v??'')==='')return false;
+   const found=source.match(new RegExp('<c\\b(?=[^>]*\\br="'+addr+'")[^>]*(?:\\/>|>[\\s\\S]*?<\\/c>)'))?.[0]||'';
+   return !/<f(?:\\s|>)/.test(found);
+  });
+  const firstRow=rows.find(r=>r.getAttribute('r')==='2');
+  const firstHasFormula=firstRow&&Array.from(firstRow.getElementsByTagName('f')).length>0;
+  const firstMerged=sheet.merges.some(m=>m.s.r<=1&&m.e.r>=1);
+  const rowNumber=!hasLiveRecord&&!firstHasFormula&&!firstMerged?2:last+1;
+  // Existing data and formulas are never shifted/overwritten. Managed rows are
+  // normalized separately with atomic manifest/DB row-number updates.
   // Reuse only explicit column styles of the last actual data row, never formulas.
   const template = [...rows].reverse().find(r => {
     const n = r.getAttribute('r'); return n !== '1' && sheet.cells['B'+n]?.v != null && sheet.cells['D'+n]?.v != null;
@@ -138,10 +150,26 @@ export function appendKakaoExcelReport(bytes: Uint8Array, draft: KakaoExcelDraft
     return numeric ? `<c${attrs}><v>${String(value).replace(/,/g,'')}</v></c>` : `<c${attrs} t="inlineStr"><is><t xml:space="preserve">${xml(String(value))}</t></is></c>`;
   }).join('');
   const height=reportRowHeight(draft.route,draft.serviceType,draft.overtime);
-  let patched = source.replace(/<\/sheetData\s*>/,`<row r="${rowNumber}" ht="${height}" customHeight="1">${cells}</row></sheetData>`);
+  let patched:string;
+  const oldRow=rows.find(r=>Number(r.getAttribute('r'))===rowNumber);
+  const freshRow='<row r="'+rowNumber+'" ht="'+height+'" customHeight="1">'+cells+'</row>';
+  if(oldRow){
+   const original=source.match(new RegExp('<row\\b(?=[^>]*\\br="'+rowNumber+'")[^>]*(?:\\/>|>[\\s\\S]*?<\\/row>)'))?.[0];
+   if(!original)throw new Error('템플릿 행의 구조를 확인해 주세요.');
+   const start=original.match(/^<row\b[^>]*>/)?.[0]||'<row r="'+rowNumber+'">';
+   const body=original.endsWith('/>')?'':original.slice(start.length,-6);
+   if(/<f(?:\s|>)/.test(body))throw new Error('수식이 있는 행에는 자동으로 기록하지 않습니다.');
+   const keep=body.replace(/<c\b(?=[^>]*\br="[A-L]\d+")[^>]*(?:\/>|>[\s\S]*?<\/c>)/g,'');
+   patched=source.replace(original,start+keep+cells+'</row>');
+  }else{
+   const next=rows.find(r=>Number(r.getAttribute('r'))>rowNumber);
+   const following=next?source.match(new RegExp('<row\\b(?=[^>]*\\br="'+next.getAttribute('r')+'")[^>]*(?:\\/>|>[\\s\\S]*?<\\/row>)'))?.[0]:null;
+   if(following)patched=source.replace(following,freshRow+following);
+   else patched=source.replace(/<\/sheetData\s*>/,freshRow+'</sheetData>');
+  }
   if (patched === source) throw new Error('지원하지 않는 빈 시트입니다. 승인된 템플릿을 확인해 주세요.');
-  const range = {s:{...sheet.ref.s},e:{...sheet.ref.e}}; range.e.r = rowNumber-1; range.e.c = Math.max(range.e.c,11);
-  patched = patched.replace(/<dimension\b[^>]*\bref="[^"]*"[^>]*\/>/,`<dimension ref="${rangeName(range)}"/>`);
+  const range = {s:{...sheet.ref.s},e:{...sheet.ref.e}}; range.e.r = Math.max(range.e.r,rowNumber-1); range.e.c = Math.max(range.e.c,11);
+  patched = patched.replace(/<dimension\\b[^>]*\\bref="[^"]*"[^>]*\\/>/, `<dimension ref="${rangeName(range)}"/>`);
   patched=widenReportColumns(patched,routeColumnWidth([draft.route,...Object.entries(sheet.cells).filter(([address])=>/^G[1-9]\d*$/.test(address)).map(([,cell])=>String(cell.v??''))]));
   entries[path] = strToU8(patched);
   // Existing cells, formulas, drawings and unrelated ZIP members are unchanged.
