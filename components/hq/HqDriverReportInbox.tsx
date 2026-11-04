@@ -1,6 +1,6 @@
 'use client';
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {Upload,Download,RefreshCw,History,ArrowRight,Check} from 'lucide-react';
+import {Upload,Download,RefreshCw,History,ArrowRight,Check,FileSpreadsheet} from 'lucide-react';
 import {HqExcelSectionIcon} from './HqExcelSectionIcon';
 import {HqExcelWorkbookView} from './HqExcelWorkbookView';
 import type {DriverReportSubmission,ReportChatMessage} from '@/types/driverReportChat';
@@ -62,7 +62,7 @@ export function HqDriverReportInbox() {
  return <section aria-label="기사 운행보고 자동 누적" className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
   <div className="flex flex-wrap items-start gap-3"><HqExcelSectionIcon src="/images/icons/excel/icon_kakao.png" label="기사 운행보고" count={unreadIds.length}/><div className="flex-1"><h2 className="font-bold text-slate-800">기사 운행보고 · 자동 누적</h2><p className="mt-1 text-sm text-slate-500">기사 대화방에서 접수한 보고와 회사 Excel 작업본을 관리합니다.</p></div><div className="flex shrink-0 items-center gap-2"><span role="status" aria-live="polite" className="text-[12px] text-[#72829A]">{refreshComplete?'업데이트됨':''}</span><button type="button" aria-label="제출 현황 새로고침" title="보고·Excel·미열람 현황 다시 불러오기" disabled={busy||refreshing} onClick={()=>void manualRefresh()} className={btn+' min-h-10 min-w-10'}>{refreshComplete?<Check size={16} className="text-[#1E60F3]"/>:<RefreshCw size={16} className={refreshing?'animate-spin':''}/>}</button></div></div>
   <div className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 p-4">
-   <div className="mr-auto"><p className="text-xs text-slate-400">회사 Excel 작업본</p><p className="mt-1 text-sm font-semibold text-slate-700">{workbook?.filename||'등록된 원본이 없습니다'}</p></div>
+   <div className="mr-auto min-w-0"><p className="flex items-center gap-2 text-xs text-slate-400"><FileSpreadsheet size={15} className="shrink-0 text-[#6A83A7]"/>회사 Excel 작업본</p><p className="mt-1 flex min-w-0 items-start gap-2 text-sm font-semibold text-slate-700"><FileSpreadsheet size={16} className="mt-0.5 shrink-0 text-[#6A83A7]"/><span className="min-w-0 break-all">{workbook?.filename||'등록된 원본이 없습니다'}</span></p></div>
    {!workbook&&<button disabled={busy} onClick={()=>file.current?.click()} className={btn}><Upload size={16}/>원본 등록</button>}{workbook&&<a className={btn+' hq-excel-download-lift min-h-11 w-full sm:w-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/40 active:bg-[#EFF4FF]'} href={'/api/hq/report-workbook?download=1&year='+workbook.year}><Download size={16}/>최신 Excel</a>}
    <input ref={file} type="file" accept=".xlsx" className="hidden" aria-label="회사 Excel 원본 등록" onChange={e=>{
     const f=e.target.files?.[0];e.target.value='';if(!f)return;
