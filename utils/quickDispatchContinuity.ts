@@ -19,6 +19,8 @@ export function editedBookingIdentity(
     groupName: original.groupName,
     groupTotalVehicles: original.groupTotalVehicles,
     groupVehicleIndex: original.groupVehicleIndex,
+    pickupPoiVerified: Boolean(original.placeVerified && samePickup && Number.isFinite(original.pickupLat) && Number.isFinite(original.pickupLng)),
+    destinationPoiVerified: Boolean(original.placeVerified && sameDestination && Number.isFinite(original.destinationLat) && Number.isFinite(original.destinationLng)),
     originLat: samePickup ? original.pickupLat : undefined,
     originLng: samePickup ? original.pickupLng : undefined,
     destinationLat: sameDestination ? original.destinationLat : undefined,
