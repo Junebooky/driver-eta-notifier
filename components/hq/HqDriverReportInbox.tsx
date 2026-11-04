@@ -2,6 +2,7 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {Upload,Download,RefreshCw,History,ArrowRight,Check} from 'lucide-react';
 import {HqExcelSectionIcon} from './HqExcelSectionIcon';
+import {HqExcelWorkbookView} from './HqExcelWorkbookView';
 import type {DriverReportSubmission,ReportChatMessage} from '@/types/driverReportChat';
 import {reportDisplayStatus,reportMatchesFilter,visibleHqReportMessages,type ReportHqFilter} from '@/utils/reportHqPresentation';
 type Version={id:string;generation:number;kind:string;created_at:string};
@@ -70,6 +71,8 @@ export function HqDriverReportInbox() {
    }}/>
   </div>
   
+
+  {workbook&&<HqExcelWorkbookView year={workbook.year} onCommitted={refresh}/>}
 
   {message&&<p role="status" className="rounded-xl bg-blue-50 p-3 text-sm text-slate-600">{message}</p>}
   <div className="flex flex-wrap items-center gap-2">
