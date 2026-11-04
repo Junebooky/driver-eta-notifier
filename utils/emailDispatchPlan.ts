@@ -23,7 +23,7 @@ export function buildEmailDispatchPlan(draft:HqEmailExtractedDraft,slots:Array<{
   if(status==='published'&&!confirmed)throw new Error(`${day.date}: 모든 경유지의 위치 후보를 확정해 주세요.`);
   return slots.map((slot,index)=>{
    if(status==='published'&&(!slot.driver?.id||!slot.vehiclePlate))throw new Error('각 차량 슬롯의 기사와 실제 차량 번호판을 모두 선택해 주세요.');
-   if(status==='published'&&requestedLanguage==='en' && !(slot.driver?.englishAvailable || slot.driver?.languages?.some(l=>['en','english','영어'].includes(l.toLowerCase()))))throw new Error('영어 가능 조건에 맞는 기사를 선택해 주세요.');
+   if(status==='published'&&requestedLanguage==='en' && !(slot.driver?.englishAvailable || slot.driver?.languages?.some(l=>l.toLowerCase()==='en'||l.toLowerCase()==='english'||l.includes('영어'))))throw new Error('영어 가능 조건에 맞는 기사를 선택해 주세요.');
    return {scheduleId:draft.savedScheduleIds?.[`${day.date}:${index}`],date:day.date,endDate:day.date,pickupTime:day.start.time!,endTime:day.endTime||undefined,origin:day.start.location,originLat:day.start.lat,originLng:day.start.lng,destination:day.end.location,destinationLat:day.end.lat,destinationLng:day.end.lng,routeWaypoints:day.points,
     customerName:draft.companyName,customerId:draft.clientId || undefined,passengerName:draft.passengerName,passengerPhone:draft.passengerPhone,passengerCount:draft.passengerCount,flightNumber:draft.flightNumber,notes:draft.specialRequests,
     eventId:`email-${draft.emailId}`,eventName:draft.companyName,groupId:`email-${draft.emailId}-${day.date}`,groupVehicleIndex:index+1,groupTotalVehicles:slots.length,
