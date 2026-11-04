@@ -1,6 +1,7 @@
 import { unzipSync, zipSync, strFromU8, strToU8 } from 'fflate';
 import { DOMParser } from '@xmldom/xmldom';
 import { normalizedPlate, validateKakaoExcelDraft, type KakaoExcelDraft } from '@/utils/kakaoExcelImport';
+import {reportRowCellStyles,widenReportColumns,reportRowHeight} from '@/utils/reportExcelCellFormatting';
 
 const MAX_BYTES = 12 * 1024 * 1024;
 export interface KakaoWorkbookResult { bytes: Uint8Array; sheetName: string; rowNumber: number; createdMonth: boolean }
@@ -121,24 +122,27 @@ export function appendKakaoExcelReport(bytes: Uint8Array, draft: KakaoExcelDraft
     const n = r.getAttribute('r'); return n !== '1' && sheet.cells['B'+n]?.v != null && sheet.cells['D'+n]?.v != null;
   });
   const styles = new Map(Array.from(template?.getElementsByTagName('c') || []).map(c => [c.getAttribute('r')?.replace(/\d/g,''),c.getAttribute('s')]));
+  const styleIds=reportRowCellStyles(entries,styles);
   const suffix = normalizedPlate(draft.plate).slice(-4);
   const dateStyle = template ? sheet.cells['A'+template.getAttribute('r')]?.z : undefined;
   const dateValue = typeof dateStyle === 'string' && (dateStyle === 'date' || /[ymd]/i.test(dateStyle.replace(/"[^"]*"/g,''))) ? serial(draft.date,date1904) : draft.date;
   const values: (string|number)[] = [dateValue,suffix.startsWith('0') ? suffix : Number(suffix),draft.model,draft.customer,draft.driver,draft.time,draft.route,draft.serviceType,draft.overtime,draft.amount,draft.payment,draft.totalWithVat];
   const cells = values.map((value,i) => {
-    if (value === '') return '';
-    const col = colName(i), style = styles.get(col);
-    const attrs = ` r="${col}${rowNumber}"${style ? ` s="${xml(style)}"` : ''}`;
+    if (value === '' && (i<6||i>8)) return '';
+    const col = colName(i), attrs = ` r="${col}${rowNumber}" s="${styleIds[i]}"`;
+    if (value === '') return `<c${attrs}/>`;
     const numeric = typeof value === 'number' || [8,9,11].includes(i) && /^\d+(?:\.\d+)?$/.test(String(value).replace(/,/g,''));
     return numeric ? `<c${attrs}><v>${String(value).replace(/,/g,'')}</v></c>` : `<c${attrs} t="inlineStr"><is><t xml:space="preserve">${xml(String(value))}</t></is></c>`;
   }).join('');
-  let patched = source.replace(/<\/sheetData\s*>/,`<row r="${rowNumber}">${cells}</row></sheetData>`);
+  const height=reportRowHeight(draft.route,draft.serviceType,draft.overtime);
+  let patched = source.replace(/<\/sheetData\s*>/,`<row r="${rowNumber}" ht="${height}" customHeight="1">${cells}</row></sheetData>`);
   if (patched === source) throw new Error('지원하지 않는 빈 시트입니다. 승인된 템플릿을 확인해 주세요.');
   const range = {s:{...sheet.ref.s},e:{...sheet.ref.e}}; range.e.r = rowNumber-1; range.e.c = Math.max(range.e.c,11);
   patched = patched.replace(/<dimension\b[^>]*\bref="[^"]*"[^>]*\/>/,`<dimension ref="${rangeName(range)}"/>`);
+  patched=widenReportColumns(patched);
   entries[path] = strToU8(patched);
-  // Every other ZIP member (styles, formulas on other tabs, drawings, relationships)
-  // is retained byte-for-byte uncompressed. No SheetJS whole-workbook serialization.
+  // Existing cells, formulas, drawings and unrelated ZIP members are unchanged.
+  // styles.xml is extended only when new report fonts/cell styles are needed.
   const result = zipSync(entries,{level:6});
   workbookFromFile(result);
   return {bytes:result,sheetName,rowNumber,createdMonth:false};
