@@ -23,7 +23,7 @@
 | 로컬 전체 테스트 | 56/66 파일 통과. 나머지 10개는 변경과 무관한 `xlsx` 설치 누락으로 시작 실패 |
 | 로컬 TypeScript | `xlsx` 누락 TS2307 두 건만 발생 |
 | 변경 파일 ESLint | 통과 |
-| GitHub 전체 CI | Push 후 Actions 결과로 확정; PR의 Checks에서 확인 |
+| GitHub 전체 CI | `79327c8` [Actions #247](https://github.com/Junebooky/driver-eta-notifier/actions/runs/41808856936) 전체 성공: TypeScript/테스트/프로덕션 빌드/HTTP Smoke/DB/audit(high) |
 
 실제 회사 파일은 제공받은 4월 원본의 **격리된 복제본**이다. 새 11월은 이 회사 양식을 빈 월로 복제해 검증했다. 개인 정보·실제 파일·세션 토큰은 저장소에 추가하지 않았다. 기존 스타일 정의는 보존하며 A01의 새 행용 글꼴/열 폭 확장은 유지한다.
 
@@ -37,3 +37,5 @@
 - `scripts/qa-report-workbook.mjs`: `REPORT_CHAT_QA_URL`, `REPORT_QA_HQ_URL`, `REPORT_CHAT_QA_TOKENS`, `REPORT_CHAT_QA_WORKBOOK`을 지정한다. 실제 파일/fixture 세션 파일은 Git 밖에서 제공한다. 필요시 `CHROMIUM_PATH`, `PLAYWRIGHT_MODULE` 지정. 출력 캡처는 `/tmp/report-workbook-{390,1440}.png`에 저장하며 발급 주소를 가린다.
 
 로컬 패키지 다운로드는 `cdn.sheetjs.com`에서 HTTP 403으로 차단된다. 이를 우회하거나 다른 SheetJS 버전으로 바꾸지 않았다. 동일 버전 설치가 가능한 GitHub CI에서 전체 테스트·TypeScript·빌드·HTTP·DB 검증을 확인한다.
+
+GitHub API 및 GraphQL 댓글 작성은 환경의 HTTP 403으로 실패했다. 이 문서를 PR #46 브랜치에 커밋하여 검증 기록을 남긴다. 실제 기기/Excel 앱 검수는 미실시이며 운영 변경은 없다.

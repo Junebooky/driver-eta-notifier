@@ -24,4 +24,3 @@ BEGIN
  END IF;
  RETURN jsonb_build_object('count',amount,'allowed',amount<=1 AND NOT denied);
 END $$;
-

@@ -95,7 +95,7 @@ export function HqSharedReportLink(){
 
   <p className="text-[13px] leading-[1.85] text-[#66748C] sm:text-[14px]">
    기사 계정 없이 링크만 열면 보고를 제출할 수 있어요.
-   외부에 공유됐다면 링크를 폐기한 뒤 다시 발급해 주세요.
+   외부에 공유됐다면 새 링크를 발급해 주세요. 이전 링크는 자동 해제됩니다.
   </p>
 
   <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
@@ -107,7 +107,7 @@ export function HqSharedReportLink(){
 
   <p className="text-[13px] leading-6 text-[#6C7890]" role="status">
    <span className="mr-3 font-medium text-[#718099]">상태</span>
-   <span className="font-semibold text-[#465775]">{state?(state.active?'사용 가능':'미발급 또는 만료·폐기'):'확인 중'}</span>
+   <span className="font-semibold text-[#465775]">{state?(state.active?'사용 가능':'미발급 또는 만료'):'확인 중'}</span>
    {state?.active&&state.expiresAt&&<span className="ml-2">· 만료 {formatExpiry(state.expiresAt)}</span>}
   </p>
 
