@@ -14,7 +14,7 @@ test('HQ server can recover sealed link from encrypted storage, not from wrong h
   assert.equal(openSharedReportToken(sealed,tokenHash(newDeviceSecret())),null);
   assert.equal(openSharedReportToken(sealed+'.tampered',tokenHash(token)),null);
   const parts=sealed.split('.');
-  parts[2]=parts[2].slice(0,-1)+(parts[2].at(-1)==='a'?'b':'a');
+  parts[2]=(parts[2][0]==='a'?'b':'a')+parts[2].slice(1);
   assert.equal(openSharedReportToken(parts.join('.'),tokenHash(token)),null);
   assert.equal(extractSharedReportToken('https://example.vercel.app/report#key='+token),token);
   assert.equal(extractSharedReportToken(token),token);
