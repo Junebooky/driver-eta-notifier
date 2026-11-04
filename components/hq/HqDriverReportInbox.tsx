@@ -1,6 +1,6 @@
 'use client';
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {Upload,Download,RefreshCw,ArrowRight,Check,Search,LocateFixed} from 'lucide-react';
+import {Upload,Download,RefreshCw,ArrowRight,Check,Search} from 'lucide-react';
 import {HqExcelSectionIcon} from './HqExcelSectionIcon';
 import {HqExcelWorkbookView,type ReportExcelFocus} from './HqExcelWorkbookView';
 import type {DriverReportSubmission,ReportChatMessage} from '@/types/driverReportChat';
@@ -124,15 +124,46 @@ export function HqDriverReportInbox() {
       ? `${report.parsed.draft.date} · ${report.parsed.draft.customer}`
       : [report.parsed.draft.date, report.parsed.draft.customer].filter(Boolean).join(' · ') || '기사 및 거래처 정보 미확인';
     return <div key={report.id} className="min-w-0">
-    <button type="button" aria-expanded={selected?.id===report.id&&isExpanded} aria-controls={'report-details-'+report.id}
-     onClick={()=>void detail(report)} className={'flex w-full items-center gap-3 rounded-2xl border p-4 text-left transition-colors duration-150 hover:bg-[#F7F9FC] '+(selected?.id===report.id&&isExpanded?'border-[#CBDCFB] bg-[#FAFCFF]':'border-[#E9EDF4] bg-white')}>
-     <div className="min-w-0 flex-1">
+    <div className={'flex w-full items-center gap-2.5 sm:gap-3 rounded-2xl border p-3.5 sm:p-4 text-left transition-colors duration-150 hover:bg-[#F7F9FC] '+(selected?.id===report.id&&isExpanded?'border-[#CBDCFB] bg-[#FAFCFF]':'border-[#E9EDF4] bg-white')}>
+     <button type="button" aria-expanded={selected?.id===report.id&&isExpanded} aria-controls={'report-details-'+report.id}
+      onClick={()=>void detail(report)} className="min-w-0 flex-1 text-left focus:outline-none cursor-pointer">
       <p className="text-sm font-semibold text-[#465775]">{title}</p>
       <p className="mt-1 truncate text-xs text-[#8B97A8]">{subtitle}</p>
-     </div>
+     </button>
+
+     {/* 위치 찾기 3D 아이콘 (반영 완료 바로 왼쪽) */}
+     {report.excel_status==='applied'&&report.excel_sheet_name&&report.excel_row_number&&(
+      <div className="relative group/pos inline-flex items-center justify-center shrink-0">
+       <button
+        type="button"
+        onClick={(e)=>{e.stopPropagation(); viewExcelLocation(report);}}
+        className="cursor-pointer transition-transform duration-150 group-hover/pos:scale-110 active:scale-95 flex items-center justify-center p-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/30 rounded-lg"
+        aria-label="해당 시트를 찾아드려요!"
+        title="해당 시트를 찾아드려요!"
+       >
+        <img
+         src="/images/icons/excel/icon_position.png"
+         alt="해당 시트를 찾아드려요!"
+         className="w-7 h-7 sm:w-8 sm:h-8 object-contain drop-shadow-2xs select-none"
+         draggable={false}
+        />
+       </button>
+
+       {/* Hover Tooltip (위로 향하는 말풍선 규격) */}
+       <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/pos:flex flex-col items-center pointer-events-none z-[100]">
+        <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+         해당 시트를 찾아드려요!
+        </span>
+        <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 shadow-xs"/>
+       </div>
+      </div>
+     )}
+
      <span className={'shrink-0 rounded-full px-3 py-1 text-xs font-medium '+(report.excel_status==='applied'?'bg-[#EAF0FE] text-[#1E60F3]':'bg-[#F2F4F6] text-[#6D7B90]')}>{reportDisplayStatus(report.excel_status)}</span>
-     <ArrowRight size={15} className={'shrink-0 text-[#B4BFCC] transition-transform duration-200 '+(selected?.id===report.id&&isExpanded?'rotate-90':'')}/>
-    </button>
+     <button type="button" aria-label="상세 내용 토글" onClick={()=>void detail(report)} className="shrink-0 p-1 text-[#B4BFCC] hover:text-slate-600 cursor-pointer focus:outline-none">
+      <ArrowRight size={15} className={'transition-transform duration-200 '+(selected?.id===report.id&&isExpanded?'rotate-90':'')}/>
+     </button>
+    </div>
     <div id={'report-details-'+report.id} aria-hidden={!(selected?.id===report.id&&isExpanded)}
       className={'grid transition-[grid-template-rows,opacity] duration-300 ease-in-out '+(selected?.id===report.id&&isExpanded?'grid-rows-[1fr] opacity-100':'grid-rows-[0fr] opacity-0')}>
      <div className="min-h-0 overflow-hidden">
@@ -140,8 +171,9 @@ export function HqDriverReportInbox() {
        {selected?.id===report.id&&<div className="space-y-3 rounded-xl border border-blue-100 bg-slate-50 p-4"><div className="flex items-center justify-between"><h3 className="text-sm font-bold text-slate-700">보고 확인</h3><button onClick={()=>setIsExpanded(false)} className="text-sm text-slate-500">닫기</button></div>
    {selected.excel_status==='applied'&&selected.excel_sheet_name&&selected.excel_row_number
     ?<button type="button" onClick={()=>viewExcelLocation(selected)}
-      className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-[#D8E4F8] bg-white px-3 text-xs font-semibold text-[#1E60F3] transition-colors hover:bg-[#F1F5FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/30">
-      <LocateFixed size={15}/>Excel에서 위치 보기 · {selected.excel_sheet_name} · {selected.excel_row_number}행
+      className="inline-flex min-h-9 items-center gap-2 rounded-xl border border-[#D8E4F8] bg-white px-3 text-xs font-semibold text-[#1E60F3] transition-colors hover:bg-[#F1F5FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/30">
+      <img src="/images/icons/excel/icon_position.png" alt="" className="w-4 h-4 object-contain select-none" draggable={false}/>
+      Excel에서 위치 보기 · {selected.excel_sheet_name} · {selected.excel_row_number}행
      </button>
     :<p className="text-xs text-[#7A879A]">Excel 반영 확인 필요</p>}
    {(selected.last_error||selected.parsed.reviewReasons.length>0)&&<details className="text-xs text-[#6D7B90]"><summary className="cursor-pointer py-1">확인 항목 보기</summary><div className="mt-2 space-y-1 rounded-xl bg-white p-3">{selected.parsed.reviewReasons.map((reason,index)=><p key={index}>{reason}</p>)}{selected.last_error&&<p>{selected.last_error}</p>}</div></details>}
