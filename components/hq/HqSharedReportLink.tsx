@@ -1,7 +1,7 @@
 'use client';
 
 import {useCallback,useEffect,useState} from 'react';
-import {Check,Copy,Plus,ShieldCheck,AlertCircle} from 'lucide-react';
+import {Check,Copy,Plus,ShieldCheck,AlertCircle,ChevronDown,ChevronUp} from 'lucide-react';
 import {HqExcelSectionIcon} from './HqExcelSectionIcon';
 
 type LinkStatus={
@@ -32,12 +32,14 @@ export function HqSharedReportLink(){
  const [recoveryInput,setRecoveryInput]=useState('');
  const [notice,setNotice]=useState<Notice|null>(null);
  const [busy,setBusy]=useState(false);
+ const [expanded,setExpanded]=useState(false);
 
  const refresh=useCallback(async()=>{
   const res=await fetch('/api/hq/report-links',{cache:'no-store'});
   const data=await res.json();
   if(!res.ok)throw new Error(data.error||'링크 상태를 확인하지 못했어요.');
   setState(data as LinkStatus);
+  setExpanded(previous=>!data.active||previous);
   setLink(data.path?window.location.origin+data.path:'');
  },[]);
 
@@ -59,6 +61,7 @@ export function HqSharedReportLink(){
    const data=await res.json();
    if(!res.ok)throw new Error(data.error||'링크를 관리하지 못했어요.');
    await refresh();
+   setExpanded(true); // Keep a newly issued link visible for copying.
    if(action==='remember')setRecoveryInput('');
    setNotice({
     kind:'success',
@@ -84,14 +87,17 @@ export function HqSharedReportLink(){
  }
 
  const locked=busy;
- return <section aria-label="공용 운행 링크" className="w-full min-w-0 space-y-6 rounded-[24px] border border-[#E4EAF3] bg-white p-5 shadow-[0_10px_36px_rgba(54,78,115,0.06)] sm:space-y-7 sm:p-8">
-  <div className="flex min-w-0 items-start gap-4 sm:gap-5">
+ return <section aria-label="공용 운행 링크" className="w-full min-w-0 rounded-[24px] border border-[#E4EAF3] bg-white p-4 shadow-[0_10px_36px_rgba(54,78,115,0.06)] sm:p-6">
+  <button type="button" aria-expanded={expanded} aria-controls="hq-shared-link-details" onClick={()=>setExpanded(value=>!value)}
+   className="flex min-h-16 w-full min-w-0 items-center gap-3 rounded-2xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B7CBFC] sm:gap-4">
    <HqExcelSectionIcon src="/images/icons/excel/icon_link.png" label="공용 운행 링크"/>
-   <div className="min-w-0 space-y-1">
-    <h2 className="font-bold text-slate-800">공용 운행 링크</h2>
-    <p className="mt-1 text-sm text-slate-500">링크로 운행보고를 간편하게 받아보세요.</p>
-   </div>
-  </div>
+   <span className="min-w-0 flex-1">
+    <span className="block font-bold text-slate-800">공용 운행 링크</span>
+    <span className="mt-1 block text-[12px] text-[#7A879A] sm:text-sm">{state?.active?'발급된 링크 사용 중 · 필요할 때 펼쳐서 관리하세요.':'링크로 운행보고를 간편하게 받아보세요.'}</span>
+   </span>
+   <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#E6ECF5] bg-[#F7F9FC] text-[#70819A]">{expanded?<ChevronUp size={18}/>:<ChevronDown size={18}/>}</span>
+  </button>
+  {expanded&&<div id="hq-shared-link-details" className="mt-4 space-y-5 border-t border-[#EDF1F7] pt-4 sm:space-y-6">
 
   <p className="text-[13px] leading-[1.85] text-[#66748C] sm:text-[14px]">
    기사 계정 없이 링크만 열면 보고를 제출할 수 있어요.
@@ -140,6 +146,8 @@ export function HqSharedReportLink(){
      placeholder="기존 링크 주소를 붙여넣어 주세요" className="h-11 min-w-0 flex-1 rounded-xl border border-[#DFE7F1] bg-white px-3 text-[14px] text-[#465775] outline-none focus:border-[#1E60F3]"/>
     <button type="submit" disabled={locked||!recoveryInput.trim()} className={subtleButton}>기존 링크 보관</button>
    </form>
+  </div>}
+
   </div>}
 
   {notice&&<div role="status" aria-live="polite"
