@@ -381,12 +381,12 @@ export const HqOfficialPricingView: React.FC<HqOfficialPricingViewProps> = ({
               className="w-8 h-8 sm:w-9 sm:h-9 object-contain shrink-0 transition-transform duration-150 group-hover/quotes:scale-110"
             />
 
-            {/* Hover Tooltip: 최상단 내브바와 동일한 블랙 말풍선 규격 */}
-            <div className="absolute top-full left-0 pt-2 hidden group-hover/quotes:flex flex-col items-start pointer-events-none z-50">
-              <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 ml-3.5 shadow-xs" />
+            {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 */}
+            <div className="absolute bottom-full left-0 mb-2 hidden group-hover/quotes:flex flex-col items-start pointer-events-none z-50">
               <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
                 차종별 공식 표준 요율을 확인하고 맞춤 견적서를 생성해요
               </span>
+              <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 ml-3.5 shadow-xs" />
             </div>
           </div>
 

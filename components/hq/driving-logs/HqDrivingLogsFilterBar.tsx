@@ -190,8 +190,8 @@ export const HqDrivingLogsFilterBar: React.FC<HqDrivingLogsFilterBarProps> = ({
               />
             </button>
 
-            {/* 마우스 호버 말풍선 Tooltip */}
-            <div className="absolute right-0 top-full mt-2 hidden group-hover/excel:flex flex-col z-30 whitespace-nowrap px-3 py-2 bg-slate-900/95 text-white rounded-xl shadow-xl backdrop-blur-xs pointer-events-none transition-all duration-200 animate-in fade-in zoom-in-95">
+            {/* 마우스 호버 말풍선 Tooltip: 위로 향하는 블랙 말풍선 규격 */}
+            <div className="absolute right-0 bottom-full mb-2 hidden group-hover/excel:flex flex-col z-30 whitespace-nowrap px-3 py-2 bg-slate-900/95 text-white rounded-xl shadow-xl backdrop-blur-xs pointer-events-none transition-all duration-200 animate-in fade-in zoom-in-95">
               <div className="flex items-center gap-1.5 font-bold text-emerald-300 text-[11px]">
                 <span>📊 엑셀파일로 내보내드릴까요?</span>
               </div>
@@ -199,7 +199,7 @@ export const HqDrivingLogsFilterBar: React.FC<HqDrivingLogsFilterBarProps> = ({
                 현재 필터링된 운행일지 목록을 다운로드해요
               </p>
               {/* 말풍선 꼬리표 화살표 */}
-              <div className="absolute -top-1 right-3.5 w-2 h-2 bg-slate-900/95 rotate-45" />
+              <div className="absolute -bottom-1 right-3.5 w-2 h-2 bg-slate-900/95 rotate-45" />
             </div>
           </div>
         </div>

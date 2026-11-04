@@ -751,13 +751,13 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
               className="w-8 h-8 sm:w-8 sm:h-8 object-contain shrink-0 transition-transform duration-150 group-hover/naver:scale-110 cursor-pointer"
             />
 
-            {/* Hover Tooltip: 실제 네이버 이메일 강조 */}
-            <div className="absolute top-full left-0 pt-2 hidden group-hover/naver:flex flex-col items-start pointer-events-none z-50">
-              <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 ml-3 shadow-xs" />
+            {/* Hover Tooltip: 위로 향하는 실제 네이버 이메일 강조 말풍선 */}
+            <div className="absolute bottom-full left-0 mb-2 hidden group-hover/naver:flex flex-col items-start pointer-events-none z-50">
               <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150 flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#03C75A] inline-block animate-pulse" />
                 실제 네이버 이메일
               </span>
+              <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 ml-3 shadow-xs" />
             </div>
           </div>
           <span className="text-xs font-bold text-slate-600 truncate">
@@ -811,12 +811,12 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                 {counts.total}
               </span>
 
-              {/* Hover Tooltip: 최상단 내브바와 동일한 블랙 말풍선 규격 */}
-              <div className="absolute top-full left-0 pt-2 hidden group-hover/email:flex flex-col items-start pointer-events-none z-50">
-                <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 ml-[10px] shadow-xs" />
+              {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 */}
+              <div className="absolute bottom-full left-0 mb-2 hidden group-hover/email:flex flex-col items-start pointer-events-none z-50">
                 <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
                   실제 관리자님에게 온 이메일 목록이에요
                 </span>
+                <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 ml-[10px] shadow-xs" />
               </div>
             </div>
             <button

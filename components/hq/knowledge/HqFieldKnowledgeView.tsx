@@ -613,12 +613,12 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
               className="w-12 h-12 object-contain shrink-0 transition-transform duration-150 group-hover/knowledge:scale-110"
             />
 
-            {/* Hover Tooltip: 최상단 내브바와 동일한 블랙 말풍선 규격 (아이콘 근접 시에만 노출) */}
-            <div className="absolute top-full left-0 pt-2 hidden group-hover/knowledge:flex flex-col items-start pointer-events-none z-50">
-              <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 ml-5 shadow-xs" />
+            {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 (아이콘 근접 시에만 노출) */}
+            <div className="absolute bottom-full left-0 mb-2 hidden group-hover/knowledge:flex flex-col items-start pointer-events-none z-50">
               <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
                 VIP 의전 현장의 주차장·동선·진입 노하우가 모여있어요
               </span>
+              <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 ml-5 shadow-xs" />
             </div>
           </div>
 

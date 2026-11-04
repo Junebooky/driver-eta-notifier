@@ -68,6 +68,7 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
   const [vehicleFilter, setVehicleFilter] = useState('all');
   const [customerFilter, setCustomerFilter] = useState('all');
   const [remindingId, setRemindingId] = useState<string | null>(null);
+  const [dispatchIconError, setDispatchIconError] = useState(false);
 
   const handleClockClick = async (e: React.MouseEvent, b: HqBooking) => {
     e.stopPropagation();
@@ -241,10 +242,31 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
     <div className="w-full bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col justify-between">
       {/* 1. Header */}
       <div className="flex items-center justify-between gap-2 pb-3.5 border-b border-slate-100">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#1E60F3] flex items-center justify-center shrink-0 border border-blue-100/60">
-            <Calendar className="w-4 h-4" />
+        <div className="flex items-center gap-2.5 min-w-0">
+          {/* 배차 관리 목록 아이콘 & 마우스 호버 툴팁 */}
+          <div className="relative group/dispatch inline-flex items-center justify-center cursor-pointer shrink-0">
+            {!dispatchIconError ? (
+              <img
+                src="/images/icons/reservations/icon_reservation.png"
+                alt="배차 관리 목록"
+                onError={() => setDispatchIconError(true)}
+                className="w-8 h-8 sm:w-9 sm:h-9 object-contain shrink-0 transition-transform duration-150 group-hover/dispatch:scale-110"
+              />
+            ) : (
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-blue-50 border border-blue-100 text-[#1E60F3] flex items-center justify-center shrink-0 transition-transform duration-150 group-hover/dispatch:scale-110 shadow-2xs">
+                <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
+              </div>
+            )}
+
+            {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 */}
+            <div className="absolute bottom-full left-0 mb-2 hidden group-hover/dispatch:flex flex-col items-start pointer-events-none z-50">
+              <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+                실시간 예약 접수와 기사님 배정 일정을 관리해요
+              </span>
+              <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 ml-3.5 shadow-xs" />
+            </div>
           </div>
+
           <div className="min-w-0">
             <h2 className="text-sm sm:text-base font-black text-slate-900 tracking-tight truncate">
               배차 관리 목록

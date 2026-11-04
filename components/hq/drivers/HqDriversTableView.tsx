@@ -195,7 +195,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                 src="/images/icons/drivers/icon_driver.png"
                 alt="기사 관리"
                 onError={() => setDriverIconError(true)}
-                className="w-8 h-8 sm:w-9 sm:h-9 object-contain shrink-0 transition-transform duration-150 group-hover/drivers:scale-110"
+                className="w-12 h-12 sm:w-12 sm:h-12 object-contain shrink-0 transition-transform duration-150 group-hover/drivers:scale-110"
               />
             ) : (
               <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-blue-50 border border-blue-100 text-[#1E60F3] flex items-center justify-center shrink-0 transition-transform duration-150 group-hover/drivers:scale-110 shadow-2xs">
@@ -203,12 +203,12 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
               </div>
             )}
 
-            {/* Hover Tooltip: 최상단 내브바와 동일한 블랙 말풍선 규격 */}
-            <div className="absolute top-full left-0 pt-2 hidden group-hover/drivers:flex flex-col items-start pointer-events-none z-50">
-              <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 ml-3.5 shadow-xs" />
+            {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 */}
+            <div className="absolute bottom-full left-0 mb-2 hidden group-hover/drivers:flex flex-col items-start pointer-events-none z-50">
               <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
                 소속 및 프리랜서 기사님들의 프로필과 배차 자격을 관리해요
               </span>
+              <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 ml-3.5 shadow-xs" />
             </div>
           </div>
 
@@ -244,11 +244,10 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                 setAffiliationFilter('all');
                 setCurrentPage(1);
               }}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                affiliationFilter === 'all'
-                  ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 shadow-2xs font-bold'
-                  : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300'
-              }`}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${affiliationFilter === 'all'
+                ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 shadow-2xs font-bold'
+                : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300'
+                }`}
             >
               <span>전체 </span>
               <span className="font-bold">{counts.total}</span>
@@ -261,11 +260,10 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                 setAffiliationFilter('employed');
                 setCurrentPage(1);
               }}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                affiliationFilter === 'employed'
-                  ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 shadow-2xs font-bold'
-                  : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300'
-              }`}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${affiliationFilter === 'employed'
+                ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 shadow-2xs font-bold'
+                : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300'
+                }`}
             >
               <span>소속 </span>
               <span className="font-bold">{counts.employed}</span>
@@ -279,11 +277,10 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                   setAffiliationFilter('freelance');
                   setCurrentPage(1);
                 }}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                  affiliationFilter === 'freelance'
-                    ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 shadow-2xs font-bold'
-                    : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300'
-                }`}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${affiliationFilter === 'freelance'
+                  ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 shadow-2xs font-bold'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300'
+                  }`}
               >
                 <span>프리랜서 </span>
                 <span className="font-bold">{counts.freelance}</span>
@@ -580,11 +577,10 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                             haptics.lightTap();
                             setMenuOpenDriverId((prev) => (prev === driver.id ? null : driver.id));
                           }}
-                          className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
-                            menuOpenDriverId === driver.id
-                              ? 'bg-blue-50 text-[#1E60F3]'
-                              : 'hover:bg-slate-100 text-slate-400 hover:text-slate-700'
-                          }`}
+                          className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${menuOpenDriverId === driver.id
+                            ? 'bg-blue-50 text-[#1E60F3]'
+                            : 'hover:bg-slate-100 text-slate-400 hover:text-slate-700'
+                            }`}
                           title="기사 관리 메뉴"
                         >
                           <MoreHorizontal className="w-4 h-4" />
@@ -725,11 +721,10 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
                   haptics.selection();
                   setCurrentPage(pageNum);
                 }}
-                className={`min-w-8 h-8 px-2 rounded-full text-xs transition-all cursor-pointer ${
-                  isActive
-                    ? 'bg-[#1E60F3] text-white font-bold shadow-2xs'
-                    : 'border border-slate-200 hover:bg-slate-50 text-slate-600 font-medium'
-                }`}
+                className={`min-w-8 h-8 px-2 rounded-full text-xs transition-all cursor-pointer ${isActive
+                  ? 'bg-[#1E60F3] text-white font-bold shadow-2xs'
+                  : 'border border-slate-200 hover:bg-slate-50 text-slate-600 font-medium'
+                  }`}
               >
                 {pageNum}
               </button>

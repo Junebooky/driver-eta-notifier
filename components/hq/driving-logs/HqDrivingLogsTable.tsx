@@ -138,8 +138,8 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
               className="w-8 h-8 sm:w-9 sm:h-9 object-contain shrink-0 transition-transform duration-200 group-hover/icon:scale-110"
             />
 
-            {/* 마우스 호버 말풍선 Tooltip */}
-            <div className="absolute left-0 top-full mt-2 hidden group-hover/icon:flex flex-col z-30 w-64 p-2.5 bg-slate-900/95 text-white rounded-xl shadow-xl backdrop-blur-xs pointer-events-none transition-all duration-200 animate-in fade-in zoom-in-95">
+            {/* 마우스 호버 말풍선 Tooltip: 위로 향하는 블랙 말풍선 규격 */}
+            <div className="absolute left-0 bottom-full mb-2 hidden group-hover/icon:flex flex-col z-30 w-64 p-2.5 bg-slate-900/95 text-white rounded-xl shadow-xl backdrop-blur-xs pointer-events-none transition-all duration-200 animate-in fade-in zoom-in-95">
               <div className="flex items-center gap-1.5 font-bold text-blue-300 text-[11px] mb-0.5">
                 <span>📋 운행일지 검수 · 승인</span>
               </div>
@@ -147,7 +147,7 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
                 기사의 실제 운행 기록과 영수증을 대조 검수하고 승인하는 공간이에요.
               </p>
               {/* 말풍선 꼬리표 화살표 */}
-              <div className="absolute -top-1 left-3.5 w-2 h-2 bg-slate-900/95 rotate-45" />
+              <div className="absolute -bottom-1 left-3.5 w-2 h-2 bg-slate-900/95 rotate-45" />
             </div>
           </div>
 
