@@ -73,14 +73,13 @@ export function DriverReportChat({driverId,driverName='기사님'}:{driverId:str
   if(retry&&!retry.serviceType&&!serviceType){setError('운행 유형을 선택한 뒤 다시 보내주세요.');return;}
   if(!retry&&outgoing.length>=10){setError('미전송 보고가 10건 있어요. 먼저 다시 보내기를 눌러 주세요.');return;}
   inflight.current=true;setSending(true);setTyping(true);stick.current=true;
-  const typingStarted=Date.now();
   const item=retry||{id:crypto.randomUUID(),body:text.trim(),created_at:new Date().toISOString(),failed:false,serviceType:serviceType??undefined};
   setOutgoing(p=>[...p.filter(v=>v.id!==item.id),{...item,failed:false}]);if(!retry)setText('');
   try{
    const response=await fetch('/api/driver-reports',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:item.body,requestKey:item.id,driverId,serviceType:item.serviceType??serviceType})});
    const data=await response.json();if(!response.ok)throw new Error(data.error||'전송하지 못했어요.');
-   // Never delay storage or the network; only delay displaying the bot response.
-   await waitForChatTyping(typingStarted);
+   // Server result is already settled. Keep the typing bubble visible for a full 2 seconds NOW.
+   await waitForChatTyping();
    if(data.accepted===false&&data.needsTemplate){
     setOutgoing(p=>p.filter(v=>v.id!==item.id));
     setLocalGuidance(p=>[...p,{id:item.id,body:item.body,reply:data.reply||'아래 + 버튼에서 보고 양식을 불러와 작성해 주세요.',created_at:item.created_at}]);
