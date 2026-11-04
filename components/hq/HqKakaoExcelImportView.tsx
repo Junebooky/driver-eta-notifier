@@ -6,7 +6,7 @@ import {
   FolderOpen, Info, Save, ShieldCheck,
 } from 'lucide-react';
 import {
-  EXCEL_COLUMN_LABELS, excelVehicleModel, parseKakaoExcelReport,
+  EXCEL_COLUMN_LABELS, EXCEL_RECORD_YEAR, excelVehicleModel, parseKakaoExcelReport,
   validateKakaoExcelDraft, type KakaoExcelDraft,
 } from '@/utils/kakaoExcelImport';
 
@@ -36,7 +36,6 @@ const optionalFields: Array<{key:keyof KakaoExcelDraft;label:string}> = [
 
 export function HqKakaoExcelImportView() {
   const [raw, setRaw] = useState('');
-  const [assumedYear, setAssumedYear] = useState(String(new Date().getFullYear()));
   const [reviewed, setReviewed] = useState(false);
   const sourceBytes = useRef<Uint8Array | null>(null);
   const operation = useRef(false);
@@ -59,7 +58,7 @@ export function HqKakaoExcelImportView() {
   });
 
   function extract() {
-    const result = parseKakaoExcelReport(raw, Number(assumedYear));
+    const result = parseKakaoExcelReport(raw, EXCEL_RECORD_YEAR);
     setReviewed(false);
     setDraft(result.draft);
     setWarnings(result.warnings);
@@ -196,9 +195,7 @@ export function HqKakaoExcelImportView() {
     <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 space-y-4">
       <div className="flex items-center justify-between gap-3">
         <h3 className="flex items-center gap-2 text-sm font-bold text-slate-800"><ClipboardPaste size={17}/> 카카오톡 운행보고 붙여넣기</h3>
-        <label className="flex items-center gap-2 text-xs text-slate-600">연도
-          <input type="number" min="2020" max="2100" value={assumedYear} onChange={e=>{setAssumedYear(e.target.value); setDraft(null); setReviewed(false);}} className="w-20 rounded-lg border border-slate-200 px-2 py-1.5 text-sm"/>
-        </label>
+        <span className="rounded-lg bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">{EXCEL_RECORD_YEAR}년 기록부</span>
       </div>
       <textarea value={raw} onChange={e => {setRaw(e.target.value); setDraft(null); setReviewed(false);}} aria-label="카카오톡 운행보고 원문" rows={8} placeholder={'10월 24일(토)\n수행담당 : 윤태준\n차량번호 : 700호 1458\n고객명 : 샤넬\n시작 시간 : 09:15\n종료 시간 : 17:20\n출발지 : 안다즈 호텔\n최종도착지 : 차고지'} className="w-full resize-y text-slate-700 rounded-xl border border-slate-200 p-4 text-sm leading-6 outline-none focus:border-[#1E60F3]"/>
       <button type="button" disabled={!raw.trim() || busy} onClick={extract} className="rounded-xl bg-[#1E60F3] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-40">항목 추출 및 검토</button>
@@ -207,7 +204,7 @@ export function HqKakaoExcelImportView() {
     {draft && <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="font-bold text-slate-800">Excel 입력값 확인</h3>
-        <span className="text-xs text-slate-500">운행경로는 기존 G열의 요약만 입력합니다.</span>
+        <span className="text-xs text-slate-500">경유지는 원문 순서대로 기존 G열에 입력합니다.</span>
       </div>
       {(warnings.length > 0 || requiredErrors.length > 0) && <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-sm text-slate-700">
         <AlertTriangle size={16} className="mr-2 inline"/>
