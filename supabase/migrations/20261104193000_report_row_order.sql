@@ -62,7 +62,7 @@ BEGIN
   OR p_sheet !~ '^(1[0-2]|[1-9])월$'
   OR p_storage->>'sha256' !~ '^[0-9a-f]{64}$'
   OR jsonb_typeof(p_moves)<>'object'
-  OR (SELECT count(*) FROM jsonb_object_keys(p_moves)) NOT BETWEEN 1 AND 1000
+  OR (SELECT count(*) FROM jsonb_object_keys(p_moves)) > 1000
  THEN RAISE EXCEPTION 'invalid reorder request'; END IF;
  PERFORM pg_advisory_xact_lock(hashtextextended(p_org,1));
  SELECT * INTO w FROM cockpit.report_ledgers WHERE org_id=p_org AND year=p_year FOR UPDATE;
