@@ -75,7 +75,9 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
   const [infoModalBooking, setInfoModalBooking] = useState<HqBooking | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeDispatchTab, setActiveDispatchTab] = useState<HqDispatchTabKey>(()=>searchParams.get('view')==='action' || representativeMode ? 'action':'all');
+  const [activeDispatchTab, setActiveDispatchTab] = useState<HqDispatchTabKey>(() =>
+    searchParams.get('view') === 'action' ? 'action' : 'all'
+  );
   const [activeKpiFilter, setActiveKpiFilter] = useState<string | null>(() => {
     const f = searchParams.get('filter');
     return f && f !== 'today' ? f : null;

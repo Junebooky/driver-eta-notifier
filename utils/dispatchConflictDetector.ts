@@ -646,6 +646,7 @@ export function mapScheduleItemToHqBooking(
     lastAckAt: item.last_ack_at,
     publishedAt: item.published_at,
     publishedBy: item.published_by,
+    placeVerified: item.place_verified,
     createdAt: item.created_at,
     updatedAt: item.updated_at,
     cancelReason: item.cancel_reason,

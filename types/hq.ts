@@ -85,6 +85,7 @@ export interface HqBooking {
   lastAckAt?: string;
   publishedAt?: string;
   publishedBy?: string;
+  placeVerified?: boolean;
   createdAt?: string;
   updatedAt?: string;
   cancelReason?: string;

@@ -425,95 +425,132 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
         </button>
       </div>
 
-      {/* 2. Operational Tabs (with real live counts) */}
-      <div className="pt-3 flex items-center justify-between gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={() => {
-              haptics.lightTap();
-              onSelectTab('action');
-            }}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${activeTab === 'action'
-              ? 'bg-[#0B1E48] text-white shadow-xs'
-              : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200/80'
-              }`}
+      {/* 2. Operational Tabs (Horizontal Scroll Chip Rail on Mobile / Split End on Desktop) */}
+      <div
+        className="pt-3.5 pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 flex items-center flex-nowrap gap-2 overflow-x-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
+        {/* 1) 전체 예정 (기본 Active 탭, 맨 좌측 배치) */}
+        <button
+          type="button"
+          onClick={() => {
+            haptics.lightTap();
+            onSelectTab('all');
+          }}
+          className={`rounded-full px-4 py-2 text-sm transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
+            activeTab === 'all'
+              ? 'bg-[#0050FF] text-white font-bold shadow-sm'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium'
+          }`}
+          title="오늘 및 향후 모든 배차 일정"
+        >
+          <span>전체 예정</span>
+          <span
+            className={`px-2 py-0.5 rounded-full text-xs font-bold leading-none ${
+              activeTab === 'all' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
+            }`}
           >
-            <span>확인 필요</span>
-            <span
-              className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${activeTab === 'action' ? 'bg-[#1E60F3] text-white' : 'bg-slate-900 text-white'
-                }`}
-            >
-              {tabCounts.action}
-            </span>
-          </button>
+            {tabCounts.all}
+          </span>
+        </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              haptics.lightTap();
-              onSelectTab('today');
-            }}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${activeTab === 'today'
-              ? 'bg-[#1E60F3] text-white shadow-xs'
-              : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-              }`}
+        {/* 2) 오늘 출발 */}
+        <button
+          type="button"
+          onClick={() => {
+            haptics.lightTap();
+            onSelectTab('today');
+          }}
+          className={`rounded-full px-4 py-2 text-sm transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
+            activeTab === 'today'
+              ? 'bg-[#0050FF] text-white font-bold shadow-sm'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium'
+          }`}
+        >
+          <span>오늘 출발</span>
+          <span
+            className={`px-2 py-0.5 rounded-full text-xs font-bold leading-none ${
+              activeTab === 'today' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
+            }`}
           >
-            <span>오늘 출발</span>
-            <span className="font-black">{tabCounts.today}</span>
-          </button>
+            {tabCounts.today}
+          </span>
+        </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              haptics.lightTap();
-              onSelectTab('tomorrow');
-            }}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${activeTab === 'tomorrow'
-              ? 'bg-[#1E60F3] text-white shadow-xs'
-              : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-              }`}
+        {/* 3) 내일 출발 */}
+        <button
+          type="button"
+          onClick={() => {
+            haptics.lightTap();
+            onSelectTab('tomorrow');
+          }}
+          className={`rounded-full px-4 py-2 text-sm transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
+            activeTab === 'tomorrow'
+              ? 'bg-[#0050FF] text-white font-bold shadow-sm'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium'
+          }`}
+        >
+          <span>내일 출발</span>
+          <span
+            className={`px-2 py-0.5 rounded-full text-xs font-bold leading-none ${
+              activeTab === 'tomorrow' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
+            }`}
           >
-            <span>내일 출발</span>
-            <span className="font-black">{tabCounts.tomorrow}</span>
-          </button>
+            {tabCounts.tomorrow}
+          </span>
+        </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              haptics.lightTap();
-              onSelectTab('all');
-            }}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${activeTab === 'all'
-              ? 'bg-[#1E60F3] text-white shadow-xs'
-              : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-              }`}
-            title="오늘 및 향후 모든 배차 일정"
+        {/* 4) 확인 필요 (1건 이상일 때 경고 틴트 뱃지 적용) */}
+        <button
+          type="button"
+          onClick={() => {
+            haptics.lightTap();
+            onSelectTab('action');
+          }}
+          className={`rounded-full px-4 py-2 text-sm transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
+            activeTab === 'action'
+              ? 'bg-[#0050FF] text-white font-bold shadow-sm'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium'
+          }`}
+        >
+          <span>확인 필요</span>
+          <span
+            className={`px-2 py-0.5 rounded-full text-xs font-bold leading-none ${
+              activeTab === 'action'
+                ? 'bg-white/20 text-white'
+                : tabCounts.action > 0
+                  ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                  : 'bg-slate-200/80 text-slate-700'
+            }`}
           >
-            <span>전체 예정</span>
-            <span className="font-black">{tabCounts.all}</span>
-          </button>
-        </div>
+            {tabCounts.action}
+          </span>
+        </button>
 
-        {/* Past Records Tab */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          <button
-            type="button"
-            onClick={() => {
-              haptics.lightTap();
-              onSelectTab('past');
-            }}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${activeTab === 'past'
-              ? 'bg-slate-800 text-white shadow-xs'
-              : 'bg-slate-100 hover:bg-slate-200 text-slate-500'
-              }`}
-            title="출발 일시가 오늘 이전인 과거 배차 기록 (정산용 데이터 보존)"
+        {/* 5) 지난 일정 (모바일에서는 5번째 인라인 스크롤 칩, 데스크톱 md 이상에서는 우측 끝 정렬) */}
+        <button
+          type="button"
+          onClick={() => {
+            haptics.lightTap();
+            onSelectTab('past');
+          }}
+          className={`md:ml-auto rounded-full px-4 py-2 text-sm transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
+            activeTab === 'past'
+              ? 'bg-[#0050FF] text-white font-bold shadow-sm'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium'
+          }`}
+          title="출발 일시가 오늘 이전인 과거 배차 기록 (정산용 데이터 보존)"
+        >
+          <History className="w-3.5 h-3.5 shrink-0" />
+          <span>지난 일정</span>
+          <span
+            className={`px-2 py-0.5 rounded-full text-xs font-bold leading-none ${
+              activeTab === 'past' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
+            }`}
           >
-            <History className="w-3.5 h-3.5" />
-            <span>지난 일정</span>
-            <span className="font-bold text-[11px] opacity-80">{tabCounts.past}</span>
-          </button>
-        </div>
+            {tabCounts.past}
+          </span>
+        </button>
       </div>
 
       {/* Notice Banner when viewing Past Records */}
