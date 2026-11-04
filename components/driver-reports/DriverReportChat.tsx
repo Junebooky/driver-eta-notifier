@@ -6,10 +6,12 @@ import {ArrowLeft,Plus,RefreshCw,ChevronUp} from 'lucide-react';
 import {VipChatAvatar} from './VipChatAvatar';
 import {useChatViewport} from './useChatViewport';
 import {buildDriverReportTemplate} from '@/utils/reportChatTemplate';
+import {ReportServicePicker} from './ReportServicePicker';
+import type {ReportServiceType} from '@/utils/reportServiceTypes';
 import type {ReportChatMessage} from '@/types/driverReportChat';
 import {koreaDate} from '@/utils/driverReportChat';
 
-type Outgoing={id:string;body:string;created_at:string;failed:boolean};
+type Outgoing={id:string;body:string;created_at:string;failed:boolean;serviceType?:ReportServiceType};
 const time=(date:string)=>new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',hour:'numeric',minute:'2-digit'}).format(new Date(date));
 const dayLabel=(date:string)=>new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seoul',year:'numeric',month:'long',day:'numeric',weekday:'short'}).format(new Date(date+'T12:00:00+09:00'));
 export function DriverReportChat({driverId,driverName='기사님'}:{driverId:string;driverName?:string}) {
@@ -17,6 +19,7 @@ export function DriverReportChat({driverId,driverName='기사님'}:{driverId:str
  const [localGuidance,setLocalGuidance]=useState<Array<{id:string;body:string;reply:string;created_at:string}>>([]);
  const [text,setText]=useState(''),[error,setError]=useState(''),[hasMore,setHasMore]=useState(false),[loading,setLoading]=useState(true);
  const [draftLoaded,setDraftLoaded]=useState(false);
+ const [serviceType,setServiceType]=useState<ReportServiceType|null>(null);
  const frame=useRef<HTMLDivElement>(null);
  useChatViewport(frame);
  const [today,setToday]=useState(koreaDate()),[templates,setTemplates]=useState(false),[sending,setSending]=useState(false);
@@ -41,32 +44,40 @@ export function DriverReportChat({driverId,driverName='기사님'}:{driverId:str
   return()=>{active.current=false;window.clearInterval(poll);};
  },[load]);
  useEffect(()=>{
-  let alive=true;queueMicrotask(()=>{if(!alive)return;try{const d=readChatDraft(localStorage,driverId);if(d){setText(d.text);setOutgoing(d.outgoing);}}catch{setError('이 기기에 임시 저장할 수 없어요.');}setDraftLoaded(true);});
-  const clear=()=>{setText('');setOutgoing([]);clearChatDrafts(localStorage);};
+  let alive=true;queueMicrotask(()=>{if(!alive)return;try{const d=readChatDraft(localStorage,driverId);if(d){setText(d.text);setOutgoing(d.outgoing);setServiceType(d.serviceType);}}catch{setError('이 기기에 임시 저장할 수 없어요.');}setDraftLoaded(true);});
+  const clear=()=>{setText('');setOutgoing([]);setServiceType(null);clearChatDrafts(localStorage);};
   window.addEventListener('report-draft-clear',clear);return()=>{alive=false;window.removeEventListener('report-draft-clear',clear);};
  },[driverId]);
- useEffect(()=>{if(draftLoaded)try{saveChatDraft(localStorage,driverId,text,outgoing);}catch{queueMicrotask(()=>setError('임시 저장 공간이 부족해요. 작성 내용을 복사해 보관해 주세요.'));}},[draftLoaded,driverId,text,outgoing]);
+ useEffect(()=>{if(draftLoaded)try{saveChatDraft(localStorage,driverId,text,outgoing,serviceType);}catch{queueMicrotask(()=>setError('임시 저장 공간이 부족해요. 작성 내용을 복사해 보관해 주세요.'));}},[draftLoaded,driverId,text,outgoing,serviceType]);
  useEffect(()=>{if(input.current){input.current.style.height='auto';input.current.style.height=Math.min(176,input.current.scrollHeight)+'px';}},[text]);
- useEffect(()=>{const view=scroller.current;if(view&&stick.current)view.scrollTop=view.scrollHeight;},[messages,outgoing,localGuidance]);
+ useEffect(()=>{const view=scroller.current;if(view&&stick.current)view.scrollTop=view.scrollHeight;},[messages,outgoing,localGuidance,serviceType]);
  useEffect(()=>{
   const guard=(e:BeforeUnloadEvent)=>{if(text||outgoing.length){e.preventDefault();e.returnValue='';}};
   window.addEventListener('beforeunload',guard);return()=>window.removeEventListener('beforeunload',guard);
  },[text,outgoing]);
  async function send(retry?:Outgoing) {
   if(inflight.current||(!retry&&!text.trim()))return;
+  if(!retry&&!serviceType){setError('먼저 운행 유형을 선택해 주세요.');return;}
+  if(retry&&!retry.serviceType&&!serviceType){setError('운행 유형을 선택한 뒤 다시 보내주세요.');return;}
   if(!retry&&outgoing.length>=10){setError('미전송 보고가 10건 있어요. 먼저 다시 보내기를 눌러 주세요.');return;}
   inflight.current=true;setSending(true);stick.current=true;
-  const item=retry||{id:crypto.randomUUID(),body:text.trim(),created_at:new Date().toISOString(),failed:false};
+  const item=retry||{id:crypto.randomUUID(),body:text.trim(),created_at:new Date().toISOString(),failed:false,serviceType:serviceType??undefined};
   setOutgoing(p=>[...p.filter(v=>v.id!==item.id),{...item,failed:false}]);if(!retry)setText('');
   try{
-   const response=await fetch('/api/driver-reports',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:item.body,requestKey:item.id,driverId})});
+   const response=await fetch('/api/driver-reports',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:item.body,requestKey:item.id,driverId,serviceType:item.serviceType??serviceType})});
    const data=await response.json();if(!response.ok)throw new Error(data.error||'전송하지 못했어요.');
    if(data.accepted===false&&data.needsTemplate){
     setOutgoing(p=>p.filter(v=>v.id!==item.id));
     setLocalGuidance(p=>[...p,{id:item.id,body:item.body,reply:data.reply||'아래 + 버튼에서 보고 양식을 불러와 작성해 주세요.',created_at:item.created_at}]);
     return;
    }
+   if(data.accepted===false&&data.needsServiceType){
+    setOutgoing(p=>p.filter(v=>v.id!==item.id));
+    setLocalGuidance(p=>[...p,{id:item.id,body:item.body,reply:data.reply,created_at:item.created_at}]);
+    return;
+   }
    await load();setOutgoing(p=>p.filter(v=>v.id!==item.id));
+   if(data.accepted)setServiceType(null);
    if(data.duplicate)setError('이미 접수된 보고예요. 기존 대화와 반영 상태를 확인해 주세요.');
   }catch(e){setOutgoing(p=>p.map(v=>v.id===item.id?{...v,failed:true}:v));setError(e instanceof Error?e.message:'연결을 확인해 주세요.');}
   finally{inflight.current=false;setSending(false);input.current?.focus();}
@@ -102,14 +113,15 @@ export function DriverReportChat({driverId,driverName='기사님'}:{driverId:str
    {messages.map((m,i)=><div key={m.id} className="space-y-3">{koreaDate(new Date(m.created_at))!==today&&(i===0||koreaDate(new Date(messages[i-1].created_at))!==koreaDate(new Date(m.created_at)))&&<p className="text-center text-[11px] text-[#566B7C]">{dayLabel(koreaDate(new Date(m.created_at)))}</p>}{bubble(m,m.sender_type==='driver')}</div>)}
    {outgoing.map(m=>bubble(m,true,m))}
    {localGuidance.map(m=><div key={m.id} className="space-y-3">{bubble({id:m.id+'-sent',body:m.body,created_at:m.created_at},true)}{bubble({id:m.id+'-help',body:m.reply,created_at:m.created_at},false)}</div>)}
+   {draftLoaded&&<div className="px-3 sm:px-5"><ReportServicePicker value={serviceType} onChange={v=>{setServiceType(v);setError('');}}/></div>}
   </section>
   {error&&<div role="status" className="flex items-center gap-2 border-t border-white/50 bg-white/90 px-4 py-2.5 text-xs leading-5 text-[#59646D]"><span className="flex-1">{error}</span><button aria-label="대화 다시 불러오기" onClick={()=>void load().catch(e=>setError(e.message))}><RefreshCw size={15}/></button></div>}
   <footer className="shrink-0 bg-white px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-2.5">
    {templates&&<div className="mb-2 rounded-lg bg-[#F4F5F6] p-2"><button onClick={template} className="w-full rounded-md px-3 py-2 text-left text-sm text-[#49525C]">운행보고 양식 불러오기</button></div>}
    <div className="flex items-end gap-2.5">
     <button aria-label="보고 양식" aria-expanded={templates} onClick={()=>setTemplates(v=>!v)} className="mb-0.5 flex h-10 w-10 shrink-0 items-center justify-center text-[#6B747B] hover:bg-[#F3F4F5]"><Plus size={29} strokeWidth={1.7}/></button>
-    <textarea ref={input} aria-label="메시지 입력" placeholder="메시지 입력" value={text} onChange={e=>setText(e.target.value)} maxLength={20000} rows={1} onKeyDown={e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();void send();}}} className="max-h-44 min-h-11 min-w-0 flex-1 resize-none rounded-[10px] border border-[#E2E4E6] bg-white px-3 py-2.5 text-[16px] leading-[1.5] outline-none placeholder:text-[#A4ABB1] focus:border-[#B9C1C7]"/>
-    <button aria-label="메시지 보내기" disabled={!text.trim()||sending} onClick={()=>void send()} className="mb-0.5 flex h-9 shrink-0 items-center justify-center rounded-[7px] bg-[#FEE500] px-3.5 text-[13px] font-semibold text-[#3B3C35] disabled:bg-[#F2F2F2] disabled:text-[#B4B9BC]">전송</button>
+    <textarea ref={input} aria-label="메시지 입력" placeholder={serviceType?'메시지 입력':'먼저 운행 유형을 선택해 주세요'} disabled={!serviceType} value={text} onChange={e=>setText(e.target.value)} maxLength={20000} rows={1} onKeyDown={e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();void send();}}} className="max-h-44 min-h-11 min-w-0 flex-1 resize-none rounded-[10px] border border-[#E2E4E6] bg-white px-3 py-2.5 text-[16px] leading-[1.5] outline-none placeholder:text-[#A4ABB1] focus:border-[#B9C1C7]"/>
+    <button aria-label="메시지 보내기" disabled={!serviceType||!text.trim()||sending} onClick={()=>void send()} className="mb-0.5 flex h-9 shrink-0 items-center justify-center rounded-[7px] bg-[#FEE500] px-3.5 text-[13px] font-semibold text-[#3B3C35] disabled:bg-[#F2F2F2] disabled:text-[#B4B9BC]">전송</button>
    </div>
   </footer>
  </div>;
