@@ -1,7 +1,7 @@
 'use client';
 
 import {useCallback,useEffect,useState} from 'react';
-import {Check,Copy,Plus,RefreshCw,ShieldCheck,ShieldOff} from 'lucide-react';
+import {Check,Copy,Plus,ShieldCheck,AlertCircle} from 'lucide-react';
 import {HqExcelSectionIcon} from './HqExcelSectionIcon';
 
 type LinkStatus={
@@ -32,7 +32,6 @@ export function HqSharedReportLink(){
  const [recoveryInput,setRecoveryInput]=useState('');
  const [notice,setNotice]=useState<Notice|null>(null);
  const [busy,setBusy]=useState(false);
- const [refreshing,setRefreshing]=useState(false);
 
  const refresh=useCallback(async()=>{
   const res=await fetch('/api/hq/report-links',{cache:'no-store'});
@@ -46,16 +45,8 @@ export function HqSharedReportLink(){
   void refresh().catch(error=>setNotice({kind:'error',text:(error as Error).message}));
  },[refresh]);
 
- async function reload(){
-  setRefreshing(true);
-  try{await refresh();setNotice(null);}
-  catch(error){setNotice({kind:'error',text:(error as Error).message});}
-  finally{setRefreshing(false);}
- }
-
- async function act(action:'issue'|'revoke'|'remember'){
+ async function act(action:'issue'|'remember'){
   if(action==='issue'&&state?.active&&!window.confirm('기존 링크가 즉시 무효화됩니다. 새 링크를 발급할까요?'))return;
-  if(action==='revoke'&&!window.confirm('현재 공유된 운행보고 링크를 폐기할까요?'))return;
   if(action==='remember'&&!recoveryInput.trim())return;
   setBusy(true);
   setNotice(null);
@@ -73,7 +64,7 @@ export function HqSharedReportLink(){
     kind:'success',
     text:action==='issue'
      ?'새 링크를 발급했어요. 언제든 다시 복사할 수 있어요.'
-     :action==='remember'?'기존 링크를 다시 확인할 수 있게 보관했어요.':'링크를 폐기했어요.'
+     :'기존 링크를 다시 확인할 수 있게 보관했어요.'
    });
   }catch(error){
    setNotice({kind:'error',text:(error as Error).message});
@@ -92,7 +83,7 @@ export function HqSharedReportLink(){
   }
  }
 
- const locked=busy||refreshing;
+ const locked=busy;
  return <section aria-label="공용 운행 링크" className="w-full min-w-0 space-y-6 rounded-[24px] border border-[#E4EAF3] bg-white p-5 shadow-[0_10px_36px_rgba(54,78,115,0.06)] sm:space-y-7 sm:p-8">
   <div className="flex min-w-0 items-start gap-4 sm:gap-5">
    <HqExcelSectionIcon src="/images/icons/excel/icon_link.png" label="공용 운행 링크"/>
@@ -111,13 +102,6 @@ export function HqSharedReportLink(){
    <button type="button" disabled={locked} onClick={()=>void act('issue')}
     className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl bg-[#1E60F3] px-6 py-3 text-[14px] font-semibold text-white shadow-[0_4px_12px_rgba(30,96,243,0.14)] transition-colors hover:bg-[#1A56DD] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#95B5FF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">
     <Plus size={19} strokeWidth={2.1}/>새 링크 발급
-   </button>
-   <button type="button" disabled={locked||!state?.active} onClick={()=>void act('revoke')} className={subtleButton}>
-    <ShieldOff size={18} strokeWidth={1.8}/>링크 폐기
-   </button>
-   <button type="button" disabled={locked} onClick={()=>void reload()} aria-label="링크 상태 새로고침" title="상태 새로고침"
-    className="flex h-11 w-12 items-center justify-center rounded-2xl border border-[#E0E7F2] bg-[#F7F9FC] text-[#66748A] transition-colors hover:bg-[#EDF2F8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B7CBFC] disabled:opacity-40">
-    <RefreshCw size={18} strokeWidth={1.8} className={refreshing?'animate-spin':''}/>
    </button>
   </div>
 
@@ -161,7 +145,7 @@ export function HqSharedReportLink(){
   {notice&&<div role="status" aria-live="polite"
    className="flex min-w-0 items-center gap-3 rounded-2xl bg-[#F1F5FC] px-4 py-3.5 text-[13px] leading-6 text-[#596981] sm:text-[14px]">
    <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#E1EAFB] text-[#1E60F3]">
-    {notice.kind==='success'?<Check size={16} strokeWidth={2.3}/>:<ShieldOff size={15} strokeWidth={1.9}/>}
+    {notice.kind==='success'?<Check size={16} strokeWidth={2.3}/>:<AlertCircle size={15} strokeWidth={1.9}/>}
    </span>
    <span className="min-w-0 flex-1">{notice.text}</span>
   </div>}

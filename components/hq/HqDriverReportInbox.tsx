@@ -16,7 +16,7 @@ export function HqDriverReportInbox() {
  const [chat,setChat]=useState<ReportChatMessage[]>([]),[audit,setAudit]=useState<{id:string;action:string;created_at:string}[]>([]);
  const [corrected,setCorrected]=useState(''),[note,setNote]=useState(''),[version,setVersion]=useState('');
  const [search,setSearch]=useState('');
- const [filter,setFilter]=useState<ReportHqFilter>('all'),[driverFilter,setDriverFilter]=useState('all'),[more,setMore]=useState(false);const file=useRef<HTMLInputElement>(null),selection=useRef<string|null>(null);
+ const [filter,setFilter]=useState<ReportHqFilter>('all'),[more,setMore]=useState(false);const file=useRef<HTMLInputElement>(null),selection=useRef<string|null>(null);
  const refresh=useCallback(async()=>{
   const [r,w,reads]=await Promise.all([json('/api/hq/driver-reports'),json('/api/hq/report-workbook'),json('/api/hq/report-reads')]);
   setReports(previous=>{const merged=new Map(previous.map(s=>[s.id,s]));for(const s of r.submissions)merged.set(s.id,s);return [...merged.values()].sort((a,b)=>b.seq-a.seq);});
@@ -82,17 +82,13 @@ export function HqDriverReportInbox() {
      onClick={()=>setFilter(item.id)}
      className={'whitespace-nowrap rounded-xl px-3 py-2 text-[13px] font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/50 sm:px-4 '+(filter===item.id?'bg-white text-[#1E60F3] shadow-[0_1px_5px_rgba(50,70,110,0.09)]':'text-[#718099] hover:bg-white/70 hover:text-[#465775]')}>{item.label}</button>)}
    </div>
-   <select aria-label="기사별 보고" value={driverFilter} onChange={e=>setDriverFilter(e.target.value)} className={btn}>
-    <option value="all">전체 기사</option>
-    {[...new Map(reports.map(s=>[s.driver_id,s.parsed.draft.driver||s.driver_id])).entries()].map(([id,name])=><option key={id} value={id}>{name}</option>)}
-   </select>
    <div className="ml-auto w-full min-w-0 sm:w-[260px] lg:w-[300px]">
     <input aria-label="최근 보고 검색" type="search" placeholder="기사·차량·거래처·날짜 검색" value={search} onChange={e=>setSearch(e.target.value)}
      className="h-11 w-full min-w-0 rounded-2xl border border-[#E0E7F2] bg-white px-4 text-[14px] text-[#465775] outline-none transition-[background-color,border-color,box-shadow] duration-150 placeholder:text-[#9AA7B8] hover:border-[#B8C9E8] focus:border-[#1E60F3] focus:bg-white focus:ring-2 focus:ring-[#1E60F3]/10"/>
    </div>
   </div>
   <div className="space-y-2">
-   {reports.filter(s=>reportMatchesFilter(s.excel_status,filter)&&(driverFilter==='all'||s.driver_id===driverFilter)&&(!search||[s.parsed.draft.driver,s.parsed.draft.customer,s.parsed.draft.plate,s.parsed.draft.date].some(v=>v.includes(search)))).map(report=><div key={report.id} className="min-w-0">
+   {reports.filter(s=>reportMatchesFilter(s.excel_status,filter)&&(!search||[s.parsed.draft.driver,s.parsed.draft.customer,s.parsed.draft.plate,s.parsed.draft.date].some(v=>v.includes(search)))).map(report=><div key={report.id} className="min-w-0">
     <button type="button" aria-expanded={selected?.id===report.id&&isExpanded} aria-controls={'report-details-'+report.id}
      onClick={()=>void detail(report)} className={'flex w-full items-center gap-3 rounded-2xl border p-4 text-left transition-colors duration-150 hover:bg-[#F7F9FC] '+(selected?.id===report.id&&isExpanded?'border-[#CBDCFB] bg-[#FAFCFF]':'border-[#E9EDF4] bg-white')}>
      <div className="min-w-0 flex-1">
@@ -117,7 +113,7 @@ export function HqDriverReportInbox() {
      </div>
     </div>
    </div>)}
-   {!reports.some(s=>reportMatchesFilter(s.excel_status,filter)&&(driverFilter==='all'||s.driver_id===driverFilter)&&(!search||[s.parsed.draft.driver,s.parsed.draft.customer,s.parsed.draft.plate,s.parsed.draft.date].some(v=>v.includes(search))))&&<p className="py-8 text-center text-sm text-[#8B97A8]">{reports.length?'조건에 맞는 보고가 없습니다.':'아직 접수된 운행보고가 없습니다.'}</p>}
+   {!reports.some(s=>reportMatchesFilter(s.excel_status,filter)&&(!search||[s.parsed.draft.driver,s.parsed.draft.customer,s.parsed.draft.plate,s.parsed.draft.date].some(v=>v.includes(search))))&&<p className="py-8 text-center text-sm text-[#8B97A8]">{reports.length?'조건에 맞는 보고가 없습니다.':'아직 접수된 운행보고가 없습니다.'}</p>}
   </div>
   <details className="text-xs text-[#7A879A]">
    <summary className="cursor-pointer select-none py-1">자동 적재 관리</summary>
