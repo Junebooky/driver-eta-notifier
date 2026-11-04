@@ -2,6 +2,7 @@
 
 import {useCallback,useEffect,useState} from 'react';
 import {Check,Copy,Plus,ShieldCheck,AlertCircle,ChevronDown,ChevronUp} from 'lucide-react';
+import {sharedReportPublicUrl} from '@/utils/sharedReportPublicUrl';
 
 type LinkStatus={
  ok:boolean;
@@ -39,7 +40,7 @@ export function HqSharedReportLink(){
   if(!res.ok)throw new Error(data.error||'링크 상태를 확인하지 못했어요.');
   setState(data as LinkStatus);
   setExpanded(previous=>!data.active||previous);
-  setLink(data.path?window.location.origin+data.path:'');
+  setLink(data.path?sharedReportPublicUrl(data.path,process.env.NEXT_PUBLIC_SHARED_REPORT_ORIGIN):'');
  },[]);
 
  useEffect(()=>{
