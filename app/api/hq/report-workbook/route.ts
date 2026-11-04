@@ -3,7 +3,8 @@ import {requireHqAdmin} from '@/lib/auth/serverAuth';
 import {supabaseAdmin as db} from '@/lib/supabase/server';
 import {check,currentWorkbook,registerWorkbook,drainReports,approveMonth} from '@/lib/driverReports/service';
 import {workbookFromFile} from '@/utils/kakaoExcelWorkbook';
-import {readWorkbook} from '@/lib/driverReports/storage';
+import {readWorkbook,storeWorkbook} from '@/lib/driverReports/storage';
+import {readWorkbookGrid,patchWorkbookCell} from '@/utils/reportWorkbookGrid';
 import {boundedBody,UUID,privateJson,failure,sameOrigin} from '@/lib/driverReports/http';
 export const dynamic='force-dynamic';export const runtime='nodejs';
 export async function GET(req:NextRequest){
@@ -12,6 +13,16 @@ export async function GET(req:NextRequest){
   const org=a.session.org,y=req.nextUrl.searchParams.get('year'),year=y?Number(y):undefined;
   if(year&&(!Number.isInteger(year)||year<2000||year>2099))throw new Error('연도를 확인해 주세요.');
   const w=await currentWorkbook(org,year),version=req.nextUrl.searchParams.get('version');
+  if(req.nextUrl.searchParams.get('view')==='1'){
+   if(!w||!w.year)throw new Error('등록된 Excel 장부가 없습니다.');
+   const book=workbookFromFile(w.bytes);
+   const requested=req.nextUrl.searchParams.get('month');
+   const months=book.SheetNames.filter(n=>/^(?:[1-9]|1[0-2])월$/.test(n));
+   const todayMonth=new Intl.DateTimeFormat('ko-KR',{month:'numeric',timeZone:'Asia/Seoul'}).format(new Date()).replace(/[^0-9]/g,'')+'월';
+   const month=requested|| (months.includes(todayMonth)?todayMonth:months.at(-1));
+   if(!month)throw new Error('월별 Excel 시트가 없습니다.');
+   return privateJson({ok:true,version:w.id,year:w.year,filename:w.filename,...readWorkbookGrid(w.bytes,month)});
+  }
   if(version&&version!=='original'&&!UUID.test(version))throw new Error('버전을 확인해 주세요.');
   if(req.nextUrl.searchParams.get('download')==='1'){
    if(!w)throw new Error('장부가 없습니다.');let bytes=w.bytes;
@@ -32,6 +43,22 @@ export async function POST(req:NextRequest){
   const s=a.session;
   if(req.headers.get('content-type')?.startsWith('application/json')){
    const b=JSON.parse(new TextDecoder().decode(await boundedBody(req,4096)));
+   if(b.action==='edit_cell'){
+    if(!Number.isInteger(b.year)||b.year<2000||b.year>2099||!UUID.test(b.expectedVersion||''))throw new Error('Excel 버전을 확인해 주세요.');
+    if(typeof b.month!=='string'||typeof b.column!=='string'||!Number.isInteger(b.row)||typeof b.value!=='string')throw new Error('편집할 셀을 확인해 주세요.');
+    const w=await currentWorkbook(s.org,b.year);
+    if(!w||w.id!==b.expectedVersion)return privateJson({ok:false,error:'Excel이 다른 관리자에 의해 변경되었습니다. 다시 불러와 주세요.'},409);
+    const edit=patchWorkbookCell(w.bytes,b.month,b.row,b.column,b.value);
+    if(!edit.changed)return privateJson({ok:true,unchanged:true,version:w.id});
+    const saved=await db.rpc('commit_report_hq_cell_edit',{
+     p_org:s.org,p_actor:s.userId,p_year:w.year,p_expected:w.id,
+     p_storage:await storeWorkbook(s.org,edit.bytes),p_sheet:b.month,
+     p_row:b.row,p_column:b.column,p_before:edit.oldValue,p_after:edit.value
+    });
+    check(saved.error);
+    if(!saved.data)return privateJson({ok:false,error:'Excel 버전이 변경됐습니다. 다시 불러온 뒤 수정해 주세요.'},409);
+    return privateJson({ok:true});
+   }
    if(b.action==='activate'){
     if(!Number.isInteger(b.year)||b.year<2000||b.year>2099)throw new Error('연도를 확인해 주세요.');const r=await db.rpc('activate_report_ledger',{p_org:s.org,p_year:b.year,p_actor:s.userId});check(r.error);if(!r.data)throw new Error('장부가 없습니다.');
    }else if(b.action==='template'){
