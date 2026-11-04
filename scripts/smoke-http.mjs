@@ -80,6 +80,7 @@ try{
  assert.ok(ready,`Next server did not start: ${logs}`);
  const html=await(await fetch(base+'/login')).text();assert.ok(html.includes('Driver Cockpit')&&html.includes('본사 관리자 로그인')&&html.includes('계정 이메일'));
  const hqHtml=await(await fetch(base+'/hq/login')).text();assert.ok(hqHtml.includes('본사 관리자 로그인')&&hqHtml.includes('계정 이메일'));
+ assert.equal((await fetch(base+'/api/driver-reports')).status,401);assert.equal((await fetch(base+'/api/hq/report-workbook?download=1')).status,401);
  assert.equal((await fetch(base+'/api/driver')).status,401);assert.equal((await fetch(base+'/api/schedules')).status,401);
  assert.equal((await post('/api/auth/session',{action:'dev_switch',target:'admin'})).status,403);
  assert.equal((await post('/api/auth/session',{role:'driver',driverName:'누구나',vehicleNo:'8호차',pin:'shared'})).status,400);
@@ -139,6 +140,9 @@ try{
  const driverLogin=await post('/api/auth/session',{email:'driver@example.invalid',password:'isolated-password',role:'hq'});assert.equal(driverLogin.status,200);
  const driverCookie=cookies(driverLogin);const driverSession=await driverLogin.json();assert.equal(driverSession.session.role,'driver');assert.equal(driverSession.session.driverId,driverId);
  assert.equal((await fetch(base+'/',{headers:{cookie:driverCookie},redirect:'manual'})).status,200,'driver launch remains the existing cockpit');
+ assert.equal((await fetch(base+'/api/hq/report-workbook?download=1',{headers:{cookie:driverCookie}})).status,403);
+ assert.equal((await fetch(base+'/api/driver-reports?driverId=b0000000-0000-4000-8000-000000000002',{headers:{cookie:driverCookie}})).status,403);
+ assert.equal((await fetch(base+'/driver/reports',{headers:{cookie:driverCookie}})).status,200);
  await assertRepresentativeRedirect(driverCookie);
  await assertRepresentativeRedirect('cockpit_session=invalid-token');
  const own=await(await fetch(base+'/api/driver?vehicle_no=another-driver',{headers:{cookie:driverCookie}})).json();assert.equal(own.driver.id,driverId);

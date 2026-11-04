@@ -1,0 +1,51 @@
+'use client';
+import {useCallback,useEffect,useRef,useState} from 'react';
+import {Upload,Download,RefreshCw,MessageCircle,History,ArrowRight} from 'lucide-react';
+import type {DriverReportSubmission,ReportChatMessage} from '@/types/driverReportChat';
+type Version={id:string;generation:number;kind:string;created_at:string};
+const status={pending:'반영 대기',applied:'반영 완료',review:'확인 필요',error:'재처리 필요'};
+const json=async(url:string,init?:RequestInit)=>{const r=await fetch(url,{cache:'no-store',...init});const d=await r.json();if(!r.ok)throw new Error(d.error||'처리하지 못했습니다.');return d;};
+export function HqDriverReportInbox() {
+ const [reports,setReports]=useState<DriverReportSubmission[]>([]),[versions,setVersions]=useState<Version[]>([]);
+ const [workbook,setWorkbook]=useState<{active_version:string;filename:string}|null>(null);
+ const [message,setMessage]=useState(''),[busy,setBusy]=useState(false),[selected,setSelected]=useState<DriverReportSubmission|null>(null);
+ const [chat,setChat]=useState<ReportChatMessage[]>([]),[audit,setAudit]=useState<{id:string;action:string;created_at:string}[]>([]);
+ const [corrected,setCorrected]=useState(''),[note,setNote]=useState(''),[version,setVersion]=useState('');
+ const [filter,setFilter]=useState('all');const file=useRef<HTMLInputElement>(null),selection=useRef<string|null>(null);
+ const refresh=useCallback(async()=>{
+  const [r,w]=await Promise.all([json('/api/hq/driver-reports'),json('/api/hq/report-workbook')]);
+  setReports(r.submissions);setVersions(w.versions);setWorkbook(w.workbook);
+ },[]);
+ useEffect(()=>{void Promise.resolve().then(refresh).catch(e=>setMessage(e.message));const timer=setInterval(()=>{if(document.visibilityState==='visible')void refresh().catch(()=>{});},15000);return()=>clearInterval(timer);},[refresh]);
+ async function detail(s:DriverReportSubmission) {
+  selection.current=s.id;setSelected(s);setCorrected(s.raw_message);setChat([]);setAudit([]);setNote('');
+  try{const r=await json('/api/hq/driver-reports?submissionId='+s.id);if(selection.current===s.id){setChat(r.messages);setAudit(r.audit);}}catch(e){setMessage((e as Error).message);}
+ }
+ async function action(body:unknown){setBusy(true);try{await json('/api/hq/driver-reports',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});await refresh();setSelected(null);setMessage('처리 결과를 갱신했습니다.');}catch(e){setMessage((e as Error).message);}finally{setBusy(false);}}
+ const btn='inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 disabled:opacity-40';
+ return <section aria-label="기사 운행보고 자동 누적" className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+  <div className="flex flex-wrap items-start gap-3"><div className="rounded-xl bg-blue-50 p-3 text-[#1E60F3]"><MessageCircle size={22}/></div><div className="flex-1"><h2 className="font-bold text-slate-800">기사 운행보고 · 자동 누적</h2><p className="mt-1 text-sm text-slate-500">기사 대화방에서 접수한 보고와 회사 Excel 작업본을 관리합니다.</p></div><button aria-label="제출 현황 새로고침" onClick={()=>void refresh().catch(e=>setMessage(e.message))} className={btn}><RefreshCw size={16}/></button></div>
+  <div className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 p-4">
+   <div className="mr-auto"><p className="text-xs text-slate-400">회사 Excel 작업본</p><p className="mt-1 text-sm font-semibold text-slate-700">{workbook?.filename||'등록된 원본이 없습니다'}</p></div>
+   {!workbook?<button disabled={busy} onClick={()=>file.current?.click()} className={btn}><Upload size={16}/>원본 등록</button>:<><a className={btn} href="/api/hq/report-workbook?download=1"><Download size={16}/>최신 Excel</a><a className={btn} href="/api/hq/report-workbook?download=1&version=original">원본 백업</a></>}
+   <input ref={file} type="file" accept=".xlsx" className="hidden" aria-label="회사 Excel 원본 등록" onChange={e=>{
+    const f=e.target.files?.[0];e.target.value='';if(!f)return;
+    if(f.size>12*1024*1024){setMessage('Excel은 12MB 이하만 등록할 수 있습니다.');return;}
+    setBusy(true);void json('/api/hq/report-workbook',{method:'POST',headers:{'Content-Type':'application/octet-stream','X-Workbook-Name':encodeURIComponent(f.name)},body:f}).then(()=>refresh()).then(()=>setMessage('원본 백업과 작업본을 등록했습니다.')).catch(e=>setMessage(e.message)).finally(()=>setBusy(false));
+   }}/>
+  </div>
+  {message&&<p role="status" className="rounded-xl bg-blue-50 p-3 text-sm text-slate-600">{message}</p>}
+  <div className="flex flex-wrap gap-2"><label className="sr-only" htmlFor="report-status-filter">처리 상태</label><select id="report-status-filter" value={filter} onChange={e=>setFilter(e.target.value)} className={btn}><option value="all">전체 보고</option>{Object.entries(status).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select><button className={btn} disabled={busy} onClick={()=>void action({action:'drain'})}><RefreshCw size={15}/>대기·오류 재처리 (최대 20건)</button></div>
+  <div className="max-h-96 space-y-2 overflow-y-auto">{reports.filter(s=>filter==='all'||s.excel_status===filter).map(s=><button key={s.id} onClick={()=>void detail(s)} className="flex w-full items-center gap-3 rounded-xl border border-slate-100 p-4 text-left hover:bg-slate-50"><div className="min-w-0 flex-1"><p className="text-sm font-semibold text-slate-700">{s.parsed.draft.driver||'담당 확인'} · {s.parsed.draft.plate||'차량 확인'}</p><p className="mt-1 truncate text-xs text-slate-400">{s.parsed.draft.date||'날짜 확인'} · {s.parsed.draft.customer||'거래처 확인'}</p></div><span className={'rounded-full px-3 py-1 text-xs '+(s.excel_status==='applied'?'bg-blue-50 text-[#1E60F3]':'bg-slate-100 text-slate-500')}>{status[s.excel_status]}</span><ArrowRight size={15} className="text-slate-300"/></button>)}{!reports.length&&<p className="py-8 text-center text-sm text-slate-400">아직 접수된 운행보고가 없습니다.</p>}</div>
+  {selected&&<div className="space-y-3 rounded-xl border border-blue-100 bg-slate-50 p-4"><div className="flex items-center justify-between"><h3 className="text-sm font-bold text-slate-700">보고 확인</h3><button onClick={()=>{selection.current=null;setSelected(null);}} className="text-sm text-slate-500">닫기</button></div>
+   <p className="text-xs text-slate-500">{selected.excel_sheet_name&&`${selected.excel_sheet_name} · ${selected.excel_row_number}행`}{selected.last_error||selected.parsed.reviewReasons.join(' ')}</p>
+   <div aria-label="제출 대화 기록" className="max-h-60 space-y-2 overflow-y-auto">{chat.map(m=><p key={m.id} className="whitespace-pre-wrap rounded-lg bg-white p-3 text-xs leading-5 text-slate-600"><span className="font-semibold">{m.sender_type==='driver'?'기사':'회사'} · </span>{m.body}</p>)}</div>
+   {selected.excel_status!=='applied'&&<><label className="block text-xs font-medium text-slate-500">확인한 보고 내용 (원문은 보관됩니다)<textarea value={corrected} onChange={e=>setCorrected(e.target.value)} rows={7} className="mt-2 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700"/></label><label className="block text-xs text-slate-500">검토 메모<input value={note} onChange={e=>setNote(e.target.value)} className="mt-2 w-full rounded-lg border border-slate-200 p-3 text-sm"/></label><div className="flex flex-wrap gap-2"><button disabled={busy} className={btn} onClick={()=>void action({action:'review',id:selected.id,revision:selected.revision,correctedMessage:corrected,note})}>확인 후 반영</button><button disabled={busy} className={btn} onClick={()=>void action({action:'retry',id:selected.id})}>기존 내용 재처리</button></div></>}
+   <details><summary className="text-xs text-slate-500">수정 이력</summary>{audit.map(a=><p key={a.id} className="mt-2 text-xs text-slate-500">{a.created_at} · {a.action}</p>)}</details>
+  </div>}
+  {versions.length>0&&<details><summary className="flex cursor-pointer items-center gap-2 text-xs text-slate-500"><History size={14}/>작업본 버전 · 복구</summary><div className="mt-3 flex flex-wrap gap-2"><select aria-label="Excel 버전" value={version} onChange={e=>setVersion(e.target.value)} className={btn}><option value="">버전 선택</option>{versions.map(v=><option key={v.id} value={v.id}>#{v.generation} · {v.kind} · {new Date(v.created_at).toLocaleString('ko-KR')}</option>)}</select>{version&&<><a className={btn} href={'/api/hq/report-workbook?download=1&version='+version}>선택 버전 다운로드</a><button disabled={busy} className={btn} onClick={()=>{
+    if(!window.confirm('이 버전으로 복구한 뒤, 빠진 보고는 다시 반영 대기로 돌립니다. 계속할까요?'))return;
+    setBusy(true);void json('/api/hq/report-workbook',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'restore',version,expected:workbook?.active_version})}).then(()=>refresh()).catch(e=>setMessage(e.message)).finally(()=>setBusy(false));
+   }}>선택 버전 복구</button></>}</div></details>}
+ </section>;
+}

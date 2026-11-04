@@ -1,5 +1,6 @@
 'use client';
 
+import { HqDriverReportInbox } from '@/components/hq/HqDriverReportInbox';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle, CheckCircle2, ClipboardPaste, Download, FileSpreadsheet,
@@ -168,6 +169,7 @@ export function HqKakaoExcelImportView() {
   }); };
 
   return <div className="mx-auto w-full min-w-0 max-w-5xl space-y-5">
+    <HqDriverReportInbox />
     <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
       <div className="flex flex-wrap items-center gap-3">
         <div className="rounded-xl bg-blue-50 p-3 text-[#1E60F3]"><FileSpreadsheet size={23}/></div>

@@ -42,6 +42,9 @@ export function SessionGate({ children }: { children: React.ReactNode }) {
       <Link href={`${loginPath}?next=${encodeURIComponent(pathname)}`} className="inline-block rounded-xl bg-[#1E60F3] px-8 py-3 font-bold text-white">로그인</Link>
     </main>;
   }
+  // The report conversation owns its full-height mobile header and composer.
+  if (pathname === '/driver/reports') return children;
+
   // HQ Area has its own HqHeader and HqSidebar with full session controls
   if (isHqArea) {
     return <>{children}</>;
