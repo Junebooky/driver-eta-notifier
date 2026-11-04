@@ -22,8 +22,10 @@ import {
   ChevronRight,
   ChevronDown,
   History,
+  X,
 } from 'lucide-react';
 import { HqMobileBookingList } from './HqMobileBookingList';
+import { getDriverProfileImage } from './HqQuickDispatch';
 import { HqBooking } from '@/types/hq';
 import { haptics } from '@/utils/haptics';
 import { VIP_REAL_VEHICLES, VipRealVehicle, stripManufacturerName } from '@/utils/vehicleData';
@@ -75,14 +77,22 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
   const [vehicleFilter, setVehicleFilter] = useState('all');
   const [customerFilter, setCustomerFilter] = useState('all');
   const [openDropdown, setOpenDropdown] = useState<'status' | 'driver' | 'vehicle' | 'customer' | null>(null);
+  const [dropdownSearch, setDropdownSearch] = useState('');
   const filterRowRef = useRef<HTMLDivElement>(null);
   const [remindingId, setRemindingId] = useState<string | null>(null);
   const [dispatchIconError, setDispatchIconError] = useState(false);
+
+  const toggleDropdown = (key: 'status' | 'driver' | 'vehicle' | 'customer') => {
+    haptics.lightTap();
+    setDropdownSearch('');
+    setOpenDropdown((prev) => (prev === key ? null : key));
+  };
 
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
       if (filterRowRef.current && !filterRowRef.current.contains(e.target as Node)) {
         setOpenDropdown(null);
+        setDropdownSearch('');
       }
     };
     document.addEventListener('mousedown', handleOutsideClick);
@@ -254,6 +264,48 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
     return found ? `${found.plate} · ${found.modelShort}` : vehicleFilter;
   }, [vehicleOptions, vehicleFilter]);
 
+  const selectedDriverObj = useMemo(() => {
+    if (driverFilter === 'all') return null;
+    return (
+      hqDrivers.find((d) => (d.name || '').replace(/\s*기사$/, '').trim() === driverFilter) || null
+    );
+  }, [hqDrivers, driverFilter]);
+
+  const filteredStatusOptions = useMemo(() => {
+    const q = dropdownSearch.trim().toLowerCase();
+    if (!q) return statusOptions;
+    return statusOptions.filter((opt) => opt.label.toLowerCase().includes(q));
+  }, [statusOptions, dropdownSearch]);
+
+  const filteredDriverOptions = useMemo(() => {
+    const q = dropdownSearch.trim().toLowerCase();
+    if (!q) return driverOptions;
+    return driverOptions.filter((name) => {
+      const drvObj = hqDrivers.find(
+        (d) => (d.name || '').replace(/\s*기사$/, '').trim() === name
+      );
+      const phone = (drvObj?.phone || '').toLowerCase();
+      return name.toLowerCase().includes(q) || phone.includes(q);
+    });
+  }, [driverOptions, hqDrivers, dropdownSearch]);
+
+  const filteredVehicleOptions = useMemo(() => {
+    const q = dropdownSearch.trim().toLowerCase();
+    if (!q) return vehicleOptions;
+    return vehicleOptions.filter(
+      (v) =>
+        v.plate.toLowerCase().includes(q) ||
+        v.modelShort.toLowerCase().includes(q) ||
+        v.model.toLowerCase().includes(q)
+    );
+  }, [vehicleOptions, dropdownSearch]);
+
+  const filteredCustomerOptions = useMemo(() => {
+    const q = dropdownSearch.trim().toLowerCase();
+    if (!q) return customerOptions;
+    return customerOptions.filter((c) => c.toLowerCase().includes(q));
+  }, [customerOptions, dropdownSearch]);
+
   const handleResetFilters = () => {
     haptics.lightTap();
     setSearchQuery('');
@@ -262,6 +314,7 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
     setVehicleFilter('all');
     setCustomerFilter('all');
     setOpenDropdown(null);
+    setDropdownSearch('');
   };
 
   const filteredList = useMemo(() => {
@@ -416,6 +469,8 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
           type="button"
           onClick={() => {
             haptics.lightTap();
+            setOpenDropdown(null);
+            setDropdownSearch('');
             onOpenNewBooking();
           }}
           className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white text-xs font-bold transition-all cursor-pointer shadow-xs shrink-0"
@@ -572,10 +627,12 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
         </div>
       )}
 
-      {/* 3. Filter Row (Responsive Mobile + Smooth White Card Dropdowns) */}
+      {/* 3. Filter Row (Responsive Mobile + Smooth White Card Dropdowns, never floats over modals) */}
       <div
         ref={filterRowRef}
-        className="pt-3 pb-2 flex flex-col lg:flex-row lg:items-center gap-2 text-xs relative z-[90]"
+        className={`pt-3 pb-2 flex flex-col lg:flex-row lg:items-center gap-2 text-xs relative ${
+          openDropdown ? 'z-20' : 'z-0'
+        }`}
       >
         {/* Search Input (Full width on mobile so placeholder never truncates) */}
         <div className="relative w-full lg:flex-1 lg:min-w-[220px]">
@@ -595,10 +652,7 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
           <div className="relative">
             <button
               type="button"
-              onClick={() => {
-                haptics.lightTap();
-                setOpenDropdown((prev) => (prev === 'status' ? null : 'status'));
-              }}
+              onClick={() => toggleDropdown('status')}
               className={`w-full sm:w-auto min-w-[116px] px-3 py-2 rounded-xl border font-bold flex items-center justify-between gap-2 transition-all cursor-pointer shadow-2xs ${
                 statusFilter !== 'all' || openDropdown === 'status'
                   ? 'bg-[#EBF3FF]/60 border-[#1E60F3]/40 text-[#1E60F3]'
@@ -614,52 +668,95 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
             </button>
 
             {openDropdown === 'status' && (
-              <div className="absolute left-0 top-full mt-1.5 w-[210px] sm:w-[220px] bg-white rounded-2xl border border-slate-200/90 shadow-[0_16px_40px_rgba(15,23,42,0.14)] p-2 z-[140] max-h-[300px] overflow-y-auto space-y-1 animate-in fade-in zoom-in-95 duration-150">
-                {statusOptions.map((opt) => {
-                  const isSelected = statusFilter === opt.value;
-                  return (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => {
-                        haptics.lightTap();
-                        setStatusFilter(opt.value);
-                        setOpenDropdown(null);
-                      }}
-                      className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
-                        isSelected
-                          ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
-                          : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
-                      }`}
-                    >
-                      <span className="flex items-center gap-2 truncate">
-                        <span className={`w-2 h-2 rounded-full shrink-0 ${opt.dotClass}`} />
-                        <span className="truncate">{opt.label}</span>
-                      </span>
-                      {isSelected && <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />}
-                    </button>
-                  );
-                })}
+              <div className="absolute left-0 top-full mt-1.5 w-[220px] sm:w-[235px] bg-white rounded-2xl border border-slate-200/90 shadow-[0_16px_40px_rgba(15,23,42,0.14)] p-2 z-30 animate-in fade-in zoom-in-95 duration-150">
+                <div className="pb-2 mb-1 border-b border-slate-100">
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={dropdownSearch}
+                      onChange={(e) => setDropdownSearch(e.target.value)}
+                      placeholder="상태 검색..."
+                      autoFocus
+                      className="w-full pl-8 pr-7 py-1.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] focus:bg-white"
+                    />
+                    {dropdownSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setDropdownSearch('')}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="max-h-[250px] overflow-y-auto space-y-1">
+                  {filteredStatusOptions.length === 0 ? (
+                    <div className="py-5 text-center text-xs font-medium text-slate-400">
+                      검색 결과가 없습니다
+                    </div>
+                  ) : (
+                    filteredStatusOptions.map((opt) => {
+                      const isSelected = statusFilter === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => {
+                            haptics.lightTap();
+                            setStatusFilter(opt.value);
+                            setOpenDropdown(null);
+                            setDropdownSearch('');
+                          }}
+                          className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
+                              : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
+                          }`}
+                        >
+                          <span className="flex items-center gap-2 truncate">
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${opt.dotClass}`} />
+                            <span className="truncate">{opt.label}</span>
+                          </span>
+                          {isSelected && <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
               </div>
             )}
           </div>
 
-          {/* 3-2. 전체 기사 드롭다운 (기사 관리 DB 1:1 연동) */}
+          {/* 3-2. 전체 기사 드롭다운 (기사 관리 DB 1:1 연동 + 검색 + 프로필 사진) */}
           <div className="relative">
             <button
               type="button"
-              onClick={() => {
-                haptics.lightTap();
-                setOpenDropdown((prev) => (prev === 'driver' ? null : 'driver'));
-              }}
-              className={`w-full sm:w-auto min-w-[116px] px-3 py-2 rounded-xl border font-bold flex items-center justify-between gap-2 transition-all cursor-pointer shadow-2xs ${
+              onClick={() => toggleDropdown('driver')}
+              className={`w-full sm:w-auto min-w-[120px] px-3 py-2 rounded-xl border font-bold flex items-center justify-between gap-2 transition-all cursor-pointer shadow-2xs ${
                 driverFilter !== 'all' || openDropdown === 'driver'
                   ? 'bg-[#EBF3FF]/60 border-[#1E60F3]/40 text-[#1E60F3]'
                   : 'bg-white border-slate-200/90 hover:border-slate-300 text-slate-700'
               }`}
             >
-              <span className="truncate">
-                {driverFilter === 'all' ? '전체 기사' : `${driverFilter} 기사`}
+              <span className="flex items-center gap-1.5 truncate">
+                {driverFilter !== 'all' && (
+                  <img
+                    src={
+                      selectedDriverObj?.avatarUrl ||
+                      getDriverProfileImage(selectedDriverObj || { name: driverFilter })
+                    }
+                    alt={driverFilter}
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = '/images/driver_kim.png';
+                    }}
+                    className="w-4 h-4 rounded-full object-cover border border-slate-200 shrink-0"
+                  />
+                )}
+                <span className="truncate">
+                  {driverFilter === 'all' ? '전체 기사' : `${driverFilter} 기사`}
+                </span>
               </span>
               <ChevronDown
                 className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${
@@ -669,74 +766,119 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
             </button>
 
             {openDropdown === 'driver' && (
-              <div className="absolute right-0 sm:left-0 sm:right-auto top-full mt-1.5 w-[210px] sm:w-[220px] bg-white rounded-2xl border border-slate-200/90 shadow-[0_16px_40px_rgba(15,23,42,0.14)] p-2 z-[140] max-h-[300px] overflow-y-auto space-y-1 animate-in fade-in zoom-in-95 duration-150">
-                <button
-                  type="button"
-                  onClick={() => {
-                    haptics.lightTap();
-                    setDriverFilter('all');
-                    setOpenDropdown(null);
-                  }}
-                  className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
-                    driverFilter === 'all'
-                      ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
-                      : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
-                  }`}
-                >
-                  <span>전체 기사</span>
-                  {driverFilter === 'all' && <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />}
-                </button>
-                {driverOptions.map((name) => {
-                  const isSelected = driverFilter === name;
-                  const drvObj = hqDrivers.find(
-                    (d) => (d.name || '').replace(/\s*기사$/, '').trim() === name
-                  );
-                  const isEmployed = drvObj ? drvObj.affiliationType === 'employed' : true;
-                  return (
+              <div className="absolute right-0 sm:left-0 sm:right-auto top-full mt-1.5 w-[240px] sm:w-[255px] bg-white rounded-2xl border border-slate-200/90 shadow-[0_16px_40px_rgba(15,23,42,0.14)] p-2 z-30 animate-in fade-in zoom-in-95 duration-150">
+                <div className="pb-2 mb-1 border-b border-slate-100">
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={dropdownSearch}
+                      onChange={(e) => setDropdownSearch(e.target.value)}
+                      placeholder="기사명 또는 연락처 검색..."
+                      autoFocus
+                      className="w-full pl-8 pr-7 py-1.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] focus:bg-white"
+                    />
+                    {dropdownSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setDropdownSearch('')}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="max-h-[260px] overflow-y-auto space-y-1">
+                  {!dropdownSearch.trim() && (
                     <button
-                      key={name}
                       type="button"
                       onClick={() => {
                         haptics.lightTap();
-                        setDriverFilter(name);
+                        setDriverFilter('all');
                         setOpenDropdown(null);
+                        setDropdownSearch('');
                       }}
                       className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
-                        isSelected
+                        driverFilter === 'all'
                           ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
                           : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
                       }`}
                     >
-                      <span className="flex items-center gap-1.5 min-w-0">
-                        <span className="truncate">{name} 기사</span>
-                        {drvObj && (
-                          <span
-                            className={`px-1.5 py-0.5 rounded-md text-[10px] font-extrabold shrink-0 ${
-                              isEmployed
-                                ? 'bg-blue-50 text-[#1E60F3]'
-                                : 'bg-slate-100 text-slate-500'
-                            }`}
-                          >
-                            {isEmployed ? '소속' : '프리랜서'}
-                          </span>
-                        )}
-                      </span>
-                      {isSelected && <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />}
+                      <span>전체 기사</span>
+                      {driverFilter === 'all' && (
+                        <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />
+                      )}
                     </button>
-                  );
-                })}
+                  )}
+                  {filteredDriverOptions.length === 0 ? (
+                    <div className="py-5 text-center text-xs font-medium text-slate-400">
+                      일치하는 기사님이 없습니다
+                    </div>
+                  ) : (
+                    filteredDriverOptions.map((name) => {
+                      const isSelected = driverFilter === name;
+                      const drvObj = hqDrivers.find(
+                        (d) => (d.name || '').replace(/\s*기사$/, '').trim() === name
+                      );
+                      const isEmployed = drvObj ? drvObj.affiliationType === 'employed' : true;
+                      const avatarSrc =
+                        drvObj?.avatarUrl || getDriverProfileImage(drvObj || { name });
+                      return (
+                        <button
+                          key={name}
+                          type="button"
+                          onClick={() => {
+                            haptics.lightTap();
+                            setDriverFilter(name);
+                            setOpenDropdown(null);
+                            setDropdownSearch('');
+                          }}
+                          className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
+                              : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
+                          }`}
+                        >
+                          <span className="flex items-center gap-2 min-w-0">
+                            <img
+                              src={avatarSrc}
+                              alt={name}
+                              onError={(e) => {
+                                (e.currentTarget as HTMLImageElement).src = '/images/driver_kim.png';
+                              }}
+                              className="w-6 h-6 rounded-full object-cover border border-slate-200/90 bg-slate-100 shrink-0 shadow-2xs"
+                            />
+                            <span className="truncate font-extrabold text-slate-900">
+                              {name} 기사
+                            </span>
+                            {drvObj && (
+                              <span
+                                className={`px-1.5 py-0.5 rounded-md text-[10px] font-extrabold shrink-0 ${
+                                  isEmployed
+                                    ? 'bg-blue-50 text-[#1E60F3]'
+                                    : 'bg-slate-100 text-slate-500'
+                                }`}
+                              >
+                                {isEmployed ? '소속' : '프리랜서'}
+                              </span>
+                            )}
+                          </span>
+                          {isSelected && <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
               </div>
             )}
           </div>
 
-          {/* 3-3. 전체 차량 드롭다운 (차량 관리 1:1 연동, 모바일에서도 노출) */}
+          {/* 3-3. 전체 차량 드롭다운 (차량 관리 1:1 연동 + 검색) */}
           <div className="relative">
             <button
               type="button"
-              onClick={() => {
-                haptics.lightTap();
-                setOpenDropdown((prev) => (prev === 'vehicle' ? null : 'vehicle'));
-              }}
+              onClick={() => toggleDropdown('vehicle')}
               className={`w-full sm:w-auto min-w-[124px] sm:max-w-[180px] px-3 py-2 rounded-xl border font-bold flex items-center justify-between gap-2 transition-all cursor-pointer shadow-2xs ${
                 vehicleFilter !== 'all' || openDropdown === 'vehicle'
                   ? 'bg-[#EBF3FF]/60 border-[#1E60F3]/40 text-[#1E60F3]'
@@ -752,62 +894,97 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
             </button>
 
             {openDropdown === 'vehicle' && (
-              <div className="absolute left-0 top-full mt-1.5 w-[235px] sm:w-[250px] bg-white rounded-2xl border border-slate-200/90 shadow-[0_16px_40px_rgba(15,23,42,0.14)] p-2 z-[140] max-h-[300px] overflow-y-auto space-y-1 animate-in fade-in zoom-in-95 duration-150">
-                <button
-                  type="button"
-                  onClick={() => {
-                    haptics.lightTap();
-                    setVehicleFilter('all');
-                    setOpenDropdown(null);
-                  }}
-                  className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
-                    vehicleFilter === 'all'
-                      ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
-                      : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
-                  }`}
-                >
-                  <span>전체 차량</span>
-                  {vehicleFilter === 'all' && <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />}
-                </button>
-                {vehicleOptions.map((v) => {
-                  const isSelected = vehicleFilter === v.plate;
-                  return (
+              <div className="absolute left-0 top-full mt-1.5 w-[245px] sm:w-[260px] bg-white rounded-2xl border border-slate-200/90 shadow-[0_16px_40px_rgba(15,23,42,0.14)] p-2 z-30 animate-in fade-in zoom-in-95 duration-150">
+                <div className="pb-2 mb-1 border-b border-slate-100">
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={dropdownSearch}
+                      onChange={(e) => setDropdownSearch(e.target.value)}
+                      placeholder="차량번호 또는 차종 검색..."
+                      autoFocus
+                      className="w-full pl-8 pr-7 py-1.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] focus:bg-white"
+                    />
+                    {dropdownSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setDropdownSearch('')}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="max-h-[260px] overflow-y-auto space-y-1">
+                  {!dropdownSearch.trim() && (
                     <button
-                      key={v.id}
                       type="button"
                       onClick={() => {
                         haptics.lightTap();
-                        setVehicleFilter(v.plate);
+                        setVehicleFilter('all');
                         setOpenDropdown(null);
+                        setDropdownSearch('');
                       }}
                       className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
-                        isSelected
+                        vehicleFilter === 'all'
                           ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
                           : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
                       }`}
                     >
-                      <span className="flex flex-col min-w-0">
-                        <span className="truncate font-extrabold text-slate-900">{v.plate}</span>
-                        <span className="truncate text-[11px] font-medium text-slate-500">
-                          {v.modelShort}
-                        </span>
-                      </span>
-                      {isSelected && <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />}
+                      <span>전체 차량</span>
+                      {vehicleFilter === 'all' && (
+                        <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />
+                      )}
                     </button>
-                  );
-                })}
+                  )}
+                  {filteredVehicleOptions.length === 0 ? (
+                    <div className="py-5 text-center text-xs font-medium text-slate-400">
+                      일치하는 차량이 없습니다
+                    </div>
+                  ) : (
+                    filteredVehicleOptions.map((v) => {
+                      const isSelected = vehicleFilter === v.plate;
+                      return (
+                        <button
+                          key={v.id}
+                          type="button"
+                          onClick={() => {
+                            haptics.lightTap();
+                            setVehicleFilter(v.plate);
+                            setOpenDropdown(null);
+                            setDropdownSearch('');
+                          }}
+                          className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
+                              : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
+                          }`}
+                        >
+                          <span className="flex flex-col min-w-0">
+                            <span className="truncate font-extrabold text-slate-900">
+                              {v.plate}
+                            </span>
+                            <span className="truncate text-[11px] font-medium text-slate-500">
+                              {v.modelShort}
+                            </span>
+                          </span>
+                          {isSelected && <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
               </div>
             )}
           </div>
 
-          {/* 3-4. 전체 고객사 드롭다운 (고객 관리 DB 1:1 연동, 모바일에서도 노출) */}
+          {/* 3-4. 전체 고객사 드롭다운 (고객 관리 DB 1:1 연동 + 검색) */}
           <div className="relative">
             <button
               type="button"
-              onClick={() => {
-                haptics.lightTap();
-                setOpenDropdown((prev) => (prev === 'customer' ? null : 'customer'));
-              }}
+              onClick={() => toggleDropdown('customer')}
               className={`w-full sm:w-auto min-w-[120px] sm:max-w-[170px] px-3 py-2 rounded-xl border font-bold flex items-center justify-between gap-2 transition-all cursor-pointer shadow-2xs ${
                 customerFilter !== 'all' || openDropdown === 'customer'
                   ? 'bg-[#EBF3FF]/60 border-[#1E60F3]/40 text-[#1E60F3]'
@@ -825,47 +1002,81 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
             </button>
 
             {openDropdown === 'customer' && (
-              <div className="absolute right-0 sm:left-0 sm:right-auto top-full mt-1.5 w-[220px] sm:w-[235px] bg-white rounded-2xl border border-slate-200/90 shadow-[0_16px_40px_rgba(15,23,42,0.14)] p-2 z-[140] max-h-[300px] overflow-y-auto space-y-1 animate-in fade-in zoom-in-95 duration-150">
-                <button
-                  type="button"
-                  onClick={() => {
-                    haptics.lightTap();
-                    setCustomerFilter('all');
-                    setOpenDropdown(null);
-                  }}
-                  className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
-                    customerFilter === 'all'
-                      ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
-                      : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
-                  }`}
-                >
-                  <span>전체 고객사</span>
-                  {customerFilter === 'all' && (
-                    <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />
-                  )}
-                </button>
-                {customerOptions.map((c) => {
-                  const isSelected = customerFilter === c;
-                  return (
+              <div className="absolute right-0 sm:left-0 sm:right-auto top-full mt-1.5 w-[235px] sm:w-[250px] bg-white rounded-2xl border border-slate-200/90 shadow-[0_16px_40px_rgba(15,23,42,0.14)] p-2 z-30 animate-in fade-in zoom-in-95 duration-150">
+                <div className="pb-2 mb-1 border-b border-slate-100">
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={dropdownSearch}
+                      onChange={(e) => setDropdownSearch(e.target.value)}
+                      placeholder="고객사명 검색..."
+                      autoFocus
+                      className="w-full pl-8 pr-7 py-1.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] focus:bg-white"
+                    />
+                    {dropdownSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setDropdownSearch('')}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="max-h-[260px] overflow-y-auto space-y-1">
+                  {!dropdownSearch.trim() && (
                     <button
-                      key={c}
                       type="button"
                       onClick={() => {
                         haptics.lightTap();
-                        setCustomerFilter(c);
+                        setCustomerFilter('all');
                         setOpenDropdown(null);
+                        setDropdownSearch('');
                       }}
                       className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
-                        isSelected
+                        customerFilter === 'all'
                           ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
                           : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
                       }`}
                     >
-                      <span className="truncate">{c}</span>
-                      {isSelected && <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />}
+                      <span>전체 고객사</span>
+                      {customerFilter === 'all' && (
+                        <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />
+                      )}
                     </button>
-                  );
-                })}
+                  )}
+                  {filteredCustomerOptions.length === 0 ? (
+                    <div className="py-5 text-center text-xs font-medium text-slate-400">
+                      일치하는 고객사가 없습니다
+                    </div>
+                  ) : (
+                    filteredCustomerOptions.map((c) => {
+                      const isSelected = customerFilter === c;
+                      return (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => {
+                            haptics.lightTap();
+                            setCustomerFilter(c);
+                            setOpenDropdown(null);
+                            setDropdownSearch('');
+                          }}
+                          className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
+                              : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
+                          }`}
+                        >
+                          <span className="truncate">{c}</span>
+                          {isSelected && <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
               </div>
             )}
           </div>
