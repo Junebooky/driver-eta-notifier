@@ -1,6 +1,7 @@
 import {unzipSync,zipSync,strFromU8,strToU8} from 'fflate';
 import {DOMParser} from '@xmldom/xmldom';
 import {workbookFromFile} from './kakaoExcelWorkbook';
+import {widenReportColumns,routeColumnWidth} from './reportExcelCellFormatting';
 
 const MAX_VALUE=2400;
 const COLS='ABCDEFGHIJKL';
@@ -77,7 +78,11 @@ export function patchWorkbookCell(bytes:Uint8Array,month:string,row:number,col:s
   '<c'+attrs+' t="inlineStr"><is><t xml:space="preserve">'+xml(trimmed)+'</t></is></c>';
  const revisedRow=existing?original.replace(existing,newCell):original.replace(/<\/row>$/,newCell+'</row>');
  if(revisedRow===original)throw new Error('셀 값을 변경하지 못했습니다.');
- const changedSource=source.replace(original,revisedRow);
+ let changedSource=source.replace(original,revisedRow);
+ if(col==='G'){
+  const routes=Object.entries(book.Sheets[month].cells).filter(([address])=>/^G[1-9]\\d*$/.test(address)&&address!==col+row).map(([,cell])=>String(cell.v??''));
+  changedSource=widenReportColumns(changedSource,routeColumnWidth([...routes,trimmed]));
+ }
  entries[path]=strToU8(changedSource);
  const output=zipSync(entries,{level:6});workbookFromFile(output);
  return {bytes:output,oldValue,value:trimmed,changed:true};
