@@ -172,23 +172,36 @@ export const HqDrivingLogsFilterBar: React.FC<HqDrivingLogsFilterBarProps> = ({
             )}
           </div>
 
-          {/* 엑셀 내보내기 Button */}
-          <button
-            type="button"
-            onClick={() => {
-              haptics.success();
-              onExportExcel();
-            }}
-            className="group flex items-center gap-1.5 px-3.5 py-2 bg-[#1E60F3] hover:bg-blue-600 text-white rounded-xl text-xs font-bold transition-all shadow-xs shrink-0 cursor-pointer active:scale-95"
-            title="현재 목록 엑셀(CSV) 다운로드"
-          >
-            <img
-              src="/images/icons/icon_excel.png"
-              alt="엑셀"
-              className="w-4 h-4 object-contain shrink-0 transition-transform duration-150 group-hover:scale-110"
-            />
-            <span>엑셀 내보내기</span>
-          </button>
+          {/* 엑셀 내보내기 Button & Tooltip */}
+          <div className="relative group/excel shrink-0 flex items-center">
+            <button
+              type="button"
+              onClick={() => {
+                haptics.success();
+                onExportExcel();
+              }}
+              className="p-1 rounded-xl hover:bg-slate-100/90 transition-all cursor-pointer active:scale-95 flex items-center justify-center"
+              aria-label="엑셀파일로 내보내기"
+            >
+              <img
+                src="/images/icons/icon_excel.png"
+                alt="엑셀"
+                className="w-8 h-8 object-contain shrink-0 transition-transform duration-150 group-hover/excel:scale-110 drop-shadow-2xs"
+              />
+            </button>
+
+            {/* 마우스 호버 말풍선 Tooltip */}
+            <div className="absolute right-0 top-full mt-2 hidden group-hover/excel:flex flex-col z-30 whitespace-nowrap px-3 py-2 bg-slate-900/95 text-white rounded-xl shadow-xl backdrop-blur-xs pointer-events-none transition-all duration-200 animate-in fade-in zoom-in-95">
+              <div className="flex items-center gap-1.5 font-bold text-emerald-300 text-[11px]">
+                <span>📊 엑셀파일로 내보내드릴까요?</span>
+              </div>
+              <p className="text-slate-300 text-[10px] font-medium mt-0.5">
+                현재 필터링된 운행일지 목록을 다운로드해요
+              </p>
+              {/* 말풍선 꼬리표 화살표 */}
+              <div className="absolute -top-1 right-3.5 w-2 h-2 bg-slate-900/95 rotate-45" />
+            </div>
+          </div>
         </div>
       </div>
     </div>

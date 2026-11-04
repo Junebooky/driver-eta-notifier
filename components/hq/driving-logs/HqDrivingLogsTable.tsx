@@ -130,9 +130,27 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
       {/* Table Header: Icon + Title + Count */}
       <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#1E60F3] flex items-center justify-center shrink-0">
-            <FileText className="w-4 h-4" />
+          {/* 운행일지 아이콘 & 마우스 호버 툴팁 */}
+          <div className="group/icon relative flex items-center cursor-help">
+            <img
+              src="/images/icons/driving-logs/icon_driving_log.png"
+              alt="운행일지"
+              className="w-8 h-8 sm:w-9 sm:h-9 object-contain shrink-0 transition-transform duration-200 group-hover/icon:scale-110"
+            />
+
+            {/* 마우스 호버 말풍선 Tooltip */}
+            <div className="absolute left-0 top-full mt-2 hidden group-hover/icon:flex flex-col z-30 w-64 p-2.5 bg-slate-900/95 text-white rounded-xl shadow-xl backdrop-blur-xs pointer-events-none transition-all duration-200 animate-in fade-in zoom-in-95">
+              <div className="flex items-center gap-1.5 font-bold text-blue-300 text-[11px] mb-0.5">
+                <span>📋 운행일지 검수 · 승인</span>
+              </div>
+              <p className="text-slate-300 text-[11px] leading-relaxed font-normal">
+                기사의 실제 운행 기록과 영수증을 대조 검수하고 승인하는 공간이에요.
+              </p>
+              {/* 말풍선 꼬리표 화살표 */}
+              <div className="absolute -top-1 left-3.5 w-2 h-2 bg-slate-900/95 rotate-45" />
+            </div>
           </div>
+
           <h2 className="text-sm font-bold text-slate-900 tracking-tight">운행일지 목록</h2>
           <span className="bg-slate-100 text-slate-500 font-bold px-2 py-0.5 rounded-full text-xs">
             {totalCount}건
@@ -427,8 +445,8 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
                   onPageChange(pageNum);
                 }}
                 className={`w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${isCurrent
-                    ? 'bg-[#1E60F3] text-white shadow-xs'
-                    : 'border border-slate-200 text-slate-600 hover:bg-slate-50'
+                  ? 'bg-[#1E60F3] text-white shadow-xs'
+                  : 'border border-slate-200 text-slate-600 hover:bg-slate-50'
                   }`}
               >
                 {pageNum}
