@@ -1,12 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {typingTimeRemaining,waitForChatTyping} from './reportChatTyping';
-test('typing bubbles stay visible for about two seconds after send, not after server response',async()=>{
- assert.equal(typingTimeRemaining(1000,1000),2000);
- assert.equal(typingTimeRemaining(1000,2350),650);
- assert.equal(typingTimeRemaining(1000,3500),0);
- let elapsed=0;
- await waitForChatTyping(1000,()=>2350,async ms=>{elapsed=ms;});
- assert.equal(elapsed,650);
- await waitForChatTyping(1000,()=>4000,async()=>{throw new Error('must not wait for a slow server');});
+import {BOT_REPLY_TYPING_MS,waitForChatTyping} from './reportChatTyping';
+
+test('bot typing always lasts two seconds after server response regardless of network duration',async()=>{
+ assert.equal(BOT_REPLY_TYPING_MS,2000);
+ let slept=0;
+ await waitForChatTyping(async ms=>{slept=ms;});
+ assert.equal(slept,2000);
+ // Sending may already have taken 15 seconds; no elapsed time before this
+ // call shortens the response animation.
+ slept=0;
+ await waitForChatTyping(async ms=>{slept=ms;});
+ assert.equal(slept,2000);
 });
