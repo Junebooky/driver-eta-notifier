@@ -121,7 +121,10 @@ export function appendKakaoExcelReport(bytes: Uint8Array, draft: KakaoExcelDraft
   const template = [...rows].reverse().find(r => {
     const n = r.getAttribute('r'); return n !== '1' && sheet.cells['B'+n]?.v != null && sheet.cells['D'+n]?.v != null;
   });
-  const styles = new Map(Array.from(template?.getElementsByTagName('c') || []).map(c => [c.getAttribute('r')?.replace(/\d/g,''),c.getAttribute('s')]));
+  const styles = new Map<string,string|null>();
+  for(const c of Array.from(template?.getElementsByTagName('c') || [])){
+    const key=c.getAttribute('r')?.replace(/\d/g,'');if(key)styles.set(key,c.getAttribute('s'));
+  }
   const styleIds=reportRowCellStyles(entries,styles);
   const suffix = normalizedPlate(draft.plate).slice(-4);
   const dateStyle = template ? sheet.cells['A'+template.getAttribute('r')]?.z : undefined;

@@ -1,4 +1,5 @@
 import {DOMParser} from '@xmldom/xmldom';
+type XmlElement = NonNullable<ReturnType<DOMParser['parseFromString']>['documentElement']>;
 import {strFromU8,strToU8} from 'fflate';
 
 /**
@@ -16,7 +17,7 @@ function attribute(tag:string,name:string,value:string){
  if(re.test(tag))return tag.replace(re,name+'="'+value+'"');
  return tag.replace(/\/>$/, ' '+name+'="'+value+'"/>');
 }
-function fontSize(font:Element|undefined){
+function fontSize(font:XmlElement|undefined){
  const size=font?.getElementsByTagName('sz')[0]?.getAttribute('val');
  return size==null?null:Number(size);
 }
@@ -66,7 +67,7 @@ export function reportRowCellStyles(entries:Record<string,Uint8Array>,templateSt
    const cached=fontCache.get(fontKey);
    if(cached!==undefined)newFontId=cached;
    else{
-    const clone=(oldFont?oldFont.cloneNode(true):parsed.createElement('font')) as Element;
+    const clone=(oldFont?oldFont.cloneNode(true):parsed.createElement('font')) as XmlElement;
     let size=clone.getElementsByTagName('sz')[0];
     if(!size){
      size=parsed.createElementNS(clone.namespaceURI,'sz');
@@ -81,7 +82,7 @@ export function reportRowCellStyles(entries:Record<string,Uint8Array>,templateSt
     fontCache.set(fontKey,newFontId);
    }
   }
-  const xf=oldXf.cloneNode(true) as Element;
+  const xf=oldXf.cloneNode(true) as XmlElement;
   xf.setAttribute('fontId',String(newFontId));
   xf.setAttribute('applyFont','1');
   if(wrap){
