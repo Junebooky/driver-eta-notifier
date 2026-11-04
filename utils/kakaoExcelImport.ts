@@ -25,6 +25,8 @@ export interface KakaoExcelParseResult {
   missing: string[];
 }
 
+export const EXCEL_RECORD_YEAR = 2026;
+
 export const EXCEL_COLUMN_LABELS = [
   '날짜', '차량번호', '차종', '거래처', '운전자', '타임',
   '센딩,픽업', '셀프/의전', 'OT Hours', '합계', '결제방법', '합계(부포함)',
@@ -72,11 +74,11 @@ export function checkedTime(value: string): string {
 }
 
 function dateString(src: string, year: number): string {
-  const explicit = src.match(/(20\d{2})\s*년/);
-  const m = src.match(/(?:20\d{2}\s*년\s*)?(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
+  // Only accept the year attached to the report date, not unrelated years in notes.
+  const m = src.match(/(?:(20\d{2})\s*년\s*)?(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
   if (!m) return '';
-  const y = explicit ? Number(explicit[1]) : year;
-  const month = Number(m[1]), day = Number(m[2]);
+  const y = m[1] ? Number(m[1]) : year;
+  const month = Number(m[2]), day = Number(m[3]);
   const date = new Date(Date.UTC(y, month - 1, day));
   if (date.getUTCFullYear() !== y || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return '';
   return [y, String(month).padStart(2, '0'), String(day).padStart(2, '0')].join('-');
@@ -86,9 +88,13 @@ export function parseKakaoExcelReport(raw: string, assumedYear = 2026): KakaoExc
   const src = raw.replace(/\u00a0/g, ' ').replace(/\r/g, '');
   const warnings: string[] = [];
   const ambiguousDate = /\d{1,2}\s*월\s*\d{1,2}\s*일?\s*[~～–—]/.test(src) || /\d\s*(?:일)?\s*[~～–—]\s*(?:\d{1,2}\s*월\s*)?\d/.test(src.split('\n')[0]) || [...src.matchAll(/\d{1,2}\s*월\s*\d{1,2}\s*일/g)].length > 1;
-  const date = ambiguousDate ? '' : dateString(src, assumedYear);
+  const dateHeader = src.match(/(?:(20\d{2})\s*년\s*)?\d{1,2}\s*월\s*\d{1,2}\s*일/);
+  const conflictingYear = Boolean(dateHeader?.[1] && Number(dateHeader[1]) !== assumedYear);
+  const date = ambiguousDate || conflictingYear ? '' : dateString(src, assumedYear);
   if (ambiguousDate) warnings.push('기간 운행 또는 여러 날짜입니다. 임의로 첫날을 선택하지 않았습니다. 확정한 단일 운행 날짜별로 검토해 주세요.');
-  if (date && !/20\d{2}\s*년/.test(src)) warnings.push('보고서에 연도가 없어 ' + assumedYear + '년으로 해석했습니다. 확인해 주세요.');
+  if (conflictingYear) warnings.push('보고서에 적힌 연도가 ' + assumedYear + '년 기록부와 다릅니다. 원문 날짜를 확인해 주세요.');
+  // When year is omitted, the selected company workbook year is authoritative.
+  // Do not show a redundant "assumed year" warning for every daily report.
 
   const plates = [...src.matchAll(/^[\t ]*차량[\t ]*번호[\t ]*[:：][\t ]*(.*?)[\t ]*$/gm)].map(m => m[1]);
   const plate = plates.length === 1 && !/[\/,+·]|및|대체/.test(plates[0]) ? plates[0] : '';
@@ -112,13 +118,17 @@ export function parseKakaoExcelReport(raw: string, assumedYear = 2026): KakaoExc
     const declared = Number(expected[1]) * 60 + Number(expected[2]);
     if (actual !== declared) warnings.push('보고된 운행총시간과 시작·종료시간 계산이 일치하지 않습니다.');
   }
-  // The original Excel G column stores a short route description, not the full
-  // KakaoTalk operational diary. Never guess stop order from inconsistent timestamps.
-  const route = from && to ? from + ' - ' + to : from || to || '';
-  const timeline = src.match(/운행일지\s*\n([\s\S]*?)(?=\n\s*경비지출|$)/i)?.[1] || '';
+  // Route locations are independent of timestamps. Preserve the exact written
+  // stop order even when timeline times contradict one another.
+  const timeline = src.match(/(?:^|\n)[ \t]*운행일지[ \t]*\n([\s\S]*?)(?=\n[ \t]*(?:경비\s*지출|특이\s*사항)(?:[ \t]*[:：]?[ \t]*(?:\n|$))|$)/i)?.[1] || '';
+  const stops = timeline.split(/\s*(?:→|➡|➔|⇒|->)\s*/)
+    .map(part => part.replace(/^\s*\d{1,2}:\d{2}\s*/, '')
+      .replace(/\s*\/\s*(?:업무\s*종료|운행\s*종료|종료)\s*$/, '').trim())
+    .filter(part => part && /[가-힣a-z]/i.test(part) && !/^(?:업무\s*종료|운행\s*종료|종료)$/.test(part));
+  const route = stops.length >= 2 ? stops.join(' → ') : (from && to ? from + ' → ' + to : from || to || '');
   const times = [...timeline.matchAll(/(?:^|[^\d])(\d{1,2}):(\d{2})(?=[^\d]|$)/g)].map(m => Number(m[1]) * 60 + Number(m[2]));
   if (times.some((v, i) => i > 0 && v < times[i - 1])) {
-    warnings.push('운행일지의 경유시간 순서가 맞지 않아 Excel 경로에는 출발지·최종도착지만 넣었습니다.');
+    warnings.push('경유시간의 앞뒤 순서가 맞지 않습니다. 경유지는 원문 순서대로 모두 추출했으며, 경유시간은 Excel 경로에 반영하지 않았습니다.');
   }
   if (!getLine(src, '고객명')) warnings.push('거래처가 없으며, 임의로 고객사를 생성하지 않습니다.');
   const draft: KakaoExcelDraft = {
@@ -136,7 +146,8 @@ export function parseKakaoExcelReport(raw: string, assumedYear = 2026): KakaoExc
 
 export function validateKakaoExcelDraft(draft: KakaoExcelDraft): string[] {
   const errors: string[] = [];
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.date) || dateString(draft.date.replace(/(\d{4})-(\d\d)-(\d\d)/, '$1년 $2월 $3일'), 2026) !== draft.date) errors.push('운행 날짜를 올바르게 입력해 주세요.');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.date) || dateString(draft.date.replace(/(\d{4})-(\d\d)-(\d\d)/, '$1년 $2월 $3일'), EXCEL_RECORD_YEAR) !== draft.date) errors.push('운행 날짜를 올바르게 입력해 주세요.');
+  else if (!draft.date.startsWith(EXCEL_RECORD_YEAR + '-')) errors.push(EXCEL_RECORD_YEAR + '년 회사 기록부에는 해당 연도 날짜만 입력할 수 있습니다.');
   if (!draft.plate.trim() || !draft.model.trim() || !draft.customer.trim() || !draft.driver.trim()) errors.push('차량번호, 차종, 거래처, 운전자는 필수입니다.');
   const timeParts = draft.time.match(/^(?:\d+(?:\.\d+)?\()?([0-4]?\d:[0-5]\d)~([0-4]?\d:[0-5]\d)\)?$/);
   if (!timeParts || !checkedTime(timeParts[1]) || !checkedTime(timeParts[2]) || checkedTime(timeParts[2]) <= checkedTime(timeParts[1]) || draft.time.includes('(') !== draft.time.endsWith(')')) errors.push('타임은 09:15~17:20 또는 11(13:20~24:20) 형식으로 입력하고 익일은 24시 이상으로 확인해 주세요.');

@@ -20,7 +20,8 @@ test('Kakao report reads only workbook fields, never sums expense as sale',()=>{
   assert.equal(draft.customer,'샤넬');
   assert.equal(draft.driver,'윤태준');
   assert.equal(draft.time,'09:15~17:20');
-  assert.equal(draft.route,'안다즈 호텔 - 차고지');
+  assert.equal(draft.route,'안다즈 호텔 → 서울 옥션 → 김포공항 → 안다즈 호텔 → 김포공항 → 차고지');
+  assert.ok(!warnings.some(x => x.includes('연도가 없어')));
   assert.equal(draft.overtime,'');
   assert.equal(draft.amount,'');
   assert.equal(draft.totalWithVat,'');
@@ -55,4 +56,50 @@ test('Periods and multiple plates require explicit review; overnight is never si
   assert.deepEqual(validateKakaoExcelDraft({...draft,time:'11(13:20~24:20)'}),[]);
   assert.deepEqual(validateKakaoExcelDraft({...draft,time:'17:30~24:20'}),[]);
   for (const time of ['25:99~26:00','09:15~09:15','17:30~00:20','48:00~49:00','11(13:20~24:20']) assert.ok(validateKakaoExcelDraft({...draft,time}).length);
+});
+
+
+test('2026 is implicit and all Kakao waypoints survive contradictory stop times', () => {
+  const sample = [
+    '10월 24일(토)',
+    '수행담당 : 윤태준',
+    '차량번호 : 700호 1458',
+    '출\u00a0    근 : 9:15',
+    '고객명 : 샤넬',
+    '출발지 : 안다즈 호텔',
+    '최종도착지 : 차고지',
+    '시작   시간 : 09:15',
+    '종료   시간 : 17:20',
+    '운행일지',
+    '안다즈 호텔 → 09:15 서울 옥션 → 16:00 김포공항 → 14:30 안다즈 호텔 → 17:20 김포공항 / 업무종료 → 16:00 차고지',
+    '경비지출\u00a0',
+    '합계 : 50,900원',
+    '특이사항',
+  ].join('\n');
+  const {draft,warnings,missing}=parseKakaoExcelReport(sample);
+  assert.equal(draft.date,'2026-10-24');
+  assert.equal(draft.driver,'윤태준');
+  assert.deepEqual(missing,[]);
+  assert.equal(draft.route,'안다즈 호텔 → 서울 옥션 → 김포공항 → 안다즈 호텔 → 김포공항 → 차고지');
+  assert.ok(warnings.some(w => w.includes('경유시간')));
+  assert.ok(!warnings.some(w => w.includes('연도가 없어')));
+  assert.ok(!draft.route.includes('업무종료'));
+  assert.ok(!draft.route.includes('경비지출'));
+  assert.equal(draft.amount,'');
+});
+
+test('A stated year different from 2026 cannot be silently saved to the 2026 workbook', () => {
+  const mismatch=parseKakaoExcelReport(input.replace('10월 24일(토)','2025년 10월 24일(금)'));
+  assert.equal(mismatch.draft.date,'');
+  assert.ok(mismatch.warnings.some(w => w.includes('연도')));
+  const draft=parseKakaoExcelReport(input).draft;
+  assert.ok(validateKakaoExcelDraft({...draft,date:'2027-10-24'}).some(e=>e.includes('2026년')));
+});
+
+test('ASCII arrows in a single diary still retain each place in written order', () => {
+  const {draft}=parseKakaoExcelReport(input.replace(
+    '안다즈 호텔 → 09:15 서울 옥션 → 16:00 김포공항 → 14:30 안다즈 호텔 → 17:20 김포공항 / 업무종료 → 16:00 차고지',
+    '안다즈 호텔 -> 09:15 서울 옥션 -> 16:00 김포공항 -> 17:20 차고지'
+  ));
+  assert.equal(draft.route,'안다즈 호텔 → 서울 옥션 → 김포공항 → 차고지');
 });
