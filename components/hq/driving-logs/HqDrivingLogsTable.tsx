@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import {
   FileText,
   Clock,
-  Check,
   CheckCircle2,
   AlertTriangle,
   XCircle,
@@ -160,10 +159,15 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
                 haptics.selection();
                 onSelectStatus?.('전체');
               }}
-              className={`flex items-center gap-1 transition-colors cursor-pointer ${selectedStatus === '전체' ? 'text-[#1E60F3] font-bold' : 'hover:text-slate-800'
+              className={`flex items-center gap-1.5 transition-colors cursor-pointer ${selectedStatus === '전체' ? 'text-[#1E60F3] font-bold' : 'hover:text-slate-800'
                 }`}
               title="전체 운행일지 보기"
             >
+              <img
+                src="/images/icons/icon_submitted_today.png"
+                alt="오늘 제출"
+                className="w-3.5 h-3.5 object-contain shrink-0"
+              />
               <span>오늘 제출 <strong className="text-slate-700 font-bold">{kpiCounts.totalToday}</strong></span>
             </button>
             <button
@@ -172,11 +176,15 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
                 haptics.selection();
                 onSelectStatus?.(selectedStatus === '검토 대기' ? '전체' : '검토 대기');
               }}
-              className={`flex items-center gap-1 transition-colors cursor-pointer ${selectedStatus === '검토 대기' ? 'text-[#1E60F3] font-bold' : 'hover:text-slate-800'
+              className={`flex items-center gap-1.5 transition-colors cursor-pointer ${selectedStatus === '검토 대기' ? 'text-[#1E60F3] font-bold' : 'hover:text-slate-800'
                 }`}
               title="검토 대기 필터"
             >
-              <Clock className="w-3.5 h-3.5 text-slate-400" />
+              <img
+                src="/images/icons/icon_review_pending.png"
+                alt="검토 대기"
+                className="w-3.5 h-3.5 object-contain shrink-0"
+              />
               <span>검토 대기 <strong className="text-slate-700 font-bold">{kpiCounts.pending}</strong></span>
             </button>
             <button
@@ -185,11 +193,15 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
                 haptics.selection();
                 onSelectStatus?.(selectedStatus === '승인 완료' ? '전체' : '승인 완료');
               }}
-              className={`flex items-center gap-1 transition-colors cursor-pointer ${selectedStatus === '승인 완료' ? 'text-emerald-600 font-bold' : 'hover:text-slate-800'
+              className={`flex items-center gap-1.5 transition-colors cursor-pointer ${selectedStatus === '승인 완료' ? 'text-emerald-600 font-bold' : 'hover:text-slate-800'
                 }`}
               title="승인 완료 필터"
             >
-              <Check className="w-3.5 h-3.5 text-slate-400" />
+              <img
+                src="/images/icons/icon_approved.png"
+                alt="승인 완료"
+                className="w-3.5 h-3.5 object-contain shrink-0"
+              />
               <span>승인 완료 <strong className="text-slate-700 font-bold">{kpiCounts.approved}</strong></span>
             </button>
             <button
@@ -198,11 +210,15 @@ export const HqDrivingLogsTable: React.FC<HqDrivingLogsTableProps> = ({
                 haptics.selection();
                 onSelectStatus?.(selectedStatus === '보완 필요' ? '전체' : '보완 필요');
               }}
-              className={`flex items-center gap-1 transition-colors cursor-pointer ${selectedStatus === '보완 필요' || selectedStatus === '반려' ? 'text-rose-600 font-bold' : 'hover:text-slate-800'
+              className={`flex items-center gap-1.5 transition-colors cursor-pointer ${selectedStatus === '보완 필요' || selectedStatus === '반려' ? 'text-rose-600 font-bold' : 'hover:text-slate-800'
                 }`}
               title="보완 필요/반려 필터"
             >
-              <AlertTriangle className="w-3.5 h-3.5 text-slate-400" />
+              <img
+                src="/images/icons/icon_revision_needed.png"
+                alt="보완 필요"
+                className="w-3.5 h-3.5 object-contain shrink-0"
+              />
               <span>보완 필요 <strong className="text-slate-700 font-bold">{kpiCounts.revision}</strong></span>
             </button>
           </div>
