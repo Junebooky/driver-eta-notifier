@@ -58,7 +58,7 @@ test('Mixed manual + managed November records sort together, moving whole rows a
  assert.equal(sheet.cells.D3.v,'기존 수기');
  const result=unzipSync(sorted.bytes);
  assert.match(strFromU8(result[path]),/<c r="M3" t="inlineStr">/);
- assert.match(strFromU8(result[path]),/<c r="L113"><f>SUM\(J2:J112\)\*1\.1<\/f>/);
+ assert.match(strFromU8(result[path]),/<c r="L113"[^>]*><f>SUM\(J2:J112\)\*1\.1<\/f>/);
  for(const name of Object.keys(originalOther))if(name!==path)assert.deepEqual(result[name],originalOther[name]);
 });
 test('Manual-only rows can be sorted without manifest UUID moves and original file is immutable',()=>{
