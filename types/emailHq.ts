@@ -117,6 +117,8 @@ export interface HqEmailExtractedDraft {
   flightNumber: string;
   requestedVehicleClass: string;
   specialRequests: string;
+  /** Operator-approved language requirement, independent of free-text notes. */
+  requestedLanguage?: 'ko' | 'en';
   tripType: EmailTripType;
   groupTrips?: HqGroupTripItem[];
   confidence: number; // 0 to 1
