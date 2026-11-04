@@ -744,11 +744,22 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
       {/* Live Connection / IMAP Status Banner */}
       <div className="bg-white rounded-2xl border border-slate-200/80 px-4 py-3 shadow-xs flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
-          <img
-            src="/images/icons/icon_naver.png"
-            alt="Naver"
-            className="w-8 h-8 sm:w-8 sm:h-8 object-contain shrink-0"
-          />
+          <div className="relative group/naver flex items-center">
+            <img
+              src="/images/icons/icon_naver.png"
+              alt="네이버 메일"
+              className="w-8 h-8 sm:w-8 sm:h-8 object-contain shrink-0 transition-transform duration-150 group-hover/naver:scale-110 cursor-pointer"
+            />
+
+            {/* Hover Tooltip: 실제 네이버 이메일 강조 */}
+            <div className="absolute top-full left-0 pt-2 hidden group-hover/naver:flex flex-col items-start pointer-events-none z-50">
+              <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 ml-3 shadow-xs" />
+              <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#03C75A] inline-block animate-pulse" />
+                실제 네이버 이메일
+              </span>
+            </div>
+          </div>
           <span className="text-xs font-bold text-slate-600 truncate">
             동기화: {imapState.lastSync || '방금 전'}
           </span>
@@ -787,14 +798,26 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
         <div className="w-full md:w-80 lg:w-[320px] xl:w-[340px] shrink-0 bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden flex flex-col min-h-[700px] md:sticky md:top-20">
           {/* Header Row */}
           <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white">
-            <div className="flex items-center gap-2">
-              <Mail className="w-4 h-4 text-[#0050FF]" />
+            <div className="relative group/email flex items-center gap-2 cursor-pointer">
+              <img
+                src="/images/icons/eemail/icon_email.png"
+                alt="이메일 아이콘"
+                className="w-7 h-7 object-contain shrink-0 transition-transform duration-150 group-hover/email:scale-110"
+              />
               <h2 className="text-sm font-extrabold text-slate-900">
                 이메일
               </h2>
               <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-600">
                 {counts.total}
               </span>
+
+              {/* Hover Tooltip: 최상단 내브바와 동일한 블랙 말풍선 규격 */}
+              <div className="absolute top-full left-0 pt-2 hidden group-hover/email:flex flex-col items-start pointer-events-none z-50">
+                <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 ml-[10px] shadow-xs" />
+                <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+                  실제 관리자님에게 온 이메일 목록이에요
+                </span>
+              </div>
             </div>
             <button
               type="button"
@@ -830,22 +853,20 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                     haptics.selection();
                     setStatusFilter(tab.id);
                   }}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1 ${
-                    isSelected
-                      ? 'bg-[#0050FF] text-white shadow-2xs'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1 ${isSelected
+                    ? 'bg-[#0050FF] text-white shadow-2xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
                 >
                   <span>{tab.label}</span>
                   {tab.count !== undefined && (
                     <span
-                      className={`text-[11px] ${
-                        isSelected
-                          ? 'text-white/90 font-black'
-                          : tab.count === 0
+                      className={`text-[11px] ${isSelected
+                        ? 'text-white/90 font-black'
+                        : tab.count === 0
                           ? 'text-slate-400 font-medium'
                           : 'text-slate-500 font-extrabold'
-                      }`}
+                        }`}
                     >
                       {tab.count}
                     </span>
@@ -911,8 +932,8 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                     key={item.id}
                     onClick={() => handleSelectEmail(item.id)}
                     className={`p-3.5 transition-all cursor-pointer relative group ${isSelected
-                        ? 'bg-blue-50/90 border-l-4 border-l-[#1E60F3] shadow-2xs'
-                        : 'hover:bg-slate-50 border-l-4 border-l-transparent'
+                      ? 'bg-blue-50/90 border-l-4 border-l-[#1E60F3] shadow-2xs'
+                      : 'hover:bg-slate-50 border-l-4 border-l-transparent'
                       }`}
                   >
                     <div className="flex items-start gap-3">
@@ -925,8 +946,8 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                         <div className="flex items-center justify-between gap-1">
                           <span
                             className={`text-xs truncate ${isSelected
-                                ? 'font-black text-[#0B1E48]'
-                                : 'font-extrabold text-slate-800'
+                              ? 'font-black text-[#0B1E48]'
+                              : 'font-extrabold text-slate-800'
                               }`}
                           >
                             {item.from.name || item.from.address}
@@ -938,8 +959,8 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
 
                         <h4
                           className={`text-xs mt-0.5 line-clamp-1 leading-snug ${isSelected
-                              ? 'font-extrabold text-blue-950'
-                              : 'font-semibold text-slate-700'
+                            ? 'font-extrabold text-blue-950'
+                            : 'font-semibold text-slate-700'
                             }`}
                         >
                           {item.subject}
