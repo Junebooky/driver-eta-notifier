@@ -2,6 +2,8 @@
 import {useEffect,useRef,useState} from 'react';
 import {ArrowLeft,Plus,RefreshCw} from 'lucide-react';
 import {VipChatAvatar} from '@/components/driver-reports/VipChatAvatar';
+import {ChatTypingBubble} from '@/components/driver-reports/ChatTypingBubble';
+import {waitForChatTyping} from '@/utils/reportChatTyping';
 import {useChatViewport} from '@/components/driver-reports/useChatViewport';
 import {buildDriverReportTemplate} from '@/utils/reportChatTemplate';
 import {ReportServicePicker} from '@/components/driver-reports/ReportServicePicker';
@@ -18,6 +20,7 @@ const showDay=(date:string)=>new Intl.DateTimeFormat('ko-KR',{timeZone:'Asia/Seo
 export function SharedReportPage(){
  const [token,setToken]=useState(''),[ready,setReady]=useState(false);
  const [draft,setDraft]=useState(''),[items,setItems]=useState<LocalMessage[]>([]);
+ const [pendingVisual,setPendingVisual]=useState<{id:string;body:string;at:string}|null>(null);
  const [serviceType,setServiceType]=useState<ReportServiceType|null>(null);
  const [reportActive,setReportActive]=useState(true);
  const [error,setError]=useState(''),[busy,setBusy]=useState(false),[templates,setTemplates]=useState(false);
@@ -39,7 +42,7 @@ export function SharedReportPage(){
    setReady(true);
   });
  },[]);
- useEffect(()=>{const view=scroller.current;if(view)view.scrollTop=view.scrollHeight;},[items,error,serviceType]);
+ useEffect(()=>{const view=scroller.current;if(view)view.scrollTop=view.scrollHeight;},[items,pendingVisual,error,serviceType]);
  useEffect(()=>{if(input.current){input.current.style.height='auto';input.current.style.height=Math.min(176,input.current.scrollHeight)+'px';}},[draft]);
  function template(){
   const reportDate=today();
@@ -54,6 +57,8 @@ export function SharedReportPage(){
   const item=pending.current||{id:crypto.randomUUID(),body:draft.trim(),serviceType};
   pending.current=item;
   setBusy(true);setError('');
+  const typingStarted=Date.now();
+  setPendingVisual({id:item.id,body:item.body,at:new Date().toISOString()});
   try{
    const response=await fetch('/api/public-report',{
     method:'POST',headers:{'Content-Type':'application/json'},
@@ -61,6 +66,7 @@ export function SharedReportPage(){
    });
    const data=await response.json();
    if(!response.ok)throw new Error(data.error||'보고를 전송하지 못했습니다.');
+   await waitForChatTyping(typingStarted);
    setItems(prev=>[...prev,{id:item.id,body:item.body,at:new Date().toISOString(),reply:data.reply||'운행보고 잘 받았습니다. 감사합니다 ^.^'}]);
    setDraft('');pending.current=null;
    if(data.accepted){
@@ -70,7 +76,7 @@ export function SharedReportPage(){
     try{sessionStorage.setItem(COMPLETED_KEY,token);}catch{/* Optional session state. */}
    }
   }catch(e){setError(e instanceof Error?e.message:'연결을 확인하고 다시 보내 주세요.');}
-  finally{setBusy(false);input.current?.focus();}
+  finally{setPendingVisual(null);setBusy(false);input.current?.focus();}
  }
  function startNextReport(){
   setReportActive(true);setServiceType(null);setTemplates(false);setError('');
@@ -110,6 +116,15 @@ export function SharedReportPage(){
      </div>
     </div>
    </div>)}
+   {pendingVisual&&<div className="space-y-3">
+    <div className="flex justify-end">
+     <div className="flex max-w-[88%] min-w-0 flex-row-reverse items-end gap-1.5">
+      <div className="min-w-0 whitespace-pre-wrap break-words rounded-[10px] rounded-tr-[3px] bg-[#FEE500] px-3 py-2.5 text-[14px] leading-[1.55]">{pendingVisual.body}</div>
+      <time dateTime={pendingVisual.at} className="mb-0.5 shrink-0 text-[10px] text-[#566B7C]">{showTime(pendingVisual.at)}</time>
+     </div>
+    </div>
+    <ChatTypingBubble/>
+   </div>}
    {ready&&token&&reportActive&&<ReportServicePicker value={serviceType} onChange={v=>{setServiceType(v);pending.current=null;setError('');}}/>}
   </section>
   {error&&<div role="status" className="flex items-center gap-2 bg-white/90 px-4 py-2.5 text-xs leading-5 text-[#59646D]"><span className="flex-1">{error}</span><button type="button" aria-label="오류 안내 닫기" onClick={()=>setError('')}><RefreshCw size={15}/></button></div>}
