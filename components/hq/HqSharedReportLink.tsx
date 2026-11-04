@@ -2,7 +2,6 @@
 
 import {useCallback,useEffect,useState} from 'react';
 import {Check,Copy,Plus,ShieldCheck,AlertCircle,ChevronDown,ChevronUp} from 'lucide-react';
-import {HqExcelSectionIcon} from './HqExcelSectionIcon';
 
 type LinkStatus={
  ok:boolean;
@@ -87,75 +86,91 @@ export function HqSharedReportLink(){
  }
 
  const locked=busy;
- return <section aria-label="공용 운행 링크" className="w-full min-w-0 rounded-[24px] border border-[#E4EAF3] bg-white p-4 shadow-[0_10px_36px_rgba(54,78,115,0.06)] sm:p-6">
-  <button type="button" aria-expanded={expanded} aria-controls="hq-shared-link-details" onClick={()=>setExpanded(value=>!value)}
-   className="flex min-h-16 w-full min-w-0 items-center gap-3 rounded-2xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B7CBFC] sm:gap-4">
-   <HqExcelSectionIcon src="/images/icons/excel/icon_link.png" label="공용 운행 링크"/>
-   <span className="min-w-0 flex-1">
-    <span className="block font-bold text-slate-800">공용 운행 링크</span>
-    <span className="mt-1 block text-[12px] text-[#7A879A] sm:text-sm">{state?.active?'발급된 링크 사용 중 · 필요할 때 펼쳐서 관리하세요.':'링크로 운행보고를 간편하게 받아보세요.'}</span>
-   </span>
-   <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#E6ECF5] bg-[#F7F9FC] text-[#70819A]">{expanded?<ChevronUp size={18}/>:<ChevronDown size={18}/>}</span>
-  </button>
-  {expanded&&<div id="hq-shared-link-details" className="mt-4 space-y-5 border-t border-[#EDF1F7] pt-4 sm:space-y-6">
-
-  <p className="text-[13px] leading-[1.85] text-[#66748C] sm:text-[14px]">
-   기사 계정 없이 링크만 열면 보고를 제출할 수 있어요.
-   외부에 공유됐다면 새 링크를 발급해 주세요. 이전 링크는 자동 해제됩니다.
-  </p>
-
-  <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
-   <button type="button" disabled={locked} onClick={()=>void act('issue')}
-    className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl bg-[#1E60F3] px-6 py-3 text-[14px] font-semibold text-white shadow-[0_4px_12px_rgba(30,96,243,0.14)] transition-colors hover:bg-[#1A56DD] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#95B5FF] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">
-    <Plus size={19} strokeWidth={2.1}/>새 링크 발급
+ return <section aria-label="공용 운행 링크 관리" className="w-full min-w-0">
+  <div className="flex flex-wrap items-center justify-between gap-2.5">
+   <button type="button" aria-expanded={expanded} aria-controls="hq-shared-link-details" onClick={()=>setExpanded(value=>!value)}
+    className="group inline-flex h-9 items-center gap-2 rounded-full border border-slate-200/90 bg-white px-3.5 text-[13px] font-semibold text-slate-700 shadow-2xs transition-all hover:bg-slate-50 hover:border-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/30">
+    <span className="text-[13px]">🔗</span>
+    <span>공용 운행 링크 관리</span>
+    {state?.active ? (
+     <span className="inline-flex items-center gap-1 pl-1 text-[11px] font-medium text-emerald-600">
+      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"/>
+      사용 가능
+     </span>
+    ) : (
+     <span className="inline-flex items-center gap-1 pl-1 text-[11px] font-medium text-slate-400">
+      미발급
+     </span>
+    )}
+    <span className="text-slate-400 transition-transform duration-150 group-hover:text-slate-600">
+     {expanded?<ChevronUp size={14}/>:<ChevronDown size={14}/>}
+    </span>
    </button>
+
+   {link&&!expanded&&(
+    <button type="button" onClick={()=>void copy()}
+     className="inline-flex h-9 items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50/70 px-3.5 text-[12px] font-semibold text-[#1E60F3] shadow-2xs transition-all hover:bg-blue-100/70 active:scale-95">
+     <Copy size={13}/>
+     <span>링크 복사</span>
+    </button>
+   )}
   </div>
 
-  <p className="text-[13px] leading-6 text-[#6C7890]" role="status">
-   <span className="mr-3 font-medium text-[#718099]">상태</span>
-   <span className="font-semibold text-[#465775]">{state?(state.active?'사용 가능':'미발급 또는 만료'):'확인 중'}</span>
-   {state?.active&&state.expiresAt&&<span className="ml-2">· 만료 {formatExpiry(state.expiresAt)}</span>}
-  </p>
-
-  {link&&<div className="min-w-0 space-y-4 rounded-[20px] bg-[#F3F6FC] p-4 sm:p-6">
-   <div className="flex flex-wrap items-start justify-between gap-3">
+  {expanded&&<div id="hq-shared-link-details" className="mt-3 space-y-4 rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs">
+   <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
     <div>
-     <h3 className="text-[16px] font-semibold tracking-[-0.025em] text-[#2B3953]">발급된 링크</h3>
-     <p className="mt-1 text-[13px] text-[#7A879A]">필요할 때 언제든 다시 복사할 수 있어요.</p>
+     <h3 className="text-[15px] font-bold text-slate-800">공용 운행 링크</h3>
+     <p className="mt-0.5 text-xs text-slate-500">기사 계정 없이 링크만 열면 보고를 제출할 수 있어요.</p>
     </div>
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E6EEFC] px-3 py-1.5 text-[12px] font-medium text-[#1E60F3]">
-     <ShieldCheck size={15}/>보안 링크
-    </span>
+    <div className="flex items-center gap-2">
+     <button type="button" disabled={locked} onClick={()=>void act('issue')}
+      className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-[#1E60F3] px-3.5 text-[13px] font-semibold text-white shadow-xs transition-colors hover:bg-[#1A56DD] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#95B5FF] disabled:opacity-50">
+      <Plus size={15}/>새 링크 발급
+     </button>
+    </div>
    </div>
-   <label htmlFor="hq-shared-report-link" className="sr-only">발급된 운행보고 주소</label>
-   <input id="hq-shared-report-link" aria-label="발급된 운행보고 주소" readOnly value={link}
-    onFocus={event=>event.currentTarget.select()}
-    className="block h-12 w-full min-w-0 rounded-[14px] border border-[#DEE6F1] bg-white px-4 text-[15px] text-[#45546C] outline-none focus:border-[#B6CAF2] focus:ring-2 focus:ring-[#D9E6FE]"/>
-   <button type="button" onClick={()=>void copy()}
-    className="inline-flex min-h-10 items-center gap-2 rounded-xl px-1 text-[14px] font-semibold text-[#1E60F3] transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#B7CBFC]">
-    <Copy size={18}/>링크 복사
-   </button>
-  </div>}
 
+   <p className="text-xs text-slate-500" role="status">
+    <span className="mr-2 font-medium text-slate-400">상태</span>
+    <span className="font-semibold text-slate-700">{state?(state.active?'사용 가능':'미발급 또는 만료'):'확인 중'}</span>
+    {state?.active&&state.expiresAt&&<span className="ml-2">· 만료 {formatExpiry(state.expiresAt)}</span>}
+   </p>
 
-  {state?.active&&state.needsRecovery&&!link&&<div className="min-w-0 space-y-3 rounded-[20px] bg-[#F3F6FC] p-4 sm:p-5">
-   <p className="text-sm font-semibold text-[#465775]">기존 링크를 다시 표시할 수 있어요</p>
-   <p className="text-[13px] leading-6 text-[#77869A]">이전에 발급한 주소는 원문을 저장하지 않았어요. 기존에 공유했던 링크를 아래에 붙여넣으면 다시 확인할 수 있어요. 원문을 찾을 수 없다면 새 링크를 발급해 주세요.</p>
-   <form onSubmit={event=>{event.preventDefault();void act('remember');}} className="flex min-w-0 flex-col gap-2 sm:flex-row">
-    <input aria-label="기존 운행보고 링크 붙여넣기" value={recoveryInput} onChange={event=>setRecoveryInput(event.target.value)}
-     placeholder="기존 링크 주소를 붙여넣어 주세요" className="h-11 min-w-0 flex-1 rounded-xl border border-[#DFE7F1] bg-white px-3 text-[14px] text-[#465775] outline-none focus:border-[#1E60F3]"/>
-    <button type="submit" disabled={locked||!recoveryInput.trim()} className={subtleButton}>기존 링크 보관</button>
-   </form>
-  </div>}
+   {link&&<div className="space-y-3 rounded-xl bg-slate-50 p-3.5">
+    <div className="flex items-center justify-between gap-2">
+     <span className="text-xs font-semibold text-slate-700">발급된 링크</span>
+     <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-medium text-[#1E60F3]">
+      <ShieldCheck size={13}/>보안 링크
+     </span>
+    </div>
+    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+     <input id="hq-shared-report-link" aria-label="발급된 운행보고 주소" readOnly value={link}
+      onFocus={event=>event.currentTarget.select()}
+      className="h-10 flex-1 min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-700 outline-none focus:border-[#1E60F3]"/>
+     <button type="button" onClick={()=>void copy()}
+      className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-white border border-slate-200 px-3.5 text-xs font-semibold text-[#1E60F3] shadow-2xs hover:bg-slate-50">
+      <Copy size={14}/>링크 복사
+     </button>
+    </div>
+   </div>}
 
+   {state?.active&&state.needsRecovery&&!link&&<div className="space-y-2 rounded-xl bg-slate-50 p-3.5 text-xs text-slate-600">
+    <p className="font-semibold text-slate-700">기존 링크 복원</p>
+    <p className="text-[12px] text-slate-500 leading-relaxed">이전에 발급한 링크를 아래에 붙여넣으면 다시 확인할 수 있어요.</p>
+    <form onSubmit={event=>{event.preventDefault();void act('remember');}} className="flex gap-2">
+     <input aria-label="기존 운행보고 링크 붙여넣기" value={recoveryInput} onChange={event=>setRecoveryInput(event.target.value)}
+      placeholder="기존 링크 주소를 붙여넣어 주세요" className="h-9 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-700 outline-none focus:border-[#1E60F3]"/>
+     <button type="submit" disabled={locked||!recoveryInput.trim()} className={subtleButton+' min-h-9 px-3 py-1.5 text-xs'}>보관</button>
+    </form>
+   </div>}
   </div>}
 
   {notice&&<div role="status" aria-live="polite"
-   className="flex min-w-0 items-center gap-3 rounded-2xl bg-[#F1F5FC] px-4 py-3.5 text-[13px] leading-6 text-[#596981] sm:text-[14px]">
-   <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#E1EAFB] text-[#1E60F3]">
-    {notice.kind==='success'?<Check size={16} strokeWidth={2.3}/>:<AlertCircle size={15} strokeWidth={1.9}/>}
+   className="mt-2.5 flex items-center gap-2.5 rounded-xl bg-blue-50 px-3.5 py-2.5 text-xs text-slate-700">
+   <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[#1E60F3]">
+    {notice.kind==='success'?<Check size={12} strokeWidth={2.5}/>:<AlertCircle size={12} strokeWidth={2}/>}
    </span>
-   <span className="min-w-0 flex-1">{notice.text}</span>
+   <span className="flex-1">{notice.text}</span>
   </div>}
  </section>;
 }

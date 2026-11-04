@@ -1,6 +1,6 @@
 'use client';
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {Upload,Download,RefreshCw,History,ArrowRight,Check,FileSpreadsheet} from 'lucide-react';
+import {Upload,Download,RefreshCw,History,ArrowRight,Check,Search} from 'lucide-react';
 import {HqExcelSectionIcon} from './HqExcelSectionIcon';
 import {HqExcelWorkbookView} from './HqExcelWorkbookView';
 import type {DriverReportSubmission,ReportChatMessage} from '@/types/driverReportChat';
@@ -59,11 +59,22 @@ export function HqDriverReportInbox() {
  async function action(body:unknown){setBusy(true);try{await json('/api/hq/driver-reports',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});await refresh();setSelected(null);setIsExpanded(false);setMessage('처리 결과를 갱신했습니다.');}catch(e){setMessage((e as Error).message);}finally{setBusy(false);}}
  const btn='inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 disabled:opacity-40';
  async function older(){try{const r=await json('/api/hq/driver-reports?before='+reports[reports.length-1]?.seq);setReports(p=>[...p,...r.submissions.filter((s:DriverReportSubmission)=>!p.some(a=>a.id===s.id))]);setMore(r.hasMore);}catch(e){setMessage((e as Error).message);}}
- return <section aria-label="기사 운행보고 자동 누적" className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
-  <div className="flex flex-wrap items-start gap-3"><HqExcelSectionIcon src="/images/icons/excel/icon_kakao.png" label="기사 운행보고" count={unreadIds.length}/><div className="flex-1"><h2 className="font-bold text-slate-800">기사 운행보고 · 자동 누적</h2><p className="mt-1 text-sm text-slate-500">기사 대화방에서 접수한 보고와 회사 Excel 작업본을 관리합니다.</p></div><div className="flex shrink-0 items-center gap-2"><span role="status" aria-live="polite" className="text-[12px] text-[#72829A]">{refreshComplete?'업데이트됨':''}</span><button type="button" aria-label="제출 현황 새로고침" title="보고·Excel·미열람 현황 다시 불러오기" disabled={busy||refreshing} onClick={()=>void manualRefresh()} className={btn+' min-h-10 min-w-10'}>{refreshComplete?<Check size={16} className="text-[#1E60F3]"/>:<RefreshCw size={16} className={refreshing?'animate-spin':''}/>}</button></div></div>
-  <div className="flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 p-4">
-   <div className="mr-auto min-w-0"><p className="flex items-center gap-2 text-xs text-slate-400"><FileSpreadsheet size={15} className="shrink-0 text-[#6A83A7]"/>회사 Excel 작업본</p><p className="mt-1 flex min-w-0 items-start gap-2 text-sm font-semibold text-slate-700"><FileSpreadsheet size={16} className="mt-0.5 shrink-0 text-[#6A83A7]"/><span className="min-w-0 break-all">{workbook?.filename||'등록된 원본이 없습니다'}</span></p></div>
-   {!workbook&&<button disabled={busy} onClick={()=>file.current?.click()} className={btn}><Upload size={16}/>원본 등록</button>}{workbook&&<a className={btn+' hq-excel-download-lift min-h-11 w-full sm:w-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/40 active:bg-[#EFF4FF]'} href={'/api/hq/report-workbook?download=1&year='+workbook.year}><Download size={16}/>최신 Excel</a>}
+ return <section aria-label="기사 운행보고 자동 누적" className="space-y-4 rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6 shadow-xs">
+  <div className="flex flex-wrap items-start gap-3"><HqExcelSectionIcon src="/images/icons/excel/icon_kakao.png" label="실시간 운행보고" count={unreadIds.length}/><div className="flex-1"><h2 className="text-lg sm:text-xl font-bold tracking-tight text-slate-800">실시간 운행보고</h2><p className="mt-1 text-sm text-slate-500">카카오톡 보고를 분석해 엑셀 기록부에 실시간으로 동기화해요.</p></div><div className="flex shrink-0 items-center gap-2"><span role="status" aria-live="polite" className="text-[12px] text-[#72829A]">{refreshComplete?'업데이트됨':''}</span><button type="button" aria-label="제출 현황 새로고침" title="보고·Excel·미열람 현황 다시 불러오기" disabled={busy||refreshing} onClick={()=>void manualRefresh()} className={btn+' min-h-10 min-w-10'}>{refreshComplete?<Check size={16} className="text-[#1E60F3]"/>:<RefreshCw size={16} className={refreshing?'animate-spin':''}/>}</button></div></div>
+  <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 p-3.5 sm:p-4">
+   <div className="flex min-w-0 items-center gap-3 sm:gap-3.5">
+    <div className="relative flex h-11 w-11 shrink-0 items-center justify-center sm:h-12 sm:w-12">
+     <img src="/images/icons/excel/icon_excel_v02.png" alt="Excel" draggable={false} className="h-full w-full select-none object-contain drop-shadow-sm"/>
+    </div>
+    <div className="min-w-0">
+     <p className="text-[12px] font-medium text-slate-400">동기화 중인 엑셀</p>
+     <p className="mt-0.5 truncate text-[14px] font-bold text-slate-800 tracking-tight sm:text-[15px]">{workbook?.filename||'등록된 원본이 없습니다'}</p>
+    </div>
+   </div>
+   <div className="flex shrink-0 items-center gap-2">
+    {!workbook&&<button disabled={busy} onClick={()=>file.current?.click()} className={btn+' h-10'}><Upload size={15}/>원본 등록</button>}
+    {workbook&&<a className="hq-excel-download-lift inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[13px] font-semibold text-slate-700 shadow-2xs transition-all hover:bg-slate-50 hover:border-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/30 active:bg-slate-100" href={'/api/hq/report-workbook?download=1&year='+workbook.year}><Download size={15} className="text-slate-500"/>엑셀 다운로드 ⤓</a>}
+   </div>
    <input ref={file} type="file" accept=".xlsx" className="hidden" aria-label="회사 Excel 원본 등록" onChange={e=>{
     const f=e.target.files?.[0];e.target.value='';if(!f)return;
     if(f.size>12*1024*1024){setMessage('Excel은 12MB 이하만 등록할 수 있습니다.');return;}
@@ -75,28 +86,39 @@ export function HqDriverReportInbox() {
   {workbook&&<HqExcelWorkbookView year={workbook.year} onCommitted={refresh}/>}
 
   {message&&<p role="status" className="rounded-xl bg-blue-50 p-3 text-sm text-slate-600">{message}</p>}
-  <div className="flex flex-wrap items-center gap-2">
-   <div role="group" aria-label="보고 상태 필터" className="inline-flex min-h-11 max-w-full items-center gap-1 rounded-2xl bg-[#F2F4F6] p-1">
+  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+   <div role="group" aria-label="보고 상태 필터" className="inline-flex h-10 items-center rounded-xl bg-slate-100 p-1">
     {([
-     {id:'all',label:'전체 보고'},
+     {id:'all',label:'전체'},
      {id:'applied',label:'반영 완료'},
      {id:'review',label:'확인 필요'}
-    ] as const).map(item=><button key={item.id} type="button" aria-pressed={filter===item.id}
-     onClick={()=>setFilter(item.id)}
-     className={'whitespace-nowrap rounded-xl px-3 py-2 text-[13px] font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/50 sm:px-4 '+(filter===item.id?'bg-white text-[#1E60F3] shadow-[0_1px_5px_rgba(50,70,110,0.09)]':'text-[#718099] hover:bg-white/70 hover:text-[#465775]')}>{item.label}</button>)}
+    ] as const).map(item=>{
+      const active=filter===item.id;
+      return <button key={item.id} type="button" aria-pressed={active}
+       onClick={()=>setFilter(item.id)}
+       className={'h-8 rounded-lg px-3.5 sm:px-4 text-[13px] transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/40 '+(active?'bg-white text-slate-900 font-semibold shadow-xs':'text-slate-500 font-medium hover:text-slate-800')}>{item.label}</button>;
+    })}
    </div>
-   <div className="ml-auto w-full min-w-0 sm:w-[260px] lg:w-[300px]">
-    <input aria-label="최근 보고 검색" type="search" placeholder="기사·차량·거래처·날짜 검색" value={search} onChange={e=>setSearch(e.target.value)}
-     className="h-11 w-full min-w-0 rounded-2xl border border-[#E0E7F2] bg-white px-4 text-[14px] text-[#465775] outline-none transition-[background-color,border-color,box-shadow] duration-150 placeholder:text-[#9AA7B8] hover:border-[#B8C9E8] focus:border-[#1E60F3] focus:bg-white focus:ring-2 focus:ring-[#1E60F3]/10"/>
+   <div className="relative w-full sm:w-[280px] lg:w-[320px]">
+    <Search size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"/>
+    <input aria-label="최근 보고 검색" type="search" placeholder="기사명, 차량번호, 고객사 검색" value={search} onChange={e=>setSearch(e.target.value)}
+     className="h-10 w-full min-w-0 rounded-xl border border-slate-200/90 bg-white pl-9 pr-3 text-[13px] text-slate-800 placeholder:text-slate-400 outline-none transition-all hover:border-slate-300 focus:border-[#1E60F3] focus:ring-2 focus:ring-[#1E60F3]/10"/>
    </div>
   </div>
   <div className="space-y-2">
-   {reports.filter(s=>reportMatchesFilter(s.excel_status,filter)&&(!search||[s.parsed.draft.driver,s.parsed.draft.customer,s.parsed.draft.plate,s.parsed.draft.date].some(v=>v.includes(search)))).map(report=><div key={report.id} className="min-w-0">
+   {reports.filter(s=>reportMatchesFilter(s.excel_status,filter)&&(!search||[s.parsed.draft.driver,s.parsed.draft.customer,s.parsed.draft.plate,s.parsed.draft.date].some(v=>v.includes(search)))).map(report=>{
+    const title = (report.parsed.draft.driver && report.parsed.draft.plate)
+      ? `${report.parsed.draft.driver} · ${report.parsed.draft.plate}`
+      : [report.parsed.draft.driver, report.parsed.draft.plate].filter(Boolean).join(' · ') || '정보 누락 · 확인 필요';
+    const subtitle = (report.parsed.draft.date && report.parsed.draft.customer)
+      ? `${report.parsed.draft.date} · ${report.parsed.draft.customer}`
+      : [report.parsed.draft.date, report.parsed.draft.customer].filter(Boolean).join(' · ') || '기사 및 거래처 정보 미확인';
+    return <div key={report.id} className="min-w-0">
     <button type="button" aria-expanded={selected?.id===report.id&&isExpanded} aria-controls={'report-details-'+report.id}
      onClick={()=>void detail(report)} className={'flex w-full items-center gap-3 rounded-2xl border p-4 text-left transition-colors duration-150 hover:bg-[#F7F9FC] '+(selected?.id===report.id&&isExpanded?'border-[#CBDCFB] bg-[#FAFCFF]':'border-[#E9EDF4] bg-white')}>
      <div className="min-w-0 flex-1">
-      <p className="text-sm font-semibold text-[#465775]">{report.parsed.draft.driver||'담당 확인'} · {report.parsed.draft.plate||'차량 확인'}</p>
-      <p className="mt-1 truncate text-xs text-[#8B97A8]">{report.parsed.draft.date||'날짜 확인'} · {report.parsed.draft.customer||'거래처 확인'}</p>
+      <p className="text-sm font-semibold text-[#465775]">{title}</p>
+      <p className="mt-1 truncate text-xs text-[#8B97A8]">{subtitle}</p>
      </div>
      <span className={'shrink-0 rounded-full px-3 py-1 text-xs font-medium '+(report.excel_status==='applied'?'bg-[#EAF0FE] text-[#1E60F3]':'bg-[#F2F4F6] text-[#6D7B90]')}>{reportDisplayStatus(report.excel_status)}</span>
      <ArrowRight size={15} className={'shrink-0 text-[#B4BFCC] transition-transform duration-200 '+(selected?.id===report.id&&isExpanded?'rotate-90':'')}/>
@@ -115,16 +137,16 @@ export function HqDriverReportInbox() {
       </div>
      </div>
     </div>
-   </div>)}
+   </div>;})}
    {!reports.some(s=>reportMatchesFilter(s.excel_status,filter)&&(!search||[s.parsed.draft.driver,s.parsed.draft.customer,s.parsed.draft.plate,s.parsed.draft.date].some(v=>v.includes(search))))&&<p className="py-8 text-center text-sm text-[#8B97A8]">{reports.length?'조건에 맞는 보고가 없습니다.':'아직 접수된 운행보고가 없습니다.'}</p>}
   </div>
   <details className="text-xs text-[#7A879A]">
-   <summary className="cursor-pointer select-none py-1">자동 적재 관리</summary>
-   <button className={btn+' mt-2'} disabled={busy} onClick={()=>void action({action:'drain'})}><RefreshCw size={15}/>대기·오류 재처리 (최대 20건)</button>
+   <summary className="cursor-pointer select-none py-1 hover:text-slate-700 transition-colors">누락 내역 재처리</summary>
+   <button className={btn+' mt-2'} disabled={busy} onClick={()=>void action({action:'drain'})}><RefreshCw size={14}/>누락 내역 재처리 (최대 20건)</button>
   </details>
   {more&&<button onClick={()=>void older()} className={btn}>이전 보고 더 보기</button>}
 
-  {versions.length>0&&<details><summary className="flex cursor-pointer items-center gap-2 text-xs text-slate-500"><History size={14}/>작업본 버전 · 복구</summary><div className="mt-3 flex flex-wrap gap-2"><select aria-label="Excel 버전" value={version} onChange={e=>setVersion(e.target.value)} className={btn}><option value="">버전 선택</option>{versions.map(v=><option key={v.id} value={v.id}>#{v.generation} · {v.kind} · {new Date(v.created_at).toLocaleString('ko-KR')}</option>)}</select>{version&&<><a className={btn} href={'/api/hq/report-workbook?download=1&version='+version+'&year='+workbook?.year}>선택 버전 다운로드</a><button disabled={busy} className={btn} onClick={()=>{
+  {versions.length>0&&<details className="text-xs text-slate-500"><summary className="flex cursor-pointer items-center gap-2 select-none py-1 hover:text-slate-700 transition-colors"><History size={14}/>버전 기록</summary><div className="mt-3 flex flex-wrap gap-2"><select aria-label="Excel 버전" value={version} onChange={e=>setVersion(e.target.value)} className={btn}><option value="">버전 선택</option>{versions.map(v=><option key={v.id} value={v.id}>#{v.generation} · {v.kind} · {new Date(v.created_at).toLocaleString('ko-KR')}</option>)}</select>{version&&<><a className={btn} href={'/api/hq/report-workbook?download=1&version='+version+'&year='+workbook?.year}>선택 버전 다운로드</a><button disabled={busy} className={btn} onClick={()=>{
     if(!window.confirm('이 버전으로 복구한 뒤, 빠진 보고는 다시 반영 대기로 돌립니다. 계속할까요?'))return;
     setBusy(true);void json('/api/hq/report-workbook',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'restore',version,expected:workbook?.active_version})}).then(()=>refresh()).catch(e=>setMessage(e.message)).finally(()=>setBusy(false));
    }}>선택 버전 복구</button></>}</div></details>}

@@ -52,8 +52,8 @@ export function HqExcelWorkbookView({year,onCommitted}:{year:number;onCommitted:
  }
  return <div className={zoom?'fixed inset-0 z-[150] flex min-w-0 flex-col bg-[#F4F7FC] p-2 sm:p-5':'min-w-0 space-y-3'}>
   {!zoom&&<button type="button" aria-expanded={open} onClick={()=>{setOpen(v=>!v);setEdit(null);setError('');}}
-   className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#DFE7F1] bg-white px-4 py-2.5 text-sm font-semibold text-[#485F82] hover:bg-[#F7F9FC] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/30">
-   <Pencil size={16}/>Excel 보기·편집{open?<ChevronUp size={16}/>:<ChevronDown size={16}/>}
+   className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[13px] font-semibold text-slate-700 shadow-2xs transition-all hover:bg-slate-50 hover:border-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/30">
+   <Pencil size={14} className="text-slate-500"/>웹에서 편집 {open?'▴':'▾'}
   </button>}
   {open&&<div className={zoom?'flex h-full min-h-0 min-w-0 flex-col gap-3 rounded-2xl border border-[#E2E9F3] bg-white p-3 shadow-xl sm:p-5':'min-w-0 space-y-3 rounded-2xl border border-[#E2E9F3] bg-white p-3 sm:p-4'}>
    <div className="flex flex-wrap items-center justify-between gap-3">
