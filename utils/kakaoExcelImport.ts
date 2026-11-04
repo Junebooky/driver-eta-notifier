@@ -85,7 +85,7 @@ function dateString(src: string, year: number): string {
 export function parseKakaoExcelReport(raw: string, assumedYear = 2026): KakaoExcelParseResult {
   const src = raw.replace(/\u00a0/g, ' ').replace(/\r/g, '');
   const warnings: string[] = [];
-  const ambiguousDate = /\d\s*(?:일)?\s*[~～–—]\s*(?:\d{1,2}\s*월\s*)?\d/.test(src.split('\n')[0]) || [...src.matchAll(/\d{1,2}\s*월\s*\d{1,2}\s*일/g)].length > 1;
+  const ambiguousDate = /\d{1,2}\s*월\s*\d{1,2}\s*일?\s*[~～–—]/.test(src) || /\d\s*(?:일)?\s*[~～–—]\s*(?:\d{1,2}\s*월\s*)?\d/.test(src.split('\n')[0]) || [...src.matchAll(/\d{1,2}\s*월\s*\d{1,2}\s*일/g)].length > 1;
   const date = ambiguousDate ? '' : dateString(src, assumedYear);
   if (ambiguousDate) warnings.push('기간 운행 또는 여러 날짜입니다. 임의로 첫날을 선택하지 않았습니다. 확정한 단일 운행 날짜별로 검토해 주세요.');
   if (date && !/20\d{2}\s*년/.test(src)) warnings.push('보고서에 연도가 없어 ' + assumedYear + '년으로 해석했습니다. 확인해 주세요.');

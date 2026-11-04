@@ -1,3 +1,5 @@
+> Historical PR #44 design notes. The integrated behavior and current validation supersede these notes: see [KAKAO_EXCEL_INTEGRATION_QA.md](KAKAO_EXCEL_INTEGRATION_QA.md). In particular missing monthly templates are now blocked, and no whole-workbook SheetJS rewrite occurs.
+
 # KakaoTalk → Excel monthly register (2026-11-03)
 
 ## Approved scope

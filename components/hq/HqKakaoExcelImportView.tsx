@@ -69,8 +69,12 @@ export function HqKakaoExcelImportView() {
   }
 
   async function loadFile(file: File, chosenHandle: LocalFileHandle | null) {
+    if (operation.current) return;
     if (!/\.xlsx$/i.test(file.name)) throw new Error('.xlsx 형식만 지원합니다.');
     if (hasChanges && !window.confirm('아직 저장하지 않은 Excel 변경 사항이 있습니다. 다른 파일을 열면 사라집니다. 계속할까요?')) return;
+    operation.current = true;
+    setBusy(true);
+    try {
     const data = new Uint8Array(await file.arrayBuffer());
     const {workbookFromFile} = await import('@/utils/kakaoExcelWorkbook');
     workbookFromFile(data);
@@ -81,6 +85,7 @@ export function HqKakaoExcelImportView() {
     setUpdatedRows([]);
     setHasChanges(false);
     setMessage(file.name + ' 파일을 불러왔습니다. 원본 파일은 아직 변경되지 않았습니다.');
+    } finally { operation.current = false; setBusy(false); }
   }
 
   async function selectPcFile() {
