@@ -63,8 +63,24 @@ export async function GET(req: NextRequest) {
     const status = await checkNaverImapStatus();
     const inbox = await fetchNaverInboxSummaries(30);
 
+    // A working configuration is not the same as a successful IMAP sync.
+    // Never cache a failed response as a healthy connected inbox.
+    if (!status.ok || !inbox.ok) {
+      return NextResponse.json({
+        ok: false,
+        isConfigured: true,
+        syncStatus: 'error',
+        status,
+        emails: [],
+        totalCount: 0,
+        lastSync: inbox.lastSync,
+        error: inbox.error || status.error || 'NAVER 메일함 동기화 실패',
+      }, { status: 502 });
+    }
+
     const responseData = {
       ok: true,
+      syncStatus: 'connected',
       isConfigured,
       status,
       emails: inbox.emails,
@@ -87,9 +103,11 @@ export async function GET(req: NextRequest) {
     if (serverInboxCache) {
       return NextResponse.json({
         ...serverInboxCache.data,
+        ok: false,
         stale: true,
+        syncStatus: 'error',
         error: `실시간 동기화 지연: ${errorMsg}`,
-      });
+      }, { status: 502 });
     }
 
     // P0 Compliance: Do not disguise errors with synthetic sample emails
