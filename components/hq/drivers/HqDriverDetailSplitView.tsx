@@ -466,7 +466,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                       <img
                         src="/images/icons/drivers/icon_phone.png"
                         alt="전화 걸기"
-                        className="w-11 h-11 object-contain drop-shadow-2xs select-none"
+                        className="w-9 h-9 object-contain drop-shadow-2xs select-none"
                         draggable={false}
                       />
                     </a>
@@ -481,7 +481,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                       <img
                         src="/images/icons/drivers/icon_phone.png"
                         alt="연락처 미등록"
-                        className="w-11 h-11 object-contain select-none grayscale"
+                        className="w-9 h-9 object-contain select-none grayscale"
                         draggable={false}
                       />
                     </button>
