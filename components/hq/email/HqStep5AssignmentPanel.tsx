@@ -22,6 +22,14 @@ interface HqStep5AssignmentPanelProps {
 }
 
 const getKnownVehicle = (plate?: string) => VIP_REAL_VEHICLES.find((v) => v.plate === plate);
+const getVerifiedVehiclePhoto = (plate?: string): string => {
+  const vehicle = getKnownVehicle(plate);
+  // Legacy thumbnail screenshots are not accepted as official vehicle photos.
+  if (!vehicle || !vehicle.imageUrl || /\/thumb_/.test(vehicle.imageUrl)) {
+    return '/images/vehicle_photo_pending.svg';
+  }
+  return getVehicleImage(vehicle);
+};
 
 export const HqStep5AssignmentPanel: React.FC<HqStep5AssignmentPanelProps> = ({
   slots, vehicles, loading, fleetError, language, onLanguageChange, onUpdateSlots,
@@ -80,7 +88,7 @@ export const HqStep5AssignmentPanel: React.FC<HqStep5AssignmentPanelProps> = ({
           const availability = vehicles?.find((vehicle) => vehicle.plate === slot.vehiclePlate);
           const driver = slot.driver;
           const languageMismatch = language === 'english' && driver && !driverSupportsEnglish(driver);
-          const photo = realVehicle ? getVehicleImage(realVehicle) : '/images/vehicle_photo_pending.svg';
+          const photo = getVerifiedVehiclePhoto(slot.vehiclePlate);
 
           return (
             <div key={slot.slotIndex} className="rounded-2xl bg-slate-50/70 p-4 sm:p-5">
@@ -188,7 +196,7 @@ export const HqStep5AssignmentPanel: React.FC<HqStep5AssignmentPanelProps> = ({
                     onClick={() => chooseVehicle(vehiclePickerIndex, vehicle)}
                     className={`flex min-h-20 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${selected ? 'bg-slate-100' : 'hover:bg-slate-50'} disabled:cursor-not-allowed disabled:opacity-45`}>
                     <div className="flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-50">
-                      <img src={known ? getVehicleImage(known) : '/images/vehicle_photo_pending.svg'}
+                      <img src={getVerifiedVehiclePhoto(vehicle.plate)}
                         alt={vehicle.model} className="h-full w-full object-contain" />
                     </div>
                     <div className="min-w-0 flex-1">
