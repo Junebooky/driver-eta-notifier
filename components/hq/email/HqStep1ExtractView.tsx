@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Sparkles,
   Paperclip,
@@ -46,6 +46,14 @@ interface HqStep1ExtractViewProps {
   onSaveModifiedDraft?: () => void;
   onUpdateDraft?: (updated: HqEmailExtractedDraft) => void;
 }
+
+type WaypointEditDraft = {
+  id: string;
+  time: string;
+  location: string;
+  selectedPoi: PoiResult | null;
+  isPoiConfirmed: boolean;
+};
 
 export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
   emailSummary,
@@ -128,8 +136,64 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
     setCollapsedDays((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  // Inline editing state: which waypoint is currently being inline-edited
-  const [editingWpId, setEditingWpId] = useState<string | null>(null);
+  // Changes remain local until explicitly saved.
+  const [waypointEdit, setWaypointEdit] = useState<WaypointEditDraft | null>(null);
+  const waypointEditorRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!waypointEdit) return;
+    const discardOnOutsideClick = (event: PointerEvent) => {
+      if (!waypointEditorRef.current?.contains(event.target as Node)) {
+        setWaypointEdit(null);
+      }
+    };
+    document.addEventListener('pointerdown', discardOnOutsideClick);
+    return () => document.removeEventListener('pointerdown', discardOnOutsideClick);
+  }, [waypointEdit?.id]);
+
+  const beginWaypointEdit = (wp: RouteWaypointItem) => {
+    setWaypointEdit({
+      id: wp.id,
+      time: wp.time || '',
+      location: wp.location,
+      selectedPoi: null,
+      isPoiConfirmed: Boolean(wp.isPoiConfirmed),
+    });
+  };
+
+  const saveWaypointEdit = () => {
+    if (!waypointEdit || !extractedDraft?.waypoints) return;
+    const original = extractedDraft.waypoints.find((wp) => wp.id === waypointEdit.id);
+    const location = waypointEdit.location.trim();
+    if (!original || !location) return;
+
+    const changedLocation = location !== original.location;
+    const poi = waypointEdit.selectedPoi;
+    const confirmed = poi ? true : changedLocation ? false : Boolean(original.isPoiConfirmed);
+    const lat = poi?.lat ?? (changedLocation ? undefined : original.lat);
+    const lng = poi?.lng ?? (changedLocation ? undefined : original.lng);
+    const time = waypointEdit.time.trim();
+    const updated = extractedDraft.waypoints.map((wp) =>
+      wp.id === waypointEdit.id ? { ...wp, time, location, lat, lng, isPoiConfirmed: confirmed } : wp
+    );
+    const isFirst = updated[0]?.id === waypointEdit.id;
+    const isLast = updated[updated.length - 1]?.id === waypointEdit.id;
+
+    onUpdateDraft?.({
+      ...extractedDraft,
+      waypoints: updated,
+      pickupTime: isFirst && time ? time : extractedDraft.pickupTime,
+      pickupLocation: isFirst ? location : extractedDraft.pickupLocation,
+      pickupLat: isFirst ? lat : extractedDraft.pickupLat,
+      pickupLng: isFirst ? lng : extractedDraft.pickupLng,
+      isPickupPoiConfirmed: isFirst ? confirmed : extractedDraft.isPickupPoiConfirmed,
+      dropoffLocation: isLast ? location : extractedDraft.dropoffLocation,
+      dropoffLat: isLast ? lat : extractedDraft.dropoffLat,
+      dropoffLng: isLast ? lng : extractedDraft.dropoffLng,
+      isDropoffPoiConfirmed: isLast ? confirmed : extractedDraft.isDropoffPoiConfirmed,
+    });
+    setWaypointEdit(null);
+  };
 
   // English driver requirement check
   const isEnglishRequired = Boolean(
@@ -189,7 +253,13 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
       waypoints: nextWps,
       dropoffLocation: nextWps[nextWps.length - 1].location || extractedDraft.dropoffLocation,
     });
-    setEditingWpId(newWpId);
+    setWaypointEdit({
+      id: newWpId,
+      time: newWp.time || '',
+      location: newWp.location,
+      selectedPoi: null,
+      isPoiConfirmed: false,
+    });
   };
 
   // Add a new waypoint specifically for a day
@@ -221,7 +291,13 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
       waypoints: reordered,
       dropoffLocation: reordered[reordered.length - 1]?.location || extractedDraft.dropoffLocation,
     });
-    setEditingWpId(newWpId);
+    setWaypointEdit({
+      id: newWpId,
+      time: newWp.time || '',
+      location: newWp.location,
+      selectedPoi: null,
+      isPoiConfirmed: false,
+    });
   };
 
   // Remove a waypoint
@@ -253,31 +329,6 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
     });
   };
 
-  // Update waypoint time
-  const handleUpdateWaypointTime = (wpId: string, newTime: string) => {
-    if (!extractedDraft || !extractedDraft.waypoints) return;
-    const updated = extractedDraft.waypoints.map((w) => (w.id === wpId ? { ...w, time: newTime } : w));
-    onUpdateDraft?.({
-      ...extractedDraft,
-      waypoints: updated,
-      pickupTime: updated[0]?.id === wpId && newTime ? newTime : extractedDraft.pickupTime,
-    });
-  };
-
-  // Update waypoint location
-  const handleUpdateWaypointLocation = (wpId: string, newLoc: string) => {
-    if (!extractedDraft || !extractedDraft.waypoints) return;
-    const updated = extractedDraft.waypoints.map((w) => (w.id === wpId ? { ...w, location: newLoc } : w));
-    const isFirst = updated[0]?.id === wpId;
-    const isLast = updated[updated.length - 1]?.id === wpId;
-    onUpdateDraft?.({
-      ...extractedDraft,
-      waypoints: updated,
-      pickupLocation: isFirst ? newLoc : extractedDraft.pickupLocation,
-      dropoffLocation: isLast ? newLoc : extractedDraft.dropoffLocation,
-    });
-  };
-
   // Convert single leg (pickup/dropoff) to multi-destination itinerary
   const handleConvertToMultiDestination = () => {
     if (!extractedDraft) return;
@@ -296,8 +347,8 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
         id: 'wp-2',
         order: 2,
         date: fallbackDate,
-        time: '12:00',
-        location: '중간 경유지 입력',
+        time: '',
+        location: '',
       },
       {
         id: 'wp-3',
@@ -312,6 +363,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
       ...extractedDraft,
       waypoints: newWaypoints,
     });
+    beginWaypointEdit(newWaypoints[1]);
   };
 
   // Reset multi-destination to single leg
@@ -523,7 +575,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
       </div>
 
       {/* 2. Right Sub-Column: AI Extraction Card */}
-      <div className="lg:col-span-6 bg-white rounded-2xl border border-blue-200/90 shadow-md p-5 flex flex-col justify-between min-h-[640px] relative overflow-hidden">
+      <div className="lg:col-span-6 bg-white rounded-2xl border border-blue-200/90 shadow-md p-5 flex flex-col justify-between min-h-[640px] relative overflow-visible">
         {extractedDraft ? (
           <div className="space-y-4">
             {/* Header: Sparkles + Title + Refresh Button (Clean, no dev subtitle) */}
@@ -656,10 +708,12 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                   ) : (
                     <span>{pickupDate}</span>
                   )}
-                  <span className="inline-flex items-center gap-1 text-slate-600 font-medium">
-                    <Clock className="w-3.5 h-3.5 text-slate-400" />
-                    <span>{pickupTime}</span>
-                  </span>
+                  {!hasMultipleDates && (
+                    <span className="inline-flex items-center gap-1 text-slate-500 font-medium">
+                      <Clock className="w-3.5 h-3.5 text-slate-400" />
+                      <span>{pickupTime}</span>
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -711,29 +765,15 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
               </div>
             </div>
 
-            {/* 블록 3: 3일간 상세 이동 경로 (타임라인) */}
-            <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200/80 space-y-3">
-              {/* Header: 남발된 뱃지 압축 (총 N개 경유지 · N일간) + 목적지 추가 */}
-              <div className="flex items-center justify-between pb-2 border-b border-slate-200/60">
-                <div className="flex items-center gap-2 min-w-0">
-                  <MapPin className="w-4 h-4 text-[#0050FF] shrink-0" />
-                  <span className="text-xs font-black text-slate-900">
-                    운행 경로 (상세 일정)
-                  </span>
-                  <span className="px-2 py-0.5 rounded-md bg-blue-50 text-[#0050FF] text-[11px] font-black border border-blue-200/60 shrink-0">
-                    총 {waypoints.length > 0 ? waypoints.length : 2}개 경유지
-                    {hasMultipleDates && ` · ${uniqueDates.length}일간`}
-                  </span>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={hasMultipleWaypoints ? handleAddWaypoint : handleConvertToMultiDestination}
-                  className="flex items-center gap-1 text-[11px] font-bold text-[#0050FF] hover:text-blue-700 bg-white hover:bg-blue-50/80 px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs transition-colors cursor-pointer shrink-0"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>목적지 추가</span>
-                </button>
+            {/* 블록 3: 상세 이동 경로 */}
+            <div className="rounded-xl bg-slate-50/70 p-4 space-y-3">
+              <div className="flex items-center gap-2 min-w-0 pb-2">
+                <MapPin className="w-4 h-4 text-slate-500 shrink-0" />
+                <span className="text-xs font-semibold text-slate-800 shrink-0">운행 경로 (상세 일정)</span>
+                <span className="text-[11px] font-normal text-slate-500 truncate">
+                  총 {waypoints.length > 0 ? waypoints.length : 2}개 경유지
+                  {hasMultipleDates && ` · ${uniqueDates.length}일간`}
+                </span>
               </div>
 
               {/* Multi-destination Timeline Accordion */}
@@ -744,19 +784,19 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                     return (
                       <div
                         key={group.date}
-                        className="bg-white rounded-xl border border-slate-200/80 shadow-2xs overflow-hidden"
+                        className={`relative rounded-xl bg-white overflow-visible ${waypointEdit && group.items.some((wp) => wp.id === waypointEdit.id) ? 'z-30' : 'z-0'}`}
                       >
                         {/* Day Group Header Accordion Trigger */}
                         <div
                           onClick={() => toggleDayCollapse(group.date)}
-                          className="px-3.5 py-2.5 bg-slate-100/70 hover:bg-slate-100 flex items-center justify-between cursor-pointer transition-colors select-none"
+                          className="px-3.5 py-2.5 rounded-t-xl bg-slate-100/70 hover:bg-slate-100 flex items-center justify-between cursor-pointer transition-colors select-none"
                         >
                           <div className="flex items-center gap-2">
-                            <Calendar className="w-3.5 h-3.5 text-[#0050FF]" />
-                            <span className="text-xs font-black text-slate-900">
+                            <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                            <span className="text-xs font-semibold text-slate-900">
                               {formatWaypointDate(group.date, hasMultipleDates ? group.dayIndex : undefined)}
                             </span>
-                            <span className="text-[11px] font-bold text-slate-400">
+                            <span className="text-[11px] font-medium text-slate-400">
                               · {group.items.length}곳
                             </span>
                           </div>
@@ -780,7 +820,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                               {group.items.map((wp, wIdx) => {
                                 const isFirst = wIdx === 0;
                                 const isLast = wIdx === group.items.length - 1 && group.items.length > 1;
-                                const isEditingThis = editingWpId === wp.id;
+                                const isEditingThis = waypointEdit?.id === wp.id;
 
                                 return (
                                   <div
@@ -789,78 +829,113 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                                   >
                                     {/* Timeline Node Bullet */}
                                     <div
-                                      className={`absolute -left-[19px] w-4 h-4 rounded-full border-2 bg-white flex items-center justify-center shrink-0 z-10 ${
-                                        isFirst
-                                          ? 'border-[#0050FF] ring-2 ring-blue-100'
-                                          : isLast
-                                          ? 'border-slate-800 ring-2 ring-slate-100'
-                                          : 'border-slate-300'
+                                      aria-hidden="true"
+                                      className={`absolute -left-[16px] w-2.5 h-2.5 rounded-full z-10 ${
+                                        isFirst ? 'bg-slate-600' : isLast ? 'bg-slate-800' : 'bg-slate-300'
                                       }`}
-                                    >
-                                      <div
-                                        className={`w-1.5 h-1.5 rounded-full ${
-                                          isFirst ? 'bg-[#0050FF]' : isLast ? 'bg-slate-800' : 'bg-slate-400'
-                                        }`}
-                                      />
-                                    </div>
+                                    />
 
-                                    {/* Inline Edit Form vs Crisp Text Line */}
-                                    {isEditingThis ? (
-                                      <div className="flex-1 flex items-center gap-2 bg-blue-50/80 p-2 rounded-xl border border-blue-200 shadow-2xs">
+                                    {/* TMAP POI autocomplete with draft-only edits. */}
+                                    {isEditingThis && waypointEdit ? (
+                                      <div
+                                        ref={waypointEditorRef}
+                                        className="relative z-30 flex flex-1 min-w-0 flex-wrap items-center gap-2 rounded-xl bg-slate-50 p-2"
+                                        onKeyDown={(event) => {
+                                          if (event.key === 'Escape') {
+                                            event.stopPropagation();
+                                            setWaypointEdit(null);
+                                          }
+                                        }}
+                                      >
                                         <input
                                           type="text"
-                                          value={wp.time || ''}
-                                          onChange={(e) => handleUpdateWaypointTime(wp.id, e.target.value)}
-                                          placeholder="10:00"
-                                          className="w-16 px-2 py-1 text-xs font-mono font-bold text-slate-900 bg-white border border-slate-300 rounded-lg outline-none focus:border-blue-500"
-                                          autoFocus
-                                        />
-                                        <input
-                                          type="text"
-                                          value={wp.location}
-                                          onChange={(e) => handleUpdateWaypointLocation(wp.id, e.target.value)}
-                                          placeholder="목적지 입력"
-                                          className="flex-1 px-2.5 py-1 text-xs font-bold text-slate-900 bg-white border border-slate-300 rounded-lg outline-none focus:border-blue-500"
-                                          onKeyDown={(e) => {
-                                            if (e.key === 'Enter') setEditingWpId(null);
+                                          value={waypointEdit.time}
+                                          onChange={(event) =>
+                                            setWaypointEdit((draft) => draft ? { ...draft, time: event.target.value } : draft)
+                                          }
+                                          onKeyDown={(event) => {
+                                            if (event.key === 'Enter') saveWaypointEdit();
                                           }}
+                                          placeholder="10:00"
+                                          aria-label="경유지 시간"
+                                          className="h-9 w-16 rounded-lg border border-slate-200 bg-white px-2 text-xs tabular-nums font-medium text-slate-800 outline-none focus:border-slate-400"
                                         />
+                                        <div className="min-w-[150px] flex-[1_1_180px]">
+                                          <HqPlaceSearchInput
+                                            key={wp.id}
+                                            value={waypointEdit.location}
+                                            onChange={(location) =>
+                                              setWaypointEdit((draft) => draft ? {
+                                                ...draft, location, selectedPoi: null, isPoiConfirmed: false,
+                                              } : draft)
+                                            }
+                                            onSelectPoi={(poi) =>
+                                              setWaypointEdit((draft) => draft ? {
+                                                ...draft, location: poi.name, selectedPoi: poi, isPoiConfirmed: true,
+                                              } : draft)
+                                            }
+                                            onConfirmStateChange={(confirmed) =>
+                                              setWaypointEdit((draft) => draft ? { ...draft, isPoiConfirmed: confirmed } : draft)
+                                            }
+                                            isConfirmed={waypointEdit.isPoiConfirmed}
+                                            placeholder="TMAP 장소 검색"
+                                            heightClass="h-9"
+                                            tone="neutral"
+                                          />
+                                        </div>
                                         <button
                                           type="button"
-                                          onClick={() => setEditingWpId(null)}
-                                          className="px-2.5 py-1 rounded-lg bg-[#0050FF] text-white text-[11px] font-bold cursor-pointer"
+                                          onClick={saveWaypointEdit}
+                                          disabled={!waypointEdit.location.trim()}
+                                          className="h-9 rounded-lg bg-slate-800 px-2.5 text-[11px] font-medium text-white hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
                                         >
                                           완료
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => setWaypointEdit(null)}
+                                          className="flex h-9 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
+                                          aria-label="수정 취소"
+                                        >
+                                          <X className="h-3.5 w-3.5" />
                                         </button>
                                       </div>
                                     ) : (
                                       <div
-                                        onClick={() => setEditingWpId(wp.id)}
+                                        onClick={() => beginWaypointEdit(wp)}
                                         className="flex-1 flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer select-none group/item"
-                                        title="클릭하여 시간 및 장소 수정"
                                       >
                                         <div className="flex items-center gap-3 min-w-0">
-                                          <span className="text-xs font-mono font-black text-slate-700 shrink-0 w-12">
+                                          <span className="text-xs tabular-nums font-medium text-slate-600 shrink-0 w-12">
                                             {wp.time || '--:--'}
                                           </span>
-                                          <span className="text-xs font-extrabold text-slate-900 truncate">
+                                          <span className="text-xs font-medium text-slate-800 truncate">
                                             {wp.location || '장소 미지정'}
                                           </span>
                                           {isFirst && (
-                                            <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-blue-50 text-[#0050FF] border border-blue-200/80 shrink-0">
+                                            <span className="text-[10px] font-medium text-slate-500 shrink-0">
                                               출발
                                             </span>
                                           )}
                                           {isLast && (
-                                            <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
+                                            <span className="text-[10px] font-medium text-slate-500 shrink-0">
                                               종료
                                             </span>
                                           )}
                                         </div>
 
-                                        <div className="flex items-center gap-1.5 opacity-0 group-hover/item:opacity-100 transition-opacity">
-                                          <span className="text-[10px] text-slate-400 font-medium">수정</span>
-                                          <Edit3 className="w-3 h-3 text-slate-400" />
+                                        <div className="flex shrink-0 items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-hover/item:opacity-100 transition-opacity">
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              beginWaypointEdit(wp);
+                                            }}
+                                            className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
+                                            aria-label="경유지 수정"
+                                          >
+                                            <Edit3 className="w-3.5 h-3.5" />
+                                          </button>
                                           {waypoints.length > 2 && (
                                             <button
                                               type="button"
@@ -868,8 +943,8 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                                                 e.stopPropagation();
                                                 handleRemoveWaypoint(wp.id);
                                               }}
-                                              className="p-1 rounded text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer"
-                                              title="목적지 삭제"
+                                              className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
+                                              aria-label="경유지 삭제"
                                             >
                                               <X className="w-3.5 h-3.5" />
                                             </button>
@@ -887,7 +962,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                               <button
                                 type="button"
                                 onClick={() => handleAddWaypointForDay(group.date)}
-                                className="text-[11px] font-bold text-[#0050FF] hover:text-blue-700 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors cursor-pointer"
+                                className="text-[11px] font-medium text-slate-600 hover:text-slate-800 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
                               >
                                 <Plus className="w-3 h-3" />
                                 <span>경유지 추가</span>
@@ -906,13 +981,11 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
 
                   {/* Pickup */}
                   <div className="relative flex items-center justify-between">
-                    <div className="absolute -left-[19px] w-4 h-4 rounded-full border-2 border-[#0050FF] bg-white flex items-center justify-center ring-2 ring-blue-100 z-10">
-                      <div className="w-1.5 h-1.5 rounded-full bg-[#0050FF]" />
-                    </div>
+                    <div aria-hidden="true" className="absolute -left-[16px] w-2.5 h-2.5 rounded-full bg-slate-600 z-10" />
                     <div className="flex-1 min-w-0 pl-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-mono font-bold text-slate-700">{pickupTime}</span>
-                        <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-blue-50 text-[#0050FF] border border-blue-200/80">
+                        <span className="text-xs tabular-nums font-medium text-slate-600">{pickupTime}</span>
+                        <span className="text-[10px] font-medium text-slate-500">
                           출발
                         </span>
                       </div>
@@ -937,12 +1010,10 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
 
                   {/* Dropoff */}
                   <div className="relative flex items-center justify-between pt-2">
-                    <div className="absolute -left-[19px] w-4 h-4 rounded-full border-2 border-slate-800 bg-white flex items-center justify-center ring-2 ring-slate-100 z-10">
-                      <div className="w-1.5 h-1.5 rounded-full bg-slate-800" />
-                    </div>
+                    <div aria-hidden="true" className="absolute -left-[16px] w-2.5 h-2.5 rounded-full bg-slate-800 z-10" />
                     <div className="flex-1 min-w-0 pl-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-slate-100 text-slate-600 border border-slate-200">
+                        <span className="text-[10px] font-medium text-slate-500">
                           종료
                         </span>
                       </div>
@@ -965,6 +1036,15 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                       />
                     </div>
                   </div>
+                  {/* Single-leg card also gets its own per-day add control. */}
+                  <button
+                    type="button"
+                    onClick={handleConvertToMultiDestination}
+                    className="ml-1 flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition-colors cursor-pointer"
+                  >
+                    <Plus className="h-3 w-3" />
+                    <span>경유지 추가</span>
+                  </button>
                 </div>
               )}
             </div>
@@ -1010,7 +1090,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
           </div>
         )}
 
-        {/* Action Buttons: 임시 저장 (화이트 테두리) vs 예약 확정 및 배차 등록 (코발트 블루 풀컬러) */}
+        {/* Action Buttons: 예약 정보 확인 후 4단계 확정 화면으로 이동 */}
         {extractedDraft && (
           <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-3 z-10">
             {/* 보조 버튼 (좌측) */}
@@ -1027,9 +1107,9 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
             <button
               type="button"
               onClick={handleRegisterClick}
-              className="px-6 py-2.5 rounded-xl bg-[#0050FF] hover:bg-blue-700 active:scale-95 text-white text-xs font-black shadow-md hover:shadow-lg transition-all cursor-pointer flex items-center gap-2"
+              className="px-6 py-2.5 rounded-xl bg-[#1E60F3] hover:bg-[#1855DB] active:scale-95 text-white text-xs font-semibold transition-colors cursor-pointer flex items-center gap-2"
             >
-              <span>예약 확정 및 배차 등록</span>
+              <span>예약 확정</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
