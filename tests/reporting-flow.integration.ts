@@ -27,7 +27,7 @@ import type { ExpenseItem } from '../utils/expense';
 /** Actual API handlers and shipped client submission helpers, with real Postgres and isolated Auth/Storage fixtures. */
 export async function verifyReportingFlow(admin:Client,writer:Client,reader:Client){
   const org='vip_limousine_korea',driver=randomUUID(),other=randomUUID(),booking=randomUUID(),otherBooking=randomUUID();
-  await admin.query('INSERT INTO cockpit.drivers(id,driver_name) VALUES($1,$3),($2,$3)',[driver,other,'동명이인']);
+  await admin.query("INSERT INTO cockpit.drivers(id,driver_name,passenger_name) VALUES($1,$3,'VIP 고객 외 2명'),($2,$3,'다른 고객')",[driver,other,'동명이인']);
   await admin.query("INSERT INTO cockpit.schedules(id,org_id,date,pickup_time,end_date,end_time,driver_id,vehicle_id,vehicle_plate,dispatch_status,schedule_meta) VALUES($1,'vip_limousine_korea','2026-12-12','09:00','2026-12-12','12:00',$2,$4,'fixture-car-one','published','{\"serviceMode\":\"with_driver\"}'),($3,'vip_limousine_korea','2026-12-12','13:00','2026-12-12','18:00',$2,$5,'fixture-car-two','published','{\"serviceMode\":\"with_driver\"}')",[booking,driver,otherBooking,randomUUID(),randomUUID()]);
   const token=(role:'driver'|'hq_admin',driverId:string=driver)=>signCockpitSession({userId:role==='driver'?driverId:'fixture-hq',org,role,driverId:role==='driver'?driverId:undefined,driverName:'동명이인'});
   let actor=token('driver'),storageFailure=false;const files=new Map<string,Buffer>();
@@ -79,8 +79,8 @@ export async function verifyReportingFlow(admin:Client,writer:Client,reader:Clie
     const submitted=await submitDriverExpensesToHqDb([ready],'동명이인','테스트차량','테스트모델',booking);assert.equal(submitted.ok,true,submitted.error);assert.equal(submitted.expenses?.[0].receiptStoragePath,ready.receiptStoragePath);
     assert.equal((await submitDriverExpensesToHqDb([ready],'동명이인','테스트차량','테스트모델',booking)).ok,true);
     assert.equal((await reader.query('SELECT count(*) FROM cockpit.expenses')).rows[0].count,'1');
-    const log={id:randomUUID(),driverId:driver,bookingId:booking,driverName:'동명이인',drivingDate:'2026-12-12',clockIn:'09:00',clockOut:'18:00',startKm:'1000',endKm:'1100',passengerCount:3,stops:[{id:'actual',time:'10:00',place:'실제 확인 장소'}],status:'검토 대기' as const,expenseAmount:999999};
-    const saved=await submitDriverLogToHqDb(log);assert.equal(saved.ok,true,saved.error);assert.equal(saved.log?.expenseAmount,8000);assert.equal(saved.log?.passengerCount,3);
+    const log={id:randomUUID(),driverId:driver,bookingId:booking,driverName:'동명이인',drivingDate:'2026-12-12',clockIn:'09:00',clockOut:'18:00',startKm:'1000',endKm:'1100',passengerCount:999,stops:[{id:'actual',time:'10:00',place:'실제 확인 장소'}],status:'검토 대기' as const,expenseAmount:999999};
+    const saved=await submitDriverLogToHqDb(log);assert.equal(saved.ok,true,saved.error);assert.equal(saved.log?.expenseAmount,8000);assert.equal(saved.log?.passengerCount,3);assert.equal(saved.log?.passengerName,'VIP 고객 외 2명');
     assert.deepEqual(await query(),{expense_amount:8000,expense_count:1});
     assert.equal((await reader.query('SELECT driving_log_id FROM cockpit.expenses WHERE id=$1',[item.id])).rows[0].driving_log_id,saved.log?.id);
     const secondDevice=await submitDriverLogToHqDb({...log,id:randomUUID()});assert.equal(secondDevice.ok,true,secondDevice.error);assert.equal(secondDevice.log?.id,saved.log?.id);
