@@ -1,5 +1,6 @@
 'use client';
 import type { HqBooking } from '@/types/hq';
+import { getCustomerDotColor } from '@/utils/customerDotColor';
 
 export function HqMobileBookingList({
   bookings,
@@ -50,8 +51,10 @@ export function HqMobileBookingList({
                 {row.dispatchStatus}
               </span>
             </div>
-            <h3 className="mt-2.5 break-words text-base font-extrabold text-slate-900 tracking-tight">
-              {row.customerName}
+            <h3 className="mt-2.5 flex items-start gap-2 break-words text-base font-semibold tracking-tight text-slate-900">
+              <span aria-hidden="true" className="mt-[7px] h-2 w-2 shrink-0 rounded-full"
+                style={{ backgroundColor: getCustomerDotColor(row.customerId, row.customerName) }} />
+              <span className="min-w-0">{row.customerName}</span>
             </h3>
             {row.groupTotalVehicles && row.groupTotalVehicles > 1 && (
               <p className="mt-1 text-xs font-medium text-slate-500">
