@@ -26,6 +26,7 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 import { HqMobileBookingList } from './HqMobileBookingList';
+import { getCustomerDotColor } from '@/utils/customerDotColor';
 import { getDriverProfileImage } from './HqQuickDispatch';
 import { HqBooking } from '@/types/hq';
 import { haptics } from '@/utils/haptics';
@@ -1242,8 +1243,10 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                         {/* Col 1 (Row Header <th>): 고객사 · 그룹 · 접수채널 */}
                         <th scope="row" className="py-3 px-2 text-left font-bold text-slate-900 align-middle">
                           <div className="flex items-center justify-between sm:justify-start gap-1 flex-wrap">
-                            <span className="group-hover:text-[#1E60F3] transition-colors font-black truncate max-w-[110px]" title={b.customerName}>
-                              {b.customerName}
+                            <span className="inline-flex min-w-0 max-w-[140px] items-center gap-1.5" title={b.customerName}>
+                              <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full"
+                                style={{ backgroundColor: getCustomerDotColor(b.customerId, b.customerName) }} />
+                              <span className="truncate font-semibold text-slate-900">{b.customerName}</span>
                             </span>
 
                             {b.intakeSource === 'phone' && (
