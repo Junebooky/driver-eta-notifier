@@ -1580,6 +1580,7 @@ export default function DriverCockpit() {
         {hasOpenedDrivingLog && <div hidden={activeTab !== 'log'} className="flex-1">
           <DrivingLogModal presentation="page" isOpen={true}
             onClose={() => selectDriverTab('drive')} driverProfile={profile} bookingId={activeBookingId}
+            onOpenProfileModal={() => setIsProfileModalOpen(true)}
             onOpenLocationSearch={() => { setIsSelectingForSchedule(true); setIsLocationSearchOpen(true); }}
             selectedLocationFromMap={selectedLocationForSchedule} />
         </div>}
@@ -1608,7 +1609,7 @@ export default function DriverCockpit() {
           const result = await response.json();
           if (!response.ok || !result.ok) throw new Error(result.error || '프로필이 저장되지 않았습니다.');
           const driver = result.driver;
-          updateProfile({ ...updated, id: driver.id, driverId: driver.id, vehicleNo: driver.vehicle_no || '', carNumber: driver.car_number || '', driverName: driver.driver_name, phone: driver.phone || '' });
+          updateProfile({ ...updated, id: driver.id, driverId: driver.id, vehicleNo: driver.vehicle_no || '', carNumber: driver.car_number || '', driverName: driver.driver_name, phone: driver.phone || '', passengerName: driver.passenger_name ?? null });
           localStorage.setItem('cockpit_driver_onboarded', 'true');
           setIsOnboarding(false); setOnboardingStage(null);
           return true;
