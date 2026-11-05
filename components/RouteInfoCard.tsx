@@ -47,7 +47,7 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
   }
 
   return (
-    <div className="w-full bg-[url('/eta_bg.jpg')] bg-cover bg-center border border-slate-100/80 rounded-2xl p-4 shadow-[0_8px_25px_rgba(30,96,243,0.06)] relative overflow-hidden select-none">
+    <div className="w-full bg-[url('/eta_bg.jpg')] bg-cover bg-center border border-slate-100/90 rounded-3xl p-4 sm:p-5 shadow-[0_6px_24px_rgba(15,23,42,0.05)] relative overflow-hidden select-none">
       {/* Soft gradient overlay for optimal text contrast & ambient depth */}
       <div className="absolute inset-0 bg-gradient-to-r from-white/95 via-white/85 to-white/40 pointer-events-none" />
 

@@ -254,7 +254,7 @@ export default function DriverCockpit() {
             const deduped = applyOrder(deduplicatePresets(merged));
             try {
               localStorage.setItem(storageKey, JSON.stringify(deduped));
-            } catch (e) {}
+            } catch (e) { }
             return deduped;
           });
         }
@@ -267,7 +267,7 @@ export default function DriverCockpit() {
   }, []);
 
   // Sync isolated presets whenever vehicle changes or profile loads
-  useEffect(()=>{if(profile.driverId){registerOutboxAutoSync(profile.driverId);void flushNavigationOutboxQueue();}},[profile.driverId]);
+  useEffect(() => { if (profile.driverId) { registerOutboxAutoSync(profile.driverId); void flushNavigationOutboxQueue(); } }, [profile.driverId]);
 
   useEffect(() => {
     if (isLoaded) {
@@ -310,7 +310,7 @@ export default function DriverCockpit() {
                 const { id, vehicle_no, car_number, driver_name, phone, default_navi } = dData.driver;
                 const fullVehicleNo = car_number ? `${vehicle_no} ${car_number}` : vehicle_no;
                 updateProfile({
-                  id, driverId:id, vehicleNo: fullVehicleNo,
+                  id, driverId: id, vehicleNo: fullVehicleNo,
                   carNumber: car_number || undefined,
                   driverName: driver_name || profile.driverName,
                   phone: phone || profile.phone,
@@ -1399,8 +1399,8 @@ export default function DriverCockpit() {
   }
 
   return (
-    <main className="driver-app min-h-dvh bg-[#F8FAFC] text-slate-800 flex flex-col items-center justify-between overflow-x-hidden selection:bg-[#1E60F3]/20">
-      <div className="w-full max-w-md mx-auto min-h-dvh pb-[calc(88px+env(safe-area-inset-bottom))] flex flex-col justify-between bg-white shadow-xl relative border-x border-slate-200/60 overflow-x-hidden">
+    <main className="driver-app min-h-dvh bg-[#F4F7FC] text-slate-800 flex flex-col items-center justify-between overflow-x-hidden selection:bg-[#1E60F3]/20">
+      <div className="w-full max-w-md mx-auto min-h-dvh pb-[calc(88px+env(safe-area-inset-bottom))] flex flex-col justify-between bg-[#F4F7FC] shadow-xl relative border-x border-slate-200/50 overflow-x-hidden">
         {/* Top Header with Safe Area Inset & Navi Switcher */}
         <Header
           profile={profile}
@@ -1570,7 +1570,7 @@ export default function DriverCockpit() {
               onOpenFlightModal={handleOpenFlightModalFromSchedule}
               onSwitchVehicle={(vNo) => {
                 // Vehicle tabs filter the authenticated driver's trips; they never switch people.
-                updateProfile({vehicleNo:vNo});
+                updateProfile({ vehicleNo: vNo });
                 fetchPresetsForVehicle(vNo);
               }}
             />
@@ -1578,7 +1578,6 @@ export default function DriverCockpit() {
         ) : null}
         {/* Keep the same editor mounted so switching tabs preserves unsaved input. */}
         {hasOpenedDrivingLog && <div hidden={activeTab !== 'log'} className="flex-1">
-          <div className="px-4 pt-4"><Link href="/driver/reports" className="flex items-center justify-between rounded-2xl border border-blue-100 bg-blue-50 px-4 py-4 text-sm font-semibold text-[#1E60F3]">VIP리무진코리아에 운행보고 보내기<span aria-hidden="true">↗</span></Link></div>
           <DrivingLogModal presentation="page" isOpen={true}
             onClose={() => selectDriverTab('drive')} driverProfile={profile} bookingId={activeBookingId}
             onOpenLocationSearch={() => { setIsSelectingForSchedule(true); setIsLocationSearchOpen(true); }}
@@ -1600,16 +1599,18 @@ export default function DriverCockpit() {
         profile={profile}
         isOnboarding={isOnboarding}
         onSave={async (updated) => {
-          const response=await fetch('/api/driver',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-            driverId:profile.driverId,driver_name:updated.driverName,phone:updated.phone || updated.mobile,
-            passenger_name:updated.passengerName ?? null,default_navi:updated.defaultNavi ?? profile.defaultNavi,
-          })});
-          const result=await response.json();
-          if(!response.ok || !result.ok) throw new Error(result.error || '프로필이 저장되지 않았습니다.');
-          const driver=result.driver;
-          updateProfile({...updated,id:driver.id,driverId:driver.id,vehicleNo:driver.vehicle_no || '',carNumber:driver.car_number || '',driverName:driver.driver_name,phone:driver.phone || ''});
-          localStorage.setItem('cockpit_driver_onboarded','true');
-          setIsOnboarding(false);setOnboardingStage(null);
+          const response = await fetch('/api/driver', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+              driverId: profile.driverId, driver_name: updated.driverName, phone: updated.phone || updated.mobile,
+              passenger_name: updated.passengerName ?? null, default_navi: updated.defaultNavi ?? profile.defaultNavi,
+            })
+          });
+          const result = await response.json();
+          if (!response.ok || !result.ok) throw new Error(result.error || '프로필이 저장되지 않았습니다.');
+          const driver = result.driver;
+          updateProfile({ ...updated, id: driver.id, driverId: driver.id, vehicleNo: driver.vehicle_no || '', carNumber: driver.car_number || '', driverName: driver.driver_name, phone: driver.phone || '' });
+          localStorage.setItem('cockpit_driver_onboarded', 'true');
+          setIsOnboarding(false); setOnboardingStage(null);
           return true;
         }}
       />
@@ -1729,10 +1730,10 @@ export default function DriverCockpit() {
           selectionTarget === 'origin'
             ? origin?.id
             : selectionTarget === 'waypoint'
-            ? (editingWaypointIndex >= 0 && editingWaypointIndex < waypoints.length
+              ? (editingWaypointIndex >= 0 && editingWaypointIndex < waypoints.length
                 ? waypoints[editingWaypointIndex]?.id
                 : undefined)
-            : destination?.id
+              : destination?.id
         }
         onSelectLocation={handleSelectLocationFromSearch}
         onOpenHomeModal={() => setIsHomeModalOpen(true)}
@@ -1802,8 +1803,8 @@ export default function DriverCockpit() {
           scheduleNaviFreshResult?.etaFormatted && scheduleNaviFreshResult.etaFormatted !== '--:--'
             ? `예상 ${scheduleNaviFreshResult.durationMinutes}분 (${scheduleNaviFreshResult.etaFormatted} 도착)`
             : routeEstimate?.etaFormatted
-            ? `예상 ${routeEstimate.durationMinutes}분 (${routeEstimate.etaFormatted} 도착)`
-            : undefined
+              ? `예상 ${routeEstimate.durationMinutes}분 (${routeEstimate.etaFormatted} 도착)`
+              : undefined
         }
         isLoadingFreshEta={isScheduleNaviLoading}
         naviProvider={profile.defaultNavi}

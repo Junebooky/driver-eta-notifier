@@ -27,7 +27,6 @@ interface QuickActionBarProps {
 }
 
 export const QuickActionBar: React.FC<QuickActionBarProps> = ({
-  isVipEnabled = false,
   onOpenDrivingLogModal,
   onOpenExpenseModal,
   onOpenInspectionModal,
@@ -38,383 +37,221 @@ export const QuickActionBar: React.FC<QuickActionBarProps> = ({
   onOpenRoadviewModal,
   onOpenFieldKnowledgeModal,
 }) => {
-  // 1. VIP KOREA Mode: 7 Buttons in Responsive 4 Top / 3 Centered Arrangement
-  if (isVipEnabled) {
-    return (
-      <div className="w-full bg-white border border-slate-100/80 rounded-2xl p-3.5 sm:p-4 shadow-[0_8px_25px_rgba(30,96,243,0.06)] select-none">
-        <div className="flex flex-col gap-3 sm:gap-3.5">
-          {/* Row 1: 4 Buttons (운행일지, 경비지출, 차량체크, 즐겨찾기) */}
-          <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
-            {/* 1. 운행일지 */}
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={() => {
-                haptics.lightTap();
-                onOpenDrivingLogModal?.();
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  onOpenDrivingLogModal?.();
-                }
-              }}
-              className="flex flex-col items-center cursor-pointer group"
-              title="당일 운행일지 작성 및 확인"
-            >
-              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white border border-slate-200/90 shadow-2xs flex items-center justify-center text-slate-700 hover:border-[#1E60F3] hover:text-[#1E60F3] hover:bg-blue-50/50 hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 group-hover:border-[#1E60F3] group-hover:text-[#1E60F3] group-hover:bg-blue-50/50 group-hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] group-hover:-translate-y-0.5">
-                <NotebookPen className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2]" />
-              </div>
-              <span className="mt-1.5 text-xs font-medium text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors truncate w-full">
-                운행일지
-              </span>
-            </div>
+  const circleClass =
+    'w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-[#F6F8FC] border border-slate-100/90 shadow-[0_2px_8px_rgba(15,23,42,0.03)] flex items-center justify-center text-slate-700 hover:border-[#1E60F3] hover:text-[#1E60F3] hover:bg-blue-50/60 hover:shadow-[0_4px_14px_rgba(30,96,243,0.16)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 group-hover:border-[#1E60F3] group-hover:text-[#1E60F3] group-hover:bg-blue-50/60 group-hover:shadow-[0_4px_14px_rgba(30,96,243,0.16)] group-hover:-translate-y-0.5';
 
-            {/* 2. 경비지출 */}
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={() => {
-                haptics.lightTap();
-                onOpenExpenseModal?.();
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  onOpenExpenseModal?.();
-                }
-              }}
-              className="flex flex-col items-center cursor-pointer group"
-              title="통행료·주차비 등 경비지출 관리"
-            >
-              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white border border-slate-200/90 shadow-2xs flex items-center justify-center text-slate-700 hover:border-[#1E60F3] hover:text-[#1E60F3] hover:bg-blue-50/50 hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 group-hover:border-[#1E60F3] group-hover:text-[#1E60F3] group-hover:bg-blue-50/50 group-hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] group-hover:-translate-y-0.5">
-                <ReceiptText className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2]" />
-              </div>
-              <span className="mt-1.5 text-xs font-medium text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors truncate w-full">
-                경비지출
-              </span>
-            </div>
-
-            {/* 3. 차량체크 */}
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={() => {
-                haptics.lightTap();
-                onOpenInspectionModal?.();
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  onOpenInspectionModal?.();
-                }
-              }}
-              className="flex flex-col items-center cursor-pointer group"
-              title="차량 인수·반납 체크"
-            >
-              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white border border-slate-200/90 shadow-2xs flex items-center justify-center text-slate-700 hover:border-[#1E60F3] hover:text-[#1E60F3] hover:bg-blue-50/50 hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 group-hover:border-[#1E60F3] group-hover:text-[#1E60F3] group-hover:bg-blue-50/50 group-hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] group-hover:-translate-y-0.5">
-                <ClipboardCheck className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2]" />
-              </div>
-              <span className="mt-1.5 text-xs font-medium text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors truncate w-full">
-                차량체크
-              </span>
-            </div>
-
-            {/* 4. 즐겨찾기 */}
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={() => {
-                haptics.lightTap();
-                if (onOpenPresetModal) {
-                  onOpenPresetModal();
-                } else if (onOpenAddModal) {
-                  onOpenAddModal();
-                }
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  if (onOpenPresetModal) onOpenPresetModal();
-                  else if (onOpenAddModal) onOpenAddModal();
-                }
-              }}
-              className="flex flex-col items-center cursor-pointer group"
-              title="거점 및 목적지 관리"
-            >
-              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white border border-slate-200/90 shadow-2xs flex items-center justify-center text-slate-700 hover:border-[#1E60F3] hover:text-[#1E60F3] hover:bg-blue-50/50 hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 group-hover:border-[#1E60F3] group-hover:text-[#1E60F3] group-hover:bg-blue-50/50 group-hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] group-hover:-translate-y-0.5">
-                <MapPinPlus className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2]" />
-              </div>
-              <span className="mt-1.5 text-xs font-medium text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors truncate w-full">
-                즐겨찾기
-              </span>
-            </div>
-          </div>
-
-          {/* Row 2: 4 Buttons (주유, 항공편, 로드뷰, 현장지식) */}
-          <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
-            {/* 5. 주유 */}
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={() => {
-                haptics.lightTap();
-                onOpenGasModal?.();
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  onOpenGasModal?.();
-                }
-              }}
-              className="flex flex-col items-center cursor-pointer group"
-              title="주변 주유소 실시간 유가 조회"
-            >
-              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white border border-slate-200/90 shadow-2xs flex items-center justify-center text-slate-700 hover:border-[#1E60F3] hover:text-[#1E60F3] hover:bg-blue-50/50 hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 group-hover:border-[#1E60F3] group-hover:text-[#1E60F3] group-hover:bg-blue-50/50 group-hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] group-hover:-translate-y-0.5">
-                <Fuel className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2]" />
-              </div>
-              <span className="mt-1.5 text-xs font-medium text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors truncate w-full">
-                주유
-              </span>
-            </div>
-
-            {/* 6. 항공편 */}
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={() => {
-                haptics.lightTap();
-                onOpenFlightModal?.();
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  onOpenFlightModal?.();
-                }
-              }}
-              className="flex flex-col items-center cursor-pointer group"
-              title="인천공항 실시간 운항 정보"
-            >
-              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white border border-slate-200/90 shadow-2xs flex items-center justify-center text-slate-700 hover:border-[#1E60F3] hover:text-[#1E60F3] hover:bg-blue-50/50 hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 group-hover:border-[#1E60F3] group-hover:text-[#1E60F3] group-hover:bg-blue-50/50 group-hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] group-hover:-translate-y-0.5">
-                <Plane className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2]" />
-              </div>
-              <span className="mt-1.5 text-xs font-medium text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors truncate w-full">
-                항공편
-              </span>
-            </div>
-
-            {/* 7. 로드뷰 */}
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={() => {
-                haptics.lightTap();
-                onOpenRoadviewModal?.();
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  onOpenRoadviewModal?.();
-                }
-              }}
-              className="flex flex-col items-center cursor-pointer group"
-              title="현장 로드뷰 및 진입로 사전 답사"
-            >
-              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white border border-slate-200/90 shadow-2xs flex items-center justify-center text-slate-700 hover:border-[#1E60F3] hover:text-[#1E60F3] hover:bg-blue-50/50 hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 group-hover:border-[#1E60F3] group-hover:text-[#1E60F3] group-hover:bg-blue-50/50 group-hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] group-hover:-translate-y-0.5">
-                <Eye className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2]" />
-              </div>
-              <span className="mt-1.5 text-xs font-medium text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors truncate w-full">
-                로드뷰
-              </span>
-            </div>
-
-            {/* 8. 현장지식 */}
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={() => {
-                haptics.lightTap();
-                onOpenFieldKnowledgeModal?.();
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  onOpenFieldKnowledgeModal?.();
-                }
-              }}
-              className="flex flex-col items-center cursor-pointer group"
-              title="주요 거점 진입로 및 현장 지식 가이드"
-            >
-              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white border border-slate-200/90 shadow-2xs flex items-center justify-center text-slate-700 hover:border-[#1E60F3] hover:text-[#1E60F3] hover:bg-blue-50/50 hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 group-hover:border-[#1E60F3] group-hover:text-[#1E60F3] group-hover:bg-blue-50/50 group-hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] group-hover:-translate-y-0.5">
-                <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2]" />
-              </div>
-              <span className="mt-1.5 text-xs font-medium text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors truncate w-full">
-                현장지식
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // 2. Standard Cockpit Mode (Unaffiliated users): 6-Button Row
   return (
-    <div className="w-full bg-white border border-slate-100/80 rounded-2xl p-3.5 sm:p-4 shadow-[0_8px_25px_rgba(30,96,243,0.06)] select-none">
-      <div className="grid grid-cols-6 gap-1.5 sm:gap-2">
-        {/* 1. 차량체크 */}
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => {
-            haptics.lightTap();
-            onOpenInspectionModal?.();
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
+    <div className="w-full bg-white border border-slate-100/90 rounded-3xl p-4 sm:p-5 shadow-[0_6px_24px_rgba(15,23,42,0.05)] select-none">
+      <div className="flex flex-col gap-3.5 sm:gap-4">
+        {/* Row 1: 4 Buttons (운행일지, 경비지출, 차량체크, 즐겨찾기) */}
+        <div className="grid grid-cols-4 gap-2 sm:gap-3">
+          {/* 1. 운행일지 */}
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => {
+              haptics.lightTap();
+              onOpenDrivingLogModal?.();
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onOpenDrivingLogModal?.();
+              }
+            }}
+            className="flex flex-col items-center cursor-pointer group"
+            title="당일 운행일지 작성 및 확인"
+          >
+            <div className={circleClass}>
+              <NotebookPen className="w-5 h-5 sm:w-5.5 sm:h-5.5 stroke-[1.9]" />
+            </div>
+            <span className="mt-1.5 text-xs font-semibold text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors truncate w-full">
+              운행일지
+            </span>
+          </div>
+
+          {/* 2. 경비지출 */}
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => {
+              haptics.lightTap();
+              onOpenExpenseModal?.();
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onOpenExpenseModal?.();
+              }
+            }}
+            className="flex flex-col items-center cursor-pointer group"
+            title="통행료·주차비 등 경비지출 관리"
+          >
+            <div className={circleClass}>
+              <ReceiptText className="w-5 h-5 sm:w-5.5 sm:h-5.5 stroke-[1.9]" />
+            </div>
+            <span className="mt-1.5 text-xs font-semibold text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors truncate w-full">
+              경비지출
+            </span>
+          </div>
+
+          {/* 3. 차량체크 */}
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => {
+              haptics.lightTap();
               onOpenInspectionModal?.();
-            }
-          }}
-          className="flex flex-col items-center cursor-pointer group"
-          title="차량 인수·반납 체크"
-        >
-          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white border border-slate-200/90 shadow-2xs flex items-center justify-center text-slate-700 hover:border-[#1E60F3] hover:text-[#1E60F3] hover:bg-blue-50/50 hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 group-hover:border-[#1E60F3] group-hover:text-[#1E60F3] group-hover:bg-blue-50/50 group-hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] group-hover:-translate-y-0.5">
-            <ClipboardCheck className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2]" />
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onOpenInspectionModal?.();
+              }
+            }}
+            className="flex flex-col items-center cursor-pointer group"
+            title="차량 인수·반납 체크"
+          >
+            <div className={circleClass}>
+              <ClipboardCheck className="w-5 h-5 sm:w-5.5 sm:h-5.5 stroke-[1.9]" />
+            </div>
+            <span className="mt-1.5 text-xs font-semibold text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors truncate w-full">
+              차량체크
+            </span>
           </div>
-          <span className="mt-1.5 text-xs font-medium text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors truncate w-full">
-            차량체크
-          </span>
+
+          {/* 4. 즐겨찾기 */}
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => {
+              haptics.lightTap();
+              if (onOpenPresetModal) {
+                onOpenPresetModal();
+              } else if (onOpenAddModal) {
+                onOpenAddModal();
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                if (onOpenPresetModal) onOpenPresetModal();
+                else if (onOpenAddModal) onOpenAddModal();
+              }
+            }}
+            className="flex flex-col items-center cursor-pointer group"
+            title="거점 및 목적지 관리"
+          >
+            <div className={circleClass}>
+              <MapPinPlus className="w-5 h-5 sm:w-5.5 sm:h-5.5 stroke-[1.9]" />
+            </div>
+            <span className="mt-1.5 text-xs font-semibold text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors truncate w-full">
+              즐겨찾기
+            </span>
+          </div>
         </div>
 
-        {/* 2. 즐겨찾기 */}
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => {
-            haptics.lightTap();
-            if (onOpenPresetModal) {
-              onOpenPresetModal();
-            } else if (onOpenAddModal) {
-              onOpenAddModal();
-            }
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              if (onOpenPresetModal) onOpenPresetModal();
-              else if (onOpenAddModal) onOpenAddModal();
-            }
-          }}
-          className="flex flex-col items-center cursor-pointer group"
-          title="거점 및 목적지 관리"
-        >
-          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white border border-slate-200/90 shadow-2xs flex items-center justify-center text-slate-700 hover:border-[#1E60F3] hover:text-[#1E60F3] hover:bg-blue-50/50 hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 group-hover:border-[#1E60F3] group-hover:text-[#1E60F3] group-hover:bg-blue-50/50 group-hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] group-hover:-translate-y-0.5">
-            <MapPinPlus className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2]" />
-          </div>
-          <span className="mt-1.5 text-xs font-medium text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors truncate w-full">
-            즐겨찾기
-          </span>
-        </div>
-
-        {/* 3. 주유 */}
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => {
-            haptics.lightTap();
-            onOpenGasModal?.();
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
+        {/* Row 2: 4 Buttons (주유, 항공편, 로드뷰, 현장지식) */}
+        <div className="grid grid-cols-4 gap-2 sm:gap-3">
+          {/* 5. 주유 */}
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => {
+              haptics.lightTap();
               onOpenGasModal?.();
-            }
-          }}
-          className="flex flex-col items-center cursor-pointer group"
-          title="주변 주유소 실시간 유가 조회"
-        >
-          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white border border-slate-200/90 shadow-2xs flex items-center justify-center text-slate-700 hover:border-[#1E60F3] hover:text-[#1E60F3] hover:bg-blue-50/50 hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 group-hover:border-[#1E60F3] group-hover:text-[#1E60F3] group-hover:bg-blue-50/50 group-hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] group-hover:-translate-y-0.5">
-            <Fuel className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2]" />
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onOpenGasModal?.();
+              }
+            }}
+            className="flex flex-col items-center cursor-pointer group"
+            title="주변 주유소 실시간 유가 조회"
+          >
+            <div className={circleClass}>
+              <Fuel className="w-5 h-5 sm:w-5.5 sm:h-5.5 stroke-[1.9]" />
+            </div>
+            <span className="mt-1.5 text-xs font-semibold text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors truncate w-full">
+              주유
+            </span>
           </div>
-          <span className="mt-1.5 text-xs font-medium text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors truncate w-full">
-            주유
-          </span>
-        </div>
 
-        {/* 4. 항공편 */}
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => {
-            haptics.lightTap();
-            onOpenFlightModal?.();
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
+          {/* 6. 항공편 */}
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => {
+              haptics.lightTap();
               onOpenFlightModal?.();
-            }
-          }}
-          className="flex flex-col items-center cursor-pointer group"
-          title="인천공항 실시간 운항 정보"
-        >
-          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white border border-slate-200/90 shadow-2xs flex items-center justify-center text-slate-700 hover:border-[#1E60F3] hover:text-[#1E60F3] hover:bg-blue-50/50 hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 group-hover:border-[#1E60F3] group-hover:text-[#1E60F3] group-hover:bg-blue-50/50 group-hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] group-hover:-translate-y-0.5">
-            <Plane className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2]" />
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onOpenFlightModal?.();
+              }
+            }}
+            className="flex flex-col items-center cursor-pointer group"
+            title="인천공항 실시간 운항 정보"
+          >
+            <div className={circleClass}>
+              <Plane className="w-5 h-5 sm:w-5.5 sm:h-5.5 stroke-[1.9]" />
+            </div>
+            <span className="mt-1.5 text-xs font-semibold text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors truncate w-full">
+              항공편
+            </span>
           </div>
-          <span className="mt-1.5 text-xs font-medium text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors truncate w-full">
-            항공편
-          </span>
-        </div>
 
-        {/* 5. 로드뷰 */}
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => {
-            haptics.lightTap();
-            onOpenRoadviewModal?.();
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
+          {/* 7. 로드뷰 */}
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => {
+              haptics.lightTap();
               onOpenRoadviewModal?.();
-            }
-          }}
-          className="flex flex-col items-center cursor-pointer group"
-          title="현장 로드뷰 및 진입로 사전 답사"
-        >
-          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white border border-slate-200/90 shadow-2xs flex items-center justify-center text-slate-700 hover:border-[#1E60F3] hover:text-[#1E60F3] hover:bg-blue-50/50 hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 group-hover:border-[#1E60F3] group-hover:text-[#1E60F3] group-hover:bg-blue-50/50 group-hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] group-hover:-translate-y-0.5">
-            <Eye className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2]" />
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onOpenRoadviewModal?.();
+              }
+            }}
+            className="flex flex-col items-center cursor-pointer group"
+            title="현장 로드뷰 및 진입로 사전 답사"
+          >
+            <div className={circleClass}>
+              <Eye className="w-5 h-5 sm:w-5.5 sm:h-5.5 stroke-[1.9]" />
+            </div>
+            <span className="mt-1.5 text-xs font-semibold text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors truncate w-full">
+              로드뷰
+            </span>
           </div>
-          <span className="mt-1.5 text-xs font-medium text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors truncate w-full">
-            로드뷰
-          </span>
-        </div>
 
-        {/* 6. 현장지식 */}
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => {
-            haptics.lightTap();
-            onOpenFieldKnowledgeModal?.();
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
+          {/* 8. 현장지식 */}
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => {
+              haptics.lightTap();
               onOpenFieldKnowledgeModal?.();
-            }
-          }}
-          className="flex flex-col items-center cursor-pointer group"
-          title="주요 거점 진입로 및 현장 지식 가이드"
-        >
-          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white border border-slate-200/90 shadow-2xs flex items-center justify-center text-slate-700 hover:border-[#1E60F3] hover:text-[#1E60F3] hover:bg-blue-50/50 hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 group-hover:border-[#1E60F3] group-hover:text-[#1E60F3] group-hover:bg-blue-50/50 group-hover:shadow-[0_4px_14px_rgba(30,96,243,0.18)] group-hover:-translate-y-0.5">
-            <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2]" />
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onOpenFieldKnowledgeModal?.();
+              }
+            }}
+            className="flex flex-col items-center cursor-pointer group"
+            title="주요 거점 진입로 및 현장 지식 가이드"
+          >
+            <div className={circleClass}>
+              <BookOpen className="w-5 h-5 sm:w-5.5 sm:h-5.5 stroke-[1.9]" />
+            </div>
+            <span className="mt-1.5 text-xs font-semibold text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors truncate w-full">
+              현장지식
+            </span>
           </div>
-          <span className="mt-1.5 text-xs font-medium text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors truncate w-full">
-            현장지식
-          </span>
         </div>
       </div>
     </div>

@@ -85,7 +85,7 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
   };
 
   return (
-    <div className="w-full bg-white border border-slate-100/80 rounded-2xl p-4 shadow-[0_8px_25px_rgba(30,96,243,0.06)] space-y-2 select-none transition-all duration-300 ease-in-out">
+    <div className="w-full bg-white border border-slate-100/90 rounded-3xl p-4 shadow-[0_6px_24px_rgba(15,23,42,0.05)] space-y-3 select-none transition-all duration-300 ease-in-out">
       {hasWaypoints ? (
         /* Vertical Multi-Tier Slim Inline View (Origin ➔ Waypoints (1~5) ➔ Destination) */
         <div className="space-y-1.5 w-full transition-all duration-300 ease-in-out animate-in fade-in slide-in-from-top-2">
@@ -276,18 +276,15 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
       ) : (
         /* Horizontal Cards (Origin ⇄ Destination) */
         <div className="flex items-center space-x-2.5 w-full">
-          {/* Origin Card (Neutral Gray 기준점) */}
+          {/* Origin Card (Clean Volumetric White Card) */}
           <div
             onClick={handleOriginClick}
-            className={`flex-1 min-w-0 w-full py-2.5 px-3 rounded-2xl border text-left cursor-pointer transition-all duration-150 active:scale-95 ${selectionTarget === 'origin'
-              ? 'bg-slate-50/80 text-slate-800 border-slate-300/90 ring-2 ring-slate-200/60 shadow-xs'
-              : 'bg-white border-slate-200/80 hover:border-slate-300'
-              }`}
+            className="flex-1 min-w-0 w-full py-3 px-3.5 rounded-2xl bg-white border border-slate-100/90 hover:border-slate-200 shadow-[0_3px_14px_rgba(15,23,42,0.05)] text-left cursor-pointer transition-all duration-150 active:scale-95"
             title="출발지 검색 및 변경"
           >
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-1.5">
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
+                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#F3F6FB] text-slate-600 shrink-0">
                   출발지
                 </span>
                 {onSetCurrentLocation && (
@@ -299,7 +296,7 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
                       onSetCurrentLocation();
                     }}
                     disabled={isLocatingGps}
-                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 hover:bg-blue-100 text-[#1E60F3] border border-blue-200/80 active:scale-95 transition-all cursor-pointer shadow-2xs"
+                    className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-blue-50 hover:bg-blue-100 text-[#1E60F3] active:scale-95 transition-all cursor-pointer"
                     title="현재 위치(GPS)를 출발지로 설정"
                   >
                     {isLocatingGps ? (
@@ -312,12 +309,11 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
                 )}
               </div>
               <span className="text-[10px] text-slate-400 font-medium flex items-center gap-0.5 group-hover:text-slate-600">
-                <Search className="w-3 h-3 text-slate-400" />
+                <Search className="w-3.5 h-3.5 text-slate-400" />
               </span>
             </div>
             <div
-              className={`text-base font-bold truncate mt-1 w-full flex items-center gap-1 ${selectionTarget === 'origin' ? 'text-slate-900' : 'text-slate-700'
-                }`}
+              className="text-[15px] sm:text-base font-extrabold truncate mt-1.5 w-full flex items-center gap-1 text-slate-900"
               title={origin.name}
             >
               <span className="truncate">{origin.shortName}</span>
@@ -326,8 +322,7 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
               )}
             </div>
             <div
-              className={`text-[11px] truncate mt-0.5 font-normal w-full ${selectionTarget === 'origin' ? 'text-slate-500' : 'text-slate-400'
-                }`}
+              className="text-[11px] truncate mt-0.5 font-medium w-full text-slate-400"
               title={origin.address || origin.name}
             >
               {origin.address || origin.name}
@@ -344,7 +339,7 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
                   haptics.mediumTap();
                   onAddWaypoint();
                 }}
-                className="w-8 h-8 rounded-full bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-50 active:scale-95 transition-all cursor-pointer"
+                className="w-8 h-8 rounded-full bg-white border border-slate-100/90 shadow-[0_2px_8px_rgba(15,23,42,0.06)] flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-50 active:scale-95 transition-all cursor-pointer"
                 title="경유지 추가"
                 aria-label="경유지 추가"
               >
@@ -362,7 +357,7 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
                 haptics.successPulse();
                 onSwap?.();
               }}
-              className="w-8 h-8 rounded-full bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 shadow-[0_2px_8px_rgba(0,0,0,0.04)] flex items-center justify-center shrink-0 active:scale-90 transition-transform duration-100 cursor-pointer"
+              className="w-8 h-8 rounded-full bg-white hover:bg-slate-50 text-slate-500 border border-slate-100/90 shadow-[0_2px_8px_rgba(15,23,42,0.06)] flex items-center justify-center shrink-0 active:scale-90 transition-transform duration-100 cursor-pointer"
               title="출발지 ⇄ 목적지 맞교환"
               aria-label="출발지 목적지 맞교환"
             >
@@ -370,18 +365,15 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
             </button>
           </div>
 
-          {/* Destination Card (2px Cobalt Outline 핵심 타깃 - 순수 화이트 배경) */}
+          {/* Destination Card (Clean Volumetric White Card) */}
           <div
             onClick={handleDestinationClick}
-            className={`flex-1 min-w-0 w-full py-2.5 px-3 rounded-2xl text-left cursor-pointer transition-all duration-150 active:scale-95 ${selectionTarget === 'destination'
-              ? 'bg-white border-2 border-[#1E60F3] shadow-sm shadow-blue-500/10'
-              : 'bg-white border border-slate-200/80 hover:border-slate-300'
-              }`}
+            className="flex-1 min-w-0 w-full py-3 px-3.5 rounded-2xl bg-white border border-slate-100/90 hover:border-slate-200 shadow-[0_3px_14px_rgba(15,23,42,0.05)] text-left cursor-pointer transition-all duration-150 active:scale-95"
             title="목적지 검색 및 변경"
           >
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-1.5 min-w-0">
-                <span className="px-1.5 py-0.5 rounded text-[10px] bg-[#1E60F3] text-white font-bold shrink-0 shadow-xs">
+                <span className="px-2 py-0.5 rounded-md text-[10px] bg-[#1E60F3] text-white font-bold shrink-0">
                   목적지
                 </span>
                 {isAdminRoute && adminWaypoints && adminWaypoints.length > 0 && (
@@ -408,15 +400,15 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
                   </button>
                 )}
               </div>
-              <span className="text-[10px] text-blue-500 font-medium flex items-center gap-0.5 shrink-0">
-                <Search className="w-3 h-3 text-[#1E60F3]" />
+              <span className="text-[10px] text-slate-400 font-medium flex items-center gap-0.5 shrink-0">
+                <Search className="w-3.5 h-3.5 text-slate-400" />
               </span>
             </div>
-            <div className="text-base font-bold truncate mt-1 w-full text-slate-900" title={destination.name}>
+            <div className="text-[15px] sm:text-base font-extrabold truncate mt-1.5 w-full text-slate-900" title={destination.name}>
               {destination.shortName}
             </div>
             <div
-              className="text-[11px] truncate mt-0.5 font-normal w-full text-slate-500"
+              className="text-[11px] truncate mt-0.5 font-medium w-full text-slate-400"
               title={destination.address || destination.name}
             >
               {destination.address || destination.name}
@@ -478,8 +470,8 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
           </span>
         </div>
 
-        {/* Action Buttons: [💡 현장 팁 3] and [🔖] */}
-        <div className="flex items-center gap-1.5 shrink-0">
+        {/* Action Buttons: [💡 현장 팁] and [🔖] */}
+        <div className="flex items-center gap-2 shrink-0">
           {onOpenFieldTips && (
             <button
               type="button"
@@ -488,12 +480,12 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
                 haptics.selection();
                 onOpenFieldTips();
               }}
-              className="h-8 px-3 rounded-xl bg-white border border-[#1E60F3] shadow-2xs flex items-center gap-1.5 text-[#1E60F3] hover:bg-blue-50/60 active:scale-95 transition-all cursor-pointer"
+              className="h-9 px-3.5 rounded-full bg-white border border-slate-100/90 shadow-[0_3px_10px_rgba(15,23,42,0.06)] flex items-center gap-1.5 text-[#1E60F3] hover:bg-blue-50/40 active:scale-95 transition-all cursor-pointer"
               title="현장 팁 보기"
               aria-label="현장 팁 보기"
             >
               <Lightbulb className="w-3.5 h-3.5 fill-[#1E60F3] text-[#1E60F3]" />
-              <span className="text-xs font-black tracking-tight">
+              <span className="text-xs font-extrabold tracking-tight">
                 현장 팁 {fieldTipsCount}
               </span>
             </button>
@@ -507,7 +499,7 @@ export const OriginDestinationSelector: React.FC<OriginDestinationSelectorProps>
                 haptics.mediumTap();
                 onSaveRouteAsPreset();
               }}
-              className="w-8 h-8 rounded-xl bg-white border border-slate-200 shadow-2xs flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-50 active:scale-95 transition-all cursor-pointer"
+              className="w-9 h-9 rounded-full bg-white border border-slate-100/90 shadow-[0_3px_10px_rgba(15,23,42,0.06)] flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-50 active:scale-95 transition-all cursor-pointer"
               title="현재 경로를 거점으로 저장"
               aria-label="현재 경로를 거점으로 저장"
             >

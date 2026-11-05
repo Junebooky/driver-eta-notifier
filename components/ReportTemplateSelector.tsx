@@ -282,20 +282,20 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
   };
 
   return (
-    <div className="w-full bg-white border border-slate-100/80 rounded-2xl p-4 shadow-[0_8px_25px_rgba(30,96,243,0.06)] space-y-3 select-none">
+    <div className="w-full bg-white border border-slate-100/90 rounded-3xl p-4 sm:p-5 shadow-[0_6px_24px_rgba(15,23,42,0.05)] space-y-3.5 select-none">
       {/* Header: Title with electric cobalt document icon */}
       <div className="flex items-center space-x-2">
-        <div className="w-5 h-5 rounded-md bg-[#1E60F3] text-white flex items-center justify-center shadow-[0_2px_6px_rgba(30,96,243,0.3)]">
+        <div className="w-6 h-6 rounded-full bg-[#1E60F3] text-white flex items-center justify-center shadow-[0_2px_6px_rgba(30,96,243,0.3)]">
           <FileText className="w-3.5 h-3.5 text-white" />
         </div>
-        <h3 className="text-base font-bold text-slate-900 tracking-tight">단톡방 보고</h3>
+        <h3 className="text-base font-extrabold text-slate-900 tracking-tight">단톡방 보고</h3>
       </div>
 
       {/* Mode Selector: Unified Sliding Segmented Control */}
-      <div className="w-full bg-slate-100/90 p-1 rounded-full relative flex items-center select-none shadow-inner">
+      <div className="w-full bg-[#F4F7FC] p-1 rounded-full relative flex items-center select-none border border-slate-100/80">
         {/* Sliding Indicator Pill */}
         <div
-          className={`w-[calc(50%-4px)] h-[calc(100%-8px)] absolute top-1 left-1 rounded-full bg-[#1E60F3] shadow-[0_4px_14px_rgba(30,96,243,0.35)] transition-transform duration-300 ease-out pointer-events-none transform ${
+          className={`w-[calc(50%-4px)] h-[calc(100%-8px)] absolute top-1 left-1 rounded-full bg-[#0055FF] shadow-[0_4px_14px_rgba(0,85,255,0.30)] transition-transform duration-300 ease-out pointer-events-none transform ${
             isDeparture ? 'translate-x-0' : 'translate-x-full'
           }`}
         />
@@ -351,9 +351,9 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
         </button>
       </div>
 
-      {/* Live Report Preview Box (Stabilized Height to prevent Action Button Layout Shift) */}
-      <div className="bg-slate-50/70 border border-slate-100 rounded-xl p-3 space-y-2">
-        <div className="text-sm text-slate-400 font-normal px-0.5 flex items-center justify-between">
+      {/* Live Report Preview Box */}
+      <div className="bg-[#F8FAFC] border border-slate-100/90 rounded-2xl p-3.5 space-y-2.5">
+        <div className="text-xs sm:text-[13px] text-slate-400 font-semibold px-0.5 flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <span>보고 텍스트 미리보기</span>
             {language === 'en' && (
@@ -365,7 +365,6 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
 
           {/* Action Buttons: Globe (left) & Copy (right) */}
           <div className="flex items-center space-x-1.5">
-            {/* Task 1: Globe Button immediately to the LEFT of the Copy button with circular button style */}
             <button
               type="button"
               onClick={handleToggleLanguage}
@@ -373,7 +372,7 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
               className={`w-8 h-8 rounded-full border flex items-center justify-center transition-all active:scale-90 cursor-pointer ${
                 language === 'en'
                   ? 'bg-blue-50 hover:bg-blue-100 text-[#1E60F3] border-blue-200/80 shadow-[0_2px_6px_rgba(30,96,243,0.15)]'
-                  : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-200/80'
+                  : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-100/90 shadow-[0_2px_6px_rgba(15,23,42,0.05)]'
               }`}
               title={language === 'en' ? '한국어 보고서로 전환' : 'Switch to English Report'}
               aria-label="보고서 언어 전환"
@@ -385,11 +384,10 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
               )}
             </button>
 
-            {/* Existing Copy Button with circular button style */}
             <button
               type="button"
               onClick={handleCopyMinimal}
-              className="w-8 h-8 rounded-full border border-slate-200/80 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-600 transition-all active:scale-90 cursor-pointer"
+              className="w-8 h-8 rounded-full border border-slate-100/90 shadow-[0_2px_6px_rgba(15,23,42,0.05)] flex items-center justify-center bg-white hover:bg-slate-50 text-slate-600 transition-all active:scale-90 cursor-pointer"
               title="양식 복사"
               aria-label="양식 복사"
             >
@@ -403,7 +401,7 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
         </div>
 
         {/* Text Area Display */}
-        <div className="text-xs font-medium text-slate-800 leading-relaxed bg-white p-3 rounded-xl border border-slate-200/80 shadow-[0_2px_8px_rgba(0,0,0,0.03)] select-all whitespace-pre-line font-sans min-h-[130px] flex flex-col justify-start items-start text-left w-full">
+        <div className="text-xs sm:text-[13px] font-semibold text-slate-800 leading-relaxed bg-white p-3.5 rounded-2xl border border-slate-100/90 shadow-[0_2px_10px_rgba(15,23,42,0.03)] select-all whitespace-pre-line font-sans min-h-[84px] flex flex-col justify-center items-start text-left w-full">
           {displayedReportText}
         </div>
       </div>
