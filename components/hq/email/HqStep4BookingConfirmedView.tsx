@@ -26,9 +26,23 @@ export const HqStep4BookingConfirmedView: React.FC<HqStep4BookingConfirmedViewPr
   const dateLabel = dates.length > 1
     ? `${firstDate} ~ ${lastDate} · ${dates.length}일`
     : firstDate || '날짜 미지정';
+  const dailyRoutes = (extractedDraft.waypoints || []).reduce<
+    Array<{ date: string; first: string; last: string; count: number }>
+  >((days, waypoint) => {
+    const date = waypoint.date?.trim() || extractedDraft.pickupDate || '날짜 미지정';
+    const location = waypoint.location?.trim() || '장소 미지정';
+    const current = days.find((day) => day.date === date);
+    if (current) {
+      current.last = location;
+      current.count += 1;
+    } else {
+      days.push({ date, first: location, last: location, count: 1 });
+    }
+    return days;
+  }, []).sort((left, right) => left.date.localeCompare(right.date));
+
   const routeLabel = [extractedDraft.pickupLocation, extractedDraft.dropoffLocation]
-    .filter(Boolean)
-    .join(' → ') || '경로 미지정';
+    .filter(Boolean).join(' → ') || '경로 미지정';
 
   return (
     <section
@@ -76,7 +90,24 @@ export const HqStep4BookingConfirmedView: React.FC<HqStep4BookingConfirmedViewPr
             </div>
             <div className="flex items-start justify-between gap-4">
               <dt className="shrink-0 text-slate-500">운행 경로</dt>
-              <dd className="min-w-0 text-right font-medium leading-relaxed text-slate-800">{routeLabel}</dd>
+              <dd className="min-w-0 flex-1 text-right font-medium leading-relaxed text-slate-800">
+                {dailyRoutes.length > 1 ? (
+                  <div className="space-y-2.5">
+                    {dailyRoutes.map((day) => (
+                      <div key={day.date} className="flex flex-col gap-0.5">
+                        <span className="text-[11px] font-normal text-slate-500">
+                          {day.date} · {day.count}곳
+                        </span>
+                        <span>{day.first} → {day.last}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <span>{dailyRoutes.length === 1
+                    ? `${dailyRoutes[0].first} → ${dailyRoutes[0].last}`
+                    : routeLabel}</span>
+                )}
+              </dd>
             </div>
             <div className="flex items-start justify-between gap-4">
               <dt className="shrink-0 text-slate-500">요청 차량</dt>
