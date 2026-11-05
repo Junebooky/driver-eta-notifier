@@ -1135,11 +1135,10 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                   <button
                     type="submit"
                     disabled={lat === null || !name.trim() || isSaveSuccess}
-                    className={`flex-1 py-3.5 rounded-2xl text-white text-[15px] font-bold shadow-[0_4px_14px_rgba(0,85,255,0.22)] transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1.5 ${
-                      isSaveSuccess
-                        ? 'bg-[#0055FF]'
-                        : 'bg-[#0055FF] hover:bg-[#0044CC] disabled:opacity-40'
-                    }`}
+                    className={`flex-1 py-3.5 rounded-2xl text-white text-[15px] font-bold shadow-[0_4px_14px_rgba(0,85,255,0.22)] transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1.5 ${isSaveSuccess
+                      ? 'bg-[#0055FF]'
+                      : 'bg-[#0055FF] hover:bg-[#0044CC] disabled:opacity-40'
+                      }`}
                   >
                     {isSaveSuccess && <Check className="w-4 h-4 stroke-[2.5] animate-in zoom-in duration-150" />}
                     <span>{isSaveSuccess ? '저장 완료' : editingItem ? '수정 완료' : '저장'}</span>
@@ -1233,11 +1232,10 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                           key={chip}
                           type="button"
                           onClick={() => setName(chip)}
-                          className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer ${
-                            name === chip
-                              ? 'bg-[#EBF3FF] text-[#0055FF] border-blue-200'
-                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                          }`}
+                          className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer ${name === chip
+                            ? 'bg-[#EBF3FF] text-[#0055FF] border-blue-200'
+                            : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                            }`}
                         >
                           {chip}
                         </button>
@@ -1270,11 +1268,10 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                   <button
                     type="submit"
                     disabled={lat === null || !name.trim() || isSaveSuccess}
-                    className={`flex-1 py-3.5 rounded-2xl text-white text-[15px] font-bold shadow-[0_4px_14px_rgba(0,85,255,0.22)] transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1.5 ${
-                      isSaveSuccess
-                        ? 'bg-[#0055FF]'
-                        : 'bg-[#0055FF] hover:bg-[#0044CC] disabled:opacity-40'
-                    }`}
+                    className={`flex-1 py-3.5 rounded-2xl text-white text-[15px] font-bold shadow-[0_4px_14px_rgba(0,85,255,0.22)] transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1.5 ${isSaveSuccess
+                      ? 'bg-[#0055FF]'
+                      : 'bg-[#0055FF] hover:bg-[#0044CC] disabled:opacity-40'
+                      }`}
                   >
                     {isSaveSuccess && <Check className="w-4 h-4 stroke-[2.5] animate-in zoom-in duration-150" />}
                     <span>{isSaveSuccess ? '저장 완료' : isHomeEditMode ? '자택 수정' : '자택 저장'}</span>
@@ -1291,7 +1288,6 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
             <div className="space-y-3 pt-1">
               <div className="flex items-center justify-between px-1">
                 <span className="flex items-center gap-1.5 text-[15px] font-black text-slate-900">
-                  <MapPin className="w-4 h-4 text-[#0055FF]" />
                   <span>자주 가는 장소</span>
                 </span>
                 <span className="text-[12px] text-slate-400 font-medium">
@@ -1374,13 +1370,12 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                                 onClearHighlight?.();
                                 handleCardClick(preset);
                               }}
-                              className={`relative min-h-[68px] py-3 px-2.5 rounded-2xl border text-center flex flex-col justify-center items-center transition-all duration-300 select-none group cursor-grab active:cursor-grabbing will-change-transform ${
-                                isBeingDragged
-                                  ? 'scale-105 shadow-xl ring-2 ring-[#0055FF]/40 z-30 opacity-90 border-2 border-[#0055FF] bg-[#EBF3FF]/60'
-                                  : isNewlyAdded
-                                    ? 'bg-[#EBF3FF]/40 border-2 border-dashed border-[#0055FF] shadow-[0_0_12px_rgba(0,85,255,0.22)]'
-                                    : 'bg-white border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)] hover:border-blue-200 active:scale-95'
-                              }`}
+                              className={`relative min-h-[68px] py-3 px-2.5 rounded-2xl border text-center flex flex-col justify-center items-center transition-all duration-300 select-none group cursor-grab active:cursor-grabbing will-change-transform ${isBeingDragged
+                                ? 'scale-105 shadow-xl ring-2 ring-[#0055FF]/40 z-30 opacity-90 border-2 border-[#0055FF] bg-[#EBF3FF]/60'
+                                : isNewlyAdded
+                                  ? 'bg-[#EBF3FF]/40 border-2 border-dashed border-[#0055FF] shadow-[0_0_12px_rgba(0,85,255,0.22)]'
+                                  : 'bg-white border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)] hover:border-blue-200 active:scale-95'
+                                }`}
                               style={{
                                 transition: isBeingDragged ? 'none' : 'transform 300ms cubic-bezier(0.2, 0, 0, 1), box-shadow 200ms ease',
                                 touchAction: isBeingDragged ? 'none' : 'manipulation',
@@ -1461,11 +1456,10 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                         }
                       }}
                       aria-label={`페이지 ${idx + 1}`}
-                      className={`h-2 rounded-full transition-all duration-300 cursor-pointer focus:outline-none ${
-                        isActive
-                          ? 'w-7 bg-[#0055FF]'
-                          : 'w-2 bg-slate-300 hover:bg-slate-400'
-                      }`}
+                      className={`h-2 rounded-full transition-all duration-300 cursor-pointer focus:outline-none ${isActive
+                        ? 'w-7 bg-[#0055FF]'
+                        : 'w-2 bg-slate-300 hover:bg-slate-400'
+                        }`}
                     />
                   );
                 })}
