@@ -29,6 +29,7 @@ test('public report optimistically removes its composer draft before waiting for
  assert.match(handler,/setDraft\(item\.body\)/);
  assert.match(src,/visibleItems\.map\(item=>/);
  assert.match(src,/<ChatTypingBubble insidePaddedViewport\/>/);
+ assert.match(src,/reportActive&&!busy&&<ReportServicePicker/); // no picker below typing while sending
 });
 
 test('both chat views use gentle bottom-up motion with reduced-motion fallback',()=>{
@@ -39,6 +40,7 @@ test('both chat views use gentle bottom-up motion with reduced-motion fallback',
  assert.match(css,/prefers-reduced-motion: no-preference/);
  assert.match(driver,/vip-chat-outgoing-enter/);
  assert.match(shared,/vip-chat-outgoing-enter/);
+ assert.match(driver,/reportActive&&!sending&&<div/); // keep driver typing bubble in view
  assert.match(driver,/await waitForChatTyping\(\)/);
  assert.match(shared,/await waitForChatTyping\(\)/);
 });
