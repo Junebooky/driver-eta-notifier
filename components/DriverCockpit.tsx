@@ -1377,7 +1377,7 @@ export default function DriverCockpit() {
   // Pre-initialization & Onboarding Splash Gate: completely blocks dashboard FOUC on initial mount
   if (!isInitialized || (isOnboarding && onboardingStage === 'splash')) {
     return (
-      <div className="fixed inset-0 z-50 bg-[#F2F4F6] flex flex-col items-center justify-center p-6 text-center select-none">
+      <div className="fixed inset-0 z-50 bg-inherit flex flex-col items-center justify-center p-6 text-center select-none">
         <div className="flex flex-col items-center max-w-xs animate-in zoom-in-95 duration-300">
           <img
             src="/cockpit_app_icon.png"
@@ -1399,8 +1399,8 @@ export default function DriverCockpit() {
   }
 
   return (
-    <main className="driver-app min-h-dvh bg-[#F2F4F6] text-slate-800 flex flex-col items-center justify-between overflow-x-hidden selection:bg-[#1E60F3]/20">
-      <div className="w-full max-w-md mx-auto min-h-dvh pb-[calc(88px+env(safe-area-inset-bottom))] flex flex-col justify-between bg-[#F2F4F6] shadow-xl relative border-x border-slate-200/50 overflow-x-hidden">
+    <main className="driver-app min-h-dvh bg-inherit text-slate-800 flex flex-col items-center justify-between overflow-x-hidden selection:bg-[#1E60F3]/20">
+      <div className="w-full max-w-md mx-auto min-h-dvh pb-[calc(88px+env(safe-area-inset-bottom))] flex flex-col justify-between bg-inherit shadow-xl relative border-x border-slate-200/50 overflow-x-hidden">
         {/* Top Header with Safe Area Inset & Navi Switcher */}
         <Header
           profile={profile}
@@ -1577,7 +1577,7 @@ export default function DriverCockpit() {
           </div>
         ) : null}
         {/* Keep the same editor mounted so switching tabs preserves unsaved input. */}
-        {hasOpenedDrivingLog && <div hidden={activeTab !== 'log'} className="flex-1">
+        {hasOpenedDrivingLog && <div hidden={activeTab !== 'log'} className="flex-1 bg-inherit">
           <DrivingLogModal presentation="page" isOpen={true}
             onClose={() => selectDriverTab('drive')} driverProfile={profile} bookingId={activeBookingId}
             onOpenProfileModal={() => setIsProfileModalOpen(true)}

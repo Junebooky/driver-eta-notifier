@@ -75,8 +75,8 @@ export function parsePhoneDetails(raw?: string): {
 }
 
 function profileVehicleDetails(profile: DriverProfile) {
-  const vehicle=parseVehicleDetails(profile.vehicleNo);
-  return profile.carNumber ? {...parseVehicleDetails(profile.carNumber),hocha:vehicle.hocha} : vehicle;
+  const vehicle = parseVehicleDetails(profile.vehicleNo);
+  return profile.carNumber ? { ...parseVehicleDetails(profile.carNumber), hocha: vehicle.hocha } : vehicle;
 }
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({
@@ -493,12 +493,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     }
 
     try {
-      const saved=await onSave(payload);
-      if(saved===false)throw new Error('프로필이 저장되지 않았습니다.');
-      setIsMounted(false);onClose();
-    } catch(error) {
+      const saved = await onSave(payload);
+      if (saved === false) throw new Error('프로필이 저장되지 않았습니다.');
+      setIsMounted(false); onClose();
+    } catch (error) {
       setValidationMsg(error instanceof Error ? error.message : '저장에 실패했습니다. 다시 시도해 주세요.');
-    } finally {setIsSaving(false);}
+    } finally { setIsSaving(false); }
 
   };
 
@@ -526,8 +526,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
         <div className="flex items-center justify-between px-5 pt-4 pb-2.5 bg-[#F6F8FC] shrink-0">
           <div className="flex items-center space-x-2.5">
             <img
-              src="/cockpit_app_icon.png"
-              alt="Protocol Cockpit"
+              src="images/icons/drivers/icon_driver.png"
+              alt="프로필설정 아이콘"
               className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl shadow-xs object-cover shrink-0"
             />
             <h2 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
@@ -554,7 +554,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           {/* 1. Hocha (Optional) Field */}
           <div className="relative">
             <label className="text-xs sm:text-[13px] font-bold text-slate-800 mb-1.5 flex items-center">
-              <Car className="w-4 h-4 mr-1.5 text-[#1E60F3] stroke-[2]" /> 호차 (선택)
+              호차 (선택)
             </label>
             <div className="relative flex items-center bg-white rounded-2xl border border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)] focus-within:border-[#1E60F3] focus-within:ring-2 focus-within:ring-[#1E60F3]/10 transition-all">
               <input
@@ -648,7 +648,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           <div>
             <label className="text-xs sm:text-[13px] font-bold text-slate-800 mb-1.5 flex items-center justify-between">
               <span className="flex items-center">
-                <Car className="w-4 h-4 mr-1.5 text-[#1E60F3] stroke-[2]" /> 차량 번호판
+                차량 번호판
               </span>
               {plateError && (
                 <span className="text-[10px] font-bold text-rose-500 bg-rose-50 border border-rose-200/80 px-2 py-0.5 rounded-md flex items-center gap-1 animate-fade-in shadow-2xs">
@@ -697,7 +697,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           <div>
             <label className="text-xs sm:text-[13px] font-bold text-slate-800 mb-1.5 flex items-center justify-between">
               <span className="flex items-center">
-                <User className="w-4 h-4 mr-1.5 text-[#1E60F3] stroke-[2]" /> 드라이버 성명
+                드라이버 성명
               </span>
               {nameError && (
                 <span className="text-[10.5px] font-bold text-rose-500 bg-rose-50 border border-rose-200/80 px-2 py-0.5 rounded-md flex items-center gap-1.5 animate-fade-in shadow-2xs">
@@ -730,7 +730,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           <div>
             <label className="text-xs sm:text-[13px] font-bold text-slate-800 mb-1.5 flex items-center justify-between">
               <span className="flex items-center">
-                <Phone className="w-4 h-4 mr-1.5 text-[#1E60F3] stroke-[2]" /> 연락처
+                연락처
               </span>
               {phoneError && (
                 <span className="text-[10.5px] font-bold text-rose-500 bg-rose-50 border border-rose-200/80 px-2 py-0.5 rounded-md flex items-center gap-1.5 animate-fade-in shadow-2xs">
@@ -804,7 +804,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           {/* 5. Passenger Name Field */}
           <div>
             <label className="text-xs sm:text-[13px] font-bold text-slate-800 mb-1.5 flex items-center">
-              <Users className="w-4 h-4 mr-1.5 text-[#1E60F3] stroke-[2]" /> 담당 승객명
+              담당 승객명
             </label>
             <input
               type="text"

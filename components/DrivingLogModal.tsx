@@ -344,7 +344,7 @@ const DrivingLogModalContent: React.FC<{
 
   return (
     <div
-      className={presentation === 'page' ? "w-full select-none" : "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in select-none overscroll-contain"}
+      className={presentation === 'page' ? "w-full bg-inherit select-none" : "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in select-none overscroll-contain"}
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           haptics.lightTap();
@@ -353,7 +353,7 @@ const DrivingLogModalContent: React.FC<{
       }}
     >
       <div
-        className={presentation === 'page' ? "relative flex min-h-[70dvh] w-full flex-col bg-[#F2F4F6]" : "w-full max-w-lg bg-[#F2F4F6] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[92dvh] h-[92dvh] sm:h-auto sm:max-h-[90vh] animate-in slide-in-from-bottom-6 sm:animate-scale-up duration-300 relative"}
+        className={presentation === 'page' ? "relative flex min-h-[70dvh] w-full flex-col bg-inherit" : "w-full max-w-lg bg-[#F6F8FC] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[92dvh] h-[92dvh] sm:h-auto sm:max-h-[90vh] animate-in slide-in-from-bottom-6 sm:animate-scale-up duration-300 relative"}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Main Scrollable Content */}
@@ -596,8 +596,8 @@ const DrivingLogModalContent: React.FC<{
             <button
               type="button"
               onClick={() => {
-                setTempStartKm(logData.startKm);
-                setTempEndKm(logData.endKm);
+                setTempStartKm(formatOdometer(logData.startKm));
+                setTempEndKm(formatOdometer(logData.endKm));
                 setMileageError(null);
                 setIsEditingMileage(true);
               }}
@@ -855,7 +855,7 @@ const DrivingLogModalContent: React.FC<{
         </section>
 
         {/* 7. Bottom Action Buttons inside Modal Card */}
-        <div className="px-4 pb-4 pt-2 bg-[#F2F4F6] shrink-0">
+        <div className="px-4 pb-4 pt-2 bg-inherit shrink-0">
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -924,10 +924,10 @@ const DrivingLogModalContent: React.FC<{
                     document.getElementById(`wheel-min-${mm}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
                   }, 30);
                 }}
-                className="px-3 py-1.5 rounded-full bg-[#1E60F3] hover:bg-blue-600 text-white text-xs font-extrabold shadow-xs active:scale-95 transition-all cursor-pointer flex items-center gap-1"
+                className="px-2 py-1 text-xs font-medium text-blue-600 hover:text-blue-700 active:scale-95 transition-all cursor-pointer flex items-center gap-1"
               >
                 <Clock className="w-3.5 h-3.5" />
-                <span>현재 시각 적용</span>
+                <span>지금</span>
               </button>
             </div>
 
@@ -1029,7 +1029,7 @@ const DrivingLogModalContent: React.FC<{
                   draggable={false}
                 />
                 <h3 className="text-base sm:text-[17px] font-extrabold text-slate-900 tracking-tight">
-                  계기판 주행거리 (km) 입력
+                  주행거리 입력
                 </h3>
               </div>
               <button
@@ -1055,7 +1055,7 @@ const DrivingLogModalContent: React.FC<{
                   type="text"
                   inputMode="numeric"
                   value={tempStartKm}
-                  onChange={(e) => setTempStartKm(e.target.value)}
+                  onChange={(e) => setTempStartKm(formatOdometer(e.target.value))}
                   placeholder="예: 154,725"
                   className="w-full h-12 sm:h-13 px-4 bg-white border border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)] rounded-2xl text-base sm:text-lg font-extrabold text-slate-900 placeholder:font-semibold placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-[#1E60F3]/10 transition-all tabular-nums"
                 />
@@ -1069,7 +1069,7 @@ const DrivingLogModalContent: React.FC<{
                   type="text"
                   inputMode="numeric"
                   value={tempEndKm}
-                  onChange={(e) => setTempEndKm(e.target.value)}
+                  onChange={(e) => setTempEndKm(formatOdometer(e.target.value))}
                   placeholder="예: 154,861"
                   className="w-full h-12 sm:h-13 px-4 bg-white border border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)] rounded-2xl text-base sm:text-lg font-extrabold text-slate-900 placeholder:font-semibold placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-[#1E60F3]/10 transition-all tabular-nums"
                 />

@@ -48,6 +48,13 @@ const roadviewSearchCache = new Map<string, PoiResult[]>();
 const RECENT_SEARCHES_STORAGE_KEY = 'cockpit_recent_searches';
 const PRESETS_PER_PAGE = 12; // 3 columns x 4 rows
 
+const DEFAULT_RECENT_DESTINATIONS: RecentDestination[] = [
+  { id: 'def-1', name: '뜨락', address: '서울 강남구 영동대로142길 13-3', lat: 37.5218, lng: 127.0568 },
+  { id: 'def-2', name: '콘래드', address: '서울 영등포구 국제금융로 10', lat: 37.5251, lng: 126.9265 },
+  { id: 'def-3', name: '자택', address: '경기 용인시 수지구 광교마을로 90, 401동 107호', lat: 37.3025, lng: 127.0715 },
+  { id: 'def-4', name: '연남CGV', address: '서울 마포구', lat: 37.5582, lng: 126.9255 },
+];
+
 export const RoadviewModal: React.FC<RoadviewModalProps> = ({
   isOpen,
   onClose,
@@ -106,12 +113,17 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
           const stored = localStorage.getItem(RECENT_SEARCHES_STORAGE_KEY);
           if (stored) {
             const parsed = JSON.parse(stored);
-            if (Array.isArray(parsed)) {
+            if (Array.isArray(parsed) && parsed.length > 0) {
               setRecentList(parsed);
+            } else {
+              setRecentList(DEFAULT_RECENT_DESTINATIONS);
             }
+          } else {
+            setRecentList(DEFAULT_RECENT_DESTINATIONS);
           }
         } catch (e) {
           console.warn('Failed to load recent destinations for roadview:', e);
+          setRecentList(DEFAULT_RECENT_DESTINATIONS);
         }
       }
 
@@ -227,22 +239,30 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs transition-opacity duration-300 p-0 sm:p-4">
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-xs transition-opacity duration-300 p-0 sm:p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          haptics.lightTap();
+          onClose();
+        }
+      }}
+    >
       <div
-        className="w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[92vh] sm:max-h-[88vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-250 select-none"
+        className="w-full max-w-lg bg-[#F6F8FC] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100/90 max-h-[92vh] sm:max-h-[88vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-250 select-none"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-5 pt-5 pb-3.5 border-b border-slate-100 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-[#1E60F3] text-white flex items-center justify-center shrink-0 shadow-2xs">
-              <Eye className="w-5 h-5 stroke-[2]" />
+        <div className="px-5 pt-5 pb-3 bg-[#F6F8FC] flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-[#0055FF] text-white flex items-center justify-center shrink-0 shadow-[0_4px_12px_rgba(0,85,255,0.28)]">
+              <Eye className="w-5 h-5 sm:w-5.5 sm:h-5.5 stroke-[2.2]" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-1.5">
+              <h2 className="text-lg font-extrabold text-slate-900 tracking-tight flex items-center gap-1.5">
                 현장 로드뷰
               </h2>
-              <p className="text-xs font-medium text-slate-500">
+              <p className="text-xs font-medium text-slate-400 mt-0.5">
                 터치 한 번, 바로 거리뷰
               </p>
             </div>
@@ -253,24 +273,24 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
               haptics.lightTap();
               onClose();
             }}
-            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition flex items-center justify-center cursor-pointer"
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#EDF1F7] hover:bg-slate-200/80 text-slate-500 hover:text-slate-800 transition flex items-center justify-center cursor-pointer"
             aria-label="닫기"
           >
-            <X className="w-4 h-4 stroke-[2.5]" />
+            <X className="w-4 h-4 stroke-[2.4]" />
           </button>
         </div>
 
         {/* Real-time POI Search Bar */}
-        <div className="p-4 border-b border-slate-100/80 bg-slate-50/60 shrink-0">
+        <div className="px-5 pb-2 bg-[#F6F8FC] shrink-0">
           <div className="relative flex items-center">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 pointer-events-none" />
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 pointer-events-none stroke-[2]" />
             <input
               ref={inputRef}
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="장소명 또는 주소 검색"
-              className="w-full pl-10 pr-9 py-2.5 bg-white border border-slate-200/90 rounded-2xl text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-[#1E60F3]/15 transition-all shadow-2xs"
+              className="w-full h-12 pl-10 pr-9 bg-white border border-slate-100/90 rounded-2xl text-xs sm:text-sm font-semibold text-slate-900 placeholder:font-medium placeholder:text-slate-400 focus:outline-none focus:border-[#0055FF] focus:ring-2 focus:ring-[#0055FF]/15 transition-all shadow-[0_3px_14px_rgba(15,23,42,0.04)]"
             />
             {searchQuery && (
               <button
@@ -280,7 +300,7 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
                   setSearchResults([]);
                   inputRef.current?.focus();
                 }}
-                className="absolute right-3 p-1 rounded-full text-slate-400 hover:text-slate-600 transition"
+                className="absolute right-3 p-1 rounded-full text-slate-400 hover:text-slate-600 transition cursor-pointer"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -289,10 +309,10 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
 
           {/* Autocomplete Dropdown */}
           {searchQuery.trim().length >= 2 && (
-            <div className="mt-2 bg-white border border-slate-200 rounded-2xl shadow-lg max-h-56 overflow-y-auto divide-y divide-slate-100">
+            <div className="mt-2 bg-white border border-slate-100/90 rounded-2xl shadow-[0_8px_24px_rgba(15,23,42,0.08)] max-h-56 overflow-y-auto divide-y divide-slate-100">
               {isSearching ? (
                 <div className="p-4 flex items-center justify-center gap-2 text-xs font-medium text-slate-500">
-                  <Loader2 className="w-4 h-4 animate-spin text-[#1E60F3]" />
+                  <Loader2 className="w-4 h-4 animate-spin text-[#0055FF]" />
                   <span>장소 검색 중...</span>
                 </div>
               ) : searchResults.length > 0 ? (
@@ -301,15 +321,15 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
                     key={`roadview-poi-${poi.id}-${idx}`}
                     type="button"
                     onClick={() => openRoadview(poi.lat, poi.lng)}
-                    className="w-full p-3 text-left hover:bg-blue-50/70 transition-colors flex items-center justify-between gap-2.5 cursor-pointer group active:scale-[0.99]"
+                    className="w-full p-3.5 text-left hover:bg-blue-50/70 transition-colors flex items-center justify-between gap-2.5 cursor-pointer group active:scale-[0.99]"
                   >
                     <div className="min-w-0 flex-1">
-                      <div className="text-sm font-bold text-slate-900 group-hover:text-[#1E60F3] truncate">
+                      <div className="text-sm font-extrabold text-slate-900 group-hover:text-[#0055FF] truncate">
                         {poi.name}
                       </div>
-                      <div className="text-xs text-slate-500 truncate mt-0.5">{poi.address}</div>
+                      <div className="text-xs text-slate-400 truncate mt-0.5">{poi.address}</div>
                     </div>
-                    <div className="shrink-0 p-1.5 text-[#1E60F3] group-hover:scale-110 transition-transform">
+                    <div className="shrink-0 p-1.5 text-[#0055FF] group-hover:scale-110 transition-transform">
                       <Eye aria-hidden="true" className="w-5 h-5 sm:w-5.5 sm:h-5.5 stroke-[2.2]" />
                     </div>
                   </button>
@@ -324,61 +344,61 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto px-5 py-3 space-y-5">
           {/* Quick Destination Card (현재 운행 목적지 카드 전체 터치) */}
           {currentDestination && currentDestination.lat && currentDestination.lng && (
-            <div className="space-y-1.5">
-              <span className="text-[13px] font-bold text-slate-400 tracking-tight block px-0.5">
+            <div className="space-y-2">
+              <span className="text-xs sm:text-[13px] font-bold text-slate-600 tracking-tight block px-0.5">
                 현재 운행 목적지
               </span>
               <button
                 type="button"
                 onClick={() => openRoadview(currentDestination.lat!, currentDestination.lng!)}
-                className="w-full p-3.5 rounded-2xl bg-white border-2 border-[#1E60F3] hover:bg-blue-100/50 hover:border-[#1E60F3] transition-all text-left flex items-center justify-between group active:scale-[0.99] cursor-pointer shadow-xs"
+                className="w-full px-4 py-3.5 rounded-2xl bg-white border-[1.5px] border-[#0055FF] hover:bg-blue-50/20 transition-all text-left flex items-center justify-between group active:scale-[0.99] cursor-pointer shadow-[0_4px_16px_rgba(0,85,255,0.08)]"
               >
                 <div className="min-w-0 pr-2">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-[#1E60F3] animate-pulse shrink-0" />
-                    <span className="text-base font-bold text-slate-900 truncate group-hover:text-[#1E60F3] transition-colors">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-[#0055FF] shrink-0" />
+                    <span className="text-base font-extrabold text-slate-900 truncate group-hover:text-[#0055FF] transition-colors">
                       {currentDestination.shortName || currentDestination.name}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500 truncate mt-0.5 pl-3.5">
+                  <p className="text-xs text-slate-400 font-medium truncate mt-0.5 pl-4">
                     {currentDestination.address || currentDestination.fullName || currentDestination.name}
                   </p>
                 </div>
-                <div className="shrink-0 p-1 text-[#1E60F3] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform">
-                  <ArrowUpRight aria-hidden="true" className="w-6 h-6 sm:w-6.5 sm:h-6.5 stroke-[2.5]" />
+                <div className="shrink-0 p-1 text-[#0055FF] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform">
+                  <ArrowUpRight aria-hidden="true" className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[2.5]" />
                 </div>
               </button>
             </div>
           )}
 
-          {/* 최근 검색 (2열 카드 그리드 - 전면 탭 인터랙션) */}
+          {/* 최근 검색 (2열 볼륨감 있는 화이트 카드 그리드 - 전면 탭 인터랙션) */}
           {recentList.length > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm font-bold text-slate-700 px-1">
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between text-xs sm:text-[13px] font-extrabold text-slate-800 px-0.5">
                 <span className="flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 text-slate-500" />
+                  <Clock className="w-3.5 h-3.5 text-slate-500 stroke-[2]" />
                   <span>최근 검색</span>
-                  <span className="text-[10px] font-semibold text-slate-400">
+                  <span className="text-xs font-semibold text-slate-400">
                     ({recentList.length})
                   </span>
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2.5">
                 {recentList.slice(0, 4).map((item, idx) => (
                   <button
                     key={`recent-${item.id || item.name}-${idx}`}
                     type="button"
                     onClick={() => openRoadview(item.lat, item.lng)}
-                    className="p-3 rounded-2xl border border-slate-200 bg-white hover:border-[#1E60F3]/60 hover:bg-blue-50/20 active:scale-[0.98] transition-all flex flex-col justify-between text-left cursor-pointer shadow-2xs group"
+                    className="p-3.5 rounded-2xl border border-slate-100/90 bg-white hover:border-blue-200 hover:bg-[#FBFDFF] active:scale-[0.98] transition-all flex flex-col justify-between text-left cursor-pointer shadow-[0_3px_14px_rgba(15,23,42,0.04)] group"
                     title={`${item.name} 거리뷰 보기`}
                   >
-                    <div className="text-sm font-bold text-slate-800 group-hover:text-[#1E60F3] truncate transition-colors w-full">
+                    <div className="text-xs sm:text-[13px] font-extrabold text-slate-900 group-hover:text-[#0055FF] truncate transition-colors w-full">
                       {item.shortName || item.name}
                     </div>
-                    <div className="text-[10px] text-slate-400 truncate mt-1 w-full">
+                    <div className="text-[11px] text-slate-400 truncate mt-1 w-full">
                       {item.address || item.name}
                     </div>
                   </button>
@@ -389,12 +409,12 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
 
           {/* 자주 가는 거점 퀵 선택 (4행 x 3열 = 12개 슬롯 그리드) */}
           <div className="space-y-2.5">
-            <div className="flex items-center justify-between text-sm font-bold text-slate-700 px-1">
+            <div className="flex items-center justify-between text-xs sm:text-[13px] font-extrabold text-slate-800 px-0.5">
               <span className="flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-[#1E60F3]" />
+                <Sparkles className="w-3.5 h-3.5 text-[#0055FF]" />
                 <span>자주 가는 거점 퀵 선택</span>
               </span>
-              <span className="text-[10px] text-slate-400 font-normal">
+              <span className="text-[11px] text-slate-400 font-medium">
                 탭하여 거리뷰 호출
               </span>
             </div>
@@ -410,8 +430,8 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
                 style={{ transform: `translateX(-${currentPage * 100}%)` }}
               >
                 {pages.map((pageSlots, pageIdx) => (
-                  <div key={pageIdx} className="w-full shrink-0 px-1 py-1">
-                    <div className="grid grid-cols-3 gap-2 content-start">
+                  <div key={pageIdx} className="w-full shrink-0 py-0.5">
+                    <div className="grid grid-cols-3 gap-2.5 content-start">
                       {pageSlots.map((slot, sIdx) => {
                         if (slot.type === 'home') {
                           if (!homeLocation) return null;
@@ -420,16 +440,16 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
                               key="slot_home"
                               type="button"
                               onClick={() => openRoadview(homeLocation.lat, homeLocation.lng)}
-                              className="min-h-[54px] sm:min-h-[58px] p-2 rounded-2xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-150 active:scale-[0.98] group shadow-2xs bg-white border-slate-200 hover:border-[#1E60F3]/60 hover:bg-blue-50/20"
+                              className="min-h-[58px] sm:min-h-[62px] px-2.5 py-3 rounded-2xl border border-slate-100/90 bg-white hover:border-blue-200 hover:bg-[#FBFDFF] shadow-[0_3px_12px_rgba(15,23,42,0.04)] text-center flex flex-col justify-center items-center cursor-pointer transition-all duration-150 active:scale-[0.98] group"
                               title={`자택: ${homeLocation.name} 거리뷰`}
                             >
                               <div className="flex items-center justify-center gap-1 w-full min-w-0">
-                                <Home className="w-3 h-3 text-slate-500 shrink-0 group-hover:text-[#1E60F3]" />
-                                <span className="text-sm font-bold tracking-tight text-slate-800 truncate">
+                                <Home className="w-3 h-3 text-slate-500 shrink-0 group-hover:text-[#0055FF]" />
+                                <span className="text-xs sm:text-[13px] font-extrabold tracking-tight text-slate-900 group-hover:text-[#0055FF] truncate">
                                   자택
                                 </span>
                               </div>
-                              <span className="text-[10px] font-medium text-slate-400 group-hover:text-slate-600 truncate w-full mt-0.5">
+                              <span className="text-[11px] font-medium text-slate-400 group-hover:text-slate-600 truncate w-full mt-1 leading-none">
                                 {homeLocation.name}
                               </span>
                             </button>
@@ -455,7 +475,7 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
                             key={`${p.id}-${sIdx}`}
                             type="button"
                             onClick={() => openRoadview(p.lat, p.lng)}
-                            className="min-h-[54px] sm:min-h-[58px] p-2 rounded-2xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-150 active:scale-[0.98] group shadow-2xs bg-white border-slate-200 hover:border-[#1E60F3]/60 hover:bg-blue-50/30"
+                            className="min-h-[58px] sm:min-h-[62px] px-2.5 py-3 rounded-2xl border border-slate-100/90 bg-white hover:border-blue-200 hover:bg-[#FBFDFF] shadow-[0_3px_12px_rgba(15,23,42,0.04)] text-center flex flex-col justify-center items-center cursor-pointer transition-all duration-150 active:scale-[0.98] group"
                             title={`${p.fullName || p.name} 거리뷰 보기`}
                           >
                             <div className="flex items-center justify-center gap-1 w-full min-w-0">
@@ -464,21 +484,21 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
                                   ⤳
                                 </span>
                               )}
-                              <span className="text-sm font-bold tracking-tight text-slate-800 group-hover:text-[#1E60F3] truncate transition-colors">
+                              <span className="text-xs sm:text-[13px] font-extrabold tracking-tight text-slate-900 group-hover:text-[#0055FF] truncate transition-colors">
                                 {p.shortName || p.name}
                               </span>
                             </div>
 
                             {isViaPreset ? (
-                              <span className="text-[10px] sm:text-xs font-semibold text-amber-600 mt-0.5 leading-none">
+                              <span className="text-[11px] font-semibold text-amber-600 mt-1 leading-none">
                                 경유
                               </span>
                             ) : isDefault ? (
-                              <span className="text-[10px] sm:text-xs font-medium text-slate-400 mt-0.5 leading-none">
+                              <span className="text-[11px] font-medium text-slate-400 mt-1 leading-none">
                                 공통
                               </span>
                             ) : (
-                              <span className="text-[10px] sm:text-xs font-medium text-blue-600 mt-0.5 leading-none">
+                              <span className="text-[11px] font-medium text-[#0055FF] mt-1 leading-none">
                                 개인
                               </span>
                             )}
@@ -504,7 +524,7 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
                     }}
                     aria-label={`페이지 ${i + 1}`}
                     className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${currentPage === i
-                      ? 'w-6 bg-[#1E60F3] shadow-[0_2px_8px_rgba(30,96,243,0.35)]'
+                      ? 'w-6 bg-[#0055FF] shadow-[0_2px_8px_rgba(0,85,255,0.35)]'
                       : 'w-2 bg-slate-200 hover:bg-slate-300'
                       }`}
                   />
@@ -515,7 +535,7 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
         </div>
 
         {/* Footer Guidance */}
-        <div className="px-5 py-2.5 bg-slate-50 border-t border-slate-100 text-[11px] text-slate-500 flex items-center justify-between shrink-0">
+        <div className="px-5 py-3 bg-[#F6F8FC] border-t border-slate-200/50 text-[11px] text-slate-400 flex items-center justify-between shrink-0">
           <span>항목을 터치하면 해당 위치의 카카오 거리뷰가 새 창으로 열립니다.</span>
           <span className="text-slate-400 font-bold flex items-center gap-1">
             <span>카카오맵</span>

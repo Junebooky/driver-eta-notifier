@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Clock, Search, MapPin, Map, MoreVertical, Loader2, AlertCircle } from 'lucide-react';
-import { RouteStopItem, isValidTimeHHMM } from '@/utils/drivingLog';
+import { X, Clock, Search, Map, MoreVertical, Loader2, AlertCircle } from 'lucide-react';
+import { RouteStopItem, isValidTimeHHMM, clampTimeComponent } from '@/utils/drivingLog';
 import { haptics } from '@/utils/haptics';
 import { searchTmapPoisClient } from '@/lib/places/tmapSearchEngine';
 
@@ -83,6 +83,39 @@ const AddScheduleModalContent: React.FC<{
   );
   const [memo, setMemo] = useState(editingStop?.memo || '');
   const [timeError, setTimeError] = useState<string | null>(null);
+
+  // Mobile-friendly iOS Wheel Time Picker Modal state
+  const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
+  const [pickerHour, setPickerHour] = useState('09');
+  const [pickerMinute, setPickerMinute] = useState('00');
+
+  const openTimePicker = () => {
+    haptics.lightTap();
+    if (isValidTimeHHMM(time)) {
+      const [h, m] = time.split(':');
+      setPickerHour(h);
+      setPickerMinute(m);
+    } else {
+      const now = new Date();
+      setPickerHour(String(now.getHours()).padStart(2, '0'));
+      setPickerMinute(String(Math.floor(now.getMinutes() / 5) * 5).padStart(2, '0'));
+    }
+    setIsTimePickerOpen(true);
+    setTimeout(() => {
+      const [h, m] = isValidTimeHHMM(time) ? time.split(':') : ['09', '00'];
+      document.getElementById(`schedule-wheel-hour-${h}`)?.scrollIntoView({ block: 'center' });
+      document.getElementById(`schedule-wheel-min-${m}`)?.scrollIntoView({ block: 'center' });
+    }, 30);
+  };
+
+  const applyTimePicker = () => {
+    haptics.selection();
+    const hh = clampTimeComponent(pickerHour, 23);
+    const mm = clampTimeComponent(pickerMinute, 59);
+    setTime(`${hh}:${mm}`);
+    if (timeError) setTimeError(null);
+    setIsTimePickerOpen(false);
+  };
 
   // Stored recent searches (empty if user has no search history)
   const [recentLocations] = useState<Array<{ name: string; address: string }>>(
@@ -184,23 +217,20 @@ const AddScheduleModalContent: React.FC<{
 
       {/* Scrollable Form Body */}
       <div className="flex-1 overflow-y-auto px-5 py-3 space-y-4">
-        {/* 1. 시간 */}
+        {/* 1. 시간 (탭 시 모바일 친화형 휠 타임피커 모달 오픈) */}
         <div>
           <label className="block text-xs sm:text-[13px] font-bold text-slate-700 mb-1.5">시간</label>
           <div className="relative flex items-center">
             <Clock className="absolute left-3.5 w-4 h-4 text-slate-400 pointer-events-none stroke-[2]" />
             <input
               type="text"
+              readOnly
               value={time}
-              onChange={(e) => {
-                setTime(e.target.value);
-                if (timeError) setTimeError(null);
-              }}
+              onClick={openTimePicker}
               placeholder="예) 15:20"
-              maxLength={5}
               className={`w-full h-12 pl-10 pr-4 bg-white border ${
-                timeError ? 'border-red-400 ring-2 ring-red-100' : 'border-slate-100/90'
-              } rounded-2xl text-sm sm:text-base font-extrabold text-slate-900 placeholder:font-medium placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-[#1E60F3]/10 transition-all shadow-[0_3px_12px_rgba(15,23,42,0.04)] tabular-nums`}
+                timeError ? 'border-red-400 ring-2 ring-red-100' : 'border-slate-100/90 hover:border-blue-200'
+              } rounded-2xl text-sm sm:text-base font-extrabold text-slate-900 placeholder:font-medium placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-[#1E60F3]/10 transition-all shadow-[0_3px_12px_rgba(15,23,42,0.04)] tabular-nums cursor-pointer`}
             />
           </div>
           {timeError && (
@@ -252,7 +282,12 @@ const AddScheduleModalContent: React.FC<{
                   onClick={() => handleSelectLocation(item)}
                   className="w-full text-left px-4 py-3 hover:bg-blue-50/60 transition-colors flex items-start gap-2.5 cursor-pointer"
                 >
-                  <MapPin className="w-4 h-4 text-[#1E60F3] shrink-0 mt-0.5" />
+                  <img
+                    src="/images/icons/excel/icon_position.png"
+                    alt="위치"
+                    className="w-5 h-5 object-contain shrink-0 mt-0.5 select-none"
+                    draggable={false}
+                  />
                   <div className="min-w-0">
                     <div className="text-xs sm:text-[13px] font-extrabold text-slate-900 truncate">{item.name}</div>
                     <div className="text-[11px] text-slate-400 truncate mt-0.5">{item.address}</div>
@@ -287,8 +322,13 @@ const AddScheduleModalContent: React.FC<{
                 className="flex items-center justify-between px-4 py-3 hover:bg-slate-50/80 cursor-pointer transition-colors group"
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-[#F3F6FB] flex items-center justify-center text-slate-500 group-hover:text-[#1E60F3] group-hover:bg-blue-50 transition-colors shrink-0">
-                    <MapPin className="w-4 h-4 stroke-[2]" />
+                  <div className="w-8 h-8 rounded-full bg-[#F3F6FB] flex items-center justify-center group-hover:bg-blue-50 transition-colors shrink-0 overflow-hidden">
+                    <img
+                      src="/images/icons/excel/icon_position.png"
+                      alt="위치"
+                      className="w-5 h-5 object-contain select-none"
+                      draggable={false}
+                    />
                   </div>
                   <div className="min-w-0">
                     <div className="text-xs sm:text-[13px] font-extrabold text-slate-900 group-hover:text-[#1E60F3] transition-colors truncate">
@@ -341,6 +381,135 @@ const AddScheduleModalContent: React.FC<{
           {editingStop ? '수정하기' : '추가하기'}
         </button>
       </div>
+
+      {/* iOS-style Wheel & Native Time Picker Modal (일정 시각 설정 - 출퇴근 시간 피커와 동일) */}
+      {isTimePickerOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              haptics.lightTap();
+              setIsTimePickerOpen(false);
+            }
+          }}
+        >
+          <div
+            className="bg-white rounded-3xl p-5 w-full max-w-xs shadow-2xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-black text-slate-900 tracking-tight">
+                일정 시각 설정
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsTimePickerOpen(false)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-full cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* 원터치 '지금' 버튼 */}
+            <div className="flex items-center justify-between bg-slate-50 border border-slate-200/80 rounded-2xl px-3.5 py-2.5">
+              <div className="text-lg font-black text-[#1E60F3] tabular-nums tracking-tight">
+                {clampTimeComponent(pickerHour, 23)}:{clampTimeComponent(pickerMinute, 59)}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.selection();
+                  const now = new Date();
+                  const hh = String(now.getHours()).padStart(2, '0');
+                  const mm = String(now.getMinutes()).padStart(2, '0');
+                  setPickerHour(hh);
+                  setPickerMinute(mm);
+                  setTimeout(() => {
+                    document.getElementById(`schedule-wheel-hour-${hh}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                    document.getElementById(`schedule-wheel-min-${mm}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                  }, 30);
+                }}
+                className="px-2 py-1 text-xs font-medium text-blue-600 hover:text-blue-700 active:scale-95 transition-all cursor-pointer flex items-center gap-1"
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span>지금</span>
+              </button>
+            </div>
+
+            {/* iOS 스타일 상하 스와이프 휠 피커 (모바일 키보드 올라옴 방지) */}
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 bg-slate-50/70 border border-slate-200/80 rounded-2xl p-2.5">
+              {/* Hour Wheel (00 ~ 23) */}
+              <div className="h-36 overflow-y-auto snap-y snap-mandatory no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden space-y-1 px-1">
+                {Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0')).map((hh) => {
+                  const selected = clampTimeComponent(pickerHour, 23) === hh;
+                  return (
+                    <button
+                      id={`schedule-wheel-hour-${hh}`}
+                      key={hh}
+                      type="button"
+                      onClick={() => {
+                        haptics.lightTap();
+                        setPickerHour(hh);
+                      }}
+                      className={`w-full py-1.5 rounded-xl text-center snap-center transition-all cursor-pointer tabular-nums ${
+                        selected
+                          ? 'bg-[#1E60F3] text-white text-base font-black shadow-2xs'
+                          : 'text-sm font-semibold text-slate-500 hover:bg-slate-200/60'
+                      }`}
+                    >
+                      {hh}시
+                    </button>
+                  );
+                })}
+              </div>
+
+              <span className="text-xl font-black text-slate-300 select-none">:</span>
+
+              {/* Minute Wheel (00 ~ 59) */}
+              <div className="h-36 overflow-y-auto snap-y snap-mandatory no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden space-y-1 px-1">
+                {Array.from({ length: 60 }, (_, m) => String(m).padStart(2, '0')).map((mm) => {
+                  const selected = clampTimeComponent(pickerMinute, 59) === mm;
+                  return (
+                    <button
+                      id={`schedule-wheel-min-${mm}`}
+                      key={mm}
+                      type="button"
+                      onClick={() => {
+                        haptics.lightTap();
+                        setPickerMinute(mm);
+                      }}
+                      className={`w-full py-1.5 rounded-xl text-center snap-center transition-all cursor-pointer tabular-nums ${
+                        selected
+                          ? 'bg-[#1E60F3] text-white text-base font-black shadow-2xs'
+                          : 'text-sm font-semibold text-slate-500 hover:bg-slate-200/60'
+                      }`}
+                    >
+                      {mm}분
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setIsTimePickerOpen(false)}
+                className="flex-1 py-2.5 border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 rounded-xl cursor-pointer transition-all"
+              >
+                닫기
+              </button>
+              <button
+                type="button"
+                onClick={applyTimePicker}
+                className="flex-1 py-2.5 bg-[#1E60F3] hover:bg-blue-600 text-white text-xs font-extrabold rounded-xl shadow-xs cursor-pointer transition-all"
+              >
+                설정 완료
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
