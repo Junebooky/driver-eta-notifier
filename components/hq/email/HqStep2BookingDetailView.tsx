@@ -47,7 +47,7 @@ export interface HqStep2BookingDetailViewProps {
   emailDetail?: HqEmailDetail | null;
   extractedDraft?: HqEmailExtractedDraft | null;
   vehicleSlots: VehicleSlotAssignment[];
-  onOpenDriverModal: (slotIndex: number, requiredLanguage?: 'any' | 'english') => void;
+  onOpenDriverModal: (slotIndex: number, requiredLanguage?: 'any' | 'english', availableDrivers?: import('@/utils/availabilityEngine').AvailableDriverItem[]) => void;
   onConfirmDispatch: () => void;
   onRequestAssignment?:()=>void;
   onBackToStep1: () => void;
@@ -319,7 +319,7 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
         language={selectedLanguage}
         onLanguageChange={changeDriverLanguage}
         onUpdateSlots={onUpdateVehicleSlots}
-        onSelectDriver={onOpenDriverModal}
+        onSelectDriver={(slotIndex, requiredLanguage) => onOpenDriverModal(slotIndex, requiredLanguage, fleet.data?.drivers || [])}
         onRequestHelp={onRequestAssignment}
         onConfirm={handleConfirm}
         isDispatching={isDispatching}
