@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { verifyServerAuth } from '@/lib/auth/serverAuth';
+import { createSignedAssetUrl } from '@/lib/assets/driverAssetServerStore';
 
 export async function GET(req: NextRequest) {
   const auth = await verifyServerAuth(req);
@@ -21,7 +22,31 @@ export async function GET(req: NextRequest) {
   if (error) return NextResponse.json({ ok: false, error: '기사 정보 조회에 실패했습니다.' }, { status: 503 });
   if (isAll) return NextResponse.json({ drivers: data || [], fallback: false });
   if (!data?.length) return NextResponse.json({ ok: false, error: '기사 정보를 찾을 수 없습니다.' }, { status: 404 });
-  return NextResponse.json({ driver: data[0], fallback: false });
+
+  const driverRow = { ...data[0] };
+  try {
+    const { data: profileAsset } = await supabaseAdmin
+      .from('driver_profile_assets')
+      .select('file_path')
+      .eq('driver_id', driverRow.id)
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (profileAsset?.file_path) {
+      const signedUrl = await createSignedAssetUrl(profileAsset.file_path);
+      if (signedUrl) {
+        driverRow.avatar_url = signedUrl;
+      }
+    } else if (driverRow.driver_meta?.avatar_url) {
+      driverRow.avatar_url = driverRow.driver_meta.avatar_url;
+    }
+  } catch {
+    if (driverRow.driver_meta?.avatar_url) {
+      driverRow.avatar_url = driverRow.driver_meta.avatar_url;
+    }
+  }
+
+  return NextResponse.json({ driver: driverRow, fallback: false });
 }
 
 export async function POST(req: NextRequest) {
@@ -36,11 +61,13 @@ export async function POST(req: NextRequest) {
     const {data:existing,error:readError}=await supabaseAdmin.from('drivers').select('*').eq('id',driverId).maybeSingle();
     if (readError) return NextResponse.json({ok:false,error:'기사 정보를 조회하지 못했습니다.'},{status:503});
     if (!existing) return NextResponse.json({ok:false,error:'기사 정보를 찾을 수 없습니다.'},{status:404});
-    // Legacy labels are read-only on this endpoint. Real trip assignments belong to bookings.
-    for (const [field,current] of [['vehicle_no',existing.vehicle_no],['car_number',existing.car_number]] as const) {
-      const value=body[field] ?? body[field==='vehicle_no'?'vehicleNo':'carNumber'];
+    // Legacy vehicle_no label is read-only on this endpoint. Real trip assignments belong to bookings.
+    for (const [field,current] of [['vehicle_no',existing.vehicle_no]] as const) {
+      const value=body[field] ?? body.vehicleNo;
       if (value!==undefined && value!==current && value!==`${existing.vehicle_no} ${existing.car_number}`) return NextResponse.json({ok:false,code:'ASSIGN_VEHICLE_THROUGH_BOOKING',error:'차량 변경은 HQ 예약·배차에서 처리해 주세요. 기사 계정 정보는 유지됩니다.'},{status:409});
     }
+    const rawCarNumber = body.car_number !== undefined ? body.car_number : body.carNumber;
+    const nextCarNumber = typeof rawCarNumber === 'string' ? rawCarNumber.trim().slice(0, 40) : undefined;
     const patch: Record<string,unknown>={};
     for (const [column,alias] of [['driver_name','driverName'],['phone','mobile'],['passenger_name','passengerName'],['default_navi','defaultNavi']] as const) {
       const value=body[column]!==undefined ? body[column] : body[alias];
@@ -61,9 +88,30 @@ export async function POST(req: NextRequest) {
       if (home!==null && (typeof home.name!=='string'||home.name.length>100||typeof home.address!=='string'||home.address.length>500||!Number.isFinite(home.lat)||Math.abs(home.lat)>90||!Number.isFinite(home.lng)||Math.abs(home.lng)>180)) return NextResponse.json({ok:false,error:'자택 주소를 확인해 주세요.'},{status:400});
       preferences.homeLocation=home;
     }
-    if (!Object.keys(patch).length && !Object.keys(preferences).length) return NextResponse.json({ok:false,error:'저장할 변경사항이 없습니다.'},{status:400});
-    const {data,error}=await supabaseAdmin.rpc('update_driver_profile_by_id',{p_driver_id:driverId,p_patch:patch,p_preferences:preferences});
-    if (error || !data) return NextResponse.json({ok:false,error:'프로필이 저장되지 않았습니다. DB 연결과 프로필 저장 기능을 확인해 주세요.'},{status:503});
-    return NextResponse.json({ok:true,driver:data,fallback:false});
+    if (!Object.keys(patch).length && !Object.keys(preferences).length && nextCarNumber === undefined) return NextResponse.json({ok:false,error:'저장할 변경사항이 없습니다.'},{status:400});
+    let updatedDriver: any = existing;
+    if (Object.keys(patch).length || Object.keys(preferences).length) {
+      const {data,error}=await supabaseAdmin.rpc('update_driver_profile_by_id',{p_driver_id:driverId,p_patch:patch,p_preferences:preferences});
+      if (error || !data) return NextResponse.json({ok:false,error:'프로필이 저장되지 않았습니다. DB 연결과 프로필 저장 기능을 확인해 주세요.'},{status:503});
+      updatedDriver = data;
+    }
+    if (nextCarNumber !== undefined && nextCarNumber !== existing.car_number) {
+      try {
+        const { data: carUpdated } = await supabaseAdmin
+          .from('drivers')
+          .update({ car_number: nextCarNumber })
+          .eq('id', driverId)
+          .select('*')
+          .maybeSingle();
+        if (carUpdated) {
+          updatedDriver = carUpdated;
+        } else {
+          updatedDriver = { ...updatedDriver, car_number: nextCarNumber };
+        }
+      } catch {
+        updatedDriver = { ...updatedDriver, car_number: nextCarNumber };
+      }
+    }
+    return NextResponse.json({ok:true,driver:updatedDriver,fallback:false});
   } catch { return NextResponse.json({ok:false,error:'프로필 저장에 실패했습니다.'},{status:503}); }
 }

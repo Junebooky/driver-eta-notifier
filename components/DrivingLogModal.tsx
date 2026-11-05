@@ -46,6 +46,16 @@ import { AddScheduleModal } from './AddScheduleModal';
 import { haptics } from '@/utils/haptics';
 import { submitDriverLogToHqDb } from '@/utils/drivingLogHqStorage';
 import { HqDrivingLog } from '@/types/drivingLogHq';
+import { findVipVehicle } from '@/utils/vehicleData';
+
+function resolveDriverAvatarFallback(name?: string | null): string {
+  const n = (name || '').trim();
+  if (n.includes('이')) return '/images/driver_lee.png';
+  if (n.includes('박')) return '/images/driver_park.png';
+  if (n.includes('최')) return '/images/driver_choi.png';
+  if (n.includes('정') || n.includes('윤')) return '/images/driver_jung.png';
+  return '/images/driver_kim.png';
+}
 
 interface DrivingLogModalProps {
   presentation?: 'modal' | 'page';
@@ -54,6 +64,7 @@ interface DrivingLogModalProps {
   driverProfile: DriverProfile;
   bookingId?: string;
   onOpenProfileModal?: () => void;
+  onUpdateProfile?: (patch: Partial<DriverProfile>) => void;
   onOpenLocationSearch?: () => void;
   selectedLocationFromMap?: { name: string; address?: string } | null;
 }
@@ -64,15 +75,55 @@ const DrivingLogModalContent: React.FC<{
   driverProfile: DriverProfile;
   bookingId?: string;
   onOpenProfileModal?: () => void;
+  onUpdateProfile?: (patch: Partial<DriverProfile>) => void;
   onOpenLocationSearch?: () => void;
   selectedLocationFromMap?: { name: string; address?: string } | null;
-}> = ({ presentation, onClose, driverProfile, bookingId, onOpenProfileModal, onOpenLocationSearch, selectedLocationFromMap }) => {
+}> = ({ presentation, onClose, driverProfile, bookingId, onOpenProfileModal, onUpdateProfile, onOpenLocationSearch, selectedLocationFromMap }) => {
   const scrollContainerRef = useRef<HTMLElement>(null);
 
   // Master driving log state initialized purely (booking-aware)
   const [logData, setLogData] = useState<DrivingLogData>(() =>
     loadDrivingLogDraft(driverProfile, undefined, undefined, bookingId)
   );
+
+  const [fetchedAvatarUrl, setFetchedAvatarUrl] = useState<string | null>(driverProfile.avatarUrl || null);
+  const [avatarLoadError, setAvatarLoadError] = useState(false);
+  const [isEditingCarNumber, setIsEditingCarNumber] = useState(false);
+  const [carNumberDraft, setCarNumberDraft] = useState('');
+  const carNumberInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync driverName and carNumber from driverProfile into logData
+  useEffect(() => {
+    setLogData((prev) => ({
+      ...prev,
+      driverName: driverProfile.driverName || prev.driverName,
+      carNumber: driverProfile.carNumber || prev.carNumber,
+    }));
+  }, [driverProfile.driverName, driverProfile.carNumber]);
+
+  // Fetch currently logged-in driver's profile photo from DB/Storage
+  useEffect(() => {
+    setAvatarLoadError(false);
+    if (driverProfile.avatarUrl) {
+      setFetchedAvatarUrl(driverProfile.avatarUrl);
+    }
+    const targetDriverId = driverProfile.driverId || driverProfile.id;
+    if (!targetDriverId) return;
+    const abort = new AbortController();
+    fetch(`/api/hq/drivers/assets?driverId=${encodeURIComponent(targetDriverId)}&type=profile`, {
+      cache: 'no-store',
+      signal: abort.signal,
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!abort.signal.aborted && data?.ok && data.profile?.signedUrl) {
+          setFetchedAvatarUrl(data.profile.signedUrl);
+          onUpdateProfile?.({ avatarUrl: data.profile.signedUrl });
+        }
+      })
+      .catch(() => { });
+    return () => abort.abort();
+  }, [driverProfile.driverId, driverProfile.id, driverProfile.avatarUrl]);
 
   // Profile settings are the only place the driver edits passenger identity.
   // Changing that setting updates this still-open draft without losing route or odometer.
@@ -90,12 +141,12 @@ const DrivingLogModalContent: React.FC<{
       if (!response.ok) return;
       const data = await response.json();
       const booking = Array.isArray(data.schedules)
-        ? data.schedules.find((item: {id?: string}) => String(item.id) === String(bookingId))
+        ? data.schedules.find((item: { id?: string }) => String(item.id) === String(bookingId))
         : null;
       if (!booking || abort.signal.aborted) return;
       const customerName = typeof booking.customer_name === 'string' ? booking.customer_name.trim() : '';
-      setLogData(previous => previous.clientName === customerName ? previous : {...previous, clientName: customerName});
-    }).catch(() => {});
+      setLogData(previous => previous.clientName === customerName ? previous : { ...previous, clientName: customerName });
+    }).catch(() => { });
     return () => abort.abort();
   }, [bookingId, logData.rawDate]);
 
@@ -346,6 +397,48 @@ const DrivingLogModalContent: React.FC<{
     showToast('실제 빈 일지 상태로 초기화했습니다.');
   };
 
+  const displayDriverName = (driverProfile.driverName || logData.driverName || '담당 기사').trim();
+  const effectiveCarNumber = (driverProfile.carNumber || logData.carNumber || '').trim();
+  const matchedDbVehicle = findVipVehicle(effectiveCarNumber);
+  const hasDbMatchedCarNumber = Boolean(matchedDbVehicle);
+  const resolvedVehicleModel =
+    matchedDbVehicle?.model ||
+    driverProfile.carModel ||
+    (effectiveCarNumber === '서울99바9999' || driverProfile.vehicleNo?.includes('99')
+      ? '대형버스 (유니버스)'
+      : '차량 미지정');
+  const effectiveAvatarSrc =
+    !avatarLoadError && (fetchedAvatarUrl || driverProfile.avatarUrl)
+      ? (fetchedAvatarUrl || driverProfile.avatarUrl)!
+      : resolveDriverAvatarFallback(displayDriverName);
+
+  const handleSaveInlineCarNumber = async () => {
+    const trimmed = carNumberDraft.trim();
+    setIsEditingCarNumber(false);
+    if (!trimmed || trimmed === effectiveCarNumber) return;
+    haptics.selection();
+    setLogData((prev) => {
+      const next = { ...prev, carNumber: trimmed };
+      saveDrivingLogDraft(next);
+      return next;
+    });
+    onUpdateProfile?.({ carNumber: trimmed });
+    if (driverProfile.driverId) {
+      try {
+        await fetch('/api/driver', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            driverId: driverProfile.driverId,
+            driver_name: displayDriverName,
+            car_number: trimmed,
+          }),
+        });
+      } catch { }
+    }
+    showToast('차량번호가 저장되었습니다.');
+  };
+
   return (
     <div
       className={presentation === 'page' ? "w-full bg-inherit select-none" : "fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm select-none overscroll-contain driver-modal-backdrop"}
@@ -381,42 +474,42 @@ const DrivingLogModalContent: React.FC<{
             </div>
           )}
 
-          {/* 1 & 2. 통합 상단 카드: 운행일지 헤더 + 히어로 이미지 + 단일 뱃지 + 고객명/탑승 인원 */}
-          <section className="bg-white border border-slate-100/90 rounded-3xl p-4 sm:p-5 shadow-[0_6px_24px_rgba(15,23,42,0.05)] space-y-4">
+          {/* 1 & 2. 통합 상단 카드: 운행일지 헤더 + 로그인 기사 프로필 카드 + 오늘의 배차 정보 카드 */}
+          <section className="bg-[#F6F8FC] border border-white/90 rounded-[28px] p-4 sm:p-5 shadow-[0_6px_24px_rgba(15,23,42,0.05)] space-y-3.5">
             {/* Header Row inside Top Card */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2.5">
+            <div className="flex items-center justify-between px-0.5">
+              <div className="flex items-center space-x-3">
                 <img
                   src="/images/icons/driving-logs/icon_driving_log.png"
                   alt="운행일지"
-                  className="w-11 h-11 sm:w-12 sm:h-12 object-contain shrink-0 select-none"
+                  className="w-11 h-11 sm:w-12 sm:h-12 object-contain shrink-0 select-none pointer-events-none"
                   draggable={false}
                 />
                 <div>
-                  <div className="flex items-center gap-1.5">
-                    <h2 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight">운행일지</h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">운행일지</h2>
                     {logData.isDemoFixture ? (
-                      <span className="text-[10px] bg-blue-50 text-[#1E60F3] font-bold px-2 py-0.5 rounded-md border border-blue-100">
+                      <span className="text-[11px] bg-blue-50 text-[#1E60F3] font-bold px-2.5 py-0.5 rounded-full border border-blue-100">
                         샘플
                       </span>
                     ) : (
-                      <span className="text-[10px] bg-[#F3F6FB] text-slate-500 font-bold px-2 py-0.5 rounded-md">
+                      <span className="text-[11px] bg-[#EBF0F7] text-slate-500 font-bold px-2.5 py-0.5 rounded-full">
                         임시저장
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] sm:text-xs text-slate-400 font-medium mt-0.5">
+                  <p className="text-xs sm:text-[13px] text-slate-400 font-semibold mt-0.5">
                     {logData.date || formatKoreanDate()}
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center space-x-1.5">
+              <div className="flex items-center space-x-2">
                 {logData.isDemoFixture ? (
                   <button
                     type="button"
                     onClick={handleResetToRealDraft}
-                    className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100 transition-colors cursor-pointer"
+                    className="w-9 h-9 flex items-center justify-center text-slate-400 hover:text-slate-700 rounded-full hover:bg-white/80 transition-colors cursor-pointer"
                     title="실제 빈 일지로 전환"
                   >
                     <RotateCcw className="w-4 h-4 stroke-[2]" />
@@ -425,83 +518,124 @@ const DrivingLogModalContent: React.FC<{
                   <button
                     type="button"
                     onClick={handleLoadDemoFixture}
-                    className="w-8 h-8 flex items-center justify-center text-[#1E60F3] hover:text-blue-700 rounded-full hover:bg-blue-50 transition-colors cursor-pointer"
+                    className="w-9 h-9 flex items-center justify-center text-[#1E60F3] hover:text-blue-700 rounded-full hover:bg-white/80 transition-colors cursor-pointer"
                     title="레퍼런스 샘플 불러오기"
                   >
                     <Sparkles className="w-4 h-4 stroke-[2]" />
                   </button>
                 )}
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    haptics.lightTap();
-                    onClose();
-                  }}
-                  className="w-8 h-8 rounded-full bg-[#F3F6FB] hover:bg-slate-200/80 active:scale-95 flex items-center justify-center text-slate-500 cursor-pointer transition-all"
-                  aria-label="닫기"
-                >
-                  <X className="w-4 h-4 stroke-[2.2]" />
-                </button>
               </div>
             </div>
 
-            {/* Rounded Limousine Hero Image inside Top Card */}
-            <div className="relative w-full h-32 sm:h-36 rounded-2xl bg-slate-100 overflow-hidden shadow-2xs">
-              <Image
-                src="/images/driving_log_hero.jpg"
-                alt="VIP 의전 리무진 및 도시 전경"
-                fill
-                priority
-                sizes="(max-width: 768px) 100vw, 500px"
-                className="object-cover object-center"
-              />
+            {/* Logged-in Driver Profile Card (Replaces old Bus Hero Image) */}
+            <div className="bg-white rounded-3xl p-4 sm:p-5 shadow-[0_4px_18px_rgba(15,23,42,0.04)] border border-slate-100/90 flex items-center gap-4 sm:gap-5">
+              <div className="w-20 h-20 sm:w-[86px] sm:h-[86px] rounded-full overflow-hidden bg-slate-100 border border-slate-200/70 shrink-0 shadow-xs flex items-center justify-center">
+                <img
+                  src={effectiveAvatarSrc}
+                  alt={displayDriverName}
+                  onError={() => setAvatarLoadError(true)}
+                  className="w-full h-full object-cover object-top select-none pointer-events-none"
+                  draggable={false}
+                />
+              </div>
+
+              <div className="min-w-0 flex-1 space-y-0.5">
+                <div className="text-[18px] sm:text-[20px] font-black text-slate-900 tracking-tight leading-snug truncate">
+                  {displayDriverName}
+                </div>
+
+                {isEditingCarNumber ? (
+                  <div className="flex items-center gap-1.5 py-0.5">
+                    <input
+                      ref={carNumberInputRef}
+                      type="text"
+                      value={carNumberDraft}
+                      onChange={(e) => setCarNumberDraft(e.target.value)}
+                      onBlur={handleSaveInlineCarNumber}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          void handleSaveInlineCarNumber();
+                        } else if (e.key === 'Escape') {
+                          setIsEditingCarNumber(false);
+                        }
+                      }}
+                      placeholder="차량번호 입력 (예: 서울99바9999)"
+                      className="w-full max-w-[180px] h-8 px-2.5 rounded-lg bg-slate-50 border border-[#1E60F3] text-sm font-bold text-slate-900 focus:outline-none tabular-nums"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[15px] sm:text-base font-bold text-slate-600 tabular-nums truncate">
+                      {effectiveCarNumber || '차량번호 미입력'}
+                    </span>
+                    {!hasDbMatchedCarNumber && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          haptics.lightTap();
+                          setCarNumberDraft(effectiveCarNumber);
+                          setIsEditingCarNumber(true);
+                          setTimeout(() => carNumberInputRef.current?.focus(), 30);
+                        }}
+                        title="차량번호 직접 입력"
+                        className="p-1 rounded-md text-slate-300 hover:text-slate-500 hover:bg-slate-50 transition-colors cursor-pointer shrink-0"
+                        aria-label="차량번호 직접 입력"
+                      >
+                        <Pencil className="w-3.5 h-3.5 stroke-[2]" />
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                <div className="text-[13px] sm:text-sm font-semibold text-slate-400 leading-snug truncate pt-0.5">
+                  {resolvedVehicleModel}
+                </div>
+              </div>
             </div>
 
-            {/* 단정한 단일 뱃지 (기사 · 차량번호) */}
-            <div className="flex items-center justify-between gap-2">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#F3F6FB] text-slate-700 text-xs font-extrabold tracking-tight">
-                <span>
-                  {logData.driverName?.endsWith('기사')
-                    ? logData.driverName
-                    : `${logData.driverName || '담당'} 기사`}
-                </span>
-                <span className="text-slate-300">·</span>
-                <span className="tabular-nums">{logData.carNumber}</span>
-              </span>
-              <span className="text-[11px] font-semibold text-slate-400">
-                VIP 의전 수행
-              </span>
-            </div>
-
-            {/* Booking customer and profile passenger are distinct, read-only sources. */}
-            <div className="rounded-2xl bg-[#F8FAFC] p-3.5 sm:p-4">
+            {/* Today's Dispatch Info Card (오늘의 배차 정보) */}
+            <div className="rounded-3xl bg-white p-4 sm:p-5 shadow-[0_4px_18px_rgba(15,23,42,0.04)] border border-slate-100/90">
               <div className="flex items-center justify-between gap-3">
-                <span className="text-xs font-semibold text-slate-800">오늘의 배차 정보</span>
+                <span className="text-[15px] sm:text-base font-black text-slate-900 tracking-tight">오늘의 배차 정보</span>
                 {onOpenProfileModal && logData.status === 'draft' && (
-                  <button type="button" onClick={() => { haptics.lightTap(); onOpenProfileModal(); }}
-                    className="inline-flex min-h-9 items-center gap-1 rounded-lg px-2 text-xs font-medium text-slate-600 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      haptics.lightTap();
+                      onOpenProfileModal();
+                    }}
+                    className="inline-flex min-h-8 items-center gap-1 rounded-lg px-2 text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20"
+                  >
                     <Pencil className="h-3.5 w-3.5" /> 프로필에서 수정
                   </button>
                 )}
               </div>
-              <div className="mt-2.5 divide-y divide-slate-200/70 rounded-xl bg-white px-3.5">
+              <div className="mt-3 divide-y divide-slate-200/60 rounded-2xl bg-[#F8FAFC] px-4 py-0.5">
                 <div className="flex items-center justify-between gap-3 py-3">
-                  <span className="shrink-0 text-xs text-slate-500">담당 승객</span>
-                  <span className="min-w-0 break-words text-right text-sm font-semibold text-slate-800">{logData.passengerName || '프로필에서 미입력'}</span>
+                  <span className="shrink-0 text-xs sm:text-[13px] font-bold text-slate-500">담당 승객</span>
+                  <span className="min-w-0 break-words text-right text-sm sm:text-[15px] font-black text-slate-900">
+                    {logData.passengerName || '프로필에서 미입력'}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between gap-3 py-3">
-                  <span className="shrink-0 text-xs text-slate-500">탑승 인원</span>
-                  <span className="text-sm font-semibold text-slate-800">{logData.passengerCount || '미확인'}</span>
+                  <span className="shrink-0 text-xs sm:text-[13px] font-bold text-slate-500">탑승 인원</span>
+                  <span className="text-sm sm:text-[15px] font-black text-slate-900">
+                    {logData.passengerCount || '미확인'}
+                  </span>
                 </div>
                 {logData.clientName && (
                   <div className="flex items-center justify-between gap-3 py-3">
-                    <span className="shrink-0 text-xs text-slate-500">예약 고객사</span>
-                    <span className="min-w-0 break-words text-right text-sm font-semibold text-slate-800">{logData.clientName}</span>
+                    <span className="shrink-0 text-xs sm:text-[13px] font-bold text-slate-500">예약 고객사</span>
+                    <span className="min-w-0 break-words text-right text-sm sm:text-[15px] font-black text-slate-900">
+                      {logData.clientName}
+                    </span>
                   </div>
                 )}
               </div>
-              <p className="mt-2 text-[11px] leading-relaxed text-slate-500">승객명은 프로필 설정에서 관리합니다. 인원은 승객명에 '외 1명' 또는 '총 2명'처럼 명시된 경우에만 계산됩니다.</p>
+              <p className="mt-3 text-[11.5px] sm:text-xs font-medium leading-relaxed text-slate-400">
+                승객명은 프로필 설정에서 관리합니다. 인원은 승객명에 &apos;외 1명&apos; 또는 &apos;총 2명&apos;처럼 명시된 경우에만 계산됩니다.
+              </p>
             </div>
           </section>
 
@@ -1261,6 +1395,7 @@ export const DrivingLogModal: React.FC<DrivingLogModalProps> = ({
   driverProfile,
   bookingId,
   onOpenProfileModal,
+  onUpdateProfile,
   onOpenLocationSearch,
   selectedLocationFromMap,
 }) => {
@@ -1284,6 +1419,7 @@ export const DrivingLogModal: React.FC<DrivingLogModalProps> = ({
       driverProfile={driverProfile}
       bookingId={bookingId}
       onOpenProfileModal={onOpenProfileModal}
+      onUpdateProfile={onUpdateProfile}
       onOpenLocationSearch={onOpenLocationSearch}
       selectedLocationFromMap={selectedLocationFromMap}
     />

@@ -2,7 +2,7 @@
 
 import React, { useEffect } from 'react';
 import Image from 'next/image';
-import { MapPin, FilePlus } from 'lucide-react';
+import { MapPin, FilePlus, X } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
 interface NaviDrivingLogConfirmModalProps {
@@ -70,39 +70,35 @@ export const NaviDrivingLogConfirmModal: React.FC<NaviDrivingLogConfirmModalProp
         {/* 1. Top Section: Header & 3D Calendar Illustration */}
         <div className="flex items-start justify-between gap-2 relative">
           <div className="flex items-start gap-3 flex-1 min-w-0">
-            {/* Blue Navigation Arrow Icon */}
-            <div className="w-10 h-10 rounded-2xl bg-[#1E60F3] shadow-md shadow-blue-500/20 flex items-center justify-center text-white shrink-0 mt-0.5">
-              <svg className="w-5 h-5 text-white fill-white" viewBox="0 0 24 24">
-                <polygon points="3 11 22 2 13 21 11 13 3 11" fill="currentColor" />
-              </svg>
-            </div>
-
+            <img
+              src="/images/icons/driver_ui/icon_schedule_add.png"
+              alt="운행일지 아이콘"
+              aria-hidden="true"
+              draggable={false}
+              className="w-12 h-12 sm:w-16 sm:h-16 object-contain shrink-0 select-none pointer-events-none"
+            />
             {/* Title & Explanatory Subtitle */}
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-slate-500 tracking-tight">
-                운행일지 연동
-              </p>
               <h3 className="text-[19px] sm:text-[20px] font-extrabold text-slate-900 tracking-tight leading-[1.3] mt-1">
-                이 경로를 운행일지에<br />추가할까요?
+                이 경로를 운행일지에 추가할까요?
               </h3>
               <p className="text-xs text-slate-500 font-medium leading-relaxed mt-1.5">
-                내비게이션으로 안내를 시작하면<br />
-                해당 경로가 운행일지에 기록됩니다.
+                운행일지에 바로 담아둘까요?
+
               </p>
             </div>
           </div>
-
-          {/* 3D Calendar Graphic with Checkmark Badge */}
-          <div className="shrink-0 w-24 h-24 relative flex items-center justify-center -mr-1 -mt-1">
-            <Image
-              src="/images/calendar_3d_badge.png"
-              alt="운행일지 연동 캘린더"
-              width={96}
-              height={96}
-              className="object-contain drop-shadow-sm pointer-events-none select-none"
-              priority
-            />
-          </div>
+          <button
+            type="button"
+            onClick={() => {
+              haptics.lightTap();
+              onClose();
+            }}
+            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200/80 active:scale-95 flex items-center justify-center text-slate-500 transition-all cursor-pointer shrink-0"
+            aria-label="닫기"
+          >
+            <X className="w-4 h-4 stroke-[2.2]" />
+          </button>
         </div>
 
         {/* 2. Route Preview Card */}
@@ -111,18 +107,28 @@ export const NaviDrivingLogConfirmModal: React.FC<NaviDrivingLogConfirmModalProp
             {/* Visual Timeline (Concentric GPS Dot -> Solid Line -> MapPin) */}
             <div className="flex flex-col items-center shrink-0 self-stretch justify-between py-1">
               {/* Origin GPS Point: Concentric Circle */}
-              <div className="w-5 h-5 rounded-full bg-[#1E60F3] flex items-center justify-center shadow-2xs">
-                <div className="w-2.5 h-2.5 rounded-full bg-white flex items-center justify-center">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#1E60F3]" />
-                </div>
+              <div className="w-10 h-10 rounded-full bg-blue-500/12 flex items-center justify-center shrink-0">
+                <img
+                  src="/images/icons/driver_ui/icon_origin.png"
+                  alt="출발지 아이콘"
+                  aria-hidden="true"
+                  draggable={false}
+                  className="w-9 h-9 sm:w-9 sm:h-9 object-contain shrink-0 select-none pointer-events-none"
+                />
               </div>
 
               {/* Connecting Vertical Line */}
               <div className="w-[1.5px] bg-slate-300 flex-1 my-1" />
 
               {/* Destination Point: Slate Circle with Location Pin */}
-              <div className="w-5 h-5 rounded-full bg-slate-200/90 flex items-center justify-center">
-                <MapPin className="w-3 h-3 fill-slate-600 text-slate-600" />
+              <div className="w-10 h-10 rounded-full bg-rose-500/12 flex items-center justify-center shrink-0">
+                <img
+                  src="/images/icons/driver_ui/icon_destination.png"
+                  alt="도착지 아이콘"
+                  aria-hidden="true"
+                  draggable={false}
+                  className="w-9 h-9 sm:w-9 sm:h-9 object-contain shrink-0 select-none pointer-events-none"
+                />
               </div>
             </div>
 
@@ -166,7 +172,7 @@ export const NaviDrivingLogConfirmModal: React.FC<NaviDrivingLogConfirmModalProp
             }}
             className="w-full py-3.5 px-4 rounded-2xl border border-slate-200/90 bg-white hover:bg-slate-50 text-slate-700 font-bold text-sm transition-all active:scale-[0.98] cursor-pointer text-center shadow-2xs"
           >
-            아니요
+            내비만 켜기
           </button>
           <button
             type="button"
@@ -177,7 +183,7 @@ export const NaviDrivingLogConfirmModal: React.FC<NaviDrivingLogConfirmModalProp
             className="w-full py-3.5 px-4 rounded-2xl bg-[#1E60F3] hover:bg-blue-600 text-white font-bold text-sm shadow-md shadow-blue-500/20 transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1.5 text-center"
           >
             <FilePlus className="w-4 h-4 stroke-[2.2]" />
-            <span>추가하기</span>
+            <span>기록하고 출발</span>
           </button>
         </div>
       </div>

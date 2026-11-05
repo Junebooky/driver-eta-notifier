@@ -13,6 +13,7 @@ interface HeaderProps {
   onSelectNavi: (provider: NaviProvider) => void;
   onOpenAdminModal?: () => void;
   isAdmin?: boolean;
+  isHidden?: boolean;
 }
 
 /**
@@ -49,6 +50,7 @@ export const Header: React.FC<HeaderProps> = ({
   onSelectNavi,
   onOpenAdminModal,
   isAdmin = false,
+  isHidden = false,
 }) => {
   const headerLabel = formatHeaderDriverLabel(profile.vehicleNo, profile.driverName);
 
@@ -108,7 +110,11 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="w-full bg-inherit backdrop-blur pt-[max(env(safe-area-inset-top),1.25rem)] pb-2.5 px-4 sticky top-0 z-30">
+    <header
+      className={`w-full bg-white/95 backdrop-blur-md border-b border-slate-200/70 shadow-[0_2px_12px_rgba(15,23,42,0.04)] pt-[max(env(safe-area-inset-top),0.875rem)] pb-2.5 px-4 sticky top-0 z-40 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform ${
+        isHidden ? '-translate-y-full pointer-events-none' : 'translate-y-0'
+      }`}
+    >
       <div className="max-w-md mx-auto flex items-center justify-between gap-2">
         {/* Left: Driver / Vehicle Pill Tag (Flexible with truncate, won't wrap to 2 lines) */}
         <div className="flex items-center gap-1.5 min-w-0 flex-1 shrink mr-2">
@@ -117,7 +123,7 @@ export const Header: React.FC<HeaderProps> = ({
               haptics.lightTap();
               onOpenProfileModal();
             }}
-            className="flex items-center space-x-1.5 bg-white px-3.5 py-2 rounded-full border border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.05)] text-sm font-bold text-slate-800 cursor-pointer hover:bg-slate-50 active:scale-95 transition-all min-w-0 max-w-full"
+            className="flex items-center space-x-1.5 bg-[#F8FAFC] px-3.5 py-2 rounded-full border border-slate-200/80 shadow-[0_2px_8px_rgba(15,23,42,0.04)] text-sm font-bold text-slate-800 cursor-pointer hover:bg-slate-100/80 active:scale-95 transition-all min-w-0 max-w-full"
             title={`${profile.vehicleNo || ''} ${profile.driverName || ''}${profile.passengerName?.trim() ? ` • 담당승객: ${profile.passengerName.trim()}` : ''}`.trim()}
           >
             <Car className="w-3.5 h-3.5 text-[#1E60F3] fill-[#1E60F3] shrink-0" />

@@ -132,10 +132,41 @@ export function useDriverProfile() {
         if (!response.ok) throw new Error('프로필 조회 실패');
         const {driver}=await response.json();
         if (!driver?.id || abort.signal.aborted) return;
-        setProfile({...EMPTY_PROFILE,id:driver.id,driverId:driver.id,driverName:driver.driver_name || '',
-          vehicleNo:driver.vehicle_no || '',carNumber:driver.car_number || '',phone:driver.phone || '',mobile:driver.phone || '',
-          passengerName:driver.passenger_name ?? null,defaultNavi:driver.default_navi || 'tmap',homeLocation:driver.driver_meta?.homeLocation || null});
+        let savedPrefs: Record<string, any> = {};
+        try {
+          const rawPrefs = localStorage.getItem(`cockpit_driver_${driver.id}_preferences`);
+          if (rawPrefs) savedPrefs = JSON.parse(rawPrefs);
+        } catch {}
+        const resolvedCarNumber = driver.car_number || savedPrefs.carNumber || '';
+        const resolvedAvatarUrl = driver.avatar_url || driver.driver_meta?.avatar_url || savedPrefs.avatarUrl || null;
+        setProfile({
+          ...EMPTY_PROFILE,
+          id: driver.id,
+          driverId: driver.id,
+          driverName: driver.driver_name || '',
+          vehicleNo: driver.vehicle_no || '',
+          carNumber: resolvedCarNumber,
+          carNumberFront: savedPrefs.carNumberFront || '',
+          carNumberBack: savedPrefs.carNumberBack || '',
+          carModel: driver.vehicle_model || savedPrefs.carModel || '',
+          avatarUrl: resolvedAvatarUrl,
+          phone: driver.phone || '',
+          mobile: driver.phone || '',
+          passengerName: driver.passenger_name ?? null,
+          defaultNavi: driver.default_navi || 'tmap',
+          homeLocation: driver.driver_meta?.homeLocation || null,
+        });
         localStorage.setItem(ONBOARDED_KEY,'true');
+        if (!resolvedAvatarUrl) {
+          fetch(`/api/hq/drivers/assets?driverId=${encodeURIComponent(driver.id)}&type=profile`, { cache: 'no-store' })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((assetData) => {
+              if (!abort.signal.aborted && assetData?.ok && assetData.profile?.signedUrl) {
+                setProfile((prev) => ({ ...prev, avatarUrl: assetData.profile.signedUrl }));
+              }
+            })
+            .catch(() => {});
+        }
       } catch { if(!abort.signal.aborted) console.warn('프로필을 조회하지 못했습니다.'); }
       finally {if(!abort.signal.aborted)setIsLoaded(true);}
     })();
@@ -146,7 +177,15 @@ export function useDriverProfile() {
       const updated={...previous,...patch,id:previous.id || patch.id,driverId:previous.driverId || patch.driverId,
         phone:patch.phone ?? patch.mobile ?? previous.phone,mobile:patch.phone ?? patch.mobile ?? previous.mobile};
       // Personal preferences are never read from a vehicle's previous driver's browser cache.
-      if(updated.driverId)try{localStorage.setItem(`cockpit_driver_${updated.driverId}_preferences`,JSON.stringify({defaultNavi:updated.defaultNavi,homeLocation:updated.homeLocation}));}catch{}
+      if(updated.driverId)try{localStorage.setItem(`cockpit_driver_${updated.driverId}_preferences`,JSON.stringify({
+        defaultNavi:updated.defaultNavi,
+        homeLocation:updated.homeLocation,
+        carNumber:updated.carNumber,
+        carNumberFront:updated.carNumberFront,
+        carNumberBack:updated.carNumberBack,
+        carModel:updated.carModel,
+        avatarUrl:updated.avatarUrl,
+      }));}catch{}
       return updated;
     });
   };

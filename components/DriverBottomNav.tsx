@@ -7,9 +7,11 @@ export type DriverTab = 'drive' | 'schedule' | 'log';
 export function DriverBottomNav({
   activeTab,
   onSelect,
+  isHidden = false,
 }: {
   activeTab: DriverTab;
   onSelect: (tab: DriverTab) => void;
+  isHidden?: boolean;
 }) {
   const tabs = [
     { id: 'drive' as const, label: '홈', icon: House },
@@ -72,7 +74,9 @@ export function DriverBottomNav({
   return (
     <nav
       aria-label="기사 메뉴"
-      className="fixed bottom-0 left-1/2 z-40 w-full max-w-md -translate-x-1/2 border-t border-slate-200 bg-white px-3 pt-2 pb-[max(8px,env(safe-area-inset-bottom))]"
+      className={`fixed bottom-0 left-1/2 z-40 w-full max-w-md -translate-x-1/2 border-t border-slate-200/80 bg-white/95 backdrop-blur-md shadow-[0_-4px_16px_rgba(15,23,42,0.04)] px-3 pt-2 pb-[max(8px,env(safe-area-inset-bottom))] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform ${
+        isHidden ? 'translate-y-full pointer-events-none' : 'translate-y-0'
+      }`}
     >
       <div className="grid grid-cols-3">
         {tabs.map(({ id, label, icon: Icon }) => {

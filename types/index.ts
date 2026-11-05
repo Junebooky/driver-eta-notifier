@@ -29,6 +29,7 @@ export interface DriverProfile {
   plateNumber?: string;    // e.g. '142호 7811' (alias for carNumber)
   clientName?: string;     // e.g. '인터코스'
   passengerCount?: string; // e.g. '9명'
+  avatarUrl?: string | null; // Logged-in driver profile photo URL
 }
 
 

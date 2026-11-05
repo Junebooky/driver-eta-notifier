@@ -129,6 +129,50 @@ export default function DriverCockpit() {
   // Field Knowledge (현장 지식) Read-Only Driver Modal State
   const [isFieldKnowledgeOpen, setIsFieldKnowledgeOpen] = useState(false);
 
+  // Scroll-direction hide/show state for top Header & bottom DriverBottomNav
+  const [isBarsHidden, setIsBarsHidden] = useState(false);
+  const lastScrollYRef = useRef(0);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleScrollDirection = (currentY: number) => {
+      const clampedY = Math.max(0, currentY);
+      const delta = clampedY - lastScrollYRef.current;
+
+      if (clampedY <= 16) {
+        setIsBarsHidden(false);
+        lastScrollYRef.current = clampedY;
+      } else if (delta > 8) {
+        setIsBarsHidden(true);
+        lastScrollYRef.current = clampedY;
+      } else if (delta < -6) {
+        setIsBarsHidden(false);
+        lastScrollYRef.current = clampedY;
+      }
+    };
+
+    const onWindowScroll = () => {
+      handleScrollDirection(window.scrollY || document.documentElement.scrollTop || 0);
+    };
+
+    const onCaptiveScroll = (e: Event) => {
+      const target = e.target;
+      if (!(target instanceof HTMLElement)) return;
+      // Ignore scrolling inside modal overlays
+      if (target.closest('.driver-modal-backdrop') || target.closest('.driver-modal-card')) return;
+      if (target === document.documentElement || target === document.body) return;
+      handleScrollDirection(target.scrollTop);
+    };
+
+    window.addEventListener('scroll', onWindowScroll, { passive: true });
+    document.addEventListener('scroll', onCaptiveScroll, { capture: true, passive: true });
+    return () => {
+      window.removeEventListener('scroll', onWindowScroll);
+      document.removeEventListener('scroll', onCaptiveScroll, { capture: true });
+    };
+  }, []);
+
   // VIP Assignment Capability & Isolated Preview Gate State (Issue #14)
   const [isVipAssigned, setIsVipAssigned] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -686,6 +730,8 @@ export default function DriverCockpit() {
     haptics.lightTap();
     if (tab === 'log') setHasOpenedDrivingLog(true);
     setActiveTab(tab);
+    setIsBarsHidden(false);
+    lastScrollYRef.current = 0;
     window.scrollTo({ top: 0 });
   };
   const [reportMode, setReportMode] = useState<ReportMode>('DEPARTURE');
@@ -1433,8 +1479,8 @@ export default function DriverCockpit() {
   }
 
   return (
-    <main className="driver-app min-h-dvh bg-inherit text-slate-800 flex flex-col items-center justify-between overflow-x-hidden selection:bg-[#1E60F3]/20">
-      <div className="w-full max-w-md mx-auto min-h-dvh pb-[calc(88px+env(safe-area-inset-bottom))] flex flex-col justify-between bg-inherit shadow-xl relative border-x border-slate-200/50 overflow-x-hidden">
+    <main className="driver-app min-h-dvh bg-inherit text-slate-800 flex flex-col items-center justify-between overflow-x-clip selection:bg-[#1E60F3]/20">
+      <div className="w-full max-w-md mx-auto min-h-dvh pb-[calc(88px+env(safe-area-inset-bottom))] flex flex-col justify-between bg-inherit shadow-xl relative border-x border-slate-200/50 overflow-x-clip">
         {/* Top Header with Safe Area Inset & Navi Switcher */}
         <Header
           profile={profile}
@@ -1444,6 +1490,7 @@ export default function DriverCockpit() {
           }}
           onOpenAdminModal={() => setIsAdminModalOpen(true)}
           isAdmin={isAdmin}
+          isHidden={isBarsHidden}
         />
 
         {/* Add to Home Screen Guidance Banner */}
@@ -1615,10 +1662,11 @@ export default function DriverCockpit() {
           <DrivingLogModal presentation="page" isOpen={true}
             onClose={() => selectDriverTab('drive')} driverProfile={profile} bookingId={activeBookingId}
             onOpenProfileModal={() => setIsProfileModalOpen(true)}
+            onUpdateProfile={updateProfile}
             onOpenLocationSearch={() => { setIsSelectingForSchedule(true); setIsLocationSearchOpen(true); }}
             selectedLocationFromMap={selectedLocationForSchedule} />
         </div>}
-        <DriverBottomNav activeTab={activeTab} onSelect={selectDriverTab} />
+        <DriverBottomNav activeTab={activeTab} onSelect={selectDriverTab} isHidden={isBarsHidden} />
       </div>
 
 
@@ -1638,12 +1686,13 @@ export default function DriverCockpit() {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
               driverId: profile.driverId, driver_name: updated.driverName, phone: updated.phone || updated.mobile,
               passenger_name: updated.passengerName ?? null, default_navi: updated.defaultNavi ?? profile.defaultNavi,
+              car_number: updated.carNumber ?? profile.carNumber,
             })
           });
           const result = await response.json();
           if (!response.ok || !result.ok) throw new Error(result.error || '프로필이 저장되지 않았습니다.');
           const driver = result.driver;
-          updateProfile({ ...updated, id: driver.id, driverId: driver.id, vehicleNo: driver.vehicle_no || '', carNumber: driver.car_number || '', driverName: driver.driver_name, phone: driver.phone || '', passengerName: driver.passenger_name ?? null });
+          updateProfile({ ...updated, id: driver.id, driverId: driver.id, vehicleNo: driver.vehicle_no || '', carNumber: updated.carNumber || driver.car_number || '', driverName: driver.driver_name, phone: driver.phone || '', passengerName: driver.passenger_name ?? null });
           localStorage.setItem('cockpit_driver_onboarded', 'true');
           setIsOnboarding(false); setOnboardingStage(null);
           return true;

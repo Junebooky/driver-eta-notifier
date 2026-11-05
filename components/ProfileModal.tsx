@@ -663,7 +663,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 <input
                   ref={plateFrontRef}
                   type="text"
-                  readOnly={Boolean(profile.driverId)}
                   value={plateFront}
                   onChange={handlePlateFrontChange}
                   placeholder="예: 서울99바"
@@ -679,7 +678,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   inputMode="numeric"
                   pattern="[0-9]*"
                   maxLength={4}
-                  readOnly={Boolean(profile.driverId)}
                   value={plateBack}
                   onChange={handlePlateBackChange}
                   onKeyDown={handlePlateBackKeyDown}
