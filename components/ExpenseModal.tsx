@@ -41,7 +41,7 @@ import { AddExpenseModal, renderCategoryIcon } from './AddExpenseModal';
 import { autoEnsureUprightReceipt } from '@/utils/imageRotate';
 import { haptics } from '@/utils/haptics';
 import { DriverProfile } from '@/types';
-import { isReportingUuid,prepareExpenseReceipt } from '@/utils/receiptSubmission';
+import { isReportingUuid, prepareExpenseReceipt } from '@/utils/receiptSubmission';
 import { getKstTodayDateStr } from '@/utils/dispatchConflictDetector';
 
 interface ExpenseModalProps {
@@ -60,41 +60,41 @@ const ExpenseModalContent: React.FC<{
   const quickFileInputRef = useRef<HTMLInputElement>(null);
 
   // Purely initialized states
-  const [{ items: initialItems, isDemo: initialIsDemo }] = useState(()=>{const loaded=loadExpenses(driverProfile?.driverId || 'unlinked');return {...loaded,items:loaded.items.map(item=>({...item,id:isReportingUuid(item.id)?item.id:crypto.randomUUID()}))};});
+  const [{ items: initialItems, isDemo: initialIsDemo }] = useState(() => { const loaded = loadExpenses(driverProfile?.driverId || 'unlinked'); return { ...loaded, items: loaded.items.map(item => ({ ...item, id: isReportingUuid(item.id) ? item.id : crypto.randomUUID() })) }; });
   const [expenseList, setExpenseList] = useState<ExpenseItem[]>(initialItems);
   const [isDemoMode, setIsDemoMode] = useState<boolean>(initialIsDemo);
 
-  const [serverLoadError,setServerLoadError]=useState('');
-  useEffect(()=>{
-    let active=true;let running=false;
-    const recover=async()=>{
-      if(running)return;running=true;
-      try{
-        const response=await fetch(`/api/expenses${bookingId?`?bookingId=${encodeURIComponent(bookingId)}`:''}`,{cache:'no-store',credentials:'include'});
-        const data=await response.json();
-        if(!response.ok || !data.ok)throw new Error(data.error || '서버 경비 내역을 불러오지 못했습니다.');
-        if(!active || isDemoMode)return;
+  const [serverLoadError, setServerLoadError] = useState('');
+  useEffect(() => {
+    let active = true; let running = false;
+    const recover = async () => {
+      if (running) return; running = true;
+      try {
+        const response = await fetch(`/api/expenses${bookingId ? `?bookingId=${encodeURIComponent(bookingId)}` : ''}`, { cache: 'no-store', credentials: 'include' });
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || '서버 경비 내역을 불러오지 못했습니다.');
+        if (!active || isDemoMode) return;
         setServerLoadError('');
-        setExpenseList(previous=>{
-          const rows:ExpenseItem[]=data.expenses.map((row:import('@/types/expenseHq').HqExpenseRecord)=>({id:row.id,category:row.category,date:row.rawDate,time:row.time,merchant:row.merchant,address:row.address,amount:row.amount,paymentMethod:row.paymentMethod,memo:row.memo,receiptUrl:row.receiptUrl,receiptStoragePath:row.receiptStoragePath,bookingId:row.bookingId,driverId:row.driverId,hqStatus:row.status,submittedToHqAt:row.submittedAt,createdAt:row.rawDate,updatedAt:row.rawDate,ocrExtracted:row.ocrExtracted,ocrSummary:row.ocrSummary}));
-          const unsent=previous.filter(item=>{
-            if(item.submittedToHqAt)return false;
-            const remote=rows.find(row=>row.id===item.id);
-            if(!remote)return true;
-            if(remote.hqStatus==='승인 완료' || remote.hqStatus==='반려')return false;
-            return (['amount','merchant','category','date','time','memo','receiptStoragePath'] as const).some(key=>(item[key] ?? '')!==(remote[key] ?? ''));
+        setExpenseList(previous => {
+          const rows: ExpenseItem[] = data.expenses.map((row: import('@/types/expenseHq').HqExpenseRecord) => ({ id: row.id, category: row.category, date: row.rawDate, time: row.time, merchant: row.merchant, address: row.address, amount: row.amount, paymentMethod: row.paymentMethod, memo: row.memo, receiptUrl: row.receiptUrl, receiptStoragePath: row.receiptStoragePath, bookingId: row.bookingId, driverId: row.driverId, hqStatus: row.status, submittedToHqAt: row.submittedAt, createdAt: row.rawDate, updatedAt: row.rawDate, ocrExtracted: row.ocrExtracted, ocrSummary: row.ocrSummary }));
+          const unsent = previous.filter(item => {
+            if (item.submittedToHqAt) return false;
+            const remote = rows.find(row => row.id === item.id);
+            if (!remote) return true;
+            if (remote.hqStatus === '승인 완료' || remote.hqStatus === '반려') return false;
+            return (['amount', 'merchant', 'category', 'date', 'time', 'memo', 'receiptStoragePath'] as const).some(key => (item[key] ?? '') !== (remote[key] ?? ''));
           });
-          const pendingIds=new Set(unsent.map(item=>item.id));
-          const merged=[...unsent,...rows.filter(row=>!pendingIds.has(row.id))];
-          saveExpenses(merged,false,driverProfile?.driverId || 'unlinked');return merged;
+          const pendingIds = new Set(unsent.map(item => item.id));
+          const merged = [...unsent, ...rows.filter(row => !pendingIds.has(row.id))];
+          saveExpenses(merged, false, driverProfile?.driverId || 'unlinked'); return merged;
         });
-      }catch(error){if(active)setServerLoadError(error instanceof Error?error.message:'서버 경비 조회에 실패했습니다.');}
-      finally{running=false;}
+      } catch (error) { if (active) setServerLoadError(error instanceof Error ? error.message : '서버 경비 조회에 실패했습니다.'); }
+      finally { running = false; }
     };
-    void recover();const timer=setInterval(()=>{if(document.visibilityState==='visible')void recover();},20_000);
-    const resume=()=>void recover();window.addEventListener('online',resume);window.addEventListener('focus',resume);
-    return()=>{active=false;clearInterval(timer);window.removeEventListener('online',resume);window.removeEventListener('focus',resume);};
-  },[bookingId,driverProfile?.driverId,isDemoMode]);
+    void recover(); const timer = setInterval(() => { if (document.visibilityState === 'visible') void recover(); }, 20_000);
+    const resume = () => void recover(); window.addEventListener('online', resume); window.addEventListener('focus', resume);
+    return () => { active = false; clearInterval(timer); window.removeEventListener('online', resume); window.removeEventListener('focus', resume); };
+  }, [bookingId, driverProfile?.driverId, isDemoMode]);
 
   // Date navigation: default to 2026-10-24 matching reference screenshot
   const [selectedDate, setSelectedDate] = useState<string>(getKstTodayDateStr);
@@ -165,34 +165,35 @@ const ExpenseModalContent: React.FC<{
   // Total calculation
   const totalAmount = calculateTotalExpense(displayedItems);
 
-  // Today check (comparison with 2026-10-24 or real local today)
-  const isSelectedDateOct24 = selectedDate === '2026-10-24';
+  // Today check (real KST today date)
+  const todayDateStr = getKstTodayDateStr();
+  const isSelectedDateToday = selectedDate === todayDateStr;
 
   // Add / Edit save handler
-  const handleSaveExpense = async (savedItem: ExpenseItem, submitToHq=true) => {
-    if(isDemoMode && submitToHq)throw new Error('샘플 내역은 제출할 수 없습니다. 실제 빈 경비로 전환해 주세요.');
-    if(!driverProfile?.driverId)throw new Error('개인 기사 계정을 확인한 뒤 다시 저장해 주세요.');
-    if(expenseList.find(item=>item.id===savedItem.id)?.hqStatus==='승인 완료')throw new Error('승인된 경비는 수정할 수 없습니다.');
-    let item:ExpenseItem={...savedItem,hqStatus:'미제출',submittedToHqAt:undefined,driverId:driverProfile.driverId,bookingId:savedItem.bookingId || bookingId};
-    const put=(value:ExpenseItem)=>{setIsDemoMode(false);setExpenseList(previous=>{const next=[value,...previous.filter(e=>e.id!==value.id)];saveExpenses(next,false,driverProfile.driverId);return next;});};
+  const handleSaveExpense = async (savedItem: ExpenseItem, submitToHq = true) => {
+    if (isDemoMode && submitToHq) throw new Error('샘플 내역은 제출할 수 없습니다. 실제 빈 경비로 전환해 주세요.');
+    if (!driverProfile?.driverId) throw new Error('개인 기사 계정을 확인한 뒤 다시 저장해 주세요.');
+    if (expenseList.find(item => item.id === savedItem.id)?.hqStatus === '승인 완료') throw new Error('승인된 경비는 수정할 수 없습니다.');
+    let item: ExpenseItem = { ...savedItem, hqStatus: '미제출', submittedToHqAt: undefined, driverId: driverProfile.driverId, bookingId: savedItem.bookingId || bookingId };
+    const put = (value: ExpenseItem) => { setIsDemoMode(false); setExpenseList(previous => { const next = [value, ...previous.filter(e => e.id !== value.id)]; saveExpenses(next, false, driverProfile.driverId); return next; }); };
     put(item); // Keep a retryable draft even when upload/network fails.
-    if(submitToHq){
-      item=await prepareExpenseReceipt(item);put(item);
-      const result=await submitDriverExpensesToHqDb([item],driverProfile.driverName,driverProfile.carNumber || '',driverProfile.carModel || '',item.bookingId);
-      if(!result.ok || !result.expenses?.[0])throw new Error(result.error || '서버 경비 저장을 확인하지 못했습니다.');
-      const saved=result.expenses[0];
-      item={...item,id:saved.id,receiptStoragePath:saved.receiptStoragePath,hqStatus:saved.status as ExpenseItem['hqStatus'],submittedToHqAt:new Date().toISOString()};
+    if (submitToHq) {
+      item = await prepareExpenseReceipt(item); put(item);
+      const result = await submitDriverExpensesToHqDb([item], driverProfile.driverName, driverProfile.carNumber || '', driverProfile.carModel || '', item.bookingId);
+      if (!result.ok || !result.expenses?.[0]) throw new Error(result.error || '서버 경비 저장을 확인하지 못했습니다.');
+      const saved = result.expenses[0];
+      item = { ...item, id: saved.id, receiptStoragePath: saved.receiptStoragePath, hqStatus: saved.status as ExpenseItem['hqStatus'], submittedToHqAt: new Date().toISOString() };
       put(item);
     }
     setSelectedDate(item.date);
-    haptics.success();showToast(submitToHq?'영수증과 경비가 본사에 저장되었습니다.':'기기에 임시 저장했습니다.');
-    setIsAddModalOpen(false);setEditingItem(null);setUploadedReceiptUrl(undefined);
+    haptics.success(); showToast(submitToHq ? '영수증과 경비가 본사에 저장되었습니다.' : '기기에 임시 저장했습니다.');
+    setIsAddModalOpen(false); setEditingItem(null); setUploadedReceiptUrl(undefined);
   };
 
   // Delete item handler
   const handleDeleteConfirm = () => {
     if (!deletingItemId) return;
-    if(expenseList.find(item=>item.id===deletingItemId)?.submittedToHqAt){showToast('제출된 경비는 삭제할 수 없습니다. 본사에서 검수·반려를 처리해 주세요.');setDeletingItemId(null);return;}
+    if (expenseList.find(item => item.id === deletingItemId)?.submittedToHqAt) { showToast('제출된 경비는 삭제할 수 없습니다. 본사에서 검수·반려를 처리해 주세요.'); setDeletingItemId(null); return; }
     haptics.mediumTap();
     const updated = expenseList.filter((i) => i.id !== deletingItemId);
     updateExpenseList(updated, false);
@@ -203,19 +204,19 @@ const ExpenseModalContent: React.FC<{
   // Submit all currently displayed items to HQ Dashboard via DB API
   const handleSubmitAllToHq = async () => {
     if (displayedItems.length === 0 || isSubmittingToHq) return;
-    const pendingItems=displayedItems.filter(item=>!item.submittedToHqAt);
-    if(!pendingItems.length){showToast('모두 서버에 제출된 내역입니다.');return;}
+    const pendingItems = displayedItems.filter(item => !item.submittedToHqAt);
+    if (!pendingItems.length) { showToast('모두 서버에 제출된 내역입니다.'); return; }
     setIsSubmittingToHq(true);
     haptics.selection();
 
-    if(isDemoMode){setIsSubmittingToHq(false);showToast('샘플 내역은 본사에 제출할 수 없습니다.');return;}
+    if (isDemoMode) { setIsSubmittingToHq(false); showToast('샘플 내역은 본사에 제출할 수 없습니다.'); return; }
     const targetDriverName = driverProfile?.driverName || '';
     const targetPlate = driverProfile?.plateNumber || driverProfile?.carNumber || '';
     const targetModel = driverProfile?.carModel || '';
 
     try {
       const result = await submitDriverExpensesToHqDb(
-        await Promise.all(pendingItems.map(async item=>{const prepared=await prepareExpenseReceipt({...item,bookingId:item.bookingId || bookingId});return prepared;})),
+        await Promise.all(pendingItems.map(async item => { const prepared = await prepareExpenseReceipt({ ...item, bookingId: item.bookingId || bookingId }); return prepared; })),
         targetDriverName,
         targetPlate,
         targetModel,
@@ -233,8 +234,8 @@ const ExpenseModalContent: React.FC<{
         if (pendingItems.some((d) => d.id === item.id)) {
           return {
             ...item,
-            id:result.expenses?.find(saved=>saved.id===item.id)?.id || item.id,
-            receiptStoragePath:result.expenses?.find(saved=>saved.id===item.id)?.receiptStoragePath || item.receiptStoragePath,
+            id: result.expenses?.find(saved => saved.id === item.id)?.id || item.id,
+            receiptStoragePath: result.expenses?.find(saved => saved.id === item.id)?.receiptStoragePath || item.receiptStoragePath,
             hqStatus: '검수 대기' as const,
             submittedToHqAt: nowIso,
           };
@@ -283,42 +284,42 @@ const ExpenseModalContent: React.FC<{
       }}
     >
       <div
-        className="w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[92dvh] h-[92dvh] sm:h-auto sm:max-h-[90vh] animate-in slide-in-from-bottom-6 sm:animate-scale-up duration-300 relative"
+        className="w-full max-w-lg bg-[#F6F8FC] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100/90 overflow-hidden flex flex-col max-h-[92dvh] h-[92dvh] sm:h-auto sm:max-h-[90vh] animate-in slide-in-from-bottom-6 sm:animate-scale-up duration-300 relative"
         onClick={(e) => e.stopPropagation()}
       >
         {serverLoadError && <p role="status" className="px-5 py-2 text-xs text-amber-700">{serverLoadError} · 기기 초안은 유지됩니다.</p>}
-      {/* 1. Modal Header */}
-        <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
-          <div className="flex items-center space-x-2.5">
-            <div className="w-8 h-8 rounded-xl bg-[#1E60F3] text-white flex items-center justify-center shadow-xs shrink-0">
-              <ReceiptText className="w-4 h-4 stroke-[2.2]" />
+        {/* 1. Modal Header */}
+        <div className="px-5 pt-5 pb-3 flex items-center justify-between bg-[#F6F8FC] shrink-0">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-2xl bg-[#0055FF] text-white flex items-center justify-center shadow-[0_4px_12px_rgba(0,85,255,0.28)] shrink-0">
+              <ReceiptText className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <h2 className="text-base font-bold text-slate-900 tracking-tight">경비지출</h2>
+                <h2 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight">경비 정산</h2>
                 {isDemoMode ? (
-                  <span className="text-[10px] bg-blue-50 text-[#1E60F3] font-semibold px-1.5 py-0.2 rounded border border-blue-100">
+                  <span className="text-[10px] bg-blue-50 text-[#0055FF] font-bold px-2 py-0.5 rounded-md border border-blue-100">
                     샘플
                   </span>
                 ) : (
-                  <span className="text-[10px] bg-slate-100 text-slate-500 font-semibold px-1.5 py-0.2 rounded">
+                  <span className="text-[10px] bg-[#EDF1F7] text-slate-500 font-bold px-2 py-0.5 rounded-md">
                     임시저장
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-slate-400 font-normal">
-                VIP 의전 경비 정산 내역
+              <p className="text-[11px] sm:text-xs text-slate-400 font-medium mt-0.5">
+                운행 중 발생한 경비를 등록해 주세요
               </p>
             </div>
           </div>
 
-          <div className="flex items-center space-x-1">
+          <div className="flex items-center space-x-1.5">
             {/* Demo fixture toggle */}
             {isDemoMode ? (
               <button
                 type="button"
                 onClick={handleResetToRealDraft}
-                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100"
+                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-200/60 cursor-pointer"
                 title="실제 빈 지출 내역으로 전환"
               >
                 <RotateCcw className="w-4 h-4 stroke-[2]" />
@@ -327,7 +328,7 @@ const ExpenseModalContent: React.FC<{
               <button
                 type="button"
                 onClick={handleLoadDemoFixture}
-                className="p-1.5 text-blue-500 hover:text-blue-700 rounded-full hover:bg-blue-50"
+                className="p-1.5 text-[#0055FF] hover:text-blue-700 rounded-full hover:bg-blue-50 cursor-pointer"
                 title="레퍼런스 샘플 불러오기"
               >
                 <Sparkles className="w-4 h-4 stroke-[2]" />
@@ -341,7 +342,7 @@ const ExpenseModalContent: React.FC<{
                 haptics.lightTap();
                 setIsDatePickerOpen(true);
               }}
-              className="p-1.5 text-slate-600 hover:text-slate-900 rounded-full hover:bg-slate-100"
+              className="p-1.5 text-slate-600 hover:text-slate-900 rounded-full hover:bg-slate-200/60 cursor-pointer"
               title="날짜 선택"
             >
               <CalendarIcon className="w-4 h-4 stroke-[2]" />
@@ -354,7 +355,7 @@ const ExpenseModalContent: React.FC<{
                 haptics.lightTap();
                 onClose();
               }}
-              className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 active:scale-95 flex items-center justify-center text-slate-500 cursor-pointer transition-all"
+              className="w-8 h-8 rounded-full bg-[#EDF1F7] hover:bg-slate-200/80 active:scale-95 flex items-center justify-center text-slate-500 cursor-pointer transition-all"
               aria-label="닫기"
             >
               <X className="w-4 h-4 stroke-[2.2]" />
@@ -362,455 +363,445 @@ const ExpenseModalContent: React.FC<{
           </div>
         </div>
 
-        {/* Main Scrollable Content (Pure White Background) */}
+        {/* Main Scrollable Content */}
         <main
           ref={scrollContainerRef}
-          className="flex-1 overflow-y-auto px-4 py-3 space-y-4 w-full pb-6 bg-white"
+          className="flex-1 overflow-y-auto px-5 py-3 space-y-4 w-full pb-6 bg-[#F6F8FC]"
         >
-        {/* Notice for Reference Demo vs Fresh Draft */}
-        {isDemoMode && (
-          <div className="bg-blue-50/70 border border-blue-100 rounded-xl px-3 py-2 flex items-center justify-between text-xs text-blue-700">
-            <span className="font-medium">레퍼런스 스크린샷 시연 모드입니다.</span>
-            <button
-              type="button"
-              onClick={handleResetToRealDraft}
-              className="underline text-[11px] font-bold hover:text-blue-900"
-            >
-              빈 내역으로 시작
-            </button>
-          </div>
-        )}
-
-        {/* 2. Date Navigator Bar (Directly on white background per reference mock) */}
-        <section className="flex items-center justify-between gap-2 py-1 px-0.5">
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => {
-                haptics.lightTap();
-                setSelectedDate((prev) => shiftDateIso(prev, -1));
-              }}
-              className="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 active:scale-95 transition-all"
-              aria-label="이전 날짜"
-            >
-              <ChevronLeft className="w-4 h-4 stroke-[2.2]" />
-            </button>
-
-            <span className="text-sm sm:text-base font-bold text-slate-900 px-2 tracking-tight">
-              {formatExpenseHeaderDate(selectedDate)}
-            </span>
-
-            <button
-              type="button"
-              onClick={() => {
-                haptics.lightTap();
-                setSelectedDate((prev) => shiftDateIso(prev, 1));
-              }}
-              className="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 active:scale-95 transition-all"
-              aria-label="다음 날짜"
-            >
-              <ChevronRight className="w-4 h-4 stroke-[2.2]" />
-            </button>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              haptics.lightTap();
-              setSelectedDate('2026-10-24');
-            }}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-              isSelectedDateOct24
-                ? 'border-slate-200 text-slate-800 bg-slate-50'
-                : 'border-slate-200 text-slate-500 hover:bg-slate-50'
-            }`}
-          >
-            오늘
-          </button>
-        </section>
-
-        {/* 3. Top Action Card: "영수증 찍고 바로 등록하기" */}
-        <section
-          role="button"
-          tabIndex={0}
-          onClick={() => {
-            haptics.selection();
-            quickFileInputRef.current?.click();
-          }}
-          className="relative bg-gradient-to-b from-[#F2F7FF] via-[#EBF3FF] to-[#E3EFFF] border border-[#D5E5FE] hover:border-blue-300 rounded-2xl p-5 text-center shadow-xs cursor-pointer active:scale-99 transition-all group overflow-hidden"
-        >
-          {/* Subtle soft gradient highlight */}
-          <div className="absolute -top-10 -right-10 w-32 h-32 bg-blue-200/30 rounded-full blur-2xl pointer-events-none" />
-
-          {/* 3D Receipt Upload Illustration */}
-          <div className="relative w-16 h-16 sm:w-18 sm:h-18 mx-auto mb-2 flex items-center justify-center">
-            <Image
-              unoptimized
-              src="/images/icons/driver_ui/icon_upload_receipt.png"
-              alt="영수증 업로드 아이콘"
-              width={72}
-              height={72}
-              className="object-contain drop-shadow-sm group-hover:scale-105 transition-transform duration-200"
-            />
-          </div>
-
-          <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight group-hover:text-[#1E60F3] transition-colors">
-            영수증 찍고 바로 등록하기
-          </h2>
-          <p className="text-xs text-slate-500 mt-1 font-medium">
-            사진을 올리면 지출 내역을 빠르게 정리해 드려요
-          </p>
-
-          <div className="flex items-center justify-center gap-2 mt-3">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                haptics.selection();
-                quickFileInputRef.current?.click();
-              }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/90 hover:bg-white text-slate-700 hover:text-[#1E60F3] border border-blue-200/80 rounded-full text-[11px] font-bold shadow-2xs transition-all cursor-pointer"
-            >
-              <Camera className="w-3.5 h-3.5 text-[#1E60F3]" />
-              <span>사진 직접 촬영 / 앨범</span>
-            </button>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                haptics.lightTap();
-                setEditingItem(null);
-                setUploadedReceiptUrl(undefined);
-                setIsAddModalOpen(true);
-              }}
-              className="inline-flex items-center gap-1 px-3 py-1.5 bg-white/90 hover:bg-white text-slate-600 hover:text-slate-900 border border-slate-200 rounded-full text-[11px] font-semibold shadow-2xs transition-all cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5 text-slate-500" />
-              <span>직접 입력</span>
-            </button>
-          </div>
-
-          <input
-            ref={quickFileInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleQuickPhotoUpload}
-          />
-        </section>
-
-        {/* 4. Hero Summary Card: "오늘 총 지출" */}
-        <section className="bg-gradient-to-r from-[#EBF3FF] via-[#F1F6FF] to-[#E6F0FF] border border-[#D6E5FE] rounded-2xl p-4 sm:p-5 relative overflow-hidden shadow-xs">
-          {/* Background coins and receipt illustration */}
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 w-16 h-16 sm:w-20 sm:h-20 opacity-90 pointer-events-none flex items-center justify-center">
-            <Image
-              unoptimized
-              src="/images/icons/driver_ui/icon_expense.png"
-              alt="지출 코인 그래픽"
-              width={80}
-              height={80}
-              className="object-contain drop-shadow-xs"
-            />
-          </div>
-
-          <div className="relative z-10">
-            {/* Top Store Icon & Label */}
-            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 mb-1">
-              <Store className="w-4 h-4 text-[#1E60F3]" />
-              <span>
-                {viewScope === 'all'
-                  ? '전체 총 지출'
-                  : isSelectedDateOct24
-                  ? '오늘 총 지출'
-                  : '선택일 총 지출'}
-              </span>
+          {/* Notice for Reference Demo vs Fresh Draft */}
+          {isDemoMode && (
+            <div className="bg-blue-50/70 border border-blue-100 rounded-xl px-3 py-2 flex items-center justify-between text-xs text-blue-700">
+              <span className="font-medium">레퍼런스 스크린샷 시연 모드입니다.</span>
+              <button
+                type="button"
+                onClick={handleResetToRealDraft}
+                className="underline text-[11px] font-bold hover:text-blue-900 cursor-pointer"
+              >
+                빈 내역으로 시작
+              </button>
             </div>
+          )}
 
-            {/* Big Bold Amount with Chevron Button */}
-            <div className="flex items-center gap-2.5">
-              <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                {formatKRW(totalAmount)}
+          {/* 2. Date Navigator Bar */}
+          <section className="flex items-center justify-between gap-2 py-0.5">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.lightTap();
+                  setViewScope('selected_date');
+                  setSelectedDate((prev) => shiftDateIso(prev, -1));
+                }}
+                className="w-8 h-8 rounded-full bg-white border border-slate-100/90 shadow-[0_2px_8px_rgba(15,23,42,0.05)] flex items-center justify-center text-slate-600 hover:bg-slate-50 active:scale-95 transition-all cursor-pointer"
+                aria-label="이전 날짜"
+              >
+                <ChevronLeft className="w-4 h-4 stroke-[2.2]" />
+              </button>
+
+              <span className="text-base sm:text-[17px] font-extrabold text-slate-900 px-1 tracking-tight">
+                {formatExpenseHeaderDate(selectedDate)}
               </span>
 
               <button
                 type="button"
                 onClick={() => {
                   haptics.lightTap();
-                  setIsBreakdownOpen(true);
+                  setViewScope('selected_date');
+                  setSelectedDate((prev) => shiftDateIso(prev, 1));
                 }}
-                className="w-7 h-7 rounded-full bg-white border border-blue-200 flex items-center justify-center text-[#1E60F3] hover:bg-blue-50 active:scale-95 shadow-2xs transition-all"
-                aria-label="항목별 지출 분석 보기"
-                title="항목별 분석 보기"
+                className="w-8 h-8 rounded-full bg-white border border-slate-100/90 shadow-[0_2px_8px_rgba(15,23,42,0.05)] flex items-center justify-center text-slate-600 hover:bg-slate-50 active:scale-95 transition-all cursor-pointer"
+                aria-label="다음 날짜"
               >
-                <ChevronRight className="w-4 h-4 stroke-[2.5]" />
+                <ChevronRight className="w-4 h-4 stroke-[2.2]" />
               </button>
             </div>
-          </div>
-        </section>
 
-        {/* 5. Expense List Section */}
-        <section className="space-y-3 pt-1">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-slate-900 tracking-tight">지출 내역</h3>
+            <button
+              type="button"
+              onClick={() => {
+                haptics.lightTap();
+                setViewScope('selected_date');
+                setSelectedDate(getKstTodayDateStr());
+              }}
+              className={`px-4 py-1.5 rounded-full text-xs font-extrabold border shadow-[0_2px_8px_rgba(15,23,42,0.05)] transition-all cursor-pointer active:scale-95 ${
+                isSelectedDateToday
+                  ? 'border-slate-100/90 text-slate-800 bg-white'
+                  : 'border-slate-100/90 text-slate-600 bg-white hover:bg-slate-50'
+              }`}
+            >
+              오늘
+            </button>
+          </section>
 
-            {/* Sort & Scope Dropdown */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setIsSortDropdownOpen((prev) => !prev)}
-                className="flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors"
-              >
-                <span>
-                  {sortOption === 'newest'
-                    ? '최신순'
-                    : sortOption === 'oldest'
-                    ? '오래된순'
-                    : sortOption === 'highest_amount'
-                    ? '금액높은순'
-                    : '금액낮은순'}
-                </span>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-              </button>
-
-              {isSortDropdownOpen && (
-                <div className="absolute right-0 top-full mt-1.5 w-36 bg-white border border-slate-200 rounded-xl shadow-lg z-20 py-1 divide-y divide-slate-100">
-                  <div className="py-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSortOption('newest');
-                        setIsSortDropdownOpen(false);
-                      }}
-                      className={`w-full px-3 py-1.5 text-left text-xs font-semibold hover:bg-slate-50 ${
-                        sortOption === 'newest' ? 'text-[#1E60F3]' : 'text-slate-700'
-                      }`}
-                    >
-                      최신순
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSortOption('oldest');
-                        setIsSortDropdownOpen(false);
-                      }}
-                      className={`w-full px-3 py-1.5 text-left text-xs font-semibold hover:bg-slate-50 ${
-                        sortOption === 'oldest' ? 'text-[#1E60F3]' : 'text-slate-700'
-                      }`}
-                    >
-                      오래된순
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSortOption('highest_amount');
-                        setIsSortDropdownOpen(false);
-                      }}
-                      className={`w-full px-3 py-1.5 text-left text-xs font-semibold hover:bg-slate-50 ${
-                        sortOption === 'highest_amount' ? 'text-[#1E60F3]' : 'text-slate-700'
-                      }`}
-                    >
-                      금액높은순
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSortOption('lowest_amount');
-                        setIsSortDropdownOpen(false);
-                      }}
-                      className={`w-full px-3 py-1.5 text-left text-xs font-semibold hover:bg-slate-50 ${
-                        sortOption === 'lowest_amount' ? 'text-[#1E60F3]' : 'text-slate-700'
-                      }`}
-                    >
-                      금액낮은순
-                    </button>
-                  </div>
-                  <div className="py-1 bg-slate-50/50">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setViewScope('all');
-                        setIsSortDropdownOpen(false);
-                      }}
-                      className={`w-full px-3 py-1.5 text-left text-xs font-semibold hover:bg-slate-50 ${
-                        viewScope === 'all' ? 'text-[#1E60F3]' : 'text-slate-600'
-                      }`}
-                    >
-                      전체 내역 보기
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setViewScope('selected_date');
-                        setIsSortDropdownOpen(false);
-                      }}
-                      className={`w-full px-3 py-1.5 text-left text-xs font-semibold hover:bg-slate-50 ${
-                        viewScope === 'selected_date' ? 'text-[#1E60F3]' : 'text-slate-600'
-                      }`}
-                    >
-                      선택일만 보기
-                    </button>
-                  </div>
-                </div>
-              )}
+          {/* 3. Top Action Card: "영수증 찍고 바로 등록하기" (클린 화이트 볼륨감 카드) */}
+          <section
+            role="button"
+            tabIndex={0}
+            onClick={() => {
+              haptics.selection();
+              quickFileInputRef.current?.click();
+            }}
+            className="relative bg-white border border-slate-100/90 hover:border-blue-200 rounded-3xl p-6 text-center shadow-[0_6px_24px_rgba(15,23,42,0.05)] cursor-pointer active:scale-[0.99] transition-all group overflow-hidden"
+          >
+            {/* 3D Receipt Upload Illustration */}
+            <div className="relative w-16 h-16 sm:w-18 sm:h-18 mx-auto mb-2.5 flex items-center justify-center">
+              <Image
+                unoptimized
+                src="/images/icons/driver_ui/icon_upload_receipt.png"
+                alt="영수증 업로드 아이콘"
+                width={72}
+                height={72}
+                className="object-contain drop-shadow-sm group-hover:scale-105 transition-transform duration-200"
+              />
             </div>
-          </div>
 
-          {displayedItems.length === 0 ? (
-            <div className="bg-white border border-slate-200/80 rounded-2xl p-8 text-center space-y-3 shadow-2xs">
-              <div className="w-12 h-12 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 mx-auto">
-                <Store className="w-6 h-6 stroke-[1.8]" />
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm font-bold text-slate-800">등록된 지출 내역이 없습니다.</p>
-                <p className="text-xs text-slate-400">
-                  영수증 사진을 올리거나 아래 버튼을 눌러 직접 등록해 보세요.
-                </p>
-              </div>
+            <h2 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight group-hover:text-[#0055FF] transition-colors">
+              영수증 찍고 바로 등록하기
+            </h2>
+            <p className="text-xs text-slate-400 mt-1 font-medium">
+              사진을 올리면 지출 내역을 빠르게 정리해 드려요
+            </p>
+
+            <div className="flex items-center justify-center gap-2.5 mt-4">
               <button
                 type="button"
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
+                  haptics.selection();
+                  quickFileInputRef.current?.click();
+                }}
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-[#0055FF] hover:bg-[#0046D5] text-white rounded-full text-xs font-extrabold shadow-[0_4px_12px_rgba(0,85,255,0.25)] transition-all cursor-pointer active:scale-95"
+              >
+                <Camera className="w-3.5 h-3.5 text-white stroke-[2.2]" />
+                <span>영수증 촬영</span>
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
                   haptics.lightTap();
                   setEditingItem(null);
                   setUploadedReceiptUrl(undefined);
                   setIsAddModalOpen(true);
                 }}
-                className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-blue-50 hover:bg-blue-100 text-[#1E60F3] font-bold text-xs rounded-xl border border-blue-200/80 transition-all cursor-pointer"
+                className="inline-flex items-center gap-1 px-4 py-2.5 bg-[#F3F6FB] hover:bg-slate-200/70 text-slate-700 rounded-full text-xs font-extrabold transition-all cursor-pointer active:scale-95"
               >
-                <Plus className="w-4 h-4 stroke-[2.2]" />
-                <span>지출 직접 등록하기</span>
+                <Plus className="w-3.5 h-3.5 text-slate-600 stroke-[2.5]" />
+                <span>직접 입력</span>
               </button>
             </div>
-          ) : (
-            <div className="space-y-2.5">
-              {displayedItems.map((item) => {
-                const catMeta = EXPENSE_CATEGORIES[item.category] || EXPENSE_CATEGORIES.other;
-                return (
-                  <div
-                    key={item.id}
-                    onClick={() => {
-                      haptics.lightTap();
-                      setEditingItem(item);
-                      setIsAddModalOpen(true);
-                    }}
-                    className="bg-white border border-[#E9EFF7] hover:border-blue-200 rounded-2xl p-4 shadow-[0_2px_10px_rgba(0,0,0,0.02)] flex items-center justify-between gap-3 cursor-pointer group active:scale-99 transition-all"
-                  >
-                    {/* Left: Category Icon Badge */}
-                    <div
-                      className={`w-11 h-11 rounded-full ${catMeta.badgeBg} flex items-center justify-center shrink-0 shadow-2xs`}
-                    >
-                      {renderCategoryIcon(catMeta.iconName, 'w-6 h-6')}
-                    </div>
 
-                    {/* Middle: Details */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-sm font-bold text-slate-900 truncate">
-                          {catMeta.label}
-                        </span>
-                        {item.receiptUrl && (
-                          <span className="text-[10px] bg-sky-50 text-sky-600 px-1.5 py-0.2 rounded border border-sky-100 font-semibold">
-                            영수증
-                          </span>
-                        )}
-                        {item.hqStatus ? (
-                          <span
-                            className={`text-[10px] px-1.5 py-0.2 rounded font-bold border ${
-                              item.hqStatus === '승인 완료'
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                : item.hqStatus === '검수 대기'
-                                ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                : item.hqStatus === '금액 확인'
-                                ? 'bg-rose-50 text-rose-700 border-rose-200'
-                                : 'bg-slate-100 text-slate-600 border-slate-200'
-                            }`}
-                          >
-                            {item.hqStatus === '검수 대기'
-                              ? '본사 검수 대기'
-                              : item.hqStatus === '승인 완료'
-                              ? '본사 승인 완료'
-                              : item.hqStatus}
-                          </span>
-                        ) : (
-                          <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.2 rounded font-medium border border-slate-200">
-                            미전송
-                          </span>
-                        )}
-                      </div>
+            <input
+              ref={quickFileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleQuickPhotoUpload}
+            />
+          </section>
 
-                      {/* Date & Time */}
-                      <div className="flex items-center gap-1 text-[11px] text-slate-400 mt-0.5 truncate">
-                        <CalendarIcon className="w-3 h-3 text-slate-400 shrink-0" />
-                        <span>{formatExpenseItemDateTime(item.date, item.time)}</span>
-                      </div>
+          {/* 4. Hero Summary Card: "오늘 총 지출" (클린 화이트 볼륨감 카드) */}
+          <section className="bg-white border border-slate-100/90 rounded-3xl p-5 relative overflow-hidden shadow-[0_6px_24px_rgba(15,23,42,0.05)]">
+            {/* Background coins illustration */}
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 w-18 h-18 sm:w-20 sm:h-20 pointer-events-none flex items-center justify-center">
+              <Image
+                unoptimized
+                src="/images/icons/driver_ui/icon_expense.png"
+                alt="지출 코인 그래픽"
+                width={80}
+                height={80}
+                className="object-contain drop-shadow-xs"
+              />
+            </div>
 
-                      {/* Location / Merchant */}
-                      <div className="flex items-center gap-1 text-[11px] text-slate-500 mt-0.5 truncate">
-                        <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-                        <span className="truncate">{item.merchant}</span>
-                      </div>
-                    </div>
+            <div className="relative z-10">
+              {/* Top Label */}
+              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 mb-1">
+                <span>
+                  {viewScope === 'all'
+                    ? '전체 총 지출'
+                    : isSelectedDateToday
+                      ? '오늘 총 지출'
+                      : '선택일 총 지출'}
+                </span>
+              </div>
 
-                    {/* Right: Amount & Delete Button */}
-                    <div className="text-right shrink-0 flex flex-col items-end justify-between h-12">
-                      <div className="text-sm sm:text-base font-extrabold text-slate-900 tracking-tight">
-                        {formatKRW(item.amount)}
-                      </div>
+              {/* Big Bold Amount with Chevron Button */}
+              <div className="flex items-center gap-2.5">
+                <span className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight tabular-nums">
+                  {formatKRW(totalAmount)}
+                </span>
 
+                <button
+                  type="button"
+                  onClick={() => {
+                    haptics.lightTap();
+                    setIsBreakdownOpen(true);
+                  }}
+                  className="w-7 h-7 rounded-full bg-[#F3F6FB] hover:bg-blue-50 flex items-center justify-center text-[#0055FF] active:scale-95 transition-all cursor-pointer"
+                  aria-label="항목별 지출 분석 보기"
+                  title="항목별 분석 보기"
+                >
+                  <ChevronRight className="w-4 h-4 stroke-[2.5]" />
+                </button>
+              </div>
+            </div>
+          </section>
+
+          {/* 5. Expense List Section */}
+          <section className="space-y-3 pt-1">
+            <div className="flex items-center justify-between px-0.5">
+              <h3 className="text-base font-extrabold text-slate-900 tracking-tight">지출 내역</h3>
+
+              {/* Sort & Scope Dropdown */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsSortDropdownOpen((prev) => !prev)}
+                  className="flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+                >
+                  <span>
+                    {sortOption === 'newest'
+                      ? '최신순'
+                      : sortOption === 'oldest'
+                        ? '오래된순'
+                        : sortOption === 'highest_amount'
+                          ? '금액높은순'
+                          : '금액낮은순'}
+                  </span>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                </button>
+
+                {isSortDropdownOpen && (
+                  <div className="absolute right-0 top-full mt-1.5 w-36 bg-white border border-slate-100/90 rounded-2xl shadow-lg z-20 py-1 divide-y divide-slate-100">
+                    <div className="py-1">
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          haptics.lightTap();
-                          setDeletingItemId(item.id);
+                        onClick={() => {
+                          setSortOption('newest');
+                          setIsSortDropdownOpen(false);
                         }}
-                        className="p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                        aria-label="삭제"
-                        title="삭제하기"
+                        className={`w-full px-3 py-1.5 text-left text-xs font-semibold hover:bg-slate-50 ${sortOption === 'newest' ? 'text-[#0055FF]' : 'text-slate-700'
+                          }`}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        최신순
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSortOption('oldest');
+                          setIsSortDropdownOpen(false);
+                        }}
+                        className={`w-full px-3 py-1.5 text-left text-xs font-semibold hover:bg-slate-50 ${sortOption === 'oldest' ? 'text-[#0055FF]' : 'text-slate-700'
+                          }`}
+                      >
+                        오래된순
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSortOption('highest_amount');
+                          setIsSortDropdownOpen(false);
+                        }}
+                        className={`w-full px-3 py-1.5 text-left text-xs font-semibold hover:bg-slate-50 ${sortOption === 'highest_amount' ? 'text-[#0055FF]' : 'text-slate-700'
+                          }`}
+                      >
+                        금액높은순
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSortOption('lowest_amount');
+                          setIsSortDropdownOpen(false);
+                        }}
+                        className={`w-full px-3 py-1.5 text-left text-xs font-semibold hover:bg-slate-50 ${sortOption === 'lowest_amount' ? 'text-[#0055FF]' : 'text-slate-700'
+                          }`}
+                      >
+                        금액낮은순
+                      </button>
+                    </div>
+                    <div className="py-1 bg-slate-50/50">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setViewScope('all');
+                          setIsSortDropdownOpen(false);
+                        }}
+                        className={`w-full px-3 py-1.5 text-left text-xs font-semibold hover:bg-slate-50 ${viewScope === 'all' ? 'text-[#0055FF]' : 'text-slate-600'
+                          }`}
+                      >
+                        전체 내역 보기
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setViewScope('selected_date');
+                          setIsSortDropdownOpen(false);
+                        }}
+                        className={`w-full px-3 py-1.5 text-left text-xs font-semibold hover:bg-slate-50 ${viewScope === 'selected_date' ? 'text-[#0055FF]' : 'text-slate-600'
+                          }`}
+                      >
+                        선택일만 보기
                       </button>
                     </div>
                   </div>
-                );
-              })}
+                )}
+              </div>
             </div>
-          )}
-        </section>
-      </main>
 
-      {/* Sticky Bottom Submission Bar: Only shown when there are unsubmitted/offline items */}
-      {displayedItems.some((item) => !item.submittedToHqAt) && (
-        <div className="p-3.5 sm:p-4 border-t border-slate-100 bg-white shrink-0">
-          <button
-            type="button"
-            onClick={handleSubmitAllToHq}
-            disabled={isSubmittingToHq}
-            className="w-full py-3.5 bg-[#1E60F3] hover:bg-blue-600 active:scale-98 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl text-sm sm:text-base shadow-[0_4px_16px_rgba(30,96,243,0.3)] transition-all flex items-center justify-center gap-2 cursor-pointer"
-          >
-            {isSubmittingToHq ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                <span>본사 대시보드로 전송 중...</span>
-              </>
+            {displayedItems.length === 0 ? (
+              <div className="bg-white border border-slate-100/90 rounded-3xl p-8 text-center space-y-3.5 shadow-[0_6px_24px_rgba(15,23,42,0.05)]">
+                <div className="w-12 h-12 rounded-full bg-[#F3F6FB] flex items-center justify-center text-slate-500 mx-auto">
+                  <Store className="w-5 h-5 stroke-[1.8]" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm sm:text-[15px] font-extrabold text-slate-900">등록된 지출 내역이 없습니다.</p>
+                  <p className="text-xs text-slate-400 font-medium">
+                    영수증 사진을 올리거나 아래 버튼을 눌러 직접 등록해 보세요.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    haptics.lightTap();
+                    setEditingItem(null);
+                    setUploadedReceiptUrl(undefined);
+                    setIsAddModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-[#EDF3FF] hover:bg-blue-100/80 text-[#0055FF] font-extrabold text-xs rounded-full transition-all cursor-pointer active:scale-95"
+                >
+                  <Plus className="w-4 h-4 stroke-[2.5]" />
+                  <span>지출 직접 등록하기</span>
+                </button>
+              </div>
             ) : (
-              <>
-                <Send className="w-5 h-5" />
-                <span>
-                  미전송 경비 본사 제출하기 ({displayedItems.filter((item) => !item.submittedToHqAt).length}건)
-                </span>
-              </>
-            )}
-          </button>
-        </div>
-      )}
+              <div className="space-y-2.5">
+                {displayedItems.map((item) => {
+                  const catMeta = EXPENSE_CATEGORIES[item.category] || EXPENSE_CATEGORIES.other;
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => {
+                        haptics.lightTap();
+                        setEditingItem(item);
+                        setIsAddModalOpen(true);
+                      }}
+                      className="bg-white border border-slate-100/90 hover:border-blue-200 rounded-3xl p-4 sm:p-4.5 shadow-[0_4px_18px_rgba(15,23,42,0.04)] flex items-center justify-between gap-3.5 cursor-pointer group active:scale-[0.99] transition-all"
+                    >
+                      {/* Left: Category Squircle Icon Badge */}
+                      <div className="w-12 h-12 rounded-2xl bg-[#F4F7FC] flex items-center justify-center shrink-0">
+                        {renderCategoryIcon(catMeta.iconName, 'w-7 h-7')}
+                      </div>
 
-      {/* Floating Success Toast */}
-      {hqSubmitSuccessToast && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-60 bg-slate-900/95 text-white text-xs font-bold px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2 backdrop-blur-sm animate-in fade-in slide-in-from-bottom-2 duration-150">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span>{hqSubmitSuccessToast}</span>
-        </div>
-      )}
+                      {/* Middle: Details */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-sm sm:text-[15px] font-extrabold text-slate-900 truncate">
+                            {catMeta.label}
+                          </span>
+                          {item.receiptUrl && (
+                            <span className="text-[10px] bg-[#EBF3FF] text-[#0055FF] px-2 py-0.5 rounded-md font-bold">
+                              영수증
+                            </span>
+                          )}
+                          {item.hqStatus && item.hqStatus !== '미제출' ? (
+                            <span
+                              className={`text-[10px] px-2 py-0.5 rounded-md font-bold ${item.hqStatus === '승인 완료'
+                                ? 'bg-emerald-50 text-emerald-700'
+                                : item.hqStatus === '검수 대기'
+                                  ? 'bg-amber-50 text-amber-700'
+                                  : item.hqStatus === '금액 확인'
+                                    ? 'bg-rose-50 text-rose-700'
+                                    : 'bg-[#F2F4F7] text-slate-500'
+                                }`}
+                            >
+                              {item.hqStatus === '검수 대기'
+                                ? '본사 검수 대기'
+                                : item.hqStatus === '승인 완료'
+                                  ? '본사 승인 완료'
+                                  : item.hqStatus}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] bg-[#F2F4F7] text-slate-500 px-2 py-0.5 rounded-md font-bold">
+                              미전송
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Date & Time */}
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium mt-1 truncate">
+                          <CalendarIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span>{formatExpenseItemDateTime(item.date, item.time)}</span>
+                        </div>
+
+                        {/* Location / Merchant */}
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium mt-0.5 truncate">
+                          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="truncate">{item.merchant}</span>
+                        </div>
+                      </div>
+
+                      {/* Right: Amount & Delete Button */}
+                      <div className="text-right shrink-0 flex flex-col items-end justify-between h-13">
+                        <div className="text-base sm:text-[17px] font-black text-slate-900 tracking-tight tabular-nums">
+                          {formatKRW(item.amount)}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            haptics.lightTap();
+                            setDeletingItemId(item.id);
+                          }}
+                          className="p-1 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                          aria-label="삭제"
+                          title="삭제하기"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        </main>
+
+        {/* Sticky Bottom Submission Bar: Only shown when there are unsubmitted/offline items */}
+        {displayedItems.some((item) => !item.submittedToHqAt) && (
+          <div className="px-5 pb-5 pt-2 bg-[#F6F8FC] shrink-0">
+            <button
+              type="button"
+              onClick={handleSubmitAllToHq}
+              disabled={isSubmittingToHq}
+              className="w-full h-12 sm:h-13 bg-[#0055FF] hover:bg-[#0046D5] active:scale-98 disabled:opacity-40 disabled:cursor-not-allowed text-white font-extrabold rounded-2xl text-sm sm:text-[15px] shadow-[0_6px_18px_rgba(0,85,255,0.28)] transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {isSubmittingToHq ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>본사 대시보드로 전송 중...</span>
+                </>
+              ) : (
+                <>
+                  <Send className="w-5 h-5" />
+                  <span>
+                    미전송 경비 본사 제출하기 ({displayedItems.filter((item) => !item.submittedToHqAt).length}건)
+                  </span>
+                </>
+              )}
+            </button>
+          </div>
+        )}
+
+        {/* Floating Success Toast */}
+        {hqSubmitSuccessToast && (
+          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-60 bg-slate-900/95 text-white text-xs font-bold px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2 backdrop-blur-sm animate-in fade-in slide-in-from-bottom-2 duration-150">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{hqSubmitSuccessToast}</span>
+          </div>
+        )}
       </div>
 
       {/* Add / Edit Expense Modal (Right Screen) */}
