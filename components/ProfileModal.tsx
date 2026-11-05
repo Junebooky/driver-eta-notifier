@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { DriverProfile, NaviProvider } from '@/types';
-import { X, User, Car, Users, Navigation, Check, Phone } from 'lucide-react';
+import { X, User, Car, Users, Navigation, Check, Phone, ChevronDown } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 import { ENABLE_DEV_FLEET_SWITCHER, FleetPresetDriver } from '@/utils/constants';
 import { getStoredVehicleProfile } from '@/hooks/useDriverProfile';
@@ -107,6 +107,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   const [isMounted, setIsMounted] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [fleetPresets, setFleetPresets] = useState<FleetPresetDriver[]>([]);
+  const [isHochaPickerOpen, setIsHochaPickerOpen] = useState(false);
 
   // Dynamic fetch of all registered drivers from Supabase SSOT
   useEffect(() => {
@@ -517,19 +518,19 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
       }}
     >
       <div
-        className={`w-full max-w-sm bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-y-auto overscroll-contain text-slate-900 transform transition-all duration-300 ease-out max-h-[90vh] flex flex-col ${isMounted ? 'scale-100 opacity-100' : 'scale-95 opacity-0 pointer-events-none'
+        className={`w-full max-w-sm bg-[#F6F8FC] border border-slate-200/80 rounded-3xl shadow-2xl overflow-y-auto overscroll-contain text-slate-900 transform transition-all duration-300 ease-out max-h-[92vh] flex flex-col ${isMounted ? 'scale-100 opacity-100' : 'scale-95 opacity-0 pointer-events-none'
           }`}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Modal Header with Master Brand App Icon & Simplified Title */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50/80 shrink-0">
+        {/* Modal Header */}
+        <div className="flex items-center justify-between px-5 pt-4 pb-2.5 bg-[#F6F8FC] shrink-0">
           <div className="flex items-center space-x-2.5">
             <img
               src="/cockpit_app_icon.png"
               alt="Protocol Cockpit"
               className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl shadow-xs object-cover shrink-0"
             />
-            <h2 className="text-sm font-black text-slate-900 tracking-tight">
+            <h2 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
               {isOnboarding ? '드라이버 정보 최초 등록' : '프로필 설정'}
             </h2>
           </div>
@@ -537,86 +538,25 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             type="button"
             onClick={handleClose}
             disabled={isSaving}
-            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 active:scale-95 transition-transform duration-100 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
+            className="w-8 h-8 rounded-full bg-white hover:bg-slate-100 border border-slate-200/70 shadow-2xs flex items-center justify-center text-slate-500 hover:text-slate-800 active:scale-95 transition-transform duration-100 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
             title="닫기"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Modal Body: Focus strictly on separated inputs, navi switcher, and action buttons */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-3.5 overflow-y-auto overscroll-contain flex-1">
-          {/* Quick Preset Drivers for Development/Dispatcher */}
-          {ENABLE_DEV_FLEET_SWITCHER && !profile.driverId && (
-            <div className="p-3 bg-blue-50/60 border border-blue-200/80 rounded-2xl space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-black text-slate-700 flex items-center gap-1.5">
-                  <Car className="w-3.5 h-3.5 text-[#1E60F3]" />
-                  개발·관제용 1초 기사 전환
-                </span>
-                <span className="text-[9px] font-bold text-[#1E60F3] bg-white px-1.5 py-0.5 rounded-md border border-blue-200">
-                  DEV
-                </span>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                {fleetPresets.map((d) => {
-                  const isCurrent = selectedPresetVehicle === d.vehicleNo;
-                  return (
-                    <button
-                      key={d.vehicleNo}
-                      type="button"
-                      onClick={() => {
-                        haptics.lightTap();
-                        setSelectedPresetVehicle(d.vehicleNo);
-                        setNameError(false);
-                        setPhoneError(false);
-                        setPlateError(false);
-                        setValidationMsg(null);
-                        const cleanV = d.vehicleNo.match(/(\d+)호차/)?.[1] ? `${d.vehicleNo.match(/(\d+)호차/)![1]}호차` : d.vehicleNo;
-                        const storedProfile = getStoredVehicleProfile(cleanV);
-                        const pObj = parsePhoneDetails(storedProfile?.phone || d.phone);
-                        setHocha(d.hocha);
-                        setPlateFront(storedProfile?.carNumberFront || d.plateFront);
-                        setPlateBack(storedProfile?.carNumberBack || d.plateBack);
-                        setDriverName(storedProfile?.driverName || d.driverName);
-                        setPhone1(pObj.p1);
-                        setPhone2(pObj.p2);
-                        setPhone3(pObj.p3);
-                        setDefaultNavi(storedProfile?.defaultNavi || d.defaultNavi);
+        {/* Modal Body: Clean Rounded Card Inputs with Volume */}
+        <form onSubmit={handleSubmit} className="px-5 pb-5 pt-1 space-y-4 overflow-y-auto overscroll-contain flex-1">
+          <p className="text-xs sm:text-[13px] font-medium text-slate-500">
+            {profile.driverId ? '차량 배정은 HQ 예약·배차에서 변경합니다.' : '차량 배정엔 아래 정보가 필요해요.'}
+          </p>
 
-                        // Auto-inject vehicle-isolated passenger name from cockpit_driver_profile_${vehicleNo}
-                        const targetPassenger =
-                          storedProfile?.passengerName !== undefined
-                            ? (storedProfile.passengerName ?? '')
-                            : (d.passengerName ?? '');
-                        setPassengerName(targetPassenger);
-                      }}
-                      className={`p-2 rounded-xl text-left border transition-all cursor-pointer ${isCurrent
-                        ? 'bg-[#1E60F3] text-white border-[#1E60F3] shadow-xs'
-                        : 'bg-white text-slate-700 border-slate-200 hover:border-[#1E60F3]/50 hover:bg-slate-50'
-                        }`}
-                    >
-                      <div className="text-sm font-black truncate">{d.vehicleNo}</div>
-                      <div className={`text-[10px] font-bold truncate ${isCurrent ? 'text-blue-100' : 'text-slate-600'}`}>
-                        {d.driverName}
-                      </div>
-                      <div className={`text-[9px] truncate ${isCurrent ? 'text-blue-200' : 'text-slate-400'}`}>
-                        {d.phone}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {profile.driverId && <p className="text-xs text-slate-500">차량 배정은 HQ 예약·배차에서 변경합니다.</p>}
           {/* 1. Hocha (Optional) Field */}
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center">
-              <Car className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 호차 (선택)
+          <div className="relative">
+            <label className="text-xs sm:text-[13px] font-bold text-slate-800 mb-1.5 flex items-center">
+              <Car className="w-4 h-4 mr-1.5 text-[#1E60F3] stroke-[2]" /> 호차 (선택)
             </label>
-            <div className="relative flex items-center">
+            <div className="relative flex items-center bg-white rounded-2xl border border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)] focus-within:border-[#1E60F3] focus-within:ring-2 focus-within:ring-[#1E60F3]/10 transition-all">
               <input
                 type="text"
                 inputMode="numeric"
@@ -624,44 +564,110 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 readOnly={Boolean(profile.driverId)}
                 value={hocha}
                 onChange={handleHochaChange}
-                placeholder="예: 4"
-                className="w-full pl-3.5 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-[#1E60F3] focus:bg-white font-bold transition-colors"
+                placeholder="예: 99"
+                className="w-full h-12 pl-4 pr-24 bg-transparent rounded-2xl text-slate-900 text-sm font-bold placeholder:font-medium placeholder:text-slate-400 focus:outline-none tabular-nums"
               />
-              <span
-                className={`absolute right-3 text-sm font-black transition-colors pointer-events-none ${hocha ? 'text-[#1E60F3]' : 'text-slate-300'
-                  }`}
+              <button
+                type="button"
+                disabled={Boolean(profile.driverId)}
+                onClick={() => {
+                  haptics.lightTap();
+                  if (ENABLE_DEV_FLEET_SWITCHER && fleetPresets.length > 0 && !profile.driverId) {
+                    setIsHochaPickerOpen((prev) => !prev);
+                  }
+                }}
+                className="absolute right-4 text-xs sm:text-[13px] font-extrabold text-[#1E60F3] hover:text-blue-700 transition-colors cursor-pointer disabled:cursor-default"
               >
-                호차
-              </span>
+                호차 선택
+              </button>
             </div>
+
+            {/* Optional Quick Hocha Preset Popover when '호차 선택' is tapped */}
+            {isHochaPickerOpen && ENABLE_DEV_FLEET_SWITCHER && !profile.driverId && fleetPresets.length > 0 && (
+              <div className="mt-2 p-2.5 bg-white border border-slate-200/90 rounded-2xl shadow-lg space-y-2 z-20 relative animate-in fade-in duration-150">
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-[11px] font-bold text-slate-500">등록된 호차 빠른 선택</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsHochaPickerOpen(false)}
+                    className="text-[11px] font-bold text-slate-400 hover:text-slate-600"
+                  >
+                    닫기
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5 max-h-44 overflow-y-auto">
+                  {fleetPresets.map((d) => {
+                    const isCurrent = selectedPresetVehicle === d.vehicleNo;
+                    return (
+                      <button
+                        key={d.vehicleNo}
+                        type="button"
+                        onClick={() => {
+                          haptics.lightTap();
+                          setSelectedPresetVehicle(d.vehicleNo);
+                          setNameError(false);
+                          setPhoneError(false);
+                          setPlateError(false);
+                          setValidationMsg(null);
+                          const cleanV = d.vehicleNo.match(/(\d+)호차/)?.[1] ? `${d.vehicleNo.match(/(\d+)호차/)![1]}호차` : d.vehicleNo;
+                          const storedProfile = getStoredVehicleProfile(cleanV);
+                          const pObj = parsePhoneDetails(storedProfile?.phone || d.phone);
+                          setHocha(d.hocha);
+                          setPlateFront(storedProfile?.carNumberFront || d.plateFront);
+                          setPlateBack(storedProfile?.carNumberBack || d.plateBack);
+                          setDriverName(storedProfile?.driverName || d.driverName);
+                          setPhone1(pObj.p1);
+                          setPhone2(pObj.p2);
+                          setPhone3(pObj.p3);
+                          setDefaultNavi(storedProfile?.defaultNavi || d.defaultNavi);
+                          const targetPassenger =
+                            storedProfile?.passengerName !== undefined
+                              ? (storedProfile.passengerName ?? '')
+                              : (d.passengerName ?? '');
+                          setPassengerName(targetPassenger);
+                          setIsHochaPickerOpen(false);
+                        }}
+                        className={`p-2 rounded-xl text-left border transition-all cursor-pointer ${isCurrent
+                          ? 'bg-[#1E60F3] text-white border-[#1E60F3]'
+                          : 'bg-slate-50 text-slate-700 border-slate-200/80 hover:border-[#1E60F3]/50'
+                          }`}
+                      >
+                        <div className="text-xs font-black truncate">{d.vehicleNo}</div>
+                        <div className={`text-[10px] font-bold truncate ${isCurrent ? 'text-blue-100' : 'text-slate-500'}`}>
+                          {d.driverName}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 2. License Plate Separated Inputs (plateFront & plateBack) */}
           <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center justify-between">
+            <label className="text-xs sm:text-[13px] font-bold text-slate-800 mb-1.5 flex items-center justify-between">
               <span className="flex items-center">
-                <Car className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 차량 번호판
+                <Car className="w-4 h-4 mr-1.5 text-[#1E60F3] stroke-[2]" /> 차량 번호판
               </span>
-              {plateError ? (
+              {plateError && (
                 <span className="text-[10px] font-bold text-rose-500 bg-rose-50 border border-rose-200/80 px-2 py-0.5 rounded-md flex items-center gap-1 animate-fade-in shadow-2xs">
                   <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
                   4자리 입력 필요
                 </span>
-              ) : (
-                <span className="text-[10px] text-slate-400 font-medium">앞자리 + 뒷자리 4자리</span>
               )}
             </label>
-            <div className="grid grid-cols-[1.2fr_1fr] gap-2">
+            <div className="grid grid-cols-2 gap-2.5">
               {/* Front Plate Input */}
               <div className="relative">
                 <input
                   ref={plateFrontRef}
                   type="text"
                   readOnly={Boolean(profile.driverId)}
-                value={plateFront}
+                  value={plateFront}
                   onChange={handlePlateFrontChange}
-                  placeholder="142호"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-[#1E60F3] focus:bg-white font-bold transition-colors"
+                  placeholder="예: 서울99바"
+                  className="w-full h-12 px-4 bg-white border border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)] rounded-2xl text-slate-900 text-sm font-bold placeholder:font-medium placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-[#1E60F3]/10 transition-all"
                 />
               </div>
 
@@ -674,24 +680,24 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   pattern="[0-9]*"
                   maxLength={4}
                   readOnly={Boolean(profile.driverId)}
-                value={plateBack}
+                  value={plateBack}
                   onChange={handlePlateBackChange}
                   onKeyDown={handlePlateBackKeyDown}
-                  placeholder="7811"
-                  className={`w-full px-3 py-2.5 rounded-xl text-slate-900 text-sm font-bold transition-all tracking-widest text-center ${plateError
-                    ? 'bg-rose-50/20 border-rose-400 ring-2 ring-rose-100 focus:outline-none focus:border-rose-500 focus:bg-white'
-                    : 'bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#1E60F3] focus:bg-white'
+                  placeholder="예: 9999"
+                  className={`w-full h-12 px-4 rounded-2xl text-slate-900 text-sm font-bold placeholder:font-medium placeholder:text-slate-400 transition-all tabular-nums ${plateError
+                    ? 'bg-rose-50/40 border border-rose-400 ring-2 ring-rose-100 focus:outline-none focus:border-rose-500'
+                    : 'bg-white border border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)] focus:outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-[#1E60F3]/10'
                     }`}
                 />
               </div>
             </div>
           </div>
 
-          {/* 3. Driver Name Field (드라이버 성명: 연락처 상단 배치) */}
+          {/* 3. Driver Name Field (드라이버 성명) */}
           <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+            <label className="text-xs sm:text-[13px] font-bold text-slate-800 mb-1.5 flex items-center justify-between">
               <span className="flex items-center">
-                <User className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 드라이버 성명
+                <User className="w-4 h-4 mr-1.5 text-[#1E60F3] stroke-[2]" /> 드라이버 성명
               </span>
               {nameError && (
                 <span className="text-[10.5px] font-bold text-rose-500 bg-rose-50 border border-rose-200/80 px-2 py-0.5 rounded-md flex items-center gap-1.5 animate-fade-in shadow-2xs">
@@ -712,19 +718,19 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   setValidationMsg(null);
                 }
               }}
-              placeholder="성함 입력"
-              className={`w-full px-3.5 py-2.5 rounded-xl text-slate-900 text-sm font-bold transition-all ${nameError
-                ? 'bg-rose-50/20 border-rose-400 ring-2 ring-rose-100 focus:outline-none focus:border-rose-500 focus:bg-white'
-                : 'bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#1E60F3] focus:bg-white'
+              placeholder="예: QA 테스트 기사"
+              className={`w-full h-12 px-4 rounded-2xl text-slate-900 text-sm font-bold placeholder:font-medium placeholder:text-slate-400 transition-all ${nameError
+                ? 'bg-rose-50/40 border border-rose-400 ring-2 ring-rose-100 focus:outline-none focus:border-rose-500'
+                : 'bg-white border border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)] focus:outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-[#1E60F3]/10'
                 }`}
             />
           </div>
 
-          {/* 4. Mobile Phone Number Field (가로 1줄 3칸 분할 입력) */}
+          {/* 4. Mobile Phone Number Field (가로 1줄 3칸 독립 카드) */}
           <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center justify-between">
+            <label className="text-xs sm:text-[13px] font-bold text-slate-800 mb-1.5 flex items-center justify-between">
               <span className="flex items-center">
-                <Phone className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 연락처
+                <Phone className="w-4 h-4 mr-1.5 text-[#1E60F3] stroke-[2]" /> 연락처
               </span>
               {phoneError && (
                 <span className="text-[10.5px] font-bold text-rose-500 bg-rose-50 border border-rose-200/80 px-2 py-0.5 rounded-md flex items-center gap-1.5 animate-fade-in shadow-2xs">
@@ -733,8 +739,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 </span>
               )}
             </label>
-            <div className="grid grid-cols-[1fr_auto_1.2fr_auto_1.2fr] items-center gap-1.5">
-              <div className="relative">
+            <div className="grid grid-cols-3 gap-2.5">
+              <div
+                className={`relative flex items-center h-12 rounded-2xl transition-all ${phoneError
+                  ? 'bg-rose-50/40 border border-rose-400 ring-2 ring-rose-100 focus-within:border-rose-500'
+                  : 'bg-white border border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)] focus-within:border-[#1E60F3] focus-within:ring-2 focus-within:ring-[#1E60F3]/10'
+                  }`}
+              >
                 <input
                   ref={phone1Ref}
                   type="tel"
@@ -745,13 +756,11 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   onChange={handlePhone1Change}
                   onPaste={handlePhonePaste}
                   placeholder="010"
-                  className={`w-full px-2 py-2.5 rounded-xl text-slate-900 text-sm font-bold transition-all text-center tracking-wider ${phoneError
-                    ? 'bg-rose-50/20 border-rose-400 ring-2 ring-rose-100 focus:outline-none focus:border-rose-500 focus:bg-white'
-                    : 'bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#1E60F3] focus:bg-white'
-                    }`}
+                  className="w-full h-full pl-3 pr-7 bg-transparent rounded-2xl text-slate-900 text-sm font-bold text-center tabular-nums placeholder:font-medium placeholder:text-slate-400 focus:outline-none"
                 />
+                <ChevronDown className="w-4 h-4 text-slate-500 absolute right-3 pointer-events-none" />
               </div>
-              <span className="text-slate-300 font-bold text-sm select-none">-</span>
+
               <div className="relative">
                 <input
                   ref={phone2Ref}
@@ -764,13 +773,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   onKeyDown={handlePhone2KeyDown}
                   onPaste={handlePhonePaste}
                   placeholder="0000"
-                  className={`w-full px-2 py-2.5 rounded-xl text-slate-900 text-sm font-bold transition-all text-center tracking-wider ${phoneError
-                    ? 'bg-rose-50/20 border-rose-400 ring-2 ring-rose-100 focus:outline-none focus:border-rose-500 focus:bg-white'
-                    : 'bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#1E60F3] focus:bg-white'
+                  className={`w-full h-12 px-2 rounded-2xl text-slate-900 text-sm font-bold transition-all text-center tabular-nums placeholder:font-medium placeholder:text-slate-400 ${phoneError
+                    ? 'bg-rose-50/40 border border-rose-400 ring-2 ring-rose-100 focus:outline-none focus:border-rose-500'
+                    : 'bg-white border border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)] focus:outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-[#1E60F3]/10'
                     }`}
                 />
               </div>
-              <span className="text-slate-300 font-bold text-sm select-none">-</span>
+
               <div className="relative">
                 <input
                   ref={phone3Ref}
@@ -783,35 +792,35 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   onKeyDown={handlePhone3KeyDown}
                   onPaste={handlePhonePaste}
                   placeholder="0000"
-                  className={`w-full px-2 py-2.5 rounded-xl text-slate-900 text-sm font-bold transition-all text-center tracking-wider ${phoneError
-                    ? 'bg-rose-50/20 border-rose-400 ring-2 ring-rose-100 focus:outline-none focus:border-rose-500 focus:bg-white'
-                    : 'bg-slate-50 border border-slate-200 focus:outline-none focus:border-[#1E60F3] focus:bg-white'
+                  className={`w-full h-12 px-2 rounded-2xl text-slate-900 text-sm font-bold transition-all text-center tabular-nums placeholder:font-medium placeholder:text-slate-400 ${phoneError
+                    ? 'bg-rose-50/40 border border-rose-400 ring-2 ring-rose-100 focus:outline-none focus:border-rose-500'
+                    : 'bg-white border border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)] focus:outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-[#1E60F3]/10'
                     }`}
                 />
               </div>
             </div>
           </div>
 
-          {/* 4. Passenger Name Field */}
+          {/* 5. Passenger Name Field */}
           <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1.5 flex items-center">
-              <Users className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 담당 승객명
+            <label className="text-xs sm:text-[13px] font-bold text-slate-800 mb-1.5 flex items-center">
+              <Users className="w-4 h-4 mr-1.5 text-[#1E60F3] stroke-[2]" /> 담당 승객명
             </label>
             <input
               type="text"
               value={passengerName}
               onChange={(e) => setPassengerName(e.target.value)}
               placeholder="예: SOYFAN 외 1명 (미입력 시 생략)"
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm focus:outline-none focus:border-blue-600 focus:bg-white font-bold transition-colors"
+              className="w-full h-12 px-4 bg-white border border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)] rounded-2xl text-slate-900 text-sm font-bold placeholder:font-medium placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-[#1E60F3]/10 transition-all"
             />
           </div>
 
-          {/* 5. Primary Navigation Switcher */}
+          {/* 6. Primary Navigation Switcher */}
           <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center">
-              <Navigation className="w-3.5 h-3.5 mr-1 text-[#1E60F3]" /> 주력 내비게이션 앱
+            <label className="text-xs sm:text-[13px] font-bold text-slate-800 mb-2 flex items-center">
+              <Navigation className="w-4 h-4 mr-1.5 text-[#1E60F3] stroke-[2]" /> 주요 내비게이션 앱
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-2.5">
               {/* TMAP Option (Default) */}
               <button
                 type="button"
@@ -819,13 +828,13 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   haptics.lightTap();
                   setDefaultNavi('tmap');
                 }}
-                className={`py-2.5 px-2 rounded-2xl border transition-all duration-100 flex flex-col items-center justify-center space-y-1 active:scale-95 cursor-pointer ${defaultNavi === 'tmap'
-                  ? 'bg-blue-50/80 border-blue-500 text-blue-900 ring-2 ring-blue-500/20 shadow-xs'
-                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'
+                className={`min-h-[96px] py-3 px-2 rounded-2xl border transition-all duration-150 flex flex-col items-center justify-center gap-1.5 active:scale-95 cursor-pointer ${defaultNavi === 'tmap'
+                  ? 'bg-[#EFF5FF] border-[#609CFA] text-slate-900 shadow-[0_3px_12px_rgba(30,96,243,0.10)]'
+                  : 'bg-white hover:bg-slate-50 border-slate-100/90 text-slate-700 shadow-[0_3px_12px_rgba(15,23,42,0.04)]'
                   }`}
               >
-                <div className="w-6 h-6 rounded-full bg-white border border-slate-200 shadow-xs flex items-center justify-center">
-                  <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <div className="w-7 h-7 rounded-full bg-white border border-slate-100 shadow-2xs flex items-center justify-center">
+                  <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <defs>
                       <linearGradient id="tmapModalGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                         <stop offset="0%" stopColor="#E11D48" />
@@ -839,8 +848,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                     />
                   </svg>
                 </div>
-                <span className="text-[11px] font-extrabold">티맵</span>
-                {defaultNavi === 'tmap' && <Check className="w-3 h-3 text-blue-600" />}
+                <span className="text-xs font-extrabold">T맵</span>
+                {defaultNavi === 'tmap' ? (
+                  <Check className="w-3.5 h-3.5 text-[#1E60F3] stroke-[2.5]" />
+                ) : (
+                  <span className="h-3.5" />
+                )}
               </button>
 
               {/* KakaoNavi Option */}
@@ -850,16 +863,20 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   haptics.lightTap();
                   setDefaultNavi('kakao');
                 }}
-                className={`py-2.5 px-2 rounded-2xl border transition-all duration-100 flex flex-col items-center justify-center space-y-1 active:scale-95 cursor-pointer ${defaultNavi === 'kakao'
-                  ? 'bg-amber-50/80 border-amber-500 text-amber-900 ring-2 ring-amber-500/20 shadow-xs'
-                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'
+                className={`min-h-[96px] py-3 px-2 rounded-2xl border transition-all duration-150 flex flex-col items-center justify-center gap-1.5 active:scale-95 cursor-pointer ${defaultNavi === 'kakao'
+                  ? 'bg-[#EFF5FF] border-[#609CFA] text-slate-900 shadow-[0_3px_12px_rgba(30,96,243,0.10)]'
+                  : 'bg-white hover:bg-slate-50 border-slate-100/90 text-slate-700 shadow-[0_3px_12px_rgba(15,23,42,0.04)]'
                   }`}
               >
-                <div className="w-6 h-6 rounded-full bg-[#FEE500] border border-amber-300 text-[#3C1E1E] flex items-center justify-center text-sm font-black shadow-2xs">
+                <div className="w-7 h-7 rounded-full bg-[#FEE500] text-[#191919] flex items-center justify-center text-xs font-black shadow-2xs">
                   K
                 </div>
-                <span className="text-[11px] font-extrabold">카카오</span>
-                {defaultNavi === 'kakao' && <Check className="w-3 h-3 text-amber-600" />}
+                <span className="text-xs font-extrabold">카카오</span>
+                {defaultNavi === 'kakao' ? (
+                  <Check className="w-3.5 h-3.5 text-[#1E60F3] stroke-[2.5]" />
+                ) : (
+                  <span className="h-3.5" />
+                )}
               </button>
 
               {/* NaverMap Option */}
@@ -869,16 +886,20 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   haptics.lightTap();
                   setDefaultNavi('naver');
                 }}
-                className={`py-2.5 px-2 rounded-2xl border transition-all duration-100 flex flex-col items-center justify-center space-y-1 active:scale-95 cursor-pointer ${defaultNavi === 'naver'
-                  ? 'bg-emerald-50/80 border-emerald-500 text-emerald-900 ring-2 ring-emerald-500/20 shadow-xs'
-                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'
+                className={`min-h-[96px] py-3 px-2 rounded-2xl border transition-all duration-150 flex flex-col items-center justify-center gap-1.5 active:scale-95 cursor-pointer ${defaultNavi === 'naver'
+                  ? 'bg-[#EFF5FF] border-[#609CFA] text-slate-900 shadow-[0_3px_12px_rgba(30,96,243,0.10)]'
+                  : 'bg-white hover:bg-slate-50 border-slate-100/90 text-slate-700 shadow-[0_3px_12px_rgba(15,23,42,0.04)]'
                   }`}
               >
-                <div className="w-6 h-6 rounded-full bg-[#03C75A] border border-emerald-400 text-white flex items-center justify-center text-sm font-black shadow-2xs">
+                <div className="w-7 h-7 rounded-full bg-[#03C75A] text-white flex items-center justify-center text-xs font-black shadow-2xs">
                   N
                 </div>
-                <span className="text-[11px] font-extrabold">네이버</span>
-                {defaultNavi === 'naver' && <Check className="w-3 h-3 text-emerald-600" />}
+                <span className="text-xs font-extrabold">네이버</span>
+                {defaultNavi === 'naver' ? (
+                  <Check className="w-3.5 h-3.5 text-[#1E60F3] stroke-[2.5]" />
+                ) : (
+                  <span className="h-3.5" />
+                )}
               </button>
             </div>
           </div>
@@ -892,19 +913,19 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           )}
 
           {/* Action Buttons */}
-          <div className="pt-2 flex items-center space-x-2">
+          <div className="pt-2 flex items-center gap-2.5">
             <button
               type="button"
               onClick={handleClose}
               disabled={isSaving}
-              className="w-1/3 py-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold active:scale-95 transition-transform duration-100 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
+              className="w-[34%] h-12 sm:h-13 rounded-2xl bg-white hover:bg-slate-50 border border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)] text-slate-800 text-sm font-extrabold active:scale-95 transition-all duration-100 cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
             >
               취소
             </button>
             <button
               type="submit"
               disabled={isSaving}
-              className={`w-2/3 py-3.5 rounded-2xl bg-[#1E60F3] hover:bg-[#1650D6] active:bg-[#1244B8] active:scale-[0.98] text-white text-sm font-bold shadow-sm shadow-blue-500/20 transition-all duration-150 ease-out cursor-pointer flex items-center justify-center gap-1.5 ${isSaving ? 'opacity-85 pointer-events-none' : ''
+              className={`flex-1 h-12 sm:h-13 rounded-2xl bg-[#0055FF] hover:bg-[#0046D5] active:bg-[#003BB5] active:scale-[0.98] text-white text-sm font-extrabold shadow-[0_6px_18px_rgba(0,85,255,0.28)] transition-all duration-150 ease-out cursor-pointer flex items-center justify-center gap-1.5 ${isSaving ? 'opacity-85 pointer-events-none' : ''
                 }`}
             >
               {isSaving ? (
