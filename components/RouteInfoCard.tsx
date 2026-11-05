@@ -163,9 +163,6 @@ export const RouteInfoCard: React.FC<RouteInfoCardProps> = ({
                     {routeEstimate.estimatedTollWon > 0 ? (
                       <>
                         ₩{routeEstimate.estimatedTollWon.toLocaleString()}{' '}
-                        <span className="text-[10px] sm:text-[11px] font-medium text-slate-500">
-                          (1종 예상)
-                        </span>
                       </>
                     ) : (
                       '0원 (무료)'

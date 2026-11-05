@@ -143,7 +143,7 @@ const DrivingLogModalContent: React.FC<{
           );
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   };
 
   const persistDraftState = (
@@ -320,11 +320,11 @@ const DrivingLogModalContent: React.FC<{
         setLogData(previous => {
           const dbStops: RouteStopItem[] = Array.isArray(row.stops)
             ? row.stops.map((stop: any) => ({
-                ...stop,
-                time: stop.time || '',
-                departureTime: stop.departureTime,
-                memo: stop.memo || stop.note || '',
-              }))
+              ...stop,
+              time: stop.time || '',
+              departureTime: stop.departureTime,
+              memo: stop.memo || stop.note || '',
+            }))
             : [];
 
           let finalStops: RouteStopItem[];
@@ -588,7 +588,7 @@ const DrivingLogModalContent: React.FC<{
             );
           }
         })
-        .catch(() => {});
+        .catch(() => { });
     }
   };
 
@@ -756,7 +756,7 @@ const DrivingLogModalContent: React.FC<{
           ref={scrollContainerRef}
           className="flex-1 overflow-y-auto px-4 py-4 space-y-4 w-full pb-4"
         >
-          {logData.hqStatus && <p role="status" className="mb-3 rounded-xl bg-blue-50 p-3 text-xs text-blue-800">본사 검토 상태: {logData.hqStatus === 'draft' ? '임시 기록' : logData.hqStatus}</p>}
+
           {/* Notice Banner for Demo Fixture or Empty Report */}
           {logData.isDemoFixture && (
             <div className="bg-blue-50/70 border border-blue-100 rounded-xl px-3 py-2 flex items-center justify-between text-xs text-blue-700">
@@ -1122,9 +1122,8 @@ const DrivingLogModalContent: React.FC<{
                   return (
                     <div
                       key={stop.id}
-                      className={`relative flex items-start justify-between text-xs sm:text-sm group ${
-                        isMenuOpen ? 'z-30' : 'z-10'
-                      }`}
+                      className={`relative flex items-start justify-between text-xs sm:text-sm group ${isMenuOpen ? 'z-30' : 'z-10'
+                        }`}
                     >
                       <div className="flex items-start gap-2.5 sm:gap-3 min-w-0 flex-1">
                         {/* Number Badge */}
