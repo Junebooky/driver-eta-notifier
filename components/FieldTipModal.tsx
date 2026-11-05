@@ -178,7 +178,7 @@ export const FieldTipModal: React.FC<FieldTipModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs select-none overscroll-contain animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs select-none overscroll-none animate-in fade-in duration-200"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           haptics.lightTap();
@@ -187,21 +187,19 @@ export const FieldTipModal: React.FC<FieldTipModalProps> = ({
       }}
     >
       <div
-        className="w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[85dvh] h-[85dvh] sm:h-auto sm:max-h-[82vh] animate-in slide-in-from-bottom-8 duration-300 relative"
+        className="w-full max-w-lg bg-[#F6F8FC] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[88dvh] h-[88dvh] sm:h-auto sm:max-h-[85vh] animate-in slide-in-from-bottom-8 duration-300 relative overscroll-contain"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Handle */}
-        <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mt-2.5 mb-1 shrink-0" />
+        <div className="w-11 h-1.5 bg-slate-300/70 rounded-full mx-auto mt-3 mb-1 shrink-0" />
 
         {/* Header Bar */}
-        <div className="px-5 pt-1 pb-3 shrink-0">
+        <div className="px-5 pt-1 pb-4 shrink-0 bg-[#F6F8FC]">
           <div className="flex items-center justify-between">
             {/* Header Title with Lightbulb Icon */}
-            <div className="flex items-center gap-1.5 text-[#1E60F3]">
-              <div className="w-5 h-5 rounded-full bg-blue-50 flex items-center justify-center">
-                <Lightbulb className="w-3.5 h-3.5 fill-[#1E60F3] text-[#1E60F3]" />
-              </div>
-              <h2 className="text-sm font-black text-slate-900 tracking-tight">현장 팁</h2>
+            <div className="flex items-center gap-2 text-[#0055FF]">
+              <Lightbulb className="w-5 h-5 fill-[#0055FF] text-[#0055FF] shrink-0" />
+              <h2 className="text-[18px] font-black text-slate-900 tracking-tight">현장 팁</h2>
             </div>
 
             {/* Close Button */}
@@ -211,26 +209,26 @@ export const FieldTipModal: React.FC<FieldTipModalProps> = ({
                 haptics.lightTap();
                 onClose();
               }}
-              className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors cursor-pointer"
+              className="w-9 h-9 rounded-full bg-slate-200/60 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
               aria-label="닫기"
             >
-              <X className="w-4 h-4" />
+              <X className="w-5 h-5" />
             </button>
           </div>
 
           {/* Location Toggle Tabs (When both origin & destination exist) */}
           {originPlaceName && destinationPlaceName && (
-            <div className="flex items-center gap-1.5 bg-slate-100/90 p-1 rounded-xl mt-2.5">
+            <div className="flex items-center gap-1.5 bg-[#EEF2F8] p-1.5 rounded-2xl mt-3.5">
               <button
                 type="button"
                 onClick={() => {
                   haptics.selection();
                   setSelectedLocationMode('origin');
                 }}
-                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all truncate cursor-pointer ${
+                className={`flex-1 py-2.5 px-3 text-[13px] rounded-xl transition-all truncate cursor-pointer ${
                   selectedLocationMode === 'origin' || (!destinationPlaceName && selectedLocationMode === 'current')
-                    ? 'bg-white text-[#1E60F3] shadow-xs'
-                    : 'text-slate-500 hover:text-slate-700'
+                    ? 'bg-white text-[#0055FF] font-extrabold shadow-[0_2px_10px_rgba(15,23,42,0.05)]'
+                    : 'text-slate-500 hover:text-slate-700 font-bold'
                 }`}
               >
                 출발지: {originPlaceName}
@@ -241,10 +239,10 @@ export const FieldTipModal: React.FC<FieldTipModalProps> = ({
                   haptics.selection();
                   setSelectedLocationMode('destination');
                 }}
-                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all truncate cursor-pointer ${
+                className={`flex-1 py-2.5 px-3 text-[13px] rounded-xl transition-all truncate cursor-pointer ${
                   selectedLocationMode === 'destination'
-                    ? 'bg-white text-[#1E60F3] shadow-xs'
-                    : 'text-slate-500 hover:text-slate-700'
+                    ? 'bg-white text-[#0055FF] font-extrabold shadow-[0_2px_10px_rgba(15,23,42,0.05)]'
+                    : 'text-slate-500 hover:text-slate-700 font-bold'
                 }`}
               >
                 목적지: {destinationPlaceName}
@@ -253,18 +251,18 @@ export const FieldTipModal: React.FC<FieldTipModalProps> = ({
           )}
 
           {/* Place Title + Address + Place Thumbnail with '지도 보기' Overlay */}
-          <div className="flex items-center justify-between gap-3 mt-3">
+          <div className="flex items-center justify-between gap-3 mt-5">
             <div className="min-w-0 flex-1">
-              <h1 className="text-xl font-black text-slate-900 tracking-tight truncate leading-tight">
+              <h1 className="text-[22px] font-black text-slate-900 tracking-tight truncate leading-tight">
                 {activePlaceData.placeName}
               </h1>
-              <p className="text-xs text-slate-500 font-medium mt-1 truncate">
+              <p className="text-[13px] text-slate-500 font-medium mt-1 truncate">
                 {activePlaceData.address}
               </p>
             </div>
 
             {/* Place Photo Card with '📍 지도 보기' pill */}
-            <div className="relative w-28 h-18 sm:w-32 sm:h-20 rounded-xl overflow-hidden shadow-xs border border-slate-200/90 shrink-0 bg-slate-100 group">
+            <div className="relative w-32 h-20 sm:w-36 sm:h-22 rounded-2xl overflow-hidden shadow-[0_4px_14px_rgba(15,23,42,0.08)] border border-white shrink-0 bg-slate-100 group">
               <Image
                 src={activePlaceData.imageUrl || '/images/josun_palace_facade.jpg'}
                 alt={activePlaceData.placeName}
@@ -274,64 +272,61 @@ export const FieldTipModal: React.FC<FieldTipModalProps> = ({
               <button
                 type="button"
                 onClick={handleMapClick}
-                className="absolute bottom-1.5 left-1/2 -translate-x-1/2 bg-white/95 hover:bg-white text-slate-800 text-[10px] font-extrabold px-2 py-0.5 rounded-full shadow-md flex items-center gap-1 backdrop-blur-xs transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+                className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-white hover:bg-slate-50 text-slate-900 text-[11px] font-extrabold px-3 py-1 rounded-full shadow-md flex items-center gap-1 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
               >
-                <MapPin className="w-2.5 h-2.5 text-[#1E60F3]" />
+                <MapPin className="w-3 h-3 text-[#0055FF]" />
                 <span>지도 보기</span>
               </button>
             </div>
           </div>
         </div>
 
-        {/* Divider */}
-        <div className="h-px bg-slate-100 shrink-0" />
-
         {/* Accordion Tip List Area */}
-        <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2.5 overscroll-contain">
+        <div className="flex-1 overflow-y-auto px-5 py-1.5 space-y-3.5 overscroll-contain">
           {activePlaceData.tips.map((item) => {
             const isExpanded = Boolean(expandedTipIds[item.id]);
 
             return (
               <div
                 key={item.id}
-                className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-2xs transition-all hover:border-slate-300"
+                className="bg-white border border-slate-100/90 rounded-3xl overflow-hidden shadow-[0_4px_20px_rgba(15,23,42,0.04)] transition-all hover:border-blue-200/80"
               >
                 {/* Header Row */}
                 <button
                   type="button"
                   onClick={() => toggleTip(item.id)}
-                  className="w-full p-3.5 flex items-center justify-between text-left cursor-pointer active:bg-slate-50/70 transition-colors"
+                  className="w-full p-4 sm:p-5 flex items-center justify-between text-left cursor-pointer active:bg-slate-50/50 transition-colors"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex items-center gap-3.5 min-w-0">
                     {/* Badge Icon */}
                     {item.badgeIconType === 'parking_p' ? (
-                      <div className="w-7 h-7 rounded-lg bg-[#1E60F3] text-white font-black text-xs flex items-center justify-center shrink-0 shadow-xs">
+                      <div className="w-11 h-11 rounded-2xl bg-[#0055FF] text-white font-black text-[16px] flex items-center justify-center shrink-0 shadow-[0_4px_12px_rgba(0,85,255,0.25)]">
                         P
                       </div>
                     ) : item.badgeIconType === 'pin' ? (
-                      <div className="w-7 h-7 rounded-lg bg-blue-50 text-[#1E60F3] flex items-center justify-center shrink-0">
-                        <MapPin className="w-4 h-4" />
+                      <div className="w-11 h-11 rounded-2xl bg-[#EBF3FF] text-[#0055FF] flex items-center justify-center shrink-0">
+                        <MapPin className="w-5 h-5" />
                       </div>
                     ) : item.badgeIconType === 'truck' ? (
-                      <div className="w-7 h-7 rounded-lg bg-blue-50 text-[#1E60F3] flex items-center justify-center shrink-0">
-                        <Truck className="w-4 h-4" />
+                      <div className="w-11 h-11 rounded-2xl bg-[#EBF3FF] text-[#0055FF] flex items-center justify-center shrink-0">
+                        <Truck className="w-5 h-5" />
                       </div>
                     ) : item.badgeIconType === 'ban' ? (
-                      <div className="w-7 h-7 rounded-lg bg-red-50 text-red-500 flex items-center justify-center shrink-0">
-                        <Ban className="w-4 h-4" />
+                      <div className="w-11 h-11 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center shrink-0">
+                        <Ban className="w-5 h-5" />
                       </div>
                     ) : (
-                      <div className="w-7 h-7 rounded-lg bg-blue-50 text-[#1E60F3] flex items-center justify-center shrink-0">
-                        <Lightbulb className="w-4 h-4" />
+                      <div className="w-11 h-11 rounded-2xl bg-[#EBF3FF] text-[#0055FF] flex items-center justify-center shrink-0">
+                        <Lightbulb className="w-5 h-5" />
                       </div>
                     )}
 
                     {/* Title & Subtitle */}
                     <div className="min-w-0">
-                      <div className="text-sm font-black text-slate-900 leading-tight truncate">
+                      <div className="text-[16px] font-black text-slate-900 leading-tight truncate tracking-tight">
                         {item.title}
                       </div>
-                      <div className="text-[11px] text-slate-500 font-medium mt-0.5 truncate">
+                      <div className="text-[13px] text-slate-400 font-medium mt-1 truncate">
                         {item.subtitle}
                       </div>
                     </div>
@@ -339,7 +334,7 @@ export const FieldTipModal: React.FC<FieldTipModalProps> = ({
 
                   {/* Expand Chevron */}
                   <ChevronDown
-                    className={`w-4 h-4 text-slate-400 shrink-0 ml-2 transition-transform duration-200 ${
+                    className={`w-5 h-5 text-slate-400 shrink-0 ml-2 transition-transform duration-200 ${
                       isExpanded ? 'rotate-180 text-slate-700' : ''
                     }`}
                   />
@@ -347,43 +342,43 @@ export const FieldTipModal: React.FC<FieldTipModalProps> = ({
 
                 {/* Expanded Details Body */}
                 {isExpanded && item.details && (
-                  <div className="border-t border-slate-100 p-3.5 space-y-2.5 bg-white animate-in fade-in duration-150">
+                  <div className="px-5 pb-5 pt-0.5 space-y-3 bg-white animate-in fade-in duration-150">
                     {/* Key-Value Information Rows */}
-                    <div className="space-y-2 text-xs">
+                    <div className="space-y-3 text-[13px]">
                       {item.details.rows.map((row, idx) => (
-                        <div key={idx} className="flex items-start gap-2.5">
+                        <div key={idx} className="flex items-start gap-3">
                           {/* Row Icon Badge */}
-                          <div className="w-5 h-5 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 mt-0.5">
-                            {row.iconType === 'clock' && <Clock className="w-3 h-3 text-slate-600" />}
-                            {row.iconType === 'won' && <Coins className="w-3 h-3 text-slate-600" />}
-                            {row.iconType === 'car' && <Car className="w-3 h-3 text-slate-600" />}
-                            {row.iconType === 'file' && <FileText className="w-3 h-3 text-slate-600" />}
-                            {row.iconType === 'mapPin' && <MapPin className="w-3 h-3 text-slate-600" />}
-                            {row.iconType === 'truck' && <Truck className="w-3 h-3 text-slate-600" />}
-                            {row.iconType === 'alert' && <AlertTriangle className="w-3 h-3 text-amber-600" />}
-                            {row.iconType === 'phone' && <Compass className="w-3 h-3 text-slate-600" />}
+                          <div className="w-6 h-6 rounded-full bg-[#F1F5F9] text-slate-500 flex items-center justify-center shrink-0 mt-0.5">
+                            {row.iconType === 'clock' && <Clock className="w-3.5 h-3.5 text-slate-500" />}
+                            {row.iconType === 'won' && <Coins className="w-3.5 h-3.5 text-slate-500" />}
+                            {row.iconType === 'car' && <Car className="w-3.5 h-3.5 text-slate-500" />}
+                            {row.iconType === 'file' && <FileText className="w-3.5 h-3.5 text-slate-500" />}
+                            {row.iconType === 'mapPin' && <MapPin className="w-3.5 h-3.5 text-slate-500" />}
+                            {row.iconType === 'truck' && <Truck className="w-3.5 h-3.5 text-slate-500" />}
+                            {row.iconType === 'alert' && <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />}
+                            {row.iconType === 'phone' && <Compass className="w-3.5 h-3.5 text-slate-500" />}
                           </div>
 
                           {/* Row Label */}
-                          <div className="w-16 font-semibold text-slate-500 shrink-0 mt-0.5">
+                          <div className="w-18 font-semibold text-slate-400 shrink-0 mt-0.5 text-[13px]">
                             {row.label}
                           </div>
 
                           {/* Row Value or Bullets */}
                           <div className="flex-1 min-w-0">
                             {row.bullets && row.bullets.length > 0 ? (
-                              <div className="space-y-1">
+                              <div className="space-y-1.5">
                                 {row.bullets.map((b, bIdx) => (
                                   <div
                                     key={bIdx}
-                                    className="text-slate-800 leading-relaxed font-medium"
+                                    className="text-slate-800 leading-relaxed font-semibold text-[13px]"
                                   >
                                     • {b}
                                   </div>
                                 ))}
                               </div>
                             ) : (
-                              <div className="text-slate-900 font-extrabold leading-relaxed">
+                              <div className="text-slate-900 font-extrabold leading-relaxed text-[14px]">
                                 {row.value}
                               </div>
                             )}
@@ -393,14 +388,14 @@ export const FieldTipModal: React.FC<FieldTipModalProps> = ({
                     </div>
 
                     {/* Source & Verification Pill Note */}
-                    <div className="bg-blue-50/80 border border-blue-100/90 rounded-xl px-3 py-2 flex items-center justify-between text-[11px] text-[#1E60F3] font-bold mt-3">
-                      <div className="flex items-center gap-1.5 truncate">
-                        <Info className="w-3.5 h-3.5 shrink-0" />
+                    <div className="bg-[#F1F5FB] rounded-2xl px-4 py-3 flex items-center justify-between text-[12px] text-slate-500 font-semibold mt-4">
+                      <div className="flex items-center gap-2 truncate">
+                        <Info className="w-4 h-4 text-[#0055FF] shrink-0" />
                         <span className="truncate">
                           {item.details.verificationNote || '기사 제보 · 호텔 공식 확인 필요'}
                         </span>
                       </div>
-                      <span className="text-blue-500 font-medium shrink-0 ml-2">
+                      <span className="text-slate-400 font-medium shrink-0 ml-2">
                         {item.details.verifiedDate || '2024.10.15'}
                       </span>
                     </div>
@@ -411,34 +406,34 @@ export const FieldTipModal: React.FC<FieldTipModalProps> = ({
           })}
         </div>
 
-        {/* Sticky Footer: '+ 현장 팁 추가' Button */}
-        <div className="p-4 border-t border-slate-100 bg-white shrink-0">
+        {/* Sticky Footer: '+ 현장 팁 추가' Volumetric White Card Button */}
+        <div className="px-5 pb-5 pt-2 bg-[#F6F8FC] shrink-0">
           <button
             type="button"
             onClick={() => {
               haptics.selection();
               setIsAddTipOpen(true);
             }}
-            className="w-full py-3.5 border border-[#1E60F3] hover:bg-blue-50/60 active:scale-98 text-[#1E60F3] font-black rounded-2xl text-sm flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer"
+            className="w-full py-4 bg-white hover:bg-slate-50 active:scale-[0.99] text-[#0055FF] font-extrabold rounded-2xl text-[15px] flex items-center justify-center gap-1.5 border border-slate-100/90 shadow-[0_4px_16px_rgba(15,23,42,0.04)] transition-all cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-4 h-4 stroke-[2.5]" />
             <span>현장 팁 추가</span>
           </button>
         </div>
 
         {/* Modal: 현장 팁 추가 Sub-Dialog */}
         {isAddTipOpen && (
-          <div className="absolute inset-0 z-60 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="absolute inset-0 z-60 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
             <div
-              className="w-full max-w-sm bg-white rounded-3xl p-5 shadow-2xl space-y-3.5 animate-in zoom-in-95 duration-150"
+              className="w-full max-w-sm bg-[#F6F8FC] rounded-3xl p-5 shadow-2xl border border-slate-100 space-y-4 animate-in zoom-in-95 duration-150"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                <h3 className="text-base font-black text-slate-900">현장 팁 추가</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-[17px] font-black text-slate-900">현장 팁 추가</h3>
                 <button
                   type="button"
                   onClick={() => setIsAddTipOpen(false)}
-                  className="w-7 h-7 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer"
+                  className="w-8 h-8 rounded-full bg-slate-200/60 text-slate-600 hover:bg-slate-200 flex items-center justify-center cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -446,8 +441,8 @@ export const FieldTipModal: React.FC<FieldTipModalProps> = ({
 
               {/* Category Selection */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">카테고리</label>
-                <div className="grid grid-cols-3 gap-1.5">
+                <label className="block text-[13px] font-bold text-slate-700 mb-1.5">카테고리</label>
+                <div className="grid grid-cols-3 gap-2">
                   {(
                     [
                       { key: 'parking', label: '무료 주차' },
@@ -461,10 +456,10 @@ export const FieldTipModal: React.FC<FieldTipModalProps> = ({
                       key={cat.key}
                       type="button"
                       onClick={() => setNewCategory(cat.key)}
-                      className={`py-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
+                      className={`py-2.5 text-xs font-bold rounded-2xl border transition-all cursor-pointer ${
                         newCategory === cat.key
-                          ? 'bg-[#1E60F3] text-white border-[#1E60F3]'
-                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                          ? 'bg-[#0055FF] text-white border-[#0055FF] shadow-[0_3px_10px_rgba(0,85,255,0.2)]'
+                          : 'bg-white text-slate-600 border-slate-100/90 shadow-[0_2px_8px_rgba(15,23,42,0.03)] hover:bg-slate-50'
                       }`}
                     >
                       {cat.label}
@@ -475,41 +470,41 @@ export const FieldTipModal: React.FC<FieldTipModalProps> = ({
 
               {/* Title Input */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">팁 요약 (제목)</label>
+                <label className="block text-[13px] font-bold text-slate-700 mb-1.5">팁 요약 (제목)</label>
                 <input
                   type="text"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   placeholder="예: 2층 로비 앞 전용 정차선 이용 가능"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-[#1E60F3] focus:bg-white transition-all"
+                  className="w-full px-4 py-3 bg-white border border-slate-100/90 rounded-2xl shadow-[0_2px_10px_rgba(15,23,42,0.04)] text-sm font-semibold text-slate-900 focus:outline-none focus:border-[#0055FF] transition-all"
                 />
               </div>
 
               {/* Detail Input */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">상세 내용 및 주의사항</label>
+                <label className="block text-[13px] font-bold text-slate-700 mb-1.5">상세 내용 및 주의사항</label>
                 <textarea
                   value={newDetail}
                   onChange={(e) => setNewDetail(e.target.value)}
                   placeholder="동료 기사들을 위해 회차 시간, 높이 제한, 도어맨 소통 팁 등을 적어주세요."
                   rows={3}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:border-[#1E60F3] focus:bg-white transition-all resize-none"
+                  className="w-full px-4 py-3 bg-white border border-slate-100/90 rounded-2xl shadow-[0_2px_10px_rgba(15,23,42,0.04)] text-sm font-medium text-slate-900 focus:outline-none focus:border-[#0055FF] transition-all resize-none"
                 />
               </div>
 
               {/* Actions */}
-              <div className="pt-2 flex items-center gap-2">
+              <div className="pt-1 flex items-center gap-2.5">
                 <button
                   type="button"
                   onClick={() => setIsAddTipOpen(false)}
-                  className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                  className="w-[36%] py-3.5 bg-[#EEF2F7] hover:bg-slate-200 text-slate-600 rounded-2xl text-[14px] font-bold transition-colors cursor-pointer"
                 >
                   취소
                 </button>
                 <button
                   type="button"
                   onClick={handleSaveTip}
-                  className="flex-1 py-3 bg-[#1E60F3] hover:bg-blue-600 text-white rounded-xl text-xs font-bold shadow-md active:scale-98 transition-all cursor-pointer"
+                  className="flex-1 py-3.5 bg-[#0055FF] hover:bg-[#0044CC] text-white rounded-2xl text-[14px] font-extrabold shadow-[0_4px_14px_rgba(0,85,255,0.25)] active:scale-98 transition-all cursor-pointer"
                 >
                   등록하기
                 </button>

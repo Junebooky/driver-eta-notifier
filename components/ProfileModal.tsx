@@ -818,7 +818,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           {/* 6. Primary Navigation Switcher */}
           <div>
             <label className="text-xs sm:text-[13px] font-bold text-slate-800 mb-2 flex items-center">
-              <Navigation className="w-4 h-4 mr-1.5 text-[#1E60F3] stroke-[2]" /> 주요 내비게이션 앱
+              주요 내비게이션 앱
             </label>
             <div className="grid grid-cols-3 gap-2.5">
               {/* TMAP Option (Default) */}

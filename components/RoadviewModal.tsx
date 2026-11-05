@@ -255,9 +255,13 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
         {/* Header */}
         <div className="px-5 pt-5 pb-3 bg-[#F6F8FC] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-[#0055FF] text-white flex items-center justify-center shrink-0 shadow-[0_4px_12px_rgba(0,85,255,0.28)]">
-              <Eye className="w-5 h-5 sm:w-5.5 sm:h-5.5 stroke-[2.2]" />
-            </div>
+            <img
+              src="/images/icons/driver_ui/icon_roadview_v02.png"
+              alt="로드뷰 아이콘"
+              aria-hidden="true"
+              draggable={false}
+              className="w-14 h-14 object-contain shrink-0 select-none pointer-events-none"
+            />
             <div>
               <h2 className="text-lg font-extrabold text-slate-900 tracking-tight flex items-center gap-1.5">
                 현장 로드뷰
@@ -348,7 +352,7 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
           {/* Quick Destination Card (현재 운행 목적지 카드 전체 터치) */}
           {currentDestination && currentDestination.lat && currentDestination.lng && (
             <div className="space-y-2">
-              <span className="text-xs sm:text-[13px] font-bold text-slate-600 tracking-tight block px-0.5">
+              <span className="flex items-center justify-between text-xs sm:text-[13px] font-semibold text-slate-500 px-1">
                 현재 운행 목적지
               </span>
               <button
@@ -377,9 +381,8 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
           {/* 최근 검색 (2열 볼륨감 있는 화이트 카드 그리드 - 전면 탭 인터랙션) */}
           {recentList.length > 0 && (
             <div className="space-y-2.5">
-              <div className="flex items-center justify-between text-xs sm:text-[13px] font-extrabold text-slate-800 px-0.5">
+              <div className="flex items-center justify-between text-xs sm:text-[13px] font-semibold text-slate-500 px-1">
                 <span className="flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 text-slate-500 stroke-[2]" />
                   <span>최근 검색</span>
                   <span className="text-xs font-semibold text-slate-400">
                     ({recentList.length})
@@ -409,9 +412,8 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
 
           {/* 자주 가는 거점 퀵 선택 (4행 x 3열 = 12개 슬롯 그리드) */}
           <div className="space-y-2.5">
-            <div className="flex items-center justify-between text-xs sm:text-[13px] font-extrabold text-slate-800 px-0.5">
+            <div className="flex items-center justify-between text-xs sm:text-[13px] font-semibold text-slate-500 px-1">
               <span className="flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-[#0055FF]" />
                 <span>자주 가는 거점 퀵 선택</span>
               </span>
               <span className="text-[11px] text-slate-400 font-medium">

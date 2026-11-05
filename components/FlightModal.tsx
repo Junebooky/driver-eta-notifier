@@ -217,14 +217,18 @@ export const FlightModal: React.FC<FlightModalProps> = ({
         {/* Modal Header: Cobalt Squircle Icon & Title */}
         <div className="px-5 pt-5 pb-3 flex items-center justify-between bg-[#F6F8FC] shrink-0">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-2xl bg-[#0055FF] text-white flex items-center justify-center shadow-[0_4px_12px_rgba(0,85,255,0.28)] shrink-0">
-              <Plane className="w-5 h-5 text-white" />
-            </div>
+            <img
+              src="/images/icons/driver_ui/icon_flight.png"
+              alt="항공기 아이콘"
+              aria-hidden="true"
+              draggable={false}
+              className="w-1 h-10 object-contain shrink-0 select-none pointer-events-none"
+            />
             <div>
               <h3 className="text-base font-extrabold text-slate-900 leading-tight">
-                인천 · 김포공항 실시간 운항 관제
+                실시간 항공편 조회
               </h3>
-              <p className="text-[11px] text-slate-400 font-medium mt-0.5">편명만 입력하면 공항을 자동 감지합니다</p>
+              <p className="text-[11px] text-slate-400 font-medium mt-0.5">편명만 입력하면 공항과 터미널을 바로 찾아드려요</p>
             </div>
           </div>
           <button
@@ -242,9 +246,8 @@ export const FlightModal: React.FC<FlightModalProps> = ({
           <div className="w-full bg-white p-1 rounded-2xl border border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)] relative flex items-center select-none">
             {/* Sliding Indicator Pill */}
             <div
-              className={`w-[calc(50%-4px)] h-[calc(100%-8px)] absolute top-1 left-1 rounded-xl bg-[#0055FF] shadow-[0_4px_14px_rgba(0,85,255,0.3)] transition-transform duration-300 ease-out pointer-events-none transform ${
-                isArrival ? 'translate-x-0' : 'translate-x-full'
-              }`}
+              className={`w-[calc(50%-4px)] h-[calc(100%-8px)] absolute top-1 left-1 rounded-xl bg-[#0055FF] shadow-[0_4px_14px_rgba(0,85,255,0.3)] transition-transform duration-300 ease-out pointer-events-none transform ${isArrival ? 'translate-x-0' : 'translate-x-full'
+                }`}
             />
 
             {/* Arrival Tab Button */}
@@ -258,9 +261,8 @@ export const FlightModal: React.FC<FlightModalProps> = ({
               className="flex-1 py-2.5 rounded-xl z-10 flex items-center justify-center cursor-pointer transition-colors duration-300"
             >
               <span
-                className={`text-sm tracking-tight transition-colors duration-300 ${
-                  isArrival ? 'text-white font-extrabold' : 'text-slate-500 font-bold hover:text-slate-800'
-                }`}
+                className={`text-sm tracking-tight transition-colors duration-300 ${isArrival ? 'text-white font-extrabold' : 'text-slate-500 font-bold hover:text-slate-800'
+                  }`}
               >
                 입국 (도착)
               </span>
@@ -277,9 +279,8 @@ export const FlightModal: React.FC<FlightModalProps> = ({
               className="flex-1 py-2.5 rounded-xl z-10 flex items-center justify-center cursor-pointer transition-colors duration-300"
             >
               <span
-                className={`text-sm tracking-tight transition-colors duration-300 ${
-                  !isArrival ? 'text-white font-extrabold' : 'text-slate-500 font-bold hover:text-slate-800'
-                }`}
+                className={`text-sm tracking-tight transition-colors duration-300 ${!isArrival ? 'text-white font-extrabold' : 'text-slate-500 font-bold hover:text-slate-800'
+                  }`}
               >
                 출국 (출발)
               </span>
@@ -362,11 +363,10 @@ export const FlightModal: React.FC<FlightModalProps> = ({
                           setFlight(cand);
                           haptics.lightTap();
                         }}
-                        className={`w-full text-left px-3.5 py-2.5 rounded-2xl text-xs flex items-center justify-between transition-all cursor-pointer ${
-                          isSelected
-                            ? 'bg-[#EBF3FF] font-extrabold text-slate-900'
-                            : 'bg-white hover:bg-slate-50 text-slate-700'
-                        }`}
+                        className={`w-full text-left px-3.5 py-2.5 rounded-2xl text-xs flex items-center justify-between transition-all cursor-pointer ${isSelected
+                          ? 'bg-[#EBF3FF] font-extrabold text-slate-900'
+                          : 'bg-white hover:bg-slate-50 text-slate-700'
+                          }`}
                       >
                         <div className="flex items-center gap-2 min-w-0">
                           <span className="text-xs font-semibold text-slate-600 tracking-tight shrink-0 tabular-nums">
@@ -384,9 +384,8 @@ export const FlightModal: React.FC<FlightModalProps> = ({
                             const shortStatus = match ? match[1].split(' ')[0] : '정상';
                             return (
                               <span
-                                className={`text-[11px] ml-1 font-semibold ${
-                                  isSelected ? 'text-[#0055FF]' : 'text-slate-400'
-                                }`}
+                                className={`text-[11px] ml-1 font-semibold ${isSelected ? 'text-[#0055FF]' : 'text-slate-400'
+                                  }`}
                               >
                                 ({shortStatus})
                               </span>
@@ -411,11 +410,10 @@ export const FlightModal: React.FC<FlightModalProps> = ({
                           {flight.airline}
                         </span>
                         <span
-                          className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
-                            flight.airportKind === 'GMP'
-                              ? 'bg-indigo-50 text-indigo-700'
-                              : 'bg-[#EBF3FF] text-[#0055FF]'
-                          }`}
+                          className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${flight.airportKind === 'GMP'
+                            ? 'bg-indigo-50 text-indigo-700'
+                            : 'bg-[#EBF3FF] text-[#0055FF]'
+                            }`}
                         >
                           {flight.airportKind === 'GMP' ? '김포국제공항' : '인천국제공항'}
                         </span>
@@ -443,15 +441,15 @@ export const FlightModal: React.FC<FlightModalProps> = ({
                         {flight.type === 'arrival'
                           ? flight.airportCode || 'DEP'
                           : flight.airportKind === 'GMP'
-                          ? 'GMP'
-                          : 'ICN'}
+                            ? 'GMP'
+                            : 'ICN'}
                       </span>
                       <span className="text-xs sm:text-sm font-medium text-slate-400 truncate block mt-1">
                         {flight.type === 'arrival'
                           ? flight.airport
                           : flight.airportKind === 'GMP'
-                          ? '김포국제공항'
-                          : '인천국제공항'}
+                            ? '김포국제공항'
+                            : '인천국제공항'}
                       </span>
                     </div>
 
@@ -485,19 +483,19 @@ export const FlightModal: React.FC<FlightModalProps> = ({
                     const theme =
                       flight.diffMinutes >= 10
                         ? {
-                            colorHex: '#E11D48',
-                            textColor: 'text-rose-600',
-                            bgBadge: 'bg-rose-50 text-rose-600',
-                            statusText: `+${flight.diffMinutes}분 지연`,
-                          }
+                          colorHex: '#E11D48',
+                          textColor: 'text-rose-600',
+                          bgBadge: 'bg-rose-50 text-rose-600',
+                          statusText: `+${flight.diffMinutes}분 지연`,
+                        }
                         : flight.diffMinutes <= -5
-                        ? {
+                          ? {
                             colorHex: '#059669',
                             textColor: 'text-emerald-600',
                             bgBadge: 'bg-emerald-50 text-emerald-700',
                             statusText: `${flight.diffMinutes}분 조기`,
                           }
-                        : {
+                          : {
                             colorHex: '#0055FF',
                             textColor: 'text-[#0055FF]',
                             bgBadge: 'bg-[#EBF3FF] text-[#0055FF]',
@@ -579,11 +577,10 @@ export const FlightModal: React.FC<FlightModalProps> = ({
                       </p>
                     ) : (
                       <p
-                        className={`text-sm sm:text-base tracking-tight leading-snug ${
-                          !flight.exitNumber && !flight.exit && !flight.gateNumber
-                            ? 'font-medium text-slate-500'
-                            : 'font-extrabold text-slate-900'
-                        }`}
+                        className={`text-sm sm:text-base tracking-tight leading-snug ${!flight.exitNumber && !flight.exit && !flight.gateNumber
+                          ? 'font-medium text-slate-500'
+                          : 'font-extrabold text-slate-900'
+                          }`}
                       >
                         {flight.arrivalLocationText}
                       </p>

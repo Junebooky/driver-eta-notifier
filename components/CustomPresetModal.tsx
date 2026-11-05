@@ -952,29 +952,13 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
         {/* ========================================================= */}
         <div className="flex items-center justify-between px-5 py-4 bg-[#F6F8FC] shrink-0">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-2xl bg-[#0055FF] flex items-center justify-center shadow-[0_4px_12px_rgba(0,85,255,0.25)] text-white shrink-0">
-              {isHomeMode ? (
-                <Home className="w-5 h-5 text-white" />
-              ) : (
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="w-5 h-5 text-white stroke-[2.2]"
-                >
-                  <path d="M19.914 11.105A7.298 7.298 0 0 0 20 10a8 8 0 0 0-16 0c0 4.993 5.539 10.193 7.399 11.799a1 1 0 0 1-1.202 0 32 32 0 0 0 .824-.738" />
-                  <circle cx="12" cy="10" r="3" />
-                  <path d="M16 18h6" />
-                  <path d="M19 15v6" />
-                </svg>
-              )}
-            </div>
+            <img
+              src="/images/icons/excel/icon_position.png"
+              alt="장소 아이콘"
+              aria-hidden="true"
+              draggable={false}
+              className="w-10 h-10 object-contain shrink-0 select-none pointer-events-none"
+            />
             <h2 className="text-[18px] font-black text-slate-900 tracking-tight leading-snug">
               {isHomeMode
                 ? (isHomeEditMode ? '자택 주소 수정' : '자택 주소 등록')
