@@ -746,7 +746,7 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
         void handleExtractWithAi();
       }
     } else if (targetStep === 4) {
-      if (currentDraft && workflowStep !== 'step1_extract') {
+      if (currentDraft && workflowStep === 'step2_booking_detail') {
         setWorkflowStep('step4_booking_confirmed');
       }
     } else if (targetStep === 5) {
