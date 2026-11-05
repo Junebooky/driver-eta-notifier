@@ -59,7 +59,7 @@ export const TossDateRangePicker: React.FC<TossDateRangePickerProps> = ({
   required = false,
   minDate,
   containerClassName = '',
-  heightClass = 'h-12',
+  heightClass = 'h-11 sm:h-12',
   disabled = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -234,8 +234,8 @@ export const TossDateRangePicker: React.FC<TossDateRangePickerProps> = ({
           disabled ? 'opacity-60 pointer-events-none' : ''
         }`}
       >
-        <CalendarIcon className="w-5 h-5 text-slate-700 shrink-0" />
-        <span className="text-sm font-bold text-slate-900 truncate flex-1">
+        <CalendarIcon className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600 shrink-0" />
+        <span className="text-xs sm:text-sm font-bold text-slate-900 truncate flex-1">
           {displayLabel}
         </span>
       </div>

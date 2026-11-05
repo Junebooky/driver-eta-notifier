@@ -1114,7 +1114,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
             ? '변경된 배차가 저장되었습니다. 기사 Cockpit에 표시됩니다.'
             : isMultiVehicleGroup
               ? `총 ${totalVehicles}대의 배차가 저장되었습니다. 기사 Cockpit에 표시됩니다.`
-               : `배차가 저장되었습니다. 기사 Cockpit에 표시됩니다.`
+              : `배차가 저장되었습니다. 기사 Cockpit에 표시됩니다.`
         );
       }
 
@@ -1159,14 +1159,14 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
   };
 
   if (isModal && !isOpen) return null;
-  const driverSmsHref = initialBooking && ['배차 완료','재확인 필요'].includes(initialBooking.dispatchStatus)
+  const driverSmsHref = initialBooking && ['배차 완료', '재확인 필요'].includes(initialBooking.dispatchStatus)
     ? driverDispatchSmsHref(initialBooking) : null;
 
   const content = (
     <div
       className={`@container bg-white select-none flex flex-col justify-between ${isModal
-          ? 'w-full'
-          : 'border border-slate-200/90 rounded-[24px] p-5 sm:p-6 shadow-[0_10px_30px_rgba(0,0,0,0.04)]'
+        ? 'w-full'
+        : 'border border-slate-200/90 rounded-[24px] p-5 sm:p-6 shadow-[0_10px_30px_rgba(0,0,0,0.04)]'
         }`}
     >
       <div>
@@ -1182,7 +1182,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight">
-                  {initialBooking ? '예약 · 배차 수정' : '빠른 예약 · 배차'}
+                  {initialBooking ? '배차 정보' : '빠른 예약 · 배차'}
                 </h2>
               </div>
               {!initialBooking && (
@@ -1210,110 +1210,92 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
 
         {/* Connected Booking Action & Status Bar (Only in Edit/Row-Click Mode) */}
         {initialBooking && (
-          <div className="mt-3.5 mb-2 rounded-2xl bg-gradient-to-r from-blue-50/80 via-indigo-50/60 to-white border border-blue-200/90 p-3.5 sm:p-4 shadow-2xs">
+          <div className="mt-3 mb-2 rounded-2xl bg-slate-50/80 border border-slate-200/90 p-3.5 sm:p-4 shadow-2xs space-y-3">
             {/* Top Row: Identity and Real-time Statuses */}
-            <div className="flex flex-wrap items-center justify-between gap-2.5 pb-2.5 border-b border-blue-100/90">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-black text-slate-800">
-                  {initialBooking.customerName}
-                </span>
-                {initialBooking.passengerName && initialBooking.passengerName !== initialBooking.customerName && (
-                  <span className="text-[11px] text-slate-500 font-medium">
-                    · 탑승 {initialBooking.passengerName}
+            <div className="flex flex-col gap-1.5 pb-2.5 border-b border-slate-200/70">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="text-xs sm:text-sm font-black text-slate-900 truncate">
+                    {initialBooking.customerName}
                   </span>
-                )}
-                {initialBooking.driverName && initialBooking.driverName !== '-' && (
-                  <span className="text-[11px] font-bold text-slate-700 bg-white px-2 py-0.5 rounded-md border border-slate-200">
-                    기사: {initialBooking.driverName}
-                  </span>
-                )}
-                {initialBooking.vehiclePlate && initialBooking.vehiclePlate !== '미배정' && (
-                  <span className="text-[11px] font-bold text-slate-700 bg-white px-2 py-0.5 rounded-md border border-slate-200">
-                    차량: {initialBooking.vehiclePlate} ({stripManufacturerName(initialBooking.vehicleModel)})
-                  </span>
-                )}
-              </div>
+                  {initialBooking.passengerName && initialBooking.passengerName !== initialBooking.customerName && (
+                    <span className="text-xs text-slate-500 font-semibold truncate">
+                      · {initialBooking.passengerName}
+                    </span>
+                  )}
+                </div>
 
-              <div className="flex items-center gap-2 flex-wrap">
-                {/* 배차 상태 Badge */}
-                <span
-                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black ${initialBooking.dispatchStatus === '배차 완료'
-                      ? 'bg-[#1E60F3] text-white shadow-xs'
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {/* 배차 상태 Badge */}
+                  <span
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-extrabold ${initialBooking.dispatchStatus === '배차 완료'
+                      ? 'bg-[#1E60F3] text-white'
                       : initialBooking.dispatchStatus === '재확인 필요'
                         ? 'bg-indigo-600 text-white'
                         : initialBooking.dispatchStatus === '취소'
                           ? 'bg-slate-200 text-slate-600 line-through'
                           : 'bg-amber-100 text-amber-800 border border-amber-300'
-                    }`}
-                >
-                  <span>{initialBooking.dispatchStatus}</span>
-                  {initialBooking.version && initialBooking.version > 1 && (
-                    <span className="text-[10px] opacity-80 font-mono">v{initialBooking.version}</span>
-                  )}
-                </span>
-
-                {/* 기사 확인 현황 Badge (Tone down to calm cool gray) */}
-                <span
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold ${initialBooking.driverAck === '확인완료'
-                      ? 'bg-slate-100 text-slate-600 border border-slate-200/80'
-                      : initialBooking.driverAck === '재확인 필요'
-                        ? 'bg-indigo-100 text-indigo-800 border border-indigo-300'
-                        : 'bg-amber-50 text-amber-900 border border-amber-200'
-                    }`}
-                >
-                  {initialBooking.driverAck === '확인완료' ? (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-slate-500" />
-                  ) : (
-                    <Clock className="w-3.5 h-3.5 text-amber-600" />
-                  )}
-                  <span>
-                    {initialBooking.driverAck === '확인완료'
-                      ? '확인 완료'
-                      : initialBooking.driverAck === '재확인 필요'
-                        ? '재확인 대기'
-                        : '확인 대기'}
+                      }`}
+                  >
+                    <span>{initialBooking.dispatchStatus}</span>
+                    {initialBooking.version && initialBooking.version > 1 && (
+                      <span className="text-[10px] opacity-80 font-mono">v{initialBooking.version}</span>
+                    )}
                   </span>
-                  {initialBooking.driverAckTime && (
-                    <span className="text-[10px] text-slate-500 font-normal">
-                      ({initialBooking.driverAckTime})
+
+                  {/* 기사 확인 현황 Badge */}
+                  <span
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-bold ${initialBooking.driverAck === '확인완료'
+                      ? 'bg-white text-slate-700 border border-slate-200/90'
+                      : initialBooking.driverAck === '재확인 필요'
+                        ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                        : 'bg-amber-50 text-amber-800 border border-amber-200'
+                      }`}
+                  >
+                    {initialBooking.driverAck === '확인완료' ? (
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                    ) : (
+                      <Clock className="w-3 h-3 text-amber-600 shrink-0" />
+                    )}
+                    <span>
+                      {initialBooking.driverAck === '확인완료'
+                        ? '확인 완료'
+                        : initialBooking.driverAck === '재확인 필요'
+                          ? '재확인 대기'
+                          : '확인 대기'}
                     </span>
-                  )}
+                  </span>
+                </div>
+              </div>
+
+              {/* Assigned Driver & Vehicle Compact Meta Line */}
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold text-slate-600">
+                <span>
+                  기사 <strong className="font-extrabold text-slate-800">{initialBooking.driverName && initialBooking.driverName !== '-' ? initialBooking.driverName : '미배정'}</strong>
                 </span>
+                <span className="text-slate-300">·</span>
+                <span>
+                  차량{' '}
+                  <strong className="font-extrabold text-slate-800">
+                    {initialBooking.vehiclePlate && initialBooking.vehiclePlate !== '미배정'
+                      ? `${initialBooking.vehiclePlate} (${stripManufacturerName(initialBooking.vehicleModel)})`
+                      : '미배정'}
+                  </strong>
+                </span>
+                {initialBooking.driverAckTime && (
+                  <>
+                    <span className="text-slate-300">·</span>
+                    <span className="text-[11px] text-slate-400 font-medium">
+                      확인 {initialBooking.driverAckTime}
+                    </span>
+                  </>
+                )}
               </div>
             </div>
 
-            {/* Bottom Row: Connected Actions */}
-            <div className="pt-2.5 flex flex-wrap items-center gap-2">
-              {/* 1. 기사 미확인 재알림 전송 (Calm Slate Tone) */}
-              {onRemindDriver && (
-                <button
-                  type="button"
-                  onClick={handleRemindClick}
-                  disabled={isReminding}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95 ${remindSuccess
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200/60'
-                    }`}
-                  title="기사 Cockpit에 확인 요청을 다시 표시합니다. 문자·푸시가 자동 발송되는 기능은 아닙니다."
-                >
-                  <BellRing className={`w-3.5 h-3.5 ${isReminding ? 'animate-bounce text-[#1E60F3]' : ''}`} />
-                  <span>{remindSuccess ? '앱 내 확인 요청 갱신됨' : isReminding ? '처리 중...' : '기사 확인 재요청'}</span>
-                </button>
-              )}
-
-              {/* Optional native SMS handoff. Opening a composer is NOT a delivery confirmation. */}
-              {driverSmsHref && (
-                <a
-                  href={driverSmsHref}
-                  className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20"
-                  title="스마트폰 문자앱을 열어 기사님께 직접 보냅니다. 자동 발송이 아닙니다."
-                >
-                  <MessageSquareText className="h-4 w-4 text-slate-500" />
-                  기사 문자 작성
-                </a>
-              )}
-
-              {/* 2. 고객사 자동 안내문자 */}
+            {/* Bottom Row: Unified Minimal Action Buttons */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {/* 1. 고객 안내 문자 */}
               {onOpenCustomerMessage && (
                 <button
                   type="button"
@@ -1321,18 +1303,15 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                     haptics.lightTap();
                     onOpenCustomerMessage(initialBooking);
                   }}
-                  className="px-3 py-1.5 rounded-xl text-xs font-bold bg-[#1E60F3] hover:bg-blue-600 text-white transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
-                  title="고객사 자동 안내문자 (배차확정·기사정보·출발도착 알림) 확인 및 발송"
+                  className="h-9 px-3 rounded-xl text-xs font-bold bg-[#1E60F3] hover:bg-blue-600 text-white transition-all inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs active:scale-95 whitespace-nowrap"
+                  title="고객사 안내문자 확인 및 발송"
                 >
-                  <MessageSquareText className="w-3.5 h-3.5" />
-                  <span>
-                    안내 문자 발송
-                    {initialBooking.pendingCustomerTrigger ? ' (준비완료)' : ''}
-                  </span>
+                  <MessageSquareText className="w-3.5 h-3.5 shrink-0" />
+                  <span>안내 문자{initialBooking.pendingCustomerTrigger ? ' · 준비' : ''}</span>
                 </button>
               )}
 
-              {/* 3. Info 고객 안내자료 */}
+              {/* 2. 배차 카드 */}
               {onOpenDriverVehicleInfo && (
                 <button
                   type="button"
@@ -1340,15 +1319,44 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                     haptics.lightTap();
                     onOpenDriverVehicleInfo(initialBooking);
                   }}
-                  className="px-3 py-1.5 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95"
-                  title="고객 안내용 기사 프로필 & 차량 안내장 카드 확인 및 이미지 다운로드"
+                  className="h-9 px-3 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 transition-all inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs active:scale-95 whitespace-nowrap"
+                  title="기사 프로필 & 차량 안내 카드"
                 >
-                  <ImageIcon className="w-3.5 h-3.5 text-[#1E60F3]" />
-                  <span>배차 카드 보기</span>
+                  <ImageIcon className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />
+                  <span>배차 카드</span>
                 </button>
               )}
 
-              {/* 4. 전체 상세 / 배정 보기 */}
+              {/* 3. 기사 문자 */}
+              {driverSmsHref && (
+                <a
+                  href={driverSmsHref}
+                  className="h-9 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 transition-all inline-flex items-center justify-center gap-1.5 shadow-2xs active:scale-95 whitespace-nowrap"
+                  title="스마트폰 문자앱을 열어 기사님께 직접 발송"
+                >
+                  <MessageSquareText className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                  <span>기사 문자</span>
+                </a>
+              )}
+
+              {/* 4. 확인 재요청 */}
+              {onRemindDriver && (
+                <button
+                  type="button"
+                  onClick={handleRemindClick}
+                  disabled={isReminding}
+                  className={`h-9 px-3 rounded-xl text-xs font-bold transition-all inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs active:scale-95 whitespace-nowrap ${remindSuccess
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'
+                    }`}
+                  title="기사 앱에 확인 요청 다시 표시"
+                >
+                  <BellRing className={`w-3.5 h-3.5 shrink-0 ${isReminding ? 'animate-bounce text-[#1E60F3]' : 'text-slate-500'}`} />
+                  <span>{remindSuccess ? '요청 완료' : isReminding ? '요청 중' : '재요청'}</span>
+                </button>
+              )}
+
+              {/* 5. 배정표 상세 */}
               {onOpenDetailModal && (
                 <button
                   type="button"
@@ -1356,10 +1364,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                     haptics.lightTap();
                     onOpenDetailModal(initialBooking);
                   }}
-                  className="ml-auto px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                  className="h-9 px-3 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200/80 text-slate-700 transition-all inline-flex items-center justify-center gap-1 cursor-pointer active:scale-95 whitespace-nowrap ml-auto"
                   title="전체 배정표 및 세부사항 확인"
                 >
-                  <span>전체 배정표 ↗</span>
+                  <span>배정표 ↗</span>
                 </button>
               )}
             </div>
@@ -1376,10 +1384,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
 
             <div
               onClick={() => setIsCustomerDropdownOpen(true)}
-              className="w-full h-12 bg-white border border-slate-200 hover:border-blue-400 focus-within:border-[#1E60F3] focus-within:ring-2 focus-within:ring-blue-100 rounded-xl px-3.5 flex items-center justify-between transition-all cursor-pointer shadow-2xs"
+              className="w-full h-11 sm:h-12 bg-white border border-slate-200 hover:border-blue-400 focus-within:border-[#1E60F3] focus-within:ring-2 focus-within:ring-blue-100 rounded-xl px-3.5 flex items-center justify-between transition-all cursor-pointer shadow-2xs"
             >
               <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                <Building2 className="w-5 h-5 text-slate-700 shrink-0" />
+                <Building2 className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600 shrink-0" />
                 <input
                   type="text"
                   value={customerName}
@@ -1391,10 +1399,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                   }}
                   onFocus={() => setIsCustomerDropdownOpen(true)}
                   placeholder="고객사명 또는 예약자 입력"
-                  className="w-full bg-transparent text-sm font-semibold text-slate-900 placeholder:text-slate-400 outline-none"
+                  className="w-full bg-transparent text-xs sm:text-sm font-bold text-slate-900 placeholder:text-slate-400 outline-none"
                 />
               </div>
-              <ChevronDown className="w-5 h-5 text-slate-600 shrink-0" />
+              <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-slate-500 shrink-0" />
             </div>
 
             {/* Customer Dropdown */}
@@ -1418,10 +1426,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                             <span className="font-bold text-slate-900 text-xs truncate">{c.name}</span>
                             <span
                               className={`text-[10px] px-1.5 py-0.2 rounded font-black ${c.tier === 'VIP'
-                                  ? 'bg-purple-100 text-purple-700'
-                                  : c.tier === '주요'
-                                    ? 'bg-blue-100 text-[#1E60F3]'
-                                    : 'bg-slate-100 text-slate-600'
+                                ? 'bg-purple-100 text-purple-700'
+                                : c.tier === '주요'
+                                  ? 'bg-blue-100 text-[#1E60F3]'
+                                  : 'bg-slate-100 text-slate-600'
                                 }`}
                             >
                               {c.tier}
@@ -1443,8 +1451,8 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
             )}
           </div>
 
-          {/* 출발 날짜 * & 출발 시간 * (2 Columns) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* 출발 날짜 * & 출발 시간 * & 예정 종료 시간 (Unified Input Size & Typography) */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {/* 출발 날짜 */}
             <TossDateRangePicker
               label="출발 날짜"
@@ -1455,7 +1463,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                 setPickupDate(start);
                 setPickupEndDate(end);
               }}
-              heightClass="h-12"
+              heightClass="h-11 sm:h-12"
             />
 
             {/* 출발 시간 */}
@@ -1465,13 +1473,13 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
               </label>
 
               <div
-                className={`w-full h-12 bg-white border rounded-xl px-3.5 flex items-center justify-between transition-all shadow-2xs ${isTimePickerOpen
-                    ? 'border-[#1E60F3] ring-1 ring-[#1E60F3]'
-                    : 'border-slate-200 hover:border-slate-300'
+                className={`w-full h-11 sm:h-12 bg-white border rounded-xl px-3.5 flex items-center justify-between transition-all shadow-2xs ${isTimePickerOpen
+                  ? 'border-[#1E60F3] ring-1 ring-[#1E60F3]'
+                  : 'border-slate-200 hover:border-slate-300'
                   }`}
               >
                 <div className="flex items-center gap-2.5 min-w-0 flex-1 h-full">
-                  <Clock className="w-5 h-5 text-slate-700 shrink-0" />
+                  <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600 shrink-0" />
                   <input
                     type="text"
                     value={timeInputText}
@@ -1482,9 +1490,9 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                     }}
                     onBlur={handleTimeInputBlur}
                     onKeyDown={handleTimeInputKeyDown}
-                    placeholder="예: 오전 07:30 또는 0730"
+                    placeholder="오전 07:30"
                     aria-label="출발 시간 입력 및 선택"
-                    className="w-full h-full bg-transparent text-sm font-bold text-slate-900 focus:outline-none placeholder:text-slate-400"
+                    className="w-full h-full bg-transparent text-xs sm:text-sm font-bold text-slate-900 focus:outline-none placeholder:text-slate-400"
                   />
                 </div>
                 <button
@@ -1494,11 +1502,11 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                     haptics.lightTap();
                     setIsTimePickerOpen((prev) => !prev);
                   }}
-                  className="p-1 -mr-1 text-slate-600 hover:text-slate-900 cursor-pointer"
+                  className="p-1 -mr-1 text-slate-500 hover:text-slate-900 cursor-pointer"
                   aria-label="시간 목록 보기"
                 >
                   <ChevronDown
-                    className={`w-5 h-5 transition-transform duration-200 ${isTimePickerOpen ? 'rotate-180 text-[#1E60F3]' : ''
+                    className={`w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-200 ${isTimePickerOpen ? 'rotate-180 text-[#1E60F3]' : ''
                       }`}
                   />
                 </button>
@@ -1521,9 +1529,9 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                           e.preventDefault();
                           handleSelectTime(time);
                         }}
-                        className={`w-full px-3 py-2.5 rounded-xl text-left text-sm flex items-center transition-colors cursor-pointer ${isSelected
-                            ? 'bg-blue-50 text-[#1E60F3] font-bold'
-                            : 'hover:bg-slate-50 text-slate-800 font-medium'
+                        className={`w-full px-3 py-2 rounded-xl text-left text-xs sm:text-sm flex items-center transition-colors cursor-pointer ${isSelected
+                          ? 'bg-blue-50 text-[#1E60F3] font-bold'
+                          : 'hover:bg-slate-50 text-slate-800 font-medium'
                           }`}
                       >
                         <span className="w-5 flex items-center justify-start shrink-0">
@@ -1538,27 +1546,22 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                 </div>
               )}
             </div>
-          </div>
 
-          {/* Explicit end time — no silently inferred duration, including on mobile. */}
-          <div className="rounded-2xl border border-slate-200 bg-[#F8FAFC] p-3.5 sm:p-4">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-              <div>
-                <label htmlFor="hq-dispatch-end-time" className="block text-xs font-semibold text-slate-800">
-                  예정 종료 시간 <span className="font-normal text-slate-500">(배차 확정 시 필수)</span>
-                </label>
-                <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
-                  종료 시간을 임의로 계산하지 않습니다. 예약만 등록할 때는 비워 두셔도 됩니다.
-                </p>
+            {/* 예정 종료 시간 (Unified Input Style) */}
+            <div>
+              <label htmlFor="hq-dispatch-end-time" className="block text-xs font-bold text-slate-800 mb-1.5">
+                종료 시간 <span className="font-medium text-slate-400 text-[11px]">(배차 시 필수)</span>
+              </label>
+              <div className="w-full h-11 sm:h-12 bg-white border border-slate-200 hover:border-slate-300 focus-within:border-[#1E60F3] focus-within:ring-1 focus-within:ring-[#1E60F3] rounded-xl px-3.5 flex items-center transition-all shadow-2xs">
+                <input
+                  id="hq-dispatch-end-time"
+                  type="time"
+                  value={endTime}
+                  onChange={(event) => setEndTime(event.target.value)}
+                  aria-label="예정 종료 시간 직접 입력"
+                  className="w-full h-full bg-transparent text-xs sm:text-sm font-bold text-slate-900 outline-none"
+                />
               </div>
-              <input
-                id="hq-dispatch-end-time"
-                type="time"
-                value={endTime}
-                onChange={(event) => setEndTime(event.target.value)}
-                aria-label="예정 종료 시간 직접 입력"
-                className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm font-medium text-slate-800 outline-none focus:border-[#1E60F3] focus:ring-1 focus:ring-[#1E60F3]/20 sm:w-40"
-              />
             </div>
           </div>
 
@@ -1657,9 +1660,9 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                           setVehicleCategoryFilter('all');
                         }
                       }}
-                      className={`w-full h-12 bg-white rounded-xl px-3 flex items-center justify-between transition-all cursor-pointer shadow-2xs border ${isOpenVehicle
-                          ? 'border-[#1E60F3] ring-1 ring-[#1E60F3]'
-                          : 'border-slate-200 hover:border-slate-300'
+                      className={`w-full h-11 sm:h-12 bg-white rounded-xl px-3.5 flex items-center justify-between transition-all cursor-pointer shadow-2xs border ${isOpenVehicle
+                        ? 'border-[#1E60F3] ring-1 ring-[#1E60F3]'
+                        : 'border-slate-200 hover:border-slate-300'
                         }`}
                       aria-expanded={isOpenVehicle}
                       aria-label={allocations.length > 1 ? `${index + 1}번 배정 차량 선택` : '배정 차량 선택'}
@@ -1738,8 +1741,8 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                                     type="button"
                                     onClick={() => setVehicleCategoryFilter(cat.key)}
                                     className={`px-2 py-1 rounded-full text-[11px] font-bold transition-colors cursor-pointer ${active
-                                        ? 'bg-[#1E60F3] text-white shadow-2xs'
-                                        : 'text-slate-600 hover:bg-slate-100'
+                                      ? 'bg-[#1E60F3] text-white shadow-2xs'
+                                      : 'text-slate-600 hover:bg-slate-100'
                                       }`}
                                   >
                                     {cat.label}
@@ -1777,8 +1780,8 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                                   type="button"
                                   onClick={() => handleSelectVehicle(allocation.id, v)}
                                   className={`w-full px-2.5 py-2 rounded-xl flex items-center justify-between transition-colors cursor-pointer text-left ${isSelected
-                                      ? 'bg-blue-50/80 border border-blue-200'
-                                      : 'hover:bg-slate-50 border border-transparent'
+                                    ? 'bg-blue-50/80 border border-blue-200'
+                                    : 'hover:bg-slate-50 border border-transparent'
                                     }`}
                                 >
                                   <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -1805,10 +1808,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                                   <div className="flex items-center gap-2.5 shrink-0 ml-2">
                                     <span
                                       className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${v.currentStatus === 'in_service'
-                                          ? 'text-amber-700 bg-amber-50'
-                                          : v.currentStatus === 'maintenance'
-                                            ? 'text-slate-500 bg-slate-100'
-                                            : 'text-blue-600 bg-blue-50'
+                                        ? 'text-amber-700 bg-amber-50'
+                                        : v.currentStatus === 'maintenance'
+                                          ? 'text-slate-500 bg-slate-100'
+                                          : 'text-blue-600 bg-blue-50'
                                         }`}
                                     >
                                       ● {v.statusLabel || '대기 중'}
@@ -1846,9 +1849,9 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                         }
                       }}
                       disabled={allocation.serviceMode === 'vehicle_only'}
-                      className={`w-full h-12 bg-white rounded-xl px-3 flex items-center justify-between transition-all cursor-pointer shadow-2xs border ${isOpenDriver
-                          ? 'border-[#1E60F3] ring-1 ring-[#1E60F3]'
-                          : 'border-slate-200 hover:border-slate-300'
+                      className={`w-full h-11 sm:h-12 bg-white rounded-xl px-3.5 flex items-center justify-between transition-all cursor-pointer shadow-2xs border ${isOpenDriver
+                        ? 'border-[#1E60F3] ring-1 ring-[#1E60F3]'
+                        : 'border-slate-200 hover:border-slate-300'
                         } disabled:opacity-50 disabled:pointer-events-none`}
                       aria-expanded={isOpenDriver}
                       aria-label={allocations.length > 1 ? `${index + 1}번 담당 기사 선택` : '담당 기사 선택'}
@@ -1943,10 +1946,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                                   disabled={isBlocked}
                                   onClick={() => handleSelectDriver(allocation.id, d)}
                                   className={`w-full px-2.5 py-2 rounded-xl flex items-center justify-between transition-colors cursor-pointer text-left ${isSelected
-                                      ? 'bg-blue-50/80 border border-blue-200'
-                                      : isBlocked
-                                        ? 'opacity-50 cursor-not-allowed border border-transparent'
-                                        : 'hover:bg-slate-50 border border-transparent'
+                                    ? 'bg-blue-50/80 border border-blue-200'
+                                    : isBlocked
+                                      ? 'opacity-50 cursor-not-allowed border border-transparent'
+                                      : 'hover:bg-slate-50 border border-transparent'
                                     }`}
                                 >
                                   <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -2118,8 +2121,8 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                         type="button"
                         onClick={() => handleCommonLanguageChange("ko")}
                         className={`h-9 sm:h-10 rounded-lg flex items-center justify-center gap-1.5 px-2 transition-all cursor-pointer ${commonLanguage === "ko"
-                            ? "bg-[#EAF2FF] border-2 border-[#1E60F3] text-[#1E60F3] shadow-xs"
-                            : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
+                          ? "bg-[#EAF2FF] border-2 border-[#1E60F3] text-[#1E60F3] shadow-xs"
+                          : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
                           }`}
                       >
                         <span className="text-xs">🇰🇷</span>
@@ -2130,8 +2133,8 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                         type="button"
                         onClick={() => handleCommonLanguageChange("en")}
                         className={`h-9 sm:h-10 rounded-lg flex items-center justify-center gap-1.5 px-2 transition-all cursor-pointer ${commonLanguage === "en"
-                            ? "bg-[#EAF2FF] border-2 border-[#1E60F3] text-[#1E60F3] shadow-xs"
-                            : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
+                          ? "bg-[#EAF2FF] border-2 border-[#1E60F3] text-[#1E60F3] shadow-xs"
+                          : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
                           }`}
                       >
                         <span className="text-xs">🇺🇸</span>
@@ -2279,9 +2282,9 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
               haptics.lightTap();
               handleSubmit('unassigned');
             }}
-            className="w-full h-12 bg-white border border-slate-200 hover:bg-slate-50 active:scale-[0.98] text-slate-800 font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer disabled:opacity-50"
+            className="w-full h-11 sm:h-12 bg-white border border-slate-200 hover:bg-slate-50 active:scale-[0.98] text-slate-800 font-bold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer disabled:opacity-50"
           >
-            <FileText className="w-4 h-4 text-slate-700" />
+            <FileText className="w-4 h-4 text-slate-700 shrink-0" />
             <span>{initialBooking ? '수정사항 저장' : '예약만 등록'}</span>
           </button>
 
@@ -2293,12 +2296,12 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
               haptics.selection();
               handleSubmit('published');
             }}
-            className="w-full h-12 bg-[#1E60F3] hover:bg-blue-600 active:scale-[0.98] text-white font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-md shadow-blue-500/25 transition-all cursor-pointer disabled:opacity-50"
+            className="w-full h-11 sm:h-12 bg-[#1E60F3] hover:bg-blue-600 active:scale-[0.98] text-white font-bold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-2 shadow-md shadow-blue-500/25 transition-all cursor-pointer disabled:opacity-50"
           >
             {isSubmitting ? (
-              <RefreshCw className="w-4 h-4 animate-spin text-white" />
+              <RefreshCw className="w-4 h-4 animate-spin text-white shrink-0" />
             ) : (
-              <Send className="w-4 h-4 text-white" />
+              <Send className="w-4 h-4 text-white shrink-0" />
             )}
             <span>{initialBooking ? '배차 확정하기' : '바로 배차'}</span>
           </button>

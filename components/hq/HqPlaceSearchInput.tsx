@@ -50,7 +50,7 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
   placeholder = '위치 검색 또는 입력',
   icon = 'mapPin',
   containerClassName = '',
-  heightClass = 'h-12',
+  heightClass = 'h-11 sm:h-12',
   disabled = false,
   autoSearch = false,
   isConfirmed = false,
@@ -243,9 +243,9 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
         }`}
       >
         {icon === 'mapPin' ? (
-          <MapPin className="w-5 h-5 shrink-0 text-[#1E60F3]" />
+          <MapPin className="w-4 h-4 sm:w-5 sm:h-5 shrink-0 text-[#1E60F3]" />
         ) : (
-          <Flag className="w-5 h-5 shrink-0 text-[#1E60F3]" />
+          <Flag className="w-4 h-4 sm:w-5 sm:h-5 shrink-0 text-[#1E60F3]" />
         )}
 
         <input
@@ -265,7 +265,7 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
           }}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className="w-full bg-transparent text-sm font-semibold text-slate-900 placeholder:text-slate-400 outline-none"
+          className="w-full bg-transparent text-xs sm:text-sm font-semibold text-slate-900 placeholder:text-slate-400 outline-none"
         />
 
         {isSearching && (

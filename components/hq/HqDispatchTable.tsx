@@ -435,7 +435,7 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
   };
 
   return (
-    <div className="w-full bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col justify-between">
+    <div className="w-full min-h-[640px] sm:min-h-[700px] bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col justify-start">
       {/* 1. Header */}
       <div className="flex items-center justify-between gap-2 pb-3.5 border-b border-slate-100">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -651,10 +651,13 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
           >
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#1E60F3] flex items-center justify-center">
-                  <SlidersHorizontal className="w-4 h-4" />
-                </div>
+              <div className="flex items-center gap-2.5">
+                <img
+                  src="/images/icons/reservations/icon_reservations.png"
+                  alt="배차 조건 필터"
+                  className="w-9 h-9 object-contain shrink-0 select-none"
+                  draggable={false}
+                />
                 <div>
                   <h3 className="text-sm font-extrabold text-slate-900">배차 조건 필터</h3>
                   <p className="text-[11px] text-slate-400 font-medium">
@@ -1213,7 +1216,7 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
               <tbody className="divide-y divide-slate-100/80 text-xs">
                 {filteredList.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="py-12 text-center text-slate-400 font-medium">
+                    <td colSpan={10} className="h-[420px] py-12 text-center align-middle text-slate-400 font-medium">
                       <p>현재 조건에 해당하는 예약/배차 내역이 없습니다.</p>
                       {activeTab !== 'past' && tabCounts.past > 0 && (
                         <p className="mt-2 text-xs text-slate-400">

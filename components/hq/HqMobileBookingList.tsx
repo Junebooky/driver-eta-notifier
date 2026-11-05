@@ -11,11 +11,13 @@ export function HqMobileBookingList({
   onAssign: (booking: HqBooking) => void;
 }) {
   return (
-    <div aria-label="모바일 배차 일정" className="space-y-3 lg:hidden pt-1">
+    <div aria-label="모바일 배차 일정" className="flex-1 flex flex-col space-y-3 lg:hidden pt-1">
       {bookings.length === 0 && (
-        <p className="rounded-2xl bg-slate-50 border border-slate-200/80 p-6 text-center text-sm font-medium text-slate-500">
-          선택한 조건의 일정이 없습니다.
-        </p>
+        <div className="flex-1 min-h-[420px] flex items-center justify-center rounded-2xl bg-slate-50/70 border border-slate-200/80 p-6 text-center">
+          <p className="text-xs sm:text-sm font-semibold text-slate-500">
+            선택한 조건의 일정이 없습니다.
+          </p>
+        </div>
       )}
       {bookings.map((row) => (
         <article
