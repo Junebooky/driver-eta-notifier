@@ -42,6 +42,7 @@ import {
   AvailableDriverItem,
 } from './HqDriverSelectModal';
 import { useHqDrivers } from '@/utils/useHqDrivers';
+import type { AvailableDriverItem as FleetAvailableDriverItem } from '@/utils/availabilityEngine';
 import { HqComposeEmailModal } from './HqComposeEmailModal';
 import { HqEmailWorkflowStepper, WorkflowStepId } from './HqEmailWorkflowStepper';
 import { parseVehicleSlotsFromRequestedClass } from '@/utils/vehicleSlotParser';
@@ -216,6 +217,7 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
   const [isDriverModalOpen, setIsDriverModalOpen] = useState<boolean>(urlDriverModal);
   const [activeSlotIndex, setActiveSlotIndex] = useState<number>(0);
   const [requiredDriverLanguage, setRequiredDriverLanguage] = useState<'any' | 'english'>(urlDriverLang);
+  const [modalDriverAvailability, setModalDriverAvailability] = useState<FleetAvailableDriverItem[] | undefined>(undefined);
 
   // 10. Compose Modal
   const [isComposeOpen, setIsComposeOpen] = useState<boolean>(false);
@@ -549,10 +551,16 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
   };
 
   // Open Step 3 Driver Modal for a specific vehicle slot with optional language condition
-  const handleOpenDriverModal = (slotIndex: number, requiredLanguage: 'any' | 'english' = 'any') => {
+  const handleOpenDriverModal = (
+    slotIndex: number,
+    requiredLanguage: 'any' | 'english' = 'any',
+    availableDrivers?: FleetAvailableDriverItem[],
+  ) => {
     haptics.lightTap();
     setActiveSlotIndex(slotIndex);
     setRequiredDriverLanguage(requiredLanguage);
+    // Explicit [] means availability is unverified: never silently treat all drivers as available.
+    setModalDriverAvailability(availableDrivers);
     setIsDriverModalOpen(true);
   };
 
@@ -1142,7 +1150,16 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
         targetTime={currentDraft?.pickupTime || '09:00'}
         initialDriverId={vehicleSlots[activeSlotIndex]?.driver?.id || ''}
         requiredLanguage={requiredDriverLanguage}
-        drivers={hqDrivers}
+        drivers={hqDrivers.map((driver) => ({
+          ...driver,
+          isAvailable: modalDriverAvailability === undefined
+            ? driver.isAvailable
+            : modalDriverAvailability.some((candidate) => candidate.id === driver.id && candidate.isAvailable),
+        }))}
+        excludedDriverIds={vehicleSlots
+          .filter((_, index) => index !== activeSlotIndex)
+          .map((slot) => slot.driver?.id)
+          .filter((id): id is string => Boolean(id))}
       />
 
       {/* Compose / Customer Notification Email Modal */}
