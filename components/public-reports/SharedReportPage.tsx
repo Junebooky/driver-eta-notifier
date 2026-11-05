@@ -43,10 +43,14 @@ export function SharedReportPage(){
   });
  },[]);
  useEffect(()=>{
-  const view=scroller.current;
-  if(!view)return;
-  const reduceMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  view.scrollTo({top:view.scrollHeight,behavior:reduceMotion?'auto':'smooth'});
+  // Scroll after the composer collapses, so long reports reveal the typing bubble.
+  const frameId=requestAnimationFrame(()=>{
+   const view=scroller.current;
+   if(!view)return;
+   const reduceMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+   view.scrollTo({top:view.scrollHeight,behavior:reduceMotion?'auto':'smooth'});
+  });
+  return()=>cancelAnimationFrame(frameId);
  },[items,pendingVisual,error,serviceType]);
  useEffect(()=>{if(input.current){input.current.style.height='auto';input.current.style.height=Math.min(176,input.current.scrollHeight)+'px';}},[draft]);
  function template(){
@@ -139,7 +143,7 @@ export function SharedReportPage(){
      </div>
      : <ChatTypingBubble insidePaddedViewport/>}
    </div>)}
-   {ready&&token&&reportActive&&<ReportServicePicker value={serviceType} onChange={v=>{setServiceType(v);pending.current=null;setError('');}}/>}
+   {ready&&token&&reportActive&&!busy&&<ReportServicePicker value={serviceType} onChange={v=>{setServiceType(v);pending.current=null;setError('');}}/>}
   </section>
   {error&&<div role="status" className="flex items-center gap-2 bg-white/90 px-4 py-2.5 text-xs leading-5 text-[#59646D]"><span className="flex-1">{error}</span><button type="button" aria-label="오류 안내 닫기" onClick={()=>setError('')}><RefreshCw size={15}/></button></div>}
   <footer className="shrink-0 bg-white px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-2.5">
