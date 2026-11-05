@@ -35,6 +35,7 @@ export interface HqPlaceSearchInputProps {
   icon?: 'mapPin' | 'flag';
   containerClassName?: string;
   heightClass?: string;
+  tone?: 'default' | 'neutral';
   disabled?: boolean;
   autoSearch?: boolean; // When true, runs search and expands candidates for AI-extracted values
   isConfirmed?: boolean;
@@ -51,11 +52,13 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
   icon = 'mapPin',
   containerClassName = '',
   heightClass = 'h-12',
+  tone = 'default',
   disabled = false,
   autoSearch = false,
   isConfirmed = false,
   onConfirmStateChange,
 }) => {
+  const isNeutral = tone === 'neutral';
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<PoiResult[]>([]);
@@ -238,14 +241,16 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
       )}
 
       <div
-        className={`w-full ${heightClass} bg-white border border-slate-200 hover:border-[#1E60F3]/60 focus-within:border-[#1E60F3] focus-within:ring-2 focus-within:ring-blue-100 rounded-xl px-3.5 flex items-center gap-2.5 transition-all shadow-2xs ${
-          disabled ? 'opacity-60 pointer-events-none' : ''
-        }`}
+        className={`w-full ${heightClass} bg-white border border-slate-200 rounded-xl px-3.5 flex items-center gap-2.5 transition-all ${
+          isNeutral
+            ? 'hover:border-slate-300 focus-within:border-slate-400 shadow-none'
+            : 'hover:border-[#1E60F3]/60 focus-within:border-[#1E60F3] focus-within:ring-2 focus-within:ring-blue-100 shadow-2xs'
+        } ${disabled ? 'opacity-60 pointer-events-none' : ''}`}
       >
         {icon === 'mapPin' ? (
-          <MapPin className="w-5 h-5 shrink-0 text-[#1E60F3]" />
+          <MapPin className={`w-5 h-5 shrink-0 ${isNeutral ? 'text-slate-400' : 'text-[#1E60F3]'}`} />
         ) : (
-          <Flag className="w-5 h-5 shrink-0 text-[#1E60F3]" />
+          <Flag className={`w-5 h-5 shrink-0 ${isNeutral ? 'text-slate-400' : 'text-[#1E60F3]'}`} />
         )}
 
         <input
@@ -265,11 +270,11 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
           }}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className="w-full bg-transparent text-sm font-semibold text-slate-900 placeholder:text-slate-400 outline-none"
+          className={`w-full bg-transparent text-sm text-slate-900 placeholder:text-slate-400 outline-none ${isNeutral ? 'font-medium' : 'font-semibold'}`}
         />
 
         {isSearching && (
-          <Loader2 className="w-4 h-4 text-[#1E60F3] animate-spin shrink-0" />
+          <Loader2 className={`w-4 h-4 animate-spin shrink-0 ${isNeutral ? 'text-slate-500' : 'text-[#1E60F3]'}`} />
         )}
 
         {value && !isSearching && !disabled && (
@@ -287,12 +292,12 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
       {/* TMAP POI Autocomplete Dropdown */}
       {isDropdownOpen && searchResults.length > 0 && (
         <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto divide-y divide-slate-100 overscroll-contain animate-in fade-in duration-150">
-          <div className="px-3 py-1.5 bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-500 flex items-center justify-between">
+          <div className={`px-3 py-1.5 bg-slate-50 border-b border-slate-100 text-[10px] text-slate-500 flex items-center justify-between ${isNeutral ? 'font-medium' : 'font-bold'}`}>
             <span className="flex items-center gap-1.5">
-              <Navigation className="w-3 h-3 text-[#1E60F3]" />
+              <Navigation className={`w-3 h-3 ${isNeutral ? 'text-slate-400' : 'text-[#1E60F3]'}`} />
               <span>TMAP 실시간 장소 검색 (후보 선택 시 좌표 확정)</span>
             </span>
-            <span className="text-blue-600 font-extrabold">{searchResults.length}건</span>
+            <span className={isNeutral ? 'text-slate-500 font-medium' : 'text-blue-600 font-extrabold'}>{searchResults.length}건</span>
           </div>
 
           {searchResults.map((poi, index) => {
@@ -304,16 +309,18 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
                 onClick={() => handleSelectPoi(poi)}
                 onMouseEnter={() => setHighlightedIndex(index)}
                 className={`w-full px-3.5 py-2.5 text-left transition-colors flex items-start gap-2.5 cursor-pointer ${
-                  isHighlighted ? 'bg-blue-50 text-[#1E60F3]' : 'hover:bg-slate-50 text-slate-900'
+                  isHighlighted
+                    ? (isNeutral ? 'bg-slate-100 text-slate-800' : 'bg-blue-50 text-[#1E60F3]')
+                    : 'hover:bg-slate-50 text-slate-900'
                 }`}
               >
                 <MapPin
                   className={`w-4 h-4 shrink-0 mt-0.5 ${
-                    isHighlighted ? 'text-[#1E60F3]' : 'text-slate-400'
+                    isHighlighted && !isNeutral ? 'text-[#1E60F3]' : 'text-slate-400'
                   }`}
                 />
                 <div className="min-w-0 flex-1">
-                  <div className="text-xs font-bold truncate">{poi.name}</div>
+                  <div className={`text-xs truncate ${isNeutral ? 'font-medium' : 'font-bold'}`}>{poi.name}</div>
                   <div className="text-[11px] text-slate-400 truncate mt-0.5">{poi.address}</div>
                 </div>
               </button>
