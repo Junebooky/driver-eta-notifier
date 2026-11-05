@@ -636,27 +636,27 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
             </div>
 
             {/* 블록 2: 배차 조건 요약 */}
-            <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200/80 space-y-2.5">
+            <div className="rounded-xl bg-slate-50/70 p-4 space-y-3">
               {/* 운행 기간 */}
-              <div className="flex items-center justify-between gap-2 text-xs">
-                <div className="flex items-center gap-2 text-slate-500 font-semibold shrink-0">
+              <div className="flex items-start justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2 text-slate-500 font-medium shrink-0">
                   <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
                   <span>운행 기간</span>
                 </div>
-                <div className="text-right font-extrabold text-slate-900 flex items-center gap-2">
+                <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 min-w-0 text-right font-semibold text-slate-800">
                   {hasMultipleDates ? (
                     <>
                       <span>
                         {uniqueDates[0]} ~ {uniqueDates[uniqueDates.length - 1]}
                       </span>
-                      <span className="px-2 py-0.5 rounded-md bg-blue-50 text-[#0050FF] text-[10px] font-black border border-blue-200/60">
+                      <span className="text-[11px] font-medium text-slate-500">
                         {uniqueDates.length}일간
                       </span>
                     </>
                   ) : (
                     <span>{pickupDate}</span>
                   )}
-                  <span className="inline-flex items-center gap-1 text-slate-600 font-bold ml-1">
+                  <span className="inline-flex items-center gap-1 text-slate-600 font-medium">
                     <Clock className="w-3.5 h-3.5 text-slate-400" />
                     <span>{pickupTime}</span>
                   </span>
@@ -664,59 +664,48 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
               </div>
 
               {/* 요청 차종 */}
-              <div className="flex items-center justify-between gap-2 text-xs pt-2 border-t border-slate-200/60">
-                <div className="flex items-center gap-2 text-slate-500 font-semibold shrink-0">
+              <div className="flex items-start justify-between gap-3 text-xs pt-3 border-t border-slate-200/40">
+                <div className="flex items-center gap-2 text-slate-500 font-medium shrink-0">
                   <Car className="w-4 h-4 text-slate-400 shrink-0" />
                   <span>요청 차종</span>
                 </div>
-                <div className="font-extrabold text-slate-900">
-                  <span className="px-2.5 py-0.5 rounded-md bg-blue-50 text-[#0050FF] border border-blue-200/80 text-xs font-black">
-                    {requestedVehicleClass}
-                  </span>
-                </div>
+                <span className="text-right font-semibold text-slate-800">
+                  {requestedVehicleClass}
+                </span>
               </div>
 
               {/* 항공편명 (정보 없음 ➔ 미정 출국 전 확인 필요) */}
-              <div className="flex items-center justify-between gap-2 text-xs pt-2 border-t border-slate-200/60">
-                <div className="flex items-center gap-2 text-slate-500 font-semibold shrink-0">
+              <div className="flex items-start justify-between gap-3 text-xs pt-3 border-t border-slate-200/40">
+                <div className="flex items-center gap-2 text-slate-500 font-medium shrink-0">
                   <Plane className="w-4 h-4 text-slate-400 shrink-0" />
                   <span>항공편명</span>
                 </div>
-                <div>
-                  {flightNumber ? (
-                    <span className="font-extrabold text-blue-600 font-mono">{flightNumber}</span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200/80 text-[11px] font-bold">
-                      미정 (출국 전 확인 필요)
-                    </span>
-                  )}
-                </div>
+                {flightNumber ? (
+                  <span className="text-right font-mono font-semibold text-slate-800">{flightNumber}</span>
+                ) : (
+                  <span className="text-right text-[11px] font-medium text-slate-600">
+                    미정 (출국 전 확인 필요)
+                  </span>
+                )}
               </div>
 
-              {/* 필수 조건 뱃지 (영어 가능 기사, 동일 기사 3일 전담) */}
-              <div className="flex items-start justify-between gap-2 text-xs pt-2 border-t border-slate-200/60">
-                <div className="text-slate-500 font-semibold shrink-0 mt-0.5">
+              {/* 필수 조건 (영어 가능 기사, 동일 기사 3일 전담) */}
+              <div className="flex items-start justify-between gap-3 text-xs pt-3 border-t border-slate-200/40">
+                <div className="text-slate-500 font-medium shrink-0">
                   <span>필수 조건</span>
                 </div>
-                <div className="flex items-center gap-1.5 justify-end flex-wrap">
+                <div className="flex flex-wrap justify-end gap-x-3 gap-y-1 min-w-0 text-right text-[11px] font-medium text-slate-700">
                   {isEnglishRequired && (
-                    <span className="px-2.5 py-0.5 rounded-md bg-blue-50 text-[#0050FF] border border-blue-200 font-black text-[11px] flex items-center gap-1">
-                      <span>🇺🇸</span>
-                      <span>영어 가능 기사</span>
-                    </span>
+                    <span>영어 가능 기사</span>
                   )}
                   {hasMultipleDates && (
-                    <span className="px-2.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 font-black text-[11px]">
-                      동일 기사 {uniqueDates.length}일 전담
-                    </span>
+                    <span>동일 기사 {uniqueDates.length}일 전담</span>
                   )}
                   {specialRequests && !specialRequests.includes('영어') && !specialRequests.includes('동일 기사') && (
-                    <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-[11px] font-bold">
-                      {specialRequests}
-                    </span>
+                    <span>{specialRequests}</span>
                   )}
                   {!isEnglishRequired && !hasMultipleDates && !specialRequests && (
-                    <span className="text-slate-400 text-[11px]">특이사항 없음</span>
+                    <span className="text-slate-400">특이사항 없음</span>
                   )}
                 </div>
               </div>
