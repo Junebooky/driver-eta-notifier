@@ -86,9 +86,12 @@ export const HqDrivingLogDetailPanel: React.FC<HqDrivingLogDetailPanelProps> = (
       {/* 1. Header with Title & Status Badge */}
       <div className="flex items-center justify-between pb-3 border-b border-slate-100">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#1E60F3] flex items-center justify-center shrink-0">
-            <Car className="w-4 h-4 stroke-[2.2]" />
-          </div>
+          <img
+            src="/images/icons/driving-logs/icon_driving_log.png"
+            alt="운행일지"
+            className="w-8 h-8 object-contain shrink-0 select-none"
+            draggable={false}
+          />
           <div>
             <h3 className="text-sm font-extrabold text-slate-900 tracking-tight">
               선택된 운행일지 상세 정보
