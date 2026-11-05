@@ -100,12 +100,12 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
           )}
         </div>
 
-        {/* Right Actions: Quick Calculator + Sync + Bell + Dev Switcher + Profile */}
+        {/* Right Actions: Quick Calculator + Bell + Sync + Dev Switcher + Profile */}
         <div className="flex items-center gap-1 sm:gap-2 shrink-0 ml-auto">
 
-          {/* Quick Quote Calculator Button (Ghost Style) */}
+          {/* Quick Quote Calculator Button (Ghost Style - visible on both Mobile & PC) */}
           {onOpenQuoteModal && (
-            <div className="relative group hidden sm:flex items-center">
+            <div className="relative group flex items-center">
               <button
                 type="button"
                 onClick={() => {
@@ -132,6 +132,38 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
             </div>
           )}
 
+          {/* Notifications Alarm (Ghost Style - placed before Refresh on both PC & Mobile) */}
+          <div className="relative group flex items-center">
+            <button
+              type="button"
+              onClick={() => {
+                haptics.lightTap();
+                onOpenNotifications?.();
+              }}
+              aria-label="배차 알림 열기"
+              className="w-10 h-10 flex items-center justify-center rounded-xl bg-transparent border-0 hover:bg-slate-100 active:bg-slate-200 active:scale-95 transition-all duration-150 cursor-pointer relative"
+              title="미배정 · 기사 미확인 · 재확인 필요 점검"
+            >
+              <img
+                src="/images/icons/alarm.png"
+                alt="알림"
+                className="w-7.5 h-7.5 object-contain shrink-0 transition-transform duration-150 group-hover:scale-110"
+              />
+              {unreadAlertsCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-rose-500 text-white rounded-full text-[9px] font-black flex items-center justify-center shadow-xs">
+                  {unreadAlertsCount > 99 ? '99+' : unreadAlertsCount}
+                </span>
+              )}
+            </button>
+
+            {/* Hover Tooltip: 배차 알림 */}
+            <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 hidden group-hover:flex flex-col items-center pointer-events-none z-50">
+              <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 shadow-xs" />
+              <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+                배차 알림
+              </span>
+            </div>
+          </div>
 
           {/* Live Server Sync Button (Ghost Style with Update Icon & Minute Pulse) */}
           {onRefresh && (
@@ -168,39 +200,6 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
               </div>
             </div>
           )}
-
-          {/* Notifications Alarm (Ghost Style) */}
-          <div className="relative group flex items-center">
-            <button
-              type="button"
-              onClick={() => {
-                haptics.lightTap();
-                onOpenNotifications?.();
-              }}
-              aria-label="배차 알림 열기"
-              className="w-10 h-10 flex items-center justify-center rounded-xl bg-transparent border-0 hover:bg-slate-100 active:bg-slate-200 active:scale-95 transition-all duration-150 cursor-pointer relative"
-              title="미배정 · 기사 미확인 · 재확인 필요 점검"
-            >
-              <img
-                src="/images/icons/alarm.png"
-                alt="알림"
-                className="w-7.5 h-7.5 object-contain shrink-0 transition-transform duration-150 group-hover:scale-110"
-              />
-              {unreadAlertsCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 bg-rose-500 text-white rounded-full text-[9px] font-black flex items-center justify-center shadow-xs">
-                  {unreadAlertsCount > 99 ? '99+' : unreadAlertsCount}
-                </span>
-              )}
-            </button>
-
-            {/* Hover Tooltip: 배차 알림 */}
-            <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 hidden group-hover:flex flex-col items-center pointer-events-none z-50">
-              <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 shadow-xs" />
-              <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
-                배차 알림
-              </span>
-            </div>
-          </div>
 
           {/* Dev Test Account Switcher (only renders on localhost with DEV_AUTH_ENABLED) */}
           <DevAuthSwitcher />

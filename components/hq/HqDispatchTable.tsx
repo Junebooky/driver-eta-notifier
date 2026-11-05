@@ -23,6 +23,7 @@ import {
   ChevronDown,
   History,
   X,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { HqMobileBookingList } from './HqMobileBookingList';
 import { getDriverProfileImage } from './HqQuickDispatch';
@@ -76,11 +77,18 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
   const [driverFilter, setDriverFilter] = useState('all');
   const [vehicleFilter, setVehicleFilter] = useState('all');
   const [customerFilter, setCustomerFilter] = useState('all');
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<'status' | 'driver' | 'vehicle' | 'customer' | null>(null);
   const [dropdownSearch, setDropdownSearch] = useState('');
   const filterRowRef = useRef<HTMLDivElement>(null);
   const [remindingId, setRemindingId] = useState<string | null>(null);
   const [dispatchIconError, setDispatchIconError] = useState(false);
+
+  const hasActiveFilter =
+    statusFilter !== 'all' ||
+    driverFilter !== 'all' ||
+    vehicleFilter !== 'all' ||
+    customerFilter !== 'all';
 
   const toggleDropdown = (key: 'status' | 'driver' | 'vehicle' | 'customer') => {
     haptics.lightTap();
@@ -482,7 +490,7 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
 
       {/* 2. Operational Tabs (Horizontal Scroll Chip Rail on Mobile / Split End on Desktop) */}
       <div
-        className="pt-3.5 pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 flex items-center flex-nowrap gap-2 overflow-x-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+        className="pt-3.5 pb-1 -mx-4 px-4 sm:mx-0 sm:px-0 flex items-center flex-nowrap gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
         {/* 1) 전체 예정 (기본 Active 탭, 맨 좌측 배치) */}
@@ -492,19 +500,14 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
             haptics.lightTap();
             onSelectTab('all');
           }}
-          className={`rounded-full px-4 py-2 text-sm transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${activeTab === 'all'
-            ? 'bg-[#0050FF] text-white font-bold shadow-sm'
-            : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium'
-            }`}
+          className={`rounded-full px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
+            activeTab === 'all'
+              ? 'bg-[#0050FF] text-white font-bold shadow-sm'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium'
+          }`}
           title="오늘 및 향후 모든 배차 일정"
         >
           <span>전체 예정</span>
-          <span
-            className={`px-2 py-0.5 rounded-full text-xs font-bold leading-none ${activeTab === 'all' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
-              }`}
-          >
-            {tabCounts.all}
-          </span>
         </button>
 
         {/* 2) 오늘 출발 */}
@@ -514,18 +517,13 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
             haptics.lightTap();
             onSelectTab('today');
           }}
-          className={`rounded-full px-4 py-2 text-sm transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${activeTab === 'today'
-            ? 'bg-[#0050FF] text-white font-bold shadow-sm'
-            : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium'
-            }`}
+          className={`rounded-full px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
+            activeTab === 'today'
+              ? 'bg-[#0050FF] text-white font-bold shadow-sm'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium'
+          }`}
         >
           <span>오늘 출발</span>
-          <span
-            className={`px-2 py-0.5 rounded-full text-xs font-bold leading-none ${activeTab === 'today' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
-              }`}
-          >
-            {tabCounts.today}
-          </span>
         </button>
 
         {/* 3) 내일 출발 */}
@@ -535,43 +533,31 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
             haptics.lightTap();
             onSelectTab('tomorrow');
           }}
-          className={`rounded-full px-4 py-2 text-sm transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${activeTab === 'tomorrow'
-            ? 'bg-[#0050FF] text-white font-bold shadow-sm'
-            : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium'
-            }`}
+          className={`rounded-full px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
+            activeTab === 'tomorrow'
+              ? 'bg-[#0050FF] text-white font-bold shadow-sm'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium'
+          }`}
         >
           <span>내일 출발</span>
-          <span
-            className={`px-2 py-0.5 rounded-full text-xs font-bold leading-none ${activeTab === 'tomorrow' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
-              }`}
-          >
-            {tabCounts.tomorrow}
-          </span>
         </button>
 
-        {/* 4) 확인 필요 (1건 이상일 때 경고 틴트 뱃지 적용) */}
+        {/* 4) 확인 필요 */}
         <button
           type="button"
           onClick={() => {
             haptics.lightTap();
             onSelectTab('action');
           }}
-          className={`rounded-full px-4 py-2 text-sm transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${activeTab === 'action'
-            ? 'bg-[#0050FF] text-white font-bold shadow-sm'
-            : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium'
-            }`}
+          className={`rounded-full px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
+            activeTab === 'action'
+              ? 'bg-[#0050FF] text-white font-bold shadow-sm'
+              : tabCounts.action > 0
+                ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100/70 font-semibold'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium'
+          }`}
         >
           <span>확인 필요</span>
-          <span
-            className={`px-2 py-0.5 rounded-full text-xs font-bold leading-none ${activeTab === 'action'
-              ? 'bg-white/20 text-white'
-              : tabCounts.action > 0
-                ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                : 'bg-slate-200/80 text-slate-700'
-              }`}
-          >
-            {tabCounts.action}
-          </span>
         </button>
 
         {/* 5) 지난 일정 (모바일에서는 5번째 인라인 스크롤 칩, 데스크톱 md 이상에서는 우측 끝 정렬) */}
@@ -581,20 +567,15 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
             haptics.lightTap();
             onSelectTab('past');
           }}
-          className={`md:ml-auto rounded-full px-4 py-2 text-sm transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${activeTab === 'past'
-            ? 'bg-[#0050FF] text-white font-bold shadow-sm'
-            : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium'
-            }`}
+          className={`md:ml-auto rounded-full px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
+            activeTab === 'past'
+              ? 'bg-[#0050FF] text-white font-bold shadow-sm'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium'
+          }`}
           title="출발 일시가 오늘 이전인 과거 배차 기록 (정산용 데이터 보존)"
         >
           <History className="w-3.5 h-3.5 shrink-0" />
           <span>지난 일정</span>
-          <span
-            className={`px-2 py-0.5 rounded-full text-xs font-bold leading-none ${activeTab === 'past' ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-700'
-              }`}
-          >
-            {tabCounts.past}
-          </span>
         </button>
       </div>
 
@@ -617,454 +598,552 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
         </div>
       )}
 
-      {/* 3. Filter Row (Responsive Mobile + Smooth White Card Dropdowns, never floats over modals) */}
-      <div
-        ref={filterRowRef}
-        className={`pt-3 pb-2 flex flex-col lg:flex-row lg:items-center gap-2 text-xs relative ${openDropdown ? 'z-20' : 'z-0'
-          }`}
-      >
-        {/* Search Input (Full width on mobile so placeholder never truncates) */}
-        <div className="relative w-full lg:flex-1 lg:min-w-[220px]">
+      {/* 3. Search Bar (White Background) + Filter Icon Button */}
+      <div className="pt-3 pb-2 flex items-center gap-2 text-xs">
+        <div className="relative flex-1 min-w-0">
           <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="고객사, 승객명, 목적지로 찾아보세요"
-            className="w-full pl-9 pr-3.5 py-2 bg-slate-50/90 border border-slate-200/90 rounded-xl text-slate-800 placeholder:text-slate-400 font-semibold focus:outline-none focus:bg-white focus:border-[#1E60F3] focus:ring-2 focus:ring-[#1E60F3]/15 transition-all"
+            className="w-full pl-9 pr-3.5 py-2.5 bg-white border border-slate-200/90 rounded-2xl text-slate-800 placeholder:text-slate-400 font-semibold shadow-2xs focus:outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-[#1E60F3]/15 transition-all"
           />
         </div>
 
-        {/* Filter Buttons Grid on Mobile / Flex Row on Desktop */}
-        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full lg:w-auto">
-          {/* 3-1. 전체 상태 드롭다운 */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => toggleDropdown('status')}
-              className={`w-full sm:w-auto min-w-[116px] px-3 py-2 rounded-xl border font-bold flex items-center justify-between gap-2 transition-all cursor-pointer shadow-2xs ${statusFilter !== 'all' || openDropdown === 'status'
-                ? 'bg-[#EBF3FF]/60 border-[#1E60F3]/40 text-[#1E60F3]'
-                : 'bg-white border-slate-200/90 hover:border-slate-300 text-slate-700'
-                }`}
-            >
-              <span className="truncate">{selectedStatusLabel}</span>
-              <ChevronDown
-                className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${openDropdown === 'status' ? 'rotate-180 text-[#1E60F3]' : 'text-slate-400'
-                  }`}
-              />
-            </button>
-
-            {openDropdown === 'status' && (
-              <div className="absolute left-0 top-full mt-1.5 w-[220px] sm:w-[235px] bg-white rounded-2xl border border-slate-200/90 shadow-[0_16px_40px_rgba(15,23,42,0.14)] p-2 z-30 animate-in fade-in zoom-in-95 duration-150">
-                <div className="pb-2 mb-1 border-b border-slate-100">
-                  <div className="relative">
-                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    <input
-                      type="text"
-                      value={dropdownSearch}
-                      onChange={(e) => setDropdownSearch(e.target.value)}
-                      placeholder="상태 검색..."
-                      autoFocus
-                      className="w-full pl-8 pr-7 py-1.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] focus:bg-white"
-                    />
-                    {dropdownSearch && (
-                      <button
-                        type="button"
-                        onClick={() => setDropdownSearch('')}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <div className="max-h-[250px] overflow-y-auto space-y-1">
-                  {filteredStatusOptions.length === 0 ? (
-                    <div className="py-5 text-center text-xs font-medium text-slate-400">
-                      검색 결과가 없습니다
-                    </div>
-                  ) : (
-                    filteredStatusOptions.map((opt) => {
-                      const isSelected = statusFilter === opt.value;
-                      return (
-                        <button
-                          key={opt.value}
-                          type="button"
-                          onClick={() => {
-                            haptics.lightTap();
-                            setStatusFilter(opt.value);
-                            setOpenDropdown(null);
-                            setDropdownSearch('');
-                          }}
-                          className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${isSelected
-                            ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
-                            : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
-                            }`}
-                        >
-                          <span className="flex items-center gap-2 truncate">
-                            <span className={`w-2 h-2 rounded-full shrink-0 ${opt.dotClass}`} />
-                            <span className="truncate">{opt.label}</span>
-                          </span>
-                          {isSelected && <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />}
-                        </button>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* 3-2. 전체 기사 드롭다운 (기사 관리 DB 1:1 연동 + 검색 + 프로필 사진) */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => toggleDropdown('driver')}
-              className={`w-full sm:w-auto min-w-[120px] px-3 py-2 rounded-xl border font-bold flex items-center justify-between gap-2 transition-all cursor-pointer shadow-2xs ${driverFilter !== 'all' || openDropdown === 'driver'
-                ? 'bg-[#EBF3FF]/60 border-[#1E60F3]/40 text-[#1E60F3]'
-                : 'bg-white border-slate-200/90 hover:border-slate-300 text-slate-700'
-                }`}
-            >
-              <span className="flex items-center gap-1.5 truncate">
-                {driverFilter !== 'all' && (
-                  <img
-                    src={
-                      selectedDriverObj?.avatarUrl ||
-                      getDriverProfileImage(selectedDriverObj || { name: driverFilter })
-                    }
-                    alt={driverFilter}
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).src = '/images/driver_kim.png';
-                    }}
-                    className="w-4 h-4 rounded-full object-cover border border-slate-200 shrink-0"
-                  />
-                )}
-                <span className="truncate">
-                  {driverFilter === 'all' ? '전체 기사' : `${driverFilter} 기사`}
-                </span>
-              </span>
-              <ChevronDown
-                className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${openDropdown === 'driver' ? 'rotate-180 text-[#1E60F3]' : 'text-slate-400'
-                  }`}
-              />
-            </button>
-
-            {openDropdown === 'driver' && (
-              <div className="absolute right-0 sm:left-0 sm:right-auto top-full mt-1.5 w-[240px] sm:w-[255px] bg-white rounded-2xl border border-slate-200/90 shadow-[0_16px_40px_rgba(15,23,42,0.14)] p-2 z-30 animate-in fade-in zoom-in-95 duration-150">
-                <div className="pb-2 mb-1 border-b border-slate-100">
-                  <div className="relative">
-                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    <input
-                      type="text"
-                      value={dropdownSearch}
-                      onChange={(e) => setDropdownSearch(e.target.value)}
-                      placeholder="기사명 또는 연락처 검색..."
-                      autoFocus
-                      className="w-full pl-8 pr-7 py-1.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] focus:bg-white"
-                    />
-                    {dropdownSearch && (
-                      <button
-                        type="button"
-                        onClick={() => setDropdownSearch('')}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <div className="max-h-[260px] overflow-y-auto space-y-1">
-                  {!dropdownSearch.trim() && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        haptics.lightTap();
-                        setDriverFilter('all');
-                        setOpenDropdown(null);
-                        setDropdownSearch('');
-                      }}
-                      className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${driverFilter === 'all'
-                        ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
-                        : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
-                        }`}
-                    >
-                      <span>전체 기사</span>
-                      {driverFilter === 'all' && (
-                        <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />
-                      )}
-                    </button>
-                  )}
-                  {filteredDriverOptions.length === 0 ? (
-                    <div className="py-5 text-center text-xs font-medium text-slate-400">
-                      일치하는 기사님이 없습니다
-                    </div>
-                  ) : (
-                    filteredDriverOptions.map((name) => {
-                      const isSelected = driverFilter === name;
-                      const drvObj = hqDrivers.find(
-                        (d) => (d.name || '').replace(/\s*기사$/, '').trim() === name
-                      );
-                      const isEmployed = drvObj ? drvObj.affiliationType === 'employed' : true;
-                      const avatarSrc =
-                        drvObj?.avatarUrl || getDriverProfileImage(drvObj || { name });
-                      return (
-                        <button
-                          key={name}
-                          type="button"
-                          onClick={() => {
-                            haptics.lightTap();
-                            setDriverFilter(name);
-                            setOpenDropdown(null);
-                            setDropdownSearch('');
-                          }}
-                          className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${isSelected
-                            ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
-                            : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
-                            }`}
-                        >
-                          <span className="flex items-center gap-2 min-w-0">
-                            <img
-                              src={avatarSrc}
-                              alt={name}
-                              onError={(e) => {
-                                (e.currentTarget as HTMLImageElement).src = '/images/driver_kim.png';
-                              }}
-                              className="w-6 h-6 rounded-full object-cover border border-slate-200/90 bg-slate-100 shrink-0 shadow-2xs"
-                            />
-                            <span className="truncate font-extrabold text-slate-900">
-                              {name} 기사
-                            </span>
-                            {drvObj && (
-                              <span
-                                className={`px-1.5 py-0.5 rounded-md text-[10px] font-extrabold shrink-0 ${isEmployed
-                                  ? 'bg-blue-50 text-[#1E60F3]'
-                                  : 'bg-slate-100 text-slate-500'
-                                  }`}
-                              >
-                                {isEmployed ? '소속' : '프리랜서'}
-                              </span>
-                            )}
-                          </span>
-                          {isSelected && <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />}
-                        </button>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* 3-3. 전체 차량 드롭다운 (차량 관리 1:1 연동 + 검색) */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => toggleDropdown('vehicle')}
-              className={`w-full sm:w-auto min-w-[124px] sm:max-w-[180px] px-3 py-2 rounded-xl border font-bold flex items-center justify-between gap-2 transition-all cursor-pointer shadow-2xs ${vehicleFilter !== 'all' || openDropdown === 'vehicle'
-                ? 'bg-[#EBF3FF]/60 border-[#1E60F3]/40 text-[#1E60F3]'
-                : 'bg-white border-slate-200/90 hover:border-slate-300 text-slate-700'
-                }`}
-            >
-              <span className="truncate">{selectedVehicleLabel}</span>
-              <ChevronDown
-                className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${openDropdown === 'vehicle' ? 'rotate-180 text-[#1E60F3]' : 'text-slate-400'
-                  }`}
-              />
-            </button>
-
-            {openDropdown === 'vehicle' && (
-              <div className="absolute left-0 top-full mt-1.5 w-[245px] sm:w-[260px] bg-white rounded-2xl border border-slate-200/90 shadow-[0_16px_40px_rgba(15,23,42,0.14)] p-2 z-30 animate-in fade-in zoom-in-95 duration-150">
-                <div className="pb-2 mb-1 border-b border-slate-100">
-                  <div className="relative">
-                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    <input
-                      type="text"
-                      value={dropdownSearch}
-                      onChange={(e) => setDropdownSearch(e.target.value)}
-                      placeholder="차량번호 또는 차종 검색..."
-                      autoFocus
-                      className="w-full pl-8 pr-7 py-1.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] focus:bg-white"
-                    />
-                    {dropdownSearch && (
-                      <button
-                        type="button"
-                        onClick={() => setDropdownSearch('')}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <div className="max-h-[260px] overflow-y-auto space-y-1">
-                  {!dropdownSearch.trim() && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        haptics.lightTap();
-                        setVehicleFilter('all');
-                        setOpenDropdown(null);
-                        setDropdownSearch('');
-                      }}
-                      className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${vehicleFilter === 'all'
-                        ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
-                        : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
-                        }`}
-                    >
-                      <span>전체 차량</span>
-                      {vehicleFilter === 'all' && (
-                        <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />
-                      )}
-                    </button>
-                  )}
-                  {filteredVehicleOptions.length === 0 ? (
-                    <div className="py-5 text-center text-xs font-medium text-slate-400">
-                      일치하는 차량이 없습니다
-                    </div>
-                  ) : (
-                    filteredVehicleOptions.map((v) => {
-                      const isSelected = vehicleFilter === v.plate;
-                      return (
-                        <button
-                          key={v.id}
-                          type="button"
-                          onClick={() => {
-                            haptics.lightTap();
-                            setVehicleFilter(v.plate);
-                            setOpenDropdown(null);
-                            setDropdownSearch('');
-                          }}
-                          className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${isSelected
-                            ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
-                            : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
-                            }`}
-                        >
-                          <span className="flex flex-col min-w-0">
-                            <span className="truncate font-extrabold text-slate-900">
-                              {v.plate}
-                            </span>
-                            <span className="truncate text-[11px] font-medium text-slate-500">
-                              {v.modelShort}
-                            </span>
-                          </span>
-                          {isSelected && <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />}
-                        </button>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* 3-4. 전체 고객사 드롭다운 (고객 관리 DB 1:1 연동 + 검색) */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => toggleDropdown('customer')}
-              className={`w-full sm:w-auto min-w-[120px] sm:max-w-[170px] px-3 py-2 rounded-xl border font-bold flex items-center justify-between gap-2 transition-all cursor-pointer shadow-2xs ${customerFilter !== 'all' || openDropdown === 'customer'
-                ? 'bg-[#EBF3FF]/60 border-[#1E60F3]/40 text-[#1E60F3]'
-                : 'bg-white border-slate-200/90 hover:border-slate-300 text-slate-700'
-                }`}
-            >
-              <span className="truncate">
-                {customerFilter === 'all' ? '전체 고객사' : customerFilter}
-              </span>
-              <ChevronDown
-                className={`w-3.5 h-3.5 shrink-0 transition-transform duration-200 ${openDropdown === 'customer' ? 'rotate-180 text-[#1E60F3]' : 'text-slate-400'
-                  }`}
-              />
-            </button>
-
-            {openDropdown === 'customer' && (
-              <div className="absolute right-0 sm:left-0 sm:right-auto top-full mt-1.5 w-[235px] sm:w-[250px] bg-white rounded-2xl border border-slate-200/90 shadow-[0_16px_40px_rgba(15,23,42,0.14)] p-2 z-30 animate-in fade-in zoom-in-95 duration-150">
-                <div className="pb-2 mb-1 border-b border-slate-100">
-                  <div className="relative">
-                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    <input
-                      type="text"
-                      value={dropdownSearch}
-                      onChange={(e) => setDropdownSearch(e.target.value)}
-                      placeholder="고객사명 검색..."
-                      autoFocus
-                      className="w-full pl-8 pr-7 py-1.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] focus:bg-white"
-                    />
-                    {dropdownSearch && (
-                      <button
-                        type="button"
-                        onClick={() => setDropdownSearch('')}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <div className="max-h-[260px] overflow-y-auto space-y-1">
-                  {!dropdownSearch.trim() && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        haptics.lightTap();
-                        setCustomerFilter('all');
-                        setOpenDropdown(null);
-                        setDropdownSearch('');
-                      }}
-                      className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${customerFilter === 'all'
-                        ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
-                        : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
-                        }`}
-                    >
-                      <span>전체 고객사</span>
-                      {customerFilter === 'all' && (
-                        <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />
-                      )}
-                    </button>
-                  )}
-                  {filteredCustomerOptions.length === 0 ? (
-                    <div className="py-5 text-center text-xs font-medium text-slate-400">
-                      일치하는 고객사가 없습니다
-                    </div>
-                  ) : (
-                    filteredCustomerOptions.map((c) => {
-                      const isSelected = customerFilter === c;
-                      return (
-                        <button
-                          key={c}
-                          type="button"
-                          onClick={() => {
-                            haptics.lightTap();
-                            setCustomerFilter(c);
-                            setOpenDropdown(null);
-                            setDropdownSearch('');
-                          }}
-                          className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${isSelected
-                            ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
-                            : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
-                            }`}
-                        >
-                          <span className="truncate">{c}</span>
-                          {isSelected && <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />}
-                        </button>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* 3-5. 초기화 버튼 */}
-          <button
-            type="button"
-            onClick={handleResetFilters}
-            className="col-span-2 sm:col-span-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200/90 text-slate-600 rounded-xl font-bold transition-all cursor-pointer active:scale-95"
-          >
-            <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
-            <span>초기화</span>
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => {
+            haptics.lightTap();
+            setOpenDropdown(null);
+            setDropdownSearch('');
+            setIsFilterModalOpen(true);
+          }}
+          aria-label="배차 필터 열기"
+          title="배차 필터"
+          className={`w-10 h-10 rounded-2xl border flex items-center justify-center shrink-0 transition-all cursor-pointer shadow-2xs relative ${
+            hasActiveFilter
+              ? 'bg-[#EBF3FF]/80 border-[#1E60F3]/40 text-[#1E60F3]'
+              : 'bg-white border-slate-200/90 hover:border-slate-300 text-slate-700 hover:bg-slate-50'
+          }`}
+        >
+          <SlidersHorizontal className="w-4 h-4" />
+          {hasActiveFilter && (
+            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#1E60F3] ring-2 ring-white" />
+          )}
+        </button>
       </div>
+
+      {/* Filter Modal (Opens when clicking the SlidersHorizontal filter icon button) */}
+      {isFilterModalOpen && (
+        <div
+          className="fixed inset-0 z-[120] bg-slate-900/40 backdrop-blur-[2px] flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => {
+            setIsFilterModalOpen(false);
+            setOpenDropdown(null);
+            setDropdownSearch('');
+          }}
+        >
+          <div
+            ref={filterRowRef}
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-3xl border border-slate-200/90 shadow-[0_24px_60px_rgba(15,23,42,0.18)] w-full max-w-md p-5 space-y-4 animate-in zoom-in-95 duration-150"
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#1E60F3] flex items-center justify-center">
+                  <SlidersHorizontal className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900">배차 조건 필터</h3>
+                  <p className="text-[11px] text-slate-400 font-medium">
+                    상태, 기사, 차량, 고객사별로 일정을 빠르게 좁혀보세요
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.lightTap();
+                  setIsFilterModalOpen(false);
+                  setOpenDropdown(null);
+                  setDropdownSearch('');
+                }}
+                className="w-8 h-8 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
+                aria-label="필터 닫기"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* 4 Filter Selectors inside Modal */}
+            <div className="space-y-3 text-xs">
+              {/* 3-1. 전체 상태 드롭다운 */}
+              <div className="relative">
+                <label className="block text-[11px] font-bold text-slate-500 mb-1">배차 상태</label>
+                <button
+                  type="button"
+                  onClick={() => toggleDropdown('status')}
+                  className={`w-full px-3.5 py-2.5 rounded-xl border font-bold flex items-center justify-between gap-2 transition-all cursor-pointer shadow-2xs ${
+                    statusFilter !== 'all' || openDropdown === 'status'
+                      ? 'bg-[#EBF3FF]/60 border-[#1E60F3]/40 text-[#1E60F3]'
+                      : 'bg-white border-slate-200/90 hover:border-slate-300 text-slate-700'
+                  }`}
+                >
+                  <span className="truncate">{selectedStatusLabel}</span>
+                  <ChevronDown
+                    className={`w-4 h-4 shrink-0 transition-transform duration-200 ${
+                      openDropdown === 'status' ? 'rotate-180 text-[#1E60F3]' : 'text-slate-400'
+                    }`}
+                  />
+                </button>
+
+                {openDropdown === 'status' && (
+                  <div className="mt-1.5 w-full bg-white rounded-2xl border border-slate-200/90 shadow-lg p-2 z-30 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="pb-2 mb-1 border-b border-slate-100">
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <input
+                          type="text"
+                          value={dropdownSearch}
+                          onChange={(e) => setDropdownSearch(e.target.value)}
+                          placeholder="상태 검색..."
+                          autoFocus
+                          className="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3]"
+                        />
+                        {dropdownSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setDropdownSearch('')}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="max-h-[200px] overflow-y-auto space-y-1">
+                      {filteredStatusOptions.length === 0 ? (
+                        <div className="py-4 text-center text-xs font-medium text-slate-400">
+                          검색 결과가 없습니다
+                        </div>
+                      ) : (
+                        filteredStatusOptions.map((opt) => {
+                          const isSelected = statusFilter === opt.value;
+                          return (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() => {
+                                haptics.lightTap();
+                                setStatusFilter(opt.value);
+                                setOpenDropdown(null);
+                                setDropdownSearch('');
+                              }}
+                              className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
+                                isSelected
+                                  ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
+                                  : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
+                              }`}
+                            >
+                              <span className="flex items-center gap-2 truncate">
+                                <span className={`w-2 h-2 rounded-full shrink-0 ${opt.dotClass}`} />
+                                <span className="truncate">{opt.label}</span>
+                              </span>
+                              {isSelected && (
+                                <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />
+                              )}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 3-2. 전체 기사 드롭다운 (기사 관리 DB 1:1 연동 + 검색 + 프로필 사진) */}
+              <div className="relative">
+                <label className="block text-[11px] font-bold text-slate-500 mb-1">담당 기사</label>
+                <button
+                  type="button"
+                  onClick={() => toggleDropdown('driver')}
+                  className={`w-full px-3.5 py-2.5 rounded-xl border font-bold flex items-center justify-between gap-2 transition-all cursor-pointer shadow-2xs ${
+                    driverFilter !== 'all' || openDropdown === 'driver'
+                      ? 'bg-[#EBF3FF]/60 border-[#1E60F3]/40 text-[#1E60F3]'
+                      : 'bg-white border-slate-200/90 hover:border-slate-300 text-slate-700'
+                  }`}
+                >
+                  <span className="flex items-center gap-2 truncate">
+                    {driverFilter !== 'all' && (
+                      <img
+                        src={
+                          selectedDriverObj?.avatarUrl ||
+                          getDriverProfileImage(selectedDriverObj || { name: driverFilter })
+                        }
+                        alt={driverFilter}
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).src = '/images/driver_kim.png';
+                        }}
+                        className="w-5 h-5 rounded-full object-cover border border-slate-200 shrink-0"
+                      />
+                    )}
+                    <span className="truncate">
+                      {driverFilter === 'all' ? '전체 기사' : `${driverFilter} 기사`}
+                    </span>
+                  </span>
+                  <ChevronDown
+                    className={`w-4 h-4 shrink-0 transition-transform duration-200 ${
+                      openDropdown === 'driver' ? 'rotate-180 text-[#1E60F3]' : 'text-slate-400'
+                    }`}
+                  />
+                </button>
+
+                {openDropdown === 'driver' && (
+                  <div className="mt-1.5 w-full bg-white rounded-2xl border border-slate-200/90 shadow-lg p-2 z-30 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="pb-2 mb-1 border-b border-slate-100">
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <input
+                          type="text"
+                          value={dropdownSearch}
+                          onChange={(e) => setDropdownSearch(e.target.value)}
+                          placeholder="기사명 또는 연락처 검색..."
+                          autoFocus
+                          className="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3]"
+                        />
+                        {dropdownSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setDropdownSearch('')}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="max-h-[210px] overflow-y-auto space-y-1">
+                      {!dropdownSearch.trim() && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            haptics.lightTap();
+                            setDriverFilter('all');
+                            setOpenDropdown(null);
+                            setDropdownSearch('');
+                          }}
+                          className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
+                            driverFilter === 'all'
+                              ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
+                              : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
+                          }`}
+                        >
+                          <span>전체 기사</span>
+                          {driverFilter === 'all' && (
+                            <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />
+                          )}
+                        </button>
+                      )}
+                      {filteredDriverOptions.length === 0 ? (
+                        <div className="py-4 text-center text-xs font-medium text-slate-400">
+                          일치하는 기사님이 없습니다
+                        </div>
+                      ) : (
+                        filteredDriverOptions.map((name) => {
+                          const isSelected = driverFilter === name;
+                          const drvObj = hqDrivers.find(
+                            (d) => (d.name || '').replace(/\s*기사$/, '').trim() === name
+                          );
+                          const isEmployed = drvObj ? drvObj.affiliationType === 'employed' : true;
+                          const avatarSrc =
+                            drvObj?.avatarUrl || getDriverProfileImage(drvObj || { name });
+                          return (
+                            <button
+                              key={name}
+                              type="button"
+                              onClick={() => {
+                                haptics.lightTap();
+                                setDriverFilter(name);
+                                setOpenDropdown(null);
+                                setDropdownSearch('');
+                              }}
+                              className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
+                                isSelected
+                                  ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
+                                  : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
+                              }`}
+                            >
+                              <span className="flex items-center gap-2 min-w-0">
+                                <img
+                                  src={avatarSrc}
+                                  alt={name}
+                                  onError={(e) => {
+                                    (e.currentTarget as HTMLImageElement).src =
+                                      '/images/driver_kim.png';
+                                  }}
+                                  className="w-6 h-6 rounded-full object-cover border border-slate-200/90 bg-slate-100 shrink-0 shadow-2xs"
+                                />
+                                <span className="truncate font-extrabold text-slate-900">
+                                  {name} 기사
+                                </span>
+                                {drvObj && (
+                                  <span
+                                    className={`px-1.5 py-0.5 rounded-md text-[10px] font-extrabold shrink-0 ${
+                                      isEmployed
+                                        ? 'bg-blue-50 text-[#1E60F3]'
+                                        : 'bg-slate-100 text-slate-500'
+                                    }`}
+                                  >
+                                    {isEmployed ? '소속' : '프리랜서'}
+                                  </span>
+                                )}
+                              </span>
+                              {isSelected && (
+                                <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />
+                              )}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 3-3. 전체 차량 드롭다운 (차량 관리 1:1 연동 + 검색) */}
+              <div className="relative">
+                <label className="block text-[11px] font-bold text-slate-500 mb-1">배정 차량</label>
+                <button
+                  type="button"
+                  onClick={() => toggleDropdown('vehicle')}
+                  className={`w-full px-3.5 py-2.5 rounded-xl border font-bold flex items-center justify-between gap-2 transition-all cursor-pointer shadow-2xs ${
+                    vehicleFilter !== 'all' || openDropdown === 'vehicle'
+                      ? 'bg-[#EBF3FF]/60 border-[#1E60F3]/40 text-[#1E60F3]'
+                      : 'bg-white border-slate-200/90 hover:border-slate-300 text-slate-700'
+                  }`}
+                >
+                  <span className="truncate">{selectedVehicleLabel}</span>
+                  <ChevronDown
+                    className={`w-4 h-4 shrink-0 transition-transform duration-200 ${
+                      openDropdown === 'vehicle' ? 'rotate-180 text-[#1E60F3]' : 'text-slate-400'
+                    }`}
+                  />
+                </button>
+
+                {openDropdown === 'vehicle' && (
+                  <div className="mt-1.5 w-full bg-white rounded-2xl border border-slate-200/90 shadow-lg p-2 z-30 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="pb-2 mb-1 border-b border-slate-100">
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <input
+                          type="text"
+                          value={dropdownSearch}
+                          onChange={(e) => setDropdownSearch(e.target.value)}
+                          placeholder="차량번호 또는 차종 검색..."
+                          autoFocus
+                          className="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3]"
+                        />
+                        {dropdownSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setDropdownSearch('')}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="max-h-[210px] overflow-y-auto space-y-1">
+                      {!dropdownSearch.trim() && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            haptics.lightTap();
+                            setVehicleFilter('all');
+                            setOpenDropdown(null);
+                            setDropdownSearch('');
+                          }}
+                          className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
+                            vehicleFilter === 'all'
+                              ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
+                              : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
+                          }`}
+                        >
+                          <span>전체 차량</span>
+                          {vehicleFilter === 'all' && (
+                            <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />
+                          )}
+                        </button>
+                      )}
+                      {filteredVehicleOptions.length === 0 ? (
+                        <div className="py-4 text-center text-xs font-medium text-slate-400">
+                          일치하는 차량이 없습니다
+                        </div>
+                      ) : (
+                        filteredVehicleOptions.map((v) => {
+                          const isSelected = vehicleFilter === v.plate;
+                          return (
+                            <button
+                              key={v.id}
+                              type="button"
+                              onClick={() => {
+                                haptics.lightTap();
+                                setVehicleFilter(v.plate);
+                                setOpenDropdown(null);
+                                setDropdownSearch('');
+                              }}
+                              className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
+                                isSelected
+                                  ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
+                                  : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
+                              }`}
+                            >
+                              <span className="flex flex-col min-w-0">
+                                <span className="truncate font-extrabold text-slate-900">
+                                  {v.plate}
+                                </span>
+                                <span className="truncate text-[11px] font-medium text-slate-500">
+                                  {v.modelShort}
+                                </span>
+                              </span>
+                              {isSelected && (
+                                <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />
+                              )}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 3-4. 전체 고객사 드롭다운 (고객 관리 DB 1:1 연동 + 검색) */}
+              <div className="relative">
+                <label className="block text-[11px] font-bold text-slate-500 mb-1">고객사</label>
+                <button
+                  type="button"
+                  onClick={() => toggleDropdown('customer')}
+                  className={`w-full px-3.5 py-2.5 rounded-xl border font-bold flex items-center justify-between gap-2 transition-all cursor-pointer shadow-2xs ${
+                    customerFilter !== 'all' || openDropdown === 'customer'
+                      ? 'bg-[#EBF3FF]/60 border-[#1E60F3]/40 text-[#1E60F3]'
+                      : 'bg-white border-slate-200/90 hover:border-slate-300 text-slate-700'
+                  }`}
+                >
+                  <span className="truncate">
+                    {customerFilter === 'all' ? '전체 고객사' : customerFilter}
+                  </span>
+                  <ChevronDown
+                    className={`w-4 h-4 shrink-0 transition-transform duration-200 ${
+                      openDropdown === 'customer' ? 'rotate-180 text-[#1E60F3]' : 'text-slate-400'
+                    }`}
+                  />
+                </button>
+
+                {openDropdown === 'customer' && (
+                  <div className="mt-1.5 w-full bg-white rounded-2xl border border-slate-200/90 shadow-lg p-2 z-30 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="pb-2 mb-1 border-b border-slate-100">
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <input
+                          type="text"
+                          value={dropdownSearch}
+                          onChange={(e) => setDropdownSearch(e.target.value)}
+                          placeholder="고객사명 검색..."
+                          autoFocus
+                          className="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3]"
+                        />
+                        {dropdownSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setDropdownSearch('')}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="max-h-[210px] overflow-y-auto space-y-1">
+                      {!dropdownSearch.trim() && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            haptics.lightTap();
+                            setCustomerFilter('all');
+                            setOpenDropdown(null);
+                            setDropdownSearch('');
+                          }}
+                          className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
+                            customerFilter === 'all'
+                              ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
+                              : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
+                          }`}
+                        >
+                          <span>전체 고객사</span>
+                          {customerFilter === 'all' && (
+                            <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />
+                          )}
+                        </button>
+                      )}
+                      {filteredCustomerOptions.length === 0 ? (
+                        <div className="py-4 text-center text-xs font-medium text-slate-400">
+                          일치하는 고객사가 없습니다
+                        </div>
+                      ) : (
+                        filteredCustomerOptions.map((c) => {
+                          const isSelected = customerFilter === c;
+                          return (
+                            <button
+                              key={c}
+                              type="button"
+                              onClick={() => {
+                                haptics.lightTap();
+                                setCustomerFilter(c);
+                                setOpenDropdown(null);
+                                setDropdownSearch('');
+                              }}
+                              className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
+                                isSelected
+                                  ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
+                                  : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
+                              }`}
+                            >
+                              <span className="truncate">{c}</span>
+                              {isSelected && (
+                                <Check className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />
+                              )}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer: Confirm Button Only (초기화 기능 제거) */}
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.lightTap();
+                  setIsFilterModalOpen(false);
+                  setOpenDropdown(null);
+                  setDropdownSearch('');
+                }}
+                className="w-full py-2.5 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-[0.99] text-white text-xs font-extrabold shadow-xs transition-all cursor-pointer"
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <HqMobileBookingList bookings={filteredList} onView={onViewBooking} onAssign={onAssignDriver || onViewBooking} />
       <div className="hidden lg:block">
