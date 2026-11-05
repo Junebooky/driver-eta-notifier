@@ -1107,7 +1107,7 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                   onOpenDriverModal={handleOpenDriverModal}
                   onConfirmDispatch={() => void handleConfirmDispatch('published')}
                   onRequestAssignment={() => void handleConfirmDispatch('unassigned')}
-                  onBackToStep1={() => setWorkflowStep('step1_extract')}
+                  onBackToStep1={() => setWorkflowStep('step4_booking_confirmed')}
                   onUpdateDraft={handleUpdateDraft}
                   onUpdateVehicleSlots={setVehicleSlots}
                   isDispatching={isDispatching}
