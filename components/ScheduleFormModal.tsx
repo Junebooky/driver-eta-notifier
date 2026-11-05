@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { ScheduleItem } from '@/data/ferrariSchedules';
 import { LocationPreset } from '@/types';
@@ -10,11 +10,7 @@ import {
   X,
   Calendar,
   Clock,
-  User,
-  Plane,
-  FileText,
   Check,
-  Navigation,
   Search,
 } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
@@ -68,7 +64,7 @@ function normalizeToIsoDate(dateStr?: string): string {
   return `${y}-${m}-${d}`;
 }
 
-// Helper: Format ISO 'YYYY-MM-DD' into Korean e.g. "2026년 09월 28일 (월)"
+// Helper: Format ISO 'YYYY-MM-DD' into Korean e.g. "2026년 11월 05일 (목)"
 function formatKoreanDate(isoDate: string): string {
   if (!isoDate) return '';
   const parts = isoDate.split('-');
@@ -82,7 +78,7 @@ function formatKoreanDate(isoDate: string): string {
   return `${year}년 ${String(month).padStart(2, '0')}월 ${String(day).padStart(2, '0')}일 (${dayOfWeek})`;
 }
 
-// Helper: Generate date label for ScheduleItem e.g. "9월 28일 (월)"
+// Helper: Generate date label for ScheduleItem e.g. "11월 5일 (목)"
 function getIsoDateLabel(isoDate: string): string {
   if (!isoDate) return '';
   const parts = isoDate.split('-');
@@ -118,9 +114,10 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
   passengerName,
   homeLocation,
 }) => {
+  const formId = useId();
   const [mounted, setMounted] = useState(false);
-  const [isSaving,setIsSaving] = useState(false);
-  const [saveError,setSaveError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   // Active Presets: Sync from props or vehicle-isolated localStorage to ensure Personal MY presets are included
   const [activePresets, setActivePresets] = useState<LocationPreset[]>(() => {
@@ -133,7 +130,9 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed) && parsed.length > 0) return parsed;
         }
-      } catch (e) { }
+      } catch {
+        // Fallback
+      }
     }
     return DEFAULT_PRESET_LOCATIONS;
   });
@@ -151,7 +150,9 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
             setActivePresets(parsed);
           }
         }
-      } catch (e) { }
+      } catch {
+        // Fallback
+      }
     }
   }, [presets, vehicleNo, isOpen]);
 
@@ -178,7 +179,7 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
     setMounted(true);
   }, []);
 
-  // [태스크 1] 바디 스크롤 락 (Body Scroll Lock)
+  // Body Scroll Lock
   useEffect(() => {
     if (!isOpen) return;
     const originalOverflow = document.body.style.overflow;
@@ -193,7 +194,6 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
     if (isOpen) {
       setPickupDate(normalizeToIsoDate(initialDate));
 
-      // Default presets
       setOrigin({
         name: activePresets[2]?.shortName || '조선팰리스 강남',
         address: activePresets[2]?.address || '서울 강남구 테헤란로 231',
@@ -215,6 +215,7 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
       setNotes('');
       setSearchModalTarget(null);
       setFormErrors({});
+      setSaveError('');
     }
   }, [isOpen, initialDate, presets, passengerName]);
 
@@ -258,7 +259,6 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
       flightType = 'arrival';
     }
 
-    // Ensure clean pickup time format e.g. "픽업 09:00"
     const resolvedTimeDisplay = `픽업 ${pickupTime}`;
 
     const newSchedule: ScheduleItem = {
@@ -286,80 +286,109 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
       notes: notes.trim() || undefined,
     };
 
-    setIsSaving(true); setSaveError('');
-    try { await onSave(newSchedule); onClose(); }
-    catch(error) { setSaveError(error instanceof Error ? error.message : '저장에 실패했습니다.'); }
-    finally { setIsSaving(false); }
+    setIsSaving(true);
+    setSaveError('');
+    try {
+      await onSave(newSchedule);
+      onClose();
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : '저장에 실패했습니다.');
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  const dateInputId = `${formId}-pickup-date`;
+  const timeInputId = `${formId}-pickup-time`;
+  const passengerInputId = `${formId}-passenger`;
+  const flightInputId = `${formId}-flight`;
+  const notesInputId = `${formId}-notes`;
 
   return createPortal(
     <div
       className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 select-none overscroll-contain animate-in fade-in duration-200"
       style={{ overscrollBehavior: 'contain', touchAction: 'pan-y' }}
-      onClick={()=>{if(!isSaving)onClose();}}
+      onClick={() => {
+        if (!isSaving) onClose();
+      }}
     >
-      {/* Background Dimmed Overlay: covering entire browser viewport without gaps */}
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm -z-10" />
+      {/* Background Dimmed Overlay */}
+      <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs -z-10" />
 
       {/* Modal Card */}
       <div
-        className="w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[90dvh] relative z-10 animate-in slide-in-from-bottom-6 duration-300"
+        className="w-full max-w-md bg-[#F6F8FC] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100/90 overflow-hidden flex flex-col max-h-[92dvh] relative z-10 animate-in slide-in-from-bottom-6 duration-300"
         style={{ overscrollBehavior: 'contain', touchAction: 'pan-y' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-5 sm:px-6 pt-5 pb-4 border-b border-slate-100 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#1E60F3] text-white flex items-center justify-center shadow-xs shrink-0">
-              <Calendar className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-snug">
-                새 스케줄 등록
-              </h3>
-              <p className="text-sm font-semibold text-slate-500 mt-0.5">
-                {vehicleNo} 전담 VIP 의전 배차 일정
-              </p>
-            </div>
+        <div className="flex items-start justify-between gap-3 px-5 sm:px-6 pt-5 pb-2 shrink-0">
+          <div className="min-w-0">
+            <h3 className="text-xl font-extrabold text-[#0F172A] tracking-tight leading-snug">
+              새 스케줄 등록
+            </h3>
+            <p className="text-xs sm:text-[13px] font-medium text-slate-400 mt-1 truncate">
+              {vehicleNo} 전담 VIP 의전 배차 일정
+            </p>
           </div>
           <button
             type="button"
             onClick={() => {
-              if(isSaving)return;
+              if (isSaving) return;
               haptics.lightTap();
               onClose();
             }}
-            className="w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center cursor-pointer transition-colors"
+            className="w-9 h-9 rounded-full bg-[#EBEEF5] hover:bg-slate-200/80 text-slate-500 flex items-center justify-center cursor-pointer transition-colors shrink-0"
+            aria-label="닫기"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4 stroke-[2.2]" />
           </button>
         </div>
 
-        {/* Modal Scrollable Body: Max 90dvh and isolated overscroll */}
-        <div
-          className="p-5 sm:p-6 space-y-5 overflow-y-auto max-h-[90dvh] flex-1 text-slate-800 overscroll-contain touch-pan-y"
+        {/* Modal Scrollable Form Body */}
+        <form
+          onSubmit={handleSubmit}
+          className="px-5 sm:px-6 pt-3 pb-5 space-y-4 overflow-y-auto max-h-[90dvh] flex-1 text-slate-800 overscroll-contain touch-pan-y"
           style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
         >
-          {/* [태스크 2] 픽업 일자 (단일 네이티브 날짜 터치 박스) */}
-          <div className="space-y-2">
-            <label className="text-base font-extrabold text-slate-700 flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-[#1E60F3]" />
-              <span>픽업 일자</span>
+          {saveError && (
+            <p role="alert" aria-live="polite" className="text-xs font-bold text-rose-600">
+              {saveError}
+            </p>
+          )}
+
+          {/* 1. 픽업 일자 */}
+          <div>
+            <label
+              htmlFor={dateInputId}
+              className="block text-xs sm:text-[13px] font-extrabold text-[#0F172A] mb-1.5"
+            >
+              픽업 일자
             </label>
 
             <div
-              className={`relative flex items-center justify-between w-full px-5 py-3 bg-slate-50 border rounded-2xl transition-all shadow-xs group cursor-pointer ${formErrors.date
-                ? 'border-rose-400 bg-rose-50/50 ring-2 ring-rose-200'
-                : 'border-slate-200 hover:border-[#1E60F3]'
-                }`}
+              className={`relative flex items-center justify-between w-full h-12 px-4 bg-white border rounded-2xl shadow-[0_3px_12px_rgba(15,23,42,0.04)] transition-all group cursor-pointer ${
+                formErrors.date
+                  ? 'border-rose-400 bg-rose-50/50 ring-2 ring-rose-200'
+                  : 'border-slate-100/90 hover:border-blue-200'
+              }`}
             >
-              <span className="text-base font-semibold text-slate-900 tracking-tight">
+              <span className="text-sm sm:text-[15px] font-bold text-[#0F172A] tracking-tight tabular-nums">
                 {formatKoreanDate(pickupDate) || '날짜 선택'}
               </span>
-              <Calendar className="w-5 h-5 text-[#1E60F3] group-hover:scale-110 transition-transform shrink-0" />
+              <Calendar className="w-[18px] h-[18px] text-[#0055FF] shrink-0 stroke-[2]" />
               <input
+                id={dateInputId}
+                name="pickup_date"
                 type="date"
                 value={pickupDate}
+                onClick={(e) => {
+                  try {
+                    (e.currentTarget as HTMLInputElement).showPicker?.();
+                  } catch {
+                    // Fallback to native input activation
+                  }
+                }}
                 onChange={(e) => {
                   haptics.lightTap();
                   setPickupDate(e.target.value);
@@ -373,97 +402,121 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
             </div>
           </div>
 
-          {/* [태스크 4] 픽업 경로 (출발지 ➔ 도착지) */}
-          <div className="space-y-2.5">
-            <label className="text-base font-extrabold text-slate-700 flex items-center gap-2">
-              <Navigation className="w-5 h-5 text-[#1E60F3]" />
-              <span>픽업 경로 (출발지 ➔ 도착지)</span>
-            </label>
+          {/* 2. 픽업 경로 (출발지 → 도착지) */}
+          <div>
+            <span className="block text-xs sm:text-[13px] font-extrabold text-[#0F172A] mb-1.5">
+              픽업 경로 (출발지 → 도착지)
+            </span>
 
-            {/* 출발지 / 도착지 선택 카드 2단 */}
             <div className="space-y-2.5">
               {/* Origin Card */}
               <div
+                role="button"
+                tabIndex={0}
                 onClick={() => {
                   haptics.lightTap();
                   setSearchModalTarget('origin');
                 }}
-                className={`p-4 rounded-2xl border transition-all cursor-pointer ${formErrors.origin
-                  ? 'border-rose-400 bg-rose-50/40 ring-1 ring-rose-200'
-                  : 'border-slate-200 bg-slate-50/80 hover:bg-slate-100/80 hover:border-slate-300'
-                  }`}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    haptics.lightTap();
+                    setSearchModalTarget('origin');
+                  }
+                }}
+                className={`px-4 py-3.5 rounded-2xl bg-white border shadow-[0_3px_12px_rgba(15,23,42,0.04)] flex items-center justify-between gap-3 transition-all cursor-pointer ${
+                  formErrors.origin
+                    ? 'border-rose-400 bg-rose-50/40 ring-1 ring-rose-200'
+                    : 'border-slate-100/90 hover:border-blue-200'
+                }`}
                 title="출발지 검색 및 선택"
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="px-2.5 py-1 rounded-lg bg-slate-200 text-slate-700 font-black text-sm shrink-0">
-                      출발
-                    </span>
-                    <span className="text-base font-black text-slate-900 truncate">
+                <div className="flex items-start gap-3 min-w-0">
+                  <span className="px-2.5 py-1 rounded-lg bg-[#EBF2FF] text-[#0055FF] font-extrabold text-xs shrink-0 mt-0.5">
+                    출발
+                  </span>
+                  <div className="min-w-0">
+                    <span className="text-sm sm:text-[15px] font-extrabold text-[#0F172A] truncate block leading-snug">
                       {origin ? origin.name : '출발지를 선택해 주세요'}
                     </span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-sm font-bold text-[#1E60F3] shrink-0 ml-2">
-                    <Search className="w-4 h-4 text-[#1E60F3]" />
-
+                    {origin && (
+                      <span className="text-xs text-slate-400 font-medium truncate block mt-0.5">
+                        {origin.address}
+                      </span>
+                    )}
                   </div>
                 </div>
-                {origin && (
-                  <p className="text-sm text-slate-500 truncate mt-1.5 pl-10">
-                    {origin.address}
-                  </p>
-                )}
+                <Search className="w-[18px] h-[18px] text-[#0055FF] shrink-0 stroke-[2.2]" />
               </div>
 
               {/* Destination Card */}
               <div
+                role="button"
+                tabIndex={0}
                 onClick={() => {
                   haptics.lightTap();
                   setSearchModalTarget('destination');
                 }}
-                className={`p-4 rounded-2xl border transition-all cursor-pointer ${formErrors.destination
-                  ? 'border-rose-400 bg-rose-50/40 ring-1 ring-rose-200'
-                  : 'border-slate-200 bg-slate-50/80 hover:bg-slate-100/80 hover:border-slate-300'
-                  }`}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    haptics.lightTap();
+                    setSearchModalTarget('destination');
+                  }
+                }}
+                className={`px-4 py-3.5 rounded-2xl bg-white border shadow-[0_3px_12px_rgba(15,23,42,0.04)] flex items-center justify-between gap-3 transition-all cursor-pointer ${
+                  formErrors.destination
+                    ? 'border-rose-400 bg-rose-50/40 ring-1 ring-rose-200'
+                    : 'border-slate-100/90 hover:border-blue-200'
+                }`}
                 title="도착지 검색 및 선택"
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="px-2.5 py-1 rounded-lg bg-[#1E60F3] text-white font-black text-sm shrink-0">
-                      도착
-                    </span>
-                    <span className="text-base font-black text-slate-900 truncate">
+                <div className="flex items-start gap-3 min-w-0">
+                  <span className="px-2.5 py-1 rounded-lg bg-[#0055FF] text-white font-extrabold text-xs shrink-0 mt-0.5">
+                    도착
+                  </span>
+                  <div className="min-w-0">
+                    <span className="text-sm sm:text-[15px] font-extrabold text-[#0F172A] truncate block leading-snug">
                       {destination ? destination.name : '도착지를 선택해 주세요'}
                     </span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-sm font-bold text-[#1E60F3] shrink-0 ml-2">
-                    <Search className="w-4 h-4 text-[#1E60F3]" />
+                    {destination && (
+                      <span className="text-xs text-slate-400 font-medium truncate block mt-0.5">
+                        {destination.address}
+                      </span>
+                    )}
                   </div>
                 </div>
-                {destination && (
-                  <p className="text-sm text-slate-500 truncate mt-1.5 pl-10">
-                    {destination.address}
-                  </p>
-                )}
+                <Search className="w-[18px] h-[18px] text-[#0055FF] shrink-0 stroke-[2.2]" />
               </div>
             </div>
           </div>
 
-          {/* 픽업 시간 (단일 네이티브 터치 박스) */}
-          <div className="space-y-2">
-            <label className="text-base font-extrabold text-slate-700 flex items-center gap-2">
-              <Clock className="w-5 h-5 text-[#1E60F3]" />
-              <span>픽업 시간</span>
+          {/* 3. 픽업 시간 */}
+          <div>
+            <label
+              htmlFor={timeInputId}
+              className="block text-xs sm:text-[13px] font-extrabold text-[#0F172A] mb-1.5"
+            >
+              픽업 시간
             </label>
 
-            <div className="relative flex items-center justify-between w-full px-5 py-3 bg-slate-50 border border-slate-200 hover:border-[#1E60F3] rounded-2xl transition-all shadow-xs group cursor-pointer">
-              <span className="text-base font-semibold text-slate-900 tracking-tight">
+            <div className="relative flex items-center justify-between w-full h-12 px-4 bg-white border border-slate-100/90 hover:border-blue-200 rounded-2xl shadow-[0_3px_12px_rgba(15,23,42,0.04)] transition-all group cursor-pointer">
+              <span className="text-sm sm:text-[15px] font-bold text-[#0F172A] tracking-tight tabular-nums">
                 {formatKoreanTime(pickupTime) || '시간 선택'}
               </span>
-              <Clock className="w-5 h-5 text-slate-400 group-hover:text-[#1E60F3] transition-colors shrink-0" />
+              <Clock className="w-[18px] h-[18px] text-slate-400 group-hover:text-[#0055FF] transition-colors shrink-0 stroke-[2]" />
               <input
+                id={timeInputId}
+                name="pickup_time"
                 type="time"
                 value={pickupTime}
+                onClick={(e) => {
+                  try {
+                    (e.currentTarget as HTMLInputElement).showPicker?.();
+                  } catch {
+                    // Fallback
+                  }
+                }}
                 onChange={(e) => {
                   haptics.lightTap();
                   setPickupTime(e.target.value);
@@ -474,76 +527,90 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
             </div>
           </div>
 
-          {/* 승객명 & 항공편명 & 의전 메모 */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="text-base font-extrabold text-slate-700 flex items-center gap-1.5">
-                <User className="w-4 h-4 text-[#1E60F3]" />
-                <span>승객명</span>
+          {/* 4. 승객명 & 항공편명 (선택) — 2-Column Side-by-Side */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label
+                htmlFor={passengerInputId}
+                className="block text-xs sm:text-[13px] font-extrabold text-[#0F172A] mb-1.5"
+              >
+                승객명
               </label>
               <input
+                id={passengerInputId}
+                name="passenger_name"
                 type="text"
                 value={passenger}
                 onChange={(e) => setPassenger(e.target.value)}
-                placeholder="예: DENZEL SOFYAN"
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-base font-semibold text-slate-900 placeholder:text-base placeholder:text-slate-400 outline-none focus:border-[#1E60F3]"
+                placeholder="예: SOYFAN 외 2명"
+                className="w-full h-12 px-4 rounded-2xl bg-white border border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)] text-sm sm:text-[15px] font-bold text-[#0F172A] placeholder:font-medium placeholder:text-slate-400 outline-none focus:border-[#0055FF] focus:ring-2 focus:ring-[#0055FF]/10 transition-all"
               />
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-base font-extrabold text-slate-700 flex items-center gap-1.5">
-                <Plane className="w-4 h-4 text-indigo-500" />
-                <span>항공편명 (선택)</span>
+            <div>
+              <label
+                htmlFor={flightInputId}
+                className="block text-xs sm:text-[13px] font-extrabold text-[#0F172A] mb-1.5"
+              >
+                항공편명 (선택)
               </label>
               <input
+                id={flightInputId}
+                name="flight_number"
                 type="text"
                 value={flight}
                 onChange={(e) => setFlight(e.target.value.toUpperCase())}
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
                 placeholder="예: SQ 612"
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-base font-semibold text-slate-900 placeholder:text-base placeholder:text-slate-400 outline-none focus:border-[#1E60F3] uppercase"
+                className="w-full h-12 px-4 rounded-2xl bg-white border border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)] text-sm sm:text-[15px] font-bold text-[#0F172A] placeholder:font-medium placeholder:text-slate-400 outline-none focus:border-[#0055FF] focus:ring-2 focus:ring-[#0055FF]/10 transition-all uppercase"
               />
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-base font-extrabold text-slate-700 flex items-center gap-1.5">
-              <FileText className="w-4 h-4 text-slate-500" />
-              <span>의전 메모 / 특이사항</span>
+          {/* 5. 의전 메모 / 특이사항 */}
+          <div>
+            <label
+              htmlFor={notesInputId}
+              className="block text-xs sm:text-[13px] font-extrabold text-[#0F172A] mb-1.5"
+            >
+              의전 메모 / 특이사항
             </label>
             <input
+              id={notesInputId}
+              name="protocol_notes"
               type="text"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="예: VIP 전담 의전 영접, 수하물 3개 등 특이사항 입력"
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-base font-semibold text-slate-900 placeholder:text-base placeholder:text-slate-400 outline-none focus:border-[#1E60F3]"
+              className="w-full h-12 px-4 rounded-2xl bg-white border border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)] text-sm sm:text-[15px] font-bold text-[#0F172A] placeholder:font-medium placeholder:text-slate-400 outline-none focus:border-[#0055FF] focus:ring-2 focus:ring-[#0055FF]/10 transition-all"
             />
           </div>
-        </div>
 
-        {saveError && <p role="alert" className="px-5 py-2 text-sm text-rose-600">{saveError}</p>}
-        {/* Modal Actions Footer */}
-        <div className="p-4 sm:p-5 bg-slate-50/80 border-t border-slate-100 flex items-center gap-3 shrink-0">
-          <button
-            type="button"
-            onClick={() => {
-              if(isSaving)return;
-              haptics.lightTap();
-              onClose();
-            }}
-            className="flex-1 py-4 rounded-2xl bg-white border border-slate-200 text-slate-600 font-bold text-base hover:bg-slate-100 transition-all cursor-pointer"
-          >
-            취소
-          </button>
-          <button
-            type="button"
-            disabled={isSaving}
-            onClick={handleSubmit}
-            className="flex-[2] py-4 rounded-2xl bg-[#1E60F3] hover:bg-[#1650D6] text-white font-black text-base shadow-md shadow-blue-500/25 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2"
-          >
-            <Check className="w-5 h-5 stroke-[2.5]" />
-            <span>{isSaving ? '저장 중…' : '스케줄 저장'}</span>
-          </button>
-        </div>
+          {/* 6. Modal Actions Footer */}
+          <div className="flex items-center gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (isSaving) return;
+                haptics.lightTap();
+                onClose();
+              }}
+              className="flex-1 h-13 rounded-2xl bg-white border border-slate-100/90 shadow-[0_4px_14px_rgba(15,23,42,0.05)] text-slate-600 font-extrabold text-sm sm:text-[15px] hover:bg-slate-50 active:scale-[0.98] transition-all cursor-pointer"
+            >
+              취소
+            </button>
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="flex-[2] h-13 rounded-2xl bg-[#0055FF] hover:bg-[#0046D5] text-white font-extrabold text-sm sm:text-[15px] shadow-[0_6px_18px_rgba(0,85,255,0.28)] active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60"
+            >
+              <Check className="w-4.5 h-4.5 stroke-[2.5]" />
+              <span>{isSaving ? '저장 중…' : '스케줄 저장'}</span>
+            </button>
+          </div>
+        </form>
       </div>
 
       {/* Standalone Location Search Modal (Child Layer: z-[110]) */}

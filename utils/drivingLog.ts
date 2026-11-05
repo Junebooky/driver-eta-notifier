@@ -89,6 +89,24 @@ export const clampTimeComponent = (val: number | string, max: number): string =>
 };
 
 /**
+ * Sort route stops chronologically by their HH:mm time (or departureTime fallback)
+ * e.g. ["19:49", "15:45", "23:47"] -> ["15:45", "19:49", "23:47"]
+ */
+export const sortRouteStopsChronologically = (stops: RouteStopItem[] = []): RouteStopItem[] => {
+  const toSortableMinutes = (stop: RouteStopItem): number => {
+    const raw = (stop.time || stop.departureTime || '').trim();
+    const match = raw.match(/(\d{1,2}):(\d{2})/);
+    if (!match) return Number.MAX_SAFE_INTEGER;
+    const h = parseInt(match[1], 10);
+    const m = parseInt(match[2], 10);
+    if (isNaN(h) || isNaN(m)) return Number.MAX_SAFE_INTEGER;
+    return h * 60 + m;
+  };
+
+  return [...stops].sort((a, b) => toSortableMinutes(a) - toSortableMinutes(b));
+};
+
+/**
  * Format Date into Korean weekday string
  * e.g. "2026년 10월 20일 (화)"
  */
@@ -379,7 +397,16 @@ export const loadDrivingLogDraft = (
   if(typeof window!=='undefined'){
     try{
       const raw=localStorage.getItem(`${DRIVING_LOG_STORAGE_PREFIX}${scopedReportId}`);
-      if(raw){const stored=JSON.parse(raw);if(stored.driverId===driverId && (stored.bookingId || null)===(bookingId || null) && stored.rawDate===dateIso)return withCurrentProfilePassenger(stored,driverProfile.passengerName);}
+      if(raw){
+        const stored=JSON.parse(raw);
+        if(stored.driverId===driverId && (stored.bookingId || null)===(bookingId || null) && stored.rawDate===dateIso){
+          const normalized = withCurrentProfilePassenger(stored,driverProfile.passengerName);
+          return {
+            ...normalized,
+            stops: sortRouteStopsChronologically(normalized.stops || []),
+          };
+        }
+      }
     }catch{console.warn('운행일지 초안을 불러오지 못했습니다.');}
   }
 
@@ -439,6 +466,7 @@ export const saveDrivingLogDraft = (data: DrivingLogData): boolean => {
   try {
     const payload: DrivingLogData = {
       ...data,
+      stops: sortRouteStopsChronologically(data.stops || []),
       status: data.status,
       savedAt: new Date().toISOString(),
     };

@@ -38,6 +38,7 @@ import {
   checkStopTimelineConsistency,
   clampTimeComponent,
   createReferenceDemoFixture,
+  sortRouteStopsChronologically,
 } from '@/utils/drivingLog';
 import { withCurrentProfilePassenger } from '@/utils/drivingLogPassenger';
 import Link from 'next/link';
@@ -106,7 +107,7 @@ const DrivingLogModalContent: React.FC<{
         if (!response.ok) return; const data = await response.json(); const row = data.logs?.find((entry: HqDrivingLog) => (entry.bookingId || null) === (bookingId || null)); if (!row || abort.signal.aborted) return;
         setLogData(previous => {
           if (previous.stops.length || previous.startKm) return { ...previous, submissionId: row.id, hqStatus: row.status };
-          const next: DrivingLogData = { ...previous, submissionId: row.id, hqStatus: row.status, driverId: row.driverId, clientName: row.customerName === '미지정 고객' ? '' : row.customerName, passengerName: row.passengerName ?? '', passengerCount: row.passengerCount ? `${row.passengerCount}명` : '', clockIn: row.clockIn, clockOut: row.clockOut, startKm: row.startKm, endKm: row.endKm, totalDutyHours: row.totalDutyHours, distanceKm: row.distanceKm, notes: row.notes, stops: row.stops.map((stop: HqDrivingLog['stops'][number]) => ({ ...stop, memo: stop.note })), status: row.status === 'draft' ? 'draft' : 'submitted' };
+          const next: DrivingLogData = { ...previous, submissionId: row.id, hqStatus: row.status, driverId: row.driverId, clientName: row.customerName === '미지정 고객' ? '' : row.customerName, passengerName: row.passengerName ?? '', passengerCount: row.passengerCount ? `${row.passengerCount}명` : '', clockIn: row.clockIn, clockOut: row.clockOut, startKm: row.startKm, endKm: row.endKm, totalDutyHours: row.totalDutyHours, distanceKm: row.distanceKm, notes: row.notes, stops: sortRouteStopsChronologically(row.stops.map((stop: HqDrivingLog['stops'][number]) => ({ ...stop, memo: stop.note }))), status: row.status === 'draft' ? 'draft' : 'submitted' };
           return withCurrentProfilePassenger(next, driverProfile.passengerName);
         });
       }).catch(() => { });
@@ -216,7 +217,7 @@ const DrivingLogModalContent: React.FC<{
     showToast('주행거리가 수정되었습니다.');
   };
 
-  // Add or update stop
+  // Add or update stop (Strictly sorted chronologically by HH:mm)
   const handleSaveStop = (stop: RouteStopItem) => {
     setLogData((prev) => {
       const existingIdx = prev.stops.findIndex((s) => s.id === stop.id);
@@ -227,10 +228,12 @@ const DrivingLogModalContent: React.FC<{
       } else {
         updatedStops = [...prev.stops, stop];
       }
-      return {
+      const nextLog: DrivingLogData = {
         ...prev,
-        stops: updatedStops,
+        stops: sortRouteStopsChronologically(updatedStops),
       };
+      saveDrivingLogDraft(nextLog);
+      return nextLog;
     });
     setEditingStop(null);
     showToast('운행 일정이 추가되었습니다.');
@@ -267,8 +270,9 @@ const DrivingLogModalContent: React.FC<{
     setIsSubmittingLog(true);
     haptics.selection();
 
-    // Map stops ensuring complete route details are passed
-    const stopsMapped = logData.stops.map((s) => ({
+    // Map stops ensuring complete route details are passed in chronological order
+    const sortedStops = sortRouteStopsChronologically(logData.stops);
+    const stopsMapped = sortedStops.map((s) => ({
       id: s.id,
       time: s.time,
       place: s.place,
@@ -676,7 +680,7 @@ const DrivingLogModalContent: React.FC<{
             {/* Timeline List or Empty State */}
             {logData.stops.length > 0 ? (
               <div className="relative pl-1 pr-1 flex flex-col pt-1">
-                {logData.stops.map((stop, idx) => {
+                {sortRouteStopsChronologically(logData.stops).map((stop, idx, sortedArr) => {
                   // Check timeline consistency against duty hours
                   const consistency = checkStopTimelineConsistency(
                     logData.clockIn,
@@ -684,7 +688,7 @@ const DrivingLogModalContent: React.FC<{
                     stop.time
                   );
                   const isFirst = idx === 0;
-                  const isLast = idx === logData.stops.length - 1;
+                  const isLast = idx === sortedArr.length - 1;
 
                   return (
                     <div
