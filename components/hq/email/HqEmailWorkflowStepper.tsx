@@ -85,7 +85,7 @@ export const HqEmailWorkflowStepper: React.FC<HqEmailWorkflowStepperProps> = ({
             : currentStep > step.id || (step.id === 2 && hasDraft && currentStep >= 3);
           const isActive = !isDispatchDone && currentStep === step.id;
           const isClickable = Boolean(
-            onStepClick && (isCompleted || (step.id === 3 && hasDraft) || (step.id === 5 && currentStep >= 4))
+            onStepClick && (isCompleted || (step.id === 3 && hasDraft) || (step.id === 5 && currentStep >= 5))
           );
           const Icon = step.icon;
 
@@ -170,7 +170,7 @@ export const HqEmailWorkflowStepper: React.FC<HqEmailWorkflowStepperProps> = ({
             : currentStep > step.id || (step.id === 2 && hasDraft && currentStep >= 3);
           const isActive = !isDispatchDone && currentStep === step.id;
           const isClickable = Boolean(
-            onStepClick && (isCompleted || (step.id === 3 && hasDraft) || (step.id === 5 && currentStep >= 4))
+            onStepClick && (isCompleted || (step.id === 3 && hasDraft) || (step.id === 5 && currentStep >= 5))
           );
 
           return (
