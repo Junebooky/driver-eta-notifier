@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Search, Check, Loader2, Globe2, UserRound } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 import { HqDriverSummary } from '@/types/driverHq';
@@ -64,23 +64,29 @@ export const HqDriverSelectModal: React.FC<HqDriverSelectModalProps> = ({
   const [englishOnly, setEnglishOnly] = useState(requiredLanguage === 'english');
   const [onlyAvailable, setOnlyAvailable] = useState(true);
   const [selectedDriverId, setSelectedDriverId] = useState(initialDriverId);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!isOpen) return;
     setSelectedDriverId(initialDriverId || '');
     setEnglishOnly(requiredLanguage === 'english');
     setSearch('');
+  }, [isOpen, initialDriverId, requiredLanguage]);
+
+  useEffect(() => {
+    if (!isOpen) return;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     const onEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') onCloseRef.current();
     };
     window.addEventListener('keydown', onEscape);
     return () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener('keydown', onEscape);
     };
-  }, [isOpen, initialDriverId, requiredLanguage, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
