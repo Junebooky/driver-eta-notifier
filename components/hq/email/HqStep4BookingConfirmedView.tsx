@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ArrowRight, Check, CheckCircle2, ChevronLeft } from 'lucide-react';
+import { ArrowRight, CheckCircle2, ChevronLeft } from 'lucide-react';
 import { HqEmailExtractedDraft, HqEmailSummary } from '@/types/emailHq';
 
 interface HqStep4BookingConfirmedViewProps {
@@ -58,7 +58,7 @@ export const HqStep4BookingConfirmedView: React.FC<HqStep4BookingConfirmedViewPr
           예약 확정!
         </h2>
         <p className="mt-2 text-sm font-normal leading-relaxed text-slate-500">
-          예약 내용을 확인했습니다. 이제 기사님을 배정할 수 있어요.
+          예약 내용을 확인했습니다. 배차 등록은 다음 단계에서 진행됩니다.
         </p>
 
         <div className="mt-8 w-full rounded-2xl bg-slate-50/70 px-5 py-5 text-left sm:px-6">
