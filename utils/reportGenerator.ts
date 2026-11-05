@@ -30,6 +30,21 @@ export function formatReportHeader(vehicleNo?: string, driverName?: string): str
   return '[의전 드라이버]';
 }
 
+export function formatEtaWithAmPm(etaFormatted: string): string {
+  const explicitMatch = etaFormatted.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (explicitMatch) {
+    return `${explicitMatch[1].padStart(2, '0')}:${explicitMatch[2]} ${explicitMatch[3].toUpperCase()}`;
+  }
+  const timeMatch = etaFormatted.match(/(\d{1,2}):(\d{2})/);
+  if (timeMatch) {
+    const hours = parseInt(timeMatch[1], 10);
+    const minutes = timeMatch[2];
+    const period = hours >= 12 ? 'PM' : 'AM';
+    return `${String(hours).padStart(2, '0')}:${minutes} ${period}`;
+  }
+  return etaFormatted.replace(/\s*\(.*?\)/, '').trim();
+}
+
 export function generateReportText({
   profile,
   origin,
@@ -45,14 +60,7 @@ export function generateReportText({
   const destName = typeof destination === 'string' ? destination : destination.shortName;
   const originName = typeof origin === 'string' ? origin : origin ? origin.shortName : '현 위치';
 
-  // Strict 24h format HH:mm (e.g. 03:08, 14:35) without "(xx분 소요)" or "오전/오후"
-  let cleanEta = etaFormatted;
-  const timeMatch = etaFormatted.match(/(\d{1,2}:\d{2})/);
-  if (timeMatch) {
-    cleanEta = timeMatch[1].padStart(5, '0');
-  } else {
-    cleanEta = etaFormatted.replace(/\s*\(.*?\)/, '').trim();
-  }
+  const cleanEta = formatEtaWithAmPm(etaFormatted);
 
   const header = formatReportHeader(profile.vehicleNo, profile.driverName);
 

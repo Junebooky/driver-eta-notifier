@@ -69,6 +69,7 @@ const AddScheduleModalContent: React.FC<{
   // Derive initial values purely
   const [time, setTime] = useState(() => {
     if (editingStop?.time) return editingStop.time;
+    if (editingStop?.departureTime) return editingStop.departureTime;
     const now = new Date();
     const hh = String(now.getHours()).padStart(2, '0');
     const mm = String(Math.floor(now.getMinutes() / 5) * 5).padStart(2, '0');

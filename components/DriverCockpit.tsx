@@ -728,7 +728,12 @@ export default function DriverCockpit() {
   const [activeTab, setActiveTab] = useState<DriverTab>('drive');
   const selectDriverTab = (tab: DriverTab) => {
     haptics.lightTap();
-    if (tab === 'log') setHasOpenedDrivingLog(true);
+    if (tab === 'log') {
+      setHasOpenedDrivingLog(true);
+      if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+        window.dispatchEvent(new Event('cockpit:driving-log-tab-focused'));
+      }
+    }
     setActiveTab(tab);
     setIsBarsHidden(false);
     lastScrollYRef.current = 0;

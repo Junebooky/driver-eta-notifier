@@ -407,6 +407,28 @@ export const loadDrivingLogDraft = (
           };
         }
       }
+      if(!reportId && driverId !== 'unlinked'){
+        const unlinkedReportId=`report_unlinked_${bookingId || 'daily'}_${dateIso}`;
+        const unlinkedRaw=localStorage.getItem(`${DRIVING_LOG_STORAGE_PREFIX}${unlinkedReportId}`);
+        if(unlinkedRaw){
+          const unlinkedStored=JSON.parse(unlinkedRaw);
+          if(unlinkedStored.driverId==='unlinked' && (unlinkedStored.bookingId || null)===(bookingId || null) && unlinkedStored.rawDate===dateIso){
+            const migrated: DrivingLogData = {
+              ...withCurrentProfilePassenger(unlinkedStored, driverProfile.passengerName),
+              reportId: scopedReportId,
+              driverId,
+              driverName: driverProfile.driverName || unlinkedStored.driverName || '담당 기사',
+              carNumber: driverProfile.carNumber || unlinkedStored.carNumber || '',
+              stops: sortRouteStopsChronologically(unlinkedStored.stops || []),
+            };
+            try {
+              localStorage.setItem(`${DRIVING_LOG_STORAGE_PREFIX}${scopedReportId}`, JSON.stringify(migrated));
+              localStorage.removeItem(`${DRIVING_LOG_STORAGE_PREFIX}${unlinkedReportId}`);
+            } catch {}
+            return migrated;
+          }
+        }
+      }
     }catch{console.warn('운행일지 초안을 불러오지 못했습니다.');}
   }
 
@@ -496,6 +518,9 @@ export const saveDrivingLogDraft = (data: DrivingLogData): boolean => {
     }
 
     localStorage.setItem(DRIVING_LOG_INDEX_KEY, JSON.stringify(index.slice(0, 30)));
+    if (typeof window.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
+      window.dispatchEvent(new CustomEvent('cockpit:driving-log-updated', { detail: payload }));
+    }
     return true;
   } catch (e) {
     console.error('Failed to save driving log draft:', e);

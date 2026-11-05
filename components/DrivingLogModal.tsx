@@ -91,6 +91,167 @@ const DrivingLogModalContent: React.FC<{
   const [isEditingCarNumber, setIsEditingCarNumber] = useState(false);
   const [carNumberDraft, setCarNumberDraft] = useState('');
   const carNumberInputRef = useRef<HTMLInputElement>(null);
+  const isInternalSaveRef = useRef(false);
+  const serverSyncTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const syncDraftToServer = (draft: DrivingLogData, replaceStops = false) => {
+    if (draft.isDemoFixture || draft.status !== 'draft') return;
+    const sortedStops = sortRouteStopsChronologically(draft.stops || []).map((s) => ({
+      ...s,
+      id: s.id,
+      time: s.time || '',
+      departureTime: s.departureTime,
+      place: s.place,
+      memo: s.memo || (s as any).note || '',
+      note: s.memo || (s as any).note || '',
+      address: s.address,
+    }));
+
+    fetch('/api/driving-logs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        id: draft.submissionId,
+        bookingId: draft.bookingId || bookingId,
+        driverId: draft.driverId || driverProfile.driverId,
+        driverName: draft.driverName || driverProfile.driverName || '담당 기사',
+        vehiclePlate: draft.carNumber || driverProfile.carNumber || '',
+        vehicleModel: driverProfile.carModel || '법인 차량',
+        customerName: draft.clientName || '고객사',
+        drivingDate: draft.rawDate,
+        clockIn: draft.clockIn || null,
+        clockOut: draft.clockOut || null,
+        totalDutyHours: draft.totalDutyHours || '',
+        startKm: draft.startKm || '',
+        endKm: draft.endKm || '',
+        stops: sortedStops,
+        notes: draft.notes || '',
+        status: 'draft',
+        replaceStops,
+        custodyId: draft.custodyId,
+      }),
+    })
+      .then(async (res) => {
+        if (!res.ok) return;
+        const data = await res.json().catch(() => null);
+        if (data?.ok && data.log?.id) {
+          setLogData((prev) =>
+            prev.submissionId === data.log.id
+              ? prev
+              : { ...prev, submissionId: data.log.id }
+          );
+        }
+      })
+      .catch(() => {});
+  };
+
+  const persistDraftState = (
+    updater: (prev: DrivingLogData) => DrivingLogData,
+    options?: { replaceStops?: boolean; debounceMs?: number }
+  ) => {
+    setLogData((prev) => {
+      const next = updater(prev);
+      if (!next.isDemoFixture) {
+        const draftPayload: DrivingLogData = {
+          ...next,
+          driverId: next.driverId || driverProfile.driverId || prev.driverId,
+          driverName: driverProfile.driverName || next.driverName || prev.driverName,
+          carNumber: driverProfile.carNumber || next.carNumber || prev.carNumber,
+        };
+        isInternalSaveRef.current = true;
+        saveDrivingLogDraft(draftPayload);
+        isInternalSaveRef.current = false;
+
+        if (serverSyncTimerRef.current) {
+          clearTimeout(serverSyncTimerRef.current);
+        }
+        const delay = options?.debounceMs ?? 0;
+        if (delay > 0) {
+          serverSyncTimerRef.current = setTimeout(() => {
+            syncDraftToServer(draftPayload, Boolean(options?.replaceStops));
+          }, delay);
+        } else {
+          syncDraftToServer(draftPayload, Boolean(options?.replaceStops));
+        }
+      }
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    return () => {
+      if (serverSyncTimerRef.current) {
+        clearTimeout(serverSyncTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Listen to external driving log draft updates (e.g. "내비 안내 시작 -> 기록하고 출발")
+  useEffect(() => {
+    const handleExternalUpdate = (e: Event) => {
+      if (isInternalSaveRef.current) return;
+      const customEvent = e as CustomEvent<DrivingLogData>;
+      const incoming = customEvent.detail;
+      if (!incoming) return;
+      if ((incoming.bookingId || null) !== (bookingId || null)) return;
+
+      setLogData((prev) => {
+        if (prev.rawDate !== incoming.rawDate) return prev;
+        const mergedStops = [...(prev.stops || [])];
+        for (const stop of incoming.stops || []) {
+          const existsIdx = mergedStops.findIndex(
+            (m) =>
+              (m.id && stop.id && m.id === stop.id) ||
+              (m.actionIdempotencyKey && stop.actionIdempotencyKey && m.actionIdempotencyKey === stop.actionIdempotencyKey)
+          );
+          if (existsIdx >= 0) {
+            mergedStops[existsIdx] = { ...mergedStops[existsIdx], ...stop };
+          } else {
+            mergedStops.push(stop);
+          }
+        }
+        const sorted = sortRouteStopsChronologically(mergedStops);
+        return {
+          ...prev,
+          submissionId: incoming.submissionId || prev.submissionId,
+          stops: sorted,
+        };
+      });
+    };
+
+    const handleTabFocused = () => {
+      setLogData((prev) => {
+        if (prev.isDemoFixture) return prev;
+        const stored = loadDrivingLogDraft(driverProfile, undefined, prev.rawDate, bookingId);
+        const mergedStops = [...(prev.stops || [])];
+        for (const stop of stored.stops || []) {
+          const existsIdx = mergedStops.findIndex(
+            (m) =>
+              (m.id && stop.id && m.id === stop.id) ||
+              (m.actionIdempotencyKey && stop.actionIdempotencyKey && m.actionIdempotencyKey === stop.actionIdempotencyKey)
+          );
+          if (existsIdx >= 0) {
+            mergedStops[existsIdx] = { ...mergedStops[existsIdx], ...stop };
+          } else {
+            mergedStops.push(stop);
+          }
+        }
+        return {
+          ...prev,
+          submissionId: stored.submissionId || prev.submissionId,
+          stops: sortRouteStopsChronologically(mergedStops),
+        };
+      });
+    };
+
+    window.addEventListener('cockpit:driving-log-updated', handleExternalUpdate);
+    window.addEventListener('cockpit:driving-log-tab-focused', handleTabFocused);
+    return () => {
+      window.removeEventListener('cockpit:driving-log-updated', handleExternalUpdate);
+      window.removeEventListener('cockpit:driving-log-tab-focused', handleTabFocused);
+    };
+  }, [bookingId, driverProfile]);
 
   // Sync driverName and carNumber from driverProfile into logData
   useEffect(() => {
@@ -157,9 +318,58 @@ const DrivingLogModalContent: React.FC<{
       .then(async response => {
         if (!response.ok) return; const data = await response.json(); const row = data.logs?.find((entry: HqDrivingLog) => (entry.bookingId || null) === (bookingId || null)); if (!row || abort.signal.aborted) return;
         setLogData(previous => {
-          if (previous.stops.length || previous.startKm) return { ...previous, submissionId: row.id, hqStatus: row.status };
-          const next: DrivingLogData = { ...previous, submissionId: row.id, hqStatus: row.status, driverId: row.driverId, clientName: row.customerName === '미지정 고객' ? '' : row.customerName, passengerName: row.passengerName ?? '', passengerCount: row.passengerCount ? `${row.passengerCount}명` : '', clockIn: row.clockIn, clockOut: row.clockOut, startKm: row.startKm, endKm: row.endKm, totalDutyHours: row.totalDutyHours, distanceKm: row.distanceKm, notes: row.notes, stops: sortRouteStopsChronologically(row.stops.map((stop: HqDrivingLog['stops'][number]) => ({ ...stop, memo: stop.note }))), status: row.status === 'draft' ? 'draft' : 'submitted' };
-          return withCurrentProfilePassenger(next, driverProfile.passengerName);
+          const dbStops: RouteStopItem[] = Array.isArray(row.stops)
+            ? row.stops.map((stop: any) => ({
+                ...stop,
+                time: stop.time || '',
+                memo: stop.memo || stop.note || '',
+              }))
+            : [];
+          const mergedStops = [...(previous.stops || [])];
+          for (const stop of dbStops) {
+            const existsIdx = mergedStops.findIndex(
+              (m) =>
+                (m.id && stop.id && m.id === stop.id) ||
+                (m.actionIdempotencyKey && stop.actionIdempotencyKey && m.actionIdempotencyKey === stop.actionIdempotencyKey)
+            );
+            if (existsIdx >= 0) {
+              mergedStops[existsIdx] = { ...stop, ...mergedStops[existsIdx], memo: mergedStops[existsIdx].memo || stop.memo };
+            } else {
+              mergedStops.push(stop);
+            }
+          }
+          const mergedClockIn = previous.clockIn || row.clockIn || '';
+          const mergedClockOut = previous.clockOut || row.clockOut || '';
+          const mergedStartKm = previous.startKm || row.startKm || '';
+          const mergedEndKm = previous.endKm || row.endKm || '';
+          const computedDuty = calculateDutyDuration(mergedClockIn, mergedClockOut);
+          const computedDist = calculateDrivingDistance(mergedStartKm, mergedEndKm);
+
+          const next: DrivingLogData = {
+            ...previous,
+            submissionId: row.id,
+            hqStatus: row.status,
+            driverId: row.driverId || previous.driverId || driverProfile.driverId,
+            clientName: previous.clientName || (row.customerName === '미지정 고객' || row.customerName === '고객사' ? '' : row.customerName),
+            passengerName: row.passengerName ?? previous.passengerName ?? '',
+            passengerCount: row.passengerCount ? `${row.passengerCount}명` : previous.passengerCount,
+            clockIn: mergedClockIn,
+            clockOut: mergedClockOut,
+            startKm: mergedStartKm,
+            endKm: mergedEndKm,
+            totalDutyHours: mergedClockIn && mergedClockOut ? computedDuty.formatted : (row.totalDutyHours || previous.totalDutyHours),
+            distanceKm: mergedStartKm && mergedEndKm ? computedDist.formatted : (row.distanceKm || previous.distanceKm),
+            notes: previous.notes || row.notes || '',
+            stops: sortRouteStopsChronologically(mergedStops),
+            status: row.status === 'draft' ? 'draft' : 'submitted',
+          };
+          const hydrated = withCurrentProfilePassenger(next, driverProfile.passengerName);
+          if (!hydrated.isDemoFixture) {
+            isInternalSaveRef.current = true;
+            saveDrivingLogDraft(hydrated);
+            isInternalSaveRef.current = false;
+          }
+          return hydrated;
         });
       }).catch(() => { });
     return () => abort.abort();
@@ -197,18 +407,19 @@ const DrivingLogModalContent: React.FC<{
     }, 2800);
   };
 
-  // Recalculate duration whenever times change
+  // Recalculate duration whenever times change (auto-saves to localStorage & DB draft)
   const handleTimeChange = (type: 'clockIn' | 'clockOut', value: string) => {
-    const newClockIn = type === 'clockIn' ? value : logData.clockIn;
-    const newClockOut = type === 'clockOut' ? value : logData.clockOut;
-    const { formatted } = calculateDutyDuration(newClockIn, newClockOut);
-
-    setLogData((prev) => ({
-      ...prev,
-      clockIn: newClockIn,
-      clockOut: newClockOut,
-      totalDutyHours: formatted,
-    }));
+    persistDraftState((prev) => {
+      const newClockIn = type === 'clockIn' ? value : prev.clockIn;
+      const newClockOut = type === 'clockOut' ? value : prev.clockOut;
+      const { formatted } = calculateDutyDuration(newClockIn, newClockOut);
+      return {
+        ...prev,
+        clockIn: newClockIn,
+        clockOut: newClockOut,
+        totalDutyHours: formatted,
+      };
+    });
   };
 
   // Open Time Picker Modal
@@ -254,7 +465,7 @@ const DrivingLogModalContent: React.FC<{
     const formattedStart = formatOdometer(tempStartKm);
     const formattedEnd = formatOdometer(tempEndKm);
 
-    setLogData((prev) => ({
+    persistDraftState((prev) => ({
       ...prev,
       startKm: formattedStart,
       endKm: formattedEnd,
@@ -268,24 +479,25 @@ const DrivingLogModalContent: React.FC<{
     showToast('주행거리가 수정되었습니다.');
   };
 
-  // Add or update stop (Strictly sorted chronologically by HH:mm)
+  // Add or update stop (Strictly sorted chronologically by HH:mm & auto-saved to DB)
   const handleSaveStop = (stop: RouteStopItem) => {
-    setLogData((prev) => {
-      const existingIdx = prev.stops.findIndex((s) => s.id === stop.id);
-      let updatedStops: RouteStopItem[];
-      if (existingIdx >= 0) {
-        updatedStops = [...prev.stops];
-        updatedStops[existingIdx] = stop;
-      } else {
-        updatedStops = [...prev.stops, stop];
-      }
-      const nextLog: DrivingLogData = {
-        ...prev,
-        stops: sortRouteStopsChronologically(updatedStops),
-      };
-      saveDrivingLogDraft(nextLog);
-      return nextLog;
-    });
+    persistDraftState(
+      (prev) => {
+        const existingIdx = prev.stops.findIndex((s) => s.id === stop.id);
+        let updatedStops: RouteStopItem[];
+        if (existingIdx >= 0) {
+          updatedStops = [...prev.stops];
+          updatedStops[existingIdx] = stop;
+        } else {
+          updatedStops = [...prev.stops, stop];
+        }
+        return {
+          ...prev,
+          stops: sortRouteStopsChronologically(updatedStops),
+        };
+      },
+      { replaceStops: true }
+    );
     setEditingStop(null);
     showToast('운행 일정이 추가되었습니다.');
   };
@@ -293,18 +505,25 @@ const DrivingLogModalContent: React.FC<{
   // Delete stop
   const handleDeleteStop = (id: string) => {
     haptics.mediumTap();
-    setLogData((prev) => ({
-      ...prev,
-      stops: prev.stops.filter((s) => s.id !== id),
-    }));
+    persistDraftState(
+      (prev) => ({
+        ...prev,
+        stops: prev.stops.filter((s) => s.id !== id),
+      }),
+      { replaceStops: true }
+    );
     setActiveMenuStopId(null);
     showToast('일정이 삭제되었습니다.');
   };
 
-  // Temporary save to localStorage (Strictly draft status)
+  // Temporary save to localStorage and DB (Strictly draft status)
   const handleTemporarySave = () => {
     haptics.success();
-    const success = saveDrivingLogDraft({ ...logData, status: 'draft' });
+    const draftPayload: DrivingLogData = { ...logData, status: 'draft' };
+    isInternalSaveRef.current = true;
+    const success = saveDrivingLogDraft(draftPayload);
+    isInternalSaveRef.current = false;
+    syncDraftToServer(draftPayload, true);
     if (success) {
       showToast('운행일지가 임시저장되었습니다.');
     } else {
@@ -324,10 +543,12 @@ const DrivingLogModalContent: React.FC<{
     // Map stops ensuring complete route details are passed in chronological order
     const sortedStops = sortRouteStopsChronologically(logData.stops);
     const stopsMapped = sortedStops.map((s) => ({
+      ...s,
       id: s.id,
-      time: s.time,
+      time: s.time || s.departureTime || '',
       place: s.place,
-      note: s.memo,
+      memo: s.memo || (s as any).note || '',
+      note: s.memo || (s as any).note || '',
       address: s.address,
     }));
 
@@ -488,13 +709,9 @@ const DrivingLogModalContent: React.FC<{
                 <div>
                   <div className="flex items-center gap-2">
                     <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">운행일지</h2>
-                    {logData.isDemoFixture ? (
+                    {logData.isDemoFixture && (
                       <span className="text-[11px] bg-blue-50 text-[#1E60F3] font-bold px-2.5 py-0.5 rounded-full border border-blue-100">
                         샘플
-                      </span>
-                    ) : (
-                      <span className="text-[11px] bg-[#EBF0F7] text-slate-500 font-bold px-2.5 py-0.5 rounded-full">
-                        임시저장
                       </span>
                     )}
                   </div>
@@ -607,7 +824,7 @@ const DrivingLogModalContent: React.FC<{
                     }}
                     className="inline-flex min-h-8 items-center gap-1 rounded-lg px-2 text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20"
                   >
-                    <Pencil className="h-3.5 w-3.5" /> 프로필에서 수정
+                    <Pencil className="h-3.5 w-3.5" />
                   </button>
                 )}
               </div>
@@ -726,7 +943,7 @@ const DrivingLogModalContent: React.FC<{
 
             <CustodyMileageLink driverId={driverProfile.driverId} bookingId={bookingId} date={logData.rawDate} onApply={value => {
               const distance = calculateDrivingDistance(value.startKm, value.endKm);
-              setLogData(previous => ({ ...previous, ...value, startKm: formatOdometer(value.startKm), endKm: formatOdometer(value.endKm), distanceKm: distance.formatted, odoSource: 'inspection_verified', isOdoManualOverride: false }));
+              persistDraftState(previous => ({ ...previous, ...value, startKm: formatOdometer(value.startKm), endKm: formatOdometer(value.endKm), distanceKm: distance.formatted, odoSource: 'inspection_verified', isOdoManualOverride: false }));
               showToast('서버 인수·반납 계기판 값을 적용했습니다.');
             }} />
 
@@ -816,10 +1033,11 @@ const DrivingLogModalContent: React.FC<{
               <div className="relative pl-1 pr-1 flex flex-col pt-1">
                 {sortRouteStopsChronologically(logData.stops).map((stop, idx, sortedArr) => {
                   // Check timeline consistency against duty hours
+                  const displayTime = stop.time || stop.departureTime || '';
                   const consistency = checkStopTimelineConsistency(
                     logData.clockIn,
                     logData.clockOut,
-                    stop.time
+                    displayTime
                   );
                   const isFirst = idx === 0;
                   const isLast = idx === sortedArr.length - 1;
@@ -837,7 +1055,7 @@ const DrivingLogModalContent: React.FC<{
 
                         {/* Time */}
                         <span className="font-semibold text-slate-700 w-11 sm:w-12 shrink-0 text-left tabular-nums mt-0.5">
-                          {stop.time}
+                          {displayTime || '--:--'}
                         </span>
 
                         {/* Continuous Timeline Axis: line connects from first circle to last circle */}
@@ -955,7 +1173,7 @@ const DrivingLogModalContent: React.FC<{
                     type="button"
                     onClick={() => {
                       haptics.lightTap();
-                      setLogData((prev) => {
+                      persistDraftState((prev) => {
                         const current = (prev.notes || '').trim();
                         if (current.includes(tag)) {
                           return prev;
@@ -979,9 +1197,10 @@ const DrivingLogModalContent: React.FC<{
               <textarea
                 rows={3}
                 value={logData.notes}
-                onChange={(e) =>
-                  setLogData((prev) => ({ ...prev, notes: e.target.value.slice(0, 500) }))
-                }
+                onChange={(e) => {
+                  const val = e.target.value.slice(0, 500);
+                  persistDraftState((prev) => ({ ...prev, notes: val }), { debounceMs: 500 });
+                }}
                 placeholder="운행 중 메모나 특이사항을 남겨주세요"
                 className="w-full p-4 pb-7 bg-white border border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)] rounded-2xl text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-[#1E60F3]/10 transition-all resize-none"
               />

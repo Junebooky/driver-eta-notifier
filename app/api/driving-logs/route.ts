@@ -353,8 +353,11 @@ export async function POST(req: NextRequest) {
     const calculatedDist = endKmNum >= startKmNum && endKmNum>0 ? endKmNum - startKmNum : 0;
     const nowIso = new Date().toISOString();
 
+    const isDraftMode = !isSubmitting;
+    const replaceStops = Boolean(body.replaceStops);
+
     // Resolve the same logical report across devices, reconnects and navigation drafts.
-    let lookup=supabaseAdmin.from('driving_logs').select('id, stops, status, meta').eq('organization_id',auth.session.org).eq('driver_id',effectiveDriverId).eq('driving_date',drivingDate);
+    let lookup=supabaseAdmin.from('driving_logs').select('*').eq('organization_id',auth.session.org).eq('driver_id',effectiveDriverId).eq('driving_date',drivingDate);
     lookup=bookingId?lookup.eq('booking_id',bookingId):lookup.is('booking_id',null);
     const previous=await lookup.maybeSingle();
     if(previous.error)return NextResponse.json({ok:false,error:'기존 운행일지 확인에 실패했습니다.'},{status:503});
@@ -362,22 +365,28 @@ export async function POST(req: NextRequest) {
     if(existing && auth.session.role==='driver' && ['승인 완료','검토 중'].includes(existing.status))return NextResponse.json({ok:false,error:'이미 검토 중이거나 승인된 운행일지입니다.'},{status:403});
     if(existing && status==='draft' && existing.status!=='draft')return NextResponse.json({ok:false,error:'이미 제출한 일지를 임시 저장으로 변경할 수 없습니다.'},{status:409});
     const targetRowId=existing?.id || (isValidUuid(id)?id:crypto.randomUUID());
-    // A background navigation append preserves stops; a deliberate final edit may delete/reorder them.
-    const existingDraftStops = status==='draft' && Array.isArray(existing?.stops)?existing.stops:[];
+    // A background navigation append preserves stops; a deliberate final edit or explicit replaceStops may delete/reorder them.
+    const existingDraftStops = !replaceStops && status==='draft' && Array.isArray(existing?.stops)?existing.stops:[];
 
-    // Merge stops deduplicating by id or actionIdempotencyKey
+    // Merge stops deduplicating/updating by id or actionIdempotencyKey
     const incomingStops = Array.isArray(stops) ? stops : [];
     const mergedStops = [...existingDraftStops];
     for (const stop of incomingStops) {
-      const exists = mergedStops.some(
+      const existingIdx = mergedStops.findIndex(
         (m) =>
           (m.id && stop.id && m.id === stop.id) ||
           (m.actionIdempotencyKey && stop.actionIdempotencyKey && m.actionIdempotencyKey === stop.actionIdempotencyKey)
       );
-      if (!exists) {
+      if (existingIdx >= 0) {
+        mergedStops[existingIdx] = { ...mergedStops[existingIdx], ...stop };
+      } else {
         mergedStops.push(stop);
       }
     }
+
+    const effectiveStartKm = startKmNum > 0 ? startKmNum : (isDraftMode && !replaceStops && Number(existing?.start_km) > 0 ? Number(existing.start_km) : startKmNum);
+    const effectiveEndKm = endKmNum > 0 ? endKmNum : (isDraftMode && !replaceStops && Number(existing?.end_km) > 0 ? Number(existing.end_km) : endKmNum);
+    const effectiveDist = effectiveEndKm >= effectiveStartKm && effectiveEndKm > 0 ? effectiveEndKm - effectiveStartKm : calculatedDist;
 
     const insertPayload: Record<string, any> = {
       id: targetRowId,
@@ -386,24 +395,24 @@ export async function POST(req: NextRequest) {
       booking_id: bookingId || null,
       driver_id: effectiveDriverId,
       driver_name: effectiveDriverName,
-      vehicle_id: verifiedSchedule?.vehicle_id || vehicleId || null,
-      vehicle_plate: verifiedSchedule?.vehicle_plate || verifiedSchedule?.schedule_meta?.vehiclePlate || vehiclePlate || auth.session.carNumber || '',
-      vehicle_model: verifiedSchedule?.schedule_meta?.vehicleModel || vehicleModel || '',
-      customer_id: verifiedSchedule?.customer_id || verifiedSchedule?.schedule_meta?.customerId || customerId || null,
-      customer_name: verifiedSchedule?.customer_name || verifiedSchedule?.schedule_meta?.customerName || customerName || '',
+      vehicle_id: verifiedSchedule?.vehicle_id || vehicleId || existing?.vehicle_id || null,
+      vehicle_plate: verifiedSchedule?.vehicle_plate || verifiedSchedule?.schedule_meta?.vehiclePlate || vehiclePlate || existing?.vehicle_plate || auth.session.carNumber || '',
+      vehicle_model: verifiedSchedule?.schedule_meta?.vehicleModel || vehicleModel || existing?.vehicle_model || '',
+      customer_id: verifiedSchedule?.customer_id || verifiedSchedule?.schedule_meta?.customerId || customerId || existing?.customer_id || null,
+      customer_name: verifiedSchedule?.customer_name || verifiedSchedule?.schedule_meta?.customerName || customerName || existing?.customer_name || '',
       driving_date: drivingDate || new Date().toISOString().split('T')[0],
-      clock_in: clockIn || null,
-      clock_out: clockOut || null,
-      garage_departure_time: garageDepartureTime || null,
-      customer_service_start: customerServiceStart || null,
-      customer_service_end: customerServiceEnd || null,
-      garage_arrival_time: garageArrivalTime || null,
-      total_duty_hours: totalDutyHours || '',
-      start_km: startKmNum,
-      end_km: endKmNum,
-      distance_km: calculatedDist,
-      stops: mergedStops.length > 0 ? mergedStops : incomingStops,
-      notes: notes || '',
+      clock_in: clockIn || (isDraftMode && !replaceStops ? existing?.clock_in || null : null),
+      clock_out: clockOut || (isDraftMode && !replaceStops ? existing?.clock_out || null : null),
+      garage_departure_time: garageDepartureTime || existing?.garage_departure_time || null,
+      customer_service_start: customerServiceStart || existing?.customer_service_start || null,
+      customer_service_end: customerServiceEnd || existing?.customer_service_end || null,
+      garage_arrival_time: garageArrivalTime || existing?.garage_arrival_time || null,
+      total_duty_hours: totalDutyHours || (isDraftMode && !replaceStops ? existing?.total_duty_hours || '' : ''),
+      start_km: effectiveStartKm,
+      end_km: effectiveEndKm,
+      distance_km: effectiveDist,
+      stops: replaceStops ? incomingStops : (mergedStops.length > 0 ? mergedStops : incomingStops),
+      notes: notes !== undefined && (notes !== '' || replaceStops) ? notes : (existing?.notes || ''),
       // A count is saved only if explicitly stated in the profile (e.g. "VIP 외 1명").
       passenger_count: profilePassenger.passengerCount ? Number.parseInt(profilePassenger.passengerCount,10) : null,
       expense_amount: 0,
