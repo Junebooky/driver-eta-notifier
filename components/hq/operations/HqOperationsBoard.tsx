@@ -977,14 +977,14 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
 
                   {/* Vehicles Table (Toss/Apple Style Streamlined) */}
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
+                    <table className="w-full min-w-[660px] text-left border-collapse">
                       <thead>
-                        <tr className="border-b border-slate-100 bg-white text-[11px] font-semibold text-slate-400 select-none">
-                          <th className="py-2.5 px-5 w-16">#</th>
-                          <th className="py-2.5 px-5">기사 (차량)</th>
-                          <th className="py-2.5 px-5">이동 경로 (현재 여정)</th>
-                          <th className="py-2.5 px-5">운영 상태</th>
-                          <th className="py-2.5 px-5 text-right w-28">작업</th>
+                        <tr className="border-b border-slate-100 bg-white text-[11px] font-semibold text-slate-400 select-none whitespace-nowrap">
+                          <th className="py-2.5 px-3.5 sm:px-5 w-16">#</th>
+                          <th className="py-2.5 px-3.5 sm:px-5">기사 (차량)</th>
+                          <th className="py-2.5 px-3.5 sm:px-5">이동 경로 (현재 여정)</th>
+                          <th className="py-2.5 px-3.5 sm:px-5">운영 상태</th>
+                          <th className="py-2.5 px-3.5 sm:px-5 text-right w-28">작업</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700">
@@ -1004,14 +1004,14 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
                               className="hover:bg-blue-50/40 transition-colors cursor-pointer group"
                             >
                               {/* 1. 호차 순번 */}
-                              <td className="py-3.5 px-5 whitespace-nowrap">
+                              <td className="py-3.5 px-3.5 sm:px-5 whitespace-nowrap">
                                 <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-md text-[11px] font-extrabold bg-slate-100 text-slate-600 border border-slate-200/60">
                                   {vehicleIndex}호차
                                 </span>
                               </td>
 
                               {/* 2. 기사 (차량) & 오기 방지 */}
-                              <td className="py-3.5 px-5">
+                              <td className="py-3.5 px-3.5 sm:px-5 whitespace-nowrap">
                                 <div>
                                   <div className="font-extrabold text-slate-900 group-hover:text-[#1E60F3] transition-colors">
                                     <span>{driverTitle}</span>{' '}
@@ -1026,22 +1026,22 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
                               </td>
 
                               {/* 3. 이동 경로 */}
-                              <td className="py-3.5 px-5">
-                                <div className="flex items-center gap-1.5 text-xs text-slate-700 font-medium">
+                              <td className="py-3.5 px-3.5 sm:px-5 whitespace-nowrap">
+                                <div className="flex items-center gap-1.5 text-xs text-slate-700 font-medium whitespace-nowrap">
                                   <img
                                     src="/images/icons/excel/icon_position.png"
                                     alt="위치"
                                     className="w-5 h-5 object-contain shrink-0 select-none"
                                     draggable={false}
                                   />
-                                  <span className="font-bold text-slate-900">{item.pickupLocation}</span>
-                                  <span className="text-slate-400 font-bold">➔</span>
-                                  <span className="text-slate-700">{item.dropoffLocation}</span>
+                                  <span className="font-bold text-slate-900 whitespace-nowrap">{item.pickupLocation}</span>
+                                  <span className="text-slate-400 font-bold shrink-0">➔</span>
+                                  <span className="text-slate-700 whitespace-nowrap">{item.dropoffLocation}</span>
                                 </div>
                               </td>
 
                               {/* 4. 운영 상태 & 최종 업데이트 병합 (컬럼 다이어트) */}
-                              <td className="py-3.5 px-5 whitespace-nowrap">
+                              <td className="py-3.5 px-3.5 sm:px-5 whitespace-nowrap">
                                 <div className="flex flex-col items-start gap-0.5">
                                   <span
                                     className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold border shadow-2xs ${statusConfig.badgeClass}`}
@@ -1056,7 +1056,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
                               </td>
 
                               {/* 5. 단일 도착 알림 버튼 (토스 스타일 단순화) */}
-                              <td className="py-3.5 px-5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                              <td className="py-3.5 px-3.5 sm:px-5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                                 <button
                                   type="button"
                                   onClick={(e) => handleSendArrivalNotice(e, item)}

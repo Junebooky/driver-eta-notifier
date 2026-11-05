@@ -481,10 +481,11 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
             setDropdownSearch('');
             onOpenNewBooking();
           }}
-          className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white text-xs font-bold transition-all cursor-pointer shadow-xs shrink-0"
+          aria-label="예약 추가"
+          className="w-10 h-10 sm:w-auto sm:h-auto sm:px-4 sm:py-2 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white text-xs font-bold transition-all cursor-pointer shadow-xs shrink-0 flex items-center justify-center gap-1.5"
         >
-
-          <span>+ 예약 추가</span>
+          <Plus className="w-5 h-5 sm:hidden stroke-[2.5]" />
+          <span className="hidden sm:inline">+ 예약 추가</span>
         </button>
       </div>
 
@@ -500,11 +501,10 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
             haptics.lightTap();
             onSelectTab('all');
           }}
-          className={`rounded-full px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
-            activeTab === 'all'
-              ? 'bg-[#0050FF] text-white font-bold shadow-sm'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium'
-          }`}
+          className={`rounded-full px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${activeTab === 'all'
+            ? 'bg-[#0050FF] text-white font-bold shadow-sm'
+            : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium'
+            }`}
           title="오늘 및 향후 모든 배차 일정"
         >
           <span>전체 예정</span>
@@ -517,11 +517,10 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
             haptics.lightTap();
             onSelectTab('today');
           }}
-          className={`rounded-full px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
-            activeTab === 'today'
-              ? 'bg-[#0050FF] text-white font-bold shadow-sm'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium'
-          }`}
+          className={`rounded-full px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${activeTab === 'today'
+            ? 'bg-[#0050FF] text-white font-bold shadow-sm'
+            : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium'
+            }`}
         >
           <span>오늘 출발</span>
         </button>
@@ -533,11 +532,10 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
             haptics.lightTap();
             onSelectTab('tomorrow');
           }}
-          className={`rounded-full px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
-            activeTab === 'tomorrow'
-              ? 'bg-[#0050FF] text-white font-bold shadow-sm'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium'
-          }`}
+          className={`rounded-full px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${activeTab === 'tomorrow'
+            ? 'bg-[#0050FF] text-white font-bold shadow-sm'
+            : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium'
+            }`}
         >
           <span>내일 출발</span>
         </button>
@@ -549,13 +547,12 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
             haptics.lightTap();
             onSelectTab('action');
           }}
-          className={`rounded-full px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
-            activeTab === 'action'
-              ? 'bg-[#0050FF] text-white font-bold shadow-sm'
-              : tabCounts.action > 0
-                ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100/70 font-semibold'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium'
-          }`}
+          className={`rounded-full px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${activeTab === 'action'
+            ? 'bg-[#0050FF] text-white font-bold shadow-sm'
+            : tabCounts.action > 0
+              ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100/70 font-semibold'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium'
+            }`}
         >
           <span>확인 필요</span>
         </button>
@@ -567,11 +564,10 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
             haptics.lightTap();
             onSelectTab('past');
           }}
-          className={`md:ml-auto rounded-full px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
-            activeTab === 'past'
-              ? 'bg-[#0050FF] text-white font-bold shadow-sm'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium'
-          }`}
+          className={`md:ml-auto rounded-full px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${activeTab === 'past'
+            ? 'bg-[#0050FF] text-white font-bold shadow-sm'
+            : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium'
+            }`}
           title="출발 일시가 오늘 이전인 과거 배차 기록 (정산용 데이터 보존)"
         >
           <History className="w-3.5 h-3.5 shrink-0" />
@@ -607,7 +603,7 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="고객사, 승객명, 목적지로 찾아보세요"
-            className="w-full pl-9 pr-3.5 py-2.5 bg-white border border-slate-200/90 rounded-2xl text-slate-800 placeholder:text-slate-400 font-semibold shadow-2xs focus:outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-[#1E60F3]/15 transition-all"
+            className="w-full pl-9 pr-3.5 py-2.5 bg-white border border-slate-200/90 rounded-2xl text-[11px] sm:text-xs text-slate-800 placeholder:text-[11px] sm:placeholder:text-xs placeholder:text-slate-400 font-semibold shadow-2xs focus:outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-[#1E60F3]/15 transition-all"
           />
         </div>
 
@@ -621,11 +617,10 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
           }}
           aria-label="배차 필터 열기"
           title="배차 필터"
-          className={`w-10 h-10 rounded-2xl border flex items-center justify-center shrink-0 transition-all cursor-pointer shadow-2xs relative ${
-            hasActiveFilter
-              ? 'bg-[#EBF3FF]/80 border-[#1E60F3]/40 text-[#1E60F3]'
-              : 'bg-white border-slate-200/90 hover:border-slate-300 text-slate-700 hover:bg-slate-50'
-          }`}
+          className={`w-10 h-10 rounded-2xl border flex items-center justify-center shrink-0 transition-all cursor-pointer shadow-2xs relative ${hasActiveFilter
+            ? 'bg-[#EBF3FF]/80 border-[#1E60F3]/40 text-[#1E60F3]'
+            : 'bg-white border-slate-200/90 hover:border-slate-300 text-slate-700 hover:bg-slate-50'
+            }`}
         >
           <SlidersHorizontal className="w-4 h-4" />
           {hasActiveFilter && (
@@ -688,17 +683,15 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                 <button
                   type="button"
                   onClick={() => toggleDropdown('status')}
-                  className={`w-full px-3.5 py-2.5 rounded-xl border font-bold flex items-center justify-between gap-2 transition-all cursor-pointer shadow-2xs ${
-                    statusFilter !== 'all' || openDropdown === 'status'
-                      ? 'bg-[#EBF3FF]/60 border-[#1E60F3]/40 text-[#1E60F3]'
-                      : 'bg-white border-slate-200/90 hover:border-slate-300 text-slate-700'
-                  }`}
+                  className={`w-full px-3.5 py-2.5 rounded-xl border font-bold flex items-center justify-between gap-2 transition-all cursor-pointer shadow-2xs ${statusFilter !== 'all' || openDropdown === 'status'
+                    ? 'bg-[#EBF3FF]/60 border-[#1E60F3]/40 text-[#1E60F3]'
+                    : 'bg-white border-slate-200/90 hover:border-slate-300 text-slate-700'
+                    }`}
                 >
                   <span className="truncate">{selectedStatusLabel}</span>
                   <ChevronDown
-                    className={`w-4 h-4 shrink-0 transition-transform duration-200 ${
-                      openDropdown === 'status' ? 'rotate-180 text-[#1E60F3]' : 'text-slate-400'
-                    }`}
+                    className={`w-4 h-4 shrink-0 transition-transform duration-200 ${openDropdown === 'status' ? 'rotate-180 text-[#1E60F3]' : 'text-slate-400'
+                      }`}
                   />
                 </button>
 
@@ -744,11 +737,10 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                                 setOpenDropdown(null);
                                 setDropdownSearch('');
                               }}
-                              className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
-                                isSelected
-                                  ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
-                                  : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
-                              }`}
+                              className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${isSelected
+                                ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
+                                : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
+                                }`}
                             >
                               <span className="flex items-center gap-2 truncate">
                                 <span className={`w-2 h-2 rounded-full shrink-0 ${opt.dotClass}`} />
@@ -772,11 +764,10 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                 <button
                   type="button"
                   onClick={() => toggleDropdown('driver')}
-                  className={`w-full px-3.5 py-2.5 rounded-xl border font-bold flex items-center justify-between gap-2 transition-all cursor-pointer shadow-2xs ${
-                    driverFilter !== 'all' || openDropdown === 'driver'
-                      ? 'bg-[#EBF3FF]/60 border-[#1E60F3]/40 text-[#1E60F3]'
-                      : 'bg-white border-slate-200/90 hover:border-slate-300 text-slate-700'
-                  }`}
+                  className={`w-full px-3.5 py-2.5 rounded-xl border font-bold flex items-center justify-between gap-2 transition-all cursor-pointer shadow-2xs ${driverFilter !== 'all' || openDropdown === 'driver'
+                    ? 'bg-[#EBF3FF]/60 border-[#1E60F3]/40 text-[#1E60F3]'
+                    : 'bg-white border-slate-200/90 hover:border-slate-300 text-slate-700'
+                    }`}
                 >
                   <span className="flex items-center gap-2 truncate">
                     {driverFilter !== 'all' && (
@@ -797,9 +788,8 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                     </span>
                   </span>
                   <ChevronDown
-                    className={`w-4 h-4 shrink-0 transition-transform duration-200 ${
-                      openDropdown === 'driver' ? 'rotate-180 text-[#1E60F3]' : 'text-slate-400'
-                    }`}
+                    className={`w-4 h-4 shrink-0 transition-transform duration-200 ${openDropdown === 'driver' ? 'rotate-180 text-[#1E60F3]' : 'text-slate-400'
+                      }`}
                   />
                 </button>
 
@@ -837,11 +827,10 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                             setOpenDropdown(null);
                             setDropdownSearch('');
                           }}
-                          className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
-                            driverFilter === 'all'
-                              ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
-                              : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
-                          }`}
+                          className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${driverFilter === 'all'
+                            ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
+                            : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
+                            }`}
                         >
                           <span>전체 기사</span>
                           {driverFilter === 'all' && (
@@ -872,11 +861,10 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                                 setOpenDropdown(null);
                                 setDropdownSearch('');
                               }}
-                              className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
-                                isSelected
-                                  ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
-                                  : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
-                              }`}
+                              className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${isSelected
+                                ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
+                                : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
+                                }`}
                             >
                               <span className="flex items-center gap-2 min-w-0">
                                 <img
@@ -893,11 +881,10 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                                 </span>
                                 {drvObj && (
                                   <span
-                                    className={`px-1.5 py-0.5 rounded-md text-[10px] font-extrabold shrink-0 ${
-                                      isEmployed
-                                        ? 'bg-blue-50 text-[#1E60F3]'
-                                        : 'bg-slate-100 text-slate-500'
-                                    }`}
+                                    className={`px-1.5 py-0.5 rounded-md text-[10px] font-extrabold shrink-0 ${isEmployed
+                                      ? 'bg-blue-50 text-[#1E60F3]'
+                                      : 'bg-slate-100 text-slate-500'
+                                      }`}
                                   >
                                     {isEmployed ? '소속' : '프리랜서'}
                                   </span>
@@ -921,17 +908,15 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                 <button
                   type="button"
                   onClick={() => toggleDropdown('vehicle')}
-                  className={`w-full px-3.5 py-2.5 rounded-xl border font-bold flex items-center justify-between gap-2 transition-all cursor-pointer shadow-2xs ${
-                    vehicleFilter !== 'all' || openDropdown === 'vehicle'
-                      ? 'bg-[#EBF3FF]/60 border-[#1E60F3]/40 text-[#1E60F3]'
-                      : 'bg-white border-slate-200/90 hover:border-slate-300 text-slate-700'
-                  }`}
+                  className={`w-full px-3.5 py-2.5 rounded-xl border font-bold flex items-center justify-between gap-2 transition-all cursor-pointer shadow-2xs ${vehicleFilter !== 'all' || openDropdown === 'vehicle'
+                    ? 'bg-[#EBF3FF]/60 border-[#1E60F3]/40 text-[#1E60F3]'
+                    : 'bg-white border-slate-200/90 hover:border-slate-300 text-slate-700'
+                    }`}
                 >
                   <span className="truncate">{selectedVehicleLabel}</span>
                   <ChevronDown
-                    className={`w-4 h-4 shrink-0 transition-transform duration-200 ${
-                      openDropdown === 'vehicle' ? 'rotate-180 text-[#1E60F3]' : 'text-slate-400'
-                    }`}
+                    className={`w-4 h-4 shrink-0 transition-transform duration-200 ${openDropdown === 'vehicle' ? 'rotate-180 text-[#1E60F3]' : 'text-slate-400'
+                      }`}
                   />
                 </button>
 
@@ -969,11 +954,10 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                             setOpenDropdown(null);
                             setDropdownSearch('');
                           }}
-                          className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
-                            vehicleFilter === 'all'
-                              ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
-                              : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
-                          }`}
+                          className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${vehicleFilter === 'all'
+                            ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
+                            : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
+                            }`}
                         >
                           <span>전체 차량</span>
                           {vehicleFilter === 'all' && (
@@ -998,11 +982,10 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                                 setOpenDropdown(null);
                                 setDropdownSearch('');
                               }}
-                              className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
-                                isSelected
-                                  ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
-                                  : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
-                              }`}
+                              className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${isSelected
+                                ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
+                                : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
+                                }`}
                             >
                               <span className="flex flex-col min-w-0">
                                 <span className="truncate font-extrabold text-slate-900">
@@ -1030,19 +1013,17 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                 <button
                   type="button"
                   onClick={() => toggleDropdown('customer')}
-                  className={`w-full px-3.5 py-2.5 rounded-xl border font-bold flex items-center justify-between gap-2 transition-all cursor-pointer shadow-2xs ${
-                    customerFilter !== 'all' || openDropdown === 'customer'
-                      ? 'bg-[#EBF3FF]/60 border-[#1E60F3]/40 text-[#1E60F3]'
-                      : 'bg-white border-slate-200/90 hover:border-slate-300 text-slate-700'
-                  }`}
+                  className={`w-full px-3.5 py-2.5 rounded-xl border font-bold flex items-center justify-between gap-2 transition-all cursor-pointer shadow-2xs ${customerFilter !== 'all' || openDropdown === 'customer'
+                    ? 'bg-[#EBF3FF]/60 border-[#1E60F3]/40 text-[#1E60F3]'
+                    : 'bg-white border-slate-200/90 hover:border-slate-300 text-slate-700'
+                    }`}
                 >
                   <span className="truncate">
                     {customerFilter === 'all' ? '전체 고객사' : customerFilter}
                   </span>
                   <ChevronDown
-                    className={`w-4 h-4 shrink-0 transition-transform duration-200 ${
-                      openDropdown === 'customer' ? 'rotate-180 text-[#1E60F3]' : 'text-slate-400'
-                    }`}
+                    className={`w-4 h-4 shrink-0 transition-transform duration-200 ${openDropdown === 'customer' ? 'rotate-180 text-[#1E60F3]' : 'text-slate-400'
+                      }`}
                   />
                 </button>
 
@@ -1080,11 +1061,10 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                             setOpenDropdown(null);
                             setDropdownSearch('');
                           }}
-                          className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
-                            customerFilter === 'all'
-                              ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
-                              : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
-                          }`}
+                          className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${customerFilter === 'all'
+                            ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
+                            : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
+                            }`}
                         >
                           <span>전체 고객사</span>
                           {customerFilter === 'all' && (
@@ -1109,11 +1089,10 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                                 setOpenDropdown(null);
                                 setDropdownSearch('');
                               }}
-                              className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
-                                isSelected
-                                  ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
-                                  : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
-                              }`}
+                              className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${isSelected
+                                ? 'bg-[#EBF3FF] text-[#1E60F3] border border-blue-200/70 shadow-2xs'
+                                : 'bg-white hover:bg-slate-50 text-slate-700 border border-transparent'
+                                }`}
                             >
                               <span className="truncate">{c}</span>
                               {isSelected && (
@@ -1217,20 +1196,28 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                 {filteredList.length === 0 ? (
                   <tr>
                     <td colSpan={10} className="h-[420px] py-12 text-center align-middle text-slate-400 font-medium">
-                      <p>현재 조건에 해당하는 예약/배차 내역이 없습니다.</p>
-                      {activeTab !== 'past' && tabCounts.past > 0 && (
-                        <p className="mt-2 text-xs text-slate-400">
-                          출발 일시가 지난 일정은{' '}
-                          <button
-                            type="button"
-                            onClick={() => onSelectTab('past')}
-                            className="font-bold text-[#1E60F3] hover:underline cursor-pointer"
-                          >
-                            지난 일정 ({tabCounts.past}건)
-                          </button>
-                          에서 확인할 수 있어요.
-                        </p>
-                      )}
+                      <div className="flex flex-col items-center justify-center gap-2.5">
+                        <img
+                          src="/images/icons/reservations/icon_no_schedule.png"
+                          alt="일정 없음"
+                          className="w-14 h-14 object-contain select-none"
+                          draggable={false}
+                        />
+                        <p>현재 조건에 해당하는 예약/배차 내역이 없습니다.</p>
+                        {activeTab !== 'past' && tabCounts.past > 0 && (
+                          <p className="text-xs text-slate-400">
+                            출발 일시가 지난 일정은{' '}
+                            <button
+                              type="button"
+                              onClick={() => onSelectTab('past')}
+                              className="font-bold text-[#1E60F3] hover:underline cursor-pointer"
+                            >
+                              지난 일정 ({tabCounts.past}건)
+                            </button>
+                            에서 확인할 수 있어요.
+                          </p>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ) : (
