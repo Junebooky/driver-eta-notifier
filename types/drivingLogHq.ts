@@ -34,7 +34,8 @@ export interface HqDrivingLog {
   drivingDate: string; // e.g. "10/24"
   rawDate: string; // e.g. "2024-10-24"
   driverName: string;
-  passengerCount?: number; // e.g. "김민수"
+  passengerName?: string; // Snapshot of driver's profile at the time this log was saved
+  passengerCount?: number; // Only when explicitly stated in the profile
   customerName: string; // e.g. "호텔신라"
   vehicleModel: string; // e.g. "S클래스 8920"
   vehiclePlate: string; // e.g. "서울 12가 8920"
