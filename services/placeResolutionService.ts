@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { DbOrgPlaceRow } from '@/types';
+import { rankAndDedupeTmapPois, TmapPoiItem } from '@/lib/places/tmapSearchEngine';
 
 export interface PlaceCandidate {
   name: string;
@@ -144,33 +145,45 @@ export async function searchTmapCandidates(keyword: string): Promise<PlaceCandid
 
     const data = await res.json();
     const pois = data?.searchPoiInfo?.pois?.poi;
-    if (!Array.isArray(pois)) return [];
+    const rawItems: TmapPoiItem[] = Array.isArray(pois)
+      ? pois.map((poi: {
+          id?: string;
+          name?: string;
+          upperAddrName?: string;
+          middleAddrName?: string;
+          lowerAddrName?: string;
+          detailAddrName?: string;
+          roadName?: string;
+          firstBuildNo?: string;
+          noorLat?: string;
+          noorLon?: string;
+          lowerBizName?: string;
+        }, idx: number) => {
+          const roadAddress = poi.roadName
+            ? `${poi.upperAddrName || ''} ${poi.middleAddrName || ''} ${poi.roadName} ${poi.firstBuildNo || ''}`.trim()
+            : `${poi.upperAddrName || ''} ${poi.middleAddrName || ''} ${poi.lowerAddrName || ''} ${poi.detailAddrName || ''}`.trim();
 
-    return pois.map((poi: {
-      name?: string;
-      upperAddrName?: string;
-      middleAddrName?: string;
-      lowerAddrName?: string;
-      detailAddrName?: string;
-      roadName?: string;
-      firstBuildNo?: string;
-      noorLat?: string;
-      noorLon?: string;
-      lowerBizName?: string;
-    }) => {
-      const roadAddress = poi.roadName
-        ? `${poi.upperAddrName || ''} ${poi.middleAddrName || ''} ${poi.roadName} ${poi.firstBuildNo || ''}`.trim()
-        : `${poi.upperAddrName || ''} ${poi.middleAddrName || ''} ${poi.lowerAddrName || ''} ${poi.detailAddrName || ''}`.trim();
+          return {
+            id: poi.id || `cand_${idx}`,
+            name: poi.name || keyword,
+            address: roadAddress,
+            lat: parseFloat(poi.noorLat || '0'),
+            lng: parseFloat(poi.noorLon || '0'),
+            originalIndex: idx,
+            lowerBizName: poi.lowerBizName,
+          };
+        })
+      : [];
 
-      return {
-        name: poi.name || keyword,
-        road_address: roadAddress,
-        lat: parseFloat(poi.noorLat || '0'),
-        lng: parseFloat(poi.noorLon || '0'),
-        lowerBizName: poi.lowerBizName,
-        isVerified: false,
-      };
-    });
+    const ranked = rankAndDedupeTmapPois(rawItems, keyword);
+    return ranked.slice(0, 10).map((item) => ({
+      name: item.name,
+      road_address: item.address,
+      lat: item.lat,
+      lng: item.lng,
+      lowerBizName: item.lowerBizName,
+      isVerified: false,
+    }));
   } catch (err) {
     console.error('[PlaceResolution] Failed to search TMAP POI candidates:', err);
     return [];

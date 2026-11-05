@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Clock, Search, MapPin, Map, MoreVertical, Loader2, AlertCircle } from 'lucide-react';
 import { RouteStopItem, isValidTimeHHMM } from '@/utils/drivingLog';
 import { haptics } from '@/utils/haptics';
+import { searchTmapPoisClient } from '@/lib/places/tmapSearchEngine';
 
 interface AddScheduleModalProps {
   isOpen: boolean;
@@ -97,18 +98,13 @@ const AddScheduleModalContent: React.FC<{
     setIsSearching(true);
     searchTimeoutRef.current = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/search?keyword=${encodeURIComponent(val.trim())}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data && Array.isArray(data.pois)) {
-            setSearchSuggestions(
-              (data.pois as PoiApiItem[]).slice(0, 5).map((p) => ({
-                name: p.name,
-                address: p.address,
-              }))
-            );
-          }
-        }
+        const pois = await searchTmapPoisClient(val.trim());
+        setSearchSuggestions(
+          pois.slice(0, 5).map((p) => ({
+            name: p.name,
+            address: p.address,
+          }))
+        );
       } catch (err) {
         console.warn('Live search failed:', err);
       } finally {

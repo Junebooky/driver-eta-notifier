@@ -13,6 +13,13 @@ import {
   Plus,
 } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
+import {
+  sanitizeSearchQuery,
+  getCachedTmapPoisClient,
+  searchTmapPoisClient,
+} from '@/lib/places/tmapSearchEngine';
+
+export { sanitizeSearchQuery };
 
 interface CustomPresetModalProps {
   isOpen: boolean;
@@ -41,22 +48,6 @@ interface PoiResult {
   lng: number;
 }
 
-/**
- * Sanitize search query by stripping commas and dong/ho/floor patterns
- * (e.g., '4108동', '101호', 'B1층', '3층', etc.) to ensure building-level retrieval.
- */
-export function sanitizeSearchQuery(query: string): string {
-  const detailPattern = /(?<=\s|^)(?:[0-9]+동|[0-9]+호|[0-9B]+층|[A-Za-z]동)(?=\s|$)/g;
-  const cleanQuery = query
-    .replace(detailPattern, '')
-    .replace(/[,]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return cleanQuery || query;
-}
-
-// Client-side in-memory search cache for 0ms instant retrieval
-const customPresetSearchCache = new Map<string, PoiResult[]>();
 const ADMIN_MODE_KEY = 'protocol_cockpit_admin_mode_v1';
 
 export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
@@ -281,12 +272,12 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
       return;
     }
 
-    if (customPresetSearchCache.has(query)) {
+    const cached = getCachedTmapPoisClient(query, 37.5665, 126.9780);
+    if (cached) {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
         abortControllerRef.current = null;
       }
-      const cached = customPresetSearchCache.get(query)!;
       setSearchResults(cached);
       setIsDropdownOpen(cached.length > 0);
       setIsSearching(false);
@@ -305,22 +296,17 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
       abortControllerRef.current = controller;
 
       try {
-        const res = await fetch(`/api/search?keyword=${encodeURIComponent(query)}&lat=37.5665&lng=126.9780`, {
+        const pois = await searchTmapPoisClient(query, {
+          lat: 37.5665,
+          lng: 126.9780,
           signal: controller.signal,
         });
-        if (res.ok) {
-          const data = await res.json();
-          const pois: PoiResult[] = data.pois || [];
-          customPresetSearchCache.set(query, pois);
-          if (!isPlaceSelectedRef.current) {
-            setSearchResults(pois);
-            setIsDropdownOpen(pois.length > 0);
-          }
-          if (pois.length === 0) {
-            setSearchError('추천 검색 결과가 없습니다.');
-          }
-        } else {
-          setSearchError('검색 서버 응답에 실패했습니다.');
+        if (!isPlaceSelectedRef.current) {
+          setSearchResults(pois);
+          setIsDropdownOpen(pois.length > 0);
+        }
+        if (pois.length === 0) {
+          setSearchError('추천 검색 결과가 없습니다.');
         }
       } catch (err: any) {
         if (err?.name === 'AbortError') return;

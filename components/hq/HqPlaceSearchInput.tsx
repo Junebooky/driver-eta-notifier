@@ -3,6 +3,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MapPin, Flag, Loader2, X, Navigation, CheckCircle2 } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
+import {
+  sanitizeSearchQuery,
+  getCachedTmapPoisClient,
+  searchTmapPoisClient,
+} from '@/lib/places/tmapSearchEngine';
+
+export { sanitizeSearchQuery };
 
 export interface PoiResult {
   id: string;
@@ -11,19 +18,6 @@ export interface PoiResult {
   lat: number;
   lng: number;
 }
-
-export function sanitizeSearchQuery(query: string): string {
-  const detailPattern = /(?<=\s|^)(?:[0-9]+동|[0-9]+호|[0-9B]+층|[A-Za-z]동)(?=\s|$)/g;
-  const cleanQuery = query
-    .replace(detailPattern, '')
-    .replace(/[,]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return cleanQuery || query;
-}
-
-// In-memory instant cache for TMAP POI searches
-const placeSearchCache = new Map<string, PoiResult[]>();
 
 export interface HqPlaceSearchInputProps {
   label?: string;
@@ -112,9 +106,9 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
 
     const cleanQuery = sanitizeSearchQuery(trimmed);
 
-    // Instant in-memory cache check
-    if (placeSearchCache.has(cleanQuery)) {
-      const cached = placeSearchCache.get(cleanQuery)!;
+    // Instant unified in-memory cache check
+    const cached = getCachedTmapPoisClient(cleanQuery, 37.5665, 126.9780);
+    if (cached) {
       setSearchResults(cached);
       if (!isConfirmed) {
         setIsDropdownOpen(cached.length > 0);
@@ -134,24 +128,17 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
       abortControllerRef.current = controller;
 
       try {
-        const res = await fetch(
-          `/api/search?keyword=${encodeURIComponent(cleanQuery)}&lat=37.5665&lng=126.9780`,
-          { signal: controller.signal }
-        );
-
-        if (res.ok) {
-          const data = await res.json();
-          const pois: PoiResult[] = data.pois || [];
-          placeSearchCache.set(cleanQuery, pois);
-          setSearchResults(pois);
-          if (!isConfirmed) {
-            setIsDropdownOpen(pois.length > 0);
-          }
-          if (pois.length === 0) {
-            setSearchError('추천 검색 결과가 없습니다.');
-          }
-        } else {
-          setSearchError('TMAP 검색 서버 응답 실패');
+        const pois = await searchTmapPoisClient(cleanQuery, {
+          lat: 37.5665,
+          lng: 126.9780,
+          signal: controller.signal,
+        });
+        setSearchResults(pois);
+        if (!isConfirmed) {
+          setIsDropdownOpen(pois.length > 0);
+        }
+        if (pois.length === 0) {
+          setSearchError('추천 검색 결과가 없습니다.');
         }
       } catch (err: unknown) {
         if ((err as Error)?.name === 'AbortError') return;

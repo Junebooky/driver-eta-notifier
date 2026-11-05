@@ -1,5 +1,6 @@
 import assert from 'node:assert';
 import { sanitizeSearchQuery } from '../components/hq/HqPlaceSearchInput';
+import { rankAndDedupeTmapPois } from '../lib/places/tmapSearchEngine';
 
 async function runPlaceSearchTests() {
   console.log('--- Testing TMAP Place Search Integration ---');
@@ -11,6 +12,28 @@ async function runPlaceSearchTests() {
   assert.strictEqual(sanitizeSearchQuery('조선팰리스, B1층'), '조선팰리스');
   assert.strictEqual(sanitizeSearchQuery('인천공항 제1여객터미널'), '인천공항 제1여객터미널');
   console.log('✓ Query sanitization correctly removes dong/ho/floor specifiers and commas');
+
+  // 1-2. Unified TMAP Search Engine canonical airport terminal priority
+  console.log('1-2. Testing unified airport terminal ranking (T1/T2 & Domestic/International first)...');
+  const incheonRanked = rankAndDedupeTmapPois(
+    [
+      {
+        id: 'legacy-1',
+        name: '인천국제공항 제1여객터미널 입국장',
+        address: '인천 중구 공항로 272',
+        lat: 37.4492,
+        lng: 126.4543,
+      },
+    ],
+    '인천국제공항'
+  );
+  assert.strictEqual(incheonRanked[0]?.name, '인천국제공항 제1여객터미널');
+  assert.strictEqual(incheonRanked[1]?.name, '인천국제공항 제2여객터미널');
+
+  const gimpoRanked = rankAndDedupeTmapPois([], '김포공항');
+  assert.strictEqual(gimpoRanked[0]?.name, '김포국제공항 국내선');
+  assert.strictEqual(gimpoRanked[1]?.name, '김포국제공항 국제선');
+  console.log('✓ Unified airport terminal ranking verified.');
 
   // 2. TMAP Search API Endpoint verification (internal fetch to localhost:3000)
   console.log('2. Testing TMAP POI live API search...');

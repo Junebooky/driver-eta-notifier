@@ -2,7 +2,11 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { LocationPreset } from '@/types';
-import { sanitizeSearchQuery } from './CustomPresetModal';
+import {
+  sanitizeSearchQuery,
+  getCachedTmapPoisClient,
+  searchTmapPoisClient,
+} from '@/lib/places/tmapSearchEngine';
 import {
   X,
   Search,
@@ -226,13 +230,16 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
       return;
     }
 
-    // 0ms Cache hit
-    if (locationSearchCache.has(query)) {
+    const centerLat = homeLocation?.lat || 37.5665;
+    const centerLng = homeLocation?.lng || 126.9780;
+
+    // 0ms Unified Cache hit
+    const cached = getCachedTmapPoisClient(query, centerLat, centerLng);
+    if (cached) {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
         abortControllerRef.current = null;
       }
-      const cached = locationSearchCache.get(query)!;
       setSearchResults(cached);
       setIsSearching(false);
       setSearchError(cached.length === 0 ? '추천 검색 결과가 없습니다.' : null);
@@ -250,25 +257,14 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
       abortControllerRef.current = controller;
 
       try {
-        const centerLat = homeLocation?.lat || 37.5665;
-        const centerLng = homeLocation?.lng || 126.9780;
-        const res = await fetch(
-          `/api/search?keyword=${encodeURIComponent(query)}&lat=${centerLat}&lng=${centerLng}`,
-          {
-            signal: controller.signal,
-          }
-        );
-
-        if (res.ok) {
-          const data = await res.json();
-          const pois: PoiResult[] = data.pois || [];
-          locationSearchCache.set(query, pois);
-          setSearchResults(pois);
-          if (pois.length === 0) {
-            setSearchError('추천 검색 결과가 없습니다.');
-          }
-        } else {
-          setSearchError('검색 서버 응답에 실패했습니다.');
+        const pois = await searchTmapPoisClient(query, {
+          lat: centerLat,
+          lng: centerLng,
+          signal: controller.signal,
+        });
+        setSearchResults(pois);
+        if (pois.length === 0) {
+          setSearchError('추천 검색 결과가 없습니다.');
         }
       } catch (err: any) {
         if (err?.name === 'AbortError') return;

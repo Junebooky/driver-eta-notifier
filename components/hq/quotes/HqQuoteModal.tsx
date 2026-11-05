@@ -120,6 +120,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
 
   // Step 3: 차량 및 옵션
   const [vehicleProductCode, setVehicleProductCode] = useState<string>(initialVehicleProductCode || 'sprinter_519_premium');
+  const [selectedVehicleCodes, setSelectedVehicleCodes] = useState<string[]>([initialVehicleProductCode || 'sprinter_519_premium']);
   const [vehicleCount, setVehicleCount] = useState<number>(1);
   const [serviceMode, setServiceMode] = useState<'with_driver' | 'vehicle_only'>('with_driver');
   const [englishOption, setEnglishOption] = useState<'basic_included' | 'fluent_upgrade'>('basic_included');
@@ -130,6 +131,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
   useEffect(() => {
     if (isOpen && initialVehicleProductCode) {
       setVehicleProductCode(initialVehicleProductCode);
+      setSelectedVehicleCodes([initialVehicleProductCode]);
       const sku = STANDARD_VEHICLE_SKU_MAPPINGS.find((m) => m.vehicleProductCode === initialVehicleProductCode);
       if (sku) {
         setVehicleCategoryFilter(sku.tier as any);
@@ -174,45 +176,130 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
       setErrorMessage(null);
       try {
         await ensureClientAuth('hq');
-        const selectedSkuObj = STANDARD_VEHICLE_SKU_MAPPINGS.find(
-          (m) => m.vehicleProductCode === vehicleProductCode
-        );
+        const activeCodes = selectedVehicleCodes.length > 0 ? selectedVehicleCodes : [vehicleProductCode];
+        const totalVehicles = Math.max(1, Number(vehicleCount));
 
-        const payload: QuoteCalculationInput = {
-          customerName,
-          contactPerson,
-          contactPhone,
-          contactEmail,
-          date,
-          serviceStartTime,
-          serviceEndTime,
-          serviceHours: Number(serviceHours),
-          origin,
-          destination,
-          vehicleModel: selectedSkuObj?.vehicleProductLabel || '벤츠 스프린터 519 최고급형',
-          vehicleProductCode,
-          tariffVersion: OFFICIAL_TARIFF_VERSION,
-          serviceCategory,
-          vehicleCount: Number(vehicleCount),
-          driverLanguage: englishOption === 'fluent_upgrade' ? 'en' : 'ko',
-          englishOption,
-          excessKm: Number(excessKm) || 0,
-          serviceMode,
-          notes,
-        };
+        if (activeCodes.length <= 1) {
+          const code = activeCodes[0] || vehicleProductCode;
+          const selectedSkuObj = STANDARD_VEHICLE_SKU_MAPPINGS.find(
+            (m) => m.vehicleProductCode === code
+          );
 
-        const res = await fetch('/api/quotes/calculate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
+          const payload: QuoteCalculationInput = {
+            customerName,
+            contactPerson,
+            contactPhone,
+            contactEmail,
+            date,
+            serviceStartTime,
+            serviceEndTime,
+            serviceHours: Number(serviceHours),
+            origin,
+            destination,
+            vehicleModel: selectedSkuObj?.vehicleProductLabel || '벤츠 스프린터 519 최고급형',
+            vehicleProductCode: code,
+            tariffVersion: OFFICIAL_TARIFF_VERSION,
+            serviceCategory,
+            vehicleCount: totalVehicles,
+            driverLanguage: englishOption === 'fluent_upgrade' ? 'en' : 'ko',
+            englishOption,
+            excessKm: Number(excessKm) || 0,
+            serviceMode,
+            notes,
+          };
 
-        const data = await res.json();
-        if (isMounted) {
-          if (data.ok && data.quote) {
-            setCalculatedQuote(data.quote);
-          } else {
-            setErrorMessage(data.error || '견적 계산에 실패했습니다.');
+          const res = await fetch('/api/quotes/calculate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+
+          const data = await res.json();
+          if (isMounted) {
+            if (data.ok && data.quote) {
+              setCalculatedQuote(data.quote);
+            } else {
+              setErrorMessage(data.error || '견적 계산에 실패했습니다.');
+            }
+          }
+        } else {
+          // Multi-vehicle selection (when vehicleCount >= 2 and multiple vehicle SKUs are selected)
+          const k = activeCodes.length;
+          const basePerCode = Math.floor(totalVehicles / k);
+          const remainder = totalVehicles % k;
+
+          const itemResponses = await Promise.all(
+            activeCodes.map(async (code, idx) => {
+              const countForThisCode = Math.max(1, basePerCode + (idx < remainder ? 1 : 0));
+              const skuObj = STANDARD_VEHICLE_SKU_MAPPINGS.find((m) => m.vehicleProductCode === code);
+              const payload: QuoteCalculationInput = {
+                customerName,
+                contactPerson,
+                contactPhone,
+                contactEmail,
+                date,
+                serviceStartTime,
+                serviceEndTime,
+                serviceHours: Number(serviceHours),
+                origin,
+                destination,
+                vehicleModel: skuObj?.vehicleProductLabel || '벤츠 스프린터 519 최고급형',
+                vehicleProductCode: code,
+                tariffVersion: OFFICIAL_TARIFF_VERSION,
+                serviceCategory,
+                vehicleCount: countForThisCode,
+                driverLanguage: englishOption === 'fluent_upgrade' ? 'en' : 'ko',
+                englishOption,
+                excessKm: Number(excessKm) || 0,
+                serviceMode,
+                notes,
+              };
+              const res = await fetch('/api/quotes/calculate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+              });
+              const data = await res.json();
+              return { data, countForThisCode, label: skuObj?.vehicleProductLabel || code };
+            })
+          );
+
+          if (isMounted) {
+            const failed = itemResponses.find((r) => !r.data.ok || !r.data.quote);
+            if (failed) {
+              setErrorMessage(failed.data.error || '견적 계산에 실패했습니다.');
+            } else {
+              const quotes: HqQuoteItem[] = itemResponses.map((r) => r.data.quote);
+              const anyQuoteRequired = quotes.some((q) => q.quoteRequired);
+              const combinedModelLabel = itemResponses
+                .map((r) => (r.countForThisCode > 1 ? `${r.label} (${r.countForThisCode}대)` : r.label))
+                .join(', ');
+
+              const sumNullable = (getter: (q: HqQuoteItem) => number | null | undefined): number | null => {
+                if (anyQuoteRequired) return null;
+                return quotes.reduce((acc, q) => acc + (getter(q) || 0), 0);
+              };
+
+              const combinedSupply = sumNullable((q) => q.supplyPriceTotal);
+              const combinedVat = combinedSupply !== null ? Math.round(combinedSupply * 0.1) : null;
+              const combinedGrandTotal =
+                combinedSupply !== null && combinedVat !== null ? combinedSupply + combinedVat : null;
+
+              const mergedQuote: HqQuoteItem = {
+                ...quotes[0],
+                vehicleModel: combinedModelLabel,
+                vehicleCount: totalVehicles,
+                baseFareTotal: sumNullable((q) => q.baseFareTotal),
+                overtimeFareTotal: quotes.reduce((acc, q) => acc + (q.overtimeFareTotal || 0), 0),
+                excessDistanceTotal: quotes.reduce((acc, q) => acc + (q.excessDistanceTotal || 0), 0),
+                englishSurchargeTotal: quotes.reduce((acc, q) => acc + (q.englishSurchargeTotal || 0), 0),
+                supplyPriceTotal: combinedSupply,
+                vatAmount: combinedVat,
+                estimatedGrandTotal: combinedGrandTotal,
+                quoteRequired: anyQuoteRequired,
+              };
+              setCalculatedQuote(mergedQuote);
+            }
           }
         }
       } catch (err: any) {
@@ -239,6 +326,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
     serviceHours,
     serviceCategory,
     vehicleProductCode,
+    selectedVehicleCodes,
     excessKm,
     englishOption,
     origin,
@@ -996,6 +1084,14 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                   )}
                 </div>
 
+                {/* Multi-select helper banner when vehicleCount >= 2 */}
+                {vehicleCount >= 2 && (
+                  <div className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-blue-50/70 border border-blue-100 text-[11px] font-bold text-[#1E60F3]">
+                    <span>필요 차량 {vehicleCount}대 · 최대 {vehicleCount}종 중복 선택 가능</span>
+                    <span className="font-extrabold">{selectedVehicleCodes.length} / {vehicleCount}종 선택됨</span>
+                  </div>
+                )}
+
                 {/* Vehicle SKU Cards */}
                 <div className="space-y-2 max-h-60 sm:max-h-64 overflow-y-auto pr-1">
                   {filteredSkus.length === 0 ? (
@@ -1004,7 +1100,8 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                     </div>
                   ) : (
                     filteredSkus.map((sku) => {
-                    const isSelected = vehicleProductCode === sku.vehicleProductCode;
+                    const isSelected = selectedVehicleCodes.includes(sku.vehicleProductCode);
+                    const selectedOrder = selectedVehicleCodes.indexOf(sku.vehicleProductCode) + 1;
                     const thumb = getVehicleImage({ model: sku.vehicleProductLabel, category: sku.tier });
                     return (
                       <button
@@ -1012,7 +1109,24 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                         type="button"
                         onClick={() => {
                           haptics.selection();
-                          setVehicleProductCode(sku.vehicleProductCode);
+                          const code = sku.vehicleProductCode;
+                          if (vehicleCount <= 1) {
+                            setSelectedVehicleCodes([code]);
+                            setVehicleProductCode(code);
+                            return;
+                          }
+                          setSelectedVehicleCodes((prev) => {
+                            let next: string[];
+                            if (prev.includes(code)) {
+                              next = prev.length > 1 ? prev.filter((c) => c !== code) : prev;
+                            } else if (prev.length < vehicleCount) {
+                              next = [...prev, code];
+                            } else {
+                              next = [...prev.slice(0, vehicleCount - 1), code];
+                            }
+                            if (next[0]) setVehicleProductCode(next[0]);
+                            return next;
+                          });
                         }}
                         className={`w-full p-3 rounded-2xl border text-left transition-all cursor-pointer shadow-2xs flex items-center justify-between ${isSelected
                           ? 'bg-blue-50/80 border-[#1E60F3] ring-1 ring-[#1E60F3]'
@@ -1051,7 +1165,12 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                           </div>
                         </div>
 
-                        <div className="shrink-0 ml-3">
+                        <div className="shrink-0 ml-3 flex items-center gap-1.5">
+                          {isSelected && vehicleCount >= 2 && selectedVehicleCodes.length > 1 && (
+                            <span className="px-1.5 py-0.5 rounded-md bg-[#1E60F3]/10 text-[#1E60F3] text-[10px] font-extrabold">
+                              {selectedOrder}순위
+                            </span>
+                          )}
                           <div
                             className={`w-5 h-5 rounded-full border flex items-center justify-center ${isSelected
                               ? 'bg-[#1E60F3] border-[#1E60F3] text-white'
@@ -1076,7 +1195,15 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                     <div className="flex items-center h-11 bg-white border border-slate-200 rounded-xl px-3 justify-between shadow-2xs">
                       <button
                         type="button"
-                        onClick={() => setVehicleCount((prev) => Math.max(1, prev - 1))}
+                        onClick={() => {
+                          setVehicleCount((prev) => {
+                            const next = Math.max(1, prev - 1);
+                            setSelectedVehicleCodes((codes) =>
+                              codes.length > next ? codes.slice(0, next) : codes
+                            );
+                            return next;
+                          });
+                        }}
                         disabled={vehicleCount <= 1}
                         className="w-7 h-7 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-black flex items-center justify-center cursor-pointer disabled:opacity-40"
                       >

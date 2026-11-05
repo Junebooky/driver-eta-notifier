@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 import { sanitizeSearchQuery } from './CustomPresetModal';
+import { getCachedTmapPoisClient, searchTmapPoisClient } from '@/lib/places/tmapSearchEngine';
 
 export interface RecentDestination {
   id?: string;
@@ -133,8 +134,9 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
       return;
     }
 
-    if (roadviewSearchCache.has(query)) {
-      setSearchResults(roadviewSearchCache.get(query)!);
+    const cached = getCachedTmapPoisClient(query, 37.5665, 126.9780);
+    if (cached) {
+      setSearchResults(cached);
       setIsSearching(false);
       setSearchError(null);
       return;
@@ -151,27 +153,11 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
 
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/search?keyword=${encodeURIComponent(query)}&lat=37.5665&lng=126.9780`, {
+        const pois = await searchTmapPoisClient(query, {
+          lat: 37.5665,
+          lng: 126.9780,
           signal: controller.signal,
         });
-
-        if (!res.ok) {
-          throw new Error('검색 서버 응답 오류');
-        }
-
-        const data = await res.json();
-        const rawList = Array.isArray(data) ? data : (data.pois || data.places || []);
-        const pois: PoiResult[] = rawList
-          .map((poi: any) => ({
-            id: String(poi.id || `poi_${Math.random()}`),
-            name: poi.name || poi.title || '',
-            address: poi.address || poi.roadAddress || poi.fullAddress || '',
-            lat: typeof poi.lat === 'number' ? poi.lat : parseFloat(poi.lat || poi.noorLat || poi.frontLat),
-            lng: typeof poi.lng === 'number' ? poi.lng : parseFloat(poi.lng || poi.noorLon || poi.frontLon),
-          }))
-          .filter((p: PoiResult) => p.name && !isNaN(p.lat) && !isNaN(p.lng));
-
-        roadviewSearchCache.set(query, pois);
         setSearchResults(pois);
         if (pois.length === 0) {
           setSearchError('검색 결과가 없습니다.');
