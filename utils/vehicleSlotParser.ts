@@ -5,6 +5,7 @@
  */
 
 import type { VehicleSlotAssignment } from '@/types/emailHq';
+import { VIP_REAL_VEHICLES, getVehicleImage } from '@/utils/vehicleData';
 
 export const STANDARD_FLEET_MODELS = [
   '스타리아 리무진',
@@ -69,17 +70,13 @@ export function normalizeVehicleModelName(raw: string): string {
  * Returns matching car illustration or photo asset path based on vehicle model name.
  */
 export function getVehicleImageForModel(modelName: string): string {
-  const norm = normalizeVehicleModelName(modelName);
-  if (norm.includes('스프린터')) {
-    return '/images/car_sprinter.png';
-  }
-  if (norm.includes('G90') || norm.includes('제네시스')) {
-    return '/images/car_g90.png';
-  }
-  if (norm.includes('카니발') || norm.includes('스타리아')) {
-    return '/images/car_phone_carnival.png';
-  }
-  return '/images/car_phone_carnival.png';
+  const normalized = normalizeVehicleModelName(modelName);
+  const registered = VIP_REAL_VEHICLES.find(
+    (vehicle) => normalizeVehicleModelName(vehicle.model) === normalized
+  );
+  // Use the same verified vehicle images as the Fleet Management screen.
+  // Never substitute screenshots or a different vehicle's picture.
+  return registered ? getVehicleImage(registered) : '/images/vehicle_photo_pending.svg';
 }
 
 /**

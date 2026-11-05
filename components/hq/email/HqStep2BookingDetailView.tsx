@@ -32,7 +32,7 @@ import { VEHICLE_STATUS_LABELS } from '@/utils/fleetVehicleStatus';
 import { haptics } from '@/utils/haptics';
 import { HqPlaceSearchInput, PoiResult } from '@/components/hq/HqPlaceSearchInput';
 import { saveContactToCrm } from '@/utils/crmCustomerSync';
-import { getVehicleImageForModel, STANDARD_FLEET_MODELS } from '@/utils/vehicleSlotParser';
+import { HqStep5AssignmentPanel } from './HqStep5AssignmentPanel';
 
 export interface VehicleSlotAssignment {
   slotIndex: number;
@@ -275,104 +275,21 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-5 space-y-5">
-      {/* 1. Header Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={onBackToStep1}
-            className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center cursor-pointer transition-all active:scale-95"
-            title="이메일 메일함으로 돌아가기"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </button>
-
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#1E60F3] flex items-center justify-center">
-              <Car className="w-4 h-4" />
-            </div>
-            <h2 className="text-base font-black text-slate-900">예약 상세</h2>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-[#1E60F3] border border-blue-200">
-              신규
-            </span>
-            <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
-              hasAssignedDriver
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                : 'bg-amber-50 text-amber-700 border-amber-200'
-            }`}>
-              {hasAssignedDriver ? '기사 배정 진행중' : '배차 필요'}
-            </span>
-          </div>
+    <div className="bg-white rounded-2xl p-5 sm:p-6 space-y-6">
+      {/* Step 5: assignment-focused mobile-first header */}
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={onBackToStep1}
+          aria-label="예약 확정 화면으로 돌아가기"
+          className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-50 text-slate-500 hover:bg-slate-100"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </button>
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight text-slate-900">기사님 배정</h2>
+          <p className="mt-0.5 text-xs text-slate-500">차량과 기사님을 선택하고 배차를 확정하세요.</p>
         </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            className="px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
-          >
-            <Copy className="w-3.5 h-3.5" />
-            <span>복사</span>
-          </button>
-          <button
-            type="button"
-            className="px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
-          >
-            <Edit className="w-3.5 h-3.5" />
-            <span>수정</span>
-          </button>
-          <button
-            type="button"
-            className="px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
-          >
-            <Trash2 className="w-3.5 h-3.5 text-slate-400" />
-            <span>삭제</span>
-          </button>
-        </div>
-      </div>
-
-      {/* 2. Navigation Sub-Tabs */}
-      <div className="flex items-center gap-6 border-b border-slate-200 text-xs font-bold">
-        <button
-          type="button"
-          onClick={() => setActiveSubTab('assign')}
-          className={`pb-2.5 transition-all relative cursor-pointer ${
-            activeSubTab === 'assign'
-              ? 'text-[#1E60F3] font-black'
-              : 'text-slate-500 hover:text-slate-900'
-          }`}
-        >
-          차량·기사 배정
-          {activeSubTab === 'assign' && (
-            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#1E60F3] rounded-full" />
-          )}
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveSubTab('schedule')}
-          className={`pb-2.5 transition-all relative cursor-pointer ${
-            activeSubTab === 'schedule'
-              ? 'text-[#1E60F3] font-black'
-              : 'text-slate-500 hover:text-slate-900'
-          }`}
-        >
-          운행 일정
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveSubTab('history')}
-          className={`pb-2.5 transition-all relative cursor-pointer ${
-            activeSubTab === 'history'
-              ? 'text-[#1E60F3] font-black'
-              : 'text-slate-500 hover:text-slate-900'
-          }`}
-        >
-          히스토리
-        </button>
       </div>
 
       {/* CRM Notice Feedback */}
@@ -394,22 +311,40 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
         </div>
       )}
 
-      {extractedDraft && <section className="rounded-2xl border border-blue-200 p-4 space-y-4">
+      <HqStep5AssignmentPanel
+        slots={vehicleSlots}
+        vehicles={fleet.data?.vehicles}
+        loading={fleet.loading}
+        fleetError={fleet.error}
+        language={selectedLanguage}
+        onLanguageChange={changeDriverLanguage}
+        onUpdateSlots={onUpdateVehicleSlots}
+        onSelectDriver={onOpenDriverModal}
+        onRequestHelp={onRequestAssignment}
+        onConfirm={handleConfirm}
+        isDispatching={isDispatching}
+      />
+
+      <details className="group rounded-2xl bg-slate-50/50 px-4 py-4">
+        <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-medium text-slate-600 marker:hidden">
+          <span>날짜별 일정·종료시간 다시 확인</span>
+          <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+        </summary>
+      {extractedDraft && <section className="mt-3 space-y-4">
         <h3 className="text-sm font-bold">날짜별 경로·종료시간 확인</h3>
         {(()=>{try{return emailDispatchDays(extractedDraft).map(day=><div key={day.date} className="space-y-2 border-t border-blue-100 pt-3"><p className="text-sm font-bold text-slate-800">{day.date}</p>
           {day.points.map(point=><div key={point.id} className="grid grid-cols-[135px_1fr] gap-2 items-center"><input aria-label={`${day.date} 경유 시간`} type="time" className="h-10 w-full rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-800 outline-none focus:border-[#1E60F3] shadow-2xs transition-colors cursor-pointer" value={normalizeTimeHHmm(point.time) || point.time || ''} onChange={event=>updateDraftRoute({...extractedDraft,waypoints:emailDispatchDays(extractedDraft).flatMap(d=>d.points).map(p=>p.id===point.id?{...p,time:event.target.value}:p)})}/><HqPlaceSearchInput value={point.location} isConfirmed={point.isPoiConfirmed} heightClass="h-10" onChange={location=>updateDraftRoute({...extractedDraft,waypoints:emailDispatchDays(extractedDraft).flatMap(d=>d.points).map(p=>p.id===point.id?{...p,location,isPoiConfirmed:false}:p)})} onSelectPoi={poi=>updateDraftRoute({...extractedDraft,waypoints:emailDispatchDays(extractedDraft).flatMap(d=>d.points).map(p=>p.id===point.id?{...p,location:poi.name,lat:poi.lat,lng:poi.lng,isPoiConfirmed:true}:p)})}/></div>)}
           <label className="flex items-center text-xs font-bold text-slate-700">실제 종료 시간<input type="time" aria-label={`${day.date} 실제 종료 시간`} className="ml-3 h-10 w-36 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-800 outline-none focus:border-[#1E60F3] shadow-2xs transition-colors cursor-pointer" value={normalizeTimeHHmm(day.endTime) || day.endTime || ''} onChange={event=>onUpdateDraft?.({...extractedDraft,dayEndTimes:{...extractedDraft.dayEndTimes,[day.date]:event.target.value}})}/></label>
         </div>);}catch(error){return <p role="alert" className="text-xs text-rose-600">{error instanceof Error?error.message:'날짜를 확인해 주세요.'}</p>;}})()}
-        {vehicleSlots.map((slot,index)=><label key={slot.slotIndex} className="block text-xs">{index+1}호차 실제 차량<select className="ml-2 rounded border p-2" disabled={!fleet.data} value={slot.vehiclePlate || ''} onChange={event=>onUpdateVehicleSlots?.(vehicleSlots.map((value,i)=>i===index?{...value,vehiclePlate:event.target.value}:value))}><option value="">번호판 선택</option>{fleet.data?.vehicles.map(vehicle=><option key={vehicle.uuid} value={vehicle.plate} disabled={!vehicle.isAvailable}>{vehicle.plate} · {vehicle.model} · {VEHICLE_STATUS_LABELS[vehicle.currentStatus]}{vehicle.isAvailable ? '' : ' (예약 불가)'}</option>)}</select></label>)}
-        <p className="text-xs text-slate-500" role={fleet.error ? 'alert' : undefined}>{fleet.error || (fleet.loading ? '차량 상태 확인 중…' : fleet.data ? '대기 차량 우선 · 전체 날짜의 가용성 확인 · 8초마다 갱신' : '날짜별 시작·종료 시간을 입력하면 차량을 선택할 수 있습니다.')}</p>
-        <button type="button" disabled={isDispatching} onClick={onRequestAssignment} className="rounded-xl border border-blue-300 p-3 text-sm text-blue-700">대표 모바일·PC에 기사·차량 지정 요청</button>
-        <p className="text-xs text-slate-500">미배정 일정으로 서버에 저장합니다. 모바일과 PC의 같은 예약에서 배정하며, 전체 날짜·차량을 한 번에 확정합니다.</p>
       </section>}
-      {/* 3. Main 2-Column Split */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* ========================================================= */}
-        {/* Left Sub-Column: 기본 정보 + 추가 정보                    */}
-        {/* ========================================================= */}
+
+      </details>
+      <details className="group rounded-2xl bg-slate-50/50 px-4 py-4">
+        <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-medium text-slate-600 marker:hidden">
+          <span>예약 기본 정보·추가 정보</span>
+          <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+        </summary>
+        <div className="mt-4">
         <div className="lg:col-span-5 space-y-4">
           {/* Card 1: 기본 정보 */}
           <div className="bg-slate-50/70 rounded-2xl border border-slate-200/80 p-4 space-y-3">
@@ -679,219 +614,9 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
         </div>
 
         {/* ========================================================= */}
-        {/* Right Sub-Column: 요청 차량 리스트                        */}
-        {/* ========================================================= */}
-        <div className="lg:col-span-7 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-black text-slate-900">
-              요청 차량 ({vehicleSlots.length}대)
-            </h3>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                className="px-2.5 py-1 rounded-lg bg-blue-600 text-white text-[11px] font-bold shadow-2xs hover:bg-blue-700 transition-colors cursor-pointer flex items-center gap-1"
-              >
-                <Layers className="w-3 h-3" />
-                <span>차등 배정</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleAddVehicleSlot}
-                className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1 active:scale-95 shadow-2xs"
-                title="요청 차량 슬롯 추가"
-              >
-                <Plus className="w-3 h-3 text-[#1E60F3]" />
-                <span>차량 추가</span>
-              </button>
-            </div>
-          </div>
 
-          {/* Vehicle Slots List */}
-          <div className="space-y-3.5">
-            {vehicleSlots.map((slot, idx) => {
-              const isAssigned = Boolean(slot.driver);
-              const isEnglishCapable = driverSupportsEnglish(slot.driver);
-              const isLanguageMismatch = selectedLanguage === 'english' && isAssigned && !isEnglishCapable;
-              const vehicleImg = getVehicleImageForModel(slot.vehicleModel);
-
-              return (
-                <div
-                  key={slot.slotIndex}
-                  className={`rounded-2xl border p-4 transition-all ${
-                    isAssigned
-                      ? isLanguageMismatch
-                        ? 'border-amber-300 bg-amber-50/20 shadow-xs'
-                        : 'border-blue-300 bg-blue-50/20 shadow-xs'
-                      : 'border-slate-200/90 bg-white shadow-2xs'
-                  }`}
-                >
-                  {/* Top Bar inside Slot */}
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                    <div className="flex items-center gap-2.5">
-                      <span className="w-5 h-5 rounded-full bg-blue-600 text-white font-black text-xs flex items-center justify-center shrink-0">
-                        {idx + 1}
-                      </span>
-                      {/* Vehicle Model Selector */}
-                      <div className="relative inline-flex items-center">
-                        <select
-                          value={slot.vehicleModel}
-                          onChange={(e) => handleUpdateSlotModel(idx, e.target.value)}
-                          className="text-xs font-black text-slate-900 bg-slate-50 hover:bg-white border border-slate-200 rounded-lg px-2 py-1 pr-6 hover:border-slate-300 focus:outline-hidden focus:border-[#1E60F3] cursor-pointer appearance-none shadow-2xs transition-colors"
-                        >
-                          {STANDARD_FLEET_MODELS.map((model) => (
-                            <option key={model} value={model}>
-                              {model}
-                            </option>
-                          ))}
-                          {!STANDARD_FLEET_MODELS.includes(slot.vehicleModel as any) && (
-                            <option value={slot.vehicleModel}>{slot.vehicleModel}</option>
-                          )}
-                        </select>
-                        <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-1.5 pointer-events-none" />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          isAssigned
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            : 'bg-amber-50 text-amber-700 border border-amber-200'
-                        }`}
-                      >
-                        {isAssigned ? '기사 지정됨' : '기사 미배정'}
-                      </span>
-
-                      {/* Remove slot button if multiple slots exist */}
-                      {vehicleSlots.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveVehicleSlot(idx)}
-                          className="w-6 h-6 rounded-lg border border-slate-200 hover:bg-rose-50 hover:border-rose-200 text-slate-400 hover:text-rose-600 transition-colors flex items-center justify-center cursor-pointer active:scale-95"
-                          title="차량 슬롯 삭제"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Body: Vehicle Image + Driver Selector */}
-                  <div className="mt-3.5 flex items-center justify-between gap-4">
-                    {/* Left: Vehicle Image */}
-                    <div className="w-28 sm:w-36 h-20 bg-slate-50 rounded-xl flex items-center justify-center p-2 shrink-0 border border-slate-100">
-                      <img
-                        src={vehicleImg}
-                        alt={slot.vehicleModel}
-                        className="max-h-full max-w-full object-contain drop-shadow-sm"
-                      />
-                    </div>
-
-                    {/* Right: Driver Slot Button or Profile */}
-                    <div className="flex-1 min-w-0">
-                      {isAssigned && slot.driver ? (
-                        <div className="p-3 bg-white rounded-xl border border-blue-200 shadow-2xs flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <img
-                              src={slot.driver.avatarUrl}
-                              alt={slot.driver.name}
-                              className="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0"
-                            />
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="text-xs font-extrabold text-slate-900 truncate">
-                                  {slot.driver.name} 기사
-                                </span>
-                                <div className="flex items-center text-amber-500 text-[11px] font-bold">
-                                  <Star className="w-3 h-3 fill-amber-400" />
-                                  <span>{slot.driver.rating}</span>
-                                </div>
-                                {isEnglishCapable && (
-                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-[#1E60F3] border border-blue-200">
-                                    🇺🇸 영어 가능
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-[10px] text-slate-400 truncate mt-0.5">
-                                {slot.driver.plate || '차량 미지정'} · {slot.driver.residence}
-                              </div>
-                              {isLanguageMismatch && (
-                                <div className="text-[10px] text-amber-700 font-bold mt-0.5">
-                                  ⚠️ 영어 불가 기사 (재배정 권장)
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => onOpenDriverModal(slot.slotIndex, selectedLanguage)}
-                            className="px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all cursor-pointer shrink-0 active:scale-95 shadow-2xs"
-                          >
-                            변경
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="space-y-1.5">
-                          <button
-                            type="button"
-                            onClick={() => onOpenDriverModal(slot.slotIndex, selectedLanguage)}
-                            className="w-full py-2.5 px-3 rounded-xl border border-blue-300 hover:border-blue-500 bg-blue-50/30 hover:bg-blue-50/60 text-[#1E60F3] text-xs font-extrabold transition-all flex items-center justify-between cursor-pointer active:scale-98 shadow-2xs"
-                          >
-                            <span>
-                              {selectedLanguage === 'english' ? '🇺🇸 영어 가능 기사 선택' : '가용 기사 선택'}
-                            </span>
-                            <ChevronDown className="w-4 h-4 text-blue-500" />
-                          </button>
-                          <p className="text-[10px] text-slate-500">
-                            * 배차 확정을 위해 {selectedLanguage === 'english' ? '영어 가능 ' : ''}가용 기사를 반드시 직접 지정해야 합니다.
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Footnote */}
-          <div className="flex items-center gap-1.5 text-[11px] text-slate-500 pt-1">
-            <Info className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-            <span>배정 시 기사에게 실시간 모바일 Cockpit 알림이 전송됩니다.</span>
-          </div>
-
-          {/* Driver Unassigned Warning */}
-          {!hasAssignedDriver && (
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs font-bold flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-              <span>배차를 확정하려면 1호차 가용 기사를 먼저 직접 선택해 주세요.</span>
-            </div>
-          )}
-
-          {/* Big Confirm Dispatch Button */}
-          <div className="pt-2">
-            <button
-              type="button"
-              onClick={handleConfirm}
-              disabled={!hasAssignedDriver || isDispatching}
-              className="w-full py-3.5 px-4 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-98 text-white text-sm font-black shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isDispatching ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin text-white" />
-                  <span>배차 확정 및 기사 알림 전송 중...</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>배차 확정 (서버 등록)</span>
-                </>
-              )}
-            </button>
-          </div>
         </div>
-      </div>
+      </details>
     </div>
   );
 };
