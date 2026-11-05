@@ -42,7 +42,12 @@ export function SharedReportPage(){
    setReady(true);
   });
  },[]);
- useEffect(()=>{const view=scroller.current;if(view)view.scrollTop=view.scrollHeight;},[items,pendingVisual,error,serviceType]);
+ useEffect(()=>{
+  const view=scroller.current;
+  if(!view)return;
+  const reduceMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  view.scrollTo({top:view.scrollHeight,behavior:reduceMotion?'auto':'smooth'});
+ },[items,pendingVisual,error,serviceType]);
  useEffect(()=>{if(input.current){input.current.style.height='auto';input.current.style.height=Math.min(176,input.current.scrollHeight)+'px';}},[draft]);
  function template(){
   const reportDate=today();
@@ -57,7 +62,11 @@ export function SharedReportPage(){
   const item=pending.current||{id:crypto.randomUUID(),body:draft.trim(),serviceType};
   pending.current=item;
   setBusy(true);setError('');
-  setPendingVisual({id:item.id,body:item.body,at:new Date().toISOString()});
+  const sentAt=new Date().toISOString();
+  // Show the message immediately, without leaving a second copy in the composer.
+  setPendingVisual({id:item.id,body:item.body,at:sentAt});
+  setDraft('');
+  let accepted=false;
   try{
    const response=await fetch('/api/public-report',{
     method:'POST',headers:{'Content-Type':'application/json'},
@@ -67,22 +76,34 @@ export function SharedReportPage(){
    if(!response.ok)throw new Error(data.error||'보고를 전송하지 못했습니다.');
    // Start the 2-second typing display after the server acknowledges the report.
    await waitForChatTyping();
-   setItems(prev=>[...prev,{id:item.id,body:item.body,at:new Date().toISOString(),reply:data.reply||'운행보고 잘 받았습니다. 감사합니다 ^.^'}]);
-   setDraft('');pending.current=null;
+   setItems(prev=>[...prev,{id:item.id,body:item.body,at:sentAt,reply:data.reply||'운행보고 잘 받았습니다. 감사합니다 ^.^'}]);
+   pending.current=null;
+   accepted=Boolean(data.accepted);
    if(data.accepted){
     setServiceType(null);
     setReportActive(false);
     setTemplates(false);
     try{sessionStorage.setItem(COMPLETED_KEY,token);}catch{/* Optional session state. */}
    }
-  }catch(e){setError(e instanceof Error?e.message:'연결을 확인하고 다시 보내 주세요.');}
-  finally{setPendingVisual(null);setBusy(false);input.current?.focus();}
+  }catch(e){
+   // Preserve exactly what the driver sent if the request fails; keep requestKey for safe retry.
+   setDraft(item.body);
+   setError(e instanceof Error?e.message:'연결을 확인하고 다시 보내 주세요.');
+  }
+  finally{
+   setPendingVisual(null);setBusy(false);
+   if(!accepted)input.current?.focus();
+  }
  }
  function startNextReport(){
   setReportActive(true);setServiceType(null);setTemplates(false);setError('');
   try{sessionStorage.removeItem(COMPLETED_KEY);}catch{/* Optional session state. */}
  }
- function goBack(){if(draft.trim()&&!confirm('작성 중인 보고를 두고 나가시겠어요?'))return;window.history.back();}
+ function goBack(){if((draft.trim()||pendingVisual)&&!confirm('작성 중인 보고를 두고 나가시겠어요?'))return;window.history.back();}
+ // A stable message key keeps the just-sent bubble in place when the bot reply arrives.
+ const visibleItems:LocalMessage[]=pendingVisual
+  ? [...items,{...pendingVisual,reply:''}]
+  : items;
  return <main ref={frame} className="fixed inset-x-0 top-0 z-40 mx-auto flex h-dvh min-h-0 min-w-0 w-full max-w-full flex-col overflow-x-hidden overflow-y-hidden bg-[#B2C7D9] text-[#30353A] sm:max-w-2xl">
   <header className="z-10 flex shrink-0 items-center gap-2 bg-[#B2C7D9] px-2 pb-3 pt-[max(12px,env(safe-area-inset-top))]">
    <button type="button" aria-label="뒤로 가기" onClick={goBack} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg hover:bg-white/15"><ArrowLeft size={24} strokeWidth={1.9}/></button>
@@ -98,33 +119,26 @@ export function SharedReportPage(){
     </div>
    </div>
    {ready&&!token&&<p role="alert" className="rounded-lg bg-white/85 px-3 py-3 text-sm text-[#53616C]">회사에서 발급한 운행보고 링크로 접속해 주세요.</p>}
-   {items.map(item=><div key={item.id} className="space-y-3">
-    <div className="flex justify-end">
+   {visibleItems.map(item=><div key={item.id} className="space-y-3">
+    <div className={'flex justify-end'+(!item.reply?' vip-chat-outgoing-enter':'')}>
      <div className="flex max-w-[88%] min-w-0 flex-row-reverse items-end gap-1.5">
       <div className="min-w-0 whitespace-pre-wrap break-words rounded-[10px] rounded-tr-[3px] bg-[#FEE500] px-3 py-2.5 text-[14px] leading-[1.55]">{item.body}</div>
       <time dateTime={item.at} className="mb-0.5 shrink-0 text-[10px] text-[#566B7C]">{showTime(item.at)}</time>
      </div>
     </div>
-    <div className="flex items-start gap-2.5">
-     <VipChatAvatar/>
-     <div className="flex max-w-[88%] min-w-0 flex-col items-start">
-      <span className="mb-1 ml-0.5 text-[12px] font-medium text-[#3E4B57]">VIP리무진코리아</span>
-      <div className="flex min-w-0 items-end gap-1.5">
-       <div className="whitespace-pre-wrap break-words rounded-[10px] rounded-tl-[3px] bg-white px-3 py-2.5 text-[14px] leading-[1.55]">{item.reply}</div>
-       <time dateTime={item.at} className="mb-0.5 shrink-0 text-[10px] text-[#566B7C]">{showTime(item.at)}</time>
+    {item.reply
+     ? <div className="vip-chat-reply-enter flex items-start gap-2.5">
+      <VipChatAvatar/>
+      <div className="flex max-w-[88%] min-w-0 flex-col items-start">
+       <span className="mb-1 ml-0.5 text-[12px] font-medium text-[#3E4B57]">VIP리무진코리아</span>
+       <div className="flex min-w-0 items-end gap-1.5">
+        <div className="whitespace-pre-wrap break-words rounded-[10px] rounded-tl-[3px] bg-white px-3 py-2.5 text-[14px] leading-[1.55]">{item.reply}</div>
+        <time dateTime={item.at} className="mb-0.5 shrink-0 text-[10px] text-[#566B7C]">{showTime(item.at)}</time>
+       </div>
       </div>
      </div>
-    </div>
+     : <ChatTypingBubble/>}
    </div>)}
-   {pendingVisual&&<div className="space-y-3">
-    <div className="flex justify-end">
-     <div className="flex max-w-[88%] min-w-0 flex-row-reverse items-end gap-1.5">
-      <div className="min-w-0 whitespace-pre-wrap break-words rounded-[10px] rounded-tr-[3px] bg-[#FEE500] px-3 py-2.5 text-[14px] leading-[1.55]">{pendingVisual.body}</div>
-      <time dateTime={pendingVisual.at} className="mb-0.5 shrink-0 text-[10px] text-[#566B7C]">{showTime(pendingVisual.at)}</time>
-     </div>
-    </div>
-    <ChatTypingBubble/>
-   </div>}
    {ready&&token&&reportActive&&<ReportServicePicker value={serviceType} onChange={v=>{setServiceType(v);pending.current=null;setError('');}}/>}
   </section>
   {error&&<div role="status" className="flex items-center gap-2 bg-white/90 px-4 py-2.5 text-xs leading-5 text-[#59646D]"><span className="flex-1">{error}</span><button type="button" aria-label="오류 안내 닫기" onClick={()=>setError('')}><RefreshCw size={15}/></button></div>}
