@@ -1313,51 +1313,6 @@ ${scheduleItemsFormatted}`.trim();
           </div>
         )}
 
-        {/* Quick Suggestion Prompt Chips */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
-          <button
-            type="button"
-            onClick={() => handleCopilotSubmit('9월 25일 일정 등록')}
-            disabled={isAnalyzing}
-            className="shrink-0 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 border border-blue-200/90 text-[11px] font-bold text-[#1E60F3] rounded-full transition-all active:scale-95 shadow-2xs cursor-pointer"
-          >
-            ➕ 9/25 스케줄 등록
-          </button>
-          <button
-            type="button"
-            onClick={() => handleCopilotSubmit('9.18일 일정 브리핑해줘')}
-            disabled={isAnalyzing}
-            className="shrink-0 px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-200/80 hover:border-slate-300 text-[11px] font-medium text-slate-700 hover:text-slate-900 rounded-full transition-all active:scale-95 shadow-2xs cursor-pointer"
-          >
-            💡 9/18 일정 브리핑
-          </button>
-          <button
-            type="button"
-            onClick={() => handleCopilotSubmit('SQ612 상태 어때?')}
-            disabled={isAnalyzing}
-            className="shrink-0 px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-200/80 hover:border-slate-300 text-[11px] font-medium text-slate-700 hover:text-slate-900 rounded-full transition-all active:scale-95 shadow-2xs cursor-pointer"
-          >
-            ✈️ SQ612 항공편 조회
-          </button>
-          <button
-            type="button"
-            onClick={() => handleCopilotSubmit('전체 일정 브리핑해줘')}
-            disabled={isAnalyzing}
-            className="shrink-0 px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-200/80 hover:border-slate-300 text-[11px] font-medium text-slate-700 hover:text-slate-900 rounded-full transition-all active:scale-95 shadow-2xs cursor-pointer"
-          >
-            📋 전체 일정 브리핑
-          </button>
-          <button
-            type="button"
-            onClick={() => handleCopilotSubmit('여기 맛집 추천해줘')}
-            disabled={isAnalyzing}
-            className="shrink-0 px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-200/80 hover:border-slate-300 text-[11px] font-medium text-slate-400 hover:text-slate-600 rounded-full transition-all active:scale-95 shadow-2xs cursor-pointer"
-            title="가드레일 방어 테스트"
-          >
-            🛡️ 가드레일 테스트
-          </button>
-        </div>
-
         {/* Floating Action Dock Input Field */}
         <form
           onSubmit={(e) => handleCopilotSubmit(undefined, e)}

@@ -38,6 +38,7 @@ import {
   saveExpenses,
 } from '@/utils/expense';
 import { AddExpenseModal, renderCategoryIcon } from './AddExpenseModal';
+import { DriverCalendarCard } from './common/DriverCalendarCard';
 import { autoEnsureUprightReceipt } from '@/utils/imageRotate';
 import { haptics } from '@/utils/haptics';
 import { DriverProfile } from '@/types';
@@ -851,248 +852,25 @@ const ExpenseModalContent: React.FC<{
         defaultDate={selectedDate}
       />
 
-      {/* Custom Calendar Date Picker Modal (Apple/Toss Volumetric Card Style) */}
-      {isDatePickerOpen && (() => {
-        const firstDayOfWeek = new Date(calendarViewYear, calendarViewMonth, 1).getDay();
-        const daysInMonth = new Date(calendarViewYear, calendarViewMonth + 1, 0).getDate();
-        const prevMonthDays = new Date(calendarViewYear, calendarViewMonth, 0).getDate();
-
-        const cells: {
-          day: number;
-          dateStr: string;
-          isCurrentMonth: boolean;
-        }[] = [];
-
-        // Previous month trailing days
-        const prevYear = calendarViewMonth === 0 ? calendarViewYear - 1 : calendarViewYear;
-        const prevMonthNum = calendarViewMonth === 0 ? 12 : calendarViewMonth;
-        for (let i = firstDayOfWeek - 1; i >= 0; i--) {
-          const d = prevMonthDays - i;
-          cells.push({
-            day: d,
-            dateStr: `${prevYear}-${String(prevMonthNum).padStart(2, '0')}-${String(d).padStart(2, '0')}`,
-            isCurrentMonth: false,
-          });
-        }
-
-        // Current month days
-        for (let d = 1; d <= daysInMonth; d++) {
-          cells.push({
-            day: d,
-            dateStr: `${calendarViewYear}-${String(calendarViewMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`,
-            isCurrentMonth: true,
-          });
-        }
-
-        // Next month leading days to fill 6x7 or 5x7 rows cleanly
-        const totalSlots = cells.length <= 35 ? 35 : 42;
-        const nextYear = calendarViewMonth === 11 ? calendarViewYear + 1 : calendarViewYear;
-        const nextMonthNum = calendarViewMonth === 11 ? 1 : calendarViewMonth + 2;
-        let nextDay = 1;
-        while (cells.length < totalSlots) {
-          cells.push({
-            day: nextDay,
-            dateStr: `${nextYear}-${String(nextMonthNum).padStart(2, '0')}-${String(nextDay).padStart(2, '0')}`,
-            isCurrentMonth: false,
-          });
-          nextDay++;
-        }
-
-        const datesWithExpenses = new Set(expenseList.map((item) => item.date));
-
-        const handlePrevMonth = () => {
-          haptics.lightTap();
-          if (calendarViewMonth === 0) {
-            setCalendarViewYear((y) => y - 1);
-            setCalendarViewMonth(11);
-          } else {
-            setCalendarViewMonth((m) => m - 1);
-          }
-        };
-
-        const handleNextMonth = () => {
-          haptics.lightTap();
-          if (calendarViewMonth === 11) {
-            setCalendarViewYear((y) => y + 1);
-            setCalendarViewMonth(0);
-          } else {
-            setCalendarViewMonth((m) => m + 1);
-          }
-        };
-
-        const handleJumpToToday = () => {
-          haptics.lightTap();
-          const today = getKstTodayDateStr();
-          const [ty, tm] = today.split('-').map(Number);
-          if (ty && tm) {
-            setCalendarViewYear(ty);
-            setCalendarViewMonth(tm - 1);
-          }
-          setCalendarPendingDate(today);
-        };
-
-        return (
-          <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-            <div className="absolute inset-0" onClick={() => setIsDatePickerOpen(false)} />
-            <div
-              className="relative w-full max-w-sm bg-[#F6F8FC] rounded-3xl shadow-2xl border border-slate-100 p-5 z-10 space-y-4 animate-in zoom-in-95 duration-200"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Modal Header */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-2xl bg-[#0055FF] text-white flex items-center justify-center shadow-[0_4px_12px_rgba(0,85,255,0.25)] shrink-0">
-                    <CalendarIcon className="w-4 h-4 stroke-[2.2]" />
-                  </div>
-                  <div>
-                    <h3 className="text-[17px] font-black text-slate-900 tracking-tight leading-tight">
-                      조회 날짜 선택
-                    </h3>
-                    <p className="text-[11px] text-slate-400 font-medium mt-0.5">
-                      {formatExpenseHeaderDate(calendarPendingDate)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={handleJumpToToday}
-                    className="px-3 py-1.5 rounded-full text-xs font-extrabold bg-white border border-slate-100/90 text-[#0055FF] shadow-[0_2px_8px_rgba(15,23,42,0.05)] hover:bg-blue-50/50 active:scale-95 transition-all cursor-pointer"
-                  >
-                    오늘
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsDatePickerOpen(false)}
-                    className="w-8 h-8 rounded-full bg-slate-200/60 hover:bg-slate-200 flex items-center justify-center text-slate-600 cursor-pointer transition-colors"
-                    aria-label="닫기"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Calendar Volumetric White Card */}
-              <div className="bg-white rounded-3xl border border-slate-100/90 shadow-[0_4px_20px_rgba(15,23,42,0.04)] p-4 space-y-3.5">
-                {/* Month / Year Switcher */}
-                <div className="flex items-center justify-between px-1">
-                  <button
-                    type="button"
-                    onClick={handlePrevMonth}
-                    className="w-8 h-8 rounded-full bg-[#F4F7FC] hover:bg-slate-200/70 flex items-center justify-center text-slate-600 active:scale-95 transition-all cursor-pointer"
-                    aria-label="이전 달"
-                  >
-                    <ChevronLeft className="w-4 h-4 stroke-[2.2]" />
-                  </button>
-                  <span className="text-[16px] font-black text-slate-900 tracking-tight">
-                    {calendarViewYear}년 {calendarViewMonth + 1}월
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleNextMonth}
-                    className="w-8 h-8 rounded-full bg-[#F4F7FC] hover:bg-slate-200/70 flex items-center justify-center text-slate-600 active:scale-95 transition-all cursor-pointer"
-                    aria-label="다음 달"
-                  >
-                    <ChevronRight className="w-4 h-4 stroke-[2.2]" />
-                  </button>
-                </div>
-
-                {/* Weekday Header */}
-                <div className="grid grid-cols-7 text-center">
-                  {['일', '월', '화', '수', '목', '금', '토'].map((dayLabel, idx) => (
-                    <div
-                      key={dayLabel}
-                      className={`text-[12px] font-extrabold py-1 ${
-                        idx === 0
-                          ? 'text-rose-500'
-                          : idx === 6
-                            ? 'text-[#0055FF]'
-                            : 'text-slate-400'
-                      }`}
-                    >
-                      {dayLabel}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Days Grid */}
-                <div className="grid grid-cols-7 gap-y-1 text-center">
-                  {cells.map((cell, idx) => {
-                    const isSelected = cell.dateStr === calendarPendingDate;
-                    const isToday = cell.dateStr === todayDateStr;
-                    const hasExpense = datesWithExpenses.has(cell.dateStr);
-                    const dayOfWeek = idx % 7;
-
-                    return (
-                      <button
-                        key={cell.dateStr}
-                        type="button"
-                        onClick={() => {
-                          haptics.lightTap();
-                          setCalendarPendingDate(cell.dateStr);
-                          if (!cell.isCurrentMonth) {
-                            const [cy, cm] = cell.dateStr.split('-').map(Number);
-                            if (cy && cm) {
-                              setCalendarViewYear(cy);
-                              setCalendarViewMonth(cm - 1);
-                            }
-                          }
-                        }}
-                        className={`relative h-10 rounded-2xl flex flex-col items-center justify-center transition-all cursor-pointer active:scale-95 ${
-                          isSelected
-                            ? 'bg-[#0055FF] text-white font-black shadow-[0_4px_12px_rgba(0,85,255,0.28)]'
-                            : !cell.isCurrentMonth
-                              ? 'text-slate-300 font-medium hover:bg-slate-50'
-                              : isToday
-                                ? 'bg-[#EBF3FF] text-[#0055FF] font-black'
-                                : dayOfWeek === 0
-                                  ? 'text-rose-500 font-bold hover:bg-slate-50'
-                                  : dayOfWeek === 6
-                                    ? 'text-[#0055FF] font-bold hover:bg-slate-50'
-                                    : 'text-slate-800 font-bold hover:bg-slate-50'
-                        }`}
-                      >
-                        <span className="text-[14px] leading-none">{cell.day}</span>
-                        {hasExpense && (
-                          <span
-                            className={`w-1 h-1 rounded-full mt-1 ${
-                              isSelected ? 'bg-white' : 'bg-[#0055FF]'
-                            }`}
-                          />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setIsDatePickerOpen(false)}
-                  className="w-[36%] py-3.5 rounded-2xl bg-[#EEF2F7] hover:bg-slate-200 text-slate-600 text-[14px] font-bold active:scale-95 transition-all cursor-pointer"
-                >
-                  닫기
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    haptics.selection();
-                    setViewScope('selected_date');
-                    setSelectedDate(calendarPendingDate);
-                    setIsDatePickerOpen(false);
-                  }}
-                  className="flex-1 py-3.5 rounded-2xl bg-[#0055FF] hover:bg-[#0044CC] text-white text-[14px] font-extrabold shadow-[0_4px_14px_rgba(0,85,255,0.25)] active:scale-98 transition-all cursor-pointer"
-                >
-                  선택 완료
-                </button>
-              </div>
-            </div>
+      {/* Custom Calendar Date Picker Modal (Reference Image 1 Style) */}
+      {isDatePickerOpen && (
+        <div
+          className="fixed inset-0 z-60 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150"
+          onClick={() => setIsDatePickerOpen(false)}
+        >
+          <div className="relative z-10 animate-in zoom-in-95 duration-200">
+            <DriverCalendarCard
+              value={selectedDate || todayDateStr}
+              highlightedDates={new Set(expenseList.map((item) => item.date))}
+              onChange={(nextIso) => {
+                setViewScope('selected_date');
+                setSelectedDate(nextIso);
+              }}
+              onClose={() => setIsDatePickerOpen(false)}
+            />
           </div>
-        );
-      })()}
+        </div>
+      )}
 
       {/* Category Breakdown Modal */}
       {isBreakdownOpen && (

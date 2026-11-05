@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { ScheduleItem } from '@/data/ferrariSchedules';
+import { DriverTimePickerModal } from './common/DriverTimePickerModal';
 import { X, Check } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 
@@ -39,6 +40,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
   const [flight, setFlight] = useState('');
   const [timeDisplay, setTimeDisplay] = useState('');
   const [notes, setNotes] = useState('');
+  const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -50,6 +52,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
       setFlight(schedule.flight || '');
       setTimeDisplay(schedule.time_display || '');
       setNotes(schedule.notes || '');
+      setIsTimePickerOpen(false);
       setSaveError('');
     }
   }, [schedule]);
@@ -65,6 +68,10 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
   }, [isOpen]);
 
   if (!isOpen || !mounted || !schedule) return null;
+
+  const extractedHHMM =
+    timeDisplay.match(/(\d{1,2}:\d{2})/)?.[1]?.padStart(5, '0') ||
+    (schedule.pickup_time ? schedule.pickup_time.slice(0, 5) : '09:00');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -155,7 +162,7 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
             </p>
           )}
 
-          {/* Field 1: Pickup Time (No icon in label per user instruction) */}
+          {/* Field 1: Pickup Time (No icon in label per user instruction; opens unified time picker on click) */}
           <div>
             <label
               htmlFor={pickupTimeId}
@@ -167,11 +174,15 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
               id={pickupTimeId}
               name="time_display"
               type="text"
+              readOnly
               value={timeDisplay}
-              onChange={(e) => setTimeDisplay(e.target.value)}
+              onClick={() => {
+                haptics.lightTap();
+                setIsTimePickerOpen(true);
+              }}
               aria-describedby={pickupTimeHelpId}
               placeholder="예: 픽업 09:00"
-              className="w-full h-12 px-4 rounded-2xl bg-white border border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)] text-sm sm:text-[15px] font-bold text-[#0F172A] placeholder:font-medium placeholder:text-slate-400 focus:border-[#0055FF] focus:ring-2 focus:ring-[#0055FF]/10 outline-none transition-all"
+              className="w-full h-12 px-4 rounded-2xl bg-white border border-slate-100/90 hover:border-blue-200 shadow-[0_3px_12px_rgba(15,23,42,0.04)] text-sm sm:text-[15px] font-bold text-[#0F172A] placeholder:font-medium placeholder:text-slate-400 focus:border-[#0055FF] focus:ring-2 focus:ring-[#0055FF]/10 outline-none transition-all cursor-pointer tabular-nums"
             />
             <p id={pickupTimeHelpId} className="text-xs text-slate-400 font-medium mt-1.5">
               배차표 카드 상단에 노출되는 픽업 시간을 지정합니다.
@@ -266,6 +277,17 @@ export const EditScheduleModal: React.FC<EditScheduleModalProps> = ({
           </div>
         </form>
       </div>
+
+      {/* Unified Driver Time Picker Modal (피커 타임 UI) */}
+      <DriverTimePickerModal
+        isOpen={isTimePickerOpen}
+        title="픽업 시각 설정"
+        value={extractedHHMM}
+        onClose={() => setIsTimePickerOpen(false)}
+        onConfirm={(nextTime) => {
+          setTimeDisplay(`픽업 ${nextTime}`);
+        }}
+      />
     </div>,
     document.body
   );

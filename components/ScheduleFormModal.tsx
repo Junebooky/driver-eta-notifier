@@ -1,11 +1,13 @@
 'use client';
 
-import React, { useState, useEffect, useId } from 'react';
+import React, { useState, useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { ScheduleItem } from '@/data/ferrariSchedules';
 import { LocationPreset } from '@/types';
 import { DEFAULT_PRESET_LOCATIONS } from '@/utils/presets';
 import { LocationSearchModal, SelectedLocationData } from './LocationSearchModal';
+import { DriverCalendarCard } from './common/DriverCalendarCard';
+import { DriverTimePickerModal } from './common/DriverTimePickerModal';
 import {
   X,
   Calendar,
@@ -115,9 +117,14 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
   homeLocation,
 }) => {
   const formId = useId();
+  const dateFieldRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+
+  // Custom Calendar & Time Picker states
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
 
   // Active Presets: Sync from props or vehicle-isolated localStorage to ensure Personal MY presets are included
   const [activePresets, setActivePresets] = useState<LocationPreset[]>(() => {
@@ -189,6 +196,22 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
     };
   }, [isOpen]);
 
+  // Close calendar when clicking outside dateFieldRef
+  useEffect(() => {
+    if (!isCalendarOpen) return;
+    const handleOutside = (e: MouseEvent | TouchEvent) => {
+      if (dateFieldRef.current && !dateFieldRef.current.contains(e.target as Node)) {
+        setIsCalendarOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutside);
+    document.addEventListener('touchstart', handleOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('touchstart', handleOutside);
+    };
+  }, [isCalendarOpen]);
+
   // Reset or pre-fill on modal open
   useEffect(() => {
     if (isOpen) {
@@ -214,6 +237,8 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
       setFlight('');
       setNotes('');
       setSearchModalTarget(null);
+      setIsCalendarOpen(false);
+      setIsTimePickerOpen(false);
       setFormErrors({});
       setSaveError('');
     }
@@ -298,8 +323,6 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
     }
   };
 
-  const dateInputId = `${formId}-pickup-date`;
-  const timeInputId = `${formId}-pickup-time`;
   const passengerInputId = `${formId}-passenger`;
   const flightInputId = `${formId}-flight`;
   const notesInputId = `${formId}-notes`;
@@ -357,49 +380,48 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
             </p>
           )}
 
-          {/* 1. 픽업 일자 */}
-          <div>
-            <label
-              htmlFor={dateInputId}
-              className="block text-xs sm:text-[13px] font-extrabold text-[#0F172A] mb-1.5"
-            >
+          {/* 1. 픽업 일자 (클릭 시 레퍼런스 1 스타일 달력 UI 표시) */}
+          <div className="relative" ref={dateFieldRef}>
+            <span className="block text-xs sm:text-[13px] font-extrabold text-[#0F172A] mb-1.5">
               픽업 일자
-            </label>
+            </span>
 
-            <div
+            <button
+              type="button"
+              onClick={() => {
+                haptics.lightTap();
+                setIsCalendarOpen((prev) => !prev);
+              }}
               className={`relative flex items-center justify-between w-full h-12 px-4 bg-white border rounded-2xl shadow-[0_3px_12px_rgba(15,23,42,0.04)] transition-all group cursor-pointer ${
                 formErrors.date
                   ? 'border-rose-400 bg-rose-50/50 ring-2 ring-rose-200'
-                  : 'border-slate-100/90 hover:border-blue-200'
+                  : isCalendarOpen
+                    ? 'border-[#0055FF] ring-2 ring-[#0055FF]/10'
+                    : 'border-slate-100/90 hover:border-blue-200'
               }`}
+              aria-label="픽업 일자 선택"
+              aria-expanded={isCalendarOpen}
             >
               <span className="text-sm sm:text-[15px] font-bold text-[#0F172A] tracking-tight tabular-nums">
                 {formatKoreanDate(pickupDate) || '날짜 선택'}
               </span>
               <Calendar className="w-[18px] h-[18px] text-[#0055FF] shrink-0 stroke-[2]" />
-              <input
-                id={dateInputId}
-                name="pickup_date"
-                type="date"
-                value={pickupDate}
-                onClick={(e) => {
-                  try {
-                    (e.currentTarget as HTMLInputElement).showPicker?.();
-                  } catch {
-                    // Fallback to native input activation
-                  }
-                }}
-                onChange={(e) => {
-                  haptics.lightTap();
-                  setPickupDate(e.target.value);
-                  if (formErrors.date) {
-                    setFormErrors((prev) => ({ ...prev, date: false }));
-                  }
-                }}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                aria-label="픽업 일자 선택"
-              />
-            </div>
+            </button>
+
+            {isCalendarOpen && (
+              <div className="mt-2 z-50 animate-in fade-in zoom-in-95 duration-150">
+                <DriverCalendarCard
+                  value={pickupDate}
+                  onChange={(nextIso) => {
+                    setPickupDate(nextIso);
+                    if (formErrors.date) {
+                      setFormErrors((prev) => ({ ...prev, date: false }));
+                    }
+                  }}
+                  onClose={() => setIsCalendarOpen(false)}
+                />
+              </div>
+            )}
           </div>
 
           {/* 2. 픽업 경로 (출발지 → 도착지) */}
@@ -491,40 +513,26 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
             </div>
           </div>
 
-          {/* 3. 픽업 시간 */}
+          {/* 3. 픽업 시간 (클릭 시 통합 피커 타임 모달 오픈) */}
           <div>
-            <label
-              htmlFor={timeInputId}
-              className="block text-xs sm:text-[13px] font-extrabold text-[#0F172A] mb-1.5"
-            >
+            <span className="block text-xs sm:text-[13px] font-extrabold text-[#0F172A] mb-1.5">
               픽업 시간
-            </label>
+            </span>
 
-            <div className="relative flex items-center justify-between w-full h-12 px-4 bg-white border border-slate-100/90 hover:border-blue-200 rounded-2xl shadow-[0_3px_12px_rgba(15,23,42,0.04)] transition-all group cursor-pointer">
+            <button
+              type="button"
+              onClick={() => {
+                haptics.lightTap();
+                setIsTimePickerOpen(true);
+              }}
+              className="relative flex items-center justify-between w-full h-12 px-4 bg-white border border-slate-100/90 hover:border-blue-200 rounded-2xl shadow-[0_3px_12px_rgba(15,23,42,0.04)] transition-all group cursor-pointer"
+              aria-label="픽업 시간 선택"
+            >
               <span className="text-sm sm:text-[15px] font-bold text-[#0F172A] tracking-tight tabular-nums">
                 {formatKoreanTime(pickupTime) || '시간 선택'}
               </span>
               <Clock className="w-[18px] h-[18px] text-slate-400 group-hover:text-[#0055FF] transition-colors shrink-0 stroke-[2]" />
-              <input
-                id={timeInputId}
-                name="pickup_time"
-                type="time"
-                value={pickupTime}
-                onClick={(e) => {
-                  try {
-                    (e.currentTarget as HTMLInputElement).showPicker?.();
-                  } catch {
-                    // Fallback
-                  }
-                }}
-                onChange={(e) => {
-                  haptics.lightTap();
-                  setPickupTime(e.target.value);
-                }}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                aria-label="픽업 시간 선택"
-              />
-            </div>
+            </button>
           </div>
 
           {/* 4. 승객명 & 항공편명 (선택) — 2-Column Side-by-Side */}
@@ -612,6 +620,15 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
           </div>
         </form>
       </div>
+
+      {/* Unified Driver Time Picker Modal (피커 타임 UI) */}
+      <DriverTimePickerModal
+        isOpen={isTimePickerOpen}
+        title="픽업 시각 설정"
+        value={pickupTime}
+        onClose={() => setIsTimePickerOpen(false)}
+        onConfirm={(nextTime) => setPickupTime(nextTime)}
+      />
 
       {/* Standalone Location Search Modal (Child Layer: z-[110]) */}
       {searchModalTarget && (

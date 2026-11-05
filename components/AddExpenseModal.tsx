@@ -53,6 +53,8 @@ import {
 } from '@/utils/receiptOcr';
 import { useDriverProfile } from '@/hooks/useDriverProfile';
 import { haptics } from '@/utils/haptics';
+import { DriverCalendarCard } from './common/DriverCalendarCard';
+import { DriverTimePickerModal } from './common/DriverTimePickerModal';
 
 export { SAMPLE_RECEIPT_PRESETS };
 
@@ -183,6 +185,7 @@ const AddExpenseModalContent: React.FC<{
   // Modal selectors & overlays
   const [isCategoryPickerOpen, setIsCategoryPickerOpen] = useState(false);
   const [isDateTimePickerOpen, setIsDateTimePickerOpen] = useState(false);
+  const [isExpenseTimePickerOpen, setIsExpenseTimePickerOpen] = useState(false);
   const [isPhotoZoomOpen, setIsPhotoZoomOpen] = useState(false);
 
   // Orientation state to enforce vertical receipts
@@ -888,32 +891,59 @@ const AddExpenseModalContent: React.FC<{
             )}
           </section>
 
-          {/* 3. 지출 일시 (Date & Time Picker) */}
-          <section>
+          {/* 3. 지출 일시 (Date & Time Picker — Reference Image 1 Calendar + Unified Time Picker) */}
+          <section className="relative">
             <label className="block text-xs sm:text-[13px] font-bold text-slate-800 mb-1.5">
               지출 일시 <span className="text-red-500">*</span>
             </label>
-            <button
-              type="button"
+            <div
               onClick={() => {
                 haptics.selection();
-                setTempDate(date);
-                setTempHour(time.split(':')[0] || '11');
-                setTempMinute(time.split(':')[1] || '32');
-                setIsDateTimePickerOpen(true);
+                setIsDateTimePickerOpen((prev) => !prev);
               }}
               className="w-full h-13 bg-white border border-slate-100/90 hover:border-blue-200 rounded-2xl px-3.5 flex items-center justify-between text-left transition-all shadow-[0_3px_12px_rgba(15,23,42,0.04)] group cursor-pointer"
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 min-w-0">
                 <div className="w-9 h-9 rounded-xl bg-[#F3F6FB] flex items-center justify-center text-slate-500 shrink-0">
                   <CalendarIcon className="w-4 h-4 stroke-[2]" />
                 </div>
-                <span className="text-sm font-extrabold text-slate-900 tabular-nums">
+                <span className="text-sm font-extrabold text-slate-900 tabular-nums truncate">
                   {formatPickerDateTime(date, time)}
                 </span>
               </div>
-              <ChevronDown className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
-            </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    haptics.lightTap();
+                    setIsDateTimePickerOpen(false);
+                    setIsExpenseTimePickerOpen(true);
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-[#EBF3FF] hover:bg-blue-100/80 text-[#0055FF] text-xs font-extrabold tabular-nums transition-colors cursor-pointer"
+                  title="지출 시각 설정"
+                >
+                  {time}
+                </button>
+                <ChevronDown
+                  className={`w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-transform ${
+                    isDateTimePickerOpen ? 'rotate-180' : ''
+                  }`}
+                />
+              </div>
+            </div>
+
+            {isDateTimePickerOpen && (
+              <div className="mt-2 z-50 animate-in fade-in zoom-in-95 duration-150">
+                <DriverCalendarCard
+                  value={date}
+                  onChange={(nextIso) => {
+                    setDate(nextIso);
+                  }}
+                  onClose={() => setIsDateTimePickerOpen(false)}
+                />
+              </div>
+            )}
           </section>
 
           {/* 4. 거래처 / 장소 */}
@@ -1165,95 +1195,14 @@ const AddExpenseModalContent: React.FC<{
           </div>
         )}
 
-        {/* Modal: Date & Time Picker */}
-        {isDateTimePickerOpen && (
-          <div className="fixed inset-0 z-60 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-2xs animate-in fade-in duration-150">
-            <div className="absolute inset-0" onClick={() => setIsDateTimePickerOpen(false)} />
-            <div
-              className="relative w-full max-w-sm bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl p-5 z-10 space-y-4"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                <h3 className="text-base font-bold text-slate-900">지출 일시 변경</h3>
-                <button
-                  type="button"
-                  onClick={() => setIsDateTimePickerOpen(false)}
-                  className="p-1 text-slate-400 hover:text-slate-600 rounded-full"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Date Input */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">날짜 선택</label>
-                <input
-                  type="date"
-                  value={tempDate}
-                  onChange={(e) => setTempDate(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800"
-                />
-              </div>
-
-              {/* Time Hour / Minute Select */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">시간 선택 (24시간제)</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
-                    <span className="text-xs text-slate-400">시:</span>
-                    <input
-                      type="number"
-                      min={0}
-                      max={23}
-                      value={tempHour}
-                      onChange={(e) => {
-                        const val = Math.min(23, Math.max(0, parseInt(e.target.value || '0', 10)));
-                        setTempHour(String(val).padStart(2, '0'));
-                      }}
-                      className="w-full bg-transparent text-sm font-bold text-slate-800 outline-hidden"
-                    />
-                  </div>
-                  <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
-                    <span className="text-xs text-slate-400">분:</span>
-                    <input
-                      type="number"
-                      min={0}
-                      max={59}
-                      value={tempMinute}
-                      onChange={(e) => {
-                        const val = Math.min(59, Math.max(0, parseInt(e.target.value || '0', 10)));
-                        setTempMinute(String(val).padStart(2, '0'));
-                      }}
-                      className="w-full bg-transparent text-sm font-bold text-slate-800 outline-hidden"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-2 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsDateTimePickerOpen(false)}
-                  className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors"
-                >
-                  취소
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    haptics.lightTap();
-                    setDate(tempDate);
-                    setTime(`${tempHour}:${tempMinute}`);
-                    setIsDateTimePickerOpen(false);
-                  }}
-                  className="flex-1 py-3 bg-[#1E60F3] hover:bg-blue-600 text-white text-xs font-bold rounded-xl transition-colors"
-                >
-                  확인
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Unified Driver Time Picker Modal (피커 타임 UI) */}
+        <DriverTimePickerModal
+          isOpen={isExpenseTimePickerOpen}
+          title="지출 시각 설정"
+          value={time}
+          onClose={() => setIsExpenseTimePickerOpen(false)}
+          onConfirm={(nextTime) => setTime(nextTime)}
+        />
 
         {/* Modal: Full Receipt Photo Zoom */}
         {isPhotoZoomOpen && receiptUrl && (
