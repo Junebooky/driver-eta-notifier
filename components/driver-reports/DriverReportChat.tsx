@@ -62,7 +62,12 @@ export function DriverReportChat({driverId,driverName='기사님'}:{driverId:str
  },[driverId]);
  useEffect(()=>{if(draftLoaded)try{saveChatDraft(localStorage,driverId,text,outgoing,serviceType);}catch{queueMicrotask(()=>setError('임시 저장 공간이 부족해요. 작성 내용을 복사해 보관해 주세요.'));}},[draftLoaded,driverId,text,outgoing,serviceType]);
  useEffect(()=>{if(input.current){input.current.style.height='auto';input.current.style.height=Math.min(176,input.current.scrollHeight)+'px';}},[text]);
- useEffect(()=>{const view=scroller.current;if(view&&stick.current)view.scrollTop=view.scrollHeight;},[messages,outgoing,localGuidance,serviceType,typing]);
+ useEffect(()=>{
+  const view=scroller.current;
+  if(!view||!stick.current)return;
+  const reduceMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  view.scrollTo({top:view.scrollHeight,behavior:reduceMotion||(!sending&&!typing)?'auto':'smooth'});
+ },[messages,outgoing,localGuidance,serviceType,typing,sending]);
  useEffect(()=>{
   const guard=(e:BeforeUnloadEvent)=>{if(text||outgoing.length){e.preventDefault();e.returnValue='';}};
   window.addEventListener('beforeunload',guard);return()=>window.removeEventListener('beforeunload',guard);
@@ -108,7 +113,7 @@ export function DriverReportChat({driverId,driverName='기사님'}:{driverId:str
   const reportDate=today;
   setText(buildDriverReportTemplate(reportDate));setTemplates(false);input.current?.focus();
  }
- const bubble=(m:{id:string;body:string;created_at:string},mine:boolean,status?:Outgoing)=> <div key={m.id} className={'flex items-start gap-2.5 px-3 sm:px-5 '+(mine?'justify-end':'justify-start')}>
+ const bubble=(m:{id:string;body:string;created_at:string},mine:boolean,status?:Outgoing)=> <div key={m.id} className={'flex items-start gap-2.5 px-3 sm:px-5 '+(mine?'justify-end':'justify-start')+(status&&!status.failed?' vip-chat-outgoing-enter':!mine&&m.id!=='welcome'?' vip-chat-reply-enter':'')}>
   {!mine&&<VipChatAvatar/>}
   <div className={'flex min-w-0 max-w-[88%] flex-col '+(mine?'items-end':'items-start')}>
    {!mine&&<span className="mb-1 ml-0.5 text-[12px] font-medium text-[#3E4B57]">VIP리무진코리아</span>}
