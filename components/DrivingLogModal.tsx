@@ -322,22 +322,39 @@ const DrivingLogModalContent: React.FC<{
             ? row.stops.map((stop: any) => ({
                 ...stop,
                 time: stop.time || '',
+                departureTime: stop.departureTime,
                 memo: stop.memo || stop.note || '',
               }))
             : [];
-          const mergedStops = [...(previous.stops || [])];
-          for (const stop of dbStops) {
-            const existsIdx = mergedStops.findIndex(
-              (m) =>
-                (m.id && stop.id && m.id === stop.id) ||
-                (m.actionIdempotencyKey && stop.actionIdempotencyKey && m.actionIdempotencyKey === stop.actionIdempotencyKey)
-            );
-            if (existsIdx >= 0) {
-              mergedStops[existsIdx] = { ...stop, ...mergedStops[existsIdx], memo: mergedStops[existsIdx].memo || stop.memo };
-            } else {
-              mergedStops.push(stop);
-            }
+
+          let finalStops: RouteStopItem[];
+          if (!previous.stops || previous.stops.length === 0) {
+            // 로컬에 등록된 일정이 없으면 DB의 최신 일정을 그대로 hydrate
+            finalStops = sortRouteStopsChronologically(dbStops);
+          } else {
+            // 로컬에 이미 일정이 있는 경우:
+            // 1) 로컬에 남아있는 일정에 대해 DB의 최신 필드값만 merge (로컬에서 이미 삭제된 일정은 되살리지 않음!)
+            // 2) 단, DB에서 ID나 시각 정보가 매칭되는 항목만 갱신
+            const merged = previous.stops.map((localStop) => {
+              const matchedDb = dbStops.find(
+                (ds) =>
+                  ds.id === localStop.id ||
+                  (ds.actionIdempotencyKey && ds.actionIdempotencyKey === localStop.actionIdempotencyKey)
+              );
+              if (matchedDb) {
+                return {
+                  ...matchedDb,
+                  ...localStop,
+                  memo: localStop.memo || matchedDb.memo,
+                  place: localStop.place || matchedDb.place,
+                  time: localStop.time || matchedDb.time || localStop.departureTime || '',
+                };
+              }
+              return localStop;
+            });
+            finalStops = sortRouteStopsChronologically(merged);
           }
+
           const mergedClockIn = previous.clockIn || row.clockIn || '';
           const mergedClockOut = previous.clockOut || row.clockOut || '';
           const mergedStartKm = previous.startKm || row.startKm || '';
@@ -360,7 +377,7 @@ const DrivingLogModalContent: React.FC<{
             totalDutyHours: mergedClockIn && mergedClockOut ? computedDuty.formatted : (row.totalDutyHours || previous.totalDutyHours),
             distanceKm: mergedStartKm && mergedEndKm ? computedDist.formatted : (row.distanceKm || previous.distanceKm),
             notes: previous.notes || row.notes || '',
-            stops: sortRouteStopsChronologically(mergedStops),
+            stops: finalStops,
             status: row.status === 'draft' ? 'draft' : 'submitted',
           };
           const hydrated = withCurrentProfilePassenger(next, driverProfile.passengerName);
@@ -502,18 +519,77 @@ const DrivingLogModalContent: React.FC<{
     showToast('운행 일정이 추가되었습니다.');
   };
 
-  // Delete stop
+  // Delete stop (즉시 로컬 상태 반영 + localStorage 저장 + 서버 DB stops 완전 삭제)
   const handleDeleteStop = (id: string) => {
     haptics.mediumTap();
-    persistDraftState(
-      (prev) => ({
-        ...prev,
-        stops: prev.stops.filter((s) => s.id !== id),
-      }),
-      { replaceStops: true }
-    );
     setActiveMenuStopId(null);
+
+    const nextStops = (logData.stops || []).filter((s) => s.id !== id);
+    const sortedStops = sortRouteStopsChronologically(nextStops);
+    const nextLog: DrivingLogData = {
+      ...logData,
+      stops: sortedStops,
+    };
+
+    // 1) React State 및 로컬스토리지 즉시 반영
+    setLogData(nextLog);
+    isInternalSaveRef.current = true;
+    saveDrivingLogDraft(nextLog);
+    isInternalSaveRef.current = false;
+
     showToast('일정이 삭제되었습니다.');
+
+    // 2) 서버 DB(/api/driving-logs)로 즉시 replaceStops=true 전송하여 DB에서도 완전 삭제
+    if (!nextLog.isDemoFixture && nextLog.status === 'draft') {
+      const stopsPayload = sortedStops.map((s) => ({
+        ...s,
+        id: s.id,
+        time: s.time || '',
+        departureTime: s.departureTime,
+        place: s.place,
+        memo: s.memo || (s as any).note || '',
+        note: s.memo || (s as any).note || '',
+        address: s.address,
+      }));
+
+      fetch('/api/driving-logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          id: nextLog.submissionId,
+          bookingId: nextLog.bookingId || bookingId,
+          driverId: nextLog.driverId || driverProfile.driverId,
+          driverName: nextLog.driverName || driverProfile.driverName || '담당 기사',
+          vehiclePlate: nextLog.carNumber || driverProfile.carNumber || '',
+          vehicleModel: driverProfile.carModel || '법인 차량',
+          customerName: nextLog.clientName || '고객사',
+          drivingDate: nextLog.rawDate,
+          clockIn: nextLog.clockIn || null,
+          clockOut: nextLog.clockOut || null,
+          totalDutyHours: nextLog.totalDutyHours || '',
+          startKm: nextLog.startKm || '',
+          endKm: nextLog.endKm || '',
+          stops: stopsPayload,
+          notes: nextLog.notes || '',
+          status: 'draft',
+          replaceStops: true, // DB의 기존 stops를 완전히 대체하여 삭제 반영
+          custodyId: nextLog.custodyId,
+        }),
+      })
+        .then(async (res) => {
+          if (!res.ok) return;
+          const data = await res.json().catch(() => null);
+          if (data?.ok && data.log?.id) {
+            setLogData((prev) =>
+              prev.submissionId === data.log.id
+                ? prev
+                : { ...prev, submissionId: data.log.id }
+            );
+          }
+        })
+        .catch(() => {});
+    }
   };
 
   // Temporary save to localStorage and DB (Strictly draft status)
@@ -1041,11 +1117,14 @@ const DrivingLogModalContent: React.FC<{
                   );
                   const isFirst = idx === 0;
                   const isLast = idx === sortedArr.length - 1;
+                  const isMenuOpen = activeMenuStopId === stop.id;
 
                   return (
                     <div
                       key={stop.id}
-                      className="relative flex items-start justify-between text-xs sm:text-sm group z-10"
+                      className={`relative flex items-start justify-between text-xs sm:text-sm group ${
+                        isMenuOpen ? 'z-30' : 'z-10'
+                      }`}
                     >
                       <div className="flex items-start gap-2.5 sm:gap-3 min-w-0 flex-1">
                         {/* Number Badge */}
@@ -1098,37 +1177,55 @@ const DrivingLogModalContent: React.FC<{
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setActiveMenuStopId(activeMenuStopId === stop.id ? null : stop.id);
+                            setActiveMenuStopId(isMenuOpen ? null : stop.id);
                           }}
-                          className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+                          className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                          aria-label="일정 옵션 메뉴"
                         >
                           <MoreHorizontal className="w-4 h-4" />
                         </button>
 
                         {/* Dropdown Menu */}
-                        {activeMenuStopId === stop.id && (
-                          <div className="absolute right-0 top-full mt-1 w-24 bg-white border border-slate-100 rounded-xl shadow-lg z-20 py-1 divide-y divide-slate-100 animate-in fade-in duration-150">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingStop(stop);
+                        {isMenuOpen && (
+                          <>
+                            {/* Backdrop to catch clicks outside and close menu */}
+                            <div
+                              className="fixed inset-0 z-40 bg-transparent"
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 setActiveMenuStopId(null);
-                                setIsAddStopOpen(true);
                               }}
-                              className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 flex items-center gap-1.5"
+                            />
+                            <div
+                              className="absolute right-0 top-full mt-1 w-24 bg-white border border-slate-200/90 rounded-2xl shadow-[0_8px_24px_rgba(15,23,42,0.15)] z-50 py-1.5 divide-y divide-slate-100 animate-in fade-in zoom-in-95 duration-150 select-none"
+                              onClick={(e) => e.stopPropagation()}
                             >
-                              <Pencil className="w-3 h-3 text-slate-400" />
-                              <span>수정</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteStop(stop.id)}
-                              className="w-full text-left px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 flex items-center gap-1.5"
-                            >
-                              <Trash2 className="w-3 h-3 text-red-500" />
-                              <span>삭제</span>
-                            </button>
-                          </div>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingStop(stop);
+                                  setActiveMenuStopId(null);
+                                  setIsAddStopOpen(true);
+                                }}
+                                className="w-full text-left px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5 cursor-pointer active:bg-slate-100 transition-colors"
+                              >
+                                <Pencil className="w-3.5 h-3.5 text-slate-400" />
+                                <span>수정</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteStop(stop.id);
+                                }}
+                                className="w-full text-left px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 flex items-center gap-1.5 cursor-pointer active:bg-red-100 transition-colors"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                                <span>삭제</span>
+                              </button>
+                            </div>
+                          </>
                         )}
                       </div>
                     </div>
