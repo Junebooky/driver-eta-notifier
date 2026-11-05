@@ -465,35 +465,35 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col h-[90dvh] max-h-[90dvh] animate-in slide-in-from-bottom-6 duration-300"
+        className="w-full max-w-lg bg-[#F6F8FC] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100/90 overflow-hidden flex flex-col h-[90dvh] max-h-[90dvh] animate-in slide-in-from-bottom-6 duration-300"
         style={{ overscrollBehavior: 'contain', touchAction: 'pan-y' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* ========================================================= */}
         {/* Sticky Pinned Header & TMAP Search Input Container        */}
         {/* ========================================================= */}
-        <div className="flex-shrink-0 sticky top-0 z-20 bg-white border-b border-slate-100">
-          {/* 1. Modal Header (Selection Mode Badge & Close Button) */}
-          <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-slate-100/80">
-            <div className="flex items-center gap-2">
-              <div
-                className={`w-7 h-7 rounded-lg flex items-center justify-center shadow-xs text-white ${
-                  isOrigin ? 'bg-slate-700' : isWaypoint ? 'bg-slate-800' : 'bg-[#1E60F3]'
-                }`}
-              >
-                {isOrigin ? (
-                  <Navigation className="w-3.5 h-3.5 fill-white" />
-                ) : (
-                  <MapPin className="w-4 h-4" />
-                )}
-              </div>
+        <div className="flex-shrink-0 sticky top-0 z-20 bg-[#F6F8FC]">
+          {/* 1. Modal Header (Selection Mode Icon & Close Button) */}
+          <div className="flex items-center justify-between px-5 pt-5 pb-3">
+            <div className="flex items-center gap-3">
+              <img
+                src={
+                  isOrigin
+                    ? '/images/icons/driver_ui/icon_origin.png'
+                    : '/images/icons/driver_ui/icon_destination.png'
+                }
+                alt={isOrigin ? '출발지 아이콘' : '목적지 아이콘'}
+                aria-hidden="true"
+                draggable={false}
+                className="w-12 h-12 object-contain shrink-0 select-none pointer-events-none"
+              />
               <div>
                 <div className="flex items-center gap-1.5">
-                  <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
+                  <h3 className="text-lg font-extrabold text-slate-900 tracking-tight">
                     {isOrigin ? '출발지 선택' : isWaypoint ? '경유지 선택' : '목적지 선택'}
                   </h3>
                 </div>
-                <p className="text-[11px] text-slate-400 font-medium">
+                <p className="text-xs text-slate-400 font-medium mt-0.5">
                   {isWaypoint ? '경유할 장소나 주소를 검색하세요.' : '주소를 검색하거나 저장된 거점을 선택하세요.'}
                 </p>
               </div>
@@ -505,18 +505,18 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                 haptics.lightTap();
                 onClose();
               }}
-              className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center cursor-pointer transition-colors active:scale-95"
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#EDF1F7] hover:bg-slate-200/80 text-slate-500 hover:text-slate-800 flex items-center justify-center cursor-pointer transition-colors active:scale-95"
               title="닫기"
               aria-label="닫기"
             >
-              <X className="w-4 h-4" />
+              <X className="w-4 h-4 stroke-[2.4]" />
             </button>
           </div>
 
           {/* 2. Real-time TMAP Search Input Bar */}
-          <div className="p-4 pb-3 bg-slate-50/50">
+          <div className="px-5 pb-2 pt-1 bg-[#F6F8FC]">
             <div className="relative flex items-center">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none stroke-[2]" />
               <input
                 ref={inputRef}
                 type="text"
@@ -524,10 +524,10 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="장소명, 지하철역, 건물명 검색 (예: 포시즌스호텔, 코엑스)"
-                className="w-full pl-10 pr-10 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-slate-900 placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 transition-all shadow-xs"
+                className="w-full h-12 pl-10 pr-10 bg-white border border-slate-100/90 rounded-2xl text-xs sm:text-sm font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-medium outline-none focus:border-[#0055FF] focus:ring-2 focus:ring-[#0055FF]/15 transition-all shadow-[0_3px_14px_rgba(15,23,42,0.04)]"
               />
               {isSearching ? (
-                <Loader2 className="w-4 h-4 text-[#1E60F3] animate-spin absolute right-3.5 top-1/2 -translate-y-1/2" />
+                <Loader2 className="w-4 h-4 text-[#0055FF] animate-spin absolute right-3.5 top-1/2 -translate-y-1/2" />
               ) : searchQuery.length > 0 ? (
                 <button
                   type="button"
@@ -550,7 +550,7 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
         {/* 3. Modal Scrollable Body: Recent, Presets & POI Search     */}
         {/* ========================================================= */}
         <div
-          className="p-4 space-y-4 overflow-y-auto flex-1 min-h-0 overscroll-contain touch-pan-y"
+          className="px-5 py-3 space-y-5 overflow-y-auto flex-1 min-h-0 overscroll-contain touch-pan-y"
           style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
           onTouchMove={handleScrollTouch}
         >
@@ -560,51 +560,51 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
               type="button"
               onClick={handleSelectCurrentLocation}
               disabled={isLocatingCurrent}
-              className="w-full p-3.5 rounded-2xl border border-blue-200/90 bg-gradient-to-r from-blue-50/90 via-sky-50/50 to-white hover:bg-blue-100/60 hover:border-[#1E60F3] active:scale-[0.99] transition-all flex items-center justify-between group shadow-xs cursor-pointer text-left"
+              className="w-full p-4 rounded-3xl border border-slate-100/90 bg-white hover:border-blue-200 hover:bg-[#FBFDFF] active:scale-[0.99] transition-all flex items-center justify-between group shadow-[0_4px_18px_rgba(15,23,42,0.04)] cursor-pointer text-left"
               title="현재 GPS 위치를 선택"
             >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-8 h-8 rounded-xl bg-[#1E60F3] text-white flex items-center justify-center shrink-0 shadow-sm shadow-blue-500/25">
+              <div className="flex items-center gap-3.5 min-w-0">
+                <div className="w-10 h-10 rounded-2xl bg-[#0055FF] text-white flex items-center justify-center shrink-0 shadow-[0_4px_12px_rgba(0,85,255,0.24)]">
                   {isLocatingCurrent ? (
-                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <Loader2 className="w-4.5 h-4.5 animate-spin text-white" />
                   ) : (
-                    <Navigation className="w-4 h-4 fill-white" />
+                    <Navigation className="w-4.5 h-4.5 fill-white" />
                   )}
                 </div>
                 <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-sm font-black text-slate-900 group-hover:text-[#1E60F3] transition-colors">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm sm:text-[15px] font-extrabold text-slate-900 group-hover:text-[#0055FF] transition-colors">
                       현위치로 설정
                     </span>
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-[#1E60F3]">
+                    <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-[#EBF3FF] text-[#0055FF]">
                       GPS 실시간
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-500 truncate mt-0.5">
-                    현재 내 GPS 수신 위치를 {isOrigin ? '출발지' : '위치'}로 즉시 지정합니다
+                  <p className="text-xs text-slate-400 font-medium truncate mt-0.5">
+                    현재 내 GPS 수신 위치를 {isOrigin ? '출발지' : '위치'}로 즉시 지정합니다.
                   </p>
                 </div>
               </div>
-              <span className="text-xs font-bold text-[#1E60F3] shrink-0 ml-2">
-                {isLocatingCurrent ? '수신 중...' : '선택 ➔'}
+              <span className="text-xs sm:text-[13px] font-extrabold text-[#0055FF] shrink-0 ml-2">
+                {isLocatingCurrent ? '수신 중...' : '선택 →'}
               </span>
             </button>
           )}
 
           {/* Search Results (If query length >= 2) */}
           {searchQuery.trim().length >= 2 ? (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm font-bold text-slate-700 px-1">
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between text-xs sm:text-[13px] font-extrabold text-slate-700 px-1">
                 <span>검색 결과</span>
                 {searchResults.length > 0 && (
-                  <span className="text-[11px] text-[#1E60F3] font-black">
+                  <span className="text-[11px] text-[#0055FF] font-black">
                     {searchResults.length}건 검색됨
                   </span>
                 )}
               </div>
 
               {searchResults.length > 0 ? (
-                <div className="space-y-1.5 divide-y divide-slate-100 border border-slate-100 rounded-2xl bg-white p-1 shadow-xs">
+                <div className="space-y-1.5 divide-y divide-slate-100 border border-slate-100/90 rounded-3xl bg-white p-1.5 shadow-[0_4px_18px_rgba(15,23,42,0.04)]">
                   {searchResults.map((poi, idx) => {
                     const poiLocationData: SelectedLocationData = {
                       id: `poi_${poi.id}`,
@@ -629,16 +629,16 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                             handleSelectPoi(poi);
                           }
                         }}
-                        className="w-full text-left p-3 rounded-xl hover:bg-blue-50/70 transition-all flex items-start gap-2.5 cursor-pointer group active:scale-[0.99]"
+                        className="w-full text-left p-3 rounded-2xl hover:bg-blue-50/70 transition-all flex items-start gap-2.5 cursor-pointer group active:scale-[0.99]"
                       >
-                        <div className="w-7 h-7 rounded-lg bg-blue-50 text-[#1E60F3] flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-[#1E60F3] group-hover:text-white transition-colors">
-                          <MapPin className="w-3.5 h-3.5" />
+                        <div className="w-8 h-8 rounded-xl bg-[#EBF3FF] text-[#0055FF] flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-[#0055FF] group-hover:text-white transition-colors">
+                          <MapPin className="w-4 h-4" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-bold text-slate-900 truncate group-hover:text-[#1E60F3] transition-colors">
+                          <p className="text-sm font-extrabold text-slate-900 truncate group-hover:text-[#0055FF] transition-colors">
                             {poi.name}
                           </p>
-                          <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                          <p className="text-[11px] text-slate-400 font-medium truncate mt-0.5">
                             {poi.address}
                           </p>
                         </div>
@@ -653,13 +653,13 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                           >
                             <Star
                               className={`w-4 h-4 transition-all duration-200 ${isFav
-                                ? 'fill-[#FEE500] stroke-[#FEE500] text-[#FEE500]'
+                                ? 'fill-[#FFB800] stroke-[#FFB800] text-[#FFB800]'
                                 : 'stroke-slate-300 fill-none text-slate-300 hover:stroke-slate-400'
                                 }`}
                             />
                           </button>
-                          <span className="text-[10px] font-bold text-slate-400 group-hover:text-[#1E60F3] shrink-0 ml-1">
-                            선택 ➔
+                          <span className="text-[11px] font-bold text-slate-400 group-hover:text-[#0055FF] shrink-0 ml-1">
+                            선택 →
                           </span>
                         </div>
                       </div>
@@ -667,7 +667,7 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                   })}
                 </div>
               ) : !isSearching ? (
-                <div className="text-center py-8 bg-slate-50 rounded-2xl border border-slate-100 space-y-1.5">
+                <div className="text-center py-8 bg-white rounded-3xl border border-slate-100/90 shadow-[0_4px_18px_rgba(15,23,42,0.04)] space-y-1.5">
                   <p className="text-sm font-bold text-slate-600">
                     {searchError || '검색된 장소가 없습니다.'}
                   </p>
@@ -680,29 +680,29 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
           ) : null}
 
           {/* ========================================================= */}
-          {/* [태스크 4] '🕒 최근 검색' 섹션 신설 (최대 8개 가로 스크롤) */}
+          {/* [태스크 4] '🕒 최근 검색' 섹션 (최대 8개 가로 스크롤)        */}
           {/* ========================================================= */}
           {recentSearches.length > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm font-bold text-slate-700 px-1">
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between text-xs sm:text-[13px] font-bold text-slate-700 px-1">
                 <span className="flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 text-slate-500" />
-                  <span>최근 검색</span>
-                  <span className="text-[10px] font-semibold text-slate-400">
+                  <Clock className="w-4 h-4 text-slate-500 stroke-[2]" />
+                  <span className="font-extrabold text-slate-800">최근 검색</span>
+                  <span className="text-xs font-semibold text-slate-400">
                     ({recentSearches.length})
                   </span>
                 </span>
                 <button
                   type="button"
                   onClick={handleClearRecentSearches}
-                  className="text-[11px] font-medium text-slate-400 hover:text-rose-500 transition-colors cursor-pointer"
+                  className="text-xs font-medium text-slate-400 hover:text-rose-500 transition-colors cursor-pointer"
                 >
                   전체 삭제
                 </button>
               </div>
 
               {/* Horizontal Scrollable Chips / Cards */}
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-0.5 no-scrollbar touch-pan-x">
+              <div className="flex items-center gap-2.5 overflow-x-auto pb-1.5 pt-0.5 no-scrollbar touch-pan-x">
                 {recentSearches.map((item, idx) => {
                   const isFav = isFavorite(item);
                   return (
@@ -714,11 +714,11 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                         onSelectLocation(item);
                         onClose();
                       }}
-                      className="min-w-[150px] max-w-[210px] p-2.5 rounded-2xl border border-slate-200 bg-white hover:border-[#1E60F3]/60 hover:bg-blue-50/20 active:scale-95 transition-all flex flex-col justify-between cursor-pointer shrink-0 relative group shadow-2xs"
+                      className="min-w-[156px] max-w-[210px] p-3.5 rounded-2xl border border-slate-100/90 bg-white hover:border-blue-200 hover:bg-[#FBFDFF] active:scale-95 transition-all flex flex-col justify-between cursor-pointer shrink-0 relative group shadow-[0_3px_14px_rgba(15,23,42,0.04)]"
                       title={`${item.name} (${item.address})`}
                     >
                       <div className="flex items-start justify-between gap-1 w-full">
-                        <span className="text-sm font-bold text-slate-800 group-hover:text-[#1E60F3] truncate transition-colors flex-1 pr-1">
+                        <span className="text-sm font-extrabold text-slate-900 group-hover:text-[#0055FF] truncate transition-colors flex-1 pr-1">
                           {item.shortName || item.name}
                         </span>
 
@@ -730,15 +730,15 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                           aria-label="즐겨찾기 토글"
                         >
                           <Star
-                            className={`w-3.5 h-3.5 transition-all duration-200 ${isFav
-                              ? 'fill-[#FEE500] stroke-[#FEE500] text-[#FEE500]'
+                            className={`w-4 h-4 transition-all duration-200 ${isFav
+                              ? 'fill-[#FFB800] stroke-[#FFB800] text-[#FFB800]'
                               : 'stroke-slate-300 fill-none text-slate-300 hover:stroke-slate-400'
                               }`}
                           />
                         </button>
                       </div>
 
-                      <p className="text-[10px] text-slate-400 truncate mt-1">
+                      <p className="text-[11px] font-medium text-slate-400 truncate mt-1">
                         {item.address || item.name}
                       </p>
                     </div>
@@ -752,29 +752,21 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
           {/* [태스크 3] '자주 가는 거점 퀵 선택' 캐러셀 & 캡슐형 인디케이터 */}
           {/* ========================================================= */}
           <div className="space-y-2.5">
-            <div className="flex items-center justify-between text-sm font-bold text-slate-700 px-1">
-              <span className="flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-[#1E60F3]" />
-                <span>자주 가는 거점 퀵 선택</span>
-              </span>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] text-slate-400 font-normal hidden sm:inline">
-                  원터치 즉시 확정
-                </span>
-                {onOpenManagePresets && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      haptics.lightTap();
-                      onOpenManagePresets();
-                    }}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 text-[11px] font-bold transition-all active:scale-95 cursor-pointer shadow-2xs"
-                    title="거점 순서 변경 및 관리"
-                  >
-                    <Settings2 className="w-3.5 h-3.5 text-slate-600" />
-                  </button>
-                )}
-              </div>
+            <div className="flex items-center justify-between text-sm sm:text-[15px] font-extrabold text-slate-900 px-1">
+              <span>자주 가는 거점 퀵 선택</span>
+              {onOpenManagePresets && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    haptics.lightTap();
+                    onOpenManagePresets();
+                  }}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white border border-slate-100/90 hover:bg-slate-100 text-slate-600 hover:text-slate-900 text-[11px] font-bold transition-all active:scale-95 cursor-pointer shadow-[0_2px_8px_rgba(15,23,42,0.03)]"
+                  title="거점 순서 변경 및 관리"
+                >
+                  <Settings2 className="w-3.5 h-3.5 text-slate-600" />
+                </button>
+              )}
             </div>
 
             {/* 3-Column Grid with Horizontal Carousel Slider */}
@@ -788,8 +780,8 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                 style={{ transform: `translateX(-${currentPage * 100}%)` }}
               >
                 {pages.map((pageSlots, pageIdx) => (
-                  <div key={pageIdx} className="w-full shrink-0 px-2 py-1.5">
-                    <div className="grid grid-cols-3 gap-2">
+                  <div key={pageIdx} className="w-full shrink-0 py-0.5">
+                    <div className="grid grid-cols-3 gap-2.5">
                       {pageSlots.map((slot, sIdx) => {
                         if (slot.type === 'current_location') {
                           const isSelected = currentSelectedId === 'gps_current';
@@ -799,23 +791,23 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                               type="button"
                               onClick={handleSelectCurrentLocation}
                               disabled={isLocatingCurrent}
-                              className={`min-h-[54px] sm:min-h-[58px] p-2 rounded-2xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-150 active:scale-95 group shadow-2xs ${isSelected
-                                ? 'border-2 border-[#1E60F3] bg-blue-50/40 text-[#1E60F3] font-bold shadow-xs'
-                                : 'bg-white border-blue-200/70 hover:border-[#1E60F3] hover:bg-blue-50/30'
+                              className={`min-h-[60px] sm:min-h-[64px] px-2.5 py-3 rounded-2xl border text-center flex flex-col justify-center items-center cursor-pointer transition-all duration-150 active:scale-95 group shadow-[0_3px_12px_rgba(15,23,42,0.04)] ${isSelected
+                                ? 'border-2 border-[#0055FF] bg-[#EEF4FF] text-[#0055FF] font-bold'
+                                : 'bg-[#EEF4FF] border-[#DCE8FF] hover:border-[#0055FF]/50 hover:bg-[#E4EEFF]'
                                 }`}
                               title="현재 위치 (GPS)로 설정"
                             >
-                              <div className="flex items-center justify-center gap-1 w-full min-w-0">
+                              <div className="flex items-center justify-center gap-1.5 w-full min-w-0">
                                 {isLocatingCurrent ? (
-                                  <Loader2 className="w-3 h-3 text-[#1E60F3] animate-spin shrink-0" />
+                                  <Loader2 className="w-3.5 h-3.5 text-[#0055FF] animate-spin shrink-0" />
                                 ) : (
-                                  <Navigation className="w-3 h-3 text-[#1E60F3] fill-[#1E60F3] shrink-0" />
+                                  <Navigation className="w-3.5 h-3.5 text-[#0055FF] fill-[#0055FF] shrink-0" />
                                 )}
-                                <span className="text-sm font-black tracking-tight text-slate-900 group-hover:text-[#1E60F3] truncate">
+                                <span className="text-sm font-extrabold tracking-tight text-slate-900 group-hover:text-[#0055FF] truncate">
                                   현위치
                                 </span>
                               </div>
-                              <span className="text-[10px] font-bold text-[#1E60F3] group-hover:text-blue-700 truncate w-full mt-0.5">
+                              <span className="text-[11px] font-bold text-[#0055FF] truncate w-full mt-1 leading-none">
                                 실시간 GPS
                               </span>
                             </button>
@@ -828,19 +820,18 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                               key="slot_home"
                               type="button"
                               onClick={handleSelectHome}
-                              className={`min-h-[54px] sm:min-h-[58px] p-2 rounded-2xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-150 active:scale-95 group shadow-2xs ${currentSelectedId === 'slot_home'
-                                ? 'border-2 border-[#1E60F3] bg-blue-50/40 text-[#1E60F3] font-bold shadow-xs'
-                                : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/80'
+                              className={`min-h-[60px] sm:min-h-[64px] px-2.5 py-3 rounded-2xl border text-center flex flex-col justify-center items-center cursor-pointer transition-all duration-150 active:scale-95 group shadow-[0_3px_12px_rgba(15,23,42,0.04)] ${currentSelectedId === 'slot_home'
+                                ? 'border-2 border-[#0055FF] bg-blue-50/40 text-[#0055FF] font-bold'
+                                : 'bg-white border-slate-100/90 hover:border-blue-200 hover:bg-[#FBFDFF]'
                                 }`}
                               title={homeLocation?.name ? `자택: ${homeLocation.name}` : '자택 등록'}
                             >
                               <div className="flex items-center justify-center gap-1 w-full min-w-0">
-                                <Home className="w-3 h-3 text-slate-500 shrink-0 group-hover:text-[#1E60F3]" />
-                                <span className="text-sm font-bold tracking-tight text-slate-800 truncate">
+                                <span className="text-sm font-extrabold tracking-tight text-slate-900 group-hover:text-[#0055FF] truncate">
                                   자택
                                 </span>
                               </div>
-                              <span className="text-[10px] font-medium text-slate-400 group-hover:text-slate-600 truncate w-full mt-0.5">
+                              <span className="text-[11px] font-medium text-slate-400 group-hover:text-slate-600 truncate w-full mt-1 leading-none">
                                 {homeLocation?.name ? homeLocation.name : '등록 필요'}
                               </span>
                             </button>
@@ -865,9 +856,9 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                             key={`${p.id}-${sIdx}`}
                             type="button"
                             onClick={() => handleSelectPreset(p)}
-                            className={`min-h-[54px] sm:min-h-[58px] p-2 rounded-2xl border text-center flex flex-col justify-between items-center cursor-pointer transition-all duration-150 active:scale-95 group shadow-2xs ${isSelected
-                              ? 'border-2 border-[#1E60F3] bg-blue-50/40 text-[#1E60F3] font-bold shadow-xs'
-                              : 'bg-white border-slate-200 hover:border-[#1E60F3]/60 hover:bg-blue-50/30'
+                            className={`min-h-[60px] sm:min-h-[64px] px-2.5 py-3 rounded-2xl border text-center flex flex-col justify-center items-center cursor-pointer transition-all duration-150 active:scale-95 group shadow-[0_3px_12px_rgba(15,23,42,0.04)] ${isSelected
+                              ? 'border-2 border-[#0055FF] bg-blue-50/40 text-[#0055FF] font-bold'
+                              : 'bg-white border-slate-100/90 hover:border-blue-200 hover:bg-[#FBFDFF]'
                               }`}
                             title={
                               isViaPreset
@@ -881,21 +872,21 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                                   ⤳
                                 </span>
                               )}
-                              <span className="text-sm font-bold tracking-tight text-slate-800 group-hover:text-[#1E60F3] truncate transition-colors">
+                              <span className="text-sm font-extrabold tracking-tight text-slate-900 group-hover:text-[#0055FF] truncate transition-colors">
                                 {p.shortName || p.name}
                               </span>
                             </div>
 
                             {isViaPreset ? (
-                              <span className="text-[10px] sm:text-xs font-semibold text-amber-600 mt-0.5 leading-none">
+                              <span className="text-[11px] font-semibold text-amber-600 mt-1 leading-none">
                                 경유
                               </span>
                             ) : isDefault ? (
-                              <span className="text-[10px] sm:text-xs font-medium text-slate-400 mt-0.5 leading-none">
+                              <span className="text-[11px] font-medium text-slate-400 mt-1 leading-none">
                                 공통
                               </span>
                             ) : (
-                              <span className="text-[10px] sm:text-xs font-medium text-blue-600 mt-0.5 leading-none">
+                              <span className="text-[11px] font-medium text-[#0055FF] mt-1 leading-none">
                                 개인
                               </span>
                             )}
@@ -920,7 +911,7 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                   }}
                   aria-label={`페이지 ${i + 1}`}
                   className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${currentPage === i
-                    ? 'w-6 bg-[#1E60F3] shadow-[0_2px_8px_rgba(30,96,243,0.35)]'
+                    ? 'w-7 bg-[#0055FF] shadow-[0_2px_8px_rgba(0,85,255,0.35)]'
                     : 'w-2 bg-slate-200 hover:bg-slate-300'
                     }`}
                 />
@@ -930,9 +921,9 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
         </div>
 
         {/* Footer Guidance */}
-        <div className="px-5 py-2.5 bg-slate-50 border-t border-slate-100 text-[11px] text-slate-500 flex items-center justify-between shrink-0">
-          <span>거점을 터치하면 {isOrigin ? '출발지' : '목적지'}로 즉시 설정됩니다.</span>
-          <span className="text-slate-400 font-bold">실시간 장소 검색</span>
+        <div className="px-5 py-3 bg-[#F6F8FC] border-t border-slate-200/60 text-xs text-slate-400 flex items-center justify-between shrink-0">
+          <span className="font-medium">거점을 터치하면 {isOrigin ? '출발지' : '목적지'}로 즉시 설정됩니다.</span>
+          <span className="text-[#0055FF] font-bold">실시간 장소 검색</span>
         </div>
       </div>
     </div>

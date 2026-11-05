@@ -38,11 +38,14 @@ export const QuickActionBar: React.FC<QuickActionBarProps> = ({
   onOpenFieldKnowledgeModal,
 }) => {
   const circleClass =
-    'w-13 h-13 sm:w-14 sm:h-14 rounded-full bg-[#F6F8FC] border border-slate-100/90 shadow-[0_2px_8px_rgba(15,23,42,0.03)] flex items-center justify-center text-slate-700 hover:border-[#1E60F3] hover:text-[#1E60F3] hover:bg-blue-50/60 hover:shadow-[0_4px_14px_rgba(30,96,243,0.16)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 group-hover:border-[#1E60F3] group-hover:text-[#1E60F3] group-hover:bg-blue-50/60 group-hover:shadow-[0_4px_14px_rgba(30,96,243,0.16)] group-hover:-translate-y-0.5';
+    'w-14 h-14 sm:w-15 sm:h-15 rounded-[20px] bg-[#F4F6FA] border border-transparent flex items-center justify-center text-[#1E293B] hover:bg-white hover:border-slate-100/80 hover:text-[#1E60F3] hover:shadow-[0_10px_24px_rgba(30,96,243,0.14),0_2px_8px_rgba(15,23,42,0.06)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 group-hover:bg-white group-hover:border-slate-100/80 group-hover:text-[#1E60F3] group-hover:shadow-[0_10px_24px_rgba(30,96,243,0.14),0_2px_8px_rgba(15,23,42,0.06)] group-hover:-translate-y-0.5';
+
+  const labelClass =
+    'mt-2 text-xs sm:text-[13px] font-bold text-[#1E293B] text-center tracking-tight group-hover:text-[#1E60F3] transition-colors truncate w-full';
 
   return (
     <div className="w-full bg-white border border-slate-100/90 rounded-3xl p-4 sm:p-5 shadow-[0_6px_24px_rgba(15,23,42,0.05)] select-none">
-      <div className="flex flex-col gap-3.5 sm:gap-4">
+      <div className="flex flex-col gap-4 sm:gap-5">
         {/* Row 1: 4 Buttons (운행일지, 경비지출, 차량체크, 즐겨찾기) */}
         <div className="grid grid-cols-4 gap-2 sm:gap-3">
           {/* 1. 운행일지 */}
@@ -63,9 +66,9 @@ export const QuickActionBar: React.FC<QuickActionBarProps> = ({
             title="당일 운행일지 작성 및 확인"
           >
             <div className={circleClass}>
-              <NotebookPen className="w-5 h-5 sm:w-5.5 sm:h-5.5 stroke-[1.9]" />
+              <NotebookPen className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[1.9]" />
             </div>
-            <span className="mt-1.5 text-xs font-semibold text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors truncate w-full">
+            <span className={labelClass}>
               운행일지
             </span>
           </div>
@@ -88,9 +91,9 @@ export const QuickActionBar: React.FC<QuickActionBarProps> = ({
             title="통행료·주차비 등 경비지출 관리"
           >
             <div className={circleClass}>
-              <ReceiptText className="w-5 h-5 sm:w-5.5 sm:h-5.5 stroke-[1.9]" />
+              <ReceiptText className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[1.9]" />
             </div>
-            <span className="mt-1.5 text-xs font-semibold text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors truncate w-full">
+            <span className={labelClass}>
               경비지출
             </span>
           </div>
@@ -113,9 +116,9 @@ export const QuickActionBar: React.FC<QuickActionBarProps> = ({
             title="차량 인수·반납 체크"
           >
             <div className={circleClass}>
-              <ClipboardCheck className="w-5 h-5 sm:w-5.5 sm:h-5.5 stroke-[1.9]" />
+              <ClipboardCheck className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[1.9]" />
             </div>
-            <span className="mt-1.5 text-xs font-semibold text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors truncate w-full">
+            <span className={labelClass}>
               차량체크
             </span>
           </div>
@@ -143,9 +146,9 @@ export const QuickActionBar: React.FC<QuickActionBarProps> = ({
             title="거점 및 목적지 관리"
           >
             <div className={circleClass}>
-              <MapPinPlus className="w-5 h-5 sm:w-5.5 sm:h-5.5 stroke-[1.9]" />
+              <MapPinPlus className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[1.9]" />
             </div>
-            <span className="mt-1.5 text-xs font-semibold text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors truncate w-full">
+            <span className={labelClass}>
               즐겨찾기
             </span>
           </div>
@@ -171,9 +174,9 @@ export const QuickActionBar: React.FC<QuickActionBarProps> = ({
             title="주변 주유소 실시간 유가 조회"
           >
             <div className={circleClass}>
-              <Fuel className="w-5 h-5 sm:w-5.5 sm:h-5.5 stroke-[1.9]" />
+              <Fuel className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[1.9]" />
             </div>
-            <span className="mt-1.5 text-xs font-semibold text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors truncate w-full">
+            <span className={labelClass}>
               주유
             </span>
           </div>
@@ -196,9 +199,9 @@ export const QuickActionBar: React.FC<QuickActionBarProps> = ({
             title="인천공항 실시간 운항 정보"
           >
             <div className={circleClass}>
-              <Plane className="w-5 h-5 sm:w-5.5 sm:h-5.5 stroke-[1.9]" />
+              <Plane className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[1.9]" />
             </div>
-            <span className="mt-1.5 text-xs font-semibold text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors truncate w-full">
+            <span className={labelClass}>
               항공편
             </span>
           </div>
@@ -221,9 +224,9 @@ export const QuickActionBar: React.FC<QuickActionBarProps> = ({
             title="현장 로드뷰 및 진입로 사전 답사"
           >
             <div className={circleClass}>
-              <Eye className="w-5 h-5 sm:w-5.5 sm:h-5.5 stroke-[1.9]" />
+              <Eye className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[1.9]" />
             </div>
-            <span className="mt-1.5 text-xs font-semibold text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors truncate w-full">
+            <span className={labelClass}>
               로드뷰
             </span>
           </div>
@@ -246,9 +249,9 @@ export const QuickActionBar: React.FC<QuickActionBarProps> = ({
             title="주요 거점 진입로 및 현장 지식 가이드"
           >
             <div className={circleClass}>
-              <BookOpen className="w-5 h-5 sm:w-5.5 sm:h-5.5 stroke-[1.9]" />
+              <BookOpen className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[1.9]" />
             </div>
-            <span className="mt-1.5 text-xs font-semibold text-slate-700 text-center tracking-tight group-hover:text-[#1E60F3] transition-colors truncate w-full">
+            <span className={labelClass}>
               현장지식
             </span>
           </div>
