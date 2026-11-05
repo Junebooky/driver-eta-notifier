@@ -823,13 +823,25 @@ ${scheduleItemsFormatted}`.trim();
       : schedules.filter((s) => s.date === selectedDateFilter)
   );
 
-  // Extract unique dates for filter chips (sorted chronologically)
+  // Extract unique dates for filter chips (sorted chronologically, formatted as 'M월 D일 (요일)')
+  const formatFilterDateLabel = (dateStr: string, fallback?: string): string => {
+    const parts = dateStr.split('-').map(Number);
+    if (parts.length === 3 && !parts.some(isNaN)) {
+      const dt = new Date(parts[0], parts[1] - 1, parts[2]);
+      if (!isNaN(dt.getTime())) {
+        const dow = ['일', '월', '화', '수', '목', '금', '토'][dt.getDay()];
+        return `${dt.getMonth() + 1}월 ${dt.getDate()}일 (${dow})`;
+      }
+    }
+    return fallback ? fallback.replace('2026-', '') : dateStr;
+  };
+
   const uniqueDates = Array.from(new Set(schedules.map((s) => s.date))).sort();
   const dateFilters = [
     { key: 'all', label: `전체 (${schedules.length})` },
     ...uniqueDates.map((d) => {
       const match = schedules.find((s) => s.date === d);
-      return { key: d, label: match ? match.dateLabel.replace('2026-', '') : d };
+      return { key: d, label: formatFilterDateLabel(d, match?.dateLabel) };
     }),
   ];
 
@@ -869,9 +881,9 @@ ${scheduleItemsFormatted}`.trim();
         </div>
       )}
 
-      {/* Fleet Vehicle Switcher (Development / Dispatcher Control Mode) */}
+      {/* Fleet Vehicle Switcher (Volumetric Pill Strip) */}
       {ENABLE_DEV_FLEET_SWITCHER && (
-        <div className="mb-3 bg-slate-100/90 p-1 rounded-2xl flex items-center gap-1 border border-slate-200/80 shadow-xs overflow-x-auto">
+        <div className="mb-4 py-1 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
           {[
             ...availableVehicles.map((v) => ({ id: v, label: v })),
             { id: 'all', label: '전체' },
@@ -890,17 +902,19 @@ ${scheduleItemsFormatted}`.trim();
                     onSwitchVehicle(v.id);
                   }
                 }}
-                className={`shrink-0 whitespace-nowrap py-1.5 px-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-1 transition-all cursor-pointer ${isSelected
-                  ? 'bg-white text-slate-900 shadow-sm border border-slate-200/90 scale-100'
-                  : 'text-slate-500 hover:text-slate-800'
-                  }`}
+                className={`shrink-0 whitespace-nowrap py-2 px-3.5 rounded-full text-[13px] flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  isSelected
+                    ? 'bg-white text-[#0F172A] font-extrabold shadow-[0_4px_14px_rgba(15,23,42,0.06)] border border-slate-100/90'
+                    : 'text-slate-600 hover:text-[#0F172A] hover:bg-white/60 font-semibold'
+                }`}
               >
                 <span>{v.label}</span>
                 <span
-                  className={`text-[10px] font-black px-1.5 py-0.2 rounded-full ${isSelected
-                    ? 'bg-blue-50 text-[#1E60F3]'
-                    : 'bg-slate-200 text-slate-600'
-                    }`}
+                  className={`text-[11px] px-1.5 py-0.5 rounded-full min-w-[20px] text-center leading-none ${
+                    isSelected
+                      ? 'bg-[#EEF4FF] text-[#0055FF] font-extrabold'
+                      : 'bg-[#E4E8F0] text-slate-500 font-bold'
+                  }`}
                 >
                   {count}
                 </span>
@@ -1028,44 +1042,44 @@ ${scheduleItemsFormatted}`.trim();
         </div>
       ) : (
         /* ================= CONFIRMED SCHEDULES VIEW (TASK 2) ================= */
-        <div className="flex-1 space-y-3.5 pt-1">
-          {/* Subheader & Date Filter Pills (Calendar icon removed, dynamic title bound) */}
-          <div className="flex items-center justify-between pb-1 px-0.5">
-            <div>
-              <h3 className="text-sm font-black text-slate-900 tracking-tight">
+        <div className="flex-1 space-y-4 pt-0.5">
+          {/* Subheader & Actions */}
+          <div className="flex items-center justify-between gap-2 pb-0.5 px-0.5">
+            <div className="min-w-0">
+              <h3 className="text-[17px] sm:text-lg font-extrabold text-[#0F172A] tracking-tight leading-snug truncate">
                 {scheduleTitle}
               </h3>
-              <p className="text-[11px] text-slate-500 font-medium">
+              <p className="text-xs text-slate-400 font-medium mt-0.5">
                 {selectedVehicleFilter === 'all'
                   ? `전체 호차 통합 관제 뷰 (총 ${schedules.length}건)`
                   : `${selectedVehicleFilter} 전담 의전 일정 (총 ${schedules.length}건)`}
               </p>
             </div>
 
-            {/* Header Action Buttons: Add Schedule & Reset */}
-            <div className="flex items-center gap-1.5">
+            {/* Header Action Buttons: Add Schedule White Pill & Reset Link */}
+            <div className="flex items-center gap-2 shrink-0">
               <button
                 type="button"
                 onClick={() => handleOpenScheduleFormModal()}
-                className="text-sm text-[#1E60F3] hover:text-[#1650D6] bg-blue-50 hover:bg-blue-100 border border-blue-200 flex items-center gap-1 py-1 px-2.5 rounded-lg transition-all font-bold cursor-pointer"
+                className="text-xs sm:text-[13px] text-[#0055FF] hover:text-[#0046D5] bg-white hover:bg-slate-50 border border-slate-100/90 shadow-[0_4px_14px_rgba(15,23,42,0.06)] flex items-center gap-1 py-2 px-3.5 rounded-full transition-all font-extrabold cursor-pointer active:scale-95 whitespace-nowrap"
                 title="새 스케줄 등록"
               >
-                <Plus className="w-3 h-3" />
+                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
                 <span>일정 추가</span>
               </button>
               <button
                 type="button"
                 onClick={handleResetSchedules}
-                className="text-sm text-slate-400 hover:text-slate-700 flex items-center gap-1 py-1 px-2 rounded-lg hover:bg-slate-100 transition-all font-medium cursor-pointer"
+                className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1 py-1.5 px-1 rounded-lg transition-colors font-semibold cursor-pointer whitespace-nowrap"
               >
-                <RefreshCw className="w-3 h-3" />
+                <RefreshCw className="w-3.5 h-3.5" />
                 <span>배차표 재등록</span>
               </button>
             </div>
           </div>
 
           {/* Date Filter Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
             {dateFilters.map((tab) => {
               const isSelected = selectedDateFilter === tab.key;
               return (
@@ -1076,10 +1090,11 @@ ${scheduleItemsFormatted}`.trim();
                     haptics.lightTap();
                     setSelectedDateFilter(tab.key);
                   }}
-                  className={`px-3 py-1.5 rounded-full text-sm font-bold shrink-0 transition-all cursor-pointer ${isSelected
-                    ? 'bg-[#1E60F3] text-white shadow-xs'
-                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                    }`}
+                  className={`px-4 py-2 rounded-full text-xs sm:text-[13px] shrink-0 transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-[#0055FF] text-white font-extrabold shadow-[0_4px_12px_rgba(0,85,255,0.25)]'
+                      : 'bg-white text-slate-700 font-bold border border-slate-100/90 shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:bg-slate-50'
+                  }`}
                 >
                   {tab.label}
                 </button>

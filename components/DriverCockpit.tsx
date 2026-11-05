@@ -866,6 +866,11 @@ export default function DriverCockpit() {
         const validWaypoints = (currentWaypoints || []).filter(
           (w) => w && typeof w.lat === 'number' && typeof w.lng === 'number' && (w.lat !== 0 || w.lng !== 0)
         );
+        // Ensure predictionTime sent to TMAP is never behind server clock when querying near-now slots
+        const safePredictionDate =
+          targetDate.getTime() < Date.now() + 90 * 1000
+            ? new Date(Date.now() + 90 * 1000)
+            : targetDate;
         const res = await fetch('/api/route/prediction', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -873,7 +878,7 @@ export default function DriverCockpit() {
             departure: { name: start.shortName || start.name, lat: start.lat, lng: start.lng },
             destination: { name: end.shortName || end.name, lat: end.lat, lng: end.lng },
             waypoints: validWaypoints.map((w) => ({ name: w.name, lat: w.lat, lng: w.lng })),
-            predictionTime: targetDate.toISOString(),
+            predictionTime: safePredictionDate.toISOString(),
           }),
           signal: controller.signal,
         });
@@ -955,17 +960,37 @@ export default function DriverCockpit() {
     }
   };
 
+  // Open Prediction Result Sheet directly (rounded to next 10-min slot) using real TMAP API
+  const handleOpenPredictionSheet = () => {
+    const next10 = new Date(Date.now() + 2 * 60 * 1000);
+    const rem = next10.getMinutes() % 10;
+    if (rem !== 0) {
+      next10.setMinutes(next10.getMinutes() + (10 - rem), 0, 0);
+    } else {
+      next10.setSeconds(0, 0);
+    }
+    setSimulationDepartureDate(next10);
+    setIsPredictionSheetOpen(true);
+    if (origin && destination) {
+      const currentWps =
+        isAdminRoute && adminWaypoints.length > 0
+          ? adminWaypoints
+          : waypoints.filter((w) => w && w.lat && w.lng && (w.lat !== 0 || w.lng !== 0));
+      fetchPrediction(next10, origin, destination, currentWps);
+    }
+  };
+
   // Handle Departure Time selection from Wheel Picker (Simulation Preview Only)
   const handleConfirmDepartureTime = (date: Date) => {
     setSimulationDepartureDate(date);
     setIsTimePickerOpen(false);
     setIsPredictionSheetOpen(true);
     if (origin && destination) {
-      const effectiveWaypoints =
+      const currentWps =
         isAdminRoute && adminWaypoints.length > 0
           ? adminWaypoints
           : waypoints.filter((w) => w && w.lat && w.lng && (w.lat !== 0 || w.lng !== 0));
-      fetchPrediction(date, origin, destination, effectiveWaypoints);
+      fetchPrediction(date, origin, destination, currentWps);
     }
   };
 
@@ -1324,23 +1349,32 @@ export default function DriverCockpit() {
   const handleOpenPredictionForSchedule = useCallback(
     (schedule: ScheduleItem) => {
       if (schedule?.id) setActiveBookingId(String(schedule.id));
-      const { originPreset, destinationPreset } = scheduleToPresets(schedule);
+      const { originPreset, destinationPreset, adminWaypoints: schedWps } = scheduleToPresets(schedule);
       setOrigin(originPreset);
       setDestination(destinationPreset);
-      fetchRouteEstimate(originPreset, destinationPreset);
+      fetchRouteEstimate(originPreset, destinationPreset, schedWps || []);
 
       const [year, month, day] = schedule.date.split('-').map(Number);
       const [hour, minute] = schedule.pickup_time.split(':').map(Number);
+      const schedDate = new Date();
       if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
-        const schedDate = new Date();
         schedDate.setFullYear(year, month - 1, day);
         schedDate.setHours(hour || 9, minute || 0, 0, 0);
-        setSimulationDepartureDate(schedDate);
       }
-      setIsTimePickerOpen(true);
+      // If the schedule's date/time has already passed, project same pickup hour:minute onto today/tomorrow for valid TMAP prediction
+      if (schedDate.getTime() < Date.now() + 60 * 1000) {
+        const now = new Date();
+        schedDate.setFullYear(now.getFullYear(), now.getMonth(), now.getDate());
+        if (schedDate.getTime() < Date.now() + 60 * 1000) {
+          schedDate.setDate(schedDate.getDate() + 1);
+        }
+      }
+      setSimulationDepartureDate(schedDate);
+      setIsPredictionSheetOpen(true);
+      fetchPrediction(schedDate, originPreset, destinationPreset, schedWps || []);
       haptics.mediumTap();
     },
-    [setOrigin, setDestination, fetchRouteEstimate]
+    [setOrigin, setDestination, fetchRouteEstimate, fetchPrediction]
   );
 
   const handleOpenFlightModalFromSchedule = useCallback(
@@ -1509,7 +1543,7 @@ export default function DriverCockpit() {
                   fetchRouteEstimate(origin, destination, effectiveWaypoints);
                 }
               }}
-              onOpenTimePicker={() => setIsTimePickerOpen(true)}
+              onOpenTimePicker={handleOpenPredictionSheet}
             />
 
             {/* 4. Report Template Selector with Globe English Translation */}
@@ -1661,7 +1695,10 @@ export default function DriverCockpit() {
       {/* Native Departure Time Picker Modal (4-Column Wheel Picker) */}
       <DepartureTimePickerModal
         isOpen={isTimePickerOpen}
-        onClose={() => setIsTimePickerOpen(false)}
+        onClose={() => {
+          setIsTimePickerOpen(false);
+          setIsPredictionSheetOpen(true);
+        }}
         onConfirm={handleConfirmDepartureTime}
         initialDate={simulationDepartureDate}
       />
