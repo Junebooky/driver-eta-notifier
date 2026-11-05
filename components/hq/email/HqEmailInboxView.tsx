@@ -36,6 +36,7 @@ import {
   VehicleSlotAssignment,
 } from './HqStep2BookingDetailView';
 import { HqStep4DispatchDoneView } from './HqStep4DispatchDoneView';
+import { HqStep4BookingConfirmedView } from './HqStep4BookingConfirmedView';
 import {
   HqDriverSelectModal,
   AvailableDriverItem,
@@ -61,7 +62,7 @@ export interface HqEmailInboxViewProps {
   onSavedServer?: () => Promise<void> | void;
 }
 
-export type EmailWorkflowStep = 'step1_extract' | 'step2_booking_detail' | 'step4_dispatch_done';
+export type EmailWorkflowStep = 'step1_extract' | 'step4_booking_confirmed' | 'step2_booking_detail' | 'step4_dispatch_done';
 
 interface ImapConnectionState {
   isConfigured: boolean;
@@ -185,7 +186,7 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
   // 7. Real Supabase drivers
   const { drivers: hqDrivers } = useHqDrivers();
 
-  // 8. Workflow Step state ('step1_extract' | 'step2_booking_detail' | 'step4_dispatch_done')
+  // 8. Distinct review, confirmation (step 4), assignment (step 5) and dispatched states.
   const [workflowStep, setWorkflowStep] = useState<EmailWorkflowStep>(() => {
     if (urlStep === 'step2_booking_detail' || urlStep === 'step4_dispatch_done') {
       return urlStep;
@@ -696,19 +697,41 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
     }
   };
 
-  // Proceed from Step 1 to Step 2 Booking Detail (Register booking)
+  // Step 3 → 4: confirm the reviewed draft, without prematurely submitting a dispatch.
   const handleProceedToBooking = () => {
+    if (!currentSummary || !currentDraft) return;
     haptics.success();
-    // Synchronize vehicle slots dynamically from current draft (STRICT: no dummy vehicles!)
-    const targetSlots = parseVehicleSlotsFromRequestedClass(currentDraft?.requestedVehicleClass);
-    setVehicleSlots(targetSlots);
+    const confirmedDraft: HqEmailExtractedDraft = {
+      ...currentDraft,
+      status: currentDraft.status === 'published' ? 'published' : 'saved',
+      updatedAt: new Date().toISOString(),
+    };
+    saveEmailDraft(confirmedDraft);
+    setDraftsByEmailId((prev) => ({ ...prev, [currentSummary.id]: confirmedDraft }));
+    setVehicleSlots(parseVehicleSlotsFromRequestedClass(confirmedDraft.requestedVehicleClass));
+    setWorkflowStep('step4_booking_confirmed');
+  };
+
+  // Step 4 → 5: assigning a driver is a separate, intentional action.
+  const handleProceedToAssignment = () => {
+    if (!currentDraft || workflowStep !== 'step4_booking_confirmed') return;
+    haptics.selection();
     setWorkflowStep('step2_booking_detail');
   };
 
-  // 5-Step Workflow: 1: 이메일 확인, 2: AI 추출, 3: 정보 검토/수정, 4: 예약 등록, 5: 차량/기사 배정
+  const handleBackToReview = () => {
+    haptics.lightTap();
+    if (currentDraft && currentDraft.status === 'saved' && !currentDraft.savedScheduleIds) {
+      handleUpdateDraft({ ...currentDraft, status: 'draft' });
+    }
+    setWorkflowStep('step1_extract');
+  };
+
+  // 5-Step Workflow: 1 mail, 2 AI, 3 review, 4 confirmation, 5 assignment.
   const calculatedCurrentStep: WorkflowStepId = useMemo(() => {
     if (workflowStep === 'step4_dispatch_done') return 5;
     if (workflowStep === 'step2_booking_detail') return 5;
+    if (workflowStep === 'step4_booking_confirmed') return 4;
     if (isExtractingAi) return 2;
     if (currentDraft) return 3;
     return 1;
@@ -716,17 +739,19 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
 
   const handleStepperStepClick = (targetStep: WorkflowStepId) => {
     haptics.selection();
-    if (targetStep === 1) {
-      setWorkflowStep('step1_extract');
+    if (targetStep === 1 || targetStep === 3) {
+      handleBackToReview();
     } else if (targetStep === 2) {
       if (!currentDraft && !isExtractingAi) {
-        handleExtractWithAi();
+        void handleExtractWithAi();
       }
-    } else if (targetStep === 3) {
-      setWorkflowStep('step1_extract');
-    } else if (targetStep === 4 || targetStep === 5) {
-      if (currentDraft) {
-        handleProceedToBooking();
+    } else if (targetStep === 4) {
+      if (currentDraft && workflowStep === 'step2_booking_detail') {
+        setWorkflowStep('step4_booking_confirmed');
+      }
+    } else if (targetStep === 5) {
+      if (currentDraft && workflowStep === 'step2_booking_detail') {
+        setWorkflowStep('step2_booking_detail');
       }
     }
   };
@@ -1061,6 +1086,15 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                     showToast('수정된 예약 초안이 저장되었습니다.');
                   }}
                   onUpdateDraft={handleUpdateDraft}
+                />
+              )}
+
+              {workflowStep === 'step4_booking_confirmed' && currentDraft && (
+                <HqStep4BookingConfirmedView
+                  emailSummary={currentSummary}
+                  extractedDraft={currentDraft}
+                  onProceedToAssignment={handleProceedToAssignment}
+                  onBackToReview={handleBackToReview}
                 />
               )}
 
