@@ -110,7 +110,7 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center pt-[12vh] sm:items-center sm:pt-0 p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in overscroll-contain select-none touch-none"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overscroll-contain select-none touch-none driver-modal-backdrop"
       style={{ overscrollBehavior: 'contain', touchAction: 'none' }}
       onTouchMove={(e) => e.preventDefault()}
       onWheel={(e) => e.preventDefault()}
@@ -122,7 +122,7 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
     >
       <div
         ref={modalRef}
-        className="w-full max-w-xs bg-white border border-slate-200 rounded-3xl shadow-2xl p-5 text-slate-900 space-y-4 transform transition-transform duration-200 ease-out focus-within:-translate-y-8 sm:focus-within:translate-y-0 overscroll-contain select-text"
+        className="w-full max-w-xs bg-white border border-slate-200 rounded-3xl shadow-2xl p-5 text-slate-900 space-y-4 transform transition-all duration-300 ease-out focus-within:-translate-y-8 sm:focus-within:translate-y-0 overscroll-contain select-text driver-modal-card"
         style={{ overscrollBehavior: 'contain', touchAction: 'none' }}
         onTouchMove={(e) => e.preventDefault()}
         onWheel={(e) => e.preventDefault()}

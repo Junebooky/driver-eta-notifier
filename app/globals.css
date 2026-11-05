@@ -33,6 +33,96 @@
     animation: fadeIn 0.2s ease-out forwards;
   }
 
+  @keyframes driverModalBackdropIn {
+    0% {
+      opacity: 0;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+
+  @keyframes driverModalCardIn {
+    0% {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes driverPopoverIn {
+    0% {
+      opacity: 0;
+      transform: scale(0.96) translateY(-4px);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  .driver-modal-backdrop {
+    opacity: 1;
+    transition: opacity 300ms cubic-bezier(0, 0, 0.2, 1);
+    animation: driverModalBackdropIn 300ms cubic-bezier(0, 0, 0.2, 1) both;
+    @starting-style {
+      opacity: 0;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      animation-duration: 100ms;
+      transition-duration: 100ms;
+    }
+  }
+
+  .driver-modal-card,
+  .animate-scale-up {
+    opacity: 1;
+    transform: scale(1);
+    transition:
+      opacity 300ms cubic-bezier(0, 0, 0.2, 1),
+      transform 300ms cubic-bezier(0, 0, 0.2, 1);
+    animation: driverModalCardIn 300ms cubic-bezier(0, 0, 0.2, 1) both;
+    will-change: transform, opacity;
+    @starting-style {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      animation: driverModalBackdropIn 100ms ease-out both;
+      transition-duration: 100ms;
+      @starting-style {
+        opacity: 0;
+        transform: none;
+      }
+    }
+  }
+
+  .driver-popover-in {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    transform-origin: top center;
+    transition:
+      opacity 220ms cubic-bezier(0, 0, 0.2, 1),
+      transform 220ms cubic-bezier(0, 0, 0.2, 1);
+    animation: driverPopoverIn 220ms cubic-bezier(0, 0, 0.2, 1) both;
+    will-change: transform, opacity;
+    @starting-style {
+      opacity: 0;
+      transform: scale(0.96) translateY(-4px);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      animation: driverModalBackdropIn 100ms ease-out both;
+      transition-duration: 100ms;
+      @starting-style {
+        opacity: 0;
+        transform: none;
+      }
+    }
+  }
+
   @keyframes stepSlideIn {
     from {
       opacity: 0;

@@ -460,12 +460,12 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 select-none overscroll-contain"
+      className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm select-none overscroll-contain driver-modal-backdrop"
       style={{ overscrollBehavior: 'contain', touchAction: 'pan-y' }}
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg bg-[#F6F8FC] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100/90 overflow-hidden flex flex-col h-[90dvh] max-h-[90dvh] animate-in slide-in-from-bottom-6 duration-300"
+        className="w-full max-w-lg bg-[#F6F8FC] rounded-3xl shadow-2xl border border-slate-100/90 overflow-hidden flex flex-col h-[88dvh] max-h-[88dvh] driver-modal-card"
         style={{ overscrollBehavior: 'contain', touchAction: 'pan-y' }}
         onClick={(e) => e.stopPropagation()}
       >

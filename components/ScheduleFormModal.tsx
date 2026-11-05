@@ -329,30 +329,36 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 select-none overscroll-contain animate-in fade-in duration-200"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm select-none overscroll-contain driver-modal-backdrop"
       style={{ overscrollBehavior: 'contain', touchAction: 'pan-y' }}
       onClick={() => {
         if (!isSaving) onClose();
       }}
     >
-      {/* Background Dimmed Overlay */}
-      <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs -z-10" />
-
       {/* Modal Card */}
       <div
-        className="w-full max-w-md bg-[#F6F8FC] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100/90 overflow-hidden flex flex-col max-h-[92dvh] relative z-10 animate-in slide-in-from-bottom-6 duration-300"
+        className="w-full max-w-md bg-[#F6F8FC] rounded-3xl shadow-2xl border border-slate-100/90 overflow-hidden flex flex-col max-h-[92dvh] relative z-10 driver-modal-card"
         style={{ overscrollBehavior: 'contain', touchAction: 'pan-y' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="flex items-start justify-between gap-3 px-5 sm:px-6 pt-5 pb-2 shrink-0">
-          <div className="min-w-0">
-            <h3 className="text-xl font-extrabold text-[#0F172A] tracking-tight leading-snug">
-              새 스케줄 등록
-            </h3>
-            <p className="text-xs sm:text-[13px] font-medium text-slate-400 mt-1 truncate">
-              {vehicleNo} 전담 VIP 의전 배차 일정
-            </p>
+        <div className="flex items-center justify-between gap-3 px-5 sm:px-6 pt-5 pb-2 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <img
+              src="/images/icons/driver_ui/icon_calendar_add.png"
+              alt="새 스케줄 등록 아이콘"
+              aria-hidden="true"
+              draggable={false}
+              className="w-11 h-11 sm:w-12 sm:h-12 object-contain shrink-0 select-none pointer-events-none"
+            />
+            <div className="min-w-0">
+              <h3 className="text-xl font-extrabold text-[#0F172A] tracking-tight leading-snug">
+                새 스케줄 등록
+              </h3>
+              <p className="text-xs sm:text-[13px] font-medium text-slate-400 mt-0.5 truncate">
+                {vehicleNo} 전담 VIP 의전 배차 일정
+              </p>
+            </div>
           </div>
           <button
             type="button"
@@ -380,7 +386,7 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
             </p>
           )}
 
-          {/* 1. 픽업 일자 (클릭 시 레퍼런스 1 스타일 달력 UI 표시) */}
+          {/* 1. 픽업 일자 (클릭 시 모달 높이 변화 없이 플로팅 달력 UI 표시) */}
           <div className="relative" ref={dateFieldRef}>
             <span className="block text-xs sm:text-[13px] font-extrabold text-[#0F172A] mb-1.5">
               픽업 일자
@@ -409,7 +415,7 @@ export const ScheduleFormModal: React.FC<ScheduleFormModalProps> = ({
             </button>
 
             {isCalendarOpen && (
-              <div className="mt-2 z-50 animate-in fade-in zoom-in-95 duration-150">
+              <div className="absolute left-0 top-full mt-2 z-50 driver-popover-in">
                 <DriverCalendarCard
                   value={pickupDate}
                   onChange={(nextIso) => {

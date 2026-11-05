@@ -59,11 +59,11 @@ export const FreshEtaActionSheet: React.FC<FreshEtaActionSheetProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-xs select-none animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm select-none driver-modal-backdrop"
       onClick={onClose}
     >
       <div
-        className="w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl border border-slate-100 shadow-2xl overflow-hidden p-5 space-y-4 animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-200"
+        className="w-full max-w-md bg-white rounded-3xl border border-slate-100 shadow-2xl overflow-hidden p-5 space-y-4 driver-modal-card"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

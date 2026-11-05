@@ -326,14 +326,14 @@ export const DepartureTimePickerModal: React.FC<DepartureTimePickerModalProps> =
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200 select-none overscroll-contain"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm select-none overscroll-contain driver-modal-backdrop"
       onClick={() => {
         haptics.lightTap();
         onClose();
       }}
     >
       <div
-        className="relative w-full max-w-md bg-[#F7F9FC] rounded-t-[32px] sm:rounded-[32px] px-5 pt-3.5 pb-[max(env(safe-area-inset-bottom),24px)] sm:pb-6 shadow-2xl border border-white/90 overflow-hidden animate-in slide-in-from-bottom-5 duration-250"
+        className="relative w-full max-w-md bg-[#F7F9FC] rounded-[32px] px-5 pt-3.5 pb-6 shadow-2xl border border-white/90 overflow-hidden driver-modal-card"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Drag Handle Pill */}

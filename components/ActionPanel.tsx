@@ -348,11 +348,11 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({
       {/* Tmap Smart Assist Bottom Sheet / Modal */}
       {isTmapAssistOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overscroll-contain touch-none select-none animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overscroll-contain touch-none select-none driver-modal-backdrop"
           onClick={() => setIsTmapAssistOpen(false)}
         >
           <div
-            className="w-full max-w-lg bg-white rounded-3xl border border-slate-100 shadow-2xl overflow-hidden flex flex-col max-h-[85dvh] animate-in zoom-in-95 duration-200 touch-auto"
+            className="w-full max-w-lg bg-white rounded-3xl border border-slate-100 shadow-2xl overflow-hidden flex flex-col max-h-[85dvh] touch-auto driver-modal-card"
             style={{ overscrollBehavior: 'contain' }}
             onClick={(e) => e.stopPropagation()}
           >

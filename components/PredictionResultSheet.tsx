@@ -171,18 +171,15 @@ export const PredictionResultSheet: React.FC<PredictionResultSheetProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 select-none animate-fade-in overscroll-contain"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm select-none overscroll-contain driver-modal-backdrop"
       onClick={() => {
         haptics.lightTap();
         onClose();
       }}
     >
-      {/* Dimmed backdrop */}
-      <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity" />
-
       {/* Outer Soft Cool-Gray Modal Container holding Two Volumetric White Cards */}
       <div
-        className="relative w-full max-w-md bg-[#F4F7FC] rounded-t-[32px] sm:rounded-[32px] p-4 sm:p-5 shadow-2xl z-10 animate-in slide-in-from-bottom-5 duration-250 border border-white/90 flex flex-col gap-4 max-h-[92dvh] overflow-y-auto pb-[max(env(safe-area-inset-bottom),16px)] sm:pb-5"
+        className="relative w-full max-w-md bg-[#F4F7FC] rounded-[32px] p-4 sm:p-5 shadow-2xl z-10 border border-white/90 flex flex-col gap-4 max-h-[90dvh] overflow-y-auto driver-modal-card"
         onClick={(e) => e.stopPropagation()}
       >
         {/* CARD 1: Top Briefing + Large Duration + [시간변경] Pill */}

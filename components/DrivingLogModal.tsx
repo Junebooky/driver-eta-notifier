@@ -348,7 +348,7 @@ const DrivingLogModalContent: React.FC<{
 
   return (
     <div
-      className={presentation === 'page' ? "w-full bg-inherit select-none" : "fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in select-none overscroll-contain"}
+      className={presentation === 'page' ? "w-full bg-inherit select-none" : "fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm select-none overscroll-contain driver-modal-backdrop"}
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           haptics.lightTap();
@@ -357,7 +357,7 @@ const DrivingLogModalContent: React.FC<{
       }}
     >
       <div
-        className={presentation === 'page' ? "relative flex min-h-[70dvh] w-full flex-col bg-inherit" : "w-full max-w-lg bg-[#F6F8FC] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[92dvh] h-[92dvh] sm:h-auto sm:max-h-[90vh] animate-in slide-in-from-bottom-6 sm:animate-scale-up duration-300 relative"}
+        className={presentation === 'page' ? "relative flex min-h-[70dvh] w-full flex-col bg-inherit" : "w-full max-w-lg bg-[#F6F8FC] rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[90dvh] h-[90dvh] sm:h-auto sm:max-h-[90vh] relative driver-modal-card"}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Main Scrollable Content */}
@@ -895,7 +895,7 @@ const DrivingLogModalContent: React.FC<{
       {/* iOS-style Wheel & Direct Input Time Picker Modal (출근 시각 설정 / 퇴근 시각 설정) */}
       {timePickerTarget && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 driver-modal-backdrop"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               haptics.lightTap();
@@ -904,7 +904,7 @@ const DrivingLogModalContent: React.FC<{
           }}
         >
           <div
-            className="bg-[#F6F8FC] border border-slate-100/90 rounded-3xl p-5 w-full max-w-xs shadow-2xl space-y-4"
+            className="bg-[#F6F8FC] border border-slate-100/90 rounded-3xl p-5 w-full max-w-xs shadow-2xl space-y-4 driver-modal-card"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
@@ -1091,7 +1091,7 @@ const DrivingLogModalContent: React.FC<{
       {/* Mileage Edit Modal */}
       {isEditingMileage && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 driver-modal-backdrop"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               haptics.lightTap();
@@ -1100,7 +1100,7 @@ const DrivingLogModalContent: React.FC<{
           }}
         >
           <div
-            className="bg-[#F6F8FC] rounded-3xl p-5 sm:p-6 w-full max-w-sm shadow-2xl border border-slate-100/90 space-y-5 animate-in zoom-in-95 duration-200"
+            className="bg-[#F6F8FC] rounded-3xl p-5 sm:p-6 w-full max-w-sm shadow-2xl border border-slate-100/90 space-y-5 driver-modal-card"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -1193,8 +1193,8 @@ const DrivingLogModalContent: React.FC<{
 
       {/* Live Submission Notice Modal connected to HQ Operations System */}
       {isPreviewSubmitModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl p-5 w-full max-w-sm shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 driver-modal-backdrop">
+          <div className="bg-white rounded-3xl p-5 w-full max-w-sm shadow-2xl space-y-4 driver-modal-card">
             <div className="flex items-center gap-2.5 text-[#1E60F3]">
               <img
                 src="/images/icons/driving-logs/icon_driving_log.png"

@@ -178,7 +178,7 @@ export const FieldTipModal: React.FC<FieldTipModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs select-none overscroll-none animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm select-none overscroll-none driver-modal-backdrop"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           haptics.lightTap();
@@ -187,7 +187,7 @@ export const FieldTipModal: React.FC<FieldTipModalProps> = ({
       }}
     >
       <div
-        className="w-full max-w-lg bg-[#F6F8FC] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[88dvh] h-[88dvh] sm:h-auto sm:max-h-[85vh] animate-in slide-in-from-bottom-8 duration-300 relative overscroll-contain"
+        className="w-full max-w-lg bg-[#F6F8FC] rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[88dvh] h-[88dvh] sm:h-auto sm:max-h-[85vh] relative overscroll-contain driver-modal-card"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Handle */}

@@ -59,7 +59,7 @@ export const DriverTimePickerModal: React.FC<DriverTimePickerModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150 select-none"
+      className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 select-none driver-modal-backdrop"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           haptics.lightTap();
@@ -68,7 +68,7 @@ export const DriverTimePickerModal: React.FC<DriverTimePickerModalProps> = ({
       }}
     >
       <div
-        className="bg-[#F6F8FC] border border-slate-100/90 rounded-3xl p-5 w-full max-w-xs shadow-2xl space-y-4"
+        className="bg-[#F6F8FC] border border-slate-100/90 rounded-3xl p-5 w-full max-w-xs shadow-2xl space-y-4 driver-modal-card"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
@@ -261,3 +261,4 @@ export const DriverTimePickerModal: React.FC<DriverTimePickerModalProps> = ({
     </div>
   );
 };
+

@@ -217,12 +217,12 @@ export const FlightModal: React.FC<FlightModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center pt-[4vh] sm:items-center sm:pt-0 p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm driver-modal-backdrop"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-[#F6F8FC] rounded-3xl shadow-2xl border border-slate-100/90 w-full max-w-md overflow-hidden flex flex-col max-h-[90vh] animate-scale-up">
+      <div className="bg-[#F6F8FC] rounded-3xl shadow-2xl border border-slate-100/90 w-full max-w-md overflow-hidden flex flex-col max-h-[90vh] driver-modal-card">
         {/* Modal Header: Cobalt Squircle Icon & Title */}
         <div className="px-5 pt-5 pb-3 flex items-center justify-between bg-[#F6F8FC] shrink-0">
           <div className="flex items-center space-x-3">
@@ -231,7 +231,7 @@ export const FlightModal: React.FC<FlightModalProps> = ({
               alt="항공기 아이콘"
               aria-hidden="true"
               draggable={false}
-              className="w-1 h-10 object-contain shrink-0 select-none pointer-events-none"
+              className="w-10 h-10 object-contain shrink-0 select-none pointer-events-none"
             />
             <div>
               <h3 className="text-base font-extrabold text-slate-900 leading-tight">

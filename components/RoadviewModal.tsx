@@ -240,7 +240,7 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-xs transition-opacity duration-300 p-0 sm:p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 driver-modal-backdrop"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           haptics.lightTap();
@@ -249,7 +249,7 @@ export const RoadviewModal: React.FC<RoadviewModalProps> = ({
       }}
     >
       <div
-        className="w-full max-w-lg bg-[#F6F8FC] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100/90 max-h-[92vh] sm:max-h-[88vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-250 select-none"
+        className="w-full max-w-lg bg-[#F6F8FC] rounded-3xl shadow-2xl border border-slate-100/90 max-h-[90vh] sm:max-h-[88vh] flex flex-col overflow-hidden select-none driver-modal-card"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

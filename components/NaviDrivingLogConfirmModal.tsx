@@ -55,7 +55,7 @@ export const NaviDrivingLogConfirmModal: React.FC<NaviDrivingLogConfirmModalProp
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200 select-none"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm select-none driver-modal-backdrop"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           haptics.lightTap();
@@ -64,7 +64,7 @@ export const NaviDrivingLogConfirmModal: React.FC<NaviDrivingLogConfirmModalProp
       }}
     >
       <div
-        className="relative w-full max-w-[390px] bg-white rounded-[28px] shadow-2xl p-5 sm:p-6 text-slate-900 border border-slate-100/80 overflow-hidden animate-in zoom-in-95 duration-200"
+        className="relative w-full max-w-[390px] bg-white rounded-[28px] shadow-2xl p-5 sm:p-6 text-slate-900 border border-slate-100/80 overflow-hidden driver-modal-card"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 1. Top Section: Header & 3D Calendar Illustration */}

@@ -298,7 +298,7 @@ const ExpenseModalContent: React.FC<{
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in select-none overscroll-contain"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm select-none overscroll-contain driver-modal-backdrop"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           haptics.lightTap();
@@ -307,7 +307,7 @@ const ExpenseModalContent: React.FC<{
       }}
     >
       <div
-        className="w-full max-w-lg bg-[#F6F8FC] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100/90 overflow-hidden flex flex-col max-h-[92dvh] h-[92dvh] sm:h-auto sm:max-h-[90vh] animate-in slide-in-from-bottom-6 sm:animate-scale-up duration-300 relative"
+        className="w-full max-w-lg bg-[#F6F8FC] rounded-3xl shadow-2xl border border-slate-100/90 overflow-hidden flex flex-col max-h-[90dvh] h-[90dvh] sm:h-auto sm:max-h-[90vh] relative driver-modal-card"
         onClick={(e) => e.stopPropagation()}
       >
         {serverLoadError && <p role="status" className="px-5 py-2 text-xs text-amber-700">{serverLoadError} · 기기 초안은 유지됩니다.</p>}
@@ -855,10 +855,10 @@ const ExpenseModalContent: React.FC<{
       {/* Custom Calendar Date Picker Modal (Reference Image 1 Style) */}
       {isDatePickerOpen && (
         <div
-          className="fixed inset-0 z-60 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150"
+          className="fixed inset-0 z-60 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 driver-modal-backdrop"
           onClick={() => setIsDatePickerOpen(false)}
         >
-          <div className="relative z-10 animate-in zoom-in-95 duration-200">
+          <div className="relative z-10 driver-modal-card">
             <DriverCalendarCard
               value={selectedDate || todayDateStr}
               highlightedDates={new Set(expenseList.map((item) => item.date))}
@@ -874,10 +874,10 @@ const ExpenseModalContent: React.FC<{
 
       {/* Category Breakdown Modal */}
       {isBreakdownOpen && (
-        <div className="fixed inset-0 z-60 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-2xs animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm driver-modal-backdrop">
           <div className="absolute inset-0" onClick={() => setIsBreakdownOpen(false)} />
           <div
-            className="relative w-full max-w-sm bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl p-5 z-10 max-h-[80vh] overflow-y-auto space-y-4"
+            className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl p-5 z-10 max-h-[80vh] overflow-y-auto space-y-4 driver-modal-card"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
@@ -936,9 +936,9 @@ const ExpenseModalContent: React.FC<{
 
       {/* Delete Confirmation Dialog */}
       {deletingItemId && (
-        <div className="fixed inset-0 z-70 flex items-center justify-center bg-black/60 backdrop-blur-2xs p-4 animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-70 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 driver-modal-backdrop">
           <div
-            className="w-full max-w-xs bg-white rounded-2xl shadow-2xl p-5 space-y-4 animate-in zoom-in-95 duration-150"
+            className="w-full max-w-xs bg-white rounded-3xl shadow-2xl p-5 space-y-4 driver-modal-card"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="text-center space-y-1.5">

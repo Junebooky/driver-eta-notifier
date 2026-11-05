@@ -197,7 +197,7 @@ const AddScheduleModalContent: React.FC<{
 
   return (
     <div
-      className="relative w-full max-w-md bg-[#F6F8FC] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100/90 z-10 flex flex-col max-h-[90vh] overflow-hidden animate-in slide-in-from-bottom duration-300"
+      className="relative w-full max-w-md bg-[#F6F8FC] rounded-3xl shadow-2xl border border-slate-100/90 z-10 flex flex-col max-h-[90vh] overflow-hidden driver-modal-card"
       onClick={(e) => e.stopPropagation()}
     >
       {/* Header */}
@@ -385,7 +385,7 @@ const AddScheduleModalContent: React.FC<{
       {/* iOS-style Wheel & Direct Input Time Picker Modal (일정 시각 설정 - 출퇴근 시간 피커와 동일) */}
       {isTimePickerOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 driver-modal-backdrop"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               haptics.lightTap();
@@ -394,7 +394,7 @@ const AddScheduleModalContent: React.FC<{
           }}
         >
           <div
-            className="bg-[#F6F8FC] border border-slate-100/90 rounded-3xl p-5 w-full max-w-xs shadow-2xl space-y-4"
+            className="bg-[#F6F8FC] border border-slate-100/90 rounded-3xl p-5 w-full max-w-xs shadow-2xl space-y-4 driver-modal-card"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
@@ -604,7 +604,7 @@ export const AddScheduleModal: React.FC<AddScheduleModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-xs transition-opacity animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm driver-modal-backdrop">
       {/* Backdrop Click */}
       <div className="absolute inset-0" onClick={onClose} />
 

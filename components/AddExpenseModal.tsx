@@ -600,11 +600,11 @@ const AddExpenseModalContent: React.FC<{
   const selectedCategoryMeta = EXPENSE_CATEGORIES[category] || EXPENSE_CATEGORIES.fuel;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm driver-modal-backdrop">
       <div className="absolute inset-0" onClick={onClose} />
 
       <div
-        className="relative w-full max-w-lg bg-[#F6F8FC] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100/90 z-10 flex flex-col max-h-[92vh] overflow-hidden animate-in slide-in-from-bottom duration-300"
+        className="relative w-full max-w-lg bg-[#F6F8FC] rounded-3xl shadow-2xl border border-slate-100/90 z-10 flex flex-col max-h-[90vh] overflow-hidden driver-modal-card"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -934,7 +934,7 @@ const AddExpenseModalContent: React.FC<{
             </div>
 
             {isDateTimePickerOpen && (
-              <div className="mt-2 z-50 animate-in fade-in zoom-in-95 duration-150">
+              <div className="absolute left-0 top-full mt-2 z-50 driver-popover-in">
                 <DriverCalendarCard
                   value={date}
                   onChange={(nextIso) => {
@@ -1139,10 +1139,10 @@ const AddExpenseModalContent: React.FC<{
 
         {/* Modal: Category Picker */}
         {isCategoryPickerOpen && (
-          <div className="fixed inset-0 z-60 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-2xs animate-in fade-in duration-150">
+          <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm driver-modal-backdrop">
             <div className="absolute inset-0" onClick={() => setIsCategoryPickerOpen(false)} />
             <div
-              className="relative w-full max-w-sm bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl p-5 z-10 max-h-[80vh] overflow-y-auto space-y-3"
+              className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl p-5 z-10 max-h-[80vh] overflow-y-auto space-y-3 driver-modal-card"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between pb-2 border-b border-slate-100">
@@ -1276,9 +1276,9 @@ const AddExpenseModalContent: React.FC<{
 
         {/* Modal: Orientation Enforcement Dialog */}
         {isOrientationModalOpen && receiptUrl && (
-          <div className="fixed inset-0 z-80 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="fixed inset-0 z-80 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm driver-modal-backdrop">
             <div
-              className="relative w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl text-center space-y-4 animate-in zoom-in-95 duration-200"
+              className="relative w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl text-center space-y-4 driver-modal-card"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-100 border border-amber-200 flex items-center justify-center text-amber-600 shadow-inner">

@@ -289,7 +289,7 @@ export const GasStationModal: React.FC<GasStationModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm driver-modal-backdrop"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           onClose();
@@ -297,7 +297,7 @@ export const GasStationModal: React.FC<GasStationModalProps> = ({
       }}
     >
       <div
-        className="w-full max-w-md bg-[#F6F8FC] border border-slate-100 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden text-slate-900 flex flex-col max-h-[90vh]"
+        className="w-full max-w-md bg-[#F6F8FC] border border-slate-100 rounded-3xl shadow-2xl overflow-hidden text-slate-900 flex flex-col max-h-[90vh] driver-modal-card"
         onClick={(e) => e.stopPropagation()}
       >
         {/* [태스크 2] Header: 주유소 아이콘 유지 & 깔끔한 모달 헤더 */}
