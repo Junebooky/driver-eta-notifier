@@ -159,7 +159,7 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
           color: #0F172A;
           line-height: 1.35;
           vertical-align: top;
-          border-right: 1px solid #E5DEC9;
+          border-right: 1px solid #E2E8F0;
         }
         .quote-val-count {
           padding: 0px 12px 10px;
@@ -168,7 +168,7 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
           color: #0F172A;
           line-height: 1.35;
           vertical-align: top;
-          border-right: 1px solid #E5DEC9;
+          border-right: 1px solid #E2E8F0;
         }
         .quote-val-category {
           padding: 0px 12px 10px;
@@ -177,7 +177,7 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
           color: #0F172A;
           line-height: 1.35;
           vertical-align: top;
-          border-right: 1px solid #E5DEC9;
+          border-right: 1px solid #E2E8F0;
         }
         .quote-val-driver {
           padding: 0px 12px 10px;
@@ -532,7 +532,7 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
           </span>
         </div>
 
-        {/* 4-Column Box: Table Structure (글자 겹침 원천 차단 및 선 색상 #E5DEC9 통일) */}
+        {/* 4-Column Box: Table Structure (심플한 회색 구분선 #E2E8F0 적용) */}
         <table
           className="quote-table-vehicle"
           data-field="vehicle-service-table"
@@ -540,7 +540,7 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
             width: '100%',
             borderCollapse: 'collapse',
             backgroundColor: '#F8FAFC',
-            border: '1px solid #E5DEC9',
+            border: '1px solid #E2E8F0',
             borderRadius: '4px',
             overflow: 'hidden',
           }}
@@ -550,21 +550,21 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
               <td
                 className="quote-cell-label quote-label-vehicle"
                 data-field="label-selected-vehicle"
-                style={{ width: '34%', padding: '10px 12px 4px', fontSize: '10px', color: '#64748B', fontWeight: 500, verticalAlign: 'top', borderRight: '1px solid #E5DEC9' }}
+                style={{ width: '34%', padding: '10px 12px 4px', fontSize: '10px', color: '#64748B', fontWeight: 500, verticalAlign: 'top', borderRight: '1px solid #E2E8F0' }}
               >
                 배정 차량
               </td>
               <td
                 className="quote-cell-label quote-label-count"
                 data-field="label-vehicle-count"
-                style={{ width: '16%', padding: '10px 12px 4px', fontSize: '10px', color: '#64748B', fontWeight: 500, verticalAlign: 'top', borderRight: '1px solid #E5DEC9' }}
+                style={{ width: '16%', padding: '10px 12px 4px', fontSize: '10px', color: '#64748B', fontWeight: 500, verticalAlign: 'top', borderRight: '1px solid #E2E8F0' }}
               >
                 차량 대수
               </td>
               <td
                 className="quote-cell-label quote-label-category"
                 data-field="label-service-category"
-                style={{ width: '28%', padding: '10px 12px 4px', fontSize: '10px', color: '#64748B', fontWeight: 500, verticalAlign: 'top', borderRight: '1px solid #E5DEC9' }}
+                style={{ width: '28%', padding: '10px 12px 4px', fontSize: '10px', color: '#64748B', fontWeight: 500, verticalAlign: 'top', borderRight: '1px solid #E2E8F0' }}
               >
                 이용 서비스
               </td>
@@ -580,21 +580,21 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
               <td
                 className="quote-cell-val quote-val-vehicle"
                 data-field="selected-vehicle"
-                style={{ padding: '0px 12px 10px', fontSize: '11.5px', fontWeight: 700, color: '#0F172A', lineHeight: 1.35, verticalAlign: 'top', borderRight: '1px solid #E5DEC9' }}
+                style={{ padding: '0px 12px 10px', fontSize: '11.5px', fontWeight: 700, color: '#0F172A', lineHeight: 1.35, verticalAlign: 'top', borderRight: '1px solid #E2E8F0' }}
               >
                 {vehicleModel || '제네시스 G90 신차 최고급형'}
               </td>
               <td
                 className="quote-cell-val quote-val-count"
                 data-field="vehicle-count"
-                style={{ padding: '0px 12px 10px', fontSize: '11.5px', fontWeight: 700, color: '#0F172A', lineHeight: 1.35, verticalAlign: 'top', borderRight: '1px solid #E5DEC9' }}
+                style={{ padding: '0px 12px 10px', fontSize: '11.5px', fontWeight: 700, color: '#0F172A', lineHeight: 1.35, verticalAlign: 'top', borderRight: '1px solid #E2E8F0' }}
               >
                 {vehicleCount}대
               </td>
               <td
                 className="quote-cell-val quote-val-category"
                 data-field="service-category"
-                style={{ padding: '0px 12px 10px', fontSize: '11.5px', fontWeight: 700, color: '#0F172A', lineHeight: 1.35, verticalAlign: 'top', borderRight: '1px solid #E5DEC9' }}
+                style={{ padding: '0px 12px 10px', fontSize: '11.5px', fontWeight: 700, color: '#0F172A', lineHeight: 1.35, verticalAlign: 'top', borderRight: '1px solid #E2E8F0' }}
               >
                 <div>{categorySplit.main}</div>
                 {categorySplit.sub && (
@@ -700,7 +700,7 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
           </div>
 
           {/* VAT */}
-          <div className="quote-row-vat" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '24px', padding: '3px 0', fontSize: '10.5px' }}>
+          <div className="quote-row-vat" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', fontSize: '11px' }}>
             <span style={{ color: '#64748B' }}>부가세 (10%)</span>
             <span className="quote-val-vat" data-field="vat-amount" style={{ fontWeight: 500, color: '#0F172A', fontFamily: 'Pretendard, monospace' }}>
               {vatAmount !== null ? `${vatAmount.toLocaleString()}원` : '별도 산정'}
@@ -899,7 +899,7 @@ export function generateOfficialQuotePrintHtml(props: HqOfficialQuoteDocumentPro
       color: #0F172A;
       line-height: 1.35;
       vertical-align: top;
-      border-right: 1px solid #E5DEC9;
+      border-right: 1px solid #E2E8F0;
     }
     .quote-val-count {
       padding: 0px 12px 10px;
@@ -908,7 +908,7 @@ export function generateOfficialQuotePrintHtml(props: HqOfficialQuoteDocumentPro
       color: #0F172A;
       line-height: 1.35;
       vertical-align: top;
-      border-right: 1px solid #E5DEC9;
+      border-right: 1px solid #E2E8F0;
     }
     .quote-val-category {
       padding: 0px 12px 10px;
@@ -917,7 +917,7 @@ export function generateOfficialQuotePrintHtml(props: HqOfficialQuoteDocumentPro
       color: #0F172A;
       line-height: 1.35;
       vertical-align: top;
-      border-right: 1px solid #E5DEC9;
+      border-right: 1px solid #E2E8F0;
     }
     .quote-val-driver {
       padding: 0px 12px 10px;
@@ -1034,16 +1034,16 @@ export function generateOfficialQuotePrintHtml(props: HqOfficialQuoteDocumentPro
         <span style="font-family: 'Playfair Display', Georgia, serif; font-size: 9px; letter-spacing: 0.16em; color: #8C7355; text-transform: uppercase;">VEHICLE & SERVICE</span>
       </div>
 
-      <table class="quote-table-vehicle" data-field="vehicle-service-table" style="width: 100%; border-collapse: collapse; background-color: #F8FAFC; border: 1px solid #E5DEC9; border-radius: 4px; overflow: hidden;">
+      <table class="quote-table-vehicle" data-field="vehicle-service-table" style="width: 100%; border-collapse: collapse; background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 4px; overflow: hidden;">
         <tbody>
           <tr class="quote-row-labels">
-            <td class="quote-cell-label quote-label-vehicle" data-field="label-selected-vehicle" style="width: 34%; padding: 10px 12px 4px; font-size: 10px; color: #64748B; font-weight: 500; vertical-align: top; border-right: 1px solid #E5DEC9;">
+            <td class="quote-cell-label quote-label-vehicle" data-field="label-selected-vehicle" style="width: 34%; padding: 10px 12px 4px; font-size: 10px; color: #64748B; font-weight: 500; vertical-align: top; border-right: 1px solid #E2E8F0;">
               선택 차량
             </td>
-            <td class="quote-cell-label quote-label-count" data-field="label-vehicle-count" style="width: 16%; padding: 10px 12px 4px; font-size: 10px; color: #64748B; font-weight: 500; vertical-align: top; border-right: 1px solid #E5DEC9;">
+            <td class="quote-cell-label quote-label-count" data-field="label-vehicle-count" style="width: 16%; padding: 10px 12px 4px; font-size: 10px; color: #64748B; font-weight: 500; vertical-align: top; border-right: 1px solid #E2E8F0;">
               차량 수량
             </td>
-            <td class="quote-cell-label quote-label-category" data-field="label-service-category" style="width: 28%; padding: 10px 12px 4px; font-size: 10px; color: #64748B; font-weight: 500; vertical-align: top; border-right: 1px solid #E5DEC9;">
+            <td class="quote-cell-label quote-label-category" data-field="label-service-category" style="width: 28%; padding: 10px 12px 4px; font-size: 10px; color: #64748B; font-weight: 500; vertical-align: top; border-right: 1px solid #E2E8F0;">
               서비스 구분
             </td>
             <td class="quote-cell-label quote-label-driver" data-field="label-driver-service" style="width: 22%; padding: 10px 12px 4px; font-size: 10px; color: #64748B; font-weight: 500; vertical-align: top;">
@@ -1051,13 +1051,13 @@ export function generateOfficialQuotePrintHtml(props: HqOfficialQuoteDocumentPro
             </td>
           </tr>
           <tr class="quote-row-values">
-            <td class="quote-cell-val quote-val-vehicle" data-field="selected-vehicle" style="padding: 0px 12px 10px; font-size: 11.5px; font-weight: 700; color: #0F172A; line-height: 1.35; vertical-align: top; border-right: 1px solid #E5DEC9;">
+            <td class="quote-cell-val quote-val-vehicle" data-field="selected-vehicle" style="padding: 0px 12px 10px; font-size: 11.5px; font-weight: 700; color: #0F172A; line-height: 1.35; vertical-align: top; border-right: 1px solid #E2E8F0;">
               ${props.vehicleModel || '제네시스 G90 신차 최고급형'}
             </td>
-            <td class="quote-cell-val quote-val-count" data-field="vehicle-count" style="padding: 0px 12px 10px; font-size: 11.5px; font-weight: 700; color: #0F172A; line-height: 1.35; vertical-align: top; border-right: 1px solid #E5DEC9;">
+            <td class="quote-cell-val quote-val-count" data-field="vehicle-count" style="padding: 0px 12px 10px; font-size: 11.5px; font-weight: 700; color: #0F172A; line-height: 1.35; vertical-align: top; border-right: 1px solid #E2E8F0;">
               ${props.vehicleCount}대
             </td>
-            <td class="quote-cell-val quote-val-category" data-field="service-category" style="padding: 0px 12px 10px; font-size: 11.5px; font-weight: 700; color: #0F172A; line-height: 1.35; vertical-align: top; border-right: 1px solid #E5DEC9;">
+            <td class="quote-cell-val quote-val-category" data-field="service-category" style="padding: 0px 12px 10px; font-size: 11.5px; font-weight: 700; color: #0F172A; line-height: 1.35; vertical-align: top; border-right: 1px solid #E2E8F0;">
               <div>${categorySplit.main}</div>
               ${categorySplit.sub ? `<div style="font-size: 10px; font-weight: 500; color: #475569; margin-top: 2px;">${categorySplit.sub}</div>` : ''}
             </td>
@@ -1118,8 +1118,8 @@ export function generateOfficialQuotePrintHtml(props: HqOfficialQuoteDocumentPro
           <span class="quote-val-subtotal" data-field="supply-price" style="font-weight: 700; color: #0F172A; font-family: Pretendard, monospace;">${supplyPriceFormatted}</span>
         </div>
 
-        <div class="quote-row-vat" style="display: flex; justify-content: flex-end; align-items: center; gap: 24px; padding: 3px 0; font-size: 10.5px;">
-          <span style="color: #64748B;">부가가치세 (10%)</span>
+        <div class="quote-row-vat" style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 11px;">
+          <span style="color: #64748B;">부가세 (10%)</span>
           <span class="quote-val-vat" data-field="vat-amount" style="font-weight: 500; color: #0F172A; font-family: Pretendard, monospace;">${vatFormatted}</span>
         </div>
       </div>

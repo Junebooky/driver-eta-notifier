@@ -106,7 +106,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
   const [contactPerson, setContactPerson] = useState('김지현 팀장');
   const [contactPhone, setContactPhone] = useState('010-3342-9910');
   const [contactEmail, setContactEmail] = useState('');
-  const [notes, setNotes] = useState('프랑스 본사 임원단 방한 의전');
+  const [notes, setNotes] = useState('');
 
   // Step 2: 서비스 선택 & 일정/경로
   const [serviceCategory, setServiceCategory] = useState<OfficialServiceCategory>('daily_metro');
@@ -762,8 +762,8 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                         type="text"
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
-                        placeholder="예: 프랑스 본사 임원단 방한 의전"
-                        className="w-full h-11 pl-10 pr-3.5 rounded-xl border border-slate-200 focus:border-[#1E60F3] focus:ring-1 focus:ring-[#1E60F3] text-sm font-bold text-slate-900 placeholder:text-slate-400 outline-none transition-all shadow-2xs"
+                        placeholder="어떤 목적의 운행인가요? (예: 임원 방한 의전, 공항 픽업)"
+                        className="w-full h-11 pl-10 pr-3.5 rounded-xl border border-slate-200 focus:border-[#1E60F3] focus:ring-1 focus:ring-[#1E60F3] text-sm font-semibold text-slate-900 placeholder:font-normal placeholder:text-slate-400 outline-none transition-all shadow-2xs"
                       />
                     </div>
                     <div className="flex items-center gap-1.5 mt-2 flex-wrap">
@@ -935,7 +935,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                     3. 차량 및 옵션 선택
                   </h4>
                   <p className="text-xs text-slate-400 font-medium mt-0.5">
-                    의전 목적에 맞는 2026 공식 상품 차량과 의전 기사 언어 옵션을 지정합니다.
+                    운행에 딱 맞는 차량과 기사님 언어 옵션을 골라주세요.
                   </p>
                 </div>
 
@@ -1036,9 +1036,13 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                                 {sku.vehicleProductLabel}
                               </span>
                               {sku.quoteRequired && (
-                                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200 shrink-0">
-                                  가격 상담 전용
-                                </span>
+                                <img
+                                  src="/images/icons/quotes/call.png"
+                                  alt="별도 상담"
+                                  title="별도 상담 (전화 문의)"
+                                  className="w-6 h-6 object-contain shrink-0 select-none"
+                                  draggable={false}
+                                />
                               )}
                             </div>
                             <div className="text-[11px] text-slate-500 font-medium mt-0.5">
@@ -1240,7 +1244,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                 }}
                 className="inline-flex items-center gap-1 px-6 py-2.5 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white font-black text-sm shadow-md shadow-blue-500/20 transition cursor-pointer"
               >
-                <span>{currentStep === 3 ? '견적 산출 및 확인' : '다음 단계'}</span>
+                <span>{currentStep === 3 ? '견적서 받아보기' : '다음 단계'}</span>
                 <ChevronRight className="w-4 h-4" />
               </button>
             ) : (

@@ -7,6 +7,7 @@ import {
   Bus,
   Loader2,
   Calculator,
+  Plus,
 } from 'lucide-react';
 import { OfficialPriceCard } from '@/types/officialPricingHq';
 import { haptics } from '@/utils/haptics';
@@ -371,8 +372,8 @@ export const HqOfficialPricingView: React.FC<HqOfficialPricingViewProps> = ({
       )}
 
       {/* Top Header Card: Icon + Title + Count */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:px-5 shadow-2xs flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
+      <div className="bg-white rounded-2xl border border-slate-200/90 p-3.5 sm:p-4 sm:px-5 shadow-2xs flex items-center justify-between gap-2 sm:gap-3">
+        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
           {/* 견적서 아이콘 & 마우스 호버 툴팁 */}
           <div className="relative group/quotes inline-flex items-center justify-center cursor-pointer shrink-0">
             <img
@@ -390,27 +391,29 @@ export const HqOfficialPricingView: React.FC<HqOfficialPricingViewProps> = ({
             </div>
           </div>
 
-          <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+          <h2 className="text-[15px] sm:text-lg font-black text-slate-900 tracking-tight whitespace-nowrap truncate">
             표준 요금표 · 견적서
           </h2>
-          <span className="bg-slate-100 text-slate-500 font-bold px-2 py-0.5 rounded-full text-xs">
+          <span className="bg-slate-100 text-slate-500 font-bold px-2 py-0.5 rounded-full text-[11px] sm:text-xs whitespace-nowrap shrink-0">
             {tabCounts.all}개 차종
           </span>
         </div>
 
-        {/* Quick Quote Calculator Trigger */}
+        {/* Quick Quote Calculator Trigger: Mobile '+' icon button, PC '견적서 작성' */}
         <button
           type="button"
           onClick={() => onOpenQuoteModal()}
-          className="px-4 py-2 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white text-xs font-extrabold shadow-sm transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
+          aria-label="견적서 작성"
+          className="w-9 h-9 sm:w-auto sm:h-auto sm:px-4 sm:py-2 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white text-xs font-extrabold shadow-sm transition-all cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0"
         >
-          <Calculator className="w-3.5 h-3.5" />
-          <span>견적서 작성</span>
+          <Plus className="w-5 h-5 sm:hidden stroke-[2.5]" />
+          <Calculator className="hidden sm:block w-3.5 h-3.5" />
+          <span className="hidden sm:inline">견적서 작성</span>
         </button>
       </div>
 
       {/* 1. Top Segmented Capsule Tabs */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 p-3 sm:px-5 flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-3 shadow-2xs">
+      <div className="bg-white rounded-2xl border border-slate-200/90 p-2.5 sm:p-3 sm:px-5 flex items-center gap-1.5 overflow-x-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden shadow-2xs">
         {/* Category Pill Tabs */}
         {CATEGORY_TABS.map((tab) => {
           const isSelected = activeTab === tab.id;
@@ -423,14 +426,14 @@ export const HqOfficialPricingView: React.FC<HqOfficialPricingViewProps> = ({
                 haptics.selection();
                 setActiveTab(tab.id);
               }}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${isSelected
-                ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 shadow-2xs font-bold'
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${isSelected
+                ? 'bg-[#1E60F3] text-white border border-[#1E60F3] shadow-sm font-bold'
                 : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300'
                 }`}
             >
               <span>{tab.label}</span>
               <span
-                className={`text-[11px] ${isSelected ? 'font-black text-[#1E60F3]' : 'text-slate-400 font-medium'
+                className={`text-[11px] ${isSelected ? 'font-black text-white/90' : 'text-slate-400 font-medium'
                   }`}
               >
                 {count}
