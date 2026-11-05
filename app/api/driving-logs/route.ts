@@ -46,6 +46,7 @@ export function mapDbRowToDrivingLog(row: any, index: number = 1): HqDrivingLog 
     drivingDate,
     rawDate,
     driverName: row.driver_name,
+    passengerName: typeof row.meta?.passengerName === 'string' ? row.meta.passengerName : undefined,
     passengerCount: row.passenger_count ?? undefined,
     customerName: row.customer_name || '미지정 고객',
     vehicleModel: row.vehicle_model || '법인 차량',
@@ -330,6 +331,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // The driver's saved profile, not the editable report body, owns passenger identity.
+    const {data: passengerProfile,error: passengerReadError}=await supabaseAdmin
+      .from('drivers').select('passenger_name').eq('id',effectiveDriverId).maybeSingle();
+    if(passengerReadError || !passengerProfile)
+      return NextResponse.json({ok:false,error:'담당 승객 정보를 기사 프로필에서 불러오지 못했습니다.'},{status:503});
+    const profilePassenger=passengerSummaryFromProfile(passengerProfile.passenger_name);
+
     let verifiedCustody: VehicleCustody | null = null;
     if (custodyId !== undefined) {
       if (!isValidUuid(custodyId)) return NextResponse.json({ok:false,error:'인수·반납 기록 식별자를 확인해 주세요.'},{status:400});
@@ -373,7 +381,7 @@ export async function POST(req: NextRequest) {
 
     const insertPayload: Record<string, any> = {
       id: targetRowId,
-      meta: { ...(existing?.meta || {}), custodyId: verifiedCustody?.id || null, odoSource: verifiedCustody ? 'server_custody' : 'manual' },
+      meta: { ...(existing?.meta || {}), passengerName: profilePassenger.passengerName, passengerSource:'driver_profile', custodyId: verifiedCustody?.id || null, odoSource: verifiedCustody ? 'server_custody' : 'manual' },
       organization_id: auth.session.org,
       booking_id: bookingId || null,
       driver_id: effectiveDriverId,
@@ -396,7 +404,8 @@ export async function POST(req: NextRequest) {
       distance_km: calculatedDist,
       stops: mergedStops.length > 0 ? mergedStops : incomingStops,
       notes: notes || '',
-      passenger_count: Number.isInteger(body.passengerCount) && body.passengerCount>=0 ? body.passengerCount : null,
+      // A count is saved only if explicitly stated in the profile (e.g. "VIP 외 1명").
+      passenger_count: profilePassenger.passengerCount ? Number.parseInt(profilePassenger.passengerCount,10) : null,
       expense_amount: 0,
       expense_count: 0,
       status: isSubmitting ? '검토 대기' : 'draft',
