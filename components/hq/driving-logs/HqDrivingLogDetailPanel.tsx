@@ -185,6 +185,12 @@ export const HqDrivingLogDetailPanel: React.FC<HqDrivingLogDetailPanelProps> = (
               <span className="text-slate-400 font-medium w-12 shrink-0">고객명</span>
               <span className="font-bold text-slate-800">{log.customerName}</span>
             </div>
+            {log.passengerName && (
+              <div className="flex items-start gap-2">
+                <span className="text-slate-400 font-medium w-12 shrink-0">승객명</span>
+                <span className="min-w-0 break-words font-semibold text-slate-800">{log.passengerName}{log.passengerCount ? ` · ${log.passengerCount}명` : ''}</span>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <span className="text-slate-400 font-medium w-12 shrink-0">차량</span>
               <span className="font-bold text-slate-700 truncate" title={`${log.vehicleModel} (${log.vehiclePlate})`}>
