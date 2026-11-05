@@ -283,11 +283,15 @@ export const ReportTemplateSelector: React.FC<ReportTemplateSelectorProps> = ({
 
   return (
     <div className="w-full bg-white border border-slate-100/90 rounded-3xl p-4 sm:p-5 shadow-[0_6px_24px_rgba(15,23,42,0.05)] space-y-3.5 select-none">
-      {/* Header: Title with electric cobalt document icon */}
+      {/* Header: Title with talk icon */}
       <div className="flex items-center space-x-2">
-        <div className="w-6 h-6 rounded-full bg-[#1E60F3] text-white flex items-center justify-center shadow-[0_2px_6px_rgba(30,96,243,0.3)]">
-          <FileText className="w-3.5 h-3.5 text-white" />
-        </div>
+        <img
+          src="/images/icons/driver_ui/icon_talk.png"
+          alt="단톡방 보고 아이콘"
+          aria-hidden="true"
+          draggable={false}
+          className="w-7 h-7 sm:w-8 sm:h-8 object-contain shrink-0 select-none pointer-events-none"
+        />
         <h3 className="text-base font-extrabold text-slate-900 tracking-tight">단톡방 보고</h3>
       </div>
 

@@ -680,13 +680,12 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
           ) : null}
 
           {/* ========================================================= */}
-          {/* [태스크 4] '🕒 최근 검색' 섹션 (최대 8개 가로 스크롤)        */}
+          {/* [태스크 4] '최근 검색' 섹션 (최대 8개 가로 스크롤)        */}
           {/* ========================================================= */}
           {recentSearches.length > 0 && (
             <div className="space-y-2.5">
               <div className="flex items-center justify-between text-xs sm:text-[13px] font-bold text-slate-700 px-1">
                 <span className="flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-slate-500 stroke-[2]" />
                   <span className="font-extrabold text-slate-800">최근 검색</span>
                   <span className="text-xs font-semibold text-slate-400">
                     ({recentSearches.length})
@@ -701,9 +700,9 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                 </button>
               </div>
 
-              {/* Horizontal Scrollable Chips / Cards */}
-              <div className="flex items-center gap-2.5 overflow-x-auto pb-1.5 pt-0.5 no-scrollbar touch-pan-x">
-                {recentSearches.map((item, idx) => {
+              {/* 3-Column Fixed Grid (No Horizontal Scroll) */}
+              <div className="grid grid-cols-3 gap-2.5 pt-0.5">
+                {recentSearches.slice(0, 3).map((item, idx) => {
                   const isFav = isFavorite(item);
                   return (
                     <div
@@ -714,11 +713,11 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                         onSelectLocation(item);
                         onClose();
                       }}
-                      className="min-w-[156px] max-w-[210px] p-3.5 rounded-2xl border border-slate-100/90 bg-white hover:border-blue-200 hover:bg-[#FBFDFF] active:scale-95 transition-all flex flex-col justify-between cursor-pointer shrink-0 relative group shadow-[0_3px_14px_rgba(15,23,42,0.04)]"
+                      className="min-w-0 p-3.5 rounded-2xl border border-slate-100/90 bg-white hover:border-blue-200 hover:bg-[#FBFDFF] active:scale-95 transition-all flex flex-col justify-between cursor-pointer relative group shadow-[0_3px_14px_rgba(15,23,42,0.04)]"
                       title={`${item.name} (${item.address})`}
                     >
                       <div className="flex items-start justify-between gap-1 w-full">
-                        <span className="text-sm font-extrabold text-slate-900 group-hover:text-[#0055FF] truncate transition-colors flex-1 pr-1">
+                        <span className="text-sm font-extrabold text-slate-900 group-hover:text-[#0055FF] truncate transition-colors flex-1 pr-0.5">
                           {item.shortName || item.name}
                         </span>
 

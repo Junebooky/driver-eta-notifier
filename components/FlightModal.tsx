@@ -10,10 +10,12 @@ import {
   Copy,
   AlertCircle,
   RefreshCw,
+  Globe,
 } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 import {
   formatFlightReport,
+  formatFlightReportEnglish,
   getCurbsideGate,
   resolveArrivalCrossValidation,
   formatExitText,
@@ -59,6 +61,7 @@ export const FlightModal: React.FC<FlightModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
+  const [reportLang, setReportLang] = useState<'ko' | 'en'>('ko');
 
   // Auto-trigger search when launched with an initial flight ID (e.g., from ScheduleCard)
   // or restore from last remembered search history
@@ -164,8 +167,14 @@ export const FlightModal: React.FC<FlightModalProps> = ({
     }
   };
 
+  const getActiveFlightReportText = (targetFlight: FlightInfo, lang: 'ko' | 'en' = reportLang) => {
+    return lang === 'en'
+      ? formatFlightReportEnglish(profile, targetFlight)
+      : formatFlightReport(profile, targetFlight);
+  };
+
   const copyReport = (targetFlight: FlightInfo) => {
-    const text = formatFlightReport(profile, targetFlight);
+    const text = getActiveFlightReportText(targetFlight);
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text);
@@ -613,6 +622,67 @@ export const FlightModal: React.FC<FlightModalProps> = ({
                       </p>
                     )}
                   </div>
+                </div>
+              </div>
+
+              {/* 단톡방 보고 미리보기 카드 (한/영 전환 및 복사 지원) */}
+              <div className="rounded-3xl border border-slate-100/90 bg-white p-4 shadow-[0_6px_24px_rgba(15,23,42,0.05)] space-y-3 select-none">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <img
+                      src="/images/icons/driver_ui/icon_talk.png"
+                      alt="단톡방 보고 아이콘"
+                      aria-hidden="true"
+                      draggable={false}
+                      className="w-6 h-6 sm:w-7 sm:h-7 object-contain shrink-0 select-none pointer-events-none"
+                    />
+                    <span className="text-sm sm:text-[15px] font-extrabold text-slate-900 tracking-tight">
+                      단톡방 보고
+                    </span>
+                    {reportLang === 'en' && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-[#0055FF] border border-blue-200/60">
+                        EN
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Action Buttons: Globe (한/영 전환) & Copy (양식 복사) */}
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        haptics.lightTap();
+                        setReportLang((prev) => (prev === 'ko' ? 'en' : 'ko'));
+                      }}
+                      className={`w-8 h-8 rounded-full border flex items-center justify-center transition-all active:scale-90 cursor-pointer ${
+                        reportLang === 'en'
+                          ? 'bg-blue-50 hover:bg-blue-100 text-[#0055FF] border-blue-200/80 shadow-[0_2px_6px_rgba(0,85,255,0.15)]'
+                          : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-100/90 shadow-[0_2px_6px_rgba(15,23,42,0.05)]'
+                      }`}
+                      title={reportLang === 'en' ? '한국어 보고서로 전환' : 'Switch to English Report'}
+                      aria-label="보고서 언어 전환"
+                    >
+                      <Globe className={`w-4 h-4 ${reportLang === 'en' ? 'text-[#0055FF]' : 'text-slate-600'}`} />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => copyReport(flight)}
+                      className="w-8 h-8 rounded-full border border-slate-100/90 shadow-[0_2px_6px_rgba(15,23,42,0.05)] flex items-center justify-center bg-white hover:bg-slate-50 text-slate-600 transition-all active:scale-90 cursor-pointer"
+                      title="보고서 복사"
+                      aria-label="보고서 복사"
+                    >
+                      {isCopied ? (
+                        <Check className="w-4 h-4 text-[#0055FF]" />
+                      ) : (
+                        <Copy className="w-4 h-4 text-slate-600" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-[#F8FAFC] border border-slate-100/90 rounded-2xl p-3.5 text-xs sm:text-[13px] font-semibold text-slate-800 leading-relaxed select-all whitespace-pre-line font-sans text-left">
+                  {getActiveFlightReportText(flight)}
                 </div>
               </div>
             </div>

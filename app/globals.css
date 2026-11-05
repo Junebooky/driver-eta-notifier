@@ -99,6 +99,16 @@
   border-radius: 4px;
 }
 
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 /* Container-query responsive data table (HQ Reservations & Dispatches) */
 .hq-responsive-table-wrapper {
   overflow: auto;

@@ -522,3 +522,169 @@ export function formatFlightReport(profile: DriverProfile, flight: FlightInfo): 
 
   return lines.join('\n');
 }
+
+const AIRPORT_KO_TO_EN_MAP: Record<string, string> = {
+  '싱가포르': 'Singapore',
+  '로스앤젤레스': 'Los Angeles',
+  '뉴욕': 'New York',
+  '뉴욕/JFK': 'New York (JFK)',
+  '뉴어크': 'Newark',
+  '샌프란시스코': 'San Francisco',
+  '시애틀': 'Seattle',
+  '애틀랜타': 'Atlanta',
+  '워싱턴': 'Washington D.C.',
+  '시카고': 'Chicago',
+  '댈러스': 'Dallas',
+  '보스턴': 'Boston',
+  '라스베이거스': 'Las Vegas',
+  '호놀룰루': 'Honolulu',
+  '밴쿠버': 'Vancouver',
+  '토론토': 'Toronto',
+  '런던': 'London',
+  '런던/히드로': 'London (LHR)',
+  '파리': 'Paris',
+  '프랑크푸르트': 'Frankfurt',
+  '뮌헨': 'Munich',
+  '로마': 'Rome',
+  '밀라노': 'Milan',
+  '암스테르담': 'Amsterdam',
+  '마드리드': 'Madrid',
+  '바르셀로나': 'Barcelona',
+  '취리히': 'Zurich',
+  '비엔나': 'Vienna',
+  '프라하': 'Prague',
+  '이스탄불': 'Istanbul',
+  '두바이': 'Dubai',
+  '도하': 'Doha',
+  '아부다비': 'Abu Dhabi',
+  '도쿄': 'Tokyo',
+  '도쿄/나리타': 'Tokyo (NRT)',
+  '도쿄/하네다': 'Tokyo (HND)',
+  '나리타': 'Tokyo (NRT)',
+  '하네다': 'Tokyo (HND)',
+  '오사카': 'Osaka',
+  '오사카/간사이': 'Osaka (KIX)',
+  '후쿠오카': 'Fukuoka',
+  '삿포로': 'Sapporo',
+  '나고야': 'Nagoya',
+  '오키나와': 'Okinawa',
+  '홍콩': 'Hong Kong',
+  '마카오': 'Macau',
+  '타이베이': 'Taipei',
+  '상하이': 'Shanghai',
+  '상하이/푸동': 'Shanghai (PVG)',
+  '상하이/홍차오': 'Shanghai (SHA)',
+  '베이징': 'Beijing',
+  '광저우': 'Guangzhou',
+  '선전': 'Shenzhen',
+  '칭다오': 'Qingdao',
+  '방콕': 'Bangkok',
+  '방콕/수완나품': 'Bangkok (BKK)',
+  '푸껫': 'Phuket',
+  '치앙마이': 'Chiang Mai',
+  '하노이': 'Hanoi',
+  '호찌민': 'Ho Chi Minh',
+  '다낭': 'Da Nang',
+  '나트랑': 'Nha Trang',
+  '푸꾸옥': 'Phu Quoc',
+  '마닐라': 'Manila',
+  '세부': 'Cebu',
+  '발리': 'Bali',
+  '자카르타': 'Jakarta',
+  '쿠알라룸푸르': 'Kuala Lumpur',
+  '시드니': 'Sydney',
+  '멜버른': 'Melbourne',
+  '브리즈번': 'Brisbane',
+  '오클랜드': 'Auckland',
+  '괌': 'Guam',
+  '사이판': 'Saipan',
+  '제주': 'Jeju',
+  '부산': 'Busan',
+  '김해': 'Busan (PUS)',
+  '대구': 'Daegu',
+  '광주': 'Gwangju',
+  '여수': 'Yeosu',
+  '울산': 'Ulsan',
+  '포항': 'Pohang',
+};
+
+/**
+ * English Multi-line KakaoTalk Report Generator for Flights
+ */
+export function formatFlightReportEnglish(
+  profile: DriverProfile,
+  flight: FlightInfo,
+  translatedAirport?: string
+): string {
+  const rawPlate =
+    profile.carNumber || profile.plateNumber || profile.vehicleNo || '116허 1514';
+  const cleanVehicleNo = rawPlate.trim().replace(/^호차\s+/, '').trim() || '116허 1514';
+
+  const lines: string[] = [`• Vehicle No.: ${cleanVehicleNo}`];
+
+  const passengerName = profile.passengerName?.trim();
+  if (passengerName) {
+    lines.push(`• Passenger: ${passengerName}`);
+  }
+
+  const airportCode = flight.airportKind === 'GMP' ? 'GMP' : 'ICN';
+  const rawAirport = (flight.airport || '').trim();
+  const airportEn =
+    translatedAirport ||
+    AIRPORT_KO_TO_EN_MAP[rawAirport] ||
+    (flight.airportCode && flight.airportCode !== 'DEP' && flight.airportCode !== 'ARR'
+      ? flight.airportCode
+      : rawAirport);
+
+  const timeFormatted = flight.estimatedTimeFormatted || flight.scheduleTimeFormatted || '--:--';
+  let statusEn = '';
+  if (flight.diffMinutes >= 10) {
+    statusEn = `${timeFormatted} (Delayed +${flight.diffMinutes}m)`;
+  } else if (flight.diffMinutes <= -5) {
+    statusEn = `${timeFormatted} (Early ${flight.diffMinutes}m)`;
+  } else {
+    statusEn = `${timeFormatted} (${flight.type === 'arrival' ? 'On-time Landing' : 'On-time Departure'})`;
+  }
+
+  const isGmp = flight.airportKind === 'GMP' || flight.terminal.includes('김포') || flight.terminal.includes('국내');
+  const isT2 = flight.terminal.includes('2') || flight.terminalId === 'P03';
+  const terminalEn = isGmp
+    ? flight.isDomestic || flight.terminal.includes('국내')
+      ? 'Gimpo Domestic'
+      : 'Gimpo Int’l'
+    : isT2
+      ? 'Terminal 2'
+      : 'Terminal 1';
+
+  if (flight.type === 'arrival') {
+    const cleanExit = cleanExitCode(flight.exitNumber || flight.exit);
+    const cleanCarousel = (flight.carousel || '').replace(/[^0-9]/g, '').trim();
+    let arrivalGateEn = '';
+    if (isGmp) {
+      const gateNum = (flight.gateNumber || '').trim();
+      arrivalGateEn = `${terminalEn} 1F (${gateNum ? `Gate ${gateNum}` : 'Gate TBD'})`;
+    } else {
+      const exitPart = cleanExit ? `Exit ${cleanExit}` : 'Exit TBD';
+      const bagPart = cleanCarousel ? `Baggage #${cleanCarousel}` : 'Baggage TBD';
+      arrivalGateEn = `${terminalEn} 1F (${exitPart} / ${bagPart})`;
+    }
+
+    lines.push(`• Flight: ${flight.flightId} (${airportEn} ➔ ${airportCode})`);
+    lines.push(`• Est. Landing: ${statusEn}`);
+    lines.push(`• Arrival Gate: ${arrivalGateEn}`);
+  } else {
+    const cleanCounter = (flight.checkinRange || '').trim();
+    const doorMatch = (flight.suggestedDoor || flight.departureLocationText || '').match(/(\d+(?:~\d+)?)\s*번\s*도어/);
+    const doorEn = doorMatch ? `Door ${doorMatch[1]}` : isT2 ? 'Door 4~5' : 'Door 7~8';
+    const floorEn = isGmp ? '2F' : '3F';
+    const depLocEn = cleanCounter
+      ? `${terminalEn} ${floorEn} (Counter ${cleanCounter} / ${doorEn})`
+      : `${terminalEn} ${floorEn} (${doorEn})`;
+
+    lines.push(`• Flight: ${flight.flightId} (${airportCode} ➔ ${airportEn})`);
+    lines.push(`• Est. Departure: ${statusEn}`);
+    lines.push(`• Drop-off: ${depLocEn}`);
+  }
+
+  return lines.join('\n');
+}
