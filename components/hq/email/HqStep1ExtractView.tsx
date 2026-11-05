@@ -1090,7 +1090,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
           </div>
         )}
 
-        {/* Action Buttons: 임시 저장 (화이트 테두리) vs 예약 확정 및 배차 등록 (코발트 블루 풀컬러) */}
+        {/* Action Buttons: 예약 정보 확인 후 4단계 확정 화면으로 이동 */}
         {extractedDraft && (
           <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-3 z-10">
             {/* 보조 버튼 (좌측) */}
@@ -1107,9 +1107,9 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
             <button
               type="button"
               onClick={handleRegisterClick}
-              className="px-6 py-2.5 rounded-xl bg-[#0050FF] hover:bg-blue-700 active:scale-95 text-white text-xs font-black shadow-md hover:shadow-lg transition-all cursor-pointer flex items-center gap-2"
+              className="px-6 py-2.5 rounded-xl bg-[#1E60F3] hover:bg-[#1855DB] active:scale-95 text-white text-xs font-semibold transition-colors cursor-pointer flex items-center gap-2"
             >
-              <span>예약 확정 및 배차 등록</span>
+              <span>예약 확정</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
