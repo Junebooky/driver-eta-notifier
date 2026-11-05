@@ -79,6 +79,25 @@ const DrivingLogModalContent: React.FC<{
     setLogData(previous => withCurrentProfilePassenger(previous, driverProfile.passengerName));
   }, [driverProfile.passengerName]);
 
+  // Customer/company belongs to the HQ booking, not the driver's passenger profile.
+  useEffect(() => {
+    if (!bookingId) return;
+    const abort = new AbortController();
+    void fetch(`/api/schedules?date=${encodeURIComponent(logData.rawDate)}`, {
+      credentials: 'same-origin', cache: 'no-store', signal: abort.signal,
+    }).then(async response => {
+      if (!response.ok) return;
+      const data = await response.json();
+      const booking = Array.isArray(data.schedules)
+        ? data.schedules.find((item: {id?: string}) => String(item.id) === String(bookingId))
+        : null;
+      if (!booking || abort.signal.aborted) return;
+      const customerName = typeof booking.customer_name === 'string' ? booking.customer_name.trim() : '';
+      setLogData(previous => previous.clientName === customerName ? previous : {...previous, clientName: customerName});
+    }).catch(() => {});
+    return () => abort.abort();
+  }, [bookingId, logData.rawDate]);
+
   useEffect(() => {
     const abort = new AbortController();
     const query = new URLSearchParams({ date: logData.rawDate }); if (bookingId) query.set('bookingId', bookingId);
