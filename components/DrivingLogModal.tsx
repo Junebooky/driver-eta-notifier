@@ -15,7 +15,6 @@ import {
   ChevronDown,
   MoreHorizontal,
   Plus,
-  Minus,
   Trash2,
   CheckCircle2,
   AlertCircle,
@@ -40,6 +39,7 @@ import {
   clampTimeComponent,
   createReferenceDemoFixture,
 } from '@/utils/drivingLog';
+import { withCurrentProfilePassenger } from '@/utils/drivingLogPassenger';
 import Link from 'next/link';
 import { AddScheduleModal } from './AddScheduleModal';
 import { haptics } from '@/utils/haptics';
@@ -52,6 +52,7 @@ interface DrivingLogModalProps {
   onClose: () => void;
   driverProfile: DriverProfile;
   bookingId?: string;
+  onOpenProfileModal?: () => void;
   onOpenLocationSearch?: () => void;
   selectedLocationFromMap?: { name: string; address?: string } | null;
 }
@@ -61,15 +62,22 @@ const DrivingLogModalContent: React.FC<{
   onClose: () => void;
   driverProfile: DriverProfile;
   bookingId?: string;
+  onOpenProfileModal?: () => void;
   onOpenLocationSearch?: () => void;
   selectedLocationFromMap?: { name: string; address?: string } | null;
-}> = ({ presentation, onClose, driverProfile, bookingId, onOpenLocationSearch, selectedLocationFromMap }) => {
+}> = ({ presentation, onClose, driverProfile, bookingId, onOpenProfileModal, onOpenLocationSearch, selectedLocationFromMap }) => {
   const scrollContainerRef = useRef<HTMLElement>(null);
 
   // Master driving log state initialized purely (booking-aware)
   const [logData, setLogData] = useState<DrivingLogData>(() =>
     loadDrivingLogDraft(driverProfile, undefined, undefined, bookingId)
   );
+
+  // Profile settings are the only place the driver edits passenger identity.
+  // Changing that setting updates this still-open draft without losing route or odometer.
+  useEffect(() => {
+    setLogData(previous => withCurrentProfilePassenger(previous, driverProfile.passengerName));
+  }, [driverProfile.passengerName]);
 
   useEffect(() => {
     const abort = new AbortController();
@@ -79,11 +87,12 @@ const DrivingLogModalContent: React.FC<{
         if (!response.ok) return; const data = await response.json(); const row = data.logs?.find((entry: HqDrivingLog) => (entry.bookingId || null) === (bookingId || null)); if (!row || abort.signal.aborted) return;
         setLogData(previous => {
           if (previous.stops.length || previous.startKm) return { ...previous, submissionId: row.id, hqStatus: row.status };
-          return { ...previous, submissionId: row.id, hqStatus: row.status, driverId: row.driverId, clientName: row.customerName, passengerCount: String(row.passengerCount || ''), clockIn: row.clockIn, clockOut: row.clockOut, startKm: row.startKm, endKm: row.endKm, totalDutyHours: row.totalDutyHours, distanceKm: row.distanceKm, notes: row.notes, stops: row.stops.map((stop: HqDrivingLog['stops'][number]) => ({ ...stop, memo: stop.note })), status: row.status === 'draft' ? 'draft' : 'submitted' };
+          const next: DrivingLogData = { ...previous, submissionId: row.id, hqStatus: row.status, driverId: row.driverId, clientName: row.customerName === '미지정 고객' ? '' : row.customerName, passengerName: row.passengerName ?? '', passengerCount: row.passengerCount ? `${row.passengerCount}명` : '', clockIn: row.clockIn, clockOut: row.clockOut, startKm: row.startKm, endKm: row.endKm, totalDutyHours: row.totalDutyHours, distanceKm: row.distanceKm, notes: row.notes, stops: row.stops.map((stop: HqDrivingLog['stops'][number]) => ({ ...stop, memo: stop.note })), status: row.status === 'draft' ? 'draft' : 'submitted' };
+          return withCurrentProfilePassenger(next, driverProfile.passengerName);
         });
       }).catch(() => { });
     return () => abort.abort();
-  }, [bookingId, driverProfile.driverId, logData.rawDate]);
+  }, [bookingId, driverProfile.driverId, driverProfile.passengerName, logData.rawDate]);
 
   // Auto-scroll to top when modal mounts
   useEffect(() => {
@@ -105,11 +114,6 @@ const DrivingLogModalContent: React.FC<{
   const [isAddStopOpen, setIsAddStopOpen] = useState(false);
   const [editingStop, setEditingStop] = useState<RouteStopItem | null>(null);
   const [activeMenuStopId, setActiveMenuStopId] = useState<string | null>(null);
-
-  // Summary fields edit state (수행담당, 차량번호, 고객명, 담당승객 수)
-  const [isEditingSummary, setIsEditingSummary] = useState(false);
-  const [tempClientName, setTempClientName] = useState(logData.clientName);
-  const [tempPassengerCount, setTempPassengerCount] = useState(logData.passengerCount);
 
   // Toast / notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -224,18 +228,6 @@ const DrivingLogModalContent: React.FC<{
     showToast('일정이 삭제되었습니다.');
   };
 
-  // Summary (Client / Passenger) save
-  const handleSaveSummary = () => {
-    setLogData((prev) => ({
-      ...prev,
-      clientName: tempClientName.trim(),
-      passengerCount: tempPassengerCount.trim(),
-    }));
-    setIsEditingSummary(false);
-    haptics.selection();
-    showToast('수행 요약 정보가 저장되었습니다.');
-  };
-
   // Temporary save to localStorage (Strictly draft status)
   const handleTemporarySave = () => {
     haptics.success();
@@ -319,8 +311,6 @@ const DrivingLogModalContent: React.FC<{
     setLogData(demo);
     setTempStartKm(demo.startKm);
     setTempEndKm(demo.endKm);
-    setTempClientName(demo.clientName);
-    setTempPassengerCount(demo.passengerCount);
     showToast('레퍼런스 샘플 데이터를 불러왔습니다.');
   };
 
@@ -330,8 +320,6 @@ const DrivingLogModalContent: React.FC<{
     setLogData(fresh);
     setTempStartKm(fresh.startKm);
     setTempEndKm(fresh.endKm);
-    setTempClientName(fresh.clientName);
-    setTempPassengerCount(fresh.passengerCount);
     showToast('실제 빈 일지 상태로 초기화했습니다.');
   };
 
@@ -463,71 +451,34 @@ const DrivingLogModalContent: React.FC<{
               </span>
             </div>
 
-            {/* 고객명 & 탑승 인원 스테퍼 (2열 볼륨감 있는 화이트 라운드 카드) */}
-            <div className="grid grid-cols-[1.35fr_1fr] gap-3">
-              {/* 고객명 */}
-              <div className="min-w-0">
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  고객명
-                </label>
-                <input
-                  type="text"
-                  value={logData.clientName}
-                  onChange={(e) =>
-                    setLogData((prev) => ({
-                      ...prev,
-                      clientName: e.target.value,
-                    }))
-                  }
-                  placeholder="탑승 VIP 성함 또는 행사명"
-                  className="w-full h-11 sm:h-12 px-3.5 rounded-2xl bg-white border border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)] focus:border-[#1E60F3] focus:ring-2 focus:ring-[#1E60F3]/10 text-xs sm:text-sm font-bold text-slate-900 placeholder:font-medium placeholder:text-slate-400 outline-none transition-all"
-                />
+            {/* Booking customer and profile passenger are distinct, read-only sources. */}
+            <div className="rounded-2xl bg-[#F8FAFC] p-3.5 sm:p-4">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs font-semibold text-slate-800">오늘의 배차 정보</span>
+                {onOpenProfileModal && logData.status === 'draft' && (
+                  <button type="button" onClick={() => { haptics.lightTap(); onOpenProfileModal(); }}
+                    className="inline-flex min-h-9 items-center gap-1 rounded-lg px-2 text-xs font-medium text-slate-600 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20">
+                    <Pencil className="h-3.5 w-3.5" /> 프로필에서 수정
+                  </button>
+                )}
               </div>
-
-              {/* 탑승 인원 (- 1명 + 스테퍼) */}
-              <div className="min-w-0">
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  탑승 인원
-                </label>
-                {(() => {
-                  const countNum = Math.max(
-                    1,
-                    parseInt(String(logData.passengerCount || '1').replace(/[^0-9]/g, ''), 10) || 1
-                  );
-                  return (
-                    <div className="flex items-center justify-between h-11 sm:h-12 px-2.5 rounded-2xl bg-white border border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)]">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          haptics.lightTap();
-                          const next = Math.max(1, countNum - 1);
-                          setLogData((prev) => ({ ...prev, passengerCount: `${next}명` }));
-                        }}
-                        disabled={countNum <= 1}
-                        aria-label="탑승 인원 감소"
-                        className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#F3F6FB] hover:bg-slate-200/70 text-slate-600 flex items-center justify-center cursor-pointer disabled:opacity-40 transition active:scale-95 shrink-0"
-                      >
-                        <Minus className="w-3.5 h-3.5 stroke-[2.5]" />
-                      </button>
-                      <span className="text-xs sm:text-sm font-black text-slate-900 tabular-nums select-none">
-                        {countNum}명
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          haptics.lightTap();
-                          const next = Math.min(45, countNum + 1);
-                          setLogData((prev) => ({ ...prev, passengerCount: `${next}명` }));
-                        }}
-                        aria-label="탑승 인원 증가"
-                        className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-blue-50 hover:bg-blue-100 text-[#1E60F3] flex items-center justify-center cursor-pointer transition active:scale-95 shrink-0"
-                      >
-                        <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                      </button>
-                    </div>
-                  );
-                })()}
+              <div className="mt-2.5 divide-y divide-slate-200/70 rounded-xl bg-white px-3.5">
+                <div className="flex items-center justify-between gap-3 py-3">
+                  <span className="shrink-0 text-xs text-slate-500">담당 승객</span>
+                  <span className="min-w-0 break-words text-right text-sm font-semibold text-slate-800">{logData.passengerName || '프로필에서 미입력'}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3 py-3">
+                  <span className="shrink-0 text-xs text-slate-500">탑승 인원</span>
+                  <span className="text-sm font-semibold text-slate-800">{logData.passengerCount || '미확인'}</span>
+                </div>
+                {logData.clientName && (
+                  <div className="flex items-center justify-between gap-3 py-3">
+                    <span className="shrink-0 text-xs text-slate-500">예약 고객사</span>
+                    <span className="min-w-0 break-words text-right text-sm font-semibold text-slate-800">{logData.clientName}</span>
+                  </div>
+                )}
               </div>
+              <p className="mt-2 text-[11px] leading-relaxed text-slate-500">승객명은 프로필 설정에서 관리합니다. 인원은 승객명에 '외 1명' 또는 '총 2명'처럼 명시된 경우에만 계산됩니다.</p>
             </div>
           </section>
 
@@ -1137,65 +1088,6 @@ const DrivingLogModalContent: React.FC<{
         </div>
       )}
 
-      {/* Summary Edit Modal (Customer name & passenger count) */}
-      {isEditingSummary && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl p-5 w-full max-w-sm shadow-xl space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900">수행 요약 정보 수정</h3>
-              <button
-                type="button"
-                onClick={() => setIsEditingSummary(false)}
-                className="p-1 text-slate-400 hover:text-slate-600 rounded-full"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">고객명</label>
-                <input
-                  type="text"
-                  value={tempClientName}
-                  onChange={(e) => setTempClientName(e.target.value)}
-                  placeholder="예: 인터코스"
-                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-[#1E60F3]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">담당승객 수</label>
-                <input
-                  type="text"
-                  value={tempPassengerCount}
-                  onChange={(e) => setTempPassengerCount(e.target.value)}
-                  placeholder="예: 9명"
-                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-[#1E60F3]"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setIsEditingSummary(false)}
-                className="flex-1 py-2.5 border border-slate-200 text-xs font-semibold text-slate-600 rounded-xl"
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveSummary}
-                className="flex-1 py-2.5 bg-[#1E60F3] text-white text-xs font-bold rounded-xl shadow-xs"
-              >
-                저장하기
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Live Submission Notice Modal connected to HQ Operations System */}
       {isPreviewSubmitModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
@@ -1265,6 +1157,7 @@ export const DrivingLogModal: React.FC<DrivingLogModalProps> = ({
   onClose,
   driverProfile,
   bookingId,
+  onOpenProfileModal,
   onOpenLocationSearch,
   selectedLocationFromMap,
 }) => {
@@ -1287,6 +1180,7 @@ export const DrivingLogModal: React.FC<DrivingLogModalProps> = ({
       onClose={onClose}
       driverProfile={driverProfile}
       bookingId={bookingId}
+      onOpenProfileModal={onOpenProfileModal}
       onOpenLocationSearch={onOpenLocationSearch}
       selectedLocationFromMap={selectedLocationFromMap}
     />
