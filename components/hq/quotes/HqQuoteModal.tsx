@@ -29,6 +29,7 @@ import {
   Plus,
   Minus,
   ExternalLink,
+  Search,
 } from 'lucide-react';
 import { HqQuoteItem, QuoteCalculationInput } from '@/types/quoteHq';
 import { OfficialServiceCategory } from '@/types/officialPricingHq';
@@ -123,6 +124,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
   const [serviceMode, setServiceMode] = useState<'with_driver' | 'vehicle_only'>('with_driver');
   const [englishOption, setEnglishOption] = useState<'basic_included' | 'fluent_upgrade'>('basic_included');
   const [vehicleCategoryFilter, setVehicleCategoryFilter] = useState<'all' | 'sprinter' | 'sedan' | 'suv' | 'van' | 'bus'>('all');
+  const [vehicleSearchQuery, setVehicleSearchQuery] = useState<string>('');
 
   // Synchronize when initialVehicleProductCode is passed
   useEffect(() => {
@@ -252,13 +254,26 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
 
   // Filtered SKUs for Step 3
   const filteredSkus = STANDARD_VEHICLE_SKU_MAPPINGS.filter((sku) => {
-    if (vehicleCategoryFilter === 'all') return true;
-    if (vehicleCategoryFilter === 'sprinter') return sku.tier === 'sprinter';
-    if (vehicleCategoryFilter === 'sedan') return sku.tier === 'sedan' || sku.tier === 'genesis';
-    if (vehicleCategoryFilter === 'suv') return sku.tier === 'suv';
-    if (vehicleCategoryFilter === 'van') return sku.tier === 'van';
-    if (vehicleCategoryFilter === 'bus') return sku.tier === 'bus';
-    return true;
+    const matchesCategory =
+      vehicleCategoryFilter === 'all'
+        ? true
+        : vehicleCategoryFilter === 'sprinter'
+          ? sku.tier === 'sprinter'
+          : vehicleCategoryFilter === 'sedan'
+            ? sku.tier === 'sedan' || sku.tier === 'genesis'
+            : vehicleCategoryFilter === 'suv'
+              ? sku.tier === 'suv'
+              : vehicleCategoryFilter === 'van'
+                ? sku.tier === 'van'
+                : vehicleCategoryFilter === 'bus'
+                  ? sku.tier === 'bus'
+                  : true;
+    if (!matchesCategory) return false;
+
+    const q = vehicleSearchQuery.trim().toLowerCase();
+    if (!q) return true;
+    const searchable = `${sku.vehicleProductLabel} ${sku.capacityNote || ''} ${sku.notes || ''} ${sku.vehicleProductCode}`.toLowerCase();
+    return searchable.includes(q);
   });
 
   // P0-1: Quarantine unapproved 'draft' tariff
@@ -562,11 +577,14 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
       >
         <div id="quote-modal-container" className="relative w-full max-w-4xl max-h-[92vh] flex flex-col bg-white border border-slate-200/90 rounded-3xl shadow-2xl overflow-hidden my-auto animate-in zoom-in-95 duration-150">
           {/* Header */}
-          <div id="quote-modal-header" className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-white shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-blue-50 text-[#1E60F3] border border-blue-100 flex items-center justify-center shrink-0 shadow-2xs">
-                <Car className="w-5 h-5" />
-              </div>
+          <div id="quote-modal-header" className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-100 bg-white shrink-0">
+            <div className="flex items-center gap-2.5 sm:gap-3">
+              <img
+                src="/images/icons/calculator.png"
+                alt="의전 견적 계산기"
+                className="w-10 h-10 object-contain shrink-0 select-none"
+                draggable={false}
+              />
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
@@ -638,7 +656,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
           </div>
 
           {/* Body Content */}
-          <div className="flex-1 overflow-y-auto p-5 sm:p-7">
+          <div className="flex-1 overflow-y-auto p-3.5 sm:p-7">
             {/* Step 1: 고객사 및 행사 정보 */}
             {currentStep === 1 && (
               <div className="space-y-4 max-w-2xl mx-auto animate-in fade-in duration-200">
@@ -922,7 +940,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                 </div>
 
                 {/* Category Filter Pills */}
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                   {(
                     [
                       { key: 'all', label: '전체' },
@@ -942,7 +960,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                           haptics.lightTap();
                           setVehicleCategoryFilter(cat.key);
                         }}
-                        className={`px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer shrink-0 ${active
+                        className={`px-3 py-1.5 rounded-full text-xs font-bold transition cursor-pointer shrink-0 ${active
                           ? 'bg-[#1E60F3] text-white shadow-2xs'
                           : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                           }`}
@@ -953,9 +971,39 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                   })}
                 </div>
 
+                {/* Vehicle Search Input (White background, Cobalt Blue hover border, Mobile optimized) */}
+                <div className="w-full h-10 sm:h-11 bg-white border border-slate-200 hover:border-[#1E60F3] focus-within:border-[#1E60F3] focus-within:ring-2 focus-within:ring-[#1E60F3]/15 rounded-xl px-3.5 flex items-center gap-2.5 transition-all shadow-2xs">
+                  <Search className="w-4 h-4 text-slate-400 shrink-0 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={vehicleSearchQuery}
+                    onChange={(e) => setVehicleSearchQuery(e.target.value)}
+                    placeholder="차량명, 인승, 등급으로 검색해보세요"
+                    className="w-full bg-transparent text-xs sm:text-sm font-semibold text-slate-900 placeholder:text-xs placeholder:text-slate-400 outline-none"
+                  />
+                  {vehicleSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        haptics.lightTap();
+                        setVehicleSearchQuery('');
+                      }}
+                      aria-label="검색어 지우기"
+                      className="p-1 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
                 {/* Vehicle SKU Cards */}
-                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                  {filteredSkus.map((sku) => {
+                <div className="space-y-2 max-h-60 sm:max-h-64 overflow-y-auto pr-1">
+                  {filteredSkus.length === 0 ? (
+                    <div className="py-8 text-center text-xs text-slate-400 font-semibold bg-slate-50/70 rounded-2xl border border-slate-200/80">
+                      검색 조건과 일치하는 차량이 없습니다.
+                    </div>
+                  ) : (
+                    filteredSkus.map((sku) => {
                     const isSelected = vehicleProductCode === sku.vehicleProductCode;
                     const thumb = getVehicleImage({ model: sku.vehicleProductLabel, category: sku.tier });
                     return (
@@ -1011,7 +1059,8 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                         </div>
                       </button>
                     );
-                  })}
+                    })
+                  )}
                 </div>
 
                 {/* 차량 대수 & 기사 언어 */}
@@ -1079,13 +1128,13 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
 
             {/* Step 4: 견적 확인 & 영수증 요약 */}
             {currentStep === 4 && (
-              <div className="max-w-xl mx-auto space-y-5 animate-in zoom-in-95 duration-200">
-                <div id="quote-step-title" className="border-b border-slate-100 pb-2 text-center">
-                  <h4 className="text-xl font-black text-slate-900 tracking-tight">
-                    4. 공식 견적서 확인
+              <div className="max-w-xl mx-auto space-y-4 sm:space-y-5 animate-in zoom-in-95 duration-200">
+                <div id="quote-step-title" className="border-b border-slate-100 pb-2.5 text-center">
+                  <h4 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
+                    견적이 준비되었어요
                   </h4>
                   <p className="text-xs text-slate-400 font-medium mt-0.5">
-                    입력하신 정보로 실시간 산출된 공식 견적 영수증입니다.
+                    입력해주신 일정에 맞춰 바로 계산했어요.
                   </p>
                 </div>
 

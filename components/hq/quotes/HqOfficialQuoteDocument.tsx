@@ -145,7 +145,7 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
         borderRadius: '12px',
       }}
     >
-      {/* DevTools Direct-Match Styles */}
+      {/* DevTools Direct-Match Styles + Mobile Responsive Optimization */}
       <style>{`
         .quote-doc-card {
           box-sizing: border-box;
@@ -187,12 +187,99 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
           line-height: 1.35;
           vertical-align: top;
         }
+        @media screen and (max-width: 639px) {
+          .quote-doc-card {
+            padding: 18px 14px 16px 14px !important;
+          }
+          .quote-header-side {
+            display: none !important;
+          }
+          .quote-header-center {
+            min-width: 0 !important;
+            width: 100% !important;
+          }
+          .quote-brand-title {
+            font-size: 16px !important;
+          }
+          .quote-divider-header {
+            margin: 12px 0 14px 0 !important;
+          }
+          .quote-title-meta-box {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 10px !important;
+            margin-bottom: 14px !important;
+          }
+          .quote-meta-grid {
+            width: 100% !important;
+            grid-template-columns: auto 1fr !important;
+            background-color: #FAF9F5;
+            padding: 8px 10px;
+            border-radius: 6px;
+            border: 1px solid #E5DEC9;
+          }
+          .quote-banner {
+            height: 108px !important;
+            margin-bottom: 16px !important;
+            border-radius: 4px !important;
+          }
+          .quote-info-row {
+            flex-wrap: wrap !important;
+            align-items: flex-start !important;
+            padding: 8px 6px !important;
+            row-gap: 6px !important;
+          }
+          .quote-info-label {
+            width: 66px !important;
+            flex-shrink: 0 !important;
+            font-size: 10.5px !important;
+          }
+          .quote-info-val {
+            width: calc(100% - 66px) !important;
+            flex: none !important;
+            font-size: 11px !important;
+            word-break: keep-all !important;
+            overflow-wrap: anywhere !important;
+          }
+          .quote-cell-label {
+            padding: 7px 6px 3px !important;
+            font-size: 9.5px !important;
+            white-space: nowrap !important;
+          }
+          .quote-cell-val {
+            padding: 0px 6px 8px !important;
+            font-size: 10.5px !important;
+            word-break: keep-all !important;
+          }
+          .quote-grand-total-box {
+            flex-wrap: wrap !important;
+            gap: 6px !important;
+            padding: 12px 0px !important;
+          }
+          .quote-grand-total-label {
+            font-size: 13px !important;
+          }
+          .quote-grand-total-sub {
+            display: block !important;
+            font-size: 10px !important;
+            margin-top: 1px !important;
+          }
+          .quote-grand-total-amount {
+            font-size: 20px !important;
+            margin-left: auto !important;
+            white-space: nowrap !important;
+          }
+          .quote-footer {
+            flex-wrap: wrap !important;
+            gap: 4px 6px !important;
+          }
+        }
       `}</style>
 
       {/* 1. Top Header */}
       <div className="quote-header" data-section="00-header" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '14px' }}>
         {/* Top Left */}
-        <div style={{ flex: 1, minWidth: '90px', textAlign: 'left' }}>
+        <div className="quote-header-side" style={{ flex: 1, minWidth: '90px', textAlign: 'left' }}>
           <div
             style={{
               fontFamily: "'Playfair Display', Georgia, serif",
@@ -220,7 +307,7 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
         </div>
 
         {/* Center Logo & Title (Strict Single-Line Layout) */}
-        <div style={{ textAlign: 'center', flex: 2, minWidth: '280px' }}>
+        <div className="quote-header-center" style={{ textAlign: 'center', flex: 2, minWidth: '280px' }}>
           <img
             src="/images/receipt/header.png"
             alt="VIP Limousine Emblem"
@@ -262,7 +349,7 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
         </div>
 
         {/* Top Right */}
-        <div style={{ flex: 1, minWidth: '90px', textAlign: 'right' }}>
+        <div className="quote-header-side" style={{ flex: 1, minWidth: '90px', textAlign: 'right' }}>
           <div
             style={{
               fontFamily: "'Playfair Display', Georgia, serif",
@@ -385,27 +472,27 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
         {/* Table Content with #E5DEC9 dividers */}
         <div className="quote-info-table" style={{ borderTop: '1px solid #E5DEC9', borderBottom: '1px solid #E5DEC9' }}>
           {/* Row 1 */}
-          <div style={{ display: 'flex', alignItems: 'center', padding: '9px 10px', borderBottom: '1px solid #E5DEC9', fontSize: '11px' }}>
-            <div style={{ width: '75px', color: '#475569', fontWeight: 500 }}>고객사명</div>
-            <div className="quote-val-customer" data-field="customer-name" style={{ flex: 1, fontWeight: 700, color: '#0F172A' }}>{customerName || '인터코스'}</div>
-            <div style={{ width: '60px', color: '#475569', fontWeight: 500 }}>담당자</div>
-            <div className="quote-val-contact" data-field="contact-person" style={{ flex: 1.2, fontWeight: 600, color: '#0F172A' }}>
+          <div className="quote-info-row" style={{ display: 'flex', alignItems: 'center', padding: '9px 10px', borderBottom: '1px solid #E5DEC9', fontSize: '11px' }}>
+            <div className="quote-info-label" style={{ width: '75px', color: '#475569', fontWeight: 500 }}>고객사명</div>
+            <div className="quote-val-customer quote-info-val" data-field="customer-name" style={{ flex: 1, fontWeight: 700, color: '#0F172A' }}>{customerName || '인터코스'}</div>
+            <div className="quote-info-label" style={{ width: '60px', color: '#475569', fontWeight: 500 }}>담당자</div>
+            <div className="quote-val-contact quote-info-val" data-field="contact-person" style={{ flex: 1.2, fontWeight: 600, color: '#0F172A' }}>
               {contactPerson || '김지현 팀장'}{contactPhone ? ` (${contactPhone})` : ''}
             </div>
           </div>
           {/* Row 2 */}
-          <div style={{ display: 'flex', alignItems: 'center', padding: '9px 10px', borderBottom: '1px solid #E5DEC9', fontSize: '11px' }}>
-            <div style={{ width: '75px', color: '#475569', fontWeight: 500 }}>운행 목적</div>
-            <div className="quote-val-purpose" data-field="trip-purpose" style={{ flex: 1, fontWeight: 600, color: '#0F172A' }}>{notes || '비즈니스 투어'}</div>
-            <div style={{ width: '60px', color: '#475569', fontWeight: 500 }}>이용 일정</div>
-            <div className="quote-val-schedule" data-field="trip-schedule" style={{ flex: 1.2, fontWeight: 600, color: '#0F172A' }}>
+          <div className="quote-info-row" style={{ display: 'flex', alignItems: 'center', padding: '9px 10px', borderBottom: '1px solid #E5DEC9', fontSize: '11px' }}>
+            <div className="quote-info-label" style={{ width: '75px', color: '#475569', fontWeight: 500 }}>운행 목적</div>
+            <div className="quote-val-purpose quote-info-val" data-field="trip-purpose" style={{ flex: 1, fontWeight: 600, color: '#0F172A' }}>{notes || '비즈니스 투어'}</div>
+            <div className="quote-info-label" style={{ width: '60px', color: '#475569', fontWeight: 500 }}>이용 일정</div>
+            <div className="quote-val-schedule quote-info-val" data-field="trip-schedule" style={{ flex: 1.2, fontWeight: 600, color: '#0F172A' }}>
               {date} ({serviceStartTime} ~ {serviceEndTime}, {serviceHours}시간)
             </div>
           </div>
           {/* Row 3 */}
-          <div style={{ display: 'flex', alignItems: 'center', padding: '9px 10px', fontSize: '11px' }}>
-            <div style={{ width: '75px', color: '#475569', fontWeight: 500 }}>이동 경로</div>
-            <div className="quote-val-route" data-field="trip-route" style={{ flex: 1, fontWeight: 700, color: '#0F172A' }}>
+          <div className="quote-info-row" style={{ display: 'flex', alignItems: 'center', padding: '9px 10px', fontSize: '11px' }}>
+            <div className="quote-info-label" style={{ width: '75px', color: '#475569', fontWeight: 500 }}>이동 경로</div>
+            <div className="quote-val-route quote-info-val" data-field="trip-route" style={{ flex: 1, fontWeight: 700, color: '#0F172A' }}>
               {origin} → {destination}
             </div>
           </div>
@@ -640,9 +727,9 @@ export const HqOfficialQuoteDocument: React.FC<HqOfficialQuoteDocumentProps> = (
       >
         {/* Left: Accent bar & Label without '04' */}
         <div style={{ display: 'flex', alignItems: 'center' }}>
-          <div style={{ width: '3.5px', height: '24px', backgroundColor: '#9B7A4F', marginRight: '10px', borderRadius: '1.5px' }} />
+          <div style={{ width: '3.5px', height: '24px', backgroundColor: '#9B7A4F', marginRight: '10px', borderRadius: '1.5px', flexShrink: 0 }} />
           <span className="quote-grand-total-label" data-field="grand-total-label" style={{ fontSize: '15px', fontWeight: 700, color: '#111827' }}>
-            최종 견적 금액 <span style={{ fontSize: '11px', fontWeight: 500, color: '#64748B' }}>(부가가치세 10% 포함)</span>
+            최종 견적 금액 <span className="quote-grand-total-sub" style={{ fontSize: '11px', fontWeight: 500, color: '#64748B' }}>(부가가치세 10% 포함)</span>
           </span>
         </div>
 

@@ -63,7 +63,31 @@ interface CanonicalAirportPoi {
 }
 
 const CANONICAL_AIRPORT_POIS: CanonicalAirportPoi[] = [
-  // 1. 인천국제공항 제1여객터미널
+  // 1. 인천국제공항 여객터미널 본관 (최우선 노출)
+  {
+    id: 'apt-icn-t1-main',
+    name: '인천국제공항 제1여객터미널',
+    address: '인천 중구 공항로 272',
+    lat: 37.44909745,
+    lng: 126.45432212,
+    type: 'incheon',
+    isArrival: false,
+    isDeparture: false,
+    terminal: 'T1',
+  },
+  {
+    id: 'apt-icn-t2-main',
+    name: '인천국제공항 제2여객터미널',
+    address: '인천 중구 제2터미널대로 446',
+    lat: 37.46878925,
+    lng: 126.4341012,
+    type: 'incheon',
+    isArrival: false,
+    isDeparture: false,
+    terminal: 'T2',
+  },
+
+  // 2. 인천국제공항 제1·제2여객터미널 입·출국장
   {
     id: 'apt-icn-t1-arr',
     name: '인천국제공항 제1여객터미널 입국장',
@@ -87,19 +111,6 @@ const CANONICAL_AIRPORT_POIS: CanonicalAirportPoi[] = [
     terminal: 'T1',
   },
   {
-    id: 'apt-icn-t1-main',
-    name: '인천국제공항 제1여객터미널',
-    address: '인천 중구 공항로 272',
-    lat: 37.44909745,
-    lng: 126.45432212,
-    type: 'incheon',
-    isArrival: false,
-    isDeparture: false,
-    terminal: 'T1',
-  },
-
-  // 2. 인천국제공항 제2여객터미널
-  {
     id: 'apt-icn-t2-arr',
     name: '인천국제공항 제2여객터미널 입국장',
     address: '인천 중구 제2터미널대로 446',
@@ -122,17 +133,6 @@ const CANONICAL_AIRPORT_POIS: CanonicalAirportPoi[] = [
     terminal: 'T2',
   },
   {
-    id: 'apt-icn-t2-main',
-    name: '인천국제공항 제2여객터미널',
-    address: '인천 중구 제2터미널대로 446',
-    lat: 37.46878925,
-    lng: 126.4341012,
-    type: 'incheon',
-    isArrival: false,
-    isDeparture: false,
-    terminal: 'T2',
-  },
-  {
     id: 'apt-icn-main',
     name: '인천국제공항',
     address: '인천 중구 공항로 272',
@@ -143,7 +143,31 @@ const CANONICAL_AIRPORT_POIS: CanonicalAirportPoi[] = [
     isDeparture: false,
   },
 
-  // 3. 김포국제공항 국내선
+  // 3. 김포국제공항 국내선·국제선 본관 (최우선 노출)
+  {
+    id: 'apt-gmp-dom-main',
+    name: '김포국제공항 국내선',
+    address: '서울 강서구 하늘길 112',
+    lat: 37.55925746,
+    lng: 126.8032872,
+    type: 'gimpo',
+    isArrival: false,
+    isDeparture: false,
+    terminal: 'domestic',
+  },
+  {
+    id: 'apt-gmp-int-main',
+    name: '김포국제공항 국제선',
+    address: '서울 강서구 하늘길 38',
+    lat: 37.56545115,
+    lng: 126.80131499,
+    type: 'gimpo',
+    isArrival: false,
+    isDeparture: false,
+    terminal: 'international',
+  },
+
+  // 4. 김포국제공항 국내선·국제선 입·출국장
   {
     id: 'apt-gmp-dom-arr',
     name: '김포국제공항 국내선 입국장',
@@ -167,19 +191,6 @@ const CANONICAL_AIRPORT_POIS: CanonicalAirportPoi[] = [
     terminal: 'domestic',
   },
   {
-    id: 'apt-gmp-dom-main',
-    name: '김포국제공항 국내선',
-    address: '서울 강서구 하늘길 112',
-    lat: 37.55925746,
-    lng: 126.8032872,
-    type: 'gimpo',
-    isArrival: false,
-    isDeparture: false,
-    terminal: 'domestic',
-  },
-
-  // 4. 김포국제공항 국제선
-  {
     id: 'apt-gmp-int-arr',
     name: '김포국제공항 국제선 입국장',
     address: '서울 강서구 하늘길 38',
@@ -199,17 +210,6 @@ const CANONICAL_AIRPORT_POIS: CanonicalAirportPoi[] = [
     type: 'gimpo',
     isArrival: false,
     isDeparture: true,
-    terminal: 'international',
-  },
-  {
-    id: 'apt-gmp-int-main',
-    name: '김포국제공항 국제선',
-    address: '서울 강서구 하늘길 38',
-    lat: 37.56545115,
-    lng: 126.80131499,
-    type: 'gimpo',
-    isArrival: false,
-    isDeparture: false,
     terminal: 'international',
   },
   {
@@ -542,7 +542,7 @@ export async function GET(req: NextRequest) {
     const wantsT1 = /t1|1터미널|제1|1터/i.test(normKeyword);
     const wantsT2 = /t2|2터미널|제2|2터/i.test(normKeyword);
     const wantsDomestic = normKeyword.includes('국내') || normKeyword.includes('domestic');
-    const wantsInternational = normKeyword.includes('국제') || normKeyword.includes('international');
+    const wantsInternational = normKeyword.includes('국제선') || normKeyword.includes('international');
 
     // 공항 전용 랭킹 판정 함수 (의전 기사 차량 특화: 입·출국장 최우선, 지하철역 최하단 배치)
     const getAirportTierAndScore = (p: TmapPoiItem): { tier: number; score: number } => {
@@ -591,61 +591,74 @@ export async function GET(req: NextRequest) {
         return { tier: 3, score: 500 };
       }
 
-      // 5) Tier 1: 여객터미널 입국장(도착) 및 출국장(출발) — 기사가 승객을 맞이하거나 배웅하는 핵심 구역
+      // 5) 여객터미널 본관 (인천국제공항 제1·제2여객터미널 / 김포국제공항 국내선·국제선) 및 입·출국장 랭킹
       const isArrival = norm.includes('입국장') || (norm.includes('도착') && !norm.includes('주차'));
       const isDeparture = norm.includes('출국장') || (norm.includes('출발') && !norm.includes('주차'));
 
       const matchesTerminal1 = wantsT1 && (norm.includes('제1') || norm.includes('1터미널') || norm.includes('t1'));
       const matchesTerminal2 = wantsT2 && (norm.includes('제2') || norm.includes('2터미널') || norm.includes('t2'));
       const matchesDomestic = wantsDomestic && norm.includes('국내');
-      const matchesInternational = wantsInternational && norm.includes('국제');
+      const matchesInternational = wantsInternational && norm.includes('국제선');
 
-      if (isArrival || isDeparture) {
-        let score = 0;
-        // 사용자 검색어가 입국/출국을 명시한 경우 해당 장소 가산점
-        if (wantsArrival && isArrival) score -= 100;
-        if (wantsDeparture && isDeparture) score -= 100;
-
-        // T1 / T2 또는 국내선 / 국제선 명시 시 해당 장소 가산점
-        if (matchesTerminal1 || matchesTerminal2 || matchesDomestic || matchesInternational) {
-          score -= 50;
-        }
-
-        // 별도 터미널 미지정 시 T1(제1터미널) 또는 국내선을 기본 선두에 배치
-        if (!wantsT2 && (norm.includes('제1') || norm.includes('1터미널') || norm.includes('t1') || norm.includes('국내선'))) {
-          score -= 20;
-        }
-
-        // 픽업(입국장) 및 샌딩(출국장) 기본 정렬: 입국장을 출국장보다 한 끗 앞서 배치
-        if (wantsArrival || (!wantsDeparture && isArrival)) {
-          score -= 10;
-        }
-
-        return { tier: 1, score };
-      }
-
-      // 6) Tier 2: 여객터미널 본관 및 공항 대표 명칭 (순수 터미널 및 공항 대표 POI)
-      const isMainTerminal =
+      // 핵심 여객터미널 본관 (제1여객터미널, 제2여객터미널, 국내선, 국제선)
+      const isSpecificMainTerminal =
         norm === '인천국제공항제1여객터미널' ||
         norm === '인천국제공항제2여객터미널' ||
-        norm === '인천국제공항' ||
-        norm === '인천공항' ||
         norm === '김포국제공항국내선' ||
         norm === '김포국제공항국제선' ||
+        /(?:국제|여객)?공항(?:제[12]여객터미널|국내선|국제선)$/.test(norm);
+
+      // 공항 대표 루트 명칭
+      const isRootAirport =
+        norm === '인천국제공항' ||
+        norm === '인천공항' ||
         norm === '김포국제공항' ||
         norm === '김포공항' ||
         norm === '제주국제공항' ||
         norm === '제주공항' ||
         norm === '김해국제공항' ||
-        norm === '김해공항' ||
-        /(?:국제|여객)?공항(?:제[12]여객터미널|여객터미널|국내선|국제선)$/.test(norm);
+        norm === '김해공항';
 
-      if (isMainTerminal) {
+      // 사용자가 '입국' 또는 '출국'을 명시하지 않은 일반 공항 검색 시:
+      // 1순위(Tier 1): 제1여객터미널, 제2여객터미널 / 국내선, 국제선 본관
+      // 2순위(Tier 2): 입국장, 출국장 및 공항 대표 명칭
+      if (isSpecificMainTerminal && !wantsArrival && !wantsDeparture) {
+        let score = -100;
+        if (matchesTerminal1 || matchesTerminal2 || matchesDomestic || matchesInternational) {
+          score -= 50;
+        }
+        if (!wantsT2 && !wantsInternational && (norm.includes('제1') || norm.includes('국내선'))) {
+          score -= 20;
+        }
+        return { tier: 1, score };
+      }
+
+      if (isArrival || isDeparture) {
+        let score = 0;
+        if (wantsArrival && isArrival) score -= 100;
+        if (wantsDeparture && isDeparture) score -= 100;
+
+        if (matchesTerminal1 || matchesTerminal2 || matchesDomestic || matchesInternational) {
+          score -= 50;
+        }
+
+        if (!wantsT2 && !wantsInternational && (norm.includes('제1') || norm.includes('1터미널') || norm.includes('t1') || norm.includes('국내선'))) {
+          score -= 20;
+        }
+
+        if (wantsArrival || (!wantsDeparture && isArrival)) {
+          score -= 10;
+        }
+
+        return { tier: wantsArrival || wantsDeparture ? 1 : 2, score };
+      }
+
+      if (isSpecificMainTerminal || isRootAirport) {
         let score = 100;
         if (matchesTerminal1 || matchesTerminal2 || matchesDomestic || matchesInternational) {
           score -= 50;
         }
-        if (!wantsT2 && (norm.includes('제1') || norm.includes('국내선'))) {
+        if (!wantsT2 && !wantsInternational && (norm.includes('제1') || norm.includes('국내선'))) {
           score -= 20;
         }
         return { tier: 2, score };
