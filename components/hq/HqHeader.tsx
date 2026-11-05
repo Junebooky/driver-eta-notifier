@@ -150,17 +150,15 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
                 <img
                   src="/images/icons/update.png"
                   alt="동기화"
-                  className={`w-7.5 h-7.5 object-contain shrink-0 transition-all duration-300 ${
-                    isRefreshing ? 'animate-spin' : ''
-                  } ${isMinutePulsing ? 'scale-125 drop-shadow-md' : 'group-hover:scale-110'}`}
+                  className={`w-7.5 h-7.5 object-contain shrink-0 transition-all duration-300 ${isRefreshing ? 'animate-spin' : ''
+                    } ${isMinutePulsing ? 'scale-125 drop-shadow-md' : 'group-hover:scale-110'}`}
                 />
               </button>
 
               {/* Speech Bubble: Hover or 1-minute alert */}
               <div
-                className={`absolute top-full left-1/2 -translate-x-1/2 pt-2 flex-col items-center pointer-events-none z-50 transition-all duration-200 ${
-                  showMinuteBubble ? 'flex animate-in fade-in zoom-in-95' : 'hidden group-hover:flex'
-                }`}
+                className={`absolute top-full left-1/2 -translate-x-1/2 pt-2 flex-col items-center pointer-events-none z-50 transition-all duration-200 ${showMinuteBubble ? 'flex animate-in fade-in zoom-in-95' : 'hidden group-hover:flex'
+                  }`}
               >
                 <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 shadow-xs" />
                 <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg flex items-center gap-1.5 animate-in fade-in-50 duration-150">
@@ -229,27 +227,6 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
             <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0 hidden lg:block" />
           </button>
         </div>
-      </div>
-
-      {/* Mobile Compact Search Bar (< md) */}
-      <div className="relative md:hidden pb-2.5">
-        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => onSearchChange(e.target.value)}
-          placeholder={searchPlaceholder}
-          className="w-full pl-8 pr-8 py-1.5 bg-slate-50 focus:bg-white border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-800 placeholder:text-slate-400 outline-none focus:border-[#1E60F3]"
-        />
-        {searchQuery && (
-          <button
-            type="button"
-            onClick={() => onSearchChange('')}
-            className="w-4 h-4 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center absolute right-2.5 top-1/2 -translate-y-1/2 cursor-pointer"
-          >
-            <X className="w-2.5 h-2.5" />
-          </button>
-        )}
       </div>
     </header>
   );
