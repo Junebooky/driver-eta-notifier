@@ -5,6 +5,7 @@ import { normalizeDateToIso,normalizeTimeHHmm } from '@/utils/dispatchConflictDe
 import { custodyOdometerForLog } from '@/utils/vehicleCustody';
 import type { VehicleCustody } from '@/types/vehicleCustody';
 import { HqDrivingLog, HqDrivingLogStatus } from '@/types/drivingLogHq';
+import { passengerSummaryFromProfile } from '@/utils/drivingLogPassenger';
 
 export const dynamic = 'force-dynamic';
 
