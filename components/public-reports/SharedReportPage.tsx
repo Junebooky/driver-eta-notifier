@@ -137,7 +137,7 @@ export function SharedReportPage(){
        </div>
       </div>
      </div>
-     : <ChatTypingBubble/>}
+     : <ChatTypingBubble insidePaddedViewport/>}
    </div>)}
    {ready&&token&&reportActive&&<ReportServicePicker value={serviceType} onChange={v=>{setServiceType(v);pending.current=null;setError('');}}/>}
   </section>
