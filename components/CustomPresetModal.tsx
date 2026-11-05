@@ -944,15 +944,15 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
   return (
     <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 select-none overscroll-contain">
       <div
-        className="w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[92dvh] h-[92dvh] sm:h-auto sm:max-h-[88vh] animate-in slide-in-from-bottom-6 duration-300"
+        className="w-full max-w-lg bg-[#F6F8FC] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[92dvh] h-[92dvh] sm:h-auto sm:max-h-[88vh] animate-in slide-in-from-bottom-6 duration-300"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ========================================================= */}
         {/* [태스크 1] 모달 헤더 (개수 뱃지 삭제 & 깔끔한 텍스트+닫기 버튼) */}
         {/* ========================================================= */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50/90 shrink-0">
+        <div className="flex items-center justify-between px-5 py-4 bg-[#F6F8FC] shrink-0">
           <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[#1E60F3] flex items-center justify-center shadow-md shadow-blue-500/20 text-white shrink-0">
+            <div className="w-10 h-10 rounded-2xl bg-[#0055FF] flex items-center justify-center shadow-[0_4px_12px_rgba(0,85,255,0.25)] text-white shrink-0">
               {isHomeMode ? (
                 <Home className="w-5 h-5 text-white" />
               ) : (
@@ -975,7 +975,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                 </svg>
               )}
             </div>
-            <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-snug">
+            <h2 className="text-[18px] font-black text-slate-900 tracking-tight leading-snug">
               {isHomeMode
                 ? (isHomeEditMode ? '자택 주소 수정' : '자택 주소 등록')
                 : '거점 · 자주 가는 장소'}
@@ -984,11 +984,11 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-slate-200/70 hover:bg-slate-300 flex items-center justify-center text-slate-500 hover:text-slate-800 active:scale-95 transition-all cursor-pointer"
+            className="w-9 h-9 rounded-full bg-slate-200/60 hover:bg-slate-200 flex items-center justify-center text-slate-600 active:scale-95 transition-all cursor-pointer"
             title="닫기"
             aria-label="닫기"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
@@ -996,22 +996,22 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
         {/* Modal Scrollable Body                                     */}
         {/* ========================================================= */}
         <div
-          className="p-4 sm:p-5 space-y-4 overflow-y-auto overscroll-contain touch-pan-y flex-1"
+          className="px-5 pb-5 pt-1 space-y-5 overflow-y-auto overscroll-contain touch-pan-y flex-1"
           style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
         >
           {/* ========================================================= */}
-          {/* [태스크 1 & 2] 상단: '장소 등록' 폼 상시 노출 및 text-lg 검색창 */}
+          {/* [태스크 1 & 2] 상단: '장소 등록' 볼륨 카드 폼 상시 노출 */}
           {/* ========================================================= */}
           {!isHomeMode ? (
-            <div className="p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 bg-slate-50/70 space-y-3 shadow-2xs">
-              <div className="flex items-center justify-between pb-1 border-b border-slate-200/60">
+            <div className="p-5 rounded-3xl bg-white border border-slate-100/90 shadow-[0_4px_20px_rgba(15,23,42,0.04)] space-y-4">
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-base font-black text-slate-800 flex items-center gap-1.5">
-                    <Plus className="w-3.5 h-3.5 text-[#1E60F3] stroke-[2.5]" />
+                  <span className="text-[16px] font-black text-slate-900 flex items-center gap-1.5 tracking-tight">
+                    <Plus className="w-4 h-4 text-[#0055FF] stroke-[2.5]" />
                     <span>{editingItem ? '거점 정보 수정' : '장소 등록'}</span>
                   </span>
                   {effectiveIsAdmin && (
-                    <span className="px-2 py-0.5 text-xs font-bold text-white bg-[#1E60F3] rounded-full shadow-xs">
+                    <span className="px-2.5 py-0.5 text-[11px] font-bold text-[#0055FF] bg-[#EBF3FF] rounded-full">
                       공통 거점으로 등록
                     </span>
                   )}
@@ -1020,16 +1020,16 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                   <button
                     type="button"
                     onClick={handleCancelForm}
-                    className="text-[11px] font-bold text-slate-400 hover:text-rose-500 transition-colors cursor-pointer"
+                    className="text-[12px] font-bold text-slate-400 hover:text-rose-500 transition-colors cursor-pointer"
                   >
                     수정 취소
                   </button>
                 )}
               </div>
 
-              {/* [태스크 2] 1. Real-time Search Bar (text-lg 인풋, w-5 h-5 돋보기, placeholder:text-base) */}
+              {/* 1. Real-time Search Bar */}
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">
+                <label className="block text-[13px] font-bold text-slate-700 mb-1.5">
                   장소 검색
                 </label>
                 <div className="relative">
@@ -1048,18 +1048,18 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                       }
                     }}
                     placeholder="장소명 또는 주소를 검색하세요 (예: 인천공항, 코엑스)"
-                    className="w-full pl-11 pr-10 py-2.5 sm:py-3 bg-white border border-slate-200 rounded-xl text-slate-800 text-sm font-medium placeholder:text-sm placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] transition-colors"
+                    className="w-full pl-11 pr-10 py-3.5 bg-white border border-slate-100/90 rounded-2xl shadow-[0_2px_10px_rgba(15,23,42,0.04)] text-slate-800 text-[15px] font-medium placeholder:text-[14px] placeholder:text-slate-400 focus:outline-none focus:border-[#0055FF] transition-all"
                   />
-                  <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-3 sm:top-3.5" />
+                  <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
                   {isSearching && (
-                    <Loader2 className="w-5 h-5 text-[#1E60F3] animate-spin absolute right-3.5 top-3 sm:top-3.5" />
+                    <Loader2 className="w-4 h-4 text-[#0055FF] animate-spin absolute right-4 top-1/2 -translate-y-1/2" />
                   )}
                 </div>
 
-                {/* Autocomplete Results Dropdown (text-base font-semibold) */}
+                {/* Autocomplete Results Dropdown */}
                 {isDropdownOpen && searchResults.length > 0 && (
-                  <div className="mt-2 border border-slate-200 rounded-xl bg-white shadow-lg max-h-48 overflow-y-auto divide-y divide-slate-100 overscroll-contain">
-                    <div className="p-2 text-[10px] font-bold text-slate-400 bg-slate-50 uppercase">
+                  <div className="mt-2 border border-slate-100 rounded-2xl bg-white shadow-[0_8px_24px_rgba(15,23,42,0.08)] max-h-48 overflow-y-auto divide-y divide-slate-100 overscroll-contain">
+                    <div className="px-3.5 py-2 text-[11px] font-bold text-slate-400 bg-slate-50/70">
                       터치하여 거점 정보 자동 입력
                     </div>
                     {searchResults.map((poi, index) => (
@@ -1074,12 +1074,12 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                             handleSelectPoi(poi);
                           }
                         }}
-                        className="w-full p-2.5 text-left hover:bg-blue-50/80 active:bg-blue-100 transition-colors flex items-start gap-2.5 cursor-pointer group"
+                        className="w-full p-3 text-left hover:bg-[#EBF3FF]/60 active:bg-[#EBF3FF] transition-colors flex items-start gap-2.5 cursor-pointer group"
                       >
-                        <MapPin className="w-4 h-4 text-[#1E60F3] shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
+                        <MapPin className="w-4 h-4 text-[#0055FF] shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
                         <div className="min-w-0 flex-1">
-                          <div className="text-base font-semibold text-slate-900 truncate">{poi.name}</div>
-                          <div className="text-sm text-slate-500 truncate mt-0.5">{poi.address}</div>
+                          <div className="text-[14px] font-bold text-slate-900 truncate">{poi.name}</div>
+                          <div className="text-[12px] text-slate-500 truncate mt-0.5">{poi.address}</div>
                         </div>
                       </div>
                     ))}
@@ -1091,10 +1091,10 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
               </div>
 
               {/* 2 & 3. Name Inputs & Action Bar */}
-              <form onSubmit={handleSubmit} className="space-y-2.5">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <form onSubmit={handleSubmit} className="space-y-3.5">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">
+                    <label className="block text-[13px] font-bold text-slate-700 mb-1.5">
                       거점 이름
                     </label>
                     <input
@@ -1102,13 +1102,13 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                       required
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder="검색 결과에서 장소를 선택하세요"
-                      className="w-full px-3.5 py-3 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder:text-sm placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3]"
+                      placeholder="검색 결과에서 선택"
+                      className="w-full px-4 py-3.5 bg-white border border-slate-100/90 rounded-2xl shadow-[0_2px_10px_rgba(15,23,42,0.04)] text-[14px] font-bold text-slate-900 placeholder:text-[13px] placeholder:text-slate-400 focus:outline-none focus:border-[#0055FF] transition-all"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">
+                    <label className="block text-[13px] font-bold text-slate-700 mb-1.5">
                       표시 이름 (최대 8자)
                     </label>
                     <input
@@ -1118,27 +1118,27 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                       onChange={(e) => setShortName(e.target.value)}
                       placeholder="예: 소노펠리체"
                       maxLength={12}
-                      className="w-full px-3.5 py-3 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-900 placeholder:text-sm placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3]"
+                      className="w-full px-4 py-3.5 bg-white border border-slate-100/90 rounded-2xl shadow-[0_2px_10px_rgba(15,23,42,0.04)] text-[14px] font-bold text-slate-900 placeholder:text-[13px] placeholder:text-slate-400 focus:outline-none focus:border-[#0055FF] transition-all"
                     />
                   </div>
                 </div>
 
                 {/* 4. Action Bar */}
-                <div className="flex items-center gap-2 pt-1">
+                <div className="flex items-center gap-2.5 pt-1">
                   <button
                     type="button"
                     onClick={handleCancelForm}
-                    className="w-1/3 py-3 rounded-xl bg-slate-200/80 hover:bg-slate-300 text-slate-700 text-sm font-bold active:scale-95 transition cursor-pointer"
+                    className="w-[34%] py-3.5 rounded-2xl bg-[#EEF2F7] hover:bg-slate-200 text-slate-600 text-[15px] font-bold active:scale-95 transition cursor-pointer"
                   >
                     취소
                   </button>
                   <button
                     type="submit"
                     disabled={lat === null || !name.trim() || isSaveSuccess}
-                    className={`w-2/3 py-3 rounded-xl text-white text-sm font-black shadow-xs transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1.5 ${
+                    className={`flex-1 py-3.5 rounded-2xl text-white text-[15px] font-bold shadow-[0_4px_14px_rgba(0,85,255,0.22)] transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1.5 ${
                       isSaveSuccess
-                        ? 'bg-[#1E60F3] shadow-[0_0_15px_rgba(30,96,243,0.35)]'
-                        : 'bg-[#1E60F3] hover:bg-[#1346D8] disabled:opacity-40'
+                        ? 'bg-[#0055FF]'
+                        : 'bg-[#0055FF] hover:bg-[#0044CC] disabled:opacity-40'
                     }`}
                   >
                     {isSaveSuccess && <Check className="w-4 h-4 stroke-[2.5] animate-in zoom-in duration-150" />}
@@ -1149,9 +1149,9 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
             </div>
           ) : (
             /* Home Mode Standalone Registration Form */
-            <div className="space-y-4">
+            <div className="p-5 rounded-3xl bg-white border border-slate-100/90 shadow-[0_4px_20px_rgba(15,23,42,0.04)] space-y-4">
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                <label className="block text-[13px] font-bold text-slate-700 mb-1.5">
                   장소 검색 (실시간 추천)
                 </label>
                 <div className="relative">
@@ -1170,18 +1170,18 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                       }
                     }}
                     placeholder="장소명 또는 주소 검색 (예: 자택 아파트명, 도로명)"
-                    className="w-full pl-11 pr-10 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-lg font-medium placeholder:text-base placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] focus:bg-white transition-colors"
+                    className="w-full pl-11 pr-10 py-3.5 bg-white border border-slate-100/90 rounded-2xl shadow-[0_2px_10px_rgba(15,23,42,0.04)] text-slate-800 text-[15px] font-medium placeholder:text-[14px] placeholder:text-slate-400 focus:outline-none focus:border-[#0055FF] transition-all"
                     autoFocus={!isHomeEditMode}
                   />
-                  <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-3.5" />
+                  <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
                   {isSearching && (
-                    <Loader2 className="w-5 h-5 text-[#1E60F3] animate-spin absolute right-3.5 top-3.5" />
+                    <Loader2 className="w-4 h-4 text-[#0055FF] animate-spin absolute right-4 top-1/2 -translate-y-1/2" />
                   )}
                 </div>
 
                 {isDropdownOpen && searchResults.length > 0 && (
-                  <div className="mt-2 border border-slate-200 rounded-xl bg-white shadow-lg max-h-52 overflow-y-auto divide-y divide-slate-100 overscroll-contain">
-                    <div className="p-2 text-[10px] font-bold text-slate-400 bg-slate-50 uppercase">
+                  <div className="mt-2 border border-slate-100 rounded-2xl bg-white shadow-[0_8px_24px_rgba(15,23,42,0.08)] max-h-52 overflow-y-auto divide-y divide-slate-100 overscroll-contain">
+                    <div className="px-3.5 py-2 text-[11px] font-bold text-slate-400 bg-slate-50/70">
                       터치하여 자택 주소 입력
                     </div>
                     {searchResults.map((poi, index) => (
@@ -1196,12 +1196,12 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                             handleSelectPoi(poi);
                           }
                         }}
-                        className="w-full p-2.5 text-left hover:bg-blue-50/80 active:bg-blue-100 transition-colors flex items-start space-x-2.5 cursor-pointer group"
+                        className="w-full p-3 text-left hover:bg-[#EBF3FF]/60 active:bg-[#EBF3FF] transition-colors flex items-start space-x-2.5 cursor-pointer group"
                       >
-                        <MapPin className="w-4 h-4 text-[#1E60F3] shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
+                        <MapPin className="w-4 h-4 text-[#0055FF] shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
                         <div className="min-w-0 flex-1">
-                          <div className="text-base font-semibold text-slate-900 truncate">{poi.name}</div>
-                          <div className="text-sm text-slate-500 truncate mt-0.5">{poi.address}</div>
+                          <div className="text-[14px] font-bold text-slate-900 truncate">{poi.name}</div>
+                          <div className="text-[12px] text-slate-500 truncate mt-0.5">{poi.address}</div>
                         </div>
                       </div>
                     ))}
@@ -1212,9 +1212,9 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                 )}
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-3 pt-2 border-t border-slate-100">
+              <form onSubmit={handleSubmit} className="space-y-3.5">
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">
+                  <label className="block text-[13px] font-bold text-slate-700 mb-1.5">
                     자택 명칭
                   </label>
                   <input
@@ -1223,7 +1223,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="예: 자택, 우리집"
-                    className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200 rounded-xl text-lg font-bold text-slate-900 placeholder:text-base placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:bg-white"
+                    className="w-full px-4 py-3.5 bg-white border border-slate-100/90 rounded-2xl shadow-[0_2px_10px_rgba(15,23,42,0.04)] text-[14px] font-bold text-slate-900 placeholder:text-[13px] placeholder:text-slate-400 focus:outline-none focus:border-[#0055FF]"
                   />
                   {recommendations.length > 0 && (
                     <div className="flex items-center gap-1.5 mt-2 flex-wrap">
@@ -1233,10 +1233,11 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                           key={chip}
                           type="button"
                           onClick={() => setName(chip)}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${name === chip
-                            ? 'bg-blue-50 text-[#1E60F3] border-blue-200'
-                            : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                            }`}
+                          className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer ${
+                            name === chip
+                              ? 'bg-[#EBF3FF] text-[#0055FF] border-blue-200'
+                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                          }`}
                         >
                           {chip}
                         </button>
@@ -1245,7 +1246,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                   )}
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1">
+                  <label className="block text-[13px] font-bold text-slate-700 mb-1.5">
                     자택 상세 주소
                   </label>
                   <input
@@ -1254,25 +1255,25 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
                     placeholder="검색 결과에서 선택하거나 입력하세요"
-                    className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200 rounded-xl text-lg font-medium text-slate-900 placeholder:text-base placeholder:text-slate-400 focus:outline-none focus:border-blue-600 focus:bg-white"
+                    className="w-full px-4 py-3.5 bg-white border border-slate-100/90 rounded-2xl shadow-[0_2px_10px_rgba(15,23,42,0.04)] text-[14px] font-medium text-slate-900 placeholder:text-[13px] placeholder:text-slate-400 focus:outline-none focus:border-[#0055FF]"
                   />
                 </div>
 
-                <div className="pt-2 flex items-center space-x-2">
+                <div className="pt-1 flex items-center gap-2.5">
                   <button
                     type="button"
                     onClick={onClose}
-                    className="w-1/3 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold active:scale-95 transition cursor-pointer"
+                    className="w-[34%] py-3.5 rounded-2xl bg-[#EEF2F7] hover:bg-slate-200 text-slate-600 text-[15px] font-bold active:scale-95 transition cursor-pointer"
                   >
                     취소
                   </button>
                   <button
                     type="submit"
                     disabled={lat === null || !name.trim() || isSaveSuccess}
-                    className={`w-2/3 py-3 rounded-xl text-white text-sm font-black shadow-xs transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1.5 ${
+                    className={`flex-1 py-3.5 rounded-2xl text-white text-[15px] font-bold shadow-[0_4px_14px_rgba(0,85,255,0.22)] transition-all active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1.5 ${
                       isSaveSuccess
-                        ? 'bg-[#1E60F3] shadow-[0_0_15px_rgba(30,96,243,0.35)]'
-                        : 'bg-[#1E60F3] hover:bg-[#1346D8] disabled:opacity-40'
+                        ? 'bg-[#0055FF]'
+                        : 'bg-[#0055FF] hover:bg-[#0044CC] disabled:opacity-40'
                     }`}
                   >
                     {isSaveSuccess && <Check className="w-4 h-4 stroke-[2.5] animate-in zoom-in duration-150" />}
@@ -1287,13 +1288,13 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
           {/* [태스크 3, 4, 5] 4행 3열(12슬롯) 캐러셀 & 롱프레스 스무스 리오더링 */}
           {/* ========================================================= */}
           {!isHomeMode && (
-            <div className="space-y-2 pt-2 border-t border-slate-100">
-              <div className="flex items-center justify-between text-sm font-bold text-slate-700 px-2.5">
-                <span className="flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-[#1E60F3]" />
+            <div className="space-y-3 pt-1">
+              <div className="flex items-center justify-between px-1">
+                <span className="flex items-center gap-1.5 text-[15px] font-black text-slate-900">
+                  <MapPin className="w-4 h-4 text-[#0055FF]" />
                   <span>자주 가는 장소</span>
                 </span>
-                <span className="text-[10px] text-slate-400 font-medium">
+                <span className="text-[12px] text-slate-400 font-medium">
                   길게 눌러 순서를 변경하세요
                 </span>
               </div>
@@ -1311,8 +1312,8 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                   style={{ transform: `translateX(-${currentPage * 100}%)` }}
                 >
                   {pages.map((pageSlots, pageIdx) => (
-                    <div key={pageIdx} className="w-full shrink-0 px-2.5 pt-2.5 pb-2">
-                      <div className="grid grid-cols-3 gap-2 content-start">
+                    <div key={pageIdx} className="w-full shrink-0 px-0.5 pt-1 pb-2">
+                      <div className="grid grid-cols-3 gap-2.5 content-start">
                         {pageSlots.map((slot) => {
                           // 1. Home Slot (Pinned at Slot 1 of Page 0)
                           if (slot.type === 'home') {
@@ -1325,19 +1326,18 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                                     onOpenHomeModal();
                                   }
                                 }}
-                                className="min-h-[64px] p-2.5 rounded-2xl border text-center flex flex-col justify-center items-center transition-all duration-150 active:scale-95 group shadow-2xs bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/80 cursor-pointer"
+                                className="min-h-[68px] py-3 px-2.5 rounded-2xl border text-center flex flex-col justify-center items-center transition-all duration-150 active:scale-95 group bg-white border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)] hover:border-blue-200 cursor-pointer"
                                 title={homeLocation?.name ? `자택: ${homeLocation.name}` : '자택 등록'}
                               >
                                 <div className="flex items-center justify-center gap-1.5 w-full min-w-0">
-                                  <Home className="w-3.5 h-3.5 text-slate-500 shrink-0 group-hover:text-[#1E60F3]" />
-                                  <span className="text-sm font-bold tracking-tight text-slate-800 truncate">
+                                  <Home className="w-4 h-4 text-slate-500 shrink-0 group-hover:text-[#0055FF]" />
+                                  <span className="text-[15px] font-black tracking-tight text-slate-900 truncate">
                                     자택
                                   </span>
                                 </div>
-                                <span className="text-[11px] font-medium text-slate-400 group-hover:text-slate-600 truncate w-full mt-1">
+                                <span className="text-[12px] font-medium text-slate-400 group-hover:text-slate-600 truncate w-full mt-1 leading-none">
                                   {homeLocation?.name ? homeLocation.name : '등록 필요'}
                                 </span>
-                                {/* [태스크 4] 자택 전용 뱃지 완전히 제거됨 */}
                               </div>
                             );
                           }
@@ -1374,12 +1374,13 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                                 onClearHighlight?.();
                                 handleCardClick(preset);
                               }}
-                              className={`relative min-h-[64px] p-2.5 rounded-2xl border text-center flex flex-col justify-between items-center transition-all duration-300 select-none group shadow-2xs cursor-grab active:cursor-grabbing will-change-transform ${isBeingDragged
-                                ? 'scale-105 shadow-xl ring-2 ring-[#1E60F3]/40 z-30 opacity-90 border-2 border-[#1E60F3] bg-blue-50/50'
-                                : isNewlyAdded
-                                ? 'bg-blue-50/40 border-2 border-dashed border-[#1E60F3] shadow-[0_0_12px_rgba(30,96,243,0.22)]'
-                                : 'bg-white border-slate-200 hover:border-[#1E60F3]/60 hover:bg-blue-50/20 active:scale-95'
-                                }`}
+                              className={`relative min-h-[68px] py-3 px-2.5 rounded-2xl border text-center flex flex-col justify-center items-center transition-all duration-300 select-none group cursor-grab active:cursor-grabbing will-change-transform ${
+                                isBeingDragged
+                                  ? 'scale-105 shadow-xl ring-2 ring-[#0055FF]/40 z-30 opacity-90 border-2 border-[#0055FF] bg-[#EBF3FF]/60'
+                                  : isNewlyAdded
+                                    ? 'bg-[#EBF3FF]/40 border-2 border-dashed border-[#0055FF] shadow-[0_0_12px_rgba(0,85,255,0.22)]'
+                                    : 'bg-white border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)] hover:border-blue-200 active:scale-95'
+                              }`}
                               style={{
                                 transition: isBeingDragged ? 'none' : 'transform 300ms cubic-bezier(0.2, 0, 0, 1), box-shadow 200ms ease',
                                 touchAction: isBeingDragged ? 'none' : 'manipulation',
@@ -1409,22 +1410,22 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                                     ⤳
                                   </span>
                                 )}
-                                <span className="text-sm font-bold tracking-tight text-slate-800 group-hover:text-[#1E60F3] truncate transition-colors">
+                                <span className="text-[15px] font-black tracking-tight text-slate-900 group-hover:text-[#0055FF] truncate transition-colors">
                                   {preset.shortName || preset.name}
                                 </span>
                               </div>
 
                               {/* Badge: 공통 vs 개인 vs 경로 */}
                               {isViaPreset ? (
-                                <span className="text-[10px] sm:text-xs font-semibold text-amber-600 mt-0.5 leading-none">
+                                <span className="text-[12px] font-semibold text-amber-600 mt-1 leading-none">
                                   경유
                                 </span>
                               ) : isDefault ? (
-                                <span className="text-[10px] sm:text-xs font-medium text-slate-400 mt-0.5 leading-none">
+                                <span className="text-[12px] font-medium text-slate-400 mt-1 leading-none">
                                   공통
                                 </span>
                               ) : (
-                                <span className="text-[10px] sm:text-xs font-medium text-blue-600 mt-0.5 leading-none">
+                                <span className="text-[12px] font-medium text-[#0055FF] mt-1 leading-none">
                                   개인
                                 </span>
                               )}
@@ -1438,7 +1439,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
               </div>
 
               {/* [태스크 5] 시그니처 도트 인디케이터 상시 노출 (1페이지 포함) */}
-              <div className="flex items-center justify-center gap-1.5 pt-3 pb-1">
+              <div className="flex items-center justify-center gap-1.5 pt-2 pb-1">
                 {Array.from({ length: totalPages }).map((_, idx) => {
                   const isActive = idx === currentPage;
                   return (
@@ -1460,10 +1461,11 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                         }
                       }}
                       aria-label={`페이지 ${idx + 1}`}
-                      className={`h-2 rounded-full transition-all duration-300 cursor-pointer focus:outline-none ${isActive
-                        ? 'w-6 bg-[#1E60F3] shadow-[0_2px_8px_rgba(30,96,243,0.35)]'
-                        : 'w-2 bg-slate-300 hover:bg-slate-400'
-                        }`}
+                      className={`h-2 rounded-full transition-all duration-300 cursor-pointer focus:outline-none ${
+                        isActive
+                          ? 'w-7 bg-[#0055FF]'
+                          : 'w-2 bg-slate-300 hover:bg-slate-400'
+                      }`}
                     />
                   );
                 })}
@@ -1477,7 +1479,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
         {/* ========================================================= */}
         {isDragging && draggedPreset && (
           <div
-            className="fixed z-[150] pointer-events-none -translate-x-1/2 -translate-y-1/2 will-change-transform shadow-2xl rounded-2xl bg-white border-2 border-[#1E60F3] ring-2 ring-[#1E60F3]/40 px-4 py-2.5 flex items-center justify-center scale-105 opacity-95 transition-transform duration-100 ease-out"
+            className="fixed z-[150] pointer-events-none -translate-x-1/2 -translate-y-1/2 will-change-transform shadow-2xl rounded-2xl bg-white border-2 border-[#0055FF] ring-2 ring-[#0055FF]/40 px-4 py-2.5 flex items-center justify-center scale-105 opacity-95 transition-transform duration-100 ease-out"
             style={{
               left: `${pointerPos.x}px`,
               top: `${pointerPos.y}px`,

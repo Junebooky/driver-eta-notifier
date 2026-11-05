@@ -19,7 +19,7 @@ interface GasStationModalProps {
 
 type SortFilter = 'FASTEST' | 'CHEAPEST';
 
-// [태스크 1] 5대 정유사 28x28px 공식 브랜드 컬러 원형 텍스트 뱃지
+// [태스크 1] 5대 정유사 36x36px 공식 브랜드 컬러 원형 텍스트 뱃지
 const BrandEmblem: React.FC<{ brandCode: string; brandName: string }> = ({ brandCode, brandName }) => {
   const code = (brandCode || '').toUpperCase();
 
@@ -27,7 +27,7 @@ const BrandEmblem: React.FC<{ brandCode: string; brandName: string }> = ({ brand
     // SK에너지: 공식 레드 배경(#E11932) + 화이트 텍스트 SK
     return (
       <div
-        className="w-7 h-7 rounded-full bg-[#E11932] flex items-center justify-center text-white text-[11px] font-black shrink-0 shadow-2xs select-none"
+        className="w-9 h-9 rounded-full bg-[#E11932] flex items-center justify-center text-white text-[12px] font-black shrink-0 shadow-2xs select-none"
         title="SK에너지"
       >
         SK
@@ -39,7 +39,7 @@ const BrandEmblem: React.FC<{ brandCode: string; brandName: string }> = ({ brand
     // GS칼텍스: 공식 딥 틸 배경(#007F74) + 화이트 텍스트 GS
     return (
       <div
-        className="w-7 h-7 rounded-full bg-[#007F74] flex items-center justify-center text-white text-[11px] font-black shrink-0 shadow-2xs select-none"
+        className="w-9 h-9 rounded-full bg-[#007F74] flex items-center justify-center text-white text-[12px] font-black shrink-0 shadow-2xs select-none"
         title="GS칼텍스"
       >
         GS
@@ -51,7 +51,7 @@ const BrandEmblem: React.FC<{ brandCode: string; brandName: string }> = ({ brand
     // S-OIL: 공식 옐로우 배경(#FFC20E) + 포레스트 그린 텍스트 S-OIL
     return (
       <div
-        className="w-7 h-7 rounded-full bg-[#FFC20E] flex items-center justify-center text-[#00873C] text-[9px] font-black tracking-tighter shrink-0 shadow-2xs select-none"
+        className="w-9 h-9 rounded-full bg-[#FFC20E] flex items-center justify-center text-[#00873C] text-[10px] font-black tracking-tighter shrink-0 shadow-2xs select-none"
         title="S-OIL"
       >
         S-OIL
@@ -63,7 +63,7 @@ const BrandEmblem: React.FC<{ brandCode: string; brandName: string }> = ({ brand
     // HD현대오일뱅크: 공식 딥 네이비 배경(#002C5F) + 화이트 텍스트 HD
     return (
       <div
-        className="w-7 h-7 rounded-full bg-[#002C5F] flex items-center justify-center text-white text-[11px] font-black shrink-0 shadow-2xs select-none"
+        className="w-9 h-9 rounded-full bg-[#002C5F] flex items-center justify-center text-white text-[12px] font-black shrink-0 shadow-2xs select-none"
         title="HD현대오일뱅크"
       >
         HD
@@ -75,7 +75,7 @@ const BrandEmblem: React.FC<{ brandCode: string; brandName: string }> = ({ brand
     // 알뜰 / EX-OIL: 한국도로공사 공식 오렌지 배경(#F37021) + 화이트 텍스트 알뜰
     return (
       <div
-        className="w-7 h-7 rounded-full bg-[#F37021] flex items-center justify-center text-white text-[10px] font-bold shrink-0 shadow-2xs select-none"
+        className="w-9 h-9 rounded-full bg-[#F37021] flex items-center justify-center text-white text-[11px] font-bold shrink-0 shadow-2xs select-none"
         title={brandName || '알뜰주유소'}
       >
         알뜰
@@ -86,10 +86,10 @@ const BrandEmblem: React.FC<{ brandCode: string; brandName: string }> = ({ brand
   // 기타/자가상표: 슬레이트 그레이 배경(#64748B) + 화이트 주유기 아이콘
   return (
     <div
-      className="w-7 h-7 rounded-full bg-slate-500 flex items-center justify-center text-white shrink-0 shadow-2xs select-none"
+      className="w-9 h-9 rounded-full bg-slate-500 flex items-center justify-center text-white shrink-0 shadow-2xs select-none"
       title={brandName || '주유소'}
     >
-      <Fuel className="w-3.5 h-3.5 text-white" />
+      <Fuel className="w-4 h-4 text-white" />
     </div>
   );
 };
@@ -289,7 +289,7 @@ export const GasStationModal: React.FC<GasStationModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center pt-[6vh] sm:items-center sm:pt-0 p-3 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           onClose();
@@ -297,45 +297,54 @@ export const GasStationModal: React.FC<GasStationModalProps> = ({
       }}
     >
       <div
-        className="w-full max-w-sm bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-hidden text-slate-900 flex flex-col max-h-[88vh]"
+        className="w-full max-w-md bg-[#F6F8FC] border border-slate-100 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden text-slate-900 flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* [태스크 2] Header: 코발트 블루 스쿼클 아이콘 & 외부 API 브랜딩 전면 제거 */}
-        <div className="p-4 bg-gradient-to-b from-slate-50 to-white border-b border-slate-100 flex items-center justify-between shrink-0">
+        {/* [태스크 2] Header: 주유소 아이콘 유지 & 깔끔한 모달 헤더 */}
+        <div className="px-5 py-4 bg-[#F6F8FC] border-b border-slate-200/60 flex items-center justify-between shrink-0">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-2xl bg-[#1E60F3] flex items-center justify-center shadow-md shadow-blue-500/20 text-white shrink-0">
-              <Fuel className="w-5 h-5 text-white" />
-            </div>
+            <img
+              src="/images/icons/expense_driver/icon-expense-fuel.png"
+              alt="주유소 아이콘"
+              className="w-11 h-11 sm:w-12 sm:h-12 object-contain shrink-0 select-none"
+              draggable={false}
+            />
             <div>
-              <h3 className="text-sm font-black text-slate-900">실시간 주유소 추천</h3>
-              <p className="text-[11px] text-slate-400 font-medium">반경 3km 실시간 유가 및 주행 소요 시간</p>
+              <h3 className="text-[18px] font-black text-slate-900 tracking-tight leading-tight">실시간 주유소 추천</h3>
+              <p className="text-[12px] text-slate-500 font-medium mt-0.5">반경 3km 내 가장 저렴한 주유소와 도착 시간</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 cursor-pointer transition-colors"
+            className="w-9 h-9 rounded-full bg-slate-200/60 hover:bg-slate-200 flex items-center justify-center text-slate-600 cursor-pointer transition-colors"
+            title="닫기"
+            aria-label="닫기"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Filter Controls: [⚡ 가장 빠른 곳] vs [💰 최저가 순] (공급자 명칭 제거) */}
-        <div className="px-4 py-3 bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-1.5">
+        {/* Filter Controls: [⚡ 가장 빠른 곳] vs [₩ 최저가 순] */}
+        <div className="px-5 pt-4 pb-2 bg-[#F6F8FC] flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => {
                 haptics.lightTap();
                 setSortFilter('FASTEST');
               }}
-              className={`px-3 py-1.5 rounded-xl text-sm font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+              className={`px-4 py-2.5 rounded-full text-[14px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                 sortFilter === 'FASTEST'
-                  ? 'bg-[#1E60F3] text-white shadow-2xs'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  ? 'bg-[#0055FF] text-white shadow-[0_4px_12px_rgba(0,85,255,0.22)]'
+                  : 'bg-[#EEF2F8] text-slate-600 hover:bg-slate-200/80'
               }`}
             >
-              <Zap className="w-3.5 h-3.5 text-yellow-300 fill-yellow-300" />
+              <Zap
+                className={`w-4 h-4 ${
+                  sortFilter === 'FASTEST' ? 'text-[#FFE600] fill-[#FFE600]' : 'text-slate-500'
+                }`}
+              />
               <span>가장 빠른 곳</span>
             </button>
             <button
@@ -344,13 +353,13 @@ export const GasStationModal: React.FC<GasStationModalProps> = ({
                 haptics.lightTap();
                 setSortFilter('CHEAPEST');
               }}
-              className={`px-3 py-1.5 rounded-xl text-sm font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+              className={`px-4 py-2.5 rounded-full text-[14px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                 sortFilter === 'CHEAPEST'
-                  ? 'bg-[#1E60F3] text-white shadow-2xs'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  ? 'bg-[#0055FF] text-white shadow-[0_4px_12px_rgba(0,85,255,0.22)]'
+                  : 'bg-[#EEF2F8] text-slate-600 hover:bg-slate-200/80'
               }`}
             >
-              <DollarSign className="w-3.5 h-3.5" />
+              <span className="font-black text-[14px] leading-none">₩</span>
               <span>최저가 순</span>
             </button>
           </div>
@@ -359,37 +368,37 @@ export const GasStationModal: React.FC<GasStationModalProps> = ({
             type="button"
             onClick={() => acquireLocationAndFetch(true)}
             disabled={isLoading}
-            className="p-2 text-slate-400 hover:text-slate-700 rounded-xl hover:bg-slate-100 cursor-pointer disabled:opacity-50 transition-colors"
+            className="w-9 h-9 flex items-center justify-center text-slate-500 hover:text-slate-800 rounded-full hover:bg-slate-200/60 cursor-pointer disabled:opacity-50 transition-colors"
             title="새로고침"
           >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-[#1E60F3]' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-[#0055FF]' : ''}`} />
           </button>
         </div>
 
         {/* Station Card List */}
-        <div className="p-3.5 overflow-y-auto space-y-3 flex-1 overscroll-contain">
+        <div className="px-5 py-3 overflow-y-auto space-y-3.5 flex-1 overscroll-contain">
           {isLoading ? (
-            <div className="py-14 flex flex-col items-center justify-center space-y-2.5 text-slate-400">
-              <RefreshCw className="w-7 h-7 animate-spin text-[#1E60F3]" />
-              <p className="text-sm font-bold text-slate-700">인근 주유소 및 실시간 경로 분석 중...</p>
-              <p className="text-[11px] text-slate-400">3대 유종 유가 및 도로 교통정보 결합 중</p>
+            <div className="py-16 flex flex-col items-center justify-center space-y-2.5 text-slate-400 bg-white rounded-3xl border border-slate-100/90 shadow-[0_4px_16px_rgba(15,23,42,0.04)]">
+              <RefreshCw className="w-7 h-7 animate-spin text-[#0055FF]" />
+              <p className="text-[14px] font-bold text-slate-700">인근 주유소 및 실시간 경로 분석 중...</p>
+              <p className="text-[12px] text-slate-400">3대 유종 유가 및 도로 교통정보 결합 중</p>
             </div>
           ) : errorMsg ? (
-            <div className="py-12 text-center space-y-2">
+            <div className="py-14 text-center space-y-2 bg-white rounded-3xl border border-slate-100/90 shadow-[0_4px_16px_rgba(15,23,42,0.04)]">
               <AlertCircle className="w-7 h-7 text-rose-500 mx-auto" />
-              <p className="text-sm font-bold text-slate-700">{errorMsg}</p>
+              <p className="text-[14px] font-bold text-slate-700">{errorMsg}</p>
               <button
                 type="button"
                 onClick={() => acquireLocationAndFetch(true)}
-                className="text-sm text-[#1E60F3] font-bold underline cursor-pointer"
+                className="text-[14px] text-[#0055FF] font-bold underline cursor-pointer"
               >
                 다시 시도
               </button>
             </div>
           ) : sortedStations.length === 0 ? (
-            <div className="py-14 text-center text-slate-400 space-y-1">
-              <p className="text-sm font-bold text-slate-600">인근에 검색된 주유소가 없습니다.</p>
-              <p className="text-[11px]">잠시 후 다시 새로고침해 주세요.</p>
+            <div className="py-14 text-center text-slate-400 space-y-1 bg-white rounded-3xl border border-slate-100/90 shadow-[0_4px_16px_rgba(15,23,42,0.04)]">
+              <p className="text-[14px] font-bold text-slate-600">인근에 검색된 주유소가 없습니다.</p>
+              <p className="text-[12px]">잠시 후 다시 새로고침해 주세요.</p>
             </div>
           ) : (
             sortedStations.map((station, idx) => {
@@ -399,70 +408,80 @@ export const GasStationModal: React.FC<GasStationModalProps> = ({
                 <div
                   key={station.id}
                   onClick={() => handleCardClick(station)}
-                  className={`p-3.5 rounded-2xl border transition-all cursor-pointer active:scale-[0.98] ${
-                    isBest
-                      ? 'bg-blue-50/40 border-blue-200 shadow-xs hover:border-blue-300'
-                      : 'bg-white hover:bg-slate-50/80 border-slate-200/80 shadow-2xs'
-                  }`}
+                  className="p-4 rounded-3xl bg-white border border-slate-100/90 shadow-[0_4px_16px_rgba(15,23,42,0.04)] hover:border-blue-200 transition-all cursor-pointer active:scale-[0.99]"
                 >
-                  {/* Top Row: [태스크 1] 28x28px 공식 브랜드 원형 텍스트 뱃지 + 주유소 상호명 + 추천 배지 */}
+                  {/* Top Row: 공식 브랜드 원형 텍스트 뱃지 + 주유소 상호명 + 실시간 최저 배지 */}
                   <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center space-x-2 min-w-0 flex-1">
+                    <div className="flex items-center space-x-2.5 min-w-0 flex-1">
                       <BrandEmblem brandCode={station.brandCode} brandName={station.brandName} />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <h4 className="text-sm font-black text-slate-900 truncate">{station.name}</h4>
-                          {isBest && (
-                            <span className="text-[10px] font-extrabold bg-[#1E60F3] text-white px-1.5 py-0.2 rounded-md shrink-0">
-                              {sortFilter === 'FASTEST' ? '최단 시간' : '최저가'}
-                            </span>
-                          )}
-                        </div>
+                      <div className="min-w-0 flex-1 flex items-center gap-2">
+                        <h4 className="text-[16px] font-black text-slate-900 truncate tracking-tight">
+                          {station.name}
+                        </h4>
+                        {isBest && (
+                          <span className="text-[11px] font-extrabold bg-[#EBF3FF] text-[#0055FF] px-2.5 py-1 rounded-full shrink-0">
+                            실시간 최저
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  {/* [태스크 2] 3대 유종 올인원 가격 스트립 (순서: 휘발유 ➔ 경유 ➔ 고급휘발유) */}
-                  <div className="mt-2.5 pt-2 border-t border-slate-100 grid grid-cols-3 divide-x divide-slate-100 text-center bg-slate-50/80 py-1.5 px-1 rounded-xl">
+                  {/* 3대 유종 올인원 가격 스트립 (휘발유 ➔ 경유 ➔ 고급휘발유) */}
+                  <div className="mt-3.5 grid grid-cols-3 divide-x divide-slate-200/70 text-center bg-[#F8FAFC] py-3 px-1 rounded-2xl">
                     <div className="px-1">
-                      <span className="block text-[10px] font-bold text-slate-400">휘발유</span>
-                      <span className="text-sm font-black text-slate-800">
+                      <span className="block text-[12px] font-semibold text-slate-400 mb-1">휘발유</span>
+                      <span className="text-[16px] font-black text-slate-900 tracking-tight">
                         {station.prices?.gasoline ? `${station.prices.gasoline.toLocaleString()}원` : '-'}
                       </span>
                     </div>
                     <div className="px-1">
-                      <span className="block text-[10px] font-bold text-slate-400">경유</span>
-                      <span className="text-sm font-black text-slate-800">
+                      <span className="block text-[12px] font-semibold text-slate-400 mb-1">경유</span>
+                      <span className="text-[16px] font-black text-slate-900 tracking-tight">
                         {station.prices?.diesel ? `${station.prices.diesel.toLocaleString()}원` : '-'}
                       </span>
                     </div>
                     <div className="px-1">
-                      <span className="block text-[10px] font-bold text-slate-400">고급휘발유</span>
-                      <span className="text-sm font-black text-slate-800">
+                      <span className="block text-[12px] font-semibold text-slate-400 mb-1">고급휘발유</span>
+                      <span className="text-[16px] font-black text-slate-900 tracking-tight">
                         {station.prices?.premiumGasoline ? `${station.prices.premiumGasoline.toLocaleString()}원` : '-'}
                       </span>
                     </div>
                   </div>
 
-                  {/* [태스크 3] Bottom Row: 실시간 소요시간/거리 + [원스톱 내비 런처: 우상향 45도 화살표] */}
-                  <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-slate-100 text-sm">
+                  {/* Bottom Row: 실시간 소요시간/거리 + 원스톱 내비 런처 */}
+                  <div className="flex items-center justify-between mt-3.5 text-[14px]">
                     <div className="text-slate-500 font-medium flex items-center gap-1.5">
-                      <span className="font-black text-slate-900 text-sm">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="w-4 h-4 text-slate-400 shrink-0"
+                      >
+                        <circle cx="6" cy="19" r="3" />
+                        <path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15" />
+                        <circle cx="18" cy="5" r="3" />
+                      </svg>
+                      <span className="font-extrabold text-slate-900">
                         약 {station.durationMinutes}분
                       </span>
-                      <span className="text-slate-300">•</span>
-                      <span className="font-semibold text-slate-600">{station.distanceKm} km</span>
-                      <span className="text-slate-300">•</span>
-                      <span className="text-[#1E60F3] font-bold">
+                      <span className="text-slate-300">·</span>
+                      <span className="font-medium text-slate-500">{station.distanceKm} km</span>
+                      <span className="text-slate-300">·</span>
+                      <span className="text-[#0055FF] font-extrabold">
                         {getAccurateEta(station.durationMinutes)} 도착
                       </span>
                     </div>
 
-                    {/* 원형 내비 런처: 45도 우상향(북동쪽) 날렵한 화살표 */}
+                    {/* 원형 내비 런처 */}
                     <button
                       type="button"
                       onClick={(e) => handleOneStopLaunch(station, e)}
-                      className="w-10 h-10 rounded-full bg-[#1E60F3] hover:bg-[#1650D6] active:scale-90 flex items-center justify-center text-white shadow-md shadow-blue-500/20 transition-all shrink-0 cursor-pointer"
+                      className="w-11 h-11 rounded-full bg-[#0055FF] hover:bg-[#0044CC] active:scale-90 flex items-center justify-center text-white shadow-[0_4px_12px_rgba(0,85,255,0.25)] transition-all shrink-0 cursor-pointer"
                       title="단톡방 보고 복사 & 길안내 즉시 시작"
                       aria-label="길안내 시작"
                     >
@@ -476,9 +495,9 @@ export const GasStationModal: React.FC<GasStationModalProps> = ({
         </div>
 
         {/* Footer Note */}
-        <div className="p-3 bg-slate-50 border-t border-slate-100 text-center shrink-0">
+        <div className="py-3.5 px-5 bg-[#F6F8FC] border-t border-slate-200/60 text-center shrink-0">
           <p className="text-[11px] text-slate-400 font-medium">
-            카드를 터치하면 목적지로 설정되며, 우측 버튼으로 즉시 길안내를 시작합니다.
+            가격은 실시간 변동될 수 있으며, 주유소 사정에 따라 도착 시간이 달라질 수 있습니다.
           </p>
         </div>
       </div>
