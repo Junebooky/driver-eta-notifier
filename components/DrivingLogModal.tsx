@@ -13,6 +13,7 @@ import {
   ChevronDown,
   MoreHorizontal,
   Plus,
+  Minus,
   Trash2,
   CheckCircle2,
   AlertCircle,
@@ -142,6 +143,17 @@ const DrivingLogModalContent: React.FC<{
     setPickerMinute(mm || '00');
   };
 
+  useEffect(() => {
+    if (!timePickerTarget) return;
+    const timer = setTimeout(() => {
+      const hEl = document.getElementById(`wheel-hour-${clampTimeComponent(pickerHour, 23)}`);
+      const mEl = document.getElementById(`wheel-min-${clampTimeComponent(pickerMinute, 59)}`);
+      hEl?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      mEl?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [timePickerTarget]);
+
   const applyTimePicker = () => {
     if (!timePickerTarget) return;
     haptics.selection();
@@ -263,7 +275,9 @@ const DrivingLogModalContent: React.FC<{
         clockIn: logData.clockIn,
         clockOut: logData.clockOut,
         totalDutyHours: logData.totalDutyHours,
-        passengerCount:logData.passengerCount ? Number(logData.passengerCount) : undefined,
+        passengerCount: logData.passengerCount
+          ? Number(String(logData.passengerCount).replace(/[^0-9]/g, '')) || undefined
+          : undefined,
         startKm: logData.startKm,
         endKm: logData.endKm,
         distanceKm: logData.distanceKm,
@@ -413,144 +427,215 @@ const DrivingLogModalContent: React.FC<{
           </div>
         )}
 
-        {/* 2. Summary Hero Card (수행담당, 차량번호, 고객명, 담당승객 수) */}
+        {/* 2. 차량 및 수행 정보 카드 (컴팩트 틴트 배너 + 레이블/입력칸 분리) */}
         <section className="bg-white border border-slate-100 rounded-2xl shadow-[0_4px_20px_rgba(30,96,243,0.05)] overflow-hidden">
-          {/* Top Illustration Banner */}
-          <div className="relative w-full h-28 sm:h-32 bg-sky-100 overflow-hidden">
+          {/* Compact Tinted Limousine Header Strip */}
+          <div className="relative w-full h-16 sm:h-20 bg-slate-900 overflow-hidden flex items-center justify-between px-4">
             <Image
               src="/images/driving_log_hero.jpg"
               alt="VIP 의전 리무진 및 도시 전경"
               fill
               priority
               sizes="(max-width: 768px) 100vw, 500px"
-              className="object-cover object-center"
+              className="object-cover object-center opacity-55"
             />
-            {/* Subtle Gradient Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-white/70 via-transparent to-black/10" />
+            <div className="absolute inset-0 bg-gradient-to-r from-slate-950/80 via-slate-900/60 to-slate-900/40" />
+
+            <div className="relative z-10 flex items-center gap-2.5 min-w-0">
+              <div className="px-2.5 py-1 rounded-lg bg-white/15 backdrop-blur-xs border border-white/20 text-white">
+                <span className="text-[10px] text-white/75 font-medium block leading-none">수행담당</span>
+                <span className="text-xs sm:text-sm font-extrabold tracking-tight mt-0.5 block truncate">
+                  {logData.driverName}
+                </span>
+              </div>
+              <div className="px-2.5 py-1 rounded-lg bg-white/15 backdrop-blur-xs border border-white/20 text-white">
+                <span className="text-[10px] text-white/75 font-medium block leading-none">차량번호</span>
+                <span className="text-xs sm:text-sm font-extrabold tracking-tight mt-0.5 block truncate">
+                  {logData.carNumber}
+                </span>
+              </div>
+            </div>
+
+            <span className="relative z-10 text-[10px] font-bold text-white/85 bg-black/30 backdrop-blur-xs px-2 py-1 rounded-full border border-white/15 shrink-0">
+              VIP 의전 수행
+            </span>
           </div>
 
-          {/* Bottom 4 Summary Columns */}
-          <div
-            className="grid grid-cols-4 py-3.5 px-2 text-center divide-x divide-slate-100 relative group cursor-pointer"
-            onClick={() => {
-              setTempClientName(logData.clientName);
-              setTempPassengerCount(logData.passengerCount);
-              setIsEditingSummary(true);
-            }}
-            title="클릭하여 고객명/승객수 수정"
-          >
-            {/* Column 1: 수행담당 */}
-            <div className="px-1">
-              <div className="text-xs sm:text-sm font-bold text-slate-900 truncate">
-                {logData.driverName}
-              </div>
-              <div className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">수행담당</div>
+          {/* Label above, Input below: 고객명 & 탑승 인원 스테퍼 */}
+          <div className="p-3.5 sm:p-4 grid grid-cols-1 sm:grid-cols-[1fr_148px] gap-3 bg-white">
+            {/* 고객명 */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                고객명
+              </label>
+              <input
+                type="text"
+                value={logData.clientName}
+                onChange={(e) =>
+                  setLogData((prev) => ({
+                    ...prev,
+                    clientName: e.target.value,
+                  }))
+                }
+                placeholder="탑승 VIP 성함 또는 행사명"
+                className="w-full h-10 px-3.5 rounded-xl bg-slate-50/70 focus:bg-white border border-slate-200 focus:border-[#1E60F3] focus:ring-2 focus:ring-[#1E60F3]/15 text-xs sm:text-sm font-bold text-slate-900 placeholder:font-normal placeholder:text-slate-400 outline-none transition-all"
+              />
             </div>
 
-            {/* Column 2: 차량번호 */}
-            <div className="px-1">
-              <div className="text-xs sm:text-sm font-bold text-slate-900 truncate">
-                {logData.carNumber}
-              </div>
-              <div className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">차량번호</div>
-            </div>
-
-            {/* Column 3: 고객명 */}
-            <div className="px-1">
-              <div className="text-xs sm:text-sm font-bold text-slate-900 truncate flex items-center justify-center gap-0.5">
-                <span className={logData.clientName ? '' : 'text-slate-400 font-normal'}>
-                  {logData.clientName || '고객명 입력'}
-                </span>
-                <Pencil className="w-2.5 h-2.5 text-slate-300 group-hover:text-[#1E60F3] transition-colors" />
-              </div>
-              <div className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">고객명</div>
-            </div>
-
-            {/* Column 4: 담당승객 수 */}
-            <div className="px-1">
-              <div className="text-xs sm:text-sm font-bold text-slate-900 truncate flex items-center justify-center gap-0.5">
-                <span className={logData.passengerCount ? '' : 'text-slate-400 font-normal'}>
-                  {logData.passengerCount || '인원 입력'}
-                </span>
-                <Pencil className="w-2.5 h-2.5 text-slate-300 group-hover:text-[#1E60F3] transition-colors" />
-              </div>
-              <div className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">담당승객 수</div>
+            {/* 탑승 인원 (- 1명 + 스테퍼) */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                탑승 인원
+              </label>
+              {(() => {
+                const countNum = Math.max(
+                  1,
+                  parseInt(String(logData.passengerCount || '1').replace(/[^0-9]/g, ''), 10) || 1
+                );
+                return (
+                  <div className="flex items-center justify-between h-10 px-2.5 rounded-xl bg-slate-50/70 border border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        haptics.lightTap();
+                        const next = Math.max(1, countNum - 1);
+                        setLogData((prev) => ({ ...prev, passengerCount: `${next}명` }));
+                      }}
+                      disabled={countNum <= 1}
+                      aria-label="탑승 인원 감소"
+                      className="w-7 h-7 rounded-lg bg-white border border-slate-200/90 hover:bg-slate-100 text-slate-700 flex items-center justify-center cursor-pointer disabled:opacity-40 shadow-2xs transition active:scale-95"
+                    >
+                      <Minus className="w-3.5 h-3.5 stroke-[2.5]" />
+                    </button>
+                    <span className="text-xs sm:text-sm font-black text-slate-900 tabular-nums select-none">
+                      {countNum}명
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        haptics.lightTap();
+                        const next = Math.min(45, countNum + 1);
+                        setLogData((prev) => ({ ...prev, passengerCount: `${next}명` }));
+                      }}
+                      aria-label="탑승 인원 증가"
+                      className="w-7 h-7 rounded-lg bg-blue-50 border border-blue-200/80 hover:bg-blue-100 text-[#1E60F3] flex items-center justify-center cursor-pointer shadow-2xs transition active:scale-95"
+                    >
+                      <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                    </button>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </section>
 
-        {/* 3. Editable 출근시간 and 퇴근시간 */}
+        {/* 3. 출근 / 퇴근 기록 (탭 가능한 아웃라인 액션 카드) */}
         <section className="grid grid-cols-2 gap-3">
-          {/* 출근시간 Card */}
-          <div
-            role="button"
-            tabIndex={0}
+          {/* 출근 기록 Card */}
+          <button
+            type="button"
             onClick={() => openTimePicker('clockIn')}
-            className="bg-white border border-slate-100 rounded-2xl p-4 shadow-[0_4px_16px_rgba(0,0,0,0.03)] flex items-center justify-between cursor-pointer hover:border-[#1E60F3]/40 active:scale-98 transition-all group"
+            className={`text-left rounded-2xl p-3.5 sm:p-4 transition-all cursor-pointer active:scale-98 flex items-center justify-between group ${
+              logData.clockIn
+                ? 'bg-white border-2 border-slate-200/90 hover:border-[#1E60F3] shadow-[0_4px_16px_rgba(0,0,0,0.03)]'
+                : 'bg-white border-2 border-dashed border-blue-300 hover:border-[#1E60F3] hover:bg-blue-50/30 shadow-2xs'
+            }`}
           >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-500 shrink-0">
-                <Sun className="w-5 h-5 stroke-[2.2]" />
+            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-500 shrink-0">
+                <Sun className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.2]" />
               </div>
-              <div>
-                <span className="text-[11px] text-slate-400 font-medium block">출근시간</span>
-                <span className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight group-hover:text-[#1E60F3] transition-colors">
-                  {logData.clockIn || '--:--'}
-                </span>
+              <div className="min-w-0">
+                <span className="text-[11px] text-slate-400 font-semibold block">출근 시각</span>
+                {logData.clockIn ? (
+                  <span className="text-lg sm:text-xl font-black text-slate-900 tracking-tight tabular-nums group-hover:text-[#1E60F3] transition-colors">
+                    {logData.clockIn}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-xs sm:text-sm font-extrabold text-[#1E60F3] mt-0.5">
+                    <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                    <span>출근 기록</span>
+                  </span>
+                )}
               </div>
             </div>
-            <div className="w-7 h-7 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:text-slate-600 transition-colors">
-              <ChevronDown className="w-4 h-4 stroke-[2.2]" />
-            </div>
-          </div>
+            <span className="px-2 py-1 rounded-lg bg-slate-50 group-hover:bg-blue-50 text-[10px] font-bold text-slate-400 group-hover:text-[#1E60F3] transition-colors shrink-0">
+              {logData.clockIn ? '변경' : '입력'}
+            </span>
+          </button>
 
-          {/* 퇴근시간 Card */}
-          <div
-            role="button"
-            tabIndex={0}
+          {/* 퇴근 기록 Card */}
+          <button
+            type="button"
             onClick={() => openTimePicker('clockOut')}
-            className="bg-white border border-slate-100 rounded-2xl p-4 shadow-[0_4px_16px_rgba(0,0,0,0.03)] flex items-center justify-between cursor-pointer hover:border-[#1E60F3]/40 active:scale-98 transition-all group"
+            className={`text-left rounded-2xl p-3.5 sm:p-4 transition-all cursor-pointer active:scale-98 flex items-center justify-between group ${
+              logData.clockOut
+                ? 'bg-white border-2 border-slate-200/90 hover:border-[#1E60F3] shadow-[0_4px_16px_rgba(0,0,0,0.03)]'
+                : 'bg-white border-2 border-dashed border-blue-300 hover:border-[#1E60F3] hover:bg-blue-50/30 shadow-2xs'
+            }`}
           >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-[#1E60F3] shrink-0">
-                <Moon className="w-5 h-5 stroke-[2.2]" />
+            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-[#1E60F3] shrink-0">
+                <Moon className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.2]" />
               </div>
-              <div>
-                <span className="text-[11px] text-slate-400 font-medium block">퇴근시간</span>
-                <span className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight group-hover:text-[#1E60F3] transition-colors">
-                  {logData.clockOut || '--:--'}
-                </span>
+              <div className="min-w-0">
+                <span className="text-[11px] text-slate-400 font-semibold block">퇴근 시각</span>
+                {logData.clockOut ? (
+                  <span className="text-lg sm:text-xl font-black text-slate-900 tracking-tight tabular-nums group-hover:text-[#1E60F3] transition-colors">
+                    {logData.clockOut}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-xs sm:text-sm font-extrabold text-[#1E60F3] mt-0.5">
+                    <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                    <span>퇴근 기록</span>
+                  </span>
+                )}
               </div>
             </div>
-            <div className="w-7 h-7 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:text-slate-600 transition-colors">
-              <ChevronDown className="w-4 h-4 stroke-[2.2]" />
-            </div>
-          </div>
+            <span className="px-2 py-1 rounded-lg bg-slate-50 group-hover:bg-blue-50 text-[10px] font-bold text-slate-400 group-hover:text-[#1E60F3] transition-colors shrink-0">
+              {logData.clockOut ? '변경' : '입력'}
+            </span>
+          </button>
         </section>
 
-        {/* 4. Automatically calculated 총 근무시간 */}
-        <section className="bg-gradient-to-r from-blue-50/90 via-sky-50/70 to-blue-100/50 border border-blue-100/80 rounded-2xl p-4 flex items-center gap-4 relative overflow-hidden shadow-[0_4px_18px_rgba(30,96,243,0.08)]">
-          {/* Subtle curved background pattern */}
+        {/* 4. 토스 스타일 KPI 요약 카드 (총 운행시간 & 실 주행거리 통합 강조) */}
+        <section className="bg-gradient-to-r from-blue-50/90 via-sky-50/70 to-blue-100/50 border border-blue-100/80 rounded-2xl p-4 flex items-center justify-between gap-3 relative overflow-hidden shadow-[0_4px_18px_rgba(30,96,243,0.08)]">
           <div className="absolute -right-8 -bottom-10 w-36 h-36 bg-blue-200/30 rounded-full blur-xl pointer-events-none" />
 
-          {/* Clock Icon Badge */}
-          <div className="w-12 h-12 rounded-full bg-[#1E60F3] text-white flex items-center justify-center shadow-[0_4px_12px_rgba(30,96,243,0.3)] shrink-0">
-            <Clock className="w-6 h-6 stroke-[2.2]" />
-          </div>
-
-          <div>
-            <div className="text-xs text-slate-500 font-medium">총 근무시간</div>
-            <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-              {logData.totalDutyHours}
+          <div className="flex items-center gap-3.5 min-w-0 relative z-10">
+            <div className="w-11 h-11 rounded-2xl bg-[#1E60F3] text-white flex items-center justify-center shadow-[0_4px_12px_rgba(30,96,243,0.3)] shrink-0">
+              <Clock className="w-5 h-5 stroke-[2.2]" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[11px] text-[#1E60F3] font-extrabold tracking-tight">
+                오늘 운행 요약
+              </div>
+              <div className="text-base sm:text-lg font-black text-slate-900 tracking-tight truncate mt-0.5">
+                오늘 총 {logData.distanceKm || '0 km'} · 총 운행 {logData.totalDutyHours || '0시간 0분'}
+              </div>
             </div>
           </div>
         </section>
 
-        {/* 5. 주행거리 (시작 km -> 종료 km, emphasized 오늘 운행 box) */}
+        {/* 5. 주행거리 (출발 계기판 -> 복귀 계기판 -> 실 주행거리) */}
         <section className="bg-white border border-slate-100 rounded-2xl p-4 shadow-[0_4px_16px_rgba(0,0,0,0.03)] space-y-3">
-          <div className="flex items-center gap-2">
-            <Navigation className="w-4 h-4 text-[#1E60F3] stroke-[2.2]" />
-            <h2 className="text-sm font-bold text-slate-900 tracking-tight">주행거리</h2>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Navigation className="w-4 h-4 text-[#1E60F3] stroke-[2.2]" />
+              <h2 className="text-sm font-bold text-slate-900 tracking-tight">주행거리</h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setTempStartKm(logData.startKm);
+                setTempEndKm(logData.endKm);
+                setMileageError(null);
+                setIsEditingMileage(true);
+              }}
+              className="text-[11px] font-bold text-[#1E60F3] hover:underline cursor-pointer"
+            >
+              계기판 입력
+            </button>
           </div>
 
           <CustodyMileageLink driverId={driverProfile.driverId} bookingId={bookingId} date={logData.rawDate} onApply={value => {
@@ -559,9 +644,9 @@ const DrivingLogModalContent: React.FC<{
             showToast('서버 인수·반납 계기판 값을 적용했습니다.');
           }} />
 
-          {/* Improved hierarchy with directional arrow and emphasized 오늘 운행 box */}
+          {/* 출발 계기판 -> 복귀 계기판 -> 실 주행거리 */}
           <div className="flex items-center gap-2">
-            {/* 시작 km */}
+            {/* 출발 계기판 */}
             <div
               onClick={() => {
                 setTempStartKm(logData.startKm);
@@ -570,11 +655,11 @@ const DrivingLogModalContent: React.FC<{
                 setIsEditingMileage(true);
               }}
               className="flex-1 bg-white border border-slate-200/90 rounded-xl p-2.5 text-center cursor-pointer hover:border-[#1E60F3] shadow-2xs group"
-              title="클릭하여 시작 km 수정"
+              title="클릭하여 출발 계기판 수정"
             >
-              <div className="text-[11px] text-slate-400 font-medium">시작 km</div>
-              <div className="text-xs sm:text-sm font-bold text-slate-800 mt-0.5 flex items-center justify-center gap-1">
-                <span>{logData.startKm || '-'}</span>
+              <div className="text-[11px] text-slate-400 font-medium">출발 계기판</div>
+              <div className="text-xs sm:text-sm font-bold text-slate-800 mt-0.5 flex items-center justify-center gap-1 tabular-nums">
+                <span>{logData.startKm ? `${logData.startKm} km` : '입력'}</span>
                 <Pencil className="w-3 h-3 text-slate-300 group-hover:text-[#1E60F3] transition-colors" />
               </div>
             </div>
@@ -582,7 +667,7 @@ const DrivingLogModalContent: React.FC<{
             {/* Directional Arrow */}
             <ArrowRight className="w-4 h-4 text-slate-400 shrink-0" />
 
-            {/* 종료 km */}
+            {/* 복귀 계기판 */}
             <div
               onClick={() => {
                 setTempStartKm(logData.startKm);
@@ -591,19 +676,19 @@ const DrivingLogModalContent: React.FC<{
                 setIsEditingMileage(true);
               }}
               className="flex-1 bg-white border border-slate-200/90 rounded-xl p-2.5 text-center cursor-pointer hover:border-[#1E60F3] shadow-2xs group"
-              title="클릭하여 종료 km 수정"
+              title="클릭하여 복귀 계기판 수정"
             >
-              <div className="text-[11px] text-slate-400 font-medium">종료 km</div>
-              <div className="text-xs sm:text-sm font-bold text-slate-800 mt-0.5 flex items-center justify-center gap-1">
-                <span>{logData.endKm || '-'}</span>
+              <div className="text-[11px] text-slate-400 font-medium">복귀 계기판</div>
+              <div className="text-xs sm:text-sm font-bold text-slate-800 mt-0.5 flex items-center justify-center gap-1 tabular-nums">
+                <span>{logData.endKm ? `${logData.endKm} km` : '입력'}</span>
                 <Pencil className="w-3 h-3 text-slate-300 group-hover:text-[#1E60F3] transition-colors" />
               </div>
             </div>
 
-            {/* 오늘 운행 box (Emphasized cobalt blue) */}
-            <div className="min-w-[92px] shrink-0 bg-white border border-[#FFFFFF] rounded-xl p-2.5 text-center shadow-2xs">
-              <div className="text-[11px] text-[#1E60F3] font-semibold">오늘 운행</div>
-              <div className="text-xs sm:text-sm font-black text-[#1E60F3] mt-0.5">
+            {/* 실 주행거리 box (Emphasized cobalt blue) */}
+            <div className="min-w-[92px] shrink-0 bg-blue-50/70 border border-blue-100 rounded-xl p-2.5 text-center shadow-2xs">
+              <div className="text-[11px] text-[#1E60F3] font-semibold">실 주행거리</div>
+              <div className="text-xs sm:text-sm font-black text-[#1E60F3] mt-0.5 tabular-nums">
                 {logData.distanceKm}
               </div>
             </div>
@@ -622,18 +707,21 @@ const DrivingLogModalContent: React.FC<{
               </span>
             </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                haptics.lightTap();
-                setEditingStop(null);
-                setIsAddStopOpen(true);
-              }}
-              className="flex items-center gap-1 text-xs font-bold text-[#1E60F3] border border-[#1E60F3] px-2.5 py-1 rounded-full hover:bg-blue-50 active:scale-95 transition-all"
-            >
-              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>경로 추가</span>
-            </button>
+            {/* 일정이 1개 이상일 때만 우측 상단 경로 추가 버튼 표시 (0개일 때는 중앙 액션 카드에 집중) */}
+            {logData.stops.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.lightTap();
+                  setEditingStop(null);
+                  setIsAddStopOpen(true);
+                }}
+                className="flex items-center gap-1 text-xs font-bold text-[#1E60F3] border border-[#1E60F3] px-2.5 py-1 rounded-full hover:bg-blue-50 active:scale-95 transition-all cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>경로 추가</span>
+              </button>
+            )}
           </div>
 
           {/* Timeline List or Empty State */}
@@ -744,29 +832,63 @@ const DrivingLogModalContent: React.FC<{
               })}
             </div>
           ) : (
-            <div className="border border-dashed border-slate-200 rounded-2xl p-6 text-center text-xs text-slate-400 bg-slate-50/40 space-y-2">
-              <p>등록된 운행 일정이 없습니다.</p>
-              <button
-                type="button"
-                onClick={() => {
-                  haptics.lightTap();
-                  setEditingStop(null);
-                  setIsAddStopOpen(true);
-                }}
-                className="inline-flex items-center gap-1 text-xs font-semibold text-[#1E60F3] hover:underline"
-              >
-                <Plus className="w-3 h-3" />
+            <button
+              type="button"
+              onClick={() => {
+                haptics.lightTap();
+                setEditingStop(null);
+                setIsAddStopOpen(true);
+              }}
+              className="w-full border-2 border-dashed border-slate-200 hover:border-[#1E60F3] rounded-2xl p-6 text-center bg-slate-50/40 hover:bg-blue-50/30 transition-all cursor-pointer group space-y-2"
+            >
+              <p className="text-xs font-semibold text-slate-500">오늘 배차된 운행 일정이 없어요</p>
+              <span className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-slate-200 group-hover:border-[#1E60F3] text-xs font-extrabold text-[#1E60F3] shadow-2xs transition-all">
+                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
                 <span>첫 번째 일정 추가하기</span>
-              </button>
-            </div>
+              </span>
+            </button>
           )}
         </section>
 
-        {/* 7. 특이사항 textarea */}
+        {/* 7. 특이사항 (자주 쓰는 태그 칩 + textarea) */}
         <section className="bg-white border border-slate-100 rounded-2xl p-4 shadow-[0_4px_16px_rgba(0,0,0,0.03)] space-y-2.5">
-          <div className="flex items-center gap-2">
-            <FileText className="w-4 h-4 text-[#1E60F3] stroke-[2.2]" />
-            <h2 className="text-sm font-bold text-slate-900 tracking-tight">특이사항</h2>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-[#1E60F3] stroke-[2.2]" />
+              <h2 className="text-sm font-bold text-slate-900 tracking-tight">특이사항</h2>
+            </div>
+            <span className="text-[11px] text-slate-400 font-medium">빠른 메모 태그</span>
+          </div>
+
+          {/* Quick-insert Tag Chips */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {['경유지 추가', 'VIP 대기 지연', '주유/세차 완료', '교통 정체 우회'].map((tag) => {
+              const isIncluded = (logData.notes || '').includes(tag);
+              return (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => {
+                    haptics.lightTap();
+                    setLogData((prev) => {
+                      const current = (prev.notes || '').trim();
+                      if (current.includes(tag)) {
+                        return prev;
+                      }
+                      const nextNotes = current ? `${current}, ${tag}` : tag;
+                      return { ...prev, notes: nextNotes.slice(0, 500) };
+                    });
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer active:scale-95 ${
+                    isIncluded
+                      ? 'bg-[#1E60F3] text-white border border-[#1E60F3] shadow-2xs'
+                      : 'bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-[#1E60F3] border border-slate-200/80'
+                  }`}
+                >
+                  + {tag}
+                </button>
+              );
+            })}
           </div>
 
           <div className="relative">
@@ -776,7 +898,7 @@ const DrivingLogModalContent: React.FC<{
               onChange={(e) =>
                 setLogData((prev) => ({ ...prev, notes: e.target.value.slice(0, 500) }))
               }
-              placeholder="특이사항이 있으시면 입력해주세요."
+              placeholder="운행 중 메모나 특이사항을 남겨주세요"
               className="w-full p-3.5 pb-7 bg-white border border-slate-200/90 rounded-xl text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 transition-all resize-none shadow-2xs"
             />
             <span className="absolute bottom-2.5 right-3 text-[11px] text-slate-400 font-medium">
@@ -801,7 +923,7 @@ const DrivingLogModalContent: React.FC<{
               onClick={handleSubmitLog}
               className="w-full py-3 bg-[#1E60F3] text-white text-sm font-bold rounded-xl shadow-[0_4px_14px_rgba(30,96,243,0.35)] hover:bg-blue-600 active:scale-98 transition-all cursor-pointer"
             >
-              운행일지 제출
+              운행일지 제출하기
             </button>
           </div>
         </div>
@@ -820,63 +942,118 @@ const DrivingLogModalContent: React.FC<{
         selectedLocationFromMap={selectedLocationFromMap}
       />
 
-      {/* Time Picker Modal with strict clamping */}
+      {/* iOS-style Wheel & Native Time Picker Modal (출근 시각 설정 / 퇴근 시각 설정) */}
       {timePickerTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl p-5 w-full max-w-xs shadow-xl space-y-4">
+          <div className="bg-white rounded-3xl p-5 w-full max-w-xs shadow-2xl space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900">
-                {timePickerTarget === 'clockIn' ? '출근시간 선택' : '퇴근시간 선택'}
+              <h3 className="text-base font-black text-slate-900 tracking-tight">
+                {timePickerTarget === 'clockIn' ? '출근 시각 설정' : '퇴근 시각 설정'}
               </h3>
               <button
                 type="button"
                 onClick={() => setTimePickerTarget(null)}
-                className="p-1 text-slate-400 hover:text-slate-600 rounded-full"
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-full cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="flex items-center justify-center gap-3 py-2">
-              <div className="flex flex-col items-center">
-                <span className="text-[11px] text-slate-400 mb-1">시 (00~23)</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="23"
-                  value={pickerHour}
-                  onChange={(e) => setPickerHour(e.target.value.slice(0, 2))}
-                  className="w-16 p-2 text-center text-xl font-bold bg-slate-50 border border-slate-200 rounded-xl focus:border-[#1E60F3] focus:outline-none"
-                />
+            {/* 원터치 '현재 시각 적용' 칩 */}
+            <div className="flex items-center justify-between bg-slate-50 border border-slate-200/80 rounded-2xl px-3.5 py-2.5">
+              <div className="text-lg font-black text-[#1E60F3] tabular-nums tracking-tight">
+                {clampTimeComponent(pickerHour, 23)}:{clampTimeComponent(pickerMinute, 59)}
               </div>
-              <span className="text-2xl font-bold text-slate-400 mt-4">:</span>
-              <div className="flex flex-col items-center">
-                <span className="text-[11px] text-slate-400 mb-1">분 (00~59)</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="59"
-                  value={pickerMinute}
-                  onChange={(e) => setPickerMinute(e.target.value.slice(0, 2))}
-                  className="w-16 p-2 text-center text-xl font-bold bg-slate-50 border border-slate-200 rounded-xl focus:border-[#1E60F3] focus:outline-none"
-                />
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.selection();
+                  const now = new Date();
+                  const hh = String(now.getHours()).padStart(2, '0');
+                  const mm = String(now.getMinutes()).padStart(2, '0');
+                  setPickerHour(hh);
+                  setPickerMinute(mm);
+                  setTimeout(() => {
+                    document.getElementById(`wheel-hour-${hh}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                    document.getElementById(`wheel-min-${mm}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                  }, 30);
+                }}
+                className="px-3 py-1.5 rounded-full bg-[#1E60F3] hover:bg-blue-600 text-white text-xs font-extrabold shadow-xs active:scale-95 transition-all cursor-pointer flex items-center gap-1"
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span>현재 시각 적용</span>
+              </button>
+            </div>
+
+            {/* iOS 스타일 상하 스와이프 휠 피커 (모바일 키보드 올라옴 방지) */}
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 bg-slate-50/70 border border-slate-200/80 rounded-2xl p-2.5">
+              {/* Hour Wheel (00 ~ 23) */}
+              <div className="h-36 overflow-y-auto snap-y snap-mandatory no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden space-y-1 px-1">
+                {Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0')).map((hh) => {
+                  const selected = clampTimeComponent(pickerHour, 23) === hh;
+                  return (
+                    <button
+                      id={`wheel-hour-${hh}`}
+                      key={hh}
+                      type="button"
+                      onClick={() => {
+                        haptics.lightTap();
+                        setPickerHour(hh);
+                      }}
+                      className={`w-full py-1.5 rounded-xl text-center snap-center transition-all cursor-pointer tabular-nums ${
+                        selected
+                          ? 'bg-[#1E60F3] text-white text-base font-black shadow-2xs'
+                          : 'text-sm font-semibold text-slate-500 hover:bg-slate-200/60'
+                      }`}
+                    >
+                      {hh}시
+                    </button>
+                  );
+                })}
+              </div>
+
+              <span className="text-xl font-black text-slate-300 select-none">:</span>
+
+              {/* Minute Wheel (00 ~ 59) */}
+              <div className="h-36 overflow-y-auto snap-y snap-mandatory no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden space-y-1 px-1">
+                {Array.from({ length: 60 }, (_, m) => String(m).padStart(2, '0')).map((mm) => {
+                  const selected = clampTimeComponent(pickerMinute, 59) === mm;
+                  return (
+                    <button
+                      id={`wheel-min-${mm}`}
+                      key={mm}
+                      type="button"
+                      onClick={() => {
+                        haptics.lightTap();
+                        setPickerMinute(mm);
+                      }}
+                      className={`w-full py-1.5 rounded-xl text-center snap-center transition-all cursor-pointer tabular-nums ${
+                        selected
+                          ? 'bg-[#1E60F3] text-white text-base font-black shadow-2xs'
+                          : 'text-sm font-semibold text-slate-500 hover:bg-slate-200/60'
+                      }`}
+                    >
+                      {mm}분
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex gap-2 pt-1">
               <button
                 type="button"
                 onClick={() => setTimePickerTarget(null)}
-                className="flex-1 py-2.5 border border-slate-200 text-xs font-semibold text-slate-600 rounded-xl"
+                className="flex-1 py-2.5 border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 rounded-xl cursor-pointer transition-all"
               >
-                취소
+                닫기
               </button>
               <button
                 type="button"
                 onClick={applyTimePicker}
-                className="flex-1 py-2.5 bg-[#1E60F3] text-white text-xs font-bold rounded-xl shadow-xs"
+                className="flex-1 py-2.5 bg-[#1E60F3] hover:bg-blue-600 text-white text-xs font-extrabold rounded-xl shadow-xs cursor-pointer transition-all"
               >
-                확인
+                설정 완료
               </button>
             </div>
           </div>
@@ -888,7 +1065,7 @@ const DrivingLogModalContent: React.FC<{
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl p-5 w-full max-w-sm shadow-xl space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900">주행거리 (km) 직접 수정</h3>
+              <h3 className="text-sm font-bold text-slate-900">계기판 주행거리 (km) 입력</h3>
               <button
                 type="button"
                 onClick={() => setIsEditingMileage(false)}
@@ -900,7 +1077,7 @@ const DrivingLogModalContent: React.FC<{
 
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">시작 km</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">출발 계기판 (km)</label>
                 <input
                   type="text"
                   inputMode="numeric"
@@ -912,7 +1089,7 @@ const DrivingLogModalContent: React.FC<{
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">종료 km</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">복귀 계기판 (km)</label>
                 <input
                   type="text"
                   inputMode="numeric"
