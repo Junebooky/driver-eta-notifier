@@ -656,10 +656,12 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                   ) : (
                     <span>{pickupDate}</span>
                   )}
-                  <span className="inline-flex items-center gap-1 text-slate-600 font-medium">
-                    <Clock className="w-3.5 h-3.5 text-slate-400" />
-                    <span>{pickupTime}</span>
-                  </span>
+                  {!hasMultipleDates && (
+                    <span className="inline-flex items-center gap-1 text-slate-500 font-medium">
+                      <Clock className="w-3.5 h-3.5 text-slate-400" />
+                      <span>{pickupTime}</span>
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -712,15 +714,15 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
             </div>
 
             {/* 블록 3: 3일간 상세 이동 경로 (타임라인) */}
-            <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200/80 space-y-3">
+            <div className="rounded-xl bg-slate-50/70 p-4 space-y-3">
               {/* Header: 남발된 뱃지 압축 (총 N개 경유지 · N일간) + 목적지 추가 */}
               <div className="flex items-center justify-between pb-2 border-b border-slate-200/60">
                 <div className="flex items-center gap-2 min-w-0">
-                  <MapPin className="w-4 h-4 text-[#0050FF] shrink-0" />
-                  <span className="text-xs font-black text-slate-900">
+                  <MapPin className="w-4 h-4 text-slate-500 shrink-0" />
+                  <span className="text-xs font-semibold text-slate-900">
                     운행 경로 (상세 일정)
                   </span>
-                  <span className="px-2 py-0.5 rounded-md bg-blue-50 text-[#0050FF] text-[11px] font-black border border-blue-200/60 shrink-0">
+                  <span className="text-[11px] font-normal text-slate-500 shrink-0">
                     총 {waypoints.length > 0 ? waypoints.length : 2}개 경유지
                     {hasMultipleDates && ` · ${uniqueDates.length}일간`}
                   </span>
@@ -729,7 +731,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                 <button
                   type="button"
                   onClick={hasMultipleWaypoints ? handleAddWaypoint : handleConvertToMultiDestination}
-                  className="flex items-center gap-1 text-[11px] font-bold text-[#0050FF] hover:text-blue-700 bg-white hover:bg-blue-50/80 px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs transition-colors cursor-pointer shrink-0"
+                  className="flex items-center gap-1 text-[11px] font-medium text-slate-600 hover:text-slate-800 bg-white hover:bg-slate-100 px-2.5 py-1 rounded-lg transition-colors cursor-pointer shrink-0"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>목적지 추가</span>
@@ -744,7 +746,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                     return (
                       <div
                         key={group.date}
-                        className="bg-white rounded-xl border border-slate-200/80 shadow-2xs overflow-hidden"
+                        className="bg-white rounded-xl overflow-hidden"
                       >
                         {/* Day Group Header Accordion Trigger */}
                         <div
@@ -752,11 +754,11 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                           className="px-3.5 py-2.5 bg-slate-100/70 hover:bg-slate-100 flex items-center justify-between cursor-pointer transition-colors select-none"
                         >
                           <div className="flex items-center gap-2">
-                            <Calendar className="w-3.5 h-3.5 text-[#0050FF]" />
-                            <span className="text-xs font-black text-slate-900">
+                            <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                            <span className="text-xs font-semibold text-slate-900">
                               {formatWaypointDate(group.date, hasMultipleDates ? group.dayIndex : undefined)}
                             </span>
-                            <span className="text-[11px] font-bold text-slate-400">
+                            <span className="text-[11px] font-medium text-slate-400">
                               · {group.items.length}곳
                             </span>
                           </div>
@@ -789,30 +791,21 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                                   >
                                     {/* Timeline Node Bullet */}
                                     <div
-                                      className={`absolute -left-[19px] w-4 h-4 rounded-full border-2 bg-white flex items-center justify-center shrink-0 z-10 ${
-                                        isFirst
-                                          ? 'border-[#0050FF] ring-2 ring-blue-100'
-                                          : isLast
-                                          ? 'border-slate-800 ring-2 ring-slate-100'
-                                          : 'border-slate-300'
+                                      aria-hidden="true"
+                                      className={`absolute -left-[16px] w-2.5 h-2.5 rounded-full z-10 ${
+                                        isFirst ? 'bg-slate-600' : isLast ? 'bg-slate-800' : 'bg-slate-300'
                                       }`}
-                                    >
-                                      <div
-                                        className={`w-1.5 h-1.5 rounded-full ${
-                                          isFirst ? 'bg-[#0050FF]' : isLast ? 'bg-slate-800' : 'bg-slate-400'
-                                        }`}
-                                      />
-                                    </div>
+                                    />
 
                                     {/* Inline Edit Form vs Crisp Text Line */}
                                     {isEditingThis ? (
-                                      <div className="flex-1 flex items-center gap-2 bg-blue-50/80 p-2 rounded-xl border border-blue-200 shadow-2xs">
+                                      <div className="flex-1 flex items-center gap-2 bg-slate-50 p-2 rounded-xl">
                                         <input
                                           type="text"
                                           value={wp.time || ''}
                                           onChange={(e) => handleUpdateWaypointTime(wp.id, e.target.value)}
                                           placeholder="10:00"
-                                          className="w-16 px-2 py-1 text-xs font-mono font-bold text-slate-900 bg-white border border-slate-300 rounded-lg outline-none focus:border-blue-500"
+                                          className="w-16 px-2 py-1 text-xs tabular-nums font-medium text-slate-800 bg-white border border-slate-200 rounded-lg outline-none focus:border-slate-400"
                                           autoFocus
                                         />
                                         <input
@@ -820,7 +813,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                                           value={wp.location}
                                           onChange={(e) => handleUpdateWaypointLocation(wp.id, e.target.value)}
                                           placeholder="목적지 입력"
-                                          className="flex-1 px-2.5 py-1 text-xs font-bold text-slate-900 bg-white border border-slate-300 rounded-lg outline-none focus:border-blue-500"
+                                          className="flex-1 px-2.5 py-1 text-xs font-medium text-slate-800 bg-white border border-slate-200 rounded-lg outline-none focus:border-slate-400"
                                           onKeyDown={(e) => {
                                             if (e.key === 'Enter') setEditingWpId(null);
                                           }}
@@ -828,7 +821,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                                         <button
                                           type="button"
                                           onClick={() => setEditingWpId(null)}
-                                          className="px-2.5 py-1 rounded-lg bg-[#0050FF] text-white text-[11px] font-bold cursor-pointer"
+                                          className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-[11px] font-medium transition-colors cursor-pointer"
                                         >
                                           완료
                                         </button>
@@ -837,30 +830,38 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                                       <div
                                         onClick={() => setEditingWpId(wp.id)}
                                         className="flex-1 flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer select-none group/item"
-                                        title="클릭하여 시간 및 장소 수정"
                                       >
                                         <div className="flex items-center gap-3 min-w-0">
-                                          <span className="text-xs font-mono font-black text-slate-700 shrink-0 w-12">
+                                          <span className="text-xs tabular-nums font-medium text-slate-600 shrink-0 w-12">
                                             {wp.time || '--:--'}
                                           </span>
-                                          <span className="text-xs font-extrabold text-slate-900 truncate">
+                                          <span className="text-xs font-medium text-slate-800 truncate">
                                             {wp.location || '장소 미지정'}
                                           </span>
                                           {isFirst && (
-                                            <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-blue-50 text-[#0050FF] border border-blue-200/80 shrink-0">
+                                            <span className="text-[10px] font-medium text-slate-500 shrink-0">
                                               출발
                                             </span>
                                           )}
                                           {isLast && (
-                                            <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
+                                            <span className="text-[10px] font-medium text-slate-500 shrink-0">
                                               종료
                                             </span>
                                           )}
                                         </div>
 
-                                        <div className="flex items-center gap-1.5 opacity-0 group-hover/item:opacity-100 transition-opacity">
-                                          <span className="text-[10px] text-slate-400 font-medium">수정</span>
-                                          <Edit3 className="w-3 h-3 text-slate-400" />
+                                        <div className="flex shrink-0 items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-hover/item:opacity-100 transition-opacity">
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setEditingWpId(wp.id);
+                                            }}
+                                            className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
+                                            aria-label="경유지 수정"
+                                          >
+                                            <Edit3 className="w-3.5 h-3.5" />
+                                          </button>
                                           {waypoints.length > 2 && (
                                             <button
                                               type="button"
@@ -868,8 +869,8 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                                                 e.stopPropagation();
                                                 handleRemoveWaypoint(wp.id);
                                               }}
-                                              className="p-1 rounded text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer"
-                                              title="목적지 삭제"
+                                              className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
+                                              aria-label="경유지 삭제"
                                             >
                                               <X className="w-3.5 h-3.5" />
                                             </button>
@@ -887,7 +888,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                               <button
                                 type="button"
                                 onClick={() => handleAddWaypointForDay(group.date)}
-                                className="text-[11px] font-bold text-[#0050FF] hover:text-blue-700 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors cursor-pointer"
+                                className="text-[11px] font-medium text-slate-600 hover:text-slate-800 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
                               >
                                 <Plus className="w-3 h-3" />
                                 <span>경유지 추가</span>
@@ -906,13 +907,11 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
 
                   {/* Pickup */}
                   <div className="relative flex items-center justify-between">
-                    <div className="absolute -left-[19px] w-4 h-4 rounded-full border-2 border-[#0050FF] bg-white flex items-center justify-center ring-2 ring-blue-100 z-10">
-                      <div className="w-1.5 h-1.5 rounded-full bg-[#0050FF]" />
-                    </div>
+                    <div aria-hidden="true" className="absolute -left-[16px] w-2.5 h-2.5 rounded-full bg-slate-600 z-10" />
                     <div className="flex-1 min-w-0 pl-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-mono font-bold text-slate-700">{pickupTime}</span>
-                        <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-blue-50 text-[#0050FF] border border-blue-200/80">
+                        <span className="text-xs tabular-nums font-medium text-slate-600">{pickupTime}</span>
+                        <span className="text-[10px] font-medium text-slate-500">
                           출발
                         </span>
                       </div>
@@ -937,12 +936,10 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
 
                   {/* Dropoff */}
                   <div className="relative flex items-center justify-between pt-2">
-                    <div className="absolute -left-[19px] w-4 h-4 rounded-full border-2 border-slate-800 bg-white flex items-center justify-center ring-2 ring-slate-100 z-10">
-                      <div className="w-1.5 h-1.5 rounded-full bg-slate-800" />
-                    </div>
+                    <div aria-hidden="true" className="absolute -left-[16px] w-2.5 h-2.5 rounded-full bg-slate-800 z-10" />
                     <div className="flex-1 min-w-0 pl-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="px-1.5 py-0.2 rounded text-[10px] font-black bg-slate-100 text-slate-600 border border-slate-200">
+                        <span className="text-[10px] font-medium text-slate-500">
                           종료
                         </span>
                       </div>
