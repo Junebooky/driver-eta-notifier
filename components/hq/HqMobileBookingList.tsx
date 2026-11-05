@@ -17,7 +17,7 @@ export function HqMobileBookingList({
           <img
             src="/images/icons/reservations/icon_no_schedule.png"
             alt="일정 없음"
-            className="w-14 h-14 object-contain select-none"
+            className="w-28 h-28 object-contain select-none"
             draggable={false}
           />
           <p className="text-xs sm:text-sm font-semibold text-slate-500">
@@ -40,13 +40,12 @@ export function HqMobileBookingList({
                 {row.pickupDate} · {row.pickupTime}
               </strong>
               <span
-                className={`rounded-lg px-2.5 py-1 text-[11px] font-extrabold ${
-                  row.dispatchStatus === '배차 완료'
-                    ? 'bg-[#EBF3FF] text-[#1E60F3]'
-                    : row.dispatchStatus === '미배정'
-                      ? 'bg-amber-50 text-amber-700'
-                      : 'bg-slate-100 text-slate-700'
-                }`}
+                className={`rounded-lg px-2.5 py-1 text-[11px] font-extrabold ${row.dispatchStatus === '배차 완료'
+                  ? 'bg-[#EBF3FF] text-[#1E60F3]'
+                  : row.dispatchStatus === '미배정'
+                    ? 'bg-amber-50 text-amber-700'
+                    : 'bg-slate-100 text-slate-700'
+                  }`}
               >
                 {row.dispatchStatus}
               </span>
@@ -77,9 +76,8 @@ export function HqMobileBookingList({
               </p>
             </div>
             <p
-              className={`mt-3 text-xs font-extrabold ${
-                row.driverAck === '확인완료' ? 'text-emerald-600' : 'text-amber-600'
-              }`}
+              className={`mt-3 text-xs font-extrabold ${row.driverAck === '확인완료' ? 'text-emerald-600' : 'text-amber-600'
+                }`}
             >
               기사 확인 · {row.driverAck}
             </p>
