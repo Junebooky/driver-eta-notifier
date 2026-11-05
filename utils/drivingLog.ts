@@ -6,6 +6,7 @@
  */
 
 import { DriverProfile } from '@/types';
+import { passengerSummaryFromProfile, withCurrentProfilePassenger } from './drivingLogPassenger';
 
 export interface RouteStopItem {
   id: string;
@@ -35,8 +36,9 @@ export interface DrivingLogData {
   // Driver / Vehicle / Customer summary
   driverName: string;        // 수행담당: "윤태준"
   carNumber: string;         // 차량번호: "142호 7811"
-  clientName: string;        // 고객명: "인터코스"
-  passengerCount: string;    // 담당승객 수: "9명"
+  clientName: string;        // 예약에 연결된 고객사, 담당 승객명과 구별
+  passengerName?: string;    // 기사 프로필에서 가져온 담당 승객명
+  passengerCount: string;    // 프로필에 인원 수가 명시된 경우에만 표시
   // Duty times
   clockIn: string;           // 출근시간: "06:40"
   clockOut: string;          // 퇴근시간: "21:50"
@@ -377,7 +379,7 @@ export const loadDrivingLogDraft = (
   if(typeof window!=='undefined'){
     try{
       const raw=localStorage.getItem(`${DRIVING_LOG_STORAGE_PREFIX}${scopedReportId}`);
-      if(raw){const stored=JSON.parse(raw);if(stored.driverId===driverId && (stored.bookingId || null)===(bookingId || null) && stored.rawDate===dateIso)return stored;}
+      if(raw){const stored=JSON.parse(raw);if(stored.driverId===driverId && (stored.bookingId || null)===(bookingId || null) && stored.rawDate===dateIso)return withCurrentProfilePassenger(stored,driverProfile.passengerName);}
     }catch{console.warn('운행일지 초안을 불러오지 못했습니다.');}
   }
 
@@ -390,9 +392,10 @@ export const loadDrivingLogDraft = (
       ? `${driverProfile.carNumberFront} ${driverProfile.carNumberBack}`
       : '');
 
-  // Client name & passenger count from verified profile fields or empty
-  const clientName = driverProfile.clientName || '';
-  const passengerCount = driverProfile.passengerCount || '';
+  // Customer/company is booked by HQ; the passenger is edited by the driver in Profile.
+  // Never read the obsolete profile.clientName / profile.passengerCount fields here.
+  const clientName = '';
+  const {passengerName,passengerCount}=passengerSummaryFromProfile(driverProfile.passengerName);
 
   // Check verified vehicle inspection odometer for today (booking-aware)
   const verifiedOdo = getVerifiedInspectionOdometer(driverProfile.vehicleNo, dateIso, bookingId, driverProfile.driverId);
@@ -409,6 +412,7 @@ export const loadDrivingLogDraft = (
     driverName,
     carNumber,
     clientName,
+    passengerName,
     passengerCount,
     clockIn: '',
     clockOut: '',
