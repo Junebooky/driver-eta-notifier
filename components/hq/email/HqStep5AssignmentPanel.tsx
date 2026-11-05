@@ -30,7 +30,9 @@ export const HqStep5AssignmentPanel: React.FC<HqStep5AssignmentPanelProps> = ({
   onSelectDriver, onRequestHelp, onConfirm, isDispatching,
 }) => {
   const [vehiclePickerIndex, setVehiclePickerIndex] = useState<number | null>(null);
-  const allAssigned = !loading && !fleetError && slots.length > 0 && slots.every((slot) => {
+  const selectedDriverIds = slots.map((slot) => slot.driver?.id).filter((id): id is string => Boolean(id));
+  const uniqueDrivers = new Set(selectedDriverIds).size === selectedDriverIds.length;
+  const allAssigned = !loading && !fleetError && uniqueDrivers && slots.length > 0 && slots.every((slot) => {
     const vehicle = vehicles?.find((item) => item.plate === slot.vehiclePlate);
     return Boolean(vehicle?.isAvailable && slot.driver && (language !== 'english' || driverSupportsEnglish(slot.driver)));
   });
@@ -103,7 +105,7 @@ export const HqStep5AssignmentPanel: React.FC<HqStep5AssignmentPanelProps> = ({
                 )}
               </div>
               <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                <button type="button" onClick={() => setVehiclePickerIndex(index)} className={sharedCard}>
+                <button type="button" disabled={isDispatching} onClick={() => setVehiclePickerIndex(index)} className={`${sharedCard} disabled:cursor-not-allowed disabled:opacity-60`}>
                   <div className="flex items-center justify-between gap-2 text-xs font-medium text-slate-500">
                     <span className="inline-flex items-center gap-2">
                       <CarFront className="h-4 w-4 text-slate-400" strokeWidth={1.7} /> 차량 선택
@@ -126,14 +128,14 @@ export const HqStep5AssignmentPanel: React.FC<HqStep5AssignmentPanelProps> = ({
                       <p className="mt-1 truncate text-xs text-slate-500">{slot.vehiclePlate || '차량관리에서 선택'}</p>
                       {slot.vehiclePlate && (
                         <p className="mt-1 text-[11px] text-slate-500">
-                          {loading ? '가용성 확인 중' : availability?.isAvailable ? '예약 가능' : '가용성 확인 필요'}
+                          {loading ? '가용성 확인 중' : availability?.isAvailable ? '예약 가능' : availability ? '해당 일정 예약 불가' : '가용성 확인 필요'}
                         </p>
                       )}
                     </div>
                   </div>
                 </button>
 
-                <button type="button" onClick={() => onSelectDriver(slot.slotIndex, language)} className={sharedCard}>
+                <button type="button" disabled={isDispatching} onClick={() => onSelectDriver(slot.slotIndex, language)} className={`${sharedCard} disabled:cursor-not-allowed disabled:opacity-60`}>
                   <div className="flex items-center justify-between gap-2 text-xs font-medium text-slate-500">
                     <span className="inline-flex items-center gap-2">
                       <UserRound className="h-4 w-4 text-slate-400" strokeWidth={1.7} /> 기사님 선택
@@ -195,7 +197,7 @@ export const HqStep5AssignmentPanel: React.FC<HqStep5AssignmentPanelProps> = ({
       </button>
 
       <HqVehicleSelectModal
-        isOpen={vehiclePickerIndex !== null}
+        isOpen={vehiclePickerIndex !== null && !isDispatching}
         onClose={() => setVehiclePickerIndex(null)}
         vehicles={vehicles}
         loading={loading}
