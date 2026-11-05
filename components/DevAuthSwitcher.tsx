@@ -66,37 +66,38 @@ export const DevAuthSwitcher: React.FC<DevAuthSwitcherProps> = ({ className = ''
         : 'driver';
 
   return (
-    <div className={`relative inline-block ${className}`} ref={dropdownRef}>
+    <div className={`relative inline-flex items-center group/devauth ${className}`} ref={dropdownRef}>
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
         disabled={isSwitching}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-900 hover:bg-amber-500/20 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+        aria-label="계정 전환 설정"
+        className="w-10 h-10 flex items-center justify-center rounded-xl bg-transparent border-0 hover:bg-slate-100 active:bg-slate-200 active:scale-95 transition-all duration-150 cursor-pointer relative"
         title="로컬 개발용 즉시 계정 전환 (Vercel Preview/운영에서는 자동 차단됨)"
       >
-        <span className="flex items-center gap-1">
-          {session.role === 'hq_admin' ? (
-            <ShieldCheck className="w-3.5 h-3.5 text-amber-700" />
-          ) : (
-            <UserCheck className="w-3.5 h-3.5 text-blue-700" />
-          )}
-          <span className="hidden sm:inline font-mono text-[10px] bg-amber-200/80 text-amber-900 px-1 py-0.2 rounded font-black">
-            DEV
-          </span>
-          <span className="text-xs truncate max-w-[120px]">
-            {session.role === 'hq_admin'
-              ? '본사 관리자'
-              : session.driverName
-                ? `${session.driverName} (${session.vehicleNo || '배차'})`
-                : '기사 모드'}
-          </span>
-        </span>
         {isSwitching ? (
-          <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-700" />
+          <RefreshCw className="w-5 h-5 animate-spin text-[#1E60F3]" />
         ) : (
-          <ChevronDown className="w-3.5 h-3.5 text-amber-700" />
+          <img
+            src="/images/icons/settings/icon_setting.png"
+            alt="설정"
+            className="w-7.5 h-7.5 object-contain shrink-0 transition-transform duration-150 group-hover/devauth:scale-110 select-none"
+            draggable={false}
+          />
         )}
       </button>
+
+      {/* Hover Tooltip */}
+      {!isOpen && (
+        <div className="absolute top-full right-0 pt-2 hidden group-hover/devauth:flex flex-col items-end pointer-events-none z-50">
+          <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 mr-3.5 shadow-xs" />
+          <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+            {session.role === 'hq_admin'
+              ? '본사 관리자 (계정 전환)'
+              : `${session.driverName || '기사 모드'} (계정 전환)`}
+          </span>
+        </div>
+      )}
 
       {isOpen && (
         <div className="absolute right-0 top-full mt-1.5 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 z-50 animate-in fade-in slide-in-from-top-1 duration-150">

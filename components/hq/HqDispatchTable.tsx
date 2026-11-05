@@ -467,7 +467,7 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
             <h2 className="text-base sm:text-base font-black text-slate-900 tracking-tight truncate">
               배차 관리
             </h2>
-            <p className="text-[11px] text-slate-400 font-medium truncate">
+            <p className="hidden sm:block text-[11px] text-slate-400 font-medium truncate">
               예약을 누르면 기사님 배정과 고객 안내를 바로 처리할 수 있어요.
             </p>
           </div>
@@ -482,7 +482,7 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
             onOpenNewBooking();
           }}
           aria-label="예약 추가"
-          className="w-10 h-10 sm:w-auto sm:h-auto sm:px-4 sm:py-2 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white text-xs font-bold transition-all cursor-pointer shadow-xs shrink-0 flex items-center justify-center gap-1.5"
+          className="w-9 h-9 sm:w-auto sm:h-auto sm:px-4 sm:py-2 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white text-xs font-bold transition-all cursor-pointer shadow-xs shrink-0 flex items-center justify-center gap-1.5"
         >
           <Plus className="w-5 h-5 sm:hidden stroke-[2.5]" />
           <span className="hidden sm:inline">+ 예약 추가</span>
@@ -1128,8 +1128,34 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
       )}
 
       <HqMobileBookingList bookings={filteredList} onView={onViewBooking} onAssign={onAssignDriver || onViewBooking} />
-      <div className="hidden lg:block">
-        {/* 5. Container-Query Semantic Data Table with Floating Centered Navigation Arrows */}
+      <div className="hidden lg:flex lg:flex-1 lg:flex-col">
+        {filteredList.length === 0 ? (
+          <div className="flex-1 min-h-[420px] mt-2 flex flex-col items-center justify-center gap-2.5 rounded-2xl bg-slate-50/70 border border-slate-200/80 p-6 text-center">
+            <img
+              src="/images/icons/reservations/icon_no_schedule.png"
+              alt="일정 없음"
+              className="w-14 h-14 object-contain select-none"
+              draggable={false}
+            />
+            <p className="text-xs sm:text-sm font-semibold text-slate-500">
+              선택한 조건의 일정이 없습니다.
+            </p>
+            {activeTab !== 'past' && tabCounts.past > 0 && (
+              <p className="text-xs text-slate-400">
+                출발 일시가 지난 일정은{' '}
+                <button
+                  type="button"
+                  onClick={() => onSelectTab('past')}
+                  className="font-bold text-[#1E60F3] hover:underline cursor-pointer"
+                >
+                  지난 일정 ({tabCounts.past}건)
+                </button>
+                에서 확인할 수 있어요.
+              </p>
+            )}
+          </div>
+        ) : (
+        /* 5. Container-Query Semantic Data Table with Floating Centered Navigation Arrows */
         <div className="relative group/table-scroll mt-2">
           {/* Floating Centered Left Navigation Arrow */}
           {canScrollLeft && (
@@ -1193,35 +1219,7 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100/80 text-xs">
-                {filteredList.length === 0 ? (
-                  <tr>
-                    <td colSpan={10} className="h-[420px] py-12 text-center align-middle text-slate-400 font-medium">
-                      <div className="flex flex-col items-center justify-center gap-2.5">
-                        <img
-                          src="/images/icons/reservations/icon_no_schedule.png"
-                          alt="일정 없음"
-                          className="w-14 h-14 object-contain select-none"
-                          draggable={false}
-                        />
-                        <p>현재 조건에 해당하는 예약/배차 내역이 없습니다.</p>
-                        {activeTab !== 'past' && tabCounts.past > 0 && (
-                          <p className="text-xs text-slate-400">
-                            출발 일시가 지난 일정은{' '}
-                            <button
-                              type="button"
-                              onClick={() => onSelectTab('past')}
-                              className="font-bold text-[#1E60F3] hover:underline cursor-pointer"
-                            >
-                              지난 일정 ({tabCounts.past}건)
-                            </button>
-                            에서 확인할 수 있어요.
-                          </p>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  filteredList.map((b) => {
+                {filteredList.map((b) => {
                     const isAssigned = b.dispatchStatus === '배차 완료' || b.dispatchStatus === '운행 완료';
                     const isUnassigned = b.dispatchStatus === '미배정';
                     const isDraft = b.dispatchStatus === '작성 중';
@@ -1453,12 +1451,12 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                         </td>
                       </tr>
                     );
-                  })
-                )}
+                  })}
               </tbody>
             </table>
           </div>
         </div>
+        )}
       </div>
     </div>
   );
