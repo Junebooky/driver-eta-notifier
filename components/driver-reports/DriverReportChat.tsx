@@ -140,7 +140,7 @@ export function DriverReportChat({driverId,driverName='기사님'}:{driverId:str
    {outgoing.map(m=>bubble(m,true,m))}
    {typing&&<ChatTypingBubble/>}
    {localGuidance.map(m=><div key={m.id} className="space-y-3">{bubble({id:m.id+'-sent',body:m.body,created_at:m.created_at},true)}{bubble({id:m.id+'-help',body:m.reply,created_at:m.created_at},false)}</div>)}
-   {draftLoaded&&reportActive&&<div className="px-3 sm:px-5"><ReportServicePicker value={serviceType} onChange={v=>{setServiceType(v);setError('');}}/></div>}
+   {draftLoaded&&reportActive&&!sending&&<div className="px-3 sm:px-5"><ReportServicePicker value={serviceType} onChange={v=>{setServiceType(v);setError('');}}/></div>}
   </section>
   {error&&<div role="status" className="flex items-center gap-2 border-t border-white/50 bg-white/90 px-4 py-2.5 text-xs leading-5 text-[#59646D]"><span className="flex-1">{error}</span><button aria-label="대화 다시 불러오기" onClick={()=>void load().catch(e=>setError(e.message))}><RefreshCw size={15}/></button></div>}
   <footer className="shrink-0 bg-white px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-2.5">
