@@ -89,6 +89,12 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
   const EXPENSE_RECEIPT_UUID = 'bbbbbbb1-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
   const RECEIPT_STORAGE_PATH = `vip_limousine_korea/expenses/receipts/${DRIVER_A_UUID}/2026/10/receipt_sample_01.jpg`;
 
+  // The driver profile is authoritative for passengers, even if the report body is stale.
+  const mockDriverProfiles = [
+    {id: DRIVER_A_UUID, passenger_name: 'VIP A 외 1명'},
+    {id: DRIVER_B_UUID, passenger_name: 'VIP B'},
+  ];
+
   const mockSchedules = [
     {
       id: BOOKING_CHANEL_UUID,
@@ -179,6 +185,8 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
       activeRows = mockExpenses;
     } else if (table === 'schedules') {
       activeRows = mockSchedules;
+    } else if (table === 'drivers') {
+      activeRows = mockDriverProfiles;
     }
 
     const builder: any = {
@@ -422,6 +430,8 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
     assert.strictEqual(getData.logs.length, 1);
     const hqLog = getData.logs[0];
     assert.strictEqual(hqLog.driverName, '윤태준');
+    assert.strictEqual(hqLog.passengerName, 'VIP A 외 1명');
+    assert.strictEqual(hqLog.passengerCount, 2);
     assert.strictEqual(hqLog.vehiclePlate, '116허 1514');
     assert.strictEqual(hqLog.startKm, '154,725');
     assert.strictEqual(hqLog.endKm, '154,861');
