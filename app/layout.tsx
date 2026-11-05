@@ -47,7 +47,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ko" className="h-full min-h-dvh bg-[#F8FAFC] text-slate-900">
+    <html lang="ko" className="h-full min-h-dvh bg-[#F2F4F6] text-slate-900">
       <head>
         <link
           rel="stylesheet"
@@ -67,7 +67,7 @@ export default function RootLayout({
           `}
         </Script>
       </head>
-      <body className={`${inter.className} ${playfair.variable} min-h-dvh flex flex-col bg-[#F8FAFC] antialiased select-none overflow-x-hidden`}>
+      <body className={`${inter.className} ${playfair.variable} min-h-dvh flex flex-col bg-[#F2F4F6] antialiased select-none overflow-x-hidden`}>
         <SessionGate>{children}</SessionGate>
       </body>
     </html>

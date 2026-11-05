@@ -26,6 +26,13 @@ interface PoiApiItem {
   address: string;
 }
 
+const DEFAULT_RECENT_LOCATIONS: Array<{ name: string; address: string }> = [
+  { name: '뜨락', address: '서울 강남구 영동대로142길 13-3' },
+  { name: '콘래드', address: '서울 영등포구 국제금융로 10' },
+  { name: '경기 용인시 수지구 광교마을로 90', address: '경기 용인시 수지구 광교마을로 90, 401동 107호' },
+  { name: '연남CGV', address: '서울 마포구' },
+];
+
 const getStoredRecentLocations = (): Array<{ name: string; address: string }> => {
   if (typeof window !== 'undefined') {
     try {
@@ -33,17 +40,23 @@ const getStoredRecentLocations = (): Array<{ name: string; address: string }> =>
       if (stored) {
         const parsed = JSON.parse(stored) as StoredSearchItem[];
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.slice(0, 4).map((item) => ({
-            name: item.name || item.shortName || '',
-            address: item.address || '',
-          }));
+          const valid = parsed
+            .slice(0, 4)
+            .map((item) => ({
+              name: item.name || item.shortName || '',
+              address: item.address || '',
+            }))
+            .filter((item) => Boolean(item.name));
+          if (valid.length > 0) {
+            return valid;
+          }
         }
       }
     } catch {
       // Fallback
     }
   }
-  return [];
+  return DEFAULT_RECENT_LOCATIONS;
 };
 
 const AddScheduleModalContent: React.FC<{
@@ -151,18 +164,18 @@ const AddScheduleModalContent: React.FC<{
 
   return (
     <div
-      className="relative w-full max-w-md bg-white rounded-t-3xl shadow-2xl z-10 flex flex-col max-h-[90vh] overflow-hidden animate-in slide-in-from-bottom duration-300"
+      className="relative w-full max-w-md bg-[#F6F8FC] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100/90 z-10 flex flex-col max-h-[90vh] overflow-hidden animate-in slide-in-from-bottom duration-300"
       onClick={(e) => e.stopPropagation()}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-slate-100">
-        <h2 className="text-lg font-bold text-slate-900 tracking-tight">
+      <div className="flex items-center justify-between px-5 pt-5 pb-2 bg-[#F6F8FC]">
+        <h2 className="text-lg font-extrabold text-slate-900 tracking-tight">
           {editingStop ? '일정 수정' : '일정 추가'}
         </h2>
         <button
           type="button"
           onClick={onClose}
-          className="p-1.5 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 transition-colors"
+          className="p-1.5 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-200/60 transition-colors cursor-pointer"
           aria-label="닫기"
         >
           <X className="w-5 h-5 stroke-[2.2]" />
@@ -170,10 +183,10 @@ const AddScheduleModalContent: React.FC<{
       </div>
 
       {/* Scrollable Form Body */}
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+      <div className="flex-1 overflow-y-auto px-5 py-3 space-y-4">
         {/* 1. 시간 */}
         <div>
-          <label className="block text-xs font-bold text-slate-700 mb-1.5">시간</label>
+          <label className="block text-xs sm:text-[13px] font-bold text-slate-700 mb-1.5">시간</label>
           <div className="relative flex items-center">
             <Clock className="absolute left-3.5 w-4 h-4 text-slate-400 pointer-events-none stroke-[2]" />
             <input
@@ -183,11 +196,11 @@ const AddScheduleModalContent: React.FC<{
                 setTime(e.target.value);
                 if (timeError) setTimeError(null);
               }}
-              placeholder="예) 08:30"
+              placeholder="예) 15:20"
               maxLength={5}
-              className={`w-full pl-10 pr-4 py-3 bg-white border ${
-                timeError ? 'border-red-400 ring-2 ring-red-100' : 'border-slate-200/90'
-              } rounded-xl text-sm font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 transition-all shadow-2xs`}
+              className={`w-full h-12 pl-10 pr-4 bg-white border ${
+                timeError ? 'border-red-400 ring-2 ring-red-100' : 'border-slate-100/90'
+              } rounded-2xl text-sm sm:text-base font-extrabold text-slate-900 placeholder:font-medium placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-[#1E60F3]/10 transition-all shadow-[0_3px_12px_rgba(15,23,42,0.04)] tabular-nums`}
             />
           </div>
           {timeError && (
@@ -200,7 +213,7 @@ const AddScheduleModalContent: React.FC<{
 
         {/* 2. 장소 */}
         <div>
-          <label className="block text-xs font-bold text-slate-700 mb-1.5">장소</label>
+          <label className="block text-xs sm:text-[13px] font-bold text-slate-700 mb-1.5">장소</label>
           <div className="relative flex items-center">
             <Search className="absolute left-3.5 w-4 h-4 text-slate-400 pointer-events-none stroke-[2]" />
             <input
@@ -208,7 +221,7 @@ const AddScheduleModalContent: React.FC<{
               value={place}
               onChange={handlePlaceChange}
               placeholder="장소명 또는 주소를 검색하세요."
-              className="w-full pl-10 pr-11 py-3 bg-white border border-slate-200/90 rounded-xl text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 transition-all shadow-2xs"
+              className="w-full h-12 pl-10 pr-11 bg-white border border-slate-100/90 rounded-2xl text-xs sm:text-sm font-semibold text-slate-800 placeholder:font-medium placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-[#1E60F3]/10 transition-all shadow-[0_3px_12px_rgba(15,23,42,0.04)]"
             />
             <button
               type="button"
@@ -216,10 +229,10 @@ const AddScheduleModalContent: React.FC<{
                 haptics.lightTap();
                 if (onOpenMapSearch) onOpenMapSearch();
               }}
-              className="absolute right-2.5 p-1.5 text-slate-500 hover:text-[#1E60F3] hover:bg-blue-50/50 rounded-lg transition-colors"
+              className="absolute right-2.5 p-1.5 text-slate-500 hover:text-[#1E60F3] hover:bg-blue-50/50 rounded-xl transition-colors cursor-pointer"
               title="지도/거점 검색"
             >
-              <Map className="w-5 h-5 stroke-[1.8]" />
+              <Map className="w-4.5 h-4.5 stroke-[1.8]" />
             </button>
           </div>
 
@@ -231,18 +244,18 @@ const AddScheduleModalContent: React.FC<{
             </div>
           )}
           {searchSuggestions.length > 0 && (
-            <div className="mt-2 border border-slate-100 rounded-xl bg-white shadow-md overflow-hidden divide-y divide-slate-100">
+            <div className="mt-2 border border-slate-100/90 rounded-2xl bg-white shadow-[0_6px_20px_rgba(15,23,42,0.08)] overflow-hidden divide-y divide-slate-100">
               {searchSuggestions.map((item, idx) => (
                 <button
                   key={idx}
                   type="button"
                   onClick={() => handleSelectLocation(item)}
-                  className="w-full text-left px-3.5 py-2.5 hover:bg-blue-50/60 transition-colors flex items-start gap-2.5"
+                  className="w-full text-left px-4 py-3 hover:bg-blue-50/60 transition-colors flex items-start gap-2.5 cursor-pointer"
                 >
                   <MapPin className="w-4 h-4 text-[#1E60F3] shrink-0 mt-0.5" />
                   <div className="min-w-0">
-                    <div className="text-xs font-bold text-slate-800 truncate">{item.name}</div>
-                    <div className="text-[11px] text-slate-400 truncate">{item.address}</div>
+                    <div className="text-xs sm:text-[13px] font-extrabold text-slate-900 truncate">{item.name}</div>
+                    <div className="text-[11px] text-slate-400 truncate mt-0.5">{item.address}</div>
                   </div>
                 </button>
               ))}
@@ -253,72 +266,65 @@ const AddScheduleModalContent: React.FC<{
         {/* 3. 최근 검색한 장소 */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-slate-700">최근 검색한 장소</span>
-            {recentLocations.length > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  haptics.lightTap();
-                  if (onOpenMapSearch) onOpenMapSearch();
-                }}
-                className="text-xs text-slate-400 hover:text-slate-600 transition-colors font-medium flex items-center gap-0.5"
-              >
-                전체보기 &gt;
-              </button>
-            )}
+            <span className="text-xs sm:text-[13px] font-extrabold text-slate-800">최근 검색한 장소</span>
+            <button
+              type="button"
+              onClick={() => {
+                haptics.lightTap();
+                if (onOpenMapSearch) onOpenMapSearch();
+              }}
+              className="text-xs text-slate-400 hover:text-slate-600 transition-colors font-medium flex items-center gap-0.5 cursor-pointer"
+            >
+              전체보기 &gt;
+            </button>
           </div>
 
-          {recentLocations.length > 0 ? (
-            <div className="divide-y divide-slate-100 border border-slate-100/90 rounded-2xl bg-white overflow-hidden shadow-2xs">
-              {recentLocations.map((loc, idx) => (
-                <div
-                  key={idx}
-                  onClick={() => handleSelectLocation(loc)}
-                  className="flex items-center justify-between px-3.5 py-3 hover:bg-slate-50/80 cursor-pointer transition-colors group"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-500 group-hover:text-[#1E60F3] group-hover:bg-blue-50/50 group-hover:border-blue-100 transition-colors shrink-0">
-                      <MapPin className="w-4 h-4 stroke-[2]" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-xs font-bold text-slate-800 group-hover:text-[#1E60F3] transition-colors truncate">
-                        {loc.name}
-                      </div>
-                      <div className="text-[11px] text-slate-400 truncate mt-0.5">{loc.address}</div>
-                    </div>
+          <div className="divide-y divide-slate-100/90 border border-slate-100/90 rounded-2xl bg-white overflow-hidden shadow-[0_3px_14px_rgba(15,23,42,0.04)]">
+            {recentLocations.map((loc, idx) => (
+              <div
+                key={idx}
+                onClick={() => handleSelectLocation(loc)}
+                className="flex items-center justify-between px-4 py-3 hover:bg-slate-50/80 cursor-pointer transition-colors group"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 rounded-full bg-[#F3F6FB] flex items-center justify-center text-slate-500 group-hover:text-[#1E60F3] group-hover:bg-blue-50 transition-colors shrink-0">
+                    <MapPin className="w-4 h-4 stroke-[2]" />
                   </div>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleSelectLocation(loc);
-                    }}
-                    className="p-1 text-slate-300 hover:text-slate-500 rounded transition-colors"
-                  >
-                    <MoreVertical className="w-4 h-4" />
-                  </button>
+                  <div className="min-w-0">
+                    <div className="text-xs sm:text-[13px] font-extrabold text-slate-900 group-hover:text-[#1E60F3] transition-colors truncate">
+                      {loc.name}
+                    </div>
+                    <div className="text-[11px] text-slate-400 truncate mt-0.5">{loc.address}</div>
+                  </div>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="border border-dashed border-slate-200 rounded-2xl p-4 text-center text-xs text-slate-400 bg-slate-50/50">
-              <span>최근 검색한 장소가 없습니다. 상단 검색창을 이용해주세요.</span>
-            </div>
-          )}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSelectLocation(loc);
+                  }}
+                  className="p-1 text-slate-300 hover:text-slate-500 rounded transition-colors cursor-pointer"
+                  aria-label="선택"
+                >
+                  <MoreVertical className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* 4. 메모 (선택) */}
         <div>
-          <label className="block text-xs font-bold text-slate-700 mb-1.5">메모 (선택)</label>
+          <label className="block text-xs sm:text-[13px] font-bold text-slate-700 mb-1.5">메모 (선택)</label>
           <div className="relative">
             <textarea
               rows={3}
               value={memo}
               onChange={(e) => setMemo(e.target.value.slice(0, 200))}
               placeholder="예) 고객 미팅, 식사, 대기 등"
-              className="w-full p-3.5 pb-7 bg-white border border-slate-200/90 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 transition-all resize-none shadow-2xs"
+              className="w-full p-4 pb-7 bg-white border border-slate-100/90 rounded-2xl text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-[#1E60F3]/10 transition-all resize-none shadow-[0_3px_12px_rgba(15,23,42,0.04)]"
             />
-            <span className="absolute bottom-2.5 right-3 text-[11px] text-slate-400 font-medium">
+            <span className="absolute bottom-2.5 right-3.5 text-[11px] text-slate-400 font-medium">
               {memo.length}/200
             </span>
           </div>
@@ -326,11 +332,11 @@ const AddScheduleModalContent: React.FC<{
       </div>
 
       {/* Bottom CTA Button */}
-      <div className="p-4 border-t border-slate-100 bg-white">
+      <div className="px-5 pb-5 pt-2 bg-[#F6F8FC]">
         <button
           type="button"
           onClick={handleSubmit}
-          className="w-full py-3.5 bg-[#1E60F3] text-white text-sm font-bold rounded-xl shadow-[0_4px_14px_rgba(30,96,243,0.32)] hover:bg-blue-600 active:scale-[0.98] transition-all"
+          className="w-full h-12 sm:h-13 bg-[#0055FF] hover:bg-[#0046D5] text-white text-sm sm:text-[15px] font-extrabold rounded-2xl shadow-[0_6px_18px_rgba(0,85,255,0.28)] active:scale-[0.98] transition-all cursor-pointer"
         >
           {editingStop ? '수정하기' : '추가하기'}
         </button>

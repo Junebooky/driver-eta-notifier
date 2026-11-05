@@ -108,7 +108,7 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="w-full bg-[#F4F7FC]/95 backdrop-blur pt-[max(env(safe-area-inset-top),1.25rem)] pb-2.5 px-4 sticky top-0 z-30">
+    <header className="w-full bg-[#F2F4F6]/95 backdrop-blur pt-[max(env(safe-area-inset-top),1.25rem)] pb-2.5 px-4 sticky top-0 z-30">
       <div className="max-w-md mx-auto flex items-center justify-between gap-2">
         {/* Left: Driver / Vehicle Pill Tag (Flexible with truncate, won't wrap to 2 lines) */}
         <div className="flex items-center gap-1.5 min-w-0 flex-1 shrink mr-2">

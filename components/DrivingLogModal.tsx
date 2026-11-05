@@ -346,7 +346,7 @@ const DrivingLogModalContent: React.FC<{
       }}
     >
       <div
-        className={presentation === 'page' ? "relative flex min-h-[70dvh] w-full flex-col bg-[#F4F7FC]" : "w-full max-w-lg bg-[#F4F7FC] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[92dvh] h-[92dvh] sm:h-auto sm:max-h-[90vh] animate-in slide-in-from-bottom-6 sm:animate-scale-up duration-300 relative"}
+        className={presentation === 'page' ? "relative flex min-h-[70dvh] w-full flex-col bg-[#F2F4F6]" : "w-full max-w-lg bg-[#F2F4F6] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[92dvh] h-[92dvh] sm:h-auto sm:max-h-[90vh] animate-in slide-in-from-bottom-6 sm:animate-scale-up duration-300 relative"}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Main Scrollable Content */}
@@ -536,7 +536,6 @@ const DrivingLogModalContent: React.FC<{
             {/* 상단 헤더 + 통합 KPI 바 */}
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-[#1E60F3] stroke-[2.2]" />
                 <h2 className="text-sm sm:text-[15px] font-extrabold text-slate-900 tracking-tight">오늘의 운행</h2>
               </div>
               <div className="inline-flex items-center px-3 py-1 rounded-full bg-[#F3F6FB] text-xs font-extrabold text-slate-600 tabular-nums">
@@ -610,7 +609,6 @@ const DrivingLogModalContent: React.FC<{
           <section className="bg-white border border-slate-100/90 rounded-3xl p-4 sm:p-5 shadow-[0_6px_24px_rgba(15,23,42,0.05)] space-y-3.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Car className="w-4 h-4 text-[#1E60F3] stroke-[2.2]" />
                 <h2 className="text-sm sm:text-[15px] font-extrabold text-slate-900 tracking-tight">주행거리</h2>
               </div>
               <span className="text-xs sm:text-[13px] font-extrabold text-[#1E60F3] tabular-nums">
@@ -681,7 +679,6 @@ const DrivingLogModalContent: React.FC<{
             {/* Header */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-[#1E60F3] stroke-[2.2]" />
                 <h2 className="text-sm sm:text-[15px] font-extrabold text-slate-900 tracking-tight">운행 경로</h2>
                 <span className="inline-flex items-center gap-1 bg-[#F3F6FB] text-slate-600 text-[11px] font-bold px-2.5 py-0.5 rounded-full">
                   <Calendar className="w-3 h-3 text-slate-400" />
@@ -835,7 +832,6 @@ const DrivingLogModalContent: React.FC<{
           <section className="bg-white border border-slate-100/90 rounded-3xl p-4 sm:p-5 shadow-[0_6px_24px_rgba(15,23,42,0.05)] space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4 text-[#1E60F3] stroke-[2.2]" />
                 <h2 className="text-sm sm:text-[15px] font-extrabold text-slate-900 tracking-tight">특이사항</h2>
               </div>
               <span className="text-[11px] text-slate-400 font-semibold">빠른 메모 태그</span>
@@ -889,7 +885,7 @@ const DrivingLogModalContent: React.FC<{
         </section>
 
         {/* 7. Bottom Action Buttons inside Modal Card */}
-        <div className="px-4 pb-4 pt-2 bg-[#F4F7FC] shrink-0">
+        <div className="px-4 pb-4 pt-2 bg-[#F2F4F6] shrink-0">
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -1040,64 +1036,99 @@ const DrivingLogModalContent: React.FC<{
 
       {/* Mileage Edit Modal */}
       {isEditingMileage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl p-5 w-full max-w-sm shadow-xl space-y-4">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              haptics.lightTap();
+              setIsEditingMileage(false);
+            }
+          }}
+        >
+          <div
+            className="bg-[#F6F8FC] rounded-3xl p-5 sm:p-6 w-full max-w-sm shadow-2xl border border-slate-100/90 space-y-5 animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900">계기판 주행거리 (km) 입력</h3>
+              <div className="flex items-center gap-2.5">
+                <img
+                  src="/images/icons/driver_ui/icon_km.png"
+                  alt="주행거리"
+                  className="w-8 h-8 sm:w-9 sm:h-9 object-contain shrink-0 select-none"
+                  draggable={false}
+                />
+                <h3 className="text-base sm:text-[17px] font-extrabold text-slate-900 tracking-tight">
+                  계기판 주행거리 (km) 입력
+                </h3>
+              </div>
               <button
                 type="button"
-                onClick={() => setIsEditingMileage(false)}
-                className="p-1 text-slate-400 hover:text-slate-600 rounded-full"
+                onClick={() => {
+                  haptics.lightTap();
+                  setIsEditingMileage(false);
+                }}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-full transition-colors cursor-pointer"
+                aria-label="닫기"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5 stroke-[2.2]" />
               </button>
             </div>
 
-            <div className="space-y-3">
+            {/* Volumetric White Inputs */}
+            <div className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">출발 계기판 (km)</label>
+                <label className="block text-xs sm:text-[13px] font-bold text-slate-600 mb-2">
+                  출발 계기판 (km)
+                </label>
                 <input
                   type="text"
                   inputMode="numeric"
                   value={tempStartKm}
                   onChange={(e) => setTempStartKm(e.target.value)}
                   placeholder="예: 154,725"
-                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-[#1E60F3]"
+                  className="w-full h-12 sm:h-13 px-4 bg-white border border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)] rounded-2xl text-base sm:text-lg font-extrabold text-slate-900 placeholder:font-semibold placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-[#1E60F3]/10 transition-all tabular-nums"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">복귀 계기판 (km)</label>
+                <label className="block text-xs sm:text-[13px] font-bold text-slate-600 mb-2">
+                  복귀 계기판 (km)
+                </label>
                 <input
                   type="text"
                   inputMode="numeric"
                   value={tempEndKm}
                   onChange={(e) => setTempEndKm(e.target.value)}
                   placeholder="예: 154,861"
-                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-[#1E60F3]"
+                  className="w-full h-12 sm:h-13 px-4 bg-white border border-slate-100/90 shadow-[0_3px_12px_rgba(15,23,42,0.04)] rounded-2xl text-base sm:text-lg font-extrabold text-slate-900 placeholder:font-semibold placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-[#1E60F3]/10 transition-all tabular-nums"
                 />
               </div>
 
               {mileageError && (
-                <div className="flex items-center gap-1.5 text-xs text-red-600 bg-red-50 p-2 rounded-lg">
+                <div className="flex items-center gap-1.5 text-xs text-red-600 bg-red-50 px-3 py-2 rounded-xl border border-red-100">
                   <AlertCircle className="w-4 h-4 shrink-0" />
                   <span>{mileageError}</span>
                 </div>
               )}
             </div>
 
-            <div className="flex gap-2">
+            {/* Bottom Buttons */}
+            <div className="grid grid-cols-2 gap-3 pt-1">
               <button
                 type="button"
-                onClick={() => setIsEditingMileage(false)}
-                className="flex-1 py-2.5 border border-slate-200 text-xs font-semibold text-slate-600 rounded-xl"
+                onClick={() => {
+                  haptics.lightTap();
+                  setIsEditingMileage(false);
+                }}
+                className="h-12 sm:h-13 rounded-2xl bg-[#EEF2F7] hover:bg-slate-200/80 text-slate-700 text-sm font-extrabold cursor-pointer transition-all active:scale-98"
               >
                 취소
               </button>
               <button
                 type="button"
                 onClick={handleSaveMileage}
-                className="flex-1 py-2.5 bg-[#1E60F3] text-white text-xs font-bold rounded-xl shadow-xs"
+                className="h-12 sm:h-13 rounded-2xl bg-[#0055FF] hover:bg-[#0046D5] text-white text-sm font-extrabold shadow-[0_6px_18px_rgba(0,85,255,0.28)] cursor-pointer transition-all active:scale-98"
               >
                 적용하기
               </button>
