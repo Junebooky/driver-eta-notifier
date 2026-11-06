@@ -35,6 +35,7 @@ function normalizePayloadItem(raw: Record<string, any>, rootBody: Record<string,
     sourceAttachmentHashes: Array.isArray(raw.sourceAttachmentHashes)
       ? raw.sourceAttachmentHashes.filter((x: unknown) => typeof x === 'string' && /^[a-f0-9]{64}$/.test(x)).slice(0, 4)
       : undefined,
+    cancelReason: typeof raw.cancelReason === 'string' ? raw.cancelReason.slice(0, 240) : undefined,
     vehicleNo: raw.vehicleNo,
     vehicleId: raw.vehicleId,
     vehicleModel: raw.vehicleModel,
