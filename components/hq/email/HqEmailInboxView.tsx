@@ -654,6 +654,15 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
     }));
   };
 
+  const handleAddBatchVehicle = () => {
+    setVehicleSlots(prev => prev.length >= 12 ? prev : [
+      ...prev, { slotIndex: prev.length, vehicleModel: '차량 미지정', driver: null, status: 'unassigned' },
+    ]);
+  };
+  const handleRemoveBatchVehicle = () => {
+    setVehicleSlots(prev => prev.length > 1 ? prev.slice(0, -1) : prev);
+  };
+
   const handleBatchAssignment = (rowKey: string, assignment: EmailBatchAssignments[string]) => {
     if (!currentSummary) return;
     const id = currentSummary.id;
@@ -1264,6 +1273,8 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                       onCancel={handleBatchCancel}
                       onCancelReason={handleBatchCancelReason}
                       onAssignment={handleBatchAssignment}
+                      onAddVehicle={handleAddBatchVehicle}
+                      onRemoveLastVehicle={handleRemoveBatchVehicle}
                     />
                   : <HqEmailRevisionMatchPanel
                       draft={currentDraft}
@@ -1326,6 +1337,8 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                         onCancel={handleBatchCancel}
                         onCancelReason={handleBatchCancelReason}
                         onAssignment={handleBatchAssignment}
+                        onAddVehicle={handleAddBatchVehicle}
+                        onRemoveLastVehicle={handleRemoveBatchVehicle}
                         showAssignments
                         isSubmitting={isDispatching}
                         onApprove={() => void handleConfirmDispatch('published')}
