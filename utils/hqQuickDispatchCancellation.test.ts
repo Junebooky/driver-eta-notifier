@@ -21,13 +21,13 @@ test('confirmed cancellation calls the existing authenticated HQ cancel API with
 });
 
 test('empty cancellation reason uses the existing endpoint default', async () => {
-  let payload: { reason?: string } | null = null;
+  let payloadText = '';
   const fakeRequest = (async (_url: string, options?: RequestInit) => {
-    payload = JSON.parse(String(options?.body));
+    payloadText = String(options?.body);
     return new Response(JSON.stringify({ ok: true }), { status: 200 });
   }) as typeof fetch;
   await cancelHqQuickDispatchSchedule('schedule-123', '  ', fakeRequest);
-  assert.equal(payload?.reason, '고객 요청 취소');
+  assert.equal(JSON.parse(payloadText).reason, '고객 요청 취소');
 });
 
 test('missing schedule ID never sends a cancellation request', async () => {
