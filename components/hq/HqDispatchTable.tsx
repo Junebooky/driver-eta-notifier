@@ -1348,6 +1348,14 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                               </span>
                             )}
                           </div>
+                          {b.routeWaypoints && b.routeWaypoints.length > 2 && (
+                            <span
+                              className="mt-1 inline-block max-w-full truncate rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600"
+                              title={b.routeWaypoints.slice(1, -1).map(p => `${p.time || '--:--'} ${p.location}`).join(' → ')}
+                            >
+                              중간 경유 {b.routeWaypoints.length - 2}곳 · 상세 보기
+                            </span>
+                          )}
                         </td>
 
                         {/* Col 8: 배차 */}
