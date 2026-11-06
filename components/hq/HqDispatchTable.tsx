@@ -86,7 +86,13 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
   const filterRowRef = useRef<HTMLDivElement>(null);
   const [remindingId, setRemindingId] = useState<string | null>(null);
   const [dispatchIconError, setDispatchIconError] = useState(false);
-  const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
+  const [viewMode, setViewMode] = useState<'calendar' | 'list'>(() =>
+    activeTab === 'all' ? 'calendar' : 'list'
+  );
+  useEffect(() => {
+    // External KPI/deep-link filters must keep their actionable list semantics.
+    if (activeTab !== 'all') setViewMode('list');
+  }, [activeTab]);
   const selectOperationalTab = (tab: HqDispatchTabKey) => {
     onSelectTab(tab);
     setViewMode(tab === 'all' ? 'calendar' : 'list');
