@@ -8,7 +8,7 @@ import { selectUserEmailAttachments } from '@/services/naverImapService';
 const email = [
   'Please arrange the same driver for Nov 18-20.',
   'Nov 18 – Staria',
-  '22:25pm – Pick up Group at Gimpo Int Airport T1 -> Conrad Seoul',
+  '22:25pm – Pick up Mr. Alex, Ben, Chris from Gimpo Int Airport T1 -> Conrad Seoul',
   'KE2104 HND-GMP 1950/2225 (Guest A, Guest B)',
   'NH867 HND-GMP 2000/2230 (Guest C)',
   'Meet & Greet',
@@ -77,6 +77,7 @@ test('all six client addresses are retained and road numbers drive TMAP search',
 test('fixes missing flight and movement info without falsely confirming any TMAP POI', () => {
   const result = enrichBookingDraftWithEmailEvidence(draft(), email);
   assert.equal(result.flights?.length, 5);
+  assert.deepEqual(result.passengerNames, ['Mr. Alex', 'Ben', 'Chris']);
   assert.ok(result.warnings.some(w=>w.includes('NH867') && w.includes('픽업')));
   assert.equal(result.waypoints?.length, 14);
   const fire = result.waypoints?.find(p => p.date==='2026-11-19' && p.time==='10:30');
