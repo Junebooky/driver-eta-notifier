@@ -36,6 +36,11 @@ export interface HqScheduleMeta {
   groupTotalVehicles?: number;
   groupVehicleIndex?: number;
   intakeSource?: 'phone' | 'email' | 'quick_dispatch' | 'manual' | 'seed';
+  sourceEmailId?: string;
+  sourceSenderEmail?: string;
+  sourceMessageId?: string;
+  sourceAttachmentHashes?: string[];
+  revisionHistory?: Array<{ revisedAt: string; sourceEmailId: string; previousSourceEmailId?: string; previousRouteWaypoints?: RouteWaypointItem[]; previousDate: string; previousPickupTime: string; previousEndTime: string; previousOrigin: string; previousDestination: string; previousDriverName?: string; previousVehiclePlate?: string; previousVersion: number }>;
   dispatchStatus: 'unassigned' | 'draft' | 'published' | 'cancelled';
   driverId?: string | null;
   driverName?: string | null;
@@ -542,6 +547,10 @@ export interface DispatchUpsertInput {
   groupTotalVehicles?: number;
   groupVehicleIndex?: number;
   intakeSource?: 'phone' | 'email' | 'quick_dispatch' | 'manual' | 'seed';
+  sourceEmailId?: string;
+  sourceSenderEmail?: string;
+  sourceMessageId?: string;
+  sourceAttachmentHashes?: string[];
   vehicleNo?: string;
   vehicleId?: string;
   vehicleModel?: string;
@@ -996,7 +1005,10 @@ async function prepareServerDispatchSchedule(
       normalizeTimeHHmm(existingHydrated.pickup_time) !== hhmm ||
       existingHydrated.origin !== input.origin.trim() ||
       existingHydrated.destination !== input.destination.trim() ||
-      (existingHydrated.passenger_name || '') !== (input.passengerName || input.customerName || '');
+      (existingHydrated.passenger_name || '') !== (input.passengerName || input.customerName || '') ||
+      (input.passengerCount !== undefined && existingHydrated.passenger_count !== input.passengerCount) ||
+      (input.flightNumber !== undefined && (existingHydrated.flight_number || '') !== input.flightNumber) ||
+      (input.notes !== undefined && (existingHydrated.protocol_notes || '') !== input.notes);
 
     if (driverChanged) {
       // New driver must acknowledge fresh from 0
@@ -1070,6 +1082,26 @@ async function prepareServerDispatchSchedule(
     groupTotalVehicles: input.groupTotalVehicles ?? existingHydrated?._meta.groupTotalVehicles,
     groupVehicleIndex: input.groupVehicleIndex ?? existingHydrated?._meta.groupVehicleIndex,
     intakeSource: input.intakeSource || existingHydrated?._meta.intakeSource || 'quick_dispatch',
+    sourceEmailId: input.sourceEmailId || existingHydrated?._meta.sourceEmailId,
+    sourceSenderEmail: input.sourceSenderEmail || existingHydrated?._meta.sourceSenderEmail,
+    sourceMessageId: input.sourceMessageId || existingHydrated?._meta.sourceMessageId,
+    sourceAttachmentHashes: input.sourceAttachmentHashes || existingHydrated?._meta.sourceAttachmentHashes,
+    revisionHistory: existingHydrated && input.sourceEmailId && input.sourceEmailId !== existingHydrated._meta.sourceEmailId
+      ? [...(existingHydrated._meta.revisionHistory || []), {
+          revisedAt: nowIso,
+          sourceEmailId: input.sourceEmailId,
+          previousSourceEmailId: existingHydrated._meta.sourceEmailId,
+          previousRouteWaypoints: existingHydrated._meta.routeWaypoints,
+          previousDate: existingHydrated.date,
+          previousPickupTime: existingHydrated.pickup_time,
+          previousEndTime: existingHydrated.end_time || '',
+          previousOrigin: existingHydrated.origin,
+          previousDestination: existingHydrated.destination,
+          previousDriverName: existingHydrated.driver_name,
+          previousVehiclePlate: existingHydrated.vehicle_plate,
+          previousVersion: existingHydrated.version,
+        }].slice(-20)
+      : existingHydrated?._meta.revisionHistory,
     dispatchStatus: effectiveDispatchStatus,
     driverId: input.serviceMode === 'vehicle_only' ? null : input.driverId ?? existingHydrated?._meta.driverId ?? null,
     driverName:
