@@ -115,7 +115,7 @@ export const HqStep5AssignmentPanel: React.FC<HqStep5AssignmentPanelProps> = ({
                 <button type="button" disabled={isDispatching} onClick={() => setVehiclePickerIndex(index)} className={`${cardClass} disabled:cursor-not-allowed disabled:opacity-60`}>
                   <div className="flex items-center justify-between gap-2 text-xs font-bold text-slate-800">
                     <span className="inline-flex items-center gap-1.5">
-                      <img src="/images/icons/vehicles/icon_vehicle.png" alt="" className="h-4 w-4 object-contain" /> 차량 선택
+                      차량 선택
                     </span>
                     <ChevronRight className="h-4 w-4 text-slate-400 transition-transform group-hover:translate-x-0.5" strokeWidth={1.8} />
                   </div>
@@ -149,7 +149,7 @@ export const HqStep5AssignmentPanel: React.FC<HqStep5AssignmentPanelProps> = ({
                 <button type="button" disabled={isDispatching} onClick={() => onSelectDriver(slot.slotIndex, language)} className={`${cardClass} disabled:cursor-not-allowed disabled:opacity-60`}>
                   <div className="flex items-center justify-between gap-2 text-xs font-bold text-slate-800">
                     <span className="inline-flex items-center gap-1.5">
-                      <img src="/images/icons/drivers/icon_driver.png" alt="" className="h-4 w-4 object-contain" /> 기사님 선택
+                      기사님 선택
                     </span>
                     <ChevronRight className="h-4 w-4 text-slate-400 transition-transform group-hover:translate-x-0.5" strokeWidth={1.8} />
                   </div>
