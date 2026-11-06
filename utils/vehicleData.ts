@@ -1,12 +1,10 @@
 /**
  * VIP LIMOUSINE KOREA — 전체 20대 공식 차량 데이터 마스터 (Single Source of Truth)
  *
- * [벤츠 스프린터 투어러 (319 CDI)] 1대: 125호 9982
- * [벤츠 스프린터 319 CDI] 2대: 700호 1458, 125호 8040
- * [벤츠 스프린터 519 CDI] 6대: 703서 2658, 70호 3864, 71두 3338, 73호 2553, 71두 3285, 711하 1058
+ * [벤츠 스프린터 319 CDI] 1대: 125호 9982
+ * [벤츠 스프린터 519 CDI] 8대: 700호 1458, 125호 8040, 703서 2658, 70호 3864, 71두 3338, 73호 2553, 71두 3285, 711하 1058
  * [현대 스타리아 리무진] 4대: 125호 7665, 125호 9037, 142호 8407, 116허 1514
- * [기아 카니발 리무진] 1대: 101호 7681
- * [기아 카니발 하이리무진] 1대: 193호 5336
+ * [기아 카니발 하이리무진] 2대: 101호 7681, 193호 5336
  * [제네시스 GV80] 1대: 203호 5947
  * [제네시스 G90 리무진] 1대: 102부 4280
  * [제네시스 G90L] 1대: 116호 1336
@@ -51,8 +49,8 @@ export interface VipRealVehicle {
   uuid: string; // Immutable RFC 4122 UUID for DB and Storage asset path mapping
   plate: string; // e.g. '125호 9982'
   plateShort: string; // e.g. '9982'
-  model: string; // e.g. '벤츠 스프린터 투어러 (319 CDI)'
-  modelShort: string; // e.g. '스프린터 투어러 (319 CDI)'
+  model: string; // e.g. '벤츠 스프린터 319 CDI'
+  modelShort: string; // e.g. '스프린터 319 CDI'
   brand: '벤츠' | '현대' | '기아' | '제네시스';
   category: VehicleCategoryKey;
   categoryLabel: string;
@@ -132,59 +130,59 @@ export function stripManufacturerName(rawModel: string | undefined | null): stri
 }
 
 export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
-  // 1. [벤츠 스프린터 투어러 (319 CDI)] 1대
+  // 1. [벤츠 스프린터 319 CDI] 1대
   {
     id: 'veh-sp-9982',
     uuid: 'e0f7c22a-0001-4c12-8800-000000009982',
     plate: '125호 9982',
     plateShort: '9982',
-    model: '벤츠 스프린터 투어러 (319 CDI)',
-    modelShort: '스프린터 투어러 (319)',
-    brand: '벤츠',
-    category: 'sprinter',
-    categoryLabel: '벤츠 스프린터',
-    subType: '투어러 (319 CDI)',
-    capacity: '13인승',
-    status: '운행 중',
-    fuelType: '디젤',
-    imageUrl: '/images/vehicles/sprinter_319.webp',
-  },
-
-  // 2. [벤츠 스프린터 319 CDI] 2대
-  {
-    id: 'veh-sp-1458',
-    uuid: 'e0f7c22a-0001-4c12-8800-000000001458',
-    plate: '700호 1458',
-    plateShort: '1458',
     model: '벤츠 스프린터 319 CDI',
     modelShort: '스프린터 319 CDI',
     brand: '벤츠',
     category: 'sprinter',
     categoryLabel: '벤츠 스프린터',
     subType: '319 CDI',
-    capacity: '11인승',
+    capacity: '6인승',
     status: '운행 중',
     fuelType: '디젤',
     imageUrl: '/images/vehicles/sprinter_319.webp',
+  },
+
+  // 2. [벤츠 스프린터 519 CDI] 2대 (1458, 8040)
+  {
+    id: 'veh-sp-1458',
+    uuid: 'e0f7c22a-0001-4c12-8800-000000001458',
+    plate: '700호 1458',
+    plateShort: '1458',
+    model: '벤츠 스프린터 519 CDI',
+    modelShort: '스프린터 519 CDI',
+    brand: '벤츠',
+    category: 'sprinter',
+    categoryLabel: '벤츠 스프린터',
+    subType: '519 CDI',
+    capacity: '9인승',
+    status: '운행 중',
+    fuelType: '디젤',
+    imageUrl: '/images/vehicles/sprinter_519.webp',
   },
   {
     id: 'veh-sp-8040',
     uuid: 'e0f7c22a-0001-4c12-8800-000000008040',
     plate: '125호 8040',
     plateShort: '8040',
-    model: '벤츠 스프린터 319 CDI',
-    modelShort: '스프린터 319 CDI',
+    model: '벤츠 스프린터 519 CDI',
+    modelShort: '스프린터 519 CDI',
     brand: '벤츠',
     category: 'sprinter',
     categoryLabel: '벤츠 스프린터',
-    subType: '319 CDI',
+    subType: '519 CDI',
     capacity: '11인승',
     status: '차고지 대기',
     fuelType: '디젤',
-    imageUrl: '/images/vehicles/sprinter_319.webp',
+    imageUrl: '/images/vehicles/sprinter_519.webp',
   },
 
-  // 3. [벤츠 스프린터 519 CDI] 6대
+  // 3. [벤츠 스프린터 519 CDI] 6대 (2658, 3864, 3338, 2553, 3285, 1058)
   {
     id: 'veh-sp-2658',
     uuid: 'e0f7c22a-0001-4c12-8800-000000002658',
@@ -228,7 +226,7 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     category: 'sprinter',
     categoryLabel: '벤츠 스프린터',
     subType: '519 CDI',
-    capacity: '15인승',
+    capacity: '9인승',
     status: '운행 중',
     fuelType: '디젤',
     imageUrl: '/images/vehicles/sprinter_519.webp',
@@ -244,7 +242,7 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     category: 'sprinter',
     categoryLabel: '벤츠 스프린터',
     subType: '519 CDI',
-    capacity: '15인승',
+    capacity: '12인승',
     status: '운행 중',
     fuelType: '디젤',
     imageUrl: '/images/vehicles/sprinter_519.webp',
@@ -260,7 +258,7 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     category: 'sprinter',
     categoryLabel: '벤츠 스프린터',
     subType: '519 CDI',
-    capacity: '15인승',
+    capacity: '9인승',
     status: '차고지 대기',
     fuelType: '디젤',
     imageUrl: '/images/vehicles/sprinter_519.webp',
@@ -276,7 +274,7 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     category: 'sprinter',
     categoryLabel: '벤츠 스프린터',
     subType: '519 CDI',
-    capacity: '15인승',
+    capacity: '12인승',
     status: '운행 중',
     fuelType: '디젤',
     imageUrl: '/images/vehicles/sprinter_519.webp',
@@ -294,7 +292,7 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     category: 'staria',
     categoryLabel: '현대 스타리아',
     subType: '스타리아 리무진',
-    capacity: '7인승',
+    capacity: '9인승',
     status: '운행 중',
     fuelType: '디젤',
     imageUrl: '/images/vehicles/staria.webp',
@@ -310,7 +308,7 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     category: 'staria',
     categoryLabel: '현대 스타리아',
     subType: '스타리아 리무진',
-    capacity: '7인승',
+    capacity: '9인승',
     status: '운행 중',
     fuelType: '디젤',
     imageUrl: '/images/vehicles/staria.webp',
@@ -326,7 +324,7 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     category: 'staria',
     categoryLabel: '현대 스타리아',
     subType: '스타리아 리무진',
-    capacity: '7인승',
+    capacity: '9인승',
     status: '차고지 대기',
     fuelType: '디젤',
     imageUrl: '/images/vehicles/staria.webp',
@@ -342,29 +340,29 @@ export const VIP_REAL_VEHICLES: VipRealVehicle[] = [
     category: 'staria',
     categoryLabel: '현대 스타리아',
     subType: '스타리아 리무진',
-    capacity: '7인승',
+    capacity: '9인승',
     status: '운행 중',
     defaultDriver: '윤태준',
-    fuelType: '디젤',
+    fuelType: '가솔린',
     imageUrl: '/images/vehicles/staria.webp',
   },
 
-  // 5. [기아 카니발 리무진] 1대 (충전 스펙 미확인 - 관리자 현장 확인 필요)
+  // 5. [기아 카니발 하이리무진] 1대 (충전 스펙 미확인 - 관리자 현장 확인 필요)
   {
     id: 'veh-cn-7681',
     uuid: 'e0f7c22a-0001-4c12-8800-000000007681',
     plate: '101호 7681',
     plateShort: '7681',
-    model: '기아 카니발 리무진',
-    modelShort: '카니발 리무진',
+    model: '기아 카니발 하이리무진',
+    modelShort: '카니발 하이리무진',
     brand: '기아',
     category: 'carnival',
     categoryLabel: '기아 카니발',
-    subType: '카니발 리무진',
+    subType: '카니발 하이리무진',
     capacity: '7인승',
     status: '운행 중',
     fuelType: '가솔린',
-    imageUrl: '/images/thumb_carnival.jpg',
+    imageUrl: '/images/vehicles/carnival_high.webp',
   },
 
   // 6. [기아 카니발 하이리무진] 1대 (사용자 스크린샷 193호 5336 확인 완료)
@@ -494,7 +492,7 @@ export const VIP_VEHICLE_FLEET_CATEGORIES = [
     totalCount: 9,
     activeCount: 7,
     availableCount: 2,
-    details: '투어러(319) 1대 · 319 CDI 2대 · 519 CDI 6대',
+    details: '319 CDI 1대 · 519 CDI 8대',
     plates: ['125호 9982', '700호 1458', '125호 8040', '703서 2658', '70호 3864', '71두 3338', '73호 2553', '71두 3285', '711하 1058'],
   },
   {
@@ -512,7 +510,7 @@ export const VIP_VEHICLE_FLEET_CATEGORIES = [
     totalCount: 2,
     activeCount: 2,
     availableCount: 0,
-    details: '카니발 리무진 1대 · 하이리무진 1대',
+    details: '카니발 하이리무진 2대',
     plates: ['101호 7681', '193호 5336'],
   },
   {
@@ -653,8 +651,10 @@ export function getVehicleImage(
   const category = vehicle.category || '';
   const subType = (vehicle as any).subType || '';
 
-  // 1. Sprinter 519 CDI (6 vehicles: 2658, 3864, 3338, 2553, 3285, 1058)
+  // 1. Sprinter 519 CDI (8 vehicles: 1458, 8040, 2658, 3864, 3338, 2553, 3285, 1058)
   if (
+    plateShort === '1458' ||
+    plateShort === '8040' ||
     plateShort === '2658' ||
     plateShort === '3864' ||
     plateShort === '3338' ||
@@ -666,10 +666,8 @@ export function getVehicleImage(
     return '/images/vehicles/sprinter_519.webp';
   }
 
-  // 2. Sprinter 319 CDI & Tourer (3 vehicles: 1458, 8040, 9982)
+  // 2. Sprinter 319 CDI (1 vehicle: 9982)
   if (
-    plateShort === '1458' ||
-    plateShort === '8040' ||
     plateShort === '9982' ||
     (category === 'sprinter' && (model.includes('319') || subType.includes('319')))
   ) {
@@ -723,15 +721,16 @@ export function getVehicleImage(
     return '/images/vehicles/g90_lwb.webp';
   }
 
-  // 8. Carnival Hi-Limousine (193호 5336)
+  // 8. Carnival Hi-Limousine (101호 7681, 193호 5336)
   if (
+    plateShort === '7681' ||
     plateShort === '5336' ||
     (category === 'carnival' && (model.includes('하이리무진') || subType.includes('하이리무진')))
   ) {
     return '/images/vehicles/carnival_high.webp';
   }
 
-  // 9. Standard Carnival (101호 7681)
+  // 9. Unknown/unregistered Carnival: keep generic fallback
   if (category === 'carnival' || model.includes('카니발')) {
     return '/images/thumb_carnival.jpg';
   }
