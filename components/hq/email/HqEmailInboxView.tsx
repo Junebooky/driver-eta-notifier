@@ -786,13 +786,13 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
       if (currentDraft.savedScheduleIds) throw new Error('이미 저장된 요청입니다. 모바일·PC의 예약 목록에서 날짜별 배정을 진행해 주세요.');
       const decision = matchDecisionByEmail[currentSummary.id] || '';
       const candidates = matchesByEmail[currentSummary.id] || [];
+      const batch = emailBatchNeedsReview(currentDraft, vehicleSlots.length, candidates.length);
       if (currentDraft.tripType === 'cancellation') throw new Error('취소 요청은 배차관리에서 해당 예약을 확인한 뒤 직접 처리해 주세요.');
-      if ((!decision && (candidates.length || currentDraft.tripType === 'modification')) ||
-        (currentDraft.revisionMatchedScheduleId && decision !== currentDraft.revisionMatchedScheduleId)) {
+      if (!batch && ((!decision && (candidates.length || currentDraft.tripType === 'modification')) ||
+        (currentDraft.revisionMatchedScheduleId && decision !== currentDraft.revisionMatchedScheduleId))) {
         throw new Error('기존 예약 수정 여부를 먼저 확인해 주세요.');
       }
       const matched = candidates.find(c => c.scheduleId === decision);
-      const batch = emailBatchNeedsReview(currentDraft, vehicleSlots.length, candidates.length);
       let items: Array<Record<string, unknown>>;
       if (batch) {
         const plan = buildEmailBatchRevisionApproval(
