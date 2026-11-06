@@ -43,7 +43,7 @@ interface AlertItemCardProps {
   onOpenCustomerMessage: (bookingId: string, trigger?: CustomerNotificationTrigger) => void;
 }
 
-function AlertItemCard({
+export function AlertItemCard({
   item,
   feedback,
   isReminding,
