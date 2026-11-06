@@ -104,6 +104,7 @@ export interface HqEmailExtractedDraft {
 
   // Actual Passenger Entity (Riding in the vehicle)
   passengerName: string;
+  passengerNames?: string[]; // All named riders, separate from the reservation coordinator.
   passengerPhone: string; // Strictly phone number or empty, NEVER email
   passengerCount: number;
 
