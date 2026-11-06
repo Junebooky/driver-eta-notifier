@@ -405,7 +405,7 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
       resizeObserver?.disconnect();
       window.removeEventListener('resize', checkScroll);
     };
-  }, [checkScroll, filteredList]);
+  }, [checkScroll, filteredList, viewMode]);
 
   const scrollTable = (direction: 'left' | 'right') => {
     haptics.lightTap();
@@ -488,7 +488,7 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
             }`}
           title="오늘 및 향후 모든 배차 일정"
         >
-          <span>전체 예정</span>
+          <span>{viewMode === 'calendar' ? '전체 일정' : '전체 예정'}</span>
         </button>
 
         {/* 2) 오늘 출발 */}
