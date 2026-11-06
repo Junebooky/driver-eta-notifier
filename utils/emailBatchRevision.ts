@@ -4,7 +4,7 @@ import { buildEmailDispatchPlan, emailDispatchDays } from './emailDispatchPlan';
 import { findVipVehicle } from './vehicleData';
 
 export type EmailBatchDecisions = Record<string, string>;
-export type EmailBatchAssignment = { vehiclePlate?: string; driverId?: string };
+export type EmailBatchAssignment = { vehiclePlate?: string; driver?: EmailBatchSlot['driver'] };
 export type EmailBatchAssignments = Record<string, EmailBatchAssignment>;
 
 export const emailBatchKey = (date: string, zeroBasedVehicleIndex: number) => `${date}:${zeroBasedVehicleIndex}`;
@@ -218,11 +218,12 @@ export function buildEmailBatchRevisionApproval(
     }
     const override = assignments[row.key] || {};
     const plate = override.vehiclePlate ?? existing?.vehiclePlate ?? slots[row.index].vehiclePlate ?? '';
-    const driverId = override.driverId ?? existing?.driverId ?? slots[row.index].driver?.id ?? '';
-    const usingExistingDriver = existing?.driverId === driverId;
-    const driver = usingExistingDriver && existing ? {
-      id: driverId, name: existing.driverName, phone: existing.driverPhone, languages: ['ko'],
-    } : slots[row.index].driver?.id === driverId ? slots[row.index].driver : null;
+    const driver = override.driver !== undefined
+      ? override.driver
+      : existing?.driverId
+        ? { id: existing.driverId, name: existing.driverName, phone: existing.driverPhone, languages: ['ko'] }
+        : slots[row.index].driver;
+    // A reassigned driver comes from the verified HQ driver picker, never from guessed names.
     // Do not submit a synthetic driver identity for an override the UI hasn't verified.
     if (status === 'published' && (!plate || !driver?.id)) {
       throw new Error(`${row.date} ${row.index + 1}호차: 정확한 차량과 기사를 선택해 주세요.`);
@@ -252,7 +253,8 @@ export function buildEmailBatchRevisionApproval(
       driverName: status === 'published' ? driver?.name : undefined,
       driverPhone: status === 'published' ? driver?.phone : undefined,
     };
-    counts[existing ? (row.changes.length ? 'updated' : 'unchanged') : 'new']++;
+    const changedAssignment = Boolean(existing && (plate !== existing.vehiclePlate || driver?.id !== existing.driverId));
+    counts[existing ? (row.changes.length || changedAssignment ? 'updated' : 'unchanged') : 'new']++;
     items.push(item);
   }
 
