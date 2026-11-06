@@ -1,3 +1,4 @@
+import type { RouteWaypointItem } from './emailHq';
 import {
   AppliedPricingSnapshot,
   RequestedDriverLanguage,
@@ -35,6 +36,8 @@ export interface HqBooking {
   endTime?: string;
   pickupLocation: string;
   destination: string;
+  /** Ordered stops, including intermediate destinations; never reduce to only endpoints. */
+  routeWaypoints?: RouteWaypointItem[];
   pickupLat?: number;
   pickupLng?: number;
   destinationLat?: number;
