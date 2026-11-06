@@ -4,7 +4,6 @@ import React, { useEffect, useId, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   AlertTriangle,
-  Bell,
   Calendar,
   Car,
   CheckCircle2,
@@ -238,7 +237,7 @@ export function AlertItemCard({
               className="w-10 h-10 rounded-xl bg-white hover:bg-slate-50 active:scale-95 flex items-center justify-center text-slate-600 border border-slate-200 transition-all cursor-pointer shadow-2xs"
               aria-label={`기사 전화 (${item.driverPhone})`}
             >
-              <Phone className="w-4 h-4 text-[#1E60F3]" />
+              <Phone className="w-4 h-4 text-slate-600" />
             </a>
           </div>
         ) : (
@@ -441,12 +440,15 @@ export default function HqDispatchAlertDrawer({
         className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        {/* 1. Header (Reference Style: Blue bell circle icon + Title & Subtitle + Close 'X' pill) */}
+        {/* 1. Header (Reference Style: alarm.png icon + Title & Subtitle + Close 'X' pill) */}
         <div className="flex items-center justify-between gap-3 px-6 pt-6 pb-4 border-b border-slate-100 bg-white">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-[#EBF2FE] flex items-center justify-center shrink-0">
-              <Bell className="w-5 h-5 sm:w-6 sm:h-6 text-[#1E60F3] stroke-[2.2]" />
-            </div>
+            <img
+              src="/images/icons/alarm.png"
+              alt="배차 확인 알림"
+              className="w-10 h-10 sm:w-11 sm:h-11 object-contain shrink-0 select-none"
+              draggable={false}
+            />
             <div className="min-w-0">
               <h2 id={titleId} className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight">
                 배차 확인 알림
