@@ -27,6 +27,11 @@ import { buildEmailDispatchPlan } from '@/utils/emailDispatchPlan';
 import type { ExistingEmailBookingCandidate } from '@/services/emailBookingMatchService';
 import { prepareEmailRevisionDraft } from '@/utils/emailBookingRevision';
 import { HqEmailRevisionMatchPanel } from './HqEmailRevisionMatchPanel';
+import { HqEmailBatchRevisionPanel } from './HqEmailBatchRevisionPanel';
+import {
+  emailBatchNeedsReview, emailBatchRows, prepareEmailBatchRevisionDraft,
+  buildEmailBatchRevisionApproval, type EmailBatchDecisions, type EmailBatchAssignments,
+} from '@/utils/emailBatchRevision';
 import { haptics } from '@/utils/haptics';
 import { createRetryableJsonMutation } from '@/utils/retryableJsonMutation';
 import {
@@ -185,6 +190,11 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
   // Read-only match search runs only after the operator clicks AI extraction.
   const [matchesByEmail, setMatchesByEmail] = useState<Record<string, ExistingEmailBookingCandidate[]>>({});
   const [matchDecisionByEmail, setMatchDecisionByEmail] = useState<Record<string, string>>({});
+  const [originalAiDraftByEmail, setOriginalAiDraftByEmail] = useState<Record<string, HqEmailExtractedDraft>>({});
+  const [batchDecisionsByEmail, setBatchDecisionsByEmail] = useState<Record<string, EmailBatchDecisions>>({});
+  const [batchCancelIdsByEmail, setBatchCancelIdsByEmail] = useState<Record<string, string[]>>({});
+  const [batchCancelReasonsByEmail, setBatchCancelReasonsByEmail] = useState<Record<string, Record<string, string>>>({});
+  const [batchAssignmentsByEmail, setBatchAssignmentsByEmail] = useState<Record<string, EmailBatchAssignments>>({});
 
   // 6. Filter tabs ('all' | 'unprocessed' | 'reviewing' | 'completed')
   const [statusFilter, setStatusFilter] = useState<'all' | 'unprocessed' | 'reviewing' | 'completed'>('all');
@@ -602,6 +612,56 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
     saveEmailDraft(updated);
   }, [currentSummary]);
 
+  const handleChooseBatchTarget = (rowKey: string, selection: string) => {
+    if (!currentSummary || !currentDraft) return;
+    const emailId = currentSummary.id;
+    const candidates = matchesByEmail[emailId] || [];
+    const next = { ...(batchDecisionsByEmail[emailId] || {}), [rowKey]: selection };
+    setBatchDecisionsByEmail(prev => ({ ...prev, [emailId]: next }));
+    setBatchAssignmentsByEmail(prev => ({
+      ...prev, [emailId]: Object.fromEntries(Object.entries(prev[emailId] || {}).filter(([key]) => key !== rowKey)),
+    }));
+    if (selection && selection !== 'new') {
+      setBatchCancelIdsByEmail(prev => ({ ...prev, [emailId]: (prev[emailId] || []).filter(id => id !== selection) }));
+    }
+    // Rebuild from the original AI extraction, not a previously-merged draft.
+    // This prevents stop duplication and preserves old POIs across multiple choices.
+    const baseline = originalAiDraftByEmail[emailId] || currentDraft;
+    try {
+      const prepared = prepareEmailBatchRevisionDraft(baseline, vehicleSlots, candidates, next);
+      handleUpdateDraft(prepared);
+    } catch (error) {
+      // Do not discard the explicit choice, but require the operator to fix
+      // an ambiguous partial route manually before publish.
+      showToast(error instanceof Error ? error.message : '날짜별 경로를 확인해 주세요.');
+    }
+  };
+
+  const handleBatchCancel = (scheduleId: string, checked: boolean) => {
+    if (!currentSummary) return;
+    const id = currentSummary.id;
+    setBatchCancelIdsByEmail(prev => ({
+      ...prev,
+      [id]: checked ? [...new Set([...(prev[id] || []), scheduleId])] : (prev[id] || []).filter(v => v !== scheduleId),
+    }));
+  };
+
+  const handleBatchCancelReason = (scheduleId: string, reason: string) => {
+    if (!currentSummary) return;
+    const id = currentSummary.id;
+    setBatchCancelReasonsByEmail(prev => ({
+      ...prev, [id]: { ...(prev[id] || {}), [scheduleId]: reason },
+    }));
+  };
+
+  const handleBatchAssignment = (rowKey: string, assignment: EmailBatchAssignments[string]) => {
+    if (!currentSummary) return;
+    const id = currentSummary.id;
+    setBatchAssignmentsByEmail(prev => ({
+      ...prev, [id]: { ...(prev[id] || {}), [rowKey]: assignment },
+    }));
+  };
+
   const handleChooseRevision = (candidate: ExistingEmailBookingCandidate) => {
     if (!currentSummary || !currentDraft) return;
     const prepared = prepareEmailRevisionDraft(currentDraft, candidate);
@@ -686,6 +746,11 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
 
       const extracted: HqEmailExtractedDraft = data.draft;
       const matches: ExistingEmailBookingCandidate[] = Array.isArray(data.matches) ? data.matches : [];
+      setOriginalAiDraftByEmail(prev => ({ ...prev, [currentSummary.id]: extracted }));
+      setBatchDecisionsByEmail(prev => ({ ...prev, [currentSummary.id]: {} }));
+      setBatchCancelIdsByEmail(prev => ({ ...prev, [currentSummary.id]: [] }));
+      setBatchCancelReasonsByEmail(prev => ({ ...prev, [currentSummary.id]: {} }));
+      setBatchAssignmentsByEmail(prev => ({ ...prev, [currentSummary.id]: {} }));
       setMatchesByEmail(prev => ({ ...prev, [currentSummary.id]: matches }));
       setMatchDecisionByEmail(prev => ({
         ...prev,
@@ -727,24 +792,35 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
         throw new Error('기존 예약 수정 여부를 먼저 확인해 주세요.');
       }
       const matched = candidates.find(c => c.scheduleId === decision);
-      let items = buildEmailDispatchPlan(currentDraft, vehicleSlots, status);
-      if (matched) {
-        if (items.length !== 1 || (matched.groupTotalVehicles || 1) > 1)
-          throw new Error('여러 날짜·차량의 기존 배차는 개별 일정별 검토가 필요합니다. 배차관리에서 상세 수정해 주세요.');
-        if (matched.dispatchStatus === 'published' && status !== 'published')
-          throw new Error('기사에게 배포된 기존 배차를 미배정으로 전환할 수 없습니다.');
-        items = items.map(item => ({
-          ...item,
-          scheduleId: matched.scheduleId,
-          expectedVersion: matched.version,
-          bookingNo: matched.bookingNo || undefined,
-          eventId: matched.eventId || item.eventId,
-          groupId: matched.groupId || item.groupId,
-          groupVehicleIndex: matched.groupVehicleIndex || 1,
-          groupTotalVehicles: matched.groupTotalVehicles || 1,
-        }));
+      const batch = emailBatchNeedsReview(currentDraft, vehicleSlots.length, candidates.length);
+      let items: Array<Record<string, unknown>>;
+      if (batch) {
+        const plan = buildEmailBatchRevisionApproval(
+          currentDraft, vehicleSlots, candidates, batchDecisionsByEmail[currentSummary.id] || {},
+          batchCancelIdsByEmail[currentSummary.id] || [],
+          batchCancelReasonsByEmail[currentSummary.id] || {},
+          batchAssignmentsByEmail[currentSummary.id] || {},
+          status,
+        );
+        items = plan.items;
+      } else {
+        items = buildEmailDispatchPlan(currentDraft, vehicleSlots, status);
+        if (matched) {
+          if (items.length !== 1 || (matched.groupTotalVehicles || 1) > 1)
+            throw new Error('여러 날짜·차량은 일괄 비교에서 날짜별 예약을 연결해 주세요.');
+          if (matched.dispatchStatus === 'published' && status !== 'published')
+            throw new Error('기사에게 배포된 기존 배차를 미배정으로 전환할 수 없습니다.');
+          items = items.map(item => ({
+            ...item,
+            scheduleId: matched.scheduleId, expectedVersion: matched.version,
+            bookingNo: matched.bookingNo || undefined, eventId: matched.eventId || item.eventId,
+            groupId: matched.groupId || item.groupId,
+            groupVehicleIndex: matched.groupVehicleIndex || 1,
+            groupTotalVehicles: matched.groupTotalVehicles || 1,
+          }));
+        }
       }
-      if (currentDraft.savedScheduleIds && (Object.keys(currentDraft.savedScheduleIds).length !== items.length || items.some(item => !item.scheduleId))) throw new Error('이미 저장한 날짜·차량 구성이 변경되었습니다. 기존 미배정 예약을 먼저 확인·취소해 주세요.');
+      if (currentDraft.savedScheduleIds) throw new Error('이미 저장된 이메일 요청입니다. 배차관리에서 변경한 뒤 다시 분석해 주세요.');
       const approvedItems = items.map(item => ({
         ...item,
         sourceEmailId: currentSummary.id,
@@ -755,13 +831,17 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
       const response = await dispatchMutation.send('/api/schedules/dispatch', { items: approvedItems });
       const data = await response.json();
       if (!response.ok || !data.ok || data.schedules?.length !== items.length) throw new Error(data.error || '전체 일정 저장을 확인하지 못했습니다.');
-      const updated = { ...currentDraft, status: status === 'published' ? 'published' as const : 'saved' as const, associatedBookingId: data.schedules[0].id, savedScheduleIds: Object.fromEntries(items.map((item, index) => [`${item.date}:${item.groupVehicleIndex - 1}`, data.schedules[index].id])) };
+      const updated = { ...currentDraft, status: status === 'published' ? 'published' as const : 'saved' as const, associatedBookingId: data.schedules[0].id, savedScheduleIds: Object.fromEntries(items.map((item, index) => [`${item.date}:${Number(item.groupVehicleIndex || 1) - 1}`, data.schedules[index].id])) };
       saveEmailDraft(updated); setDraftsByEmailId(previous => ({ ...previous, [currentSummary.id]: updated }));
       setDispatchedSchedule(data.schedules[0]);
       data.schedules.forEach((schedule: import('@/data/ferrariSchedules').ScheduleItem, index: number) => onCreateBooking?.(mapScheduleItemToHqBooking(schedule, index)));
       await onSavedServer?.();
       if (status === 'published') setWorkflowStep('step4_dispatch_done');
-      showToast(matched && status === 'published' ? '기존 예약을 수정했습니다. 기사 재확인을 기다리고 고객 안내가 필요한지 확인해 주세요.' : status === 'published' ? `${items.length}건의 날짜별 배차가 저장되었습니다.` : '대표 모바일·PC의 미배정 배차 목록에 지정 요청이 저장되었습니다.');
+      showToast((batch || matched) && status === 'published'
+        ? '일괄 변경사항을 저장했습니다. 기사 재확인과 고객 안내 필요 여부를 확인해 주세요.'
+        : status === 'published'
+          ? `${items.length}건의 날짜별 배차가 저장되었습니다.`
+          : '대표 모바일·PC의 미배정 배차 목록에 지정 요청이 저장되었습니다.');
     } catch (error) { setDispatchError(error instanceof Error ? error.message : '배차 저장에 실패했습니다.'); }
     finally { setIsDispatching(false); }
   };
@@ -784,7 +864,16 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
       showToast('취소 요청은 배차관리에서 기존 예약을 확인하고 직접 처리해 주세요.');
       return;
     }
-    if (!decision && ((matchesByEmail[currentSummary.id] || []).length || currentDraft.tripType === 'modification')) {
+    const batch = emailBatchNeedsReview(currentDraft, vehicleSlots.length, (matchesByEmail[currentSummary.id] || []).length);
+    if (batch) {
+      const rows = emailBatchRows(currentDraft, vehicleSlots, matchesByEmail[currentSummary.id] || [], batchDecisionsByEmail[currentSummary.id] || {});
+      if (!rows.length || rows.some(row => !row.selection) ||
+        rows.filter(row => row.selection !== 'new').some(row => !row.previous) ||
+        new Set(rows.map(row => row.previous?.scheduleId).filter(Boolean)).size !== rows.filter(row => Boolean(row.previous)).length) {
+        showToast('날짜·호차별 기존 예약을 중복 없이 모두 선택해 주세요.');
+        return;
+      }
+    } else if (!decision && ((matchesByEmail[currentSummary.id] || []).length || currentDraft.tripType === 'modification')) {
       showToast('기존 예약 후보를 선택하거나 신규 예약으로 처리할지 먼저 확인해 주세요.');
       return;
     }
@@ -1162,13 +1251,27 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
           ) : (
             <div key={workflowStep} className="animate-step-slide">
               {workflowStep === 'step1_extract' && currentDraft && (
-                <HqEmailRevisionMatchPanel
-                  draft={currentDraft}
-                  matches={matchesByEmail[currentSummary.id] || []}
-                  decision={matchDecisionByEmail[currentSummary.id] || null}
-                  onSelect={handleChooseRevision}
-                  onNew={handleChooseNewBooking}
-                />
+                emailBatchNeedsReview(currentDraft, vehicleSlots.length, (matchesByEmail[currentSummary.id] || []).length)
+                  ? <HqEmailBatchRevisionPanel
+                      draft={currentDraft}
+                      slots={vehicleSlots}
+                      candidates={matchesByEmail[currentSummary.id] || []}
+                      decisions={batchDecisionsByEmail[currentSummary.id] || {}}
+                      cancelIds={batchCancelIdsByEmail[currentSummary.id] || []}
+                      cancelReasons={batchCancelReasonsByEmail[currentSummary.id] || {}}
+                      assignments={batchAssignmentsByEmail[currentSummary.id] || {}}
+                      onSelect={handleChooseBatchTarget}
+                      onCancel={handleBatchCancel}
+                      onCancelReason={handleBatchCancelReason}
+                      onAssignment={handleBatchAssignment}
+                    />
+                  : <HqEmailRevisionMatchPanel
+                      draft={currentDraft}
+                      matches={matchesByEmail[currentSummary.id] || []}
+                      decision={matchDecisionByEmail[currentSummary.id] || null}
+                      onSelect={handleChooseRevision}
+                      onNew={handleChooseNewBooking}
+                    />
               )}
               {workflowStep === 'step1_extract' && (
                 <HqStep1ExtractView
@@ -1209,6 +1312,26 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                   onUpdateVehicleSlots={setVehicleSlots}
                   isDispatching={isDispatching}
                   dispatchError={dispatchError}
+                  batchReview={currentDraft && emailBatchNeedsReview(currentDraft, vehicleSlots.length, (matchesByEmail[currentSummary.id] || []).length)
+                    ? <HqEmailBatchRevisionPanel
+                        draft={currentDraft}
+                        slots={vehicleSlots}
+                        candidates={matchesByEmail[currentSummary.id] || []}
+                        decisions={batchDecisionsByEmail[currentSummary.id] || {}}
+                        cancelIds={batchCancelIdsByEmail[currentSummary.id] || []}
+                        cancelReasons={batchCancelReasonsByEmail[currentSummary.id] || {}}
+                        assignments={batchAssignmentsByEmail[currentSummary.id] || {}}
+                        drivers={hqDrivers}
+                        onSelect={handleChooseBatchTarget}
+                        onCancel={handleBatchCancel}
+                        onCancelReason={handleBatchCancelReason}
+                        onAssignment={handleBatchAssignment}
+                        showAssignments
+                        isSubmitting={isDispatching}
+                        onApprove={() => void handleConfirmDispatch('published')}
+                        onRequestUnassigned={() => void handleConfirmDispatch('unassigned')}
+                      />
+                    : undefined}
                 />
               )}
 
