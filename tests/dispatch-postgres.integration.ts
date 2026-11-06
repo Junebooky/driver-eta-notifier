@@ -125,10 +125,10 @@ async function main() {
       vehicle_plate:oldSecond.row.vehicle_plate,driver_id:oldSecond.row.driver_id,
     });
     await commit(b,[editedFirst,cancelledSecond,replacement]);
-    const committed = await admin.query(`SELECT id,pickup_time,dispatch_status,(schedule_meta->>'version')::int AS version FROM cockpit.schedules ORDER BY date,id`);
+    const committed = await admin.query(`SELECT id,pickup_time,dispatch_status,schedule_meta->>'cancelReason' AS cancel_reason FROM cockpit.schedules ORDER BY date,id`);
     assert.equal(committed.rows.length,3);
     assert.ok(committed.rows.some(row => row.id === oldFirst.row.id && String(row.pickup_time).slice(0,8)==='10:00:00'));
-    assert.ok(committed.rows.some(row => row.id === oldSecond.row.id && row.dispatch_status==='cancelled' && row.version===2));
+    assert.ok(committed.rows.some(row => row.id === oldSecond.row.id && row.dispatch_status==='cancelled' && row.cancel_reason==='고객 수정본에서 2호차 취소'));
     assert.ok(committed.rows.some(row => row.id === replacement.row.id && row.dispatch_status==='published'));
     console.log('PASS multi-day/vehicle mixed revision: atomic rollback and explicit cancellation');
     // Cross-midnight buffer and unresolved legacy end times.
