@@ -18,6 +18,7 @@ export function HqDriverReportInbox() {
  const [corrected,setCorrected]=useState(''),[note,setNote]=useState(''),[version,setVersion]=useState('');
  const [search,setSearch]=useState('');
  const [excelFocus,setExcelFocus]=useState<ReportExcelFocus|null>(null);
+ const [replacement,setReplacement]=useState<{file:File;year:number;expectedVersion:string;previousName:string}|null>(null);
  const focusCounter=useRef(0);
  function viewExcelLocation(report:DriverReportSubmission){
   if(report.excel_status!=='applied'||!report.excel_sheet_name||!report.excel_row_number)return;
@@ -68,6 +69,22 @@ export function HqDriverReportInbox() {
  }
  async function action(body:unknown){setBusy(true);try{await json('/api/hq/driver-reports',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});await refresh();setSelected(null);setIsExpanded(false);setMessage('처리 결과를 갱신했습니다.');}catch(e){setMessage((e as Error).message);}finally{setBusy(false);}}
  const btn='inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 disabled:opacity-40';
+
+ async function uploadWorkbook(chosen:File,source?:{year:number;expectedVersion:string}){
+  if(busy)return;
+  setBusy(true);setMessage('');
+  try{
+   const headers:Record<string,string>={'Content-Type':'application/octet-stream','X-Workbook-Name':encodeURIComponent(chosen.name)};
+   if(source){headers['X-Workbook-Replace-Version']=source.expectedVersion;headers['X-Workbook-Replace-Year']=String(source.year);}
+   const result=await json('/api/hq/report-workbook',{method:'POST',headers,body:chosen});
+   setReplacement(null);setExcelFocus(null);setSelected(null);setIsExpanded(false);
+   await refresh();
+   setMessage(result.replacement
+    ? `새 원본으로 교체했습니다. 이전 보고 ${result.replacement.archivedReports}건은 이전 장부에 보관되며, 새 채팅 보고는 새 Excel에 누적됩니다.`
+    : '원본 백업과 작업본을 등록했습니다.');
+  }catch(error){setMessage((error as Error).message);}
+  finally{setBusy(false);}
+ }
  async function older(){try{const r=await json('/api/hq/driver-reports?before='+reports[reports.length-1]?.seq);setReports(p=>[...p,...r.submissions.filter((s:DriverReportSubmission)=>!p.some(a=>a.id===s.id))]);setMore(r.hasMore);}catch(e){setMessage((e as Error).message);}}
  return <section aria-label="기사 운행보고 자동 누적" className="space-y-4 rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6 shadow-xs">
   <div className="flex flex-wrap items-start gap-3"><HqExcelSectionIcon src="/images/icons/excel/icon_kakao.png" label="실시간 운행보고" count={unreadIds.length}/><div className="flex-1"><h2 className="text-lg sm:text-xl font-bold tracking-tight text-slate-800">실시간 운행보고</h2><p className="mt-1 text-sm text-slate-500">카카오톡 보고를 분석해 엑셀 기록부에 실시간으로 동기화해요.</p></div><div className="flex shrink-0 items-center gap-2"><span role="status" aria-live="polite" className="text-[12px] text-[#72829A]">{refreshComplete?'업데이트됨':''}</span><button type="button" aria-label="제출 현황 새로고침" title="보고·Excel·미열람 현황 다시 불러오기" disabled={busy||refreshing} onClick={()=>void manualRefresh()} className={btn+' group min-h-10 min-w-10 hover:border-slate-300 hover:bg-slate-50 transition-all'}>{refreshComplete?<Check size={16} className="text-[#1E60F3]"/>:<RefreshCw size={16} className={refreshing?'animate-spin':'transition-transform duration-500 ease-out group-hover:rotate-180'}/>}</button></div></div>
@@ -81,19 +98,36 @@ export function HqDriverReportInbox() {
      <p className="mt-0.5 truncate text-[14px] font-bold text-slate-800 tracking-tight sm:text-[15px]">{workbook?.filename||'등록된 원본이 없습니다'}</p>
     </div>
    </div>
-   <div className="flex shrink-0 items-center gap-2">
+   <div className="flex shrink-0 flex-wrap items-center gap-2">
     {!workbook&&<button disabled={busy} onClick={()=>file.current?.click()} className={btn+' h-10'}><Upload size={15}/>원본 등록</button>}
+    {workbook&&<button type="button" disabled={busy} onClick={()=>file.current?.click()}
+      className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 text-[13px] font-semibold text-slate-600 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20">
+      <Upload size={15} className="text-slate-500"/>원본 교체
+     </button>}
     {workbook&&<a className="hq-excel-download-lift inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[13px] font-semibold text-slate-700 shadow-2xs transition-all hover:bg-slate-50 hover:border-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/30 active:bg-slate-100" href={'/api/hq/report-workbook?download=1&year='+workbook.year}><Download size={15} className="text-slate-500"/>엑셀 다운로드 ⤓</a>}
    </div>
    <input ref={file} type="file" accept=".xlsx" className="hidden" aria-label="회사 Excel 원본 등록" onChange={e=>{
     const f=e.target.files?.[0];e.target.value='';if(!f)return;
     if(f.size>12*1024*1024){setMessage('Excel은 12MB 이하만 등록할 수 있습니다.');return;}
-    setBusy(true);void json('/api/hq/report-workbook',{method:'POST',headers:{'Content-Type':'application/octet-stream','X-Workbook-Name':encodeURIComponent(f.name)},body:f}).then(()=>refresh()).then(()=>setMessage('원본 백업과 작업본을 등록했습니다.')).catch(e=>setMessage(e.message)).finally(()=>setBusy(false));
+    if(workbook)setReplacement({file:f,year:workbook.year,expectedVersion:workbook.active_version,previousName:workbook.filename});
+    else void uploadWorkbook(f);
    }}/>
   </div>
   
 
-  {(workbook||excelFocus)&&<HqExcelWorkbookView year={excelFocus?.year??workbook!.year} focus={excelFocus} onCommitted={refresh}/>}
+  {workbook&&versions.length>1&&
+   <details className="rounded-xl px-1 text-xs text-slate-500">
+    <summary className="w-fit cursor-pointer py-1.5 font-medium hover:text-slate-700">이전 Excel 작업본 · 원본 다운로드</summary>
+    <div className="mt-1 flex flex-wrap gap-2">
+     {versions.filter(v=>v.id!==workbook.active_version).slice(0,8).map(v=>
+      <a key={v.id} href={'/api/hq/report-workbook?download=1&year='+workbook.year+'&version='+v.id}
+       className="inline-flex min-h-9 items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-600 hover:bg-slate-50">
+       <Download size={13}/>{v.kind==='original'?'이전 원본':'작업본'} · {new Date(v.created_at).toLocaleDateString('ko-KR',{timeZone:'Asia/Seoul'})}
+      </a>)}
+    </div>
+   </details>}
+
+  {(workbook||excelFocus)&&<HqExcelWorkbookView key={workbook?.active_version??'no-book'} year={excelFocus?.year??workbook!.year} focus={excelFocus} onCommitted={refresh}/>}
 
   {message&&<p role="status" className="rounded-xl bg-blue-50 p-3 text-sm text-slate-600">{message}</p>}
   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
