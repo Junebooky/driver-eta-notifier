@@ -709,16 +709,15 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                   <Users className="w-4 h-4 text-slate-400 shrink-0" />
                   <span>대표 탑승객</span>
                 </div>
-                <div className="text-right min-w-0 flex items-center gap-1">
-                  <span className="font-black text-slate-900">
-                    {passengerName || '승객 미지정'}
-                  </span>
-                  <span className="text-slate-500 font-normal text-xs ml-1">
-                    (총 {passengerCount}명)
-                  </span>
-                  {passengerPhone && (
-                    <span className="text-slate-500 font-normal text-xs ml-1">
-                      ({passengerPhone})
+                <div className="text-right min-w-0 flex flex-col items-end gap-0.5">
+                  <div className="flex flex-wrap items-center justify-end gap-1">
+                    <span className="font-black text-slate-900">{passengerName || '승객 미지정'}</span>
+                    <span className="text-slate-500 font-normal text-xs ml-1">(총 {passengerCount}명)</span>
+                    {passengerPhone && <span className="text-slate-500 font-normal text-xs ml-1">({passengerPhone})</span>}
+                  </div>
+                  {(extractedDraft?.passengerNames?.length || 0) > 1 && (
+                    <span className="text-[11px] text-slate-500 break-words">
+                      전체 탑승객 · {extractedDraft!.passengerNames!.join(', ')}
                     </span>
                   )}
                 </div>
