@@ -210,10 +210,12 @@ export function HqDriverReportInbox() {
       <img src="/images/icons/excel/icon_position.png" alt="" className="w-4 h-4 object-contain select-none" draggable={false}/>
       Excel에서 위치 보기 · {selected.excel_sheet_name} · {selected.excel_row_number}행
      </button>
-    :<p className="text-xs text-[#7A879A]">Excel 반영 확인 필요</p>}
+    :<p className="text-xs text-[#7A879A]">{selected.excel_status==='archived'
+      ? '이전 Excel에 보관된 보고입니다. 새 원본에는 자동 중복 등록되지 않습니다.'
+      : 'Excel 반영 확인 필요'}</p>}
    {(selected.last_error||selected.parsed.reviewReasons.length>0)&&<details className="text-xs text-[#6D7B90]"><summary className="cursor-pointer py-1">확인 항목 보기</summary><div className="mt-2 space-y-1 rounded-xl bg-white p-3">{selected.parsed.reviewReasons.map((reason,index)=><p key={index}>{reason}</p>)}{selected.last_error&&<p>{selected.last_error}</p>}</div></details>}
    <div aria-label="제출 대화 기록" className="max-h-60 space-y-2 overflow-y-auto">{visibleHqReportMessages(chat).map(m=><p key={m.id} className="whitespace-pre-wrap rounded-xl bg-white p-3 text-xs leading-5 text-[#596981]"><span className="font-semibold">{m.sender_type==='driver'?'기사':'관리자'} · </span>{m.body}</p>)}</div>
-   {<><label className="block text-xs font-medium text-slate-500">확인한 보고 내용 (원문은 보관됩니다)<textarea value={corrected} onChange={e=>setCorrected(e.target.value)} rows={7} className="mt-2 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700"/></label><label className="block text-xs text-slate-500">검토 메모<input value={note} onChange={e=>setNote(e.target.value)} className="mt-2 w-full rounded-lg border border-slate-200 p-3 text-sm"/></label><div className="flex flex-wrap gap-2"><button disabled={busy} className={btn} onClick={()=>void action({action:'review',id:selected.id,revision:selected.revision,correctedMessage:corrected,note})}>{selected.applied_version?'정정 후 기존 기록 반영':'확인 후 반영'}</button><button disabled={busy} className={btn} onClick={()=>void action({action:'retry',id:selected.id})}>기존 내용 재처리</button></div></>}
+   {<><label className="block text-xs font-medium text-slate-500">확인한 보고 내용 (원문은 보관됩니다)<textarea value={corrected} onChange={e=>setCorrected(e.target.value)} rows={7} className="mt-2 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700"/></label><label className="block text-xs text-slate-500">검토 메모<input value={note} onChange={e=>setNote(e.target.value)} className="mt-2 w-full rounded-lg border border-slate-200 p-3 text-sm"/></label><div className="flex flex-wrap gap-2"><button disabled={busy} className={btn} onClick={()=>void action({action:'review',id:selected.id,revision:selected.revision,correctedMessage:corrected,note})}>{selected.applied_version?'정정 후 기존 기록 반영':'확인 후 반영'}</button>{selected.excel_status!=='archived'&&<button disabled={busy} className={btn} onClick={()=>void action({action:'retry',id:selected.id})}>기존 내용 재처리</button>}</div></>}
    <details><summary className="text-xs text-slate-500">수정 이력</summary>{audit.map(a=><p key={a.id} className="mt-2 text-xs text-slate-500">{a.created_at} · {a.action}</p>)}</details>
   </div>}
       </div>
@@ -222,5 +224,30 @@ export function HqDriverReportInbox() {
    </div>;})}
    {!reports.some(s=>reportMatchesFilter(s.excel_status,filter)&&(!search||[s.parsed.draft.driver,s.parsed.draft.customer,s.parsed.draft.plate,s.parsed.draft.date].some(v=>v.includes(search))))&&<p className="py-8 text-center text-sm text-[#8B97A8]">{reports.length?'조건에 맞는 보고가 없습니다.':'아직 접수된 운행보고가 없습니다.'}</p>}
   </div>
+  {replacement&&
+   <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/25 p-4" role="presentation">
+    <div role="dialog" aria-modal="true" aria-labelledby="hq-excel-replace-title"
+      className="w-full max-w-md rounded-[24px] border border-slate-100 bg-white p-5 shadow-[0_18px_65px_rgba(15,23,42,0.14)] sm:p-6">
+     <h3 id="hq-excel-replace-title" className="text-lg font-bold tracking-tight text-slate-900">Excel 원본 교체</h3>
+     <p className="mt-2 text-sm leading-6 text-slate-500">
+      기존 장부와 보고 기록은 백업으로 보관합니다. 새 파일을 원본으로 등록하면 이후 채팅 운행보고가 이 파일에 누적됩니다.
+     </p>
+     <div className="mt-4 space-y-3 rounded-2xl bg-slate-50 p-4">
+      <div><p className="text-[11px] font-medium text-slate-400">현재 원본 · {replacement.year}년</p>
+       <p className="mt-1 break-all text-sm font-semibold text-slate-700">{replacement.previousName}</p></div>
+      <div className="border-t border-slate-200 pt-3"><p className="text-[11px] font-medium text-slate-400">새 원본</p>
+       <p className="mt-1 break-all text-sm font-semibold text-slate-900">{replacement.file.name}</p></div>
+     </div>
+     <p className="mt-3 text-xs leading-5 text-slate-500">
+      이전에 반영된 보고는 옛 장부에 보관하며, 새 원본에 다시 넣지 않습니다. 사모님 원본의 기존 기록 중복을 방지하기 위한 방식입니다.
+     </p>
+     <div className="mt-5 grid grid-cols-2 gap-2.5">
+      <button type="button" disabled={busy} onClick={()=>setReplacement(null)}
+       className="min-h-11 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">취소</button>
+      <button type="button" disabled={busy} onClick={()=>void uploadWorkbook(replacement.file,{year:replacement.year,expectedVersion:replacement.expectedVersion})}
+       className="min-h-11 rounded-xl bg-[#1E60F3] text-sm font-semibold text-white hover:bg-[#1955DA] disabled:opacity-50">{busy?'등록 중...':'이 원본으로 교체'}</button>
+     </div>
+    </div>
+   </div>}
  </section>;
 }
