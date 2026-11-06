@@ -111,7 +111,7 @@ export async function POST(req:NextRequest){
    }else throw new Error('요청을 확인해 주세요.');
   }else{
    const name=decodeURIComponent(req.headers.get('x-workbook-name')||'');
-   if(!/\\.xlsx$/i.test(name)||name.length>200||/[\\r\\n/\\\\]/.test(name))throw new Error('Excel 파일 이름을 확인해 주세요.');
+   if(!/\.xlsx$/i.test(name)||name.length>200||/[\r\n/\\]/.test(name))throw new Error('Excel 파일 이름을 확인해 주세요.');
    const replaceVersion=req.headers.get('x-workbook-replace-version');
    if(replaceVersion!==null){
     const year=Number(req.headers.get('x-workbook-replace-year'));
