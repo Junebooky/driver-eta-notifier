@@ -1,7 +1,7 @@
 import {NextRequest,NextResponse} from 'next/server';
 import {requireHqAdmin} from '@/lib/auth/serverAuth';
 import {supabaseAdmin as db} from '@/lib/supabase/server';
-import {check,currentWorkbook,registerWorkbook,drainReports,approveMonth,processReport,nightEndHour} from '@/lib/driverReports/service';
+import {check,currentWorkbook,registerWorkbook,replaceWorkbook,drainReports,approveMonth,processReport,nightEndHour} from '@/lib/driverReports/service';
 import {workbookFromFile} from '@/utils/kakaoExcelWorkbook';
 import {parseDriverReport} from '@/utils/driverReportChat';
 import {isReportServiceType} from '@/utils/reportServiceTypes';
@@ -34,7 +34,7 @@ export async function GET(req:NextRequest){
   if(version&&version!=='original'&&!UUID.test(version))throw new Error('버전을 확인해 주세요.');
   if(req.nextUrl.searchParams.get('download')==='1'){
    if(!w)throw new Error('장부가 없습니다.');let bytes=w.bytes;
-   if(version){let q=db.from('report_workbook_versions').select('*').eq('org_id',org).eq('ledger_year',w.year!);q=version==='original'?q.eq('kind','original'):q.eq('id',version);const r=await q.single();check(r.error);bytes=await readWorkbook(r.data!);}
+   if(version){let q=db.from('report_workbook_versions').select('*').eq('org_id',org).eq('ledger_year',w.year!);q=version==='original'?q.eq('kind','original').order('generation',{ascending:false}).limit(1):q.eq('id',version);const r=await q.single();check(r.error);bytes=await readWorkbook(r.data!);}
    if(!version)bytes=refitWorkbookRouteColumns(bytes); // Only the latest download gets presentation widths.
    return new NextResponse(Uint8Array.from(bytes),{headers:{'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','Content-Disposition':`attachment; filename*=UTF-8''${encodeURIComponent(w.filename)}`,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
   }
@@ -50,6 +50,7 @@ export async function POST(req:NextRequest){
  const a=await requireHqAdmin(req);if(!a.ok||!a.session)return privateJson({ok:false},a.statusCode);if(!sameOrigin(req))return privateJson({ok:false},403);
  try{
   const s=a.session;
+  let replacement:null|Awaited<ReturnType<typeof replaceWorkbook>>=null;
   if(req.headers.get('content-type')?.startsWith('application/json')){
    const b=JSON.parse(new TextDecoder().decode(await boundedBody(req,4096)));
    if(b.action==='sort_month'){
@@ -109,8 +110,17 @@ export async function POST(req:NextRequest){
     const r=await db.rpc('restore_report_workbook',{p_org:s.org,p_actor:s.userId,p_target:b.version,p_expected:b.expected});check(r.error);if(!r.data)return privateJson({ok:false,error:'장부가 변경되었습니다.'},409);
    }else throw new Error('요청을 확인해 주세요.');
   }else{
-   const name=decodeURIComponent(req.headers.get('x-workbook-name')||'');if(!/\.xlsx$/i.test(name)||name.length>200||/[\r\n/\\]/.test(name))throw new Error('Excel 파일 이름을 확인해 주세요.');await registerWorkbook(s,await boundedBody(req,12*1024*1024),name);
+   const name=decodeURIComponent(req.headers.get('x-workbook-name')||'');
+   if(!/\\.xlsx$/i.test(name)||name.length>200||/[\\r\\n/\\\\]/.test(name))throw new Error('Excel 파일 이름을 확인해 주세요.');
+   const replaceVersion=req.headers.get('x-workbook-replace-version');
+   if(replaceVersion!==null){
+    const year=Number(req.headers.get('x-workbook-replace-year'));
+    if(!UUID.test(replaceVersion)||!Number.isInteger(year)||year<2000||year>2099)
+     throw new Error('교체할 Excel의 현재 버전과 연도를 확인해 주세요.');
+    replacement=await replaceWorkbook(s,await boundedBody(req,12*1024*1024),name,year,replaceVersion);
+   }else await registerWorkbook(s,await boundedBody(req,12*1024*1024),name);
   }
-  try{await drainReports(s);}catch{/* durable queue */}return privateJson({ok:true});
+  try{await drainReports(s);}catch{/* durable queue */}
+  return privateJson({ok:true,...(replacement?{replacement}:{})});
  }catch(e){return failure(e);}
 }
