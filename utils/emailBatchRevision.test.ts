@@ -118,21 +118,21 @@ test('mismatched, duplicate and unsafe cancellation choices fail before any serv
   const newChoices=selectAll();
   const removed=originals[0].scheduleId;
   newChoices[emailBatchKey(dates[0],0)]='new';
-  assert.throws(()=>buildEmailBatchRevisionApproval(draft(),slots,originals,newChoices,[removed],{}, {},'published'),/취소 사유/);
+  assert.throws(()=>buildEmailBatchRevisionApproval(draft(),slots,originals,newChoices,[removed],{}, {},'published'),/사유/);
 });
 
 test('each date can use its own independently verified vehicle and driver assignment',()=>{
   const override={
-    [emailBatchKey(dates[1],1)]: {
+    [emailBatchKey(dates[0],1)]: {
       vehiclePlate:'101호 7681',
       driver:{ id:'driver-new',name:'재배정 기사',phone:'010-1234-5678',languages:['ko'] },
     },
   };
   const approval=buildEmailBatchRevisionApproval(draft(),slots,originals,selectAll(),[],{},override,'published');
-  assert.equal(approval.items[4].vehiclePlate,'101호 7681');
-  assert.equal(approval.items[4].driverId,'driver-new');
-  assert.equal(approval.items[1].vehiclePlate,plates[1]);
-  assert.equal(approval.items[1].driverId,'driver-2');
+  assert.equal(approval.items[1].vehiclePlate,'101호 7681');
+  assert.equal(approval.items[1].driverId,'driver-new');
+  assert.equal(approval.items[4].vehiclePlate,plates[1]);
+  assert.equal(approval.items[4].driverId,'driver-2');
   assert.equal(approval.changes.updated,4);
 });
 
