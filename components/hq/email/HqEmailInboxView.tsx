@@ -761,7 +761,7 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
       data.schedules.forEach((schedule: import('@/data/ferrariSchedules').ScheduleItem, index: number) => onCreateBooking?.(mapScheduleItemToHqBooking(schedule, index)));
       await onSavedServer?.();
       if (status === 'published') setWorkflowStep('step4_dispatch_done');
-      showToast(status === 'published' ? `${items.length}건의 날짜별 배차가 저장되었습니다.` : '대표 모바일·PC의 미배정 배차 목록에 지정 요청이 저장되었습니다.');
+      showToast(matched && status === 'published' ? '기존 예약을 수정했습니다. 기사 재확인을 기다리고 고객 안내가 필요한지 확인해 주세요.' : status === 'published' ? `${items.length}건의 날짜별 배차가 저장되었습니다.` : '대표 모바일·PC의 미배정 배차 목록에 지정 요청이 저장되었습니다.');
     } catch (error) { setDispatchError(error instanceof Error ? error.message : '배차 저장에 실패했습니다.'); }
     finally { setIsDispatching(false); }
   };
