@@ -3,6 +3,9 @@
 import React, { useState } from 'react';
 import { CarFront, Check, ChevronRight, CircleHelp, Loader2, Plus, Trash2, UserRound } from 'lucide-react';
 import type { AvailableVehicleItem } from '@/utils/availabilityEngine';
+import type { HqEmailExtractedDraft } from '@/types/emailHq';
+import { getUnconfirmedEmailRouteStops } from '@/utils/emailRoutePlaceVerification';
+import { HqRoutePlaceVerification } from './HqRoutePlaceVerification';
 import { VIP_REAL_VEHICLES } from '@/utils/vehicleData';
 import { driverSupportsEnglish } from './HqDriverSelectModal';
 import { getVerifiedVehiclePhoto, HqVehicleSelectModal } from './HqVehicleSelectModal';
@@ -10,6 +13,8 @@ import type { VehicleSlotAssignment } from './HqStep2BookingDetailView';
 
 interface HqStep5AssignmentPanelProps {
   slots: VehicleSlotAssignment[];
+  draft?: HqEmailExtractedDraft | null;
+  onUpdateDraft?: (draft: HqEmailExtractedDraft) => void;
   vehicles?: AvailableVehicleItem[];
   loading: boolean;
   fleetError?: string;
@@ -26,13 +31,15 @@ const findVehicle = (plate?: string) =>
   VIP_REAL_VEHICLES.find((item) => item.plate.replace(/\s/g, '') === plate?.replace(/\s/g, ''));
 
 export const HqStep5AssignmentPanel: React.FC<HqStep5AssignmentPanelProps> = ({
-  slots, vehicles, loading, fleetError, language, onLanguageChange, onUpdateSlots,
+  slots, draft, onUpdateDraft, vehicles, loading, fleetError, language, onLanguageChange, onUpdateSlots,
   onSelectDriver, onRequestHelp, onConfirm, isDispatching,
 }) => {
   const [vehiclePickerIndex, setVehiclePickerIndex] = useState<number | null>(null);
   const selectedDriverIds = slots.map((slot) => slot.driver?.id).filter((id): id is string => Boolean(id));
   const uniqueDrivers = new Set(selectedDriverIds).size === selectedDriverIds.length;
-  const allAssigned = !loading && !fleetError && uniqueDrivers && slots.length > 0 && slots.every((slot) => {
+  const unconfirmedStops = draft ? getUnconfirmedEmailRouteStops(draft) : [];
+  const allPlacesConfirmed = Boolean(draft) && unconfirmedStops.length === 0;
+  const allAssigned = allPlacesConfirmed && !loading && !fleetError && uniqueDrivers && slots.length > 0 && slots.every((slot) => {
     const vehicle = vehicles?.find((item) => item.plate === slot.vehiclePlate);
     return Boolean(vehicle?.isAvailable && slot.driver && (language !== 'english' || driverSupportsEnglish(slot.driver)));
   });
@@ -172,6 +179,8 @@ export const HqStep5AssignmentPanel: React.FC<HqStep5AssignmentPanelProps> = ({
         })}
       </div>
 
+      {draft && <HqRoutePlaceVerification draft={draft} onUpdateDraft={onUpdateDraft} disabled={isDispatching} />}
+
       <div className="flex flex-wrap items-center justify-between gap-2 px-1">
         <div className="flex items-center gap-2 text-xs text-slate-500">
           <CircleHelp className="h-4 w-4 shrink-0 text-slate-400" strokeWidth={1.7} />
@@ -188,7 +197,11 @@ export const HqStep5AssignmentPanel: React.FC<HqStep5AssignmentPanelProps> = ({
         <Loader2 className="h-4 w-4 animate-spin text-slate-400" /> 차량 가용성 확인 중
       </p>}
       {!allAssigned && !loading && !fleetError && (
-        <p className="text-center text-xs text-slate-500">차량과 기사님을 모두 지정하면 배차를 확정할 수 있습니다.</p>
+        <p className="text-center text-xs text-slate-500">
+          {unconfirmedStops.length > 0
+            ? `위 운행 경로에서 미확정 장소 ${unconfirmedStops.length}곳의 TMAP 주소를 먼저 확인해 주세요.`
+            : '차량과 기사님을 모두 지정하면 배차를 확정할 수 있습니다.'}
+        </p>
       )}
       <button type="button" onClick={onConfirm} disabled={!allAssigned || isDispatching}
         className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#1E60F3] px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#1855DB] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500">
