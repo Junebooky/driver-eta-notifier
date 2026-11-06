@@ -277,12 +277,12 @@ export function mapHydratedRowToScheduleItem(rawRow: Record<string, any>): Sched
     time_display: resolvedTimeDisplay,
     flightType: isDeparture ? 'departure' : 'arrival',
     origin_name: row.origin,
-    origin_address: row.origin_address || '',
+    origin_address: meta.routeWaypoints?.[0]?.address || row.origin_address || '',
     origin_lat: meta.routeWaypoints?.[0]?.lat ?? row.origin_lat ?? 37.5042,
     origin_lng: meta.routeWaypoints?.[0]?.lng ?? row.origin_lng ?? 127.0425,
     origin_preset_id: `preset-${(row.origin || 'origin').replace(/\s+/g, '-').toLowerCase()}`,
     destination_name: row.destination,
-    destination_address: row.destination_address || '',
+    destination_address: meta.routeWaypoints?.[meta.routeWaypoints.length-1]?.address || row.destination_address || '',
     destination_lat: meta.routeWaypoints?.[meta.routeWaypoints.length-1]?.lat ?? row.destination_lat ?? 37.4495,
     destination_lng: meta.routeWaypoints?.[meta.routeWaypoints.length-1]?.lng ?? row.destination_lng ?? 126.4512,
     destination_preset_id: `preset-${(row.destination || 'dest').replace(/\s+/g, '-').toLowerCase()}`,
@@ -292,7 +292,16 @@ export function mapHydratedRowToScheduleItem(rawRow: Record<string, any>): Sched
     passenger_count: row.passenger_count || 1,
     flight: row.flight_number || undefined,
     notes: row.protocol_notes || undefined,
-    adminWaypoints:meta.routeWaypoints?.slice(1,-1).filter(p=>p.isPoiConfirmed&&Number.isFinite(p.lat)&&Number.isFinite(p.lng)).map(p=>({id:p.id,name:p.location,shortName:p.location,lat:p.lat!,lng:p.lng!,category:'CUSTOM' as const})),
+    /** Preserve the full original order, time and address for every schedule consumer. */
+    routeWaypoints: meta.routeWaypoints?.map((point) => ({ ...point })),
+    /** Driver navigation uses the two verified intermediate stops, not just the endpoints. */
+    adminWaypoints: meta.routeWaypoints?.slice(1, -1)
+      .filter((p) => p.isPoiConfirmed && Number.isFinite(p.lat) && Number.isFinite(p.lng))
+      .map((p) => ({
+        id: p.id, name: p.location, shortName: p.location, address: p.address,
+        lat: p.lat!, lng: p.lng!, category: 'CUSTOM' as const,
+      })),
+    isAdminRoute: Boolean(meta.routeWaypoints && meta.routeWaypoints.length > 2),
     org_id: row.org_id,
     driver_id: row.driver_id || undefined,
     driver_name: row.driver_name || undefined,
