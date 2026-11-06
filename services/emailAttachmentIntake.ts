@@ -1,0 +1,91 @@
+import { createHash } from 'node:crypto';
+import { read, utils } from 'xlsx';
+import { unzipSync } from 'fflate';
+
+export const MAX_EMAIL_ATTACHMENT_BYTES = 8 * 1024 * 1024;
+export const MAX_EMAIL_ATTACHMENT_TOTAL_BYTES = 12 * 1024 * 1024;
+export const MAX_EMAIL_SCHEDULE_ATTACHMENTS = 4;
+
+export interface ScheduleAttachmentInput {
+  filename: string;
+  contentType: string;
+  content: Buffer;
+}
+export interface AnalyzedScheduleAttachment {
+  filename: string;
+  kind: 'excel' | 'pdf';
+  sha256: string;
+  size: number;
+  /** Excel cell text only; PDFs are passed to Gemini as PDF inline data. */
+  text?: string;
+  pdfBase64?: string;
+}
+export interface AttachmentAnalysis {
+  analyzed: AnalyzedScheduleAttachment[];
+  ignored: string[];
+}
+
+/** Validate MIME by content signature, never only by sender-controlled extension. */
+export function analyzeScheduleAttachments(attachments: ScheduleAttachmentInput[]): AttachmentAnalysis {
+  const analyzed: AnalyzedScheduleAttachment[] = [];
+  const ignored: string[] = [];
+  if (attachments.length > 20) throw new Error('첨부파일이 너무 많습니다. 필요한 일정표만 별도로 보내 주세요.');
+  let totalBytes = 0;
+  for (const file of attachments) {
+    const name = file.filename.replace(/[\\/\x00-\x1f]/g, '_').slice(0, 160) || '이름 없는 첨부파일';
+    const ext = name.toLowerCase().match(/\.(xlsx|xls|pdf)$/)?.[1];
+    if (!ext) { ignored.push(name); continue; }
+    const bytes = file.content;
+    if (!Buffer.isBuffer(bytes) || !bytes.length || bytes.length > MAX_EMAIL_ATTACHMENT_BYTES) {
+      throw new Error(`${name}: 파일 크기는 8MB 이하여야 합니다.`);
+    }
+    totalBytes += bytes.length;
+    if (totalBytes > MAX_EMAIL_ATTACHMENT_TOTAL_BYTES || analyzed.length >= MAX_EMAIL_SCHEDULE_ATTACHMENTS) {
+      throw new Error('분석할 일정표는 최대 4개이며 전체 12MB 이하여야 합니다.');
+    }
+    const digest = createHash('sha256').update(bytes).digest('hex');
+    if (ext === 'pdf') {
+      if (bytes.subarray(0, 5).toString('ascii') !== '%PDF-') {
+        throw new Error(`${name}: 올바른 PDF 파일이 아닙니다.`);
+      }
+      analyzed.push({ filename: name, kind: 'pdf', sha256: digest, size: bytes.length, pdfBase64: bytes.toString('base64') });
+      continue;
+    }
+    const isZip = bytes.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 0x03, 0x04]));
+    const isXls = bytes.subarray(0, 8).equals(Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]));
+    if ((ext === 'xlsx' && !isZip) || (ext === 'xls' && !isXls)) {
+      throw new Error(`${name}: 확장자와 실제 Excel 형식이 일치하지 않습니다.`);
+    }
+    if (isZip) {
+      let expanded = 0;
+      unzipSync(bytes, { filter: entry => {
+        expanded += entry.originalSize;
+        if (expanded > 48 * 1024 * 1024) throw new Error(`${name}: 압축 해제 크기가 너무 큽니다.`);
+        return false;
+      }});
+    }
+    try {
+      // Bounded parsing: reject oversized/ambiguous documents instead of silently truncating a route.
+      const book = read(bytes, { type: 'buffer', sheetRows: 1502, cellDates: false, bookVBA: false });
+      if (book.SheetNames.length > 12) throw new Error('시트가 12개를 초과합니다.');
+      let text = '';
+      for (const sheetName of book.SheetNames) {
+        const sheet = book.Sheets[sheetName];
+        const rows = utils.sheet_to_json<Array<string | number>>(sheet, { header: 1, raw: false, defval: '', blankrows: false });
+        if (rows.length >= 1502) throw new Error('시트당 1500행을 초과합니다.');
+        text += `\n[Excel ${name} / Sheet: ${sheetName}]\n`;
+        for (const [rowIndex, row] of rows.entries()) {
+          if (row.length > 60) throw new Error('표가 60열을 초과합니다.');
+          const cells = row.map((val, col) => val === '' ? '' : `${col + 1}:${String(val).replace(/[\r\n\t]+/g, ' ').slice(0, 500)}`).filter(Boolean);
+          if (cells.length) text += `행 ${rowIndex + 1} | ${cells.join(' | ')}\n`;
+          if (text.length > 100_000) throw new Error('일정표 텍스트가 너무 깁니다.');
+        }
+      }
+      if (!text.trim()) throw new Error('읽을 수 있는 셀이 없습니다.');
+      analyzed.push({ filename: name, kind: 'excel', sha256: digest, size: bytes.length, text });
+    } catch (error) {
+      throw new Error(`${name}: Excel 분석 실패 — ${error instanceof Error ? error.message : '문서 구조를 확인해 주세요.'}`);
+    }
+  }
+  return { analyzed, ignored };
+}
