@@ -296,7 +296,10 @@ export function enrichBookingDraftWithEmailEvidence(
     const onDay = points.filter(p => (p.date || draft.pickupDate) === source.date);
     const matching = onDay.filter(p => sameVenue(p.location, source.location));
     const matchingAtTime = matching.find(p => Boolean(source.time) && p.time === source.time);
-    const matchingUntimed = !source.time ? matching.at(-1) : undefined;
+    // An untimed return is a NEW visit when the current last stop is elsewhere.
+    // Do not overwrite an earlier lunch/standby visit to the same hotel.
+    const matchingUntimed = !source.time && onDay.at(-1) &&
+      sameVenue(onDay.at(-1)!.location, source.location) ? onDay.at(-1) : undefined;
     const existing = matchingAtTime || matchingUntimed;
     if (existing) {
       if (source.clientAddress) existing.clientAddress = source.clientAddress;
