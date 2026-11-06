@@ -98,7 +98,26 @@ test('explicit road-address appointment missing from AI is restored with review 
   withoutFire.waypoints = withoutFire.waypoints?.filter(p=>p.location!=='Samsung Fire');
   const result = enrichBookingDraftWithEmailEvidence(withoutFire, email);
   assert.equal(result.waypoints?.length, 14);
-  assert.ok(result.warnings.some(w=>w.includes('고객 원문에서 복원한 경유지')));
+  assert.ok(result.warnings.some(w=>w.includes('고객 메일의 명시된 방문지를 복원했습니다')));
+});
+
+test('even a blank AI waypoint list is rebuilt from the 14 explicitly stated stops', () => {
+  const blank = draft();
+  blank.waypoints = undefined;
+  blank.pickupLocation = '';
+  blank.dropoffLocation = '';
+  const result = enrichBookingDraftWithEmailEvidence(blank, email);
+  assert.equal(result.waypoints?.length, 14);
+  assert.deepEqual(
+    [...new Set(result.waypoints?.map(p=>p.date))],
+    ['2026-11-18','2026-11-19','2026-11-20']
+  );
+  assert.equal(result.waypoints?.[0].location, '김포국제공항 국제선');
+  assert.equal(result.waypoints?.at(-1)?.location, '인천국제공항 제1여객터미널');
+  assert.equal(result.waypoints?.at(-1)?.time, '');
+  assert.equal(result.waypoints?.find(p=>p.location==='삼성화재')?.clientAddress,
+    '14 Seocho-daero 74-gil, Seocho-gu, Seoul');
+  assert.ok(result.warnings.some(w=>w.includes('고객 메일의 명시된 방문지를 복원했습니다')));
 });
 
 test('canonical venue translation never guesses an unknown venue', () => {
