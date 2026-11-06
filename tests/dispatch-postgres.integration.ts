@@ -96,6 +96,41 @@ async function main() {
     assert.equal((await admin.query('SELECT retained_legacy_column FROM cockpit.schedules WHERE id=$1',[row.row.id])).rows[0].retained_legacy_column,'preserved');
     await assert.rejects(commit(b,[{...update,expected_updated_at:'2000-01-01T00:00:00Z'}]), { code:'40001' });
     console.log('PASS update preserves other columns and rejects stale revision');
+    // Multi-day/vehicle email revision: a changed booking, explicit cancellation,
+    // and a replacement car must commit or roll back as one Postgres operation.
+    await admin.query('DELETE FROM cockpit.schedules');
+    const oldFirst = envelope({ date:'2026-12-07',end_date:'2026-12-07',pickup_time:'09:00',end_time:'12:00' });
+    const oldSecond = envelope({
+      date:'2026-12-08',end_date:'2026-12-08',pickup_time:'09:00',end_time:'12:00',
+      vehicle_id:randomUUID(),vehicle_no:'200가 0002',vehicle_plate:'200가 0002',driver_id:randomUUID(),
+    });
+    const originals = (await commit(a,[oldFirst,oldSecond])).rows[0].result;
+    const editedFirst = { row:{...oldFirst.row,pickup_time:'10:00',end_time:'13:00',version:2},
+      expected_updated_at:originals[0].updated_at, is_update:true };
+    const cancelledSecond = { row:{
+      ...oldSecond.row,dispatch_status:'cancelled',status:'cancelled',version:2,
+      schedule_meta:{...oldSecond.row.schedule_meta,dispatchStatus:'cancelled',cancelReason:'고객 수정본에서 2호차 취소'},
+    },expected_updated_at:originals[1].updated_at,is_update:true };
+    const badReplacement = envelope({
+      date:'2026-12-07',end_date:'2026-12-07',pickup_time:'10:30',end_time:'12:30',
+    });
+    await assert.rejects(commit(a,[editedFirst,cancelledSecond,badReplacement]),{code:'23P01'});
+    const rolledBack = await admin.query('SELECT id,pickup_time,dispatch_status FROM cockpit.schedules ORDER BY date');
+    assert.equal(rolledBack.rows.length,2);
+    assert.equal(String(rolledBack.rows[0].pickup_time).slice(0,8),'09:00:00');
+    assert.equal(rolledBack.rows[1].dispatch_status,'published');
+    const replacement = envelope({
+      date:'2026-12-08',end_date:'2026-12-08',pickup_time:'09:00',end_time:'12:00',
+      vehicle_id:oldSecond.row.vehicle_id,vehicle_no:oldSecond.row.vehicle_no,
+      vehicle_plate:oldSecond.row.vehicle_plate,driver_id:oldSecond.row.driver_id,
+    });
+    await commit(b,[editedFirst,cancelledSecond,replacement]);
+    const committed = await admin.query('SELECT id,pickup_time,dispatch_status,version FROM cockpit.schedules ORDER BY date,id');
+    assert.equal(committed.rows.length,3);
+    assert.ok(committed.rows.some(row => row.id === oldFirst.row.id && String(row.pickup_time).slice(0,8)==='10:00:00'));
+    assert.ok(committed.rows.some(row => row.id === oldSecond.row.id && row.dispatch_status==='cancelled' && row.version===2));
+    assert.ok(committed.rows.some(row => row.id === replacement.row.id && row.dispatch_status==='published'));
+    console.log('PASS multi-day/vehicle mixed revision: atomic rollback and explicit cancellation');
     // Cross-midnight buffer and unresolved legacy end times.
     await admin.query('DELETE FROM cockpit.schedules');
     await commit(a,[envelope({date:'2026-12-02',pickup_time:'22:00',end_time:'23:30'})]);
