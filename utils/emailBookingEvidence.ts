@@ -175,7 +175,7 @@ function sameVenue(a: string, b: string): boolean {
  * and a dash, or be the stated destination of an arrow / "Head to" instruction. */
 export function extractItineraryEvidence(body: string, pickupDate: string): RouteWaypointItem[] {
   const points: RouteWaypointItem[] = [];
-  const untimedTargets: Array<{ date: string; location: string; after: number }> = [];
+  const untimedTargets: Array<{ date: string; location: string; after: number; departureTime: string }> = [];
   const addresses = extractCustomerAddressEvidence(body, pickupDate);
   for (const { line, date } of datedLines(body, pickupDate)) {
     const timed = line.match(/^\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*[–—-]\s*(.+)$/i);
@@ -185,7 +185,7 @@ export function extractItineraryEvidence(body: string, pickupDate: string): Rout
     const rest = timed[4].trim();
     const movement = rest.match(/^Head\s+(?:back\s+)?to\s+(.+)$/i);
     if (movement) {
-      untimedTargets.push({ date, location: movement[1].trim(), after: points.length });
+      untimedTargets.push({ date, location: movement[1].trim(), after: points.length, departureTime: time });
       continue;
     }
 
@@ -219,7 +219,7 @@ export function extractItineraryEvidence(body: string, pickupDate: string): Rout
     if (!points.some(point=>point.date === date && point.time === time && sameVenue(point.location, candidate.location))) {
       points.push(candidate);
     }
-    if (target) untimedTargets.push({ date, location: target, after: points.length });
+    if (target) untimedTargets.push({ date, location: target, after: points.length, departureTime: time });
   }
   // A route arrow is not a second stop if the same venue has an explicit timed
   // appointment later that day. Final untimed destinations remain unresolved.
@@ -232,7 +232,7 @@ export function extractItineraryEvidence(body: string, pickupDate: string): Rout
       id: 'source-destination-' + points.length,
       order: points.length + 1,
       date: target.date,
-      time: '', location: venue, notes: '도착시간 미제공', isPoiConfirmed: false,
+      time: '', location: venue, notes: '도착시간 미제공 · ' + target.departureTime + ' 출발', isPoiConfirmed: false,
     });
   }
   return points;
@@ -296,10 +296,15 @@ export function enrichBookingDraftWithEmailEvidence(
     const onDay = points.filter(p => (p.date || draft.pickupDate) === source.date);
     const matching = onDay.filter(p => sameVenue(p.location, source.location));
     const matchingAtTime = matching.find(p => Boolean(source.time) && p.time === source.time);
-    // An untimed return is a NEW visit when the current last stop is elsewhere.
-    // Do not overwrite an earlier lunch/standby visit to the same hotel.
-    const matchingUntimed = !source.time && onDay.at(-1) &&
-      sameVenue(onDay.at(-1)!.location, source.location) ? onDay.at(-1) : undefined;
+    // Match an untimed destination to the AI's mistaken DEPARTURE clock,
+    // never to an earlier same-day visit (Conrad breakfast/lunch vs hotel return).
+    // Restoration of a missed morning stop can append it after the last AI stop,
+    // so array order alone is not a reliable indication of the final venue.
+    const sourceDepartureTime = source.notes?.match(/\b\d{2}:\d{2}\b/)?.[0];
+    const matchingUntimed = !source.time
+      ? matching.find(p=>Boolean(sourceDepartureTime) && p.time === sourceDepartureTime)
+        || matching.find(p=>!p.time)
+      : undefined;
     const existing = matchingAtTime || matchingUntimed;
     if (existing) {
       if (source.clientAddress) existing.clientAddress = source.clientAddress;
@@ -308,7 +313,7 @@ export function enrichBookingDraftWithEmailEvidence(
       }
       // Source explicitly says a destination is untimed; this is not a known
       // arrival clock. Apply to the last matching stop only.
-      if (!source.time && existing === onDay.at(-1)) existing.time = '';
+      if (!source.time && sourceDepartureTime && existing.time === sourceDepartureTime) existing.time = '';
     } else {
       points.push({
         ...source, id: 'restored-' + points.length,
