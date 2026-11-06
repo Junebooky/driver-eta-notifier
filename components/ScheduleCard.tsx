@@ -237,7 +237,11 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
 
         {/* Row 1: Departure Origin */}
         <div className="relative flex items-center gap-2.5 min-w-0">
-          <div className="absolute -left-[21px] w-2.5 h-2.5 rounded-full bg-[#94A3B8] ring-2 ring-white" />
+          <img
+            src="/images/icons/driver_ui/icon_origin.png"
+            alt="출발"
+            className="absolute -left-[24px] w-4 h-4 object-contain shrink-0"
+          />
           <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#F2F4F7] text-slate-600 flex items-center justify-center shrink-0">
             출발
           </span>
@@ -259,7 +263,11 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
 
         {/* Row 2: Arrival Destination */}
         <div className="relative flex items-center gap-2.5 min-w-0">
-          <div className="absolute -left-[21px] w-2.5 h-2.5 rounded-full bg-[#0055FF] ring-2 ring-white" />
+          <img
+            src="/images/icons/driver_ui/icon_destination.png"
+            alt="도착"
+            className="absolute -left-[24px] w-4 h-4 object-contain shrink-0"
+          />
           <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#0055FF] text-white flex items-center justify-center shrink-0">
             도착
           </span>
