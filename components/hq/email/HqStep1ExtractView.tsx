@@ -76,6 +76,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
   const fromAddress = emailDetail?.from?.address || emailSummary.from.address;
   const toList = emailDetail?.to || emailSummary.to;
   const bodyText = emailDetail?.bodyText || emailSummary.preview || '(본문 내용 없음)';
+  const attachmentFiles = emailDetail?.attachments || (extractedDraft?.sourceAttachments || []).map(file => ({ filename: file.filename, contentType: file.kind === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', size: 0 }));
 
   // Editing mode toggle
   const [isEditing, setIsEditing] = useState(false);
@@ -546,42 +547,29 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
           )}
         </div>
 
-        {/* Attachments Section */}
-        {emailDetail?.hasAttachments && (
-          <div className="p-4 border-t border-slate-100 bg-slate-50/70">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 mb-2.5">
-              <Paperclip className="w-3.5 h-3.5 text-slate-500" />
-              <span>첨부 파일 (2)</span>
+        {/* Real attachment metadata from read-only IMAP, never fictitious demo names. */}
+        {(emailDetail?.hasAttachments || attachmentFiles.length > 0) && (
+          <div className="border-t border-slate-100 bg-slate-50/70 p-4">
+            <div className="mb-2.5 flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+              <Paperclip className="h-3.5 w-3.5 text-slate-500" />
+              <span>첨부 파일{attachmentFiles.length ? ` (${attachmentFiles.length})` : ''}</span>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:border-blue-400 transition-colors cursor-pointer group">
-                <div className="w-6 h-6 rounded-md bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
-                  <FileText className="w-3.5 h-3.5" />
-                </div>
-                <div className="text-left">
-                  <div className="text-[11px] font-bold text-slate-800 group-hover:text-blue-600 transition-colors">
-                    Flight Itinerary.pdf
+            {attachmentFiles.length ? (
+              <div className="flex flex-wrap gap-2">
+                {attachmentFiles.map((file, index) => (
+                  <div key={`${file.filename}-${index}`} className="flex min-w-0 items-center gap-2 rounded-xl bg-white px-3 py-2 shadow-[0_2px_8px_rgba(35,49,78,0.04)]">
+                    <FileText className="h-4 w-4 shrink-0 text-slate-500" strokeWidth={1.7}/>
+                    <div className="min-w-0">
+                      <div className="max-w-[210px] truncate text-[11px] font-medium text-slate-800" title={file.filename}>{file.filename}</div>
+                      <div className="text-[10px] text-slate-400">{file.size ? `${(file.size / 1024).toFixed(0)} KB` : '메일 원본 첨부파일'}</div>
+                    </div>
                   </div>
-                  <div className="text-[9px] text-slate-400">1.2 MB</div>
-                </div>
+                ))}
               </div>
-
-              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-slate-200/80 shadow-2xs hover:border-emerald-400 transition-colors cursor-pointer group active:scale-95">
-                <div className="w-6 h-6 rounded-md bg-emerald-50 flex items-center justify-center shrink-0">
-                  <img
-                    src="/images/icons/icon_excel.png"
-                    alt="Excel"
-                    className="w-4 h-4 object-contain shrink-0 transition-transform duration-150 group-hover:scale-110"
-                  />
-                </div>
-                <div className="text-left">
-                  <div className="text-[11px] font-bold text-slate-800 group-hover:text-emerald-600 transition-colors">
-                    Guest List.xlsx
-                  </div>
-                  <div className="text-[9px] text-slate-400">850 KB</div>
-                </div>
-              </div>
-            </div>
+            ) : (
+              <p className="text-xs text-slate-500">첨부파일이 있습니다. 메일을 불러온 뒤 파일명을 확인해 주세요.</p>
+            )}
+            <p className="mt-2 text-[11px] text-slate-500">지원되는 Excel·PDF 일정표는 ‘AI로 분석하기’를 누를 때만 읽습니다.</p>
           </div>
         )}
       </div>
