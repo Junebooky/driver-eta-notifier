@@ -164,11 +164,83 @@ export function canonicalKoreanPlaceName(name: string): string {
   return aliases.find(([pattern]) => pattern.test(clean))?.[1] || clean;
 }
 
+function sameVenue(a: string, b: string): boolean {
+  const normalize = (s: string) => canonicalKoreanPlaceName(s)
+    .replace(/\bTBA\b/gi, '').replace(/[^가-힣A-Za-z0-9]/g, '').toLowerCase();
+  return Boolean(normalize(a)) && normalize(a) === normalize(b);
+}
+
+/** Independent evidence ledger of explicitly timed locations in a multi-day email.
+ * It is deliberately narrower than the AI extractor: text must contain a time
+ * and a dash, or be the stated destination of an arrow / "Head to" instruction. */
+export function extractItineraryEvidence(body: string, pickupDate: string): RouteWaypointItem[] {
+  const points: RouteWaypointItem[] = [];
+  const untimedTargets: Array<{ date: string; location: string; after: number }> = [];
+  const addresses = extractCustomerAddressEvidence(body, pickupDate);
+  for (const { line, date } of datedLines(body, pickupDate)) {
+    const timed = line.match(/^\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*[–—-]\s*(.+)$/i);
+    if (!timed) continue;
+    const time = normalizeClock(timed[1], timed[2] || '00', timed[3]);
+    if (!time) continue;
+    const rest = timed[4].trim();
+    const movement = rest.match(/^Head\s+(?:back\s+)?to\s+(.+)$/i);
+    if (movement) {
+      untimedTargets.push({ date, location: movement[1].trim(), after: points.length });
+      continue;
+    }
+
+    let location = rest;
+    let target = '';
+    const pickup = rest.match(/^Pick\s+up\s+(?:.+?\s+)?from\s+(.+)$/i);
+    if (pickup) location = pickup[1].trim();
+    const arrow = location.match(/^(.+?)\s*(?:->|→)\s*(.+)$/);
+    if (arrow) {
+      location = arrow[1].trim();
+      target = arrow[2].trim();
+    }
+    const parenthetical = location.match(/^(.+?)\s+\(([^()]+)\)$/);
+    const notes = parenthetical?.[2] || undefined;
+    if (parenthetical) location = parenthetical[1].trim();
+
+    const original = addresses.find(hint => hint.date === date && hint.time === time);
+    if (original) location = original.location;
+    const comma = location.indexOf(',');
+    if (comma !== -1) location = location.slice(0, comma).trim();
+    if (!location) continue;
+    const candidate: RouteWaypointItem = {
+      id: 'source-stop-' + points.length,
+      order: points.length + 1,
+      date, time,
+      location: canonicalKoreanPlaceName(location),
+      ...(original?.address ? { clientAddress: original.address } : {}),
+      ...(notes ? { notes } : {}),
+      isPoiConfirmed: false,
+    };
+    if (!points.some(point=>point.date === date && point.time === time && sameVenue(point.location, candidate.location))) {
+      points.push(candidate);
+    }
+    if (target) untimedTargets.push({ date, location: target, after: points.length });
+  }
+  // A route arrow is not a second stop if the same venue has an explicit timed
+  // appointment later that day. Final untimed destinations remain unresolved.
+  for (const target of untimedTargets) {
+    const venue = canonicalKoreanPlaceName(target.location);
+    if (points.some(p=>p.date === target.date && sameVenue(p.location, venue))) continue;
+    points.push({
+      id: 'source-destination-' + points.length,
+      order: points.length + 1,
+      date: target.date,
+      time: '', location: venue, isPoiConfirmed: false,
+    });
+  }
+  return points;
+}
+
 const withNote = (notes: string | undefined, addition: string): string =>
   notes?.includes(addition) ? notes : [notes, addition].filter(Boolean).join(' · ');
 
-function sameStop(point: RouteWaypointItem, date: string, time: string): boolean {
-  return (point.date || date) === date && point.time === time;
+function sameStop(point: RouteWaypointItem, date: string, time: string, location: string): boolean {
+  return (point.date || date) === date && point.time === time && sameVenue(point.location, location);
 }
 
 function applyMovementEvidence(waypoints: RouteWaypointItem[], body: string, pickupDate: string): RouteWaypointItem[] {
@@ -217,8 +289,29 @@ export function enrichBookingDraftWithEmailEvidence(
   const addresses = extractCustomerAddressEvidence(body, draft.pickupDate);
   const points = [...(draft.waypoints || [])].map((p) => ({ ...p }));
   const warnings = [...draft.warnings];
+  const sourceStops = extractItineraryEvidence(body, draft.pickupDate);
+  for (const source of sourceStops) {
+    const onDay = points.filter(p => (p.date || draft.pickupDate) === source.date);
+    const matching = onDay.filter(p => sameVenue(p.location, source.location));
+    const matchingAtTime = matching.find(p => Boolean(source.time) && p.time === source.time);
+    const matchingUntimed = !source.time ? matching.at(-1) : undefined;
+    const existing = matchingAtTime || matchingUntimed;
+    if (existing) {
+      if (source.clientAddress) existing.clientAddress = source.clientAddress;
+      // Source explicitly says a destination is untimed; this is not a known
+      // arrival clock. Apply to the last matching stop only.
+      if (!source.time && existing === onDay.at(-1)) existing.time = '';
+    } else {
+      points.push({
+        ...source, id: 'restored-' + points.length,
+        order: points.length + 1,
+        lat: undefined, lng: undefined, address: undefined, isPoiConfirmed: false,
+      });
+      warnings.push(source.date + ' ' + (source.time || '시간 미정') + ' ' + source.location + ': 고객 메일의 명시된 방문지를 복원했습니다. 확인해 주세요.');
+    }
+  }
   for (const address of addresses) {
-    const matches = points.filter((p) => sameStop(p, address.date, address.time));
+    const matches = points.filter((p) => sameStop(p, address.date, address.time, address.location));
     if (matches.length === 1) {
       matches[0].clientAddress = address.address;
     } else if (matches.length === 0) {
