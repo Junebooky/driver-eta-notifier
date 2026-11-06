@@ -62,20 +62,22 @@ test('both arrival flights, both departure flights and the connecting leg surviv
   assert.deepEqual(flights[1].passengers, ['Guest C']);
 });
 
-test('five client addresses are retained exactly and address search prefers road + number', () => {
+test('all six client addresses are retained and road numbers drive TMAP search', () => {
   const hints = extractCustomerAddressEvidence(email, '2026-11-18');
-  assert.equal(hints.length, 5);
+  assert.equal(hints.length, 6);
   assert.equal(hints[0].address, '14 Seocho-daero 74-gil, Seocho-gu, Seoul');
   assert.equal(addressHintToTmapQuery(hints[0].address), '서울 서초구 서초대로74길 14');
   assert.equal(addressHintToTmapQuery(hints[1].address), '서울 영등포구 국제금융로 10');
   assert.equal(addressHintToTmapQuery(hints[2].address), '서울 영등포구 여의대로 108');
-  assert.equal(addressHintToTmapQuery(hints[3].address), '서울 용산구 한강대로 140');
-  assert.equal(addressHintToTmapQuery(hints[4].address), '서울 종로구 세종대로 163');
+  assert.match(hints[3].address, /63 Hanwha Life Building/);
+  assert.equal(addressHintToTmapQuery(hints[4].address), '서울 용산구 한강대로 140');
+  assert.equal(addressHintToTmapQuery(hints[5].address), '서울 종로구 세종대로 163');
 });
 
 test('fixes missing flight and movement info without falsely confirming any TMAP POI', () => {
   const result = enrichBookingDraftWithEmailEvidence(draft(), email);
   assert.equal(result.flights?.length, 5);
+  assert.ok(result.warnings.some(w=>w.includes('NH867') && w.includes('픽업')));
   assert.equal(result.waypoints?.length, 14);
   const fire = result.waypoints?.find(p => p.date==='2026-11-19' && p.time==='10:30');
   assert.equal(fire?.location, '삼성화재');
