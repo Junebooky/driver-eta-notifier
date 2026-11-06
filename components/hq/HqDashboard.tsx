@@ -459,7 +459,9 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
     setActiveTabOverride(tab);
     setSearchQuery('');
     setActiveKpiFilter(filter && filter !== 'today' ? filter : null);
-    setActiveDispatchTab(filter === 'today' ? 'today' : filter ? 'all' : representativeMode ? 'action' : 'all');
+    // Opening 예약·배차관리 normally shows its monthly calendar, including for 대표 계정.
+    // Explicit today/KPI entry points retain their existing operational filters.
+    setActiveDispatchTab(filter === 'today' ? 'today' : 'all');
     setMobileDispatchSubView('list');
     window.scrollTo({ top: 0 });
 
