@@ -42,6 +42,9 @@ export interface MatchingEmailInput {
   references?: string[];
   attachmentHashes?: string[];
   pickupDate: string;
+  /** All reviewed schedule dates in one Excel/PDF, for day-by-day matching. */
+  scheduleDates?: string[];
+  batchMode?: boolean;
   passengerName?: string;
 }
 const normalize = (value: unknown) => String(value || '').toLocaleLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
@@ -67,7 +70,8 @@ export function matchEmailBookingCandidates(input: MatchingEmailInput, rows: Arr
       (key) => key && String(key).trim() === meta.sourceMessageId
     ));
     const attachmentSame = Boolean(Array.isArray(meta.sourceAttachmentHashes) && meta.sourceAttachmentHashes.some((hash: string) => input.attachmentHashes?.includes(hash)));
-    const distance = dateDistance(input.pickupDate, String(row.date || ''));
+    const validDates = [input.pickupDate, ...(input.scheduleDates || [])].filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d));
+    const distance = Math.min(...validDates.map(d => dateDistance(d, String(row.date || ''))));
     const dateSame = distance === 0;
     const nearby = distance <= 2;
     const passengerSame = Boolean(normalize(input.passengerName) && normalize(input.passengerName) === normalize(row.passenger_name));
@@ -118,16 +122,21 @@ export function matchEmailBookingCandidates(input: MatchingEmailInput, rows: Arr
       score,
       reasons,
     }];
-  }).sort((a, b) => b.score - a.score || a.scheduleId.localeCompare(b.scheduleId)).slice(0, 6);
+  }).sort((a, b) => b.score - a.score || a.pickupDate.localeCompare(b.pickupDate) || a.scheduleId.localeCompare(b.scheduleId))
+    .slice(0, input.batchMode ? 80 : 6);
 }
 
 /** No AI call: read a bounded candidate window from this organisation only. */
 export async function findEmailBookingCandidates(input: MatchingEmailInput): Promise<ExistingEmailBookingCandidate[]> {
   let candidates: ExistingEmailBookingCandidate[] = [];
-  if (/^\d{4}-\d{2}-\d{2}$/.test(input.pickupDate)) {
-    const center = Date.parse(input.pickupDate + 'T00:00:00Z');
-    const start = new Date(center - 2 * 86_400_000).toISOString().slice(0, 10);
-    const end = new Date(center + 2 * 86_400_000).toISOString().slice(0, 10);
+  const dates = [...new Set([input.pickupDate, ...(input.scheduleDates || [])].filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)))].sort();
+  if (dates.length) {
+    if (dates.length > 40) throw new Error('한 번에 비교할 운행 날짜는 최대 40일입니다.');
+    const first = Date.parse(dates[0] + 'T00:00:00Z');
+    const last = Date.parse(dates[dates.length - 1] + 'T00:00:00Z');
+    if (last - first > 45 * 86_400_000) throw new Error('45일을 초과하는 일정은 기간을 나누어 검토해 주세요.');
+    const start = new Date(first - 2 * 86_400_000).toISOString().slice(0, 10);
+    const end = new Date(last + 2 * 86_400_000).toISOString().slice(0, 10);
     const { data, error } = await supabaseAdmin.from('schedules')
       .select('id,org_id,date,pickup_time,end_time,origin,destination,passenger_name,passenger_count,vehicle_plate,vehicle_model,vehicle_id,driver_id,driver_name,driver_phone,flight_number,protocol_notes,dispatch_status,status,version,schedule_meta')
       .eq('org_id', 'vip_limousine_korea').gte('date', start).lte('date', end)
@@ -135,6 +144,28 @@ export async function findEmailBookingCandidates(input: MatchingEmailInput): Pro
     if (error || !data) throw new Error('기존 예약 조회에 실패했습니다. 중복 생성 방지를 위해 다시 시도해 주세요.');
     if (data.length === 300) throw new Error('기존 예약 후보가 너무 많습니다. 날짜를 지정한 뒤 다시 확인해 주세요.');
     candidates = matchEmailBookingCandidates(input, data as Array<Record<string, any>>);
+  }
+  if (input.batchMode && candidates.length) {
+    // The initial match may cover only one day. Retrieve other bookings from
+    // the exact original event before presenting additions/removals.
+    const eventIds = [...new Set(candidates.map(c => c.eventId).filter((v): v is string => Boolean(v)))];
+    if (eventIds.length <= 3) {
+      const siblings: Array<Record<string, any>> = [];
+      for (const eventId of eventIds) {
+        const { data, error } = await supabaseAdmin.from('schedules')
+          .select('id,org_id,date,pickup_time,end_time,origin,destination,passenger_name,passenger_count,vehicle_plate,vehicle_model,vehicle_id,driver_id,driver_name,driver_phone,flight_number,protocol_notes,dispatch_status,status,version,schedule_meta')
+          .eq('org_id', 'vip_limousine_korea').contains('schedule_meta', { eventId }).limit(81);
+        if (error || !data || data.length > 80) throw new Error('연결된 행사 예약이 너무 많거나 조회할 수 없습니다.');
+        siblings.push(...data as Array<Record<string, any>>);
+      }
+      const siblingDates = siblings.map(row => String(row.date || ''));
+      const expanded = matchEmailBookingCandidates({ ...input, batchMode: true, scheduleDates: [...dates, ...siblingDates] }, siblings);
+      const merged = new Map(candidates.map(c => [c.scheduleId, c]));
+      for (const candidate of expanded) if (!merged.has(candidate.scheduleId)) {
+        merged.set(candidate.scheduleId, { ...candidate, reasons: [...candidate.reasons, '동일 예약 묶음'] });
+      }
+      candidates = [...merged.values()].sort((a,b) => a.pickupDate.localeCompare(b.pickupDate) || a.groupVehicleIndex! - b.groupVehicleIndex!).slice(0, 80);
+    }
   }
   if (candidates.length) return candidates;
 
