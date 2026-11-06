@@ -9,7 +9,6 @@ import {
   ChevronRight,
   ChevronDown,
   ChevronUp,
-  RefreshCw,
   MapPin,
   History,
   X,
@@ -460,7 +459,6 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
 }) => {
   const [eventGroups, setEventGroups] = useState<EventGroup[]>(DEFAULT_OPERATIONAL_EVENTS);
   const [isLoading, setIsLoading] = useState(false);
-  const [lastUpdatedTime, setLastUpdatedTime] = useState('09:58');
   const [selectedSchedule, setSelectedSchedule] = useState<ScheduleOperationItem | null>(null);
   const [selectedEventInfo, setSelectedEventInfo] = useState<EventGroup | null>(null);
 
@@ -483,12 +481,6 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
       await ensureClientAuth('hq');
       const res = await fetch('/api/schedules/dispatch?onlyDispatched=true');
       const data = await res.json();
-
-      const now = new Date();
-      const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(
-        now.getMinutes()
-      ).padStart(2, '0')}`;
-      setLastUpdatedTime(timeStr);
 
       if (data.ok && Array.isArray(data.schedules) && data.schedules.length > 0) {
         // Map server schedules to ScheduleOperationItem
@@ -641,72 +633,44 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
     <div className="space-y-4 sm:space-y-5">
       {/* 1. Header Bar & 5-Card KPI Summary Widget (통합 상단 보드 카드) */}
       <div className="bg-white rounded-[28px] border border-slate-100/90 p-5 sm:p-6 shadow-[0_6px_24px_rgba(15,23,42,0.05)] space-y-4 sm:space-y-5 select-none">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3.5">
-            {/* 실시간 운영 보드 아이콘 & 마우스 호버 툴팁 */}
-            <div className="relative group/operations inline-flex items-center justify-center cursor-pointer shrink-0">
-              <img
-                src="/images/icons/live_dashboard/icon_live_dashboard.png"
-                alt="실시간 행사 운영 보드"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                  const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                  if (fallback) fallback.style.display = 'flex';
-                }}
-                className="w-12 h-12 sm:w-13 sm:h-13 object-contain shrink-0 transition-transform duration-200 group-hover/operations:scale-110 drop-shadow-xs"
-              />
-              <div className="hidden w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-blue-50 border border-blue-100 text-[#1E60F3] items-center justify-center shrink-0 transition-transform duration-200 group-hover/operations:scale-110 shadow-2xs">
-                <Activity className="w-6 h-6" />
-              </div>
-
-              {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 (최상단 레이어) */}
-              <div className="absolute bottom-full left-0 mb-2.5 hidden group-hover/operations:flex flex-col items-start pointer-events-none z-[100]">
-                <span className="whitespace-nowrap rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white shadow-xl animate-in fade-in-50 duration-150">
-                  진행 중인 행사의 차량 위치와 운행 상태를 실시간으로 확인해요
-                </span>
-                <div className="w-2.5 h-2.5 bg-slate-900 rotate-45 -mt-1 ml-5 shadow-xs" />
-              </div>
+        <div className="flex items-center gap-3.5">
+          {/* 실시간 운영 보드 아이콘 & 마우스 호버 툴팁 */}
+          <div className="relative group/operations inline-flex items-center justify-center cursor-pointer shrink-0">
+            <img
+              src="/images/icons/live_dashboard/icon_live_dashboard.png"
+              alt="실시간 행사 운영 보드"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+                const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                if (fallback) fallback.style.display = 'flex';
+              }}
+              className="w-12 h-12 sm:w-13 sm:h-13 object-contain shrink-0 transition-transform duration-200 group-hover/operations:scale-110 drop-shadow-xs"
+            />
+            <div className="hidden w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-blue-50 border border-blue-100 text-[#1E60F3] items-center justify-center shrink-0 transition-transform duration-200 group-hover/operations:scale-110 shadow-2xs">
+              <Activity className="w-6 h-6" />
             </div>
 
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-black tracking-wider text-[#1E60F3] uppercase bg-blue-50/90 border border-blue-100/80 px-2.5 py-0.5 rounded-full">
-                  OPERATIONS · 실시간 관제
-                </span>
-              </div>
-              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-1">
-                실시간 행사 운영 보드
-              </h1>
-              <p className="text-xs text-slate-500 font-medium mt-0.5">
+            {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 (최상단 레이어) */}
+            <div className="absolute bottom-full left-0 mb-2.5 hidden group-hover/operations:flex flex-col items-start pointer-events-none z-[100]">
+              <span className="whitespace-nowrap rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white shadow-xl animate-in fade-in-50 duration-150">
                 진행 중인 행사의 차량 위치와 운행 상태를 실시간으로 확인해요
-              </p>
+              </span>
+              <div className="w-2.5 h-2.5 bg-slate-900 rotate-45 -mt-1 ml-5 shadow-xs" />
             </div>
           </div>
 
-          {/* Right Live Sync Indicator & Refresh Button */}
-          <div className="flex items-center gap-2 self-start sm:self-center">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-emerald-50/80 border border-emerald-200/70 text-xs font-bold text-emerald-700 shadow-2xs">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-black tracking-wider text-[#1E60F3] uppercase bg-blue-50/90 border border-blue-100/80 px-2.5 py-0.5 rounded-full">
+                OPERATIONS · 실시간 관제
               </span>
-              <span>실시간 관제 중</span>
-              <span className="text-[10px] text-emerald-600/80 font-mono font-bold">({lastUpdatedTime})</span>
             </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                haptics.lightTap();
-                fetchOperations();
-              }}
-              disabled={isLoading}
-              className="w-10 h-10 rounded-2xl bg-blue-50 hover:bg-[#1E60F3] text-[#1E60F3] hover:text-white border border-blue-200/80 flex items-center justify-center transition-all duration-200 shadow-2xs active:scale-95 cursor-pointer disabled:opacity-50"
-              title="실시간 데이터 새로고침"
-              aria-label="데이터 새로고침"
-            >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-            </button>
+            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-1">
+              실시간 행사 운영 보드
+            </h1>
+            <p className="text-xs text-slate-500 font-medium mt-0.5">
+              진행 중인 행사의 차량 위치와 운행 상태를 실시간으로 확인해요
+            </p>
           </div>
         </div>
 
