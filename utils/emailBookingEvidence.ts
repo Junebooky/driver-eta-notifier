@@ -93,7 +93,7 @@ export function extractCustomerAddressEvidence(body: string, pickupDate: string)
     if (comma < 2) continue;
     const location = rest.slice(0, comma).trim();
     const address = rest.slice(comma + 1).trim();
-    if (!/(?:-daero|-ro|-gil|\broad\b|\bstreet\b|\bave\b|대로|로\s*\d|길\s*\d)/i.test(address)) continue;
+    if (!/(?:-daero|-ro|-gil|-dong\b|\bbuilding\b|\btower\b|\broad\b|\bstreet\b|\bave\b|대로|로\s*\d|길\s*\d|동\s*\d)/i.test(address)) continue;
     found.push({ date, time, location, address });
   }
   return found;
@@ -226,6 +226,15 @@ export function enrichBookingDraftWithEmailEvidence(
   const enriched = (ordered.length >= 2 ? applyMovementEvidence(ordered, body, draft.pickupDate) : ordered)
     .map((point) => ({ ...point, location: canonicalKoreanPlaceName(point.location) }));
   const first = enriched[0], last = enriched.at(-1);
+  const lateArrivals = flights.filter((flight) =>
+    flight.date === draft.pickupDate && flight.role === 'arrival' &&
+    /^\d{2}:\d{2}$/.test(flight.scheduledArrival || '') &&
+    /^\d{2}:\d{2}$/.test(draft.pickupTime) &&
+    flight.scheduledArrival! > draft.pickupTime
+  );
+  for (const arrival of lateArrivals) {
+    warnings.push('픽업 ' + draft.pickupTime + '보다 ' + arrival.flightNumber + ' 도착 ' + arrival.scheduledArrival + '이 늦습니다. 고객에게 픽업시간을 확인해 주세요.');
+  }
   const originalFlightCodes = new Set((body.toUpperCase().match(/\b[A-Z0-9]{2}\d{2,4}\b/g) || []).filter((s) => /[A-Z]/.test(s)));
   for (const code of originalFlightCodes) {
     if (!flights.some((f) => f.flightNumber === code)) {
