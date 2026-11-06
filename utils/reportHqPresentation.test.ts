@@ -4,13 +4,13 @@ import {reportDisplayStatus,reportMatchesFilter,visibleHqReportMessages,type Rep
 import type {ReportExcelStatus,ReportChatMessage} from '@/types/driverReportChat';
 
 test('HQ status dropdown has only the two business states plus All; backend states remain unchanged',()=>{
- const statuses:ReportExcelStatus[]=['pending','applied','review','error'];
- const expected=['확인 필요','반영 완료','확인 필요','확인 필요'];
+ const statuses:ReportExcelStatus[]=['pending','applied','review','error','archived'];
+ const expected=['확인 필요','반영 완료','확인 필요','확인 필요','이전 장부 보관'];
  assert.deepEqual(statuses.map(reportDisplayStatus),expected);
  for(const status of statuses){
   assert.equal(reportMatchesFilter(status,'all'),true);
-  assert.equal(reportMatchesFilter(status,'applied'),status==='applied');
-  assert.equal(reportMatchesFilter(status,'review'),status!=='applied');
+  assert.equal(reportMatchesFilter(status,'applied'),['applied','archived'].includes(status));
+  assert.equal(reportMatchesFilter(status,'review'),!['applied','archived'].includes(status));
  }
  const selected:ReportHqFilter='review';
  assert.ok(reportMatchesFilter('error',selected));
