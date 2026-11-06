@@ -98,6 +98,16 @@ export interface HqEmailExtractedDraft {
   // Schedule & Route with POI Confirmation
   savedScheduleIds?: Record<string,string>;
   dayEndTimes?: Record<string,string>;
+  /** AI classifies whether the received revision replaces the entire route or only changes parts. */
+  revisionScope?: 'full' | 'partial' | 'unknown';
+  /** Explicit HQ selection, never picked by AI. */
+  revisionMatchedScheduleId?: string;
+  revisionMatchedVersion?: number;
+  sourceMessageId?: string;
+  sourceSenderEmail?: string;
+  sourceAttachments?: Array<{ filename: string; kind: 'excel' | 'pdf'; sha256: string }>;
+  sourceInReplyTo?: string;
+  sourceReferences?: string[];
   pickupDate: string; // YYYY-MM-DD
   pickupTime: string; // HH:MM
   pickupLocation: string;
