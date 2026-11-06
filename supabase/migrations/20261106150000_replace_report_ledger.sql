@@ -14,6 +14,7 @@ CREATE OR REPLACE FUNCTION cockpit.replace_report_ledger(
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,cockpit AS $$
 DECLARE
  old_ledger cockpit.report_ledgers;
+ global_active uuid;
  replacement uuid;
  archived_count integer:=0;
 BEGIN
@@ -25,6 +26,8 @@ BEGIN
  WHERE org_id=p_org AND year=p_year FOR UPDATE;
  -- A background report commit or another HQ edit may have changed the current workbook.
  IF NOT FOUND OR old_ledger.active_version<>p_expected THEN RETURN NULL; END IF;
+ SELECT active_version INTO global_active FROM cockpit.report_workbooks WHERE org_id=p_org FOR UPDATE;
+ IF NOT FOUND OR global_active<>p_expected THEN RETURN NULL; END IF;
 
  INSERT INTO cockpit.report_workbook_versions(
    org_id,ledger_year,bytes,object_path,sha256,byte_size,
@@ -49,6 +52,9 @@ BEGIN
      applied_version=NULL,revision=revision+1,last_error=NULL
  WHERE org_id=p_org AND ledger_year=p_year AND excel_status='applied';
  GET DIAGNOSTICS archived_count=ROW_COUNT;
+ -- Approved month templates belong to the prior Excel layout. Never reuse them
+ -- when cloning a month in a differently styled owner-provided original.
+ DELETE FROM cockpit.report_month_templates WHERE org_id=p_org AND year=p_year;
 
  INSERT INTO cockpit.report_audit(org_id,actor_id,action,detail)
  VALUES(p_org,p_actor,'ledger_replaced',jsonb_build_object(
