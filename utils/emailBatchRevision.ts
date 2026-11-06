@@ -28,7 +28,7 @@ export interface EmailBatchReviewRow {
   stops: RouteWaypointItem[];
   selection: string;
   previous?: ExistingEmailBookingCandidate;
-  action: 'new' | 'update' | 'unchanged' | 'pending';
+  action: 'new' | 'update' | 'unchanged' | 'skip' | 'pending';
   changes: Array<{ label: string; previous: string; next: string }>;
 }
 
@@ -74,7 +74,7 @@ export function emailBatchRows(
         key, date: day.date, index, selection, previous,
         startTime: day.start.time || '', endTime: day.endTime || '',
         start: day.start.location, destination: day.end.location, stops: day.points,
-        action: !selection ? 'pending' as const : selection === 'new' ? 'new' as const :
+        action: !selection ? 'pending' as const : selection === 'skip' ? 'skip' as const : selection === 'new' ? 'new' as const :
           changes.length ? 'update' as const : 'unchanged' as const,
         changes,
       };
@@ -216,7 +216,8 @@ export function buildEmailBatchRevisionApproval(
   }
 
   for (const row of rows) {
-    if (!row.selection) throw new Error(`${row.date} ${row.index + 1}호차: 기존 예약 또는 신규 예약을 선택해 주세요.`);
+    if (!row.selection) throw new Error(`${row.date} ${row.index + 1}호차: 기존 예약, 신규 또는 운행 없음 중 하나를 선택해 주세요.`);
+    if (row.selection === 'skip') continue; // Explicitly no vehicle on this date; never create an empty booking.
     const existing = row.previous;
     if (row.selection !== 'new' && !existing)
       throw new Error(`${row.date} ${row.index + 1}호차: 이전 예약 후보가 변경됐습니다. 다시 분석해 주세요.`);
@@ -301,6 +302,7 @@ export function buildEmailBatchRevisionApproval(
     });
     counts.cancelled++;
   }
+  if (!items.length) throw new Error('저장할 운행 일정이나 명시적 취소가 없습니다.');
   if (items.length > 100) throw new Error('한 번에 승인할 변경 및 취소 건수는 최대 100건입니다.');
   return { items, changes: counts };
 }
