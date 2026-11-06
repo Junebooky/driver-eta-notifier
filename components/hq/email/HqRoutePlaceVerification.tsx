@@ -17,6 +17,7 @@ interface Props {
 /** Visible from step 5: operators can verify every waypoint without going back to step 3. */
 export const HqRoutePlaceVerification: React.FC<Props> = ({ draft, onUpdateDraft, disabled = false }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [selectionError, setSelectionError] = useState<string | null>(null);
   const stops = getEmailRouteStops(draft);
   const confirmedCount = stops.filter(isVerifiedEmailRouteStop).length;
   const missingCount = stops.length - confirmedCount;
@@ -71,7 +72,7 @@ export const HqRoutePlaceVerification: React.FC<Props> = ({ draft, onUpdateDraft
                   </p>
                 </div>
                 <button type="button" disabled={disabled || !onUpdateDraft}
-                  onClick={() => setEditingId(expanded ? null : stop.id)}
+                  onClick={() => { setSelectionError(null); setEditingId(expanded ? null : stop.id); }}
                   aria-expanded={expanded} aria-label={`${stop.location || '경유지'} 주소 ${expanded ? '닫기' : '확인하기'}`}
                   className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-slate-50 px-2.5 py-2 text-[11px] font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-40">
                   {verified ? '변경' : '주소 확인'}
@@ -82,10 +83,18 @@ export const HqRoutePlaceVerification: React.FC<Props> = ({ draft, onUpdateDraft
                 <div className="relative z-20 mt-3 pl-0.5">
                   <HqPlaceSearchInput
                     value={stop.location}
-                    onChange={(name) => onUpdateDraft?.(changeEmailRouteStopName(draft, stop.id, name))}
+                    onChange={(name) => {
+                      setSelectionError(null);
+                      onUpdateDraft?.(changeEmailRouteStopName(draft, stop.id, name));
+                    }}
                     onSelectPoi={(poi) => {
-                      onUpdateDraft?.(confirmEmailRouteStop(draft, stop.id, poi));
-                      setEditingId(null);
+                      try {
+                        onUpdateDraft?.(confirmEmailRouteStop(draft, stop.id, poi));
+                        setSelectionError(null);
+                        setEditingId(null);
+                      } catch (error) {
+                        setSelectionError(error instanceof Error ? error.message : '장소 확인에 실패했습니다.');
+                      }
                     }}
                     autoSearch
                     isConfirmed={verified}
@@ -95,6 +104,7 @@ export const HqRoutePlaceVerification: React.FC<Props> = ({ draft, onUpdateDraft
                     placeholder="장소명 또는 주소로 TMAP 검색"
                   />
                   <p className="mt-1.5 text-[11px] text-slate-400">검색 결과에서 정확한 주소를 선택하면 자동으로 확정됩니다.</p>
+                  {selectionError && <p role="alert" className="mt-1.5 text-[11px] text-rose-600">{selectionError}</p>}
                 </div>
               )}
             </div>
