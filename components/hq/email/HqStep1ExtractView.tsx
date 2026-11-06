@@ -34,6 +34,7 @@ import { HqEmailSummary, HqEmailDetail, HqEmailExtractedDraft, RouteWaypointItem
 import { haptics } from '@/utils/haptics';
 import { HqPlaceSearchInput, PoiResult } from '@/components/hq/HqPlaceSearchInput';
 import { saveContactToCrm } from '@/utils/crmCustomerSync';
+import { confirmEmailRouteStop, changeEmailRouteStopName, isVerifiedEmailRouteStop } from '@/utils/emailRoutePlaceVerification';
 
 interface HqStep1ExtractViewProps {
   emailSummary: HqEmailSummary;
@@ -157,7 +158,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
       time: wp.time || '',
       location: wp.location,
       selectedPoi: null,
-      isPoiConfirmed: Boolean(wp.isPoiConfirmed),
+      isPoiConfirmed: Boolean(wp.isPoiConfirmed && Number.isFinite(wp.lat) && Number.isFinite(wp.lng)),
     });
   };
 
@@ -169,12 +170,13 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
 
     const changedLocation = location !== original.location;
     const poi = waypointEdit.selectedPoi;
-    const confirmed = poi ? true : changedLocation ? false : Boolean(original.isPoiConfirmed);
-    const lat = poi?.lat ?? (changedLocation ? undefined : original.lat);
-    const lng = poi?.lng ?? (changedLocation ? undefined : original.lng);
+    const confirmed = poi ? true : Boolean(!changedLocation && waypointEdit.isPoiConfirmed && original.isPoiConfirmed);
+    const lat = poi?.lat ?? (confirmed ? original.lat : undefined);
+    const lng = poi?.lng ?? (confirmed ? original.lng : undefined);
+    const address = poi?.address ?? (confirmed ? original.address : undefined);
     const time = waypointEdit.time.trim();
     const updated = extractedDraft.waypoints.map((wp) =>
-      wp.id === waypointEdit.id ? { ...wp, time, location, lat, lng, isPoiConfirmed: confirmed } : wp
+      wp.id === waypointEdit.id ? { ...wp, time, location, address, lat, lng, isPoiConfirmed: confirmed } : wp
     );
     const isFirst = updated[0]?.id === waypointEdit.id;
     const isLast = updated[updated.length - 1]?.id === waypointEdit.id;
@@ -186,10 +188,12 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
       pickupLocation: isFirst ? location : extractedDraft.pickupLocation,
       pickupLat: isFirst ? lat : extractedDraft.pickupLat,
       pickupLng: isFirst ? lng : extractedDraft.pickupLng,
+      pickupAddress: isFirst ? address : extractedDraft.pickupAddress,
       isPickupPoiConfirmed: isFirst ? confirmed : extractedDraft.isPickupPoiConfirmed,
       dropoffLocation: isLast ? location : extractedDraft.dropoffLocation,
       dropoffLat: isLast ? lat : extractedDraft.dropoffLat,
       dropoffLng: isLast ? lng : extractedDraft.dropoffLng,
+      dropoffAddress: isLast ? address : extractedDraft.dropoffAddress,
       isDropoffPoiConfirmed: isLast ? confirmed : extractedDraft.isDropoffPoiConfirmed,
     });
     setWaypointEdit(null);
@@ -342,6 +346,9 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
         time: pickupTime !== '시간 미지정' ? pickupTime : '10:00',
         location: pickupLocation || '인천공항 제1터미널 (T1)',
         isPoiConfirmed: isPickupPoiConfirmed,
+        address: extractedDraft.pickupAddress,
+        lat: extractedDraft.pickupLat,
+        lng: extractedDraft.pickupLng,
       },
       {
         id: 'wp-2',
@@ -357,6 +364,9 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
         time: '14:00',
         location: dropoffLocation || '최종 목적지 입력',
         isPoiConfirmed: isDropoffPoiConfirmed,
+        address: extractedDraft.dropoffAddress,
+        lat: extractedDraft.dropoffLat,
+        lng: extractedDraft.dropoffLng,
       },
     ];
     onUpdateDraft?.({
@@ -459,26 +469,14 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
 
   const handleSelectPickupPoi = (poi: PoiResult) => {
     if (!extractedDraft) return;
-    const updated: HqEmailExtractedDraft = {
-      ...extractedDraft,
-      pickupLocation: poi.name,
-      pickupLat: poi.lat,
-      pickupLng: poi.lng,
-      isPickupPoiConfirmed: true,
-    };
-    onUpdateDraft?.(updated);
+    const first = [...(extractedDraft.waypoints || [])].sort((a, b) => a.order - b.order)[0];
+    onUpdateDraft?.(confirmEmailRouteStop(extractedDraft, first?.id || 'pickup', poi));
   };
 
   const handleSelectDropoffPoi = (poi: PoiResult) => {
     if (!extractedDraft) return;
-    const updated: HqEmailExtractedDraft = {
-      ...extractedDraft,
-      dropoffLocation: poi.name,
-      dropoffLat: poi.lat,
-      dropoffLng: poi.lng,
-      isDropoffPoiConfirmed: true,
-    };
-    onUpdateDraft?.(updated);
+    const last = [...(extractedDraft.waypoints || [])].sort((a, b) => a.order - b.order).at(-1);
+    onUpdateDraft?.(confirmEmailRouteStop(extractedDraft, last?.id || 'dropoff', poi));
   };
 
   const handleRegisterClick = () => {
@@ -881,8 +879,12 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                                             placeholder="TMAP 장소 검색"
                                             heightClass="h-9"
                                             tone="neutral"
+                                            autoSearch
                                           />
                                         </div>
+                                        {waypointEdit.selectedPoi?.address && (
+                                          <p className="w-full break-words px-1 text-[11px] text-slate-500">{waypointEdit.selectedPoi.address}</p>
+                                        )}
                                         <button
                                           type="button"
                                           onClick={saveWaypointEdit}
@@ -905,23 +907,25 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                                         onClick={() => beginWaypointEdit(wp)}
                                         className="flex-1 flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer select-none group/item"
                                       >
-                                        <div className="flex items-center gap-3 min-w-0">
-                                          <span className="text-xs tabular-nums font-medium text-slate-600 shrink-0 w-12">
-                                            {wp.time || '--:--'}
-                                          </span>
-                                          <span className="text-xs font-medium text-slate-800 truncate">
-                                            {wp.location || '장소 미지정'}
-                                          </span>
-                                          {isFirst && (
-                                            <span className="text-[10px] font-medium text-slate-500 shrink-0">
-                                              출발
+                                        <div className="flex min-w-0 flex-col gap-1">
+                                          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5">
+                                            <span className="w-12 shrink-0 text-xs font-medium tabular-nums text-slate-600">
+                                              {wp.time || '--:--'}
                                             </span>
-                                          )}
-                                          {isLast && (
-                                            <span className="text-[10px] font-medium text-slate-500 shrink-0">
-                                              종료
+                                            <span className="min-w-0 text-xs font-medium text-slate-800">
+                                              {wp.location || '장소 미지정'}
                                             </span>
-                                          )}
+                                            {isFirst && <span className="shrink-0 text-[10px] text-slate-500">출발</span>}
+                                            {isLast && <span className="shrink-0 text-[10px] text-slate-500">종료</span>}
+                                          </div>
+                                          <p className="pl-[60px] text-[11px] leading-relaxed text-slate-500">
+                                            {wp.address || (isVerifiedEmailRouteStop({
+                                              id: wp.id, date: wp.date || pickupDate, time: wp.time || '',
+                                              location: wp.location, lat: wp.lat, lng: wp.lng,
+                                              isPoiConfirmed: Boolean(wp.isPoiConfirmed),
+                                            }) ? 'TMAP 좌표 확인됨 · 상세 주소 재검색 가능'
+                                              : '주소 미확정 · 눌러서 TMAP 검색 결과 선택')}
+                                          </p>
                                         </div>
 
                                         <div className="flex shrink-0 items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-hover/item:opacity-100 transition-opacity">
@@ -993,11 +997,8 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                         value={pickupLocation}
                         onChange={(val) => {
                           if (!extractedDraft) return;
-                          onUpdateDraft?.({
-                            ...extractedDraft,
-                            pickupLocation: val,
-                            isPickupPoiConfirmed: false,
-                          });
+                          const first = [...(extractedDraft.waypoints || [])].sort((a, b) => a.order - b.order)[0];
+                          onUpdateDraft?.(changeEmailRouteStopName(extractedDraft, first?.id || 'pickup', val));
                         }}
                         onSelectPoi={handleSelectPickupPoi}
                         autoSearch={true}
@@ -1005,6 +1006,9 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                         placeholder="TMAP 출발지 검색 및 후보 선택"
                         heightClass="h-9"
                       />
+                      <p className="mt-1.5 break-words text-[11px] leading-relaxed text-slate-500">
+                        {extractedDraft?.pickupAddress || '상세 주소 미확정 · TMAP 검색 결과를 선택해 주세요.'}
+                      </p>
                     </div>
                   </div>
 
@@ -1021,11 +1025,8 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                         value={dropoffLocation}
                         onChange={(val) => {
                           if (!extractedDraft) return;
-                          onUpdateDraft?.({
-                            ...extractedDraft,
-                            dropoffLocation: val,
-                            isDropoffPoiConfirmed: false,
-                          });
+                          const last = [...(extractedDraft.waypoints || [])].sort((a, b) => a.order - b.order).at(-1);
+                          onUpdateDraft?.(changeEmailRouteStopName(extractedDraft, last?.id || 'dropoff', val));
                         }}
                         onSelectPoi={handleSelectDropoffPoi}
                         autoSearch={true}
@@ -1034,6 +1035,9 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                         placeholder="TMAP 도착지 검색 및 후보 선택"
                         heightClass="h-9"
                       />
+                      <p className="mt-1.5 break-words text-[11px] leading-relaxed text-slate-500">
+                        {extractedDraft?.dropoffAddress || '상세 주소 미확정 · TMAP 검색 결과를 선택해 주세요.'}
+                      </p>
                     </div>
                   </div>
                   {/* Single-leg card also gets its own per-day add control. */}
