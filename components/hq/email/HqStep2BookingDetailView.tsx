@@ -88,7 +88,9 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
   try {
     if (extractedDraft) availabilityWindows = emailDispatchDays(extractedDraft).map(day => ({ startDate: day.date, startTime: day.start.time || '', endDate: day.date, endTime: day.endTime }));
   } catch { /* The date editor below shows the validation error. */ }
-  const fleet = useFleetAvailabilityWindows(availabilityWindows);
+  // A revised reservation must not conflict with its own vehicle and driver.
+  // All *other* bookings remain part of the server-side availability check.
+  const fleet = useFleetAvailabilityWindows(availabilityWindows, extractedDraft?.revisionMatchedScheduleId);
   const [activeSubTab, setActiveSubTab] = useState<'assign' | 'schedule' | 'history'>('assign');
   const [selectedLanguage, setSelectedLanguage] = useState<'any' | 'english'>(() => {
     if (extractedDraft?.requestedLanguage) return extractedDraft.requestedLanguage === 'en' ? 'english' : 'any';
