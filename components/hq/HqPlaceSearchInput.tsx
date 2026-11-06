@@ -228,7 +228,7 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
       )}
 
       <div
-        className={`w-full ${heightClass} bg-white border border-slate-200 rounded-xl px-3.5 flex items-center gap-2.5 transition-all ${
+        className={`w-full ${heightClass} bg-white border border-slate-200 ${heightClass.includes('rounded-') ? '' : 'rounded-xl'} px-3.5 flex items-center gap-2.5 transition-all ${
           isNeutral
             ? 'hover:border-slate-300 focus-within:border-slate-400 shadow-none'
             : 'hover:border-[#1E60F3]/60 focus-within:border-[#1E60F3] focus-within:ring-2 focus-within:ring-blue-100 shadow-2xs'

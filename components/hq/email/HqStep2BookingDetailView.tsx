@@ -42,6 +42,17 @@ export interface VehicleSlotAssignment {
   status: 'unassigned' | 'assigned';
 }
 
+function formatKoreanAmPmTime(time?: string | null): string {
+  if (!time) return '';
+  const match = time.match(/(\d{1,2}):(\d{2})/);
+  if (!match) return time;
+  const hours = parseInt(match[1], 10);
+  const minutes = match[2];
+  const ampm = hours < 12 ? '오전' : '오후';
+  const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours;
+  return `${ampm} ${String(displayHours).padStart(2, '0')}:${minutes}`;
+}
+
 export interface HqStep2BookingDetailViewProps {
   emailSummary: HqEmailSummary;
   emailDetail?: HqEmailDetail | null;
@@ -332,45 +343,137 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
         isDispatching={isDispatching}
       />
 
-      <details className="group rounded-2xl bg-white border border-slate-100 shadow-[0_2px_12px_rgba(15,23,42,0.03)] px-5 py-4 transition-all">
-        <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-black text-slate-800 marker:hidden">
-          <span>날짜별 일정·종료시간 다시 확인</span>
+      {/* Section 1: 날짜별 장소·종료시간 확인 (Reference 1) */}
+      <details className="group rounded-[28px] bg-white border border-slate-100 shadow-[0_2px_12px_rgba(15,23,42,0.03)] p-5 sm:p-6 transition-all" open>
+        <summary className="flex cursor-pointer list-none items-center justify-between text-sm sm:text-base font-bold text-slate-900 marker:hidden">
+          <span className="group-open:hidden">날짜별 일정·종료시간 다시 확인</span>
+          <span className="hidden group-open:inline">날짜별 장소·종료시간 확인</span>
           <ChevronDown className="h-4 w-4 text-slate-400 transition-transform group-open:rotate-180" />
         </summary>
-      {extractedDraft && <section className="mt-3 space-y-4">
-        <h3 className="text-sm font-bold">날짜별 경로·종료시간 확인</h3>
-        {(()=>{try{return emailDispatchDays(extractedDraft).map(day=><div key={day.date} className="space-y-2 border-t border-blue-100 pt-3"><p className="text-sm font-bold text-slate-800">{day.date}</p>
-          {day.points.map(point=><div key={point.id} className="grid grid-cols-[135px_1fr] gap-2 items-center"><input aria-label={`${day.date} 경유 시간`} type="time" className="h-10 w-full rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-800 outline-none focus:border-[#1E60F3] shadow-2xs transition-colors cursor-pointer" value={normalizeTimeHHmm(point.time) || point.time || ''} onChange={event=>updateDraftRoute({...extractedDraft,waypoints:emailDispatchDays(extractedDraft).flatMap(d=>d.points).map(p=>p.id===point.id?{...p,time:event.target.value}:p)})}/><HqPlaceSearchInput value={point.location} isConfirmed={point.isPoiConfirmed} heightClass="h-10" onChange={location=>updateDraftRoute({...extractedDraft,waypoints:emailDispatchDays(extractedDraft).flatMap(d=>d.points).map(p=>p.id===point.id?{...p,location,isPoiConfirmed:false}:p)})} onSelectPoi={poi=>updateDraftRoute({...extractedDraft,waypoints:emailDispatchDays(extractedDraft).flatMap(d=>d.points).map(p=>p.id===point.id?{...p,location:poi.name,lat:poi.lat,lng:poi.lng,isPoiConfirmed:true}:p)})}/></div>)}
-          <label className="flex items-center text-xs font-bold text-slate-700">실제 종료 시간<input type="time" aria-label={`${day.date} 실제 종료 시간`} className="ml-3 h-10 w-36 rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-800 outline-none focus:border-[#1E60F3] shadow-2xs transition-colors cursor-pointer" value={normalizeTimeHHmm(day.endTime) || day.endTime || ''} onChange={event=>onUpdateDraft?.({...extractedDraft,dayEndTimes:{...extractedDraft.dayEndTimes,[day.date]:event.target.value}})}/></label>
-        </div>);}catch(error){return <p role="alert" className="text-xs text-rose-600">{error instanceof Error?error.message:'날짜를 확인해 주세요.'}</p>;}})()}
-      </section>}
+        {extractedDraft && (
+          <section className="mt-4 space-y-6">
+            {(() => {
+              try {
+                return emailDispatchDays(extractedDraft).map((day) => (
+                  <div key={day.date} className="space-y-3">
+                    <p className="text-sm font-bold text-slate-900">{day.date}</p>
+                    <div className="space-y-2.5">
+                      {day.points.map((point) => (
+                        <div key={point.id} className="flex items-center gap-2.5 sm:gap-3">
+                          {/* Time Picker Pill */}
+                          <div className="relative flex h-12 w-32 sm:w-36 shrink-0 items-center justify-between rounded-2xl bg-white border border-slate-200/80 px-3.5 hover:border-blue-400 focus-within:border-[#1E60F3] focus-within:ring-2 focus-within:ring-blue-100 transition-all cursor-pointer group">
+                            <span className="text-xs sm:text-sm font-bold text-slate-800 tracking-tight">
+                              {formatKoreanAmPmTime(point.time) || '시간 선택'}
+                            </span>
+                            <Clock className="h-4 w-4 text-slate-400 group-hover:text-slate-600 shrink-0" strokeWidth={1.8} />
+                            <input
+                              aria-label={`${day.date} 경유 시간`}
+                              type="time"
+                              value={normalizeTimeHHmm(point.time) || point.time || ''}
+                              onChange={(event) =>
+                                updateDraftRoute({
+                                  ...extractedDraft,
+                                  waypoints: emailDispatchDays(extractedDraft)
+                                    .flatMap((d) => d.points)
+                                    .map((p) => (p.id === point.id ? { ...p, time: event.target.value } : p)),
+                                })
+                              }
+                              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                            />
+                          </div>
 
+                          {/* Place Search Input */}
+                          <HqPlaceSearchInput
+                            value={point.location}
+                            isConfirmed={point.isPoiConfirmed}
+                            containerClassName="flex-1 min-w-0"
+                            heightClass="h-12 rounded-2xl"
+                            icon="mapPin"
+                            placeholder="경유지 또는 목적지 입력"
+                            onChange={(location) =>
+                              updateDraftRoute({
+                                ...extractedDraft,
+                                waypoints: emailDispatchDays(extractedDraft)
+                                  .flatMap((d) => d.points)
+                                  .map((p) => (p.id === point.id ? { ...p, location, isPoiConfirmed: false } : p)),
+                              })
+                            }
+                            onSelectPoi={(poi) =>
+                              updateDraftRoute({
+                                ...extractedDraft,
+                                waypoints: emailDispatchDays(extractedDraft)
+                                  .flatMap((d) => d.points)
+                                  .map((p) =>
+                                    p.id === point.id
+                                      ? { ...p, location: poi.name, lat: poi.lat, lng: poi.lng, isPoiConfirmed: true }
+                                      : p
+                                  ),
+                              })
+                            }
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* 실제 종료 시간 */}
+                    <div className="flex items-center gap-3 pt-2">
+                      <span className="text-xs sm:text-sm font-bold text-slate-500 shrink-0">
+                        실제 종료 시간
+                      </span>
+                      <div className="relative flex h-11 w-32 sm:w-36 shrink-0 items-center justify-between rounded-2xl bg-white border border-slate-200/80 px-3.5 hover:border-blue-400 focus-within:border-[#1E60F3] focus-within:ring-2 focus-within:ring-blue-100 transition-all cursor-pointer group">
+                        <span className="text-xs sm:text-sm font-bold text-slate-800 tracking-tight">
+                          {formatKoreanAmPmTime(day.endTime) || '시간 선택'}
+                        </span>
+                        <Clock className="h-4 w-4 text-slate-400 group-hover:text-slate-600 shrink-0" strokeWidth={1.8} />
+                        <input
+                          type="time"
+                          aria-label={`${day.date} 실제 종료 시간`}
+                          value={normalizeTimeHHmm(day.endTime) || day.endTime || ''}
+                          onChange={(event) =>
+                            onUpdateDraft?.({
+                              ...extractedDraft,
+                              dayEndTimes: { ...extractedDraft.dayEndTimes, [day.date]: event.target.value },
+                            })
+                          }
+                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ));
+              } catch (error) {
+                return <p role="alert" className="text-xs text-rose-600">{error instanceof Error ? error.message : '날짜를 확인해 주세요.'}</p>;
+              }
+            })()}
+          </section>
+        )}
       </details>
-      <details className="group rounded-2xl bg-white border border-slate-100 shadow-[0_2px_12px_rgba(15,23,42,0.03)] px-5 py-4 transition-all">
-        <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-black text-slate-800 marker:hidden">
+
+      {/* Section 2: 예약 기본 정보·추가 정보 (Reference 2) */}
+      <details className="group rounded-[28px] bg-white border border-slate-100 shadow-[0_2px_12px_rgba(15,23,42,0.03)] p-5 sm:p-6 transition-all" open>
+        <summary className="flex cursor-pointer list-none items-center justify-between text-sm sm:text-base font-bold text-slate-900 marker:hidden">
           <span>예약 기본 정보·추가 정보</span>
           <ChevronDown className="h-4 w-4 text-slate-400 transition-transform group-open:rotate-180" />
         </summary>
-        <div className="mt-4">
-        <div className="lg:col-span-5 space-y-4">
+        <div className="mt-4 space-y-4">
           {/* Card 1: 기본 정보 */}
-          <div className="bg-slate-50/70 rounded-2xl border border-slate-200/80 p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-black text-slate-900">기본 정보</h3>
+          <div className="rounded-[24px] bg-white border border-slate-100/90 shadow-2xs p-5 sm:p-6 space-y-3.5">
+            <div className="flex items-center justify-between pb-1">
+              <h3 className="text-sm font-bold text-slate-900">기본 정보</h3>
               <button
                 type="button"
                 onClick={handleSaveToCrm}
                 disabled={extractedDraft?.isSavedToCrm || isSavingCrm}
-                className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border transition-colors flex items-center gap-1 ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                   extractedDraft?.isSavedToCrm
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-300 cursor-default'
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                     : isSavingCrm
-                    ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                    : 'bg-blue-50 text-[#1E60F3] border-blue-200 hover:bg-blue-100 cursor-pointer'
+                    ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                    : 'bg-blue-50 text-[#1E60F3] hover:bg-blue-100 border border-blue-200/60'
                 }`}
                 title="고객 관리에 회사 및 담당자 정보를 저장하거나 연결합니다"
               >
-                <BookmarkCheck className="w-3 h-3" />
+                <BookmarkCheck className="w-3.5 h-3.5" />
                 <span>
                   {isSavingCrm
                     ? '저장 중...'
@@ -381,33 +484,34 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
               </button>
             </div>
 
-            <div className="space-y-2 text-xs">
+            <div className="space-y-2.5 text-xs">
               <div className="flex items-center justify-between">
                 <span className="text-slate-400 font-medium">예약 번호</span>
-                <span className="font-mono font-bold text-slate-800">{bookingCode}</span>
+                <span className="font-bold text-slate-900">{bookingCode}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-400 font-medium">고객사</span>
-                <span className="font-extrabold text-slate-900">{companyName}</span>
+                <span className="font-bold text-slate-900">{companyName}</span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400 font-medium">예약 담당자</span>
+              <div className="flex items-start justify-between">
+                <span className="text-slate-400 font-medium pt-0.5">예약 담당자</span>
                 <div className="text-right">
-                  <span className="font-bold text-slate-800">{contactName}</span>
-                  <span className="text-[10px] text-slate-400 font-normal ml-1">
-                    ({contactSource === 'signature' ? '서명' : contactSource === 'body' ? '본문' : '발신 헤더'})
-                  </span>
-                  <div className="text-[10px] text-slate-500">
-                    {contactPhone && <span>📞 {contactPhone} </span>}
-                    {contactEmail && <span>✉️ {contactEmail}</span>}
+                  <div className="font-bold text-slate-900">
+                    {contactName}
+                    <span className="text-slate-400 font-normal ml-1">
+                      ({contactSource === 'signature' ? '서명' : contactSource === 'body' ? '변신 메디' : '발신 헤더'})
+                    </span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-end gap-2 text-[11px] text-slate-400 font-medium">
+                    <span>📞 {contactPhone || '연락처 미등록'}</span>
+                    <span>|</span>
+                    <span>✉️ {contactEmail || '이메일 없음'}</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="h-px bg-slate-200 my-2" />
-
-            <div className="space-y-2 text-xs">
+            <div className="space-y-2.5 text-xs pt-2">
               <div className="flex items-center justify-between">
                 <span className="text-slate-400 font-medium">운행 날짜</span>
                 <span className="font-bold text-slate-900">{bookingDate}</span>
@@ -418,210 +522,121 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
               </div>
 
               {/* 운행 경로: 다중 목적지 vs 단일 구간 */}
-              {extractedDraft?.waypoints && extractedDraft.waypoints.length > 2 ? (
-                <div className="pt-2">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-slate-400 font-bold flex items-center gap-1">
-                      <MapPin className="w-3.5 h-3.5 text-[#1E60F3]" />
-                      <span>운행 경로 (여러 목적지)</span>
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      {(() => {
-                        const uniqueWpDates = Array.from(
-                          new Set(extractedDraft.waypoints.map((w) => (w.date || bookingDate || '').trim()).filter(Boolean))
-                        );
-                        return uniqueWpDates.length > 1 ? (
-                          <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-extrabold text-[10px] border border-indigo-200/50">
-                            {uniqueWpDates.length}일간 순회
-                          </span>
-                        ) : null;
-                      })()}
-                      <span className="px-2 py-0.5 rounded-full bg-blue-50 text-[#1E60F3] font-extrabold text-[10px] border border-blue-200/50">
-                        {extractedDraft.waypoints.length}개 구간
-                      </span>
-                    </div>
-                  </div>
-                  <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
-                    {(() => {
-                      const uniqueWpDates = Array.from(
-                        new Set(extractedDraft.waypoints.map((w) => (w.date || bookingDate || '').trim()).filter(Boolean))
-                      );
-                      const hasMultiDays = uniqueWpDates.length > 1;
-
-                      return extractedDraft.waypoints.map((wp, idx) => {
-                        const curDate = (wp.date || bookingDate || '').trim();
-                        const prevDate = idx > 0 ? (extractedDraft.waypoints![idx - 1].date || bookingDate || '').trim() : null;
-                        const isDateChanged = idx === 0 ? Boolean(curDate) : Boolean(curDate && curDate !== prevDate);
-                        const dayIdx = uniqueWpDates.indexOf(curDate) >= 0 ? uniqueWpDates.indexOf(curDate) + 1 : undefined;
-
-                        return (
-                          <React.Fragment key={wp.id}>
-                            {isDateChanged && (
-                              <div className={`flex items-center gap-1.5 ${idx === 0 ? 'pb-1' : 'pt-2.5 pb-1'}`}>
-                                <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 border border-blue-100 text-[#1E60F3] text-[10px] font-black">
-                                  <Calendar className="w-3 h-3 text-[#1E60F3]" />
-                                  <span>{curDate} {hasMultiDays && dayIdx ? `[${dayIdx}일차]` : ''}</span>
-                                </div>
-                                <div className="flex-1 h-px bg-slate-200" />
-                              </div>
-                            )}
-                            <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-200/70 text-xs">
-                              <span className="w-5 h-5 rounded-full bg-[#1E60F3] text-white font-extrabold text-[10px] flex items-center justify-center shrink-0 shadow-2xs">
-                                {idx + 1}
-                              </span>
-                              {wp.date && hasMultiDays && (
-                                <span className="text-slate-500 font-bold shrink-0 text-[10px] px-1.5 py-0.5 bg-white rounded border border-slate-200">
-                                  {wp.date}
-                                </span>
-                              )}
-                              {wp.time && (
-                                <span className="text-slate-500 font-bold shrink-0 text-[11px] px-1.5 py-0.5 bg-white rounded border border-slate-200">
-                                  {wp.time}
-                                </span>
-                              )}
-                              <span className="font-bold text-slate-900 truncate flex-1">
-                                {wp.location}
-                              </span>
-                            </div>
-                          </React.Fragment>
-                        );
-                      });
-                    })()}
-                  </div>
+              <div className="pt-2">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <MapPin className="w-4 h-4 text-[#1E60F3]" />
+                    <span>운행 경로 (여러 목적지)</span>
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-[#1E60F3] font-bold text-xs border border-blue-100">
+                    {extractedDraft?.waypoints?.length || 4}개 구간
+                  </span>
                 </div>
-              ) : (
-                <>
-                  {/* 픽업 위치 (TMAP 후보 검색 및 선택) */}
-                  <div className="pt-1">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-slate-400 font-medium">픽업 위치</span>
-                      {pickupDetailNotes && (
-                        <span className="text-[10px] text-slate-400">[{pickupDetailNotes}]</span>
-                      )}
-                    </div>
-                    <HqPlaceSearchInput
-                      value={pickupLocation}
-                      onChange={(val) => {
-                        if (!extractedDraft) return;
-                        onUpdateDraft?.({
-                          ...extractedDraft,
-                          pickupLocation: val,
-                          waypoints:extractedDraft.waypoints?.map((point,index)=>index===0?{...point,location:val,isPoiConfirmed:false}:point),
-                          isPickupPoiConfirmed: false,
-                        });
-                      }}
-                      onSelectPoi={handleSelectPickupPoi}
-                      autoSearch={true}
-                      isConfirmed={isPickupPoiConfirmed}
-                      placeholder="TMAP 출발지 검색 및 후보 선택"
-                      heightClass="h-9"
-                    />
-                  </div>
 
-                  {/* 목적지 (TMAP 후보 검색 및 선택) */}
-                  <div className="pt-1">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-slate-400 font-medium">목적지</span>
-                      {dropoffDetailNotes && (
-                        <span className="text-[10px] text-slate-400">[{dropoffDetailNotes}]</span>
-                      )}
-                    </div>
-                    <HqPlaceSearchInput
-                      value={dropoffLocation}
-                      onChange={(val) => {
-                        if (!extractedDraft) return;
-                        onUpdateDraft?.({
-                          ...extractedDraft,
-                          dropoffLocation: val,
-                          waypoints:extractedDraft.waypoints?.map((point,index)=>index===(extractedDraft.waypoints?.length || 0)-1?{...point,location:val,isPoiConfirmed:false}:point),
-                          isDropoffPoiConfirmed: false,
-                        });
-                      }}
-                      onSelectPoi={handleSelectDropoffPoi}
-                      autoSearch={true}
-                      isConfirmed={isDropoffPoiConfirmed}
-                      icon="flag"
-                      placeholder="TMAP 목적지 검색 및 후보 선택"
-                      heightClass="h-9"
-                    />
-                  </div>
-                </>
-              )}
-            </div>
+                <div className="mb-2.5">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50/70 border border-blue-100 text-[#1E60F3] font-bold text-xs">
+                    <Calendar className="w-3.5 h-3.5" />
+                    <span>{bookingDate}</span>
+                  </span>
+                </div>
 
-            <div className="h-px bg-slate-200 my-2" />
+                <div className="space-y-2">
+                  {extractedDraft?.waypoints && extractedDraft.waypoints.length > 0 ? (
+                    extractedDraft.waypoints.map((wp, idx) => (
+                      <div
+                        key={wp.id}
+                        className="flex items-center gap-3 p-3.5 rounded-2xl bg-white border border-slate-100/90 shadow-2xs text-xs"
+                      >
+                        <span className="w-6 h-6 rounded-full bg-[#1E60F3] text-white font-bold text-xs flex items-center justify-center shrink-0">
+                          {idx + 1}
+                        </span>
+                        <span className="font-bold text-slate-600 shrink-0 w-12 text-center">
+                          {wp.time || bookingTime}
+                        </span>
+                        <span className="font-bold text-slate-900 truncate flex-1">
+                          {wp.location}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-white border border-slate-100/90 shadow-2xs text-xs">
+                        <span className="w-6 h-6 rounded-full bg-[#1E60F3] text-white font-bold text-xs flex items-center justify-center shrink-0">1</span>
+                        <span className="font-bold text-slate-600 shrink-0 w-12 text-center">{bookingTime}</span>
+                        <span className="font-bold text-slate-900 truncate flex-1">{pickupLocation}</span>
+                      </div>
+                      <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-white border border-slate-100/90 shadow-2xs text-xs">
+                        <span className="w-6 h-6 rounded-full bg-[#1E60F3] text-white font-bold text-xs flex items-center justify-center shrink-0">2</span>
+                        <span className="font-bold text-slate-600 shrink-0 w-12 text-center">--:--</span>
+                        <span className="font-bold text-slate-900 truncate flex-1">{dropoffLocation}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
 
-            <div className="text-xs">
-              <span className="text-slate-400 font-medium block mb-1">요청 사항</span>
-              <p className="font-bold text-slate-800 leading-snug">
-                {specialRequests}
-              </p>
+              <div className="pt-2 text-xs">
+                <span className="text-slate-400 font-medium block mb-1">요청 사항</span>
+                <p className="font-bold text-slate-800 leading-snug">
+                  {specialRequests || '요청 사항 없음'}
+                </p>
+              </div>
             </div>
           </div>
 
           {/* Card 2: 추가 정보 */}
-          <div className="bg-slate-50/70 rounded-2xl border border-slate-200/80 p-4 space-y-3">
-            <h3 className="text-xs font-black text-slate-900">추가 정보</h3>
+          <div className="rounded-[24px] bg-white border border-slate-100/90 shadow-2xs p-5 sm:p-6 space-y-3.5">
+            <h3 className="text-sm font-bold text-slate-900">추가 정보</h3>
 
             {/* 기사 언어 조건 */}
-            <div>
-              <span className="text-slate-400 font-medium text-xs block mb-1.5">
-                기사 언어 조건
-              </span>
-              <div className="grid grid-cols-2 gap-2">
+            <div className="flex items-center justify-between text-xs pt-1">
+              <span className="text-slate-500 font-medium">기사 언어 조건</span>
+              <div className="flex items-center gap-2 flex-1 max-w-xs sm:max-w-sm ml-auto">
                 <button
                   type="button"
                   onClick={() => changeDriverLanguage('any')}
-                  className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  className={`flex-1 py-2 px-3 rounded-xl border text-xs font-bold transition-all text-center cursor-pointer ${
                     selectedLanguage === 'any'
-                      ? 'border-[#1E60F3] bg-blue-50/80 text-[#1E60F3] shadow-2xs'
-                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                      ? 'border-blue-200/80 bg-blue-100/70 text-[#1E60F3]'
+                      : 'border-slate-200/80 bg-white text-slate-600 hover:bg-slate-50'
                   }`}
                 >
-                  <span>무관</span>
+                  무관
                 </button>
                 <button
                   type="button"
                   onClick={() => changeDriverLanguage('english')}
-                  className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  className={`flex-1 py-2 px-3 rounded-xl border text-xs font-bold transition-all text-center cursor-pointer ${
                     selectedLanguage === 'english'
-                      ? 'border-[#1E60F3] bg-blue-50/80 text-[#1E60F3] shadow-2xs'
-                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                      ? 'border-blue-200/80 bg-blue-100/70 text-[#1E60F3]'
+                      : 'border-slate-200/80 bg-white text-slate-600 hover:bg-slate-50'
                   }`}
                 >
-                  <span>영어 가능</span>
+                  영어 가능
                 </button>
               </div>
             </div>
 
             {/* Details */}
-            <div className="space-y-2 text-xs pt-1">
+            <div className="space-y-2.5 text-xs pt-2">
               <div className="flex items-center justify-between">
                 <span className="text-slate-400 font-medium">탑승객 수</span>
-                <span className="font-bold text-slate-800">{passengerCount}명</span>
+                <span className="font-bold text-slate-900">{passengerCount}명</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-400 font-medium">탑승객명</span>
-                <span className="font-bold text-slate-800">
-                  {passengerName}
-                </span>
+                <span className="font-bold text-slate-900">{passengerName}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-400 font-medium">탑승객 연락처</span>
-                <span className="font-bold text-slate-800">
-                  {passengerPhone || '연락처 미입력'}
-                </span>
+                <span className="font-medium text-slate-400">{passengerPhone || '연락처 미입력'}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-400 font-medium">항공편명</span>
-                <span className="font-bold text-blue-600">{flightNumber}</span>
+                <span className="font-bold text-[#1E60F3]">{flightNumber || '항공편 없음'}</span>
               </div>
             </div>
           </div>
-        </div>
-
-        {/* ========================================================= */}
-
         </div>
       </details>
     </div>
