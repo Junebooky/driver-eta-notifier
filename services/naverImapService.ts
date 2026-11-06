@@ -280,6 +280,11 @@ export async function fetchNaverEmailDetail(uid: number): Promise<HqEmailDetail 
           flags: [],
           preview: bodyText.slice(0, 140).replace(/\s+/g, ' ').trim(),
           hasAttachments: (parsed.attachments || []).length > 0,
+          attachments: (parsed.attachments || []).slice(0, 30).map(file => ({
+            filename: file.filename || '이름 없는 첨부파일',
+            contentType: file.contentType || 'application/octet-stream',
+            size: file.size || file.content?.length || 0,
+          })),
           candidateClassification: classification.classification,
           aiStatus: classification.classification === 'booking_candidate' ? 'candidate' : 'not_analyzed',
           matchedKeywords: classification.matchedPositive,
