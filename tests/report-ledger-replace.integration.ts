@@ -33,6 +33,7 @@ export async function verifyReportLedgerReplacement(admin:Client,a:Client,b:Clie
   'SELECT cockpit.register_report_ledger($1,$2,$3,$4,$5::jsonb) version',
   [org,2026,actor,'이전 원본2026년.xlsx',JSON.stringify(storage(legacy.bytes))]
  )).rows[0].version as string;
+ await admin.query("INSERT INTO cockpit.report_month_templates(org_id,year,month,source_month,approved_by) VALUES($1,2026,11,'4월',$2)",[org,actor]);
  const oldId=randomUUID();
  await admin.query(`INSERT INTO cockpit.report_submissions(
    id,org_id,driver_id,request_key,fingerprint,raw_message,parsed,excel_status,
@@ -70,6 +71,7 @@ export async function verifyReportLedgerReplacement(admin:Client,a:Client,b:Clie
  assert.deepEqual((await admin.query('SELECT bytes FROM cockpit.report_workbook_versions WHERE id=$1',[registration])).rows[0].bytes,Buffer.from(legacy.bytes));
  assert.deepEqual((await admin.query('SELECT bytes FROM cockpit.report_workbook_versions WHERE id=$1',[newer])).rows[0].bytes,Buffer.from(fresh));
  assert.equal((await admin.query('SELECT count(*)::integer AS n FROM cockpit.report_workbook_versions WHERE org_id=$1',[org])).rows[0].n,2);
+ assert.equal((await admin.query('SELECT count(*)::integer AS n FROM cockpit.report_month_templates WHERE org_id=$1 AND year=2026',[org])).rows[0].n,0,'old owner month templates must not leak into the new owner file');
  assert.equal(await run(a),null,'stale expected version cannot replace again');
  assert.equal((await admin.query('SELECT count(*)::integer AS n FROM cockpit.report_workbook_versions WHERE org_id=$1',[org])).rows[0].n,2);
 
