@@ -5,6 +5,7 @@ import { ScheduleItem } from '@/data/ferrariSchedules';
 import { Navigation, Clock, User, Plane, FileText, ChevronRight, Pencil, Check, AlertTriangle, Building2, Phone, Users } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 import { sanitizePlaceName } from '@/utils/formatters';
+import { DispatchRouteTimeline } from '@/components/common/DispatchRouteTimeline';
 
 interface ScheduleCardProps {
   item: ScheduleItem;
@@ -221,7 +222,15 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
         </div>
       </div>
 
-      {/* Origin / Destination Route Timeline */}
+      {/* Every verified HQ waypoint, not just the first and last stop. */}
+      {item.routeWaypoints && item.routeWaypoints.length > 2 ? (
+        <DispatchRouteTimeline
+          waypoints={item.routeWaypoints}
+          compact
+          className="rounded-2xl bg-slate-50/70 px-3.5 py-3"
+        />
+      ) : (
+        <>
       <div className="relative pl-6 py-0.5 space-y-3">
         {/* Left Vertical Route Connector Line */}
         <div className="absolute left-[7px] top-3 bottom-3 w-[1.5px] bg-slate-200" />
@@ -270,6 +279,9 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
           )}
         </div>
       </div>
+
+        </>
+      )}
 
       {/* Details Box: Aligned 2-Column Info Table */}
       <div
