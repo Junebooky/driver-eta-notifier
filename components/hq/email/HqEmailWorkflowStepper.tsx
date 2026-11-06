@@ -76,7 +76,7 @@ export const HqEmailWorkflowStepper: React.FC<HqEmailWorkflowStepperProps> = ({
   onStepClick,
 }) => {
   return (
-    <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md px-3.5 sm:px-5 py-2.5 sm:py-3 border-b border-slate-200/80 shadow-2xs">
+    <div className="bg-white px-3.5 sm:px-5 py-2.5 sm:py-3">
       {/* Desktop / Tablet Stepper (>= md) */}
       <div className="hidden md:flex items-center justify-between gap-1 lg:gap-2">
         {WORKFLOW_STEPS.map((step, idx) => {
