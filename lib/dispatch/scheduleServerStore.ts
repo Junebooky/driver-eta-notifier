@@ -1099,7 +1099,7 @@ async function prepareServerDispatchSchedule(
           previousDestination: existingHydrated.destination,
           previousDriverName: existingHydrated.driver_name || undefined,
           previousVehiclePlate: existingHydrated._meta.vehiclePlate || undefined,
-          previousVersion: existingHydrated.version,
+          previousVersion: existingHydrated.version || 1,
         }].slice(-20)
       : existingHydrated?._meta.revisionHistory,
     dispatchStatus: effectiveDispatchStatus,
