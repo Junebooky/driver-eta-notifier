@@ -26,6 +26,7 @@ import {
   Plane,
   RefreshCw,
   BellRing,
+  Ban,
   MessageSquareText,
   ExternalLink,
   Image as ImageIcon,
@@ -80,6 +81,7 @@ import { useFleetAvailability } from '@/hooks/useFleetAvailability';
 import { validateDispatchInterval } from '@/utils/dispatchInterval';
 import { editedBookingIdentity, resolveQuickDispatchPlaces } from '@/utils/quickDispatchContinuity';
 import { driverDispatchSmsHref } from '@/utils/driverDispatchSms';
+import { cancelHqQuickDispatchSchedule } from '@/utils/hqQuickDispatchCancellation';
 import { useHqDrivers } from '@/utils/useHqDrivers';
 
 export interface HqQuickDispatchProps {
@@ -96,7 +98,6 @@ export interface HqQuickDispatchProps {
   onRemindDriver?: (booking: HqBooking) => Promise<void> | void;
   onOpenCustomerMessage?: (booking: HqBooking) => void;
   onOpenDriverVehicleInfo?: (booking: HqBooking) => void;
-  onOpenDetailModal?: (booking: HqBooking) => void;
 }
 
 const VEHICLE_OPTIONS = VIP_REAL_VEHICLES.map((v) => ({
@@ -351,7 +352,6 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
   onRemindDriver,
   onOpenCustomerMessage,
   onOpenDriverVehicleInfo,
-  onOpenDetailModal,
 }) => {
   // 1. Customer Selection
   const [customerName, setCustomerName] = useState(() => initialBooking?.customerName || '');
@@ -467,6 +467,12 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isReminding, setIsReminding] = useState(false);
   const [remindSuccess, setRemindSuccess] = useState(false);
+  const [isCancelConfirmOpen, setIsCancelConfirmOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState('고객 요청 일정 취소');
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [cancelSucceeded, setCancelSucceeded] = useState(false);
+  const cancelLock = useRef(false);
+  const bookingCancelled = initialBooking?.dispatchStatus === '취소' || cancelSucceeded;
 
   // Sync state when initialBooking prop changes
   useEffect(() => {
@@ -539,6 +545,9 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
     setDestinationPoi(null);
     setErrorMsg(null);
     setNotificationMsg(null);
+    setIsCancelConfirmOpen(false);
+    setCancelReason('고객 요청 일정 취소');
+    setCancelSucceeded(false);
   }, [initialBooking]);
 
   // Sync driverId if hqDrivers or fleet.data.drivers loads asynchronously
@@ -562,6 +571,41 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isModal, isOpen, onClose]);
+
+  const handleCancelDispatch = async () => {
+    if (!initialBooking || bookingCancelled || isCancelling || isSubmitting || cancelLock.current) return;
+    const targetId = initialBooking.scheduleId || (initialBooking.id.startsWith('new_') ? '' : initialBooking.id);
+    if (!targetId) {
+      setErrorMsg('서버에 등록된 예약만 취소할 수 있습니다.');
+      return;
+    }
+
+    cancelLock.current = true;
+    setIsCancelling(true);
+    setErrorMsg(null);
+    try {
+      // The button below asks for an explicit second confirmation before this is called.
+      await cancelHqQuickDispatchSchedule(targetId, cancelReason);
+      setCancelSucceeded(true);
+      setIsCancelConfirmOpen(false);
+      setNotificationMsg('예약·배차가 취소되었습니다. 담당 기사 Cockpit에도 취소 상태가 반영됩니다.');
+      haptics.warningPulse();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('vip_hq_schedules_updated'));
+      }
+      try {
+        await onSavedBookings?.();
+      } catch {
+        setErrorMsg('취소는 완료됐지만 배차 목록을 새로고침하지 못했습니다. 목록을 다시 열어 확인해 주세요.');
+      }
+    } catch (error: unknown) {
+      setErrorMsg(error instanceof Error ? error.message : '배차 취소 중 네트워크 오류가 발생했습니다.');
+      haptics.errorAlert();
+    } finally {
+      cancelLock.current = false;
+      setIsCancelling(false);
+    }
+  };
 
   const handleRemindClick = async () => {
     if (!initialBooking || !onRemindDriver || isReminding) return;
@@ -1155,7 +1199,8 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
   };
 
   const handleSubmit = async (mode: 'unassigned' | 'published') => {
-    if (submitLock.current) return; submitLock.current = true;
+    if (submitLock.current || isCancelling || bookingCancelled) return;
+    submitLock.current = true;
     try { await submit(mode); } finally { submitLock.current = false; }
   };
 
@@ -1357,20 +1402,6 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                 </button>
               )}
 
-              {/* 5. 배정표 상세 */}
-              {onOpenDetailModal && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    haptics.lightTap();
-                    onOpenDetailModal(initialBooking);
-                  }}
-                  className="h-9 px-3 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200/80 text-slate-700 transition-all inline-flex items-center justify-center gap-1 cursor-pointer active:scale-95 whitespace-nowrap ml-auto"
-                  title="전체 배정표 및 세부사항 확인"
-                >
-                  <span>배정표 ↗</span>
-                </button>
-              )}
             </div>
           </div>
         )}
@@ -2288,7 +2319,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
           {/* 예약만 등록 / 수정사항 저장 */}
           <button
             type="button"
-            disabled={isSubmitting}
+            disabled={isSubmitting || isCancelling || bookingCancelled}
             onClick={() => {
               haptics.lightTap();
               handleSubmit('unassigned');
@@ -2302,7 +2333,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
           {/* 바로 배차 / 배차 확정하기 */}
           <button
             type="button"
-            disabled={isSubmitting || !fleet.data || Boolean(fleet.error) || totalLiveConflicts > 0}
+            disabled={isSubmitting || isCancelling || bookingCancelled || !fleet.data || Boolean(fleet.error) || totalLiveConflicts > 0}
             onClick={() => {
               haptics.selection();
               handleSubmit('published');
@@ -2317,6 +2348,72 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
             <span>{initialBooking ? '배차 확정하기' : '바로 배차'}</span>
           </button>
         </div>
+
+        {/* Low-priority destructive action, consolidated here instead of a second detail modal. */}
+        {initialBooking && (
+          <div className="mt-4 border-t border-slate-100 pt-3">
+            {bookingCancelled ? (
+              <p role="status" className="flex items-center justify-center gap-2 py-2 text-xs font-medium text-slate-500">
+                <CheckCircle2 className="h-4 w-4 text-slate-400" strokeWidth={1.8} />
+                취소된 예약입니다.
+              </p>
+            ) : !isCancelConfirmOpen ? (
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.lightTap();
+                  setErrorMsg(null);
+                  setIsCancelConfirmOpen(true);
+                }}
+                disabled={isSubmitting || isCancelling}
+                className="ml-auto flex min-h-9 items-center justify-center gap-1.5 rounded-xl px-3 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Ban className="h-3.5 w-3.5 text-slate-400" strokeWidth={1.7} />
+                예약·배차 취소
+              </button>
+            ) : (
+              <section aria-label="예약 취소 확인" className="space-y-3 rounded-2xl bg-[#F7F9FC] p-3.5 sm:p-4">
+                <div>
+                  <h3 className="text-[13px] font-semibold text-slate-800">예약·배차를 취소할까요?</h3>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                    취소하면 담당 기사 Cockpit에도 취소 상태가 반영됩니다. 작성 중인 수정사항은 저장되지 않습니다.
+                  </p>
+                </div>
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-medium text-slate-600">취소 사유</span>
+                  <input
+                    type="text"
+                    value={cancelReason}
+                    onChange={(event) => setCancelReason(event.target.value)}
+                    maxLength={240}
+                    disabled={isCancelling}
+                    placeholder="취소 사유를 입력해 주세요"
+                    className="h-11 w-full rounded-xl bg-white px-3.5 text-sm text-slate-800 outline-none ring-1 ring-slate-200/60 transition-shadow placeholder:text-slate-400 focus:ring-[#B9C7DF] disabled:opacity-60"
+                  />
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    disabled={isCancelling}
+                    onClick={() => { haptics.lightTap(); setIsCancelConfirmOpen(false); }}
+                    className="min-h-10 rounded-xl bg-white text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:opacity-50"
+                  >
+                    돌아가기
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isCancelling || isSubmitting}
+                    onClick={handleCancelDispatch}
+                    className="flex min-h-10 items-center justify-center gap-2 rounded-xl bg-rose-50 px-3 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isCancelling && <RefreshCw className="h-3.5 w-3.5 animate-spin" />}
+                    {isCancelling ? '취소 처리 중…' : '예약 취소 확정'}
+                  </button>
+                </div>
+              </section>
+            )}
+          </div>
+        )}
 
         {/* Helper Note (Only for new reservation, completely removed in edit mode) */}
         {!initialBooking && (
