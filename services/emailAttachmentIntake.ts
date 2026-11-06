@@ -71,13 +71,14 @@ export function analyzeScheduleAttachments(attachments: ScheduleAttachmentInput[
       let text = '';
       for (const sheetName of book.SheetNames) {
         const sheet = book.Sheets[sheetName];
-        const rows = utils.sheet_to_json<Array<string | number>>(sheet, { header: 1, raw: false, defval: '', blankrows: false });
+        const rows = utils.sheet_to_json<Array<string | number>>(sheet, { header: 1, raw: false, defval: '', blankrows: true });
+        const firstRow = sheet['!ref'] ? utils.decode_range(sheet['!ref']).s.r : 0;
         if (rows.length >= 1502) throw new Error('시트당 1500행을 초과합니다.');
         text += `\n[Excel ${name} / Sheet: ${sheetName}]\n`;
         for (const [rowIndex, row] of rows.entries()) {
           if (row.length > 60) throw new Error('표가 60열을 초과합니다.');
           const cells = row.map((val, col) => val === '' ? '' : `${col + 1}:${String(val).replace(/[\r\n\t]+/g, ' ').slice(0, 500)}`).filter(Boolean);
-          if (cells.length) text += `행 ${rowIndex + 1} | ${cells.join(' | ')}\n`;
+          if (cells.length) text += `행 ${firstRow + rowIndex + 1} | ${cells.join(' | ')}\n`;
           if (text.length > 100_000) throw new Error('일정표 텍스트가 너무 깁니다.');
         }
       }
