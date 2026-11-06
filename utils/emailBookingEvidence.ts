@@ -225,12 +225,14 @@ export function extractItineraryEvidence(body: string, pickupDate: string): Rout
   // appointment later that day. Final untimed destinations remain unresolved.
   for (const target of untimedTargets) {
     const venue = canonicalKoreanPlaceName(target.location);
-    if (points.some(p=>p.date === target.date && sameVenue(p.location, venue))) continue;
+    // Only a LATER explicit appointment satisfies the arrow destination.
+    // Visiting Conrad at noon does not eliminate the final 17:30 return.
+    if (points.some((p, index)=>index >= target.after && p.date === target.date && sameVenue(p.location, venue))) continue;
     points.push({
       id: 'source-destination-' + points.length,
       order: points.length + 1,
       date: target.date,
-      time: '', location: venue, isPoiConfirmed: false,
+      time: '', location: venue, notes: '도착시간 미제공', isPoiConfirmed: false,
     });
   }
   return points;
@@ -298,6 +300,9 @@ export function enrichBookingDraftWithEmailEvidence(
     const existing = matchingAtTime || matchingUntimed;
     if (existing) {
       if (source.clientAddress) existing.clientAddress = source.clientAddress;
+      if (source.notes && !existing.notes?.includes(source.notes)) {
+        existing.notes = [existing.notes, source.notes].filter(Boolean).join(' · ');
+      }
       // Source explicitly says a destination is untimed; this is not a known
       // arrival clock. Apply to the last matching stop only.
       if (!source.time && existing === onDay.at(-1)) existing.time = '';
