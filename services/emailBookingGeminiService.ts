@@ -92,13 +92,16 @@ const BOOKING_RESPONSE_SCHEMA = {
     contactEmail: { type: Type.STRING },
     contactSource: { type: Type.STRING, enum: ['body', 'signature', 'from', 'reply-to'] },
     passengerName: { type: Type.STRING },
+    passengerNames: { type: Type.ARRAY, items: { type: Type.STRING } },
     passengerPhone: { type: Type.STRING },
     passengerCount: { type: Type.INTEGER },
     pickupDate: { type: Type.STRING },
     pickupTime: { type: Type.STRING },
     pickupLocation: { type: Type.STRING },
+    pickupProvidedAddress: { type: Type.STRING },
     pickupDetailNotes: { type: Type.STRING },
     dropoffLocation: { type: Type.STRING },
+    dropoffProvidedAddress: { type: Type.STRING },
     dropoffDetailNotes: { type: Type.STRING },
     flightNumber: { type: Type.STRING },
     flights: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: {
@@ -301,10 +304,13 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
    - "contactPhone": Coordinator's phone only. MUST NEVER CONTAIN AN EMAIL ADDRESS!
    - "contactEmail": Coordinator's email address.
    - "contactSource": "body" | "signature" | "from" | "reply-to".
-   - "passengerName": Actual VIP guest riding in the car. Distinguish from coordinator!
+   - "passengerName": First/main VIP guest riding in the car, never the coordinator.
+   - "passengerNames": EVERY named rider. For "Pick up Mr. A, B, C from ..." extract all three exact names; never drop B or C.
    - "passengerPhone": Actual VIP passenger phone only. MUST NEVER CONTAIN AN EMAIL ADDRESS!
    - "passengerCount": Number of passengers (integer). For partial modifications with no count mentioned, return 0 (unknown); for new bookings only, default 1.
 3. LOCATIONS FOR TMAP POI SEARCH & ITINERARY:
+   - "pickupProvidedAddress": Customer-given pickup road address if present, original exact text. No invented POI coordinates.
+   - "dropoffProvidedAddress": Customer-given final destination road address if present, original exact text.
    - "pickupLocation": Initial departure location clean name for TMAP search (e.g. "인천공항 제1터미널 (T1)", "김포공항 국제선", "조선팰리스 호텔", "신라호텔"). Do not include gate/floor here.
    - "pickupDetailNotes": Floor, gate, terminal details (e.g. "3층 출국장 7번 게이트 앞", "로비 1층").
    - Use Korean names for TMAP search (Conrad Seoul -> 콘래드 서울, Samsung Fire -> 삼성화재). Preserve the client's original road address separately; never invent a street.
@@ -330,7 +336,7 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
    - "flightNumber": BACKWARD COMPATIBILITY ONLY: first leg code.
    - "flights": MUST list EVERY flight leg with number, departure date, IATA origin and destination, local departure and arrival HH:mm if shown, associated passengers, role ("arrival"/"departure"/"connection"). Two arrival flights KE2104 and NH867 are separate records even when they share one vehicle. Record onward connecting AS34 separately, NOT as a ground pickup. Never drop extra flights because flightNumber already has a value.
    - "requestedVehicleClass": Vehicle model and quantity if mentioned (e.g. "스타리아 리무진 1대", "카니발 2대", "스프린터 1대, G90 1대"). If unspecified or unclear, return "".
-   - "specialRequests": VIP requests, picket board text, water/amenities, driver language preferences (e.g. "영어 가능 기사님 희망"). Do not create luggage field.
+   - "specialRequests": Preserve ALL specific requirements, including same driver on every date, driver information deadline, Meet & Greet, standby, language, signage, and client handover instructions. Do not create luggage field.
 6. REVISIONS AND DOCUMENTS:
    - Infer tripType=modification when the sender requests changes to an earlier reservation, regardless of whether sender differs.
    - revisionScope: full ONLY if sender explicitly supplies a complete replacement itinerary; partial if individual fields/stops are adjusted; otherwise unknown.
@@ -415,14 +421,17 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
         ? parsed.contactSource
         : undefined) as 'body' | 'signature' | 'from' | 'reply-to' | undefined,
       passengerName: String(parsed.passengerName || ''),
+      passengerNames: Array.isArray(parsed.passengerNames) ? parsed.passengerNames.map(String) : undefined,
       passengerPhone: cleanPhone(parsed.passengerPhone),
       passengerCount: typeof parsed.passengerCount === 'number' && Number.isInteger(parsed.passengerCount) && parsed.passengerCount > 0 ? parsed.passengerCount : parsed.tripType === 'modification' ? 0 : 1,
       pickupDate: String(parsed.pickupDate || ''),
       pickupTime: String(parsed.pickupTime || ''),
       pickupLocation: String(parsed.pickupLocation || ''),
+      pickupProvidedAddress: String(parsed.pickupProvidedAddress || '') || undefined,
       pickupDetailNotes: String(parsed.pickupDetailNotes || ''),
       isPickupPoiConfirmed: false,
       dropoffLocation: String(parsed.dropoffLocation || ''),
+      dropoffProvidedAddress: String(parsed.dropoffProvidedAddress || '') || undefined,
       dropoffDetailNotes: String(parsed.dropoffDetailNotes || ''),
       isDropoffPoiConfirmed: false,
       flightNumber: String(parsed.flightNumber || ''),
