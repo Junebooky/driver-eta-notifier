@@ -31,6 +31,7 @@ import {
   Image as ImageIcon,
 } from 'lucide-react';
 import { HqBooking } from '@/types/hq';
+import { DispatchRouteTimeline } from '@/components/common/DispatchRouteTimeline';
 import { haptics } from '@/utils/haptics';
 import {
   VIP_REAL_VEHICLES,
@@ -1372,6 +1373,16 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
               )}
             </div>
           </div>
+        )}
+
+        {/* Read-only saved itinerary in the same detail modal opened from the monthly calendar. */}
+        {initialBooking?.routeWaypoints && initialBooking.routeWaypoints.length > 2 && (
+          <DispatchRouteTimeline
+            waypoints={initialBooking.routeWaypoints}
+            heading="전체 운행 경로"
+            className="mt-3 rounded-2xl bg-[#FAFBFD] p-4 shadow-[0_2px_6px_rgba(35,49,78,0.025)]"
+            compact
+          />
         )}
 
         {/* 2. Main Form Fields */}
