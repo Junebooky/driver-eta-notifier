@@ -107,7 +107,7 @@ test('even a blank AI waypoint list is rebuilt from the 14 explicitly stated sto
   blank.pickupLocation = '';
   blank.dropoffLocation = '';
   const result = enrichBookingDraftWithEmailEvidence(blank, email);
-  assert.equal(result.waypoints?.length, 14);
+  assert.equal(result.waypoints?.length, 14, JSON.stringify(result.waypoints?.map(p=>({date:p.date,time:p.time,location:p.location}))));
   assert.deepEqual(
     [...new Set(result.waypoints?.map(p=>p.date))],
     ['2026-11-18','2026-11-19','2026-11-20']
