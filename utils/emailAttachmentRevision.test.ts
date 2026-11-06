@@ -100,6 +100,20 @@ test('partial revision changes only specified stop and retains all other stops, 
   assert.equal(revised.waypoints?.[2].isPoiConfirmed,true);
 });
 
+test('partial revision without passenger count retains original count instead of inventing one passenger', () => {
+  const revised = prepareEmailRevisionDraft(draft({
+    passengerCount: 0,
+    pickupTime: '10:00',
+    revisionScope: 'partial',
+    waypoints: undefined,
+  }), old);
+  assert.equal(revised.passengerCount, 3);
+  assert.equal(revised.pickupTime, '10:00');
+  assert.equal(revised.waypoints?.length, 4);
+  assert.equal(revised.waypoints?.[0].time, '10:00');
+  assert.equal(revised.waypoints?.[3].time, '18:00');
+});
+
 test('full replacement can add new stop but needs fresh TMAP POI confirmation', () => {
   const waypoints = [...stops.slice(0,2), {id:'new',order:3,date:'2026-11-10',time:'13:30',location:'새로운 호텔'}, ...stops.slice(2)].map((p,i)=>({...p,order:i+1}));
   const revised = prepareEmailRevisionDraft(draft({revisionScope:'full',waypoints}),old);
