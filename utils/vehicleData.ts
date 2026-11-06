@@ -534,6 +534,42 @@ export const VIP_VEHICLE_FLEET_CATEGORIES = [
 ];
 
 /**
+ * Keep the user-confirmed fleet master authoritative for registered plates even
+ * if an old localStorage "custom vehicle" shadow record still has stale seats,
+ * model or fuel. Preserve genuine user-specific details (color, memo, charging
+ * notes and an explicitly uploaded photo) instead of resetting the record.
+ *
+ * UUID, vehicle ID and plate follow the canonical registry so assignments and
+ * availability continue to refer to the same physical car.
+ */
+export function reconcileRegisteredVehicle(vehicle: VipRealVehicle): VipRealVehicle {
+  const plateKey = vehicle.plate.replace(/\s+/g, '');
+  const canonical = VIP_REAL_VEHICLES.find(
+    (candidate) => candidate.plate.replace(/\s+/g, '') === plateKey
+  );
+  if (!canonical) return vehicle;
+
+  return {
+    ...vehicle,
+    id: canonical.id,
+    uuid: canonical.uuid,
+    plate: canonical.plate,
+    plateShort: canonical.plateShort,
+    model: canonical.model,
+    modelShort: canonical.modelShort,
+    brand: canonical.brand,
+    category: canonical.category,
+    categoryLabel: canonical.categoryLabel,
+    subType: canonical.subType,
+    capacity: canonical.capacity,
+    fuelType: canonical.fuelType,
+    // Existing explicit photos and operator notes must not be erased.
+    imageUrl: vehicle.imageUrl || canonical.imageUrl,
+    chargingSpecs: vehicle.chargingSpecs ?? canonical.chargingSpecs,
+  };
+}
+
+/**
  * Find vehicle by full plate or partial 4-digit number
  */
 export function findVipVehicle(query: string): VipRealVehicle | undefined {
