@@ -287,7 +287,7 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
    - "contactSource": "body" | "signature" | "from" | "reply-to".
    - "passengerName": Actual VIP guest riding in the car. Distinguish from coordinator!
    - "passengerPhone": Actual VIP passenger phone only. MUST NEVER CONTAIN AN EMAIL ADDRESS!
-   - "passengerCount": Number of passengers (integer, default 1).
+   - "passengerCount": Number of passengers (integer). For partial modifications with no count mentioned, return 0 (unknown); for new bookings only, default 1.
 3. LOCATIONS FOR TMAP POI SEARCH & ITINERARY:
    - "pickupLocation": Initial departure location clean name for TMAP search (e.g. "인천공항 제1터미널 (T1)", "김포공항 국제선", "조선팰리스 호텔", "신라호텔"). Do not include gate/floor here.
    - "pickupDetailNotes": Floor, gate, terminal details (e.g. "3층 출국장 7번 게이트 앞", "로비 1층").
@@ -394,7 +394,7 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
         : undefined) as 'body' | 'signature' | 'from' | 'reply-to' | undefined,
       passengerName: String(parsed.passengerName || ''),
       passengerPhone: cleanPhone(parsed.passengerPhone),
-      passengerCount: typeof parsed.passengerCount === 'number' ? parsed.passengerCount : 1,
+      passengerCount: typeof parsed.passengerCount === 'number' && Number.isInteger(parsed.passengerCount) && parsed.passengerCount > 0 ? parsed.passengerCount : parsed.tripType === 'modification' ? 0 : 1,
       pickupDate: String(parsed.pickupDate || ''),
       pickupTime: String(parsed.pickupTime || ''),
       pickupLocation: String(parsed.pickupLocation || ''),
