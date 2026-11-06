@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, Check, ChevronDown, FileClock, GitCompareArrows, Info, ShieldCheck } from 'lucide-react';
+import { ArrowRight, ChevronDown, FileClock, GitCompareArrows, Info, Plus, Minus, ShieldCheck } from 'lucide-react';
 import type { HqEmailExtractedDraft } from '@/types/emailHq';
 import type { HqDriverSummary } from '@/types/driverHq';
 import type { ExistingEmailBookingCandidate } from '@/services/emailBookingMatchService';
@@ -26,6 +26,8 @@ interface Props {
   onCancel: (scheduleId: string, checked: boolean) => void;
   onCancelReason: (scheduleId: string, reason: string) => void;
   onAssignment: (rowKey: string, assignment: EmailBatchAssignments[string]) => void;
+  onAddVehicle?: () => void;
+  onRemoveLastVehicle?: () => void;
   showAssignments?: boolean;
   isSubmitting?: boolean;
   onApprove?: () => void;
@@ -35,7 +37,7 @@ interface Props {
 /** Mirrors the White First / borderless HQ email design. No implicit matches or cancellations. */
 export function HqEmailBatchRevisionPanel({
   draft, slots, candidates, decisions, cancelIds, cancelReasons, assignments,
-  drivers = [], onSelect, onCancel, onCancelReason, onAssignment, showAssignments = false,
+  drivers = [], onSelect, onCancel, onCancelReason, onAssignment, onAddVehicle, onRemoveLastVehicle, showAssignments = false,
   isSubmitting = false, onApprove, onRequestUnassigned,
 }: Props) {
   const rows = useMemo(() => {
@@ -73,9 +75,21 @@ export function HqEmailBatchRevisionPanel({
             날짜·차량별 기존 예약을 직접 연결합니다. 같은 송신자라도 자동으로 덮어쓰지 않습니다.
           </p>
         </div>
-        <p className="rounded-full bg-[#F7F9FC] px-3 py-1.5 text-[11px] font-medium tabular-nums text-[#64748B]">
-          {rows.length}건 검토
-        </p>
+        <div className="flex items-center gap-3">
+          <span className="rounded-full bg-[#F7F9FC] px-3 py-1.5 text-[11px] font-medium tabular-nums text-[#64748B]">{rows.length}건 검토</span>
+          {onRemoveLastVehicle && slots.length > 1 && (
+            <button type="button" disabled={isSubmitting} onClick={onRemoveLastVehicle}
+              className="flex min-h-9 items-center gap-1 text-[11px] font-medium text-[#8492A4] hover:text-[#475569] disabled:opacity-40">
+              <Minus className="h-3.5 w-3.5"/>호차 제거
+            </button>
+          )}
+          {onAddVehicle && slots.length < 12 && (
+            <button type="button" disabled={isSubmitting} onClick={onAddVehicle}
+              className="flex min-h-9 items-center gap-1 text-[11px] font-medium text-[#52647A] hover:text-[#253449] disabled:opacity-40">
+              <Plus className="h-3.5 w-3.5"/>호차 추가
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-y border-[#F1F3F7] py-3 text-[12px] text-[#64748B]">
