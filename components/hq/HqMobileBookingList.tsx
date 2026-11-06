@@ -1,6 +1,7 @@
 'use client';
 import type { HqBooking } from '@/types/hq';
 import { getCustomerDotColor } from '@/utils/customerDotColor';
+import { DispatchRouteTimeline } from '@/components/common/DispatchRouteTimeline';
 
 export function HqMobileBookingList({
   bookings,
@@ -61,9 +62,17 @@ export function HqMobileBookingList({
                 {row.groupVehicleIndex || 1}호차 / 총 {row.groupTotalVehicles}대
               </p>
             )}
-            <p className="mt-2.5 break-words text-sm font-medium text-slate-600 leading-snug">
-              {row.pickupLocation} → {row.destination}
-            </p>
+            {row.routeWaypoints && row.routeWaypoints.length > 2 ? (
+              <DispatchRouteTimeline
+                waypoints={row.routeWaypoints}
+                className="mt-3 rounded-xl bg-slate-50/80 p-3"
+                compact
+              />
+            ) : (
+              <p className="mt-2.5 break-words text-sm font-medium text-slate-600 leading-snug">
+                {row.pickupLocation} → {row.destination}
+              </p>
+            )}
             <div className="mt-3.5 grid grid-cols-2 gap-2.5 rounded-xl bg-slate-50/80 border border-slate-100 p-3 text-xs text-slate-500">
               <p className="break-words">
                 차량
