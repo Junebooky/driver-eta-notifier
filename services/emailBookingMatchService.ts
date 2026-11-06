@@ -123,17 +123,19 @@ export function matchEmailBookingCandidates(input: MatchingEmailInput, rows: Arr
 
 /** No AI call: read a bounded candidate window from this organisation only. */
 export async function findEmailBookingCandidates(input: MatchingEmailInput): Promise<ExistingEmailBookingCandidate[]> {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.pickupDate)) return [];
-  const center = Date.parse(input.pickupDate + 'T00:00:00Z');
-  const start = new Date(center - 2 * 86_400_000).toISOString().slice(0, 10);
-  const end = new Date(center + 2 * 86_400_000).toISOString().slice(0, 10);
-  const { data, error } = await supabaseAdmin.from('schedules')
-    .select('id,org_id,date,pickup_time,end_time,origin,destination,passenger_name,passenger_count,vehicle_plate,vehicle_model,vehicle_id,driver_id,driver_name,driver_phone,flight_number,protocol_notes,dispatch_status,status,version,schedule_meta')
-    .eq('org_id', 'vip_limousine_korea').gte('date', start).lte('date', end)
-    .order('date', { ascending: true }).limit(300);
-  if (error || !data) throw new Error('기존 예약 조회에 실패했습니다. 중복 생성 방지를 위해 다시 시도해 주세요.');
-  if (data.length === 300) throw new Error('기존 예약 후보가 너무 많습니다. 날짜를 지정한 뒤 다시 확인해 주세요.');
-  const candidates = matchEmailBookingCandidates(input, data as Array<Record<string, any>>);
+  let candidates: ExistingEmailBookingCandidate[] = [];
+  if (/^\d{4}-\d{2}-\d{2}$/.test(input.pickupDate)) {
+    const center = Date.parse(input.pickupDate + 'T00:00:00Z');
+    const start = new Date(center - 2 * 86_400_000).toISOString().slice(0, 10);
+    const end = new Date(center + 2 * 86_400_000).toISOString().slice(0, 10);
+    const { data, error } = await supabaseAdmin.from('schedules')
+      .select('id,org_id,date,pickup_time,end_time,origin,destination,passenger_name,passenger_count,vehicle_plate,vehicle_model,vehicle_id,driver_id,driver_name,driver_phone,flight_number,protocol_notes,dispatch_status,status,version,schedule_meta')
+      .eq('org_id', 'vip_limousine_korea').gte('date', start).lte('date', end)
+      .order('date', { ascending: true }).limit(300);
+    if (error || !data) throw new Error('기존 예약 조회에 실패했습니다. 중복 생성 방지를 위해 다시 시도해 주세요.');
+    if (data.length === 300) throw new Error('기존 예약 후보가 너무 많습니다. 날짜를 지정한 뒤 다시 확인해 주세요.');
+    candidates = matchEmailBookingCandidates(input, data as Array<Record<string, any>>);
+  }
   if (candidates.length) return candidates;
 
   // A rescheduled trip can move more than two days. Only search wider when
