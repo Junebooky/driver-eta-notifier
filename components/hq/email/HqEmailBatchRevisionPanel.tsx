@@ -53,6 +53,7 @@ export function HqEmailBatchRevisionPanel({
   const additions = rows.filter(row => row.action === 'new').length;
   const updates = rows.filter(row => row.action === 'update').length;
   const unchanged = rows.filter(row => row.action === 'unchanged').length;
+  const skipped = rows.filter(row => row.action === 'skip').length;
   const [cancelAcknowledged, setCancelAcknowledged] = useState(false);
   const approvalSignature = [
     JSON.stringify(decisions), JSON.stringify(cancelIds), JSON.stringify(cancelReasons),
@@ -60,7 +61,7 @@ export function HqEmailBatchRevisionPanel({
   ].join('|');
   useEffect(() => { setCancelAcknowledged(false); }, [approvalSignature]);
 
-  const canSubmit = !pending && rows.length > 0 && rows.length <= 80 &&
+  const canSubmit = !pending && rows.length > 0 && rows.length <= 80 && rows.length > skipped &&
     (!cancelIds.length || (cancelAcknowledged && cancelIds.every(id => (cancelReasons[id] || '').trim().length >= 2)));
 
   return (
@@ -96,6 +97,7 @@ export function HqEmailBatchRevisionPanel({
         <span>신규 <strong className="font-semibold text-[#243449]">{additions}</strong></span>
         <span>수정 <strong className="font-semibold text-[#243449]">{updates}</strong></span>
         <span>변경 없음 <strong className="font-semibold text-[#243449]">{unchanged}</strong></span>
+        {skipped > 0 && <span>운행 없음 <strong className="font-semibold text-[#243449]">{skipped}</strong></span>
         <span>미선택 <strong className="font-semibold text-[#243449]">{pending}</strong></span>
         {cancelIds.length > 0 && <span>취소 예정 <strong className="font-semibold text-[#243449]">{cancelIds.length}</strong></span>}
       </div>
@@ -121,7 +123,7 @@ export function HqEmailBatchRevisionPanel({
                   <p className="text-[10px] text-[#9DA8B6]">전체 경유 {row.stops.length}곳 · {row.endTime || '종료 시간 확인 필요'}</p>
                 </div>
                 <span className="rounded-lg bg-[#F7F9FC] px-2 py-1 text-[10px] font-medium text-[#627185]">
-                  {row.action === 'new' ? '신규' : row.action === 'update' ? '수정' : row.action === 'unchanged' ? '변경 없음' : '선택 필요'}
+                  {row.action === 'new' ? '신규' : row.action === 'update' ? '수정' : row.action === 'unchanged' ? '변경 없음' : row.action === 'skip' ? '운행 없음' : '선택 필요'}
                 </span>
               </div>
 
@@ -137,6 +139,7 @@ export function HqEmailBatchRevisionPanel({
                   >
                     <option value="">연결할 예약을 선택해 주세요</option>
                     <option value="new">+ 신규 예약으로 추가</option>
+                    <option value="skip">— 이 날짜에는 차량 운행 없음</option>
                     {candidates.map(item => (
                       <option key={item.scheduleId} value={item.scheduleId} disabled={alreadyUsed.has(item.scheduleId)}>
                         {item.pickupDate} · {item.groupVehicleIndex || 1}호차 · {item.vehiclePlate || '차량 미정'} · {item.driverName || item.customerName}
@@ -166,7 +169,12 @@ export function HqEmailBatchRevisionPanel({
                 </details>
               )}
 
-              {showAssignments && row.selection && (
+              {row.action === 'skip' && (
+                <p className="rounded-xl bg-[#F8FAFC] px-3.5 py-2.5 text-[11px] leading-relaxed text-[#718095]">
+                  이 날짜의 {row.index + 1}호차는 배차하지 않습니다. 다른 날짜의 동일 호차 일정은 유지됩니다.
+                </p>
+              )}
+              {showAssignments && row.selection && row.selection !== 'skip' && (
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <label className="space-y-1">
                     <span className="text-[11px] text-[#8491A3]">이 날짜에 사용할 차량</span>
@@ -266,7 +274,7 @@ export function HqEmailBatchRevisionPanel({
           {pending > 0 && <p role="status" className="text-[11px] font-medium text-[#718096]">연결할 예약을 모두 선택해야 일괄 승인할 수 있습니다.</p>}
           <button type="button" onClick={onApprove} disabled={!canSubmit || isSubmitting}
             className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#1E60F3] px-4 text-[13px] font-semibold text-white transition-colors hover:bg-[#1954D5] disabled:cursor-not-allowed disabled:bg-[#DCE3EC] disabled:text-[#7D8B9D]">
-            {isSubmitting ? '일괄 저장 중…' : `${rows.length}건 비교 · 일괄 승인`}
+            {isSubmitting ? '일괄 저장 중…' : `${rows.length - skipped}건 배차 · 일괄 승인`}
             {!isSubmitting && <ArrowRight className="h-4 w-4" strokeWidth={1.8}/>}
           </button>
           {onRequestUnassigned && <button type="button" onClick={onRequestUnassigned} disabled={!canSubmit || isSubmitting}
