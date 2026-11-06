@@ -140,7 +140,7 @@ export async function findEmailBookingCandidates(input: MatchingEmailInput): Pro
 
   // A rescheduled trip can move more than two days. Only search wider when
   // an exact RFC822 thread ID or a stored booking number is available.
-  const thread = [input.inReplyTo, ...(input.references || [])].find(value => typeof value === 'string' && /^<[^<>\\r\\n]{3,240}>$/.test(value));
+  const thread = [input.inReplyTo, ...(input.references || [])].find(value => typeof value === 'string' && /^<[^<>\r\n]{3,240}>$/.test(value));
   const bookingNumber = input.subject.match(/#[0-9]{6}-[0-9]{3}/)?.[0];
   if (!thread && !bookingNumber) return [];
   const additional: Array<Record<string, any>> = [];
