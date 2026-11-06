@@ -74,6 +74,18 @@ export function extractFlightEvidence(body: string, pickupDate: string): EmailFl
   return [...new Map(found.map((item) => [item.date + ':' + item.flightNumber, item])).values()];
 }
 
+/** Separates the riders named in "Pick up A, B, C from ..." from the coordinator. */
+export function extractPassengerNamesEvidence(body: string): string[] {
+  for (const line of body.split(/\r?\n/)) {
+    const match = line.match(/\bPick\s+up\s+(?!from\b)(.+?)\s+from\s+.+/i);
+    if (!match) continue;
+    const people = match[1].split(/\s*,\s*/).map((person) => person.trim()).filter(Boolean);
+    // Names without a clear comma-separated list or honorific are ambiguous.
+    if (people.length > 1 || /^(?:Mr|Mrs|Ms|Dr)\.? /i.test(people[0] || '')) return people;
+  }
+  return [];
+}
+
 export type CustomerAddressEvidence = {
   date: string;
   time: string;
@@ -118,6 +130,9 @@ export function addressHintToTmapQuery(address: string): string {
     [/Yongsan-gu/i, '용산구'],
     [/Jongno-gu/i, '종로구'],
   ];
+  if (/63\s+Hanwha\s+Life\s+Building/i.test(address) && /Yeouido-dong/i.test(address)) {
+    return '서울 영등포구 63빌딩';
+  }
   for (const [pattern, roadName] of roads) {
     const match = pattern.exec(address);
     if (!match) continue;
@@ -193,6 +208,8 @@ export function enrichBookingDraftWithEmailEvidence(
   body: string,
   aiFlights: EmailFlightLeg[] = [],
 ): HqEmailExtractedDraft {
+  const sourcePassengerNames = extractPassengerNamesEvidence(body);
+  const passengerNames = sourcePassengerNames.length ? sourcePassengerNames : draft.passengerNames || [];
   const evidenceFlights = extractFlightEvidence(body, draft.pickupDate);
   const flights = [...new Map(
     [...aiFlights, ...evidenceFlights].map((f) => [f.date + ':' + f.flightNumber.toUpperCase(), f])
@@ -241,8 +258,27 @@ export function enrichBookingDraftWithEmailEvidence(
       warnings.push('항공편 ' + code + '의 세부 경로를 확인하지 못했습니다. 메일 원문을 확인해 주세요.');
     }
   }
+  const specialRequirements: string[] = [];
+  if (/\bsame driver\b/i.test(body) && !/동일 기사|same driver/i.test(draft.specialRequests)) {
+    specialRequirements.push('전 일정 동일 기사 요청');
+  }
+  const detailDeadline = body.match(/driver details?\s+before\s+([A-Za-z]+\s+\d{1,2})/i);
+  if (detailDeadline && !draft.specialRequests.includes(detailDeadline[1])) {
+    specialRequirements.push('기사 정보 전달 기한: ' + detailDeadline[1] + ' 이전');
+  }
+  if (/\bmeet\s*&\s*greet\b/i.test(body) && !/미팅|meet.*greet/i.test(draft.specialRequests)) {
+    specialRequirements.push('미팅 & 그리팅');
+  }
+  if (enriched.some(p=>/\bTBA\b/i.test(p.location))) {
+    warnings.push('TBA로 표시된 방문 장소는 아직 정해지지 않았습니다. 임의 위치를 지정하지 마세요.');
+  }
   return {
     ...draft, flights,
+    passengerNames,
+    passengerName: draft.passengerName || passengerNames[0] || '',
+    passengerCount: passengerNames.length > 0 && draft.tripType !== 'modification'
+      ? Math.max(draft.passengerCount, passengerNames.length) : draft.passengerCount,
+    specialRequests: [draft.specialRequests, ...specialRequirements].filter(Boolean).join(' · '),
     flightNumber: flights.find((f) => f.date === draft.pickupDate && f.role !== 'connection')?.flightNumber || draft.flightNumber,
     waypoints: enriched.length >= 2 ? enriched : draft.waypoints,
     pickupLocation: first?.location || draft.pickupLocation,
