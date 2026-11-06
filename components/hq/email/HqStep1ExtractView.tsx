@@ -39,6 +39,7 @@ import { HqEmailSummary, HqEmailDetail, HqEmailExtractedDraft, RouteWaypointItem
 import { haptics } from '@/utils/haptics';
 import { HqPlaceSearchInput, PoiResult } from '@/components/hq/HqPlaceSearchInput';
 import { saveContactToCrm } from '@/utils/crmCustomerSync';
+import { HqEmailAddressCandidate } from './HqEmailAddressCandidate';
 import { confirmEmailRouteStop, changeEmailRouteStopName, getUnconfirmedEmailRouteStops, isVerifiedEmailRouteStop } from '@/utils/emailRoutePlaceVerification';
 
 interface HqStep1ExtractViewProps {
@@ -107,6 +108,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
   const pickupDate = extractedDraft?.pickupDate || '날짜 미지정';
   const pickupTime = extractedDraft?.pickupTime || '시간 미지정';
   const flightNumber = extractedDraft?.flightNumber || '';
+  const flights = extractedDraft?.flights || [];
   const requestedVehicleClass = extractedDraft?.requestedVehicleClass || '차량 미지정';
   const specialRequests = extractedDraft?.specialRequests || '';
 
@@ -762,19 +764,26 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                 </span>
               </div>
 
-              {/* 항공편명 */}
-              <div className="flex items-center justify-between gap-3 text-xs">
-                <div className="flex items-center gap-2 text-slate-500 font-semibold shrink-0">
+              {/* 모든 항공편: 도착·출발 및 환승 구간을 구분하여 표시 */}
+              <div className="flex items-start justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2 text-slate-500 font-semibold shrink-0 pt-0.5">
                   <Plane className="w-4 h-4 text-slate-400 shrink-0" />
-                  <span>항공편명</span>
+                  <span>항공편</span>
                 </div>
-                {flightNumber ? (
-                  <span className="font-mono font-bold text-slate-900">{flightNumber}</span>
-                ) : (
-                  <span className="font-medium text-slate-600">
-                    미정 (출국 전 확인 필요)
-                  </span>
-                )}
+                <div className="min-w-0 text-right space-y-1">
+                  {flights.length > 0 ? flights.map((flight, index) => (
+                    <div key={flight.date + flight.flightNumber + index} className="font-medium text-slate-900 leading-relaxed">
+                      <span className="font-mono font-bold">{flight.flightNumber}</span>
+                      <span className="text-slate-500 ml-1.5">{flight.date.slice(5)} · {flight.originAirport || '?'}-{flight.destinationAirport || '?'}</span>
+                      {flight.role === 'connection' && <span className="ml-1.5 text-slate-400">(환승)</span>}
+                      {flight.passengers?.length ? <span className="block text-[10px] text-slate-400">{flight.passengers.join(', ')}</span> : null}
+                    </div>
+                  )) : flightNumber ? (
+                    <span className="font-mono font-bold text-slate-900">{flightNumber}</span>
+                  ) : (
+                    <span className="font-medium text-slate-600">미정 (출국 전 확인 필요)</span>
+                  )}
+                </div>
               </div>
 
               {/* 필수 조건 */}
@@ -966,6 +975,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                                                   )
                                                 }
                                                 isConfirmed={waypointEdit.isPoiConfirmed}
+                                                addressHint={wp.clientAddress}
                                                 placeholder="TMAP 장소 검색"
                                                 heightClass="h-11 rounded-2xl"
                                                 icon="mapPin"
@@ -1045,6 +1055,9 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                                                   ? 'TMAP 좌표 확인됨 · 상세 주소 재검색 가능'
                                                   : '주소 미확정 · 눌러서 TMAP 검색 결과 선택')}
                                             </p>
+                                            {wp.notes && (
+                                              <p className="pl-14 mt-0.5 text-[11px] text-slate-400 break-words">{wp.notes}</p>
+                                            )}
                                           </div>
 
                                           <div className="flex shrink-0 items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-hover/item:opacity-100 transition-opacity">
@@ -1074,6 +1087,14 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                                             )}
                                           </div>
                                         </div>
+                                      )}
+                                      {!isEditingThis && wp.clientAddress && (
+                                        <HqEmailAddressCandidate
+                                          sourceAddress={wp.clientAddress}
+                                          placeName={wp.location}
+                                          isPoiConfirmed={Boolean(wp.isPoiConfirmed)}
+                                          onPick={(poi) => extractedDraft && onUpdateDraft?.(confirmEmailRouteStop(extractedDraft, wp.id, poi))}
+                                        />
                                       )}
                                     </div>
                                   </div>
@@ -1120,6 +1141,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                         </div>
                         <HqPlaceSearchInput
                           value={pickupLocation}
+                          addressHint={extractedDraft?.pickupProvidedAddress}
                           onChange={(val) => {
                             if (!extractedDraft) return;
                             const first = [...(extractedDraft.waypoints || [])].sort((a, b) => a.order - b.order)[0];
@@ -1132,7 +1154,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                           heightClass="h-9"
                         />
                         <p className="mt-1.5 break-words text-[11px] leading-relaxed text-slate-500">
-                          {extractedDraft?.pickupAddress || '상세 주소 미확정 · TMAP 검색 결과를 선택해 주세요.'}
+                          {extractedDraft?.pickupAddress || (extractedDraft?.pickupProvidedAddress ? '고객 제공 주소 · ' + extractedDraft.pickupProvidedAddress : '상세 주소 미확정 · TMAP 검색 결과를 선택해 주세요.')}
                         </p>
                       </div>
                     </div>
@@ -1152,6 +1174,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                         </div>
                         <HqPlaceSearchInput
                           value={dropoffLocation}
+                          addressHint={extractedDraft?.dropoffProvidedAddress}
                           onChange={(val) => {
                             if (!extractedDraft) return;
                             const last = [...(extractedDraft.waypoints || [])].sort((a, b) => a.order - b.order).at(-1);
@@ -1165,7 +1188,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                           heightClass="h-9"
                         />
                         <p className="mt-1.5 break-words text-[11px] leading-relaxed text-slate-500">
-                          {extractedDraft?.dropoffAddress || '상세 주소 미확정 · TMAP 검색 결과를 선택해 주세요.'}
+                          {extractedDraft?.dropoffAddress || (extractedDraft?.dropoffProvidedAddress ? '고객 제공 주소 · ' + extractedDraft.dropoffProvidedAddress : '상세 주소 미확정 · TMAP 검색 결과를 선택해 주세요.')}
                         </p>
                       </div>
                     </div>
