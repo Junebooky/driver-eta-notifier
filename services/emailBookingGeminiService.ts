@@ -415,7 +415,8 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
       sourceInReplyTo: params.sourceInReplyTo,
       sourceReferences: params.sourceReferences,
       sourceAttachments: attachments.map((file) => ({ filename: file.filename, kind: file.kind, sha256: file.sha256 })),
-      waypoints: Array.isArray(parsed.waypoints) && parsed.waypoints.length > 1
+      // A partial modification can legitimately mention only one changed stop.
+      waypoints: Array.isArray(parsed.waypoints) && parsed.waypoints.length > (parsed.tripType === 'modification' ? 0 : 1)
         ? (() => {
             let lastDate = String(parsed.pickupDate || '');
             return parsed.waypoints.map((wp: any, idx: number) => {
