@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import {verifyReportCompletion} from './report-completion.integration';
 import { verifyDriverReportChat } from './driver-report-chat.integration';
 import { verifyReportingFlow } from './reporting-flow.integration';
+import { verifyReportLedgerReplacement } from './report-ledger-replace.integration';
 
 async function main() {
   const connectionString = process.env.TEST_DATABASE_URL;
@@ -175,6 +176,7 @@ async function main() {
     console.log('PASS immutable profile UUID and linked assets across vehicle assignments; public access denied');
     await verifyReportingFlow(admin,a,b);
     await verifyReportCompletion(admin,connectionString);
+    await verifyReportLedgerReplacement(admin,a,b);
 
   } finally { await a.end().catch(()=>{}); await b.end().catch(()=>{}); await admin.end(); }
 }
