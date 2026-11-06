@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { extractBookingFromEmail } from '@/services/emailBookingGeminiService';
-import { fetchNaverEmailDetail } from '@/services/naverImapService';
+import { fetchNaverEmailForAnalysis } from '@/services/naverImapService';
+import { analyzeScheduleAttachments, type AnalyzedScheduleAttachment } from '@/services/emailAttachmentIntake';
+import { findEmailBookingCandidates } from '@/services/emailBookingMatchService';
 import { requireHqAdmin, isDevAuthAllowed } from '@/lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
@@ -19,27 +21,42 @@ export async function POST(request: NextRequest) {
     let sender = body.sender || body.emailFrom || '';
     let senderName = body.senderName || '';
     const replyTo = body.replyTo || '';
-    let bodyText = body.bodyText || body.emailText || '';
+    let bodyText = typeof (body.bodyText || body.emailText) === 'string' ? (body.bodyText || body.emailText) : '';
+    let attachments: AnalyzedScheduleAttachment[] = [];
+    let sourceMessageId = '';
+    let sourceInReplyTo = '';
+    let sourceReferences: string[] = [];
+    let ignoredAttachments: string[] = [];
 
     if (!emailId) {
       return NextResponse.json({ ok: false, error: 'emailId는 필수 항목입니다.' }, { status: 400 });
     }
 
-    // Server-side authoritative verification:
-    // If bodyText is missing or empty, fetch directly from IMAP server for naver-* UIDs
-    if (!bodyText.trim() && emailId.startsWith('naver-')) {
-      const uidStr = emailId.replace(/^naver-/, '');
-      const uid = parseInt(uidStr, 10);
-      if (!isNaN(uid)) {
-        const detail = await fetchNaverEmailDetail(uid);
-        if (detail) {
-          subject = detail.subject || subject;
-          sender = detail.from?.address || sender;
-          senderName = detail.from?.name || senderName;
-          bodyText = detail.bodyText || '';
-        }
+    // Always use the authenticated source when analyzing a NAVER email.
+    // Client-provided bodyText/From/Subject is display-only and cannot spoof
+    // attachment bytes or a previously booked customer.
+    if (emailId.startsWith('naver-')) {
+      const uidMatch = /^naver-(\\d+)$/.exec(emailId);
+      if (!uidMatch) return NextResponse.json({ ok: false, error: '메일 ID가 올바르지 않습니다.' }, { status: 400 });
+      try {
+        const source = await fetchNaverEmailForAnalysis(Number(uidMatch[1]));
+        subject = source.subject;
+        sender = source.sender;
+        senderName = source.senderName;
+        bodyText = source.bodyText;
+        sourceMessageId = source.messageId;
+        sourceInReplyTo = source.inReplyTo;
+        sourceReferences = source.references;
+        const analysis = analyzeScheduleAttachments(source.attachments);
+        attachments = analysis.analyzed;
+        ignoredAttachments = analysis.ignored;
+      } catch (error) {
+        return NextResponse.json({
+          ok: false,
+          error: error instanceof Error ? error.message : '메일 첨부파일을 불러오지 못했습니다.',
+        }, { status: 422 });
       }
-    } else if (!bodyText.trim() && emailId.startsWith('em-ref-') && isDevAuthAllowed()) {
+    } else if (emailId.startsWith('em-ref-') && isDevAuthAllowed() && !bodyText.trim()) {
       const { REFERENCE_EMAILS } = await import('@/components/hq/email/emailReferenceData');
       const refItem = REFERENCE_EMAILS.find((r) => r.summary.id === emailId);
       if (refItem) {
@@ -48,16 +65,15 @@ export async function POST(request: NextRequest) {
         senderName = refItem.detail.from.name;
         bodyText = refItem.detail.bodyText;
       }
+    } else if (!isDevAuthAllowed()) {
+      return NextResponse.json({ ok: false, error: '지원하지 않는 이메일 원본입니다.' }, { status: 400 });
     }
 
-    if (!bodyText.trim()) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: '이메일 본문 내용이 비어 있거나 로드되지 않았습니다. 본문 확인 후 다시 시도해 주세요.',
-        },
-        { status: 400 }
-      );
+    if (!bodyText.trim() && attachments.length === 0) {
+      return NextResponse.json({
+        ok: false,
+        error: '메일 본문 또는 지원되는 Excel·PDF 일정표가 없습니다.',
+      }, { status: 400 });
     }
 
     const result = await extractBookingFromEmail({
@@ -67,13 +83,32 @@ export async function POST(request: NextRequest) {
       senderName,
       replyTo,
       bodyText,
+      attachments,
+      sourceMessageId,
+      sourceInReplyTo,
+      sourceReferences,
     });
 
     if (!result.ok) {
       return NextResponse.json(result, { status: 422 });
     }
 
-    return NextResponse.json(result);
+    const matches = await findEmailBookingCandidates({
+      companyName: result.draft.companyName,
+      clientId: result.draft.clientId,
+      sender,
+      subject,
+      inReplyTo: sourceInReplyTo,
+      references: sourceReferences,
+      pickupDate: result.draft.pickupDate,
+      passengerName: result.draft.passengerName,
+    });
+    return NextResponse.json({
+      ...result,
+      matches,
+      attachmentFiles: attachments.map((item) => ({ filename: item.filename, kind: item.kind })),
+      ignoredAttachments,
+    });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     console.error('Error in /api/email/extract-booking:', message);
