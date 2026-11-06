@@ -17,6 +17,7 @@ import {
   Image as ImageIcon,
 } from 'lucide-react';
 import { HqBooking } from '@/types/hq';
+import { DispatchRouteTimeline } from '@/components/common/DispatchRouteTimeline';
 import { VEHICLE_STATUS_LABELS } from '@/utils/fleetVehicleStatus';
 import { useFleetAvailability } from '@/hooks/useFleetAvailability';
 import { validateDispatchInterval } from '@/utils/dispatchInterval';
@@ -537,6 +538,15 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                   heightClass="h-11"
                   icon="flag"
                 />
+
+                {booking.routeWaypoints && booking.routeWaypoints.length > 2 && (
+                  <DispatchRouteTimeline
+                    waypoints={booking.routeWaypoints}
+                    className="rounded-xl bg-white p-3.5"
+                    heading="전체 운행 경로"
+                    compact
+                  />
+                )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
