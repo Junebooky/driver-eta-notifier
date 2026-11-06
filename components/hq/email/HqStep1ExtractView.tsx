@@ -34,7 +34,7 @@ import { HqEmailSummary, HqEmailDetail, HqEmailExtractedDraft, RouteWaypointItem
 import { haptics } from '@/utils/haptics';
 import { HqPlaceSearchInput, PoiResult } from '@/components/hq/HqPlaceSearchInput';
 import { saveContactToCrm } from '@/utils/crmCustomerSync';
-import { confirmEmailRouteStop, changeEmailRouteStopName, isVerifiedEmailRouteStop } from '@/utils/emailRoutePlaceVerification';
+import { confirmEmailRouteStop, changeEmailRouteStopName, getUnconfirmedEmailRouteStops, isVerifiedEmailRouteStop } from '@/utils/emailRoutePlaceVerification';
 
 interface HqStep1ExtractViewProps {
   emailSummary: HqEmailSummary;
@@ -107,6 +107,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
   // Multi-destination waypoints check & Multi-day grouping
   const waypoints: RouteWaypointItem[] = extractedDraft?.waypoints || [];
   const hasMultipleWaypoints = waypoints.length > 2;
+  const unconfirmedPlaces = extractedDraft ? getUnconfirmedEmailRouteStops(extractedDraft).length : 0;
 
   // Extract unique dates for multi-day itineraries
   const waypointDates = waypoints
@@ -772,7 +773,18 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                   총 {waypoints.length > 0 ? waypoints.length : 2}개 경유지
                   {hasMultipleDates && ` · ${uniqueDates.length}일간`}
                 </span>
+                {unconfirmedPlaces > 0 && (
+                  <span className="ml-auto shrink-0 rounded-full bg-white px-2 py-1 text-[10px] font-medium text-slate-600">
+                    주소 {unconfirmedPlaces}곳 확인 필요
+                  </span>
+                )}
               </div>
+
+              {unconfirmedPlaces > 0 && (
+                <p className="text-[11px] leading-relaxed text-slate-500">
+                  경유지를 누른 뒤 TMAP 검색 결과에서 실제 주소를 선택해 주세요. 확인한 주소는 일정 아래에 표시됩니다.
+                </p>
+              )}
 
               {/* Multi-destination Timeline Accordion */}
               {hasMultipleWaypoints ? (
