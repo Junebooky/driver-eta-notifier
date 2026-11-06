@@ -55,6 +55,7 @@ export interface RouteWaypointItem {
   date?: string; // YYYY-MM-DD or MM/DD (e.g. "2026-10-28")
   time?: string; // HH:MM (e.g. "10:00")
   location: string; // e.g. "인천공항 제1터미널 (T1)"
+  address?: string; // Official TMAP address, only stored after the operator selects a POI.
   lat?: number;
   lng?: number;
   isPoiConfirmed?: boolean;
@@ -100,12 +101,14 @@ export interface HqEmailExtractedDraft {
   pickupDate: string; // YYYY-MM-DD
   pickupTime: string; // HH:MM
   pickupLocation: string;
+  pickupAddress?: string; // Official verified TMAP address, never guessed by the AI.
   pickupDetailNotes?: string; // Gate, floor, terminal notes
   pickupLat?: number;
   pickupLng?: number;
   isPickupPoiConfirmed?: boolean;
 
   dropoffLocation: string;
+  dropoffAddress?: string; // Official verified TMAP address, never guessed by the AI.
   dropoffDetailNotes?: string;
   dropoffLat?: number;
   dropoffLng?: number;
