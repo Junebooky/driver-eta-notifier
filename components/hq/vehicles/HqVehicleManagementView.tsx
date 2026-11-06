@@ -1,7 +1,7 @@
 'use client';
 import { scheduleOverlapsInterval } from '@/utils/dispatchInterval';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import {
   Car,
@@ -120,6 +120,18 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
   }, []);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>(defaultCarId);
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+  const [isFuelDropdownOpen, setIsFuelDropdownOpen] = useState(false);
+  const fuelDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (fuelDropdownRef.current && !fuelDropdownRef.current.contains(e.target as Node)) {
+        setIsFuelDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // 3. Tab State inside Detail View
   const [activeDetailTab, setActiveDetailTab] = useState<'info' | 'calendar' | 'tips' | 'memo'>('info');
@@ -815,21 +827,61 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
             {/* 세로 구분선 (데스크톱) */}
             <div className="hidden xl:block w-px h-6 bg-slate-200 shrink-0" />
 
-            {/* Fuel Type Compact Dropdown */}
-            <div className="relative shrink-0">
-              <select
-                value={fuelFilter}
-                onChange={(e) => {
-                  haptics.selection();
-                  setFuelFilter(e.target.value as FuelTypeFilter);
+            {/* Fuel Type Custom Dropdown */}
+            <div className="relative shrink-0" ref={fuelDropdownRef}>
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.lightTap();
+                  setIsFuelDropdownOpen((prev) => !prev);
                 }}
-                className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-2xs transition-colors"
+                className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer shadow-2xs flex items-center gap-1.5 ${
+                  fuelFilter !== 'all'
+                    ? 'border-blue-400 bg-blue-50/50 text-[#0050FF]'
+                    : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                }`}
               >
-                <option value="all">유종: 전체</option>
-                <option value="휘발유">휘발유 ({fuelCounts.gasoline})</option>
-                <option value="경유">경유 ({fuelCounts.diesel})</option>
-                {fuelCounts.hybrid > 0 && <option value="하이브리드">하이브리드 ({fuelCounts.hybrid})</option>}
-              </select>
+                <Fuel className={`w-3.5 h-3.5 ${fuelFilter !== 'all' ? 'text-[#0050FF]' : 'text-slate-400'}`} />
+                <span>
+                  {fuelFilter === '휘발유'
+                    ? `휘발유 (${fuelCounts.gasoline})`
+                    : fuelFilter === '경유'
+                    ? `경유 (${fuelCounts.diesel})`
+                    : fuelFilter === '하이브리드'
+                    ? `하이브리드 (${fuelCounts.hybrid})`
+                    : '유종: 전체'}
+                </span>
+                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-150 ${isFuelDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {isFuelDropdownOpen && (
+                <div className="absolute right-0 mt-1.5 w-36 bg-white rounded-xl shadow-xl border border-slate-200/90 py-1 z-30 animate-in fade-in zoom-in-95 duration-100">
+                  {[
+                    { value: 'all' as const, label: '유종: 전체' },
+                    { value: '휘발유' as const, label: `휘발유 (${fuelCounts.gasoline})` },
+                    { value: '경유' as const, label: `경유 (${fuelCounts.diesel})` },
+                    ...(fuelCounts.hybrid > 0 ? [{ value: '하이브리드' as const, label: `하이브리드 (${fuelCounts.hybrid})` }] : []),
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => {
+                        haptics.selection();
+                        setFuelFilter(opt.value);
+                        setIsFuelDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-1.5 text-xs font-bold flex items-center justify-between hover:bg-slate-50 cursor-pointer transition-colors ${
+                        fuelFilter === opt.value
+                          ? 'text-[#0050FF] bg-blue-50/50'
+                          : 'text-slate-700'
+                      }`}
+                    >
+                      <span>{opt.label}</span>
+                      {fuelFilter === opt.value && <Check className="w-3.5 h-3.5 text-[#0050FF]" />}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Search Input */}
