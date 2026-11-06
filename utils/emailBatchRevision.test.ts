@@ -194,3 +194,47 @@ test('White First review displays all nine rows with explicit unmapped and cance
   assert.ok(html.includes('수정본에 연결되지 않은 기존 일정')===false);
   assert.ok(html.includes('bg-white'));
 });
+
+
+test('different dates may intentionally run different numbers of vehicles without phantom schedules', () => {
+  const decisions=selectAll();
+  // First day: 2 vehicles. Second day: 3. Last day: 1.
+  decisions[emailBatchKey(dates[0],2)]='skip';
+  decisions[emailBatchKey(dates[2],1)]='skip';
+  decisions[emailBatchKey(dates[2],2)]='skip';
+  const rows=emailBatchRows(draft(),slots,originals,decisions);
+  assert.equal(rows.filter(row=>row.action==='skip').length,3);
+  const approved=buildEmailBatchRevisionApproval(draft(),slots,originals,decisions,[],{}, {},'published');
+  assert.equal(approved.items.length,6);
+  assert.equal(approved.changes.new,0);
+  assert.equal(approved.changes.cancelled,0);
+  assert.equal(new Set(approved.items.map(item=>item.scheduleId)).size,6);
+  assert.deepEqual(
+    dates.map(date=>approved.items.filter(item=>item.date===date).length),
+    [2,3,1],
+  );
+  assert.ok(approved.items.every(item=>item.vehiclePlate && item.driverId));
+  // Existing schedules on an excluded day are NOT auto-cancelled.
+  assert.ok(!approved.items.some(item=>item.scheduleId===`old-${dates[2]}-2`));
+});
+
+test('all days intentionally excluded cannot be approved as an empty successful batch',()=>{
+  const decisions=Object.fromEntries(dates.flatMap(date=>
+    plates.map((_,i)=>[emailBatchKey(date,i),'skip'])));
+  assert.throws(()=>buildEmailBatchRevisionApproval(draft(),slots,originals,decisions,[],{}, {},'published'),/저장할 운행 일정/);
+});
+
+test('review UI shows a no-service choice and preserves three day groupings',()=>{
+  const decisions=selectAll();
+  decisions[emailBatchKey(dates[0],2)]='skip';
+  const html=renderToStaticMarkup(createElement(HqEmailBatchRevisionPanel,{
+    draft:draft(),slots,candidates:originals,decisions,
+    cancelIds:[],cancelReasons:{},assignments:{},
+    onSelect:()=>{},onCancel:()=>{},onCancelReason:()=>{},onAssignment:()=>{},
+    showAssignments:true,onApprove:()=>{},
+  }));
+  assert.ok(html.includes('이 날짜에는 차량 운행 없음'));
+  assert.ok(html.includes('운행 없음'));
+  assert.ok(html.includes('6') || html.includes('8건 배차'));
+  assert.ok(html.includes('2026-11-12'));
+});
