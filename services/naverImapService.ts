@@ -16,6 +16,31 @@ import { HqEmailSummary, HqEmailDetail } from '@/types/emailHq';
 import { classifyEmailCandidate } from '@/utils/emailClassifier';
 import type { ScheduleAttachmentInput } from '@/services/emailAttachmentIntake';
 
+/** Only actual user-visible files count as attachments. Mailparser also lists
+ * inline signature logos/tracking images, which are not separate documents. */
+export function selectUserEmailAttachments<T extends {
+  filename?: string | null;
+  contentDisposition?: string | null;
+  contentId?: string | null;
+  contentType?: string | null;
+  size?: number | null;
+  content?: Buffer | null;
+}>(files: T[]): T[] {
+  const seen = new Set<string>();
+  return files.filter((file) => {
+    const filename = String(file.filename || '');
+    const documentFile = /\.(pdf|xlsx?|xlsm|csv|docx?|hwp|hwpx)$/i.test(filename);
+    const inline = String(file.contentDisposition || '').toLowerCase() === 'inline' || Boolean(file.contentId);
+    if (inline && !documentFile && (String(file.contentType || '').startsWith('image/') || !filename)) return false;
+    if (!filename && inline) return false;
+    // MIME duplicates of the same named file should not create two file icons.
+    const signature = filename.toLowerCase() + ':' + (file.content?.length ?? file.size ?? 0);
+    if (seen.has(signature)) return false;
+    seen.add(signature);
+    return true;
+  });
+}
+
 export interface ImapConnectionStatus {
   ok: boolean;
   totalMessages: number;
@@ -279,8 +304,8 @@ export async function fetchNaverEmailDetail(uid: number): Promise<HqEmailDetail 
           isUnread: false,
           flags: [],
           preview: bodyText.slice(0, 140).replace(/\s+/g, ' ').trim(),
-          hasAttachments: (parsed.attachments || []).length > 0,
-          attachments: (parsed.attachments || []).slice(0, 30).map(file => ({
+          hasAttachments: selectUserEmailAttachments(parsed.attachments || []).length > 0,
+          attachments: selectUserEmailAttachments(parsed.attachments || []).slice(0, 30).map(file => ({
             filename: file.filename || '이름 없는 첨부파일',
             contentType: file.contentType || 'application/octet-stream',
             size: file.size || file.content?.length || 0,
@@ -331,7 +356,7 @@ export async function fetchNaverEmailForAnalysis(uid: number): Promise<{
       if (!download?.content) throw new Error('메일 원문을 찾을 수 없습니다.');
       const parsed = await simpleParser(download.content);
       const addresses = parsed.from?.value || [];
-      const attachmentList = (parsed.attachments || []).map((file) => ({
+      const attachmentList = selectUserEmailAttachments(parsed.attachments || []).map((file) => ({
         filename: file.filename || '이름 없는 첨부파일',
         contentType: file.contentType || 'application/octet-stream',
         content: file.content,
