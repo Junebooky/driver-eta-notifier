@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   Calendar,
+  LayoutList,
   Plus,
   Search,
   Check,
@@ -26,6 +27,7 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 import { HqMobileBookingList } from './HqMobileBookingList';
+import { HqDispatchCalendar } from './HqDispatchCalendar';
 import { getCustomerDotColor } from '@/utils/customerDotColor';
 import { getDriverProfileImage } from './HqQuickDispatch';
 import { HqBooking } from '@/types/hq';
@@ -84,6 +86,11 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
   const filterRowRef = useRef<HTMLDivElement>(null);
   const [remindingId, setRemindingId] = useState<string | null>(null);
   const [dispatchIconError, setDispatchIconError] = useState(false);
+  const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
+  const selectOperationalTab = (tab: HqDispatchTabKey) => {
+    onSelectTab(tab);
+    setViewMode(tab === 'all' ? 'calendar' : 'list');
+  };
 
   const hasActiveFilter =
     statusFilter !== 'all' ||
@@ -326,75 +333,48 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
     setDropdownSearch('');
   };
 
-  const filteredList = useMemo(() => {
-    return bookings.filter((b) => {
-      const isPast = isBookingInPast(b);
-
-      if (activeTab === 'past') {
-        if (!isPast) return false;
-      } else {
-        // Active operational tabs ('action', 'today', 'tomorrow', 'all') only show current & upcoming dispatches
-        if (isPast) return false;
-
-        if (activeTab === 'today' && !b.isToday) return false;
-        if (activeTab === 'tomorrow' && !b.isTomorrow) return false;
-        if (activeTab === 'action') {
-          const needsAction =
-            b.dispatchStatus !== '취소' &&
-            (b.dispatchStatus === '미배정' ||
-              b.dispatchStatus === '작성 중' ||
-              b.dispatchStatus === '재확인 필요' ||
-              b.driverAck === '미확인' ||
-              b.driverAck === '재확인 필요' ||
-              Boolean(b.hasConflict));
-          if (!needsAction) return false;
-        }
-      }
-
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matches =
-          b.customerName.toLowerCase().includes(q) ||
-          b.bookingNo.toLowerCase().includes(q) ||
-          b.destination.toLowerCase().includes(q) ||
-          b.pickupLocation.toLowerCase().includes(q) ||
-          b.driverName.toLowerCase().includes(q) ||
-          (b.passengerName && b.passengerName.toLowerCase().includes(q)) ||
-          b.vehicleModel.toLowerCase().includes(q) ||
-          (b.vehiclePlate && b.vehiclePlate.toLowerCase().includes(q));
-        if (!matches) return false;
-      }
-
-      if (statusFilter === 'conflict') {
-        if (!b.hasConflict) return false;
-      } else if (statusFilter === 'unacked') {
-        if (b.driverAck !== '미확인' && b.driverAck !== '재확인 필요') return false;
-      } else if (statusFilter !== 'all' && b.dispatchStatus !== statusFilter) {
-        return false;
-      }
-
-      if (driverFilter !== 'all') {
-        const cleanDrv = b.driverName.replace(/\s*기사$/, '').trim();
-        if (cleanDrv !== driverFilter) return false;
-      }
-
-      if (vehicleFilter !== 'all') {
-        const cleanTarget = cleanVehicleIdentity(vehicleFilter);
-        const cleanRowPlate = cleanVehicleIdentity(b.vehiclePlate);
-        const cleanRowModel = cleanVehicleIdentity(b.vehicleModel);
-        const matchesVehicle =
-          b.vehiclePlate === vehicleFilter ||
-          b.vehicleModel === vehicleFilter ||
-          b.vehicleModel.includes(vehicleFilter) ||
-          (cleanTarget && (cleanRowPlate === cleanTarget || cleanRowModel.includes(cleanTarget)));
-        if (!matchesVehicle) return false;
-      }
-
-      if (customerFilter !== 'all' && b.customerName !== customerFilter) return false;
-
-      return true;
-    });
-  }, [bookings, activeTab, searchQuery, statusFilter, driverFilter, vehicleFilter, customerFilter]);
+  // Shared search and modal filters apply to the calendar and the legacy list.
+  // Calendar includes past records for any selected month, unlike the operational all-list.
+  const matchesSharedFilters = useCallback((b: HqBooking) => {
+    if (searchQuery.trim()) {
+      const query = searchQuery.trim().toLocaleLowerCase();
+      const fields = [
+        b.customerName, b.bookingNo, b.pickupLocation, b.destination,
+        b.driverName, b.passengerName, b.vehicleModel, b.vehiclePlate,
+        ...(b.routeWaypoints || []).map((point) => point.location),
+      ];
+      if (!fields.some((field) => (field || '').toLocaleLowerCase().includes(query))) return false;
+    }
+    if (statusFilter === 'conflict') {
+      if (!b.hasConflict) return false;
+    } else if (statusFilter === 'unacked') {
+      if (b.driverAck !== '미확인' && b.driverAck !== '재확인 필요') return false;
+    } else if (statusFilter !== 'all' && b.dispatchStatus !== statusFilter) return false;
+    if (driverFilter !== 'all' && b.driverName.replace(/\\s*기사$/, '').trim() !== driverFilter) return false;
+    if (vehicleFilter !== 'all') {
+      const target = cleanVehicleIdentity(vehicleFilter);
+      const plate = cleanVehicleIdentity(b.vehiclePlate);
+      const model = cleanVehicleIdentity(b.vehicleModel);
+      if (!(b.vehiclePlate === vehicleFilter || b.vehicleModel === vehicleFilter ||
+        b.vehicleModel.includes(vehicleFilter) || (target && (plate === target || model.includes(target))))) return false;
+    }
+    return customerFilter === 'all' || b.customerName === customerFilter;
+  }, [searchQuery, statusFilter, driverFilter, vehicleFilter, customerFilter]);
+  const calendarFilteredList = useMemo(() => bookings.filter(matchesSharedFilters), [bookings, matchesSharedFilters]);
+  const filteredList = useMemo(() => calendarFilteredList.filter((b) => {
+    const past = isBookingInPast(b);
+    if (activeTab === 'past') return past;
+    if (past) return false;
+    if (activeTab === 'today') return Boolean(b.isToday);
+    if (activeTab === 'tomorrow') return Boolean(b.isTomorrow);
+    if (activeTab === 'action') {
+      return b.dispatchStatus !== '취소' && (
+        ['미배정', '작성 중', '재확인 필요'].includes(b.dispatchStatus) ||
+        b.driverAck === '미확인' || b.driverAck === '재확인 필요' || Boolean(b.hasConflict)
+      );
+    }
+    return true;
+  }), [calendarFilteredList, activeTab]);
 
   // Horizontal Table Scroll Management & Centered Navigation
   const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -436,7 +416,7 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
   };
 
   return (
-    <div className="w-full min-h-[640px] sm:min-h-[700px] bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col justify-start">
+    <div className="w-full min-h-[640px] bg-white rounded-[26px] p-4 sm:p-6 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] flex flex-col justify-start">
       {/* 1. Header */}
       <div className="flex items-center justify-between gap-2 pb-3.5 border-b border-slate-100">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -1128,7 +1108,29 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
         </div>
       )}
 
-      <HqMobileBookingList bookings={filteredList} onView={onViewBooking} onAssign={onAssignDriver || onViewBooking} />
+      {/* A-style live calendar is the default. Keep the old operational list as an option. */}
+      <div className="mt-2 flex items-center justify-between gap-2 py-2">
+        <span className="text-xs font-medium text-[#73839D]">
+          {viewMode === 'calendar' ? '월간 배차 일정' : '예약·배차 목록'}
+        </span>
+        <div role="group" aria-label="배차 보기 방식" className="inline-flex gap-1 rounded-xl bg-[#F7F9FC] p-1">
+          <button type="button" aria-pressed={viewMode === 'calendar'}
+            onClick={() => { haptics.lightTap(); onSelectTab('all'); setViewMode('calendar'); }}
+            className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-all ${viewMode === 'calendar' ? 'bg-white text-[#17233B] shadow-[0_2px_6px_rgba(35,49,78,0.08)]' : 'text-[#73839D] hover:text-[#17233B]'}`}>
+            <Calendar className="h-3.5 w-3.5" strokeWidth={1.8} /> 달력
+          </button>
+          <button type="button" aria-pressed={viewMode === 'list'}
+            onClick={() => { haptics.lightTap(); setViewMode('list'); }}
+            className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-all ${viewMode === 'list' ? 'bg-white text-[#17233B] shadow-[0_2px_6px_rgba(35,49,78,0.08)]' : 'text-[#73839D] hover:text-[#17233B]'}`}>
+            <LayoutList className="h-3.5 w-3.5" strokeWidth={1.8} /> 목록
+          </button>
+        </div>
+      </div>
+      {viewMode === 'calendar' ? (
+        <HqDispatchCalendar bookings={calendarFilteredList} onViewBooking={onViewBooking} onOpenNewBooking={onOpenNewBooking} />
+      ) : (
+        <>
+          <HqMobileBookingList bookings={filteredList} onView={onViewBooking} onAssign={onAssignDriver || onViewBooking} />
       <div className="hidden lg:flex lg:flex-1 lg:flex-col">
         {filteredList.length === 0 ? (
           <div className="flex-1 min-h-[420px] mt-2 flex flex-col items-center justify-center gap-2.5 rounded-2xl bg-slate-50/70 border border-slate-200/80 p-6 text-center">
@@ -1469,6 +1471,8 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
         </div>
         )}
       </div>
+        </>
+      )}
     </div>
   );
 };
