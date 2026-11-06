@@ -4,7 +4,7 @@ import {parseDriverReport,workMinutes,koreaDate,routeFromDiary} from './driverRe
 const raw=(time='09:15~17:20',plate='700호 1458')=>`2026년 10월 24일\n수행담당 : 검증 기사\n차량번호 : ${plate}\n고객명 : 샤넬\n시작 시간 : ${time.split('~')[0]}\n종료 시간 : ${time.split('~')[1]}\n운행일지\n안다즈 호텔 → 09:15 서울 옥션 → 16:00 김포공항 → 14:30 안다즈 호텔 → 17:20 김포공항 / 업무종료 → 16:00 차고지\n경비지출\n합계 : 50,000원`;
 test('company report keeps repeated stops in original order and maps standard models with UUID',()=>{
  const p=parseDriverReport(raw(),'검증 기사');
- assert.deepEqual(p.reviewReasons,[]);assert.equal(p.draft.model,'스프린터 319');assert.ok(p.vehicleUuid);
+ assert.deepEqual(p.reviewReasons,[]);assert.equal(p.draft.model,'스프린터 519');assert.ok(p.vehicleUuid);
  assert.equal(p.draft.route,'안다즈 호텔 - 서울 옥션 - 김포공항 - 안다즈 호텔 - 김포공항 - 차고지');
  assert.ok(p.warnings.some(w=>w.includes('경유시간')));assert.equal(p.draft.overtime,'');
  assert.equal(p.draft.amount,'');assert.equal(p.draft.totalWithVat,'');
@@ -33,7 +33,7 @@ test('uncertain plate, period, year, overnight and impersonated names require re
 test('yearless reports use the active ledger year, never the server calendar; night end is configurable',()=>{
  const message=raw('10:00~24:00').replace('2026년 ','');
  const p=parseDriverReport(message,'검증 기사',new Date('2030-01-01'),{workbookYear:2026,nightEndHour:6});
- assert.deepEqual(p.reviewReasons,[]);assert.equal(p.draft.date,'2026-10-24');assert.equal(p.draft.model,'스프린터 319');
+ assert.deepEqual(p.reviewReasons,[]);assert.equal(p.draft.date,'2026-10-24');assert.equal(p.draft.model,'스프린터 519');
  assert.equal(p.draft.overtime,'OT 2시간 / 심야 2시간');
  assert.deepEqual(workMinutes('20:00','30:00',4),{total:600,ot:0,night:360});
 });
