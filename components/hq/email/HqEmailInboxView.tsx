@@ -24,6 +24,9 @@ import {
   HqEmailExtractedDraft,
 } from '@/types/emailHq';
 import { buildEmailDispatchPlan } from '@/utils/emailDispatchPlan';
+import type { ExistingEmailBookingCandidate } from '@/services/emailBookingMatchService';
+import { prepareEmailRevisionDraft } from '@/utils/emailBookingRevision';
+import { HqEmailRevisionMatchPanel } from './HqEmailRevisionMatchPanel';
 import { haptics } from '@/utils/haptics';
 import { createRetryableJsonMutation } from '@/utils/retryableJsonMutation';
 import {
@@ -179,6 +182,9 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
     return {};
   });
   const [isExtractingAi, setIsExtractingAi] = useState<boolean>(false);
+  // Read-only match search runs only after the operator clicks AI extraction.
+  const [matchesByEmail, setMatchesByEmail] = useState<Record<string, ExistingEmailBookingCandidate[]>>({});
+  const [matchDecisionByEmail, setMatchDecisionByEmail] = useState<Record<string, string>>({});
 
   // 6. Filter tabs ('all' | 'unprocessed' | 'reviewing' | 'completed')
   const [statusFilter, setStatusFilter] = useState<'all' | 'unprocessed' | 'reviewing' | 'completed'>('all');
@@ -596,6 +602,34 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
     saveEmailDraft(updated);
   }, [currentSummary]);
 
+  const handleChooseRevision = (candidate: ExistingEmailBookingCandidate) => {
+    if (!currentSummary || !currentDraft) return;
+    const prepared = prepareEmailRevisionDraft(currentDraft, candidate);
+    setMatchDecisionByEmail(prev => ({ ...prev, [currentSummary.id]: candidate.scheduleId }));
+    handleUpdateDraft(prepared);
+    setVehicleSlots([{
+      slotIndex: 0,
+      vehicleModel: candidate.vehicleModel || '차량 미지정',
+      vehiclePlate: candidate.vehiclePlate || undefined,
+      driver: candidate.driverId ? {
+        id: candidate.driverId,
+        name: candidate.driverName,
+        phone: candidate.driverPhone,
+        rating: 0, reviewCount: 0, flags: [], languages: ['ko'],
+        affiliation: '', residence: '', isAvailable: true,
+      } : null,
+      status: candidate.driverId ? 'assigned' : 'unassigned',
+    }]);
+    showToast('기존 예약을 수정 대상으로 선택했습니다. 전체 경로와 TMAP 주소를 검토해 주세요.');
+  };
+
+  const handleChooseNewBooking = () => {
+    if (!currentSummary || !currentDraft) return;
+    setMatchDecisionByEmail(prev => ({ ...prev, [currentSummary.id]: 'new' }));
+    handleUpdateDraft({ ...currentDraft, revisionMatchedScheduleId: undefined, revisionMatchedVersion: undefined });
+    setVehicleSlots(parseVehicleSlotsFromRequestedClass(currentDraft.requestedVehicleClass));
+  };
+
   // =========================================================
   // On-Demand AI Extraction Trigger (Strict Body Validation)
   // =========================================================
@@ -615,7 +649,7 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
       } catch { }
     }
 
-    if (!emailBody?.trim()) {
+    if (!emailBody?.trim() && !currentSummary.id.startsWith('naver-')) {
       showToast('이메일 본문이 아직 로드되지 않았습니다. 본문이 화면에 표시된 후 다시 시도해 주세요.');
       haptics.errorAlert();
       return;
@@ -651,6 +685,12 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
       }
 
       const extracted: HqEmailExtractedDraft = data.draft;
+      const matches: ExistingEmailBookingCandidate[] = Array.isArray(data.matches) ? data.matches : [];
+      setMatchesByEmail(prev => ({ ...prev, [currentSummary.id]: matches }));
+      setMatchDecisionByEmail(prev => ({
+        ...prev,
+        [currentSummary.id]: matches.length || ['modification','cancellation'].includes(extracted.tripType) ? '' : 'new',
+      }));
       setDraftsByEmailId((prev) => ({
         ...prev,
         [currentSummary.id]: extracted,
@@ -679,9 +719,40 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
     setIsDispatching(true); setDispatchError(null);
     try {
       if (currentDraft.savedScheduleIds) throw new Error('이미 저장된 요청입니다. 모바일·PC의 예약 목록에서 날짜별 배정을 진행해 주세요.');
-      const items = buildEmailDispatchPlan(currentDraft, vehicleSlots, status);
+      const decision = matchDecisionByEmail[currentSummary.id] || '';
+      const candidates = matchesByEmail[currentSummary.id] || [];
+      if (currentDraft.tripType === 'cancellation') throw new Error('취소 요청은 배차관리에서 해당 예약을 확인한 뒤 직접 처리해 주세요.');
+      if ((!decision && (candidates.length || currentDraft.tripType === 'modification')) ||
+        (currentDraft.revisionMatchedScheduleId && decision !== currentDraft.revisionMatchedScheduleId)) {
+        throw new Error('기존 예약 수정 여부를 먼저 확인해 주세요.');
+      }
+      const matched = candidates.find(c => c.scheduleId === decision);
+      let items = buildEmailDispatchPlan(currentDraft, vehicleSlots, status);
+      if (matched) {
+        if (items.length !== 1 || (matched.groupTotalVehicles || 1) > 1)
+          throw new Error('여러 날짜·차량의 기존 배차는 개별 일정별 검토가 필요합니다. 배차관리에서 상세 수정해 주세요.');
+        if (matched.dispatchStatus === 'published' && status !== 'published')
+          throw new Error('기사에게 배포된 기존 배차를 미배정으로 전환할 수 없습니다.');
+        items = items.map(item => ({
+          ...item,
+          scheduleId: matched.scheduleId,
+          expectedVersion: matched.version,
+          bookingNo: matched.bookingNo || undefined,
+          eventId: matched.eventId || item.eventId,
+          groupId: matched.groupId || item.groupId,
+          groupVehicleIndex: matched.groupVehicleIndex || 1,
+          groupTotalVehicles: matched.groupTotalVehicles || 1,
+        }));
+      }
       if (currentDraft.savedScheduleIds && (Object.keys(currentDraft.savedScheduleIds).length !== items.length || items.some(item => !item.scheduleId))) throw new Error('이미 저장한 날짜·차량 구성이 변경되었습니다. 기존 미배정 예약을 먼저 확인·취소해 주세요.');
-      const response = await dispatchMutation.send('/api/schedules/dispatch', { items });
+      const approvedItems = items.map(item => ({
+        ...item,
+        sourceEmailId: currentSummary.id,
+        sourceSenderEmail: currentDraft.sourceSenderEmail || currentSummary.from.address,
+        sourceMessageId: currentDraft.sourceMessageId || undefined,
+        sourceAttachmentHashes: (currentDraft.sourceAttachments || []).map(file => file.sha256),
+      }));
+      const response = await dispatchMutation.send('/api/schedules/dispatch', { items: approvedItems });
       const data = await response.json();
       if (!response.ok || !data.ok || data.schedules?.length !== items.length) throw new Error(data.error || '전체 일정 저장을 확인하지 못했습니다.');
       const updated = { ...currentDraft, status: status === 'published' ? 'published' as const : 'saved' as const, associatedBookingId: data.schedules[0].id, savedScheduleIds: Object.fromEntries(items.map((item, index) => [`${item.date}:${item.groupVehicleIndex - 1}`, data.schedules[index].id])) };
@@ -708,6 +779,15 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
   // Step 3 → 4: confirm the reviewed draft, without prematurely submitting a dispatch.
   const handleProceedToBooking = () => {
     if (!currentSummary || !currentDraft) return;
+    const decision = matchDecisionByEmail[currentSummary.id] || '';
+    if (currentDraft.tripType === 'cancellation') {
+      showToast('취소 요청은 배차관리에서 기존 예약을 확인하고 직접 처리해 주세요.');
+      return;
+    }
+    if (!decision && ((matchesByEmail[currentSummary.id] || []).length || currentDraft.tripType === 'modification')) {
+      showToast('기존 예약 후보를 선택하거나 신규 예약으로 처리할지 먼저 확인해 주세요.');
+      return;
+    }
     haptics.success();
     const confirmedDraft: HqEmailExtractedDraft = {
       ...currentDraft,
@@ -716,7 +796,7 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
     };
     saveEmailDraft(confirmedDraft);
     setDraftsByEmailId((prev) => ({ ...prev, [currentSummary.id]: confirmedDraft }));
-    setVehicleSlots(parseVehicleSlotsFromRequestedClass(confirmedDraft.requestedVehicleClass));
+    if (!confirmedDraft.revisionMatchedScheduleId) setVehicleSlots(parseVehicleSlotsFromRequestedClass(confirmedDraft.requestedVehicleClass));
     setWorkflowStep('step4_booking_confirmed');
   };
 
@@ -1081,6 +1161,15 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
             </div>
           ) : (
             <div key={workflowStep} className="animate-step-slide">
+              {workflowStep === 'step1_extract' && currentDraft && (
+                <HqEmailRevisionMatchPanel
+                  draft={currentDraft}
+                  matches={matchesByEmail[currentSummary.id] || []}
+                  decision={matchDecisionByEmail[currentSummary.id] || null}
+                  onSelect={handleChooseRevision}
+                  onNew={handleChooseNewBooking}
+                />
+              )}
               {workflowStep === 'step1_extract' && (
                 <HqStep1ExtractView
                   emailSummary={currentSummary}
