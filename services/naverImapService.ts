@@ -14,6 +14,7 @@ import { ImapFlow } from 'imapflow';
 import { simpleParser } from 'mailparser';
 import { HqEmailSummary, HqEmailDetail } from '@/types/emailHq';
 import { classifyEmailCandidate } from '@/utils/emailClassifier';
+import type { ScheduleAttachmentInput } from '@/services/emailAttachmentIntake';
 
 export interface ImapConnectionStatus {
   ok: boolean;
@@ -294,6 +295,60 @@ export async function fetchNaverEmailDetail(uid: number): Promise<HqEmailDetail 
   } catch (err) {
     console.error(`Failed to fetch email detail for UID ${uid}:`, err);
     return null;
+  }
+}
+
+/**
+ * Fetch source-authenticated email and attachments only when an HQ operator
+ * explicitly requests AI extraction. Unlike inbox previews, bytes stay server-side.
+ * The mailbox is opened read-only and the IMAP message is never marked Seen.
+ */
+export async function fetchNaverEmailForAnalysis(uid: number): Promise<{
+  subject: string;
+  sender: string;
+  senderName: string;
+  replyTo: string;
+  bodyText: string;
+  attachments: ScheduleAttachmentInput[];
+  messageId: string;
+  inReplyTo: string;
+  references: string[];
+}> {
+  if (!Number.isSafeInteger(uid) || uid <= 0 || !isNaverImapConfigured()) {
+    throw new Error('네이버 메일 연결 또는 메일 식별값을 확인해 주세요.');
+  }
+  const client = createImapClient();
+  try {
+    await client.connect();
+    const lock = await client.getMailboxLock('INBOX', { readOnly: true });
+    try {
+      const download = await client.download(String(uid), undefined, { uid: true });
+      if (!download?.content) throw new Error('메일 원문을 찾을 수 없습니다.');
+      const parsed = await simpleParser(download.content);
+      const addresses = parsed.from?.value || [];
+      const attachmentList = (parsed.attachments || []).map((file) => ({
+        filename: file.filename || '이름 없는 첨부파일',
+        contentType: file.contentType || 'application/octet-stream',
+        content: file.content,
+      }));
+      return {
+        subject: parsed.subject || '',
+        sender: addresses[0]?.address || '',
+        senderName: addresses[0]?.name || '',
+        replyTo: parsed.replyTo?.value?.[0]?.address || '',
+        bodyText: parsed.text || '',
+        attachments: attachmentList,
+        messageId: parsed.messageId || '',
+        inReplyTo: parsed.inReplyTo || '',
+        references: Array.isArray(parsed.references)
+          ? parsed.references
+          : parsed.references ? [parsed.references] : [],
+      };
+    } finally {
+      lock.release();
+    }
+  } finally {
+    try { await client.logout(); } catch { /* Preserve original fetch error. */ }
   }
 }
 
