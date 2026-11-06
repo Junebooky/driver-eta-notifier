@@ -1,4 +1,5 @@
 import { HqBooking } from '@/types/hq';
+import type { RouteWaypointItem } from '@/types/emailHq';
 import { normalizeDateToIso, normalizeTimeHHmm } from '@/utils/dispatchConflictDetector';
 
 export type EscalationSeverity = 'critical' | 'urgent' | 'warning' | 'watch';
@@ -34,6 +35,8 @@ export interface UnackEscalationAlert {
   pickupTime: string;
   pickupLocation: string;
   destination: string;
+  /** Whole persisted itinerary: departure, intermediate stops, arrival. */
+  routeWaypoints?: RouteWaypointItem[];
   version: number;
   reminderCount: number;
   lastRemindedAt?: string;
@@ -197,6 +200,7 @@ export function evaluateDispatchEscalationAlerts(
         pickupTime: b.pickupTime,
         pickupLocation: b.pickupLocation,
         destination: b.destination,
+        routeWaypoints: b.routeWaypoints?.map((point) => ({ ...point })),
         version,
         reminderCount,
         lastRemindedAt: b.lastRemindedAt,
@@ -240,6 +244,7 @@ export function evaluateDispatchEscalationAlerts(
           pickupTime: b.pickupTime,
           pickupLocation: b.pickupLocation,
           destination: b.destination,
+          routeWaypoints: b.routeWaypoints?.map((point) => ({ ...point })),
           version,
           reminderCount: 0,
           canSendDriverReminder: false,
@@ -282,6 +287,7 @@ export function evaluateDispatchEscalationAlerts(
         pickupTime: b.pickupTime,
         pickupLocation: b.pickupLocation,
         destination: b.destination,
+        routeWaypoints: b.routeWaypoints?.map((point) => ({ ...point })),
         version,
         reminderCount,
         pendingCustomerTrigger: b.pendingCustomerTrigger,
