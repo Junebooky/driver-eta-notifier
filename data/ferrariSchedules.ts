@@ -1,4 +1,5 @@
 import { LocationPreset } from '@/types';
+import type { RouteWaypointItem } from '@/types/emailHq';
 
 export interface ScheduleItem {
   id: string;
@@ -28,6 +29,8 @@ export interface ScheduleItem {
   destination_lat: number;
   destination_lng: number;
   waypoints?: LocationPreset[];
+  /** Full ordered itinerary, including departure and arrival, with times and verified addresses. */
+  routeWaypoints?: RouteWaypointItem[];
   adminWaypoints?: LocationPreset[];
   isAdminRoute?: boolean;
   // Dispatch Lifecycle & Acknowledgment (Issue #25 & HQ-Driver Sync)
