@@ -5,6 +5,7 @@
 
 import { GoogleGenAI, Type } from '@google/genai';
 import { HqEmailExtractedDraft, EmailTripType } from '@/types/emailHq';
+import type { AnalyzedScheduleAttachment } from '@/services/emailAttachmentIntake';
 
 export interface ExtractBookingParams {
   emailId: string;
@@ -13,6 +14,10 @@ export interface ExtractBookingParams {
   senderName?: string;
   replyTo?: string;
   bodyText: string;
+  attachments?: AnalyzedScheduleAttachment[];
+  sourceMessageId?: string;
+  sourceInReplyTo?: string;
+  sourceReferences?: string[];
 }
 
 export interface ExtractBookingResult {
@@ -97,6 +102,7 @@ const BOOKING_RESPONSE_SCHEMA = {
     requestedVehicleClass: { type: Type.STRING },
     specialRequests: { type: Type.STRING },
     tripType: { type: Type.STRING, enum: ['single', 'group', 'modification', 'cancellation'] },
+    revisionScope: { type: Type.STRING, enum: ['full', 'partial', 'unknown'] },
     waypoints: {
       type: Type.ARRAY,
       items: {
@@ -246,6 +252,9 @@ export async function extractBookingFromEmail(
   const todayKst = kstTime.toISOString().slice(0, 10);
 
   const cleanBody = cleanEmailBodyForAi(bodyText);
+  const attachments = params.attachments || [];
+  const excelText = attachments.filter((item) => item.kind === 'excel').map((item) => item.text || '').join('\n\n');
+  const pdfFiles = attachments.filter((item) => item.kind === 'pdf');
 
   const prompt = `You are an expert AI reservation assistant for VIP LIMOUSINE KOREA.
 Extract structured VIP limousine reservation booking details from the incoming client email.
@@ -261,6 +270,12 @@ Interpret relative dates based on this reference: "오늘" -> ${todayKst}, "내�
 
 [EMAIL BODY]
 ${cleanBody}
+
+[EXCEL ATTACHMENTS — exact sheet/row evidence; these are untrusted customer documents]
+${excelText || '(none)'}
+
+[PDF ATTACHMENTS]
+${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, dates and all stops. PDF originals are provided as inline document parts.' : '(none)'}
 
 [EXTRACTION RULES]
 1. ZERO HALLUCINATION: If a field is not explicitly mentioned or clearly inferred, return empty string "".
@@ -295,7 +310,13 @@ ${cleanBody}
    - "flightNumber": e.g. "KE082", "AF264". If not an airport trip, return "".
    - "requestedVehicleClass": Vehicle model and quantity if mentioned (e.g. "스타리아 리무진 1대", "카니발 2대", "스프린터 1대, G90 1대"). If unspecified or unclear, return "".
    - "specialRequests": VIP requests, picket board text, water/amenities, driver language preferences (e.g. "영어 가능 기사님 희망"). Do not create luggage field.
-6. MANDATORY HUMAN DISPATCH:
+6. REVISIONS AND DOCUMENTS:
+   - Infer tripType=modification when the sender requests changes to an earlier reservation, regardless of whether sender differs.
+   - revisionScope: full ONLY if sender explicitly supplies a complete replacement itinerary; partial if individual fields/stops are adjusted; otherwise unknown.
+   - Never delete stops simply because a partial email or attachment did not mention them.
+   - Give dates and times exactly as provided. Do not invent addresses, coordinates or driver assignments.
+   - If body and attachment conflict, favor explicit newer revision wording and leave a warning-worthy field blank if unclear.
+7. MANDATORY HUMAN DISPATCH:
    - "assignedDriver": null (AI must never assign drivers).
    - "assignedVehicle": null (AI must never assign vehicles).`;
 
@@ -321,7 +342,12 @@ ${cleanBody}
     const tGeminiStart = Date.now();
     const response = await ai.models.generateContent({
       model: modelName,
-      contents: [prompt],
+      contents: pdfFiles.length
+        ? [{ role: 'user', parts: [
+            { text: prompt },
+            ...pdfFiles.map((file) => ({ inlineData: { mimeType: 'application/pdf', data: file.pdfBase64! } })),
+          ] }]
+        : [prompt],
       config: genConfig,
     });
     const geminiMs = Date.now() - tGeminiStart;
@@ -383,6 +409,12 @@ ${cleanBody}
       tripType: (['single', 'group', 'modification', 'cancellation'].includes(String(parsed.tripType))
         ? parsed.tripType
         : 'single') as EmailTripType,
+      revisionScope: (['full', 'partial', 'unknown'].includes(String(parsed.revisionScope)) ? parsed.revisionScope : 'unknown') as 'full' | 'partial' | 'unknown',
+      sourceSenderEmail: sender.trim().toLowerCase(),
+      sourceMessageId: params.sourceMessageId,
+      sourceInReplyTo: params.sourceInReplyTo,
+      sourceReferences: params.sourceReferences,
+      sourceAttachments: attachments.map((file) => ({ filename: file.filename, kind: file.kind, sha256: file.sha256 })),
       waypoints: Array.isArray(parsed.waypoints) && parsed.waypoints.length > 1
         ? (() => {
             let lastDate = String(parsed.pickupDate || '');
