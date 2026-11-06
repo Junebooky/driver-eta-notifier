@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Inbox, MapPin } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Inbox, MapPin } from 'lucide-react';
 import type { HqBooking } from '@/types/hq';
 import { getCustomerDotColor } from '@/utils/customerDotColor';
 import { getKstTodayDateStr } from '@/utils/dispatchConflictDetector';
