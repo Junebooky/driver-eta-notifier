@@ -13,7 +13,7 @@ export interface ScheduleAttachmentInput {
 }
 export interface AnalyzedScheduleAttachment {
   filename: string;
-  kind: 'excel' | 'pdf';
+  kind: 'excel' | 'pdf' | 'docx';
   sha256: string;
   size: number;
   /** Excel cell text only; PDFs are passed to Gemini as PDF inline data. */
@@ -33,7 +33,7 @@ export function analyzeScheduleAttachments(attachments: ScheduleAttachmentInput[
   let totalBytes = 0;
   for (const file of attachments) {
     const name = file.filename.replace(/[\\/\x00-\x1f]/g, '_').slice(0, 160) || '이름 없는 첨부파일';
-    const ext = name.toLowerCase().match(/\.(xlsx|xls|pdf)$/)?.[1];
+    const ext = name.toLowerCase().match(/\.(xlsx|xls|pdf|docx)$/)?.[1];
     if (!ext) { ignored.push(name); continue; }
     const bytes = file.content;
     if (!Buffer.isBuffer(bytes) || !bytes.length || bytes.length > MAX_EMAIL_ATTACHMENT_BYTES) {
@@ -53,6 +53,47 @@ export function analyzeScheduleAttachments(attachments: ScheduleAttachmentInput[
     }
     const isZip = bytes.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 0x03, 0x04]));
     const isXls = bytes.subarray(0, 8).equals(Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]));
+    if (ext === 'docx') {
+      if (!isZip) {
+        throw new Error(`${name}: 확장자와 실제 Word(DOCX) 형식이 일치하지 않습니다.`);
+      }
+      let docXml = '';
+      try {
+        const unzipped = unzipSync(bytes, {
+          filter: (entry) => entry.name === 'word/document.xml',
+        });
+        const docBytes = unzipped['word/document.xml'];
+        if (docBytes) {
+          docXml = new TextDecoder('utf-8').decode(docBytes);
+        }
+      } catch (zipErr) {
+        throw new Error(`${name}: Word 문서 압축 해제 실패 — ${zipErr instanceof Error ? zipErr.message : ''}`);
+      }
+      if (!docXml) {
+        throw new Error(`${name}: Word 문서 본문(document.xml)을 찾을 수 없습니다.`);
+      }
+      const text = docXml
+        .replace(/<w:p[^>]*>/g, '\n')
+        .replace(/<w:tab[^>]*\/>/g, '\t')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&amp;/g, '&')
+        .replace(/[ \t]+/g, ' ')
+        .replace(/\n\s*\n/g, '\n')
+        .trim();
+      if (!text) {
+        throw new Error(`${name}: Word 문서에 읽을 수 있는 텍스트가 없습니다.`);
+      }
+      analyzed.push({
+        filename: name,
+        kind: 'docx',
+        sha256: digest,
+        size: bytes.length,
+        text: `\n[Word ${name}]\n${text}\n`,
+      });
+      continue;
+    }
     if ((ext === 'xlsx' && !isZip) || (ext === 'xls' && !isXls)) {
       throw new Error(`${name}: 확장자와 실제 Excel 형식이 일치하지 않습니다.`);
     }

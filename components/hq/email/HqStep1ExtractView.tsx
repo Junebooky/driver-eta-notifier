@@ -167,12 +167,12 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
       selectedPoi:
         wp.address && typeof wp.lat === 'number' && typeof wp.lng === 'number'
           ? {
-              id: wp.id,
-              name: wp.location,
-              address: wp.address,
-              lat: wp.lat,
-              lng: wp.lng,
-            }
+            id: wp.id,
+            name: wp.location,
+            address: wp.address,
+            lat: wp.lat,
+            lng: wp.lng,
+          }
           : null,
       isPoiConfirmed: Boolean(wp.isPoiConfirmed && Number.isFinite(wp.lat) && Number.isFinite(wp.lng)),
     });
@@ -566,10 +566,10 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                   const visual = isPdf
                     ? { bg: 'bg-rose-50 text-rose-600 border border-rose-100', icon: <FileText className="h-4 w-4 shrink-0 text-rose-600" strokeWidth={1.8} /> }
                     : isExcel
-                    ? { bg: 'bg-emerald-50 text-emerald-600 border border-emerald-100', icon: <img src="/images/icons/icon_excel.png" alt="Excel" className="w-4 h-4 object-contain shrink-0" /> }
-                    : isWord
-                    ? { bg: 'bg-blue-50 text-[#1E60F3] border border-blue-100', icon: <FileText className="h-4 w-4 shrink-0 text-[#1E60F3]" strokeWidth={1.8} /> }
-                    : { bg: 'bg-slate-100 text-slate-600 border border-slate-200', icon: <FileText className="h-4 w-4 shrink-0 text-slate-500" strokeWidth={1.8} /> };
+                      ? { bg: 'bg-emerald-50 text-emerald-600 border border-emerald-100', icon: <img src="/images/icons/icon_excel.png" alt="Excel" className="w-4 h-4 object-contain shrink-0" /> }
+                      : isWord
+                        ? { bg: 'bg-blue-50 text-[#1E60F3] border border-blue-100', icon: <FileText className="h-4 w-4 shrink-0 text-[#1E60F3]" strokeWidth={1.8} /> }
+                        : { bg: 'bg-slate-100 text-slate-600 border border-slate-200', icon: <FileText className="h-4 w-4 shrink-0 text-slate-500" strokeWidth={1.8} /> };
 
                   const emailId = emailDetail?.id || emailSummary.id;
                   const downloadUrl = `/api/email/${encodeURIComponent(emailId)}/attachment?filename=${encodeURIComponent(file.filename)}&index=${index}`;
@@ -664,13 +664,12 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                   type="button"
                   onClick={handleSaveToCrm}
                   disabled={extractedDraft.isSavedToCrm || isSavingCrm}
-                  className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-colors shrink-0 flex items-center gap-1.5 ${
-                    extractedDraft.isSavedToCrm
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 cursor-default'
-                      : isSavingCrm
+                  className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-colors shrink-0 flex items-center gap-1.5 ${extractedDraft.isSavedToCrm
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 cursor-default'
+                    : isSavingCrm
                       ? 'bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed'
                       : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200/80 cursor-pointer shadow-2xs'
-                  }`}
+                    }`}
                   title="고객 관리에 회사 및 담당자 정보를 저장하거나 연결합니다"
                 >
                   <Bookmark className="w-3.5 h-3.5 text-slate-500" />
@@ -678,8 +677,8 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                     {isSavingCrm
                       ? '저장 중...'
                       : extractedDraft.isSavedToCrm
-                      ? '고객 관리 연결됨'
-                      : '고객 관리에 저장'}
+                        ? '고객 관리 연결됨'
+                        : '고객 관리에 저장'}
                   </span>
                 </button>
               </div>
@@ -788,8 +787,8 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                   {isEnglishRequired
                     ? '영어 가능 기사'
                     : hasMultipleDates
-                    ? `동일 기사 ${uniqueDates.length}일 전담`
-                    : specialRequests || '특이사항 없음'}
+                      ? `동일 기사 ${uniqueDates.length}일 전담`
+                      : specialRequests || '특이사항 없음'}
                 </span>
               </div>
             </div>
@@ -881,13 +880,13 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                                           <img
                                             src="/images/icons/driver_ui/icon_origin.png"
                                             alt="출발"
-                                            className="h-4 w-4 object-contain"
+                                            className="h-6 w-6 object-contain"
                                           />
                                         ) : isLast ? (
                                           <img
                                             src="/images/icons/driver_ui/icon_destination.png"
                                             alt="종료"
-                                            className="h-4 w-4 object-contain"
+                                            className="h-6 w-6 object-contain"
                                           />
                                         ) : (
                                           <div
@@ -941,11 +940,11 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                                                   setWaypointEdit((draft) =>
                                                     draft
                                                       ? {
-                                                          ...draft,
-                                                          location,
-                                                          selectedPoi: null,
-                                                          isPoiConfirmed: false,
-                                                        }
+                                                        ...draft,
+                                                        location,
+                                                        selectedPoi: null,
+                                                        isPoiConfirmed: false,
+                                                      }
                                                       : draft
                                                   )
                                                 }
@@ -953,11 +952,11 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                                                   setWaypointEdit((draft) =>
                                                     draft
                                                       ? {
-                                                          ...draft,
-                                                          location: poi.name,
-                                                          selectedPoi: poi,
-                                                          isPoiConfirmed: true,
-                                                        }
+                                                        ...draft,
+                                                        location: poi.name,
+                                                        selectedPoi: poi,
+                                                        isPoiConfirmed: true,
+                                                      }
                                                       : draft
                                                   )
                                                 }

@@ -105,7 +105,7 @@ export interface HqEmailExtractedDraft {
   revisionMatchedVersion?: number;
   sourceMessageId?: string;
   sourceSenderEmail?: string;
-  sourceAttachments?: Array<{ filename: string; kind: 'excel' | 'pdf'; sha256: string }>;
+  sourceAttachments?: Array<{ filename: string; kind: 'excel' | 'pdf' | 'docx'; sha256: string }>;
   sourceInReplyTo?: string;
   sourceReferences?: string[];
   pickupDate: string; // YYYY-MM-DD

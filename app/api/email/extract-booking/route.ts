@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({
             ok: false,
             code: 'UNSUPPORTED_EMAIL_SCHEDULE_ATTACHMENT',
-            error: `일정 첨부파일을 분석할 수 없습니다: ${unsupportedSchedules.join(', ')}. 지원되는 Excel 또는 PDF로 다시 전달받거나 파일 형식을 확인해 주세요.`,
+            error: `일정 첨부파일을 분석할 수 없습니다: ${unsupportedSchedules.join(', ')}. 지원되는 Excel, Word(DOCX) 또는 PDF로 다시 전달받거나 파일 형식을 확인해 주세요.`,
             ignoredAttachments: analysis.ignored,
           }, { status: 422 });
         }
