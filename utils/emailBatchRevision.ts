@@ -38,6 +38,7 @@ export function emailBatchRows(
   slots: EmailBatchSlot[],
   candidates: ExistingEmailBookingCandidate[],
   decisions: EmailBatchDecisions,
+  assignments: EmailBatchAssignments = {},
 ): EmailBatchReviewRow[] {
   return emailDispatchDays(draft).flatMap(day =>
     slots.map((slot, index) => {
@@ -65,6 +66,9 @@ export function emailBatchRows(
         if (previous.passengerCount !== count) push('탑승 인원', String(previous.passengerCount), String(count));
         if (draft.passengerName) push('탑승객', previous.passengerName, draft.passengerName);
         if (draft.flightNumber) push('편명', previous.flightNumber, draft.flightNumber);
+        const assignment = assignments[key];
+        if (assignment?.vehiclePlate) push('배정 차량', previous.vehiclePlate, assignment.vehiclePlate);
+        if (assignment?.driver !== undefined) push('담당 기사', previous.driverName, assignment.driver?.name || '미배정');
       }
       return {
         key, date: day.date, index, selection, previous,
@@ -197,7 +201,7 @@ export function buildEmailBatchRevisionApproval(
   if (draft.tripType === 'cancellation') throw new Error('전체 취소 요청은 별도로 확인해 주세요.');
   if (draft.tripType === 'group' && draft.groupTrips?.length)
     throw new Error('승객별 개별 출발 경로가 있는 예약은 차량별 TMAP 경로를 먼저 확정해 주세요.');
-  const rows = emailBatchRows(draft, slots, candidates, decisions);
+  const rows = emailBatchRows(draft, slots, candidates, decisions, assignments);
   if (!rows.length || rows.length > 80) throw new Error('일괄 배차는 1~80건까지 검토할 수 있습니다.');
   const selected = new Set<string>();
   const items: Array<Record<string, unknown>> = [];
