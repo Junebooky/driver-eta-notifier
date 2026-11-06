@@ -551,6 +551,8 @@ export interface DispatchUpsertInput {
   sourceSenderEmail?: string;
   sourceMessageId?: string;
   sourceAttachmentHashes?: string[];
+  /** Explicit HQ reason required when cancelling a row in an atomic revision batch. */
+  cancelReason?: string;
   vehicleNo?: string;
   vehicleId?: string;
   vehicleModel?: string;
@@ -883,6 +885,9 @@ async function prepareServerDispatchSchedule(
   const cleanDrv = cleanDriverIdentity(input.driverName);
   const cleanPlt = cleanVehicleIdentity(input.vehiclePlate);
   const requestedStatus = input.dispatchStatus || 'published';
+  if (requestedStatus === 'cancelled' && (!input.scheduleId || !input.expectedVersion || !input.cancelReason?.trim())) {
+    return { error: '일괄 취소는 기존 예약 ID, 버전, 취소 사유가 모두 필요합니다.', statusCode: 400 };
+  }
 
   // Determine effective dispatch status
   const effectiveDispatchStatus: HqScheduleMeta['dispatchStatus'] = requestedStatus;
@@ -968,6 +973,9 @@ async function prepareServerDispatchSchedule(
     if (readError) return { error: '기존 배차 조회에 실패했습니다.', statusCode: 503 };
     if (!exRaw) return { error: '해당 배차를 찾을 수 없습니다.', statusCode: 404 };
     existingHydrated = hydrateRawScheduleRow(exRaw);
+    if (existingHydrated.dispatch_status === 'cancelled' || existingHydrated.status === 'cancelled') {
+      return { error: '이미 취소된 예약입니다. 최신 예약을 확인해 주세요.', statusCode: 409 };
+    }
     if (input.expectedVersion !== undefined && input.expectedVersion !== existingHydrated.version) return { error: '다른 기기에서 배차가 변경되었습니다. 최신 배차를 다시 열어 주세요.', statusCode: 409 };
   }
 
@@ -1060,6 +1068,17 @@ async function prepareServerDispatchSchedule(
     pendingCustomerTriggeredAt = nowIso;
   }
 
+  if (effectiveDispatchStatus === 'cancelled' && existingHydrated) {
+    // A cancelled dispatch must invalidate the driver's previously acknowledged version.
+    nextVersion = (existingHydrated.version || 1) + 1;
+    lastAckVersion = 0;
+    lastAckAt = null;
+    pendingCustomerTrigger = null;
+    pendingCustomerTriggeredAt = null;
+    reminderCount = 0;
+    lastRemindedAt = null;
+  }
+
   const bookingNo =
     input.bookingNo ||
     existingHydrated?._meta.bookingNo ||
@@ -1103,6 +1122,7 @@ async function prepareServerDispatchSchedule(
         }].slice(-20)
       : existingHydrated?._meta.revisionHistory,
     dispatchStatus: effectiveDispatchStatus,
+    cancelReason: effectiveDispatchStatus === 'cancelled' ? input.cancelReason!.trim().slice(0, 240) : existingHydrated?._meta.cancelReason,
     driverId: input.serviceMode === 'vehicle_only' ? null : input.driverId ?? existingHydrated?._meta.driverId ?? null,
     driverName:
       input.serviceMode === 'vehicle_only'
@@ -1183,7 +1203,9 @@ async function prepareServerDispatchSchedule(
     passenger_note: encodeScheduleMeta(nextMeta),
     schedule_meta: nextMeta,
     flight_number: input.flightNumber?.trim() || null,
-    protocol_notes: input.notes?.trim() || null,
+    protocol_notes: effectiveDispatchStatus === 'cancelled'
+      ? `[배차 취소 사유: ${input.cancelReason!.trim().slice(0, 240)} (본사 승인)] ${existingHydrated?.protocol_notes || ''}`.trim()
+      : input.notes?.trim() || null,
     driver_name: input.serviceMode === 'vehicle_only' ? null : cleanDrv || input.driverName || null,
     driver_phone: input.serviceMode === 'vehicle_only' ? null : input.driverPhone || null,
     vehicle_plate: resolvedPlate || null,
