@@ -180,6 +180,7 @@ export interface HqEmailSummary {
 
 export interface HqEmailDetail extends HqEmailSummary {
   bodyText: string;
+  attachments?: Array<{ filename: string; contentType: string; size: number }>;
   bodyHtmlSanitized?: string;
   headers?: Record<string, string>;
   extractedDraft?: HqEmailExtractedDraft | null;
