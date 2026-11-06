@@ -66,6 +66,8 @@ export interface HqStep2BookingDetailViewProps {
   onUpdateVehicleSlots?: (slots: VehicleSlotAssignment[]) => void;
   isDispatching?: boolean;
   dispatchError?: string | null;
+  /** Multi-date/vehicle comparison replaces only the assignment action area. */
+  batchReview?: React.ReactNode;
   // Backward compatibility
   emailItem?: any;
 }
@@ -83,6 +85,7 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
   onUpdateVehicleSlots,
   isDispatching = false,
   dispatchError = null,
+  batchReview,
 }) => {
   let availabilityWindows: Array<{ startDate: string; startTime: string; endDate: string; endTime: string }> = [];
   try {
@@ -329,6 +332,7 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
         </div>
       )}
 
+      {batchReview || (
       <HqStep5AssignmentPanel
         slots={vehicleSlots}
         draft={extractedDraft}
@@ -344,6 +348,7 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
         onConfirm={handleConfirm}
         isDispatching={isDispatching}
       />
+      )}
 
       {/* Section 1: 날짜별 장소·종료시간 확인 (Reference 1) */}
       <details className="group rounded-[28px] bg-white border border-slate-100 shadow-[0_2px_12px_rgba(15,23,42,0.03)] p-5 sm:p-6 transition-all" open>
