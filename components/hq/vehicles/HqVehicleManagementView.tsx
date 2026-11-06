@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import {
   VIP_REAL_VEHICLES,
+  reconcileRegisteredVehicle,
   VipRealVehicle,
   VehicleUiCategoryKey,
   mapVehicleToUiCategory,
@@ -114,7 +115,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [fuelFilter, setFuelFilter] = useState<FuelTypeFilter>('all');
 
-  // 2. Selected Vehicle - Defaults to 125호 9982 (Benz Sprinter Tourer 319 CDI from mockup)
+  // 2. Selected Vehicle - Defaults to registered 125호 9982 (Benz Sprinter 319 CDI)
   const defaultCarId = useMemo(() => {
     return VIP_REAL_VEHICLES[0].id;
   }, []);
@@ -306,7 +307,9 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
       return true;
     };
 
-    const validCustom = customVehicles.filter(isNotDeleted);
+    // Keep custom photos and notes, but never let stale browser records override
+    // owner-confirmed model, seat count and fuel for registered fleet plates.
+    const validCustom = customVehicles.filter(isNotDeleted).map(reconcileRegisteredVehicle);
 
     // Filter default vehicles: not deleted AND not superseded by a custom vehicle with same plate
     const validDefault = VIP_REAL_VEHICLES.filter(
