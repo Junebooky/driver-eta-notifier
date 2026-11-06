@@ -307,12 +307,19 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
           <div className="flex-1">
             <span className="font-extrabold block">배차 등록 오류</span>
             <span className="font-normal text-rose-700">{dispatchError}</span>
+            {/주소|좌표|경유지|위치|POI|TMAP/i.test(dispatchError) && (
+              <a href="#email-route-place-verification" className="mt-1.5 inline-block text-xs font-medium underline underline-offset-2 text-rose-700">
+                아래 운행 경로에서 주소 확인하기
+              </a>
+            )}
           </div>
         </div>
       )}
 
       <HqStep5AssignmentPanel
         slots={vehicleSlots}
+        draft={extractedDraft}
+        onUpdateDraft={onUpdateDraft}
         vehicles={fleet.data?.vehicles}
         loading={fleet.loading}
         fleetError={fleet.error}
