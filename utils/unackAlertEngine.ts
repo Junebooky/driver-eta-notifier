@@ -184,8 +184,8 @@ export function evaluateDispatchEscalationAlerts(
           severity === 'critical'
             ? `${pickupCountdownLabel}인데 아직 기사가 배차를 확인하지 않았습니다! 즉시 전화 또는 재알림이 필요합니다.`
             : isReconfirm
-            ? `일정·배차 변경(v${version}) 후 기사가 아직 재확인하지 않았습니다 (${elapsedWaitLabel}).`
-            : `배차 전송 후 ${elapsedWaitLabel} 동안 기사 확인 대기 중입니다 (${pickupCountdownLabel}).`,
+              ? `일정·배차 변경(v${version}) 후 기사가 아직 재확인하지 않았습니다 (${elapsedWaitLabel}).`
+              : `배차 전송 후 ${elapsedWaitLabel} 동안 기사 확인 대기 중입니다 (${pickupCountdownLabel}).`,
         pickupCountdownLabel,
         elapsedWaitLabel,
         minutesUntilPickup,
@@ -217,8 +217,8 @@ export function evaluateDispatchEscalationAlerts(
         const severity: EscalationSeverity = isWithin2h
           ? 'critical'
           : isWithin6h || b.isToday
-          ? 'urgent'
-          : 'warning';
+            ? 'urgent'
+            : 'warning';
 
         alerts.push({
           id: `esc-unassigned-${b.id}`,
@@ -272,7 +272,7 @@ export function evaluateDispatchEscalationAlerts(
         title: `${b.customerName} · ${b.driverName} 기사 (${b.vehiclePlate || b.vehicleModel})`,
         detail: isArrival
           ? `기사가 픽업지(${b.pickupLocation})에 도착했습니다. 자동 작성된 고객 안내 문자/이메일을 확인 후 발송하세요.`
-          : `배차/변경 내역이 반영된 짧은 고객 안내 메시지가 준비되었습니다. 관리자 확인 후 발송할 수 있습니다.`,
+          : `손님께 보낼 안내 문자가 준비됐어요.`,
         pickupCountdownLabel,
         elapsedWaitLabel,
         minutesUntilPickup,

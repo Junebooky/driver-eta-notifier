@@ -5,6 +5,7 @@ import {
   Sparkles,
   Paperclip,
   FileText,
+  Download,
   ArrowRight,
   Edit3,
   Calendar,
@@ -556,15 +557,51 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
             </div>
             {attachmentFiles.length ? (
               <div className="flex flex-wrap gap-2">
-                {attachmentFiles.map((file, index) => (
-                  <div key={`${file.filename}-${index}`} className="flex min-w-0 items-center gap-2 rounded-xl bg-white px-3 py-2 shadow-[0_2px_8px_rgba(35,49,78,0.04)]">
-                    <FileText className="h-4 w-4 shrink-0 text-slate-500" strokeWidth={1.7}/>
-                    <div className="min-w-0">
-                      <div className="max-w-[210px] truncate text-[11px] font-medium text-slate-800" title={file.filename}>{file.filename}</div>
-                      <div className="text-[10px] text-slate-400">{file.size ? `${(file.size / 1024).toFixed(0)} KB` : '메일 원본 첨부파일'}</div>
-                    </div>
-                  </div>
-                ))}
+                {attachmentFiles.map((file, index) => {
+                  const lower = (file.filename || '').toLowerCase();
+                  const isPdf = lower.endsWith('.pdf');
+                  const isExcel = lower.endsWith('.xlsx') || lower.endsWith('.xls') || lower.endsWith('.csv');
+                  const isWord = lower.endsWith('.docx') || lower.endsWith('.doc');
+
+                  const visual = isPdf
+                    ? { bg: 'bg-rose-50 text-rose-600 border border-rose-100', icon: <FileText className="h-4 w-4 shrink-0 text-rose-600" strokeWidth={1.8} /> }
+                    : isExcel
+                    ? { bg: 'bg-emerald-50 text-emerald-600 border border-emerald-100', icon: <img src="/images/icons/icon_excel.png" alt="Excel" className="w-4 h-4 object-contain shrink-0" /> }
+                    : isWord
+                    ? { bg: 'bg-blue-50 text-[#1E60F3] border border-blue-100', icon: <FileText className="h-4 w-4 shrink-0 text-[#1E60F3]" strokeWidth={1.8} /> }
+                    : { bg: 'bg-slate-100 text-slate-600 border border-slate-200', icon: <FileText className="h-4 w-4 shrink-0 text-slate-500" strokeWidth={1.8} /> };
+
+                  const emailId = emailDetail?.id || emailSummary.id;
+                  const downloadUrl = `/api/email/${encodeURIComponent(emailId)}/attachment?filename=${encodeURIComponent(file.filename)}&index=${index}`;
+
+                  return (
+                    <a
+                      key={`${file.filename}-${index}`}
+                      href={downloadUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      download={file.filename}
+                      className="flex min-w-0 items-center gap-2.5 rounded-xl bg-white border border-slate-200/80 px-3 py-2 shadow-[0_2px_8px_rgba(35,49,78,0.04)] hover:border-[#1E60F3] hover:shadow-xs transition-all cursor-pointer group active:scale-[0.98]"
+                      title={`${file.filename} 다운로드 / 열기`}
+                    >
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${visual.bg}`}>
+                        {visual.icon}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="max-w-[210px] truncate text-[11px] font-bold text-slate-800 group-hover:text-[#1E60F3] transition-colors" title={file.filename}>
+                          {file.filename}
+                        </div>
+                        <div className="text-[10px] text-slate-400 flex items-center gap-1.5">
+                          <span>{file.size ? `${(file.size / 1024).toFixed(0)} KB` : '메일 원본 첨부파일'}</span>
+                          <span className="text-[#1E60F3] font-semibold inline-flex items-center gap-0.5 opacity-80 group-hover:opacity-100">
+                            <Download className="w-2.5 h-2.5 stroke-[2.5]" />
+                            열기
+                          </span>
+                        </div>
+                      </div>
+                    </a>
+                  );
+                })}
               </div>
             ) : (
               <p className="text-xs text-slate-500">첨부파일이 있습니다. 메일을 불러온 뒤 파일명을 확인해 주세요.</p>
