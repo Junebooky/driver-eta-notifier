@@ -19,6 +19,7 @@ export function HqDriverReportInbox() {
  const [search,setSearch]=useState('');
  const [excelFocus,setExcelFocus]=useState<ReportExcelFocus|null>(null);
  const [replacement,setReplacement]=useState<{file:File;year:number;expectedVersion:string;previousName:string}|null>(null);
+ const [workbookReset,setWorkbookReset]=useState(0);
  const focusCounter=useRef(0);
  function viewExcelLocation(report:DriverReportSubmission){
   if(report.excel_status!=='applied'||!report.excel_sheet_name||!report.excel_row_number)return;
@@ -78,6 +79,7 @@ export function HqDriverReportInbox() {
    if(source){headers['X-Workbook-Replace-Version']=source.expectedVersion;headers['X-Workbook-Replace-Year']=String(source.year);}
    const result=await json('/api/hq/report-workbook',{method:'POST',headers,body:chosen});
    setReplacement(null);setExcelFocus(null);setSelected(null);setIsExpanded(false);
+   if(result.replacement)setWorkbookReset(value=>value+1);
    await refresh();
    setMessage(result.replacement
     ? `새 원본으로 교체했습니다. 이전 보고 ${result.replacement.archivedReports}건은 이전 장부에 보관되며, 새 채팅 보고는 새 Excel에 누적됩니다.`
@@ -109,7 +111,7 @@ export function HqDriverReportInbox() {
    <input ref={file} type="file" accept=".xlsx" className="hidden" aria-label="회사 Excel 원본 등록" onChange={e=>{
     const f=e.target.files?.[0];e.target.value='';if(!f)return;
     if(f.size>12*1024*1024){setMessage('Excel은 12MB 이하만 등록할 수 있습니다.');return;}
-    if(workbook)setReplacement({file:f,year:workbook.year,expectedVersion:workbook.active_version,previousName:workbook.filename});
+    if(workbook){setMessage('');setReplacement({file:f,year:workbook.year,expectedVersion:workbook.active_version,previousName:workbook.filename});}
     else void uploadWorkbook(f);
    }}/>
   </div>
@@ -127,7 +129,7 @@ export function HqDriverReportInbox() {
     </div>
    </details>}
 
-  {(workbook||excelFocus)&&<HqExcelWorkbookView key={workbook?.active_version??'no-book'} year={excelFocus?.year??workbook!.year} focus={excelFocus} onCommitted={refresh}/>}
+  {(workbook||excelFocus)&&<HqExcelWorkbookView key={workbookReset} year={excelFocus?.year??workbook!.year} focus={excelFocus} onCommitted={refresh}/>}
 
   {message&&<p role="status" className="rounded-xl bg-blue-50 p-3 text-sm text-slate-600">{message}</p>}
   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
@@ -241,6 +243,7 @@ export function HqDriverReportInbox() {
      <p className="mt-3 text-xs leading-5 text-slate-500">
       이전에 반영된 보고는 옛 장부에 보관하며, 새 원본에 다시 넣지 않습니다. 사모님 원본의 기존 기록 중복을 방지하기 위한 방식입니다.
      </p>
+     {message&&<p role="alert" className="mt-3 rounded-xl bg-slate-50 p-3 text-xs leading-5 text-slate-700">{message}</p>}
      <div className="mt-5 grid grid-cols-2 gap-2.5">
       <button type="button" disabled={busy} onClick={()=>setReplacement(null)}
        className="min-h-11 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">취소</button>
