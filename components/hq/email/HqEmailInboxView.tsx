@@ -902,7 +902,11 @@ export const HqEmailInboxView: React.FC<HqEmailInboxViewProps> = ({
     };
     saveEmailDraft(confirmedDraft);
     setDraftsByEmailId((prev) => ({ ...prev, [currentSummary.id]: confirmedDraft }));
-    if (!confirmedDraft.revisionMatchedScheduleId) setVehicleSlots(parseVehicleSlotsFromRequestedClass(confirmedDraft.requestedVehicleClass));
+    // Preserve the date×vehicle structure HQ just reviewed. Rebuilding from the
+    // AI's original vehicle request here silently drops manually added slots.
+    if (!batch && !confirmedDraft.revisionMatchedScheduleId) {
+      setVehicleSlots(parseVehicleSlotsFromRequestedClass(confirmedDraft.requestedVehicleClass));
+    }
     setWorkflowStep('step4_booking_confirmed');
   };
 
