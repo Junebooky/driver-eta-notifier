@@ -29,6 +29,12 @@ function normalizePayloadItem(raw: Record<string, any>, rootBody: Record<string,
     groupTotalVehicles: raw.groupTotalVehicles,
     groupVehicleIndex: raw.groupVehicleIndex,
     intakeSource: raw.intakeSource,
+    sourceEmailId: typeof raw.sourceEmailId === 'string' ? raw.sourceEmailId.slice(0, 160) : undefined,
+    sourceSenderEmail: typeof raw.sourceSenderEmail === 'string' ? raw.sourceSenderEmail.slice(0, 255) : undefined,
+    sourceMessageId: typeof raw.sourceMessageId === 'string' ? raw.sourceMessageId.slice(0, 255) : undefined,
+    sourceAttachmentHashes: Array.isArray(raw.sourceAttachmentHashes)
+      ? raw.sourceAttachmentHashes.filter((x: unknown) => typeof x === 'string' && /^[a-f0-9]{64}$/.test(x)).slice(0, 4)
+      : undefined,
     vehicleNo: raw.vehicleNo,
     vehicleId: raw.vehicleId,
     vehicleModel: raw.vehicleModel,
