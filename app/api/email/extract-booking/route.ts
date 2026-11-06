@@ -100,6 +100,7 @@ export async function POST(request: NextRequest) {
       subject,
       inReplyTo: sourceInReplyTo,
       references: sourceReferences,
+      attachmentHashes: attachments.map((file) => file.sha256),
       pickupDate: result.draft.pickupDate,
       passengerName: result.draft.passengerName,
     });
