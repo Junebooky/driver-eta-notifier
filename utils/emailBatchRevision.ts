@@ -203,6 +203,13 @@ export function buildEmailBatchRevisionApproval(
   const items: Array<Record<string, unknown>> = [];
   const counts = { new: 0, updated: 0, unchanged: 0, cancelled: 0 };
   const groupEventIds = new Set<string>();
+  const selectedEventIds = [...new Set(rows.map(row => row.previous?.eventId).filter((v): v is string => Boolean(v)))];
+  const sharedEventId = selectedEventIds.length === 1 ? selectedEventIds[0] : undefined;
+  const knownGroupsByDay = new Map<string, string>();
+  for (const row of rows) {
+    if (row.previous?.groupId && row.previous.pickupDate === row.date &&
+      !knownGroupsByDay.has(row.date)) knownGroupsByDay.set(row.date, row.previous.groupId);
+  }
 
   for (const row of rows) {
     if (!row.selection) throw new Error(`${row.date} ${row.index + 1}호차: 기존 예약 또는 신규 예약을 선택해 주세요.`);
@@ -243,8 +250,8 @@ export function buildEmailBatchRevisionApproval(
     const item: Record<string, unknown> = {
       ...base, scheduleId: existing?.scheduleId, expectedVersion: existing?.version,
       bookingNo: existing?.bookingNo || undefined,
-      eventId: existing?.eventId || base.eventId,
-      groupId: existing?.groupId || base.groupId,
+      eventId: existing?.eventId || sharedEventId || base.eventId,
+      groupId: existing?.groupId || knownGroupsByDay.get(row.date) || base.groupId,
       groupVehicleIndex: existing?.groupVehicleIndex || row.index + 1,
       groupTotalVehicles: slots.length,
       vehicleId: findVipVehicle(plate)?.uuid,
@@ -275,7 +282,8 @@ export function buildEmailBatchRevisionApproval(
       date: previous.pickupDate, endDate: previous.pickupDate,
       pickupTime: previous.pickupTime, endTime: previous.endTime,
       origin: previous.pickupLocation, destination: previous.destination,
-      routeWaypoints: previous.routeWaypoints.length >= 2 ? previous.routeWaypoints : undefined,
+      // Omit routeWaypoints: the server keeps the original itinerary even when
+      // legacy records contain missing/old-format waypoint dates.
       customerName: previous.customerName,
       passengerName: previous.passengerName, passengerCount: previous.passengerCount,
       vehiclePlate: previous.vehiclePlate, vehicleModel: previous.vehicleModel,
