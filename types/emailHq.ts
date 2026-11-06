@@ -55,11 +55,23 @@ export interface RouteWaypointItem {
   date?: string; // YYYY-MM-DD or MM/DD (e.g. "2026-10-28")
   time?: string; // HH:MM (e.g. "10:00")
   location: string; // e.g. "인천공항 제1터미널 (T1)"
-  address?: string; // Official TMAP address, only stored after the operator selects a POI.
+  address?: string; // Verified TMAP address, only populated after manual POI confirmation.
+  clientAddress?: string; // Address quoted verbatim from the client email; NEVER verified coordinates.
   lat?: number;
   lng?: number;
   isPoiConfirmed?: boolean;
   notes?: string;
+}
+
+export interface EmailFlightLeg {
+  flightNumber: string;
+  date: string; // Departure date shown in the client itinerary.
+  originAirport?: string;
+  destinationAirport?: string;
+  scheduledDeparture?: string; // Airport-local scheduled HH:mm from email.
+  scheduledArrival?: string;
+  passengers?: string[];
+  role?: 'arrival' | 'departure' | 'connection' | 'unknown';
 }
 
 export interface HqGroupTripItem {
@@ -92,6 +104,7 @@ export interface HqEmailExtractedDraft {
 
   // Actual Passenger Entity (Riding in the vehicle)
   passengerName: string;
+  passengerNames?: string[]; // All named riders, separate from the reservation coordinator.
   passengerPhone: string; // Strictly phone number or empty, NEVER email
   passengerCount: number;
 
@@ -112,6 +125,7 @@ export interface HqEmailExtractedDraft {
   pickupTime: string; // HH:MM
   pickupLocation: string;
   pickupAddress?: string; // Official verified TMAP address, never guessed by the AI.
+  pickupProvidedAddress?: string; // Unverified address from the client.
   pickupDetailNotes?: string; // Gate, floor, terminal notes
   pickupLat?: number;
   pickupLng?: number;
@@ -119,6 +133,7 @@ export interface HqEmailExtractedDraft {
 
   dropoffLocation: string;
   dropoffAddress?: string; // Official verified TMAP address, never guessed by the AI.
+  dropoffProvidedAddress?: string; // Unverified address from the client.
   dropoffDetailNotes?: string;
   dropoffLat?: number;
   dropoffLng?: number;
@@ -127,7 +142,8 @@ export interface HqEmailExtractedDraft {
   // Multiple destinations / itinerary waypoints (when schedule visits multiple locations in a day)
   waypoints?: RouteWaypointItem[];
 
-  flightNumber: string;
+  flightNumber: string; // Backward-compatible primary flight only.
+  flights?: EmailFlightLeg[]; // Every leg, including multiple arrivals and onward connections.
   requestedVehicleClass: string;
   specialRequests: string;
   /** Operator-approved language requirement, independent of free-text notes. */

@@ -6,6 +6,8 @@
 import { GoogleGenAI, Type } from '@google/genai';
 import { HqEmailExtractedDraft, EmailTripType } from '@/types/emailHq';
 import type { AnalyzedScheduleAttachment } from '@/services/emailAttachmentIntake';
+import type { EmailFlightLeg } from '@/types/emailHq';
+import { enrichBookingDraftWithEmailEvidence } from '@/utils/emailBookingEvidence';
 
 export interface ExtractBookingParams {
   emailId: string;
@@ -90,15 +92,28 @@ const BOOKING_RESPONSE_SCHEMA = {
     contactEmail: { type: Type.STRING },
     contactSource: { type: Type.STRING, enum: ['body', 'signature', 'from', 'reply-to'] },
     passengerName: { type: Type.STRING },
+    passengerNames: { type: Type.ARRAY, items: { type: Type.STRING } },
     passengerPhone: { type: Type.STRING },
     passengerCount: { type: Type.INTEGER },
     pickupDate: { type: Type.STRING },
     pickupTime: { type: Type.STRING },
     pickupLocation: { type: Type.STRING },
+    pickupProvidedAddress: { type: Type.STRING },
     pickupDetailNotes: { type: Type.STRING },
     dropoffLocation: { type: Type.STRING },
+    dropoffProvidedAddress: { type: Type.STRING },
     dropoffDetailNotes: { type: Type.STRING },
     flightNumber: { type: Type.STRING },
+    flights: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: {
+      flightNumber: { type: Type.STRING },
+      date: { type: Type.STRING },
+      originAirport: { type: Type.STRING },
+      destinationAirport: { type: Type.STRING },
+      scheduledDeparture: { type: Type.STRING },
+      scheduledArrival: { type: Type.STRING },
+      passengers: { type: Type.ARRAY, items: { type: Type.STRING } },
+      role: { type: Type.STRING, enum: ['arrival', 'departure', 'connection', 'unknown'] },
+    } } },
     requestedVehicleClass: { type: Type.STRING },
     specialRequests: { type: Type.STRING },
     tripType: { type: Type.STRING, enum: ['single', 'group', 'modification', 'cancellation'] },
@@ -111,6 +126,7 @@ const BOOKING_RESPONSE_SCHEMA = {
           date: { type: Type.STRING },
           time: { type: Type.STRING },
           location: { type: Type.STRING },
+          clientAddress: { type: Type.STRING },
           notes: { type: Type.STRING },
         },
       },
@@ -288,12 +304,16 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
    - "contactPhone": Coordinator's phone only. MUST NEVER CONTAIN AN EMAIL ADDRESS!
    - "contactEmail": Coordinator's email address.
    - "contactSource": "body" | "signature" | "from" | "reply-to".
-   - "passengerName": Actual VIP guest riding in the car. Distinguish from coordinator!
+   - "passengerName": First/main VIP guest riding in the car, never the coordinator.
+   - "passengerNames": EVERY named rider. For "Pick up Mr. A, B, C from ..." extract all three exact names; never drop B or C.
    - "passengerPhone": Actual VIP passenger phone only. MUST NEVER CONTAIN AN EMAIL ADDRESS!
    - "passengerCount": Number of passengers (integer). For partial modifications with no count mentioned, return 0 (unknown); for new bookings only, default 1.
 3. LOCATIONS FOR TMAP POI SEARCH & ITINERARY:
+   - "pickupProvidedAddress": Customer-given pickup road address if present, original exact text. No invented POI coordinates.
+   - "dropoffProvidedAddress": Customer-given final destination road address if present, original exact text.
    - "pickupLocation": Initial departure location clean name for TMAP search (e.g. "인천공항 제1터미널 (T1)", "김포공항 국제선", "조선팰리스 호텔", "신라호텔"). Do not include gate/floor here.
    - "pickupDetailNotes": Floor, gate, terminal details (e.g. "3층 출국장 7번 게이트 앞", "로비 1층").
+   - Use Korean names for TMAP search (Conrad Seoul -> 콘래드 서울, Samsung Fire -> 삼성화재). Preserve the client's original road address separately; never invent a street.
    - "dropoffLocation": Final destination clean name for TMAP search.
    - "dropoffDetailNotes": Floor, building, dropoff zone details.
    - "waypoints": If the client email contains a multi-stop daily schedule or multi-day itinerary (e.g. 1-day multi-stop or 2~5 day itinerary with intermediate dates), extract EVERY stop in chronological order with:
@@ -303,21 +323,26 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
        - If all stops are on the same single day, set "date" to the pickupDate for all waypoints.
      * "time": Stop time (HH:MM 24h format, e.g. "10:00").
      * "location": Clean place or landmark name for TMAP search (do not include floor/gate).
-     * "notes": Optional floor, gate, or stop note.
+     * "clientAddress": EXACT original road/street address written in the email, if present. It must not be lost or replaced with a landmark name.
+     * "notes": Arrival/pickup vs departure timing, standby, floor, and gate instructions.
+     * If "16:30 Head to Incheon Airport" appears, 16:30 is DEPARTURE FROM THE PREVIOUS STOP, NOT arrival at the airport. Leave airport arrival time empty and preserve departure as a note on the previous stop. "17:30 Head back to Conrad" likewise does not mean arrival at Conrad at 17:30. Preserve "13:15 Head to POBA" as departure; POBA appointment time is 14:00.
+     * If a location is TBA, never infer a venue or address.
      If the email is for a simple 1-leg trip (single departure to destination), "waypoints" can be empty or omitted.
    - "groupTrips": If the email contains multiple distinct vehicle dispatches or passenger sub-schedules for a group or event (e.g. Car 1: Mr. Kim, Incheon -> Conrad 10:00; Car 2: Mr. Lee, Gimpo -> Josun Palace 11:00), extract each sub-trip into "groupTrips" with passengerName, pickupLocation, dropoffLocation, pickupTime, vehicleClass, and notes. Also set "tripType": "group".
 4. DATE & TIME:
    - "pickupDate": Primary departure date in YYYY-MM-DD format. (For multi-day trips, this is the first day).
    - "pickupTime": HH:MM (24-hour format).
 5. FLIGHT & VEHICLE:
-   - "flightNumber": e.g. "KE082", "AF264". If not an airport trip, return "".
+   - "flightNumber": BACKWARD COMPATIBILITY ONLY: first leg code.
+   - "flights": MUST list EVERY flight leg with number, departure date, IATA origin and destination, local departure and arrival HH:mm if shown, associated passengers, role ("arrival"/"departure"/"connection"). Two arrival flights KE2104 and NH867 are separate records even when they share one vehicle. Record onward connecting AS34 separately, NOT as a ground pickup. Never drop extra flights because flightNumber already has a value.
    - "requestedVehicleClass": Vehicle model and quantity if mentioned (e.g. "스타리아 리무진 1대", "카니발 2대", "스프린터 1대, G90 1대"). If unspecified or unclear, return "".
-   - "specialRequests": VIP requests, picket board text, water/amenities, driver language preferences (e.g. "영어 가능 기사님 희망"). Do not create luggage field.
+   - "specialRequests": Preserve ALL specific requirements, including same driver on every date, driver information deadline, Meet & Greet, standby, language, signage, and client handover instructions. Do not create luggage field.
 6. REVISIONS AND DOCUMENTS:
    - Infer tripType=modification when the sender requests changes to an earlier reservation, regardless of whether sender differs.
    - revisionScope: full ONLY if sender explicitly supplies a complete replacement itinerary; partial if individual fields/stops are adjusted; otherwise unknown.
    - Never delete stops simply because a partial email or attachment did not mention them.
    - Give dates and times exactly as provided. Do not invent addresses, coordinates or driver assignments.
+   - Customer-supplied road addresses must survive as clientAddress on the correct dated stop and remain unverified until TMAP selection.
    - If body and attachment conflict, favor explicit newer revision wording and leave a warning-worthy field blank if unclear.
 7. MANDATORY HUMAN DISPATCH:
    - "assignedDriver": null (AI must never assign drivers).
@@ -396,14 +421,17 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
         ? parsed.contactSource
         : undefined) as 'body' | 'signature' | 'from' | 'reply-to' | undefined,
       passengerName: String(parsed.passengerName || ''),
+      passengerNames: Array.isArray(parsed.passengerNames) ? parsed.passengerNames.map(String) : undefined,
       passengerPhone: cleanPhone(parsed.passengerPhone),
       passengerCount: typeof parsed.passengerCount === 'number' && Number.isInteger(parsed.passengerCount) && parsed.passengerCount > 0 ? parsed.passengerCount : parsed.tripType === 'modification' ? 0 : 1,
       pickupDate: String(parsed.pickupDate || ''),
       pickupTime: String(parsed.pickupTime || ''),
       pickupLocation: String(parsed.pickupLocation || ''),
+      pickupProvidedAddress: String(parsed.pickupProvidedAddress || '') || undefined,
       pickupDetailNotes: String(parsed.pickupDetailNotes || ''),
       isPickupPoiConfirmed: false,
       dropoffLocation: String(parsed.dropoffLocation || ''),
+      dropoffProvidedAddress: String(parsed.dropoffProvidedAddress || '') || undefined,
       dropoffDetailNotes: String(parsed.dropoffDetailNotes || ''),
       isDropoffPoiConfirmed: false,
       flightNumber: String(parsed.flightNumber || ''),
@@ -441,6 +469,7 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
                 time: String(wp.time || ''),
                 location: String(wp.location || ''),
                 notes: wp.notes ? String(wp.notes) : undefined,
+                clientAddress: wp.clientAddress ? String(wp.clientAddress) : undefined,
               };
             });
           })()
@@ -465,6 +494,22 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
       updatedAt: new Date().toISOString(),
     };
 
+    const parsedFlights: EmailFlightLeg[] = Array.isArray(parsed.flights)
+      ? parsed.flights.filter((flight: any) => typeof flight?.flightNumber === 'string' && /^[A-Z0-9]{2}\s?\d{2,4}$/i.test(flight.flightNumber)).map((flight: any) => ({
+          flightNumber: String(flight.flightNumber).replace(/\s/g, '').toUpperCase(),
+          date: String(flight.date || draft.pickupDate),
+          originAirport: String(flight.originAirport || '').toUpperCase(),
+          destinationAirport: String(flight.destinationAirport || '').toUpperCase(),
+          scheduledDeparture: String(flight.scheduledDeparture || ''),
+          scheduledArrival: String(flight.scheduledArrival || ''),
+          passengers: Array.isArray(flight.passengers) ? flight.passengers.map(String) : [],
+          role: ['arrival', 'departure', 'connection', 'unknown'].includes(String(flight.role))
+            ? flight.role : 'unknown',
+        }))
+      : [];
+    // Repair model omissions using only evidence explicitly present in the email.
+    const evidenceDraft = enrichBookingDraftWithEmailEvidence(draft, cleanBody, parsedFlights);
+
     const usage = response.usageMetadata;
     const inputTokens = usage?.promptTokenCount || 0;
     const outputTokens = usage?.candidatesTokenCount || 0;
@@ -472,7 +517,7 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
 
     return {
       ok: true,
-      draft,
+      draft: evidenceDraft,
       rawJson: rawText,
       metrics: {
         totalMs,

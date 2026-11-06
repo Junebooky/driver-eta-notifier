@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MapPin, Flag, Loader2, X, Navigation, CheckCircle2 } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
+import { addressHintToTmapQuery } from '@/utils/emailBookingEvidence';
 import {
   sanitizeSearchQuery,
   getCachedTmapPoisClient,
@@ -32,6 +33,7 @@ export interface HqPlaceSearchInputProps {
   tone?: 'default' | 'neutral';
   disabled?: boolean;
   autoSearch?: boolean; // When true, runs search and expands candidates for AI-extracted values
+  addressHint?: string; // Exact address in client email, used for search only, not verification.
   isConfirmed?: boolean;
   onConfirmStateChange?: (confirmed: boolean) => void;
 }
@@ -49,6 +51,7 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
   tone = 'default',
   disabled = false,
   autoSearch = false,
+  addressHint,
   isConfirmed = false,
   onConfirmStateChange,
 }) => {
@@ -104,7 +107,10 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
       return;
     }
 
-    const cleanQuery = sanitizeSearchQuery(trimmed);
+    // The customer's exact address is stronger evidence than a generic company name.
+    // When the user types manually, their current text takes priority.
+    const preferAddress = Boolean(addressHint?.trim() && !isUserTypingRef.current && !isConfirmed);
+    const cleanQuery = sanitizeSearchQuery(preferAddress ? addressHintToTmapQuery(addressHint!) : trimmed);
 
     // Instant unified in-memory cache check
     const cached = getCachedTmapPoisClient(cleanQuery, 37.5665, 126.9780);
@@ -128,11 +134,14 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
       abortControllerRef.current = controller;
 
       try {
-        const pois = await searchTmapPoisClient(cleanQuery, {
+        let pois = await searchTmapPoisClient(cleanQuery, {
           lat: 37.5665,
           lng: 126.9780,
           signal: controller.signal,
         });
+        if (!pois.length && preferAddress) {
+          pois = await searchTmapPoisClient(sanitizeSearchQuery(trimmed), { lat: 37.5665, lng: 126.9780, signal: controller.signal });
+        }
         setSearchResults(pois);
         if (!isConfirmed) {
           setIsDropdownOpen(pois.length > 0);
@@ -156,7 +165,7 @@ export const HqPlaceSearchInput: React.FC<HqPlaceSearchInputProps> = ({
         abortControllerRef.current.abort();
       }
     };
-  }, [value, autoSearch, isConfirmed]);
+  }, [value, autoSearch, isConfirmed, addressHint]);
 
   const handleSelectPoi = useCallback(
     (poi: PoiResult) => {
