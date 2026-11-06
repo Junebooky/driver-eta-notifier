@@ -97,7 +97,7 @@ export function HqEmailBatchRevisionPanel({
         <span>신규 <strong className="font-semibold text-[#243449]">{additions}</strong></span>
         <span>수정 <strong className="font-semibold text-[#243449]">{updates}</strong></span>
         <span>변경 없음 <strong className="font-semibold text-[#243449]">{unchanged}</strong></span>
-        {skipped > 0 && <span>운행 없음 <strong className="font-semibold text-[#243449]">{skipped}</strong></span>
+        {skipped > 0 && <span>운행 없음 <strong className="font-semibold text-[#243449]">{skipped}</strong></span>}
         <span>미선택 <strong className="font-semibold text-[#243449]">{pending}</strong></span>
         {cancelIds.length > 0 && <span>취소 예정 <strong className="font-semibold text-[#243449]">{cancelIds.length}</strong></span>}
       </div>
