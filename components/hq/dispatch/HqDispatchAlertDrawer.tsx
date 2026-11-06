@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { CustomerNotificationTrigger } from '@/types/hq';
 import { UnackEscalationAlert } from '@/utils/unackAlertEngine';
+import { DispatchRouteTimeline } from '@/components/common/DispatchRouteTimeline';
 import { haptics } from '@/utils/haptics';
 
 interface HqDispatchAlertDrawerProps {
@@ -169,15 +170,24 @@ function AlertItemCard({
           </span>
         </div>
 
-        {/* Row 2: 구간 */}
-        <div className="flex items-center text-xs sm:text-sm min-w-0">
-          <MapPin className="w-4 h-4 text-slate-500 shrink-0" />
-          <span className="font-medium text-slate-600 ml-2 w-14 shrink-0">구간</span>
-          <span className="text-slate-300 mx-2 shrink-0 select-none">|</span>
-          <span className="font-semibold text-slate-800 truncate">
-            {item.pickupLocation} → {item.destination}
-          </span>
-        </div>
+        {/* Full chronological itinerary for multi-stop dispatches; legacy two-stop schedules keep their existing row. */}
+        {item.routeWaypoints && item.routeWaypoints.length > 2 ? (
+          <DispatchRouteTimeline
+            waypoints={item.routeWaypoints}
+            heading="전체 운행 경로"
+            compact
+            className="rounded-xl bg-white px-3 py-3"
+          />
+        ) : (
+          <div className="flex items-center text-xs sm:text-sm min-w-0">
+            <MapPin className="w-4 h-4 text-slate-500 shrink-0" />
+            <span className="font-medium text-slate-600 ml-2 w-14 shrink-0">구간</span>
+            <span className="text-slate-300 mx-2 shrink-0 select-none">|</span>
+            <span className="font-semibold text-slate-800 truncate">
+              {item.pickupLocation} → {item.destination}
+            </span>
+          </div>
+        )}
 
         {/* Row 3: 차량/기사 */}
         <div className="flex items-center text-xs sm:text-sm min-w-0">
