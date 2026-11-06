@@ -669,11 +669,6 @@ function HqDashboardInner({ representativeMode }: { representativeMode: boolean 
           onOpenDriverVehicleInfo={(booking) => {
             setInfoModalBooking(booking);
           }}
-          onOpenDetailModal={(booking) => {
-            setSelectedBooking(booking);
-            setBookingModalSection('details');
-            setIsDetailModalOpen(true);
-          }}
         />
       )}
 
