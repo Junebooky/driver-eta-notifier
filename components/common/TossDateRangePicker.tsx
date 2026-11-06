@@ -19,6 +19,8 @@ interface TossDateRangePickerProps {
   containerClassName?: string;
   heightClass?: string;
   disabled?: boolean;
+  align?: 'left' | 'right';
+  customTrigger?: (displayLabel: string, isOpen: boolean) => React.ReactNode;
 }
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -61,6 +63,8 @@ export const TossDateRangePicker: React.FC<TossDateRangePickerProps> = ({
   containerClassName = '',
   heightClass = 'h-11 sm:h-12',
   disabled = false,
+  align = 'left',
+  customTrigger,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -209,40 +213,67 @@ export const TossDateRangePicker: React.FC<TossDateRangePickerProps> = ({
 
   return (
     <div className={`relative ${containerClassName}`} ref={containerRef}>
-      {label && (
-        <label className="block text-xs font-bold text-slate-800 mb-1.5">
-          {label} {required && <span className="text-red-500 font-bold ml-0.5">*</span>}
-        </label>
-      )}
+      {customTrigger ? (
+        <div
+          role="button"
+          tabIndex={disabled ? -1 : 0}
+          onClick={() => {
+            if (disabled) return;
+            haptics.lightTap();
+            setIsOpen((prev) => !prev);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              if (!disabled) setIsOpen((prev) => !prev);
+            }
+          }}
+          className={disabled ? 'opacity-60 pointer-events-none' : ''}
+        >
+          {customTrigger(displayLabel, isOpen)}
+        </div>
+      ) : (
+        <>
+          {label && (
+            <label className="block text-xs font-bold text-slate-800 mb-1.5">
+              {label} {required && <span className="text-red-500 font-bold ml-0.5">*</span>}
+            </label>
+          )}
 
-      {/* Trigger Button */}
-      <div
-        role="button"
-        tabIndex={disabled ? -1 : 0}
-        onClick={() => {
-          if (disabled) return;
-          haptics.lightTap();
-          setIsOpen((prev) => !prev);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            if (!disabled) setIsOpen((prev) => !prev);
-          }
-        }}
-        className={`w-full ${heightClass} bg-white border border-slate-200 hover:border-blue-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 rounded-xl px-3.5 flex items-center gap-2.5 transition-all cursor-pointer shadow-2xs select-none ${
-          disabled ? 'opacity-60 pointer-events-none' : ''
-        }`}
-      >
-        <CalendarIcon className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600 shrink-0" />
-        <span className="text-xs sm:text-sm font-bold text-slate-900 truncate flex-1">
-          {displayLabel}
-        </span>
-      </div>
+          {/* Trigger Button */}
+          <div
+            role="button"
+            tabIndex={disabled ? -1 : 0}
+            onClick={() => {
+              if (disabled) return;
+              haptics.lightTap();
+              setIsOpen((prev) => !prev);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                if (!disabled) setIsOpen((prev) => !prev);
+              }
+            }}
+            className={`w-full ${heightClass} bg-white border border-slate-200 hover:border-blue-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 rounded-xl px-3.5 flex items-center gap-2.5 transition-all cursor-pointer shadow-2xs select-none ${
+              disabled ? 'opacity-60 pointer-events-none' : ''
+            }`}
+          >
+            <CalendarIcon className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600 shrink-0" />
+            <span className="text-xs sm:text-sm font-bold text-slate-900 truncate flex-1">
+              {displayLabel}
+            </span>
+          </div>
+        </>
+      )}
 
       {/* Toss-Style Calendar Popover (Clean White) */}
       {isOpen && (
-        <div className="absolute left-0 sm:left-auto right-auto sm:right-0 top-full mt-2 z-50 w-[310px] sm:w-[332px] rounded-2xl bg-white border border-slate-200 shadow-xl p-4 animate-in fade-in zoom-in-95 duration-150">
+        <div
+          className={`absolute ${
+            align === 'right' ? 'right-0 left-auto' : 'left-0 right-auto'
+          } top-full mt-2 z-50 w-[310px] sm:w-[332px] rounded-2xl bg-white border border-slate-200 shadow-xl p-4 animate-in fade-in zoom-in-95 duration-150`}
+        >
           {/* Header Bar */}
           <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-100">
             <span className="text-base font-extrabold text-slate-900 tracking-tight">

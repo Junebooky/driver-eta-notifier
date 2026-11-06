@@ -20,6 +20,7 @@ import {
   AlertTriangle,
   FileText,
   Calendar,
+  CalendarCheck,
   Clock,
   MapPin,
   Flag,
@@ -30,6 +31,8 @@ import {
   MessageSquareText,
   ExternalLink,
   Image as ImageIcon,
+  ArrowRight,
+  ChevronRight,
 } from 'lucide-react';
 import { HqBooking } from '@/types/hq';
 import { DispatchRouteTimeline } from '@/components/common/DispatchRouteTimeline';
@@ -40,6 +43,8 @@ import {
   mapVehicleToUiCategory,
   getVehicleImage,
 } from '@/utils/vehicleData';
+import { HqVehicleSelectModal, getVerifiedVehiclePhoto } from './email/HqVehicleSelectModal';
+import { HqDriverSelectModal } from './email/HqDriverSelectModal';
 import { INITIAL_HQ_CUSTOMERS } from '@/utils/customerHqData';
 import { HqCustomer } from '@/types/customerHq';
 import {
@@ -122,6 +127,20 @@ export const DEFAULT_TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
   return `${String(h).padStart(2, '0')}:${m}`;
 });
 export const POPULAR_TIMES = DEFAULT_TIME_OPTIONS;
+
+export function formatDisplayDateWithDay(isoDate: string): string {
+  if (!isoDate) return '-';
+  const clean = normalizeDateToIso(isoDate) || isoDate;
+  const parts = clean.split('-').map(Number);
+  if (parts.length < 3 || isNaN(parts[0]) || isNaN(parts[1]) || isNaN(parts[2])) return isoDate;
+  const d = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+  const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+  const dayName = dayNames[d.getUTCDay()];
+  const y = String(parts[0]);
+  const m = String(parts[1]).padStart(2, '0');
+  const day = String(parts[2]).padStart(2, '0');
+  return `${y}. ${m}. ${day} (${dayName})`;
+}
 
 /**
  * Parses user flexible time input into 24h "HH:mm" format.
@@ -432,6 +451,12 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
   const [vehicleCategoryFilter, setVehicleCategoryFilter] = useState<'all' | 'sedan' | 'suv' | 'van' | 'sprinter'>('all');
   const [driverSearchQuery, setDriverSearchQuery] = useState('');
   const activeCardDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Sub-modal and inline editor states for Edit/Detail mode
+  const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
+  const [isDriverModalOpen, setIsDriverModalOpen] = useState(false);
+  const [isEditingDateTime, setIsEditingDateTime] = useState(false);
+  const [isEditingRoute, setIsEditingRoute] = useState(false);
 
   // Allocations (1 to N vehicles)
   const [allocations, setAllocations] = useState<VehicleAllocationItem[]>(() => {
@@ -1208,9 +1233,21 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
   const driverSmsHref = initialBooking && ['배차 완료', '재확인 필요'].includes(initialBooking.dispatchStatus)
     ? driverDispatchSmsHref(initialBooking) : null;
 
+  const firstAlloc = allocations[0];
+  const currentVehiclePlate = firstAlloc?.selectedVehiclePlate || initialBooking?.vehiclePlate || '';
+  const currentVehicleModel = firstAlloc?.selectedVehicleModel || initialBooking?.vehicleModel || '';
+  const currentVehiclePhoto = getVerifiedVehiclePhoto(currentVehiclePlate);
+  const currentDriverId = firstAlloc?.selectedDriver || initialBooking?.driverId || initialBooking?.driverName || '';
+  const currentDriverObj = allDrivers.find(
+    (d) => d.id === currentDriverId || d.name === currentDriverId
+  );
+  const currentDriverName = currentDriverObj?.name || initialBooking?.driverName || '기사 미배정';
+  const currentDriverPhone = currentDriverObj?.phone || initialBooking?.driverPhone || '010-0000-0000';
+  const currentDriverAvatar = currentDriverObj?.avatarUrl || getDriverProfileImage({ name: currentDriverName });
+
   const content = (
     <div
-      className={`@container bg-white select-none flex flex-col justify-between ${isModal
+      className={`@container ${initialBooking ? 'bg-transparent' : 'bg-white'} select-none flex flex-col justify-between ${isModal
         ? 'w-full'
         : 'border border-slate-200/90 rounded-[24px] p-5 sm:p-6 shadow-[0_10px_30px_rgba(0,0,0,0.04)]'
         }`}
@@ -1218,13 +1255,19 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
       <div>
         {/* 1. Header */}
         <div className="flex items-center justify-between gap-3 pb-3.5 border-b border-slate-100">
-          <div className="flex items-center gap-3 min-w-0">
-            <img
-              src="/images/icons/reservations/icon_reservations.png"
-              alt="빠른 예약 · 배차"
-              className="w-11 h-11 sm:w-12 sm:h-12 object-contain shrink-0 select-none"
-              draggable={false}
-            />
+          <div className="flex items-center gap-2.5 min-w-0">
+            {initialBooking ? (
+              <div className="w-8 h-8 rounded-xl bg-[#EBF2FE] text-[#1E60F3] flex items-center justify-center shrink-0">
+                <CalendarCheck className="w-5 h-5 text-[#1E60F3]" />
+              </div>
+            ) : (
+              <img
+                src="/images/icons/reservations/icon_reservations.png"
+                alt="빠른 예약 · 배차"
+                className="w-11 h-11 sm:w-12 sm:h-12 object-contain shrink-0 select-none"
+                draggable={false}
+              />
+            )}
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight">
@@ -1246,62 +1289,62 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                 haptics.lightTap();
                 onClose();
               }}
-              className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 active:scale-95 flex items-center justify-center text-slate-500 hover:text-slate-800 cursor-pointer transition-colors shrink-0"
+              className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 active:scale-95 flex items-center justify-center text-slate-500 hover:text-slate-800 cursor-pointer transition-colors shrink-0"
               aria-label="닫기"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
           )}
         </div>
 
-        {/* Connected Booking Action & Status Bar (Only in Edit/Row-Click Mode) */}
-        {initialBooking && (
-          <div className="mt-3 mb-2 rounded-2xl bg-slate-50/80 border border-slate-200/90 p-3.5 sm:p-4 shadow-2xs space-y-3">
-            {/* Top Row: Identity and Real-time Statuses */}
-            <div className="flex flex-col gap-1.5 pb-2.5 border-b border-slate-200/70">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="text-xs sm:text-sm font-black text-slate-900 truncate">
-                    {initialBooking.customerName}
-                  </span>
-                  {initialBooking.passengerName && initialBooking.passengerName !== initialBooking.customerName && (
-                    <span className="text-xs text-slate-500 font-semibold truncate">
-                      · {initialBooking.passengerName}
+        {initialBooking ? (
+          <div className="space-y-3 mt-3">
+            {/* Card 1: Customer & Status Summary */}
+            <div className="bg-white rounded-2xl border border-slate-100/90 shadow-2xs p-4 sm:p-5 space-y-2.5">
+              <div className="flex items-center justify-between gap-3">
+                {/* Customer & Passenger */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-base sm:text-lg font-black text-slate-900 uppercase tracking-tight">
+                      {customerName || initialBooking.customerName}
                     </span>
-                  )}
+                    {(commonPassengerName || initialBooking.passengerName) && (
+                      <>
+                        <span className="text-slate-300 font-bold">·</span>
+                        <span className="text-sm sm:text-base font-semibold text-slate-700">
+                          {commonPassengerName || initialBooking.passengerName}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  {/* Subtitle / Meta Line */}
+                  <div className="text-xs text-slate-500 font-medium mt-1 truncate">
+                    기사 {currentDriverName} · 차량 {currentVehiclePlate}
+                    {currentVehicleModel ? ` (${stripManufacturerName(currentVehicleModel)})` : ''}
+                    {initialBooking.driverAckTime && ` · 확인 ${initialBooking.driverAckTime}`}
+                  </div>
                 </div>
 
+                {/* Badges on the right */}
                 <div className="flex items-center gap-1.5 shrink-0">
-                  {/* 배차 상태 Badge */}
-                  <span
-                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-extrabold ${initialBooking.dispatchStatus === '배차 완료'
-                      ? 'bg-[#1E60F3] text-white'
-                      : initialBooking.dispatchStatus === '재확인 필요'
-                        ? 'bg-indigo-600 text-white'
-                        : initialBooking.dispatchStatus === '취소'
-                          ? 'bg-slate-200 text-slate-600 line-through'
-                          : 'bg-amber-100 text-amber-800 border border-amber-300'
-                      }`}
-                  >
-                    <span>{initialBooking.dispatchStatus}</span>
-                    {initialBooking.version && initialBooking.version > 1 && (
-                      <span className="text-[10px] opacity-80 font-mono">v{initialBooking.version}</span>
-                    )}
+                  {/* 배차 완료 Badge */}
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#1E60F3] text-white shadow-2xs">
+                    {initialBooking.dispatchStatus || '배차 완료'}
                   </span>
-
                   {/* 기사 확인 현황 Badge */}
                   <span
-                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-bold ${initialBooking.driverAck === '확인완료'
-                      ? 'bg-white text-slate-700 border border-slate-200/90'
-                      : initialBooking.driverAck === '재확인 필요'
-                        ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                        : 'bg-amber-50 text-amber-800 border border-amber-200'
-                      }`}
+                    className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border ${
+                      initialBooking.driverAck === '확인완료'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : initialBooking.driverAck === '재확인 필요'
+                          ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                          : 'bg-amber-50 text-amber-800 border-amber-200'
+                    }`}
                   >
                     {initialBooking.driverAck === '확인완료' ? (
-                      <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                     ) : (
-                      <Clock className="w-3 h-3 text-amber-600 shrink-0" />
+                      <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                     )}
                     <span>
                       {initialBooking.driverAck === '확인완료'
@@ -1314,110 +1357,442 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                 </div>
               </div>
 
-              {/* Assigned Driver & Vehicle Compact Meta Line */}
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold text-slate-600">
-                <span>
-                  기사 <strong className="font-extrabold text-slate-800">{initialBooking.driverName && initialBooking.driverName !== '-' ? initialBooking.driverName : '미배정'}</strong>
-                </span>
-                <span className="text-slate-300">·</span>
-                <span>
-                  차량{' '}
-                  <strong className="font-extrabold text-slate-800">
-                    {initialBooking.vehiclePlate && initialBooking.vehiclePlate !== '미배정'
-                      ? `${initialBooking.vehiclePlate} (${stripManufacturerName(initialBooking.vehicleModel)})`
-                      : '미배정'}
-                  </strong>
-                </span>
-                {initialBooking.driverAckTime && (
-                  <>
-                    <span className="text-slate-300">·</span>
-                    <span className="text-[11px] text-slate-400 font-medium">
-                      확인 {initialBooking.driverAckTime}
-                    </span>
-                  </>
-                )}
-              </div>
+              {/* Quick Action Buttons Row */}
+              {(onOpenCustomerMessage || onOpenDriverVehicleInfo || driverSmsHref || onRemindDriver) && (
+                <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100">
+                  {onOpenCustomerMessage && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        haptics.lightTap();
+                        onOpenCustomerMessage(initialBooking);
+                      }}
+                      className="h-8 px-2.5 rounded-lg text-xs font-bold bg-[#1E60F3] hover:bg-blue-600 text-white transition-all inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs active:scale-95 whitespace-nowrap"
+                    >
+                      <MessageSquareText className="w-3 h-3 shrink-0" />
+                      <span>안내 문자</span>
+                    </button>
+                  )}
+                  {onOpenDriverVehicleInfo && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        haptics.lightTap();
+                        onOpenDriverVehicleInfo(initialBooking);
+                      }}
+                      className="h-8 px-2.5 rounded-lg text-xs font-bold bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 transition-all inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs active:scale-95 whitespace-nowrap"
+                    >
+                      <ImageIcon className="w-3 h-3 text-[#1E60F3] shrink-0" />
+                      <span>배차 카드</span>
+                    </button>
+                  )}
+                  {driverSmsHref && (
+                    <a
+                      href={driverSmsHref}
+                      className="h-8 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 transition-all inline-flex items-center justify-center gap-1.5 shadow-2xs active:scale-95 whitespace-nowrap"
+                    >
+                      <MessageSquareText className="w-3 h-3 text-slate-500 shrink-0" />
+                      <span>기사 문자</span>
+                    </a>
+                  )}
+                  {onRemindDriver && (
+                    <button
+                      type="button"
+                      onClick={handleRemindClick}
+                      disabled={isReminding}
+                      className={`h-8 px-2.5 rounded-lg text-xs font-bold transition-all inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs active:scale-95 whitespace-nowrap ${
+                        remindSuccess
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'
+                      }`}
+                    >
+                      <BellRing className={`w-3 h-3 shrink-0 ${isReminding ? 'animate-bounce text-[#1E60F3]' : 'text-slate-500'}`} />
+                      <span>{remindSuccess ? '요청 완료' : isReminding ? '요청 중' : '재요청'}</span>
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
-            {/* Bottom Row: Unified Minimal Action Buttons */}
-            <div className="flex flex-wrap items-center gap-1.5">
-              {/* 1. 고객 안내 문자 */}
-              {onOpenCustomerMessage && (
+            {/* Card 2: 출발일 · 출발 시간 · 종료 시간 (3 columns) */}
+            <div className="bg-white rounded-2xl border border-slate-100/90 shadow-2xs grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 overflow-hidden">
+              {/* Col 1: 출발일 */}
+              <TossDateRangePicker
+                align="left"
+                startDate={pickupDate}
+                endDate={pickupEndDate}
+                onChangeRange={(start, end) => {
+                  setPickupDate(start);
+                  setPickupEndDate(end);
+                }}
+                customTrigger={() => (
+                  <div className="flex items-center gap-3 p-4 sm:p-5 hover:bg-slate-50/70 transition-colors cursor-pointer select-none">
+                    <Calendar className="w-5 h-5 text-slate-400 shrink-0" />
+                    <div>
+                      <div className="text-xs text-slate-400 font-medium">출발일</div>
+                      <div className="text-sm sm:text-base font-bold text-slate-800 tracking-tight">
+                        {formatDisplayDateWithDay(pickupDate)}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              />
+
+              {/* Col 2: 출발 시간 (Identical <input type="time"> native picker) */}
+              <label className="relative flex items-center gap-3 p-4 sm:p-5 hover:bg-slate-50/70 transition-colors cursor-pointer select-none">
+                <Clock className="w-5 h-5 text-slate-400 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs text-slate-400 font-medium">출발 시간</div>
+                  <div className="text-sm sm:text-base font-bold text-slate-800 tracking-tight">
+                    {timeInputText || formatTimeKoreanAmPm(pickupTimeOnly)}
+                  </div>
+                </div>
+                <input
+                  type="time"
+                  value={pickupTimeOnly}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setPickupTimeOnly(val);
+                    setTimeInputText(formatTimeKoreanAmPm(val));
+                  }}
+                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                  aria-label="출발 시간 선택"
+                />
+              </label>
+
+              {/* Col 3: 종료 시간 (Identical <input type="time"> native picker) */}
+              <label className="relative flex items-center gap-3 p-4 sm:p-5 hover:bg-slate-50/70 transition-colors cursor-pointer select-none">
+                <Clock className="w-5 h-5 text-slate-400 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs text-slate-400 font-medium">종료 시간</div>
+                  <div className="text-sm sm:text-base font-bold text-slate-800 tracking-tight">
+                    {endTime ? formatTimeKoreanAmPm(endTime) : '오후 09:00'}
+                  </div>
+                </div>
+                <input
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                  aria-label="종료 시간 선택"
+                />
+              </label>
+            </div>
+
+            {/* Card 3: 배정 차량 · 담당 기사 (2 columns) */}
+            <div className="bg-white rounded-2xl border border-slate-100/90 shadow-2xs grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 overflow-hidden">
+              {/* Col 1: 배정 차량 */}
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.lightTap();
+                  setIsVehicleModalOpen(true);
+                }}
+                className="flex items-center gap-3.5 p-4 sm:p-5 hover:bg-slate-50/70 transition-colors cursor-pointer text-left w-full group"
+              >
+                <div className="w-14 h-9 relative shrink-0 flex items-center justify-center bg-slate-50 rounded-lg p-0.5 border border-slate-100 group-hover:border-blue-200 transition-colors">
+                  <img
+                    src={currentVehiclePhoto}
+                    alt=""
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs text-slate-400 font-medium">배정 차량</div>
+                  <div className="text-sm sm:text-base font-bold text-slate-800 tracking-tight truncate">
+                    {currentVehiclePlate && currentVehiclePlate !== '미배정'
+                      ? `${currentVehicleModel} · ${currentVehiclePlate}`
+                      : '차량 선택'}
+                  </div>
+                </div>
+              </button>
+
+              {/* Col 2: 담당 기사 */}
+              <button
+                type="button"
+                onClick={() => {
+                  haptics.lightTap();
+                  setIsDriverModalOpen(true);
+                }}
+                className="flex items-center gap-3.5 p-4 sm:p-5 hover:bg-slate-50/70 transition-colors cursor-pointer text-left w-full group"
+              >
+                <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 border border-slate-200 bg-slate-100 group-hover:border-blue-300 transition-colors">
+                  <img
+                    src={currentDriverAvatar}
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs text-slate-400 font-medium">담당 기사</div>
+                  <div className="text-sm sm:text-base font-bold text-slate-800 tracking-tight truncate">
+                    {currentDriverName && currentDriverName !== '미배정'
+                      ? `${currentDriverName} · ${currentDriverPhone}`
+                      : '기사 선택'}
+                  </div>
+                </div>
+              </button>
+            </div>
+
+            {/* Card 4: 경로 (출발지 → 도착지) */}
+            <div className="bg-white rounded-2xl border border-slate-100/90 shadow-2xs p-4 sm:p-5 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                {/* 출발지 */}
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="w-8 h-8 rounded-full bg-blue-50 text-[#1E60F3] flex items-center justify-center shrink-0">
+                    <MapPin className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs text-slate-400 font-medium">출발지</div>
+                    <div
+                      className="text-sm sm:text-base font-bold text-slate-800 tracking-tight truncate"
+                      title={pickupLocation}
+                    >
+                      {pickupLocation || '출발지 미정'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Arrow */}
+                <div className="shrink-0 px-2 sm:px-4">
+                  <ArrowRight className="w-5 h-5 text-slate-300" />
+                </div>
+
+                {/* 도착지 */}
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="w-8 h-8 rounded-full bg-blue-50 text-[#1E60F3] flex items-center justify-center shrink-0">
+                    <Flag className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs text-slate-400 font-medium">도착지</div>
+                    <div
+                      className="text-sm sm:text-base font-bold text-slate-800 tracking-tight truncate"
+                      title={destination}
+                    >
+                      {destination || '도착지 미정'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 경로 변경 버튼 */}
                 <button
                   type="button"
                   onClick={() => {
                     haptics.lightTap();
-                    onOpenCustomerMessage(initialBooking);
+                    setIsEditingRoute((prev) => !prev);
                   }}
-                  className="h-9 px-3 rounded-xl text-xs font-bold bg-[#1E60F3] hover:bg-blue-600 text-white transition-all inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs active:scale-95 whitespace-nowrap"
-                  title="고객사 안내문자 확인 및 발송"
+                  className="ml-1 px-2.5 py-1 rounded-lg text-xs font-bold text-slate-400 hover:text-[#1E60F3] hover:bg-blue-50 transition-colors shrink-0"
                 >
-                  <MessageSquareText className="w-3.5 h-3.5 shrink-0" />
-                  <span>안내 문자{initialBooking.pendingCustomerTrigger ? ' · 준비' : ''}</span>
+                  {isEditingRoute ? '완료' : '변경'}
                 </button>
+              </div>
+
+              {/* Expanded Route Editor when user clicks '변경' */}
+              {isEditingRoute && (
+                <div className="pt-3 border-t border-slate-100 space-y-3 animate-in fade-in duration-150">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <HqPlaceSearchInput
+                      label="출발지"
+                      value={pickupLocation}
+                      isConfirmed={Boolean(pickupPoi)}
+                      onChange={(val) => {
+                        setPickupLocation(val);
+                        setPickupPoi(null);
+                        setErrorMsg(null);
+                      }}
+                      onSelectPoi={(poi) => {
+                        setPickupLocation(poi.name);
+                        setPickupPoi(poi);
+                        setErrorMsg(null);
+                      }}
+                      placeholder="출발 장소명 또는 주소 검색"
+                      icon="mapPin"
+                    />
+                    <HqPlaceSearchInput
+                      label="도착지"
+                      value={destination}
+                      isConfirmed={Boolean(destinationPoi)}
+                      onChange={(val) => {
+                        setDestination(val);
+                        setDestinationPoi(null);
+                        setErrorMsg(null);
+                      }}
+                      onSelectPoi={(poi) => {
+                        setDestination(poi.name);
+                        setDestinationPoi(poi);
+                        setErrorMsg(null);
+                      }}
+                      placeholder="도착 장소명 또는 주소 검색"
+                      icon="flag"
+                    />
+                  </div>
+                </div>
               )}
 
-              {/* 2. 배차 카드 */}
-              {onOpenDriverVehicleInfo && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    haptics.lightTap();
-                    onOpenDriverVehicleInfo(initialBooking);
-                  }}
-                  className="h-9 px-3 rounded-xl text-xs font-bold bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 transition-all inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs active:scale-95 whitespace-nowrap"
-                  title="기사 프로필 & 차량 안내 카드"
-                >
-                  <ImageIcon className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />
-                  <span>배차 카드</span>
-                </button>
+              {/* Optional Route Timeline */}
+              {initialBooking?.routeWaypoints && initialBooking.routeWaypoints.length > 2 && (
+                <DispatchRouteTimeline
+                  waypoints={initialBooking.routeWaypoints}
+                  heading="전체 운행 경로"
+                  className="mt-2 rounded-xl bg-slate-50 p-3"
+                  compact
+                />
               )}
+            </div>
 
-              {/* 3. 기사 문자 */}
-              {driverSmsHref && (
-                <a
-                  href={driverSmsHref}
-                  className="h-9 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 transition-all inline-flex items-center justify-center gap-1.5 shadow-2xs active:scale-95 whitespace-nowrap"
-                  title="스마트폰 문자앱을 열어 기사님께 직접 발송"
-                >
-                  <MessageSquareText className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                  <span>기사 문자</span>
-                </a>
+            {/* Card 5: 추가 정보 아코디언 */}
+            <div className="bg-white rounded-2xl border border-slate-100/90 shadow-2xs overflow-hidden">
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  haptics.lightTap();
+                  setIsExtraInfoOpen((prev) => !prev);
+                }}
+                className="flex items-center justify-between p-4 sm:p-5 cursor-pointer select-none hover:bg-slate-50/50 transition-colors"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-[#EBF2FE] text-[#1E60F3] flex items-center justify-center shrink-0">
+                    <FileText className="w-4 h-4 text-[#1E60F3]" />
+                  </div>
+                  <span className="text-sm sm:text-base font-bold text-slate-800 tracking-tight">
+                    추가 정보
+                  </span>
+                </div>
+                <div className="w-7 h-7 rounded-full flex items-center justify-center text-slate-400">
+                  {isExtraInfoOpen ? (
+                    <ChevronUp className="w-4 h-4 stroke-[2.2]" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 stroke-[2.2]" />
+                  )}
+                </div>
+              </div>
+
+              {isExtraInfoOpen && (
+                <div className="p-4 sm:p-5 pt-0 space-y-3 animate-in slide-in-from-top-2 duration-150 border-t border-slate-100">
+                  {/* Row 1: 기사 언어 & 항공편명 */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3">
+                    {/* 기사 언어 */}
+                    <div className="bg-[#F8FAFC] border border-slate-100 rounded-2xl p-3.5 flex flex-col justify-between">
+                      <div className="flex items-center gap-1.5 mb-2.5">
+                        <Globe className="w-4 h-4 text-[#1E60F3] stroke-[2]" />
+                        <span className="text-xs font-bold text-slate-700">기사 언어</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleCommonLanguageChange('ko')}
+                          className={`h-10 rounded-xl flex items-center justify-center gap-1.5 px-2 transition-all cursor-pointer ${
+                            commonLanguage === 'ko'
+                              ? 'bg-[#EBF2FE] text-[#1E60F3] font-bold shadow-2xs'
+                              : 'bg-white border border-slate-200/90 text-slate-700 hover:bg-slate-50 font-semibold'
+                          }`}
+                        >
+                          <span className="text-sm">🇰🇷</span>
+                          <span className="text-xs font-bold">한국어</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleCommonLanguageChange('en')}
+                          className={`h-10 rounded-xl flex items-center justify-center gap-1.5 px-2 transition-all cursor-pointer ${
+                            commonLanguage === 'en'
+                              ? 'bg-[#EBF2FE] text-[#1E60F3] font-bold shadow-2xs'
+                              : 'bg-white border border-slate-200/90 text-slate-700 hover:bg-slate-50 font-semibold'
+                          }`}
+                        >
+                          <span className="text-sm">🇺🇸</span>
+                          <span className="text-xs font-bold">영어</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 항공편명 */}
+                    <div className="bg-[#F8FAFC] border border-slate-100 rounded-2xl p-3.5 flex flex-col justify-between">
+                      <div className="flex items-center gap-1.5 mb-2.5">
+                        <Plane className="w-4 h-4 text-[#1E60F3] stroke-[2]" />
+                        <span className="text-xs font-bold text-slate-700">항공편명</span>
+                      </div>
+                      <input
+                        type="text"
+                        value={commonFlightNumber}
+                        onChange={(e) => setCommonFlightNumber(e.target.value)}
+                        placeholder="예: SQ612"
+                        className="w-full h-10 bg-white border border-slate-200/90 rounded-xl px-3.5 text-xs sm:text-sm font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#1E60F3]"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row 2: 탑승객 정보 */}
+                  <div className="bg-[#F8FAFC] border border-slate-100 rounded-2xl p-3.5">
+                    <div className="flex items-center gap-1.5 mb-2.5">
+                      <Users className="w-4 h-4 text-[#1E60F3] stroke-[2]" />
+                      <span className="text-xs font-bold text-slate-700">탑승객 정보</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      {/* 탑승 인원 */}
+                      <div className="h-10 bg-white border border-slate-200/90 rounded-xl px-3 flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-700 whitespace-nowrap">탑승 인원</span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setCommonPassengerCount((prev) => Math.max(0, prev - 1))}
+                            className="w-6 h-6 rounded-md bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold flex items-center justify-center cursor-pointer active:scale-95"
+                          >
+                            <Minus className="w-3 h-3 stroke-[2.5]" />
+                          </button>
+                          <span className="text-xs font-black text-slate-900 px-1 min-w-[16px] text-center">
+                            {commonPassengerCount}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setCommonPassengerCount((prev) => prev + 1)}
+                            className="w-6 h-6 rounded-md bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white font-bold flex items-center justify-center cursor-pointer"
+                          >
+                            <Plus className="w-3 h-3 stroke-[2.5]" />
+                          </button>
+                        </div>
+                      </div>
+                      {/* 탑승객명 */}
+                      <input
+                        type="text"
+                        value={commonPassengerName}
+                        onChange={(e) => setCommonPassengerName(e.target.value)}
+                        placeholder="탑승객명 (홍길동)"
+                        className="w-full h-10 bg-white border border-slate-200/90 rounded-xl px-3 text-xs sm:text-sm font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#1E60F3]"
+                      />
+                      {/* 탑승객 번호 */}
+                      <input
+                        type="tel"
+                        value={commonPassengerPhone}
+                        onChange={(e) => setCommonPassengerPhone(formatPhoneNumber(e.target.value))}
+                        placeholder="연락처 (010-1234-5678)"
+                        className="w-full h-10 bg-white border border-slate-200/90 rounded-xl px-3 text-xs sm:text-sm font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#1E60F3]"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row 3: 현장 요청 */}
+                  <div className="bg-[#F8FAFC] border border-slate-100 rounded-2xl p-2.5 sm:p-3 flex items-center gap-3">
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="w-7 h-7 rounded-lg bg-[#EBF2FE] text-[#1E60F3] flex items-center justify-center shrink-0">
+                        <FileText className="w-3.5 h-3.5 text-[#1E60F3]" />
+                      </div>
+                      <span className="text-xs font-bold text-slate-700 whitespace-nowrap">현장 요청</span>
+                    </div>
+                    <input
+                      type="text"
+                      value={commonMemo}
+                      onChange={(e) => setCommonMemo(e.target.value)}
+                      placeholder="요청사항을 입력하세요 (예: 공항 피켓 영접, 미팅 후 이동 등)"
+                      className="w-full h-10 bg-white border border-slate-200/90 rounded-xl px-3 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#1E60F3] flex-1 min-w-0"
+                    />
+                  </div>
+                </div>
               )}
-
-              {/* 4. 확인 재요청 */}
-              {onRemindDriver && (
-                <button
-                  type="button"
-                  onClick={handleRemindClick}
-                  disabled={isReminding}
-                  className={`h-9 px-3 rounded-xl text-xs font-bold transition-all inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs active:scale-95 whitespace-nowrap ${remindSuccess
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'
-                    }`}
-                  title="기사 앱에 확인 요청 다시 표시"
-                >
-                  <BellRing className={`w-3.5 h-3.5 shrink-0 ${isReminding ? 'animate-bounce text-[#1E60F3]' : 'text-slate-500'}`} />
-                  <span>{remindSuccess ? '요청 완료' : isReminding ? '요청 중' : '재요청'}</span>
-                </button>
-              )}
-
             </div>
           </div>
-        )}
-
-        {/* Read-only saved itinerary in the same detail modal opened from the monthly calendar. */}
-        {initialBooking?.routeWaypoints && initialBooking.routeWaypoints.length > 2 && (
-          <DispatchRouteTimeline
-            waypoints={initialBooking.routeWaypoints}
-            heading="전체 운행 경로"
-            className="mt-3 rounded-2xl bg-[#FAFBFD] p-4 shadow-[0_2px_6px_rgba(35,49,78,0.025)]"
-            compact
-          />
-        )}
-
-        {/* 2. Main Form Fields */}
-        <div className="space-y-3.5 mt-1">
+        ) : (
+          <div className="space-y-3.5 mt-1">
           {/* 고객사 * */}
           <div className="relative" ref={customerDropdownRef}>
             <label className="block text-xs font-bold text-slate-800 mb-1.5">
@@ -1499,6 +1874,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
             <TossDateRangePicker
               label="출발 날짜"
               required
+              align="left"
               startDate={pickupDate}
               endDate={pickupEndDate}
               onChangeRange={(start, end) => {
@@ -1508,85 +1884,25 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
               heightClass="h-11 sm:h-12"
             />
 
-            {/* 출발 시간 */}
-            <div className="relative" ref={timePickerRef}>
-              <label className="block text-xs font-bold text-slate-800 mb-1.5">
+            {/* 출발 시간 (종료 시간 인풋박스와 동일한 select 스타일) */}
+            <div>
+              <label htmlFor="hq-dispatch-pickup-time" className="block text-xs font-bold text-slate-800 mb-1.5">
                 출발 시간 <span className="text-red-500 font-bold ml-0.5">*</span>
               </label>
-
-              <div
-                className={`w-full h-11 sm:h-12 bg-white border rounded-xl px-3.5 flex items-center justify-between transition-all shadow-2xs ${isTimePickerOpen
-                  ? 'border-[#1E60F3] ring-1 ring-[#1E60F3]'
-                  : 'border-slate-200 hover:border-slate-300'
-                  }`}
-              >
-                <div className="flex items-center gap-2.5 min-w-0 flex-1 h-full">
-                  <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600 shrink-0" />
-                  <input
-                    type="text"
-                    value={timeInputText}
-                    onChange={handleTimeInputChange}
-                    onFocus={() => {
-                      setIsInputFocused(true);
-                      setIsTimePickerOpen(true);
-                    }}
-                    onBlur={handleTimeInputBlur}
-                    onKeyDown={handleTimeInputKeyDown}
-                    placeholder="오전 07:30"
-                    aria-label="출발 시간 입력 및 선택"
-                    className="w-full h-full bg-transparent text-xs sm:text-sm font-bold text-slate-900 focus:outline-none placeholder:text-slate-400"
-                  />
-                </div>
-                <button
-                  type="button"
-                  tabIndex={-1}
-                  onClick={() => {
-                    haptics.lightTap();
-                    setIsTimePickerOpen((prev) => !prev);
+              <div className="w-full h-11 sm:h-12 bg-white border border-slate-200 hover:border-slate-300 focus-within:border-[#1E60F3] focus-within:ring-1 focus-within:ring-[#1E60F3] rounded-xl px-3.5 flex items-center transition-all shadow-2xs">
+                <input
+                  id="hq-dispatch-pickup-time"
+                  type="time"
+                  value={pickupTimeOnly}
+                  onChange={(event) => {
+                    const val = event.target.value;
+                    setPickupTimeOnly(val);
+                    setTimeInputText(formatTimeKoreanAmPm(val));
                   }}
-                  className="p-1 -mr-1 text-slate-500 hover:text-slate-900 cursor-pointer"
-                  aria-label="시간 목록 보기"
-                >
-                  <ChevronDown
-                    className={`w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-200 ${isTimePickerOpen ? 'rotate-180 text-[#1E60F3]' : ''
-                      }`}
-                  />
-                </button>
+                  aria-label="출발 시간 입력 및 선택"
+                  className="w-full h-full bg-transparent text-xs sm:text-sm font-bold text-slate-900 outline-none cursor-pointer"
+                />
               </div>
-
-              {/* Time Picker Dropdown */}
-              {isTimePickerOpen && (
-                <div
-                  ref={timeDropdownListRef}
-                  className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white border border-slate-200/90 rounded-2xl shadow-xl p-2 max-h-56 overflow-y-auto animate-in fade-in duration-150 space-y-0.5"
-                >
-                  {timeDropdownOptions.map((time) => {
-                    const isSelected = pickupTimeOnly === time;
-                    return (
-                      <button
-                        key={time}
-                        ref={isSelected ? selectedTimeItemRef : undefined}
-                        type="button"
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          handleSelectTime(time);
-                        }}
-                        className={`w-full px-3 py-2 rounded-xl text-left text-xs sm:text-sm flex items-center transition-colors cursor-pointer ${isSelected
-                          ? 'bg-blue-50 text-[#1E60F3] font-bold'
-                          : 'hover:bg-slate-50 text-slate-800 font-medium'
-                          }`}
-                      >
-                        <span className="w-5 flex items-center justify-start shrink-0">
-                          {isSelected && <Check className="w-4 h-4 text-[#1E60F3] stroke-[2.5]" />}
-                        </span>
-                        <span className={isSelected ? 'text-[#1E60F3] font-bold' : 'text-slate-800'}>
-                          {formatTimeKoreanAmPm(time)}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
             </div>
 
             {/* 예정 종료 시간 (Unified Input Style) */}
@@ -1601,7 +1917,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                   value={endTime}
                   onChange={(event) => setEndTime(event.target.value)}
                   aria-label="예정 종료 시간 직접 입력"
-                  className="w-full h-full bg-transparent text-xs sm:text-sm font-bold text-slate-900 outline-none"
+                  className="w-full h-full bg-transparent text-xs sm:text-sm font-bold text-slate-900 outline-none cursor-pointer"
                 />
               </div>
             </div>
@@ -2056,8 +2372,8 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
               label="출발지"
               required
               value={pickupLocation}
-              autoSearch={initialBooking?.intakeSource === 'email'}
-              isConfirmed={Boolean(pickupPoi || (initialBooking?.placeVerified && pickupLocation.trim() === initialBooking.pickupLocation.trim()))}
+              autoSearch={false}
+              isConfirmed={Boolean(pickupPoi)}
               onChange={(val) => {
                 setPickupLocation(val);
                 setPickupPoi(null);
@@ -2077,8 +2393,8 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
               label="도착지"
               required
               value={destination}
-              autoSearch={initialBooking?.intakeSource === 'email'}
-              isConfirmed={Boolean(destinationPoi || (initialBooking?.placeVerified && destination.trim() === initialBooking.destination.trim()))}
+              autoSearch={false}
+              isConfirmed={Boolean(destinationPoi)}
               onChange={(val) => {
                 setDestination(val);
                 setDestinationPoi(null);
@@ -2280,6 +2596,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
             )}
           </div>
         </div>
+        )}
 
         {/* Live Conflict Warning Banner if any */}
         {totalLiveConflicts > 0 && (
@@ -2422,6 +2739,35 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
           </div>
         )}
       </div>
+
+      {/* Sub-modals for Vehicle & Driver Selection */}
+      <HqVehicleSelectModal
+        isOpen={isVehicleModalOpen}
+        onClose={() => setIsVehicleModalOpen(false)}
+        slotNumber={1}
+        selectedPlate={currentVehiclePlate}
+        loading={false}
+        onSelect={(selectedVehicle) => {
+          const matched = allVehicles.find((v) => v.plate === selectedVehicle.plate) || null;
+          if (firstAlloc) {
+            handleSelectVehicle(firstAlloc.id, matched || (selectedVehicle as any));
+          }
+          setIsVehicleModalOpen(false);
+        }}
+      />
+
+      <HqDriverSelectModal
+        isOpen={isDriverModalOpen}
+        onClose={() => setIsDriverModalOpen(false)}
+        initialDriverId={currentDriverId}
+        onSelectDriver={(selectedDriver) => {
+          const matched = allDrivers.find((d) => d.id === selectedDriver.id || d.name === selectedDriver.name) || null;
+          if (firstAlloc) {
+            handleSelectDriver(firstAlloc.id, matched || (selectedDriver as any));
+          }
+          setIsDriverModalOpen(false);
+        }}
+      />
     </div>
   );
 
@@ -2439,7 +2785,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
           }
         }}
       >
-        <div className="relative w-full max-w-4xl max-h-[92vh] overflow-y-auto bg-white rounded-3xl border border-slate-200/90 shadow-2xl p-5 sm:p-7 flex flex-col justify-between my-auto animate-in zoom-in-95 duration-150">
+        <div className={`relative w-full ${initialBooking ? 'max-w-3xl bg-[#FAFBFD] p-5 sm:p-6' : 'max-w-4xl bg-white p-5 sm:p-7'} max-h-[92vh] overflow-y-auto rounded-3xl border border-slate-200/90 shadow-2xl flex flex-col justify-between my-auto animate-in zoom-in-95 duration-150`}>
           {content}
         </div>
       </div>
