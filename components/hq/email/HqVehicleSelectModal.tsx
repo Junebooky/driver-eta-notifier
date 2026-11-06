@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ArrowRight, CarFront, Check, Loader2, Search, X } from 'lucide-react';
 import type { AvailableVehicleItem } from '@/utils/availabilityEngine';
 import { VIP_REAL_VEHICLES, getVehicleImage } from '@/utils/vehicleData';
@@ -41,12 +42,17 @@ export interface HqVehicleSelectModalProps {
 export const HqVehicleSelectModal: React.FC<HqVehicleSelectModalProps> = ({
   isOpen, onClose, vehicles, loading, error, slotNumber, selectedPlate, excludedPlates = [], onSelect,
 }) => {
+  const [mounted, setMounted] = useState(false);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<Category>('all');
   const [availableOnly, setAvailableOnly] = useState(true);
   const searchRef = useRef<HTMLInputElement>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -79,18 +85,37 @@ export const HqVehicleSelectModal: React.FC<HqVehicleSelectModalProps> = ({
       .sort((a, b) => Number(b.isAvailable) - Number(a.isAvailable) || a.model.localeCompare(b.model, 'ko') || a.plate.localeCompare(b.plate, 'ko'));
   }, [vehicles, query, category, availableOnly, excludedPlates]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-[105] flex items-center justify-center p-4 sm:p-6 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200"
       onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}
     >
       <section role="dialog" aria-modal="true" aria-labelledby="hq-vehicle-picker-title"
         className="flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200">
         
-        {/* Search & Filters Header */}
-        <div className="shrink-0 space-y-3.5 p-5 pb-3 sm:p-6 sm:pb-3.5">
+        {/* Header with Title and Close Button */}
+        <div className="shrink-0 p-5 pb-3 sm:p-6 sm:pb-3.5 space-y-3.5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h3 id="hq-vehicle-picker-title" className="text-lg font-bold tracking-tight text-slate-900">
+                차량 선택
+              </h3>
+              <p className="mt-0.5 truncate text-xs text-slate-400 font-medium">
+                {slotNumber}호차 배정 차량 선택
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="차량 선택 닫기"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600 cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
           {/* Search Box */}
           <div className="flex h-12 items-center gap-3 rounded-2xl bg-slate-50/80 border border-slate-200/70 px-4 focus-within:bg-white focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all">
             <Search className="h-4 w-4 shrink-0 text-slate-400" />
@@ -239,6 +264,7 @@ export const HqVehicleSelectModal: React.FC<HqVehicleSelectModalProps> = ({
           실제 차량 가용성 기준 · 선택하면 배정 카드에 반영됩니다.
         </div>
       </section>
-    </div>
+    </div>,
+    document.body
   );
 };

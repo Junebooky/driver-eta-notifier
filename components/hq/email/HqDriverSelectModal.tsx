@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Search, Check, Loader2, Globe2, UserRound, Phone } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 import { HqDriverSummary } from '@/types/driverHq';
@@ -57,6 +58,7 @@ export const HqDriverSelectModal: React.FC<HqDriverSelectModalProps> = ({
   // An explicitly empty availability list MUST remain empty: do not fall back to all HQ drivers.
   const driversList: (AvailableDriverItem | HqDriverSummary)[] =
     propDrivers !== undefined ? propDrivers : hookDrivers.drivers;
+  const [mounted, setMounted] = useState(false);
   const [search, setSearch] = useState('');
   const [englishOnly, setEnglishOnly] = useState(requiredLanguage === 'english');
   const [onlyAvailable, setOnlyAvailable] = useState(true);
@@ -64,6 +66,10 @@ export const HqDriverSelectModal: React.FC<HqDriverSelectModalProps> = ({
   const onCloseRef = useRef(onClose);
   const searchRef = useRef<HTMLInputElement>(null);
   onCloseRef.current = onClose;
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -87,7 +93,7 @@ export const HqDriverSelectModal: React.FC<HqDriverSelectModalProps> = ({
     };
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   const q = search.trim().toLocaleLowerCase();
   const isExcluded = (id: string) => excludedDriverIds.includes(id);
@@ -103,7 +109,7 @@ export const HqDriverSelectModal: React.FC<HqDriverSelectModalProps> = ({
     (requiredLanguage !== 'english' || driverSupportsEnglish(selected)) &&
     (!englishOnly || driverSupportsEnglish(selected)));
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[105] flex items-center justify-center p-4 sm:p-6 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200"
       onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}
@@ -302,6 +308,7 @@ export const HqDriverSelectModal: React.FC<HqDriverSelectModalProps> = ({
           </button>
         </div>
       </section>
-    </div>
+    </div>,
+    document.body
   );
 };
