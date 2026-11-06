@@ -121,7 +121,7 @@ export function HqDriverReportInbox() {
    <details className="rounded-xl px-1 text-xs text-slate-500">
     <summary className="w-fit cursor-pointer py-1.5 font-medium hover:text-slate-700">이전 Excel 작업본 · 원본 다운로드</summary>
     <div className="mt-1 flex flex-wrap gap-2">
-     {versions.filter(v=>v.id!==workbook.active_version).slice(0,8).map(v=>
+     {[...versions.filter(v=>v.kind==='original'&&v.id!==workbook.active_version),...versions.filter(v=>v.kind!=='original'&&v.id!==workbook.active_version).slice(0,5)].slice(0,10).map(v=>
       <a key={v.id} href={'/api/hq/report-workbook?download=1&year='+workbook.year+'&version='+v.id}
        className="inline-flex min-h-9 items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-600 hover:bg-slate-50">
        <Download size={13}/>{v.kind==='original'?'이전 원본':'작업본'} · {new Date(v.created_at).toLocaleDateString('ko-KR',{timeZone:'Asia/Seoul'})}
