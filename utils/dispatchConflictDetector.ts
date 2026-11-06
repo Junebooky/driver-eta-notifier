@@ -605,6 +605,7 @@ export function mapScheduleItemToHqBooking(
     endTime: normalizeTimeHHmm(item.end_time) || '',
     pickupLocation: item.origin_name,
     destination: item.destination_name,
+    routeWaypoints: item.routeWaypoints?.map((point) => ({ ...point })),
     pickupLat: item.origin_lat,
     pickupLng: item.origin_lng,
     destinationLat: item.destination_lat,
