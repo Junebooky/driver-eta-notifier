@@ -41,9 +41,9 @@ export function HqEmailBatchRevisionPanel({
   isSubmitting = false, onApprove, onRequestUnassigned,
 }: Props) {
   const rows = useMemo(() => {
-    try { return emailBatchRows(draft, slots, candidates, decisions); }
+    try { return emailBatchRows(draft, slots, candidates, decisions, assignments); }
     catch { return []; }
-  }, [draft, slots, candidates, decisions]);
+  }, [draft, slots, candidates, decisions, assignments]);
   const selectedIds = new Set(rows.map(row => row.previous?.scheduleId).filter(Boolean));
   const selectedEvents = new Set(rows.map(row => row.previous?.eventId).filter(Boolean));
   const eligibleRemovals = candidates.filter(item =>
