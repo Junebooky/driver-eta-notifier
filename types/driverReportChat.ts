@@ -1,5 +1,5 @@
 import type {KakaoExcelDraft} from '@/utils/kakaoExcelImport';
-export type ReportExcelStatus = 'pending' | 'applied' | 'review' | 'error';
+export type ReportExcelStatus = 'pending' | 'applied' | 'review' | 'error' | 'archived';
 export interface ReportChatMessage {
   id:string; seq:number; sender_type:'driver'|'system'|'hq'; message_type:'text'|'status'|'error';
   body:string; linked_submission_id:string|null; created_at:string;
