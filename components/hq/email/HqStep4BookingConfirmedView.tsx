@@ -47,7 +47,7 @@ export const HqStep4BookingConfirmedView: React.FC<HqStep4BookingConfirmedViewPr
   return (
     <section
       aria-labelledby="booking-confirmed-title"
-      className="rounded-2xl bg-white px-5 py-10 sm:px-10 sm:py-14"
+      className="rounded-[32px] bg-white px-5 py-10 sm:px-10 sm:py-14 border border-slate-100 shadow-sm"
     >
       <div className="mx-auto flex w-full max-w-lg flex-col items-center text-center">
         {checkImageFailed ? (
@@ -67,35 +67,35 @@ export const HqStep4BookingConfirmedView: React.FC<HqStep4BookingConfirmedViewPr
 
         <h2
           id="booking-confirmed-title"
-          className="mt-3 text-[26px] font-semibold tracking-tight text-slate-900 sm:text-[30px]"
+          className="mt-4 text-[26px] sm:text-[30px] font-black tracking-tight text-slate-900"
         >
           예약 확정!
         </h2>
-        <p className="mt-2 text-sm font-normal leading-relaxed text-slate-500">
+        <p className="mt-2 text-xs sm:text-sm font-medium leading-relaxed text-slate-400">
           예약 내용을 확인했습니다. 배차 등록은 다음 단계에서 진행됩니다.
         </p>
 
-        <div className="mt-8 w-full rounded-2xl bg-slate-50/70 px-5 py-5 text-left sm:px-6">
-          <h3 className="mb-4 text-xs font-semibold text-slate-800">예약 정보</h3>
-          <dl className="space-y-3.5 text-[13px]">
+        <div className="mt-8 w-full rounded-[28px] bg-slate-50/70 border border-slate-100 p-6 sm:p-7 text-left shadow-xs">
+          <h3 className="mb-4 text-sm font-bold text-slate-900">예약 정보</h3>
+          <dl className="space-y-3.5 text-xs">
             <div className="flex items-start justify-between gap-4">
-              <dt className="shrink-0 text-slate-500">고객사</dt>
-              <dd className="min-w-0 text-right font-medium text-slate-800">
+              <dt className="shrink-0 text-slate-400 font-medium">고객사</dt>
+              <dd className="min-w-0 text-right font-bold text-slate-900">
                 {extractedDraft.companyName || emailSummary.from.name || '미지정'}
               </dd>
             </div>
             <div className="flex items-start justify-between gap-4">
-              <dt className="shrink-0 text-slate-500">운행 기간</dt>
-              <dd className="min-w-0 text-right font-medium text-slate-800">{dateLabel}</dd>
+              <dt className="shrink-0 text-slate-400 font-medium">운행 기간</dt>
+              <dd className="min-w-0 text-right font-bold text-slate-900">{dateLabel}</dd>
             </div>
             <div className="flex items-start justify-between gap-4">
-              <dt className="shrink-0 text-slate-500">운행 경로</dt>
-              <dd className="min-w-0 flex-1 text-right font-medium leading-relaxed text-slate-800">
+              <dt className="shrink-0 text-slate-400 font-medium">운행 경로</dt>
+              <dd className="min-w-0 flex-1 text-right font-bold leading-relaxed text-slate-900">
                 {dailyRoutes.length > 1 ? (
-                  <div className="space-y-2.5">
+                  <div className="space-y-2">
                     {dailyRoutes.map((day) => (
                       <div key={day.date} className="flex flex-col gap-0.5">
-                        <span className="text-[11px] font-normal text-slate-500">
+                        <span className="text-[11px] font-medium text-slate-400">
                           {day.date} · {day.count}곳
                         </span>
                         <span>{day.first} → {day.last}</span>
@@ -110,14 +110,14 @@ export const HqStep4BookingConfirmedView: React.FC<HqStep4BookingConfirmedViewPr
               </dd>
             </div>
             <div className="flex items-start justify-between gap-4">
-              <dt className="shrink-0 text-slate-500">요청 차량</dt>
-              <dd className="min-w-0 text-right font-medium text-slate-800">
+              <dt className="shrink-0 text-slate-400 font-medium">요청 차량</dt>
+              <dd className="min-w-0 text-right font-bold text-slate-900">
                 {extractedDraft.requestedVehicleClass || '미지정'}
               </dd>
             </div>
             <div className="flex items-start justify-between gap-4">
-              <dt className="shrink-0 text-slate-500">탑승 인원</dt>
-              <dd className="min-w-0 text-right font-medium text-slate-800">
+              <dt className="shrink-0 text-slate-400 font-medium">탑승 인원</dt>
+              <dd className="min-w-0 text-right font-bold text-slate-900">
                 {extractedDraft.passengerCount}명
               </dd>
             </div>
@@ -125,17 +125,17 @@ export const HqStep4BookingConfirmedView: React.FC<HqStep4BookingConfirmedViewPr
         </div>
 
         <div className="mt-10 w-full">
-          <h3 className="text-lg font-semibold tracking-tight text-slate-900 sm:text-xl">
+          <h3 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">
             기사님을 배정하시겠습니까?
           </h3>
-          <p className="mt-1.5 text-xs text-slate-500">
+          <p className="mt-1.5 text-xs font-medium text-slate-400">
             다음 단계에서 차량과 기사님을 선택할 수 있습니다.
           </p>
 
           <button
             type="button"
             onClick={onProceedToAssignment}
-            className="cockpit-assignment-next group mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-[#1E60F3] px-5 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#1855DB] active:bg-[#164AC1] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1E60F3]"
+            className="cockpit-assignment-next group mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#1E60F3] px-5 py-4 text-sm font-bold text-white shadow-md shadow-blue-500/20 transition-all hover:bg-blue-600 active:scale-98 cursor-pointer"
           >
             <span>기사님 배정하기</span>
             <ArrowRight className="cockpit-assignment-arrow h-4 w-4 shrink-0" aria-hidden="true" />
@@ -143,7 +143,7 @@ export const HqStep4BookingConfirmedView: React.FC<HqStep4BookingConfirmedViewPr
           <button
             type="button"
             onClick={onBackToReview}
-            className="mt-4 inline-flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-medium text-slate-500 transition-colors hover:text-slate-800"
+            className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-slate-400 transition-colors hover:text-slate-600 cursor-pointer"
           >
             <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />
             예약 내용 다시 보기

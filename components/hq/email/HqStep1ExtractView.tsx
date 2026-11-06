@@ -162,7 +162,16 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
       id: wp.id,
       time: wp.time || '',
       location: wp.location,
-      selectedPoi: null,
+      selectedPoi:
+        wp.address && typeof wp.lat === 'number' && typeof wp.lng === 'number'
+          ? {
+              id: wp.id,
+              name: wp.location,
+              address: wp.address,
+              lat: wp.lat,
+              lng: wp.lng,
+            }
+          : null,
       isPoiConfirmed: Boolean(wp.isPoiConfirmed && Number.isFinite(wp.lat) && Number.isFinite(wp.lng)),
     });
   };
@@ -816,178 +825,240 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                         {/* Timeline List (Expanded) */}
                         {!isCollapsed && (
                           <div className="pt-3">
-                            <div className="relative pl-7 py-1 space-y-4">
-                              {/* Vertical Rail Line */}
-                              <div className="absolute left-[7px] top-2 bottom-3 w-[1.5px] bg-slate-200" />
-
+                            <div className="space-y-4 pt-1">
                               {group.items.map((wp, wIdx) => {
                                 const isFirst = wIdx === 0;
                                 const isLast = wIdx === group.items.length - 1 && group.items.length > 1;
                                 const isEditingThis = waypointEdit?.id === wp.id;
+                                const activeAddress =
+                                  (isEditingThis && waypointEdit ? waypointEdit.selectedPoi?.address : null) ||
+                                  wp.address ||
+                                  '';
+                                const displayRoadAddress = activeAddress
+                                  ? activeAddress.replace(/\s*\(.*?\)/g, '').trim()
+                                  : '';
+                                const displayFullAddress = activeAddress || '';
 
                                 return (
                                   <div
                                     key={wp.id}
-                                    className="relative flex items-start justify-between group/node"
+                                    className="relative flex items-start gap-3.5 group/node"
                                   >
-                                    {/* Timeline Node Icon: 출발지 = icon_origin.png, 목적지 = icon_destination.png, 중간 = dot */}
-                                    {isFirst ? (
-                                      <img
-                                        src="/images/icons/driver_ui/icon_origin.png"
-                                        alt="출발"
-                                        className="absolute -left-[16px] top-0.5 w-4 h-4 object-contain z-10 shrink-0"
-                                      />
-                                    ) : isLast ? (
-                                      <img
-                                        src="/images/icons/driver_ui/icon_destination.png"
-                                        alt="종료"
-                                        className="absolute -left-[16px] top-0.5 w-4 h-4 object-contain z-10 shrink-0"
-                                      />
-                                    ) : (
-                                      <div
-                                        aria-hidden="true"
-                                        className="absolute -left-[12px] top-1.5 w-2 h-2 rounded-full bg-slate-300 ring-2 ring-white z-10 shrink-0"
-                                      />
-                                    )}
-
-                                    {/* TMAP POI autocomplete with draft-only edits. */}
-                                    {isEditingThis && waypointEdit ? (
-                                      <div
-                                        ref={waypointEditorRef}
-                                        className="relative z-30 flex flex-1 min-w-0 flex-wrap items-center gap-2 rounded-xl bg-slate-50 p-2"
-                                        onKeyDown={(event) => {
-                                          if (event.key === 'Escape') {
-                                            event.stopPropagation();
-                                            setWaypointEdit(null);
-                                          }
-                                        }}
-                                      >
-                                        <input
-                                          type="text"
-                                          value={waypointEdit.time}
-                                          onChange={(event) =>
-                                            setWaypointEdit((draft) => draft ? { ...draft, time: event.target.value } : draft)
-                                          }
-                                          onKeyDown={(event) => {
-                                            if (event.key === 'Enter') saveWaypointEdit();
-                                          }}
-                                          placeholder="10:00"
-                                          aria-label="경유지 시간"
-                                          className="h-9 w-16 rounded-lg border border-slate-200 bg-white px-2 text-xs tabular-nums font-medium text-slate-800 outline-none focus:border-slate-400"
-                                        />
-                                        <div className="min-w-[150px] flex-[1_1_180px]">
-                                          <HqPlaceSearchInput
-                                            key={wp.id}
-                                            value={waypointEdit.location}
-                                            onChange={(location) =>
-                                              setWaypointEdit((draft) => draft ? {
-                                                ...draft, location, selectedPoi: null, isPoiConfirmed: false,
-                                              } : draft)
-                                            }
-                                            onSelectPoi={(poi) =>
-                                              setWaypointEdit((draft) => draft ? {
-                                                ...draft, location: poi.name, selectedPoi: poi, isPoiConfirmed: true,
-                                              } : draft)
-                                            }
-                                            onConfirmStateChange={(confirmed) =>
-                                              setWaypointEdit((draft) => draft ? { ...draft, isPoiConfirmed: confirmed } : draft)
-                                            }
-                                            isConfirmed={waypointEdit.isPoiConfirmed}
-                                            placeholder="TMAP 장소 검색"
-                                            heightClass="h-9"
-                                            tone="neutral"
-                                            autoSearch
+                                    {/* Timeline Column with seamless, unbreakable continuous rail */}
+                                    <div className="relative flex flex-col items-center self-stretch shrink-0 w-5">
+                                      {/* Connector Line to next node */}
+                                      {!isLast && (
+                                        <div className="absolute top-5 -bottom-4 w-[2px] bg-slate-200" />
+                                      )}
+                                      {/* Node Icon */}
+                                      <div className="relative z-10 mt-3 flex h-5 w-5 items-center justify-center">
+                                        {isFirst ? (
+                                          <img
+                                            src="/images/icons/driver_ui/icon_origin.png"
+                                            alt="출발"
+                                            className="h-4 w-4 object-contain"
                                           />
-                                        </div>
-                                        {waypointEdit.selectedPoi?.address && (
-                                          <p className="w-full break-words px-1 text-[11px] text-slate-500">{waypointEdit.selectedPoi.address}</p>
+                                        ) : isLast ? (
+                                          <img
+                                            src="/images/icons/driver_ui/icon_destination.png"
+                                            alt="종료"
+                                            className="h-4 w-4 object-contain"
+                                          />
+                                        ) : (
+                                          <div
+                                            aria-hidden="true"
+                                            className="h-2.5 w-2.5 rounded-full bg-slate-400 ring-4 ring-white"
+                                          />
                                         )}
-                                        <button
-                                          type="button"
-                                          onClick={saveWaypointEdit}
-                                          disabled={!waypointEdit.location.trim()}
-                                          className="h-9 rounded-lg bg-slate-800 px-2.5 text-[11px] font-medium text-white hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                                        >
-                                          완료
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => setWaypointEdit(null)}
-                                          className="flex h-9 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
-                                          aria-label="수정 취소"
-                                        >
-                                          <X className="h-3.5 w-3.5" />
-                                        </button>
                                       </div>
-                                    ) : (
-                                      <div
-                                        onClick={() => beginWaypointEdit(wp)}
-                                        className="flex-1 flex items-start justify-between p-1.5 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer select-none group/item"
-                                      >
-                                        <div className="flex min-w-0 flex-col gap-0.5">
-                                          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
-                                            <span className="w-12 shrink-0 text-xs font-black tabular-nums text-slate-900">
-                                              {wp.time || '--:--'}
-                                            </span>
-                                            <span className="min-w-0 text-xs font-black text-slate-900">
-                                              {wp.location || '장소 미지정'}
-                                            </span>
-                                            {isFirst && (
-                                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-[#1E60F3] border border-blue-100/80">
-                                                출발
-                                              </span>
-                                            )}
-                                            {isLast && (
-                                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">
-                                                종료
-                                              </span>
-                                            )}
-                                          </div>
-                                          <p className="pl-14 text-[11px] font-medium leading-relaxed text-slate-500">
-                                            {wp.address || (isVerifiedEmailRouteStop({
-                                              id: wp.id, date: wp.date || pickupDate, time: wp.time || '',
-                                              location: wp.location, lat: wp.lat, lng: wp.lng,
-                                              isPoiConfirmed: Boolean(wp.isPoiConfirmed),
-                                            }) ? 'TMAP 좌표 확인됨 · 상세 주소 재검색 가능'
-                                              : '주소 미확정 · 눌러서 TMAP 검색 결과 선택')}
-                                          </p>
-                                        </div>
+                                    </div>
 
-                                        <div className="flex shrink-0 items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-hover/item:opacity-100 transition-opacity">
-                                          <button
-                                            type="button"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              beginWaypointEdit(wp);
-                                            }}
-                                            className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
-                                            aria-label="경유지 수정"
-                                          >
-                                            <Edit3 className="w-3.5 h-3.5" />
-                                          </button>
-                                          {waypoints.length > 2 && (
+                                    {/* Content (Edit Card or Standard Row) */}
+                                    <div className="flex-1 min-w-0">
+                                      {isEditingThis && waypointEdit ? (
+                                        <div
+                                          ref={waypointEditorRef}
+                                          className="rounded-[24px] bg-white border border-slate-200/90 shadow-sm p-3.5 sm:p-4 space-y-3 animate-in fade-in zoom-in-98 duration-150"
+                                          onKeyDown={(event) => {
+                                            if (event.key === 'Escape') {
+                                              event.stopPropagation();
+                                              setWaypointEdit(null);
+                                            }
+                                          }}
+                                        >
+                                          {/* Top Row: Time pill + Location Search Input */}
+                                          <div className="flex items-center gap-2.5 sm:gap-3">
+                                            {/* Time Pill */}
+                                            <div className="flex h-11 w-24 sm:w-28 shrink-0 items-center justify-center rounded-2xl bg-white border border-slate-200/80 px-3 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                                              <input
+                                                type="text"
+                                                value={waypointEdit.time}
+                                                onChange={(event) =>
+                                                  setWaypointEdit((draft) =>
+                                                    draft ? { ...draft, time: event.target.value } : draft
+                                                  )
+                                                }
+                                                onKeyDown={(event) => {
+                                                  if (event.key === 'Enter') saveWaypointEdit();
+                                                }}
+                                                placeholder="11:00"
+                                                aria-label="경유지 시간"
+                                                className="w-full bg-transparent text-center text-sm font-black text-slate-900 outline-none placeholder:text-slate-400"
+                                              />
+                                            </div>
+
+                                            {/* Location Search Input */}
+                                            <div className="flex-1 min-w-0">
+                                              <HqPlaceSearchInput
+                                                key={wp.id}
+                                                value={waypointEdit.location}
+                                                onChange={(location) =>
+                                                  setWaypointEdit((draft) =>
+                                                    draft
+                                                      ? {
+                                                          ...draft,
+                                                          location,
+                                                          selectedPoi: null,
+                                                          isPoiConfirmed: false,
+                                                        }
+                                                      : draft
+                                                  )
+                                                }
+                                                onSelectPoi={(poi) =>
+                                                  setWaypointEdit((draft) =>
+                                                    draft
+                                                      ? {
+                                                          ...draft,
+                                                          location: poi.name,
+                                                          selectedPoi: poi,
+                                                          isPoiConfirmed: true,
+                                                        }
+                                                      : draft
+                                                  )
+                                                }
+                                                onConfirmStateChange={(confirmed) =>
+                                                  setWaypointEdit((draft) =>
+                                                    draft ? { ...draft, isPoiConfirmed: confirmed } : draft
+                                                  )
+                                                }
+                                                isConfirmed={waypointEdit.isPoiConfirmed}
+                                                placeholder="TMAP 장소 검색"
+                                                heightClass="h-11 rounded-2xl"
+                                                icon="mapPin"
+                                                autoSearch
+                                              />
+                                            </div>
+                                          </div>
+
+                                          {/* Bottom Row: Address Confirmation & Action Buttons */}
+                                          <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-100">
+                                            <div className="min-w-0 flex-1">
+                                              <p className="text-sm font-bold text-slate-900 truncate">
+                                                {displayRoadAddress || waypointEdit.location || '상세 주소를 선택해 주세요'}
+                                              </p>
+                                              <p className="text-xs text-slate-400 font-medium truncate mt-0.5">
+                                                {displayFullAddress ||
+                                                  (waypointEdit.selectedPoi
+                                                    ? 'TMAP 좌표 확인됨'
+                                                    : 'TMAP 검색 결과에서 장소를 선택해 주세요')}
+                                              </p>
+                                            </div>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                              <button
+                                                type="button"
+                                                onClick={saveWaypointEdit}
+                                                disabled={!waypointEdit.location.trim()}
+                                                className="px-4 py-2 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white font-bold text-xs shadow-xs transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                              >
+                                                완료
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => setWaypointEdit(null)}
+                                                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-400 hover:bg-slate-200 hover:text-slate-600 transition-colors cursor-pointer"
+                                                aria-label="수정 취소"
+                                              >
+                                                <X className="h-4 w-4" />
+                                              </button>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <div
+                                          onClick={() => beginWaypointEdit(wp)}
+                                          className="flex items-start justify-between p-2.5 rounded-2xl hover:bg-slate-50/80 transition-colors cursor-pointer select-none group/item"
+                                        >
+                                          <div className="flex min-w-0 flex-col gap-0.5">
+                                            <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-0.5">
+                                              <span className="w-12 shrink-0 text-xs font-black tabular-nums text-slate-900">
+                                                {wp.time || '--:--'}
+                                              </span>
+                                              <span className="min-w-0 text-xs font-black text-slate-900">
+                                                {wp.location || '장소 미지정'}
+                                              </span>
+                                              {isFirst && (
+                                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-[#1E60F3] border border-blue-100/80">
+                                                  출발
+                                                </span>
+                                              )}
+                                              {isLast && (
+                                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">
+                                                  종료
+                                                </span>
+                                              )}
+                                            </div>
+                                            <p className="pl-14 text-[11px] font-medium leading-relaxed text-slate-500">
+                                              {wp.address ||
+                                                (isVerifiedEmailRouteStop({
+                                                  id: wp.id,
+                                                  date: wp.date || pickupDate,
+                                                  time: wp.time || '',
+                                                  location: wp.location,
+                                                  lat: wp.lat,
+                                                  lng: wp.lng,
+                                                  isPoiConfirmed: Boolean(wp.isPoiConfirmed),
+                                                })
+                                                  ? 'TMAP 좌표 확인됨 · 상세 주소 재검색 가능'
+                                                  : '주소 미확정 · 눌러서 TMAP 검색 결과 선택')}
+                                            </p>
+                                          </div>
+
+                                          <div className="flex shrink-0 items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-hover/item:opacity-100 transition-opacity">
                                             <button
                                               type="button"
                                               onClick={(e) => {
                                                 e.stopPropagation();
-                                                handleRemoveWaypoint(wp.id);
+                                                beginWaypointEdit(wp);
                                               }}
                                               className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
-                                              aria-label="경유지 삭제"
+                                              aria-label="경유지 수정"
                                             >
-                                              <X className="w-3.5 h-3.5" />
+                                              <Edit3 className="w-3.5 h-3.5" />
                                             </button>
-                                          )}
+                                            {waypoints.length > 2 && (
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleRemoveWaypoint(wp.id);
+                                                }}
+                                                className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
+                                                aria-label="경유지 삭제"
+                                              >
+                                                <X className="w-3.5 h-3.5" />
+                                              </button>
+                                            )}
+                                          </div>
                                         </div>
-                                      </div>
-                                    )}
+                                      )}
+                                    </div>
                                   </div>
                                 );
                               })}
                             </div>
 
                             {/* Add Stop Button per day */}
-                            <div className="pt-2 flex justify-start pl-7">
+                            <div className="pt-3 flex justify-start pl-8">
                               <button
                                 type="button"
                                 onClick={() => handleAddWaypointForDay(group.date)}
