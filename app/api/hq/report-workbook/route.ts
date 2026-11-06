@@ -36,7 +36,8 @@ export async function GET(req:NextRequest){
    if(!w)throw new Error('장부가 없습니다.');let bytes=w.bytes;
    if(version){let q=db.from('report_workbook_versions').select('*').eq('org_id',org).eq('ledger_year',w.year!);q=version==='original'?q.eq('kind','original').order('generation',{ascending:false}).limit(1):q.eq('id',version);const r=await q.single();check(r.error);bytes=await readWorkbook(r.data!);}
    if(!version)bytes=refitWorkbookRouteColumns(bytes); // Only the latest download gets presentation widths.
-   return new NextResponse(Uint8Array.from(bytes),{headers:{'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','Content-Disposition':`attachment; filename*=UTF-8''${encodeURIComponent(w.filename)}`,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
+   const downloadName=version?`${w.year}-excel-backup-${version==='original'?'original':version.slice(0,8)}.xlsx`:w.filename;
+   return new NextResponse(Uint8Array.from(bytes),{headers:{'Content-Type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','Content-Disposition':`attachment; filename*=UTF-8''${encodeURIComponent(downloadName)}`,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
   }
   let q=db.from('report_workbook_versions').select('id,generation,kind,created_at,byte_size,object_path,ledger_year').eq('org_id',org).order('generation',{ascending:false}).limit(50);if(w?.year)q=q.eq('ledger_year',w.year);
   const versions=await q;check(versions.error);
