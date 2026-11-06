@@ -4,7 +4,7 @@ import React, { useMemo, useState } from 'react';
 import { CalendarDays, ChevronLeft, ChevronRight, Inbox, MapPin } from 'lucide-react';
 import type { HqBooking } from '@/types/hq';
 import { getCustomerDotColor } from '@/utils/customerDotColor';
-import { getKstTodayDateStr } from '@/utils/dispatchConflictDetector';
+import { getKstTodayDateStr, normalizeDateToIso } from '@/utils/dispatchConflictDetector';
 import {
   getHqCalendarDays,
   isHqBookingScheduledOn,
@@ -71,8 +71,9 @@ function DesktopEvent({ booking, onClick }: { booking: HqBooking; onClick: () =>
   );
 }
 
-function DayBooking({ booking, onClick }: { booking: HqBooking; onClick: () => void }) {
+function DayBooking({ booking, onClick, viewingDate }: { booking: HqBooking; onClick: () => void; viewingDate: string }) {
   const state = status(booking);
+  const isStartDay = normalizeDateToIso(booking.pickupDate) === viewingDate;
   return (
     <button
       type="button"
@@ -90,7 +91,7 @@ function DayBooking({ booking, onClick }: { booking: HqBooking; onClick: () => v
             {booking.customerName}
           </span>
         </span>
-        <span className="shrink-0 text-xs font-medium tabular-nums text-[#73839D]">{booking.pickupTime}</span>
+        <span className="shrink-0 text-xs font-medium tabular-nums text-[#73839D]">{isStartDay ? booking.pickupTime : '연속 운행'}</span>
       </span>
       <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 pl-4">
         <p className="min-w-0">
@@ -264,7 +265,7 @@ export function HqDispatchCalendar({ bookings, onViewBooking, onOpenNewBooking }
         {selectedBookings.length > 0 ? (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {selectedBookings.map((booking) => (
-              <DayBooking key={booking.id} booking={booking} onClick={() => onViewBooking(booking)} />
+              <DayBooking key={booking.id} booking={booking} viewingDate={selectedDate} onClick={() => onViewBooking(booking)} />
             ))}
           </div>
         ) : (
