@@ -131,6 +131,24 @@ export function addressHintToTmapQuery(address: string): string {
   return address.trim();
 }
 
+/** Canonical Korean POI labels; the address hint remains separate and untouched. */
+export function canonicalKoreanPlaceName(name: string): string {
+  const clean = name.trim();
+  const aliases: Array<[RegExp, string]> = [
+    [/^Gimpo (?:Int(?:ernational)?\.?\s*)?Airport(?:\s+T1)?$/i, '김포국제공항 국제선'],
+    [/^Incheon (?:Int(?:ernational)?\.?\s*)?Airport\s*(?:T1|Terminal\s*1)$/i, '인천국제공항 제1여객터미널'],
+    [/^Incheon (?:Int(?:ernational)?\.?\s*)?Airport\s*(?:T2|Terminal\s*2)$/i, '인천국제공항 제2여객터미널'],
+    [/^Conrad Seoul$/i, '콘래드 서울'],
+    [/^Samsung Fire$/i, '삼성화재'],
+    [/^KB Ins(?:urance)?$/i, 'KB손해보험'],
+    [/^NH Securities$/i, 'NH투자증권'],
+    [/^Hanwha Life$/i, '한화생명'],
+    [/^Hyundai Insurance$/i, '현대해상'],
+    [/^POBA$/i, '대한지방행정공제회'],
+  ];
+  return aliases.find(([pattern]) => pattern.test(clean))?.[1] || clean;
+}
+
 const withNote = (notes: string | undefined, addition: string): string =>
   notes?.includes(addition) ? notes : [notes, addition].filter(Boolean).join(' · ');
 
@@ -205,7 +223,8 @@ export function enrichBookingDraftWithEmailEvidence(
     (a.date || draft.pickupDate).localeCompare(b.date || draft.pickupDate) ||
     (a.time || '99:99').localeCompare(b.time || '99:99') || a.order - b.order
   ).map((p, i) => ({ ...p, order: i + 1 }));
-  const enriched = ordered.length >= 2 ? applyMovementEvidence(ordered, body, draft.pickupDate) : ordered;
+  const enriched = (ordered.length >= 2 ? applyMovementEvidence(ordered, body, draft.pickupDate) : ordered)
+    .map((point) => ({ ...point, location: canonicalKoreanPlaceName(point.location) }));
   const first = enriched[0], last = enriched.at(-1);
   const originalFlightCodes = new Set((body.toUpperCase().match(/\b[A-Z0-9]{2}\d{2,4}\b/g) || []).filter((s) => /[A-Z]/.test(s)));
   for (const code of originalFlightCodes) {
