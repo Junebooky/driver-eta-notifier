@@ -4,6 +4,7 @@ import { fetchNaverEmailForAnalysis } from '@/services/naverImapService';
 import { analyzeScheduleAttachments, type AnalyzedScheduleAttachment } from '@/services/emailAttachmentIntake';
 import { findEmailBookingCandidates } from '@/services/emailBookingMatchService';
 import { parseVehicleSlotsFromRequestedClass } from '@/utils/vehicleSlotParser';
+import { parseNaverEmailUid } from '@/utils/naverEmailUid';
 import { requireHqAdmin, isDevAuthAllowed } from '@/lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
@@ -37,10 +38,10 @@ export async function POST(request: NextRequest) {
     // Client-provided bodyText/From/Subject is display-only and cannot spoof
     // attachment bytes or a previously booked customer.
     if (emailId.startsWith('naver-')) {
-      const uidMatch = /^naver-(\\d+)$/.exec(emailId);
-      if (!uidMatch) return NextResponse.json({ ok: false, error: '메일 ID가 올바르지 않습니다.' }, { status: 400 });
+      const uid = parseNaverEmailUid(emailId);
+      if (!uid) return NextResponse.json({ ok: false, error: '메일 ID가 올바르지 않습니다.' }, { status: 400 });
       try {
-        const source = await fetchNaverEmailForAnalysis(Number(uidMatch[1]));
+        const source = await fetchNaverEmailForAnalysis(uid);
         subject = source.subject;
         sender = source.sender;
         senderName = source.senderName;
@@ -51,6 +52,16 @@ export async function POST(request: NextRequest) {
         const analysis = analyzeScheduleAttachments(source.attachments);
         attachments = analysis.analyzed;
         ignoredAttachments = analysis.ignored;
+        // Never quietly summarize body only when a schedule file was attached.
+        const unsupportedSchedules = analysis.ignored.filter(name => /\.(xlsx?|xlsm|xlsb|csv|pdf|hwp|hwpx|docx?|zip)$/i.test(name));
+        if (unsupportedSchedules.length) {
+          return NextResponse.json({
+            ok: false,
+            code: 'UNSUPPORTED_EMAIL_SCHEDULE_ATTACHMENT',
+            error: `일정 첨부파일을 분석할 수 없습니다: ${unsupportedSchedules.join(', ')}. 지원되는 Excel 또는 PDF로 다시 전달받거나 파일 형식을 확인해 주세요.`,
+            ignoredAttachments: analysis.ignored,
+          }, { status: 422 });
+        }
       } catch (error) {
         return NextResponse.json({
           ok: false,
