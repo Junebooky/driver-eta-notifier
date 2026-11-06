@@ -275,20 +275,20 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
   };
 
   return (
-    <div className="bg-white rounded-2xl p-5 sm:p-6 space-y-6">
+    <div className="bg-slate-50/60 rounded-[28px] border border-slate-200/80 p-5 sm:p-6 space-y-5">
       {/* Step 5: assignment-focused mobile-first header */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 pb-1">
         <button
           type="button"
           onClick={onBackToStep1}
           aria-label="예약 확정 화면으로 돌아가기"
-          className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-50 text-slate-500 hover:bg-slate-100"
+          className="flex h-9 w-9 items-center justify-center rounded-xl bg-white border border-slate-200/80 text-slate-500 hover:bg-slate-50 hover:text-slate-800 shadow-2xs transition-colors cursor-pointer"
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
         <div>
-          <h2 className="text-lg font-semibold tracking-tight text-slate-900">기사님 배정</h2>
-          <p className="mt-0.5 text-xs text-slate-500">차량과 기사님을 선택하고 배차를 확정하세요.</p>
+          <h2 className="text-lg font-black tracking-tight text-slate-900">기사님 배정</h2>
+          <p className="mt-0.5 text-xs font-medium text-slate-500">차량과 기사님을 선택하고 배차를 확정하세요.</p>
         </div>
       </div>
 
@@ -332,10 +332,10 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
         isDispatching={isDispatching}
       />
 
-      <details className="group rounded-2xl bg-slate-50/50 px-4 py-4">
-        <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-medium text-slate-600 marker:hidden">
+      <details className="group rounded-2xl bg-white border border-slate-100 shadow-[0_2px_12px_rgba(15,23,42,0.03)] px-5 py-4 transition-all">
+        <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-black text-slate-800 marker:hidden">
           <span>날짜별 일정·종료시간 다시 확인</span>
-          <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+          <ChevronDown className="h-4 w-4 text-slate-400 transition-transform group-open:rotate-180" />
         </summary>
       {extractedDraft && <section className="mt-3 space-y-4">
         <h3 className="text-sm font-bold">날짜별 경로·종료시간 확인</h3>
@@ -346,10 +346,10 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
       </section>}
 
       </details>
-      <details className="group rounded-2xl bg-slate-50/50 px-4 py-4">
-        <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-medium text-slate-600 marker:hidden">
+      <details className="group rounded-2xl bg-white border border-slate-100 shadow-[0_2px_12px_rgba(15,23,42,0.03)] px-5 py-4 transition-all">
+        <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-black text-slate-800 marker:hidden">
           <span>예약 기본 정보·추가 정보</span>
-          <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+          <ChevronDown className="h-4 w-4 text-slate-400 transition-transform group-open:rotate-180" />
         </summary>
         <div className="mt-4">
         <div className="lg:col-span-5 space-y-4">

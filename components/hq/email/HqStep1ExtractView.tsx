@@ -29,6 +29,10 @@ import {
   ChevronUp,
   Save,
   Check,
+  Compass,
+  User,
+  ListOrdered,
+  Bookmark,
 } from 'lucide-react';
 import { HqEmailSummary, HqEmailDetail, HqEmailExtractedDraft, RouteWaypointItem } from '@/types/emailHq';
 import { haptics } from '@/utils/haptics';
@@ -574,11 +578,11 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
       </div>
 
       {/* 2. Right Sub-Column: AI Extraction Card */}
-      <div className="lg:col-span-6 bg-white rounded-2xl border border-blue-200/90 shadow-md p-5 flex flex-col justify-between min-h-[640px] relative overflow-visible">
+      <div className="lg:col-span-6 bg-slate-50/60 rounded-[28px] border border-slate-200/80 p-5 sm:p-6 shadow-[0_4px_24px_rgba(15,23,42,0.04)] flex flex-col justify-between min-h-[640px] relative overflow-visible">
         {extractedDraft ? (
           <div className="space-y-4">
-            {/* Header: Sparkles + Title + Refresh Button (Clean, no dev subtitle) */}
-            <div className="flex items-center justify-between pb-3.5 border-b border-slate-100">
+            {/* Header: Sparkles + Title + Refresh Button */}
+            <div className="flex items-center justify-between pb-3.5 border-b border-slate-200/60">
               <div className="flex items-center gap-2.5">
                 <img
                   src="/images/icons/ai_email.png"
@@ -586,7 +590,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                   className="w-8 h-8 object-contain shrink-0 select-none"
                   draggable={false}
                 />
-                <h3 className="text-sm font-black text-slate-900">
+                <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
                   AI가 추출한 예약 정보
                 </h3>
               </div>
@@ -595,10 +599,10 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                 type="button"
                 onClick={onExtractWithAi}
                 disabled={isExtractingAi}
-                className="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                className="px-3.5 py-1.5 rounded-full border border-slate-200/90 bg-white hover:bg-slate-50 active:scale-95 text-slate-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
                 title="Gemini AI로 다시 추출"
               >
-                <RefreshCw className={`w-3 h-3 ${isExtractingAi ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`w-3.5 h-3.5 text-slate-500 ${isExtractingAi ? 'animate-spin' : ''}`} />
                 <span>재추출</span>
               </button>
             </div>
@@ -612,13 +616,13 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
             )}
 
             {/* 블록 1: 고객사 및 탑승객 정보 */}
-            <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200/80 space-y-2.5">
-              {/* 고객사 & CRM 연동 (가벼운 회색 칩) */}
-              <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-200/60">
+            <div className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-100 shadow-[0_2px_12px_rgba(15,23,42,0.03)] space-y-3.5">
+              {/* 고객사 & CRM 연동 */}
+              <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-100">
                 <div className="flex items-center gap-2 min-w-0">
                   <Building2 className="w-4 h-4 text-slate-400 shrink-0" />
                   <span className="text-xs text-slate-500 font-semibold shrink-0">고객사</span>
-                  <span className="text-xs font-black text-slate-900 truncate">
+                  <span className="text-sm font-black text-slate-900 truncate ml-1">
                     {companyName || '미지정'}
                   </span>
                 </div>
@@ -626,16 +630,16 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                   type="button"
                   onClick={handleSaveToCrm}
                   disabled={extractedDraft.isSavedToCrm || isSavingCrm}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors shrink-0 flex items-center gap-1 ${
+                  className={`px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-colors shrink-0 flex items-center gap-1.5 ${
                     extractedDraft.isSavedToCrm
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-300 cursor-default'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 cursor-default'
                       : isSavingCrm
-                      ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200 cursor-pointer shadow-2xs'
+                      ? 'bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed'
+                      : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200/80 cursor-pointer shadow-2xs'
                   }`}
                   title="고객 관리에 회사 및 담당자 정보를 저장하거나 연결합니다"
                 >
-                  <BookmarkCheck className="w-3.5 h-3.5 text-slate-500" />
+                  <Bookmark className="w-3.5 h-3.5 text-slate-500" />
                   <span>
                     {isSavingCrm
                       ? '저장 중...'
@@ -646,39 +650,39 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                 </button>
               </div>
 
-              {/* 예약 담당자 (출처 괄호 태그 완전 삭제) */}
+              {/* 예약 담당자 */}
               <div className="flex items-center justify-between gap-2 text-xs">
                 <div className="flex items-center gap-2 text-slate-500 font-semibold shrink-0">
-                  <UserCheck className="w-4 h-4 text-slate-400 shrink-0" />
+                  <User className="w-4 h-4 text-slate-400 shrink-0" />
                   <span>예약 담당자</span>
                 </div>
-                <div className="text-right min-w-0 flex items-center gap-2">
-                  <span className="font-extrabold text-slate-900">
+                <div className="text-right min-w-0 flex items-center gap-1">
+                  <span className="font-black text-slate-900">
                     {contactName || '미지정'}
                   </span>
                   {(contactPhone || contactEmail) && (
-                    <span className="text-slate-500 font-medium text-[11px]">
+                    <span className="text-slate-500 font-normal text-xs ml-1">
                       ({contactPhone || contactEmail})
                     </span>
                   )}
                 </div>
               </div>
 
-              {/* 대표 탑승객 & 연락처 */}
+              {/* 대표 탑승객 */}
               <div className="flex items-center justify-between gap-2 text-xs">
                 <div className="flex items-center gap-2 text-slate-500 font-semibold shrink-0">
                   <Users className="w-4 h-4 text-slate-400 shrink-0" />
                   <span>대표 탑승객</span>
                 </div>
-                <div className="text-right min-w-0 flex items-center gap-2">
-                  <span className="font-extrabold text-slate-900">
+                <div className="text-right min-w-0 flex items-center gap-1">
+                  <span className="font-black text-slate-900">
                     {passengerName || '승객 미지정'}
                   </span>
-                  <span className="text-slate-500 font-medium text-[11px]">
+                  <span className="text-slate-500 font-normal text-xs ml-1">
                     (총 {passengerCount}명)
                   </span>
                   {passengerPhone && (
-                    <span className="text-slate-500 font-medium text-[11px]">
+                    <span className="text-slate-500 font-normal text-xs ml-1">
                       ({passengerPhone})
                     </span>
                   )}
@@ -687,94 +691,86 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
             </div>
 
             {/* 블록 2: 배차 조건 요약 */}
-            <div className="rounded-xl bg-slate-50/70 p-4 space-y-3">
+            <div className="rounded-2xl bg-white border border-slate-100 shadow-[0_2px_12px_rgba(15,23,42,0.03)] p-4 sm:p-5 space-y-3.5">
               {/* 운행 기간 */}
-              <div className="flex items-start justify-between gap-3 text-xs">
-                <div className="flex items-center gap-2 text-slate-500 font-medium shrink-0">
+              <div className="flex items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2 text-slate-500 font-semibold shrink-0">
                   <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
                   <span>운행 기간</span>
                 </div>
-                <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 min-w-0 text-right font-semibold text-slate-800">
+                <div className="flex items-center gap-1 font-bold text-slate-900">
                   {hasMultipleDates ? (
                     <>
                       <span>
                         {uniqueDates[0]} ~ {uniqueDates[uniqueDates.length - 1]}
                       </span>
-                      <span className="text-[11px] font-medium text-slate-500">
-                        {uniqueDates.length}일간
+                      <span className="text-xs font-normal text-slate-500 ml-1">
+                        ({uniqueDates.length}일간)
                       </span>
                     </>
                   ) : (
-                    <span>{pickupDate}</span>
-                  )}
-                  {!hasMultipleDates && (
-                    <span className="inline-flex items-center gap-1 text-slate-500 font-medium">
-                      <Clock className="w-3.5 h-3.5 text-slate-400" />
+                    <>
+                      <span>{pickupDate}</span>
+                      <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0 ml-2 mr-1" />
                       <span>{pickupTime}</span>
-                    </span>
+                    </>
                   )}
                 </div>
               </div>
 
               {/* 요청 차종 */}
-              <div className="flex items-start justify-between gap-3 text-xs pt-3 border-t border-slate-200/40">
-                <div className="flex items-center gap-2 text-slate-500 font-medium shrink-0">
+              <div className="flex items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2 text-slate-500 font-semibold shrink-0">
                   <Car className="w-4 h-4 text-slate-400 shrink-0" />
                   <span>요청 차종</span>
                 </div>
-                <span className="text-right font-semibold text-slate-800">
+                <span className="font-bold text-slate-900">
                   {requestedVehicleClass}
                 </span>
               </div>
 
-              {/* 항공편명 (정보 없음 ➔ 미정 출국 전 확인 필요) */}
-              <div className="flex items-start justify-between gap-3 text-xs pt-3 border-t border-slate-200/40">
-                <div className="flex items-center gap-2 text-slate-500 font-medium shrink-0">
+              {/* 항공편명 */}
+              <div className="flex items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2 text-slate-500 font-semibold shrink-0">
                   <Plane className="w-4 h-4 text-slate-400 shrink-0" />
                   <span>항공편명</span>
                 </div>
                 {flightNumber ? (
-                  <span className="text-right font-mono font-semibold text-slate-800">{flightNumber}</span>
+                  <span className="font-mono font-bold text-slate-900">{flightNumber}</span>
                 ) : (
-                  <span className="text-right text-[11px] font-medium text-slate-600">
+                  <span className="font-medium text-slate-600">
                     미정 (출국 전 확인 필요)
                   </span>
                 )}
               </div>
 
-              {/* 필수 조건 (영어 가능 기사, 동일 기사 3일 전담) */}
-              <div className="flex items-start justify-between gap-3 text-xs pt-3 border-t border-slate-200/40">
-                <div className="text-slate-500 font-medium shrink-0">
+              {/* 필수 조건 */}
+              <div className="flex items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2 text-slate-500 font-semibold shrink-0">
+                  <ListOrdered className="w-4 h-4 text-slate-400 shrink-0" />
                   <span>필수 조건</span>
                 </div>
-                <div className="flex flex-wrap justify-end gap-x-3 gap-y-1 min-w-0 text-right text-[11px] font-medium text-slate-700">
-                  {isEnglishRequired && (
-                    <span>영어 가능 기사</span>
-                  )}
-                  {hasMultipleDates && (
-                    <span>동일 기사 {uniqueDates.length}일 전담</span>
-                  )}
-                  {specialRequests && !specialRequests.includes('영어') && !specialRequests.includes('동일 기사') && (
-                    <span>{specialRequests}</span>
-                  )}
-                  {!isEnglishRequired && !hasMultipleDates && !specialRequests && (
-                    <span className="text-slate-400">특이사항 없음</span>
-                  )}
-                </div>
+                <span className="font-bold text-slate-900">
+                  {isEnglishRequired
+                    ? '영어 가능 기사'
+                    : hasMultipleDates
+                    ? `동일 기사 ${uniqueDates.length}일 전담`
+                    : specialRequests || '특이사항 없음'}
+                </span>
               </div>
             </div>
 
             {/* 블록 3: 상세 이동 경로 */}
-            <div className="rounded-xl bg-slate-50/70 p-4 space-y-3">
-              <div className="flex items-center gap-2 min-w-0 pb-2">
-                <MapPin className="w-4 h-4 text-slate-500 shrink-0" />
-                <span className="text-xs font-semibold text-slate-800 shrink-0">운행 경로 (상세 일정)</span>
-                <span className="text-[11px] font-normal text-slate-500 truncate">
+            <div className="space-y-2.5">
+              <div className="flex items-center gap-2 min-w-0 pt-1 pb-0.5">
+                <Compass className="w-4.5 h-4.5 text-slate-800 shrink-0" />
+                <span className="text-sm font-black text-slate-900 shrink-0">운행 경로 (상세 일정)</span>
+                <span className="text-xs font-normal text-slate-400 truncate">
                   총 {waypoints.length > 0 ? waypoints.length : 2}개 경유지
                   {hasMultipleDates && ` · ${uniqueDates.length}일간`}
                 </span>
                 {unconfirmedPlaces > 0 && (
-                  <span className="ml-auto shrink-0 rounded-full bg-white px-2 py-1 text-[10px] font-medium text-slate-600">
+                  <span className="ml-auto shrink-0 rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-amber-700 border border-amber-200">
                     주소 {unconfirmedPlaces}곳 확인 필요
                   </span>
                 )}
@@ -794,24 +790,21 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                     return (
                       <div
                         key={group.date}
-                        className={`relative rounded-xl bg-white overflow-visible ${waypointEdit && group.items.some((wp) => wp.id === waypointEdit.id) ? 'z-30' : 'z-0'}`}
+                        className={`relative rounded-2xl bg-white border border-slate-100 shadow-[0_2px_12px_rgba(15,23,42,0.03)] p-4 sm:p-5 overflow-visible ${waypointEdit && group.items.some((wp) => wp.id === waypointEdit.id) ? 'z-30' : 'z-0'}`}
                       >
                         {/* Day Group Header Accordion Trigger */}
                         <div
                           onClick={() => toggleDayCollapse(group.date)}
-                          className="px-3.5 py-2.5 rounded-t-xl bg-slate-100/70 hover:bg-slate-100 flex items-center justify-between cursor-pointer transition-colors select-none"
+                          className="flex items-center justify-between cursor-pointer select-none pb-1"
                         >
                           <div className="flex items-center gap-2">
-                            <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                            <span className="text-xs font-semibold text-slate-900">
-                              {formatWaypointDate(group.date, hasMultipleDates ? group.dayIndex : undefined)}
-                            </span>
-                            <span className="text-[11px] font-medium text-slate-400">
-                              · {group.items.length}곳
+                            <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
+                            <span className="text-sm font-black text-slate-900">
+                              {formatWaypointDate(group.date, hasMultipleDates ? group.dayIndex : undefined)} · {group.items.length}곳
                             </span>
                           </div>
 
-                          <div className="flex items-center gap-1 text-slate-400 hover:text-slate-600">
+                          <div className="flex items-center text-slate-400 hover:text-slate-600">
                             {isCollapsed ? (
                               <ChevronDown className="w-4 h-4" />
                             ) : (
@@ -822,10 +815,10 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
 
                         {/* Timeline List (Expanded) */}
                         {!isCollapsed && (
-                          <div className="p-3">
-                            <div className="relative pl-6 py-1 space-y-2.5">
+                          <div className="pt-3">
+                            <div className="relative pl-7 py-1 space-y-4">
                               {/* Vertical Rail Line */}
-                              <div className="absolute left-[11px] top-3 bottom-3 w-0.5 bg-slate-200" />
+                              <div className="absolute left-[7px] top-2 bottom-3 w-[1.5px] bg-slate-200" />
 
                               {group.items.map((wp, wIdx) => {
                                 const isFirst = wIdx === 0;
@@ -835,15 +828,27 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                                 return (
                                   <div
                                     key={wp.id}
-                                    className="relative flex items-center justify-between group/node"
+                                    className="relative flex items-start justify-between group/node"
                                   >
-                                    {/* Timeline Node Bullet */}
-                                    <div
-                                      aria-hidden="true"
-                                      className={`absolute -left-[16px] w-2.5 h-2.5 rounded-full z-10 ${
-                                        isFirst ? 'bg-slate-600' : isLast ? 'bg-slate-800' : 'bg-slate-300'
-                                      }`}
-                                    />
+                                    {/* Timeline Node Icon: 출발지 = icon_origin.png, 목적지 = icon_destination.png, 중간 = dot */}
+                                    {isFirst ? (
+                                      <img
+                                        src="/images/icons/driver_ui/icon_origin.png"
+                                        alt="출발"
+                                        className="absolute -left-[16px] top-0.5 w-4 h-4 object-contain z-10 shrink-0"
+                                      />
+                                    ) : isLast ? (
+                                      <img
+                                        src="/images/icons/driver_ui/icon_destination.png"
+                                        alt="종료"
+                                        className="absolute -left-[16px] top-0.5 w-4 h-4 object-contain z-10 shrink-0"
+                                      />
+                                    ) : (
+                                      <div
+                                        aria-hidden="true"
+                                        className="absolute -left-[12px] top-1.5 w-2 h-2 rounded-full bg-slate-300 ring-2 ring-white z-10 shrink-0"
+                                      />
+                                    )}
 
                                     {/* TMAP POI autocomplete with draft-only edits. */}
                                     {isEditingThis && waypointEdit ? (
@@ -917,20 +922,28 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                                     ) : (
                                       <div
                                         onClick={() => beginWaypointEdit(wp)}
-                                        className="flex-1 flex items-center justify-between p-2 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer select-none group/item"
+                                        className="flex-1 flex items-start justify-between p-1.5 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer select-none group/item"
                                       >
-                                        <div className="flex min-w-0 flex-col gap-1">
-                                          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5">
-                                            <span className="w-12 shrink-0 text-xs font-medium tabular-nums text-slate-600">
+                                        <div className="flex min-w-0 flex-col gap-0.5">
+                                          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+                                            <span className="w-12 shrink-0 text-xs font-black tabular-nums text-slate-900">
                                               {wp.time || '--:--'}
                                             </span>
-                                            <span className="min-w-0 text-xs font-medium text-slate-800">
+                                            <span className="min-w-0 text-xs font-black text-slate-900">
                                               {wp.location || '장소 미지정'}
                                             </span>
-                                            {isFirst && <span className="shrink-0 text-[10px] text-slate-500">출발</span>}
-                                            {isLast && <span className="shrink-0 text-[10px] text-slate-500">종료</span>}
+                                            {isFirst && (
+                                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-[#1E60F3] border border-blue-100/80">
+                                                출발
+                                              </span>
+                                            )}
+                                            {isLast && (
+                                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">
+                                                종료
+                                              </span>
+                                            )}
                                           </div>
-                                          <p className="pl-[60px] text-[11px] leading-relaxed text-slate-500">
+                                          <p className="pl-14 text-[11px] font-medium leading-relaxed text-slate-500">
                                             {wp.address || (isVerifiedEmailRouteStop({
                                               id: wp.id, date: wp.date || pickupDate, time: wp.time || '',
                                               location: wp.location, lat: wp.lat, lng: wp.lng,
@@ -974,13 +987,13 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                             </div>
 
                             {/* Add Stop Button per day */}
-                            <div className="pt-2 flex justify-start pl-5">
+                            <div className="pt-2 flex justify-start pl-7">
                               <button
                                 type="button"
                                 onClick={() => handleAddWaypointForDay(group.date)}
-                                className="text-[11px] font-medium text-slate-600 hover:text-slate-800 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                                className="text-xs font-bold text-slate-700 hover:text-slate-900 flex items-center gap-1.5 cursor-pointer"
                               >
-                                <Plus className="w-3 h-3" />
+                                <Plus className="w-3.5 h-3.5 text-slate-500" />
                                 <span>경유지 추가</span>
                               </button>
                             </div>
@@ -992,75 +1005,86 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                 </div>
               ) : (
                 /* Single Leg Timeline View with POI search */
-                <div className="relative pl-6 py-2 space-y-3">
-                  <div className="absolute left-[11px] top-3 bottom-3 w-0.5 bg-slate-200" />
+                <div className="rounded-2xl bg-white border border-slate-100 shadow-[0_2px_12px_rgba(15,23,42,0.03)] p-4 sm:p-5">
+                  <div className="relative pl-7 py-2 space-y-4">
+                    <div className="absolute left-[7px] top-3 bottom-3 w-[1.5px] bg-slate-200" />
 
-                  {/* Pickup */}
-                  <div className="relative flex items-center justify-between">
-                    <div aria-hidden="true" className="absolute -left-[16px] w-2.5 h-2.5 rounded-full bg-slate-600 z-10" />
-                    <div className="flex-1 min-w-0 pl-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs tabular-nums font-medium text-slate-600">{pickupTime}</span>
-                        <span className="text-[10px] font-medium text-slate-500">
-                          출발
-                        </span>
-                      </div>
-                      <HqPlaceSearchInput
-                        value={pickupLocation}
-                        onChange={(val) => {
-                          if (!extractedDraft) return;
-                          const first = [...(extractedDraft.waypoints || [])].sort((a, b) => a.order - b.order)[0];
-                          onUpdateDraft?.(changeEmailRouteStopName(extractedDraft, first?.id || 'pickup', val));
-                        }}
-                        onSelectPoi={handleSelectPickupPoi}
-                        autoSearch={true}
-                        isConfirmed={isPickupPoiConfirmed}
-                        placeholder="TMAP 출발지 검색 및 후보 선택"
-                        heightClass="h-9"
+                    {/* Pickup */}
+                    <div className="relative flex items-center justify-between">
+                      <img
+                        src="/images/icons/driver_ui/icon_origin.png"
+                        alt="출발"
+                        className="absolute -left-[16px] top-1 w-4 h-4 object-contain z-10 shrink-0"
                       />
-                      <p className="mt-1.5 break-words text-[11px] leading-relaxed text-slate-500">
-                        {extractedDraft?.pickupAddress || '상세 주소 미확정 · TMAP 검색 결과를 선택해 주세요.'}
-                      </p>
+                      <div className="flex-1 min-w-0 pl-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs tabular-nums font-black text-slate-900">{pickupTime}</span>
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-[#1E60F3] border border-blue-100/80">
+                            출발
+                          </span>
+                        </div>
+                        <HqPlaceSearchInput
+                          value={pickupLocation}
+                          onChange={(val) => {
+                            if (!extractedDraft) return;
+                            const first = [...(extractedDraft.waypoints || [])].sort((a, b) => a.order - b.order)[0];
+                            onUpdateDraft?.(changeEmailRouteStopName(extractedDraft, first?.id || 'pickup', val));
+                          }}
+                          onSelectPoi={handleSelectPickupPoi}
+                          autoSearch={true}
+                          isConfirmed={isPickupPoiConfirmed}
+                          placeholder="TMAP 출발지 검색 및 후보 선택"
+                          heightClass="h-9"
+                        />
+                        <p className="mt-1.5 break-words text-[11px] leading-relaxed text-slate-500">
+                          {extractedDraft?.pickupAddress || '상세 주소 미확정 · TMAP 검색 결과를 선택해 주세요.'}
+                        </p>
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Dropoff */}
-                  <div className="relative flex items-center justify-between pt-2">
-                    <div aria-hidden="true" className="absolute -left-[16px] w-2.5 h-2.5 rounded-full bg-slate-800 z-10" />
-                    <div className="flex-1 min-w-0 pl-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[10px] font-medium text-slate-500">
-                          종료
-                        </span>
-                      </div>
-                      <HqPlaceSearchInput
-                        value={dropoffLocation}
-                        onChange={(val) => {
-                          if (!extractedDraft) return;
-                          const last = [...(extractedDraft.waypoints || [])].sort((a, b) => a.order - b.order).at(-1);
-                          onUpdateDraft?.(changeEmailRouteStopName(extractedDraft, last?.id || 'dropoff', val));
-                        }}
-                        onSelectPoi={handleSelectDropoffPoi}
-                        autoSearch={true}
-                        isConfirmed={isDropoffPoiConfirmed}
-                        icon="flag"
-                        placeholder="TMAP 도착지 검색 및 후보 선택"
-                        heightClass="h-9"
+                    {/* Dropoff */}
+                    <div className="relative flex items-center justify-between pt-2">
+                      <img
+                        src="/images/icons/driver_ui/icon_destination.png"
+                        alt="종료"
+                        className="absolute -left-[16px] top-1 w-4 h-4 object-contain z-10 shrink-0"
                       />
-                      <p className="mt-1.5 break-words text-[11px] leading-relaxed text-slate-500">
-                        {extractedDraft?.dropoffAddress || '상세 주소 미확정 · TMAP 검색 결과를 선택해 주세요.'}
-                      </p>
+                      <div className="flex-1 min-w-0 pl-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">
+                            종료
+                          </span>
+                        </div>
+                        <HqPlaceSearchInput
+                          value={dropoffLocation}
+                          onChange={(val) => {
+                            if (!extractedDraft) return;
+                            const last = [...(extractedDraft.waypoints || [])].sort((a, b) => a.order - b.order).at(-1);
+                            onUpdateDraft?.(changeEmailRouteStopName(extractedDraft, last?.id || 'dropoff', val));
+                          }}
+                          onSelectPoi={handleSelectDropoffPoi}
+                          autoSearch={true}
+                          isConfirmed={isDropoffPoiConfirmed}
+                          icon="flag"
+                          placeholder="TMAP 도착지 검색 및 후보 선택"
+                          heightClass="h-9"
+                        />
+                        <p className="mt-1.5 break-words text-[11px] leading-relaxed text-slate-500">
+                          {extractedDraft?.dropoffAddress || '상세 주소 미확정 · TMAP 검색 결과를 선택해 주세요.'}
+                        </p>
+                      </div>
                     </div>
+
+                    {/* Single-leg card also gets its own per-day add control. */}
+                    <button
+                      type="button"
+                      onClick={handleConvertToMultiDestination}
+                      className="ml-1 flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-slate-900 pt-2 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5 text-slate-500" />
+                      <span>경유지 추가</span>
+                    </button>
                   </div>
-                  {/* Single-leg card also gets its own per-day add control. */}
-                  <button
-                    type="button"
-                    onClick={handleConvertToMultiDestination}
-                    className="ml-1 flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition-colors cursor-pointer"
-                  >
-                    <Plus className="h-3 w-3" />
-                    <span>경유지 추가</span>
-                  </button>
                 </div>
               )}
             </div>
@@ -1106,27 +1130,27 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
           </div>
         )}
 
-        {/* Action Buttons: 예약 정보 확인 후 4단계 확정 화면으로 이동 */}
+        {/* Action Buttons: 임시 저장 & 예약 확정 */}
         {extractedDraft && (
-          <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-3 z-10">
-            {/* 보조 버튼 (좌측) */}
+          <div className="pt-4 flex items-center justify-between gap-3 z-10">
+            {/* 임시 저장 */}
             <button
               type="button"
               onClick={handleSaveClick}
-              className="px-5 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 active:scale-95 text-slate-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
+              className="px-6 py-3.5 rounded-2xl border border-slate-200/90 bg-white hover:bg-slate-50 active:scale-95 text-slate-800 text-sm font-bold shadow-2xs transition-all cursor-pointer flex items-center gap-2"
             >
-              <Save className="w-3.5 h-3.5 text-slate-400" />
+              <Save className="w-4 h-4 text-slate-400" />
               <span>임시 저장</span>
             </button>
 
-            {/* 메인 액션 (우측) */}
+            {/* 예약 확정 */}
             <button
               type="button"
               onClick={handleRegisterClick}
-              className="px-6 py-2.5 rounded-xl bg-[#1E60F3] hover:bg-[#1855DB] active:scale-95 text-white text-xs font-semibold transition-colors cursor-pointer flex items-center gap-2"
+              className="px-8 py-3.5 rounded-2xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white text-sm font-bold shadow-md shadow-blue-500/20 transition-all cursor-pointer flex items-center justify-center gap-2 flex-1"
             >
               <span>예약 확정</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              <ArrowRight className="w-4 h-4 stroke-[2.5]" />
             </button>
           </div>
         )}
