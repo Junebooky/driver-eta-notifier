@@ -1097,8 +1097,8 @@ async function prepareServerDispatchSchedule(
           previousEndTime: existingHydrated.end_time || '',
           previousOrigin: existingHydrated.origin,
           previousDestination: existingHydrated.destination,
-          previousDriverName: existingHydrated.driver_name,
-          previousVehiclePlate: existingHydrated.vehicle_plate,
+          previousDriverName: existingHydrated.driver_name || undefined,
+          previousVehiclePlate: existingHydrated._meta.vehiclePlate || undefined,
           previousVersion: existingHydrated.version,
         }].slice(-20)
       : existingHydrated?._meta.revisionHistory,
