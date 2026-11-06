@@ -3,6 +3,7 @@ import { extractBookingFromEmail } from '@/services/emailBookingGeminiService';
 import { fetchNaverEmailForAnalysis } from '@/services/naverImapService';
 import { analyzeScheduleAttachments, type AnalyzedScheduleAttachment } from '@/services/emailAttachmentIntake';
 import { findEmailBookingCandidates } from '@/services/emailBookingMatchService';
+import { parseVehicleSlotsFromRequestedClass } from '@/utils/vehicleSlotParser';
 import { requireHqAdmin, isDevAuthAllowed } from '@/lib/auth/serverAuth';
 
 export const dynamic = 'force-dynamic';
@@ -93,7 +94,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(result, { status: 422 });
     }
 
+    const scheduleDates = [...new Set(
+      [result.draft.pickupDate, ...(result.draft.waypoints || []).map(stop => stop.date || '')]
+        .filter((date): date is string => /^\d{4}-\d{2}-\d{2}$/.test(date)),
+    )];
+    const slotCount = parseVehicleSlotsFromRequestedClass(result.draft.requestedVehicleClass).length;
     const matches = await findEmailBookingCandidates({
+      scheduleDates,
+      batchMode: scheduleDates.length > 1 || slotCount > 1,
       companyName: result.draft.companyName,
       clientId: result.draft.clientId,
       sender,
