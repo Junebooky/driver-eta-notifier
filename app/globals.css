@@ -638,3 +638,24 @@ dialog::backdrop {
     font-size: 16px;
   }
 }
+
+
+/* HQ quote calculator A-plan only. Printed official quote document is not changed. */
+.hq-quote-modal-a :is(input:not([type="checkbox"]),textarea,select),
+.hq-pricing-a :is(input:not([type="checkbox"]),textarea,select) {
+  background-color: #fff;
+  border: 1px solid rgba(225,231,240,.28);
+  border-radius: 15px;
+  box-shadow: 0 4px 14px rgba(35,49,78,.045);
+  color: #17233B;
+  outline: none;
+}
+.hq-quote-modal-a :is(input:not([type="checkbox"]),textarea,select):focus-visible,
+.hq-pricing-a :is(input:not([type="checkbox"]),textarea,select):focus-visible {
+  border-color: rgba(30,96,243,.18);
+  box-shadow: 0 4px 14px rgba(35,49,78,.045), 0 0 0 2px rgba(30,96,243,.12);
+}
+@media (max-width:767px) {
+  .hq-quote-modal-a :is(input:not([type="checkbox"]),textarea,select),
+  .hq-pricing-a :is(input:not([type="checkbox"]),textarea,select) { font-size: 16px; }
+}
