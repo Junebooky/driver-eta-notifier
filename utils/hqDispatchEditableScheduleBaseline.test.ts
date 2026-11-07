@@ -30,9 +30,11 @@ test('schedule values are shown separately without replacing current dispatch in
   assert.ok(dispatch.includes('initialBooking.vehiclePlate'));
   assert.ok(dispatch.includes('initialBooking.pickupTime'));
   assert.ok(dispatch.includes('initialBooking.endTime'));
-  assert.ok(dispatch.includes('차량 변경 중'));
-  assert.ok(dispatch.includes('출발 시간 변경 중'));
-  assert.ok(dispatch.includes('종료 시간 변경 중'));
+  assert.ok(dispatch.includes('originalDispatchBaseline?.vehiclePlate'));
+  assert.ok(dispatch.includes('originalDispatchBaseline?.pickupTime'));
+  assert.ok(dispatch.includes('originalDispatchBaseline?.endTime'));
+  assert.ok(dispatch.includes('최초 스케줄 기준 정보'));
+  assert.ok(dispatch.includes('현재 배차와 다름'));
   assert.ok(dispatch.includes('rounded-[20px] bg-[#F7F9FC]'));
 });
 

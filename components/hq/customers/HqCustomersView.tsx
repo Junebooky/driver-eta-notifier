@@ -42,6 +42,7 @@ import {
 import { CustomerBrandLogo } from './CustomerBrandLogo';
 import { HqCustomerRegisterModal } from './HqCustomerRegisterModal';
 import { HqCustomerEditModal } from './HqCustomerEditModal';
+import { HqCustomerAddContactModal, type NewCustomerContact } from './HqCustomerAddContactModal';
 import { HqComposeEmailModal } from '@/components/hq/email/HqComposeEmailModal';
 import { haptics } from '@/utils/haptics';
 import {
@@ -145,6 +146,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
 
   // Modals
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+  const [isAddContactOpen, setIsAddContactOpen] = useState(false);
   const [editModalConfig, setEditModalConfig] = useState<{
     isOpen: boolean;
     mode: 'preferences' | 'notes';
@@ -390,6 +392,31 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
     } finally {
       setIsLoadingDb(false);
     }
+  };
+
+  const handleAddContact = async (draft: NewCustomerContact): Promise<string | null> => {
+    if (!selectedCustomer) return '저장할 고객사를 먼저 선택해 주세요.';
+    const result = await saveContactToCrmDb({
+      companyName: selectedCustomer.name,
+      contactName: draft.name.trim(),
+      contactPhone: draft.phone.trim(),
+      contactEmail: draft.email.trim(),
+      role: draft.role.trim() || '예약 담당자',
+      department: draft.department.trim() || '의전예약',
+    });
+    if (!result.success) return result.message || '서버에 담당자를 저장하지 못했습니다.';
+
+    const refreshed = await fetchHqCustomersFromDb();
+    if (!refreshed.ok) {
+      setDbErrorMessage('담당자는 DB에 저장됐지만 목록 갱신에 실패했습니다. 새로고침해 주세요.');
+      // The server already persisted the contact; don't retry POST and create duplicates.
+      return null;
+    }
+    setCustomers(refreshed.customers);
+    setSelectedCustomerId(result.clientId);
+    setActiveTab('contacts');
+    setDbErrorMessage(null);
+    return null;
   };
 
   return (
@@ -1242,7 +1269,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                   </h3>
                   <button
                     type="button"
-                    onClick={() => alert('신규 담당자 추가 모달을 호출합니다.')}
+                    onClick={() => setIsAddContactOpen(true)}
                     className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-50 text-[#1E60F3] hover:bg-blue-100 text-xs font-bold transition-all cursor-pointer"
                   >
                     <Plus className="w-3 h-3" />
@@ -1465,6 +1492,14 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
         isOpen={isRegisterModalOpen}
         onClose={() => setIsRegisterModalOpen(false)}
         onRegisterCustomer={handleRegisterCustomer}
+      />
+
+      {/* 1-A. Server-persisted customer contact creation */}
+      <HqCustomerAddContactModal
+        isOpen={isAddContactOpen && Boolean(selectedCustomer)}
+        companyName={selectedCustomer?.name || ''}
+        onClose={() => setIsAddContactOpen(false)}
+        onSave={handleAddContact}
       />
 
       {/* 2. Modal: 선호사항 / 메모 수정 */}

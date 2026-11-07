@@ -603,6 +603,7 @@ export function mapScheduleItemToHqBooking(
     pickupTime: normalizeTimeHHmm(item.pickup_time) || normalizeTimeHHmm(item.time_display),
     endDate: normalizeDateToIso(item.end_date) || dateIso,
     endTime: normalizeTimeHHmm(item.end_time) || '',
+    originalDispatchBaseline: item.original_dispatch_baseline,
     pickupLocation: item.origin_name,
     destination: item.destination_name,
     routeWaypoints: item.routeWaypoints?.map((point) => ({ ...point })),

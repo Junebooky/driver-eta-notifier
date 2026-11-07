@@ -15,12 +15,17 @@ import {
 } from '@/utils/dispatchConflictDetector';
 import { isDateTimeIntervalOverlapping, DEFAULT_TURNAROUND_BUFFER_MINUTES } from '@/utils/availabilityEngine';
 import { findVipVehicle } from '@/utils/vehicleData';
+import { readFleetRegistry } from '@/lib/fleet/registryStore';
+import { mergeFleetRegistry } from '@/utils/fleetVehicleRegistry';
+import type { OriginalDispatchBaseline } from '@/types/originalDispatchBaseline';
 import { FLEET_PRESET_DRIVERS } from '@/utils/constants';
 
 export const VIP_META_PREFIX = '__VIP_META_V1__:';
 export const UNASSIGNED_VEHICLE_SENTINEL = '미배정';
 
 export interface HqScheduleMeta {
+  /** Written once at creation / first revision, never overwritten by dispatch edits. */
+  originalDispatchBaseline?: OriginalDispatchBaseline;
   routeWaypoints?: RouteWaypointItem[];
   bookingNo?: string;
   customerName?: string;
@@ -276,6 +281,7 @@ export function mapHydratedRowToScheduleItem(rawRow: Record<string, any>): Sched
     date: row.date,
     end_date: row.end_date || undefined,
     end_time: row.end_time?.slice(0, 5) || undefined,
+    original_dispatch_baseline: meta.originalDispatchBaseline,
     dateLabel: formatDateLabel(row.date),
     pickup_time: row.pickup_time ? row.pickup_time.slice(0, 5) : '',
     dropoff_time: null,
@@ -940,7 +946,9 @@ async function prepareServerDispatchSchedule(
   }
 
   // Determine canonical `vehicle_no` for FK `cockpit.drivers(vehicle_no)`
-  const matchedVeh = findVipVehicle(input.vehiclePlate || input.vehicleNo || '');
+  const fleetVehicles = mergeFleetRegistry(await readFleetRegistry());
+  const exactPlate = cleanVehicleIdentity(input.vehiclePlate || input.vehicleNo);
+  const matchedVeh = fleetVehicles.find(vehicle => cleanVehicleIdentity(vehicle.plate) === exactPlate);
   if (requestedStatus === 'published' && (!matchedVeh || cleanVehicleIdentity(matchedVeh.plate) !== cleanVehicleIdentity(input.vehiclePlate || input.vehicleNo) || (input.vehicleId && input.vehicleId !== matchedVeh.uuid))) {
     return { error: '확정 배차의 차량 UUID와 정확한 전체 번호판을 확인해 주세요.', statusCode: 400 };
   }
@@ -1084,8 +1092,18 @@ async function prepareServerDispatchSchedule(
     existingHydrated?._meta.bookingNo ||
     `#${isoDate.replace(/-/g, '').slice(2)}-${String(Math.floor(100 + Math.random() * 900))}`;
 
+  const initialBaseline: OriginalDispatchBaseline =
+    existingHydrated?._meta.originalDispatchBaseline || {
+      vehiclePlate: (existingHydrated?._meta.vehiclePlate || existingHydrated?.vehicle_no || resolvedPlate || '').trim(),
+      vehicleModel: (existingHydrated?._meta.vehicleModel || resolvedModel || '').trim(),
+      pickupTime: (existingHydrated?.pickup_time || hhmm).slice(0, 5),
+      endTime: (existingHydrated?.end_time || input.endTime || '').slice(0, 5),
+      capturedAt: nowIso,
+    };
+
   const nextMeta: HqScheduleMeta = {
     ...(existingHydrated?._meta || {}),
+    originalDispatchBaseline: initialBaseline,
     bookingNo,
     routeWaypoints: input.routeWaypoints ?? existingHydrated?._meta.routeWaypoints,
     customerName: input.customerName?.trim() || existingHydrated?._meta.customerName || input.passengerName?.trim() || 'VIP 고객',
