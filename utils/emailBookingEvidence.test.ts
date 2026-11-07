@@ -70,6 +70,9 @@ test('22:25 and 22:30 create two passenger meeting groups for ONE vehicle', () =
     [2,'NH867','22:30',1],
   ]);
   assert.ok(groups.every(g=>g.date==='2026-11-18' && g.airport==='GMP' && g.totalGroups===2));
+  const airportStop = result.waypoints?.find(p=>p.date==='2026-11-18' && p.location==='김포국제공항 국제선');
+  assert.match(airportStop?.notes || '', /1차 KE2104 22:25 \(Guest A, Guest B\)/);
+  assert.match(airportStop?.notes || '', /2차 NH867 22:30 \(Guest C\)/);
   assert.equal(result.tripType,'single');
   assert.equal(result.groupTrips,undefined);
   assert.equal(result.passengerCount,3);
