@@ -59,5 +59,5 @@ test('real HQ screens have been incrementally migrated; Settings keeps its origi
   assert.match(pricing,/HqCard/);
   assert.match(pricing,/HqSegmentedTabs/);
   assert.match(pricing,/onOpenQuoteModal\(item\.vehicleProductCode\)/);
-  assert.match(sidebar,/isSettings \? \(isActive \? 'bg-slate-100 text-slate-800'/);
+  assert.match(sidebar,/isSettings\s*\?\s*\(isActive \? 'bg-slate-100 text-slate-800'/);
 });
