@@ -1666,7 +1666,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                     {/* 기사 언어 */}
                     <div className="flex flex-col justify-between rounded-[18px] bg-[#FAFBFD] p-4">
                       <div className="flex items-center gap-1.5 mb-2.5">
-                        <Globe className="w-4 h-4 text-[#1E60F3] stroke-[2]" />
+                        <Globe className="size-4 text-[#73839D]" strokeWidth={1.9} />
                         <span className="text-xs font-bold text-slate-700">기사 언어</span>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
@@ -1698,7 +1698,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                     {/* 항공편명 */}
                     <div className="flex flex-col justify-between rounded-[18px] bg-[#FAFBFD] p-4">
                       <div className="flex items-center gap-1.5 mb-2.5">
-                        <Plane className="w-4 h-4 text-[#1E60F3] stroke-[2]" />
+                        <Plane className="size-4 text-[#73839D]" strokeWidth={1.9} />
                         <span className="text-xs font-bold text-slate-700">항공편명</span>
                       </div>
                       <input
@@ -1714,7 +1714,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                   {/* Row 2: 탑승객 정보 */}
                   <div className="rounded-[18px] bg-[#FAFBFD] p-4">
                     <div className="flex items-center gap-1.5 mb-2.5">
-                      <Users className="w-4 h-4 text-[#1E60F3] stroke-[2]" />
+                      <Users className="size-4 text-[#73839D]" strokeWidth={1.9} />
                       <span className="text-xs font-bold text-slate-700">탑승객 정보</span>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
@@ -1764,7 +1764,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                   <div className="flex flex-col gap-3 rounded-[18px] bg-[#FAFBFD] p-4 sm:flex-row sm:items-center">
                     <div className="flex items-center gap-2 shrink-0">
                       <div className="flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-white text-[#73839D]">
-                        <FileText className="w-3.5 h-3.5 text-[#1E60F3]" />
+                        <FileText className="size-4 text-[#73839D]" />
                       </div>
                       <span className="text-xs font-bold text-slate-700 whitespace-nowrap">현장 요청</span>
                     </div>
@@ -2586,7 +2586,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
         {totalLiveConflicts > 0 && (
           <div className="mt-3 space-y-1 rounded-[16px] bg-[#FFF9F1] p-4 text-[12px] font-medium text-[#8E633F]">
             <div className="flex items-center gap-1.5">
-              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+              <AlertTriangle className="size-4 shrink-0 text-[#A8784C]" />
               <span>기존 배차와 일정 중복이 감지되었습니다 ({totalLiveConflicts}건)</span>
             </div>
             <p className="pt-1 text-[11px] text-amber-300 font-semibold">
@@ -2606,7 +2606,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
         {/* Success Banner */}
         {notificationMsg && (
           <div className="mt-3 flex items-start gap-2 rounded-[16px] bg-[#EEF3FF] p-4 text-[12px] font-medium text-[#31598F]">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+            <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[#1E60F3]" />
             <span>{notificationMsg}</span>
           </div>
         )}
