@@ -184,65 +184,15 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
     },
   ];
 
-  const tabColorStyles: Record<string, { active: string; hover: string }> = {
-    dispatch: {
-      active: 'bg-blue-50/90 text-blue-700 border-blue-200/80 shadow-2xs',
-      hover: 'hover:bg-blue-50/40 hover:text-blue-700',
-    },
-    operations: {
-      active: 'bg-sky-50/90 text-sky-800 border-sky-200/80 shadow-2xs',
-      hover: 'hover:bg-sky-50/40 hover:text-sky-800',
-    },
-    quotes: {
-      active: 'bg-amber-50/90 text-amber-900 border-amber-200/80 shadow-2xs',
-      hover: 'hover:bg-amber-50/40 hover:text-amber-900',
-    },
-    customers: {
-      active: 'bg-yellow-50/90 text-yellow-900 border-yellow-200/80 shadow-2xs',
-      hover: 'hover:bg-yellow-50/40 hover:text-yellow-900',
-    },
-    emails: {
-      active: 'bg-blue-50/90 text-blue-800 border-blue-200/80 shadow-2xs',
-      hover: 'hover:bg-blue-50/40 hover:text-blue-800',
-    },
-    vehicles: {
-      active: 'bg-rose-50/90 text-rose-800 border-rose-200/80 shadow-2xs',
-      hover: 'hover:bg-rose-50/40 hover:text-rose-800',
-    },
-    drivers: {
-      active: 'bg-slate-100/95 text-slate-800 border-slate-300/80 shadow-2xs',
-      hover: 'hover:bg-slate-100/50 hover:text-slate-900',
-    },
-    driving_logs: {
-      active: 'bg-cyan-50/90 text-cyan-900 border-cyan-200/80 shadow-2xs',
-      hover: 'hover:bg-cyan-50/40 hover:text-cyan-900',
-    },
-    expenses: {
-      active: 'bg-orange-50/90 text-orange-900 border-orange-200/80 shadow-2xs',
-      hover: 'hover:bg-orange-50/40 hover:text-orange-900',
-    },
-    field_knowledge: {
-      active: 'bg-emerald-50/90 text-emerald-900 border-emerald-200/80 shadow-2xs',
-      hover: 'hover:bg-emerald-50/40 hover:text-emerald-900',
-    },
-    reports: {
-      active: 'bg-indigo-50/90 text-indigo-900 border-indigo-200/80 shadow-2xs',
-      hover: 'hover:bg-indigo-50/40 hover:text-indigo-900',
-    },
-    excel_import: {
-      active: 'bg-amber-50/90 text-amber-900 border-amber-200/80 shadow-2xs',
-      hover: 'hover:bg-amber-50/40 hover:text-amber-900',
-    },
-    settings: {
-      active: 'bg-slate-100/95 text-slate-800 border-slate-200/80 shadow-2xs',
-      hover: 'hover:bg-slate-100/50 hover:text-slate-900',
-    },
-  };
+  // Shared HQ A-plan selection. The intentionally unconfigured Settings tab
+  // remains untouched, including its existing menu behavior and styling.
+  const activeNavClass = 'bg-[#F3F7FF] text-[#17233B] shadow-[0_4px_14px_rgba(35,49,78,0.055)]';
+  const idleNavClass = 'bg-transparent text-[#61728A] hover:bg-[#F7F9FC] hover:text-[#17233B]';
 
   const renderSidebarBody = (isMobileDrawer: boolean, expanded: boolean) => (
     <>
       {/* Brand Header Card with Logo and Pin button */}
-      <div className="h-16 px-3 flex items-center border-b border-slate-100/80 relative shrink-0 overflow-hidden">
+      <div className="relative flex h-[72px] shrink-0 items-center overflow-hidden px-3">
         {/* Logo Anchor: Stays strictly in position */}
         <div className="w-10 h-10 flex items-center justify-center shrink-0">
           <img
@@ -261,10 +211,10 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
           }`}
         >
           <div className="flex flex-col min-w-0">
-            <span className="text-xs font-black text-slate-900 tracking-tight truncate">
+            <span className="truncate text-[12px] font-bold tracking-[-0.02em] text-[#17233B]">
               VIP LIMOUSINE
             </span>
-            <span className="text-[10px] text-slate-400 font-semibold truncate leading-none">
+            <span className="truncate text-[10px] font-medium leading-none text-[#95A3B9]">
               KOREA HQ
             </span>
           </div>
@@ -275,8 +225,8 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
               onClick={togglePin}
               className={`p-1.5 rounded-lg transition-all cursor-pointer shrink-0 ml-1.5 ${
                 isPinned
-                  ? 'text-[#1E60F3] bg-blue-50 hover:bg-blue-100 shadow-2xs'
-                  : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
+                  ? 'text-[#1E60F3] bg-[#EEF3FF] hover:bg-[#E8F0FF]'
+                  : 'text-[#73839D] hover:text-[#17233B] hover:bg-[#F7F9FC]'
               }`}
               title={isPinned ? '사이드바 고정 해제 (Cmd+B)' : '사이드바 고정 (Cmd+B)'}
               aria-label={isPinned ? '사이드바 고정 해제' : '사이드바 고정'}
@@ -294,7 +244,7 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
           <button
             type="button"
             onClick={onCloseMobile}
-            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center cursor-pointer transition-colors shrink-0 ml-auto"
+            className="ml-auto flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#F7F9FC] text-[#73839D] transition-colors hover:bg-[#EDF1F6]"
             aria-label="메뉴 닫기"
           >
             <X className="w-4 h-4" />
@@ -303,13 +253,10 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
       </div>
 
       {/* Navigation List */}
-      <nav className="flex-1 px-2.5 pt-3 pb-3 space-y-1 overflow-y-auto overflow-x-hidden">
+      <nav className="flex-1 space-y-1 overflow-x-hidden overflow-y-auto px-2.5 pb-3 pt-3">
         {menuItems.map((item) => {
           const isActive = activeTab === item.id;
-          const style = tabColorStyles[item.id] || {
-            active: 'bg-blue-50/90 text-blue-700 border-blue-200/80 shadow-2xs',
-            hover: 'hover:bg-blue-50/40 hover:text-blue-800',
-          };
+          const isSettings = item.id === 'settings';
 
           return (
             <button
@@ -320,10 +267,11 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
                 onSelectTab(item.id);
                 onCloseMobile?.();
               }}
-              className={`w-full h-10 px-2.5 flex items-center rounded-xl text-xs sm:text-sm font-bold transition-all text-left cursor-pointer active:scale-[0.98] border group ${
-                isActive
-                  ? style.active
-                  : `border-transparent text-slate-600 ${style.hover}`
+              aria-current={isActive ? 'page' : undefined}
+              className={`group flex min-h-11 w-full cursor-pointer items-center rounded-[14px] px-3 text-left text-[12px] font-semibold transition-[background-color,color,box-shadow,transform] active:scale-[0.99] sm:text-[13px] ${
+                isSettings
+                  ? (isActive ? 'bg-slate-100 text-slate-800' : 'text-slate-600 hover:bg-slate-100/50')
+                  : isActive ? activeNavClass : idleNavClass
               }`}
               title={!expanded ? item.label : undefined}
             >
@@ -375,14 +323,14 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
       </nav>
 
       {/* Switch to Driver Cockpit shortcut & Admin Logout */}
-      <div className="p-2.5 border-t border-slate-100 space-y-1 shrink-0 overflow-hidden">
+      <div className="shrink-0 space-y-1 overflow-hidden px-2.5 pb-2 pt-3">
         <Link
           href="/"
           onClick={() => {
             haptics.lightTap();
             onCloseMobile?.();
           }}
-          className="h-10 px-2.5 flex items-center rounded-xl bg-slate-50 hover:bg-blue-50/70 border border-slate-200/80 text-slate-600 hover:text-[#1E60F3] text-xs font-bold transition-colors group cursor-pointer"
+          className="group flex min-h-11 cursor-pointer items-center rounded-[14px] bg-[#F7F9FC] px-3 text-[12px] font-semibold text-[#4D607C] transition-colors hover:bg-[#EEF3FF] hover:text-[#1E60F3]"
           title={!expanded ? '기사 Cockpit 전환' : undefined}
           aria-label="기사 Cockpit 전환"
         >
@@ -412,7 +360,7 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
             await logoutClientSession();
             window.location.assign('/hq/login');
           }}
-          className="w-full h-10 px-2.5 flex items-center rounded-xl text-slate-500 hover:text-rose-600 hover:bg-rose-50 text-xs font-bold transition-colors cursor-pointer"
+          className="flex min-h-11 w-full cursor-pointer items-center rounded-[14px] px-3 text-[12px] font-semibold text-[#73839D] transition-colors hover:bg-[#F7F9FC] hover:text-[#4D607C]"
           title={!expanded ? '관리자 로그아웃' : undefined}
           aria-label="관리자 로그아웃"
         >
@@ -467,8 +415,8 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
           isExpanded ? 'w-60' : 'w-16'
         } ${
           isHovered && !isPinned
-            ? 'z-50 bg-white/95 backdrop-blur-md border-r border-slate-200/90 shadow-2xl'
-            : 'z-30 bg-white border-r border-slate-100'
+            ? 'z-50 bg-white/98 backdrop-blur-md shadow-[0_16px_48px_rgba(35,49,78,0.11)]'
+            : 'z-30 bg-white shadow-[1px_0_0_rgba(225,231,240,0.35)]'
         }`}
       >
         {renderSidebarBody(false, isExpanded)}
@@ -477,11 +425,11 @@ export const HqSidebar: React.FC<HqSidebarProps> = ({
       {/* Mobile Slide-Over Drawer (100% Full-Featured Parity) */}
       {isOpenMobile && (
         <div
-          className="fixed inset-0 z-[115] lg:hidden bg-slate-900/50 backdrop-blur-xs flex animate-fade-in select-none"
+          className="fixed inset-0 z-[115] flex select-none bg-[#17233B]/30 backdrop-blur-[2px] animate-fade-in lg:hidden"
           onClick={onCloseMobile}
         >
           <aside
-            className="w-72 max-w-[84dvw] h-dvh max-h-dvh bg-white shadow-2xl flex flex-col border-r border-slate-100"
+            className="flex h-dvh max-h-dvh w-72 max-w-[84dvw] flex-col bg-white shadow-[0_20px_60px_rgba(35,49,78,0.14)]"
             onClick={(e) => e.stopPropagation()}
           >
             {renderSidebarBody(true, true)}

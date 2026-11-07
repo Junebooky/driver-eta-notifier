@@ -81,7 +81,7 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
   }, [lastSyncedLabel]);
 
   return (
-    <header className="bg-white border-b border-slate-100 px-3.5 sm:px-6 sticky top-0 z-20">
+    <header className="sticky top-0 z-20 bg-white px-3.5 shadow-[0_1px_0_rgba(225,231,240,0.5)] sm:px-6">
       <div className="flex items-center justify-between gap-2.5 h-14 sm:h-16">
         {/* Left: Mobile Menu Button (lg:hidden) */}
         <div className="flex items-center gap-2">
@@ -92,7 +92,7 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
                 haptics.lightTap();
                 onOpenMobileMenu();
               }}
-              className="lg:hidden w-10 h-10 rounded-xl border border-slate-200/80 bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-700 shrink-0 cursor-pointer active:scale-95"
+              className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-[13px] bg-[#F7F9FC] text-[#4D607C] transition-colors hover:bg-[#EDF1F6] active:scale-[0.98] lg:hidden"
               aria-label="전체 메뉴 열기"
             >
               <Menu className="w-4 h-4" />
@@ -113,7 +113,7 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
                   onOpenQuoteModal();
                 }}
                 aria-label="빠른 견적 계산"
-                className="w-10 h-10 flex items-center justify-center rounded-xl bg-transparent border-0 hover:bg-slate-100 active:bg-slate-200 active:scale-95 transition-all duration-150 cursor-pointer"
+                className="flex size-10 cursor-pointer items-center justify-center rounded-[13px] bg-transparent transition-colors hover:bg-[#F7F9FC] active:bg-[#EEF3FF]"
               >
                 <img
                   src="/images/icons/calculator.png"
@@ -124,8 +124,8 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
 
               {/* Hover Tooltip: 빠른 견적 계산 */}
               <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 hidden group-hover:flex flex-col items-center pointer-events-none z-50">
-                <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 shadow-xs" />
-                <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+                <div className="-mb-1 size-2 rotate-45 bg-white" />
+                <span className="whitespace-nowrap rounded-[12px] bg-white px-3 py-2 text-[11px] font-medium text-[#4D607C] shadow-[0_8px_22px_rgba(35,49,78,0.1)] animate-in fade-in-50 duration-150">
                   빠른 견적 계산
                 </span>
               </div>
@@ -141,7 +141,7 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
                 onOpenNotifications?.();
               }}
               aria-label="배차 알림 열기"
-              className="w-10 h-10 flex items-center justify-center rounded-xl bg-transparent border-0 hover:bg-slate-100 active:bg-slate-200 active:scale-95 transition-all duration-150 cursor-pointer relative"
+              className="relative flex size-10 cursor-pointer items-center justify-center rounded-[13px] bg-transparent transition-colors hover:bg-[#F7F9FC] active:bg-[#EEF3FF]"
               title="미배정 · 기사 미확인 · 재확인 필요 점검"
             >
               <img
@@ -158,8 +158,8 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
 
             {/* Hover Tooltip: 배차 알림 */}
             <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 hidden group-hover:flex flex-col items-center pointer-events-none z-50">
-              <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 shadow-xs" />
-              <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+              <div className="-mb-1 size-2 rotate-45 bg-white" />
+              <span className="whitespace-nowrap rounded-[12px] bg-white px-3 py-2 text-[11px] font-medium text-[#4D607C] shadow-[0_8px_22px_rgba(35,49,78,0.1)] animate-in fade-in-50 duration-150">
                 배차 알림
               </span>
             </div>
@@ -176,7 +176,7 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
                 }}
                 disabled={isRefreshing}
                 aria-label="실시간 서버 동기화"
-                className="w-10 h-10 flex items-center justify-center rounded-xl bg-transparent border-0 hover:bg-slate-100 active:bg-slate-200 hover:scale-110 active:scale-95 transition-all duration-150 cursor-pointer disabled:opacity-60 relative"
+                className="relative flex size-10 cursor-pointer items-center justify-center rounded-[13px] bg-transparent transition-colors hover:bg-[#F7F9FC] active:bg-[#EEF3FF] disabled:cursor-not-allowed disabled:opacity-40"
                 title={lastSyncedLabel ? `최근 업데이트: ${lastSyncedLabel}` : '실시간 서버 동기화'}
               >
                 <img
@@ -192,9 +192,9 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
                 className={`absolute top-full left-1/2 -translate-x-1/2 pt-2 flex-col items-center pointer-events-none z-50 transition-all duration-200 ${showMinuteBubble ? 'flex animate-in fade-in zoom-in-95' : 'hidden group-hover:flex'
                   }`}
               >
-                <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 shadow-xs" />
-                <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg flex items-center gap-1.5 animate-in fade-in-50 duration-150">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping inline-block" />
+                <div className="-mb-1 size-2 rotate-45 bg-white" />
+                <span className="flex items-center gap-1.5 whitespace-nowrap rounded-[12px] bg-white px-3 py-2 text-[11px] font-medium text-[#4D607C] shadow-[0_8px_22px_rgba(35,49,78,0.1)] animate-in fade-in-50 duration-150">
+                  <span className="inline-block size-1.5 rounded-full bg-[#1E60F3]" />
                   {formattedSyncTime} 업데이트
                 </span>
               </div>
@@ -213,14 +213,14 @@ export const HqHeader: React.FC<HqHeaderProps> = ({
                 onOpenAdminLogin();
               }
             }}
-            className="hidden sm:flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl border border-slate-200/70 bg-white hover:bg-slate-50 transition-all shadow-2xs cursor-pointer active:scale-98"
+            className="hidden min-h-11 cursor-pointer items-center gap-2 rounded-[14px] bg-white py-1.5 pl-2 pr-3 shadow-[0_4px_14px_rgba(35,49,78,0.055)] transition-colors hover:bg-[#FAFBFD] active:scale-[0.99] sm:flex"
             title="본사 관제 세션 (클릭하여 관리자 로그인)"
           >
-            <div className="w-7 h-7 rounded-lg bg-[#1E60F3] text-white flex items-center justify-center text-xs font-black shrink-0">
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-[11px] bg-[#EEF3FF] text-[12px] font-semibold text-[#1E60F3]">
               V
             </div>
             <div className="text-left hidden lg:block">
-              <div className="text-xs font-bold text-slate-900 leading-tight">본사 관제</div>
+              <div className="text-[12px] font-semibold leading-tight text-[#17233B]">본사 관제</div>
               <div className="text-[10px] text-slate-400 font-medium leading-none">PC · 모바일 연동</div>
             </div>
             <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0 hidden lg:block" />
