@@ -1,6 +1,6 @@
 'use client';
 
-import { HqInput, HqSelect, HqTextarea } from '@/components/hq/ui';
+import { HqInput, HqSelect, HqTextarea, HqButton } from '@/components/hq/ui';
 import React, { useState } from 'react';
 import { X, Building2, User, Plus, Loader2 } from 'lucide-react';
 import { HqCustomer, CustomerTier } from '@/types/customerHq';
@@ -289,17 +289,17 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
 
           {/* Action buttons */}
           <div className="flex items-center justify-end gap-2 pt-3">
-            <button
+            <HqButton variant="subtle"
               type="button"
               onClick={onClose}
-              className="min-h-11 cursor-pointer rounded-[14px] bg-[#F7F9FC] px-4 text-[12px] font-semibold text-[#4D607C] transition-colors hover:bg-[#EDF1F6]"
+              
             >
               취소
-            </button>
-            <button
+            </HqButton>
+            <HqButton variant="primary"
               type="submit"
               disabled={isSubmitting}
-              className="flex min-h-11 cursor-pointer items-center gap-1.5 rounded-[14px] bg-[#1E60F3] px-5 text-[12px] font-semibold text-white shadow-[0_6px_16px_rgba(30,96,243,0.15)] transition-colors hover:bg-[#1757DC] disabled:cursor-not-allowed disabled:opacity-50 active:scale-[0.99]"
+              
             >
               {isSubmitting ? (
                 <>
@@ -312,7 +312,7 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
                   <span>고객사 등록 완료</span>
                 </>
               )}
-            </button>
+            </HqButton>
           </div>
         </form>
       </div>
