@@ -31,9 +31,9 @@ export interface HqDriverVehicleInfoModalProps {
 }
 
 const DELIVERY_OPTIONS = [
-  { value: 'manual_copy', label: '문자 / 카카오톡 직접 전달', detail: '직접 전송한 내역을 기록' },
-  { value: 'email', label: '외부 이메일 직접 전달', detail: '이메일 전송 후 이력 기록' },
-  { value: 'download', label: '다운로드 준비 기록', detail: '안내자료 준비 상태만 저장' },
+  { value: 'manual_copy', label: '문자·카카오톡으로 보냈어요', detail: '문자나 카카오톡으로 전달했어요', icon: '/images/icons/driver_ui/icon_talk.png' },
+  { value: 'email', label: '이메일로 보냈어요', detail: '이메일로 직접 전달했어요', icon: '/images/icons/eemail/icon_email.png' },
+  { value: 'download', label: '이미지만 저장해둘게요', detail: '보내기 전 준비해둘게요', icon: null },
 ] as const;
 
 export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> = ({
@@ -281,12 +281,10 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
         {/* Header */}
         <div className="flex shrink-0 items-start justify-between gap-3 bg-white px-5 pb-4 pt-5 sm:px-7 sm:pb-5 sm:pt-7">
           <div className="flex min-w-0 items-center gap-3.5">
-            <div className="flex size-11 shrink-0 items-center justify-center rounded-[15px] bg-[#EEF3FF] text-[#1E60F3]">
-              <Car className="size-5" />
-            </div>
+            <img src="/images/icons/drivers/icon_profile_card.png" alt="" aria-hidden="true" className="size-12 shrink-0 select-none object-contain" draggable={false} />
             <div>
               <h2 id="hq-driver-card-title" className="text-[18px] font-bold tracking-[-0.035em] text-[#17233B] sm:text-[20px]">
-                기사·차량 Info 고객 안내자료
+                고객 안내 카드
               </h2>
               <p className="mt-1 text-[12px] leading-relaxed text-[#73839D]">
                 예약 {booking.bookingNo || booking.id.slice(0, 8)} · {booking.customerName} ({booking.pickupDate} {booking.pickupTime})
@@ -454,7 +452,7 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
                     className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-1.5 rounded-[14px] bg-white px-3.5 text-[12px] font-semibold text-[#4D607C] shadow-[0_5px_16px_rgba(35,49,78,0.045),0_2px_5px_rgba(35,49,78,0.02)] transition-all hover:bg-[#FAFBFD] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25"
                   >
                     <Download className="size-4 text-[#73839D]" />
-                    <span>고화질 원본 다운로드</span>
+                    <span>이미지 저장</span>
                   </button>
                 )}
               </div>
@@ -507,17 +505,17 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
               <section aria-labelledby="hq-delivery-heading" className="relative space-y-5 rounded-[24px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] sm:p-6">
                 <div className="space-y-1.5">
                   <h3 id="hq-delivery-heading" className="text-[16px] font-bold tracking-[-0.025em] text-[#17233B]">
-                    고객사 발송 방식 및 수신처 확인
+                    어떻게 전달하셨나요?
                   </h3>
                   <p className="text-[12px] leading-relaxed text-[#73839D]">
-                    안내자료를 준비하거나 직접 전달한 내역을 남길 수 있습니다.
+                    고객에게 직접 전달한 방법을 기록으로 남겨둘 수 있어요.
                   </p>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <label htmlFor="hq-brochure-recipient" className="block text-[12px] font-semibold text-[#4D607C]">
-                      수신 연락처 / 이메일
+                      받는 분
                     </label>
                     <input
                       id="hq-brochure-recipient"
@@ -535,7 +533,7 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
 
                   <div className="space-y-2">
                     <span id="hq-brochure-channel-label" className="block text-[12px] font-semibold text-[#4D607C]">
-                      기록할 발송 방식
+                      전달 방법
                     </span>
                     <div className="relative" ref={channelMenuRef}>
                       <button
@@ -608,7 +606,7 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
 
                 <div className="space-y-4 pt-0.5">
                   <p className="text-[12px] leading-[1.65] text-[#73839D]">
-                    이메일이나 문자를 자동 발송하지 않으며, 고객 수신 여부도 자동 확인하지 않습니다.
+                    자동으로 발송되지 않아요. 직접 전달한 뒤 기록을 남겨주세요.
                   </p>
                   {channel !== 'download' && (
                     <label className="group flex cursor-pointer items-start gap-3 rounded-[14px] py-0.5 text-[13px] leading-relaxed text-[#4D607C]">
@@ -621,7 +619,7 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
                       <span aria-hidden="true" className={'mt-0.5 flex size-[21px] shrink-0 items-center justify-center rounded-[7px] transition-all peer-focus-visible:ring-2 peer-focus-visible:ring-[#1E60F3]/30 ' + (manualDeliveryConfirmed ? 'bg-[#1E60F3] text-white' : 'bg-white text-transparent shadow-[0_2px_8px_rgba(35,49,78,0.11)] ring-1 ring-[#E1E7F0]/60')}>
                         <Check className="size-3.5" strokeWidth={2.5} />
                       </span>
-                      <span>위 수신처에 안내자료를 직접 전달했으며, 수동 발송 기록을 남깁니다.</span>
+                      <span>안내 카드를 직접 전달했어요</span>
                     </label>
                   )}
                 </div>
@@ -633,7 +631,7 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
                   className="flex min-h-[52px] w-full cursor-pointer items-center justify-center gap-2 rounded-[16px] bg-[#1E60F3] px-5 py-3 text-[14px] font-semibold text-white shadow-[0_6px_16px_rgba(30,96,243,0.16)] transition-all hover:bg-[#1757DC] active:scale-[0.995] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#1E60F3]/20 disabled:cursor-not-allowed disabled:bg-[#E5EAF2] disabled:text-[#95A3B9] disabled:shadow-none"
                 >
                   {isSubmitting ? <Loader2 aria-hidden="true" className="size-[17px] animate-spin" /> : <Check aria-hidden="true" className="size-[18px]" strokeWidth={2.4} />}
-                  <span>{manualDeliveryConfirmed && channel !== 'download' ? '직접 전달한 수동 발송 기록 저장' : '안내자료 준비 상태 저장'}</span>
+                  <span>기록 저장하기</span>
                 </button>
               </section>
             </div>
@@ -644,7 +642,7 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 bg-white px-5 py-3.5 text-[11px] text-[#73839D] sm:px-7 sm:py-4">
           <span className="flex items-center gap-2">
             <ShieldCheck className="size-4 shrink-0 text-[#95A3B9]" />
-            <span>비공개 만료형 서명 URL · cross-tenant 격리 적용됨</span>
+            <span>안전하게 보호되는 보안 링크예요</span>
           </span>
           <button
             type="button"
