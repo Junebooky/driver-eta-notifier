@@ -26,6 +26,8 @@ export interface CustomerNotificationRecord {
 }
 
 export interface HqBooking {
+  /** Immutable schedule values from its first confirmed save. */
+  originalDispatchBaseline?: import('./originalDispatchBaseline').OriginalDispatchBaseline;
   id: string;
   bookingNo: string;
   no: number;
