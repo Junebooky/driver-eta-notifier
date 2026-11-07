@@ -1664,7 +1664,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                   {/* Row 1: 기사 언어 & 항공편명 */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3">
                     {/* 기사 언어 */}
-                    <div className="bg-[#F8FAFC] border border-slate-100 rounded-2xl p-3.5 flex flex-col justify-between">
+                    <div className="flex flex-col justify-between rounded-[18px] bg-[#FAFBFD] p-4">
                       <div className="flex items-center gap-1.5 mb-2.5">
                         <Globe className="w-4 h-4 text-[#1E60F3] stroke-[2]" />
                         <span className="text-xs font-bold text-slate-700">기사 언어</span>
@@ -1673,9 +1673,9 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                         <button
                           type="button"
                           onClick={() => handleCommonLanguageChange('ko')}
-                          className={`h-10 rounded-xl flex items-center justify-center gap-1.5 px-2 transition-all cursor-pointer ${commonLanguage === 'ko'
-                            ? 'bg-[#EBF2FE] text-[#1E60F3] font-bold shadow-2xs'
-                            : 'bg-white border border-slate-200/90 text-slate-700 hover:bg-slate-50 font-semibold'
+                          className={`h-11 rounded-[14px] flex items-center justify-center gap-1.5 px-3 transition-all cursor-pointer ${commonLanguage === 'ko'
+                            ? 'bg-[#EEF3FF] text-[#1E60F3] font-semibold'
+                            : 'bg-white text-[#4D607C] hover:bg-[#F7F9FC] font-medium shadow-[0_3px_10px_rgba(35,49,78,0.045)]'
                             }`}
                         >
                           <span className="text-sm">🇰🇷</span>
@@ -1684,9 +1684,9 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                         <button
                           type="button"
                           onClick={() => handleCommonLanguageChange('en')}
-                          className={`h-10 rounded-xl flex items-center justify-center gap-1.5 px-2 transition-all cursor-pointer ${commonLanguage === 'en'
-                            ? 'bg-[#EBF2FE] text-[#1E60F3] font-bold shadow-2xs'
-                            : 'bg-white border border-slate-200/90 text-slate-700 hover:bg-slate-50 font-semibold'
+                          className={`h-11 rounded-[14px] flex items-center justify-center gap-1.5 px-3 transition-all cursor-pointer ${commonLanguage === 'en'
+                            ? 'bg-[#EEF3FF] text-[#1E60F3] font-semibold'
+                            : 'bg-white text-[#4D607C] hover:bg-[#F7F9FC] font-medium shadow-[0_3px_10px_rgba(35,49,78,0.045)]'
                             }`}
                         >
                           <span className="text-sm">🇺🇸</span>
@@ -1696,7 +1696,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                     </div>
 
                     {/* 항공편명 */}
-                    <div className="bg-[#F8FAFC] border border-slate-100 rounded-2xl p-3.5 flex flex-col justify-between">
+                    <div className="flex flex-col justify-between rounded-[18px] bg-[#FAFBFD] p-4">
                       <div className="flex items-center gap-1.5 mb-2.5">
                         <Plane className="w-4 h-4 text-[#1E60F3] stroke-[2]" />
                         <span className="text-xs font-bold text-slate-700">항공편명</span>
@@ -1706,26 +1706,26 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                         value={commonFlightNumber}
                         onChange={(e) => setCommonFlightNumber(e.target.value)}
                         placeholder="예: SQ612"
-                        className="w-full h-10 bg-white border border-slate-200/90 rounded-xl px-3.5 text-xs sm:text-sm font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#1E60F3]"
+                        className="h-[52px] w-full rounded-[16px] bg-white px-4 text-[14px] font-medium text-[#17233B] placeholder:text-[#95A3B9] outline-none"
                       />
                     </div>
                   </div>
 
                   {/* Row 2: 탑승객 정보 */}
-                  <div className="bg-[#F8FAFC] border border-slate-100 rounded-2xl p-3.5">
+                  <div className="rounded-[18px] bg-[#FAFBFD] p-4">
                     <div className="flex items-center gap-1.5 mb-2.5">
                       <Users className="w-4 h-4 text-[#1E60F3] stroke-[2]" />
                       <span className="text-xs font-bold text-slate-700">탑승객 정보</span>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                       {/* 탑승 인원 */}
-                      <div className="h-10 bg-white border border-slate-200/90 rounded-xl px-3 flex items-center justify-between">
+                      <div className="flex min-h-[52px] items-center justify-between rounded-[16px] bg-white px-4">
                         <span className="text-xs font-bold text-slate-700 whitespace-nowrap">탑승 인원</span>
                         <div className="flex items-center gap-1.5">
                           <button
                             type="button"
                             onClick={() => setCommonPassengerCount((prev) => Math.max(0, prev - 1))}
-                            className="w-6 h-6 rounded-md bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold flex items-center justify-center cursor-pointer active:scale-95"
+                            className="flex size-7 cursor-pointer items-center justify-center rounded-[9px] bg-[#F7F9FC] text-[#4D607C] transition-colors hover:bg-[#EDF1F6] active:scale-95"
                           >
                             <Minus className="w-3 h-3 stroke-[2.5]" />
                           </button>
@@ -1735,7 +1735,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                           <button
                             type="button"
                             onClick={() => setCommonPassengerCount((prev) => prev + 1)}
-                            className="w-6 h-6 rounded-md bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white font-bold flex items-center justify-center cursor-pointer"
+                            className="flex size-7 cursor-pointer items-center justify-center rounded-[9px] bg-[#EEF3FF] text-[#1E60F3] transition-colors hover:bg-[#E2EBFF] active:scale-95"
                           >
                             <Plus className="w-3 h-3 stroke-[2.5]" />
                           </button>
@@ -1747,7 +1747,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                         value={commonPassengerName}
                         onChange={(e) => setCommonPassengerName(e.target.value)}
                         placeholder="탑승객명 (홍길동)"
-                        className="w-full h-10 bg-white border border-slate-200/90 rounded-xl px-3 text-xs sm:text-sm font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#1E60F3]"
+                        className="h-[52px] w-full rounded-[16px] bg-white px-4 text-[14px] font-medium text-[#17233B] placeholder:text-[#95A3B9] outline-none"
                       />
                       {/* 탑승객 번호 */}
                       <input
@@ -1755,15 +1755,15 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                         value={commonPassengerPhone}
                         onChange={(e) => setCommonPassengerPhone(formatPhoneNumber(e.target.value))}
                         placeholder="연락처 (010-1234-5678)"
-                        className="w-full h-10 bg-white border border-slate-200/90 rounded-xl px-3 text-xs sm:text-sm font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#1E60F3]"
+                        className="h-[52px] w-full rounded-[16px] bg-white px-4 text-[14px] font-medium text-[#17233B] placeholder:text-[#95A3B9] outline-none"
                       />
                     </div>
                   </div>
 
                   {/* Row 3: 현장 요청 */}
-                  <div className="bg-[#F8FAFC] border border-slate-100 rounded-2xl p-2.5 sm:p-3 flex items-center gap-3">
+                  <div className="flex flex-col gap-3 rounded-[18px] bg-[#FAFBFD] p-4 sm:flex-row sm:items-center">
                     <div className="flex items-center gap-2 shrink-0">
-                      <div className="w-7 h-7 rounded-lg bg-[#EBF2FE] text-[#1E60F3] flex items-center justify-center shrink-0">
+                      <div className="flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-white text-[#73839D]">
                         <FileText className="w-3.5 h-3.5 text-[#1E60F3]" />
                       </div>
                       <span className="text-xs font-bold text-slate-700 whitespace-nowrap">현장 요청</span>
@@ -1773,7 +1773,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                       value={commonMemo}
                       onChange={(e) => setCommonMemo(e.target.value)}
                       placeholder="요청사항을 입력하세요 (예: 공항 피켓 영접, 미팅 후 이동 등)"
-                      className="w-full h-10 bg-white border border-slate-200/90 rounded-xl px-3 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#1E60F3] flex-1 min-w-0"
+                      className="h-[52px] min-w-0 w-full flex-1 rounded-[16px] bg-white px-4 text-[14px] font-medium text-[#17233B] placeholder:text-[#95A3B9] outline-none"
                     />
                   </div>
                 </div>
@@ -2562,7 +2562,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                   </div>
 
                   {/* Row 3: Sub-Card 4 (현장 요청) */}
-                  <div className="bg-[#F8FAFC] border border-slate-100 rounded-2xl p-2.5 sm:p-3 flex items-center gap-3">
+                  <div className="flex flex-col gap-3 rounded-[18px] bg-[#FAFBFD] p-4 sm:flex-row sm:items-center">
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="text-xs font-bold text-slate-700 whitespace-nowrap">
                         현장 요청
