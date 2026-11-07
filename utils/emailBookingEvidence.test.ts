@@ -79,6 +79,17 @@ test('22:25 and 22:30 create two passenger meeting groups for ONE vehicle', () =
   assert.equal(result.warnings.some(w=>/픽업.*보다.*도착.*늦/.test(w)),false);
 });
 
+test('incorrect AI timing warning for a second same-airport arrival is discarded',()=>{
+  const base=draft();
+  base.warnings=[
+    '픽업 22:25보다 NH867 도착 22:30이 늦습니다. 고객에게 시간을 확인해 주세요.',
+    'Meet & Greet 피켓 문구 미지정',
+  ];
+  const result=enrichBookingDraftWithEmailEvidence(base,email);
+  assert.equal(result.warnings.some(w=>w.includes('NH867')&&w.includes('픽업')),false);
+  assert.ok(result.warnings.includes('Meet & Greet 피켓 문구 미지정'));
+});
+
 test('arrival-group guests use their full names only when the email identifies them uniquely', () => {
   const e = [
     'Nov 18 – Staria',
