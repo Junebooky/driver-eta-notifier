@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { HqEmailExtractedDraft, RouteWaypointItem } from '@/types/emailHq';
-import { extractFlightEvidence, extractCustomerAddressEvidence, addressHintToTmapQuery, enrichBookingDraftWithEmailEvidence, canonicalKoreanPlaceName } from './emailBookingEvidence';
+import { extractFlightEvidence, extractCustomerAddressEvidence, addressHintToTmapQuery, enrichBookingDraftWithEmailEvidence, canonicalKoreanPlaceName, buildAirportArrivalPickupGroups } from './emailBookingEvidence';
 import { selectUserEmailAttachments } from '@/services/naverImapService';
 
 // Anonymized regression fixture: no real passenger names, emails or internal customer IDs.
@@ -62,6 +62,46 @@ test('both arrival flights, both departure flights and the connecting leg surviv
   assert.deepEqual(flights[1].passengers, ['Guest C']);
 });
 
+test('22:25 and 22:30 create two passenger meeting groups for ONE vehicle', () => {
+  const result = enrichBookingDraftWithEmailEvidence(draft(), email);
+  const groups = buildAirportArrivalPickupGroups(result.flights || []);
+  assert.deepEqual(groups.map(g=>[g.sequence,g.flightNumber,g.arrivalTime,g.passengers.length]), [
+    [1,'KE2104','22:25',2],
+    [2,'NH867','22:30',1],
+  ]);
+  assert.ok(groups.every(g=>g.date==='2026-11-18' && g.airport==='GMP' && g.totalGroups===2));
+  assert.equal(result.tripType,'single');
+  assert.equal(result.groupTrips,undefined);
+  assert.equal(result.passengerCount,3);
+  assert.equal(result.warnings.some(w=>/픽업.*보다.*도착.*늦/.test(w)),false);
+});
+
+test('arrival-group guests use their full names only when the email identifies them uniquely', () => {
+  const e = [
+    'Nov 18 – Staria',
+    '22:25 – Pick up Mr. Evan North, Maya Stone, Alex Park from Gimpo Int Airport T1 -> Conrad Seoul',
+    'KE2104 HND-GMP 1950/2225 (Evan, Maya)',
+    'NH867 HND-GMP 2000/2230 (Alex)',
+  ].join('\n');
+  const result = enrichBookingDraftWithEmailEvidence(draft(),e);
+  const first=result.flights?.find(f=>f.flightNumber==='KE2104');
+  const second=result.flights?.find(f=>f.flightNumber==='NH867');
+  assert.deepEqual(first?.passengers,['Mr. Evan North','Maya Stone']);
+  assert.deepEqual(second?.passengers,['Alex Park']);
+  assert.equal(result.warnings.some(w=>w.includes('NH867') && w.includes('픽업')),false);
+});
+
+test('single late arrival is still flagged when pickup explicitly precedes its only flight',()=>{
+  const e=[
+    'Nov 18 – Staria',
+    '22:25 – Pick up Mr. Evan North from Gimpo Int Airport T1 -> Conrad Seoul',
+    'NH867 HND-GMP 2000/2230 (Evan)',
+  ].join('\n');
+  const result=enrichBookingDraftWithEmailEvidence(draft(),e);
+  assert.equal(buildAirportArrivalPickupGroups(result.flights||[]).length,1);
+  assert.ok(result.warnings.some(w=>w.includes('NH867') && w.includes('픽업')));
+});
+
 test('all six client addresses are retained and road numbers drive TMAP search', () => {
   const hints = extractCustomerAddressEvidence(email, '2026-11-18');
   assert.equal(hints.length, 6);
@@ -78,7 +118,9 @@ test('fixes missing flight and movement info without falsely confirming any TMAP
   const result = enrichBookingDraftWithEmailEvidence(draft(), email);
   assert.equal(result.flights?.length, 5);
   assert.deepEqual(result.passengerNames, ['Mr. Alex', 'Ben', 'Chris']);
-  assert.ok(result.warnings.some(w=>w.includes('NH867') && w.includes('픽업')));
+  assert.equal(result.warnings.some(w=>w.includes('NH867') && w.includes('픽업')), false,
+    'separately arriving passengers share the same airport pickup, not a timing conflict');
+  assert.equal(result.flights?.find(f=>f.flightNumber==='NH867')?.passengers.length, 1);
   assert.equal(result.waypoints?.length, 14);
   const fire = result.waypoints?.find(p => p.date==='2026-11-19' && p.time==='10:30');
   assert.equal(fire?.location, '삼성화재');
