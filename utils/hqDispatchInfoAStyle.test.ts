@@ -19,8 +19,10 @@ test('all three requested image assets exist in the committed project',()=>{
 test('existing booking details retain every working action and use requested simple Korean labels',()=>{
   assert.match(info, /onOpenDriverVehicleInfo\(initialBooking\)/);
   assert.match(info, /onOpenCustomerMessage\(initialBooking\)/);
-  assert.match(info, /setIsVehicleModalOpen\(true\)/);
-  assert.match(info, /setIsDriverModalOpen\(true\)/);
+  assert.match(info, /renderAllocationSelector\(firstAlloc, 0\)/);
+  assert.match(info, /allocations\.map\(\(allocation, index\) => renderAllocationSelector\(allocation, index\)\)/);
+  assert.match(info, /setActiveCardDropdown\(\{ allocId: allocation\.id, type: 'vehicle' \}\)/);
+  assert.match(info, /setActiveCardDropdown\(\{ allocId: allocation\.id, type: 'driver' \}\)/);
   assert.match(info, /handleSubmit\('unassigned'\)/);
   assert.match(info, /handleSubmit\('published'\)/);
   assert.match(info, /handleCancelDispatch/);
