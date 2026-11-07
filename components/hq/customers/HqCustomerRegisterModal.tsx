@@ -148,7 +148,7 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="예: DIOR Korea, Tiffany & Co."
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-[#1E60F3] outline-none text-slate-900 font-bold"
+                
               />
             </div>
             <div>
@@ -158,7 +158,7 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
               <HqSelect
                 value={tier}
                 onChange={(e) => setTier(e.target.value as CustomerTier)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-[#1E60F3] outline-none text-slate-900 font-bold"
+                
               >
                 <option value="VIP">VIP</option>
                 <option value="주요">주요 고객</option>
@@ -177,7 +177,7 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
               value={department}
               onChange={(e) => setDepartment(e.target.value)}
               placeholder="예: Global Events, 의전비서팀, 홍보마케팅실"
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-[#1E60F3] outline-none text-slate-900"
+              
             />
           </div>
 
@@ -195,7 +195,7 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
                   value={contactName}
                   onChange={(e) => setContactName(e.target.value)}
                   placeholder="예: Marie Dupont"
-                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-bold"
+                  
                 />
               </div>
               <div>
@@ -205,7 +205,7 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
                   value={contactRole}
                   onChange={(e) => setContactRole(e.target.value)}
                   placeholder="예: Global Events Director"
-                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900"
+                  
                 />
               </div>
               <div>
@@ -215,7 +215,7 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
                   value={contactPhone}
                   onChange={(e) => setContactPhone(formatPhoneNumber(e.target.value))}
                   placeholder="예: 010-1234-5678 또는 +33 6 12 34 56 78"
-                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900"
+                  
                 />
               </div>
               <div>
@@ -225,7 +225,7 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
                   value={contactEmail}
                   onChange={(e) => setContactEmail(e.target.value)}
                   placeholder="예: contact@company.com"
-                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900"
+                  
                 />
               </div>
             </div>
@@ -242,7 +242,7 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
                 value={nextEventTitle}
                 onChange={(e) => setNextEventTitle(e.target.value)}
                 placeholder="예: 2024 Collection Preview"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-[#1E60F3] outline-none text-slate-900"
+                
               />
             </div>
             <div>
@@ -254,7 +254,7 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
                 value={nextEventDate}
                 onChange={(e) => setNextEventDate(e.target.value)}
                 placeholder="예: 2024. 11. 30"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-[#1E60F3] outline-none text-slate-900"
+                
               />
             </div>
           </div>
@@ -269,7 +269,7 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
               value={preferencesInput}
               onChange={(e) => setPreferencesInput(e.target.value)}
               placeholder="예: S클래스 선호, 영어 가능 기사, 정시 출발 필수"
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-[#1E60F3] outline-none text-slate-900"
+              
             />
           </div>
 
@@ -283,7 +283,7 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
               value={notesInput}
               onChange={(e) => setNotesInput(e.target.value)}
               placeholder="행사 시 주의점 및 기사 배차 유의사항을 줄바꿈하여 입력하세요..."
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-[#1E60F3] outline-none text-slate-900 font-medium"
+              
             />
           </div>
 
