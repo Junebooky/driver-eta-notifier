@@ -55,7 +55,7 @@ test('batch saves issue one RPC, preserve metadata, and never compensate with se
   const vehicle = VIP_REAL_VEHICLES[0];
   const candidate = {date:'2026-11-01',pickupTime:'19:00',endTime:'22:00',vehiclePlate:vehicle.plate,vehicleId:vehicle.uuid,driverId:'a0000000-0000-4000-8000-000000000001',driverName:'테스트운전',origin:'A',destination:'B',dispatchStatus:'published' as const};
   let calls=0;
-  supabaseAdmin.from = (()=>{throw new Error('unexpected mutation/read');}) as typeof from;
+  supabaseAdmin.from = ((table:string)=>{if(table==='fleet_vehicle_registry'){const registry={select:()=>registry,eq:async()=>({data:[],error:null})};return registry;}throw new Error('unexpected mutation/read');}) as unknown as typeof from;
   supabaseAdmin.rpc = (async (name: string,args: Record<string,unknown>) => {
     calls++; assert.equal(name,'commit_dispatch_batch');
     const items = args.p_items as {row:Record<string,unknown>}[];
