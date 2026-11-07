@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { HqCard } from '@/components/hq/ui';
 import {
   Car,
   Truck,
@@ -372,7 +373,7 @@ export const HqOfficialPricingView: React.FC<HqOfficialPricingViewProps> = ({
       )}
 
       {/* Top Header Card: Icon + Title + Count */}
-      <div className="flex items-center justify-between gap-3 rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] sm:px-6">
+      <HqCard className="flex items-center justify-between gap-3 p-5 sm:px-6">
         <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
           {/* 견적서 아이콘 & 마우스 호버 툴팁 */}
           <div className="relative group/quotes inline-flex items-center justify-center cursor-pointer shrink-0">
@@ -410,7 +411,7 @@ export const HqOfficialPricingView: React.FC<HqOfficialPricingViewProps> = ({
           <Calculator className="hidden sm:block w-3.5 h-3.5" />
           <span className="hidden sm:inline">견적서 작성</span>
         </button>
-      </div>
+      </HqCard>
 
       {/* 1. Top Segmented Capsule Tabs */}
       <div className="flex items-center gap-1.5 overflow-x-auto rounded-[20px] bg-white p-3 sm:px-5 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden shadow-2xs">
