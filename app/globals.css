@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+.driver-app :is(button, input, textarea, select) {
+  scroll-margin-block-end: calc(96px + env(safe-area-inset-bottom));
+}
+
 @layer utilities {
   @keyframes slideUp {
     from {
@@ -27,6 +31,111 @@
 
   .animate-fade-in {
     animation: fadeIn 0.2s ease-out forwards;
+  }
+
+  @keyframes driverModalBackdropIn {
+    0% {
+      opacity: 0;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+
+  @keyframes driverModalCardIn {
+    0% {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes driverPopoverIn {
+    0% {
+      opacity: 0;
+      transform: scale(0.96) translateY(-4px);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  .driver-modal-backdrop {
+    opacity: 1;
+    transition: opacity 300ms cubic-bezier(0, 0, 0.2, 1);
+    animation: driverModalBackdropIn 300ms cubic-bezier(0, 0, 0.2, 1) both;
+    @starting-style {
+      opacity: 0;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      animation-duration: 100ms;
+      transition-duration: 100ms;
+    }
+  }
+
+  .driver-modal-card,
+  .animate-scale-up {
+    opacity: 1;
+    transform: scale(1);
+    transition:
+      opacity 300ms cubic-bezier(0, 0, 0.2, 1),
+      transform 300ms cubic-bezier(0, 0, 0.2, 1);
+    animation: driverModalCardIn 300ms cubic-bezier(0, 0, 0.2, 1) both;
+    will-change: transform, opacity;
+    @starting-style {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      animation: driverModalBackdropIn 100ms ease-out both;
+      transition-duration: 100ms;
+      @starting-style {
+        opacity: 0;
+        transform: none;
+      }
+    }
+  }
+
+  .driver-popover-in {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    transform-origin: top center;
+    transition:
+      opacity 220ms cubic-bezier(0, 0, 0.2, 1),
+      transform 220ms cubic-bezier(0, 0, 0.2, 1);
+    animation: driverPopoverIn 220ms cubic-bezier(0, 0, 0.2, 1) both;
+    will-change: transform, opacity;
+    @starting-style {
+      opacity: 0;
+      transform: scale(0.96) translateY(-4px);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      animation: driverModalBackdropIn 100ms ease-out both;
+      transition-duration: 100ms;
+      @starting-style {
+        opacity: 0;
+        transform: none;
+      }
+    }
+  }
+
+  @keyframes stepSlideIn {
+    from {
+      opacity: 0;
+      transform: translateX(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .animate-step-slide {
+    animation: stepSlideIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 
   @keyframes reasoningShimmer {
@@ -78,4 +187,624 @@
 ::-webkit-scrollbar-thumb {
   background: #CBD5E1;
   border-radius: 4px;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* Container-query responsive data table (HQ Reservations & Dispatches) */
+.hq-responsive-table-wrapper {
+  overflow: auto;
+  max-inline-size: 100%;
+  max-block-size: min(680px, 78dvh);
+  container-type: inline-size;
+}
+
+.hq-responsive-table-wrapper table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+}
+
+.hq-responsive-table-wrapper thead {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+}
+
+.hq-responsive-table-wrapper thead th:first-child {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 3;
+  background: #F8FAFC;
+  box-shadow: 2px 0 8px -2px rgba(15, 23, 42, 0.08);
+}
+
+.hq-responsive-table-wrapper tbody th {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+  background: #FFFFFF;
+  box-shadow: 2px 0 8px -2px rgba(15, 23, 42, 0.08);
+}
+
+.hq-responsive-table-wrapper tbody tr:hover th {
+  background: #F8FAFC;
+}
+
+@container (width < 580px) {
+  .hq-responsive-table-wrapper table,
+  .hq-responsive-table-wrapper thead,
+  .hq-responsive-table-wrapper tbody,
+  .hq-responsive-table-wrapper tr,
+  .hq-responsive-table-wrapper th,
+  .hq-responsive-table-wrapper td {
+    display: block;
+    min-width: 0 !important;
+    width: 100%;
+  }
+
+  .hq-responsive-table-wrapper thead {
+    /* Hide column header from layout and screen readers in stacked card mode */
+    display: none;
+  }
+
+  .hq-responsive-table-wrapper tbody tr {
+    margin-block-end: 0.75rem;
+    border: 1px solid #E2E8F0;
+    border-radius: 1rem;
+    background: #FFFFFF;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+    overflow: hidden;
+  }
+
+  .hq-responsive-table-wrapper tbody th {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 2;
+    background: #F8FAFC;
+    border-block-end: 1px solid #F1F5F9;
+    padding: 0.75rem 0.875rem !important;
+  }
+
+  .hq-responsive-table-wrapper tbody td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.5rem 0.875rem !important;
+    border-block-end: 1px solid #F8FAFC;
+    white-space: normal !important;
+    max-width: none !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    word-break: keep-all;
+    text-align: right;
+  }
+
+  .hq-responsive-table-wrapper tbody td > * {
+    max-width: 72% !important;
+    margin-inline-start: auto;
+  }
+
+  .hq-responsive-table-wrapper tbody td:last-child {
+    border-block-end: none;
+    padding-block-end: 0.75rem !important;
+  }
+
+  .hq-responsive-table-wrapper table {
+    --label-2: "운행 일시";
+    --label-3: "담당 기사";
+    --label-4: "배정 차량";
+    --label-5: "픽업 출발지";
+    --label-6: "도착 목적지";
+    --label-7: "배차 상태";
+    --label-8: "기사 확인";
+    --label-9: "안내자료";
+  }
+
+  .hq-responsive-table-wrapper td:nth-child(2)::before {
+    content: var(--label-2);
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748B;
+    flex-shrink: 0;
+  }
+  .hq-responsive-table-wrapper td:nth-child(3)::before {
+    content: var(--label-3);
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748B;
+    flex-shrink: 0;
+  }
+  .hq-responsive-table-wrapper td:nth-child(4)::before {
+    content: var(--label-4);
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748B;
+    flex-shrink: 0;
+  }
+  .hq-responsive-table-wrapper td:nth-child(5)::before {
+    content: var(--label-5);
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748B;
+    flex-shrink: 0;
+  }
+  .hq-responsive-table-wrapper td:nth-child(6)::before {
+    content: var(--label-6);
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748B;
+    flex-shrink: 0;
+  }
+  .hq-responsive-table-wrapper td:nth-child(7)::before {
+    content: var(--label-7);
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748B;
+    flex-shrink: 0;
+  }
+  .hq-responsive-table-wrapper td:nth-child(8)::before {
+    content: var(--label-8);
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748B;
+    flex-shrink: 0;
+  }
+  .hq-responsive-table-wrapper td:nth-child(9)::before {
+    content: var(--label-9);
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748B;
+    flex-shrink: 0;
+  }
+}
+
+/* Native modal dialog scroll containment (modern-web-guidance: dialog & prevent-page-scroll-under-modal-dialog) */
+dialog:modal {
+  overscroll-behavior: contain;
+}
+
+dialog::backdrop {
+  overflow: hidden;
+  overscroll-behavior: contain;
+  background-color: rgba(15, 23, 42, 0.62);
+  backdrop-filter: blur(3px);
+}
+
+@media (max-width: 767px) {
+  .hq-app :is(input, select, textarea),
+  .hq-booking-scroll :is(input, select, textarea) { font-size: 16px; }
+  .hq-app :is(button, input, select, textarea) { scroll-margin-block-end: calc(96px + env(safe-area-inset-bottom)); }
+  .hq-app select { min-height: 44px; }
+}
+
+
+/* HQ Excel: elevation only on pointer devices; touch interactions stay stable. */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .hq-excel-download-lift {
+    transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 220ms ease;
+  }
+  .hq-excel-download-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 9px 20px rgba(53, 84, 136, 0.12);
+  }
+}
+
+/* One brief left-right shake per 30 seconds; no hover reaction or tooltip. */
+@keyframes hq-report-unread-shake {
+  0%, 2.5%, 100% { transform: translateX(0) rotate(0); }
+  0.4% { transform: translateX(-3px) rotate(-5deg); }
+  0.8% { transform: translateX(3px) rotate(5deg); }
+  1.2% { transform: translateX(-3px) rotate(-4deg); }
+  1.6% { transform: translateX(3px) rotate(4deg); }
+  2% { transform: translateX(-1px) rotate(-2deg); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hq-report-unread-wiggle {
+    transform-origin: 50% 75%;
+    animation: hq-report-unread-shake 30s linear infinite;
+  }
+}
+
+/* HQ inline workbook: comfortable horizontal scrollbar on pointer devices. */
+.hq-excel-scroll {scrollbar-width:auto;scrollbar-color:#A9B9CC #EFF3F8;}
+.hq-excel-scroll::-webkit-scrollbar {height:16px;width:13px;}
+.hq-excel-scroll::-webkit-scrollbar-track {background:#EFF3F8;border-radius:12px;}
+.hq-excel-scroll::-webkit-scrollbar-thumb {background:#A9B9CC;border:3px solid #EFF3F8;border-radius:12px;min-width:48px;}
+.hq-excel-scroll::-webkit-scrollbar-thumb:hover {background:#889DB7;}
+
+/* When HQ selects an applied report, reveal its real month/physical row. */
+.hq-excel-target-row {
+  position: relative;
+  outline: 2px solid #1E60F3;
+  outline-offset: -2px;
+  background-color: #F0F5FF;
+}
+.hq-excel-target-row > td {
+  background-color: #F0F5FF;
+}
+@keyframes hq-excel-row-reveal {
+  0% {background-color:#DCE9FF;box-shadow:0 0 0 0 rgba(30,96,243,.3);transform:translateY(0)}
+  30% {background-color:#E9F1FF;box-shadow:0 0 0 4px rgba(30,96,243,.13);transform:translateY(-2px)}
+  100% {background-color:#F0F5FF;box-shadow:0 0 0 0 rgba(30,96,243,0);transform:translateY(0)}
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hq-excel-target-row {animation:hq-excel-row-reveal 1.5s ease-out both;}
+}
+
+/* Driver Cockpit report chat: quick, quiet motion rather than abrupt insertions.
+   Only animate the new message; no bright flash, bounce or page-level movement. */
+@keyframes vip-chat-send-in {
+  0% { opacity: .3; transform: translate3d(0, 34px, 0) scale(.985); }
+  55% { opacity: 1; }
+  100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+@keyframes vip-chat-reply-in {
+  from { opacity: 0; transform: translate3d(0, 11px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes vip-chat-typing-pulse {
+  0%, 65%, 100% { opacity: .42; transform: translateY(0); }
+  32% { opacity: 1; transform: translateY(-3px); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .vip-chat-outgoing-enter {
+    animation: vip-chat-send-in 420ms cubic-bezier(.16, 1, .3, 1) both;
+  }
+  .vip-chat-reply-enter {
+    animation: vip-chat-reply-in 270ms cubic-bezier(.2, .8, .2, 1) both;
+  }
+  .vip-chat-typing-enter {
+    animation: vip-chat-reply-in 250ms cubic-bezier(.2, .8, .2, 1) both;
+  }
+  .vip-chat-typing-dot {
+    animation: vip-chat-typing-pulse 1050ms ease-in-out infinite;
+  }
+}
+
+
+/* Driver Cockpit A안 — existing dispatch information only.
+   Native time pickers are left untouched so browser date/time picking works. */
+.hq-dispatch-info-a :is(input[type="text"], input[type="tel"], input[type="email"], input[type="search"], input[type="number"]) {
+  background-color: #FFFFFF;
+  border: 1px solid rgba(225, 231, 240, 0.28);
+  border-radius: 16px;
+  color: #17233B;
+  box-shadow: 0 5px 16px rgba(35, 49, 78, 0.045), 0 2px 5px rgba(35, 49, 78, 0.02);
+  font-weight: 500;
+  transition: box-shadow 170ms ease, border-color 170ms ease;
+}
+
+.hq-dispatch-info-a :is(input[type="text"], input[type="tel"], input[type="email"], input[type="search"], input[type="number"])::placeholder {
+  color: #95A3B9;
+}
+
+.hq-dispatch-info-a :is(input[type="text"], input[type="tel"], input[type="email"], input[type="search"], input[type="number"]):focus-visible {
+  outline: none;
+  border-color: rgba(30, 96, 243, 0.20);
+  box-shadow: 0 5px 16px rgba(35, 49, 78, 0.05), 0 0 0 2px rgba(30, 96, 243, 0.10);
+}
+
+.hq-dispatch-info-a :is(input[type="text"], input[type="tel"], input[type="email"], input[type="search"], input[type="number"]):disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Prevent iOS input zoom, including the address picker nested in this modal. */
+@media (max-width: 767px) {
+  .hq-dispatch-info-a :is(input[type="text"], input[type="tel"], input[type="email"], input[type="search"], input[type="number"]) {
+    font-size: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hq-dispatch-info-a :is(input, button) { transition: none; }
+}
+
+
+/* HQ customer list search only. Customer create/edit forms use HqInput/Select/Textarea. */
+.hq-customer-a :is(input[type="text"], input[type="search"], select) {
+  min-height: 44px;
+  background-color: #fff;
+  border: 1px solid var(--hq-line, rgba(225,231,240,.28));
+  border-radius: 15px;
+  color: var(--hq-ink, #17233B);
+  box-shadow: var(--hq-shadow-control, 0 4px 14px rgba(35,49,78,.045));
+  outline: none;
+}
+.hq-customer-a :is(input[type="text"], input[type="search"], select):focus-visible {
+  border-color: rgba(30,96,243,.18);
+  box-shadow: var(--hq-shadow-control, 0 4px 14px rgba(35,49,78,.045)), 0 0 0 2px rgba(30,96,243,.12);
+}
+@media (max-width:767px) {
+  .hq-customer-a :is(input[type="text"], input[type="search"], select) { font-size: 16px; }
+}
+
+/* HQ Driver Management A-plan only; no changes to driver Cockpit forms. */
+.hq-drivers-a :is(input:not([type="checkbox"]), select, textarea),
+.hq-driver-form-a :is(input:not([type="checkbox"]), select, textarea),
+.hq-driver-detail-a :is(input:not([type="checkbox"]), select, textarea) {
+  background-color: #fff;
+  border: 1px solid rgba(225, 231, 240, .28);
+  border-radius: 15px;
+  box-shadow: 0 4px 14px rgba(35, 49, 78, .045);
+  color: #17233B;
+  outline: none;
+  transition: box-shadow 160ms ease;
+}
+.hq-drivers-a :is(input:not([type="checkbox"]), select, textarea):focus-visible,
+.hq-driver-form-a :is(input:not([type="checkbox"]), select, textarea):focus-visible,
+.hq-driver-detail-a :is(input:not([type="checkbox"]), select, textarea):focus-visible {
+  border-color: rgba(30, 96, 243, .18);
+  box-shadow: 0 4px 14px rgba(35, 49, 78, .045), 0 0 0 2px rgba(30, 96, 243, .12);
+}
+.hq-driver-form-a :is(input:not([type="checkbox"]), select, textarea) {
+  min-height: 44px;
+  padding: 10px 14px;
+  font-size: 14px;
+}
+.hq-drivers-a :is(input,textarea)::placeholder,
+.hq-driver-form-a :is(input,textarea)::placeholder {
+  color: #95A3B9;
+}
+.hq-drivers-a table thead {
+  background-color: #FAFBFD;
+}
+.hq-drivers-a table tbody tr:hover {
+  background-color: #FAFBFD;
+}
+@media (max-width: 767px) {
+  .hq-drivers-a :is(input:not([type="checkbox"]), select,textarea),
+  .hq-driver-form-a :is(input:not([type="checkbox"]), select,textarea),
+  .hq-driver-detail-a :is(input:not([type="checkbox"]), select,textarea) {
+    font-size: 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hq-drivers-a :is(button,input,select,textarea),
+  .hq-driver-form-a :is(button,input,select,textarea) { transition: none; }
+}
+
+
+/* HQ Email inbox and compose A-plan only; A02 batch-approval internals are not restyled. */
+.hq-email-a :is(input[type="text"],input[type="search"]),
+.hq-email-compose-a :is(input:not([type="checkbox"]),textarea) {
+  background-color: white;
+  border: 1px solid rgba(225,231,240,.28);
+  border-radius: 15px;
+  color: #17233B;
+  box-shadow: 0 4px 14px rgba(35,49,78,.045);
+  outline: none;
+  transition: box-shadow 160ms ease;
+}
+.hq-email-compose-a :is(input:not([type="checkbox"]),textarea) {
+  padding: 11px 14px;
+  font-size: 14px;
+}
+.hq-email-a input[type="text"]:focus-visible,
+.hq-email-compose-a :is(input:not([type="checkbox"]),textarea):focus-visible {
+  border-color: rgba(30,96,243,.18);
+  box-shadow: 0 4px 14px rgba(35,49,78,.045), 0 0 0 2px rgba(30,96,243,.12);
+}
+@media (max-width:767px) {
+  .hq-email-a :is(input[type="text"],input[type="search"]),
+  .hq-email-compose-a :is(input:not([type="checkbox"]),textarea) { font-size: 16px; }
+}
+
+
+/* HQ booking detail A-plan; other recently completed dispatch modals untouched. */
+.hq-booking-residual-a :is(input:not([type="checkbox"]), select, textarea) {
+  background-color: #fff;
+  border: 1px solid rgba(225,231,240,.28);
+  border-radius: 15px;
+  color: #17233B;
+  box-shadow: 0 4px 14px rgba(35,49,78,.045);
+  outline: none;
+  transition: box-shadow 160ms ease;
+}
+.hq-booking-residual-a :is(input:not([type="checkbox"]), select, textarea):focus-visible {
+  border-color: rgba(30,96,243,.18);
+  box-shadow: 0 4px 14px rgba(35,49,78,.045), 0 0 0 2px rgba(30,96,243,.12);
+}
+@media (max-width:767px) {
+  .hq-booking-residual-a :is(input:not([type="checkbox"]), select, textarea) {
+    font-size: 16px;
+  }
+}
+
+
+/* HQ quote calculator A-plan only. Printed official quote document is not changed. */
+.hq-quote-modal-a :is(input:not([type="checkbox"]),textarea,select),
+.hq-pricing-a :is(input:not([type="checkbox"]),textarea,select) {
+  background-color: #fff;
+  border: 1px solid rgba(225,231,240,.28);
+  border-radius: 15px;
+  box-shadow: 0 4px 14px rgba(35,49,78,.045);
+  color: #17233B;
+  outline: none;
+}
+.hq-quote-modal-a :is(input:not([type="checkbox"]),textarea,select):focus-visible,
+.hq-pricing-a :is(input:not([type="checkbox"]),textarea,select):focus-visible {
+  border-color: rgba(30,96,243,.18);
+  box-shadow: 0 4px 14px rgba(35,49,78,.045), 0 0 0 2px rgba(30,96,243,.12);
+}
+@media (max-width:767px) {
+  .hq-quote-modal-a :is(input:not([type="checkbox"]),textarea,select),
+  .hq-pricing-a :is(input:not([type="checkbox"]),textarea,select) { font-size: 16px; }
+}
+
+
+/* HQ A-plan design tokens & primitives (not applied to driver Cockpit or Settings). */
+:root {
+  --hq-accent: #1E60F3;
+  --hq-accent-hover: #1757DC;
+  --hq-ink: #17233B;
+  --hq-ink-muted: #61728A;
+  --hq-ink-soft: #73839D;
+  --hq-surface: #FFFFFF;
+  --hq-surface-muted: #FAFBFD;
+  --hq-surface-control: #F7F9FC;
+  --hq-selected: #F3F7FF;
+  --hq-selected-quiet: #EEF3FF;
+  --hq-line: rgba(225,231,240,.28);
+  --hq-shadow-card: 0 6px 20px rgba(35,49,78,.055), 0 2px 6px rgba(35,49,78,.025);
+  --hq-shadow-control: 0 4px 14px rgba(35,49,78,.045);
+  --hq-shadow-dialog: 0 24px 64px rgba(27,45,77,.16), 0 4px 14px rgba(27,45,77,.04);
+  --hq-radius-card: 23px;
+  --hq-radius-control: 14px;
+  --hq-radius-dialog: 26px;
+}
+.hq-ui-card {
+  border-radius: var(--hq-radius-card);
+  background: var(--hq-surface);
+  box-shadow: var(--hq-shadow-card);
+}
+.hq-ui-card[data-tone="muted"] {
+  background: var(--hq-surface-muted);
+  box-shadow: none;
+}
+.hq-ui-button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  border-radius: var(--hq-radius-control);
+  padding: 0 16px;
+  font-size: 12px;
+  line-height: 1.3;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 160ms ease, box-shadow 160ms ease, color 160ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.hq-ui-button[data-size="sm"] { min-height: 40px; padding-inline: 12px; }
+.hq-ui-button[data-size="lg"] { min-height: 52px; padding-inline: 20px; font-size: 13px; }
+.hq-ui-button[data-variant="primary"] { color: #fff; background: var(--hq-accent); box-shadow: 0 6px 16px rgba(30,96,243,.15); }
+.hq-ui-button[data-variant="primary"]:hover:not(:disabled) { background: var(--hq-accent-hover); }
+.hq-ui-button[data-variant="secondary"] { color: var(--hq-ink-muted); background: var(--hq-surface); box-shadow: var(--hq-shadow-control); }
+.hq-ui-button[data-variant="secondary"]:hover:not(:disabled) { background: #F5F8FF; }
+.hq-ui-button[data-variant="subtle"] { color: var(--hq-ink-muted); background: var(--hq-surface-control); }
+.hq-ui-button[data-variant="subtle"]:hover:not(:disabled) { background: #EDF1F6; }
+.hq-ui-button[data-variant="ghost"] { color: var(--hq-ink-muted); background: transparent; }
+.hq-ui-button[data-variant="ghost"]:hover:not(:disabled) { background: var(--hq-surface-control); }
+.hq-ui-button[data-variant="ghost"]:active:not(:disabled) { background: var(--hq-selected-quiet); }
+.hq-ui-button[data-variant="danger"] { color: #A34E45; background: #FFF4F2; }
+.hq-ui-button[data-variant="danger"]:hover:not(:disabled) { background: #FFE9E5; }
+.hq-ui-button:disabled { cursor: not-allowed; opacity: .45; }
+.hq-ui-button:focus-visible,
+.hq-ui-field:focus-visible,
+.hq-ui-tab:focus-visible {
+  outline: 2px solid rgba(30,96,243,.38);
+  outline-offset: 2px;
+}
+.hq-ui-icon-button { width: 40px; min-width: 40px; padding: 0; }
+.hq-ui-field {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--hq-line);
+  border-radius: 15px;
+  padding: 10px 14px;
+  outline: 0;
+  background: var(--hq-surface);
+  box-shadow: var(--hq-shadow-control);
+  color: var(--hq-ink);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.hq-ui-field::placeholder { color: #95A3B9; }
+.hq-ui-field:disabled { opacity: .5; cursor: not-allowed; }
+.hq-ui-field:focus-visible {
+  border-color: rgba(30,96,243,.18);
+  box-shadow: var(--hq-shadow-control), 0 0 0 2px rgba(30,96,243,.12);
+}
+.hq-ui-textarea { resize: vertical; min-height: 104px; }
+.hq-ui-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 11px;
+  line-height: 1.2;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--hq-surface-control);
+  color: var(--hq-ink-soft);
+}
+.hq-ui-badge[data-tone="selected"] { background: var(--hq-selected-quiet); color: var(--hq-accent); }
+.hq-ui-badge[data-tone="warning"] { background: #FFF9F1; color: #8E633F; }
+.hq-ui-badge[data-tone="critical"] { background: #FFF4F2; color: #A34E45; }
+.hq-ui-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  border-radius: 15px;
+  background: var(--hq-surface-control);
+  padding: 4px;
+}
+.hq-ui-tab {
+  display: inline-flex;
+  min-height: 40px;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--hq-ink-soft);
+  padding: 0 14px;
+  font-size: 12px;
+  line-height: 1.2;
+  font-weight: 600;
+  cursor: pointer;
+}
+.hq-ui-tab[aria-selected="true"] { background: #fff; color: var(--hq-accent); box-shadow: 0 3px 10px rgba(35,49,78,.065); }
+.hq-ui-tab:not([aria-selected="true"]):hover { color: var(--hq-ink); }
+.hq-ui-tooltip {
+  display: inline-flex;
+  white-space: nowrap;
+  border-radius: 12px;
+  background: var(--hq-surface);
+  padding: 8px 12px;
+  color: #4D607C;
+  font-size: 11px;
+  font-weight: 500;
+  box-shadow: 0 8px 22px rgba(35,49,78,.1);
+}
+.hq-ui-tooltip-caret { background: var(--hq-surface); }
+.hq-ui-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(23,35,59,.3);
+  padding: 12px;
+  backdrop-filter: blur(2px);
+}
+.hq-ui-modal-surface {
+  max-height: 94dvh;
+  border-radius: var(--hq-radius-dialog);
+  background: var(--hq-surface-muted);
+  box-shadow: var(--hq-shadow-dialog);
+  overflow: auto;
+}
+@media (max-width:767px) {
+  .hq-ui-field { font-size: 16px; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .hq-ui-button,.hq-ui-field,.hq-ui-tab { transition: none; }
 }

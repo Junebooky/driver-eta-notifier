@@ -1,4 +1,5 @@
 'use client';
+import { createRetryableJsonMutation } from '@/utils/retryableJsonMutation';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { DriverProfile, LocationPreset } from '@/types';
@@ -9,9 +10,10 @@ import { EditScheduleModal } from '@/components/EditScheduleModal';
 import { ScheduleFormModal } from '@/components/ScheduleFormModal';
 import { Camera, Send, AlertCircle, Sparkles, RefreshCw, Bot, Copy, Check, X, Plus, CalendarPlus } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
-import { ENABLE_DEV_FLEET_SWITCHER } from '@/utils/constants';
+import { ENABLE_DEV_FLEET_SWITCHER, FLEET_PRESET_DRIVERS } from '@/utils/constants';
 import { generateNameCandidates } from '@/utils/nameMatcher';
 import { parseVehicleDetails } from '@/components/ProfileModal';
+import { ensureClientAuth } from '@/utils/cockpitClientAuth';
 
 const THINKING_STEPS = [
   '🔍 배차 데이터베이스 동선 대조 중...',
@@ -113,6 +115,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
 }) => {
   // Schedules state (starts with empty state by default, populated dynamically per vehicle)
   const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
+  const [scheduleSaveError,setScheduleSaveError]=useState('');
   const [scheduleTitle, setScheduleTitle] = useState<string>('페라리 VIP 의전 배차표');
   const [inputText, setInputText] = useState('');
   const [selectedDateFilter, setSelectedDateFilter] = useState<string>('all');
@@ -138,21 +141,8 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
   };
 
   const handleSaveNewSchedule = async (newSchedule: ScheduleItem) => {
-    setSchedules((prev) => {
-      const updated = sortSchedulesChronologically([newSchedule, ...prev.filter((s) => s.id !== newSchedule.id)]);
-      try {
-        localStorage.setItem('cockpit_schedules', JSON.stringify(updated));
-      } catch (e) {
-        console.warn('Failed to cache new schedule to storage:', e);
-      }
-      return updated;
-    });
-
     try {
-      await fetch('/api/schedules', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const response = await scheduleMutation.send('/api/schedules', {
           vehicle_no: newSchedule.vehicle_no,
           date: newSchedule.date,
           pickup_time: newSchedule.pickup_time,
@@ -169,15 +159,19 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
           flight_number: newSchedule.flight,
           protocol_notes: newSchedule.notes,
           status: newSchedule.status,
-        }),
       });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || '일정을 저장하지 못했습니다.');
+      setSchedules(prev => sortSchedulesChronologically([result.schedule || newSchedule,...prev.filter(s => s.id !== newSchedule.id)]));
     } catch (err) {
-      console.warn('Failed to persist new schedule to Supabase:', err);
+      setScheduleSaveError(err instanceof Error ? err.message : '저장 결과를 확인하지 못했습니다.');
+      throw err;
     }
   };
 
   // Vehicle Isolation & Fleet Switcher State (Dev Mode enables switching between vehicles & All)
   const initialVehicle = profile.vehicleNo?.match(/(\d+호차)/)?.[1] || '4호차';
+  const [scheduleMutation]=useState(()=>createRetryableJsonMutation('cockpit_pending_schedule_edit'));
   const [selectedVehicleFilter, setSelectedVehicleFilter] = useState<string>(initialVehicle);
   const [availableVehicles, setAvailableVehicles] = useState<string[]>(['1호차', '2호차', '4호차', '8호차']);
   const [vehicleCounts, setVehicleCounts] = useState<Record<string, number>>({
@@ -190,9 +184,10 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
 
   const fetchCounts = useCallback(async () => {
     try {
+      await ensureClientAuth('driver', { driverName: profile.driverName, vehicleNo: profile.vehicleNo });
       const [schedRes, driverRes] = await Promise.all([
-        fetch('/api/schedules?vehicle_no=all'),
-        fetch('/api/driver?all=true'),
+        fetch('/api/schedules?vehicle_no=all&include_cancelled=1', { cache: 'no-store' }),
+        fetch('/api/driver?all=true', { cache: 'no-store' }),
       ]);
 
       const vehicleSet = new Set<string>(['1호차', '2호차', '4호차', '8호차']);
@@ -207,14 +202,31 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
         all: 0,
       };
 
+      const isValidVehicleTab = (val?: string | null) => {
+        if (!val) return false;
+        const t = val.trim();
+        return Boolean(t && t !== '미배정' && t !== 'unassigned');
+      };
+
       if (schedRes.ok) {
         const data = await schedRes.json();
         if (data.schedules) {
           counts.all = data.schedules.length;
           data.schedules.forEach((s: ScheduleItem) => {
-            const v = s.vehicle_no || '4호차';
+            const v = (s.vehicle_no || '').trim();
+            if (!isValidVehicleTab(v)) return;
             vehicleSet.add(v);
             counts[v] = (counts[v] || 0) + 1;
+
+            // Also attribute to dedicated Fleet Hocha if dispatched by plate/driver name (e.g., '윤태준' -> '4호차')
+            if (s.driver_name) {
+              const matchedHocha = FLEET_PRESET_DRIVERS.find(
+                (p) => p.driverName === s.driver_name && p.vehicleNo !== v
+              );
+              if (matchedHocha) {
+                counts[matchedHocha.vehicleNo] = (counts[matchedHocha.vehicleNo] || 0) + 1;
+              }
+            }
           });
         }
       }
@@ -223,7 +235,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
         const dData = await driverRes.json();
         if (Array.isArray(dData.drivers)) {
           dData.drivers.forEach((d: any) => {
-            if (d.vehicle_no) {
+            if (isValidVehicleTab(d.vehicle_no)) {
               vehicleSet.add(d.vehicle_no);
               if (counts[d.vehicle_no] === undefined) {
                 counts[d.vehicle_no] = 0;
@@ -234,6 +246,10 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
       }
 
       const sortedVehicles = Array.from(vehicleSet).sort((a, b) => {
+        const isHochaA = a.endsWith('호차');
+        const isHochaB = b.endsWith('호차');
+        if (isHochaA && !isHochaB) return -1;
+        if (!isHochaA && isHochaB) return 1;
         const numA = parseInt(a.replace(/\D/g, ''), 10) || 999;
         const numB = parseInt(b.replace(/\D/g, ''), 10) || 999;
         return numA - numB;
@@ -248,17 +264,19 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
 
   const fetchSchedulesForVehicle = useCallback(async (vNo: string) => {
     try {
-      const res = await fetch(`/api/schedules?vehicle_no=${encodeURIComponent(vNo)}`);
+      await ensureClientAuth('driver', { driverName: profile.driverName, vehicleNo: profile.vehicleNo });
+      const res = await fetch(
+        `/api/schedules?vehicle_no=${encodeURIComponent(vNo)}&include_cancelled=1`,
+        { cache: 'no-store' }
+      );
       if (res.ok) {
         const data = await res.json();
         if (data.schedules) {
           setSchedules(sortSchedulesChronologically(data.schedules));
           if (vNo === 'all') {
             setScheduleTitle('전체 호차 통합 관제 배차표');
-          } else if (vNo.includes('4')) {
-            setScheduleTitle('4호차 페라리 VIP 의전 배차표');
           } else {
-            setScheduleTitle(`${vNo} VIP 의전 배차표`);
+            setScheduleTitle(`${vNo} 확정 의전 배차 스케줄`);
           }
         }
       }
@@ -272,15 +290,33 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
   }, [fetchCounts]);
 
   useEffect(() => {
-    if (!ENABLE_DEV_FLEET_SWITCHER) {
-      // Production Rule: Strictly locked to driver's own vehicle
-      const lockV = profile.vehicleNo?.match(/(\d+호차)/)?.[1] || '4호차';
-      setSelectedVehicleFilter(lockV);
-      fetchSchedulesForVehicle(lockV);
-    } else {
-      fetchSchedulesForVehicle(selectedVehicleFilter);
+    const activeTargetVehicle = !ENABLE_DEV_FLEET_SWITCHER
+      ? profile.vehicleNo?.match(/(\d+호차)/)?.[1] || profile.carNumber || '4호차'
+      : selectedVehicleFilter;
+
+    if (!ENABLE_DEV_FLEET_SWITCHER && selectedVehicleFilter !== activeTargetVehicle) {
+      setSelectedVehicleFilter(activeTargetVehicle);
     }
-  }, [selectedVehicleFilter, profile.vehicleNo, fetchSchedulesForVehicle]);
+    fetchSchedulesForVehicle(activeTargetVehicle);
+
+    const syncDriverSchedules = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      fetchSchedulesForVehicle(activeTargetVehicle);
+      fetchCounts();
+    };
+
+    const intervalId = window.setInterval(syncDriverSchedules, 8000);
+    window.addEventListener('focus', syncDriverSchedules);
+    document.addEventListener('visibilitychange', syncDriverSchedules);
+    window.addEventListener('vip_hq_schedules_updated', syncDriverSchedules);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', syncDriverSchedules);
+      document.removeEventListener('visibilitychange', syncDriverSchedules);
+      window.removeEventListener('vip_hq_schedules_updated', syncDriverSchedules);
+    };
+  }, [selectedVehicleFilter, profile.vehicleNo, profile.carNumber, fetchSchedulesForVehicle, fetchCounts]);
 
   // Copilot Thinking & Typewriter States
   const [thinkingStep, setThinkingStep] = useState<number | null>(null);
@@ -689,7 +725,7 @@ ${scheduleItemsFormatted}`.trim();
             driverName: profile.driverName,
             passengerName: profile.passengerName,
           },
-          schedules: schedules.length > 0 ? schedules : CONFIRMED_FERRARI_SCHEDULES,
+          schedules: schedules,
         }),
       });
 
@@ -706,17 +742,6 @@ ${scheduleItemsFormatted}`.trim();
 
       // Start Typewriter effect
       startTypewriter(data.reply);
-
-      // Auto-load schedules if user requested schedules or confirmed load
-      if (
-        schedules.length === 0 &&
-        (targetQuery.includes('배차') ||
-          targetQuery.includes('등록') ||
-          targetQuery.includes('샘플') ||
-          targetQuery.includes('전체'))
-      ) {
-        setSchedules(sortSchedulesChronologically(CONFIRMED_FERRARI_SCHEDULES));
-      }
       haptics.success();
     } catch (err) {
       console.error('Copilot query error:', err);
@@ -748,6 +773,49 @@ ${scheduleItemsFormatted}`.trim();
     setSelectedDateFilter('all');
   };
 
+  // Driver Acknowledgment handler
+  const handleAcknowledgeSchedule = async (item: ScheduleItem) => {
+    try {
+      const resolvedDriverName = item.driver_name || profile.driverName || '기사님';
+      const res = await fetch('/api/schedules/ack', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scheduleId: item.id,
+          version: item.version || 1,
+          driverId: item.driver_id || resolvedDriverName,
+          driverName: resolvedDriverName,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && (data.ok || data.success)) {
+        const ackedAt = new Date().toISOString();
+        setSchedules((prev) =>
+          prev.map((s) =>
+            s.id === item.id
+              ? {
+                  ...s,
+                  isAcknowledged: true,
+                  last_ack_version: item.version || 1,
+                  last_ack_at: ackedAt,
+                }
+              : s
+          )
+        );
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('vip_hq_schedules_updated'));
+        }
+        haptics.success();
+      } else {
+        console.error('Failed to acknowledge schedule:', data);
+        haptics.errorAlert();
+      }
+    } catch (err) {
+      console.error('Error acknowledging schedule:', err);
+      haptics.errorAlert();
+    }
+  };
+
   // Filtered schedules (Chronological order guaranteed)
   const filteredSchedules = sortSchedulesChronologically(
     selectedDateFilter === 'all'
@@ -755,18 +823,32 @@ ${scheduleItemsFormatted}`.trim();
       : schedules.filter((s) => s.date === selectedDateFilter)
   );
 
-  // Extract unique dates for filter chips (sorted chronologically)
+  // Extract unique dates for filter chips (sorted chronologically, formatted as 'M월 D일 (요일)')
+  const formatFilterDateLabel = (dateStr: string, fallback?: string): string => {
+    const parts = dateStr.split('-').map(Number);
+    if (parts.length === 3 && !parts.some(isNaN)) {
+      const dt = new Date(parts[0], parts[1] - 1, parts[2]);
+      if (!isNaN(dt.getTime())) {
+        const dow = ['일', '월', '화', '수', '목', '금', '토'][dt.getDay()];
+        return `${dt.getMonth() + 1}월 ${dt.getDate()}일 (${dow})`;
+      }
+    }
+    return fallback ? fallback.replace('2026-', '') : dateStr;
+  };
+
   const uniqueDates = Array.from(new Set(schedules.map((s) => s.date))).sort();
   const dateFilters = [
     { key: 'all', label: `전체 (${schedules.length})` },
     ...uniqueDates.map((d) => {
       const match = schedules.find((s) => s.date === d);
-      return { key: d, label: match ? match.dateLabel.replace('2026-', '') : d };
+      return { key: d, label: formatFilterDateLabel(d, match?.dateLabel) };
     }),
   ];
 
   return (
     <div className="w-full min-h-[calc(100dvh-130px)] flex flex-col justify-between relative pb-6 select-none">
+      {scheduleSaveError && <p role="alert" className="p-3 text-sm text-rose-600">{scheduleSaveError}</p>}
+      {scheduleMutation.hasPending && <button type="button" className="rounded-xl border p-3 text-sm text-blue-700" onClick={async()=>{try{const response=await scheduleMutation.retry();const data=await response.json();if(!response.ok)throw new Error(data.error || '저장 결과를 확인하지 못했습니다.');window.location.reload();}catch(error){setScheduleSaveError(error instanceof Error?error.message:'저장 결과를 확인하지 못했습니다.');}}}>이전 일정 저장 결과 확인</button>}
       {/* Hidden File Input for Image/PDF Upload (multiple enabled) */}
       <input
         type="file"
@@ -799,9 +881,9 @@ ${scheduleItemsFormatted}`.trim();
         </div>
       )}
 
-      {/* Fleet Vehicle Switcher (Development / Dispatcher Control Mode) */}
+      {/* Fleet Vehicle Switcher (Volumetric Pill Strip) */}
       {ENABLE_DEV_FLEET_SWITCHER && (
-        <div className="mb-3 bg-slate-100/90 p-1 rounded-2xl flex items-center gap-1 border border-slate-200/80 shadow-xs overflow-x-auto">
+        <div className="mb-4 py-1 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
           {[
             ...availableVehicles.map((v) => ({ id: v, label: v })),
             { id: 'all', label: '전체' },
@@ -820,17 +902,19 @@ ${scheduleItemsFormatted}`.trim();
                     onSwitchVehicle(v.id);
                   }
                 }}
-                className={`flex-1 py-1.5 px-1 rounded-xl text-sm font-black flex items-center justify-center gap-1 transition-all cursor-pointer ${isSelected
-                  ? 'bg-white text-slate-900 shadow-sm border border-slate-200/90 scale-100'
-                  : 'text-slate-500 hover:text-slate-800'
-                  }`}
+                className={`shrink-0 whitespace-nowrap py-2 px-3.5 rounded-full text-[13px] flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  isSelected
+                    ? 'bg-white text-[#0F172A] font-extrabold shadow-[0_4px_14px_rgba(15,23,42,0.06)] border border-slate-100/90'
+                    : 'text-slate-600 hover:text-[#0F172A] hover:bg-white/60 font-semibold'
+                }`}
               >
                 <span>{v.label}</span>
                 <span
-                  className={`text-[10px] font-black px-1.5 py-0.2 rounded-full ${isSelected
-                    ? 'bg-blue-50 text-[#1E60F3]'
-                    : 'bg-slate-200 text-slate-600'
-                    }`}
+                  className={`text-[11px] px-1.5 py-0.5 rounded-full min-w-[20px] text-center leading-none ${
+                    isSelected
+                      ? 'bg-[#EEF4FF] text-[#0055FF] font-extrabold'
+                      : 'bg-[#E4E8F0] text-slate-500 font-bold'
+                  }`}
                 >
                   {count}
                 </span>
@@ -931,10 +1015,10 @@ ${scheduleItemsFormatted}`.trim();
 
           {/* Typography */}
           <h2 className="text-xl font-bold text-slate-900 tracking-tight mt-6">
-            내 스케줄, AI가 바로 만들어드려요 ✨
+            배정된 일정이 없습니다 ✨
           </h2>
           <p className="text-sm text-slate-500 mt-2 text-center max-w-xs leading-relaxed">
-            배차표 이미지나 텍스트만 등록해 주세요
+            본사에서 배차가 발송되면 여기에 표시됩니다. 배차표 파일이나 텍스트를 직접 등록할 수도 있습니다.
           </p>
 
           {/* Convenience Helper: 1-Click Ferrari Confirmed Schedule Loader & Manual Register */}
@@ -958,44 +1042,44 @@ ${scheduleItemsFormatted}`.trim();
         </div>
       ) : (
         /* ================= CONFIRMED SCHEDULES VIEW (TASK 2) ================= */
-        <div className="flex-1 space-y-3.5 pt-1">
-          {/* Subheader & Date Filter Pills (Calendar icon removed, dynamic title bound) */}
-          <div className="flex items-center justify-between pb-1 px-0.5">
-            <div>
-              <h3 className="text-sm font-black text-slate-900 tracking-tight">
+        <div className="flex-1 space-y-4 pt-0.5">
+          {/* Subheader & Actions */}
+          <div className="flex items-center justify-between gap-2 pb-0.5 px-0.5">
+            <div className="min-w-0">
+              <h3 className="text-[17px] sm:text-lg font-extrabold text-[#0F172A] tracking-tight leading-snug truncate">
                 {scheduleTitle}
               </h3>
-              <p className="text-[11px] text-slate-500 font-medium">
+              <p className="text-xs text-slate-400 font-medium mt-0.5">
                 {selectedVehicleFilter === 'all'
                   ? `전체 호차 통합 관제 뷰 (총 ${schedules.length}건)`
                   : `${selectedVehicleFilter} 전담 의전 일정 (총 ${schedules.length}건)`}
               </p>
             </div>
 
-            {/* Header Action Buttons: Add Schedule & Reset */}
-            <div className="flex items-center gap-1.5">
+            {/* Header Action Buttons: Add Schedule White Pill & Reset Link */}
+            <div className="flex items-center gap-2 shrink-0">
               <button
                 type="button"
                 onClick={() => handleOpenScheduleFormModal()}
-                className="text-sm text-[#1E60F3] hover:text-[#1650D6] bg-blue-50 hover:bg-blue-100 border border-blue-200 flex items-center gap-1 py-1 px-2.5 rounded-lg transition-all font-bold cursor-pointer"
+                className="text-xs sm:text-[13px] text-[#0055FF] hover:text-[#0046D5] bg-white hover:bg-slate-50 border border-slate-100/90 shadow-[0_4px_14px_rgba(15,23,42,0.06)] flex items-center gap-1 py-2 px-3.5 rounded-full transition-all font-extrabold cursor-pointer active:scale-95 whitespace-nowrap"
                 title="새 스케줄 등록"
               >
-                <Plus className="w-3 h-3" />
+                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
                 <span>일정 추가</span>
               </button>
               <button
                 type="button"
                 onClick={handleResetSchedules}
-                className="text-sm text-slate-400 hover:text-slate-700 flex items-center gap-1 py-1 px-2 rounded-lg hover:bg-slate-100 transition-all font-medium cursor-pointer"
+                className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1 py-1.5 px-1 rounded-lg transition-colors font-semibold cursor-pointer whitespace-nowrap"
               >
-                <RefreshCw className="w-3 h-3" />
+                <RefreshCw className="w-3.5 h-3.5" />
                 <span>배차표 재등록</span>
               </button>
             </div>
           </div>
 
           {/* Date Filter Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
             {dateFilters.map((tab) => {
               const isSelected = selectedDateFilter === tab.key;
               return (
@@ -1006,16 +1090,47 @@ ${scheduleItemsFormatted}`.trim();
                     haptics.lightTap();
                     setSelectedDateFilter(tab.key);
                   }}
-                  className={`px-3 py-1.5 rounded-full text-sm font-bold shrink-0 transition-all cursor-pointer ${isSelected
-                    ? 'bg-[#1E60F3] text-white shadow-xs'
-                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                    }`}
+                  className={`px-4 py-2 rounded-full text-xs sm:text-[13px] shrink-0 transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-[#0055FF] text-white font-extrabold shadow-[0_4px_12px_rgba(0,85,255,0.25)]'
+                      : 'bg-white text-slate-700 font-bold border border-slate-100/90 shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:bg-slate-50'
+                  }`}
                 >
                   {tab.label}
                 </button>
               );
             })}
           </div>
+
+          {/* Sticky Unacknowledged Dispatch Warning Banner for Driver */}
+          {(() => {
+            const unackedList = filteredSchedules.filter(
+              (s) =>
+                !s.isAcknowledged &&
+                s.dispatch_status !== 'cancelled' &&
+                s.status !== 'cancelled'
+            );
+            if (unackedList.length === 0) return null;
+            const remindedCount = unackedList.filter((s) => (s.reminder_count || 0) > 0).length;
+            return (
+              <div
+                className={`rounded-2xl p-3.5 text-xs font-bold flex items-center justify-between gap-2 shadow-sm ${
+                  remindedCount > 0
+                    ? 'bg-rose-600 text-white ring-2 ring-rose-300'
+                    : 'bg-amber-50 text-amber-900 border border-amber-300'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>
+                    {remindedCount > 0
+                      ? `본사 긴급 확인 요청 포함 미확인 배차가 ${unackedList.length}건 있습니다. 각 카드의 [배차 확인] 버튼을 눌러주세요!`
+                      : `아직 확인하지 않은 신규·변경 배차가 ${unackedList.length}건 있습니다. 내용을 확인 후 [배차 확인]을 눌러주세요.`}
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Schedule Cards List */}
           <div className="space-y-3">
@@ -1034,6 +1149,7 @@ ${scheduleItemsFormatted}`.trim();
                   setEditingSchedule(sch);
                   setIsEditModalOpen(true);
                 }}
+                onAcknowledge={handleAcknowledgeSchedule}
               />
             ))}
           </div>
@@ -1197,51 +1313,6 @@ ${scheduleItemsFormatted}`.trim();
           </div>
         )}
 
-        {/* Quick Suggestion Prompt Chips */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
-          <button
-            type="button"
-            onClick={() => handleCopilotSubmit('9월 25일 일정 등록')}
-            disabled={isAnalyzing}
-            className="shrink-0 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 border border-blue-200/90 text-[11px] font-bold text-[#1E60F3] rounded-full transition-all active:scale-95 shadow-2xs cursor-pointer"
-          >
-            ➕ 9/25 스케줄 등록
-          </button>
-          <button
-            type="button"
-            onClick={() => handleCopilotSubmit('9.18일 일정 브리핑해줘')}
-            disabled={isAnalyzing}
-            className="shrink-0 px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-200/80 hover:border-slate-300 text-[11px] font-medium text-slate-700 hover:text-slate-900 rounded-full transition-all active:scale-95 shadow-2xs cursor-pointer"
-          >
-            💡 9/18 일정 브리핑
-          </button>
-          <button
-            type="button"
-            onClick={() => handleCopilotSubmit('SQ612 상태 어때?')}
-            disabled={isAnalyzing}
-            className="shrink-0 px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-200/80 hover:border-slate-300 text-[11px] font-medium text-slate-700 hover:text-slate-900 rounded-full transition-all active:scale-95 shadow-2xs cursor-pointer"
-          >
-            ✈️ SQ612 항공편 조회
-          </button>
-          <button
-            type="button"
-            onClick={() => handleCopilotSubmit('전체 일정 브리핑해줘')}
-            disabled={isAnalyzing}
-            className="shrink-0 px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-200/80 hover:border-slate-300 text-[11px] font-medium text-slate-700 hover:text-slate-900 rounded-full transition-all active:scale-95 shadow-2xs cursor-pointer"
-          >
-            📋 전체 일정 브리핑
-          </button>
-          <button
-            type="button"
-            onClick={() => handleCopilotSubmit('여기 맛집 추천해줘')}
-            disabled={isAnalyzing}
-            className="shrink-0 px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-200/80 hover:border-slate-300 text-[11px] font-medium text-slate-400 hover:text-slate-600 rounded-full transition-all active:scale-95 shadow-2xs cursor-pointer"
-            title="가드레일 방어 테스트"
-          >
-            🛡️ 가드레일 테스트
-          </button>
-        </div>
-
         {/* Floating Action Dock Input Field */}
         <form
           onSubmit={(e) => handleCopilotSubmit(undefined, e)}
@@ -1298,22 +1369,22 @@ ${scheduleItemsFormatted}`.trim();
         }}
         schedule={editingSchedule}
         onSave={async (updated) => {
-          setSchedules((prev) => sortSchedulesChronologically(prev.map((s) => (s.id === updated.id ? updated : s))));
           try {
-            await fetch('/api/schedules', {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
+            const response = await scheduleMutation.send('/api/schedules', {
                 id: updated.id,
                 time_display: updated.time_display,
+                pickup_time: updated.pickup_time,
                 passenger_name: updated.passenger,
                 flight_number: updated.flight,
                 protocol_notes: updated.notes,
                 status: updated.status,
-              }),
-            });
+            }, {method:'PUT'});
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || '일정을 수정하지 못했습니다.');
+            setSchedules(prev => sortSchedulesChronologically(prev.map(s => s.id === updated.id ? (result.schedule || updated) : s)));
           } catch (err) {
-            console.warn('Failed to persist schedule update to Supabase:', err);
+            setScheduleSaveError(err instanceof Error ? err.message : '저장 결과를 확인하지 못했습니다.');
+            throw err;
           }
         }}
       />

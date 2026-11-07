@@ -3,7 +3,7 @@
  */
 
 import { LocationPreset } from '@/types';
-import { formatReportHeader } from './reportGenerator';
+import { formatReportHeader, formatEtaWithAmPm } from './reportGenerator';
 
 export interface VipReportParams {
   carNumber?: string;
@@ -33,13 +33,7 @@ export function generateVipReportText({
   mode = 'DEPARTURE',
   departureTimeText,
 }: VipReportParams): string {
-  let cleanEta = etaFormatted;
-  const timeMatch = etaFormatted.match(/(\d{1,2}:\d{2})/);
-  if (timeMatch) {
-    cleanEta = timeMatch[1].padStart(5, '0');
-  } else {
-    cleanEta = etaFormatted.replace(/\s*\(.*?\)/, '').trim();
-  }
+  const cleanEta = formatEtaWithAmPm(etaFormatted);
 
   const header = formatReportHeader(carNumber, driverName);
   const passenger = passengerName?.trim();
