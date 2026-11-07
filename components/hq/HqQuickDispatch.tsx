@@ -1232,16 +1232,21 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
     ? driverDispatchSmsHref(initialBooking) : null;
 
   const firstAlloc = allocations[0];
-  const currentVehiclePlate = firstAlloc?.selectedVehiclePlate || initialBooking?.vehiclePlate || '';
-  const currentVehicleModel = firstAlloc?.selectedVehicleModel || initialBooking?.vehicleModel || '';
+  // A cleared/changed choice must not silently fall back to the original schedule assignment.
+  const currentVehiclePlate = firstAlloc?.selectedVehiclePlate ?? initialBooking?.vehiclePlate ?? '';
+  const currentVehicleModel = firstAlloc?.selectedVehicleModel ?? initialBooking?.vehicleModel ?? '';
   const currentVehiclePhoto = getVerifiedVehiclePhoto(currentVehiclePlate);
-  const currentDriverId = firstAlloc?.selectedDriver || initialBooking?.driverId || initialBooking?.driverName || '';
+  const currentDriverId = firstAlloc?.selectedDriver ?? initialBooking?.driverId ?? '';
   const currentDriverObj = allDrivers.find(
     (d) => d.id === currentDriverId || d.name === currentDriverId
   );
-  const currentDriverName = currentDriverObj?.name || initialBooking?.driverName || '기사 미배정';
-  const currentDriverPhone = currentDriverObj?.phone || initialBooking?.driverPhone || '010-0000-0000';
+  const isOriginalDriver = Boolean(currentDriverId && currentDriverId === initialBooking?.driverId);
+  const currentDriverName = currentDriverObj?.name || (isOriginalDriver ? initialBooking?.driverName : '') || '기사 미배정';
+  const currentDriverPhone = currentDriverObj?.phone || (isOriginalDriver ? initialBooking?.driverPhone : '') || '';
   const currentDriverAvatar = currentDriverObj?.avatarUrl || getDriverProfileImage({ name: currentDriverName });
+  const isPreviouslyPublished = Boolean(
+    initialBooking && ['배차 완료', '재확인 필요'].includes(initialBooking.dispatchStatus)
+  );
 
   // All dispatch quick actions are quiet secondary actions: one consistent
   // surface, size, elevation and subtle hover. Blue is reserved for key CTAs.
@@ -1431,44 +1436,38 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                 )}
               />
 
-              {/* Col 2: 출발 시간 (Identical <input type="time"> native picker) */}
-              <label className="relative flex min-h-[88px] cursor-pointer select-none items-center gap-3 rounded-[20px] bg-white p-4 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] transition-all hover:shadow-[0_7px_24px_rgba(35,49,78,0.08)] sm:p-5">
-                <Clock className="w-5 h-5 text-slate-400 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs text-slate-400 font-medium">출발 시간</div>
-                  <div className="text-sm sm:text-base font-bold text-slate-800 tracking-tight">
-                    {timeInputText || formatTimeKoreanAmPm(pickupTimeOnly)}
-                  </div>
+              {/* 출발·종료 시간은 스케줄 기본값으로 채우되 직접 수정할 수 있습니다. */}
+              <label className="flex min-h-[88px] items-center gap-3 rounded-[20px] bg-white p-4 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] sm:p-5">
+                <Clock className="h-5 w-5 shrink-0 text-[#8290A1]" strokeWidth={1.8} />
+                <div className="min-w-0 flex-1">
+                  <span className="block text-[12px] font-medium text-[#73839D]">출발 시간</span>
+                  <input
+                    type="time"
+                    value={pickupTimeOnly}
+                    onChange={(event) => {
+                      setPickupTimeOnly(event.target.value);
+                      setTimeInputText(formatTimeKoreanAmPm(event.target.value));
+                    }}
+                    disabled={bookingCancelled || isSubmitting}
+                    aria-label="출발 시간 수정"
+                    className="mt-1 h-9 w-full min-w-0 rounded-[10px] bg-[#FAFBFD] px-2 text-[14px] font-semibold tabular-nums text-[#17233B] outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25 disabled:cursor-not-allowed disabled:opacity-50"
+                  />
                 </div>
-                <input
-                  type="time"
-                  value={pickupTimeOnly}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setPickupTimeOnly(val);
-                    setTimeInputText(formatTimeKoreanAmPm(val));
-                  }}
-                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                  aria-label="출발 시간 선택"
-                />
               </label>
 
-              {/* Col 3: 종료 시간 (Identical <input type="time"> native picker) */}
-              <label className="relative flex min-h-[88px] cursor-pointer select-none items-center gap-3 rounded-[20px] bg-white p-4 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] transition-all hover:shadow-[0_7px_24px_rgba(35,49,78,0.08)] sm:p-5">
-                <Clock className="w-5 h-5 text-slate-400 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs text-slate-400 font-medium">종료 시간</div>
-                  <div className="text-sm sm:text-base font-bold text-slate-800 tracking-tight">
-                    {endTime ? formatTimeKoreanAmPm(endTime) : '오후 09:00'}
-                  </div>
+              <label className="flex min-h-[88px] items-center gap-3 rounded-[20px] bg-white p-4 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] sm:p-5">
+                <Clock className="h-5 w-5 shrink-0 text-[#8290A1]" strokeWidth={1.8} />
+                <div className="min-w-0 flex-1">
+                  <span className="block text-[12px] font-medium text-[#73839D]">종료 시간</span>
+                  <input
+                    type="time"
+                    value={endTime}
+                    onChange={(event) => setEndTime(event.target.value)}
+                    disabled={bookingCancelled || isSubmitting}
+                    aria-label="종료 시간 수정"
+                    className="mt-1 h-9 w-full min-w-0 rounded-[10px] bg-[#FAFBFD] px-2 text-[14px] font-semibold tabular-nums text-[#17233B] outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25 disabled:cursor-not-allowed disabled:opacity-50"
+                  />
                 </div>
-                <input
-                  type="time"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                  aria-label="종료 시간 선택"
-                />
               </label>
             </div>
 
@@ -1526,6 +1525,35 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                 </div>
               </button>
             </div>
+
+            {/* A quiet, read-only snapshot of the saved schedule. Editing above never mutates this reference. */}
+            <section aria-label="스케줄 기준 배차 정보" className="rounded-[20px] bg-[#F7F9FC] px-4 py-4 sm:px-5">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                <h3 className="text-[12px] font-semibold text-[#4D607C]">스케줄 기준 정보</h3>
+                <p className="text-[11px] text-[#8492A4]">현재 저장된 일정 · 위 배차 정보는 별도로 수정 가능</p>
+              </div>
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-medium text-[#8A97A7]">스케줄 차량</p>
+                  <p className="mt-1 break-words text-[12px] font-semibold text-[#52647A]">
+                    {initialBooking.vehiclePlate && initialBooking.vehiclePlate !== '미배정'
+                      ? `${stripManufacturerName(initialBooking.vehicleModel || '')} · ${initialBooking.vehiclePlate}`
+                      : '미배정'}
+                  </p>
+                  {currentVehiclePlate !== (initialBooking.vehiclePlate || '') && <p className="mt-1 text-[10px] text-[#8A97A7]">차량 변경 중</p>}
+                </div>
+                <div>
+                  <p className="text-[11px] font-medium text-[#8A97A7]">스케줄 출발 시간</p>
+                  <p className="mt-1 text-[12px] font-semibold tabular-nums text-[#52647A]">{initialBooking.pickupTime ? formatTimeKoreanAmPm(initialBooking.pickupTime) : '미정'}</p>
+                  {pickupTimeOnly !== (initialBooking.pickupTime || '') && <p className="mt-1 text-[10px] text-[#8A97A7]">출발 시간 변경 중</p>}
+                </div>
+                <div>
+                  <p className="text-[11px] font-medium text-[#8A97A7]">스케줄 종료 시간</p>
+                  <p className="mt-1 text-[12px] font-semibold tabular-nums text-[#52647A]">{initialBooking.endTime ? formatTimeKoreanAmPm(initialBooking.endTime) : '미정'}</p>
+                  {endTime !== (initialBooking.endTime || '') && <p className="mt-1 text-[10px] text-[#8A97A7]">종료 시간 변경 중</p>}
+                </div>
+              </div>
+            </section>
 
             {/* Card 4: 경로 (출발지 → 도착지) */}
             <div className="space-y-4 rounded-[22px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] sm:p-6">
@@ -2620,38 +2648,45 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
       {saveMutation.hasPending && <button type="button" className="rounded-xl border border-blue-200 p-3 text-sm text-blue-700" disabled={isSubmitting} onClick={async () => { setIsSubmitting(true); try { const response = await saveMutation.retry(); const data = await response.json(); if (!response.ok) throw new Error(data.error || '저장 결과 확인 실패'); window.location.reload(); } catch (error) { setErrorMsg(error instanceof Error ? error.message : '확인 실패'); } finally { setIsSubmitting(false); } }}>이전 저장 결과 확인</button>}
       {/* 4. Action Buttons */}
       <div className="pt-4 mt-2">
-        <div className="grid grid-cols-2 gap-3">
-          {/* 예약만 등록 / 수정사항 저장 */}
+        <div className={`grid gap-3 ${isPreviouslyPublished ? 'grid-cols-1' : 'grid-cols-2'}`}>
+          {/* Save a published booking as published: never silently clear its vehicle and driver. */}
           <button
             type="button"
-            disabled={isSubmitting || isCancelling || bookingCancelled}
+            disabled={isSubmitting || isCancelling || bookingCancelled || (isPreviouslyPublished && (!fleet.data || Boolean(fleet.error) || totalLiveConflicts > 0))}
             onClick={() => {
               haptics.lightTap();
-              handleSubmit('unassigned');
+              if (isPreviouslyPublished) {
+                handleSubmit('published');
+              } else {
+                handleSubmit('unassigned');
+              }
             }}
-            className="flex min-h-[52px] w-full cursor-pointer items-center justify-center gap-2 rounded-[16px] bg-white px-3 text-[13px] font-semibold text-[#17233B] shadow-[0_5px_16px_rgba(35,49,78,0.055),0_2px_5px_rgba(35,49,78,0.025)] transition-all hover:bg-[#FAFBFD] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25 disabled:cursor-not-allowed disabled:opacity-40"
+            className={`flex min-h-[52px] w-full cursor-pointer items-center justify-center gap-2 rounded-[16px] px-3 text-[13px] font-semibold transition-all active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25 disabled:cursor-not-allowed disabled:opacity-40 ${isPreviouslyPublished
+              ? 'bg-[#1E60F3] text-white shadow-[0_6px_16px_rgba(30,96,243,0.15)] hover:bg-[#1757DC]'
+              : 'bg-white text-[#17233B] shadow-[0_5px_16px_rgba(35,49,78,0.055),0_2px_5px_rgba(35,49,78,0.025)] hover:bg-[#FAFBFD]'}`}
           >
-            <FileText className="w-4 h-4 text-slate-700 shrink-0" />
+            <FileText className="h-4 w-4 shrink-0" />
             <span>{initialBooking ? '변경 내용 저장' : '예약만 등록'}</span>
           </button>
 
-          {/* 바로 배차 / 배차 확정하기 */}
-          <button
-            type="button"
-            disabled={isSubmitting || isCancelling || bookingCancelled || !fleet.data || Boolean(fleet.error) || totalLiveConflicts > 0}
-            onClick={() => {
-              haptics.selection();
-              handleSubmit('published');
-            }}
-            className="flex min-h-[52px] w-full cursor-pointer items-center justify-center gap-2 rounded-[16px] bg-[#1E60F3] px-3 text-[13px] font-semibold text-white shadow-[0_6px_16px_rgba(30,96,243,0.15)] transition-all hover:bg-[#1757DC] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20 disabled:cursor-not-allowed disabled:bg-[#E5EAF2] disabled:text-[#95A3B9] disabled:shadow-none"
-          >
-            {isSubmitting ? (
-              <RefreshCw className="w-4 h-4 animate-spin text-white shrink-0" />
-            ) : (
-              <Send className="w-4 h-4 text-white shrink-0" />
-            )}
-            <span>{initialBooking ? '배차 확정' : '바로 배차'}</span>
-          </button>
+          {!isPreviouslyPublished && (
+            <button
+              type="button"
+              disabled={isSubmitting || isCancelling || bookingCancelled || !fleet.data || Boolean(fleet.error) || totalLiveConflicts > 0}
+              onClick={() => {
+                haptics.selection();
+                handleSubmit('published');
+              }}
+              className="flex min-h-[52px] w-full cursor-pointer items-center justify-center gap-2 rounded-[16px] bg-[#1E60F3] px-3 text-[13px] font-semibold text-white shadow-[0_6px_16px_rgba(30,96,243,0.15)] transition-all hover:bg-[#1757DC] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20 disabled:cursor-not-allowed disabled:bg-[#E5EAF2] disabled:text-[#95A3B9] disabled:shadow-none"
+            >
+              {isSubmitting ? (
+                <RefreshCw className="w-4 h-4 animate-spin text-white shrink-0" />
+              ) : (
+                <Send className="w-4 h-4 text-white shrink-0" />
+              )}
+              <span>{initialBooking ? '배차 확정' : '바로 배차'}</span>
+            </button>
+          )}
         </div>
 
         {/* Low-priority destructive action, consolidated here instead of a second detail modal. */}
@@ -2735,7 +2770,9 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
         onClose={() => setIsVehicleModalOpen(false)}
         slotNumber={1}
         selectedPlate={currentVehiclePlate}
-        loading={false}
+        vehicles={fleet.data?.vehicles}
+        loading={fleet.loading}
+        error={fleet.error}
         onSelect={(selectedVehicle) => {
           const matched = allVehicles.find((v) => v.plate === selectedVehicle.plate) || null;
           if (firstAlloc) {
@@ -2749,6 +2786,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
         isOpen={isDriverModalOpen}
         onClose={() => setIsDriverModalOpen(false)}
         initialDriverId={currentDriverId}
+        drivers={allDrivers}
+        requiredLanguage={commonLanguage === 'en' ? 'english' : 'any'}
+        targetDate={pickupDate}
+        targetTime={pickupTimeOnly}
         onSelectDriver={(selectedDriver) => {
           const matched = allDrivers.find((d) => d.id === selectedDriver.id || d.name === selectedDriver.name) || null;
           if (firstAlloc) {
