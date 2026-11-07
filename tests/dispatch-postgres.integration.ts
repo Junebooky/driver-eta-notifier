@@ -48,6 +48,12 @@ async function main() {
     await admin.query(readFileSync('supabase/migrations/20261101103643_vehicle_custody_integrity.sql','utf8'));
     await admin.query(readFileSync('supabase/migrations/20261102001414_receipt_review_integrity.sql','utf8'));
     await admin.query(readFileSync('supabase/migrations/20261102001414_receipt_review_integrity.sql','utf8'));
+    await admin.query(readFileSync('supabase/migrations/20261107221000_fleet_vehicle_registry.sql','utf8'));
+    await admin.query(readFileSync('supabase/migrations/20261107221000_fleet_vehicle_registry.sql','utf8'));
+    await admin.query('SET ROLE authenticated');
+    await assert.rejects(admin.query('SELECT * FROM cockpit.fleet_vehicle_registry'), { code: '42501' });
+    await admin.query('RESET ROLE');
+    console.log('PASS shared fleet registry migration idempotent and browser role denied');
     await a.connect(); await b.connect();
     await Promise.all([a.query('SET ROLE service_role'),b.query('SET ROLE service_role')]);
     const vehicle = randomUUID(); const driver = randomUUID();
