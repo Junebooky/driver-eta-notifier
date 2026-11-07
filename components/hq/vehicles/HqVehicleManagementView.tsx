@@ -755,10 +755,10 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
 
             {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 (최상단 레이어) */}
             <div className="absolute bottom-full left-0 mb-2 hidden group-hover/vehicles:flex flex-col items-start pointer-events-none z-[100]">
-              <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+              <span className="whitespace-nowrap rounded-[12px] bg-white px-3 py-2 text-[11px] font-medium text-[#4D607C] shadow-[0_8px_22px_rgba(35,49,78,0.1)] animate-in fade-in-50 duration-150">
                 VIP 의전 세단·SUV·밴·스프린터의 실시간 배차 및 제원을 관리해요
               </span>
-              <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 ml-3.5 shadow-xs" />
+              <div className="ml-3.5 -mt-1 size-2 rotate-45 bg-white" />
             </div>
           </div>
 
@@ -844,7 +844,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                     : 'bg-white text-[#73839D] hover:bg-[#F7F9FC]'
                 }`}
               >
-                <Fuel className={`w-3.5 h-3.5 ${fuelFilter !== 'all' ? 'text-[#0050FF]' : 'text-slate-400'}`} />
+                <Fuel className={`w-3.5 h-3.5 ${fuelFilter !== 'all' ? 'text-[#1E60F3]' : 'text-slate-400'}`} />
                 <span>
                   {fuelFilter === '휘발유'
                     ? `휘발유 (${fuelCounts.gasoline})`
@@ -880,7 +880,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                       }`}
                     >
                       <span>{opt.label}</span>
-                      {fuelFilter === opt.value && <Check className="w-3.5 h-3.5 text-[#0050FF]" />}
+                      {fuelFilter === opt.value && <Check className="w-3.5 h-3.5 text-[#1E60F3]" />}
                     </button>
                   ))}
                 </div>
@@ -1111,11 +1111,11 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                                     handleQuickChangeStatus(selectedVehicle.id, st.value);
                                     setIsStatusDropdownOpen(false);
                                   }}
-                                  className={`w-full text-left px-3 py-1.5 text-xs font-bold flex items-center justify-between hover:bg-slate-50 cursor-pointer ${selectedVehicle.effectiveStatus === st.value ? "text-[#0050FF] bg-blue-50/50" : "text-slate-700"
+                                  className={`w-full text-left px-3 py-1.5 text-xs font-bold flex items-center justify-between hover:bg-slate-50 cursor-pointer ${selectedVehicle.effectiveStatus === st.value ? "text-[#1E60F3] bg-blue-50/50" : "text-slate-700"
                                     }`}
                                 >
                                   <span>{st.label}</span>
-                                  {selectedVehicle.effectiveStatus === st.value && <Check className="w-3 h-3 text-[#0050FF]" />}
+                                  {selectedVehicle.effectiveStatus === st.value && <Check className="w-3 h-3 text-[#1E60F3]" />}
                                 </button>
                               ))}
                             </div>
@@ -1151,7 +1151,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
 
                     {/* Row 2: Plate & Copy Button */}
                     <div className="flex items-center gap-1.5">
-                      <span className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                      <span className="text-[17px] font-bold tracking-[-0.02em] text-[#17233B]">
                         {selectedVehicle.plate}
                       </span>
                       <button
@@ -1163,7 +1163,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                         <Copy className="w-3.5 h-3.5" />
                       </button>
                       {copiedToast && (
-                        <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded">
+                        <span className="rounded-[9px] bg-[#EEF3FF] px-2 py-1 text-[10px] font-medium text-[#1E60F3]">
                           복사됨!
                         </span>
                       )}
@@ -1171,7 +1171,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
 
                     {/* Row 3: Badges */}
                     <div className="flex items-center gap-1.5">
-                      <span className="bg-blue-50 text-[#0050FF] text-[10px] font-bold px-2 py-0.5 rounded">
+                      <span className="rounded-[8px] bg-[#F1F4F9] px-2 py-1 text-[10px] font-medium text-[#73839D]">
                         {selectedVehicle.uiCategory === "sprinter"
                           ? "스프린터"
                           : selectedVehicle.uiCategory === "van"
@@ -1218,7 +1218,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                 <div className="space-y-5 rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] sm:p-6">
                   <div className="flex items-center justify-between gap-2 pb-2">
                     <div className="flex items-center gap-2">
-                      <Info className="w-4 h-4 text-[#0050FF]" />
+                      <Info className="size-4 text-[#73839D]" />
                       <h3 className="text-sm font-bold text-slate-900">
                         {selectedVehicle.model} ({selectedVehicle.plate}) 기본 제원
                       </h3>
@@ -1226,7 +1226,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                     <button
                       type="button"
                       onClick={handleOpenEdit}
-                      className="text-xs font-semibold text-[#0050FF] hover:underline flex items-center gap-1 cursor-pointer"
+                      className="flex min-h-9 cursor-pointer items-center gap-1 rounded-[12px] bg-[#F7F9FC] px-3 text-[12px] font-semibold text-[#4D607C] transition-colors hover:bg-[#EEF3FF] hover:text-[#1E60F3]"
                     >
                       <Edit2 className="w-3 h-3" />
                       <span>정보 수정</span>
@@ -1286,16 +1286,16 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
               {activeDetailTab === "calendar" && (
                 <div className="space-y-4">
                   {/* 5-Day Quick Strip */}
-                  <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-3">
-                    <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div className="space-y-4 rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] sm:p-6">
+                    <div className="flex items-center justify-between gap-2 pb-2">
                       <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-[#0050FF]" />
+                        <Calendar className="size-4 text-[#73839D]" />
                         <h3 className="text-sm font-bold text-slate-900">5일간 단기 배차 일정</h3>
                       </div>
                       <button
                         type="button"
                         onClick={() => setIsCalendarModalOpen(true)}
-                        className="text-xs font-semibold text-[#0050FF] hover:underline flex items-center gap-1 cursor-pointer"
+                        className="flex min-h-9 cursor-pointer items-center gap-1 rounded-[12px] bg-[#F7F9FC] px-3 text-[12px] font-semibold text-[#4D607C] transition-colors hover:bg-[#EEF3FF] hover:text-[#1E60F3]"
                       >
                         <span>전체 달력 보기</span>
                         <ChevronRight className="w-3.5 h-3.5" />
@@ -1308,9 +1308,9 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                         return (
                           <div
                             key={i}
-                            className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition-all ${isAvail
-                              ? "bg-blue-50/40 border-blue-100"
-                              : "bg-slate-50 border-slate-100"
+                            className={`flex min-w-0 flex-col items-center gap-1.5 rounded-[13px] p-2 transition-all sm:p-3 ${isAvail
+                              ? "bg-[#F3F7FF] shadow-[0_2px_8px_rgba(35,49,78,0.04)]"
+                              : "bg-[#FAFBFD]"
                               }`}
                             title={d.detail || d.status}
                           >
@@ -1319,8 +1319,8 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                             </span>
                             <span
                               className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${isAvail
-                                ? "bg-blue-50 text-[#0050FF] border border-blue-200/60"
-                                : "bg-slate-200/80 text-slate-700"
+                                ? "bg-white text-[#31598F]"
+                                : "bg-[#EEF1F6] text-[#73839D]"
                                 }`}
                             >
                               {d.status}
@@ -1340,7 +1340,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                   <div className="space-y-5 rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] sm:p-6">
                     <div className="flex items-center justify-between gap-2 pb-2">
                       <div className="flex items-center gap-2">
-                        <CalendarDays className="w-4 h-4 text-[#0050FF]" />
+                        <CalendarDays className="size-4 text-[#73839D]" />
                         <h3 className="text-sm font-bold text-slate-900">2주간 일자별 가용성 현황</h3>
                       </div>
                       <span className="text-xs text-slate-400 font-medium">실시간 스케줄</span>
@@ -1357,12 +1357,12 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                         return (
                           <div
                             key={i}
-                            className="p-3 rounded-xl border border-slate-100 bg-slate-50/60 flex flex-col items-center gap-1.5"
+                            className="flex min-w-0 flex-col items-center gap-1.5 rounded-[12px] bg-[#FAFBFD] p-2 sm:p-3"
                             title={d.detail || d.status}
                           >
                             <span className="text-xs font-bold text-slate-700">{d.label}</span>
                             {isAvailable ? (
-                              <div className="w-6 h-6 rounded-full bg-blue-50 border border-blue-200/70 flex items-center justify-center text-[#0050FF]">
+                              <div className="w-6 h-6 rounded-full bg-blue-50 border border-blue-200/70 flex items-center justify-center text-[#1E60F3]">
                                 <Check className="w-3 h-3 stroke-[2.5]" />
                               </div>
                             ) : (
@@ -1386,7 +1386,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                 <div className="space-y-5 rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] sm:p-6">
                   <div className="flex items-center justify-between gap-2 pb-2">
                     <div className="flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-[#0050FF]" />
+                      <Sparkles className="size-4 text-[#73839D]" />
                       <h3 className="text-sm font-bold text-slate-900">
                         {selectedVehicle.model} 탑승 편의 사양
                       </h3>
@@ -1399,37 +1399,37 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
 
                   {tips.isVerified ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="p-3.5 rounded-xl border border-slate-100 bg-slate-50/50 space-y-1">
+                      <div className="space-y-2 rounded-[16px] bg-[#FAFBFD] p-4">
                         <div className="flex items-center gap-2 text-slate-900 font-bold text-xs">
-                          <Zap className="w-4 h-4 text-[#0050FF]" />
+                          <Zap className="size-4 text-[#73839D]" />
                           <span>1열 충전 포트</span>
                         </div>
                         <p className="text-xs text-slate-600 font-medium pl-6">{tips.frontCharging}</p>
                       </div>
-                      <div className="p-3.5 rounded-xl border border-slate-100 bg-slate-50/50 space-y-1">
+                      <div className="space-y-2 rounded-[16px] bg-[#FAFBFD] p-4">
                         <div className="flex items-center gap-2 text-slate-900 font-bold text-xs">
-                          <Zap className="w-4 h-4 text-[#0050FF]" />
+                          <Zap className="size-4 text-[#73839D]" />
                           <span>VIP석 충전 포트</span>
                         </div>
                         <p className="text-xs text-slate-600 font-medium pl-6">{tips.rearCharging}</p>
                       </div>
-                      <div className="p-3.5 rounded-xl border border-slate-100 bg-slate-50/50 space-y-1">
+                      <div className="space-y-2 rounded-[16px] bg-[#FAFBFD] p-4">
                         <div className="flex items-center gap-2 text-slate-900 font-bold text-xs">
-                          <Fuel className="w-4 h-4 text-[#0050FF]" />
+                          <Fuel className="size-4 text-[#73839D]" />
                           <span>사용 연료: {selectedVehicle.fuelDisplay}</span>
                         </div>
                         <p className="text-xs text-slate-600 font-medium pl-6">{tips.fuelTip}</p>
                       </div>
-                      <div className="p-3.5 rounded-xl border border-slate-100 bg-slate-50/50 space-y-1">
+                      <div className="space-y-2 rounded-[16px] bg-[#FAFBFD] p-4">
                         <div className="flex items-center gap-2 text-slate-900 font-bold text-xs">
-                          <Plug className="w-4 h-4 text-[#0050FF]" />
+                          <Plug className="size-4 text-[#73839D]" />
                           <span>220V 파워 아울렛</span>
                         </div>
                         <p className="text-xs text-slate-600 font-medium pl-6">{tips.powerTip}</p>
                       </div>
                     </div>
                   ) : (
-                    <div className="p-8 rounded-xl border border-dashed border-slate-200 bg-slate-50/50 flex flex-col items-center justify-center text-center space-y-2.5">
+                    <div className="flex flex-col items-center justify-center space-y-3 rounded-[20px] bg-[#FAFBFD] p-8 text-center">
                       <Zap className="w-6 h-6 text-slate-400" />
                       <p className="text-xs text-slate-600 font-semibold">
                         아직 {selectedVehicle.model}의 충전 포트 및 편의 사양이 등록되지 않았습니다.
@@ -1437,7 +1437,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                       <button
                         type="button"
                         onClick={handleOpenEdit}
-                        className="px-3.5 py-2 rounded-xl bg-[#0050FF] hover:bg-blue-600 text-white text-xs font-bold transition-all shadow-2xs cursor-pointer inline-flex items-center gap-1.5"
+                        className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-[14px] bg-[#1E60F3] px-4 text-[12px] font-semibold text-white shadow-[0_6px_16px_rgba(30,96,243,0.15)] transition-all hover:bg-[#1757DC]"
                       >
                         <Plus className="w-4 h-4" />
                         <span>+ 충전 단자 정보 입력하기</span>
@@ -1452,7 +1452,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                 <div className="space-y-5 rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] sm:p-6">
                   <div className="flex items-center justify-between gap-2 pb-2">
                     <div className="flex items-center gap-2">
-                      <Edit2 className="w-4 h-4 text-[#0050FF]" />
+                      <Edit2 className="size-4 text-[#73839D]" />
                       <h3 className="text-sm font-bold text-slate-900">
                         {selectedVehicle.model} ({selectedVehicle.plate}) 운영 메모
                       </h3>
@@ -1460,21 +1460,21 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                     <button
                       type="button"
                       onClick={handleOpenEdit}
-                      className="text-xs font-semibold text-[#0050FF] hover:underline flex items-center gap-1 cursor-pointer"
+                      className="flex min-h-9 cursor-pointer items-center gap-1 rounded-[12px] bg-[#F7F9FC] px-3 text-[12px] font-semibold text-[#4D607C] transition-colors hover:bg-[#EEF3FF] hover:text-[#1E60F3]"
                     >
                       <Edit2 className="w-3 h-3" />
                       <span>정보 수정</span>
                     </button>
                   </div>
 
-                  <div className="p-4 rounded-xl border border-slate-100 bg-slate-50/60 min-h-[120px] text-xs text-slate-700 whitespace-pre-wrap leading-relaxed">
+                  <div className="min-h-[120px] whitespace-pre-wrap rounded-[16px] bg-[#FAFBFD] p-5 text-[13px] leading-relaxed text-[#4D607C]">
                     {memos[selectedVehicle.id] || selectedVehicle.adminMemo || "등록된 운영 메모가 없습니다. [정보 수정] 버튼을 눌러 메모를 작성해 보세요."}
                   </div>
                 </div>
               )}
             </>
           ) : (
-            <div className="bg-white rounded-2xl p-10 border border-slate-200 text-center space-y-2">
+            <div className="space-y-2 rounded-[23px] bg-white p-10 text-center shadow-[0_6px_20px_rgba(35,49,78,0.055)]">
               <Car className="w-8 h-8 text-slate-300 mx-auto" />
               <p className="text-xs font-bold text-slate-700">선택된 차량이 없습니다.</p>
             </div>
@@ -1487,7 +1487,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
       {isEditModalOpen && selectedVehicle && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-5 space-y-4 shadow-xl border border-slate-200">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+            <div className="flex items-center justify-between gap-2 pb-2">
               <h3 className="text-base font-black text-slate-900">
                 차량 정보 수정 ({selectedVehicle.plate})
               </h3>
@@ -1592,9 +1592,9 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
       {isCalendarModalOpen && selectedVehicle && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full p-5 space-y-4 shadow-xl border border-slate-200">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+            <div className="flex items-center justify-between gap-2 pb-2">
               <div className="flex items-center gap-2">
-                <CalendarDays className="w-4 h-4 text-[#1E60F3]" />
+                <CalendarDays className="size-4 text-[#73839D]" />
                 <h3 className="text-base font-black text-slate-900">
                   {selectedVehicle.model} ({selectedVehicle.plate}) 월간 예약 현황
                 </h3>
