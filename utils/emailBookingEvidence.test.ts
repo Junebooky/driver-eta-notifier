@@ -120,7 +120,7 @@ test('fixes missing flight and movement info without falsely confirming any TMAP
   assert.deepEqual(result.passengerNames, ['Mr. Alex', 'Ben', 'Chris']);
   assert.equal(result.warnings.some(w=>w.includes('NH867') && w.includes('픽업')), false,
     'separately arriving passengers share the same airport pickup, not a timing conflict');
-  assert.equal(result.flights?.find(f=>f.flightNumber==='NH867')?.passengers.length, 1);
+  assert.equal(result.flights?.find(f=>f.flightNumber==='NH867')?.passengers?.length, 1);
   assert.equal(result.waypoints?.length, 14);
   const fire = result.waypoints?.find(p => p.date==='2026-11-19' && p.time==='10:30');
   assert.equal(fire?.location, '삼성화재');
