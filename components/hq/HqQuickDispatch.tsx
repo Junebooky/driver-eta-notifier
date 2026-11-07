@@ -2676,7 +2676,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                 <div>
                   <h3 className="text-[13px] font-semibold text-slate-800">배차를 취소할까요?</h3>
                   <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                    취소하면 담당 기사 Cockpit에도 취소 상태가 반영됩니다. 작성 중인 변경 내용은 저장되지 않습니다.
+                    배차를 취소하면 이 예약 일정도 취소되고 담당 기사 Cockpit에도 반영돼요. 저장하지 않은 변경 내용은 사라집니다.
                   </p>
                 </div>
                 <label className="block space-y-1.5">
