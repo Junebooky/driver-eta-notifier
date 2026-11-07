@@ -1867,31 +1867,43 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
               {firstAlloc && renderAllocationSelector(firstAlloc, 0)}
             </div>
 
-            {/* A quiet, read-only snapshot of the saved schedule. Editing above never mutates this reference. */}
+            {/* Immutable creation-time reference from server schedule_meta, not the most recent edit. */}
             <section aria-label="스케줄 기준 배차 정보" className="rounded-[20px] bg-[#F7F9FC] px-4 py-4 sm:px-5">
               <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                <h3 className="text-[12px] font-semibold text-[#4D607C]">스케줄 기준 정보</h3>
-                <p className="text-[11px] text-[#8492A4]">현재 저장된 일정 · 위 배차 정보는 별도로 수정 가능</p>
+                <h3 className="text-[12px] font-semibold text-[#4D607C]">최초 스케줄 기준 정보</h3>
+                <p className="text-[11px] text-[#8492A4]">최초 등록 시점의 차량·시간 · 배차를 수정해도 유지됩니다</p>
               </div>
               <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div className="min-w-0">
                   <p className="text-[11px] font-medium text-[#8A97A7]">스케줄 차량</p>
                   <p className="mt-1 break-words text-[12px] font-semibold text-[#52647A]">
-                    {initialBooking.vehiclePlate && initialBooking.vehiclePlate !== '미배정'
-                      ? `${stripManufacturerName(initialBooking.vehicleModel || '')} · ${initialBooking.vehiclePlate}`
+                    {(initialBooking.originalDispatchBaseline?.vehiclePlate ?? initialBooking.vehiclePlate) &&
+                    (initialBooking.originalDispatchBaseline?.vehiclePlate ?? initialBooking.vehiclePlate) !== '미배정'
+                      ? `${stripManufacturerName(initialBooking.originalDispatchBaseline?.vehicleModel ?? initialBooking.vehicleModel ?? '')} · ${initialBooking.originalDispatchBaseline?.vehiclePlate ?? initialBooking.vehiclePlate}`
                       : '미배정'}
                   </p>
-                  {currentVehiclePlate !== (initialBooking.vehiclePlate || '') && <p className="mt-1 text-[10px] text-[#8A97A7]">차량 변경 중</p>}
+                  {currentVehiclePlate !== (initialBooking.originalDispatchBaseline?.vehiclePlate ?? initialBooking.vehiclePlate ?? '') &&
+                    <p className="mt-1 text-[10px] text-[#8A97A7]">현재 배차와 다름</p>}
                 </div>
                 <div>
                   <p className="text-[11px] font-medium text-[#8A97A7]">스케줄 출발 시간</p>
-                  <p className="mt-1 text-[12px] font-semibold tabular-nums text-[#52647A]">{initialBooking.pickupTime ? formatTimeKoreanAmPm(initialBooking.pickupTime) : '미정'}</p>
-                  {pickupTimeOnly !== (initialBooking.pickupTime || '') && <p className="mt-1 text-[10px] text-[#8A97A7]">출발 시간 변경 중</p>}
+                  <p className="mt-1 text-[12px] font-semibold tabular-nums text-[#52647A]">
+                    {(initialBooking.originalDispatchBaseline?.pickupTime ?? initialBooking.pickupTime)
+                      ? formatTimeKoreanAmPm(initialBooking.originalDispatchBaseline?.pickupTime ?? initialBooking.pickupTime)
+                      : '미정'}
+                  </p>
+                  {pickupTimeOnly !== (initialBooking.originalDispatchBaseline?.pickupTime ?? initialBooking.pickupTime ?? '') &&
+                    <p className="mt-1 text-[10px] text-[#8A97A7]">현재 배차와 다름</p>}
                 </div>
                 <div>
                   <p className="text-[11px] font-medium text-[#8A97A7]">스케줄 종료 시간</p>
-                  <p className="mt-1 text-[12px] font-semibold tabular-nums text-[#52647A]">{initialBooking.endTime ? formatTimeKoreanAmPm(initialBooking.endTime) : '미정'}</p>
-                  {endTime !== (initialBooking.endTime || '') && <p className="mt-1 text-[10px] text-[#8A97A7]">종료 시간 변경 중</p>}
+                  <p className="mt-1 text-[12px] font-semibold tabular-nums text-[#52647A]">
+                    {(initialBooking.originalDispatchBaseline?.endTime ?? initialBooking.endTime)
+                      ? formatTimeKoreanAmPm(initialBooking.originalDispatchBaseline?.endTime ?? initialBooking.endTime ?? '')
+                      : '미정'}
+                  </p>
+                  {endTime !== (initialBooking.originalDispatchBaseline?.endTime ?? initialBooking.endTime ?? '') &&
+                    <p className="mt-1 text-[10px] text-[#8A97A7]">현재 배차와 다름</p>}
                 </div>
               </div>
             </section>
