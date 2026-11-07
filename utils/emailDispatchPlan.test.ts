@@ -12,6 +12,25 @@ test('existing extracted stops become independent daily rows for every selected 
  const days=emailDispatchDays(draft());assert.equal(days.length,2);assert.equal(days[0].points.length,3);
  const plan=buildEmailDispatchPlan(draft(),slots(),'published');assert.equal(plan.length,4);assert.deepEqual(plan.map(row=>row.date),['2026-12-10','2026-12-10','2026-12-11','2026-12-11']);assert.ok(plan.every(row=>row.origin==='공항'&&row.destination==='호텔'&&row.endTime==='18:00'&&row.routeWaypoints.length===3));
 });
+test('two flights, two passenger arrival groups, ONE Staria slot create one driver schedule per day',()=>{
+ const oneVehicle=slots().slice(0,1);
+ const withTwoArrivals={...draft(),passengerCount:3,flights:[
+  {date:'2026-12-10',flightNumber:'KE2104',originAirport:'HND',destinationAirport:'GMP',role:'arrival' as const,scheduledArrival:'09:00',passengers:['Guest A','Guest B']},
+  {date:'2026-12-10',flightNumber:'NH867',originAirport:'HND',destinationAirport:'GMP',role:'arrival' as const,scheduledArrival:'09:05',passengers:['Guest C']},
+ ]};
+ const plan=buildEmailDispatchPlan(withTwoArrivals,oneVehicle,'published');
+ assert.equal(plan.length,2,'one vehicle, not two vehicles for each arrival flight');
+ const first=plan[0];
+ assert.equal(first.flightNumber,'KE2104, NH867');
+ assert.match(first.notes,/1차 KE2104 도착 09:00 \(Guest A, Guest B\)/);
+ assert.match(first.notes,/2차 NH867 도착 09:05 \(Guest C\)/);
+ assert.match(first.notes,/전원 합류 후 이동/);
+ assert.equal(first.passengerCount,3);
+ assert.equal(first.groupTotalVehicles,1);
+ assert.equal(plan[1].notes.includes('공항 입국 그룹별 픽업'),false,
+  'November 18 shared arrivals should not leak into the next service day');
+});
+
 test('missing end/POI/assignment fails; an unassigned mobile request retains every day without inventing an assignment',()=>{
  const missing=draft();missing.waypoints[2].time='';assert.throws(()=>buildEmailDispatchPlan(missing,slots(),'published'),/종료/);
  missing.waypoints[2].isPoiConfirmed=false;assert.equal(buildEmailDispatchPlan(missing,slots().map(s=>({...s,driver:null,vehiclePlate:undefined})),'unassigned').length,4);

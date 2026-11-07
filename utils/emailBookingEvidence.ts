@@ -74,6 +74,79 @@ export function extractFlightEvidence(body: string, pickupDate: string): EmailFl
   return [...new Map(found.map((item) => [item.date + ':' + item.flightNumber, item])).values()];
 }
 
+/**
+ * One arrival flight equals one passenger meeting group, NOT one vehicle.
+ * Co-arrivals into the same airport remain part of the same vehicle booking.
+ */
+export interface AirportArrivalPickupGroup {
+  date: string;
+  airport: string;
+  flightNumber: string;
+  arrivalTime: string;
+  passengers: string[];
+  sequence: number;
+  totalGroups: number;
+}
+
+export function buildAirportArrivalPickupGroups(flights: EmailFlightLeg[]): AirportArrivalPickupGroup[] {
+  const arrivals = flights.filter(flight => flight.role === 'arrival' && Boolean(flight.destinationAirport));
+  const groups = new Map<string, EmailFlightLeg[]>();
+  for (const arrival of arrivals) {
+    const key = arrival.date + ':' + arrival.destinationAirport!.toUpperCase();
+    groups.set(key, [...(groups.get(key) || []), arrival]);
+  }
+  return [...groups.values()].flatMap(group => {
+    const sorted = [...group].sort((a, b) =>
+      (a.scheduledArrival || '99:99').localeCompare(b.scheduledArrival || '99:99') ||
+      a.flightNumber.localeCompare(b.flightNumber)
+    );
+    return sorted.map((flight, index) => ({
+      date: flight.date,
+      airport: flight.destinationAirport!.toUpperCase(),
+      flightNumber: flight.flightNumber,
+      arrivalTime: flight.scheduledArrival || '',
+      passengers: flight.passengers || [],
+      sequence: index + 1,
+      totalGroups: sorted.length,
+    }));
+  });
+}
+
+/** Only explicit, non-overlapping passenger groups justify treating the first
+ * arrival clock as the service start and later arrival clocks as collection
+ * points. A single late flight still requires pickup-time review. */
+function isSeparatePassengerArrivalGroup(
+  arrival: EmailFlightLeg,
+  groups: AirportArrivalPickupGroup[],
+): boolean {
+  const related = groups.filter(group =>
+    group.date === arrival.date &&
+    group.airport === arrival.destinationAirport?.toUpperCase()
+  );
+  if (related.length < 2 || related.some(group => group.passengers.length === 0)) return false;
+  const seen = new Set<string>();
+  for (const group of related) {
+    for (const person of group.passengers) {
+      const key = person.trim().toLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+    }
+  }
+  return true;
+}
+
+/** Expand "Lou" to "Mr. Lou Hanover" only if exactly one named rider in the
+ * original email has that given name. Never guess ambiguous identities. */
+function resolveFlightPassengerName(name: string, roster: string[]): string {
+  const candidate = name.trim();
+  if (!candidate) return candidate;
+  const firstName = (full: string) =>
+    full.replace(/^(?:Mr|Mrs|Ms|Dr)\.?\s+/i, '').trim().split(/\s+/)[0].toLowerCase();
+  const matching = roster.filter(full => full.toLowerCase() === candidate.toLowerCase() ||
+    firstName(full) === candidate.toLowerCase());
+  return matching.length === 1 ? matching[0] : candidate;
+}
+
 /** Separates the riders named in "Pick up A, B, C from ..." from the coordinator. */
 export function extractPassengerNamesEvidence(body: string): string[] {
   for (const line of body.split(/\r?\n/)) {
@@ -287,10 +360,27 @@ export function enrichBookingDraftWithEmailEvidence(
   const evidenceFlights = extractFlightEvidence(body, draft.pickupDate);
   const flights = [...new Map(
     [...aiFlights, ...evidenceFlights].map((f) => [f.date + ':' + f.flightNumber.toUpperCase(), f])
-  ).values()];
+  ).values()].map(flight => ({
+    ...flight,
+    passengers: (flight.passengers || []).map(name => resolveFlightPassengerName(name, passengerNames)),
+  }));
+  const arrivalGroups = buildAirportArrivalPickupGroups(flights);
   const addresses = extractCustomerAddressEvidence(body, draft.pickupDate);
   const points = [...(draft.waypoints || [])].map((p) => ({ ...p }));
-  const warnings = [...draft.warnings];
+  const warnings = [...draft.warnings].filter(warning => {
+    // Ignore model-generated timing "conflicts" that mistake the second
+    // passenger group's flight arrival for the first group's pickup clock.
+    // Keep unrelated flight, terminal and pickup warnings unchanged.
+    const misleadingArrival = flights.find(flight =>
+      flight.role === 'arrival' &&
+      isSeparatePassengerArrivalGroup(flight, arrivalGroups) &&
+      warning.toUpperCase().includes(flight.flightNumber.toUpperCase())
+    );
+    return !(misleadingArrival &&
+      /픽업|pickup/i.test(warning) &&
+      /도착|arrival/i.test(warning) &&
+      /시간|time|before|earlier|later|늦|빠르|이전|조정/i.test(warning));
+  });
   const sourceStops = extractItineraryEvidence(body, draft.pickupDate);
   for (const source of sourceStops) {
     const onDay = points.filter(p => (p.date || draft.pickupDate) === source.date);
@@ -348,9 +438,41 @@ export function enrichBookingDraftWithEmailEvidence(
   ).map((p, i) => ({ ...p, order: i + 1 }));
   const enriched = (ordered.length >= 2 ? applyMovementEvidence(ordered, body, draft.pickupDate) : ordered)
     .map((point) => ({ ...point, location: canonicalKoreanPlaceName(point.location) }));
+  // The airport is one physical route stop, but the driver must meet each
+  // flight's passengers separately. Keep both meeting groups on that stop.
+  const seenArrivalPairs = new Set<string>();
+  for (const group of arrivalGroups) {
+    const key = group.date + ':' + group.airport;
+    if (group.totalGroups < 2 || seenArrivalPairs.has(key)) continue;
+    seenArrivalPairs.add(key);
+    const sameAirportGroups = arrivalGroups.filter(item =>
+      item.date === group.date && item.airport === group.airport
+    );
+    const codePattern: Record<string, RegExp> = {
+      GMP: /김포|gimpo/i, ICN: /인천|incheon/i,
+      PUS: /김해|gimhae/i, CJU: /제주|jeju/i,
+    };
+    const airportPattern = codePattern[group.airport];
+    if (!airportPattern) continue;
+    const airportStop = enriched.find(point =>
+      point.date === group.date && airportPattern.test(point.location)
+    );
+    if (!airportStop) continue;
+    airportStop.notes = withNote(airportStop.notes,
+      '입국 그룹별 픽업 · ' + sameAirportGroups.map(item =>
+        item.sequence + '차 ' + item.flightNumber + ' ' +
+        (item.arrivalTime || '도착시각 미정') +
+        (item.passengers.length ? ' (' + item.passengers.join(', ') + ')' : '')
+      ).join(' / ')
+    );
+  }
   const first = enriched[0], last = enriched.at(-1);
+  // A 22:25 KE2104 arrival followed by 22:30 NH867 is two separately
+  // arriving passenger groups. It is NOT a booking-time conflict for one
+  // Staria picking up both groups in the same airport.
   const lateArrivals = flights.filter((flight) =>
     flight.date === draft.pickupDate && flight.role === 'arrival' &&
+    !isSeparatePassengerArrivalGroup(flight, arrivalGroups) &&
     /^\d{2}:\d{2}$/.test(flight.scheduledArrival || '') &&
     /^\d{2}:\d{2}$/.test(draft.pickupTime) &&
     flight.scheduledArrival! > draft.pickupTime

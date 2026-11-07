@@ -40,6 +40,7 @@ import { haptics } from '@/utils/haptics';
 import { HqPlaceSearchInput, PoiResult } from '@/components/hq/HqPlaceSearchInput';
 import { saveContactToCrm } from '@/utils/crmCustomerSync';
 import { HqEmailAddressCandidate } from './HqEmailAddressCandidate';
+import { buildAirportArrivalPickupGroups } from '@/utils/emailBookingEvidence';
 import { confirmEmailRouteStop, changeEmailRouteStopName, getUnconfirmedEmailRouteStops, isVerifiedEmailRouteStop } from '@/utils/emailRoutePlaceVerification';
 
 interface HqStep1ExtractViewProps {
@@ -109,6 +110,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
   const pickupTime = extractedDraft?.pickupTime || '시간 미지정';
   const flightNumber = extractedDraft?.flightNumber || '';
   const flights = extractedDraft?.flights || [];
+  const arrivalGroups = buildAirportArrivalPickupGroups(flights);
   const requestedVehicleClass = extractedDraft?.requestedVehicleClass || '차량 미지정';
   const specialRequests = extractedDraft?.specialRequests || '';
 
@@ -770,14 +772,24 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                   <span>항공편</span>
                 </div>
                 <div className="min-w-0 text-right space-y-1">
-                  {flights.length > 0 ? flights.map((flight, index) => (
-                    <div key={flight.date + flight.flightNumber + index} className="font-medium text-slate-900 leading-relaxed">
-                      <span className="font-mono font-bold">{flight.flightNumber}</span>
-                      <span className="text-slate-500 ml-1.5">{flight.date.slice(5)} · {flight.originAirport || '?'}-{flight.destinationAirport || '?'}</span>
-                      {flight.role === 'connection' && <span className="ml-1.5 text-slate-400">(환승)</span>}
-                      {flight.passengers?.length ? <span className="block text-[10px] text-slate-400">{flight.passengers.join(', ')}</span> : null}
-                    </div>
-                  )) : flightNumber ? (
+                  {flights.length > 0 ? flights.map((flight, index) => {
+                    const arrivalGroup = flight.role === 'arrival' ?
+                      arrivalGroups.find(group => group.date === flight.date && group.flightNumber === flight.flightNumber) : undefined;
+                    const roleLabel = arrivalGroup?.totalGroups && arrivalGroup.totalGroups > 1
+                      ? `${arrivalGroup.sequence}차 입국 그룹`
+                      : flight.role === 'arrival' ? '입국' : flight.role === 'departure' ? '출국' : flight.role === 'connection' ? '환승' : '';
+                    const shownClock = flight.role === 'arrival' ? flight.scheduledArrival
+                      : flight.scheduledDeparture;
+                    return (
+                      <div key={flight.date + flight.flightNumber + index} className="font-medium text-slate-900 leading-relaxed">
+                        <span className="font-mono font-bold">{flight.flightNumber}</span>
+                        <span className="text-slate-500 ml-1.5">{flight.date.slice(5)} · {flight.originAirport || '?'}-{flight.destinationAirport || '?'}</span>
+                        {roleLabel && <span className="ml-1.5 text-slate-500">({roleLabel})</span>}
+                        {shownClock && <span className="ml-1.5 text-slate-500">· {flight.role === 'arrival' ? '도착' : '출발'} {shownClock}</span>}
+                        {flight.passengers?.length ? <span className="block text-[10px] text-slate-500">{flight.passengers.join(', ')} · {flight.passengers.length}명</span> : null}
+                      </div>
+                    );
+                  }) : flightNumber ? (
                     <span className="font-mono font-bold text-slate-900">{flightNumber}</span>
                   ) : (
                     <span className="font-medium text-slate-600">미정 (출국 전 확인 필요)</span>
