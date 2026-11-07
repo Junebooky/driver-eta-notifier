@@ -655,7 +655,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
         role="dialog"
         aria-modal="true"
         aria-label="의전 견적 계산기"
-        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200 select-none"
+        className="fixed inset-0 z-[90] flex items-center justify-center bg-[#17233B]/30 p-3 backdrop-blur-[2px] sm:p-6 overflow-y-auto animate-in fade-in duration-200 select-none"
         onClick={(e) => {
           if (e.target === e.currentTarget) {
             haptics.lightTap();
@@ -663,9 +663,9 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
           }
         }}
       >
-        <div id="quote-modal-container" className="relative w-full max-w-4xl max-h-[92vh] flex flex-col bg-white border border-slate-200/90 rounded-3xl shadow-2xl overflow-hidden my-auto animate-in zoom-in-95 duration-150">
+        <div id="quote-modal-container" className="hq-quote-modal-a relative flex max-h-[94dvh] w-full max-w-4xl flex-col overflow-hidden rounded-[26px] bg-[#FAFBFD] shadow-[0_24px_64px_rgba(27,45,77,0.16),0_4px_14px_rgba(27,45,77,0.04)] my-auto animate-in zoom-in-95 duration-150">
           {/* Header */}
-          <div id="quote-modal-header" className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-100 bg-white shrink-0">
+          <div id="quote-modal-header" className="flex shrink-0 items-center justify-between bg-white px-5 py-5 sm:px-6">
             <div className="flex items-center gap-2.5 sm:gap-3">
               <img
                 src="/images/icons/calculator.png"
@@ -675,7 +675,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
               />
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                  <h3 className="text-[19px] font-bold tracking-[-0.03em] text-[#17233B] sm:text-[22px]">
                     의전 견적 계산기
                   </h3>
                 </div>
@@ -686,7 +686,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition cursor-pointer"
+                className="flex size-10 cursor-pointer items-center justify-center rounded-full bg-[#F7F9FC] text-[#73839D] transition-colors hover:bg-[#EDF1F6]"
                 aria-label="닫기"
               >
                 <X className="w-5 h-5" />
@@ -695,7 +695,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
           </div>
 
           {/* Stepper (1 ~ 4) */}
-          <div id="quote-modal-stepper" className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 shrink-0">
+          <div id="quote-modal-stepper" className="shrink-0 bg-white px-5 py-5 sm:px-6">
             <div className="flex items-center justify-between max-w-2xl mx-auto relative">
               {/* Background connector line */}
               <div className="absolute top-4 left-6 right-6 h-0.5 bg-slate-200 -z-0" />
@@ -719,10 +719,10 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                   >
                     <div
                       className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all ${isCurrent
-                        ? 'bg-[#1E60F3] text-white ring-4 ring-blue-100 shadow-sm scale-105'
+                        ? 'bg-[#1E60F3] text-white shadow-[0_4px_14px_rgba(30,96,243,0.13)]'
                         : isCompleted
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-white border-2 border-slate-300 text-slate-400'
+                          ? 'bg-[#EEF3FF] text-[#1E60F3]'
+                          : 'bg-[#F7F9FC] text-[#95A3B9]'
                         }`}
                     >
                       {isCompleted ? <Check className="w-4 h-4 stroke-[3]" /> : step.number}
@@ -744,7 +744,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
           </div>
 
           {/* Body Content */}
-          <div className="flex-1 overflow-y-auto p-3.5 sm:p-7">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-[#FAFBFD] p-5 sm:p-7">
             {/* Step 1: 고객사 및 행사 정보 */}
             {currentStep === 1 && (
               <div className="space-y-4 max-w-2xl mx-auto animate-in fade-in duration-200">
@@ -1275,19 +1275,19 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                 {/* Notifications & Feedback */}
                 <div id="quote-feedback-messages" className="space-y-2">
                   {errorMessage && (
-                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs flex items-center gap-2">
+                    <div className="flex items-center gap-2 rounded-[16px] bg-[#FFF4F2] p-4 text-[12px] font-medium text-[#A34E45]">
                       <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
                       <span>{errorMessage}</span>
                     </div>
                   )}
                   {saveSuccess && (
-                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-blue-700 text-xs flex items-center gap-2">
+                    <div className="flex items-center gap-2 rounded-[16px] bg-[#EEF3FF] p-4 text-[12px] font-medium text-[#31598F]">
                       <CheckCircle2 className="w-4 h-4 shrink-0 text-[#1E60F3]" />
                       <span>{saveSuccess}</span>
                     </div>
                   )}
                   {conversionSuccess && (
-                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs flex items-center gap-2">
+                    <div className="flex items-center gap-2 rounded-[16px] bg-[#EEF3FF] p-4 text-[12px] font-medium text-[#31598F]">
                       <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
                       <span>{conversionSuccess}</span>
                     </div>
@@ -1301,7 +1301,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                     type="button"
                     onClick={handleConvertToBooking}
                     disabled={isConverting || !calculatedQuote || calculatedQuote.quoteRequired}
-                    className="w-full h-12 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-98 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-md shadow-blue-500/25 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex min-h-[52px] w-full cursor-pointer items-center justify-center gap-2 rounded-[16px] bg-[#1E60F3] px-4 text-[13px] font-semibold text-white shadow-[0_6px_16px_rgba(30,96,243,0.15)] transition-colors hover:bg-[#1757DC] active:scale-[0.99] transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <CheckCircle2 className="w-4 h-4" />
                     <span>{isConverting ? '예약 전환 중...' : '예약 전환 및 관제 등록'}</span>
@@ -1311,7 +1311,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                     <button
                       type="button"
                       onClick={handleCopyReceipt}
-                      className="py-2.5 px-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+                      className="flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-[14px] bg-white px-2 text-[12px] font-semibold text-[#4D607C] shadow-[0_4px_14px_rgba(35,49,78,0.045)] transition-colors hover:bg-[#F5F8FF] transition cursor-pointer"
                     >
                       <Copy className="w-3.5 h-3.5 text-slate-500" />
                       <span>{isCopied ? '복사 완료!' : '견적서 복사'}</span>
@@ -1319,7 +1319,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                     <button
                       type="button"
                       onClick={handlePrintPdf}
-                      className="py-2.5 px-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
+                      className="flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-[14px] bg-white px-2 text-[12px] font-semibold text-[#4D607C] shadow-[0_4px_14px_rgba(35,49,78,0.045)] transition-colors hover:bg-[#F5F8FF] transition cursor-pointer"
                     >
                       <Printer className="w-3.5 h-3.5 text-slate-500" />
                       <span>견적서 PDF</span>
@@ -1328,7 +1328,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                       type="button"
                       onClick={handleSaveQuote}
                       disabled={isSaving || !calculatedQuote}
-                      className="py-2.5 px-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-[14px] bg-white px-2 text-[12px] font-semibold text-[#4D607C] shadow-[0_4px_14px_rgba(35,49,78,0.045)] transition-colors hover:bg-[#F5F8FF] transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <FileText className="w-3.5 h-3.5 text-slate-500" />
                       <span>{isSaving ? '저장 중...' : '임시 저장'}</span>
@@ -1340,7 +1340,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
           </div>
 
           {/* Wizard Footer Navigation */}
-          <div id="quote-modal-footer" className="px-6 py-4 border-t border-slate-100 bg-white flex items-center justify-between shrink-0">
+          <div id="quote-modal-footer" className="flex shrink-0 items-center justify-between bg-white px-5 py-4 sm:px-6">
             {currentStep > 1 ? (
               <button
                 type="button"
@@ -1348,7 +1348,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                   haptics.lightTap();
                   setCurrentStep((prev) => (prev - 1) as 1 | 2 | 3 | 4);
                 }}
-                className="inline-flex items-center gap-1 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs transition cursor-pointer"
+                className="inline-flex min-h-11 cursor-pointer items-center gap-1 rounded-[14px] bg-[#F7F9FC] px-4 text-[12px] font-semibold text-[#4D607C] transition-colors hover:bg-[#EDF1F6] transition cursor-pointer"
               >
                 <ChevronLeft className="w-4 h-4" />
                 <span>이전 단계</span>
@@ -1369,7 +1369,7 @@ export const HqQuoteModal: React.FC<HqQuoteModalProps> = ({
                   setErrorMessage(null);
                   setCurrentStep((prev) => (prev + 1) as 1 | 2 | 3 | 4);
                 }}
-                className="inline-flex items-center gap-1 px-6 py-2.5 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white font-black text-sm shadow-md shadow-blue-500/20 transition cursor-pointer"
+                className="inline-flex min-h-11 cursor-pointer items-center gap-1 rounded-[14px] bg-[#1E60F3] px-6 text-[13px] font-semibold text-white shadow-[0_6px_16px_rgba(30,96,243,0.15)] transition-colors hover:bg-[#1757DC] active:scale-[0.99] transition cursor-pointer"
               >
                 <span>{currentStep === 3 ? '견적서 받아보기' : '다음 단계'}</span>
                 <ChevronRight className="w-4 h-4" />
