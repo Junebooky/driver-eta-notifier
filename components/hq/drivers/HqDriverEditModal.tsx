@@ -78,30 +78,30 @@ export const HqDriverEditModal: React.FC<HqDriverEditModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-150 flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[#17233B]/30 p-3 backdrop-blur-[2px] sm:p-6 animate-in fade-in duration-150">
+      <div className="hq-driver-form-a w-full max-w-md overflow-hidden rounded-[25px] bg-[#FAFBFD] shadow-[0_24px_64px_rgba(27,45,77,0.16),0_4px_14px_rgba(27,45,77,0.04)] animate-in zoom-in-95 duration-150 flex flex-col max-h-[92vh]">
         {/* Header */}
-        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70 shrink-0">
+        <div className="flex shrink-0 items-center justify-between bg-white px-5 py-5">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#1E60F3] flex items-center justify-center font-bold">
+            <div className="flex size-11 items-center justify-center rounded-[15px] bg-[#EEF3FF] text-[#1E60F3]">
               <User className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-sm font-black text-slate-900">기사 정보 수정</h3>
+              <h3 className="text-[18px] font-bold tracking-[-0.025em] text-[#17233B]">기사 정보 수정</h3>
               <p className="text-[11px] text-slate-500 font-medium">소속 구분 및 프로필 정보를 변경할 수 있어요</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-lg hover:bg-slate-200/60 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
+            className="flex size-10 cursor-pointer items-center justify-center rounded-full bg-[#F7F9FC] text-[#73839D] transition-colors hover:bg-[#EDF1F6]"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs font-bold text-slate-700 overflow-y-auto flex-1">
+        <form onSubmit={handleSubmit} className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain p-5 text-[12px] font-medium text-[#4D607C]">
           {errorMessage && (
             <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium">
               {errorMessage}
@@ -109,7 +109,7 @@ export const HqDriverEditModal: React.FC<HqDriverEditModalProps> = ({
           )}
 
           {/* Affiliation Type - Core requirement */}
-          <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-200/80 space-y-2">
+          <div className="space-y-3 rounded-[18px] bg-white p-4 shadow-[0_4px_14px_rgba(35,49,78,0.045)]">
             <label className="block text-xs font-black text-slate-900">
               소속 구분 <span className="text-[#1E60F3]">*</span>
             </label>
@@ -120,9 +120,9 @@ export const HqDriverEditModal: React.FC<HqDriverEditModalProps> = ({
                   haptics.selection();
                   setAffiliationType('employed');
                 }}
-                className={`p-2.5 rounded-xl border text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer ${affiliationType === 'employed'
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                    : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
+                className={`flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-[13px] px-3 text-[12px] font-semibold transition-colors ${affiliationType === 'employed'
+                    ? 'bg-[#EEF3FF] text-[#1E60F3] font-semibold'
+                    : 'bg-white text-[#73839D] shadow-[0_3px_10px_rgba(35,49,78,0.045)] hover:bg-[#F7F9FC]'
                   }`}
               >
                 {affiliationType === 'employed' && <Check className="w-3.5 h-3.5" />}
@@ -135,9 +135,9 @@ export const HqDriverEditModal: React.FC<HqDriverEditModalProps> = ({
                   haptics.selection();
                   setAffiliationType('freelance');
                 }}
-                className={`p-2.5 rounded-xl border text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer ${affiliationType === 'freelance'
-                    ? 'bg-slate-700 text-white border-slate-700 shadow-xs'
-                    : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
+                className={`flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-[13px] px-3 text-[12px] font-semibold transition-colors ${affiliationType === 'freelance'
+                    ? 'bg-[#EEF3FF] text-[#1E60F3] font-semibold'
+                    : 'bg-white text-[#73839D] shadow-[0_3px_10px_rgba(35,49,78,0.045)] hover:bg-[#F7F9FC]'
                   }`}
               >
                 {affiliationType === 'freelance' && <Check className="w-3.5 h-3.5" />}
@@ -201,7 +201,7 @@ export const HqDriverEditModal: React.FC<HqDriverEditModalProps> = ({
             </div>
 
             <div>
-              <label className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100/70 transition-colors">
+              <label className="flex min-h-[52px] cursor-pointer items-center gap-2 rounded-[15px] bg-white p-3 transition-colors hover:bg-[#FAFBFD]">
                 <input
                   type="checkbox"
                   checked={englishAvailable}
@@ -231,19 +231,19 @@ export const HqDriverEditModal: React.FC<HqDriverEditModalProps> = ({
           </div>
 
           {/* Footer Actions */}
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+          <div className="flex items-center justify-end gap-2 pt-3">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold transition-colors cursor-pointer"
+              className="min-h-11 cursor-pointer rounded-[14px] bg-[#F7F9FC] px-4 text-[12px] font-semibold text-[#4D607C] transition-colors hover:bg-[#EDF1F6]"
             >
               취소
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-5 py-2 rounded-xl bg-[#1E60F3] hover:bg-blue-600 disabled:opacity-50 text-white font-black flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+              className="flex min-h-11 cursor-pointer items-center gap-1.5 rounded-[14px] bg-[#1E60F3] px-5 text-[12px] font-semibold text-white shadow-[0_6px_16px_rgba(30,96,243,0.15)] transition-colors hover:bg-[#1757DC] disabled:opacity-50"
             >
               {isSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
               <span>저장하기</span>

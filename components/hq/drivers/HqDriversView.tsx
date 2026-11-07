@@ -148,7 +148,7 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="hq-drivers-a space-y-5">
       {viewMode === 'table' ? (
         <HqDriversTableView
           onSelectDriver={handleSelectDriver}
@@ -179,30 +179,30 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
 
       {/* Quick Add Driver Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[#17233B]/30 p-3 backdrop-blur-[2px] sm:p-6 animate-in fade-in duration-150">
+          <div className="hq-driver-form-a w-full max-w-md overflow-hidden rounded-[25px] bg-[#FAFBFD] shadow-[0_24px_64px_rgba(27,45,77,0.16),0_4px_14px_rgba(27,45,77,0.04)] animate-in zoom-in-95 duration-150">
             {/* Header */}
-            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+            <div className="flex items-center justify-between bg-white px-5 py-5">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#1E60F3] flex items-center justify-center">
+                <div className="flex size-11 items-center justify-center rounded-[15px] bg-[#EEF3FF] text-[#1E60F3]">
                   <User className="w-4 h-4" />
                 </div>
-                <h3 className="text-sm font-black text-slate-900">신규 기사 등록</h3>
+                <h3 className="text-[18px] font-bold tracking-[-0.03em] text-[#17233B]">신규 기사 등록</h3>
               </div>
               <button
                 type="button"
                 onClick={handleCloseAddModal}
-                className="w-7 h-7 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-700 flex items-center justify-center cursor-pointer transition-colors"
+                className="flex size-10 cursor-pointer items-center justify-center rounded-full bg-[#F7F9FC] text-[#73839D] transition-colors hover:bg-[#EDF1F6]"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Form */}
-            <form onSubmit={(e) => handleCreateDriver(e, false)} className="p-5 space-y-4 text-xs font-bold text-slate-700">
+            <form onSubmit={(e) => handleCreateDriver(e, false)} className="space-y-5 p-5 text-[12px] font-medium text-[#4D607C]">
               {/* Duplicate Driver Warning Card */}
               {duplicateInfo && (
-                <div className="p-3.5 rounded-xl bg-amber-50 border-2 border-amber-300 text-amber-900 space-y-2.5 animate-in fade-in duration-150">
+                <div className="rounded-[17px] bg-[#FFF9F1] p-4 text-[#8E633F] space-y-2.5 animate-in fade-in duration-150">
                   <div className="flex items-start gap-2">
                     <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                     <div>
@@ -219,7 +219,7 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
                     {duplicateInfo.existing.map((ex) => (
                       <div
                         key={ex.id}
-                        className="p-2 rounded-lg bg-white border border-amber-200 flex items-center justify-between text-xs"
+                        className="flex items-center justify-between rounded-[12px] bg-white p-3 text-[12px]"
                       >
                         <div className="min-w-0 pr-2">
                           <div className="font-bold text-slate-900 flex items-center gap-1.5">
@@ -259,7 +259,7 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
                       type="button"
                       onClick={() => handleCreateDriver(undefined, true)}
                       disabled={isSubmitting}
-                      className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-black text-[11px] transition-all cursor-pointer shadow-xs shrink-0"
+                      className="min-h-10 shrink-0 cursor-pointer rounded-[13px] bg-white px-3 text-[11px] font-semibold text-[#8E633F] shadow-[0_3px_10px_rgba(35,49,78,0.06)] transition-colors hover:bg-[#FFF4E6] disabled:opacity-50"
                     >
                       동명이인 확인 후 등록
                     </button>
@@ -269,7 +269,7 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
 
               {/* Error Alert Card */}
               {createError && (
-                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 space-y-2 animate-in fade-in duration-150">
+                <div className="rounded-[17px] bg-[#FFF4F2] p-4 text-[#A34E45] space-y-2 animate-in fade-in duration-150">
                   <div className="flex items-center gap-1.5 font-bold text-xs">
                     <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
                     <span>등록 실패 {createError.statusCode ? `(HTTP ${createError.statusCode})` : ''}</span>
@@ -282,7 +282,7 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
                       <button
                         type="button"
                         onClick={() => setIsLoginModalOpen(true)}
-                        className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-black cursor-pointer shadow-xs transition-colors"
+                        className="min-h-10 cursor-pointer rounded-[13px] bg-white px-3 text-[11px] font-semibold text-[#A34E45] shadow-[0_3px_10px_rgba(35,49,78,0.06)] transition-colors hover:bg-[#FFE9E5]"
                       >
                         본사 관리자(HQ) 인증 로그인하기
                       </button>
@@ -342,7 +342,7 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
               </div>
 
               {/* English Capability Toggle */}
-              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200">
+              <div className="flex items-center justify-between rounded-[16px] bg-white p-4 shadow-[0_4px_14px_rgba(35,49,78,0.045)]">
                 <div>
                   <span className="block text-xs font-bold text-slate-900">영어 소통 가능 여부</span>
                   <span className="text-[11px] text-slate-400 font-normal">외국인 VIP 의전 배차 시 우선 필터링</span>
@@ -362,18 +362,18 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
                 </button>
               </div>
 
-              <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+              <div className="flex items-center justify-end gap-2 pt-3">
                 <button
                   type="button"
                   onClick={handleCloseAddModal}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+                  className="min-h-11 cursor-pointer rounded-[14px] bg-[#F7F9FC] px-4 text-[12px] font-semibold text-[#4D607C] transition-colors hover:bg-[#EDF1F6]"
                 >
                   취소
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2 rounded-xl bg-[#1E60F3] hover:bg-blue-600 disabled:opacity-50 text-white text-xs font-black shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+                  className="flex min-h-11 cursor-pointer items-center gap-1.5 rounded-[14px] bg-[#1E60F3] px-5 text-[12px] font-semibold text-white shadow-[0_6px_16px_rgba(30,96,243,0.15)] transition-colors hover:bg-[#1757DC] disabled:opacity-50"
                 >
                   {isSubmitting ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
