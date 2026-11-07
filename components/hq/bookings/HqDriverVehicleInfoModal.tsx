@@ -58,6 +58,7 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
   const [channel, setChannel] = useState<'manual_copy' | 'email' | 'download'>('manual_copy');
   const [isChannelMenuOpen, setIsChannelMenuOpen] = useState(false);
   const channelMenuRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const channelTriggerRef = useRef<HTMLButtonElement>(null);
   const channelOptionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [feedback, setFeedback] = useState<{
@@ -144,6 +145,21 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
     setFeedback(null);
   }, [isOpen, currentBookingId]);
 
+  // Prevent the dispatch screen from moving behind the mobile modal.
+  // Restore the previously focused control on close.
+  useEffect(() => {
+    if (!isOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    const previouslyFocused = document.activeElement instanceof HTMLElement
+      ? document.activeElement : null;
+    document.body.style.overflow = 'hidden';
+    dialogRef.current?.focus({ preventScroll: true });
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      if (previouslyFocused?.isConnected) previouslyFocused.focus({ preventScroll: true });
+    };
+  }, [isOpen]);
+
   useEffect(() => {
     if (!isOpen) return;
     const onPointerDown = (event: PointerEvent) => {
@@ -152,6 +168,22 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
       }
     };
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Tab' && dialogRef.current) {
+        const focusable = [...dialogRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], input:not([disabled])'
+        )].filter(element => element.getClientRects().length > 0);
+        if (focusable.length) {
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+          if (event.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) {
+            event.preventDefault();
+            last.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+          }
+        }
+      }
       if (event.key !== 'Escape') return;
       if (isChannelMenuOpen) {
         setIsChannelMenuOpen(false);
@@ -245,7 +277,7 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[#17233B]/30 p-2.5 sm:p-6 backdrop-blur-[2px] animate-in fade-in duration-200">
-      <div role="dialog" aria-modal="true" aria-labelledby="hq-driver-card-title" className="flex w-full max-w-[760px] max-h-[94dvh] sm:max-h-[90vh] flex-col overflow-hidden rounded-[24px] sm:rounded-[28px] bg-white shadow-[0_26px_76px_rgba(27,45,77,0.16),0_4px_14px_rgba(27,45,77,0.045)]">
+      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="hq-driver-card-title" className="flex w-full max-w-[760px] max-h-[94dvh] sm:max-h-[90vh] flex-col overflow-hidden outline-none rounded-[24px] sm:rounded-[28px] bg-white shadow-[0_26px_76px_rgba(27,45,77,0.16),0_4px_14px_rgba(27,45,77,0.045)]">
         {/* Header */}
         <div className="flex shrink-0 items-start justify-between gap-3 bg-white px-5 pb-4 pt-5 sm:px-7 sm:pb-5 sm:pt-7">
           <div className="flex min-w-0 items-center gap-3.5">
