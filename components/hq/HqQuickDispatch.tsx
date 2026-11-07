@@ -38,7 +38,6 @@ import { haptics } from '@/utils/haptics';
 import {
   VIP_REAL_VEHICLES,
   stripManufacturerName,
-  mapVehicleToUiCategory,
   getVehicleImage,
 } from '@/utils/vehicleData';
 import { HqDispatchTimeField } from './ui/HqDispatchTimeField';
@@ -685,23 +684,17 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
 
+  // Only the server-confirmed fleet may be selected. No static "available" fallback.
+  // New custom vehicles and archived fleet now follow the same source as availability.
   const allVehicles = useMemo(() => {
-    return VIP_REAL_VEHICLES.map((v) => {
-      const live = fleet.data?.vehicles.find((fv) => fv.plate === v.plate || fv.uuid === v.uuid);
-      const isAvailable = live ? live.isAvailable : true;
-      const currentStatus = live ? live.currentStatus : 'available';
-      const statusLabel = live ? VEHICLE_STATUS_LABELS[live.currentStatus] : '대기 중';
-      const uiCategory = mapVehicleToUiCategory(v);
-      const image = getVehicleImage(v);
-      return {
-        ...v,
-        isAvailable,
-        currentStatus,
-        statusLabel,
-        uiCategory,
-        image,
-      };
-    });
+    return (fleet.data?.vehicles || []).map((v) => ({
+      ...v,
+      brand: v.model.includes('벤츠') ? '벤츠'
+        : v.model.includes('현대') || v.model.includes('스타리아') ? '현대'
+        : v.model.includes('기아') || v.model.includes('카니발') ? '기아' : '제네시스',
+      statusLabel: VEHICLE_STATUS_LABELS[v.currentStatus] || '상태 확인 필요',
+      image: getVehicleImage(v),
+    }));
   }, [fleet.data?.vehicles]);
 
   const filteredVehiclesForDropdown = useMemo(() => {
@@ -1001,7 +994,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
       const matchedDriver = allDrivers.find(d => d.id === alloc.selectedDriver || d.name === alloc.selectedDriver);
       const cleanDrv = mode === 'published' && alloc.serviceMode !== 'vehicle_only' ? matchedDriver?.name || '' : '';
       const resolvedPlate = mode === 'unassigned' ? '' : alloc.selectedVehiclePlate;
-      const matchedVehicle = VIP_REAL_VEHICLES.find(v => v.plate === resolvedPlate);
+      const matchedVehicle = allVehicles.find(v => v.plate === resolvedPlate);
       const resolvedModel = matchedVehicle?.model || alloc.selectedVehicleModel || selectedVehicleModel;
 
       const resolvedPassengerName =
