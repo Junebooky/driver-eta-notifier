@@ -513,10 +513,10 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
       {/* 1. Left Sub-Column: Original Safe Email Viewer */}
-      <div className="lg:col-span-6 bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden flex flex-col min-h-[640px]">
+      <div className="lg:col-span-6 flex min-h-[640px] flex-col overflow-hidden rounded-[23px] bg-white shadow-[0_6px_20px_rgba(35,49,78,0.055)]">
         {/* Email Header */}
-        <div className="p-5 border-b border-slate-100 bg-white">
-          <h2 className="text-base font-black text-slate-900 leading-snug">
+        <div className="bg-white p-5">
+          <h2 className="text-[18px] font-bold leading-snug tracking-[-0.02em] text-[#17233B]">
             {subject}
           </h2>
 
@@ -541,7 +541,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
         </div>
 
         {/* Email Body */}
-        <div className="p-5 flex-1 overflow-y-auto font-sans text-xs text-slate-700 leading-relaxed whitespace-pre-line selection:bg-blue-100">
+        <div className="flex-1 overflow-y-auto p-5 font-sans text-[13px] text-[#4D607C] leading-relaxed whitespace-pre-line selection:bg-blue-100">
           {isLoadingDetail ? (
             <div className="h-64 flex flex-col items-center justify-center gap-2 text-slate-400">
               <RefreshCw className="w-6 h-6 animate-spin text-[#1E60F3]" />
@@ -554,7 +554,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
 
         {/* Real attachment metadata from read-only IMAP, never fictitious demo names. */}
         {(emailDetail?.hasAttachments || attachmentFiles.length > 0) && (
-          <div className="border-t border-slate-100 bg-slate-50/70 p-4">
+          <div className="bg-[#FAFBFD] p-4">
             <div className="mb-2.5 flex items-center gap-1.5 text-xs font-semibold text-slate-700">
               <Paperclip className="h-3.5 w-3.5 text-slate-500" />
               <span>첨부 파일{attachmentFiles.length ? ` (${attachmentFiles.length})` : ''}</span>
@@ -585,7 +585,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                       target="_blank"
                       rel="noopener noreferrer"
                       download={file.filename}
-                      className="flex min-w-0 items-center gap-2.5 rounded-xl bg-white border border-slate-200/80 px-3 py-2 shadow-[0_2px_8px_rgba(35,49,78,0.04)] hover:border-[#1E60F3] hover:shadow-xs transition-all cursor-pointer group active:scale-[0.98]"
+                      className="group flex min-w-0 cursor-pointer items-center gap-2.5 rounded-[15px] bg-white px-3 py-3 shadow-[0_4px_14px_rgba(35,49,78,0.045)] transition-shadow hover:shadow-[0_5px_16px_rgba(35,49,78,0.07)] active:scale-[0.99]"
                       title={`${file.filename} 다운로드 / 열기`}
                     >
                       <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${visual.bg}`}>
@@ -616,11 +616,11 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
       </div>
 
       {/* 2. Right Sub-Column: AI Extraction Card */}
-      <div className="lg:col-span-6 bg-slate-50/60 rounded-[28px] border border-slate-200/80 p-5 sm:p-6 shadow-[0_4px_24px_rgba(15,23,42,0.04)] flex flex-col justify-between min-h-[640px] relative overflow-visible">
+      <div className="relative lg:col-span-6 flex min-h-[640px] flex-col justify-between overflow-visible rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055)] sm:p-6">
         {extractedDraft ? (
           <div className="space-y-4">
             {/* Header: Sparkles + Title + Refresh Button */}
-            <div className="flex items-center justify-between pb-3.5 border-b border-slate-200/60">
+            <div className="flex items-center justify-between gap-3 pb-4">
               <div className="flex items-center gap-2.5">
                 <img
                   src="/images/icons/ai_email.png"
@@ -628,7 +628,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                   className="w-8 h-8 object-contain shrink-0 select-none"
                   draggable={false}
                 />
-                <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                <h3 className="text-[17px] font-bold tracking-[-0.03em] text-[#17233B] sm:text-[20px]">
                   AI가 추출한 예약 정보
                 </h3>
               </div>
@@ -637,7 +637,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                 type="button"
                 onClick={onExtractWithAi}
                 disabled={isExtractingAi}
-                className="px-3.5 py-1.5 rounded-full border border-slate-200/90 bg-white hover:bg-slate-50 active:scale-95 text-slate-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                className="flex min-h-10 cursor-pointer items-center gap-1.5 rounded-[13px] bg-white px-3.5 text-[12px] font-semibold text-[#4D607C] shadow-[0_4px_14px_rgba(35,49,78,0.055)] transition-colors hover:bg-[#F5F8FF]"
                 title="Gemini AI로 다시 추출"
               >
                 <RefreshCw className={`w-3.5 h-3.5 text-slate-500 ${isExtractingAi ? 'animate-spin' : ''}`} />
@@ -1223,9 +1223,9 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
           <div className="flex-1 flex flex-col items-center justify-center text-center p-6 space-y-3">
             <div className="group relative flex flex-col items-center cursor-pointer">
               {/* Speech Bubble - reveals on hover */}
-              <div className="absolute -top-11 left-1/2 -translate-x-1/2 whitespace-nowrap bg-slate-900 text-white text-[11px] font-extrabold px-3 py-1.5 rounded-full shadow-lg opacity-0 pointer-events-none group-hover:opacity-100 group-hover:-translate-y-1 transition-all duration-200 flex items-center gap-1.5 z-20">
+              <div className="absolute -top-11 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-[12px] bg-white px-3 py-2 text-[11px] font-medium text-[#4D607C] shadow-[0_8px_22px_rgba(35,49,78,0.1)] opacity-0 pointer-events-none group-hover:opacity-100 group-hover:-translate-y-1 transition-all duration-200 flex items-center gap-1.5 z-20">
                 <span>⚡ 3초만에 스케줄링 해드릴게요!</span>
-                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-slate-900 rotate-45" />
+                <div className="absolute -bottom-1 left-1/2 size-2.5 -translate-x-1/2 rotate-45 bg-white" />
               </div>
 
               {/* AI Email Icon with hover scale */}
