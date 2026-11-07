@@ -1659,7 +1659,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
 
   const content = (
     <div
-      className={`@container ${initialBooking ? 'hq-dispatch-info-a bg-transparent select-text' : 'bg-white select-none'} flex flex-col justify-between ${isModal
+      className={`@container ${initialBooking ? 'hq-dispatch-info-a bg-transparent select-text' : 'bg-white select-text'} flex flex-col justify-between ${isModal
         ? 'w-full'
         : 'border border-slate-200/90 rounded-[24px] p-5 sm:p-6 shadow-[0_10px_30px_rgba(0,0,0,0.04)]'
         }`}
