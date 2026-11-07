@@ -330,7 +330,7 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
 
       {/* Floating Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900/90 text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-xl backdrop-blur-md flex items-center gap-2 animate-in fade-in slide-in-from-bottom-3 duration-200">
+        <div className="fixed bottom-6 right-6 z-50 rounded-[15px] bg-white px-4 py-3 text-[12px] font-medium text-[#4D607C] shadow-[0_10px_28px_rgba(35,49,78,0.13)] backdrop-blur-md flex items-center gap-2 animate-in fade-in slide-in-from-bottom-3 duration-200">
           <CheckCircle2 className="w-4 h-4 text-blue-400 shrink-0" />
           <span>{toastMessage}</span>
         </div>

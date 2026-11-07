@@ -54,7 +54,7 @@ export const HqDrivingLogDetailPanel: React.FC<HqDrivingLogDetailPanelProps> = (
   if (!log) {
     if (isModal) return null;
     return (
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-8 text-center text-slate-400 space-y-2 shadow-2xs">
+      <div className="space-y-2 rounded-[23px] bg-white p-8 text-center text-[#73839D] shadow-[0_6px_20px_rgba(35,49,78,0.055)]">
         <FileText className="w-8 h-8 text-slate-300 mx-auto" />
         <p className="text-sm font-semibold">선택된 운행일지가 없습니다.</p>
         <p className="text-xs text-slate-400">목록에서 확인하고자 하는 운행일지를 클릭해주세요.</p>
@@ -79,7 +79,7 @@ export const HqDrivingLogDetailPanel: React.FC<HqDrivingLogDetailPanelProps> = (
 
   const cardWrapperClasses = isModal
     ? 'overflow-hidden flex flex-col space-y-4'
-    : 'bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden flex flex-col space-y-4 p-5';
+    : 'flex flex-col space-y-5 overflow-hidden rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055)]';
 
   const content = (
     <div className={cardWrapperClasses}>
@@ -93,7 +93,7 @@ export const HqDrivingLogDetailPanel: React.FC<HqDrivingLogDetailPanelProps> = (
             draggable={false}
           />
           <div>
-            <h3 className="text-sm font-extrabold text-slate-900 tracking-tight">
+            <h3 className="text-[16px] font-bold tracking-[-0.03em] text-[#17233B]">
               선택된 운행일지 상세 정보
             </h3>
             <span className="text-[10px] text-slate-400 font-medium">No. {log.no} (ID: {log.id})</span>
@@ -103,37 +103,37 @@ export const HqDrivingLogDetailPanel: React.FC<HqDrivingLogDetailPanelProps> = (
         {/* Status Badge & Modal Close Button */}
         <div className="flex items-center gap-2">
           {log.status === 'draft' && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border border-amber-300 bg-amber-50 text-amber-700">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-[#FFF9F1] text-[#8E633F]">
               <Clock className="w-3.5 h-3.5 stroke-[2.2]" />
               <span>진행 중 (초안)</span>
             </span>
           )}
           {log.status === '검토 대기' && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border border-amber-300 bg-amber-50 text-amber-700">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-[#FFF9F1] text-[#8E633F]">
               <Clock className="w-3.5 h-3.5 stroke-[2.2]" />
               <span>검토 대기</span>
             </span>
           )}
           {log.status === '검토 중' && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border border-sky-300 bg-sky-50 text-sky-700">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-[#F7F9FC] text-[#73839D]">
               <Clock className="w-3.5 h-3.5 stroke-[2.2]" />
               <span>검토 중</span>
             </span>
           )}
           {log.status === '승인 완료' && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border border-emerald-300 bg-emerald-50 text-emerald-700">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-[#EEF3FF] text-[#31598F]">
               <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.2]" />
               <span>승인 완료</span>
             </span>
           )}
           {log.status === '보완 필요' && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border border-rose-300 bg-rose-50 text-rose-600">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-[#FFF4F2] text-[#A34E45]">
               <AlertTriangle className="w-3.5 h-3.5 stroke-[2.2]" />
               <span>보완 필요</span>
             </span>
           )}
           {log.status === '반려' && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border border-red-300 bg-red-50 text-red-600">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-[#FFF4F2] text-[#A34E45]">
               <XCircle className="w-3.5 h-3.5 stroke-[2.2]" />
               <span>반려</span>
             </span>
@@ -156,7 +156,7 @@ export const HqDrivingLogDetailPanel: React.FC<HqDrivingLogDetailPanelProps> = (
       </div>
 
       {/* 2. 운행 요약 (Summary Card) */}
-      <section className="bg-slate-50/70 border border-slate-100 rounded-xl p-3.5 space-y-2.5">
+      <section className="space-y-3 rounded-[17px] bg-[#FAFBFD] p-4">
         <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
           <FileText className="w-3.5 h-3.5 text-[#1E60F3]" />
           <span>운행 요약</span>
@@ -426,8 +426,8 @@ export const HqDrivingLogDetailPanel: React.FC<HqDrivingLogDetailPanelProps> = (
 
       {/* Action Reason Input Modal (for 보완 요청 / 반려) */}
       {modalAction && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl p-5 w-full max-w-sm shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#17233B]/30 backdrop-blur-[2px] p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-sm space-y-5 rounded-[24px] bg-white p-6 shadow-[0_24px_64px_rgba(27,45,77,0.16)]">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-slate-900">
                 {modalAction === 'revision' ? '운행일지 보완 요청' : '운행일지 반려 처리'}
@@ -487,7 +487,7 @@ export const HqDrivingLogDetailPanel: React.FC<HqDrivingLogDetailPanelProps> = (
         role="dialog"
         aria-modal="true"
         aria-label="선택된 운행일지 상세 정보"
-        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200"
+        className="fixed inset-0 z-[90] flex items-center justify-center bg-[#17233B]/30 p-3 backdrop-blur-[2px] sm:p-6 overflow-y-auto animate-in fade-in duration-200"
         onClick={(e) => {
           if (e.target === e.currentTarget) {
             haptics.lightTap();
@@ -495,7 +495,7 @@ export const HqDrivingLogDetailPanel: React.FC<HqDrivingLogDetailPanelProps> = (
           }
         }}
       >
-        <div className="relative w-full max-w-2xl max-h-[92vh] overflow-y-auto bg-white rounded-3xl border border-slate-200/90 shadow-2xl p-5 sm:p-6 my-auto animate-in zoom-in-95 duration-150">
+        <div className="relative max-h-[92dvh] w-full max-w-2xl overflow-y-auto rounded-[26px] bg-white shadow-[0_24px_64px_rgba(27,45,77,0.16)] p-5 sm:p-6 my-auto animate-in zoom-in-95 duration-150">
           {content}
         </div>
       </div>

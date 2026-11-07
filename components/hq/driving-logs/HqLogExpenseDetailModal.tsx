@@ -135,20 +135,20 @@ export const HqLogExpenseDetailModal: React.FC<HqLogExpenseDetailModalProps> = (
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-[#17233B]/30 p-3 backdrop-blur-[2px] sm:p-6 animate-in fade-in duration-200"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+      <div className="flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-[26px] bg-white shadow-[0_24px_64px_rgba(27,45,77,0.16)] animate-in zoom-in-95 duration-200">
         {/* Header */}
-        <div className="px-5 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
+        <div className="flex shrink-0 items-center justify-between bg-white px-5 py-5 sm:px-6">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-9 h-9 rounded-xl bg-blue-100/80 text-[#1E60F3] flex items-center justify-center shrink-0">
               <Receipt className="w-5 h-5" />
             </div>
             <div className="min-w-0">
-              <h3 className="text-base font-black text-slate-900 tracking-tight flex items-center gap-2">
+              <h3 className="text-[18px] font-bold tracking-[-0.03em] text-[#17233B] flex items-center gap-2">
                 <span>운행 경비 지출 상세</span>
                 <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-50 text-[#1E60F3] border border-blue-200/60">
                   {matchingExpenses.length}건
@@ -173,16 +173,16 @@ export const HqLogExpenseDetailModal: React.FC<HqLogExpenseDetailModalProps> = (
         </div>
 
         {/* Summary Metric Ribbon */}
-        <div className="px-5 sm:px-6 py-3.5 bg-gradient-to-r from-blue-50/80 via-slate-50 to-indigo-50/50 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2 shrink-0">
+        <div className="bg-[#FAFBFD] px-5 py-4 sm:px-6 flex items-center justify-between flex-wrap gap-2 shrink-0">
           <div>
             <div className="text-[11px] text-slate-500 font-semibold">총 승인/검수 대상 경비</div>
-            <div className="text-xl font-black text-[#1E60F3] tracking-tight">
+            <div className="text-[23px] font-bold text-[#17233B] tracking-tight">
               {totalAmount.toLocaleString()}원
             </div>
           </div>
           <div className="flex items-center gap-3 text-xs">
             <div className="px-2.5 py-1 rounded-xl bg-white/90 border border-slate-200/80 text-slate-700 font-medium">
-              승인 완료 <strong className="text-emerald-700 font-bold ml-1">{approvedCount}건</strong>
+              승인 완료 <strong className="text-[#31598F] font-semibold ml-1">{approvedCount}건</strong>
             </div>
             <div className="px-2.5 py-1 rounded-xl bg-white/90 border border-slate-200/80 text-slate-700 font-medium">
               검수 대기 <strong className="text-blue-700 font-bold ml-1">{pendingCount}건</strong>
@@ -301,7 +301,7 @@ export const HqLogExpenseDetailModal: React.FC<HqLogExpenseDetailModalProps> = (
               haptics.lightTap();
               onClose();
             }}
-            className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-95 text-white text-xs font-bold transition cursor-pointer"
+            className="min-h-11 rounded-[14px] bg-white px-5 text-[12px] font-semibold text-[#4D607C] shadow-[0_4px_14px_rgba(35,49,78,0.045)] transition-colors hover:bg-[#F5F8FF] transition cursor-pointer"
           >
             닫기
           </button>
@@ -317,7 +317,7 @@ export const HqLogExpenseDetailModal: React.FC<HqLogExpenseDetailModalProps> = (
           onClick={() => setPreviewImage(null)}
         >
           <div
-            className="relative max-w-xl max-h-[85vh] bg-white rounded-2xl overflow-hidden shadow-2xl p-2"
+            className="relative max-w-xl max-h-[85vh] overflow-hidden rounded-[21px] bg-white p-2 shadow-[0_24px_64px_rgba(27,45,77,0.16)]"
             onClick={(e) => e.stopPropagation()}
           >
             <button
