@@ -863,7 +863,7 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                   <div className="flex items-center gap-1.5">
                     <ImageIcon className="w-4 h-4 text-[#1E60F3]" />
                     <span className="text-sm font-black text-slate-900">
-                      기사·차량 Info 고객 안내자료
+                      고객 안내 카드
                     </span>
                   </div>
                   <span
@@ -882,17 +882,17 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                 </div>
 
                 <p className="text-xs text-slate-500 leading-normal">
-                  확정된 기사와 실차 번호판 조합의 완성형 안내자료(PC·모바일)를 확인하고 다운로드하거나 발송 기록을 남깁니다.
+                  배정된 기사와 차량의 안내 카드를 확인하고 저장할 수 있어요.
                 </p>
 
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setIsDriverVehicleInfoModalOpen(true)}
-                    className="flex-1 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-extrabold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
+                    className="flex min-h-[48px] flex-1 cursor-pointer items-center justify-center gap-2 rounded-[15px] bg-[#1E60F3] px-4 text-[13px] font-semibold text-white shadow-[0_6px_16px_rgba(30,96,243,0.15)] transition-colors hover:bg-[#1757DC]"
                   >
-                    <ImageIcon className="w-4 h-4 text-blue-400" />
-                    <span>기사·차량 Info 확인 및 발송창 열기</span>
+                    <ImageIcon className="size-4 text-white" />
+                    <span>고객 안내 카드 보기</span>
                   </button>
 
 

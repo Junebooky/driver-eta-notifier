@@ -26,9 +26,9 @@ test('dispatch delivery choices use a branded custom popup, not an unstyled brow
   assert.match(component, /aria-selected=\{channel === option\.value\}/);
   assert.match(component, /aria-expanded=\{isChannelMenuOpen\}/);
   assert.match(component, /DELIVERY_OPTIONS\.map/);
-  assert.match(component, /문자 \/ 카카오톡 직접 전달/);
-  assert.match(component, /외부 이메일 직접 전달/);
-  assert.match(component, /다운로드 준비 기록/);
+  assert.match(component, /문자·카카오톡으로 보냈어요/);
+  assert.match(component, /이메일로 보냈어요/);
+  assert.match(component, /이미지만 저장해둘게요/);
   assert.match(component, /event\.key === 'ArrowDown'/);
   assert.match(component, /event\.key !== 'Escape'/);
 });
@@ -50,4 +50,26 @@ test('A-plan keeps blue for primary actions without old dark button and green ba
   assert.doesNotMatch(component, /bg-emerald-|text-emerald-/);
   assert.match(component, /shadow-\[0_6px_20px/);
   assert.match(component, /focus-visible:ring-2/);
+});
+
+test('the three requested brand icon paths are used without replacing original vehicle imagery', () => {
+  assert.match(component, /\/images\/icons\/drivers\/icon_profile_card\.png/);
+  assert.match(component, /\/images\/icons\/driver_ui\/icon_talk\.png/);
+  assert.match(component, /\/images\/icons\/eemail\/icon_email\.png/);
+  assert.match(component, /src=\{selectedDelivery\.icon\}/);
+  assert.match(component, /src=\{option\.icon\}/);
+});
+
+test('customer-card copy uses simple and warm Korean throughout the visible workflow', () => {
+  const labels = [
+    '고객 안내 카드', '이미지 저장', '어떻게 전달하셨나요?',
+    '고객에게 직접 전달한 방법을 기록으로 남겨둘 수 있어요.',
+    '받는 분', '전달 방법', '문자·카카오톡으로 보냈어요',
+    '이메일로 보냈어요', '이미지만 저장해둘게요',
+    '자동으로 발송되지 않아요. 직접 전달한 뒤 기록을 남겨주세요.',
+    '안내 카드를 직접 전달했어요', '기록 저장하기',
+    '안전하게 보호되는 보안 링크예요',
+  ];
+  for (const label of labels) assert.ok(component.includes(label), label);
+  assert.ok(!component.includes('기사·차량 Info 고객 안내자료'));
 });

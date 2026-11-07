@@ -89,20 +89,20 @@ export const HqVehicleSelectModal: React.FC<HqVehicleSelectModalProps> = ({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[105] flex items-center justify-center p-4 sm:p-6 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-[105] flex items-center justify-center p-4 sm:p-6 bg-[#17233B]/30 backdrop-blur-[2px] animate-in fade-in duration-200"
       onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}
     >
       <section role="dialog" aria-modal="true" aria-labelledby="hq-vehicle-picker-title"
-        className="flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200">
+        className="flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-[26px] bg-[#FAFBFD] shadow-[0_24px_64px_rgba(27,45,77,0.16),0_4px_14px_rgba(27,45,77,0.04)] animate-in zoom-in-95 duration-200">
         
         {/* Header with Title and Close Button */}
         <div className="shrink-0 p-5 pb-3 sm:p-6 sm:pb-3.5 space-y-3.5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h3 id="hq-vehicle-picker-title" className="text-lg font-bold tracking-tight text-slate-900">
+              <h3 id="hq-vehicle-picker-title" className="text-[21px] font-bold tracking-[-0.035em] text-[#17233B]">
                 차량 선택
               </h3>
-              <p className="mt-0.5 truncate text-xs text-slate-400 font-medium">
+              <p className="mt-0.5 truncate text-xs text-[#73839D] font-medium">
                 {slotNumber}호차 배정 차량 선택
               </p>
             </div>
@@ -110,14 +110,14 @@ export const HqVehicleSelectModal: React.FC<HqVehicleSelectModalProps> = ({
               type="button"
               onClick={onClose}
               aria-label="차량 선택 닫기"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-600 cursor-pointer"
+              className="flex size-10 shrink-0 items-center justify-center rounded-full bg-[#F7F9FC] text-[#73839D] transition-colors hover:bg-[#EDF1F6] hover:text-[#17233B] cursor-pointer"
             >
               <X className="h-4 w-4" />
             </button>
           </div>
 
           {/* Search Box */}
-          <div className="flex h-12 items-center gap-3 rounded-2xl bg-slate-50/80 border border-slate-200/70 px-4 focus-within:bg-white focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all">
+          <div className="flex h-[52px] items-center gap-3 rounded-[16px] bg-white px-4 shadow-[0_5px_16px_rgba(35,49,78,0.045),0_2px_5px_rgba(35,49,78,0.02)] focus-within:ring-2 focus-within:ring-[#1E60F3]/20 transition-shadow">
             <Search className="h-4 w-4 shrink-0 text-slate-400" />
             <input
               ref={searchRef}
@@ -151,8 +151,8 @@ export const HqVehicleSelectModal: React.FC<HqVehicleSelectModalProps> = ({
                 onClick={() => setCategory(item.key)}
                 className={`shrink-0 rounded-full px-4 py-1.5 text-xs font-bold transition-all cursor-pointer ${
                   category === item.key
-                    ? 'bg-blue-100/70 text-[#1E60F3] shadow-2xs'
-                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                    ? 'bg-[#EEF3FF] text-[#1E60F3]'
+                    : 'bg-white text-[#73839D] shadow-[0_3px_10px_rgba(35,49,78,0.04)] hover:bg-[#F7F9FC]'
                 }`}
               >
                 {item.label}
@@ -215,15 +215,15 @@ export const HqVehicleSelectModal: React.FC<HqVehicleSelectModalProps> = ({
                 disabled={!canChoose}
                 aria-pressed={selected}
                 onClick={() => onSelect(vehicle)}
-                className={`flex w-full items-center justify-between rounded-2xl p-3.5 text-left transition-all cursor-pointer ${
+                className={`flex w-full items-center justify-between rounded-[17px] p-3.5 text-left transition-all cursor-pointer ${
                   selected
-                    ? 'bg-blue-50/70 border border-blue-200/80 shadow-2xs'
-                    : 'border-b border-slate-100/80 last:border-b-0 hover:bg-slate-50/80'
+                    ? 'bg-[#EEF3FF] shadow-[0_5px_16px_rgba(35,49,78,0.07)]'
+                    : 'bg-white shadow-[0_4px_14px_rgba(35,49,78,0.045)] hover:bg-[#FAFBFD]'
                 } disabled:cursor-not-allowed disabled:opacity-50`}
               >
                 <div className="flex items-center gap-3.5 min-w-0">
                   {/* Vehicle Icon / Photo */}
-                  <div className="flex h-12 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white border border-slate-100">
+                  <div className="flex h-12 w-14 shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-white">
                     {selected ? (
                       <CarFront className="h-6 w-6 text-[#1E60F3] stroke-[1.8]" />
                     ) : (
@@ -243,7 +243,7 @@ export const HqVehicleSelectModal: React.FC<HqVehicleSelectModalProps> = ({
                     <p className="mt-0.5 truncate text-xs font-medium text-slate-500">
                       {vehicle.plate} · {known?.capacity || vehicle.capacity}
                     </p>
-                    <p className={`mt-0.5 text-[11px] font-bold ${selected || vehicle.isAvailable ? 'text-emerald-600' : 'text-slate-400'}`}>
+                    <p className={`mt-0.5 text-[11px] font-bold ${selected || vehicle.isAvailable ? 'text-[#73839D]' : 'text-[#95A3B9]'}`}>
                       {availabilityLabel}
                     </p>
                   </div>
@@ -260,7 +260,7 @@ export const HqVehicleSelectModal: React.FC<HqVehicleSelectModalProps> = ({
         </div>
 
         {/* Footer info text */}
-        <div className="shrink-0 border-t border-slate-100 py-3.5 text-center text-xs font-medium text-slate-400">
+        <div className="shrink-0 bg-white py-3.5 text-center text-xs font-medium text-[#73839D]">
           실제 차량 가용성 기준 · 선택하면 배정 카드에 반영됩니다.
         </div>
       </section>

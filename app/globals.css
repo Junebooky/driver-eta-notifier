@@ -470,3 +470,42 @@ dialog::backdrop {
     animation: vip-chat-typing-pulse 1050ms ease-in-out infinite;
   }
 }
+
+
+/* Driver Cockpit A안 — existing dispatch information only.
+   Native time pickers are left untouched so browser date/time picking works. */
+.hq-dispatch-info-a :is(input[type="text"], input[type="tel"], input[type="email"], input[type="search"], input[type="number"]) {
+  background-color: #FFFFFF;
+  border: 1px solid rgba(225, 231, 240, 0.28);
+  border-radius: 16px;
+  color: #17233B;
+  box-shadow: 0 5px 16px rgba(35, 49, 78, 0.045), 0 2px 5px rgba(35, 49, 78, 0.02);
+  font-weight: 500;
+  transition: box-shadow 170ms ease, border-color 170ms ease;
+}
+
+.hq-dispatch-info-a :is(input[type="text"], input[type="tel"], input[type="email"], input[type="search"], input[type="number"])::placeholder {
+  color: #95A3B9;
+}
+
+.hq-dispatch-info-a :is(input[type="text"], input[type="tel"], input[type="email"], input[type="search"], input[type="number"]):focus-visible {
+  outline: none;
+  border-color: rgba(30, 96, 243, 0.20);
+  box-shadow: 0 5px 16px rgba(35, 49, 78, 0.05), 0 0 0 2px rgba(30, 96, 243, 0.10);
+}
+
+.hq-dispatch-info-a :is(input[type="text"], input[type="tel"], input[type="email"], input[type="search"], input[type="number"]):disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Prevent iOS input zoom, including the address picker nested in this modal. */
+@media (max-width: 767px) {
+  .hq-dispatch-info-a :is(input[type="text"], input[type="tel"], input[type="email"], input[type="search"], input[type="number"]) {
+    font-size: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hq-dispatch-info-a :is(input, button) { transition: none; }
+}
