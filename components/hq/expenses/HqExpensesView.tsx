@@ -246,7 +246,7 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
       )}
 
       {/* Expenses List & Review Workspace Table */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl sm:rounded-3xl shadow-xs p-5 sm:p-6 space-y-4 relative z-20">
+      <div className="rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] sm:p-6 space-y-4 relative z-20">
         {/* Card Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           {/* Left: Icon + Title + Count */}
@@ -260,17 +260,17 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
 
               {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 (아이콘 근접 시에만 노출, 최상단 레이어) */}
               <div className="absolute bottom-full left-0 mb-2 hidden group-hover/expense:flex flex-col items-start pointer-events-none z-[100]">
-                <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+                <span className="whitespace-nowrap rounded-[12px] bg-white px-3 py-2 text-[11px] font-medium text-[#4D607C] shadow-[0_8px_22px_rgba(35,49,78,0.1)] animate-in fade-in-50 duration-150">
                   기사님이 제출한 유류비·통행료 등 실비 영수증 목록이에요
                 </span>
-                <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 ml-3 shadow-xs" />
+                <div className="-mt-1 ml-3 size-2 rotate-45 bg-white" />
               </div>
             </div>
 
-            <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+            <h3 className="text-[19px] font-bold tracking-[-0.03em] text-[#17233B] sm:text-[22px]">
               경비지출 제출 목록
             </h3>
-            <span className="bg-slate-100 text-slate-500 font-bold px-2 py-0.5 rounded-full text-xs">
+            <span className="rounded-full bg-[#F7F9FC] px-3 py-1 text-[11px] font-medium text-[#73839D]">
               {filteredExpenses.length}건
             </span>
           </div>
@@ -294,10 +294,10 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
 
               {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 (최상단 레이어) */}
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/csv:flex flex-col items-center pointer-events-none z-[100]">
-                <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+                <span className="whitespace-nowrap rounded-[12px] bg-white px-3 py-2 text-[11px] font-medium text-[#4D607C] shadow-[0_8px_22px_rgba(35,49,78,0.1)] animate-in fade-in-50 duration-150">
                   경비 내역을 엑셀(CSV)로 내보내요
                 </span>
-                <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 shadow-xs" />
+                <div className="-mt-1 size-2 rotate-45 bg-white" />
               </div>
             </div>
 
@@ -308,7 +308,7 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="기사 · 차량 · 거래처 검색"
-                className="w-full pl-8 pr-7 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-hidden focus:border-[#1E60F3] focus:bg-white transition-all"
+                className="h-11 w-full rounded-[14px] bg-white pl-9 pr-8 text-[13px] font-medium text-[#17233B] placeholder:text-[#95A3B9] shadow-[0_4px_14px_rgba(35,49,78,0.045)] outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20"
               />
               {searchQuery && (
                 <button
@@ -328,8 +328,8 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
                 setIsFilterOpen((prev) => !prev);
               }}
               className={`px-3 py-1.5 border rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 ${isFilterOpen || selectedStatus !== '전체' || selectedCategory !== '전체'
-                ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
-                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                ? 'bg-[#EEF3FF] text-[#1E60F3]'
+                : 'bg-white text-[#73839D] shadow-[0_3px_10px_rgba(35,49,78,0.045)] hover:bg-[#F7F9FC]'
                 }`}
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -388,7 +388,7 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
 
         {/* Collapsible Filter Bar */}
         {isFilterOpen && (
-          <div className="bg-slate-50/70 border border-slate-200/70 rounded-xl p-3 space-y-2.5 animate-in fade-in duration-150">
+          <div className="rounded-[18px] bg-[#FAFBFD] p-4 space-y-2.5 animate-in fade-in duration-150">
             <div className="flex items-center gap-1.5 overflow-x-auto">
               <span className="text-[11px] font-bold text-slate-400 mr-1 shrink-0">상태:</span>
               {['전체', '검수 대기', '승인 완료', '금액 확인', '반려'].map((status) => (
@@ -400,8 +400,8 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
                     setSelectedStatus(status);
                   }}
                   className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${selectedStatus === status
-                    ? 'bg-[#1E60F3] text-white shadow-2xs'
-                    : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/60'
+                    ? 'bg-[#EEF3FF] text-[#1E60F3]'
+                    : 'bg-white text-[#73839D] shadow-[0_3px_10px_rgba(35,49,78,0.04)] hover:bg-[#F7F9FC]'
                     }`}
                 >
                   {status}
@@ -419,8 +419,8 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
                     setSelectedCategory(cat);
                   }}
                   className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${selectedCategory === cat
-                    ? 'bg-slate-900 text-white shadow-2xs'
-                    : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/60'
+                    ? 'bg-[#EEF3FF] text-[#1E60F3]'
+                    : 'bg-white text-[#73839D] shadow-[0_3px_10px_rgba(35,49,78,0.04)] hover:bg-[#F7F9FC]'
                     }`}
                 >
                   {cat}
@@ -478,7 +478,7 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
                         setSelectedExpenseId(item.id);
                         setReviewQueue(filteredExpenses.map((row) => row.id));
                       }}
-                      className={`group cursor-pointer transition-colors ${isSelected ? 'bg-blue-50/50' : 'hover:bg-slate-50/80'
+                      className={`group cursor-pointer transition-colors ${isSelected ? 'bg-[#F3F7FF]' : 'hover:bg-[#FAFBFD]'
                         }`}
                     >
                       <td className="py-3.5 px-3 text-slate-400 text-center font-medium text-xs">
@@ -540,8 +540,8 @@ export const HqExpensesView: React.FC<HqExpensesViewProps> = ({
 
       {/* Floating Toast Notification */}
       {toastMessage && (
-        <div role="status" className="fixed bottom-6 right-6 z-60 bg-slate-900/95 text-white text-xs font-bold px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2 backdrop-blur-sm animate-in fade-in slide-in-from-bottom-2 duration-150">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+        <div role="status" className="fixed bottom-6 right-6 z-60 rounded-[15px] bg-white px-4 py-3 text-[12px] font-medium text-[#4D607C] shadow-[0_10px_28px_rgba(35,49,78,0.13)] flex items-center gap-2 backdrop-blur-sm animate-in fade-in slide-in-from-bottom-2 duration-150">
+          <CheckCircle2 className="size-4 text-[#1E60F3] shrink-0" />
           <span>{toastMessage}</span>
         </div>
       )}
