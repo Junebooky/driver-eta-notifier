@@ -34,7 +34,7 @@ test('existing vehicle and driver selectors use live choices and availability', 
   assert.ok(dispatch.includes('vehicles={fleet.data?.vehicles}'));
   assert.ok(dispatch.includes('loading={fleet.loading}'));
   assert.ok(dispatch.includes('error={fleet.error}'));
-  assert.ok(dispatch.includes('drivers={allDrivers}'));
+  assert.ok(dispatch.includes('drivers={hqDrivers}'));
   assert.ok(dispatch.includes('requiredLanguage={commonLanguage === \'en\' ? \'english\' : \'any\'}'));
 });
 
