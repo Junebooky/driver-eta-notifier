@@ -10,7 +10,6 @@ import {
   subscribeHqDrivingLogs,
   getHqDrivingLogsSnapshot,
   getHqDrivingLogsServerSnapshot,
-  updateHqDrivingLogStatus,
   updateHqDrivingLogStatusDb,
   fetchHqDrivingLogsFromDb,
   exportDrivingLogsToCsv,
@@ -152,10 +151,13 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
   }, [logs, selectedLogId]);
 
   // Status Action Handlers (strictly syncs to DB)
+  // Server-authoritative review actions: never change local status or announce
+  // success when the DB write fails. Drivers and HQ must see the same result.
   const handleApprove = async (logId: string) => {
     const ok = await updateHqDrivingLogStatusDb(logId, '승인 완료');
     if (!ok) {
-      updateHqDrivingLogStatus(logId, '승인 완료');
+      showToast('승인 저장에 실패했습니다. 서버 연결을 확인하고 다시 시도해 주세요.');
+      return;
     }
     const target = logs.find((l) => l.id === logId);
     showToast(`${target?.driverName || '해당'} 기사의 운행일지가 승인 완료되었습니다.`);
@@ -164,16 +166,18 @@ export const HqDrivingLogsView: React.FC<HqDrivingLogsViewProps> = ({
   const handleRequestRevision = async (logId: string, reason: string) => {
     const ok = await updateHqDrivingLogStatusDb(logId, '보완 필요', reason);
     if (!ok) {
-      updateHqDrivingLogStatus(logId, '보완 필요', reason);
+      showToast('보완 요청 저장에 실패했습니다. 기사에게 전달되었다고 표시하지 않습니다.');
+      return;
     }
     const target = logs.find((l) => l.id === logId);
-    showToast(`${target?.driverName || '해당'} 기사에게 보완 요청을 전송했습니다.`);
+    showToast(`${target?.driverName || '해당'} 기사의 보완 요청이 서버에 저장되었습니다.`);
   };
 
   const handleReject = async (logId: string, reason: string) => {
     const ok = await updateHqDrivingLogStatusDb(logId, '반려', reason);
     if (!ok) {
-      updateHqDrivingLogStatus(logId, '반려', reason);
+      showToast('반려 저장에 실패했습니다. 서버 연결을 확인하고 다시 시도해 주세요.');
+      return;
     }
     const target = logs.find((l) => l.id === logId);
     showToast(`${target?.driverName || '해당'} 기사의 운행일지가 반려 처리되었습니다.`);
