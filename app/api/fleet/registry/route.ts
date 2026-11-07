@@ -2,29 +2,29 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireHqAdmin } from '@/lib/auth/serverAuth';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { readFleetRegistry } from '@/lib/fleet/registryStore';
-import { normalizeFleetPlate, type FleetRegistryRecord } from '@/utils/fleetVehicleRegistry';
-import { VIP_REAL_VEHICLES, reconcileRegisteredVehicle, type VipRealVehicle } from '@/utils/vehicleData';
+import { normalizeFleetPlate } from '@/utils/fleetVehicleRegistry';
+import { VIP_REAL_VEHICLES, type VipRealVehicle } from '@/utils/vehicleData';
 
 export const dynamic = 'force-dynamic';
 const ORG = 'vip_limousine_korea';
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 
-async function authorized(req: NextRequest) {
-  return requireHqAdmin(req);
-}
-
+/**
+ * Thin admin-only CRUD over the EXISTING cockpit.vehicles physical fleet.
+ * No second inventory table: all vehicles share a single UUID and plate.
+ */
 export async function GET(req: NextRequest) {
-  const auth = await authorized(req);
+  const auth = await requireHqAdmin(req);
   if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
   try {
     return NextResponse.json({ ok: true, records: await readFleetRegistry() });
   } catch (err) {
-    return NextResponse.json({ ok: false, error: err instanceof Error ? err.message : '차량 등록부를 조회할 수 없습니다.' }, { status: 503 });
+    return NextResponse.json({ ok: false, error: err instanceof Error ? err.message : '차량 목록을 조회할 수 없습니다.' }, { status: 503 });
   }
 }
 
 export async function POST(req: NextRequest) {
-  const auth = await authorized(req);
+  const auth = await requireHqAdmin(req);
   if (!auth.ok || !auth.session) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
   try {
     const input = await req.json() as Partial<VipRealVehicle>;
@@ -42,59 +42,82 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: '차량번호·차종·좌석수·차량 사진 입력을 확인해 주세요.' }, { status: 400 });
     }
 
-    const existing = await readFleetRegistry();
-    const old = existing.find(row => normalizeFleetPlate(row.plate) === normalizeFleetPlate(plate));
+    const rows = await readFleetRegistry();
+    const existing = rows.find(row => normalizeFleetPlate(row.plate) === normalizeFleetPlate(plate));
     const canonical = VIP_REAL_VEHICLES.find(v => normalizeFleetPlate(v.plate) === normalizeFleetPlate(plate));
-    const vehicleId = old?.vehicle_id || canonical?.uuid || crypto.randomUUID();
+    // A pre-existing physical record is authoritative even if a browser has
+    // an outdated copy of its model, number of seats or fuel.
+    const verified = existing?.profile;
+    const vehicleId = existing?.vehicle_id || canonical?.uuid || crypto.randomUUID();
     if (!UUID.test(vehicleId)) {
       return NextResponse.json({ ok: false, error: '차량 UUID 형식이 올바르지 않습니다.' }, { status: 400 });
     }
-    const saved: VipRealVehicle = reconcileRegisteredVehicle({
-      id: old?.profile.id || canonical?.id || `vehicle-custom-${vehicleId}`,
+    const saved: VipRealVehicle = {
+      id: verified?.id || canonical?.id || `vehicle-custom-${vehicleId}`,
       uuid: vehicleId,
-      plate: canonical?.plate || plate,
-      plateShort: canonical?.plateShort || plate.replace(/\s/g,'').slice(-4),
-      model, modelShort: input.modelShort?.slice(0, 160) || model,
-      brand: input.brand!, category: input.category!, categoryLabel: input.categoryLabel?.slice(0, 70) || '',
-      subType: input.subType?.slice(0, 160) || model, capacity,
-      status: input.status === '운행 중' || input.status === '정비 중' ? input.status : '차고지 대기',
-      fuelType: input.fuelType!, year: input.year?.slice(0, 10), color: input.color?.slice(0, 100),
-      imageUrl: imageUrl || undefined,
-      chargingSpecs: input.chargingSpecs,
-      adminMemo: input.adminMemo?.slice(0, 5000),
-    });
+      plate: verified?.plate || plate,
+      plateShort: verified?.plateShort || input.plateShort?.slice(0, 30) || plate.replace(/\s/g,'').slice(-4),
+      model: verified?.model || model,
+      modelShort: verified?.modelShort || input.modelShort?.slice(0, 160) || model,
+      brand: verified?.brand || input.brand!,
+      category: verified?.category || input.category!,
+      categoryLabel: verified?.categoryLabel || input.categoryLabel?.slice(0, 70) || '',
+      subType: verified?.subType || input.subType?.slice(0, 160) || model,
+      capacity: verified?.capacity || capacity,
+      status: verified?.status || '차고지 대기',
+      fuelType: verified?.fuelType || input.fuelType!,
+      year: input.year?.slice(0, 10) || verified?.year,
+      color: input.color?.slice(0, 100) || verified?.color,
+      imageUrl: imageUrl || verified?.imageUrl,
+      chargingSpecs: input.chargingSpecs ?? verified?.chargingSpecs,
+      adminMemo: input.adminMemo?.slice(0, 5000) ?? verified?.adminMemo,
+    };
+
     const now = new Date().toISOString();
-    const { error } = await supabaseAdmin.from('fleet_vehicle_registry').upsert({
-      vehicle_id: vehicleId, organization_id: ORG, plate: saved.plate, profile: saved,
-      archived: false, updated_by: auth.session.userId, updated_at: now,
-    }, { onConflict: 'vehicle_id' });
+    const data = {
+      id: saved.uuid,
+      organization_id: ORG,
+      plate: saved.plate,
+      plate_short: saved.plateShort,
+      model: saved.model,
+      model_short: saved.modelShort,
+      brand: saved.brand,
+      category: saved.category,
+      category_label: saved.categoryLabel,
+      sub_type: saved.subType,
+      capacity: saved.capacity,
+      fuel_type: saved.fuelType,
+      status: existing?.archived ? 'available' : (existing ? 'available' : 'available'),
+      archived: false,
+      // Only UI extras are JSON; physical catalog identity lives in columns.
+      profile: { id: saved.id, year: saved.year, color: saved.color, imageUrl: saved.imageUrl,
+        chargingSpecs: saved.chargingSpecs, adminMemo: saved.adminMemo },
+      updated_by: auth.session.userId,
+      updated_at: now,
+    };
+    const { error } = await supabaseAdmin.from('vehicles').upsert(data, { onConflict: 'id' });
     if (error) throw new Error(error.message);
-    return NextResponse.json({ ok: true, vehicle: saved, archived: false });
+    return NextResponse.json({ ok: true, vehicle: saved });
   } catch (err) {
     return NextResponse.json({ ok: false, error: err instanceof Error ? err.message : '차량 등록에 실패했습니다.' }, { status: 503 });
   }
 }
 
 export async function DELETE(req: NextRequest) {
-  const auth = await authorized(req);
+  const auth = await requireHqAdmin(req);
   if (!auth.ok || !auth.session) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
   try {
     const body = await req.json();
     const plate = typeof body.plate === 'string' ? body.plate.trim() : '';
-    const records = await readFleetRegistry();
-    const existing = records.find(row => normalizeFleetPlate(row.plate) === normalizeFleetPlate(plate));
-    const canonical = VIP_REAL_VEHICLES.find(v => normalizeFleetPlate(v.plate) === normalizeFleetPlate(plate));
-    if (!plate || (!existing && !canonical)) {
-      return NextResponse.json({ ok: false, error: '삭제할 등록 차량을 찾지 못했습니다.' }, { status: 404 });
-    }
-    const uuid = existing?.vehicle_id || canonical!.uuid;
-    const profile = existing?.profile || canonical!;
-    const { error } = await supabaseAdmin.from('fleet_vehicle_registry').upsert({
-      vehicle_id: uuid, organization_id: ORG, plate: profile.plate, profile,
+    if (!plate) return NextResponse.json({ ok: false, error: '차량번호를 확인해 주세요.' }, { status: 400 });
+    const rows = await readFleetRegistry();
+    const existing = rows.find(row => normalizeFleetPlate(row.plate) === normalizeFleetPlate(plate));
+    if (!existing) return NextResponse.json({ ok: false, error: '등록된 차량을 찾지 못했습니다.' }, { status: 404 });
+    const { data, error } = await supabaseAdmin.from('vehicles').update({
       archived: true, updated_by: auth.session.userId, updated_at: new Date().toISOString(),
-    }, { onConflict: 'vehicle_id' });
-    if (error) throw new Error(error.message);
-    return NextResponse.json({ ok: true, vehicleId: uuid });
+    }).eq('id', existing.vehicle_id).eq('organization_id', ORG).select('id').single();
+    if (error || !data) throw new Error(error?.message || '차량 삭제 확인에 실패했습니다.');
+    return NextResponse.json({ ok: true, vehicleId: existing.vehicle_id });
   } catch (err) {
     return NextResponse.json({ ok: false, error: err instanceof Error ? err.message : '차량 삭제에 실패했습니다.' }, { status: 503 });
   }
