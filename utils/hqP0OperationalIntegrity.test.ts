@@ -24,29 +24,34 @@ const record = (vehicle: VipRealVehicle, archived: boolean, org = 'vip_limousine
 });
 
 test('server registry includes registered custom vehicles in the same fleet as defaults', () => {
-  const fleet = mergeFleetRegistry([record(custom, false)]);
+  const fleet = mergeFleetRegistry([record(custom, false)], VIP_REAL_VEHICLES);
   assert.equal(fleet.length, VIP_REAL_VEHICLES.length + 1);
   assert.equal(fleet.find(v => v.plate === custom.plate)?.uuid, custom.uuid);
 });
 
 test('archiving a default vehicle removes it from every HQ fleet consumer', () => {
-  const fleet = mergeFleetRegistry([record(base, true)]);
+  const fleet = mergeFleetRegistry([record(base, true)], VIP_REAL_VEHICLES);
   assert.equal(fleet.length, VIP_REAL_VEHICLES.length - 1);
   assert.equal(fleet.some(v => v.plate === base.plate), false);
 });
 
 test('registry rejects wrong org and mismatched plate payloads', () => {
-  assert.equal(mergeFleetRegistry([record(custom, false, 'other-org')]).length, VIP_REAL_VEHICLES.length);
-  assert.equal(mergeFleetRegistry([{ ...record(custom, false), plate: 'broken' }]).length, VIP_REAL_VEHICLES.length);
+  assert.equal(mergeFleetRegistry([record(custom, false, 'other-org')], VIP_REAL_VEHICLES).length, VIP_REAL_VEHICLES.length);
+  assert.equal(mergeFleetRegistry([{ ...record(custom, false), plate: 'broken' }], VIP_REAL_VEHICLES).length, VIP_REAL_VEHICLES.length);
 });
 
-test('known fleet plates retain canonical vehicle UUID and verified capacity', () => {
+test('the stored physical DB row wins over any stale hardcoded values', () => {
   const modified = { ...base, uuid: custom.uuid, capacity: '999인승', model: '잘못된 모델' };
-  const fleet = mergeFleetRegistry([record(modified, false)]);
+  const fleet = mergeFleetRegistry([record(modified, false)], VIP_REAL_VEHICLES);
   const vehicle = fleet.find(v => v.plate === base.plate)!;
-  assert.equal(vehicle.uuid, base.uuid);
-  assert.equal(vehicle.capacity, base.capacity);
-  assert.equal(vehicle.model, base.model);
+  assert.equal(vehicle.uuid, custom.uuid);
+  assert.equal(vehicle.capacity, '999인승');
+  assert.equal(vehicle.model, '잘못된 모델');
+});
+
+test('the physical DB rows alone determine the real fleet; an empty fleet stays empty', () => {
+  assert.deepEqual(mergeFleetRegistry([]), []);
+  assert.equal(mergeFleetRegistry([record(custom, false)]).length, 1);
 });
 
 test('HQ dispatch, server validation, and availability all use the shared registry', () => {
