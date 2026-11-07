@@ -85,32 +85,32 @@ const STATUS_CONFIG: Record<
 > = {
   ready: {
     label: '운행 준비',
-    badgeClass: 'bg-blue-50/80 text-blue-700 border-blue-200/90',
-    dotClass: 'bg-blue-500',
+    badgeClass: 'bg-[#F7F9FC] text-[#61728A]',
+    dotClass: 'bg-[#95A3B9]',
     icon: Play,
   },
   arrived_pickup: {
     label: '픽업지 도착',
-    badgeClass: 'bg-sky-50 text-sky-700 border-sky-200/90',
-    dotClass: 'bg-sky-500',
+    badgeClass: 'bg-[#F7F9FC] text-[#61728A]',
+    dotClass: 'bg-[#95A3B9]',
     icon: MapPin,
   },
   boarded: {
     label: '승객 탑승',
-    badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-200/90',
-    dotClass: 'bg-indigo-500',
+    badgeClass: 'bg-[#F7F9FC] text-[#61728A]',
+    dotClass: 'bg-[#95A3B9]',
     icon: Users,
   },
   in_transit: {
     label: '운행 중',
-    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200/90',
-    dotClass: 'bg-emerald-500',
+    badgeClass: 'bg-[#EEF3FF] text-[#31598F]',
+    dotClass: 'bg-[#1E60F3]',
     icon: Car,
     isLive: true,
   },
   completed: {
     label: '운행 종료',
-    badgeClass: 'bg-slate-100 text-slate-500 border-slate-200/80',
+    badgeClass: 'bg-[#F7F9FC] text-[#95A3B9]',
     dotClass: 'bg-slate-400',
     icon: Check,
   },
@@ -630,9 +630,9 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
   };
 
   return (
-    <div className="space-y-4 sm:space-y-5">
+    <div className="hq-operations-a space-y-5 sm:space-y-6">
       {/* 1. Header Bar & 5-Card KPI Summary Widget (통합 상단 보드 카드) */}
-      <div className="bg-white rounded-[28px] border border-slate-100/90 p-5 sm:p-6 shadow-[0_6px_24px_rgba(15,23,42,0.05)] space-y-4 sm:space-y-5 select-none">
+      <div className="space-y-5 rounded-[24px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] sm:p-6 select-none">
         <div className="flex items-center gap-3.5">
           {/* 실시간 운영 보드 아이콘 & 마우스 호버 툴팁 */}
           <div className="relative group/operations inline-flex items-center justify-center cursor-pointer shrink-0">
@@ -652,30 +652,30 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
 
             {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 (최상단 레이어) */}
             <div className="absolute bottom-full left-0 mb-2.5 hidden group-hover/operations:flex flex-col items-start pointer-events-none z-[100]">
-              <span className="whitespace-nowrap rounded-xl bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white shadow-xl animate-in fade-in-50 duration-150">
+              <span className="whitespace-nowrap rounded-[12px] bg-white px-3 py-2 text-[12px] font-medium text-[#4D607C] shadow-[0_10px_28px_rgba(35,49,78,0.12)] animate-in fade-in-50 duration-150">
                 진행 중인 행사의 차량 위치와 운행 상태를 실시간으로 확인해요
               </span>
-              <div className="w-2.5 h-2.5 bg-slate-900 rotate-45 -mt-1 ml-5 shadow-xs" />
+              <div className="-mt-1 ml-5 size-2.5 rotate-45 bg-white" />
             </div>
           </div>
 
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[11px] font-black tracking-wider text-[#1E60F3] uppercase bg-blue-50/90 border border-blue-100/80 px-2.5 py-0.5 rounded-full">
+              <span className="rounded-full bg-[#F7F9FC] px-3 py-1 text-[11px] font-medium tracking-wide text-[#73839D]">
                 OPERATIONS · 실시간 관제
               </span>
             </div>
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-1">
+            <h1 className="mt-1 text-[22px] font-bold tracking-[-0.04em] text-[#17233B] sm:text-[26px]">
               실시간 행사 운영 보드
             </h1>
-            <p className="text-xs text-slate-500 font-medium mt-0.5">
+            <p className="mt-1 text-[12px] font-medium text-[#73839D]">
               진행 중인 행사의 차량 위치와 운행 상태를 실시간으로 확인해요
             </p>
           </div>
         </div>
 
         {/* Divider */}
-        <div className="border-t border-slate-100" />
+        <div className="h-px bg-[#F1F4F9]" />
 
         {/* 2. Top 5-Card KPI Summary Grid (QuickActionBar & Driver Card 스타일) */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -685,9 +685,9 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
               haptics.lightTap();
               setActiveTab('running');
             }}
-            className={`p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl border transition-all duration-200 cursor-pointer select-none group flex items-center gap-3.5 ${activeTab === 'running'
-              ? 'bg-blue-50/70 border-blue-300 ring-2 ring-blue-500/20 shadow-xs'
-              : 'bg-slate-50/70 hover:bg-white border-slate-100/90 hover:border-blue-200/80 shadow-2xs hover:shadow-[0_8px_20px_rgba(30,96,243,0.12)] hover:-translate-y-0.5'
+            className={`flex min-h-[98px] cursor-pointer select-none items-center gap-3.5 rounded-[20px] p-4 transition-all duration-200 group sm:p-4 ${activeTab === 'running'
+              ? 'bg-[#F3F7FF] shadow-[0_5px_16px_rgba(35,49,78,0.085)]'
+              : 'bg-white shadow-[0_4px_14px_rgba(35,49,78,0.045)] hover:bg-[#FAFBFD] hover:shadow-[0_6px_20px_rgba(35,49,78,0.065)]'
               }`}
           >
             <img
@@ -709,9 +709,9 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
               haptics.lightTap();
               setActiveTab('all');
             }}
-            className={`p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl border transition-all duration-200 cursor-pointer select-none group flex items-center gap-3.5 ${activeTab === 'all'
-              ? 'bg-blue-50/70 border-blue-300 ring-2 ring-blue-500/20 shadow-xs'
-              : 'bg-slate-50/70 hover:bg-white border-slate-100/90 hover:border-blue-200/80 shadow-2xs hover:shadow-[0_8px_20px_rgba(30,96,243,0.12)] hover:-translate-y-0.5'
+            className={`flex min-h-[98px] cursor-pointer select-none items-center gap-3.5 rounded-[20px] p-4 transition-all duration-200 group sm:p-4 ${activeTab === 'all'
+              ? 'bg-[#F3F7FF] shadow-[0_5px_16px_rgba(35,49,78,0.085)]'
+              : 'bg-white shadow-[0_4px_14px_rgba(35,49,78,0.045)] hover:bg-[#FAFBFD] hover:shadow-[0_6px_20px_rgba(35,49,78,0.065)]'
               }`}
           >
             <img
@@ -733,9 +733,9 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
               haptics.lightTap();
               setActiveTab('running');
             }}
-            className={`p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl border transition-all duration-200 cursor-pointer select-none group flex items-center gap-3.5 ${activeTab === 'running'
-              ? 'bg-blue-50/70 border-blue-300 ring-2 ring-blue-500/20 shadow-xs'
-              : 'bg-slate-50/70 hover:bg-white border-slate-100/90 hover:border-blue-200/80 shadow-2xs hover:shadow-[0_8px_20px_rgba(30,96,243,0.12)] hover:-translate-y-0.5'
+            className={`flex min-h-[98px] cursor-pointer select-none items-center gap-3.5 rounded-[20px] p-4 transition-all duration-200 group sm:p-4 ${activeTab === 'running'
+              ? 'bg-[#F3F7FF] shadow-[0_5px_16px_rgba(35,49,78,0.085)]'
+              : 'bg-white shadow-[0_4px_14px_rgba(35,49,78,0.045)] hover:bg-[#FAFBFD] hover:shadow-[0_6px_20px_rgba(35,49,78,0.065)]'
               }`}
           >
             <img
@@ -757,9 +757,9 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
               haptics.lightTap();
               setActiveTab('closed');
             }}
-            className={`p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl border transition-all duration-200 cursor-pointer select-none group flex items-center gap-3.5 ${activeTab === 'closed'
-              ? 'bg-blue-50/70 border-blue-300 ring-2 ring-blue-500/20 shadow-xs'
-              : 'bg-slate-50/70 hover:bg-white border-slate-100/90 hover:border-blue-200/80 shadow-2xs hover:shadow-[0_8px_20px_rgba(30,96,243,0.12)] hover:-translate-y-0.5'
+            className={`flex min-h-[98px] cursor-pointer select-none items-center gap-3.5 rounded-[20px] p-4 transition-all duration-200 group sm:p-4 ${activeTab === 'closed'
+              ? 'bg-[#F3F7FF] shadow-[0_5px_16px_rgba(35,49,78,0.085)]'
+              : 'bg-white shadow-[0_4px_14px_rgba(35,49,78,0.045)] hover:bg-[#FAFBFD] hover:shadow-[0_6px_20px_rgba(35,49,78,0.065)]'
               }`}
           >
             <img
@@ -781,7 +781,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
               haptics.lightTap();
               setActiveTab('all');
             }}
-            className="col-span-2 sm:col-span-1 p-3.5 sm:p-4 rounded-2xl sm:rounded-3xl bg-slate-50/70 hover:bg-white border border-slate-100/90 hover:border-blue-200/80 shadow-2xs hover:shadow-[0_8px_20px_rgba(30,96,243,0.12)] hover:-translate-y-0.5 flex flex-col justify-between transition-all duration-200 cursor-pointer select-none group"
+            className="group col-span-2 flex min-h-[98px] cursor-pointer select-none flex-col justify-between rounded-[20px] bg-white p-4 shadow-[0_4px_14px_rgba(35,49,78,0.045)] transition-all duration-200 hover:bg-[#FAFBFD] hover:shadow-[0_6px_20px_rgba(35,49,78,0.065)] sm:col-span-1"
           >
             <div className="flex items-center gap-3 min-w-0">
               <img
@@ -812,7 +812,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
       </div>
 
       {/* 3. Filter Bar & Search Container */}
-      <div className="bg-white rounded-2xl border border-slate-100/90 p-2.5 sm:p-3 shadow-[0_4px_16px_rgba(15,23,42,0.04)] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs select-none">
+      <div className="rounded-[22px] bg-white p-3 shadow-[0_6px_20px_rgba(35,49,78,0.055)] sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs select-none">
         {/* Left Filter Tabs (우리만의 캡슐 필 스타일) */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
           <button
@@ -822,12 +822,12 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
               setActiveTab('all');
             }}
             className={`px-4 py-2 rounded-xl font-black transition-all cursor-pointer whitespace-nowrap inline-flex items-center gap-1.5 ${activeTab === 'all'
-              ? 'bg-[#1E60F3] text-white shadow-sm shadow-blue-500/25'
-              : 'bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200/70 font-bold'
+              ? 'bg-[#EEF3FF] text-[#1E60F3]'
+              : 'bg-white text-[#73839D] hover:text-[#17233B] hover:bg-[#F7F9FC]'
               }`}
           >
             <span>전체 행사</span>
-            <span className={`px-1.5 py-0.2 rounded-md text-[11px] ${activeTab === 'all' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'}`}>
+            <span className={`px-1.5 py-0.2 rounded-md text-[11px] ${activeTab === 'all' ? 'bg-white/75 text-[#1E60F3]' : 'bg-[#F7F9FC] text-[#73839D]'}`}>
               {eventGroups.length}
             </span>
           </button>
@@ -839,12 +839,12 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
               setActiveTab('running');
             }}
             className={`px-4 py-2 rounded-xl font-black transition-all cursor-pointer whitespace-nowrap inline-flex items-center gap-1.5 ${activeTab === 'running'
-              ? 'bg-[#1E60F3] text-white shadow-sm shadow-blue-500/25'
-              : 'bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200/70 font-bold'
+              ? 'bg-[#EEF3FF] text-[#1E60F3]'
+              : 'bg-white text-[#73839D] hover:text-[#17233B] hover:bg-[#F7F9FC]'
               }`}
           >
             <span>운영 중</span>
-            <span className={`px-1.5 py-0.2 rounded-md text-[11px] ${activeTab === 'running' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'}`}>
+            <span className={`px-1.5 py-0.2 rounded-md text-[11px] ${activeTab === 'running' ? 'bg-white/75 text-[#1E60F3]' : 'bg-[#F7F9FC] text-[#73839D]'}`}>
               {eventGroups.length}
             </span>
           </button>
@@ -856,12 +856,12 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
               setActiveTab('closed');
             }}
             className={`px-4 py-2 rounded-xl font-black transition-all cursor-pointer whitespace-nowrap inline-flex items-center gap-1.5 ${activeTab === 'closed'
-              ? 'bg-[#1E60F3] text-white shadow-sm shadow-blue-500/25'
-              : 'bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200/70 font-bold'
+              ? 'bg-[#EEF3FF] text-[#1E60F3]'
+              : 'bg-white text-[#73839D] hover:text-[#17233B] hover:bg-[#F7F9FC]'
               }`}
           >
             <span>대기·종료</span>
-            <span className={`px-1.5 py-0.2 rounded-md text-[11px] ${activeTab === 'closed' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'}`}>
+            <span className={`px-1.5 py-0.2 rounded-md text-[11px] ${activeTab === 'closed' ? 'bg-white/75 text-[#1E60F3]' : 'bg-[#F7F9FC] text-[#73839D]'}`}>
               0
             </span>
           </button>
@@ -876,7 +876,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="기사님, 차량번호, 장소로 찾아보세요"
-              className="w-full pl-9 pr-8 py-2 bg-slate-50/80 hover:bg-slate-50 focus:bg-white border border-slate-200/80 rounded-xl text-xs font-bold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-[#1E60F3] transition-all shadow-2xs"
+              className="h-11 w-full rounded-[15px] bg-white pl-10 pr-8 text-[13px] font-medium text-[#17233B] placeholder:text-[#95A3B9] shadow-[0_4px_14px_rgba(35,49,78,0.045)] outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20"
             />
             {searchQuery && (
               <button
@@ -892,7 +892,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
           <button
             type="button"
             onClick={() => haptics.lightTap()}
-            className="px-3.5 py-2 rounded-xl border border-slate-200/80 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs shrink-0"
+            className="inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-[14px] bg-white px-3.5 text-[12px] font-semibold text-[#4D607C] shadow-[0_4px_14px_rgba(35,49,78,0.045)] transition-colors hover:bg-[#F5F8FF]"
           >
             <Filter className="w-3.5 h-3.5 text-slate-400" />
             <span>필터</span>
@@ -901,7 +901,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
       </div>
 
       {/* 4. Event Cards (우리만의 프리미엄 아코디언 카드) */}
-      <div className="space-y-4 sm:space-y-5">
+      <div className="hq-operations-a space-y-5 sm:space-y-6">
         {filteredGroups.map((group) => {
           const isExpanded = expandedEvents[group.id] !== false;
           const isShowingAll = showAllVehicles[group.id] === true;
@@ -923,14 +923,14 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
           return (
             <div
               key={group.id}
-              className="bg-white rounded-[28px] border border-slate-100/90 shadow-[0_6px_24px_rgba(15,23,42,0.05)] overflow-hidden transition-all duration-200"
+              className="overflow-hidden rounded-[24px] bg-white shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] transition-all duration-200"
             >
               {/* Event Header */}
               <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col gap-3 bg-white">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   {/* Left: Customer Tag & Event Name */}
                   <div className="flex items-center gap-2.5">
-                    <span className="px-3 py-1 rounded-full bg-blue-50 text-[#1E60F3] text-xs font-black border border-blue-200/60 shadow-2xs">
+                    <span className="rounded-full bg-[#F7F9FC] px-3 py-1.5 text-[12px] font-medium text-[#73839D]">
                       {group.customerTag}
                     </span>
                     <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
@@ -946,7 +946,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
                         haptics.lightTap();
                         setSelectedEventInfo(group);
                       }}
-                      className="px-3.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-bold text-slate-700 flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer active:scale-95"
+                      className="flex min-h-10 cursor-pointer items-center gap-1.5 rounded-[13px] bg-white px-3.5 text-[12px] font-semibold text-[#4D607C] shadow-[0_4px_14px_rgba(35,49,78,0.05)] transition-colors hover:bg-[#F5F8FF]"
                     >
                       <span>행사 정보</span>
                       <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
@@ -955,7 +955,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
                     <button
                       type="button"
                       onClick={() => toggleEventAccordion(group.id)}
-                      className="w-9 h-9 rounded-2xl bg-slate-50 hover:bg-slate-100 border border-slate-200/60 flex items-center justify-center text-slate-600 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                      className="flex size-10 cursor-pointer items-center justify-center rounded-[13px] bg-[#F7F9FC] text-[#73839D] transition-colors hover:bg-[#EDF1F6]"
                       aria-label="아코디언 토글"
                     >
                       {isExpanded ? (
@@ -969,7 +969,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
 
                 {/* Event Meta Row (Pill Cards) */}
                 <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 font-medium">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-50 border border-slate-100 text-xs font-semibold text-slate-600">
+                  <div className="inline-flex items-center gap-1.5 rounded-[12px] bg-[#F7F9FC] px-3 py-1.5 text-[12px] font-medium text-[#4D607C]">
                     <img
                       src="/images/icons/driver_ui/icon_calendar.png"
                       alt="일정"
@@ -980,12 +980,12 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
                     </span>
                   </div>
 
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-blue-50/70 border border-blue-100 text-xs font-black text-blue-700">
+                  <div className="inline-flex items-center gap-1.5 rounded-[12px] bg-[#F7F9FC] px-3 py-1.5 text-[12px] font-medium text-[#4D607C]">
                     <Car className="w-3.5 h-3.5 text-blue-600" />
                     <span>총 {totalVehiclesCount}대 배차</span>
                   </div>
 
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-50 border border-slate-100 text-xs text-slate-600 font-semibold truncate max-w-full">
+                  <div className="inline-flex max-w-full items-center gap-1.5 truncate rounded-[12px] bg-[#F7F9FC] px-3 py-1.5 text-[12px] font-medium text-[#4D607C]">
                     <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                     <span className="truncate">{group.routeSummary}</span>
                   </div>
@@ -1151,7 +1151,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
                                 <button
                                   type="button"
                                   onClick={(e) => handleSendArrivalNotice(e, item)}
-                                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-black bg-blue-50 hover:bg-[#1E60F3] text-[#1E60F3] hover:text-white border border-blue-200/80 transition-all duration-200 shadow-2xs cursor-pointer active:scale-95"
+                                  className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-[13px] bg-white px-3.5 text-[12px] font-semibold text-[#4D607C] shadow-[0_4px_14px_rgba(35,49,78,0.045)] transition-colors hover:bg-[#F5F8FF]"
                                 >
                                   <img
                                     src="/images/icons/driver_ui/icon_talk.png"
@@ -1246,7 +1246,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
                             <button
                               type="button"
                               onClick={(e) => handleSendArrivalNotice(e, item)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black bg-blue-50 hover:bg-[#1E60F3] text-[#1E60F3] hover:text-white border border-blue-200/80 transition-all duration-200 shadow-2xs active:scale-95"
+                              className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-[13px] bg-white px-3.5 text-[12px] font-semibold text-[#4D607C] shadow-[0_4px_14px_rgba(35,49,78,0.045)] transition-colors hover:bg-[#F5F8FF]"
                             >
                               <img
                                 src="/images/icons/driver_ui/icon_talk.png"
@@ -1309,11 +1309,11 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
       {/* 5. Event Info Modal (우리만의 팝업 애니메이션 & 스타일) */}
       {selectedEventInfo && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm select-none animate-in fade-in duration-200"
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-[#17233B]/30 p-4 backdrop-blur-[2px] select-none animate-in fade-in duration-200"
           onClick={() => setSelectedEventInfo(null)}
         >
           <div
-            className="relative w-full max-w-md bg-white border border-slate-100 rounded-[28px] shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95 duration-200"
+            className="relative w-full max-w-md space-y-5 rounded-[24px] bg-white p-6 shadow-[0_24px_64px_rgba(27,45,77,0.16),0_4px_14px_rgba(27,45,77,0.04)] animate-in fade-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between pb-3.5 border-b border-slate-100">
@@ -1328,7 +1328,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
               <button
                 type="button"
                 onClick={() => setSelectedEventInfo(null)}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
+                className="flex size-10 cursor-pointer items-center justify-center rounded-full bg-[#F7F9FC] text-[#73839D] transition-colors hover:bg-[#EDF1F6]"
                 aria-label="닫기"
               >
                 <X className="w-4 h-4" />
@@ -1336,7 +1336,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
             </div>
 
             <div className="space-y-3 text-xs">
-              <div className="p-4 bg-slate-50/80 rounded-2xl space-y-2.5 border border-slate-100/90">
+              <div className="space-y-2.5 rounded-[17px] bg-[#FAFBFD] p-4">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-400 font-bold">행사 일시</span>
                   <span className="font-extrabold text-slate-900">
@@ -1374,11 +1374,11 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
       {/* 6. Vehicle History / Timeline Modal (기사 앱 운행일지 타임라인 스타일) */}
       {selectedSchedule && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm select-none animate-in fade-in duration-200"
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-[#17233B]/30 p-4 backdrop-blur-[2px] select-none animate-in fade-in duration-200"
           onClick={() => setSelectedSchedule(null)}
         >
           <div
-            className="relative w-full max-w-lg bg-white border border-slate-100 rounded-[28px] shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95 duration-200"
+            className="relative w-full max-w-lg space-y-5 rounded-[24px] bg-white p-6 shadow-[0_24px_64px_rgba(27,45,77,0.16),0_4px_14px_rgba(27,45,77,0.04)] animate-in fade-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
@@ -1399,7 +1399,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
               <button
                 type="button"
                 onClick={() => setSelectedSchedule(null)}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
+                className="flex size-10 cursor-pointer items-center justify-center rounded-full bg-[#F7F9FC] text-[#73839D] transition-colors hover:bg-[#EDF1F6]"
                 aria-label="닫기"
               >
                 <X className="w-4 h-4" />
@@ -1407,7 +1407,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
             </div>
 
             {/* Quick Summary Card */}
-            <div className="p-4 bg-slate-50/80 rounded-2xl space-y-2 text-xs border border-slate-100/90">
+            <div className="space-y-2 rounded-[17px] bg-[#FAFBFD] p-4 text-[12px]">
               <div className="flex items-center justify-between">
                 <span className="text-slate-400 font-bold">현재 운행 상태</span>
                 <span className="font-black text-[#1E60F3] flex items-center gap-1.5">
@@ -1447,7 +1447,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
                 selectedSchedule.operationHistory.map((hist, idx) => (
                   <div key={idx} className="flex items-start gap-3 text-xs">
                     <div className="w-2.5 h-2.5 rounded-full bg-[#1E60F3] mt-1 shrink-0 ring-4 ring-blue-50" />
-                    <div className="flex-1 bg-slate-50/80 p-3 rounded-2xl border border-slate-100/90 space-y-1">
+                    <div className="flex-1 space-y-1 rounded-[16px] bg-[#FAFBFD] p-4">
                       <div className="flex justify-between items-center text-slate-400">
                         <span className="font-black text-slate-900">
                           {STATUS_CONFIG[hist.toStatus as OperationStatus]?.label || hist.toStatus}
@@ -1489,7 +1489,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
               <button
                 type="button"
                 onClick={() => setSelectedSchedule(null)}
-                className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs rounded-2xl cursor-pointer active:scale-95 transition-all"
+                className="min-h-11 cursor-pointer rounded-[14px] bg-[#F7F9FC] px-5 text-[12px] font-semibold text-[#4D607C] transition-colors hover:bg-[#EDF1F6]"
               >
                 닫기
               </button>
