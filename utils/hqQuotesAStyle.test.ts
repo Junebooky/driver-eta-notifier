@@ -11,7 +11,8 @@ test('official price screen retains vehicle-specific quote action with quiet cat
   assert.match(pricing,/hq-pricing-a space-y-5/);
   assert.match(pricing,/onOpenQuoteModal\(item\.vehicleProductCode\)/);
   assert.match(pricing,/onOpenQuoteModal\(\)/);
-  assert.match(pricing,/setActiveTab\(tab\.id\)/);
+  assert.match(pricing,/HqSegmentedTabs/);
+  assert.match(pricing,/setActiveTab\(id as CategoryTabId\)/);
   assert.match(pricing,/displayedVehicles\.map/);
   assert.doesNotMatch(pricing,/bg-\[#1E60F3\] text-white border border-\[#1E60F3\]/);
 });
