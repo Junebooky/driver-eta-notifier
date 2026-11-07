@@ -977,17 +977,17 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
   };
 
   return (
-    <div className="space-y-4">
+    <div className="hq-email-a space-y-5">
       {/* Toast Alert Banner */}
       {toastMessage && (
-        <div className="fixed top-20 right-6 z-50 bg-[#0B1E48] text-white px-4 py-3 rounded-2xl shadow-xl border border-blue-500/30 flex items-center gap-2.5 text-xs font-bold animate-slide-up">
+        <div className="fixed right-6 top-20 z-50 flex items-center gap-2.5 rounded-[17px] bg-white px-4 py-3 text-[12px] font-medium text-[#4D607C] shadow-[0_10px_30px_rgba(35,49,78,0.13)] animate-slide-up">
           <span className="w-2 h-2 rounded-full bg-[#1E60F3] animate-ping" />
           <span>{toastMessage}</span>
         </div>
       )}
 
       {/* Live Connection / IMAP Status Banner */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 px-4 py-3 shadow-xs flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3 rounded-[21px] bg-white px-5 py-4 shadow-[0_6px_20px_rgba(35,49,78,0.055)]">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="relative group/naver flex items-center">
             <img
@@ -998,11 +998,11 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
 
             {/* Hover Tooltip: 위로 향하는 실제 네이버 이메일 강조 말풍선 */}
             <div className="absolute bottom-full left-0 mb-2 hidden group-hover/naver:flex flex-col items-start pointer-events-none z-[100]">
-              <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150 flex items-center gap-1.5">
+              <span className="whitespace-nowrap rounded-[12px] bg-white px-3 py-2 text-[11px] font-medium text-[#4D607C] shadow-[0_8px_22px_rgba(35,49,78,0.1)] animate-in fade-in-50 duration-150 flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#03C75A] inline-block animate-pulse" />
                 실제 네이버 이메일
               </span>
-              <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 ml-3 shadow-xs" />
+              <div className="-mt-1 ml-3 size-2 rotate-45 bg-white" />
             </div>
           </div>
           <span className="text-xs font-bold text-slate-600 truncate">
@@ -1024,7 +1024,7 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
 
       {/* Disconnected / Error Notice */}
       {!isDemoMode && !imapState.isConfigured && (
-        <div className="p-4 bg-amber-50/80 border border-amber-200 rounded-2xl flex items-start gap-3 text-amber-900 text-xs">
+        <div className="rounded-[18px] bg-[#FFF9F1] p-4 flex items-start gap-3 text-amber-900 text-xs">
           <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
           <div className="space-y-1">
             <span className="font-extrabold block">NAVER IMAP 연동 환경변수 미설정</span>
@@ -1040,16 +1040,16 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
         {/* ========================================================= */}
         {/* Pinned Left Column: 이메일 목록                           */}
         {/* ========================================================= */}
-        <div className="w-full md:w-80 lg:w-[320px] xl:w-[340px] shrink-0 bg-white rounded-2xl border border-slate-200/80 shadow-xs flex flex-col min-h-[700px] md:sticky md:top-20 relative z-20">
+        <div className="flex min-h-[700px] w-full shrink-0 flex-col rounded-[23px] bg-white shadow-[0_6px_20px_rgba(35,49,78,0.055)] md:w-80 lg:w-[320px] xl:w-[340px] md:sticky md:top-20 relative z-20">
           {/* Header Row */}
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white rounded-t-2xl">
+          <div className="flex items-center justify-between rounded-t-[23px] bg-white px-4 py-4">
             <div className="relative group/email flex items-center gap-2 cursor-pointer">
               <img
                 src="/images/icons/eemail/icon_email.png"
                 alt="이메일 아이콘"
                 className="w-7 h-7 object-contain shrink-0 transition-transform duration-150 group-hover/email:scale-110"
               />
-              <h2 className="text-sm font-extrabold text-slate-900">
+              <h2 className="text-[16px] font-bold tracking-[-0.02em] text-[#17233B]">
                 이메일
               </h2>
               <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-600">
@@ -1058,10 +1058,10 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
 
               {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 (최상단 레이어) */}
               <div className="absolute bottom-full left-0 mb-2 hidden group-hover/email:flex flex-col items-start pointer-events-none z-[100]">
-                <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+                <span className="whitespace-nowrap rounded-[12px] bg-white px-3 py-2 text-[11px] font-medium text-[#4D607C] shadow-[0_8px_22px_rgba(35,49,78,0.1)] animate-in fade-in-50 duration-150">
                   실제 관리자님에게 온 이메일 목록이에요
                 </span>
-                <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 ml-[10px] shadow-xs" />
+                <div className="-mt-1 ml-[10px] size-2 rotate-45 bg-white" />
               </div>
             </div>
             <button
@@ -1073,7 +1073,7 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                 setComposeBody('');
                 setIsComposeOpen(true);
               }}
-              className="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all cursor-pointer shadow-2xs active:scale-95 flex items-center gap-1"
+              className="flex min-h-10 cursor-pointer items-center gap-1 rounded-[13px] bg-white px-3 text-[12px] font-semibold text-[#4D607C] shadow-[0_4px_14px_rgba(35,49,78,0.05)] transition-colors hover:bg-[#F5F8FF]"
               title="새 이메일 작성"
             >
               <Plus className="w-3.5 h-3.5 stroke-[2.2] text-slate-500" />
@@ -1082,7 +1082,7 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
           </div>
 
           {/* Status Filter Badges */}
-          <div className="p-3 border-b border-slate-100 bg-slate-50/50 flex items-center gap-1.5 overflow-x-auto text-xs font-bold scrollbar-none">
+          <div className="flex items-center gap-1 overflow-x-auto bg-white px-3 pb-3 text-[12px] font-medium scrollbar-none">
             {[
               { id: 'all' as const, label: '전체', count: undefined },
               { id: 'unprocessed' as const, label: '미처리', count: counts.unprocessed },
@@ -1098,16 +1098,16 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                     haptics.selection();
                     setStatusFilter(tab.id);
                   }}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1 ${isSelected
-                    ? 'bg-[#0050FF] text-white shadow-2xs'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  className={`flex min-h-10 shrink-0 cursor-pointer items-center gap-1 rounded-[12px] px-3 text-[12px] font-semibold transition-colors ${isSelected
+                    ? 'bg-[#EEF3FF] text-[#1E60F3]'
+                    : 'bg-white text-[#73839D] shadow-[0_3px_10px_rgba(35,49,78,0.04)] hover:bg-[#F7F9FC]'
                     }`}
                 >
                   <span>{tab.label}</span>
                   {tab.count !== undefined && (
                     <span
                       className={`text-[11px] ${isSelected
-                        ? 'text-white/90 font-black'
+                        ? 'text-[#1E60F3] font-semibold'
                         : tab.count === 0
                           ? 'text-slate-400 font-medium'
                           : 'text-slate-500 font-extrabold'
@@ -1122,7 +1122,7 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
           </div>
 
           {/* Search Input */}
-          <div className="p-3 border-b border-slate-100 bg-white">
+          <div className="bg-white px-4 pb-4">
             <div className="relative">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
@@ -1130,7 +1130,7 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="보낸 사람, 제목 또는 내용 검색"
-                className="w-full pl-8 pr-7 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-hidden focus:border-[#0050FF] focus:ring-2 focus:ring-blue-100 transition-all duration-150"
+                className="h-11 w-full rounded-[15px] bg-white pl-9 pr-7 text-[13px] font-medium text-[#17233B] placeholder:text-[#95A3B9] shadow-[0_4px_14px_rgba(35,49,78,0.045)] outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20"
               />
               {searchQuery && (
                 <button
@@ -1149,7 +1149,7 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
           </div>
 
           {/* Scrollable Email Cards List */}
-          <div className="divide-y divide-slate-100 overflow-y-auto max-h-[580px] flex-1 rounded-b-2xl">
+          <div className="max-h-[580px] flex-1 space-y-1.5 overflow-y-auto overscroll-contain rounded-b-[23px] px-3 pb-4">
             {isLoadingInbox ? (
               <div className="p-12 text-center text-slate-400 space-y-2">
                 <RefreshCw className="w-7 h-7 mx-auto animate-spin text-[#1E60F3]" />
@@ -1176,9 +1176,9 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                   <div
                     key={item.id}
                     onClick={() => handleSelectEmail(item.id)}
-                    className={`p-3.5 transition-all cursor-pointer relative group ${isSelected
-                      ? 'bg-blue-50/90 border-l-4 border-l-[#1E60F3] shadow-2xs'
-                      : 'hover:bg-slate-50 border-l-4 border-l-transparent'
+                    className={`group relative cursor-pointer rounded-[16px] p-3.5 transition-colors ${isSelected
+                      ? 'bg-[#F3F7FF] shadow-[0_3px_12px_rgba(35,49,78,0.05)]'
+                      : 'hover:bg-[#FAFBFD]'
                       }`}
                   >
                     <div className="flex items-start gap-3">
@@ -1220,15 +1220,15 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
                         {/* Status chip */}
                         <div className="mt-2 flex items-center gap-1.5">
                           {draft?.status === 'published' ? (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <span className="rounded-full bg-[#EEF3FF] px-2.5 py-1 text-[10px] font-medium text-[#31598F]">
                               배차 완료
                             </span>
                           ) : isAnalyzed ? (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-[#1E60F3] border border-blue-200">
+                            <span className="rounded-full bg-[#F7F9FC] px-2.5 py-1 text-[10px] font-medium text-[#73839D]">
                               초안 생성됨
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500">
+                            <span className="rounded-full bg-[#F7F9FC] px-2.5 py-1 text-[10px] font-medium text-[#95A3B9]">
                               AI 분석 대기
                             </span>
                           )}
@@ -1248,7 +1248,7 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
         <div className="flex-1 min-w-0 w-full space-y-4">
           {dispatchMutation.hasPending && <button type="button" className="rounded-xl border border-blue-200 p-3 text-sm text-blue-700" onClick={async () => { try { const response = await dispatchMutation.retry(); const data = await response.json(); if (!response.ok || !data.ok) throw new Error(data.error || '저장 결과를 확인하지 못했습니다.'); window.location.reload(); } catch (error) { setDispatchError(error instanceof Error ? error.message : '저장 결과를 확인하지 못했습니다.'); } }}>이전 배차 저장 결과 확인</button>}
           {currentSummary && (
-            <div className="rounded-2xl border border-slate-200/90 overflow-hidden shadow-xs">
+            <div className="overflow-hidden rounded-[22px] bg-white shadow-[0_6px_20px_rgba(35,49,78,0.055)]">
               <HqEmailWorkflowStepper
                 currentStep={calculatedCurrentStep}
                 isExtractingAi={isExtractingAi}
@@ -1260,7 +1260,7 @@ VIP LIMOUSINE KOREA 관제팀 드림`);
           )}
 
           {!currentSummary ? (
-            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-12 text-center text-slate-400 space-y-3">
+            <div className="rounded-[23px] bg-white p-12 shadow-[0_6px_20px_rgba(35,49,78,0.055)] text-center text-slate-400 space-y-3">
               <Mail className="w-10 h-10 mx-auto text-slate-300" />
               <h3 className="text-base font-extrabold text-slate-800">
                 선택된 이메일이 없습니다
