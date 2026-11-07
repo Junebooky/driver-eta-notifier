@@ -255,7 +255,7 @@ export const TossDateRangePicker: React.FC<TossDateRangePickerProps> = ({
                 if (!disabled) setIsOpen((prev) => !prev);
               }
             }}
-            className={`w-full ${heightClass} bg-white border border-slate-200 hover:border-blue-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 rounded-xl px-3.5 flex items-center gap-2.5 transition-all cursor-pointer shadow-2xs select-none ${
+            className={`w-full ${heightClass} bg-white border border-[#E1E7F0]/25 rounded-[16px] px-4 flex items-center gap-2.5 transition-all cursor-pointer shadow-[0_5px_16px_rgba(35,49,78,0.045),0_2px_5px_rgba(35,49,78,0.02)] hover:shadow-[0_6px_18px_rgba(35,49,78,0.065)] focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20 select-none ${
               disabled ? 'opacity-60 pointer-events-none' : ''
             }`}
           >
@@ -272,11 +272,11 @@ export const TossDateRangePicker: React.FC<TossDateRangePickerProps> = ({
         <div
           className={`absolute ${
             align === 'right' ? 'right-0 left-auto' : 'left-0 right-auto'
-          } top-full mt-2 z-50 w-[310px] sm:w-[332px] rounded-2xl bg-white border border-slate-200 shadow-xl p-4 animate-in fade-in zoom-in-95 duration-150`}
+          } top-full mt-2 z-50 w-[310px] sm:w-[332px] rounded-[22px] bg-white shadow-[0_16px_46px_rgba(35,49,78,0.13),0_4px_12px_rgba(35,49,78,0.04)] p-4 animate-in fade-in zoom-in-95 duration-150`}
         >
           {/* Header Bar */}
-          <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-100">
-            <span className="text-base font-extrabold text-slate-900 tracking-tight">
+          <div className="flex items-center justify-between pb-3 mb-2">
+            <span className="text-[16px] font-bold text-[#17233B] tracking-[-0.02em]">
               {viewYear}년 {viewMonth}월
             </span>
 
@@ -285,7 +285,7 @@ export const TossDateRangePicker: React.FC<TossDateRangePickerProps> = ({
                 type="button"
                 onClick={handlePrevMonth}
                 aria-label="이전 달"
-                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 active:scale-95 transition-all cursor-pointer shadow-2xs"
+                className="w-9 h-9 rounded-full flex items-center justify-center bg-[#F7F9FC] text-[#73839D] hover:text-[#17233B] hover:bg-[#EDF1F6] active:scale-[0.98] transition-all cursor-pointer"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
@@ -293,7 +293,7 @@ export const TossDateRangePicker: React.FC<TossDateRangePickerProps> = ({
                 type="button"
                 onClick={handleNextMonth}
                 aria-label="다음 달"
-                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-slate-100 active:scale-95 transition-all cursor-pointer shadow-2xs"
+                className="w-9 h-9 rounded-full flex items-center justify-center bg-[#F7F9FC] text-[#73839D] hover:text-[#17233B] hover:bg-[#EDF1F6] active:scale-[0.98] transition-all cursor-pointer"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -301,7 +301,7 @@ export const TossDateRangePicker: React.FC<TossDateRangePickerProps> = ({
                 type="button"
                 onClick={() => setIsOpen(false)}
                 aria-label="닫기"
-                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 active:scale-95 transition-all cursor-pointer ml-1"
+                className="w-9 h-9 rounded-full flex items-center justify-center bg-[#F7F9FC] text-[#73839D] hover:text-[#17233B] hover:bg-[#EDF1F6] active:scale-[0.98] transition-all cursor-pointer ml-1"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -335,9 +335,9 @@ export const TossDateRangePicker: React.FC<TossDateRangePickerProps> = ({
                 <div
                   key={item.iso}
                   className={`flex items-center justify-center p-0.5 relative ${
-                    isInRange ? 'bg-blue-100/50' : ''
-                  } ${isStart && tempEnd > tempStart ? 'rounded-l-2xl bg-blue-100/30' : ''} ${
-                    isEnd && tempEnd > tempStart ? 'rounded-r-2xl bg-blue-100/30' : ''
+                    isInRange ? 'bg-[#EEF3FF]/60' : ''
+                  } ${isStart && tempEnd > tempStart ? 'rounded-l-2xl bg-[#EEF3FF]/50' : ''} ${
+                    isEnd && tempEnd > tempStart ? 'rounded-r-2xl bg-[#EEF3FF]/50' : ''
                   }`}
                 >
                   <button
@@ -346,11 +346,11 @@ export const TossDateRangePicker: React.FC<TossDateRangePickerProps> = ({
                     onClick={() => handleDayClick(item.iso)}
                     className={`w-9 h-9 rounded-2xl flex flex-col items-center justify-center text-xs transition-all cursor-pointer relative ${
                       isStart || isEnd
-                        ? 'bg-[#1E60F3] text-white font-extrabold shadow-md shadow-blue-500/35 scale-105 z-10'
+                        ? 'bg-[#1E60F3] text-white font-semibold shadow-[0_4px_12px_rgba(30,96,243,0.13)] z-10'
                         : isInRange
-                        ? 'bg-blue-100 text-[#1E60F3] font-bold'
+                        ? 'bg-[#EEF3FF] text-[#1E60F3] font-semibold'
                         : isToday
-                        ? 'bg-blue-50 text-[#1E60F3] font-black border border-blue-200'
+                        ? 'bg-[#F7F9FC] text-[#1E60F3] font-semibold'
                         : item.isCurrentMonth
                         ? 'text-slate-800 font-semibold hover:bg-slate-100 hover:text-[#1E60F3]'
                         : 'text-slate-300 font-normal hover:bg-slate-100/50'
