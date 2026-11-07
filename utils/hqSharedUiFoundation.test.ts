@@ -16,7 +16,7 @@ test('shared primitives expose centralized HQ style variants without tying to bu
   const disabled=renderToStaticMarkup(React.createElement(HqButton,{loading:true},'저장'));
   assert.match(disabled,/disabled=""/);
   assert.match(disabled,/aria-busy="true"/);
-  const secondary=renderToStaticMarkup(React.createElement(HqIconButton,{'aria-label':'닫기',variant:'subtle'},'×'));
+  const secondary=renderToStaticMarkup(React.createElement(HqIconButton,{'aria-label':'닫기',variant:'subtle',children:'×'}));
   assert.match(secondary,/aria-label="닫기"/);
   assert.match(secondary,/hq-ui-icon-button/);
   const card=renderToStaticMarkup(React.createElement(HqCard,{tone:'muted'},'메모'));
