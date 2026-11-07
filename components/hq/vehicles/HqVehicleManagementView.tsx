@@ -734,9 +734,9 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
   };
 
   return (
-    <div className="space-y-4">
+    <div className="hq-fleet-a space-y-5">
       {/* Top Header Card: Icon + Title + Count */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:px-5 shadow-2xs flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3 rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] sm:px-6">
         <div className="flex items-center gap-2.5">
           {/* 차량관리 아이콘 & 마우스 호버 툴팁 */}
           <div className="relative group/vehicles inline-flex items-center justify-center cursor-pointer shrink-0">
@@ -762,10 +762,10 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
             </div>
           </div>
 
-          <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+          <h2 className="text-[20px] sm:text-[23px] font-bold tracking-[-0.035em] text-[#17233B]">
             차량 관리
           </h2>
-          <span className="bg-slate-100 text-slate-500 font-bold px-2 py-0.5 rounded-full text-xs">
+          <span className="rounded-full bg-[#F7F9FC] px-3 py-1 text-[11px] font-medium text-[#73839D]">
             {allBaseVehicles.length}대
           </span>
         </div>
@@ -777,7 +777,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
             haptics.lightTap();
             setIsNewVehicleModalOpen(true);
           }}
-          className="bg-[#0050FF] hover:bg-blue-700 text-white font-semibold text-xs px-3.5 py-2 rounded-xl shadow-xs transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer active:scale-95 shrink-0"
+          className="inline-flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-[14px] bg-[#1E60F3] px-4 text-[12px] font-semibold text-white shadow-[0_6px_16px_rgba(30,96,243,0.15)] transition-all hover:bg-[#1757DC] active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20"
           title="신규 차량 등록"
         >
           <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -786,7 +786,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
       </div>
 
       {/* Top Horizontal Filter Bar */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-3 sm:p-3.5 shadow-2xs">
+      <div className="rounded-[23px] bg-white p-4 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] sm:p-5">
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
           {/* 1. 차량 분류 (Category Pills) - 가로 스크롤 및 충분한 간격 확보 */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1 xl:pb-0 scrollbar-none flex-1 min-w-0">
@@ -807,15 +807,15 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                     haptics.selection();
                     setSelectedCategory(cat.key as VehicleUiCategoryKey);
                   }}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer shrink-0 ${isSelected
-                    ? "bg-[#0050FF] text-white shadow-xs"
-                    : "bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-slate-200"
+                  className={`flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-[13px] px-3.5 text-[12px] font-semibold transition-all ${isSelected
+                    ? "bg-[#EEF3FF] text-[#1E60F3]"
+                    : "bg-white text-[#73839D] hover:bg-[#F7F9FC] shadow-[0_3px_10px_rgba(35,49,78,0.04)]"
                     }`}
                 >
-                  <IconComp className={`w-3.5 h-3.5 ${isSelected ? "text-white" : "text-slate-400"}`} />
+                  <IconComp className={`w-3.5 h-3.5 ${isSelected ? "text-[#1E60F3]" : "text-[#95A3B9]"}`} />
                   <span>{cat.label}</span>
                   <span
-                    className={`text-[11px] font-bold px-1.5 py-0.2 rounded-full ${isSelected ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
+                    className={`text-[11px] font-bold px-1.5 py-0.2 rounded-full ${isSelected ? "bg-white/70 text-[#1E60F3]" : "bg-[#F7F9FC] text-[#73839D]"
                       }`}
                   >
                     {cat.count}
@@ -838,10 +838,10 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                   haptics.lightTap();
                   setIsFuelDropdownOpen((prev) => !prev);
                 }}
-                className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer shadow-2xs flex items-center gap-1.5 ${
+                className={`flex min-h-10 cursor-pointer items-center gap-1.5 rounded-[13px] px-3.5 text-[12px] font-semibold shadow-[0_3px_10px_rgba(35,49,78,0.04)] transition-all ${
                   fuelFilter !== 'all'
-                    ? 'border-blue-400 bg-blue-50/50 text-[#0050FF]'
-                    : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                    ? 'bg-[#EEF3FF] text-[#1E60F3]'
+                    : 'bg-white text-[#73839D] hover:bg-[#F7F9FC]'
                 }`}
               >
                 <Fuel className={`w-3.5 h-3.5 ${fuelFilter !== 'all' ? 'text-[#0050FF]' : 'text-slate-400'}`} />
@@ -858,7 +858,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
               </button>
 
               {isFuelDropdownOpen && (
-                <div className="absolute right-0 mt-1.5 w-36 bg-white rounded-xl shadow-xl border border-slate-200/90 py-1 z-30 animate-in fade-in zoom-in-95 duration-100">
+                <div className="absolute right-0 z-30 mt-2 w-44 overflow-hidden rounded-[17px] bg-white p-1.5 shadow-[0_14px_36px_rgba(35,49,78,0.13),0_3px_10px_rgba(35,49,78,0.05)] animate-in fade-in zoom-in-95 duration-100">
                   {[
                     { value: 'all' as const, label: '유종: 전체' },
                     { value: '휘발유' as const, label: `휘발유 (${fuelCounts.gasoline})` },
@@ -873,10 +873,10 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                         setFuelFilter(opt.value);
                         setIsFuelDropdownOpen(false);
                       }}
-                      className={`w-full text-left px-3 py-1.5 text-xs font-bold flex items-center justify-between hover:bg-slate-50 cursor-pointer transition-colors ${
+                      className={`flex min-h-10 w-full cursor-pointer items-center justify-between rounded-[12px] px-3.5 text-left text-[12px] font-medium transition-colors hover:bg-[#F7F9FC] ${
                         fuelFilter === opt.value
-                          ? 'text-[#0050FF] bg-blue-50/50'
-                          : 'text-slate-700'
+                          ? 'text-[#1E60F3] bg-[#EEF3FF]'
+                          : 'text-[#4D607C]'
                       }`}
                     >
                       <span>{opt.label}</span>
@@ -888,20 +888,20 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
             </div>
 
             {/* Search Input */}
-            <div className="relative w-44 sm:w-56">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
+            <div className="relative min-w-0 flex-1 sm:w-60 sm:flex-none">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-[#95A3B9]" />
               <input
                 type="text"
                 placeholder="차량명이나 번호로 검색"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-7 py-1.5 text-xs font-medium border border-slate-200 rounded-xl bg-slate-50/50 focus:bg-white focus:outline-none focus:border-[#0050FF] placeholder:text-slate-400 transition-all"
+                className="h-11 w-full rounded-[14px] border border-[#E1E7F0]/25 bg-white pl-10 pr-8 text-[13px] font-medium text-[#17233B] placeholder:text-[#95A3B9] shadow-[0_4px_14px_rgba(35,49,78,0.045)] outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery("")}
-                  className="absolute right-2 top-2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-[#95A3B9] hover:text-[#4D607C]"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -912,7 +912,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
       </div>
 
       {/* Main 2-Column Layout Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-12">
         {/* ============================================================== */}
         {/* COLUMN 1 (Left): Vehicle List Cards                           */}
         {/* ============================================================== */}
