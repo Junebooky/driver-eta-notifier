@@ -15,6 +15,8 @@ import {
 } from '@/utils/dispatchConflictDetector';
 import { isDateTimeIntervalOverlapping, DEFAULT_TURNAROUND_BUFFER_MINUTES } from '@/utils/availabilityEngine';
 import { findVipVehicle } from '@/utils/vehicleData';
+import { readFleetRegistry } from '@/lib/fleet/registryStore';
+import { mergeFleetRegistry } from '@/utils/fleetVehicleRegistry';
 import type { OriginalDispatchBaseline } from '@/types/originalDispatchBaseline';
 import { FLEET_PRESET_DRIVERS } from '@/utils/constants';
 
@@ -944,7 +946,9 @@ async function prepareServerDispatchSchedule(
   }
 
   // Determine canonical `vehicle_no` for FK `cockpit.drivers(vehicle_no)`
-  const matchedVeh = findVipVehicle(input.vehiclePlate || input.vehicleNo || '');
+  const fleetVehicles = mergeFleetRegistry(await readFleetRegistry());
+  const exactPlate = cleanVehicleIdentity(input.vehiclePlate || input.vehicleNo);
+  const matchedVeh = fleetVehicles.find(vehicle => cleanVehicleIdentity(vehicle.plate) === exactPlate);
   if (requestedStatus === 'published' && (!matchedVeh || cleanVehicleIdentity(matchedVeh.plate) !== cleanVehicleIdentity(input.vehiclePlate || input.vehicleNo) || (input.vehicleId && input.vehicleId !== matchedVeh.uuid))) {
     return { error: '확정 배차의 차량 UUID와 정확한 전체 번호판을 확인해 주세요.', statusCode: 400 };
   }
