@@ -443,15 +443,15 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
 
             {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 (최상단 레이어) */}
             <div className="absolute bottom-full left-0 mb-2 hidden group-hover/dispatch:flex flex-col items-start pointer-events-none z-[100]">
-              <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+              <span className="whitespace-nowrap rounded-[12px] bg-white px-3 py-2 text-[11px] font-medium text-[#4D607C] shadow-[0_8px_22px_rgba(35,49,78,0.1)] animate-in fade-in-50 duration-150">
                 실시간 예약 접수와 기사님 배정 일정을 관리해요
               </span>
-              <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 ml-3.5 shadow-xs" />
+              <div className="-mt-1 ml-3.5 size-2 rotate-45 bg-white" />
             </div>
           </div>
 
           <div className="min-w-0">
-            <h2 className="text-base sm:text-base font-black text-slate-900 tracking-tight truncate">
+            <h2 className="text-[18px] font-bold tracking-[-0.03em] text-[#17233B] truncate">
               배차 관리
             </h2>
             <p className="hidden sm:block text-[11px] text-slate-400 font-medium truncate">
@@ -469,7 +469,7 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
             onOpenNewBooking();
           }}
           aria-label="예약 추가"
-          className="w-9 h-9 sm:w-auto sm:h-auto sm:px-4 sm:py-2 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white text-xs font-bold transition-all cursor-pointer shadow-xs shrink-0 flex items-center justify-center gap-1.5"
+          className="flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-[14px] bg-[#1E60F3] px-3 text-[12px] font-semibold text-white shadow-[0_6px_16px_rgba(30,96,243,0.15)] transition-colors hover:bg-[#1757DC] sm:px-4"
         >
           <Plus className="w-5 h-5 sm:hidden stroke-[2.5]" />
           <span className="hidden sm:inline">+ 예약 추가</span>
@@ -488,9 +488,9 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
             haptics.lightTap();
             onSelectTab('all');
           }}
-          className={`rounded-full px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${activeTab === 'all'
-            ? 'bg-[#0050FF] text-white font-bold shadow-sm'
-            : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium'
+          className={`flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-[13px] px-3.5 text-[12px] transition-colors sm:px-4 ${activeTab === 'all'
+            ? 'bg-[#EEF3FF] text-[#1E60F3] font-semibold'
+            : 'bg-white text-[#73839D] shadow-[0_3px_10px_rgba(35,49,78,0.045)] hover:bg-[#F7F9FC]'
             }`}
           title="오늘 및 향후 모든 배차 일정"
         >
@@ -504,9 +504,9 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
             haptics.lightTap();
             onSelectTab('today');
           }}
-          className={`rounded-full px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${activeTab === 'today'
-            ? 'bg-[#0050FF] text-white font-bold shadow-sm'
-            : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium'
+          className={`flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-[13px] px-3.5 text-[12px] transition-colors sm:px-4 ${activeTab === 'today'
+            ? 'bg-[#EEF3FF] text-[#1E60F3] font-semibold'
+            : 'bg-white text-[#73839D] shadow-[0_3px_10px_rgba(35,49,78,0.045)] hover:bg-[#F7F9FC]'
             }`}
         >
           <span>오늘 출발</span>
@@ -519,9 +519,9 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
             haptics.lightTap();
             onSelectTab('tomorrow');
           }}
-          className={`rounded-full px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${activeTab === 'tomorrow'
-            ? 'bg-[#0050FF] text-white font-bold shadow-sm'
-            : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium'
+          className={`flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-[13px] px-3.5 text-[12px] transition-colors sm:px-4 ${activeTab === 'tomorrow'
+            ? 'bg-[#EEF3FF] text-[#1E60F3] font-semibold'
+            : 'bg-white text-[#73839D] shadow-[0_3px_10px_rgba(35,49,78,0.045)] hover:bg-[#F7F9FC]'
             }`}
         >
           <span>내일 출발</span>
@@ -534,11 +534,11 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
             haptics.lightTap();
             onSelectTab('action');
           }}
-          className={`rounded-full px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${activeTab === 'action'
-            ? 'bg-[#0050FF] text-white font-bold shadow-sm'
+          className={`flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-[13px] px-3.5 text-[12px] transition-colors sm:px-4 ${activeTab === 'action'
+            ? 'bg-[#EEF3FF] text-[#1E60F3] font-semibold'
             : tabCounts.action > 0
-              ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100/70 font-semibold'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium'
+              ? 'bg-[#FFF9F1] text-[#8E633F] hover:bg-[#FFF5E6] font-medium'
+              : 'bg-white text-[#73839D] shadow-[0_3px_10px_rgba(35,49,78,0.045)] hover:bg-[#F7F9FC]'
             }`}
         >
           <span>확인 필요</span>
@@ -551,9 +551,9 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
             haptics.lightTap();
             onSelectTab('past');
           }}
-          className={`md:ml-auto rounded-full px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 whitespace-nowrap ${activeTab === 'past'
-            ? 'bg-[#0050FF] text-white font-bold shadow-sm'
-            : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium'
+          className={`md:ml-auto flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-[13px] px-3.5 text-[12px] transition-colors sm:px-4 ${activeTab === 'past'
+            ? 'bg-[#EEF3FF] text-[#1E60F3] font-semibold'
+            : 'bg-white text-[#73839D] shadow-[0_3px_10px_rgba(35,49,78,0.045)] hover:bg-[#F7F9FC]'
             }`}
           title="출발 일시가 오늘 이전인 과거 배차 기록 (정산용 데이터 보존)"
         >
@@ -564,7 +564,7 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
 
       {/* Notice Banner when viewing Past Records */}
       {activeTab === 'past' && (
-        <div className="mt-2.5 px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200/90 text-xs text-slate-600 flex items-center justify-between gap-2">
+        <div className="mt-2.5 rounded-[15px] bg-[#FAFBFD] px-4 py-3 text-[12px] text-[#61728A] flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <span className="w-2 h-2 rounded-full bg-slate-400 shrink-0" />
             <span className="truncate">
@@ -619,7 +619,7 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
       {/* Filter Modal (Opens when clicking the SlidersHorizontal filter icon button) */}
       {isFilterModalOpen && (
         <div
-          className="fixed inset-0 z-[120] bg-slate-900/40 backdrop-blur-[2px] flex items-center justify-center p-4 animate-in fade-in duration-150"
+          className="fixed inset-0 z-[120] bg-[#17233B]/30 backdrop-blur-[2px] flex items-center justify-center p-4 animate-in fade-in duration-150"
           onClick={() => {
             setIsFilterModalOpen(false);
             setOpenDropdown(null);
