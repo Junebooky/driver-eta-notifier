@@ -2,6 +2,7 @@ import { Client } from 'pg';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
+import { VIP_REAL_VEHICLES } from '../utils/vehicleData';
 import {verifyReportCompletion} from './report-completion.integration';
 import { verifyDriverReportChat } from './driver-report-chat.integration';
 import { verifyReportingFlow } from './reporting-flow.integration';
@@ -23,6 +24,14 @@ async function main() {
     CREATE SCHEMA cockpit;
     GRANT USAGE ON SCHEMA cockpit TO service_role, anon, authenticated;
     CREATE TABLE cockpit.drivers (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_no text UNIQUE, driver_name text, phone text, default_navi text, passenger_name text, driver_meta jsonb, english_available boolean, unavailable_windows jsonb DEFAULT '[]'::jsonb);
+    CREATE TABLE cockpit.vehicles (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      organization_id text NOT NULL DEFAULT 'vip_limousine_korea', plate text NOT NULL UNIQUE,
+      plate_short text, model text NOT NULL, model_short text, brand text NOT NULL,
+      category text NOT NULL, category_label text NOT NULL,
+      sub_type text, capacity text, fuel_type text, status text NOT NULL DEFAULT 'available',
+      created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()
+    );
     CREATE SCHEMA auth;
     CREATE TABLE auth.sessions(id uuid PRIMARY KEY,user_id uuid NOT NULL,not_after timestamptz);
     CREATE TABLE cockpit.schedules (
@@ -50,10 +59,19 @@ async function main() {
     await admin.query(readFileSync('supabase/migrations/20261102001414_receipt_review_integrity.sql','utf8'));
     await admin.query(readFileSync('supabase/migrations/20261107221000_fleet_vehicle_registry.sql','utf8'));
     await admin.query(readFileSync('supabase/migrations/20261107221000_fleet_vehicle_registry.sql','utf8'));
+    for (const vehicle of VIP_REAL_VEHICLES) {
+      await admin.query(
+        `INSERT INTO cockpit.vehicles (id, organization_id, plate, plate_short, model, model_short, brand, category, category_label, sub_type, capacity, fuel_type)
+         VALUES ($1,'vip_limousine_korea',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+        [vehicle.uuid, vehicle.plate, vehicle.plateShort, vehicle.model, vehicle.modelShort,
+          vehicle.brand, vehicle.category, vehicle.categoryLabel, vehicle.subType,
+          vehicle.capacity, vehicle.fuelType],
+      );
+    }
     await admin.query('SET ROLE authenticated');
-    await assert.rejects(admin.query('SELECT * FROM cockpit.fleet_vehicle_registry'), { code: '42501' });
+    await assert.rejects(admin.query('SELECT * FROM cockpit.vehicles'), { code: '42501' });
     await admin.query('RESET ROLE');
-    console.log('PASS shared fleet registry migration idempotent and browser role denied');
+    console.log('PASS existing fleet schema migration and default DB fleet initialized with 20 stable UUIDs');
     await a.connect(); await b.connect();
     await Promise.all([a.query('SET ROLE service_role'),b.query('SET ROLE service_role')]);
     const vehicle = randomUUID(); const driver = randomUUID();
