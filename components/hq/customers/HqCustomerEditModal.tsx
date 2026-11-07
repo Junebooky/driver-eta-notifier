@@ -93,7 +93,7 @@ export const HqCustomerEditModal: React.FC<HqCustomerEditModalProps> = ({
                 value={preferencesText}
                 onChange={(e) => setPreferencesText(e.target.value)}
                 placeholder="예: S클래스 선호, 영어 가능 기사, 정시 출발 필수, 공항 CIQ 지원"
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-[#1E60F3] outline-none text-slate-900 font-semibold"
+                
               />
               <p className="text-[10px] text-slate-400 mt-1">
                 * 배차 시 기사님 및 관제 시스템에 우선 알림 항목으로 반영됩니다.
@@ -109,7 +109,7 @@ export const HqCustomerEditModal: React.FC<HqCustomerEditModalProps> = ({
                 value={notesText}
                 onChange={(e) => setNotesText(e.target.value)}
                 placeholder="의전 지침 및 주의사항을 입력하세요..."
-                className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-[#1E60F3] outline-none text-slate-900 leading-relaxed"
+                
               />
             </div>
           )}
