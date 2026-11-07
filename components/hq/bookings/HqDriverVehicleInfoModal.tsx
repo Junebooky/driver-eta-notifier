@@ -315,11 +315,11 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
         {feedback && (
           <div
             role={feedback.type === 'success' ? 'status' : 'alert'}
-            className={`px-5 py-2.5 text-xs font-bold flex items-center gap-2 ${
+            className={`mx-5 mb-4 flex items-center gap-2.5 rounded-[16px] px-4 py-3 text-xs font-medium sm:mx-7 ${
               feedback.type === 'success'
-                ? 'bg-emerald-50 text-emerald-800 border-b border-emerald-100'
-                : feedback.type === 'warning' ? 'bg-amber-50 text-amber-900 border-b border-amber-200'
-                : 'bg-rose-50 text-rose-800 border-b border-rose-100'
+                ? 'bg-[#EEF3FF] text-[#31598F]'
+                : feedback.type === 'warning' ? 'bg-[#FFF9F1] text-[#8E633F]'
+                : 'bg-[#FFF4F2] text-[#A34E45]'
             }`}
           >
             {feedback.type === 'success' ? (
@@ -334,37 +334,37 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
         {/* Body Content */}
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain bg-[#FAFBFD] px-5 pb-6 pt-5 sm:px-7 sm:pb-7 sm:pt-6">
           {isLoading ? (
-            <div role="status" className="py-12 text-center text-sm text-slate-600">최신 배차와 안내자료를 확인하고 있습니다.</div>
+            <div role="status" className="flex min-h-[270px] items-center justify-center rounded-[22px] bg-white px-6 text-center text-sm text-[#73839D] shadow-[0_6px_20px_rgba(35,49,78,0.045)]">최신 배차와 안내자료를 확인하고 있습니다.</div>
           ) : !isAssigned ? (
             /* Condition 1: Dispatch Not Confirmed */
-            <div className="py-12 px-6 text-center bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mx-auto">
+            <div className="space-y-3 rounded-[24px] bg-white px-6 py-12 text-center shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)]">
+              <div className="mx-auto flex size-14 items-center justify-center rounded-[19px] bg-[#F7F9FC] text-[#73839D]">
                 <AlertTriangle className="w-6 h-6" />
               </div>
-              <h3 className="text-base font-black text-slate-900">배차 미확정 (발송 차단)</h3>
-              <p className="text-xs text-slate-600 max-w-md mx-auto leading-relaxed">
+              <h3 className="text-[17px] font-bold tracking-tight text-[#17233B]">배차 미확정 (발송 차단)</h3>
+              <p className="mx-auto max-w-md text-[13px] leading-6 text-[#73839D]">
                 해당 예약에 담당 기사 또는 차량이 아직 배정되지 않았습니다. 고객에게 잘못된 차량이나 다른 기사
                 안내자료가 나가는 것을 방지하기 위해 발송이 차단되었습니다.
               </p>
-              <div className="pt-2 text-xs font-bold text-slate-400">
+              <div className="pt-2 text-[12px] font-medium text-[#73839D]">
                 예약 상세에서 먼저 기사와 차량을 배정한 뒤 다시 시도해주세요.
               </div>
             </div>
           ) : !bundle?.isReadyForCustomerDispatch ? (
             /* Condition 2: Assigned, but Info is Missing */
             <div className="py-12 px-6 text-center bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center mx-auto">
+              <div className="mx-auto flex size-14 items-center justify-center rounded-[19px] bg-[#F7F9FC] text-[#73839D]">
                 <AlertTriangle className="w-6 h-6" />
               </div>
               <h3 className="text-base font-black text-slate-900">
                 Info 미등록 (발송 차단)
               </h3>
               <p className="text-xs text-slate-600 max-w-md mx-auto leading-relaxed">
-                <strong className="text-slate-900">[{booking.driverName}]</strong> 기사님의{' '}
-                <strong className="text-slate-900">[{booking.vehicleModel} ({booking.vehiclePlate})]</strong> 실차 조합
+                <strong className="font-semibold text-[#17233B]">[{booking.driverName}]</strong> 기사님의{' '}
+                <strong className="font-semibold text-[#17233B]">[{booking.vehicleModel} ({booking.vehiclePlate})]</strong> 실차 조합
                 PC/모바일 안내 이미지가 Supabase에 아직 등록되지 않았습니다.
               </p>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-[#95A3B9]">
                 다른 차량 이미지를 대체 표시하거나 임의로 변경하지 않습니다.
               </p>
               {onOpenAssetManager && (
@@ -375,7 +375,7 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
                       onClose();
                       onOpenAssetManager(booking.driverId || '', booking.vehiclePlate || '');
                     }}
-                    className="px-5 py-2.5 rounded-xl bg-[#1E60F3] hover:bg-blue-600 text-white text-xs font-extrabold shadow-sm transition-all cursor-pointer inline-flex items-center gap-1.5"
+                    className="inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-[15px] bg-[#1E60F3] px-5 py-3 text-[13px] font-semibold text-white shadow-[0_6px_16px_rgba(30,96,243,0.15)] transition-all hover:bg-[#1757DC] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#1E60F3]/20"
                   >
                     <span>이 기사 × 차량 안내자료 등록하러 가기</span>
                   </button>
@@ -386,30 +386,32 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
             /* Condition 3: Info Ready for Customer Dispatch */
             <div className="space-y-4">
               {/* PC / Mobile Variant Toggle */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="inline-flex max-w-full items-center gap-1 rounded-[16px] bg-[#F1F4F9] p-1">
                   <button
                     type="button"
                     onClick={() => setActiveTab('pc')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                    aria-pressed={activeTab === 'pc'}
+                    className={`flex min-h-10 cursor-pointer items-center gap-1.5 rounded-[12px] px-3 sm:px-4 text-[12px] font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25 ${
                       activeTab === 'pc'
-                        ? 'bg-white text-slate-900 shadow-xs'
-                        : 'text-slate-500 hover:text-slate-800'
+                        ? 'bg-white text-[#17233B] shadow-[0_3px_10px_rgba(35,49,78,0.07)]'
+                        : 'text-[#73839D] hover:text-[#17233B]'
                     }`}
                   >
-                    <Monitor className="w-3.5 h-3.5 text-[#1E60F3]" />
+                    <Monitor className={activeTab === 'pc' ? 'size-4 text-[#1E60F3]' : 'size-4 text-[#95A3B9]'} />
                     <span>PC 가로형 {bundle.pcInfo ? '✓' : '(미등록)'}</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setActiveTab('mobile')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer ${
+                    aria-pressed={activeTab === 'mobile'}
+                    className={`flex min-h-10 cursor-pointer items-center gap-1.5 rounded-[12px] px-3 sm:px-4 text-[12px] font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25 ${
                       activeTab === 'mobile'
                         ? 'bg-white text-slate-900 shadow-xs'
                         : 'text-slate-500 hover:text-slate-800'
                     }`}
                   >
-                    <Smartphone className="w-3.5 h-3.5 text-[#1E60F3]" />
+                    <Smartphone className={activeTab === 'mobile' ? 'size-4 text-[#1E60F3]' : 'size-4 text-[#95A3B9]'} />
                     <span>모바일 세로형 {bundle.mobileInfo ? '✓' : '(미등록)'}</span>
                   </button>
                 </div>
@@ -418,7 +420,7 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
                   <button
                     type="button"
                     onClick={handleDownload}
-                    className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                    className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-1.5 rounded-[14px] bg-white px-3.5 text-[12px] font-semibold text-[#4D607C] shadow-[0_5px_16px_rgba(35,49,78,0.045),0_2px_5px_rgba(35,49,78,0.02)] transition-all hover:bg-[#FAFBFD] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25"
                   >
                     <Download className="w-3.5 h-3.5 text-slate-500" />
                     <span>고화질 원본 다운로드</span>
