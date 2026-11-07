@@ -348,38 +348,12 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
     }
   };
 
+  // The physical cockpit.vehicles DB is the sole inventory source.
+  // No static fallback: an absent or archived vehicle must stay unavailable.
   const allBaseVehicles = useMemo(() => {
     if (!registryLoaded) return [] as VipRealVehicle[];
-    // 1. Plates in customVehicles (user explicitly registered these, so they take highest priority)
-    const customPlates = new Set(customVehicles.map((v) => v.plate.trim().replace(/\s+/g, '')));
-
-    // 2. Active deleted set, excluding any plate that exists in customVehicles
-    const activeDeletedSet = new Set(
-      deletedVehicleIds
-        .map((id) => id.trim().replace(/\s+/g, ''))
-        .filter((cleanId) => !customPlates.has(cleanId))
-    );
-
-    const isNotDeleted = (v: VipRealVehicle) => {
-      const cleanPlate = v.plate.trim().replace(/\s+/g, '');
-      const cleanId = v.id.trim().replace(/\s+/g, '');
-      if (activeDeletedSet.has(cleanPlate) || activeDeletedSet.has(cleanId)) {
-        return false;
-      }
-      return true;
-    };
-
-    // Keep custom photos and notes, but never let stale browser records override
-    // owner-confirmed model, seat count and fuel for registered fleet plates.
-    const validCustom = customVehicles.filter(isNotDeleted).map(reconcileRegisteredVehicle);
-
-    // Filter default vehicles: not deleted AND not superseded by a custom vehicle with same plate
-    const validDefault = VIP_REAL_VEHICLES.filter(
-      (v) => isNotDeleted(v) && !customPlates.has(v.plate.trim().replace(/\s+/g, ''))
-    );
-
-    return [...validCustom, ...validDefault];
-  }, [customVehicles, deletedVehicleIds, registryLoaded]);
+    return customVehicles;
+  }, [customVehicles, registryLoaded]);
 
   // Edit Modal Form State
   const [editStatus, setEditStatus] = useState<'확인 필요' | '대기 중' | '운행 중' | '정비 중'>('확인 필요');
