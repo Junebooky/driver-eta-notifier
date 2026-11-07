@@ -511,41 +511,23 @@ dialog::backdrop {
 }
 
 
-/* HQ Customer CRM A-plan. Scoped so driver and email workflows are unaffected. */
-.hq-customer-a :is(input[type="text"], input[type="search"], select),
-.hq-customer-modal-a :is(input:not([type="checkbox"]), select, textarea) {
+/* HQ customer list search only. Customer create/edit forms use HqInput/Select/Textarea. */
+.hq-customer-a :is(input[type="text"], input[type="search"], select) {
   min-height: 44px;
   background-color: #fff;
-  border: 1px solid rgba(225, 231, 240, 0.3);
+  border: 1px solid var(--hq-line, rgba(225,231,240,.28));
   border-radius: 15px;
-  color: #17233B;
-  box-shadow: 0 4px 14px rgba(35, 49, 78, 0.045);
+  color: var(--hq-ink, #17233B);
+  box-shadow: var(--hq-shadow-control, 0 4px 14px rgba(35,49,78,.045));
   outline: none;
-  transition: box-shadow 160ms ease;
 }
-.hq-customer-modal-a :is(input:not([type="checkbox"]), select, textarea) {
-  padding: 11px 14px;
-  font-size: 14px;
+.hq-customer-a :is(input[type="text"], input[type="search"], select):focus-visible {
+  border-color: rgba(30,96,243,.18);
+  box-shadow: var(--hq-shadow-control, 0 4px 14px rgba(35,49,78,.045)), 0 0 0 2px rgba(30,96,243,.12);
 }
-.hq-customer-a :is(input[type="text"], input[type="search"], select):focus-visible,
-.hq-customer-modal-a :is(input:not([type="checkbox"]), select, textarea):focus-visible {
-  border-color: rgba(30, 96, 243, .18);
-  box-shadow: 0 3px 12px rgba(35, 49, 78, .05), 0 0 0 2px rgba(30, 96, 243, .12);
+@media (max-width:767px) {
+  .hq-customer-a :is(input[type="text"], input[type="search"], select) { font-size: 16px; }
 }
-.hq-customer-modal-a :is(input, textarea)::placeholder {
-  color: #95A3B9;
-}
-@media (max-width: 767px) {
-  .hq-customer-a :is(input[type="text"], input[type="search"], select),
-  .hq-customer-modal-a :is(input:not([type="checkbox"]), select, textarea) {
-    font-size: 16px;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .hq-customer-a :is(input,select),
-  .hq-customer-modal-a :is(input,select,textarea) { transition: none; }
-}
-
 
 /* HQ Driver Management A-plan only; no changes to driver Cockpit forms. */
 .hq-drivers-a :is(input:not([type="checkbox"]), select, textarea),
