@@ -32,5 +32,6 @@ test('customer creation/editing remove blue-black gradient headers without alter
   assert.match(create,/setContactEmail\(e\.target\.value\)/);
   assert.match(edit,/setNotesText\(e\.target\.value\)/);
   assert.match(css,/HQ customer list search only\. Customer create\/edit forms use HqInput\/Select\/Textarea/);
-  assert.match(css,/\.hq-customer-modal-a :is\(input:not\(\[type="checkbox"\]\), select, textarea\)/);
+  assert.match(css,/\.hq-ui-field/);
+  assert.doesNotMatch(css,/\.hq-customer-modal-a :is\(input:not\(\[type="checkbox"\]\), select, textarea\)/);
 });
