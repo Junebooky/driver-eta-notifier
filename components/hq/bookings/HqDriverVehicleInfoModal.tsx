@@ -623,6 +623,11 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
                   <p className="text-[12px] leading-[1.65] text-[#73839D]">
                     자동으로 발송되지 않아요. 직접 전달한 뒤 기록을 남겨주세요.
                   </p>
+                  {channel === 'download' && (
+                    <p className="text-[12px] leading-relaxed text-[#73839D]">
+                      이미지 파일은 위의 '이미지 저장' 버튼으로 내려받을 수 있어요.
+                    </p>
+                  )}
                   {channel !== 'download' && (
                     <label className="group flex cursor-pointer items-start gap-3 rounded-[14px] py-0.5 text-[13px] leading-relaxed text-[#4D607C]">
                       <input
