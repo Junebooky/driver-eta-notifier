@@ -1,5 +1,6 @@
 'use client';
 
+import { HqInput, HqSelect, HqTextarea } from '@/components/hq/ui';
 import React, { useState } from 'react';
 import { X, Building2, User, Plus, Loader2 } from 'lucide-react';
 import { HqCustomer, CustomerTier } from '@/types/customerHq';
@@ -141,7 +142,7 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
               <label className="block text-[11px] font-bold text-slate-800 mb-1">
                 고객사명 (Company Name) *
               </label>
-              <input
+              <HqInput
                 type="text"
                 required
                 value={name}
@@ -154,7 +155,7 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
               <label className="block text-[11px] font-bold text-slate-800 mb-1">
                 고객사 등급 (Tier)
               </label>
-              <select
+              <HqSelect
                 value={tier}
                 onChange={(e) => setTier(e.target.value as CustomerTier)}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-[#1E60F3] outline-none text-slate-900 font-bold"
@@ -162,7 +163,7 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
                 <option value="VIP">VIP</option>
                 <option value="주요">주요 고객</option>
                 <option value="일반">일반 고객</option>
-              </select>
+              </HqSelect>
             </div>
           </div>
 
@@ -171,7 +172,7 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
             <label className="block text-[11px] font-bold text-slate-800 mb-1">
               주요 소관 부서
             </label>
-            <input
+            <HqInput
               type="text"
               value={department}
               onChange={(e) => setDepartment(e.target.value)}
@@ -189,7 +190,7 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
             <div className="grid grid-cols-2 gap-2.5">
               <div>
                 <label className="block text-[10px] font-bold text-slate-600 mb-0.5">담당자명</label>
-                <input
+                <HqInput
                   type="text"
                   value={contactName}
                   onChange={(e) => setContactName(e.target.value)}
@@ -199,7 +200,7 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-slate-600 mb-0.5">직책/역할</label>
-                <input
+                <HqInput
                   type="text"
                   value={contactRole}
                   onChange={(e) => setContactRole(e.target.value)}
@@ -209,7 +210,7 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-slate-600 mb-0.5">연락처</label>
-                <input
+                <HqInput
                   type="tel"
                   value={contactPhone}
                   onChange={(e) => setContactPhone(formatPhoneNumber(e.target.value))}
@@ -219,7 +220,7 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-slate-600 mb-0.5">이메일</label>
-                <input
+                <HqInput
                   type="email"
                   value={contactEmail}
                   onChange={(e) => setContactEmail(e.target.value)}
@@ -236,7 +237,7 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
               <label className="block text-[11px] font-bold text-slate-800 mb-1">
                 다음 예정 행사명
               </label>
-              <input
+              <HqInput
                 type="text"
                 value={nextEventTitle}
                 onChange={(e) => setNextEventTitle(e.target.value)}
@@ -248,7 +249,7 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
               <label className="block text-[11px] font-bold text-slate-800 mb-1">
                 행사 예정 일자
               </label>
-              <input
+              <HqInput
                 type="text"
                 value={nextEventDate}
                 onChange={(e) => setNextEventDate(e.target.value)}
@@ -263,7 +264,7 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
             <label className="block text-[11px] font-bold text-slate-800 mb-1">
               주요 선호사항 (쉼표로 구분)
             </label>
-            <input
+            <HqInput
               type="text"
               value={preferencesInput}
               onChange={(e) => setPreferencesInput(e.target.value)}
@@ -277,7 +278,7 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
             <label className="block text-[11px] font-bold text-slate-800 mb-1">
               관리자 내부 메모 (의전 가이드라인)
             </label>
-            <textarea
+            <HqTextarea
               rows={3}
               value={notesInput}
               onChange={(e) => setNotesInput(e.target.value)}
