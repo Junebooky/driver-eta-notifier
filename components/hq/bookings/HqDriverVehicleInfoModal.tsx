@@ -294,7 +294,7 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
           <button
             type="button"
             onClick={onClose}
-            aria-label="배차 카드 닫기"
+            aria-label="고객 안내 카드 닫기"
             className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#F7F9FC] text-[#73839D] transition-colors hover:bg-[#EDF1F6] hover:text-[#17233B] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/30"
           >
             <X className="w-5 h-5" />
@@ -332,9 +332,9 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
           <div className="mx-5 mb-4 flex items-start gap-2.5 rounded-[16px] bg-[#FFF9F1] px-4 py-3 text-xs font-semibold text-[#8E633F] sm:mx-7">
             <AlertTriangle className="mt-0.5 size-4 shrink-0 text-[#A8784C]" />
             <div className="flex-1">
-              <span>{mismatchReason || '배차 정보가 변경되어 기존 발송 자료와 불일치합니다.'}</span>
+              <span>{mismatchReason || '배차가 바뀌었어요. 새 안내 카드를 확인해 주세요.'}</span>
               <span className="mt-1 block text-[11px] font-normal leading-relaxed text-[#9E8067]">
-                새 배차 조합의 안내자료를 확인한 뒤 준비하거나 직접 전달한 기록을 남겨주세요.
+                새 기사·차량 안내 카드를 확인한 뒤 전달해 주세요.
               </span>
             </div>
           </div>
@@ -370,13 +370,12 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
               <div className="mx-auto flex size-14 items-center justify-center rounded-[19px] bg-[#F7F9FC] text-[#73839D]">
                 <AlertTriangle className="w-6 h-6" />
               </div>
-              <h3 className="text-[17px] font-bold tracking-tight text-[#17233B]">배차 미확정 (발송 차단)</h3>
+              <h3 className="text-[17px] font-bold tracking-tight text-[#17233B]">기사와 차량을 먼저 배정해 주세요</h3>
               <p className="mx-auto max-w-md text-[13px] leading-6 text-[#73839D]">
-                해당 예약에 담당 기사 또는 차량이 아직 배정되지 않았습니다. 고객에게 잘못된 차량이나 다른 기사
-                안내자료가 나가는 것을 방지하기 위해 발송이 차단되었습니다.
+                기사나 차량이 아직 정해지지 않았어요. 정확한 정보를 전달할 수 있도록 배차부터 완료해 주세요.
               </p>
               <div className="pt-2 text-[12px] font-medium text-[#73839D]">
-                예약 상세에서 먼저 기사와 차량을 배정한 뒤 다시 시도해주세요.
+                배차를 완료하면 안내 카드를 볼 수 있어요.
               </div>
             </div>
           ) : !bundle?.isReadyForCustomerDispatch ? (
@@ -386,7 +385,7 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
                 <AlertTriangle className="w-6 h-6" />
               </div>
               <h3 className="text-[17px] font-bold tracking-tight text-[#17233B]">
-                Info 미등록 (발송 차단)
+                아직 안내 카드가 없어요
               </h3>
               <p className="mx-auto max-w-md text-[13px] leading-6 text-[#73839D]">
                 <strong className="font-semibold text-[#17233B]">[{booking.driverName}]</strong> 기사님의{' '}
@@ -394,7 +393,7 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
                 PC/모바일 안내 이미지가 Supabase에 아직 등록되지 않았습니다.
               </p>
               <p className="text-[11px] text-[#95A3B9]">
-                다른 차량 이미지를 대체 표시하거나 임의로 변경하지 않습니다.
+                잘못된 차량 이미지로 대신 보여드리지 않아요.
               </p>
               {onOpenAssetManager && (
                 <div className="pt-2">
@@ -406,7 +405,7 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
                     }}
                     className="inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-[15px] bg-[#1E60F3] px-5 py-3 text-[13px] font-semibold text-white shadow-[0_6px_16px_rgba(30,96,243,0.15)] transition-all hover:bg-[#1757DC] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#1E60F3]/20"
                   >
-                    <span>이 기사 × 차량 안내자료 등록하러 가기</span>
+                    <span>안내 카드 등록하기</span>
                   </button>
                 </div>
               )}
@@ -555,7 +554,14 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
                         }}
                         className="flex h-[52px] w-full cursor-pointer items-center justify-between gap-3 rounded-[16px] border border-[#E1E7F0]/30 bg-white px-4 text-left text-[13px] font-semibold text-[#17233B] shadow-[0_5px_16px_rgba(35,49,78,0.045),0_2px_5px_rgba(35,49,78,0.02)] outline-none transition-shadow hover:shadow-[0_6px_18px_rgba(35,49,78,0.07)] focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20"
                       >
-                        <span id="hq-brochure-channel-value" className="min-w-0 truncate">{selectedDelivery.label}</span>
+                        <span id="hq-brochure-channel-value" className="flex min-w-0 items-center gap-2.5">
+                          {selectedDelivery.icon ? (
+                            <img src={selectedDelivery.icon} alt="" aria-hidden="true" draggable={false} className="size-6 shrink-0 object-contain" />
+                          ) : (
+                            <Download aria-hidden="true" className="size-5 shrink-0 text-[#73839D]" />
+                          )}
+                          <span className="min-w-0 truncate">{selectedDelivery.label}</span>
+                        </span>
                         <ChevronDown aria-hidden="true" className={'size-4 shrink-0 text-[#73839D] transition-transform ' + (isChannelMenuOpen ? 'rotate-180' : '')} />
                       </button>
 
@@ -591,9 +597,18 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
                               }}
                               className={'flex w-full cursor-pointer items-center justify-between gap-2 rounded-[13px] px-3.5 py-3 text-left transition-colors focus-visible:outline-none focus-visible:bg-[#EEF3FF] ' + (channel === option.value ? 'bg-[#EEF3FF]' : 'hover:bg-[#F7F9FC]')}
                             >
-                              <span className="flex min-w-0 flex-col gap-0.5">
-                                <span className="text-[13px] font-semibold text-[#17233B]">{option.label}</span>
-                                <span className="text-[11px] text-[#73839D]">{option.detail}</span>
+                              <span className="flex min-w-0 items-center gap-3">
+                                <span className="flex size-9 shrink-0 items-center justify-center rounded-[12px] bg-white">
+                                  {option.icon ? (
+                                    <img src={option.icon} alt="" aria-hidden="true" draggable={false} className="size-7 object-contain" />
+                                  ) : (
+                                    <Download aria-hidden="true" className="size-[18px] text-[#73839D]" />
+                                  )}
+                                </span>
+                                <span className="flex min-w-0 flex-col gap-0.5">
+                                  <span className="text-[13px] font-semibold text-[#17233B]">{option.label}</span>
+                                  <span className="text-[11px] text-[#73839D]">{option.detail}</span>
+                                </span>
                               </span>
                               {channel === option.value && <Check aria-hidden="true" className="size-4 shrink-0 text-[#1E60F3]" />}
                             </button>
