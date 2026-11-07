@@ -22,8 +22,6 @@ import {
   Calendar,
   CalendarCheck,
   Clock,
-  MapPin,
-  Flag,
   Plane,
   RefreshCw,
   BellRing,
@@ -1257,9 +1255,11 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
         <div className="flex items-center justify-between gap-3 pb-3.5 border-b border-slate-100">
           <div className="flex items-center gap-2.5 min-w-0">
             {initialBooking ? (
-              <div className="w-8 h-8 rounded-xl bg-[#EBF2FE] text-[#1E60F3] flex items-center justify-center shrink-0">
-                <CalendarCheck className="w-5 h-5 text-[#1E60F3]" />
-              </div>
+              <img
+                src="/images/icons/reservations/icon_reservations.png"
+                alt="배차 관리 목록"
+                className="w-12 h-12 sm:w-12 sm:h-12 object-contain shrink-0 transition-transform duration-150 group-hover/dispatch:scale-110"
+              />
             ) : (
               <img
                 src="/images/icons/reservations/icon_reservations.png"
@@ -1333,13 +1333,12 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                   </span>
                   {/* 기사 확인 현황 Badge */}
                   <span
-                    className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border ${
-                      initialBooking.driverAck === '확인완료'
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                        : initialBooking.driverAck === '재확인 필요'
-                          ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                          : 'bg-amber-50 text-amber-800 border-amber-200'
-                    }`}
+                    className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border ${initialBooking.driverAck === '확인완료'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : initialBooking.driverAck === '재확인 필요'
+                        ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                        : 'bg-amber-50 text-amber-800 border-amber-200'
+                      }`}
                   >
                     {initialBooking.driverAck === '확인완료' ? (
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
@@ -1400,11 +1399,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                       type="button"
                       onClick={handleRemindClick}
                       disabled={isReminding}
-                      className={`h-8 px-2.5 rounded-lg text-xs font-bold transition-all inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs active:scale-95 whitespace-nowrap ${
-                        remindSuccess
-                          ? 'bg-emerald-600 text-white'
-                          : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'
-                      }`}
+                      className={`h-8 px-2.5 rounded-lg text-xs font-bold transition-all inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs active:scale-95 whitespace-nowrap ${remindSuccess
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'
+                        }`}
                     >
                       <BellRing className={`w-3 h-3 shrink-0 ${isReminding ? 'animate-bounce text-[#1E60F3]' : 'text-slate-500'}`} />
                       <span>{remindSuccess ? '요청 완료' : isReminding ? '요청 중' : '재요청'}</span>
@@ -1539,9 +1537,12 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
               <div className="flex items-center justify-between gap-3">
                 {/* 출발지 */}
                 <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className="w-8 h-8 rounded-full bg-blue-50 text-[#1E60F3] flex items-center justify-center shrink-0">
-                    <MapPin className="w-4 h-4" />
-                  </div>
+                  <img
+                    src="/images/icons/driver_ui/icon_origin.png"
+                    alt="출발지"
+                    className="w-6 h-6 object-contain shrink-0 select-none"
+                    draggable={false}
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="text-xs text-slate-400 font-medium">출발지</div>
                     <div
@@ -1560,9 +1561,12 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
 
                 {/* 도착지 */}
                 <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className="w-8 h-8 rounded-full bg-blue-50 text-[#1E60F3] flex items-center justify-center shrink-0">
-                    <Flag className="w-4 h-4" />
-                  </div>
+                  <img
+                    src="/images/icons/driver_ui/icon_destination.png"
+                    alt="도착지"
+                    className="w-6 h-6 object-contain shrink-0 select-none"
+                    draggable={false}
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="text-xs text-slate-400 font-medium">도착지</div>
                     <div
@@ -1652,9 +1656,6 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                 className="flex items-center justify-between p-4 sm:p-5 cursor-pointer select-none hover:bg-slate-50/50 transition-colors"
               >
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-[#EBF2FE] text-[#1E60F3] flex items-center justify-center shrink-0">
-                    <FileText className="w-4 h-4 text-[#1E60F3]" />
-                  </div>
                   <span className="text-sm sm:text-base font-bold text-slate-800 tracking-tight">
                     추가 정보
                   </span>
@@ -1682,11 +1683,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                         <button
                           type="button"
                           onClick={() => handleCommonLanguageChange('ko')}
-                          className={`h-10 rounded-xl flex items-center justify-center gap-1.5 px-2 transition-all cursor-pointer ${
-                            commonLanguage === 'ko'
-                              ? 'bg-[#EBF2FE] text-[#1E60F3] font-bold shadow-2xs'
-                              : 'bg-white border border-slate-200/90 text-slate-700 hover:bg-slate-50 font-semibold'
-                          }`}
+                          className={`h-10 rounded-xl flex items-center justify-center gap-1.5 px-2 transition-all cursor-pointer ${commonLanguage === 'ko'
+                            ? 'bg-[#EBF2FE] text-[#1E60F3] font-bold shadow-2xs'
+                            : 'bg-white border border-slate-200/90 text-slate-700 hover:bg-slate-50 font-semibold'
+                            }`}
                         >
                           <span className="text-sm">🇰🇷</span>
                           <span className="text-xs font-bold">한국어</span>
@@ -1694,11 +1694,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                         <button
                           type="button"
                           onClick={() => handleCommonLanguageChange('en')}
-                          className={`h-10 rounded-xl flex items-center justify-center gap-1.5 px-2 transition-all cursor-pointer ${
-                            commonLanguage === 'en'
-                              ? 'bg-[#EBF2FE] text-[#1E60F3] font-bold shadow-2xs'
-                              : 'bg-white border border-slate-200/90 text-slate-700 hover:bg-slate-50 font-semibold'
-                          }`}
+                          className={`h-10 rounded-xl flex items-center justify-center gap-1.5 px-2 transition-all cursor-pointer ${commonLanguage === 'en'
+                            ? 'bg-[#EBF2FE] text-[#1E60F3] font-bold shadow-2xs'
+                            : 'bg-white border border-slate-200/90 text-slate-700 hover:bg-slate-50 font-semibold'
+                            }`}
                         >
                           <span className="text-sm">🇺🇸</span>
                           <span className="text-xs font-bold">영어</span>
@@ -1793,661 +1792,634 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
           </div>
         ) : (
           <div className="space-y-3.5 mt-1">
-          {/* 고객사 * */}
-          <div className="relative" ref={customerDropdownRef}>
-            <label className="block text-xs font-bold text-slate-800 mb-1.5">
-              고객사 <span className="text-red-500 font-bold ml-0.5">*</span>
-            </label>
+            {/* 고객사 * */}
+            <div className="relative" ref={customerDropdownRef}>
+              <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                고객사 <span className="text-red-500 font-bold ml-0.5">*</span>
+              </label>
 
-            <div
-              onClick={() => setIsCustomerDropdownOpen(true)}
-              className="w-full h-11 sm:h-12 bg-white border border-slate-200 hover:border-blue-400 focus-within:border-[#1E60F3] focus-within:ring-2 focus-within:ring-blue-100 rounded-xl px-3.5 flex items-center justify-between transition-all cursor-pointer shadow-2xs"
-            >
-              <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                <Building2 className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600 shrink-0" />
-                <input
-                  type="text"
-                  value={customerName}
-                  onChange={(e) => {
-                    setCustomerName(e.target.value);
-                    setSelectedCustomerId(null);
-                    setIsCustomerDropdownOpen(true);
-                    setErrorMsg(null);
-                  }}
-                  onFocus={() => setIsCustomerDropdownOpen(true)}
-                  placeholder="고객사명 또는 예약자 입력"
-                  className="w-full bg-transparent text-xs sm:text-sm font-bold text-slate-900 placeholder:text-slate-400 outline-none"
-                />
-              </div>
-              <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-slate-500 shrink-0" />
-            </div>
-
-            {/* Customer Dropdown */}
-            {isCustomerDropdownOpen && (
-              <div className="absolute left-0 right-0 top-full mt-1.5 z-30 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden max-h-56 overflow-y-auto animate-in fade-in duration-150">
-                <div className="px-3 py-1.5 bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 flex items-center justify-between">
-                  <span>등록 고객사</span>
-                  <span>{filteredCustomerSuggestions.length}개</span>
+              <div
+                onClick={() => setIsCustomerDropdownOpen(true)}
+                className="w-full h-11 sm:h-12 bg-white border border-slate-200 hover:border-blue-400 focus-within:border-[#1E60F3] focus-within:ring-2 focus-within:ring-blue-100 rounded-xl px-3.5 flex items-center justify-between transition-all cursor-pointer shadow-2xs"
+              >
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <Building2 className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600 shrink-0" />
+                  <input
+                    type="text"
+                    value={customerName}
+                    onChange={(e) => {
+                      setCustomerName(e.target.value);
+                      setSelectedCustomerId(null);
+                      setIsCustomerDropdownOpen(true);
+                      setErrorMsg(null);
+                    }}
+                    onFocus={() => setIsCustomerDropdownOpen(true)}
+                    placeholder="고객사명 또는 예약자 입력"
+                    className="w-full bg-transparent text-xs sm:text-sm font-bold text-slate-900 placeholder:text-slate-400 outline-none"
+                  />
                 </div>
-                {filteredCustomerSuggestions.length > 0 ? (
-                  <div className="divide-y divide-slate-100">
-                    {filteredCustomerSuggestions.map((c) => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => handleSelectCustomer(c)}
-                        className="w-full px-3 py-2 text-left hover:bg-blue-50/70 transition-colors flex items-center justify-between gap-2 cursor-pointer"
-                      >
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-slate-900 text-xs truncate">{c.name}</span>
-                            <span
-                              className={`text-[10px] px-1.5 py-0.2 rounded font-black ${c.tier === 'VIP'
-                                ? 'bg-purple-100 text-purple-700'
-                                : c.tier === '주요'
-                                  ? 'bg-blue-100 text-[#1E60F3]'
-                                  : 'bg-slate-100 text-slate-600'
-                                }`}
-                            >
-                              {c.tier}
-                            </span>
-                          </div>
-                          <div className="text-[10px] text-slate-400 truncate">
-                            {c.primaryContactName} · {c.department}
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="p-3 text-center text-slate-400 text-xs">
-                    신규 고객사/예약자로 등록됩니다.
-                  </div>
-                )}
+                <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-slate-500 shrink-0" />
               </div>
-            )}
-          </div>
 
-          {/* 출발 날짜 * & 출발 시간 * & 예정 종료 시간 (Unified Input Size & Typography) */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {/* 출발 날짜 */}
-            <TossDateRangePicker
-              label="출발 날짜"
-              required
-              align="left"
-              startDate={pickupDate}
-              endDate={pickupEndDate}
-              onChangeRange={(start, end) => {
-                setPickupDate(start);
-                setPickupEndDate(end);
-              }}
-              heightClass="h-11 sm:h-12"
-            />
-
-            {/* 출발 시간 (종료 시간 인풋박스와 동일한 select 스타일) */}
-            <div>
-              <label htmlFor="hq-dispatch-pickup-time" className="block text-xs font-bold text-slate-800 mb-1.5">
-                출발 시간 <span className="text-red-500 font-bold ml-0.5">*</span>
-              </label>
-              <div className="w-full h-11 sm:h-12 bg-white border border-slate-200 hover:border-slate-300 focus-within:border-[#1E60F3] focus-within:ring-1 focus-within:ring-[#1E60F3] rounded-xl px-3.5 flex items-center transition-all shadow-2xs">
-                <input
-                  id="hq-dispatch-pickup-time"
-                  type="time"
-                  value={pickupTimeOnly}
-                  onChange={(event) => {
-                    const val = event.target.value;
-                    setPickupTimeOnly(val);
-                    setTimeInputText(formatTimeKoreanAmPm(val));
-                  }}
-                  aria-label="출발 시간 입력 및 선택"
-                  className="w-full h-full bg-transparent text-xs sm:text-sm font-bold text-slate-900 outline-none cursor-pointer"
-                />
-              </div>
+              {/* Customer Dropdown */}
+              {isCustomerDropdownOpen && (
+                <div className="absolute left-0 right-0 top-full mt-1.5 z-30 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden max-h-56 overflow-y-auto animate-in fade-in duration-150">
+                  <div className="px-3 py-1.5 bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 flex items-center justify-between">
+                    <span>등록 고객사</span>
+                    <span>{filteredCustomerSuggestions.length}개</span>
+                  </div>
+                  {filteredCustomerSuggestions.length > 0 ? (
+                    <div className="divide-y divide-slate-100">
+                      {filteredCustomerSuggestions.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => handleSelectCustomer(c)}
+                          className="w-full px-3 py-2 text-left hover:bg-blue-50/70 transition-colors flex items-center justify-between gap-2 cursor-pointer"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-slate-900 text-xs truncate">{c.name}</span>
+                              <span
+                                className={`text-[10px] px-1.5 py-0.2 rounded font-black ${c.tier === 'VIP'
+                                  ? 'bg-purple-100 text-purple-700'
+                                  : c.tier === '주요'
+                                    ? 'bg-blue-100 text-[#1E60F3]'
+                                    : 'bg-slate-100 text-slate-600'
+                                  }`}
+                              >
+                                {c.tier}
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-slate-400 truncate">
+                              {c.primaryContactName} · {c.department}
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-3 text-center text-slate-400 text-xs">
+                      신규 고객사/예약자로 등록됩니다.
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
-            {/* 예정 종료 시간 (Unified Input Style) */}
-            <div>
-              <label htmlFor="hq-dispatch-end-time" className="block text-xs font-bold text-slate-800 mb-1.5">
-                종료 시간 <span className="font-medium text-slate-400 text-[11px]">(배차 시 필수)</span>
-              </label>
-              <div className="w-full h-11 sm:h-12 bg-white border border-slate-200 hover:border-slate-300 focus-within:border-[#1E60F3] focus-within:ring-1 focus-within:ring-[#1E60F3] rounded-xl px-3.5 flex items-center transition-all shadow-2xs">
-                <input
-                  id="hq-dispatch-end-time"
-                  type="time"
-                  value={endTime}
-                  onChange={(event) => setEndTime(event.target.value)}
-                  aria-label="예정 종료 시간 직접 입력"
-                  className="w-full h-full bg-transparent text-xs sm:text-sm font-bold text-slate-900 outline-none cursor-pointer"
-                />
+            {/* 출발 날짜 * & 출발 시간 * & 예정 종료 시간 (Unified Input Size & Typography) */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* 출발 날짜 */}
+              <TossDateRangePicker
+                label="출발 날짜"
+                required
+                align="left"
+                startDate={pickupDate}
+                endDate={pickupEndDate}
+                onChangeRange={(start, end) => {
+                  setPickupDate(start);
+                  setPickupEndDate(end);
+                }}
+                heightClass="h-11 sm:h-12"
+              />
+
+              {/* 출발 시간 (종료 시간 인풋박스와 동일한 select 스타일) */}
+              <div>
+                <label htmlFor="hq-dispatch-pickup-time" className="block text-xs font-bold text-slate-800 mb-1.5">
+                  출발 시간 <span className="text-red-500 font-bold ml-0.5">*</span>
+                </label>
+                <div className="w-full h-11 sm:h-12 bg-white border border-slate-200 hover:border-slate-300 focus-within:border-[#1E60F3] focus-within:ring-1 focus-within:ring-[#1E60F3] rounded-xl px-3.5 flex items-center transition-all shadow-2xs">
+                  <input
+                    id="hq-dispatch-pickup-time"
+                    type="time"
+                    value={pickupTimeOnly}
+                    onChange={(event) => {
+                      const val = event.target.value;
+                      setPickupTimeOnly(val);
+                      setTimeInputText(formatTimeKoreanAmPm(val));
+                    }}
+                    aria-label="출발 시간 입력 및 선택"
+                    className="w-full h-full bg-transparent text-xs sm:text-sm font-bold text-slate-900 outline-none cursor-pointer"
+                  />
+                </div>
               </div>
-            </div>
-          </div>
 
-          {/* 차량 및 기사 배차 (Clean White UI, Aligned with Other Fields) */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="block text-xs font-bold text-slate-800">
-                차량 및 기사 배차
-              </label>
-              <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-bold text-slate-500">차량 수:</span>
-                <div className="inline-flex items-center bg-white border border-slate-200 rounded-lg p-0.5 shadow-2xs">
-                  <button
-                    type="button"
-                    onClick={handleDecrementVehicle}
-                    disabled={allocations.length <= 1}
-                    className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-black flex items-center justify-center transition-colors active:scale-95 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
-                    aria-label="차량 감소"
-                  >
-                    <Minus className="w-3 h-3 stroke-[2.5]" />
-                  </button>
-
-                  <span className="w-7 text-xs font-black text-slate-900 text-center">
-                    {allocations.length}대
-                  </span>
-
-                  <button
-                    type="button"
-                    onClick={handleIncrementVehicle}
-                    className="w-6 h-6 rounded bg-[#1E60F3] hover:bg-blue-600 text-white font-black flex items-center justify-center transition-colors active:scale-95 cursor-pointer"
-                    aria-label="차량 증가"
-                  >
-                    <Plus className="w-3 h-3 stroke-[2.5]" />
-                  </button>
+              {/* 예정 종료 시간 (Unified Input Style) */}
+              <div>
+                <label htmlFor="hq-dispatch-end-time" className="block text-xs font-bold text-slate-800 mb-1.5">
+                  종료 시간 <span className="font-medium text-slate-400 text-[11px]">(배차 시 필수)</span>
+                </label>
+                <div className="w-full h-11 sm:h-12 bg-white border border-slate-200 hover:border-slate-300 focus-within:border-[#1E60F3] focus-within:ring-1 focus-within:ring-[#1E60F3] rounded-xl px-3.5 flex items-center transition-all shadow-2xs">
+                  <input
+                    id="hq-dispatch-end-time"
+                    type="time"
+                    value={endTime}
+                    onChange={(event) => setEndTime(event.target.value)}
+                    aria-label="예정 종료 시간 직접 입력"
+                    className="w-full h-full bg-transparent text-xs sm:text-sm font-bold text-slate-900 outline-none cursor-pointer"
+                  />
                 </div>
               </div>
             </div>
 
-            {allocations.map((allocation, index) => {
-              const isOpenVehicle =
-                activeCardDropdown?.allocId === allocation.id && activeCardDropdown?.type === 'vehicle';
-              const isOpenDriver =
-                activeCardDropdown?.allocId === allocation.id && activeCardDropdown?.type === 'driver';
+            {/* 차량 및 기사 배차 (Clean White UI, Aligned with Other Fields) */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-slate-800">
+                  차량 및 기사 배차
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-bold text-slate-500">차량 수:</span>
+                  <div className="inline-flex items-center bg-white border border-slate-200 rounded-lg p-0.5 shadow-2xs">
+                    <button
+                      type="button"
+                      onClick={handleDecrementVehicle}
+                      disabled={allocations.length <= 1}
+                      className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-black flex items-center justify-center transition-colors active:scale-95 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                      aria-label="차량 감소"
+                    >
+                      <Minus className="w-3 h-3 stroke-[2.5]" />
+                    </button>
 
-              const selectedVehicle =
-                allVehicles.find((v) => v.plate === allocation.selectedVehiclePlate) ||
-                (allocation.selectedVehiclePlate
-                  ? {
-                    plate: allocation.selectedVehiclePlate,
-                    model: allocation.selectedVehicleModel || allocation.selectedVehiclePlate,
-                    image: getVehicleImage({
-                      plate: allocation.selectedVehiclePlate,
-                      model: allocation.selectedVehicleModel,
-                    }),
-                    statusLabel: '대기 중',
-                    currentStatus: 'available',
-                  }
-                  : null);
-
-              const selectedDriver =
-                allDrivers.find(
-                  (d) => d.id === allocation.selectedDriver || d.name === allocation.selectedDriver
-                ) ||
-                (allocation.selectedDriver
-                  ? {
-                    id: allocation.selectedDriver,
-                    name: allocation.selectedDriver,
-                    phone: '010-0000-0000',
-                    isAvailable: true,
-                    avatarUrl: getDriverProfileImage({ name: allocation.selectedDriver }),
-                  }
-                  : null);
-
-              return (
-                <div
-                  key={allocation.id}
-                  className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${index > 0 ? 'pt-2.5 border-t border-slate-100' : ''}`}
-                >
-                  {/* 1. 배정 차량 Selector */}
-                  <div className="relative">
-                    <label className="block text-xs font-bold text-slate-800 mb-1.5">
-                      {allocations.length > 1 ? `${index + 1}번 배정 차량` : '배정 차량'}{' '}
-                      <span className="text-red-500 font-bold">*</span>
-                    </label>
+                    <span className="w-7 text-xs font-black text-slate-900 text-center">
+                      {allocations.length}대
+                    </span>
 
                     <button
                       type="button"
-                      data-card-dropdown-trigger="true"
-                      onClick={() => {
-                        haptics.lightTap();
-                        if (isOpenVehicle) {
-                          setActiveCardDropdown(null);
-                        } else {
-                          setActiveCardDropdown({ allocId: allocation.id, type: 'vehicle' });
-                          setVehicleSearchQuery('');
-                          setVehicleCategoryFilter('all');
-                        }
-                      }}
-                      className={`w-full h-11 sm:h-12 bg-white rounded-xl px-3.5 flex items-center justify-between transition-all cursor-pointer shadow-2xs border ${isOpenVehicle
-                        ? 'border-[#1E60F3] ring-1 ring-[#1E60F3]'
-                        : 'border-slate-200 hover:border-slate-300'
-                        }`}
-                      aria-expanded={isOpenVehicle}
-                      aria-label={allocations.length > 1 ? `${index + 1}번 배정 차량 선택` : '배정 차량 선택'}
+                      onClick={handleIncrementVehicle}
+                      className="w-6 h-6 rounded bg-[#1E60F3] hover:bg-blue-600 text-white font-black flex items-center justify-center transition-colors active:scale-95 cursor-pointer"
+                      aria-label="차량 증가"
                     >
-                      {selectedVehicle ? (
-                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                          <div className="w-12 h-7 relative shrink-0 flex items-center justify-center">
-                            <img
-                              src={selectedVehicle.image}
-                              alt={selectedVehicle.model}
-                              onError={(e) => {
-                                (e.currentTarget as HTMLImageElement).src = '/images/thumb_g90.jpg';
-                              }}
-                              className="w-full h-full object-contain"
-                            />
+                      <Plus className="w-3 h-3 stroke-[2.5]" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {allocations.map((allocation, index) => {
+                const isOpenVehicle =
+                  activeCardDropdown?.allocId === allocation.id && activeCardDropdown?.type === 'vehicle';
+                const isOpenDriver =
+                  activeCardDropdown?.allocId === allocation.id && activeCardDropdown?.type === 'driver';
+
+                const selectedVehicle =
+                  allVehicles.find((v) => v.plate === allocation.selectedVehiclePlate) ||
+                  (allocation.selectedVehiclePlate
+                    ? {
+                      plate: allocation.selectedVehiclePlate,
+                      model: allocation.selectedVehicleModel || allocation.selectedVehiclePlate,
+                      image: getVehicleImage({
+                        plate: allocation.selectedVehiclePlate,
+                        model: allocation.selectedVehicleModel,
+                      }),
+                      statusLabel: '대기 중',
+                      currentStatus: 'available',
+                    }
+                    : null);
+
+                const selectedDriver =
+                  allDrivers.find(
+                    (d) => d.id === allocation.selectedDriver || d.name === allocation.selectedDriver
+                  ) ||
+                  (allocation.selectedDriver
+                    ? {
+                      id: allocation.selectedDriver,
+                      name: allocation.selectedDriver,
+                      phone: '010-0000-0000',
+                      isAvailable: true,
+                      avatarUrl: getDriverProfileImage({ name: allocation.selectedDriver }),
+                    }
+                    : null);
+
+                return (
+                  <div
+                    key={allocation.id}
+                    className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${index > 0 ? 'pt-2.5 border-t border-slate-100' : ''}`}
+                  >
+                    {/* 1. 배정 차량 Selector */}
+                    <div className="relative">
+                      <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                        {allocations.length > 1 ? `${index + 1}번 배정 차량` : '배정 차량'}{' '}
+                        <span className="text-red-500 font-bold">*</span>
+                      </label>
+
+                      <button
+                        type="button"
+                        data-card-dropdown-trigger="true"
+                        onClick={() => {
+                          haptics.lightTap();
+                          if (isOpenVehicle) {
+                            setActiveCardDropdown(null);
+                          } else {
+                            setActiveCardDropdown({ allocId: allocation.id, type: 'vehicle' });
+                            setVehicleSearchQuery('');
+                            setVehicleCategoryFilter('all');
+                          }
+                        }}
+                        className={`w-full h-11 sm:h-12 bg-white rounded-xl px-3.5 flex items-center justify-between transition-all cursor-pointer shadow-2xs border ${isOpenVehicle
+                          ? 'border-[#1E60F3] ring-1 ring-[#1E60F3]'
+                          : 'border-slate-200 hover:border-slate-300'
+                          }`}
+                        aria-expanded={isOpenVehicle}
+                        aria-label={allocations.length > 1 ? `${index + 1}번 배정 차량 선택` : '배정 차량 선택'}
+                      >
+                        {selectedVehicle ? (
+                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                            <div className="w-12 h-7 relative shrink-0 flex items-center justify-center">
+                              <img
+                                src={selectedVehicle.image}
+                                alt={selectedVehicle.model}
+                                onError={(e) => {
+                                  (e.currentTarget as HTMLImageElement).src = '/images/thumb_g90.jpg';
+                                }}
+                                className="w-full h-full object-contain"
+                              />
+                            </div>
+                            <span className="text-xs sm:text-sm font-black text-slate-900 truncate">
+                              {selectedVehicle.model} · {selectedVehicle.plate}
+                            </span>
                           </div>
-                          <span className="text-xs sm:text-sm font-black text-slate-900 truncate">
-                            {selectedVehicle.model} · {selectedVehicle.plate}
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2 text-slate-400">
-                          <Car className="w-4 h-4 shrink-0 text-slate-400" />
-                          <span className="text-xs sm:text-sm font-medium">배정 차량 선택</span>
+                        ) : (
+                          <div className="flex items-center gap-2 text-slate-400">
+                            <Car className="w-4 h-4 shrink-0 text-slate-400" />
+                            <span className="text-xs sm:text-sm font-medium">배정 차량 선택</span>
+                          </div>
+                        )}
+                        <ChevronDown
+                          className={`w-4 h-4 text-slate-500 transition-transform duration-200 shrink-0 ml-2 ${isOpenVehicle ? 'rotate-180 text-[#1E60F3]' : ''
+                            }`}
+                        />
+                      </button>
+
+                      {/* Vehicle Dropdown Popover */}
+                      {isOpenVehicle && (
+                        <div
+                          ref={activeCardDropdownRef}
+                          className="absolute left-0 top-full mt-1.5 w-full sm:min-w-[420px] max-w-[520px] z-50 bg-white border border-slate-200/90 rounded-2xl shadow-xl p-3 animate-in fade-in duration-150"
+                        >
+                          {/* Top Bar: Search Input & Category Pills */}
+                          <div className="flex flex-col gap-2 pb-2.5 border-b border-slate-100">
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 relative">
+                                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                                <input
+                                  type="text"
+                                  value={vehicleSearchQuery}
+                                  onChange={(e) => setVehicleSearchQuery(e.target.value)}
+                                  placeholder="차량명 또는 차량번호 검색"
+                                  className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200/80 rounded-lg text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] focus:bg-white"
+                                />
+                                {vehicleSearchQuery && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setVehicleSearchQuery('')}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-1 shrink-0">
+                                {(
+                                  [
+                                    { key: 'all', label: '전체' },
+                                    { key: 'sedan', label: '세단' },
+                                    { key: 'suv', label: 'SUV' },
+                                    { key: 'van', label: '밴' },
+                                    { key: 'sprinter', label: '스프린터' },
+                                  ] as const
+                                ).map((cat) => {
+                                  const active = vehicleCategoryFilter === cat.key;
+                                  return (
+                                    <button
+                                      key={cat.key}
+                                      type="button"
+                                      onClick={() => setVehicleCategoryFilter(cat.key)}
+                                      className={`px-2 py-1 rounded-full text-[11px] font-bold transition-colors cursor-pointer ${active
+                                        ? 'bg-[#1E60F3] text-white shadow-2xs'
+                                        : 'text-slate-600 hover:bg-slate-100'
+                                        }`}
+                                    >
+                                      {cat.label}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Unassign Option */}
+                          {allocation.selectedVehiclePlate && (
+                            <button
+                              type="button"
+                              onClick={() => handleSelectVehicle(allocation.id, null)}
+                              className="w-full mt-1.5 mb-1 px-2.5 py-1.5 text-left text-xs font-bold text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-between cursor-pointer"
+                            >
+                              <span>배정 해제 (미배정)</span>
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+
+                          {/* Vehicle List */}
+                          <div className="max-h-60 overflow-y-auto space-y-1 mt-1 pr-1">
+                            {filteredVehiclesForDropdown.length === 0 ? (
+                              <div className="py-6 text-center text-xs text-slate-400 font-medium">
+                                일치하는 차량이 없습니다
+                              </div>
+                            ) : (
+                              filteredVehiclesForDropdown.map((v) => {
+                                const isSelected = allocation.selectedVehiclePlate === v.plate;
+                                return (
+                                  <button
+                                    key={v.uuid || v.plate}
+                                    type="button"
+                                    onClick={() => handleSelectVehicle(allocation.id, v)}
+                                    className={`w-full px-2.5 py-2 rounded-xl flex items-center justify-between transition-colors cursor-pointer text-left ${isSelected
+                                      ? 'bg-blue-50/80 border border-blue-200'
+                                      : 'hover:bg-slate-50 border border-transparent'
+                                      }`}
+                                  >
+                                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                                      <div className="w-14 h-8 relative shrink-0 flex items-center justify-center">
+                                        <img
+                                          src={v.image}
+                                          alt={v.model}
+                                          onError={(e) => {
+                                            (e.currentTarget as HTMLImageElement).src = '/images/thumb_g90.jpg';
+                                          }}
+                                          className="w-full h-full object-contain"
+                                        />
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <p className="text-xs font-black text-slate-900 truncate">
+                                          {v.model}
+                                        </p>
+                                        <p className="text-[11px] font-semibold text-slate-500 mt-0.5">
+                                          {v.plate}
+                                        </p>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2.5 shrink-0 ml-2">
+                                      <span
+                                        className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${v.currentStatus === 'in_service'
+                                          ? 'text-amber-700 bg-amber-50'
+                                          : v.currentStatus === 'maintenance'
+                                            ? 'text-slate-500 bg-slate-100'
+                                            : 'text-blue-600 bg-blue-50'
+                                          }`}
+                                      >
+                                        ● {v.statusLabel || '대기 중'}
+                                      </span>
+                                      {isSelected && (
+                                        <Check className="w-4 h-4 text-[#1E60F3] stroke-[3]" />
+                                      )}
+                                    </div>
+                                  </button>
+                                );
+                              })
+                            )}
+                          </div>
                         </div>
                       )}
-                      <ChevronDown
-                        className={`w-4 h-4 text-slate-500 transition-transform duration-200 shrink-0 ml-2 ${isOpenVehicle ? 'rotate-180 text-[#1E60F3]' : ''
-                          }`}
-                      />
-                    </button>
+                    </div>
 
-                    {/* Vehicle Dropdown Popover */}
-                    {isOpenVehicle && (
-                      <div
-                        ref={activeCardDropdownRef}
-                        className="absolute left-0 top-full mt-1.5 w-full sm:min-w-[420px] max-w-[520px] z-50 bg-white border border-slate-200/90 rounded-2xl shadow-xl p-3 animate-in fade-in duration-150"
+                    {/* 2. 담당 기사 Selector */}
+                    <div className="relative">
+                      <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                        {allocations.length > 1 ? `${index + 1}번 담당 기사` : '담당 기사'}{' '}
+                        <span className="text-red-500 font-bold">*</span>
+                      </label>
+
+                      <button
+                        type="button"
+                        data-card-dropdown-trigger="true"
+                        onClick={() => {
+                          haptics.lightTap();
+                          if (isOpenDriver) {
+                            setActiveCardDropdown(null);
+                          } else {
+                            setActiveCardDropdown({ allocId: allocation.id, type: 'driver' });
+                            setDriverSearchQuery('');
+                          }
+                        }}
+                        disabled={allocation.serviceMode === 'vehicle_only'}
+                        className={`w-full h-11 sm:h-12 bg-white rounded-xl px-3.5 flex items-center justify-between transition-all cursor-pointer shadow-2xs border ${isOpenDriver
+                          ? 'border-[#1E60F3] ring-1 ring-[#1E60F3]'
+                          : 'border-slate-200 hover:border-slate-300'
+                          } disabled:opacity-50 disabled:pointer-events-none`}
+                        aria-expanded={isOpenDriver}
+                        aria-label={allocations.length > 1 ? `${index + 1}번 담당 기사 선택` : '담당 기사 선택'}
                       >
-                        {/* Top Bar: Search Input & Category Pills */}
-                        <div className="flex flex-col gap-2 pb-2.5 border-b border-slate-100">
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1 relative">
+                        {selectedDriver ? (
+                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                            <div className="w-7 h-7 rounded-full overflow-hidden border border-slate-200 shrink-0 relative bg-slate-100">
+                              <img
+                                src={selectedDriver.avatarUrl || getDriverProfileImage(selectedDriver)}
+                                alt={selectedDriver.name}
+                                onError={(e) => {
+                                  (e.currentTarget as HTMLImageElement).src = '/images/driver_kim.png';
+                                }}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <span className="text-xs sm:text-sm font-black text-slate-900 truncate">
+                              {selectedDriver.name} · {selectedDriver.phone}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-slate-400">
+                            <Users className="w-4 h-4 shrink-0 text-slate-400" />
+                            <span className="text-xs sm:text-sm font-medium">담당 기사 선택</span>
+                          </div>
+                        )}
+                        <ChevronDown
+                          className={`w-4 h-4 text-slate-500 transition-transform duration-200 shrink-0 ml-2 ${isOpenDriver ? 'rotate-180 text-[#1E60F3]' : ''
+                            }`}
+                        />
+                      </button>
+
+                      {/* Driver Dropdown Popover */}
+                      {isOpenDriver && (
+                        <div
+                          ref={activeCardDropdownRef}
+                          className="absolute left-0 sm:left-auto sm:right-0 top-full mt-1.5 w-full sm:min-w-[340px] md:min-w-[380px] max-w-[460px] z-50 bg-white border border-slate-200/90 rounded-2xl shadow-xl p-3 animate-in fade-in duration-150"
+                        >
+                          {/* Top Search Area */}
+                          <div className="pb-2.5 border-b border-slate-100">
+                            <div className="relative">
                               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
                               <input
                                 type="text"
-                                value={vehicleSearchQuery}
-                                onChange={(e) => setVehicleSearchQuery(e.target.value)}
-                                placeholder="차량명 또는 차량번호 검색"
+                                value={driverSearchQuery}
+                                onChange={(e) => setDriverSearchQuery(e.target.value)}
+                                placeholder="기사명 또는 연락처 검색"
                                 className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200/80 rounded-lg text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] focus:bg-white"
                               />
-                              {vehicleSearchQuery && (
+                              {driverSearchQuery && (
                                 <button
                                   type="button"
-                                  onClick={() => setVehicleSearchQuery('')}
+                                  onClick={() => setDriverSearchQuery('')}
                                   className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
                                 >
                                   <X className="w-3 h-3" />
                                 </button>
                               )}
                             </div>
+                          </div>
 
-                            <div className="flex items-center gap-1 shrink-0">
-                              {(
-                                [
-                                  { key: 'all', label: '전체' },
-                                  { key: 'sedan', label: '세단' },
-                                  { key: 'suv', label: 'SUV' },
-                                  { key: 'van', label: '밴' },
-                                  { key: 'sprinter', label: '스프린터' },
-                                ] as const
-                              ).map((cat) => {
-                                const active = vehicleCategoryFilter === cat.key;
+                          {/* Unassign Option */}
+                          {allocation.selectedDriver && (
+                            <button
+                              type="button"
+                              onClick={() => handleSelectDriver(allocation.id, null)}
+                              className="w-full mt-1.5 mb-1 px-2.5 py-1.5 text-left text-xs font-bold text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-between cursor-pointer"
+                            >
+                              <span>배정 해제 (미배정)</span>
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+
+                          {/* Driver List */}
+                          <div className="max-h-60 overflow-y-auto space-y-1 mt-1 pr-1">
+                            {filteredDriversForDropdown.length === 0 ? (
+                              <div className="py-6 text-center text-xs text-slate-400 font-medium">
+                                일치하는 기사님이 없습니다
+                              </div>
+                            ) : (
+                              filteredDriversForDropdown.map((d) => {
+                                const isSelected =
+                                  allocation.selectedDriver === d.id || allocation.selectedDriver === d.name;
+                                const isEnglishNeeded = allocation.requestedLanguage === 'en';
+                                const isEnglishUnqualified = isEnglishNeeded && !(d as any).isEnglishVerified;
+                                const isBlocked = !d.isAvailable || isEnglishUnqualified;
+
                                 return (
                                   <button
-                                    key={cat.key}
+                                    key={d.id}
                                     type="button"
-                                    onClick={() => setVehicleCategoryFilter(cat.key)}
-                                    className={`px-2 py-1 rounded-full text-[11px] font-bold transition-colors cursor-pointer ${active
-                                      ? 'bg-[#1E60F3] text-white shadow-2xs'
-                                      : 'text-slate-600 hover:bg-slate-100'
+                                    disabled={isBlocked}
+                                    onClick={() => handleSelectDriver(allocation.id, d)}
+                                    className={`w-full px-2.5 py-2 rounded-xl flex items-center justify-between transition-colors cursor-pointer text-left ${isSelected
+                                      ? 'bg-blue-50/80 border border-blue-200'
+                                      : isBlocked
+                                        ? 'opacity-50 cursor-not-allowed border border-transparent'
+                                        : 'hover:bg-slate-50 border border-transparent'
                                       }`}
                                   >
-                                    {cat.label}
+                                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                                      <div className="w-8 h-8 rounded-full overflow-hidden border border-slate-200 shrink-0 relative bg-slate-100">
+                                        <img
+                                          src={d.avatarUrl || getDriverProfileImage(d)}
+                                          alt={d.name}
+                                          onError={(e) => {
+                                            (e.currentTarget as HTMLImageElement).src = '/images/driver_kim.png';
+                                          }}
+                                          className="w-full h-full object-cover"
+                                        />
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-1.5">
+                                          <p className="text-xs font-black text-slate-900 truncate">
+                                            {d.name}
+                                          </p>
+                                          {d.affiliationType === 'employed' && (
+                                            <span className="text-[10px] bg-blue-50 text-[#1E60F3] border border-blue-200/60 font-bold px-1.5 py-0.2 rounded shrink-0">
+                                              소속
+                                            </span>
+                                          )}
+                                        </div>
+                                        <p className="text-[11px] font-semibold text-slate-500 mt-0.5">
+                                          {d.phone}
+                                        </p>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 shrink-0 ml-2">
+                                      {!d.isAvailable ? (
+                                        <span className="text-[10px] text-amber-700 bg-amber-50 font-semibold px-2 py-0.5 rounded-full">
+                                          배차 불가
+                                        </span>
+                                      ) : isEnglishUnqualified ? (
+                                        <span className="text-[10px] text-amber-700 bg-amber-50 font-semibold px-2 py-0.5 rounded-full">
+                                          영어 미인증
+                                        </span>
+                                      ) : null}
+                                      {isSelected && (
+                                        <Check className="w-4 h-4 text-[#1E60F3] stroke-[3]" />
+                                      )}
+                                    </div>
                                   </button>
                                 );
-                              })}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Unassign Option */}
-                        {allocation.selectedVehiclePlate && (
-                          <button
-                            type="button"
-                            onClick={() => handleSelectVehicle(allocation.id, null)}
-                            className="w-full mt-1.5 mb-1 px-2.5 py-1.5 text-left text-xs font-bold text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-between cursor-pointer"
-                          >
-                            <span>배정 해제 (미배정)</span>
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-
-                        {/* Vehicle List */}
-                        <div className="max-h-60 overflow-y-auto space-y-1 mt-1 pr-1">
-                          {filteredVehiclesForDropdown.length === 0 ? (
-                            <div className="py-6 text-center text-xs text-slate-400 font-medium">
-                              일치하는 차량이 없습니다
-                            </div>
-                          ) : (
-                            filteredVehiclesForDropdown.map((v) => {
-                              const isSelected = allocation.selectedVehiclePlate === v.plate;
-                              return (
-                                <button
-                                  key={v.uuid || v.plate}
-                                  type="button"
-                                  onClick={() => handleSelectVehicle(allocation.id, v)}
-                                  className={`w-full px-2.5 py-2 rounded-xl flex items-center justify-between transition-colors cursor-pointer text-left ${isSelected
-                                    ? 'bg-blue-50/80 border border-blue-200'
-                                    : 'hover:bg-slate-50 border border-transparent'
-                                    }`}
-                                >
-                                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                                    <div className="w-14 h-8 relative shrink-0 flex items-center justify-center">
-                                      <img
-                                        src={v.image}
-                                        alt={v.model}
-                                        onError={(e) => {
-                                          (e.currentTarget as HTMLImageElement).src = '/images/thumb_g90.jpg';
-                                        }}
-                                        className="w-full h-full object-contain"
-                                      />
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                      <p className="text-xs font-black text-slate-900 truncate">
-                                        {v.model}
-                                      </p>
-                                      <p className="text-[11px] font-semibold text-slate-500 mt-0.5">
-                                        {v.plate}
-                                      </p>
-                                    </div>
-                                  </div>
-
-                                  <div className="flex items-center gap-2.5 shrink-0 ml-2">
-                                    <span
-                                      className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${v.currentStatus === 'in_service'
-                                        ? 'text-amber-700 bg-amber-50'
-                                        : v.currentStatus === 'maintenance'
-                                          ? 'text-slate-500 bg-slate-100'
-                                          : 'text-blue-600 bg-blue-50'
-                                        }`}
-                                    >
-                                      ● {v.statusLabel || '대기 중'}
-                                    </span>
-                                    {isSelected && (
-                                      <Check className="w-4 h-4 text-[#1E60F3] stroke-[3]" />
-                                    )}
-                                  </div>
-                                </button>
-                              );
-                            })
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 2. 담당 기사 Selector */}
-                  <div className="relative">
-                    <label className="block text-xs font-bold text-slate-800 mb-1.5">
-                      {allocations.length > 1 ? `${index + 1}번 담당 기사` : '담당 기사'}{' '}
-                      <span className="text-red-500 font-bold">*</span>
-                    </label>
-
-                    <button
-                      type="button"
-                      data-card-dropdown-trigger="true"
-                      onClick={() => {
-                        haptics.lightTap();
-                        if (isOpenDriver) {
-                          setActiveCardDropdown(null);
-                        } else {
-                          setActiveCardDropdown({ allocId: allocation.id, type: 'driver' });
-                          setDriverSearchQuery('');
-                        }
-                      }}
-                      disabled={allocation.serviceMode === 'vehicle_only'}
-                      className={`w-full h-11 sm:h-12 bg-white rounded-xl px-3.5 flex items-center justify-between transition-all cursor-pointer shadow-2xs border ${isOpenDriver
-                        ? 'border-[#1E60F3] ring-1 ring-[#1E60F3]'
-                        : 'border-slate-200 hover:border-slate-300'
-                        } disabled:opacity-50 disabled:pointer-events-none`}
-                      aria-expanded={isOpenDriver}
-                      aria-label={allocations.length > 1 ? `${index + 1}번 담당 기사 선택` : '담당 기사 선택'}
-                    >
-                      {selectedDriver ? (
-                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                          <div className="w-7 h-7 rounded-full overflow-hidden border border-slate-200 shrink-0 relative bg-slate-100">
-                            <img
-                              src={selectedDriver.avatarUrl || getDriverProfileImage(selectedDriver)}
-                              alt={selectedDriver.name}
-                              onError={(e) => {
-                                (e.currentTarget as HTMLImageElement).src = '/images/driver_kim.png';
-                              }}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                          <span className="text-xs sm:text-sm font-black text-slate-900 truncate">
-                            {selectedDriver.name} · {selectedDriver.phone}
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2 text-slate-400">
-                          <Users className="w-4 h-4 shrink-0 text-slate-400" />
-                          <span className="text-xs sm:text-sm font-medium">담당 기사 선택</span>
-                        </div>
-                      )}
-                      <ChevronDown
-                        className={`w-4 h-4 text-slate-500 transition-transform duration-200 shrink-0 ml-2 ${isOpenDriver ? 'rotate-180 text-[#1E60F3]' : ''
-                          }`}
-                      />
-                    </button>
-
-                    {/* Driver Dropdown Popover */}
-                    {isOpenDriver && (
-                      <div
-                        ref={activeCardDropdownRef}
-                        className="absolute left-0 sm:left-auto sm:right-0 top-full mt-1.5 w-full sm:min-w-[340px] md:min-w-[380px] max-w-[460px] z-50 bg-white border border-slate-200/90 rounded-2xl shadow-xl p-3 animate-in fade-in duration-150"
-                      >
-                        {/* Top Search Area */}
-                        <div className="pb-2.5 border-b border-slate-100">
-                          <div className="relative">
-                            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                            <input
-                              type="text"
-                              value={driverSearchQuery}
-                              onChange={(e) => setDriverSearchQuery(e.target.value)}
-                              placeholder="기사명 또는 연락처 검색"
-                              className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200/80 rounded-lg text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#1E60F3] focus:bg-white"
-                            />
-                            {driverSearchQuery && (
-                              <button
-                                type="button"
-                                onClick={() => setDriverSearchQuery('')}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
-                              >
-                                <X className="w-3 h-3" />
-                              </button>
+                              })
                             )}
                           </div>
                         </div>
-
-                        {/* Unassign Option */}
-                        {allocation.selectedDriver && (
-                          <button
-                            type="button"
-                            onClick={() => handleSelectDriver(allocation.id, null)}
-                            className="w-full mt-1.5 mb-1 px-2.5 py-1.5 text-left text-xs font-bold text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center justify-between cursor-pointer"
-                          >
-                            <span>배정 해제 (미배정)</span>
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-
-                        {/* Driver List */}
-                        <div className="max-h-60 overflow-y-auto space-y-1 mt-1 pr-1">
-                          {filteredDriversForDropdown.length === 0 ? (
-                            <div className="py-6 text-center text-xs text-slate-400 font-medium">
-                              일치하는 기사님이 없습니다
-                            </div>
-                          ) : (
-                            filteredDriversForDropdown.map((d) => {
-                              const isSelected =
-                                allocation.selectedDriver === d.id || allocation.selectedDriver === d.name;
-                              const isEnglishNeeded = allocation.requestedLanguage === 'en';
-                              const isEnglishUnqualified = isEnglishNeeded && !(d as any).isEnglishVerified;
-                              const isBlocked = !d.isAvailable || isEnglishUnqualified;
-
-                              return (
-                                <button
-                                  key={d.id}
-                                  type="button"
-                                  disabled={isBlocked}
-                                  onClick={() => handleSelectDriver(allocation.id, d)}
-                                  className={`w-full px-2.5 py-2 rounded-xl flex items-center justify-between transition-colors cursor-pointer text-left ${isSelected
-                                    ? 'bg-blue-50/80 border border-blue-200'
-                                    : isBlocked
-                                      ? 'opacity-50 cursor-not-allowed border border-transparent'
-                                      : 'hover:bg-slate-50 border border-transparent'
-                                    }`}
-                                >
-                                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                                    <div className="w-8 h-8 rounded-full overflow-hidden border border-slate-200 shrink-0 relative bg-slate-100">
-                                      <img
-                                        src={d.avatarUrl || getDriverProfileImage(d)}
-                                        alt={d.name}
-                                        onError={(e) => {
-                                          (e.currentTarget as HTMLImageElement).src = '/images/driver_kim.png';
-                                        }}
-                                        className="w-full h-full object-cover"
-                                      />
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                      <div className="flex items-center gap-1.5">
-                                        <p className="text-xs font-black text-slate-900 truncate">
-                                          {d.name}
-                                        </p>
-                                        {d.affiliationType === 'employed' && (
-                                          <span className="text-[10px] bg-blue-50 text-[#1E60F3] border border-blue-200/60 font-bold px-1.5 py-0.2 rounded shrink-0">
-                                            소속
-                                          </span>
-                                        )}
-                                      </div>
-                                      <p className="text-[11px] font-semibold text-slate-500 mt-0.5">
-                                        {d.phone}
-                                      </p>
-                                    </div>
-                                  </div>
-
-                                  <div className="flex items-center gap-2 shrink-0 ml-2">
-                                    {!d.isAvailable ? (
-                                      <span className="text-[10px] text-amber-700 bg-amber-50 font-semibold px-2 py-0.5 rounded-full">
-                                        배차 불가
-                                      </span>
-                                    ) : isEnglishUnqualified ? (
-                                      <span className="text-[10px] text-amber-700 bg-amber-50 font-semibold px-2 py-0.5 rounded-full">
-                                        영어 미인증
-                                      </span>
-                                    ) : null}
-                                    {isSelected && (
-                                      <Check className="w-4 h-4 text-[#1E60F3] stroke-[3]" />
-                                    )}
-                                  </div>
-                                </button>
-                              );
-                            })
-                          )}
-                        </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
 
-          {/* 출발지 * & 도착지 * (2 Columns with TMAP Search) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* 출발지 */}
-            <HqPlaceSearchInput
-              label="출발지"
-              required
-              value={pickupLocation}
-              autoSearch={false}
-              isConfirmed={Boolean(pickupPoi)}
-              onChange={(val) => {
-                setPickupLocation(val);
-                setPickupPoi(null);
-                setErrorMsg(null);
-              }}
-              onSelectPoi={(poi) => {
-                setPickupLocation(poi.name);
-                setPickupPoi(poi);
-                setErrorMsg(null);
-              }}
-              placeholder="위치 검색 또는 입력"
-              icon="mapPin"
-            />
-
-            {/* 도착지 */}
-            <HqPlaceSearchInput
-              label="도착지"
-              required
-              value={destination}
-              autoSearch={false}
-              isConfirmed={Boolean(destinationPoi)}
-              onChange={(val) => {
-                setDestination(val);
-                setDestinationPoi(null);
-                setErrorMsg(null);
-              }}
-              onSelectPoi={(poi) => {
-                setDestination(poi.name);
-                setDestinationPoi(poi);
-                setErrorMsg(null);
-              }}
-              placeholder="목적지 검색 또는 입력"
-              icon="flag"
-            />
-          </div>
-
-          {/* 3. 추가 정보 (선택사항) Accordion (Reference Match) */}
-          <div className="pt-0.5">
-            {!isExtraInfoOpen ? (
-              <div
-                role="button"
-                tabIndex={0}
-                onClick={() => {
-                  haptics.lightTap();
-                  setIsExtraInfoOpen(true);
+            {/* 출발지 * & 도착지 * (2 Columns with TMAP Search) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* 출발지 */}
+              <HqPlaceSearchInput
+                label="출발지"
+                required
+                value={pickupLocation}
+                autoSearch={false}
+                isConfirmed={Boolean(pickupPoi)}
+                onChange={(val) => {
+                  setPickupLocation(val);
+                  setPickupPoi(null);
+                  setErrorMsg(null);
                 }}
-                className="bg-white border border-slate-200/90 hover:border-blue-200 rounded-2xl p-3 sm:p-3.5 flex items-center justify-between cursor-pointer hover:bg-slate-50/70 transition-all shadow-xs"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-[#EBF2FE] text-[#1E60F3] flex items-center justify-center shrink-0">
-                    <FileText className="w-4 h-4 text-[#1E60F3]" />
-                  </div>
-                  <div>
-                    <h3 className="text-xs sm:text-sm font-bold text-slate-900 tracking-tight">
-                      추가 정보 (선택)
-                    </h3>
-                  </div>
-                </div>
+                onSelectPoi={(poi) => {
+                  setPickupLocation(poi.name);
+                  setPickupPoi(poi);
+                  setErrorMsg(null);
+                }}
+                placeholder="위치 검색 또는 입력"
+                icon="mapPin"
+              />
 
-                <div className="w-7 h-7 rounded-full flex items-center justify-center text-slate-600">
-                  <ChevronDown className="w-4 h-4 stroke-[2.2]" />
-                </div>
-              </div>
-            ) : (
-              <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 sm:p-4 shadow-xs space-y-3 animate-in slide-in-from-top-2 duration-200">
-                {/* Accordion Header */}
+              {/* 도착지 */}
+              <HqPlaceSearchInput
+                label="도착지"
+                required
+                value={destination}
+                autoSearch={false}
+                isConfirmed={Boolean(destinationPoi)}
+                onChange={(val) => {
+                  setDestination(val);
+                  setDestinationPoi(null);
+                  setErrorMsg(null);
+                }}
+                onSelectPoi={(poi) => {
+                  setDestination(poi.name);
+                  setDestinationPoi(poi);
+                  setErrorMsg(null);
+                }}
+                placeholder="목적지 검색 또는 입력"
+                icon="flag"
+              />
+            </div>
+
+            {/* 3. 추가 정보 (선택사항) Accordion (Reference Match) */}
+            <div className="pt-0.5">
+              {!isExtraInfoOpen ? (
                 <div
                   role="button"
                   tabIndex={0}
                   onClick={() => {
                     haptics.lightTap();
-                    setIsExtraInfoOpen(false);
+                    setIsExtraInfoOpen(true);
                   }}
-                  className="flex items-center justify-between cursor-pointer select-none pb-0.5 px-0.5"
+                  className="bg-white border border-slate-200/90 hover:border-blue-200 rounded-2xl p-3 sm:p-3.5 flex items-center justify-between cursor-pointer hover:bg-slate-50/70 transition-all shadow-xs"
                 >
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-lg bg-[#EBF2FE] text-[#1E60F3] flex items-center justify-center shrink-0">
@@ -2460,142 +2432,164 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                     </div>
                   </div>
 
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-slate-700 hover:bg-slate-100 transition-colors">
-                    <ChevronUp className="w-4 h-4 stroke-[2.2]" />
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-slate-600">
+                    <ChevronDown className="w-4 h-4 stroke-[2.2]" />
                   </div>
                 </div>
-
-                {/* Row 1: Sub-Card 1 (기사 언어) & Sub-Card 2 (항공편명) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Sub-Card 1: 기사 언어 */}
-                  <div className="bg-[#F8FAFC] border border-slate-100 rounded-2xl p-3.5 sm:p-4 flex flex-col justify-between">
-                    <div className="flex items-center gap-1.5 mb-2.5">
-                      <Globe className="w-4 h-4 text-[#1E60F3] stroke-[2]" />
-                      <span className="text-xs font-bold text-slate-700">기사 언어</span>
+              ) : (
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 sm:p-4 shadow-xs space-y-3 animate-in slide-in-from-top-2 duration-200">
+                  {/* Accordion Header */}
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      haptics.lightTap();
+                      setIsExtraInfoOpen(false);
+                    }}
+                    className="flex items-center justify-between cursor-pointer select-none pb-0.5 px-0.5"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-[#EBF2FE] text-[#1E60F3] flex items-center justify-center shrink-0">
+                        <FileText className="w-4 h-4 text-[#1E60F3]" />
+                      </div>
+                      <div>
+                        <h3 className="text-xs sm:text-sm font-bold text-slate-900 tracking-tight">
+                          추가 정보 (선택)
+                        </h3>
+                      </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <button
-                        type="button"
-                        onClick={() => handleCommonLanguageChange("ko")}
-                        className={`h-11 rounded-xl flex items-center justify-center gap-1.5 px-2 transition-all cursor-pointer ${
-                          commonLanguage === "ko"
-                            ? "bg-[#EBF2FE] text-[#1E60F3] font-bold shadow-2xs"
-                            : "bg-white border border-slate-200/90 text-slate-700 hover:bg-slate-50 font-semibold shadow-2xs"
-                        }`}
-                      >
-                        <span className="text-sm">🇰🇷</span>
-                        <span className="text-xs font-bold whitespace-nowrap">한국어</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleCommonLanguageChange("en")}
-                        className={`h-11 rounded-xl flex items-center justify-center gap-1.5 px-2 transition-all cursor-pointer ${
-                          commonLanguage === "en"
-                            ? "bg-[#EBF2FE] text-[#1E60F3] font-bold shadow-2xs"
-                            : "bg-white border border-slate-200/90 text-slate-700 hover:bg-slate-50 font-semibold shadow-2xs"
-                        }`}
-                      >
-                        <span className="text-sm">🇺🇸</span>
-                        <span className="text-xs font-bold whitespace-nowrap">영어</span>
-                      </button>
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center text-slate-700 hover:bg-slate-100 transition-colors">
+                      <ChevronUp className="w-4 h-4 stroke-[2.2]" />
                     </div>
                   </div>
 
-                  {/* Sub-Card 2: 항공편명 */}
-                  <div className="bg-[#F8FAFC] border border-slate-100 rounded-2xl p-3.5 sm:p-4 flex flex-col justify-between">
-                    <div className="flex items-center gap-1.5 mb-2.5">
-                      <Plane className="w-4 h-4 text-[#1E60F3] stroke-[2]" />
-                      <span className="text-xs font-bold text-slate-700">항공편명</span>
-                    </div>
+                  {/* Row 1: Sub-Card 1 (기사 언어) & Sub-Card 2 (항공편명) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Sub-Card 1: 기사 언어 */}
+                    <div className="bg-[#F8FAFC] border border-slate-100 rounded-2xl p-3.5 sm:p-4 flex flex-col justify-between">
+                      <div className="flex items-center gap-1.5 mb-2.5">
+                        <Globe className="w-4 h-4 text-[#1E60F3] stroke-[2]" />
+                        <span className="text-xs font-bold text-slate-700">기사 언어</span>
+                      </div>
 
-                    <div className="flex items-center">
-                      <input
-                        type="text"
-                        value={commonFlightNumber}
-                        onChange={(e) => setCommonFlightNumber(e.target.value)}
-                        placeholder="예: KE082"
-                        className="w-full h-11 bg-white border border-slate-200/90 rounded-xl px-3.5 text-xs sm:text-sm font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#1E60F3] focus:ring-1 focus:ring-blue-100 shadow-2xs transition-all min-w-0"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Row 2: Sub-Card 3 (탑승객 정보) */}
-                <div className="bg-[#F8FAFC] border border-slate-100 rounded-2xl p-3.5 sm:p-4">
-                  <div className="flex items-center gap-1.5 mb-2.5">
-                    <Users className="w-4 h-4 text-[#1E60F3] stroke-[2]" />
-                    <span className="text-xs font-bold text-slate-700">탑승객 정보</span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                    {/* 탑승 인원 */}
-                    <div className="h-11 bg-white border border-slate-200/90 rounded-xl px-3.5 flex items-center justify-between shadow-2xs">
-                      <span className="text-xs font-bold text-slate-700 whitespace-nowrap">탑승 인원</span>
-                      <div className="flex items-center gap-1.5">
+                      <div className="grid grid-cols-2 gap-2.5">
                         <button
                           type="button"
-                          onClick={() => setCommonPassengerCount((prev) => Math.max(0, prev - 1))}
-                          className="w-6 h-6 rounded-md bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold flex items-center justify-center cursor-pointer active:scale-95 shadow-2xs transition-all"
+                          onClick={() => handleCommonLanguageChange("ko")}
+                          className={`h-11 rounded-xl flex items-center justify-center gap-1.5 px-2 transition-all cursor-pointer ${commonLanguage === "ko"
+                            ? "bg-[#EBF2FE] text-[#1E60F3] font-bold shadow-2xs"
+                            : "bg-white border border-slate-200/90 text-slate-700 hover:bg-slate-50 font-semibold shadow-2xs"
+                            }`}
                         >
-                          <Minus className="w-3 h-3 stroke-[2.5]" />
+                          <span className="text-sm">🇰🇷</span>
+                          <span className="text-xs font-bold whitespace-nowrap">한국어</span>
                         </button>
-                        <span className="text-xs font-black text-slate-900 px-1 min-w-[16px] text-center">
-                          {commonPassengerCount}
-                        </span>
+
                         <button
                           type="button"
-                          onClick={() => setCommonPassengerCount((prev) => prev + 1)}
-                          className="w-6 h-6 rounded-md bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white font-bold flex items-center justify-center cursor-pointer shadow-2xs transition-all"
+                          onClick={() => handleCommonLanguageChange("en")}
+                          className={`h-11 rounded-xl flex items-center justify-center gap-1.5 px-2 transition-all cursor-pointer ${commonLanguage === "en"
+                            ? "bg-[#EBF2FE] text-[#1E60F3] font-bold shadow-2xs"
+                            : "bg-white border border-slate-200/90 text-slate-700 hover:bg-slate-50 font-semibold shadow-2xs"
+                            }`}
                         >
-                          <Plus className="w-3 h-3 stroke-[2.5]" />
+                          <span className="text-sm">🇺🇸</span>
+                          <span className="text-xs font-bold whitespace-nowrap">영어</span>
                         </button>
                       </div>
                     </div>
 
-                    {/* 탑승객명 */}
+                    {/* Sub-Card 2: 항공편명 */}
+                    <div className="bg-[#F8FAFC] border border-slate-100 rounded-2xl p-3.5 sm:p-4 flex flex-col justify-between">
+                      <div className="flex items-center gap-1.5 mb-2.5">
+                        <Plane className="w-4 h-4 text-[#1E60F3] stroke-[2]" />
+                        <span className="text-xs font-bold text-slate-700">항공편명</span>
+                      </div>
+
+                      <div className="flex items-center">
+                        <input
+                          type="text"
+                          value={commonFlightNumber}
+                          onChange={(e) => setCommonFlightNumber(e.target.value)}
+                          placeholder="예: KE082"
+                          className="w-full h-11 bg-white border border-slate-200/90 rounded-xl px-3.5 text-xs sm:text-sm font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#1E60F3] focus:ring-1 focus:ring-blue-100 shadow-2xs transition-all min-w-0"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Row 2: Sub-Card 3 (탑승객 정보) */}
+                  <div className="bg-[#F8FAFC] border border-slate-100 rounded-2xl p-3.5 sm:p-4">
+                    <div className="flex items-center gap-1.5 mb-2.5">
+                      <Users className="w-4 h-4 text-[#1E60F3] stroke-[2]" />
+                      <span className="text-xs font-bold text-slate-700">탑승객 정보</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      {/* 탑승 인원 */}
+                      <div className="h-11 bg-white border border-slate-200/90 rounded-xl px-3.5 flex items-center justify-between shadow-2xs">
+                        <span className="text-xs font-bold text-slate-700 whitespace-nowrap">탑승 인원</span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setCommonPassengerCount((prev) => Math.max(0, prev - 1))}
+                            className="w-6 h-6 rounded-md bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold flex items-center justify-center cursor-pointer active:scale-95 shadow-2xs transition-all"
+                          >
+                            <Minus className="w-3 h-3 stroke-[2.5]" />
+                          </button>
+                          <span className="text-xs font-black text-slate-900 px-1 min-w-[16px] text-center">
+                            {commonPassengerCount}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setCommonPassengerCount((prev) => prev + 1)}
+                            className="w-6 h-6 rounded-md bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white font-bold flex items-center justify-center cursor-pointer shadow-2xs transition-all"
+                          >
+                            <Plus className="w-3 h-3 stroke-[2.5]" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* 탑승객명 */}
+                      <input
+                        type="text"
+                        value={commonPassengerName}
+                        onChange={(e) => setCommonPassengerName(e.target.value)}
+                        placeholder="탑승객명 (홍길동)"
+                        className="w-full h-11 bg-white border border-slate-200/90 rounded-xl px-3.5 text-xs sm:text-sm font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#1E60F3] focus:ring-1 focus:ring-blue-100 shadow-2xs transition-all min-w-0"
+                      />
+
+                      {/* 탑승객 번호 */}
+                      <input
+                        type="tel"
+                        value={commonPassengerPhone}
+                        onChange={(e) => setCommonPassengerPhone(formatPhoneNumber(e.target.value))}
+                        placeholder="연락처 (010-1234-5678)"
+                        className="w-full h-11 bg-white border border-slate-200/90 rounded-xl px-3.5 text-xs sm:text-sm font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#1E60F3] focus:ring-1 focus:ring-blue-100 shadow-2xs transition-all min-w-0"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row 3: Sub-Card 4 (현장 요청) */}
+                  <div className="bg-[#F8FAFC] border border-slate-100 rounded-2xl p-2.5 sm:p-3 flex items-center gap-3">
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-xs font-bold text-slate-700 whitespace-nowrap">
+                        현장 요청
+                      </span>
+                    </div>
                     <input
                       type="text"
-                      value={commonPassengerName}
-                      onChange={(e) => setCommonPassengerName(e.target.value)}
-                      placeholder="탑승객명 (홍길동)"
-                      className="w-full h-11 bg-white border border-slate-200/90 rounded-xl px-3.5 text-xs sm:text-sm font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#1E60F3] focus:ring-1 focus:ring-blue-100 shadow-2xs transition-all min-w-0"
-                    />
-
-                    {/* 탑승객 번호 */}
-                    <input
-                      type="tel"
-                      value={commonPassengerPhone}
-                      onChange={(e) => setCommonPassengerPhone(formatPhoneNumber(e.target.value))}
-                      placeholder="연락처 (010-1234-5678)"
-                      className="w-full h-11 bg-white border border-slate-200/90 rounded-xl px-3.5 text-xs sm:text-sm font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#1E60F3] focus:ring-1 focus:ring-blue-100 shadow-2xs transition-all min-w-0"
+                      value={commonMemo}
+                      onChange={(e) => setCommonMemo(e.target.value)}
+                      placeholder="요청사항을 입력하세요 (예: 공항 피켓 영접, 미팅 후 이동 등)"
+                      className="w-full h-11 bg-white border border-slate-200/90 rounded-xl px-3.5 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#1E60F3] focus:ring-1 focus:ring-blue-100 shadow-2xs transition-all flex-1 min-w-0"
                     />
                   </div>
                 </div>
-
-                {/* Row 3: Sub-Card 4 (현장 요청) */}
-                <div className="bg-[#F8FAFC] border border-slate-100 rounded-2xl p-2.5 sm:p-3 flex items-center gap-3">
-                  <div className="flex items-center gap-2 shrink-0">
-                    <div className="w-7 h-7 rounded-lg bg-[#EBF2FE] text-[#1E60F3] flex items-center justify-center shrink-0">
-                      <FileText className="w-3.5 h-3.5 text-[#1E60F3]" />
-                    </div>
-                    <span className="text-xs font-bold text-slate-700 whitespace-nowrap">
-                      현장 요청
-                    </span>
-                  </div>
-                  <input
-                    type="text"
-                    value={commonMemo}
-                    onChange={(e) => setCommonMemo(e.target.value)}
-                    placeholder="요청사항을 입력하세요 (예: 공항 피켓 영접, 미팅 후 이동 등)"
-                    className="w-full h-11 bg-white border border-slate-200/90 rounded-xl px-3.5 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none focus:border-[#1E60F3] focus:ring-1 focus:ring-blue-100 shadow-2xs transition-all flex-1 min-w-0"
-                  />
-                </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
-        </div>
         )}
 
         {/* Live Conflict Warning Banner if any */}
