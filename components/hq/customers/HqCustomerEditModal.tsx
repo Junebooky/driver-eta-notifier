@@ -1,5 +1,6 @@
 'use client';
 
+import { HqTextarea } from '@/components/hq/ui';
 import React, { useState } from 'react';
 import { X, Heart, FileText, Check, Loader2 } from 'lucide-react';
 import { HqCustomer } from '@/types/customerHq';
@@ -87,7 +88,7 @@ export const HqCustomerEditModal: React.FC<HqCustomerEditModalProps> = ({
               <label className="block text-[11px] font-bold text-slate-800 mb-1">
                 선호사항 태그 (쉼표로 구분하여 입력)
               </label>
-              <textarea
+              <HqTextarea
                 rows={4}
                 value={preferencesText}
                 onChange={(e) => setPreferencesText(e.target.value)}
@@ -103,7 +104,7 @@ export const HqCustomerEditModal: React.FC<HqCustomerEditModalProps> = ({
               <label className="block text-[11px] font-bold text-slate-800 mb-1">
                 관리자 내부 메모 (한 줄에 하나씩 입력)
               </label>
-              <textarea
+              <HqTextarea
                 rows={6}
                 value={notesText}
                 onChange={(e) => setNotesText(e.target.value)}
