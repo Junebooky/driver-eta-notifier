@@ -1379,9 +1379,9 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                         haptics.lightTap();
                         onOpenDriverVehicleInfo(initialBooking);
                       }}
-                      className="h-8 px-2.5 rounded-lg text-xs font-bold bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 transition-all inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs active:scale-95 whitespace-nowrap"
+                      className="inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-[13px] bg-white px-3 text-[12px] font-semibold text-[#17233B] shadow-[0_4px_14px_rgba(35,49,78,0.055),0_1px_4px_rgba(35,49,78,0.025)] transition-all hover:bg-[#FAFBFD] hover:shadow-[0_5px_16px_rgba(35,49,78,0.08)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25"
                     >
-                      <ImageIcon className="w-3 h-3 text-[#1E60F3] shrink-0" />
+                      <ImageIcon className="size-3.5 shrink-0 text-[#1E60F3]" />
                       <span>배차 카드</span>
                     </button>
                   )}
