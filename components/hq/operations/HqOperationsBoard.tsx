@@ -646,7 +646,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
               }}
               className="w-12 h-12 sm:w-13 sm:h-13 object-contain shrink-0 transition-transform duration-200 group-hover/operations:scale-110 drop-shadow-xs"
             />
-            <div className="hidden w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-blue-50 border border-blue-100 text-[#1E60F3] items-center justify-center shrink-0 transition-transform duration-200 group-hover/operations:scale-110 shadow-2xs">
+            <div className="hidden w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-[#F7F9FC] text-[#1E60F3] items-center justify-center shrink-0 transition-transform duration-200 group-hover/operations:scale-110 shadow-2xs">
               <Activity className="w-6 h-6" />
             </div>
 
@@ -697,7 +697,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
             />
             <div className="min-w-0">
               <div className="text-xs text-slate-500 font-bold group-hover:text-slate-700">운영 중인 행사</div>
-              <div className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-0.5">
+              <div className="mt-1 text-[22px] font-bold tracking-[-0.035em] text-[#17233B] sm:text-[25px]">
                 {kpiStats.totalEvents}건
               </div>
             </div>
@@ -721,7 +721,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
             />
             <div className="min-w-0">
               <div className="text-xs text-slate-500 font-bold group-hover:text-slate-700">전체 배차</div>
-              <div className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-0.5">
+              <div className="mt-1 text-[22px] font-bold tracking-[-0.035em] text-[#17233B] sm:text-[25px]">
                 {kpiStats.totalVehicles}대
               </div>
             </div>
@@ -745,7 +745,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
             />
             <div className="min-w-0">
               <div className="text-xs text-slate-500 font-bold group-hover:text-slate-700">운행 중</div>
-              <div className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-0.5">
+              <div className="mt-1 text-[22px] font-bold tracking-[-0.035em] text-[#17233B] sm:text-[25px]">
                 {kpiStats.inTransit}대
               </div>
             </div>
@@ -769,7 +769,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
             />
             <div className="min-w-0">
               <div className="text-xs text-slate-500 font-bold group-hover:text-slate-700">완료</div>
-              <div className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-0.5">
+              <div className="mt-1 text-[22px] font-bold tracking-[-0.035em] text-[#17233B] sm:text-[25px]">
                 {kpiStats.completed}대
               </div>
             </div>
@@ -791,7 +791,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
               />
               <div className="min-w-0 flex-1">
                 <div className="text-xs text-slate-500 font-bold group-hover:text-slate-700">운영 진행률</div>
-                <div className="text-lg sm:text-xl font-black text-slate-900 mt-0.5 flex items-baseline gap-1">
+                <div className="mt-1 text-[21px] font-bold tracking-[-0.035em] text-[#17233B] sm:text-[23px] flex items-baseline gap-1">
                   <span>{kpiStats.progressRate}%</span>
                   <span className="text-[11px] text-slate-400 font-semibold truncate">
                     ({kpiStats.inTransit}/{kpiStats.totalVehicles}대)
@@ -821,7 +821,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
               haptics.selection();
               setActiveTab('all');
             }}
-            className={`px-4 py-2 rounded-xl font-black transition-all cursor-pointer whitespace-nowrap inline-flex items-center gap-1.5 ${activeTab === 'all'
+            className={`inline-flex min-h-10 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-[13px] px-4 text-[12px] font-semibold transition-colors ${activeTab === 'all'
               ? 'bg-[#EEF3FF] text-[#1E60F3]'
               : 'bg-white text-[#73839D] hover:text-[#17233B] hover:bg-[#F7F9FC]'
               }`}
@@ -838,7 +838,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
               haptics.selection();
               setActiveTab('running');
             }}
-            className={`px-4 py-2 rounded-xl font-black transition-all cursor-pointer whitespace-nowrap inline-flex items-center gap-1.5 ${activeTab === 'running'
+            className={`inline-flex min-h-10 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-[13px] px-4 text-[12px] font-semibold transition-colors ${activeTab === 'running'
               ? 'bg-[#EEF3FF] text-[#1E60F3]'
               : 'bg-white text-[#73839D] hover:text-[#17233B] hover:bg-[#F7F9FC]'
               }`}
@@ -855,7 +855,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
               haptics.selection();
               setActiveTab('closed');
             }}
-            className={`px-4 py-2 rounded-xl font-black transition-all cursor-pointer whitespace-nowrap inline-flex items-center gap-1.5 ${activeTab === 'closed'
+            className={`inline-flex min-h-10 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-[13px] px-4 text-[12px] font-semibold transition-colors ${activeTab === 'closed'
               ? 'bg-[#EEF3FF] text-[#1E60F3]'
               : 'bg-white text-[#73839D] hover:text-[#17233B] hover:bg-[#F7F9FC]'
               }`}
@@ -933,7 +933,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
                     <span className="rounded-full bg-[#F7F9FC] px-3 py-1.5 text-[12px] font-medium text-[#73839D]">
                       {group.customerTag}
                     </span>
-                    <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
+                    <h2 className="text-[18px] font-bold tracking-[-0.03em] text-[#17233B] sm:text-[20px]">
                       {group.eventName}
                     </h2>
                   </div>
@@ -996,19 +996,19 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
               {isExpanded && (
                 <div>
                   {/* Inner Sub-header: Count & Status Chips */}
-                  <div className="px-5 py-3 bg-[#F8FAFC] border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-3 bg-[#FAFBFD] px-5 py-3.5 text-[12px]">
                     <div className="font-black text-slate-900 flex items-center gap-2">
                       <span>배차 목록</span>
-                      <span className="px-2 py-0.5 rounded-full bg-blue-50 text-[#1E60F3] text-[11px] font-black border border-blue-100">
+                      <span className="rounded-full bg-[#F7F9FC] px-2.5 py-1 text-[11px] font-medium text-[#73839D]">
                         총 {totalVehiclesCount}대
                       </span>
                     </div>
 
                     <div className="flex items-center gap-3">
-                      <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700">
+                      <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[#31598F]">
                         <span className="relative flex h-2 w-2">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#1E60F3] opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-[#1E60F3]" />
                         </span>
                         <span>운행 중 {inTransitCount}</span>
                       </span>
@@ -1043,7 +1043,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
                   <div className="hidden md:block overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                       <thead>
-                        <tr className="border-b border-slate-100 bg-white text-[11px] font-black text-slate-400 uppercase tracking-wider select-none whitespace-nowrap">
+                        <tr className="border-b border-[#F1F4F9] bg-white text-[11px] font-medium text-[#73839D] tracking-wide select-none whitespace-nowrap">
                           <th className="py-3 px-5 w-16">#</th>
                           <th className="py-3 px-5">기사 (차량)</th>
                           <th className="py-3 px-5">이동 경로 (운행 여정)</th>
@@ -1065,7 +1065,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
                                 haptics.lightTap();
                                 setSelectedSchedule(item);
                               }}
-                              className="hover:bg-blue-50/40 transition-colors cursor-pointer group"
+                              className="cursor-pointer transition-colors hover:bg-[#FAFBFD] group"
                             >
                               {/* 1. 호차 순번 */}
                               <td className="py-3.5 px-5 whitespace-nowrap">
@@ -1091,10 +1091,10 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
 
                               {/* 3. 이동 경로 (우리만의 출발지/목적지 아이콘) */}
                               <td className="py-3.5 px-5 whitespace-nowrap">
-                                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-slate-50 group-hover:bg-white border border-slate-100/90 shadow-2xs transition-colors">
+                                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-slate-50 group-hover:bg-white  shadow-2xs transition-colors">
                                   {/* 출발지 */}
                                   <div className="flex items-center gap-1.5">
-                                    <div className="w-5.5 h-5.5 rounded-full bg-blue-50 border border-blue-100/80 flex items-center justify-center shrink-0">
+                                    <div className="w-5.5 h-5.5 rounded-full bg-[#F7F9FC] flex items-center justify-center shrink-0">
                                       <img
                                         src="/images/icons/driver_ui/icon_origin.png"
                                         alt="출발지"
@@ -1132,8 +1132,8 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
                                   >
                                     {statusConfig.isLive ? (
                                       <span className="relative flex h-2 w-2">
-                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#1E60F3] opacity-75" />
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-[#1E60F3]" />
                                       </span>
                                     ) : (
                                       <StatusIcon className="w-3 h-3" />
@@ -1182,7 +1182,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
                             haptics.lightTap();
                             setSelectedSchedule(item);
                           }}
-                          className="p-4 space-y-3 hover:bg-blue-50/20 transition-colors cursor-pointer group"
+                          className="group cursor-pointer space-y-3 p-4 transition-colors hover:bg-[#FAFBFD]"
                         >
                           {/* Row 1: Vehicle, Driver, Status */}
                           <div className="flex items-center justify-between gap-2">
@@ -1205,8 +1205,8 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
                             >
                               {statusConfig.isLive && (
                                 <span className="relative flex h-1.5 w-1.5">
-                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#1E60F3] opacity-75" />
+                                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#1E60F3]" />
                                 </span>
                               )}
                               <span>{statusConfig.label}</span>
@@ -1214,9 +1214,9 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
                           </div>
 
                           {/* Row 2: Route box */}
-                          <div className="p-2.5 rounded-2xl bg-slate-50 border border-slate-100/90 space-y-1.5 text-xs">
+                          <div className="p-2.5 rounded-2xl bg-slate-50  space-y-1.5 text-xs">
                             <div className="flex items-center gap-2">
-                              <div className="w-5 h-5 rounded-full bg-blue-50 border border-blue-100/80 flex items-center justify-center shrink-0">
+                              <div className="w-5 h-5 rounded-full bg-[#F7F9FC] flex items-center justify-center shrink-0">
                                 <img
                                   src="/images/icons/driver_ui/icon_origin.png"
                                   alt="출발지"
@@ -1273,7 +1273,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
                             [group.id]: !isShowingAll,
                           }));
                         }}
-                        className="text-xs font-black text-slate-700 hover:text-[#1E60F3] inline-flex items-center gap-1.5 transition-all cursor-pointer py-1.5 px-4 rounded-xl bg-white hover:bg-slate-100 border border-slate-200/80 shadow-2xs active:scale-95"
+                        className="text-xs font-black text-slate-700 hover:text-[#1E60F3] inline-flex items-center gap-1.5 transition-all cursor-pointer py-1.5 px-4 rounded-xl bg-white shadow-[0_4px_14px_rgba(35,49,78,0.05)] hover:bg-[#F5F8FF] active:scale-95"
                       >
                         {isShowingAll ? (
                           <>
@@ -1296,11 +1296,11 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
         })}
 
         {filteredGroups.length === 0 && (
-          <div className="p-12 text-center bg-white border border-slate-100/90 rounded-[28px] shadow-[0_6px_24px_rgba(15,23,42,0.05)] text-slate-400 space-y-3">
-            <div className="w-14 h-14 rounded-2xl bg-blue-50 text-[#1E60F3] flex items-center justify-center mx-auto shadow-2xs">
+          <div className="p-12 text-center bg-white  rounded-[28px] shadow-[0_6px_24px_rgba(15,23,42,0.05)] text-slate-400 space-y-3">
+            <div className="w-14 h-14 rounded-2xl bg-[#EEF3FF] text-[#1E60F3] flex items-center justify-center mx-auto shadow-2xs">
               <Activity className="w-7 h-7" />
             </div>
-            <p className="text-sm font-black text-slate-800">일치하는 행사나 배차 정보가 없습니다.</p>
+            <p className="text-[14px] font-semibold text-[#17233B]">일치하는 행사나 배차 정보가 없습니다.</p>
             <p className="text-xs text-slate-400">검색어 또는 필터를 변경해 보세요.</p>
           </div>
         )}
@@ -1318,10 +1318,10 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
           >
             <div className="flex items-center justify-between pb-3.5 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
-                <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-[#1E60F3] text-[11px] font-black border border-blue-200/60">
+                <span className="px-2.5 py-0.5 rounded-full bg-[#EEF3FF] text-[#1E60F3] text-[11px] font-black border border-blue-200/60">
                   {selectedEventInfo.customerTag}
                 </span>
-                <h3 className="text-base font-black text-slate-900 tracking-tight">
+                <h3 className="text-[17px] font-bold tracking-[-0.025em] text-[#17233B]">
                   {selectedEventInfo.eventName} 정보
                 </h3>
               </div>
@@ -1362,7 +1362,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
               <button
                 type="button"
                 onClick={() => setSelectedEventInfo(null)}
-                className="w-full py-3 bg-[#1E60F3] hover:bg-blue-700 text-white font-black text-xs sm:text-sm rounded-2xl transition-all shadow-md shadow-blue-500/20 active:scale-[0.98] cursor-pointer"
+                className="min-h-[52px] w-full cursor-pointer rounded-[15px] bg-[#1E60F3] px-4 text-[13px] font-semibold text-white shadow-[0_6px_16px_rgba(30,96,243,0.15)] transition-colors hover:bg-[#1757DC] active:scale-[0.99]"
               >
                 확인 완료
               </button>
@@ -1384,11 +1384,11 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-3.5 border-b border-slate-100">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-blue-50 text-[#1E60F3] flex items-center justify-center shadow-2xs shrink-0">
+                <div className="w-10 h-10 rounded-2xl bg-[#EEF3FF] text-[#1E60F3] flex items-center justify-center shadow-2xs shrink-0">
                   <History className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
+                  <h4 className="text-sm sm:text-[17px] font-bold tracking-[-0.025em] text-[#17233B]">
                     {formatDriverTitle(selectedSchedule.driverName)} 운행 상세
                   </h4>
                   <p className="text-[11px] text-slate-400 font-semibold">
@@ -1462,7 +1462,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
                   </div>
                 ))
               ) : (
-                <div className="text-center text-slate-400 py-6 text-xs bg-slate-50/80 rounded-2xl border border-dashed border-slate-200/90 space-y-1">
+                <div className="text-center text-slate-400 py-6 text-xs bg-[#FAFBFD] rounded-[18px] space-y-1">
                   <Clock className="w-5 h-5 text-slate-300 mx-auto mb-1" />
                   <p className="font-black text-slate-700">기사 Cockpit 실시간 연동 중</p>
                   <p className="text-[11px] text-slate-400">
@@ -1477,7 +1477,7 @@ export const HqOperationsBoard: React.FC<HqOperationsBoardProps> = ({
               <button
                 type="button"
                 onClick={(e) => handleSendArrivalNotice(e, selectedSchedule)}
-                className="px-4 py-2.5 rounded-2xl bg-blue-50 hover:bg-[#1E60F3] text-[#1E60F3] hover:text-white border border-blue-200/80 font-black text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-2xs active:scale-95 transition-all"
+                className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-[14px] bg-white px-4 text-[12px] font-semibold text-[#4D607C] shadow-[0_4px_14px_rgba(35,49,78,0.055)] transition-colors hover:bg-[#F5F8FF]"
               >
                 <img
                   src="/images/icons/driver_ui/icon_talk.png"
