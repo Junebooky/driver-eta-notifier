@@ -1,5 +1,6 @@
 'use client';
 
+import { HqInput, HqSelect, HqTextarea, HqButton } from '@/components/hq/ui';
 import React, { useState } from 'react';
 import { X, Building2, User, Plus, Loader2 } from 'lucide-react';
 import { HqCustomer, CustomerTier } from '@/types/customerHq';
@@ -141,28 +142,28 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
               <label className="block text-[11px] font-bold text-slate-800 mb-1">
                 고객사명 (Company Name) *
               </label>
-              <input
+              <HqInput
                 type="text"
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="예: DIOR Korea, Tiffany & Co."
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-[#1E60F3] outline-none text-slate-900 font-bold"
+                
               />
             </div>
             <div>
               <label className="block text-[11px] font-bold text-slate-800 mb-1">
                 고객사 등급 (Tier)
               </label>
-              <select
+              <HqSelect
                 value={tier}
                 onChange={(e) => setTier(e.target.value as CustomerTier)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-[#1E60F3] outline-none text-slate-900 font-bold"
+                
               >
                 <option value="VIP">VIP</option>
                 <option value="주요">주요 고객</option>
                 <option value="일반">일반 고객</option>
-              </select>
+              </HqSelect>
             </div>
           </div>
 
@@ -171,12 +172,12 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
             <label className="block text-[11px] font-bold text-slate-800 mb-1">
               주요 소관 부서
             </label>
-            <input
+            <HqInput
               type="text"
               value={department}
               onChange={(e) => setDepartment(e.target.value)}
               placeholder="예: Global Events, 의전비서팀, 홍보마케팅실"
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-[#1E60F3] outline-none text-slate-900"
+              
             />
           </div>
 
@@ -189,42 +190,42 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
             <div className="grid grid-cols-2 gap-2.5">
               <div>
                 <label className="block text-[10px] font-bold text-slate-600 mb-0.5">담당자명</label>
-                <input
+                <HqInput
                   type="text"
                   value={contactName}
                   onChange={(e) => setContactName(e.target.value)}
                   placeholder="예: Marie Dupont"
-                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900 font-bold"
+                  
                 />
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-slate-600 mb-0.5">직책/역할</label>
-                <input
+                <HqInput
                   type="text"
                   value={contactRole}
                   onChange={(e) => setContactRole(e.target.value)}
                   placeholder="예: Global Events Director"
-                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900"
+                  
                 />
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-slate-600 mb-0.5">연락처</label>
-                <input
+                <HqInput
                   type="tel"
                   value={contactPhone}
                   onChange={(e) => setContactPhone(formatPhoneNumber(e.target.value))}
                   placeholder="예: 010-1234-5678 또는 +33 6 12 34 56 78"
-                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900"
+                  
                 />
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-slate-600 mb-0.5">이메일</label>
-                <input
+                <HqInput
                   type="email"
                   value={contactEmail}
                   onChange={(e) => setContactEmail(e.target.value)}
                   placeholder="예: contact@company.com"
-                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-900"
+                  
                 />
               </div>
             </div>
@@ -236,24 +237,24 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
               <label className="block text-[11px] font-bold text-slate-800 mb-1">
                 다음 예정 행사명
               </label>
-              <input
+              <HqInput
                 type="text"
                 value={nextEventTitle}
                 onChange={(e) => setNextEventTitle(e.target.value)}
                 placeholder="예: 2024 Collection Preview"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-[#1E60F3] outline-none text-slate-900"
+                
               />
             </div>
             <div>
               <label className="block text-[11px] font-bold text-slate-800 mb-1">
                 행사 예정 일자
               </label>
-              <input
+              <HqInput
                 type="text"
                 value={nextEventDate}
                 onChange={(e) => setNextEventDate(e.target.value)}
                 placeholder="예: 2024. 11. 30"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-[#1E60F3] outline-none text-slate-900"
+                
               />
             </div>
           </div>
@@ -263,12 +264,12 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
             <label className="block text-[11px] font-bold text-slate-800 mb-1">
               주요 선호사항 (쉼표로 구분)
             </label>
-            <input
+            <HqInput
               type="text"
               value={preferencesInput}
               onChange={(e) => setPreferencesInput(e.target.value)}
               placeholder="예: S클래스 선호, 영어 가능 기사, 정시 출발 필수"
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-[#1E60F3] outline-none text-slate-900"
+              
             />
           </div>
 
@@ -277,28 +278,28 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
             <label className="block text-[11px] font-bold text-slate-800 mb-1">
               관리자 내부 메모 (의전 가이드라인)
             </label>
-            <textarea
+            <HqTextarea
               rows={3}
               value={notesInput}
               onChange={(e) => setNotesInput(e.target.value)}
               placeholder="행사 시 주의점 및 기사 배차 유의사항을 줄바꿈하여 입력하세요..."
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-[#1E60F3] outline-none text-slate-900 font-medium"
+              
             />
           </div>
 
           {/* Action buttons */}
           <div className="flex items-center justify-end gap-2 pt-3">
-            <button
+            <HqButton variant="subtle"
               type="button"
               onClick={onClose}
-              className="min-h-11 cursor-pointer rounded-[14px] bg-[#F7F9FC] px-4 text-[12px] font-semibold text-[#4D607C] transition-colors hover:bg-[#EDF1F6]"
+              
             >
               취소
-            </button>
-            <button
+            </HqButton>
+            <HqButton variant="primary"
               type="submit"
               disabled={isSubmitting}
-              className="flex min-h-11 cursor-pointer items-center gap-1.5 rounded-[14px] bg-[#1E60F3] px-5 text-[12px] font-semibold text-white shadow-[0_6px_16px_rgba(30,96,243,0.15)] transition-colors hover:bg-[#1757DC] disabled:cursor-not-allowed disabled:opacity-50 active:scale-[0.99]"
+              
             >
               {isSubmitting ? (
                 <>
@@ -311,7 +312,7 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
                   <span>고객사 등록 완료</span>
                 </>
               )}
-            </button>
+            </HqButton>
           </div>
         </form>
       </div>

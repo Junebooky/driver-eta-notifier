@@ -511,41 +511,23 @@ dialog::backdrop {
 }
 
 
-/* HQ Customer CRM A-plan. Scoped so driver and email workflows are unaffected. */
-.hq-customer-a :is(input[type="text"], input[type="search"], select),
-.hq-customer-modal-a :is(input:not([type="checkbox"]), select, textarea) {
+/* HQ customer list search only. Customer create/edit forms use HqInput/Select/Textarea. */
+.hq-customer-a :is(input[type="text"], input[type="search"], select) {
   min-height: 44px;
   background-color: #fff;
-  border: 1px solid rgba(225, 231, 240, 0.3);
+  border: 1px solid var(--hq-line, rgba(225,231,240,.28));
   border-radius: 15px;
-  color: #17233B;
-  box-shadow: 0 4px 14px rgba(35, 49, 78, 0.045);
+  color: var(--hq-ink, #17233B);
+  box-shadow: var(--hq-shadow-control, 0 4px 14px rgba(35,49,78,.045));
   outline: none;
-  transition: box-shadow 160ms ease;
 }
-.hq-customer-modal-a :is(input:not([type="checkbox"]), select, textarea) {
-  padding: 11px 14px;
-  font-size: 14px;
+.hq-customer-a :is(input[type="text"], input[type="search"], select):focus-visible {
+  border-color: rgba(30,96,243,.18);
+  box-shadow: var(--hq-shadow-control, 0 4px 14px rgba(35,49,78,.045)), 0 0 0 2px rgba(30,96,243,.12);
 }
-.hq-customer-a :is(input[type="text"], input[type="search"], select):focus-visible,
-.hq-customer-modal-a :is(input:not([type="checkbox"]), select, textarea):focus-visible {
-  border-color: rgba(30, 96, 243, .18);
-  box-shadow: 0 3px 12px rgba(35, 49, 78, .05), 0 0 0 2px rgba(30, 96, 243, .12);
+@media (max-width:767px) {
+  .hq-customer-a :is(input[type="text"], input[type="search"], select) { font-size: 16px; }
 }
-.hq-customer-modal-a :is(input, textarea)::placeholder {
-  color: #95A3B9;
-}
-@media (max-width: 767px) {
-  .hq-customer-a :is(input[type="text"], input[type="search"], select),
-  .hq-customer-modal-a :is(input:not([type="checkbox"]), select, textarea) {
-    font-size: 16px;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .hq-customer-a :is(input,select),
-  .hq-customer-modal-a :is(input,select,textarea) { transition: none; }
-}
-
 
 /* HQ Driver Management A-plan only; no changes to driver Cockpit forms. */
 .hq-drivers-a :is(input:not([type="checkbox"]), select, textarea),
@@ -658,4 +640,171 @@ dialog::backdrop {
 @media (max-width:767px) {
   .hq-quote-modal-a :is(input:not([type="checkbox"]),textarea,select),
   .hq-pricing-a :is(input:not([type="checkbox"]),textarea,select) { font-size: 16px; }
+}
+
+
+/* HQ A-plan design tokens & primitives (not applied to driver Cockpit or Settings). */
+:root {
+  --hq-accent: #1E60F3;
+  --hq-accent-hover: #1757DC;
+  --hq-ink: #17233B;
+  --hq-ink-muted: #61728A;
+  --hq-ink-soft: #73839D;
+  --hq-surface: #FFFFFF;
+  --hq-surface-muted: #FAFBFD;
+  --hq-surface-control: #F7F9FC;
+  --hq-selected: #F3F7FF;
+  --hq-selected-quiet: #EEF3FF;
+  --hq-line: rgba(225,231,240,.28);
+  --hq-shadow-card: 0 6px 20px rgba(35,49,78,.055), 0 2px 6px rgba(35,49,78,.025);
+  --hq-shadow-control: 0 4px 14px rgba(35,49,78,.045);
+  --hq-shadow-dialog: 0 24px 64px rgba(27,45,77,.16), 0 4px 14px rgba(27,45,77,.04);
+  --hq-radius-card: 23px;
+  --hq-radius-control: 14px;
+  --hq-radius-dialog: 26px;
+}
+.hq-ui-card {
+  border-radius: var(--hq-radius-card);
+  background: var(--hq-surface);
+  box-shadow: var(--hq-shadow-card);
+}
+.hq-ui-card[data-tone="muted"] {
+  background: var(--hq-surface-muted);
+  box-shadow: none;
+}
+.hq-ui-button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  border-radius: var(--hq-radius-control);
+  padding: 0 16px;
+  font-size: 12px;
+  line-height: 1.3;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 160ms ease, box-shadow 160ms ease, color 160ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.hq-ui-button[data-size="sm"] { min-height: 40px; padding-inline: 12px; }
+.hq-ui-button[data-size="lg"] { min-height: 52px; padding-inline: 20px; font-size: 13px; }
+.hq-ui-button[data-variant="primary"] { color: #fff; background: var(--hq-accent); box-shadow: 0 6px 16px rgba(30,96,243,.15); }
+.hq-ui-button[data-variant="primary"]:hover:not(:disabled) { background: var(--hq-accent-hover); }
+.hq-ui-button[data-variant="secondary"] { color: var(--hq-ink-muted); background: var(--hq-surface); box-shadow: var(--hq-shadow-control); }
+.hq-ui-button[data-variant="secondary"]:hover:not(:disabled) { background: #F5F8FF; }
+.hq-ui-button[data-variant="subtle"] { color: var(--hq-ink-muted); background: var(--hq-surface-control); }
+.hq-ui-button[data-variant="subtle"]:hover:not(:disabled) { background: #EDF1F6; }
+.hq-ui-button[data-variant="ghost"] { color: var(--hq-ink-muted); background: transparent; }
+.hq-ui-button[data-variant="ghost"]:hover:not(:disabled) { background: var(--hq-surface-control); }
+.hq-ui-button[data-variant="ghost"]:active:not(:disabled) { background: var(--hq-selected-quiet); }
+.hq-ui-button[data-variant="danger"] { color: #A34E45; background: #FFF4F2; }
+.hq-ui-button[data-variant="danger"]:hover:not(:disabled) { background: #FFE9E5; }
+.hq-ui-button:disabled { cursor: not-allowed; opacity: .45; }
+.hq-ui-button:focus-visible,
+.hq-ui-field:focus-visible,
+.hq-ui-tab:focus-visible {
+  outline: 2px solid rgba(30,96,243,.38);
+  outline-offset: 2px;
+}
+.hq-ui-icon-button { width: 40px; min-width: 40px; padding: 0; }
+.hq-ui-field {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--hq-line);
+  border-radius: 15px;
+  padding: 10px 14px;
+  outline: 0;
+  background: var(--hq-surface);
+  box-shadow: var(--hq-shadow-control);
+  color: var(--hq-ink);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.hq-ui-field::placeholder { color: #95A3B9; }
+.hq-ui-field:disabled { opacity: .5; cursor: not-allowed; }
+.hq-ui-field:focus-visible {
+  border-color: rgba(30,96,243,.18);
+  box-shadow: var(--hq-shadow-control), 0 0 0 2px rgba(30,96,243,.12);
+}
+.hq-ui-textarea { resize: vertical; min-height: 104px; }
+.hq-ui-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 11px;
+  line-height: 1.2;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--hq-surface-control);
+  color: var(--hq-ink-soft);
+}
+.hq-ui-badge[data-tone="selected"] { background: var(--hq-selected-quiet); color: var(--hq-accent); }
+.hq-ui-badge[data-tone="warning"] { background: #FFF9F1; color: #8E633F; }
+.hq-ui-badge[data-tone="critical"] { background: #FFF4F2; color: #A34E45; }
+.hq-ui-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  border-radius: 15px;
+  background: var(--hq-surface-control);
+  padding: 4px;
+}
+.hq-ui-tab {
+  display: inline-flex;
+  min-height: 40px;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--hq-ink-soft);
+  padding: 0 14px;
+  font-size: 12px;
+  line-height: 1.2;
+  font-weight: 600;
+  cursor: pointer;
+}
+.hq-ui-tab[aria-selected="true"] { background: #fff; color: var(--hq-accent); box-shadow: 0 3px 10px rgba(35,49,78,.065); }
+.hq-ui-tab:not([aria-selected="true"]):hover { color: var(--hq-ink); }
+.hq-ui-tooltip {
+  display: inline-flex;
+  white-space: nowrap;
+  border-radius: 12px;
+  background: var(--hq-surface);
+  padding: 8px 12px;
+  color: #4D607C;
+  font-size: 11px;
+  font-weight: 500;
+  box-shadow: 0 8px 22px rgba(35,49,78,.1);
+}
+.hq-ui-tooltip-caret { background: var(--hq-surface); }
+.hq-ui-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(23,35,59,.3);
+  padding: 12px;
+  backdrop-filter: blur(2px);
+}
+.hq-ui-modal-surface {
+  max-height: 94dvh;
+  border-radius: var(--hq-radius-dialog);
+  background: var(--hq-surface-muted);
+  box-shadow: var(--hq-shadow-dialog);
+  overflow: auto;
+}
+@media (max-width:767px) {
+  .hq-ui-field { font-size: 16px; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .hq-ui-button,.hq-ui-field,.hq-ui-tab { transition: none; }
 }
