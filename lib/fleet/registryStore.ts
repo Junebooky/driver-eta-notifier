@@ -1,5 +1,5 @@
 import { supabaseAdmin } from '@/lib/supabase/server';
-import type { VipRealVehicle } from '@/utils/vehicleData';
+import { VIP_REAL_VEHICLES, type VipRealVehicle } from '@/utils/vehicleData';
 import type { FleetRegistryRecord } from '@/utils/fleetVehicleRegistry';
 
 /**
@@ -17,6 +17,7 @@ export async function readFleetRegistry(): Promise<FleetRegistryRecord[]> {
       ? row.profile : {};
     const fleetId = String(row.id || '');
     const plate = String(row.plate || '');
+    const canonical = VIP_REAL_VEHICLES.find(v => v.uuid === fleetId || v.plate.replace(/\s/g, '') === plate.replace(/\s/g, ''));
     const status: VipRealVehicle['status'] = row.status === 'maintenance' || row.status === '정비 중'
       ? '정비 중'
       : row.status === 'driving' || row.status === '운행 중' ? '운행 중' : '차고지 대기';
@@ -25,7 +26,7 @@ export async function readFleetRegistry(): Promise<FleetRegistryRecord[]> {
     const fuelType = (['디젤', '가솔린', '하이브리드'].includes(row.fuel_type) ? row.fuel_type : '가솔린') as VipRealVehicle['fuelType'];
     const model = String(row.model || '');
     const profile: VipRealVehicle = {
-      id: String(extras.id || `vehicle-custom-${fleetId}`),
+      id: String(canonical?.id || extras.id || `vehicle-custom-${fleetId}`),
       uuid: fleetId,
       plate,
       plateShort: String(row.plate_short || plate.replace(/\s/g, '').slice(-4)),
