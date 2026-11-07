@@ -367,7 +367,20 @@ export function enrichBookingDraftWithEmailEvidence(
   const arrivalGroups = buildAirportArrivalPickupGroups(flights);
   const addresses = extractCustomerAddressEvidence(body, draft.pickupDate);
   const points = [...(draft.waypoints || [])].map((p) => ({ ...p }));
-  const warnings = [...draft.warnings];
+  const warnings = [...draft.warnings].filter(warning => {
+    // Ignore model-generated timing "conflicts" that mistake the second
+    // passenger group's flight arrival for the first group's pickup clock.
+    // Keep unrelated flight, terminal and pickup warnings unchanged.
+    const misleadingArrival = flights.find(flight =>
+      flight.role === 'arrival' &&
+      isSeparatePassengerArrivalGroup(flight, arrivalGroups) &&
+      warning.toUpperCase().includes(flight.flightNumber.toUpperCase())
+    );
+    return !(misleadingArrival &&
+      /픽업|pickup/i.test(warning) &&
+      /도착|arrival/i.test(warning) &&
+      /시간|time|before|earlier|later|늦|빠르|이전|조정/i.test(warning));
+  });
   const sourceStops = extractItineraryEvidence(body, draft.pickupDate);
   for (const source of sourceStops) {
     const onDay = points.filter(p => (p.date || draft.pickupDate) === source.date);
