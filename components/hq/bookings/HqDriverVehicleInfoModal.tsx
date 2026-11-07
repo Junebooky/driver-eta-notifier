@@ -15,6 +15,8 @@ import {
   Loader2,
   Clock,
   ShieldCheck,
+  ChevronDown,
+  Check,
 } from 'lucide-react';
 import { HqBooking, CustomerBrochureStatus } from '@/types/hq';
 import { DriverVehicleAssetBundle, DriverInfoDispatchLog } from '@/types/driverVehicleAsset';
@@ -28,6 +30,12 @@ export interface HqDriverVehicleInfoModalProps {
   onOpenAssetManager?: (driverId: string, vehiclePlate: string) => void;
   onDispatchRecorded?: (status: CustomerBrochureStatus, scheduleSynced: boolean) => void;
 }
+
+const DELIVERY_OPTIONS = [
+  { value: 'manual_copy', label: '문자 / 카카오톡 직접 전달', detail: '직접 전송한 내역을 기록' },
+  { value: 'email', label: '외부 이메일 직접 전달', detail: '이메일 전송 후 이력 기록' },
+  { value: 'download', label: '다운로드 준비 기록', detail: '안내자료 준비 상태만 저장' },
+] as const;
 
 export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> = ({
   isOpen,
@@ -49,6 +57,10 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
   const submittingRef = useRef(false);
   const loadGeneration = useRef(0);
   const [channel, setChannel] = useState<'manual_copy' | 'email' | 'download'>('manual_copy');
+  const [isChannelMenuOpen, setIsChannelMenuOpen] = useState(false);
+  const channelMenuRef = useRef<HTMLDivElement>(null);
+  const channelTriggerRef = useRef<HTMLButtonElement>(null);
+  const channelOptionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [feedback, setFeedback] = useState<{
     type: 'success' | 'warning' | 'error';
     message: string;
@@ -121,6 +133,46 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
     return () => { generation.current++; };
   }, [isOpen, loadData]);
 
+  // The open modal can be reused for a different dispatch card. Never keep
+  // a previous client's recipient or manual-delivery confirmation.
+  useEffect(() => {
+    if (!isOpen) return;
+    setRecipient(booking?.passengerPhone || '');
+    setManualDeliveryConfirmed(false);
+    setChannel('manual_copy');
+    setActiveTab('pc');
+    setIsChannelMenuOpen(false);
+    setFeedback(null);
+  }, [isOpen, currentBookingId]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (isChannelMenuOpen && !channelMenuRef.current?.contains(event.target as Node)) {
+        setIsChannelMenuOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      if (isChannelMenuOpen) {
+        setIsChannelMenuOpen(false);
+        channelTriggerRef.current?.focus();
+      } else {
+        onClose();
+      }
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isOpen, isChannelMenuOpen, onClose]);
+
+  useEffect(() => {
+    if (isChannelMenuOpen) channelOptionRefs.current[DELIVERY_OPTIONS.findIndex(option => option.value === channel)]?.focus();
+  }, [isChannelMenuOpen, channel]);
+
   if (!isOpen || !booking) return null;
 
   const isAssigned =
@@ -132,6 +184,7 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
 
   const bookingId = booking.scheduleId || booking.id;
   const currentAsset = activeTab === 'pc' ? bundle?.pcInfo : bundle?.mobileInfo;
+  const selectedDelivery = DELIVERY_OPTIONS.find(option => option.value === channel) || DELIVERY_OPTIONS[0];
 
   // Handle Download
   const handleDownload = () => {
