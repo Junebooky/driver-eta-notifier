@@ -10,6 +10,8 @@ interface HqDispatchTimeFieldProps {
   parseInput: (raw: string) => string | null;
   formatValue: (value: string) => string;
   disabled?: boolean;
+  compact?: boolean;
+  required?: boolean;
 }
 
 /**
@@ -18,7 +20,7 @@ interface HqDispatchTimeFieldProps {
  * The dropdown is in document flow so scrollable HQ modals cannot clip it.
  */
 export function HqDispatchTimeField({
-  label, value, onChange, parseInput, formatValue, disabled = false,
+  label, value, onChange, parseInput, formatValue, disabled = false, compact = false, required = false,
 }: HqDispatchTimeFieldProps) {
   const id = useId();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -88,14 +90,16 @@ export function HqDispatchTimeField({
   return (
     <div
       ref={rootRef}
-      className="min-w-0 rounded-[20px] bg-white p-4 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] sm:p-5"
+      className={compact
+        ? 'relative min-w-0'
+        : 'min-w-0 rounded-[20px] bg-white p-4 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] sm:p-5'}
       data-hq-dispatch-time={label}
     >
-      <div className="flex items-center gap-3">
-        <Clock aria-hidden="true" className="h-5 w-5 shrink-0 text-[#8290A1]" strokeWidth={1.8} />
+      <div className={compact ? 'flex items-end gap-2' : 'flex items-center gap-3'}>
+        {!compact && <Clock aria-hidden="true" className="h-5 w-5 shrink-0 text-[#8290A1]" strokeWidth={1.8} />}
         <div className="min-w-0 flex-1">
-          <label htmlFor={id} className="block text-[12px] font-medium text-[#73839D]">
-            {label}
+          <label htmlFor={id} className={compact ? 'mb-1.5 block text-xs font-bold text-[#17233B]' : 'block text-[12px] font-medium text-[#73839D]'}>
+            {label}{required && <span className="ml-0.5 text-[#1E60F3]"> *</span>}
           </label>
           <input
             id={id}
@@ -107,6 +111,7 @@ export function HqDispatchTimeField({
             placeholder="09:00 또는 오후 2:30"
             aria-label={`${label} 직접 입력`}
             aria-invalid={invalid || undefined}
+            aria-required={required || undefined}
             aria-controls={opened ? `${id}-options` : undefined}
             disabled={disabled}
             onFocus={() => { setOpened(true); setInvalid(false); }}
@@ -132,7 +137,9 @@ export function HqDispatchTimeField({
                 event.currentTarget.blur();
               }
             }}
-            className="mt-1.5 min-h-9 w-full min-w-0 rounded-[12px] bg-[#FAFBFD] px-3 text-[14px] font-semibold tabular-nums text-[#17233B] outline-none placeholder:text-[#9AA6B6] focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25 disabled:cursor-not-allowed disabled:opacity-50"
+            className={compact
+              ? 'h-11 w-full min-w-0 rounded-[13px] bg-white px-3 text-[14px] font-semibold tabular-nums text-[#17233B] shadow-[0_4px_14px_rgba(35,49,78,0.045)] outline-none placeholder:text-[#9AA6B6] focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25 disabled:cursor-not-allowed disabled:opacity-50 sm:h-12'
+              : 'mt-1.5 min-h-9 w-full min-w-0 rounded-[12px] bg-[#FAFBFD] px-3 text-[14px] font-semibold tabular-nums text-[#17233B] outline-none placeholder:text-[#9AA6B6] focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25 disabled:cursor-not-allowed disabled:opacity-50'}
           />
         </div>
         <button
@@ -142,7 +149,7 @@ export function HqDispatchTimeField({
           aria-controls={`${id}-options`}
           disabled={disabled}
           onClick={() => { setOpened(prev => !prev); setInvalid(false); }}
-          className="flex size-10 shrink-0 items-center justify-center rounded-[13px] bg-[#F7F9FC] text-[#73839D] transition-colors hover:bg-[#EEF3FF] hover:text-[#1E60F3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25 disabled:opacity-40"
+          className={`flex shrink-0 items-center justify-center rounded-[13px] bg-[#F7F9FC] text-[#73839D] transition-colors hover:bg-[#EEF3FF] hover:text-[#1E60F3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25 disabled:opacity-40 ${compact ? 'size-11 sm:size-12' : 'size-10'}`}
         >
           <ChevronDown aria-hidden="true" className={`h-4 w-4 transition-transform ${opened ? 'rotate-180' : ''}`} />
         </button>
