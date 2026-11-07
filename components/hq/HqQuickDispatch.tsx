@@ -2584,7 +2584,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
 
         {/* Live Conflict Warning Banner if any */}
         {totalLiveConflicts > 0 && (
-          <div className="mt-3 p-3 rounded-xl bg-slate-900 border border-slate-700 text-xs font-bold text-white space-y-1 shadow-sm">
+          <div className="mt-3 space-y-1 rounded-[16px] bg-[#FFF9F1] p-4 text-[12px] font-medium text-[#8E633F]">
             <div className="flex items-center gap-1.5">
               <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
               <span>기존 배차와 일정 중복이 감지되었습니다 ({totalLiveConflicts}건)</span>
@@ -2597,7 +2597,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
 
         {/* Error Banner */}
         {errorMsg && (
-          <div className="mt-3 p-3 rounded-xl bg-slate-900 border border-slate-700 flex items-start gap-2 text-xs font-bold text-white shadow-sm">
+          <div className="mt-3 flex items-start gap-2 rounded-[16px] bg-[#FFF4F2] p-4 text-[12px] font-medium text-[#A34E45]">
             <AlertTriangle className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
             <span>{errorMsg}</span>
           </div>
@@ -2605,7 +2605,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
 
         {/* Success Banner */}
         {notificationMsg && (
-          <div className="mt-3 p-3 rounded-xl bg-emerald-50 border border-emerald-200 flex items-start gap-2 text-xs font-bold text-emerald-800">
+          <div className="mt-3 flex items-start gap-2 rounded-[16px] bg-[#EEF3FF] p-4 text-[12px] font-medium text-[#31598F]">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
             <span>{notificationMsg}</span>
           </div>
@@ -2624,10 +2624,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
               haptics.lightTap();
               handleSubmit('unassigned');
             }}
-            className="w-full h-11 sm:h-12 bg-white border border-slate-200 hover:bg-slate-50 active:scale-[0.98] text-slate-800 font-bold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer disabled:opacity-50"
+            className="flex min-h-[52px] w-full cursor-pointer items-center justify-center gap-2 rounded-[16px] bg-white px-3 text-[13px] font-semibold text-[#17233B] shadow-[0_5px_16px_rgba(35,49,78,0.055),0_2px_5px_rgba(35,49,78,0.025)] transition-all hover:bg-[#FAFBFD] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <FileText className="w-4 h-4 text-slate-700 shrink-0" />
-            <span>{initialBooking ? '수정사항 저장' : '예약만 등록'}</span>
+            <span>{initialBooking ? '변경 내용 저장' : '예약만 등록'}</span>
           </button>
 
           {/* 바로 배차 / 배차 확정하기 */}
@@ -2638,14 +2638,14 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
               haptics.selection();
               handleSubmit('published');
             }}
-            className="w-full h-11 sm:h-12 bg-[#1E60F3] hover:bg-blue-600 active:scale-[0.98] text-white font-bold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-2 shadow-md shadow-blue-500/25 transition-all cursor-pointer disabled:opacity-50"
+            className="flex min-h-[52px] w-full cursor-pointer items-center justify-center gap-2 rounded-[16px] bg-[#1E60F3] px-3 text-[13px] font-semibold text-white shadow-[0_6px_16px_rgba(30,96,243,0.15)] transition-all hover:bg-[#1757DC] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20 disabled:cursor-not-allowed disabled:bg-[#E5EAF2] disabled:text-[#95A3B9] disabled:shadow-none"
           >
             {isSubmitting ? (
               <RefreshCw className="w-4 h-4 animate-spin text-white shrink-0" />
             ) : (
               <Send className="w-4 h-4 text-white shrink-0" />
             )}
-            <span>{initialBooking ? '배차 확정하기' : '바로 배차'}</span>
+            <span>{initialBooking ? '배차 확정' : '바로 배차'}</span>
           </button>
         </div>
 
@@ -2666,17 +2666,17 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                   setIsCancelConfirmOpen(true);
                 }}
                 disabled={isSubmitting || isCancelling}
-                className="ml-auto flex min-h-9 items-center justify-center gap-1.5 rounded-xl px-3 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+                className="ml-auto flex min-h-10 cursor-pointer items-center justify-center gap-1.5 rounded-[13px] px-3.5 text-[12px] font-medium text-[#73839D] transition-colors hover:bg-white hover:text-[#4D607C] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <Ban className="h-3.5 w-3.5 text-slate-400" strokeWidth={1.7} />
-                예약·배차 취소
+                배차 취소
               </button>
             ) : (
-              <section aria-label="예약 취소 확인" className="space-y-3 rounded-2xl bg-[#F7F9FC] p-3.5 sm:p-4">
+              <section aria-label="예약 취소 확인" className="space-y-3 rounded-[20px] bg-white p-4 shadow-[0_6px_20px_rgba(35,49,78,0.055)] sm:p-5">
                 <div>
-                  <h3 className="text-[13px] font-semibold text-slate-800">예약·배차를 취소할까요?</h3>
+                  <h3 className="text-[13px] font-semibold text-slate-800">배차를 취소할까요?</h3>
                   <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                    취소하면 담당 기사 Cockpit에도 취소 상태가 반영됩니다. 작성 중인 수정사항은 저장되지 않습니다.
+                    취소하면 담당 기사 Cockpit에도 취소 상태가 반영됩니다. 작성 중인 변경 내용은 저장되지 않습니다.
                   </p>
                 </div>
                 <label className="block space-y-1.5">
@@ -2688,7 +2688,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                     maxLength={240}
                     disabled={isCancelling}
                     placeholder="취소 사유를 입력해 주세요"
-                    className="h-11 w-full rounded-xl bg-white px-3.5 text-sm text-slate-800 outline-none ring-1 ring-slate-200/60 transition-shadow placeholder:text-slate-400 focus:ring-[#B9C7DF] disabled:opacity-60"
+                    className="min-h-[52px] w-full rounded-[16px] bg-white px-4 text-[14px] font-medium text-[#17233B] shadow-[0_5px_16px_rgba(35,49,78,0.045)] outline-none placeholder:text-[#95A3B9] focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20 disabled:opacity-60"
                   />
                 </label>
                 <div className="grid grid-cols-2 gap-2">
@@ -2696,7 +2696,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                     type="button"
                     disabled={isCancelling}
                     onClick={() => { haptics.lightTap(); setIsCancelConfirmOpen(false); }}
-                    className="min-h-10 rounded-xl bg-white text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 disabled:opacity-50"
+                    className="min-h-11 rounded-[14px] bg-[#F7F9FC] text-[12px] font-semibold text-[#4D607C] transition-colors hover:bg-[#EDF1F6] disabled:opacity-50"
                   >
                     돌아가기
                   </button>
@@ -2704,10 +2704,10 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                     type="button"
                     disabled={isCancelling || isSubmitting}
                     onClick={handleCancelDispatch}
-                    className="flex min-h-10 items-center justify-center gap-2 rounded-xl bg-rose-50 px-3 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex min-h-11 items-center justify-center gap-2 rounded-[14px] bg-[#FFF4F2] px-3 text-[12px] font-semibold text-[#A34E45] transition-colors hover:bg-[#FFE9E5] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {isCancelling && <RefreshCw className="h-3.5 w-3.5 animate-spin" />}
-                    {isCancelling ? '취소 처리 중…' : '예약 취소 확정'}
+                    {isCancelling ? '취소 처리 중…' : '배차 취소 확정'}
                   </button>
                 </div>
               </section>
@@ -2761,7 +2761,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
         role="dialog"
         aria-modal="true"
         aria-label={initialBooking ? '예약 · 배차 수정' : '빠른 예약 · 배차'}
-        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200"
+        className="fixed inset-0 z-[80] flex items-center justify-center overflow-y-auto bg-[#17233B]/30 p-2.5 backdrop-blur-[2px] animate-in fade-in duration-200 sm:p-6"
         onClick={(e) => {
           if (e.target === e.currentTarget) {
             haptics.lightTap();
@@ -2769,7 +2769,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
           }
         }}
       >
-        <div className={`relative w-full ${initialBooking ? 'max-w-3xl bg-[#FAFBFD] p-5 sm:p-6' : 'max-w-4xl bg-white p-5 sm:p-7'} max-h-[92vh] overflow-y-auto rounded-3xl border border-slate-200/90 shadow-2xl flex flex-col justify-between my-auto animate-in zoom-in-95 duration-150`}>
+        <div className={`relative my-auto flex max-h-[94dvh] w-full flex-col justify-between overflow-y-auto overscroll-contain rounded-[24px] border-0 outline-none shadow-[0_26px_76px_rgba(27,45,77,0.16),0_4px_14px_rgba(27,45,77,0.045)] animate-in zoom-in-95 duration-150 sm:max-h-[90dvh] sm:rounded-[28px] ${initialBooking ? 'max-w-[760px] bg-[#FAFBFD] p-5 sm:p-7' : 'max-w-4xl bg-white p-5 sm:p-7'}`}>
           {content}
         </div>
       </div>
