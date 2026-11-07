@@ -1,4 +1,4 @@
-import { VIP_REAL_VEHICLES, reconcileRegisteredVehicle, type VipRealVehicle } from '@/utils/vehicleData';
+import type { VipRealVehicle } from '@/utils/vehicleData';
 
 export interface FleetRegistryRecord {
   vehicle_id: string;
@@ -13,11 +13,13 @@ export interface FleetRegistryRecord {
 export const normalizeFleetPlate = (plate: string) => plate.trim().replace(/[\s-]/g, '').toLowerCase();
 
 /**
- * Server registry is authoritative for created / removed vehicles.
- * Stock vehicles remain available unless a matching server tombstone archives them.
- * Browser localStorage must never decide fleet availability.
+ * DB cockpit.vehicles is authoritative. A deleted/archived row is never
+ * selectable, and a missing vehicle must not be silently resurrected from
+ * localStorage or the hardcoded original catalog.
+ *
+ * Optional stock is only for isolated fixture tests, never production.
  */
-export function mergeFleetRegistry(records: FleetRegistryRecord[], stock = VIP_REAL_VEHICLES): VipRealVehicle[] {
+export function mergeFleetRegistry(records: FleetRegistryRecord[], stock: VipRealVehicle[] = []): VipRealVehicle[] {
   const byPlate = new Map<string, VipRealVehicle>();
   for (const vehicle of stock) byPlate.set(normalizeFleetPlate(vehicle.plate), vehicle);
   for (const row of records) {
@@ -28,7 +30,7 @@ export function mergeFleetRegistry(records: FleetRegistryRecord[], stock = VIP_R
       continue;
     }
     if (!row.profile?.plate || normalizeFleetPlate(row.profile.plate) !== key) continue;
-    byPlate.set(key, reconcileRegisteredVehicle(row.profile));
+    byPlate.set(key, row.profile);
   }
   return [...byPlate.values()];
 }
