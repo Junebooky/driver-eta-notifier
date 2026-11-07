@@ -2786,7 +2786,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
         isOpen={isDriverModalOpen}
         onClose={() => setIsDriverModalOpen(false)}
         initialDriverId={currentDriverId}
-        drivers={allDrivers}
+        drivers={hqDrivers}
         requiredLanguage={commonLanguage === 'en' ? 'english' : 'any'}
         targetDate={pickupDate}
         targetTime={pickupTimeOnly}
