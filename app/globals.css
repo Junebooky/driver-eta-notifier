@@ -617,3 +617,24 @@ dialog::backdrop {
   .hq-email-a :is(input[type="text"],input[type="search"]),
   .hq-email-compose-a :is(input:not([type="checkbox"]),textarea) { font-size: 16px; }
 }
+
+
+/* HQ booking detail A-plan; other recently completed dispatch modals untouched. */
+.hq-booking-residual-a :is(input:not([type="checkbox"]), select, textarea) {
+  background-color: #fff;
+  border: 1px solid rgba(225,231,240,.28);
+  border-radius: 15px;
+  color: #17233B;
+  box-shadow: 0 4px 14px rgba(35,49,78,.045);
+  outline: none;
+  transition: box-shadow 160ms ease;
+}
+.hq-booking-residual-a :is(input:not([type="checkbox"]), select, textarea):focus-visible {
+  border-color: rgba(30,96,243,.18);
+  box-shadow: 0 4px 14px rgba(35,49,78,.045), 0 0 0 2px rgba(30,96,243,.12);
+}
+@media (max-width:767px) {
+  .hq-booking-residual-a :is(input:not([type="checkbox"]), select, textarea) {
+    font-size: 16px;
+  }
+}
