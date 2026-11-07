@@ -280,8 +280,8 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
               <strong className="font-semibold text-[#17233B]">{booking.driverName || '미배정'}</strong>
             </div>
 
-            <div className="flex items-center gap-1.5 font-bold">
-              <Car className="w-3.5 h-3.5 text-[#1E60F3]" />
+            <div className="flex items-center gap-2 font-medium">
+              <Car className="size-4 text-[#73839D]" />
               <span className="text-[#73839D]">배정 차량:</span>
               <strong className="font-semibold text-[#17233B]">
                 {booking.vehicleModel} ({booking.vehiclePlate || '미배정'})
@@ -351,14 +351,14 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
             </div>
           ) : !bundle?.isReadyForCustomerDispatch ? (
             /* Condition 2: Assigned, but Info is Missing */
-            <div className="py-12 px-6 text-center bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+            <div className="space-y-3 rounded-[24px] bg-white px-6 py-12 text-center shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)]">
               <div className="mx-auto flex size-14 items-center justify-center rounded-[19px] bg-[#F7F9FC] text-[#73839D]">
                 <AlertTriangle className="w-6 h-6" />
               </div>
-              <h3 className="text-base font-black text-slate-900">
+              <h3 className="text-[17px] font-bold tracking-tight text-[#17233B]">
                 Info 미등록 (발송 차단)
               </h3>
-              <p className="text-xs text-slate-600 max-w-md mx-auto leading-relaxed">
+              <p className="mx-auto max-w-md text-[13px] leading-6 text-[#73839D]">
                 <strong className="font-semibold text-[#17233B]">[{booking.driverName}]</strong> 기사님의{' '}
                 <strong className="font-semibold text-[#17233B]">[{booking.vehicleModel} ({booking.vehiclePlate})]</strong> 실차 조합
                 PC/모바일 안내 이미지가 Supabase에 아직 등록되지 않았습니다.
@@ -406,8 +406,8 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
                     aria-pressed={activeTab === 'mobile'}
                     className={`flex min-h-10 cursor-pointer items-center gap-1.5 rounded-[12px] px-3 sm:px-4 text-[12px] font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25 ${
                       activeTab === 'mobile'
-                        ? 'bg-white text-slate-900 shadow-xs'
-                        : 'text-slate-500 hover:text-slate-800'
+                        ? 'bg-white text-[#17233B] shadow-[0_3px_10px_rgba(35,49,78,0.07)]'
+                        : 'text-[#73839D] hover:text-[#17233B]'
                     }`}
                   >
                     <Smartphone className={activeTab === 'mobile' ? 'size-4 text-[#1E60F3]' : 'size-4 text-[#95A3B9]'} />
@@ -421,7 +421,7 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
                     onClick={handleDownload}
                     className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-1.5 rounded-[14px] bg-white px-3.5 text-[12px] font-semibold text-[#4D607C] shadow-[0_5px_16px_rgba(35,49,78,0.045),0_2px_5px_rgba(35,49,78,0.02)] transition-all hover:bg-[#FAFBFD] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25"
                   >
-                    <Download className="w-3.5 h-3.5 text-slate-500" />
+                    <Download className="size-4 text-[#73839D]" />
                     <span>고화질 원본 다운로드</span>
                   </button>
                 )}
