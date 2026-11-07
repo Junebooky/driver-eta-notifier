@@ -2,17 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireHqAdmin } from '@/lib/auth/serverAuth';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { readFleetOperations, FleetOperation } from '@/lib/fleet/operationsStore';
-import { VIP_REAL_VEHICLES } from '@/utils/vehicleData';
+import { mergeFleetRegistry } from '@/utils/fleetVehicleRegistry';
+import { readFleetRegistry } from '@/lib/fleet/registryStore';
+import type { VipRealVehicle } from '@/utils/vehicleData';
 import { cleanVehicleIdentity } from '@/utils/dispatchConflictDetector';
 
 export const dynamic = 'force-dynamic';
 
-function responseMaps(rows: FleetOperation[]) {
+function responseMaps(rows: FleetOperation[], activeVehicles: VipRealVehicle[]) {
   const statuses: Record<string, FleetOperation['status']> = {};
   const memos: Record<string, string> = {};
   const colors: Record<string, string> = {};
   for (const row of rows) {
-    const vehicle = VIP_REAL_VEHICLES.find(v => v.uuid === row.vehicle_id);
+    const vehicle = activeVehicles.find(v => v.uuid === row.vehicle_id);
     if (!vehicle) continue;
     for (const key of [vehicle.id, row.vehicle_id, cleanVehicleIdentity(row.plate)]) {
       statuses[key] = row.status; memos[key] = row.memo; colors[key] = row.color;
@@ -25,7 +27,8 @@ export async function GET(req: NextRequest) {
   const auth = await requireHqAdmin(req);
   if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
   try {
-    return NextResponse.json({ ok: true, ...responseMaps(await readFleetOperations()) });
+    const [operations, registry] = await Promise.all([readFleetOperations(), readFleetRegistry()]);
+    return NextResponse.json({ ok: true, ...responseMaps(operations, mergeFleetRegistry(registry)) });
   } catch {
     return NextResponse.json({ ok: false, error: '차량 상태 조회에 실패했습니다. 저장된 상태를 확인할 수 없습니다.' }, { status: 503 });
   }
@@ -36,7 +39,8 @@ export async function POST(req: NextRequest) {
   if (!auth.ok || !auth.session) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.statusCode });
   try {
     const body = await req.json();
-    const vehicle = VIP_REAL_VEHICLES.find(v => v.uuid === body.vehicleId || v.id === body.vehicleId);
+    const activeVehicles = mergeFleetRegistry(await readFleetRegistry());
+    const vehicle = activeVehicles.find(v => v.uuid === body.vehicleId || v.id === body.vehicleId);
     if (!vehicle?.uuid || (body.plate && cleanVehicleIdentity(body.plate) !== cleanVehicleIdentity(vehicle.plate))) {
       return NextResponse.json({ ok: false, error: '차량 ID와 전체 번호판을 확인해 주세요.' }, { status: 400 });
     }
@@ -51,7 +55,7 @@ export async function POST(req: NextRequest) {
       updated_by: auth.session.userId, updated_at: new Date().toISOString(),
     }, { onConflict: 'vehicle_id' }).select('*').single();
     if (error || !data) throw new Error('save failed');
-    return NextResponse.json({ ok: true, ...responseMaps([data]) });
+    return NextResponse.json({ ok: true, ...responseMaps([data], activeVehicles) });
   } catch {
     return NextResponse.json({ ok: false, error: '차량 상태가 저장되지 않았습니다. DB 연결 및 마이그레이션을 확인해 주세요.' }, { status: 503 });
   }
