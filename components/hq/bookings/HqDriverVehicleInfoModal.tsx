@@ -428,43 +428,46 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
                 )}
               </div>
 
-              {/* Image Preview Box */}
-              <div className="bg-slate-900/5 rounded-2xl border border-slate-200 p-4 flex items-center justify-center min-h-[300px] overflow-hidden">
+              {/* Premium white preview: retain original asset, no decorative overlays */}
+              <div className="flex min-h-[260px] items-center justify-center overflow-hidden rounded-[24px] bg-white p-4 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] sm:min-h-[320px] sm:p-6">
                 {currentAsset?.signedUrl ? (
-                  <div className="relative group max-h-[420px] flex items-center justify-center">
+                  <div className="relative flex w-full items-center justify-center rounded-[16px] bg-[#FAFBFD] px-3 py-5 sm:px-5 sm:py-6">
                     <img
                       src={currentAsset.signedUrl}
-                      alt={`${booking.driverName} ${booking.vehicleModel} ${activeTab.toUpperCase()}`}
-                      className="max-h-[400px] w-auto max-w-full rounded-xl shadow-md object-contain"
+                      alt={String(booking.driverName || '') + ' ' + String(booking.vehicleModel || '') + ' ' + (activeTab === 'pc' ? 'PC 가로형' : '모바일 세로형') + ' 안내자료'}
+                      className="max-h-[400px] w-auto max-w-full rounded-[12px] object-contain shadow-[0_6px_18px_rgba(35,49,78,0.10)] sm:max-h-[460px]"
                     />
                     <a
                       href={currentAsset.signedUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1 rounded-xl"
+                      aria-label="안내자료 원본 새 창에서 보기"
+                      title="원본 크게 보기"
+                      className="absolute right-3 top-3 flex size-10 items-center justify-center rounded-[12px] bg-white/95 text-[#4D607C] shadow-[0_4px_14px_rgba(35,49,78,0.09)] transition-colors hover:text-[#1E60F3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/30"
                     >
-                      <ExternalLink className="w-4 h-4" /> 브라우저 새 탭에서 원본 보기
+                      <ExternalLink className="size-4" />
                     </a>
                   </div>
                 ) : (
-                  <div className="text-center p-8 text-slate-400">
-                    <p className="text-xs font-bold">
-                      {activeTab === 'pc' ? 'PC 가로형' : '모바일 세로형'} 이미지가 등록되지 않았습니다.
+                  <div className="space-y-2 px-4 py-10 text-center">
+                    <p className="text-[14px] font-semibold text-[#17233B]">
+                      {activeTab === 'pc' ? 'PC 가로형' : '모바일 세로형'} 이미지가 아직 없습니다
                     </p>
+                    <p className="text-[12px] text-[#73839D]">기사·차량 안내자료를 등록하면 여기서 확인할 수 있어요.</p>
                   </div>
                 )}
               </div>
 
-              {/* Asset Meta Specs */}
+              {/* Exact source asset details stay visible under the preview */}
               {currentAsset && (
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-[11px] text-slate-500 flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-bold text-slate-700 truncate">{currentAsset.fileName}</span>
-                  <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 px-1 text-[11px] leading-relaxed text-[#73839D]">
+                  <span className="max-w-full truncate font-semibold text-[#4D607C]" title={currentAsset.fileName}>{currentAsset.fileName}</span>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                     {currentAsset.width && currentAsset.height && (
-                      <span>해상도: {currentAsset.width} × {currentAsset.height} px</span>
+                      <span>해상도 {currentAsset.width} × {currentAsset.height} px</span>
                     )}
-                    <span>파일 크기: {Math.round(currentAsset.fileSize / 1024)} KB</span>
-                    <span>버전: v{currentAsset.version}</span>
+                    <span>파일 크기 {Math.round(currentAsset.fileSize / 1024)} KB</span>
+                    <span>버전 v{currentAsset.version}</span>
                   </div>
                 </div>
               )}
