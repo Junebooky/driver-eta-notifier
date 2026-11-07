@@ -960,7 +960,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                 <button
                   type="button"
                   onClick={() => void handleRestoreAllVehicles()}
-                  disabled={registryBusy}}
+                  disabled={registryBusy}
                   className="flex min-h-9 cursor-pointer items-center gap-1.5 rounded-[12px] bg-white px-3 text-[11px] font-semibold text-[#73839D] shadow-[0_3px_10px_rgba(35,49,78,0.04)] transition-colors hover:bg-[#F5F8FF]"
                   title="삭제된 차량 초기화 및 복구"
                 >
@@ -1055,7 +1055,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                   <button
                     type="button"
                     onClick={() => void handleRestoreAllVehicles()}
-                    disabled={registryBusy}}
+                    disabled={registryBusy}
                     className="mt-2 inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-[12px] bg-[#F7F9FC] px-3 text-[12px] font-semibold text-[#4D607C] transition-colors hover:bg-[#EDF1F6]"
                   >
                     <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
