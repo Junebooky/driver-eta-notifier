@@ -425,6 +425,34 @@ export function enrichBookingDraftWithEmailEvidence(
   ).map((p, i) => ({ ...p, order: i + 1 }));
   const enriched = (ordered.length >= 2 ? applyMovementEvidence(ordered, body, draft.pickupDate) : ordered)
     .map((point) => ({ ...point, location: canonicalKoreanPlaceName(point.location) }));
+  // The airport is one physical route stop, but the driver must meet each
+  // flight's passengers separately. Keep both meeting groups on that stop.
+  const seenArrivalPairs = new Set<string>();
+  for (const group of arrivalGroups) {
+    const key = group.date + ':' + group.airport;
+    if (group.totalGroups < 2 || seenArrivalPairs.has(key)) continue;
+    seenArrivalPairs.add(key);
+    const sameAirportGroups = arrivalGroups.filter(item =>
+      item.date === group.date && item.airport === group.airport
+    );
+    const codePattern: Record<string, RegExp> = {
+      GMP: /김포|gimpo/i, ICN: /인천|incheon/i,
+      PUS: /김해|gimhae/i, CJU: /제주|jeju/i,
+    };
+    const airportPattern = codePattern[group.airport];
+    if (!airportPattern) continue;
+    const airportStop = enriched.find(point =>
+      point.date === group.date && airportPattern.test(point.location)
+    );
+    if (!airportStop) continue;
+    airportStop.notes = withNote(airportStop.notes,
+      '입국 그룹별 픽업 · ' + sameAirportGroups.map(item =>
+        item.sequence + '차 ' + item.flightNumber + ' ' +
+        (item.arrivalTime || '도착시각 미정') +
+        (item.passengers.length ? ' (' + item.passengers.join(', ') + ')' : '')
+      ).join(' / ')
+    );
+  }
   const first = enriched[0], last = enriched.at(-1);
   // A 22:25 KE2104 arrival followed by 22:30 NH867 is two separately
   // arriving passenger groups. It is NOT a booking-time conflict for one
