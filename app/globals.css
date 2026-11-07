@@ -545,3 +545,49 @@ dialog::backdrop {
   .hq-customer-a :is(input,select),
   .hq-customer-modal-a :is(input,select,textarea) { transition: none; }
 }
+
+
+/* HQ Driver Management A-plan only; no changes to driver Cockpit forms. */
+.hq-drivers-a :is(input:not([type="checkbox"]), select, textarea),
+.hq-driver-form-a :is(input:not([type="checkbox"]), select, textarea),
+.hq-driver-detail-a :is(input:not([type="checkbox"]), select, textarea) {
+  background-color: #fff;
+  border: 1px solid rgba(225, 231, 240, .28);
+  border-radius: 15px;
+  box-shadow: 0 4px 14px rgba(35, 49, 78, .045);
+  color: #17233B;
+  outline: none;
+  transition: box-shadow 160ms ease;
+}
+.hq-drivers-a :is(input:not([type="checkbox"]), select, textarea):focus-visible,
+.hq-driver-form-a :is(input:not([type="checkbox"]), select, textarea):focus-visible,
+.hq-driver-detail-a :is(input:not([type="checkbox"]), select, textarea):focus-visible {
+  border-color: rgba(30, 96, 243, .18);
+  box-shadow: 0 4px 14px rgba(35, 49, 78, .045), 0 0 0 2px rgba(30, 96, 243, .12);
+}
+.hq-driver-form-a :is(input:not([type="checkbox"]), select, textarea) {
+  min-height: 44px;
+  padding: 10px 14px;
+  font-size: 14px;
+}
+.hq-drivers-a :is(input,textarea)::placeholder,
+.hq-driver-form-a :is(input,textarea)::placeholder {
+  color: #95A3B9;
+}
+.hq-drivers-a table thead {
+  background-color: #FAFBFD;
+}
+.hq-drivers-a table tbody tr:hover {
+  background-color: #FAFBFD;
+}
+@media (max-width: 767px) {
+  .hq-drivers-a :is(input:not([type="checkbox"]), select,textarea),
+  .hq-driver-form-a :is(input:not([type="checkbox"]), select,textarea),
+  .hq-driver-detail-a :is(input:not([type="checkbox"]), select,textarea) {
+    font-size: 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hq-drivers-a :is(button,input,select,textarea),
+  .hq-driver-form-a :is(button,input,select,textarea) { transition: none; }
+}
