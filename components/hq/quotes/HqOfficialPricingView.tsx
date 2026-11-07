@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { HqCard } from '@/components/hq/ui';
+import { HqCard, HqSegmentedTabs } from '@/components/hq/ui';
 import {
   Car,
   Truck,
@@ -413,36 +413,22 @@ export const HqOfficialPricingView: React.FC<HqOfficialPricingViewProps> = ({
         </button>
       </HqCard>
 
-      {/* 1. Top Segmented Capsule Tabs */}
-      <div className="flex items-center gap-1.5 overflow-x-auto rounded-[20px] bg-white p-3 sm:px-5 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden shadow-2xs">
-        {/* Category Pill Tabs */}
-        {CATEGORY_TABS.map((tab) => {
-          const isSelected = activeTab === tab.id;
-          const count = tabCounts[tab.id];
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => {
-                haptics.selection();
-                setActiveTab(tab.id);
-              }}
-              className={`flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-[13px] px-3.5 text-[12px] font-semibold transition-colors ${isSelected
-                ? 'bg-[#EEF3FF] text-[#1E60F3] font-semibold'
-                : 'bg-white text-[#73839D] shadow-[0_3px_10px_rgba(35,49,78,0.045)] hover:bg-[#F7F9FC]'
-                }`}
-            >
-              <span>{tab.label}</span>
-              <span
-                className={`text-[11px] ${isSelected ? 'font-semibold text-[#1E60F3]' : 'text-slate-400 font-medium'
-                  }`}
-              >
-                {count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      {/* 1. Shared HQ segmented category tabs */}
+      <HqCard className="p-3 sm:px-5">
+        <HqSegmentedTabs
+          aria-label="요금표 차종 선택"
+          value={activeTab}
+          tabs={CATEGORY_TABS.map((tab) => ({
+            id: tab.id,
+            label: tab.label,
+            count: tabCounts[tab.id],
+          }))}
+          onValueChange={(id) => {
+            haptics.selection();
+            setActiveTab(id as CategoryTabId);
+          }}
+        />
+      </HqCard>
 
       {/* 2. Unified Pricing Table (Single Clean Table Container) */}
       <div className="overflow-hidden rounded-[23px] bg-white shadow-[0_6px_20px_rgba(35,49,78,0.055)]">
