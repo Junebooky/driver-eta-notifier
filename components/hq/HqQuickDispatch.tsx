@@ -1243,6 +1243,11 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
   const currentDriverPhone = currentDriverObj?.phone || initialBooking?.driverPhone || '010-0000-0000';
   const currentDriverAvatar = currentDriverObj?.avatarUrl || getDriverProfileImage({ name: currentDriverName });
 
+  // All dispatch quick actions are quiet secondary actions: one consistent
+  // surface, size, elevation and subtle hover. Blue is reserved for key CTAs.
+  const dispatchQuickActionClass = 'inline-flex min-h-10 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-[13px] bg-white px-3.5 text-[12px] font-semibold text-[#17233B] shadow-[0_4px_14px_rgba(35,49,78,0.055),0_1px_4px_rgba(35,49,78,0.025)] transition-[background-color,box-shadow,transform] hover:bg-[#F5F8FF] hover:shadow-[0_5px_16px_rgba(35,49,78,0.08)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25 disabled:cursor-not-allowed disabled:opacity-50';
+  const dispatchStatusClass = 'inline-flex min-h-7 items-center gap-1.5 rounded-full bg-[#F7F9FC] px-3 py-1 text-[11px] font-medium text-[#73839D]';
+
   const content = (
     <div
       className={`@container ${initialBooking ? 'hq-dispatch-info-a bg-transparent' : 'bg-white'} select-none flex flex-col justify-between ${isModal
@@ -1326,12 +1331,12 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                 {/* Badges on the right */}
                 <div className="flex flex-wrap items-center justify-end gap-1.5 shrink-0">
                   {/* 배차 완료 Badge */}
-                  <span className="rounded-full bg-[#F1F4F9] px-3 py-1.5 text-[11px] font-semibold text-[#4D607C]">
+                  <span className={dispatchStatusClass}>
                     {initialBooking.dispatchStatus || '배차 완료'}
                   </span>
                   {/* 기사 확인 현황 Badge */}
                   <span
-                    className="inline-flex items-center gap-1 rounded-full bg-[#F7F9FC] px-3 py-1.5 text-[11px] font-medium text-[#73839D]"
+                    className={dispatchStatusClass}
                   >
                     {initialBooking.driverAck === '확인완료' ? (
                       <CheckCircle2 className="size-3.5 shrink-0 text-[#1E60F3]" />
@@ -1359,9 +1364,9 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                         haptics.lightTap();
                         onOpenCustomerMessage(initialBooking);
                       }}
-                      className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-[13px] bg-white px-3.5 text-[12px] font-semibold text-[#17233B] shadow-[0_4px_14px_rgba(35,49,78,0.055),0_1px_4px_rgba(35,49,78,0.025)] transition-all hover:bg-[#FAFBFD] active:scale-[0.98]"
+                      className={dispatchQuickActionClass}
                     >
-                      <MessageSquareText className="w-3 h-3 shrink-0" />
+                      <MessageSquareText className="size-3.5 shrink-0 text-[#73839D]" />
                       <span>안내 문자</span>
                     </button>
                   )}
@@ -1372,18 +1377,18 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                         haptics.lightTap();
                         onOpenDriverVehicleInfo(initialBooking);
                       }}
-                      className="inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-[13px] bg-white px-3 text-[12px] font-semibold text-[#17233B] shadow-[0_4px_14px_rgba(35,49,78,0.055),0_1px_4px_rgba(35,49,78,0.025)] transition-all hover:bg-[#FAFBFD] hover:shadow-[0_5px_16px_rgba(35,49,78,0.08)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25"
+                      className={dispatchQuickActionClass}
                     >
-                      <ImageIcon className="size-3.5 shrink-0 text-[#1E60F3]" />
+                      <ImageIcon className="size-3.5 shrink-0 text-[#73839D]" />
                       <span>배차 카드</span>
                     </button>
                   )}
                   {driverSmsHref && (
                     <a
                       href={driverSmsHref}
-                      className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-[13px] bg-white px-3.5 text-[12px] font-semibold text-[#4D607C] shadow-[0_4px_14px_rgba(35,49,78,0.055),0_1px_4px_rgba(35,49,78,0.025)] transition-all hover:bg-[#FAFBFD] active:scale-[0.98]"
+                      className={dispatchQuickActionClass}
                     >
-                      <MessageSquareText className="w-3 h-3 text-slate-500 shrink-0" />
+                      <MessageSquareText className="size-3.5 shrink-0 text-[#73839D]" />
                       <span>기사 문자</span>
                     </a>
                   )}
@@ -1392,9 +1397,9 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                       type="button"
                       onClick={handleRemindClick}
                       disabled={isReminding}
-                      className={`inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-[13px] px-3.5 text-[12px] font-semibold shadow-[0_4px_14px_rgba(35,49,78,0.055),0_1px_4px_rgba(35,49,78,0.025)] transition-all active:scale-[0.98] ${remindSuccess ? 'bg-[#EEF3FF] text-[#1E60F3]' : 'bg-white text-[#4D607C] hover:bg-[#FAFBFD]'}`}
+                      className={dispatchQuickActionClass}
                     >
-                      <BellRing className={`w-3 h-3 shrink-0 ${isReminding ? 'animate-bounce text-[#1E60F3]' : 'text-slate-500'}`} />
+                      <BellRing className={`size-3.5 shrink-0 text-[#73839D] ${isReminding ? 'animate-pulse' : ''}`} />
                       <span>{remindSuccess ? '요청 완료' : isReminding ? '요청 중' : '재요청'}</span>
                     </button>
                   )}

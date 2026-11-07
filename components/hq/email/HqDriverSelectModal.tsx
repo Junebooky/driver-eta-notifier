@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Search, Check, Loader2, Globe2, UserRound, Phone } from 'lucide-react';
+import { X, Search, Check, Loader2, Globe2, UserRound, Phone, ChevronLeft, ChevronRight } from 'lucide-react';
 import { haptics } from '@/utils/haptics';
 import { HqDriverSummary } from '@/types/driverHq';
 import { useHqDrivers } from '@/utils/useHqDrivers';
+import { DRIVERS_PER_PAGE, paginateDriverItems } from '@/utils/driverPickerPagination';
 
 export interface AvailableDriverItem {
   id: string;
@@ -65,6 +66,8 @@ export const HqDriverSelectModal: React.FC<HqDriverSelectModalProps> = ({
   const [selectedDriverId, setSelectedDriverId] = useState(initialDriverId);
   const onCloseRef = useRef(onClose);
   const searchRef = useRef<HTMLInputElement>(null);
+  const pagesRef = useRef<HTMLDivElement>(null);
+  const [currentPage, setCurrentPage] = useState(0);
   onCloseRef.current = onClose;
 
   useEffect(() => {
@@ -78,6 +81,28 @@ export const HqDriverSelectModal: React.FC<HqDriverSelectModalProps> = ({
     setOnlyAvailable(true);
     setSearch('');
   }, [isOpen, initialDriverId, requiredLanguage]);
+
+  // Filters only change the visible list, never the dialog's height.
+  useEffect(() => {
+    setCurrentPage(0);
+    if (pagesRef.current) pagesRef.current.scrollLeft = 0;
+  }, [isOpen, search, englishOnly, onlyAvailable]);
+
+  // Open on the page containing the current driver assignment, if present.
+  // Keep the current assignment visible, even when it is driver #5 or later.
+  useEffect(() => {
+    if (!isOpen || !mounted) return;
+    const matchingDrivers = driversList.filter(driver =>
+      driver.isAvailable && !excludedDriverIds.includes(driver.id) &&
+      (requiredLanguage !== 'english' || driverSupportsEnglish(driver))
+    ).sort((a, b) => Number(b.isAvailable) - Number(a.isAvailable) || a.name.localeCompare(b.name, 'ko'));
+    const selectedIndex = matchingDrivers.findIndex(driver => driver.id === initialDriverId);
+    const target = selectedIndex < 0 ? 0 : Math.floor(selectedIndex / DRIVERS_PER_PAGE);
+    setCurrentPage(target);
+    if (pagesRef.current) pagesRef.current.scrollLeft = target * pagesRef.current.clientWidth;
+  // Intentionally initialize for each opened booking. Active filters reset separately.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, mounted, initialDriverId, driversList.length]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -104,6 +129,15 @@ export const HqDriverSelectModal: React.FC<HqDriverSelectModalProps> = ({
       .some((word) => word.toLocaleLowerCase().includes(q))) return false;
     return true;
   }).sort((a,b) => Number(b.isAvailable) - Number(a.isAvailable) || a.name.localeCompare(b.name, 'ko'));
+  const driverPages = paginateDriverItems(filteredDrivers);
+  const pageCount = driverPages.length;
+  const goToPage = (index: number) => {
+    const next = Math.max(0, Math.min(index, pageCount - 1));
+    setCurrentPage(next);
+    if (pagesRef.current) {
+      pagesRef.current.scrollTo({ left: next * pagesRef.current.clientWidth, behavior: 'smooth' });
+    }
+  };
   const selected = driversList.find((driver) => driver.id === selectedDriverId);
   const canConfirm = Boolean(selected?.isAvailable && !isExcluded(selected.id) &&
     (requiredLanguage !== 'english' || driverSupportsEnglish(selected)) &&
@@ -118,7 +152,7 @@ export const HqDriverSelectModal: React.FC<HqDriverSelectModalProps> = ({
         role="dialog"
         aria-modal="true"
         aria-labelledby="driver-picker-title"
-        className="flex max-h-[88vh] w-full max-w-lg flex-col overflow-hidden rounded-[26px] bg-[#FAFBFD] shadow-[0_24px_64px_rgba(27,45,77,0.16),0_4px_14px_rgba(27,45,77,0.04)] animate-in zoom-in-95 duration-200"
+        className="flex h-[min(744px,94dvh)] w-full max-w-lg flex-col overflow-hidden rounded-[26px] bg-[#FAFBFD] shadow-[0_24px_64px_rgba(27,45,77,0.16),0_4px_14px_rgba(27,45,77,0.04)] animate-in zoom-in-95 duration-200"
       >
         {/* Header */}
         <div className="shrink-0 p-5 pb-3 sm:p-6 sm:pb-3.5 space-y-3.5">
@@ -202,85 +236,111 @@ export const HqDriverSelectModal: React.FC<HqDriverSelectModalProps> = ({
           </div>
         </div>
 
-        {/* Drivers List */}
-        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain px-4 pb-4 sm:px-6">
+        {/* Fixed-height driver viewport. Filters never resize the modal. */}
+        <div className="flex min-h-0 flex-1 flex-col px-4 pb-2 sm:px-6">
           {hookDrivers.isLoading && propDrivers === undefined && !driversList.length ? (
-            <div className="flex items-center justify-center gap-2 py-16 text-xs text-slate-500">
-              <Loader2 className="h-4 w-4 animate-spin text-[#1E60F3]" /> 기사 프로필을 불러오고 있습니다.
+            <div className="flex h-full items-center justify-center gap-2 text-[13px] text-[#73839D]">
+              <Loader2 className="size-4 animate-spin text-[#1E60F3]" /> 기사 정보를 불러오고 있어요.
             </div>
           ) : hookDrivers.error && propDrivers === undefined && !driversList.length ? (
-            <p role="alert" className="py-14 text-center text-sm text-slate-500">{hookDrivers.error}</p>
+            <div role="alert" className="flex h-full items-center justify-center px-4 text-center text-[13px] text-[#73839D]">{hookDrivers.error}</div>
           ) : filteredDrivers.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 py-14 text-center">
-              <UserRound className="h-10 w-10 text-slate-300" strokeWidth={1.4} />
-              <p className="text-sm font-semibold text-slate-600">조건에 맞는 기사님이 없습니다.</p>
+            <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+              <UserRound className="size-10 text-[#95A3B9]" strokeWidth={1.4} />
+              <p className="text-[13px] font-semibold text-[#4D607C]">조건에 맞는 기사님이 없어요.</p>
               <button
                 type="button"
                 onClick={() => { setSearch(''); setOnlyAvailable(false); if (requiredLanguage !== 'english') setEnglishOnly(false); }}
-                className="rounded-xl bg-slate-100 px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
+                className="min-h-10 cursor-pointer rounded-[13px] bg-white px-4 text-[12px] font-semibold text-[#4D607C] shadow-[0_4px_14px_rgba(35,49,78,0.055)] hover:bg-[#F5F8FF]"
               >
                 전체 기사 보기
               </button>
             </div>
           ) : (
-            filteredDrivers.map((driver) => {
-              const active = selectedDriverId === driver.id;
-              const english = driverSupportsEnglish(driver);
-              const blocked = isExcluded(driver.id);
-              const canChoose = driver.isAvailable && !blocked;
-
-              return (
-                <button
-                  key={driver.id}
-                  type="button"
-                  onClick={() => {
-                    if (canChoose) setSelectedDriverId(driver.id);
-                  }}
-                  aria-pressed={active}
-                  disabled={!canChoose}
-                  className={`group relative flex w-full items-center justify-between rounded-[17px] p-3.5 sm:p-4 text-left transition-all ${
-                    active
-                      ? 'bg-[#EEF3FF] shadow-[0_5px_16px_rgba(35,49,78,0.07)]'
-                      : 'bg-white shadow-[0_4px_14px_rgba(35,49,78,0.045)] hover:bg-[#FAFBFD]'
-                  } disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer`}
-                >
-                  <div className="flex items-center gap-3.5 min-w-0">
-                    <div className={`flex h-13 w-13 sm:h-14 sm:w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-100 ${
-                      active ? 'ring-2 ring-[#1E60F3]/20' : ''
-                    }`}>
-                      {driver.avatarUrl ? (
-                        <img src={driver.avatarUrl} alt={driver.name} className="h-full w-full object-cover" loading="lazy" />
-                      ) : (
-                        <UserRound className="h-6 w-6 text-slate-400" strokeWidth={1.5} aria-hidden="true" />
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm sm:text-base font-bold text-slate-900 tracking-tight">
-                        {driver.name} 기사님
-                      </p>
-                      <p className="mt-0.5 truncate text-xs text-slate-500 font-medium">
-                        소속 · {driver.affiliation || driver.residence || '소속 미등록'}
-                      </p>
-                      <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-slate-500 font-medium">
-                        <span>한국어{english ? ' · 영어 가능' : ''}</span>
-                        {typeof driver.careerYears === 'number' && driver.careerYears > 0 && (
-                          <span>· 경력 {driver.careerYears}년</span>
-                        )}
-                        {blocked ? (
-                          <span className="font-bold text-rose-500">· 배정 불가</span>
-                        ) : !driver.isAvailable ? (
-                          <span className="text-slate-400">· 일정 불가</span>
-                        ) : null}
-                      </div>
-                    </div>
+            <>
+              <div
+                ref={pagesRef}
+                aria-label="기사 목록, 좌우로 넘겨 볼 수 있어요"
+                onScroll={(event) => {
+                  const width = event.currentTarget.clientWidth;
+                  if (width) setCurrentPage(Math.min(pageCount - 1, Math.round(event.currentTarget.scrollLeft / width)));
+                }}
+                className="flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden scroll-smooth overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              >
+                {driverPages.map((page, pageIndex) => (
+                  <div
+                    key={page.map(driver => driver.id).join(':')}
+                    className="flex h-full w-full shrink-0 snap-start snap-always flex-col gap-2 overflow-y-auto overscroll-contain pb-2"
+                    aria-label={'기사 목록 ' + (pageIndex + 1) + '/' + pageCount}
+                  >
+                    {page.map((driver) => {
+                      const active = selectedDriverId === driver.id;
+                      const english = driverSupportsEnglish(driver);
+                      const blocked = isExcluded(driver.id);
+                      const canChoose = driver.isAvailable && !blocked;
+                      return (
+                        <button
+                          key={driver.id}
+                          type="button"
+                          onClick={() => { if (canChoose) setSelectedDriverId(driver.id); }}
+                          aria-pressed={active}
+                          disabled={!canChoose}
+                          className={'group relative flex min-h-[79px] w-full shrink-0 cursor-pointer items-center justify-between gap-3 rounded-[17px] px-3.5 py-2.5 text-left transition-all sm:min-h-[83px] sm:px-4 ' +
+                            (active ? 'bg-[#EEF3FF] shadow-[0_4px_14px_rgba(35,49,78,0.065)]' :
+                              'bg-white shadow-[0_4px_14px_rgba(35,49,78,0.045)] hover:bg-[#F5F8FF]') +
+                            ' disabled:cursor-not-allowed disabled:opacity-50'}
+                        >
+                          <span className="flex min-w-0 items-center gap-3">
+                            <span className={'flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#F7F9FC] sm:size-13 ' +
+                              (active ? 'ring-2 ring-[#1E60F3]/25' : '')}>
+                              {driver.avatarUrl ? (
+                                <img src={driver.avatarUrl} alt={driver.name} className="size-full object-cover" loading="lazy" />
+                              ) : (
+                                <UserRound className="size-6 text-[#95A3B9]" strokeWidth={1.5} aria-hidden="true" />
+                              )}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-[13px] font-semibold text-[#17233B] sm:text-[14px]">{driver.name} 기사님</span>
+                              <span className="mt-0.5 block truncate text-[11px] text-[#73839D]">소속 · {driver.affiliation || driver.residence || '소속 미등록'}</span>
+                              <span className="mt-0.5 block text-[11px] text-[#73839D]">
+                                한국어{english ? ' · 영어 가능' : ''}
+                                {typeof driver.careerYears === 'number' && driver.careerYears > 0 ? ' · 경력 ' + driver.careerYears + '년' : ''}
+                              </span>
+                              {blocked || !driver.isAvailable ? <span className="block text-[11px] text-[#A34E45]">배정 불가</span> : null}
+                            </span>
+                          </span>
+                          {active && <Check className="size-5 shrink-0 text-[#1E60F3]" strokeWidth={2.5} aria-label="선택한 기사님" />}
+                        </button>
+                      );
+                    })}
                   </div>
-
-                  {active && (
-                    <Check className="h-5 w-5 text-[#1E60F3] stroke-[2.5] shrink-0 ml-3" aria-label="선택한 기사님" />
-                  )}
-                </button>
-              );
-            })
+                ))}
+              </div>
+              <div className="flex h-11 shrink-0 items-center justify-between gap-2 border-t border-[#E9EDF4]/70 pt-2">
+                <p className="text-[11px] font-medium text-[#73839D]">
+                  {pageCount > 1 ? '좌우로 밀어서 다른 기사님도 볼 수 있어요' : '기사님을 선택해 주세요'}
+                </p>
+                {pageCount > 1 && (
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      aria-label="이전 기사 목록"
+                      disabled={currentPage === 0}
+                      onClick={() => goToPage(currentPage - 1)}
+                      className="flex size-9 cursor-pointer items-center justify-center rounded-full bg-white text-[#4D607C] shadow-[0_2px_8px_rgba(35,49,78,0.045)] disabled:cursor-not-allowed disabled:opacity-30"
+                    ><ChevronLeft className="size-4" /></button>
+                    <span aria-live="polite" className="min-w-8 text-center text-[11px] font-semibold tabular-nums text-[#73839D]">{currentPage + 1}/{pageCount}</span>
+                    <button
+                      type="button"
+                      aria-label="다음 기사 목록"
+                      disabled={currentPage >= pageCount - 1}
+                      onClick={() => goToPage(currentPage + 1)}
+                      className="flex size-9 cursor-pointer items-center justify-center rounded-full bg-white text-[#4D607C] shadow-[0_2px_8px_rgba(35,49,78,0.045)] disabled:cursor-not-allowed disabled:opacity-30"
+                    ><ChevronRight className="size-4" /></button>
+                  </div>
+                )}
+              </div>
+            </>
           )}
         </div>
 
