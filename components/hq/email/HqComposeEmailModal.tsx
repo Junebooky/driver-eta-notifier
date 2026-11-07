@@ -418,19 +418,19 @@ const HqComposeEmailModalContent: React.FC<HqComposeEmailModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 overscroll-contain">
-      <div className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden max-h-[92vh] overscroll-contain">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[#17233B]/30 p-3 backdrop-blur-[2px] sm:p-6 animate-in fade-in duration-200 overscroll-contain">
+      <div className="hq-email-compose-a flex max-h-[94dvh] w-full max-w-3xl flex-col overflow-hidden rounded-[26px] bg-[#FAFBFD] shadow-[0_24px_64px_rgba(27,45,77,0.16),0_4px_14px_rgba(27,45,77,0.04)] overscroll-contain">
         {/* Header */}
-        <div className="px-6 py-4 bg-gradient-to-r from-[#0B1E48] to-[#123485] text-white flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3 bg-white px-5 py-5 sm:px-6 sm:py-6">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-500/20 border border-blue-400/30 flex items-center justify-center">
-              <Mail className="w-4 h-4 text-blue-300" />
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-[15px] bg-[#EEF3FF] text-[#1E60F3]">
+              <Mail className="size-5 text-[#1E60F3]" />
             </div>
             <div>
-              <h2 className="text-base font-black tracking-tight">
+              <h2 className="text-[19px] font-bold tracking-[-0.03em] text-[#17233B]">
                 {initialSubject?.startsWith('Re:') ? '이메일 회신 (답장)' : '새 이메일 작성'}
               </h2>
-              <p className="text-[11px] text-blue-200/80 font-medium">
+              <p className="mt-1 text-[12px] font-medium leading-relaxed text-[#73839D]">
                 VIP LIMOUSINE KOREA 공식 NAVER SMTP 메일 서버를 통해 고객/기사에게 발송됩니다.
               </p>
             </div>
@@ -438,17 +438,17 @@ const HqComposeEmailModalContent: React.FC<HqComposeEmailModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-white/10 text-white/80 transition-colors"
+            className="flex size-10 cursor-pointer items-center justify-center rounded-full bg-[#F7F9FC] text-[#73839D] transition-colors hover:bg-[#EDF1F6]"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSendEmail} className="flex-1 overflow-y-auto p-6 space-y-4 overscroll-contain">
+        <form onSubmit={handleSendEmail} className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain p-5 sm:p-6">
           {/* Success Banner */}
           {successToast && (
-            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2 text-emerald-800 text-xs font-bold animate-in fade-in">
+            <div className="flex items-center gap-2 rounded-[16px] bg-[#EEF3FF] p-4 text-[12px] font-medium text-[#31598F] animate-in fade-in">
               <Check className="w-4 h-4 text-emerald-600" />
               <span>{successToast}</span>
             </div>
@@ -456,7 +456,7 @@ const HqComposeEmailModalContent: React.FC<HqComposeEmailModalProps> = ({
 
           {/* Error Banner */}
           {errorMessage && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 text-red-800 text-xs font-bold animate-in fade-in">
+            <div className="flex items-center gap-2 rounded-[16px] bg-[#FFF4F2] p-4 text-[12px] font-medium text-[#A34E45] animate-in fade-in">
               <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
               <span>{errorMessage}</span>
             </div>
@@ -465,8 +465,8 @@ const HqComposeEmailModalContent: React.FC<HqComposeEmailModalProps> = ({
           {/* Sender (Read-only branding) */}
           <div className="flex items-center gap-3 text-xs">
             <span className="w-16 font-bold text-slate-500 text-right">보낸 사람</span>
-            <div className="flex-1 py-1 px-2.5 bg-slate-50 border border-slate-200/80 rounded-lg text-slate-700 font-medium text-xs flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            <div className="flex min-h-10 flex-1 items-center gap-2 rounded-[13px] bg-white px-4 text-[12px] font-medium text-[#4D607C]">
+              <span className="size-2 rounded-full bg-[#1E60F3]" />
               <span className="font-bold text-slate-900">VIP LIMOUSINE KOREA 관제팀</span>
               <span className="text-slate-400">&lt;관제 연동 계정&gt;</span>
             </div>
@@ -480,7 +480,7 @@ const HqComposeEmailModalContent: React.FC<HqComposeEmailModalProps> = ({
                   받는 사람 *
                 </label>
                 {toEmails.length > 0 && (
-                  <span className="px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold">
+                  <span className="rounded-full bg-[#EEF3FF] px-2 py-1 text-[#31598F] text-[10px] font-bold">
                     총 {toEmails.length}명
                   </span>
                 )}
@@ -516,8 +516,8 @@ const HqComposeEmailModalContent: React.FC<HqComposeEmailModalProps> = ({
                     type="button"
                     onClick={() => handleAddRecipient(c.email)}
                     className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-all cursor-pointer ${isSelected
-                      ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
-                      : 'bg-slate-100 hover:bg-blue-50 hover:text-blue-600 text-slate-600 border-slate-200/60'
+                      ? 'bg-[#EEF3FF] text-[#1E60F3]'
+                      : 'bg-white hover:bg-[#F7F9FC] text-[#73839D]'
                       }`}
                   >
                     {isSelected ? '✓ ' : '+ '}
@@ -575,7 +575,7 @@ const HqComposeEmailModalContent: React.FC<HqComposeEmailModalProps> = ({
           </div>
 
           {/* Quick Template Selector */}
-          <div className="flex items-center gap-2 p-2.5 bg-blue-50/60 border border-blue-100 rounded-xl text-xs">
+          <div className="flex items-center gap-2 rounded-[16px] bg-[#FAFBFD] p-4 text-[12px]">
             <Sparkles className="w-3.5 h-3.5 text-[#1E60F3] shrink-0" />
             <span className="font-bold text-[#1E60F3] text-[11px] shrink-0">추천 서식:</span>
             <div className="flex items-center gap-1.5 flex-wrap">
@@ -584,7 +584,7 @@ const HqComposeEmailModalContent: React.FC<HqComposeEmailModalProps> = ({
                   key={tmpl.id}
                   type="button"
                   onClick={() => handleApplyTemplate(tmpl)}
-                  className="px-2.5 py-1 rounded-lg bg-white hover:bg-blue-600 hover:text-white text-slate-700 text-[11px] font-bold border border-blue-200/80 shadow-2xs transition-all cursor-pointer"
+                  className="min-h-9 rounded-[12px] bg-white px-3 text-[11px] font-semibold text-[#4D607C] shadow-[0_3px_10px_rgba(35,49,78,0.045)] transition-colors hover:bg-[#F5F8FF] transition-all cursor-pointer"
                 >
                   {tmpl.name}
                 </button>
@@ -608,7 +608,7 @@ const HqComposeEmailModalContent: React.FC<HqComposeEmailModalProps> = ({
             />
           </div>
           {/* Modal Actions */}
-          <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-3">
             <span className="text-[11px] text-slate-400 font-medium">
               💡 발송된 메일은 상대방의 받은편지함으로 즉시 전달되며, 네이버 보낸편지함에도 자동 기록됩니다.
             </span>
@@ -618,7 +618,7 @@ const HqComposeEmailModalContent: React.FC<HqComposeEmailModalProps> = ({
                 type="button"
                 onClick={onClose}
                 disabled={isSending}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+                className="min-h-11 cursor-pointer rounded-[14px] bg-[#F7F9FC] px-4 text-[12px] font-semibold text-[#4D607C] transition-colors hover:bg-[#EDF1F6]"
               >
                 닫기
               </button>
@@ -626,7 +626,7 @@ const HqComposeEmailModalContent: React.FC<HqComposeEmailModalProps> = ({
               <button
                 type="submit"
                 disabled={isSending || !isConfirmedRealSend}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white text-xs font-bold shadow-md shadow-blue-500/20 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex min-h-11 cursor-pointer items-center gap-2 rounded-[14px] bg-[#1E60F3] px-5 text-[12px] font-semibold text-white shadow-[0_6px_16px_rgba(30,96,243,0.15)] transition-colors hover:bg-[#1757DC] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isSending ? (
                   <>
