@@ -352,7 +352,7 @@ export const NewVehicleModal: React.FC<NewVehicleModalProps> = ({
                         }}
                         className={`p-2 rounded-xl border text-left transition-all cursor-pointer flex flex-col items-center justify-between gap-1 relative ${
                           isSelected
-                            ? 'ring-2 ring-[#0050FF] bg-blue-50/40 border-[#1E60F3] shadow-2xs'
+                            ? 'ring-2 ring-[#1E60F3]/25 bg-blue-50/40 border-[#1E60F3] shadow-2xs'
                             : 'bg-white border-slate-200/80 hover:bg-slate-50 hover:border-slate-300'
                         }`}
                       >
@@ -410,7 +410,7 @@ export const NewVehicleModal: React.FC<NewVehicleModalProps> = ({
                         : 'border-slate-200 hover:border-blue-300 bg-slate-50/50 hover:bg-slate-50'
                     }`}
                   >
-                    <div className="w-10 h-10 rounded-full bg-blue-50 text-[#1E60F3] flex items-center justify-center shadow-2xs">
+                    <div className="flex size-10 items-center justify-center rounded-full bg-[#EEF3FF] text-[#1E60F3]">
                       <Upload className="w-5 h-5 stroke-[2]" />
                     </div>
                     <div>
@@ -488,10 +488,10 @@ export const NewVehicleModal: React.FC<NewVehicleModalProps> = ({
                   if (errors.plate) setErrors((prev) => ({ ...prev, plate: undefined }));
                 }}
                 placeholder="예) 125호 9982"
-                className={`w-full px-3.5 py-2.5 rounded-xl border text-xs font-bold transition-all focus:outline-hidden ${
+                className={`min-h-[52px] w-full rounded-[16px] border px-4 text-[14px] font-medium text-[#17233B] shadow-[0_4px_14px_rgba(35,49,78,0.045)] outline-none transition-shadow ${
                   errors.plate
                     ? 'border-rose-400 bg-rose-50/30 text-rose-900 focus:border-rose-500'
-                    : 'border-slate-200 bg-slate-50/50 focus:bg-white focus:border-[#1E60F3]'
+                    : 'border-[#E1E7F0]/25 bg-white focus:ring-2 focus:ring-[#1E60F3]/20'
                 }`}
               />
               {errors.plate && (
@@ -516,10 +516,10 @@ export const NewVehicleModal: React.FC<NewVehicleModalProps> = ({
                       key={cat.key}
                       type="button"
                       onClick={() => handleCategoryChange(cat.key)}
-                      className={`py-2 px-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      className={`flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-[13px] px-2 text-[12px] font-semibold transition-all ${
                         isChecked
-                          ? 'bg-[#1E60F3] text-white border-[#1E60F3] shadow-xs'
-                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                          ? 'bg-[#EEF3FF] text-[#1E60F3]'
+                          : 'bg-white text-[#73839D] hover:bg-[#F7F9FC]'
                       }`}
                     >
                       <Icon className="w-3.5 h-3.5" />
@@ -544,10 +544,10 @@ export const NewVehicleModal: React.FC<NewVehicleModalProps> = ({
                   if (errors.model) setErrors((prev) => ({ ...prev, model: undefined }));
                 }}
                 placeholder="예) 벤츠 스프린터 투어러 (319 CDI)"
-                className={`w-full px-3.5 py-2.5 rounded-xl border text-xs font-bold transition-all focus:outline-hidden ${
+                className={`min-h-[52px] w-full rounded-[16px] border px-4 text-[14px] font-medium text-[#17233B] shadow-[0_4px_14px_rgba(35,49,78,0.045)] outline-none transition-shadow ${
                   errors.model
                     ? 'border-rose-400 bg-rose-50/30 text-rose-900 focus:border-rose-500'
-                    : 'border-slate-200 bg-slate-50/50 focus:bg-white focus:border-[#1E60F3]'
+                    : 'border-[#E1E7F0]/25 bg-white focus:ring-2 focus:ring-[#1E60F3]/20'
                 }`}
               />
               {errors.model && (
@@ -577,10 +577,10 @@ export const NewVehicleModal: React.FC<NewVehicleModalProps> = ({
                           haptics.selection();
                           setFuelType(f);
                         }}
-                        className={`py-1.5 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-center border ${
+                        className={`min-h-10 cursor-pointer rounded-[12px] px-2 text-center text-[12px] font-semibold transition-all ${
                           isSelected
-                            ? 'bg-blue-50 text-[#1E60F3] border-blue-300 font-black shadow-2xs'
-                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                            ? 'bg-[#EEF3FF] text-[#1E60F3] font-semibold'
+                            : 'bg-white text-[#73839D] hover:bg-[#F7F9FC]'
                         }`}
                       >
                         {f}
@@ -608,10 +608,10 @@ export const NewVehicleModal: React.FC<NewVehicleModalProps> = ({
                             haptics.selection();
                             setCapacity(cap);
                           }}
-                          className={`px-2 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer border ${
+                          className={`min-h-9 cursor-pointer rounded-[11px] px-3 text-[11px] font-semibold transition-all ${
                             isSelected
-                              ? 'bg-slate-900 text-white border-slate-900'
-                              : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                              ? 'bg-[#EEF3FF] text-[#1E60F3]'
+                              : 'bg-white text-[#73839D] hover:bg-[#F7F9FC]'
                           }`}
                         >
                           {cap}
