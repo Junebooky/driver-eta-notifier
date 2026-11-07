@@ -472,67 +472,140 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
                 </div>
               )}
 
-              {/* Recipient & Send Options Section */}
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-                <h4 className="text-xs font-black text-slate-900 flex items-center gap-1.5">
-                  <Send className="w-3.5 h-3.5 text-[#1E60F3]" />
-                  <span>고객사 발송 방식 및 수신처 확인</span>
-                </h4>
+              {/* A안: Customer channel and manual-send log. No automated email or SMS. */}
+              <section aria-labelledby="hq-delivery-heading" className="relative space-y-5 rounded-[24px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] sm:p-6">
+                <div className="space-y-1.5">
+                  <h3 id="hq-delivery-heading" className="text-[16px] font-bold tracking-[-0.025em] text-[#17233B]">
+                    고객사 발송 방식 및 수신처 확인
+                  </h3>
+                  <p className="text-[12px] leading-relaxed text-[#73839D]">
+                    안내자료를 준비하거나 직접 전달한 내역을 남길 수 있습니다.
+                  </p>
+                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <label htmlFor="hq-brochure-recipient" className="block text-[12px] font-semibold text-[#4D607C]">
                       수신 연락처 / 이메일
                     </label>
                     <input
+                      id="hq-brochure-recipient"
                       type="text"
+                      inputMode="email"
+                      autoComplete="off"
                       value={recipient}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setRecipient(val.includes('@') ? val : formatPhoneNumber(val));
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        setRecipient(value.includes('@') ? value : formatPhoneNumber(value));
                       }}
-                      placeholder="010-0000-0000 또는 이메일 주소"
-                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-900"
+                      placeholder="연락처 또는 이메일 주소"
+                      className="h-[52px] w-full rounded-[16px] border border-[#E1E7F0]/30 bg-white px-4 text-[14px] font-medium text-[#17233B] shadow-[0_5px_16px_rgba(35,49,78,0.045),0_2px_5px_rgba(35,49,78,0.02)] outline-none transition-shadow placeholder:text-[#95A3B9] hover:shadow-[0_6px_18px_rgba(35,49,78,0.07)] focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20"
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                  <div className="space-y-2">
+                    <span id="hq-brochure-channel-label" className="block text-[12px] font-semibold text-[#4D607C]">
                       기록할 발송 방식
-                    </label>
-                    <select
-                      value={channel}
-                      onChange={(e) => { const value = e.target.value; if (value === 'manual_copy' || value === 'email' || value === 'download') { setChannel(value); setManualDeliveryConfirmed(false); } }}
-                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900"
-                    >
-                      <option value="manual_copy">문자 / 카카오톡 직접 전달</option>
-                      <option value="email">외부 이메일 직접 전달</option>
-                      <option value="download">다운로드 준비 기록</option>
-                    </select>
+                    </span>
+                    <div className="relative" ref={channelMenuRef}>
+                      <button
+                        ref={channelTriggerRef}
+                        type="button"
+                        aria-labelledby="hq-brochure-channel-label hq-brochure-channel-value"
+                        aria-haspopup="listbox"
+                        aria-expanded={isChannelMenuOpen}
+                        aria-controls="hq-brochure-channel-options"
+                        onClick={() => {
+                          haptics.lightTap();
+                          setIsChannelMenuOpen(!isChannelMenuOpen);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                            event.preventDefault();
+                            setIsChannelMenuOpen(true);
+                          }
+                        }}
+                        className="flex h-[52px] w-full cursor-pointer items-center justify-between gap-3 rounded-[16px] border border-[#E1E7F0]/30 bg-white px-4 text-left text-[13px] font-semibold text-[#17233B] shadow-[0_5px_16px_rgba(35,49,78,0.045),0_2px_5px_rgba(35,49,78,0.02)] outline-none transition-shadow hover:shadow-[0_6px_18px_rgba(35,49,78,0.07)] focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20"
+                      >
+                        <span id="hq-brochure-channel-value" className="min-w-0 truncate">{selectedDelivery.label}</span>
+                        <ChevronDown aria-hidden="true" className={'size-4 shrink-0 text-[#73839D] transition-transform ' + (isChannelMenuOpen ? 'rotate-180' : '')} />
+                      </button>
+
+                      {isChannelMenuOpen && (
+                        <div
+                          id="hq-brochure-channel-options"
+                          role="listbox"
+                          aria-labelledby="hq-brochure-channel-label"
+                          className="absolute inset-x-0 bottom-[calc(100%+8px)] z-30 overflow-hidden rounded-[18px] bg-white p-1.5 shadow-[0_14px_36px_rgba(35,49,78,0.13),0_3px_10px_rgba(35,49,78,0.05)]"
+                        >
+                          {DELIVERY_OPTIONS.map((option, index) => (
+                            <button
+                              key={option.value}
+                              ref={(node) => { channelOptionRefs.current[index] = node; }}
+                              type="button"
+                              role="option"
+                              aria-selected={channel === option.value}
+                              onClick={() => {
+                                setChannel(option.value);
+                                setManualDeliveryConfirmed(false);
+                                setIsChannelMenuOpen(false);
+                                channelTriggerRef.current?.focus();
+                                haptics.lightTap();
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Home' || event.key === 'End') {
+                                  event.preventDefault();
+                                  const next = event.key === 'Home' ? 0
+                                    : event.key === 'End' ? DELIVERY_OPTIONS.length - 1
+                                    : (index + (event.key === 'ArrowDown' ? 1 : -1) + DELIVERY_OPTIONS.length) % DELIVERY_OPTIONS.length;
+                                  channelOptionRefs.current[next]?.focus();
+                                }
+                              }}
+                              className={'flex w-full cursor-pointer items-center justify-between gap-2 rounded-[13px] px-3.5 py-3 text-left transition-colors focus-visible:outline-none focus-visible:bg-[#EEF3FF] ' + (channel === option.value ? 'bg-[#EEF3FF]' : 'hover:bg-[#F7F9FC]')}
+                            >
+                              <span className="flex min-w-0 flex-col gap-0.5">
+                                <span className="text-[13px] font-semibold text-[#17233B]">{option.label}</span>
+                                <span className="text-[11px] text-[#73839D]">{option.detail}</span>
+                              </span>
+                              {channel === option.value && <Check aria-hidden="true" className="size-4 shrink-0 text-[#1E60F3]" />}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                <p className="text-xs text-slate-600">이 화면은 준비 상태와 직접 전달한 이력을 저장합니다. 이메일·문자를 자동으로 보내거나 고객 수신을 확인하지 않습니다.</p>
-                {channel !== 'download' && <label className="flex items-start gap-2 text-xs text-slate-700">
-                  <input type="checkbox" checked={manualDeliveryConfirmed} onChange={e => setManualDeliveryConfirmed(e.target.checked)} className="mt-0.5" />
-                  <span>위 수신처에 안내자료를 직접 전달했으며 수동 발송 기록을 남깁니다.</span>
-                </label>}
-                <div className="pt-2 flex items-center gap-3">
-                  <button
-                    type="button"
-                    disabled={isSubmitting || (manualDeliveryConfirmed && channel !== 'download' && !recipient.trim())}
-                    onClick={handleRecordDispatch}
-                    className="flex-1 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                  >
-                    {isSubmitting ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                    )}
-                    <span>{manualDeliveryConfirmed && channel !== 'download' ? '직접 전달한 수동 발송 기록 저장' : '안내자료 준비 상태 저장'}</span>
-                  </button>
+                <div className="space-y-4 pt-0.5">
+                  <p className="text-[12px] leading-[1.65] text-[#73839D]">
+                    이메일이나 문자를 자동 발송하지 않으며, 고객 수신 여부도 자동 확인하지 않습니다.
+                  </p>
+                  {channel !== 'download' && (
+                    <label className="group flex cursor-pointer items-start gap-3 rounded-[14px] py-0.5 text-[13px] leading-relaxed text-[#4D607C]">
+                      <input
+                        type="checkbox"
+                        checked={manualDeliveryConfirmed}
+                        onChange={(event) => setManualDeliveryConfirmed(event.target.checked)}
+                        className="peer sr-only"
+                      />
+                      <span aria-hidden="true" className={'mt-0.5 flex size-[21px] shrink-0 items-center justify-center rounded-[7px] transition-all peer-focus-visible:ring-2 peer-focus-visible:ring-[#1E60F3]/30 ' + (manualDeliveryConfirmed ? 'bg-[#1E60F3] text-white' : 'bg-white text-transparent shadow-[0_2px_8px_rgba(35,49,78,0.11)] ring-1 ring-[#E1E7F0]/60')}>
+                        <Check className="size-3.5" strokeWidth={2.5} />
+                      </span>
+                      <span>위 수신처에 안내자료를 직접 전달했으며, 수동 발송 기록을 남깁니다.</span>
+                    </label>
+                  )}
                 </div>
-              </div>
+
+                <button
+                  type="button"
+                  disabled={isSubmitting || (manualDeliveryConfirmed && channel !== 'download' && !recipient.trim())}
+                  onClick={handleRecordDispatch}
+                  className="flex min-h-[52px] w-full cursor-pointer items-center justify-center gap-2 rounded-[16px] bg-[#1E60F3] px-5 py-3 text-[14px] font-semibold text-white shadow-[0_6px_16px_rgba(30,96,243,0.16)] transition-all hover:bg-[#1757DC] active:scale-[0.995] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#1E60F3]/20 disabled:cursor-not-allowed disabled:bg-[#E5EAF2] disabled:text-[#95A3B9] disabled:shadow-none"
+                >
+                  {isSubmitting ? <Loader2 aria-hidden="true" className="size-[17px] animate-spin" /> : <Check aria-hidden="true" className="size-[18px]" strokeWidth={2.4} />}
+                  <span>{manualDeliveryConfirmed && channel !== 'download' ? '직접 전달한 수동 발송 기록 저장' : '안내자료 준비 상태 저장'}</span>
+                </button>
+              </section>
             </div>
           )}
         </div>
