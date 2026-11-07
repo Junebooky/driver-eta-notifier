@@ -17,6 +17,7 @@ import { scheduleOverlapsInterval } from '@/utils/dispatchInterval';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import {
   mapVehicleToUiCategory,
+  VIP_REAL_VEHICLES,
   VehicleUiCategoryKey,
   VehicleChargingSpecs,
   formatChargingPortSummary,
@@ -173,8 +174,14 @@ export async function checkFleetAvailability(
   });
   const overlaps = (s: any) => scheduleOverlapsInterval(summary(s), query, DEFAULT_TURNAROUND_BUFFER_MINUTES);
   const now = options?.nowMs ?? Date.now();
+  // Injected schedules are isolated fixture runs: default the matching fixture
+  // vehicle catalog only in that branch. Production always reads DB vehicles.
+  const fixtureRegistry: FleetRegistryRecord[] = VIP_REAL_VEHICLES.map(profile => ({
+    vehicle_id: profile.uuid, organization_id: 'vip_limousine_korea',
+    plate: profile.plate, profile, archived: false,
+  }));
   const fleetRegistry = options?.injectedRegistry ??
-    (options?.injectedSchedules !== undefined ? [] : await readFleetRegistry());
+    (options?.injectedSchedules !== undefined ? fixtureRegistry : await readFleetRegistry());
   const registeredVehicles = mergeFleetRegistry(fleetRegistry);
   const vehicleItems: AvailableVehicleItem[] = registeredVehicles.map(v => {
     const operation = operations.find(o => o.vehicle_id === v.uuid);
