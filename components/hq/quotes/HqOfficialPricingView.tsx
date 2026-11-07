@@ -356,7 +356,7 @@ export const HqOfficialPricingView: React.FC<HqOfficialPricingViewProps> = ({
 
   if (isLoading && cards.length === 0) {
     return (
-      <div className="py-24 text-center bg-white rounded-3xl border border-slate-200 shadow-sm">
+      <div className="rounded-[24px] bg-white py-24 text-center shadow-[0_6px_20px_rgba(35,49,78,0.055)]">
         <Loader2 className="w-8 h-8 mx-auto text-[#1E60F3] animate-spin mb-3" />
         <p className="font-extrabold text-sm text-slate-700">2026 공식 요율표 로드 중...</p>
       </div>
@@ -364,15 +364,15 @@ export const HqOfficialPricingView: React.FC<HqOfficialPricingViewProps> = ({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="hq-pricing-a space-y-5">
       {error && (
-        <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl text-amber-800 text-xs font-bold">
+        <div className="rounded-[16px] bg-[#FFF9F1] p-4 text-[12px] font-medium text-[#8E633F]">
           ⚠️ {error} (로컬 캐시 표준 요율표를 표시합니다)
         </div>
       )}
 
       {/* Top Header Card: Icon + Title + Count */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 p-3.5 sm:p-4 sm:px-5 shadow-2xs flex items-center justify-between gap-2 sm:gap-3">
+      <div className="flex items-center justify-between gap-3 rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] sm:px-6">
         <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
           {/* 견적서 아이콘 & 마우스 호버 툴팁 */}
           <div className="relative group/quotes inline-flex items-center justify-center cursor-pointer shrink-0">
@@ -384,17 +384,17 @@ export const HqOfficialPricingView: React.FC<HqOfficialPricingViewProps> = ({
 
             {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 (최상단 레이어) */}
             <div className="absolute bottom-full left-0 mb-2 hidden group-hover/quotes:flex flex-col items-start pointer-events-none z-[100]">
-              <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+              <span className="whitespace-nowrap rounded-[12px] bg-white px-3 py-2 text-[11px] font-medium text-[#4D607C] shadow-[0_8px_22px_rgba(35,49,78,0.1)] animate-in fade-in-50 duration-150">
                 차종별 공식 표준 요율을 확인하고 맞춤 견적서를 생성해요
               </span>
-              <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 ml-3.5 shadow-xs" />
+              <div className="-mt-1 ml-3.5 size-2 rotate-45 bg-white" />
             </div>
           </div>
 
-          <h2 className="text-[15px] sm:text-lg font-black text-slate-900 tracking-tight whitespace-nowrap truncate">
+          <h2 className="truncate whitespace-nowrap text-[19px] font-bold tracking-[-0.03em] text-[#17233B] sm:text-[22px]">
             표준 요금표 · 견적서
           </h2>
-          <span className="bg-slate-100 text-slate-500 font-bold px-2 py-0.5 rounded-full text-[11px] sm:text-xs whitespace-nowrap shrink-0">
+          <span className="rounded-full bg-[#F7F9FC] px-3 py-1 text-[11px] font-medium text-[#73839D] whitespace-nowrap shrink-0">
             {tabCounts.all}개 차종
           </span>
         </div>
@@ -404,7 +404,7 @@ export const HqOfficialPricingView: React.FC<HqOfficialPricingViewProps> = ({
           type="button"
           onClick={() => onOpenQuoteModal()}
           aria-label="견적서 작성"
-          className="w-9 h-9 sm:w-auto sm:h-auto sm:px-4 sm:py-2 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white text-xs font-extrabold shadow-sm transition-all cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0"
+          className="flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-[14px] bg-[#1E60F3] px-3 text-[12px] font-semibold text-white shadow-[0_6px_16px_rgba(30,96,243,0.15)] transition-colors hover:bg-[#1757DC] active:scale-[0.99] sm:px-4"
         >
           <Plus className="w-5 h-5 sm:hidden stroke-[2.5]" />
           <Calculator className="hidden sm:block w-3.5 h-3.5" />
@@ -413,7 +413,7 @@ export const HqOfficialPricingView: React.FC<HqOfficialPricingViewProps> = ({
       </div>
 
       {/* 1. Top Segmented Capsule Tabs */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 p-2.5 sm:p-3 sm:px-5 flex items-center gap-1.5 overflow-x-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden shadow-2xs">
+      <div className="flex items-center gap-1.5 overflow-x-auto rounded-[20px] bg-white p-3 sm:px-5 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden shadow-2xs">
         {/* Category Pill Tabs */}
         {CATEGORY_TABS.map((tab) => {
           const isSelected = activeTab === tab.id;
@@ -426,14 +426,14 @@ export const HqOfficialPricingView: React.FC<HqOfficialPricingViewProps> = ({
                 haptics.selection();
                 setActiveTab(tab.id);
               }}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 shrink-0 ${isSelected
-                ? 'bg-[#1E60F3] text-white border border-[#1E60F3] shadow-sm font-bold'
-                : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300'
+              className={`flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-[13px] px-3.5 text-[12px] font-semibold transition-colors ${isSelected
+                ? 'bg-[#EEF3FF] text-[#1E60F3] font-semibold'
+                : 'bg-white text-[#73839D] shadow-[0_3px_10px_rgba(35,49,78,0.045)] hover:bg-[#F7F9FC]'
                 }`}
             >
               <span>{tab.label}</span>
               <span
-                className={`text-[11px] ${isSelected ? 'font-black text-white/90' : 'text-slate-400 font-medium'
+                className={`text-[11px] ${isSelected ? 'font-semibold text-[#1E60F3]' : 'text-slate-400 font-medium'
                   }`}
               >
                 {count}
@@ -444,11 +444,11 @@ export const HqOfficialPricingView: React.FC<HqOfficialPricingViewProps> = ({
       </div>
 
       {/* 2. Unified Pricing Table (Single Clean Table Container) */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
+      <div className="overflow-hidden rounded-[23px] bg-white shadow-[0_6px_20px_rgba(35,49,78,0.055)]">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50/70 border-b border-slate-200/80 text-[11px] sm:text-xs font-bold text-slate-700 select-none">
+              <tr className="bg-[#FAFBFD] text-[11px] font-medium text-[#73839D] sm:text-[12px] select-none">
                 <th className="py-3.5 px-5 font-bold text-slate-800 text-left min-w-[240px]">
                   차량명
                 </th>
@@ -477,13 +477,13 @@ export const HqOfficialPricingView: React.FC<HqOfficialPricingViewProps> = ({
                     haptics.lightTap();
                     onOpenQuoteModal(item.vehicleProductCode);
                   }}
-                  className="hover:bg-blue-50/40 transition-colors cursor-pointer group"
+                  className="group cursor-pointer transition-colors hover:bg-[#FAFBFD]"
                   title="클릭하여 이 차량으로 견적서 작성"
                 >
                   {/* 1. 차량명 (썸네일 + 라벨 + 서브텍스트 연식) */}
                   <td className="py-3.5 px-5">
                     <div className="flex items-center gap-3">
-                      <div className="w-14 h-9 shrink-0 flex items-center justify-center bg-slate-50 rounded-lg p-0.5 border border-slate-100">
+                      <div className="flex h-10 w-14 shrink-0 items-center justify-center rounded-[11px] bg-[#F7F9FC] p-1">
                         <img
                           src={item.imageUrl}
                           alt={item.vehicleProductLabel}
