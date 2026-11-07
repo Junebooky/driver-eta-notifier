@@ -6,7 +6,6 @@ import {
   User,
   Car,
   Download,
-  Send,
   CheckCircle2,
   AlertTriangle,
   Monitor,
@@ -491,7 +490,6 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
                     <input
                       id="hq-brochure-recipient"
                       type="text"
-                      inputMode="email"
                       autoComplete="off"
                       value={recipient}
                       onChange={(event) => {
@@ -611,15 +609,15 @@ export const HqDriverVehicleInfoModal: React.FC<HqDriverVehicleInfoModalProps> =
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400 shrink-0">
-          <span className="flex items-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 bg-white px-5 py-3.5 text-[11px] text-[#73839D] sm:px-7 sm:py-4">
+          <span className="flex items-center gap-2">
+            <ShieldCheck className="size-4 shrink-0 text-[#95A3B9]" />
             <span>비공개 만료형 서명 URL · cross-tenant 격리 적용됨</span>
           </span>
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold cursor-pointer"
+            className="inline-flex min-h-10 cursor-pointer items-center justify-center rounded-[14px] bg-white px-5 text-[12px] font-semibold text-[#4D607C] shadow-[0_4px_14px_rgba(35,49,78,0.06),0_1px_4px_rgba(35,49,78,0.025)] transition-all hover:bg-[#FAFBFD] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25"
           >
             닫기
           </button>
