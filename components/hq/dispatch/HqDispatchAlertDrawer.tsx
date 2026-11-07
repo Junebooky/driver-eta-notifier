@@ -111,7 +111,7 @@ export function AlertItemCard({
   }, [item.category, item.canSendDriverReminder]);
 
   return (
-    <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs transition-all hover:border-slate-300">
+    <div className="rounded-[20px] bg-white p-5 shadow-[0_5px_16px_rgba(35,49,78,0.045)] transition-all hover:border-slate-300">
       {/* 1. Top Badges & Elapsed Time Row */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
@@ -428,7 +428,7 @@ export default function HqDispatchAlertDrawer({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[105] flex items-center justify-center p-3 sm:p-5 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-[105] flex items-center justify-center bg-[#17233B]/30 p-3 backdrop-blur-[2px] sm:p-6 animate-in fade-in duration-200"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -437,11 +437,11 @@ export default function HqDispatchAlertDrawer({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-[28px] bg-white shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200"
+        className="flex max-h-[92dvh] w-full max-w-2xl flex-col overflow-hidden rounded-[26px] bg-[#FAFBFD] shadow-[0_24px_64px_rgba(27,45,77,0.16),0_4px_14px_rgba(27,45,77,0.04)] animate-in zoom-in-95 duration-200"
         onMouseDown={(e) => e.stopPropagation()}
       >
         {/* 1. Header (Reference Style: alarm.png icon + Title & Subtitle + Close 'X' pill) */}
-        <div className="flex items-center justify-between gap-3 px-6 pt-6 pb-4 border-b border-slate-100 bg-white">
+        <div className="flex items-center justify-between gap-3 bg-white px-5 pb-5 pt-6 sm:px-6">
           <div className="flex items-center gap-3 min-w-0">
             <img
               src="/images/icons/alarm.png"
@@ -450,7 +450,7 @@ export default function HqDispatchAlertDrawer({
               draggable={false}
             />
             <div className="min-w-0">
-              <h2 id={titleId} className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight">
+              <h2 id={titleId} className="text-[19px] font-bold tracking-[-0.03em] text-[#17233B] sm:text-[21px]">
                 배차 확인 알림
               </h2>
               <p className="text-xs sm:text-[13px] text-slate-400 font-normal mt-0.5 truncate">
@@ -466,14 +466,14 @@ export default function HqDispatchAlertDrawer({
               onClose();
             }}
             aria-label="닫기"
-            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-slate-100 hover:bg-slate-200 active:scale-95 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors cursor-pointer shrink-0"
+            className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#F7F9FC] text-[#73839D] transition-colors hover:bg-[#EDF1F6] active:scale-[0.99]"
           >
             <X className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
 
         {/* 2. Filter Tabs (Pill style: 전체, 긴급, 기사 확인, 미배정, 안내 대기) */}
-        <div className="flex items-center gap-2 overflow-x-auto px-6 py-3 border-b border-slate-100 bg-white no-scrollbar">
+        <div className="flex items-center gap-1 overflow-x-auto bg-white px-5 pb-4 no-scrollbar sm:px-6">
           {tabs.map((tab) => {
             const active = activeTab === tab.id;
             return (
@@ -484,9 +484,9 @@ export default function HqDispatchAlertDrawer({
                   haptics.selection();
                   setActiveTab(tab.id);
                 }}
-                className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${active
-                  ? 'bg-[#EBF2FE] text-[#1E60F3] shadow-2xs'
-                  : 'bg-white text-slate-600 border border-slate-200/80 hover:bg-slate-50'
+                className={`inline-flex min-h-10 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-[13px] px-3.5 text-[12px] font-semibold transition-colors ${active
+                  ? 'bg-[#EEF3FF] text-[#1E60F3]'
+                  : 'bg-white text-[#73839D] shadow-[0_3px_10px_rgba(35,49,78,0.045)] hover:bg-[#F7F9FC]'
                   }`}
               >
                 <span>{tab.label}</span>
@@ -504,11 +504,11 @@ export default function HqDispatchAlertDrawer({
         </div>
 
         {/* 3. Alert List */}
-        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-3.5 bg-[#FAFBFD]/70">
+        <div className="min-h-0 flex-1 space-y-3.5 overflow-y-auto overscroll-contain bg-[#FAFBFD] p-5 sm:p-6">
           {filteredAlerts.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white py-14 px-6 text-center shadow-xs">
-              <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center mb-3">
-                <CheckCircle2 className="w-6 h-6 text-emerald-500" />
+            <div className="flex flex-col items-center justify-center rounded-[20px] bg-white px-6 py-14 text-center shadow-[0_5px_16px_rgba(35,49,78,0.045)]">
+              <div className="mb-3 flex size-12 items-center justify-center rounded-full bg-[#F7F9FC]">
+                <CheckCircle2 className="size-6 text-[#73839D]" />
               </div>
               <p className="text-sm font-bold text-slate-800">
                 확인이 필요한 배차 알림이 없습니다.
