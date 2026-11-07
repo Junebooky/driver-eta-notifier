@@ -56,31 +56,32 @@ export const HqCustomerEditModal: React.FC<HqCustomerEditModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[#17233B]/30 p-3 backdrop-blur-[2px] animate-in fade-in duration-150 sm:p-6">
+      <div className="hq-customer-modal-a flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-[26px] bg-[#FAFBFD] shadow-[0_24px_64px_rgba(27,45,77,0.16),0_4px_14px_rgba(27,45,77,0.04)]">
         {/* Header */}
-        <div className="px-6 py-4 bg-gradient-to-r from-[#0B1E48] to-[#123485] text-white flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3 bg-white px-5 py-5 sm:px-6 sm:py-6">
           <div className="flex items-center gap-2">
             {mode === 'preferences' ? (
-              <Heart className="w-4 h-4 text-rose-400" />
+              <Heart className="size-5 text-[#73839D]" />
             ) : (
-              <FileText className="w-4 h-4 text-amber-300" />
+              <FileText className="size-5 text-[#73839D]" />
             )}
-            <h2 className="text-sm font-black">
+            <h2 className="text-[18px] font-bold tracking-[-0.025em] text-[#17233B]">
               {customer.name} - {mode === 'preferences' ? '주요 선호사항 수정' : '의전 메모 수정'}
             </h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-white/10 text-white/80 transition-colors cursor-pointer"
+            aria-label="수정 모달 닫기"
+            className="flex size-10 cursor-pointer items-center justify-center rounded-full bg-[#F7F9FC] text-[#73839D] transition-colors hover:bg-[#EDF1F6]"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Body */}
-        <form onSubmit={handleSave} className="p-6 space-y-4 text-xs font-medium text-slate-700">
+        <form onSubmit={handleSave} className="min-h-0 space-y-5 overflow-y-auto overscroll-contain p-5 text-[12px] font-medium text-[#4D607C] sm:p-6">
           {mode === 'preferences' ? (
             <div>
               <label className="block text-[11px] font-bold text-slate-800 mb-1">
@@ -112,18 +113,18 @@ export const HqCustomerEditModal: React.FC<HqCustomerEditModalProps> = ({
             </div>
           )}
 
-          <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+          <div className="flex items-center justify-end gap-2 pt-3">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 text-xs font-bold cursor-pointer"
+              className="min-h-11 cursor-pointer rounded-[14px] bg-[#F7F9FC] px-4 text-[12px] font-semibold text-[#4D607C] transition-colors hover:bg-[#EDF1F6]"
             >
               취소
             </button>
             <button
               type="submit"
               disabled={isSaving}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#1E60F3] hover:bg-blue-600 disabled:bg-blue-400 text-white text-xs font-bold shadow-sm cursor-pointer disabled:cursor-not-allowed transition-all"
+              className="flex min-h-11 cursor-pointer items-center gap-1.5 rounded-[14px] bg-[#1E60F3] px-5 text-[12px] font-semibold text-white shadow-[0_6px_16px_rgba(30,96,243,0.15)] transition-colors hover:bg-[#1757DC] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isSaving ? (
                 <>

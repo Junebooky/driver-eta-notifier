@@ -108,32 +108,33 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[#17233B]/30 p-3 backdrop-blur-[2px] animate-in fade-in duration-150 sm:p-6">
+      <div className="hq-customer-modal-a flex max-h-[94dvh] w-full max-w-xl flex-col overflow-hidden rounded-[26px] bg-[#FAFBFD] shadow-[0_24px_64px_rgba(27,45,77,0.16),0_4px_14px_rgba(27,45,77,0.04)]">
         {/* Modal Header */}
-        <div className="px-6 py-4 bg-gradient-to-r from-[#0B1E48] to-[#123485] text-white flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3 bg-white px-5 py-5 sm:px-6 sm:py-6">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-500/20 border border-blue-400/30 flex items-center justify-center">
-              <Building2 className="w-4 h-4 text-blue-300" />
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-[15px] bg-[#EEF3FF] text-[#1E60F3]">
+              <Building2 className="size-5 text-[#1E60F3]" />
             </div>
             <div>
-              <h2 className="text-base font-black tracking-tight">신규 고객사 등록</h2>
-              <p className="text-[11px] text-blue-200/80 font-medium">
-                VIP Limousine Korea 주요 고객사 기본 정보 및 전담 의전 프로토콜 등록
+              <h2 className="text-[19px] font-bold tracking-[-0.03em] text-[#17233B]">신규 고객사 등록</h2>
+              <p className="mt-1 text-[12px] font-medium leading-relaxed text-[#73839D]">
+                고객사와 담당자 정보를 입력해 주세요.
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-white/10 text-white/80 transition-colors cursor-pointer"
+            aria-label="고객사 등록 닫기"
+            className="flex size-10 cursor-pointer items-center justify-center rounded-full bg-[#F7F9FC] text-[#73839D] transition-colors hover:bg-[#EDF1F6]"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Modal Body Form */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4 text-xs font-medium text-slate-700">
+        <form onSubmit={handleSubmit} className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain p-5 text-[12px] font-medium text-[#4D607C] sm:p-6">
           {/* Row 1: Company Name & Tier */}
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-2">
@@ -180,8 +181,8 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
           </div>
 
           {/* Section: Primary Contact */}
-          <div className="p-3.5 bg-blue-50/50 rounded-xl border border-blue-100 space-y-2.5">
-            <div className="flex items-center gap-1.5 text-xs font-black text-blue-900">
+          <div className="space-y-4 rounded-[19px] bg-white p-5 shadow-[0_5px_16px_rgba(35,49,78,0.045)]">
+            <div className="flex items-center gap-2 text-[13px] font-semibold text-[#17233B]">
               <User className="w-3.5 h-3.5 text-[#1E60F3]" />
               <span>대표 담당자 (Primary Contact)</span>
             </div>
@@ -286,18 +287,18 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
           </div>
 
           {/* Action buttons */}
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+          <div className="flex items-center justify-end gap-2 pt-3">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 text-xs font-bold cursor-pointer"
+              className="min-h-11 cursor-pointer rounded-[14px] bg-[#F7F9FC] px-4 text-[12px] font-semibold text-[#4D607C] transition-colors hover:bg-[#EDF1F6]"
             >
               취소
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#1E60F3] hover:bg-blue-600 disabled:bg-blue-400 active:scale-95 text-white text-xs font-bold shadow-md shadow-blue-500/20 cursor-pointer disabled:cursor-not-allowed transition-all"
+              className="flex min-h-11 cursor-pointer items-center gap-1.5 rounded-[14px] bg-[#1E60F3] px-5 text-[12px] font-semibold text-white shadow-[0_6px_16px_rgba(30,96,243,0.15)] transition-colors hover:bg-[#1757DC] disabled:cursor-not-allowed disabled:opacity-50 active:scale-[0.99]"
             >
               {isSubmitting ? (
                 <>
