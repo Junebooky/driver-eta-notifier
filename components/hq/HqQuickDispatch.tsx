@@ -2247,43 +2247,29 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                 heightClass="h-11 sm:h-12"
               />
 
-              {/* 출발 시간 (종료 시간 인풋박스와 동일한 select 스타일) */}
-              <div>
-                <label htmlFor="hq-dispatch-pickup-time" className="block text-xs font-bold text-slate-800 mb-1.5">
-                  출발 시간 <span className="text-red-500 font-bold ml-0.5">*</span>
-                </label>
-                <div className="w-full h-11 sm:h-12 bg-white border border-slate-200 hover:border-slate-300 focus-within:border-[#1E60F3] focus-within:ring-1 focus-within:ring-[#1E60F3] rounded-xl px-3.5 flex items-center transition-all shadow-2xs">
-                  <input
-                    id="hq-dispatch-pickup-time"
-                    type="time"
-                    value={pickupTimeOnly}
-                    onChange={(event) => {
-                      const val = event.target.value;
-                      setPickupTimeOnly(val);
-                      setTimeInputText(formatTimeKoreanAmPm(val));
-                    }}
-                    aria-label="출발 시간 입력 및 선택"
-                    className="w-full h-full bg-transparent text-xs sm:text-sm font-bold text-slate-900 outline-none cursor-pointer"
-                  />
-                </div>
-              </div>
-
-              {/* 예정 종료 시간 (Unified Input Style) */}
-              <div>
-                <label htmlFor="hq-dispatch-end-time" className="block text-xs font-bold text-slate-800 mb-1.5">
-                  종료 시간 <span className="font-medium text-slate-400 text-[11px]">(배차 시 필수)</span>
-                </label>
-                <div className="w-full h-11 sm:h-12 bg-white border border-slate-200 hover:border-slate-300 focus-within:border-[#1E60F3] focus-within:ring-1 focus-within:ring-[#1E60F3] rounded-xl px-3.5 flex items-center transition-all shadow-2xs">
-                  <input
-                    id="hq-dispatch-end-time"
-                    type="time"
-                    value={endTime}
-                    onChange={(event) => setEndTime(event.target.value)}
-                    aria-label="예정 종료 시간 직접 입력"
-                    className="w-full h-full bg-transparent text-xs sm:text-sm font-bold text-slate-900 outline-none cursor-pointer"
-                  />
-                </div>
-              </div>
+              <HqDispatchTimeField
+                compact
+                required
+                label="출발 시간"
+                value={pickupTimeOnly}
+                onChange={(nextTime) => {
+                  setPickupTimeOnly(nextTime);
+                  setTimeInputText(formatTimeKoreanAmPm(nextTime));
+                  setErrorMsg(null);
+                }}
+                parseInput={parseFlexibleTimeInput}
+                formatValue={formatTimeKoreanAmPm}
+                disabled={isSubmitting || isCancelling}
+              />
+              <HqDispatchTimeField
+                compact
+                label="종료 시간"
+                value={endTime}
+                onChange={(nextTime) => { setEndTime(nextTime); setErrorMsg(null); }}
+                parseInput={parseFlexibleTimeInput}
+                formatValue={formatTimeKoreanAmPm}
+                disabled={isSubmitting || isCancelling}
+              />
             </div>
 
             {/* 차량 및 기사 배차 (Clean White UI, Aligned with Other Fields) */}
