@@ -36,7 +36,7 @@ export async function verifyReportingFlow(admin:Client,writer:Client,reader:Clie
   const column=(key:string)=>{if(key==='result->>outcome')return '"result"->>\'outcome\'';assert.match(key,/^[a-z_]+$/);return '"'+key+'"';};
   const value=(key:string,v:unknown)=>['stops','review_history','audit_history','operation_history','ocr_details','meta'].includes(key)?JSON.stringify(v):v;
   supabaseAdmin.from=((table:string)=>{
-    assert.ok(['driving_logs','expenses','schedules','drivers','fleet_vehicle_operations','fleet_vehicle_registry','dispatch_requests','vehicle_custodies','vehicle_custody_requests'].includes(table));
+    assert.ok(['driving_logs','expenses','schedules','drivers','fleet_vehicle_operations','vehicles','dispatch_requests','vehicle_custodies','vehicle_custody_requests'].includes(table));
     const filters:Array<[string,unknown,string?]>=[],orders:string[]=[];let rows:Record<string,unknown>[]|null=null,patch:Record<string,unknown>|null=null;
     let offset=0,limit=1000;let eitherDate: string | null=null;
     const execute=async(single=false)=>{try{
