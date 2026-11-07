@@ -1,5 +1,6 @@
 import { LocationPreset } from '@/types';
 import type { RouteWaypointItem } from '@/types/emailHq';
+import type { OriginalDispatchBaseline } from '@/types/originalDispatchBaseline';
 
 export interface ScheduleItem {
   id: string;
@@ -41,6 +42,7 @@ export interface ScheduleItem {
   vehicle_id?: string;
   vehicle_model?: string;
   vehicle_plate?: string;
+  original_dispatch_baseline?: OriginalDispatchBaseline;
   dispatch_status?: 'unassigned' | 'draft' | 'published' | 'cancelled';
   version?: number;
   place_verified?: boolean;
