@@ -393,15 +393,15 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="hq-customer-a space-y-5">
       {/* Main 2-Column Workstation Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         {/* ========================================================= */}
         {/* LEFT COLUMN: 고객사 목록 (Left 4.5 cols / ~38%)             */}
         {/* ========================================================= */}
-        <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/80 shadow-xs flex flex-col min-h-[760px]">
+        <div className="lg:col-span-5 flex min-h-[760px] flex-col rounded-[23px] bg-white shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)]">
           {/* Header Bar */}
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between rounded-t-2xl">
+          <div className="flex items-center justify-between gap-3 px-5 pb-4 pt-5 sm:px-6 sm:pt-6">
             <div className="flex items-center gap-1.5">
               <div className="relative group/clients inline-flex items-center justify-center cursor-pointer shrink-0">
                 <img
@@ -412,14 +412,14 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
 
                 {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 (아이콘 근접 시에만 노출, 최상단 레이어) */}
                 <div className="absolute bottom-full left-0 mb-2 hidden group-hover/clients:flex flex-col items-start pointer-events-none z-[100]">
-                  <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+                  <span className="whitespace-nowrap rounded-[12px] bg-white px-3 py-2 text-[11px] font-medium text-[#4D607C] shadow-[0_8px_22px_rgba(35,49,78,0.1)] animate-in fade-in-50 duration-150">
                     주요 고객사의 계약 단가와 예약 이력을 관리해요
                   </span>
-                  <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 ml-5 shadow-xs" />
+                  <div className="-mt-1 ml-5 size-2 rotate-45 bg-white" />
                 </div>
               </div>
 
-              <h2 className="text-base font-black text-slate-900 tracking-tight">
+              <h2 className="text-[18px] font-bold tracking-[-0.03em] text-[#17233B]">
                 고객사 목록
               </h2>
               <span className="text-sm font-bold text-slate-500">
@@ -433,7 +433,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                 haptics.lightTap();
                 setIsRegisterModalOpen(true);
               }}
-              className="flex items-center gap-1 px-3.5 py-2 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white text-xs font-bold shadow-sm transition-all cursor-pointer"
+              className="flex min-h-11 cursor-pointer items-center gap-1.5 rounded-[14px] bg-[#1E60F3] px-4 text-[12px] font-semibold text-white shadow-[0_6px_16px_rgba(30,96,243,0.15)] transition-colors hover:bg-[#1757DC] active:scale-[0.99]"
             >
               <Plus className="w-3.5 h-3.5 stroke-[3]" />
               <span>고객 등록</span>
@@ -441,7 +441,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
           </div>
 
           {/* Search & Filter Bar */}
-          <div className="p-3 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
+          <div className="flex items-center gap-2 px-5 pb-4 sm:px-6">
             <div className="relative flex-1">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
@@ -452,7 +452,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                   setCurrentPage(1);
                 }}
                 placeholder="고객명 또는 담당자명 검색..."
-                className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="h-11 w-full rounded-[14px] bg-white pl-9 pr-3 text-[13px] font-medium text-[#17233B] placeholder:text-[#95A3B9] shadow-[0_4px_14px_rgba(35,49,78,0.045)] outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20"
               />
             </div>
 
@@ -464,7 +464,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                   setTierFilter(e.target.value as 'all' | 'VIP' | '주요' | '일반' | 'favorite');
                   setCurrentPage(1);
                 }}
-                className="appearance-none pl-3 pr-7 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="h-11 cursor-pointer appearance-none rounded-[14px] bg-white pl-3.5 pr-8 text-[13px] font-medium text-[#4D607C] shadow-[0_4px_14px_rgba(35,49,78,0.045)] outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20"
               >
                 <option value="all">전체</option>
                 <option value="VIP">VIP</option>
@@ -477,7 +477,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
           </div>
 
           {/* Customer Cards List */}
-          <div className="flex-1 divide-y divide-slate-100 overflow-y-auto max-h-[610px]">
+          <div className="max-h-[610px] flex-1 space-y-1.5 overflow-y-auto overscroll-contain px-3 pb-3">
             {isLoadingDb && customers.length === 0 ? (
               <div className="p-12 text-center text-slate-400">
                 <Loader2 className="w-8 h-8 mx-auto mb-2 text-[#1E60F3] animate-spin" />
@@ -514,9 +514,9 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                       haptics.lightTap();
                       setSelectedCustomerId(cust.id);
                     }}
-                    className={`p-3.5 transition-all cursor-pointer flex items-center justify-between gap-3 group relative ${isSelected
-                      ? 'bg-blue-50/80 border-l-4 border-l-[#1E60F3]'
-                      : 'hover:bg-slate-50 border-l-4 border-l-transparent'
+                    className={`group relative flex cursor-pointer items-center justify-between gap-3 rounded-[17px] p-3.5 transition-colors ${isSelected
+                      ? 'bg-[#F3F7FF] shadow-[0_3px_12px_rgba(35,49,78,0.055)]'
+                      : 'hover:bg-[#FAFBFD]'
                       }`}
                   >
                     {/* Left: Brand Logo + Company Info */}
@@ -534,9 +534,9 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                           </h3>
                           <span
                             className={`px-1.5 py-0.2 rounded text-[10px] font-black shrink-0 ${cust.tier === 'VIP'
-                              ? 'bg-blue-100/80 text-[#1E60F3]'
+                              ? 'bg-[#EEF3FF] text-[#31598F]'
                               : cust.tier === '주요'
-                                ? 'bg-sky-100 text-sky-700'
+                                ? 'bg-[#F7F9FC] text-[#73839D]'
                                 : 'bg-slate-100 text-slate-500'
                               }`}
                           >
@@ -587,7 +587,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
           </div>
 
           {/* Bottom Pagination Bar (Matches image: < 1 2 3 4 5 ... > 28개 중 1-8개) */}
-          <div className="p-3 border-t border-slate-100 bg-white flex items-center justify-between text-xs font-semibold text-slate-600">
+          <div className="flex items-center justify-between bg-white p-4 text-[12px] font-medium text-[#61728A]">
             {/* Page numbers */}
             <div className="flex items-center gap-1">
               <button
@@ -597,7 +597,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                   setCurrentPage((p) => Math.max(1, p - 1));
                 }}
                 disabled={currentPage === 1}
-                className="w-7 h-7 rounded-lg border border-slate-200 hover:bg-slate-50 flex items-center justify-center text-slate-400 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+                className="flex size-9 cursor-pointer items-center justify-center rounded-[12px] bg-[#F7F9FC] text-[#73839D] transition-colors hover:bg-[#EDF1F6] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <ChevronLeft className="w-3.5 h-3.5" />
               </button>
@@ -610,9 +610,9 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                     haptics.lightTap();
                     setCurrentPage(pageNum);
                   }}
-                  className={`w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${currentPage === pageNum
-                    ? 'bg-[#1E60F3] text-white shadow-xs'
-                    : 'border border-slate-200 text-slate-700 hover:bg-slate-50'
+                  className={`flex size-9 cursor-pointer items-center justify-center rounded-[12px] text-[12px] font-semibold transition-colors ${currentPage === pageNum
+                    ? 'bg-[#EEF3FF] text-[#1E60F3]'
+                    : 'bg-white text-[#73839D] hover:bg-[#F7F9FC]'
                     }`}
                 >
                   {pageNum}
@@ -628,7 +628,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                   setCurrentPage((p) => Math.min(totalPages, p + 1));
                 }}
                 disabled={currentPage === totalPages}
-                className="w-7 h-7 rounded-lg border border-slate-200 hover:bg-slate-50 flex items-center justify-center text-slate-400 disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+                className="flex size-9 cursor-pointer items-center justify-center rounded-[12px] bg-[#F7F9FC] text-[#73839D] transition-colors hover:bg-[#EDF1F6] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
@@ -653,7 +653,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
         {selectedCustomer ? (
           <div className="lg:col-span-7 space-y-4">
             {/* Top Customer Header Card */}
-            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5">
+            <div className="rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)]">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-4">
                   <CustomerBrandLogo
@@ -664,14 +664,14 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
 
                   <div>
                     <div className="flex items-center gap-2">
-                      <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+                      <h2 className="text-[23px] font-bold tracking-[-0.035em] text-[#17233B]">
                         {selectedCustomer.name}
                       </h2>
                       <span
                         className={`px-2 py-0.5 rounded-md text-[11px] font-black ${selectedCustomer.tier === 'VIP'
-                          ? 'bg-blue-100 text-[#1E60F3]'
+                          ? 'bg-[#EEF3FF] text-[#31598F]'
                           : selectedCustomer.tier === '주요'
-                            ? 'bg-sky-100 text-sky-700'
+                            ? 'bg-[#F7F9FC] text-[#73839D]'
                             : 'bg-slate-100 text-slate-600'
                           }`}
                       >
@@ -708,7 +708,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
               </div>
 
               {/* Sub-Navigation Tabs with Active Blue Underline */}
-              <div className="flex items-center gap-6 mt-6 border-b border-slate-100 text-xs font-bold text-slate-500 overflow-x-auto">
+              <div className="mt-6 flex items-center gap-1 overflow-x-auto rounded-[15px] bg-[#F7F9FC] p-1 text-[12px] font-medium text-[#73839D]">
                 {[
                   { id: 'overview', label: '개요', icon: LayoutGrid },
                   { id: 'billing', label: '청구 내역', icon: Receipt },
@@ -738,19 +738,17 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                           | 'communications'
                         );
                       }}
-                      className={`flex items-center gap-1.5 pb-2.5 transition-all cursor-pointer relative shrink-0 ${isActive ? 'text-[#1E60F3]' : 'hover:text-slate-800'
+                      className={`relative flex min-h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-[12px] px-3.5 transition-colors ${isActive ? 'bg-white text-[#1E60F3] shadow-[0_3px_10px_rgba(35,49,78,0.065)]' : 'hover:text-[#17233B]'
                         }`}
                     >
                       <Icon className="w-3.5 h-3.5" />
                       <span>{tab.label}</span>
                       {tab.id === 'billing' && customerExpenses.length > 0 && (
-                        <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-blue-100 text-[#1E60F3]">
+                        <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-[#EEF3FF] text-[#31598F]">
                           {customerExpenses.length}
                         </span>
                       )}
-                      {isActive && (
-                        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#1E60F3] rounded-full" />
-                      )}
+                      
                     </button>
                   );
                 })}
@@ -761,14 +759,14 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
             {activeTab === 'overview' && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* 1. 최근 요청 사항 */}
-                <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-4 flex flex-col justify-between">
+                <div className="flex flex-col justify-between rounded-[21px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)]">
                   <div>
-                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div className="flex items-center justify-between pb-3">
                       <div className="flex items-center gap-2">
                         <div className="w-6 h-6 rounded-lg bg-rose-50 text-rose-500 flex items-center justify-center">
                           <AlertCircle className="w-3.5 h-3.5" />
                         </div>
-                        <h3 className="text-xs font-black text-slate-900">최근 요청 사항</h3>
+                        <h3 className="text-[13px] font-semibold text-[#17233B]">최근 요청 사항</h3>
                       </div>
                       <button
                         type="button"
@@ -802,14 +800,14 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                 </div>
 
                 {/* 2. 다음 행사 */}
-                <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-4 flex flex-col justify-between">
+                <div className="flex flex-col justify-between rounded-[21px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)]">
                   <div>
-                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div className="flex items-center justify-between pb-3">
                       <div className="flex items-center gap-2">
                         <div className="w-6 h-6 rounded-lg bg-blue-50 text-[#1E60F3] flex items-center justify-center">
                           <Calendar className="w-3.5 h-3.5" />
                         </div>
-                        <h3 className="text-xs font-black text-slate-900">다음 행사</h3>
+                        <h3 className="text-[13px] font-semibold text-[#17233B]">다음 행사</h3>
                       </div>
                     </div>
 
@@ -819,7 +817,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                           <span className="text-sm font-black text-slate-900">
                             {selectedCustomer.nextEvent.date}
                           </span>
-                          <span className="px-2 py-0.5 rounded-full bg-blue-100 text-[#1E60F3] text-[10px] font-black">
+                          <span className="px-2 py-0.5 rounded-full bg-[#EEF3FF] text-[#31598F] text-[10px] font-black">
                             {selectedCustomer.nextEvent.dDay}
                           </span>
                         </div>
@@ -851,14 +849,14 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                 </div>
 
                 {/* 3. 주요 선호사항 */}
-                <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-4 flex flex-col justify-between">
+                <div className="flex flex-col justify-between rounded-[21px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)]">
                   <div>
-                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div className="flex items-center justify-between pb-3">
                       <div className="flex items-center gap-2">
                         <div className="w-6 h-6 rounded-lg bg-rose-50 text-rose-500 flex items-center justify-center">
                           <Heart className="w-3.5 h-3.5" />
                         </div>
-                        <h3 className="text-xs font-black text-slate-900">주요 선호사항</h3>
+                        <h3 className="text-[13px] font-semibold text-[#17233B]">주요 선호사항</h3>
                       </div>
                       <button
                         type="button"
@@ -886,14 +884,14 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                 </div>
 
                 {/* 4. 최근 운행 */}
-                <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-4 flex flex-col justify-between">
+                <div className="flex flex-col justify-between rounded-[21px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)]">
                   <div>
-                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div className="flex items-center justify-between pb-3">
                       <div className="flex items-center gap-2">
                         <div className="w-6 h-6 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center">
                           <Clock className="w-3.5 h-3.5" />
                         </div>
-                        <h3 className="text-xs font-black text-slate-900">최근 운행</h3>
+                        <h3 className="text-[13px] font-semibold text-[#17233B]">최근 운행</h3>
                       </div>
                       <button
                         type="button"
@@ -930,14 +928,14 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                 </div>
 
                 {/* 5. 담당자 (3) */}
-                <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-4 flex flex-col justify-between">
+                <div className="flex flex-col justify-between rounded-[21px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)]">
                   <div>
-                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div className="flex items-center justify-between pb-3">
                       <div className="flex items-center gap-2">
                         <div className="w-6 h-6 rounded-lg bg-blue-50 text-[#1E60F3] flex items-center justify-center">
                           <Users className="w-3.5 h-3.5" />
                         </div>
-                        <h3 className="text-xs font-black text-slate-900">
+                        <h3 className="text-[13px] font-semibold text-[#17233B]">
                           담당자 ({selectedCustomer.contacts.length})
                         </h3>
                       </div>
@@ -965,11 +963,11 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                             className="py-2.5 flex items-center justify-between gap-2"
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="w-7 h-7 rounded-full bg-blue-100 text-[#1E60F3] font-black text-[10px] flex items-center justify-center shrink-0">
+                              <div className="w-7 h-7 rounded-full bg-[#EEF3FF] text-[#31598F] font-black text-[10px] flex items-center justify-center shrink-0">
                                 {initials}
                               </div>
                               <div className="min-w-0">
-                                <p className="text-xs font-black text-slate-900 truncate">
+                                <p className="text-[13px] font-semibold text-[#17233B] truncate">
                                   {contact.name}
                                 </p>
                                 <p className="text-[10px] text-slate-400 truncate">
@@ -1010,14 +1008,14 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                 </div>
 
                 {/* 6. 메모 */}
-                <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-4 flex flex-col justify-between">
+                <div className="flex flex-col justify-between rounded-[21px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)]">
                   <div>
-                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div className="flex items-center justify-between pb-3">
                       <div className="flex items-center gap-2">
                         <div className="w-6 h-6 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
                           <FileText className="w-3.5 h-3.5" />
                         </div>
-                        <h3 className="text-xs font-black text-slate-900">메모</h3>
+                        <h3 className="text-[13px] font-semibold text-[#17233B]">메모</h3>
                       </div>
                       <button
                         type="button"
@@ -1043,17 +1041,17 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                 </div>
 
                 {/* 7. 배차 경비 청구 요약 카드 (Full width) */}
-                <div className="md:col-span-2 bg-gradient-to-r from-blue-50/80 via-white to-slate-50/80 rounded-2xl border border-blue-100 shadow-xs p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="md:col-span-2 rounded-[21px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055)] flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-[#1E60F3] text-white flex items-center justify-center shrink-0 shadow-sm">
                       <Receipt className="w-5 h-5" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <h3 className="text-xs font-black text-slate-900">
+                        <h3 className="text-[13px] font-semibold text-[#17233B]">
                           {selectedCustomer.name} 배차 경비 청구 요약
                         </h3>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-[#1E60F3]">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#EEF3FF] text-[#31598F]">
                           {billingStats.count}건 제출
                         </span>
                       </div>
@@ -1088,14 +1086,14 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
 
             {/* TAB: 청구 내역 (Billing & Dispatched Expenses) */}
             {activeTab === 'billing' && (
-              <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 space-y-5">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+              <div className="rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3">
                   <div>
                     <div className="flex items-center gap-2">
                       <h3 className="text-sm font-black text-slate-900">
                         {selectedCustomer.name} 배차 경비 청구 내역
                       </h3>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-100 text-[#1E60F3]">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-[#EEF3FF] text-[#31598F]">
                         자동 맵핑 완료
                       </span>
                     </div>
@@ -1237,7 +1235,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
 
             {/* TAB 2: 담당자 상세 탭 */}
             {activeTab === 'contacts' && (
-              <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 space-y-4">
+              <div className="rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-black text-slate-900">
                     전체 담당자 및 비서실 연락처 ({selectedCustomer.contacts.length})
@@ -1264,7 +1262,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                           <p className="text-slate-500 font-medium">{contact.role}</p>
                         </div>
                         {contact.isPrimary && (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-black bg-blue-100 text-[#1E60F3]">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-black bg-[#EEF3FF] text-[#31598F]">
                             대표 담당자
                           </span>
                         )}
@@ -1305,7 +1303,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
 
             {/* TAB 3: 예약 이력 탭 */}
             {activeTab === 'history' && (
-              <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 space-y-4">
+              <div className="rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] space-y-4">
                 <h3 className="text-sm font-black text-slate-900">
                   {selectedCustomer.name} 과거 및 진행 중 운행 이력
                 </h3>
@@ -1339,7 +1337,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
 
             {/* TAB 4: 행사 탭 */}
             {activeTab === 'events' && (
-              <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 space-y-4">
+              <div className="rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] space-y-4">
                 <h3 className="text-sm font-black text-slate-900">
                   {selectedCustomer.name} 전담 행사 및 VIP 프로젝트 타임라인
                 </h3>
@@ -1354,7 +1352,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <span className="font-black text-slate-900 text-sm">{ev.title}</span>
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-100 text-[#1E60F3]">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-[#EEF3FF] text-[#31598F]">
                               {ev.dDay}
                             </span>
                           </div>
@@ -1378,7 +1376,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
 
             {/* TAB 5: 요청사항 탭 */}
             {activeTab === 'requests' && (
-              <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 space-y-4">
+              <div className="rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] space-y-4">
                 <h3 className="text-sm font-black text-slate-900">
                   {selectedCustomer.name} 특별 요청사항 히스토리
                 </h3>
@@ -1401,7 +1399,7 @@ export const HqCustomersView: React.FC<HqCustomersViewProps> = ({
 
             {/* TAB 6: 소통 기록 탭 */}
             {activeTab === 'communications' && (
-              <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 space-y-4">
+              <div className="rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-black text-slate-900">
                     {selectedCustomer.name} 의전 소통 및 연락 타임라인
