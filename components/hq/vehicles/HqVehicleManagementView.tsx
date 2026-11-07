@@ -920,7 +920,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
           {/* Header */}
           <div className="flex items-center justify-between px-1">
             <div>
-              <h2 className="text-sm font-black text-slate-900">차량 목록</h2>
+              <h2 className="text-[15px] font-bold tracking-[-0.02em] text-[#17233B]">차량 목록</h2>
               <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-medium mt-0.5">
                 <span>실시간 반영 중</span>
                 <button
@@ -947,7 +947,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                     }
                     showToast("삭제된 모든 차량이 복구되었습니다.");
                   }}
-                  className="text-[11px] font-bold text-slate-600 hover:text-[#0050FF] flex items-center gap-1 transition-colors cursor-pointer bg-slate-100/80 hover:bg-blue-50 px-2 py-0.5 rounded-lg border border-slate-200"
+                  className="flex min-h-9 cursor-pointer items-center gap-1.5 rounded-[12px] bg-white px-3 text-[11px] font-semibold text-[#73839D] shadow-[0_3px_10px_rgba(35,49,78,0.04)] transition-colors hover:bg-[#F5F8FF]"
                   title="삭제된 차량 초기화 및 복구"
                 >
                   <RefreshCw className="w-2.5 h-2.5 text-slate-400" />
@@ -961,21 +961,23 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
           </div>
 
           {/* Cards Stack */}
-          <div className="space-y-2.5 max-h-[calc(100vh-210px)] overflow-y-auto pr-1">
+          <div className="max-h-[min(800px,calc(100vh-210px))] space-y-3 overflow-y-auto overscroll-contain pr-1 pb-1">
             {filteredVehicles.map((vehicle) => {
               const isSelected = vehicle.id === selectedVehicle?.id;
               const thumbUrl = getVehicleImage(vehicle);
 
               return (
-                <div
+                <button
                   key={vehicle.id}
+                  type="button"
+                  aria-pressed={isSelected}
                   onClick={() => {
                     haptics.selection();
                     setSelectedVehicleId(vehicle.id);
                   }}
-                  className={`rounded-2xl p-3 sm:p-3.5 transition-all cursor-pointer flex items-center gap-3 relative shadow-2xs group border ${isSelected
-                    ? "bg-blue-50/70 border-blue-200/90 border-l-4 border-l-[#0050FF] shadow-xs"
-                    : "bg-white hover:bg-slate-50/80 border-slate-200/80 hover:border-slate-300"
+                  className={`group relative flex w-full cursor-pointer items-center gap-3 rounded-[19px] p-4 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25 ${isSelected
+                    ? "bg-[#F3F7FF] shadow-[0_5px_18px_rgba(35,49,78,0.075)]"
+                    : "bg-white shadow-[0_4px_14px_rgba(35,49,78,0.045)] hover:bg-[#FAFBFD]"
                     }`}
                 >
                   {/* Left Thumbnail Image */}
@@ -984,7 +986,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                       src={thumbUrl}
                       alt={vehicle.model}
                       fill
-                      className="object-contain filter drop-shadow-[0_8px_12px_rgba(0,0,0,0.16)] transition-transform duration-200 group-hover:scale-105"
+                      className="object-contain drop-shadow-[0_5px_9px_rgba(35,49,78,0.09)] transition-transform duration-200 group-hover:scale-[1.02]"
                       sizes="96px"
                     />
                   </div>
@@ -993,7 +995,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                   <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5 self-stretch">
                     {/* Top: Model & Chevron */}
                     <div className="flex items-start justify-between gap-1">
-                      <h3 className="text-xs sm:text-[13px] font-bold text-slate-900 tracking-tight truncate">
+                      <h3 className="truncate text-[13px] font-semibold tracking-[-0.02em] text-[#17233B]">
                         {vehicle.model}
                       </h3>
                       <ChevronRight className="w-4 h-4 text-slate-300 shrink-0 mt-0.5" />
@@ -1001,7 +1003,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
 
                     {/* Middle: Badges */}
                     <div className="flex items-center gap-1.5 my-1">
-                      <span className="bg-blue-50 text-[#0050FF] text-[10px] font-bold px-1.5 py-0.2 rounded">
+                      <span className="rounded-[7px] bg-[#F1F4F9] px-2 py-0.5 text-[10px] font-medium text-[#73839D]">
                         {vehicle.uiCategory === "sprinter"
                           ? "스프린터"
                           : vehicle.uiCategory === "van"
@@ -1010,28 +1012,28 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                               ? "SUV"
                               : "세단"}
                       </span>
-                      <span className="bg-slate-100 text-slate-600 text-[10px] font-medium px-1.5 py-0.2 rounded">
+                      <span className="rounded-[7px] bg-[#F7F9FC] px-2 py-0.5 text-[10px] font-medium text-[#73839D]">
                         {vehicle.fuelDisplay}
                       </span>
                     </div>
 
                     {/* Bottom: Plate (Tag Style) & Status Pill */}
                     <div className="flex items-center justify-between gap-2 pt-0.5">
-                      <span className="text-xs sm:text-[13px] font-black text-slate-900 tracking-tight px-1.5 py-0.5 rounded-md bg-slate-100/90 border border-slate-200/80">
+                      <span className="rounded-[8px] bg-[#F7F9FC] px-2 py-1 text-[12px] font-semibold tracking-tight text-[#17233B]">
                         {vehicle.plate}
                       </span>
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-600 bg-white px-2 py-0.5 rounded-md border border-slate-200/60 shrink-0">
+                      <span className="inline-flex shrink-0 items-center gap-1 rounded-[8px] bg-white px-2 py-1 text-[10px] font-medium text-[#73839D]">
                         <Calendar className="w-2.5 h-2.5 text-slate-400" />
                         <span>{formatVehicleStatus(vehicle.effectiveStatus)}</span>
                       </span>
                     </div>
                   </div>
-                </div>
+                </button>
               );
             })}
 
             {filteredVehicles.length === 0 && (
-              <div className="bg-white rounded-2xl p-8 border border-slate-200 text-center space-y-2">
+              <div className="space-y-2 rounded-[20px] bg-white p-8 text-center shadow-[0_5px_18px_rgba(35,49,78,0.045)]">
                 <Car className="w-8 h-8 text-slate-300 mx-auto" />
                 <p className="text-xs font-bold text-slate-700">검색된 차량이 없습니다.</p>
                 <p className="text-[11px] text-slate-400">필터나 검색어를 변경해 보세요.</p>
@@ -1048,7 +1050,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                       }
                       showToast("삭제된 모든 차량이 복구되었습니다.");
                     }}
-                    className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs font-bold transition-colors cursor-pointer"
+                    className="mt-2 inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-[12px] bg-[#F7F9FC] px-3 text-[12px] font-semibold text-[#4D607C] transition-colors hover:bg-[#EDF1F6]"
                   >
                     <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
                     <span>삭제된 차량 복구</span>
@@ -1066,7 +1068,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
           {selectedVehicle ? (
             <>
               {/* Top Hero Header Card (Streamlined, no redundant quick specs) */}
-              <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
+              <div className="space-y-5 rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] sm:p-6">
                 <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
                   {/* Left Hero Photo - Transparent background with floating 3D drop-shadow */}
                   <div className="relative w-full sm:w-[240px] md:w-[260px] h-[145px] shrink-0 flex items-center justify-center p-2">
@@ -1074,7 +1076,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                       src={getVehicleHero(selectedVehicle)}
                       alt={selectedVehicle.model}
                       fill
-                      className="object-contain filter drop-shadow-[0_12px_22px_rgba(0,0,0,0.20)] transition-transform duration-300 hover:scale-[1.03]"
+                      className="object-contain drop-shadow-[0_8px_18px_rgba(35,49,78,0.10)] transition-transform duration-300 hover:scale-[1.02]"
                       priority
                     />
                   </div>
@@ -1083,7 +1085,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                   <div className="flex-1 w-full min-w-0 space-y-2.5">
                     {/* Row 1: Model Title & Minimal Icon Actions */}
                     <div className="flex flex-wrap sm:flex-nowrap items-start justify-between gap-3">
-                      <h2 className="text-lg sm:text-xl font-black text-slate-950 tracking-tight break-keep">
+                      <h2 className="break-keep text-[20px] font-bold tracking-[-0.03em] text-[#17233B] sm:text-[22px]">
                         {selectedVehicle.model}
                       </h2>
 
@@ -1093,14 +1095,14 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                           <button
                             type="button"
                             onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 cursor-pointer shadow-2xs"
+                            className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-[13px] bg-white px-3 text-[12px] font-medium text-[#4D607C] shadow-[0_3px_12px_rgba(35,49,78,0.06)] transition-colors hover:bg-[#F5F8FF]"
                           >
                             <Calendar className="w-3.5 h-3.5 text-slate-400" />
                             <span>{formatVehicleStatus(selectedVehicle.effectiveStatus)}</span>
                             <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
                           </button>
                           {isStatusDropdownOpen && (
-                            <div className="absolute right-0 mt-1 w-32 bg-white rounded-xl shadow-lg border border-slate-200 py-1 z-30">
+                            <div className="absolute right-0 z-30 mt-2 w-40 overflow-hidden rounded-[16px] bg-white p-1.5 shadow-[0_14px_36px_rgba(35,49,78,0.13),0_3px_10px_rgba(35,49,78,0.05)]">
                               {STATUS_OPTIONS.map((st) => (
                                 <button
                                   key={st.value}
@@ -1187,7 +1189,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
               </div>
 
               {/* Navigation Tabs (4 distinct tabs) */}
-              <div className="flex items-center gap-6 border-b border-slate-200 px-1 text-xs font-bold text-slate-500">
+              <div className="flex items-center gap-1 overflow-x-auto rounded-[15px] bg-[#F7F9FC] p-1 text-[12px] font-medium text-[#73839D]">
                 {[
                   { key: "info", label: "기본 제원" },
                   { key: "calendar", label: "예약 일정" },
@@ -1201,9 +1203,9 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                       haptics.lightTap();
                       setActiveDetailTab(tab.key as any);
                     }}
-                    className={`pb-2.5 transition-all cursor-pointer relative ${activeDetailTab === tab.key
-                      ? "text-[#0050FF] font-black after:content-[''] after:absolute after:bottom-0 after:inset-x-0 after:h-[2px] after:bg-[#0050FF]"
-                      : "hover:text-slate-800"
+                    className={`min-h-10 shrink-0 cursor-pointer rounded-[11px] px-3.5 transition-all ${activeDetailTab === tab.key
+                      ? "bg-white text-[#1E60F3] font-semibold shadow-[0_3px_10px_rgba(35,49,78,0.065)]"
+                      : "text-[#73839D] hover:text-[#17233B]"
                       }`}
                   >
                     <span>{tab.label}</span>
@@ -1213,8 +1215,8 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
 
               {/* Tab Content 1: 기본 제원 (단독 뷰) */}
               {activeDetailTab === "info" && (
-                <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="space-y-5 rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] sm:p-6">
+                  <div className="flex items-center justify-between gap-2 pb-2">
                     <div className="flex items-center gap-2">
                       <Info className="w-4 h-4 text-[#0050FF]" />
                       <h3 className="text-sm font-bold text-slate-900">
@@ -1232,21 +1234,21 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
-                    <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-100">
+                    <div className="rounded-[15px] bg-[#FAFBFD] p-4">
                       <span className="text-[11px] text-slate-400 font-medium block">제조사</span>
-                      <span className="font-bold text-slate-900 mt-0.5 block">{selectedVehicle.brand}</span>
+                      <span className="mt-1 block font-semibold text-[#17233B]">{selectedVehicle.brand}</span>
                     </div>
-                    <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-100">
+                    <div className="rounded-[15px] bg-[#FAFBFD] p-4">
                       <span className="text-[11px] text-slate-400 font-medium block">차량 모델</span>
-                      <span className="font-bold text-slate-900 mt-0.5 block">{selectedVehicle.model}</span>
+                      <span className="mt-1 block font-semibold text-[#17233B]">{selectedVehicle.model}</span>
                     </div>
-                    <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-100">
+                    <div className="rounded-[15px] bg-[#FAFBFD] p-4">
                       <span className="text-[11px] text-slate-400 font-medium block">차량 번호판</span>
-                      <span className="font-bold text-slate-900 mt-0.5 block">{selectedVehicle.plate}</span>
+                      <span className="mt-1 block font-semibold text-[#17233B]">{selectedVehicle.plate}</span>
                     </div>
-                    <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-100">
+                    <div className="rounded-[15px] bg-[#FAFBFD] p-4">
                       <span className="text-[11px] text-slate-400 font-medium block">차급 분류</span>
-                      <span className="font-bold text-slate-900 mt-0.5 block">
+                      <span className="mt-1 block font-semibold text-[#17233B]">
                         {selectedVehicle.uiCategory === "sprinter"
                           ? "스프린터"
                           : selectedVehicle.uiCategory === "van"
@@ -1256,23 +1258,23 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                               : "세단"}
                       </span>
                     </div>
-                    <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-100">
+                    <div className="rounded-[15px] bg-[#FAFBFD] p-4">
                       <span className="text-[11px] text-slate-400 font-medium block">연식</span>
-                      <span className="font-bold text-slate-900 mt-0.5 block">{selectedVehicle.year}</span>
+                      <span className="mt-1 block font-semibold text-[#17233B]">{selectedVehicle.year}</span>
                     </div>
-                    <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-100">
+                    <div className="rounded-[15px] bg-[#FAFBFD] p-4">
                       <span className="text-[11px] text-slate-400 font-medium block">승차 정원</span>
-                      <span className="font-bold text-slate-900 mt-0.5 block">{selectedVehicle.capacity}</span>
+                      <span className="mt-1 block font-semibold text-[#17233B]">{selectedVehicle.capacity}</span>
                     </div>
-                    <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-100">
+                    <div className="rounded-[15px] bg-[#FAFBFD] p-4">
                       <span className="text-[11px] text-slate-400 font-medium block">차량 색상</span>
-                      <span className="font-bold text-slate-900 mt-0.5 block">{selectedVehicle.color}</span>
+                      <span className="mt-1 block font-semibold text-[#17233B]">{selectedVehicle.color}</span>
                     </div>
-                    <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-100">
+                    <div className="rounded-[15px] bg-[#FAFBFD] p-4">
                       <span className="text-[11px] text-slate-400 font-medium block">사용 연료</span>
-                      <span className="font-bold text-slate-900 mt-0.5 block">{selectedVehicle.fuelDisplay}</span>
+                      <span className="mt-1 block font-semibold text-[#17233B]">{selectedVehicle.fuelDisplay}</span>
                     </div>
-                    <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-100">
+                    <div className="rounded-[15px] bg-[#FAFBFD] p-4">
                       <span className="text-[11px] text-slate-400 font-medium block">운행 상태</span>
                       <span className="font-bold text-blue-600 mt-0.5 block">{formatVehicleStatus(selectedVehicle.effectiveStatus)}</span>
                     </div>
@@ -1335,8 +1337,8 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                   </div>
 
                   {/* 2-Week Full Calendar */}
-                  <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
-                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="space-y-5 rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] sm:p-6">
+                    <div className="flex items-center justify-between gap-2 pb-2">
                       <div className="flex items-center gap-2">
                         <CalendarDays className="w-4 h-4 text-[#0050FF]" />
                         <h3 className="text-sm font-bold text-slate-900">2주간 일자별 가용성 현황</h3>
@@ -1381,8 +1383,8 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
 
               {/* Tab Content 3: 편의 사양 (단독 뷰) */}
               {activeDetailTab === "tips" && (
-                <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="space-y-5 rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] sm:p-6">
+                  <div className="flex items-center justify-between gap-2 pb-2">
                     <div className="flex items-center gap-2">
                       <Sparkles className="w-4 h-4 text-[#0050FF]" />
                       <h3 className="text-sm font-bold text-slate-900">
@@ -1447,8 +1449,8 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
 
               {/* Tab Content 4: 운영 메모 (단독 뷰) */}
               {activeDetailTab === "memo" && (
-                <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="space-y-5 rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] sm:p-6">
+                  <div className="flex items-center justify-between gap-2 pb-2">
                     <div className="flex items-center gap-2">
                       <Edit2 className="w-4 h-4 text-[#0050FF]" />
                       <h3 className="text-sm font-bold text-slate-900">
