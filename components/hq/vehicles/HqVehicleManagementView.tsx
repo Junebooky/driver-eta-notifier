@@ -248,46 +248,102 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
     setTimeout(() => setToastMessage(null), 3200);
   }, []);
 
-  // Custom vehicles dynamically added via NewVehicleModal (persisted to localStorage)
+  // The HQ server registry is authoritative across devices and dispatch.
   const [customVehicles, setCustomVehicles] = useState<VipRealVehicle[]>([]);
-  // Deleted vehicle IDs (persisted to localStorage)
   const [deletedVehicleIds, setDeletedVehicleIds] = useState<string[]>([]);
+  const [archivedVehicleProfiles, setArchivedVehicleProfiles] = useState<VipRealVehicle[]>([]);
+  const [legacyVehicleProfiles, setLegacyVehicleProfiles] = useState<VipRealVehicle[]>([]);
+  const [registryLoaded, setRegistryLoaded] = useState(false);
+  const [registryError, setRegistryError] = useState<string | null>(null);
+  const [registryBusy, setRegistryBusy] = useState(false);
 
-  useEffect(() => {
-    let customList: VipRealVehicle[] = [];
+  const fetchServerRegistry = useCallback(async () => {
     try {
+      const res = await fetch('/api/fleet/registry', { cache: 'no-store' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok || !Array.isArray(data.records)) {
+        throw new Error(data.error || '공용 차량 등록부를 불러오지 못했습니다.');
+      }
+      const records: Array<{ vehicle_id: string; plate: string; archived: boolean; profile: VipRealVehicle }> = data.records;
+      setCustomVehicles(records.filter(row => !row.archived).map(row => row.profile));
+      setArchivedVehicleProfiles(records.filter(row => row.archived).map(row => row.profile));
+      setDeletedVehicleIds(records.filter(row => row.archived).flatMap(row => [row.profile.id, row.plate]));
+      setRegistryLoaded(true);
+      setRegistryError(null);
+
+      // Existing browser-only fleet data is never discarded or silently synced.
+      // Offer an explicit one-time import after the operator confirms the records.
       const stored = localStorage.getItem('vip_hq_custom_vehicles');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          customList = parsed;
-          setCustomVehicles(parsed);
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to parse cached custom vehicles', e);
-    }
-
-    try {
-      const storedDeleted = localStorage.getItem('vip_hq_deleted_vehicle_ids');
-      if (storedDeleted) {
-        const parsedDeleted = JSON.parse(storedDeleted);
-        if (Array.isArray(parsedDeleted)) {
-          // Self-heal: Any plate that the user has explicitly registered should NOT remain deleted
-          const customPlates = new Set(customList.map((cv) => cv.plate?.trim().replace(/\s+/g, '')));
-          const cleaned = parsedDeleted.filter((id) => !customPlates.has(String(id).trim().replace(/\s+/g, '')));
-          setDeletedVehicleIds(cleaned);
-          if (cleaned.length !== parsedDeleted.length) {
-            localStorage.setItem('vip_hq_deleted_vehicle_ids', JSON.stringify(cleaned));
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to parse cached deleted vehicle ids', e);
+      const parsed = stored ? JSON.parse(stored) : [];
+      const active = Array.isArray(parsed) ? parsed.filter((v): v is VipRealVehicle =>
+        Boolean(v && typeof v.plate === 'string' && typeof v.model === 'string')) : [];
+      const knownPlates = new Set(records.map(row => row.plate.replace(/\s/g, '')));
+      setLegacyVehicleProfiles(active.filter(v => !knownPlates.has(v.plate.replace(/\s/g, ''))));
+    } catch (err) {
+      setRegistryError(err instanceof Error ? err.message : '차량 서버 연결에 실패했습니다.');
+      setRegistryLoaded(false);
     }
   }, []);
 
+  useEffect(() => {
+    void fetchServerRegistry();
+    const refresh = () => {
+      if (document.visibilityState === 'visible') void fetchServerRegistry();
+    };
+    window.addEventListener('focus', refresh);
+    window.addEventListener('vip_hq_fleet_updated', refresh);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('vip_hq_fleet_updated', refresh);
+    };
+  }, [fetchServerRegistry]);
+
+  const persistFleetVehicle = async (vehicle: VipRealVehicle): Promise<VipRealVehicle> => {
+    const response = await fetch('/api/fleet/registry', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(vehicle),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.ok || !data.vehicle) {
+      throw new Error(data.error || '차량 등록을 서버에 저장하지 못했습니다.');
+    }
+    return data.vehicle as VipRealVehicle;
+  };
+
+  const handleImportLegacyVehicles = async () => {
+    if (registryBusy || !legacyVehicleProfiles.length) return;
+    setRegistryBusy(true);
+    try {
+      for (const v of legacyVehicleProfiles) await persistFleetVehicle(reconcileRegisteredVehicle(v));
+      localStorage.removeItem('vip_hq_custom_vehicles');
+      await fetchServerRegistry();
+      window.dispatchEvent(new Event('vip_hq_fleet_updated'));
+      showToast('이 기기의 기존 차량을 공용 등록부로 가져왔습니다.');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : '기존 차량 가져오기에 실패했습니다.');
+      await fetchServerRegistry();
+    } finally {
+      setRegistryBusy(false);
+    }
+  };
+
+  const handleRestoreAllVehicles = async () => {
+    if (registryBusy || !archivedVehicleProfiles.length) return;
+    setRegistryBusy(true);
+    try {
+      for (const v of archivedVehicleProfiles) await persistFleetVehicle(v);
+      await fetchServerRegistry();
+      window.dispatchEvent(new Event('vip_hq_fleet_updated'));
+      showToast('서버 등록부에서 삭제된 차량을 복구했습니다.');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : '차량 복구에 실패했습니다.');
+    } finally {
+      setRegistryBusy(false);
+    }
+  };
+
   const allBaseVehicles = useMemo(() => {
+    if (!registryLoaded) return [] as VipRealVehicle[];
     // 1. Plates in customVehicles (user explicitly registered these, so they take highest priority)
     const customPlates = new Set(customVehicles.map((v) => v.plate.trim().replace(/\s+/g, '')));
 
@@ -317,7 +373,7 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
     );
 
     return [...validCustom, ...validDefault];
-  }, [customVehicles, deletedVehicleIds]);
+  }, [customVehicles, deletedVehicleIds, registryLoaded]);
 
   // Edit Modal Form State
   const [editStatus, setEditStatus] = useState<'확인 필요' | '대기 중' | '운행 중' | '정비 중'>('확인 필요');
