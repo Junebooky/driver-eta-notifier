@@ -589,8 +589,8 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="고객사, 승객명, 목적지로 찾아보세요"
-            className="w-full pl-9 pr-3.5 py-2.5 bg-white border border-slate-200/90 rounded-2xl text-[11px] sm:text-xs text-slate-800 placeholder:text-[11px] sm:placeholder:text-xs placeholder:text-slate-400 font-semibold shadow-2xs focus:outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-[#1E60F3]/15 transition-all"
+            placeholder="고객사, 승객, 목적지 검색"
+            className="h-12 w-full rounded-[16px] border border-[#E1E7F0]/25 bg-white pl-10 pr-4 text-[14px] font-medium text-[#17233B] placeholder:text-[#95A3B9] shadow-[0_5px_16px_rgba(35,49,78,0.045),0_2px_5px_rgba(35,49,78,0.02)] outline-none transition-shadow hover:shadow-[0_6px_18px_rgba(35,49,78,0.06)] focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20"
           />
         </div>
 
