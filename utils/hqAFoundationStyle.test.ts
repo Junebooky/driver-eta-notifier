@@ -23,7 +23,8 @@ test('settings and permissions remains intentionally unconfigured and untouched'
 
 test('HQ header controls use light tooltips without removing their actions',()=>{
   assert.doesNotMatch(header,/bg-slate-900/);
-  assert.match(header,/rounded-\[12px\] bg-white px-3 py-2/);
+  assert.match(header,/hq-ui-tooltip/);
+  assert.match(header,/HqIconButton/);
   assert.match(header,/onOpenNotifications\?\.\(\)/);
   assert.match(header,/onOpenQuoteModal\(\)/);
   assert.match(header,/onRefresh\(\)/);
