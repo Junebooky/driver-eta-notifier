@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
       sub_type: saved.subType,
       capacity: saved.capacity,
       fuel_type: saved.fuelType,
-      status: existing?.archived ? 'available' : (existing ? 'available' : 'available'),
+      status: verified?.status === '정비 중' ? 'maintenance' : verified?.status === '운행 중' ? 'driving' : 'available',
       archived: false,
       // Only UI extras are JSON; physical catalog identity lives in columns.
       profile: { id: saved.id, year: saved.year, color: saved.color, imageUrl: saved.imageUrl,
