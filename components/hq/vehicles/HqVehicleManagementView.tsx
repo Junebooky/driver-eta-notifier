@@ -658,9 +658,8 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
   }, [enrichedVehicles]);
 
   // Register New Vehicle Handler
-  const handleCreateVehicle = (data: NewVehicleFormData) => {
+  const handleCreateVehicle = async (data: NewVehicleFormData) => {
     const normalizedPlate = data.plate.trim();
-    const cleanPlate = normalizedPlate.replace(/\s+/g, '');
 
     const newVehicle: VipRealVehicle = {
       id: `vehicle-custom-${Date.now()}`,
@@ -698,95 +697,52 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
       imageUrl: data.imageUrl,
     };
 
-    // 1. Immediately un-delete this plate if it was previously marked deleted
-    setDeletedVehicleIds((prev) => {
-      const next = prev.filter((id) => {
-        const cleanId = id.trim().replace(/\s+/g, '');
-        if (cleanId === cleanPlate || id === normalizedPlate) return false;
-        const matchingDefault = VIP_REAL_VEHICLES.find(
-          (dv) => dv.plate.replace(/\s+/g, '') === cleanPlate
-        );
-        if (matchingDefault && (matchingDefault.id === id || matchingDefault.plate === id)) {
-          return false;
-        }
-        return true;
-      });
-      try {
-        localStorage.setItem('vip_hq_deleted_vehicle_ids', JSON.stringify(next));
-      } catch (err) {
-        console.warn('Failed to update deleted vehicle ids in localStorage', err);
-      }
-      return next;
-    });
-
-    // 2. Add to customVehicles state and localStorage (replace duplicate if exists)
-    setCustomVehicles((prev) => {
-      const filteredPrev = prev.filter((v) => v.plate.trim().replace(/\s+/g, '') !== cleanPlate);
-      const next = [newVehicle, ...filteredPrev];
-      try {
-        localStorage.setItem('vip_hq_custom_vehicles', JSON.stringify(next));
-      } catch (err) {
-        console.warn('Failed to save custom vehicles to localStorage', err);
-      }
-      return next;
-    });
-
-    // 3. Reset filters so the new vehicle is immediately visible
-    setSelectedCategory('all');
-    setFuelFilter('all');
-    setSearchQuery('');
-
-    // 4. Focus on the new vehicle
-    setSelectedVehicleId(newVehicle.id);
-    setIsNewVehicleModalOpen(false);
-    showToast(`차량 '${normalizedPlate}'이(가) 등록되었습니다.`);
-    haptics.success();
+    setRegistryBusy(true);
+    try {
+      const saved = await persistFleetVehicle(newVehicle);
+      await fetchServerRegistry();
+      setSelectedCategory('all');
+      setFuelFilter('all');
+      setSearchQuery('');
+      setSelectedVehicleId(saved.id);
+      setIsNewVehicleModalOpen(false);
+      window.dispatchEvent(new Event('vip_hq_fleet_updated'));
+      showToast(`차량 '${normalizedPlate}'이(가) HQ 공용 등록부에 저장됐습니다.`);
+      haptics.success();
+      void fetchAvailability();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : '차량 등록에 실패했습니다.');
+      haptics.errorAlert();
+    } finally {
+      setRegistryBusy(false);
+    }
   };
 
   // Delete Vehicle Handler
-  const handleConfirmDeleteVehicle = (vehicle: VipRealVehicle) => {
-    haptics.warningPulse();
-
-    const cleanPlate = vehicle.plate.trim().replace(/\s+/g, '');
-
-    // 1. Remove from custom vehicles state if present
-    setCustomVehicles((prev) => {
-      const next = prev.filter(
-        (v) => v.id !== vehicle.id && v.plate.trim().replace(/\s+/g, '') !== cleanPlate
-      );
-      try {
-        localStorage.setItem('vip_hq_custom_vehicles', JSON.stringify(next));
-      } catch (e) {
-        console.warn('Failed to update custom vehicles in localStorage', e);
-      }
-      return next;
-    });
-
-    // 2. Add to deleted vehicle IDs
-    setDeletedVehicleIds((prev) => {
-      const next = Array.from(new Set([...prev, vehicle.id, vehicle.plate.trim(), cleanPlate]));
-      try {
-        localStorage.setItem('vip_hq_deleted_vehicle_ids', JSON.stringify(next));
-      } catch (e) {
-        console.warn('Failed to save deleted vehicle ids to localStorage', e);
-      }
-      return next;
-    });
-
-    // 3. Clear modal
-    setVehicleToDelete(null);
-
-    // 4. Update selected vehicle to next available vehicle
-    const remaining = enrichedVehicles.filter(
-      (v) => v.id !== vehicle.id && v.plate.trim().replace(/\s+/g, '') !== cleanPlate
-    );
-    if (remaining.length > 0) {
-      setSelectedVehicleId(remaining[0].id);
+  const handleConfirmDeleteVehicle = async (vehicle: VipRealVehicle) => {
+    if (registryBusy) return;
+    setRegistryBusy(true);
+    try {
+      const res = await fetch('/api/fleet/registry', {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plate: vehicle.plate }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) throw new Error(data.error || '차량 삭제를 서버에 저장하지 못했습니다.');
+      await fetchServerRegistry();
+      const remaining = enrichedVehicles.filter(v => v.plate !== vehicle.plate);
+      setSelectedVehicleId(remaining[0]?.id || '');
+      setVehicleToDelete(null);
+      window.dispatchEvent(new Event('vip_hq_fleet_updated'));
+      void fetchAvailability();
+      showToast(`차량 '${vehicle.plate}'이(가) 공용 등록부에서 삭제됐습니다.`);
+      haptics.success();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : '차량 삭제에 실패했습니다.');
+      haptics.errorAlert();
+    } finally {
+      setRegistryBusy(false);
     }
-
-    // 5. Toast & haptics
-    showToast(`차량 '${vehicle.plate}' (${vehicle.model})이(가) 삭제되었습니다.`);
-    haptics.success();
   };
 
   return (
@@ -990,19 +946,21 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {legacyVehicleProfiles.length > 0 && (
+                <button type="button" onClick={() => void handleImportLegacyVehicles()} disabled={registryBusy}
+                  className="flex min-h-9 items-center rounded-[12px] bg-[#EEF3FF] px-3 text-[11px] font-semibold text-[#1E60F3] transition-colors hover:bg-[#E5EDFF] disabled:opacity-50"
+                  title="이 브라우저에만 저장된 차량을 HQ 공용 등록부로 가져오기">
+                  로컬 차량 {legacyVehicleProfiles.length}대 가져오기
+                </button>
+              )}
+              {registryError && (
+                <p role="alert" className="max-w-[280px] text-[11px] font-medium text-[#A34E45]">{registryError}</p>
+              )}
               {deletedVehicleIds.length > 0 && (
                 <button
                   type="button"
-                  onClick={() => {
-                    haptics.impactMedium();
-                    setDeletedVehicleIds([]);
-                    try {
-                      localStorage.removeItem("vip_hq_deleted_vehicle_ids");
-                    } catch (e) {
-                      console.warn(e);
-                    }
-                    showToast("삭제된 모든 차량이 복구되었습니다.");
-                  }}
+                  onClick={() => void handleRestoreAllVehicles()}
+                  disabled={registryBusy}}
                   className="flex min-h-9 cursor-pointer items-center gap-1.5 rounded-[12px] bg-white px-3 text-[11px] font-semibold text-[#73839D] shadow-[0_3px_10px_rgba(35,49,78,0.04)] transition-colors hover:bg-[#F5F8FF]"
                   title="삭제된 차량 초기화 및 복구"
                 >
@@ -1096,16 +1054,8 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
                 {deletedVehicleIds.length > 0 && (
                   <button
                     type="button"
-                    onClick={() => {
-                      haptics.impactMedium();
-                      setDeletedVehicleIds([]);
-                      try {
-                        localStorage.removeItem("vip_hq_deleted_vehicle_ids");
-                      } catch (e) {
-                        console.warn(e);
-                      }
-                      showToast("삭제된 모든 차량이 복구되었습니다.");
-                    }}
+                    onClick={() => void handleRestoreAllVehicles()}
+                    disabled={registryBusy}}
                     className="mt-2 inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-[12px] bg-[#F7F9FC] px-3 text-[12px] font-semibold text-[#4D607C] transition-colors hover:bg-[#EDF1F6]"
                   >
                     <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
@@ -1790,7 +1740,8 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
               </button>
               <button
                 type="button"
-                onClick={() => handleConfirmDeleteVehicle(vehicleToDelete)}
+                onClick={() => void handleConfirmDeleteVehicle(vehicleToDelete)}
+                disabled={registryBusy}
                 className="flex min-h-11 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-[14px] bg-[#FFF4F2] text-[12px] font-semibold text-[#A34E45] transition-colors hover:bg-[#FFE9E5]"
               >
                 <Trash2 className="w-3.5 h-3.5" />
