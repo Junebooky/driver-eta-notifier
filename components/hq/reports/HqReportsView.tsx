@@ -476,13 +476,13 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
             }}
             className={`relative min-h-11 cursor-pointer rounded-[13px] px-4 font-semibold transition-colors ${
               activeSubTab === "events"
-                ? "text-[#1E60F3]"
-                : "text-slate-500 hover:text-slate-800"
+                ? "bg-white text-[#1E60F3] shadow-[0_3px_10px_rgba(35,49,78,0.065)]"
+                : "text-[#73839D] hover:text-[#17233B]"
             }`}
           >
             <span>행사별 정산</span>
             {activeSubTab === "events" && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#1E60F3] rounded-full" />
+              <span className="sr-only">선택됨</span>
             )}
           </button>
           <button
@@ -493,13 +493,13 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
             }}
             className={`relative min-h-11 cursor-pointer rounded-[13px] px-4 font-semibold transition-colors ${
               activeSubTab === "profitability"
-                ? "text-[#1E60F3]"
-                : "text-slate-500 hover:text-slate-800"
+                ? "bg-white text-[#1E60F3] shadow-[0_3px_10px_rgba(35,49,78,0.065)]"
+                : "text-[#73839D] hover:text-[#17233B]"
             }`}
           >
             <span>수익성 분석</span>
             {activeSubTab === "profitability" && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#1E60F3] rounded-full" />
+              <span className="sr-only">선택됨</span>
             )}
           </button>
           <button
@@ -510,13 +510,13 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
             }}
             className={`relative min-h-11 cursor-pointer rounded-[13px] px-4 font-semibold transition-colors ${
               activeSubTab === "comprehensive"
-                ? "text-[#1E60F3]"
-                : "text-slate-500 hover:text-slate-800"
+                ? "bg-white text-[#1E60F3] shadow-[0_3px_10px_rgba(35,49,78,0.065)]"
+                : "text-[#73839D] hover:text-[#17233B]"
             }`}
           >
             <span>종합 리포트</span>
             {activeSubTab === "comprehensive" && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#1E60F3] rounded-full" />
+              <span className="sr-only">선택됨</span>
             )}
           </button>
         </div>
@@ -527,10 +527,10 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
         <div className="rounded-[21px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055)] space-y-2.5 animate-in fade-in duration-150 print:hidden">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="px-2 py-0.5 rounded bg-blue-600 text-white text-[10px] font-black tracking-wide">
+              <span className="rounded-[9px] bg-[#EEF3FF] px-3 py-1 text-[10px] font-semibold tracking-wide text-[#31598F]">
                 DEV TEST CONSOLE
               </span>
-              <span className="text-xs font-black text-white">
+              <span className="text-[12px] font-semibold text-[#17233B]">
                 E2E 업무·정산 파이프라인 시나리오 실행기
               </span>
             </div>
@@ -558,8 +558,8 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                   }}
                   className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
                     btn.code === "ALL"
-                      ? "bg-[#0050FF] hover:bg-blue-600 text-white shadow-xs"
-                      : "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
+                      ? "bg-[#EEF3FF] text-[#1E60F3]"
+                      : "bg-white text-[#73839D] shadow-[0_3px_10px_rgba(35,49,78,0.045)] hover:bg-[#F7F9FC]"
                   }`}
                 >
                   {btn.label}
@@ -574,7 +574,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                   setDemoLogs([]);
                   showToast("DEMO 시나리오 데이터가 초기화되었습니다.");
                 }}
-                className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-rose-950/80 hover:bg-rose-900 text-rose-200 border border-rose-800/70 cursor-pointer"
+                className="min-h-10 cursor-pointer rounded-[12px] bg-[#FFF4F2] px-3 text-[11px] font-semibold text-[#A34E45] transition-colors hover:bg-[#FFE9E5]"
               >
                 초기화
               </button>
@@ -582,7 +582,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
           </div>
 
           {demoLogs.length > 0 && (
-            <div className="p-2.5 rounded-xl bg-slate-950/90 border border-slate-800 text-[11px] text-emerald-300 font-mono space-y-1">
+            <div className="rounded-[15px] bg-[#FAFBFD] p-3 text-[11px] font-mono text-[#4D607C] space-y-1">
               {demoLogs.map((logLine, i) => (
                 <div key={i}>✓ {logLine}</div>
               ))}
