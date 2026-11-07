@@ -1094,8 +1094,8 @@ async function prepareServerDispatchSchedule(
 
   const initialBaseline: OriginalDispatchBaseline =
     existingHydrated?._meta.originalDispatchBaseline || {
-      vehiclePlate: (existingHydrated?._meta.vehiclePlate || existingHydrated?.vehicle_plate || resolvedPlate || '').trim(),
-      vehicleModel: (existingHydrated?._meta.vehicleModel || existingHydrated?.vehicle_model || resolvedModel || '').trim(),
+      vehiclePlate: (existingHydrated?._meta.vehiclePlate || existingHydrated?.vehicle_no || resolvedPlate || '').trim(),
+      vehicleModel: (existingHydrated?._meta.vehicleModel || resolvedModel || '').trim(),
       pickupTime: (existingHydrated?.pickup_time || hhmm).slice(0, 5),
       endTime: (existingHydrated?.end_time || input.endTime || '').slice(0, 5),
       capturedAt: nowIso,
