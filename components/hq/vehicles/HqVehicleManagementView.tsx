@@ -162,19 +162,25 @@ export const HqVehicleManagementView: React.FC<HqVehicleManagementViewProps> = (
   }, [fetchServerStatus]);
 
   const handleQuickChangeStatus = async (vehicleId: string, newStatus: '확인 필요' | '대기 중' | '운행 중' | '정비 중') => {
-    haptics.selection();
-    setStatusOverrides((prev) => ({ ...prev, [vehicleId]: newStatus }));
+    const vehicle = allBaseVehicles.find(v => v.id === vehicleId || v.uuid === vehicleId);
+    if (!vehicle) { showToast('등록된 차량을 확인할 수 없습니다.'); return; }
     try {
-      await fetch('/api/fleet/status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch('/api/fleet/status', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          statuses: { [vehicleId]: newStatus },
+          vehicleId: vehicle.id, plate: vehicle.plate, status: newStatus,
+          memo: memos[vehicle.id] || '', color: serverColors[vehicle.id] || '',
         }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) throw new Error(data.error || '차량 상태를 서버에 저장하지 못했습니다.');
+      setStatusOverrides(prev => ({ ...prev, ...data.statuses }));
+      haptics.selection();
       void fetchAvailability();
+      showToast('차량 상태가 서버에 저장됐습니다.');
     } catch (err) {
-      console.warn('Failed to save status change:', err);
+      showToast(err instanceof Error ? err.message : '차량 상태 저장에 실패했습니다.');
+      haptics.errorAlert();
     }
   };
 
