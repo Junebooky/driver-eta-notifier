@@ -1403,7 +1403,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
             </div>
 
             {/* Card 2: 출발일 · 출발 시간 · 종료 시간 (3 columns) */}
-            <div className="bg-white rounded-2xl border border-slate-100/90 shadow-2xs grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 overflow-hidden">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               {/* Col 1: 출발일 */}
               <TossDateRangePicker
                 align="left"
@@ -1414,7 +1414,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                   setPickupEndDate(end);
                 }}
                 customTrigger={() => (
-                  <div className="flex items-center gap-3 p-4 sm:p-5 hover:bg-slate-50/70 transition-colors cursor-pointer select-none">
+                  <div className="flex min-h-[88px] cursor-pointer select-none items-center gap-3 rounded-[20px] bg-white p-4 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] transition-all hover:shadow-[0_7px_24px_rgba(35,49,78,0.08)] sm:p-5">
                     <Calendar className="w-5 h-5 text-slate-400 shrink-0" />
                     <div>
                       <div className="text-xs text-slate-400 font-medium">출발일</div>
@@ -1427,7 +1427,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
               />
 
               {/* Col 2: 출발 시간 (Identical <input type="time"> native picker) */}
-              <label className="relative flex items-center gap-3 p-4 sm:p-5 hover:bg-slate-50/70 transition-colors cursor-pointer select-none">
+              <label className="relative flex min-h-[88px] cursor-pointer select-none items-center gap-3 rounded-[20px] bg-white p-4 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] transition-all hover:shadow-[0_7px_24px_rgba(35,49,78,0.08)] sm:p-5">
                 <Clock className="w-5 h-5 text-slate-400 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="text-xs text-slate-400 font-medium">출발 시간</div>
@@ -1449,7 +1449,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
               </label>
 
               {/* Col 3: 종료 시간 (Identical <input type="time"> native picker) */}
-              <label className="relative flex items-center gap-3 p-4 sm:p-5 hover:bg-slate-50/70 transition-colors cursor-pointer select-none">
+              <label className="relative flex min-h-[88px] cursor-pointer select-none items-center gap-3 rounded-[20px] bg-white p-4 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] transition-all hover:shadow-[0_7px_24px_rgba(35,49,78,0.08)] sm:p-5">
                 <Clock className="w-5 h-5 text-slate-400 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="text-xs text-slate-400 font-medium">종료 시간</div>
@@ -1468,7 +1468,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
             </div>
 
             {/* Card 3: 배정 차량 · 담당 기사 (2 columns) */}
-            <div className="bg-white rounded-2xl border border-slate-100/90 shadow-2xs grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 overflow-hidden">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {/* Col 1: 배정 차량 */}
               <button
                 type="button"
@@ -1476,9 +1476,9 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                   haptics.lightTap();
                   setIsVehicleModalOpen(true);
                 }}
-                className="flex items-center gap-3.5 p-4 sm:p-5 hover:bg-slate-50/70 transition-colors cursor-pointer text-left w-full group"
+                className="group flex min-h-[90px] w-full cursor-pointer items-center gap-3.5 rounded-[20px] bg-white p-4 text-left shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] transition-all hover:shadow-[0_7px_24px_rgba(35,49,78,0.08)] sm:p-5"
               >
-                <div className="w-14 h-9 relative shrink-0 flex items-center justify-center bg-slate-50 rounded-lg p-0.5 border border-slate-100 group-hover:border-blue-200 transition-colors">
+                <div className="relative flex h-11 w-[68px] shrink-0 items-center justify-center rounded-[13px] bg-[#FAFBFD] p-1">
                   <img
                     src={currentVehiclePhoto}
                     alt=""
@@ -1502,9 +1502,9 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                   haptics.lightTap();
                   setIsDriverModalOpen(true);
                 }}
-                className="flex items-center gap-3.5 p-4 sm:p-5 hover:bg-slate-50/70 transition-colors cursor-pointer text-left w-full group"
+                className="group flex min-h-[90px] w-full cursor-pointer items-center gap-3.5 rounded-[20px] bg-white p-4 text-left shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] transition-all hover:shadow-[0_7px_24px_rgba(35,49,78,0.08)] sm:p-5"
               >
-                <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 border border-slate-200 bg-slate-100 group-hover:border-blue-300 transition-colors">
+                <div className="size-11 shrink-0 overflow-hidden rounded-full bg-[#F7F9FC]">
                   <img
                     src={currentDriverAvatar}
                     alt=""
@@ -1523,7 +1523,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
             </div>
 
             {/* Card 4: 경로 (출발지 → 도착지) */}
-            <div className="bg-white rounded-2xl border border-slate-100/90 shadow-2xs p-4 sm:p-5 space-y-3">
+            <div className="space-y-4 rounded-[22px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] sm:p-6">
               <div className="flex items-center justify-between gap-3">
                 {/* 출발지 */}
                 <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -1575,7 +1575,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                     haptics.lightTap();
                     setIsEditingRoute((prev) => !prev);
                   }}
-                  className="ml-1 px-2.5 py-1 rounded-lg text-xs font-bold text-slate-400 hover:text-[#1E60F3] hover:bg-blue-50 transition-colors shrink-0"
+                  className="ml-1 min-h-9 shrink-0 cursor-pointer rounded-[12px] bg-[#F7F9FC] px-3 text-[12px] font-semibold text-[#4D607C] transition-colors hover:bg-[#EEF3FF] hover:text-[#1E60F3]"
                 >
                   {isEditingRoute ? '완료' : '변경'}
                 </button>
@@ -1583,7 +1583,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
 
               {/* Expanded Route Editor when user clicks '변경' */}
               {isEditingRoute && (
-                <div className="pt-3 border-t border-slate-100 space-y-3 animate-in fade-in duration-150">
+                <div className="space-y-3 pt-2 animate-in fade-in duration-150">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <HqPlaceSearchInput
                       label="출발지"
@@ -1628,14 +1628,14 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                 <DispatchRouteTimeline
                   waypoints={initialBooking.routeWaypoints}
                   heading="전체 운행 경로"
-                  className="mt-2 rounded-xl bg-slate-50 p-3"
+                  className="mt-2 rounded-[18px] bg-[#FAFBFD] p-4"
                   compact
                 />
               )}
             </div>
 
             {/* Card 5: 추가 정보 아코디언 */}
-            <div className="bg-white rounded-2xl border border-slate-100/90 shadow-2xs overflow-hidden">
+            <div className="overflow-hidden rounded-[22px] bg-white shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)]">
               <div
                 role="button"
                 tabIndex={0}
@@ -1643,14 +1643,14 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
                   haptics.lightTap();
                   setIsExtraInfoOpen((prev) => !prev);
                 }}
-                className="flex items-center justify-between p-4 sm:p-5 cursor-pointer select-none hover:bg-slate-50/50 transition-colors"
+                className="flex cursor-pointer select-none items-center justify-between p-5 transition-colors hover:bg-[#FAFBFD] sm:p-6"
               >
                 <div className="flex items-center gap-2.5">
                   <span className="text-sm sm:text-base font-bold text-slate-800 tracking-tight">
                     추가 정보
                   </span>
                 </div>
-                <div className="w-7 h-7 rounded-full flex items-center justify-center text-slate-400">
+                <div className="flex size-8 items-center justify-center rounded-full bg-[#F7F9FC] text-[#73839D]">
                   {isExtraInfoOpen ? (
                     <ChevronUp className="w-4 h-4 stroke-[2.2]" />
                   ) : (
@@ -1660,7 +1660,7 @@ export const HqQuickDispatch: React.FC<HqQuickDispatchProps> = ({
               </div>
 
               {isExtraInfoOpen && (
-                <div className="p-4 sm:p-5 pt-0 space-y-3 animate-in slide-in-from-top-2 duration-150 border-t border-slate-100">
+                <div className="space-y-3 px-5 pb-5 pt-0 animate-in slide-in-from-top-2 duration-150 sm:px-6 sm:pb-6">
                   {/* Row 1: 기사 언어 & 항공편명 */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3">
                     {/* 기사 언어 */}
