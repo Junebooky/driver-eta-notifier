@@ -1,4 +1,6 @@
 import { readActiveCustodies } from '@/lib/fleet/operationsStore';
+import { readFleetRegistry } from '@/lib/fleet/registryStore';
+import { mergeFleetRegistry, type FleetRegistryRecord } from '@/utils/fleetVehicleRegistry';
 import { custodyBlocksInterval } from './vehicleCustody';
 import type { VehicleCustody } from '@/types/vehicleCustody';
 import { resolveVehicleCurrentStatus, compareDispatchVehicles } from './fleetVehicleStatus';
@@ -14,7 +16,6 @@ import { scheduleOverlapsInterval } from '@/utils/dispatchInterval';
 
 import { supabaseAdmin } from '@/lib/supabase/server';
 import {
-  VIP_REAL_VEHICLES,
   mapVehicleToUiCategory,
   VehicleUiCategoryKey,
   VehicleChargingSpecs,
@@ -131,7 +132,7 @@ export interface FleetAvailabilityResult {
 /** Real DB failures propagate. Fixture injection is explicit and never changes production behavior. */
 export async function checkFleetAvailability(
   query: AvailabilityQuery,
-  options?: { injectedSchedules?: any[]; injectedDrivers?: any[]; injectedOperations?: FleetOperation[]; injectedCustodies?: VehicleCustody[]; nowMs?: number }
+  options?: { injectedSchedules?: any[]; injectedDrivers?: any[]; injectedOperations?: FleetOperation[]; injectedCustodies?: VehicleCustody[]; injectedRegistry?: FleetRegistryRecord[]; nowMs?: number }
 ): Promise<FleetAvailabilityResult> {
   const startDate = normalizeDateToIso(query.startDate);
   const endDate = normalizeDateToIso(query.endDate || query.startDate);
@@ -172,7 +173,10 @@ export async function checkFleetAvailability(
   });
   const overlaps = (s: any) => scheduleOverlapsInterval(summary(s), query, DEFAULT_TURNAROUND_BUFFER_MINUTES);
   const now = options?.nowMs ?? Date.now();
-  const vehicleItems: AvailableVehicleItem[] = VIP_REAL_VEHICLES.map(v => {
+  const fleetRegistry = options?.injectedRegistry ??
+    (options?.injectedSchedules !== undefined ? [] : await readFleetRegistry());
+  const registeredVehicles = mergeFleetRegistry(fleetRegistry);
+  const vehicleItems: AvailableVehicleItem[] = registeredVehicles.map(v => {
     const operation = operations.find(o => o.vehicle_id === v.uuid);
     const vRows = activeSchedules.filter(s => (v.uuid && (s.vehicle_id || s.schedule_meta?.vehicleId) === v.uuid)
       || cleanVehicleIdentity(s.vehicle_plate || s.schedule_meta?.vehiclePlate || s.vehicle_no) === cleanVehicleIdentity(v.plate));
