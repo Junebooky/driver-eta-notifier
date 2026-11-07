@@ -96,23 +96,23 @@ export default function HqReceiptReviewWorkspace({ expense, expenses, bookings, 
     setSaved(expense); setFields(expenseCorrectionFields(expense)); setAmount(String(expense.amount));
     setNotes(expense.reviewNotes || ''); setBillable(expense.billableToCustomer ?? true); setChecked(false); setError('');
   }
-  const inputClass = 'mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-base disabled:opacity-60';
-  const buttonClass = 'min-h-11 rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold disabled:opacity-40';
+  const inputClass = 'mt-1 min-h-11 w-full rounded-[15px] border border-[#E1E7F0]/25 bg-white px-4 py-3 text-[14px] text-[#17233B] shadow-[0_4px_14px_rgba(35,49,78,0.045)] outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20 disabled:opacity-60';
+  const buttonClass = 'min-h-11 cursor-pointer rounded-[14px] bg-white px-4 py-2 text-[13px] font-semibold text-[#4D607C] shadow-[0_4px_14px_rgba(35,49,78,0.045)] transition-colors hover:bg-[#F5F8FF] disabled:cursor-not-allowed disabled:opacity-40';
 
   return <dialog ref={dialog} aria-labelledby="receipt-review-title" aria-busy={busy}
     onCancel={event => { event.preventDefault(); close(); }}
     onKeyDown={event => {
       if (receiptApprovalShortcut(event.nativeEvent)) { event.preventDefault(); if (canApprove) approveButton.current?.click(); }
     }}
-    className="fixed inset-0 m-auto h-[95dvh] max-h-[95dvh] w-[96vw] max-w-7xl overflow-hidden rounded-2xl bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-slate-950/65">
+    className="fixed inset-0 m-auto h-[95dvh] max-h-[95dvh] w-[96vw] max-w-7xl overflow-hidden rounded-[26px] bg-[#FAFBFD] p-0 text-[#17233B] shadow-[0_24px_64px_rgba(27,45,77,0.16),0_4px_14px_rgba(27,45,77,0.04)] backdrop:bg-[#17233B]/30">
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex shrink-0 items-start justify-between gap-3 border-b p-4">
-        <div><h2 id="receipt-review-title" className="text-lg font-black">영수증 검수 · {saved.merchant || '상호 확인 필요'}</h2>
+      <header className="flex shrink-0 items-start justify-between gap-3 bg-white p-5">
+        <div><h2 id="receipt-review-title" className="text-[20px] font-bold tracking-[-0.03em] text-[#17233B]">영수증 검수 · {saved.merchant || '상호 확인 필요'}</h2>
           <p className="mt-1 text-xs text-slate-500">{saved.driverName} · {saved.vehiclePlate} · {saved.status} · {formatKRW(saved.amount)}</p></div>
         <button type="button" className={buttonClass} aria-label="검수 닫기" onClick={close} disabled={busy}><X size={20}/></button>
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain lg:grid lg:grid-cols-2 lg:overflow-hidden">
-        <section aria-label="영수증 원본" className="flex flex-col border-b bg-slate-100 lg:min-h-0 lg:border-r lg:border-b-0">
+        <section aria-label="영수증 원본" className="flex flex-col bg-[#F7F9FC] lg:min-h-0">
           <div className="flex flex-wrap items-center gap-1 p-3">
             {!pdf && <><button className={buttonClass} aria-label="원본 축소" onClick={() => setZoom(value => Math.max(0.5, value - 0.25))}><ZoomOut size={18}/></button>
               <span className="px-1 text-xs">{Math.round(zoom * 100)}%</span>
@@ -135,12 +135,12 @@ export default function HqReceiptReviewWorkspace({ expense, expenses, bookings, 
           </div>
           <p className="p-3 text-xs text-slate-500">회전·확대는 보기 설정입니다. 원본은 변경되지 않습니다. {pdf ? 'PDF의 페이지·확대는 뷰어 도구를 사용하세요.' : '확대 후 가로·세로 스크롤로 이동하세요.'}</p>
         </section>
-        <section aria-label="영수증 항목 수정" className="space-y-4 p-4 lg:overflow-y-auto lg:overscroll-contain">
-          {stale && <div role="alert" className="rounded-lg bg-amber-50 p-3 text-sm">다른 기기에서 변경된 내역입니다. 입력 내용은 유지됩니다.
+        <section aria-label="영수증 항목 수정" className="space-y-5 bg-white p-5 lg:overflow-y-auto lg:overscroll-contain">
+          {stale && <div role="alert" className="rounded-[15px] bg-[#FFF9F1] p-4 text-sm">다른 기기에서 변경된 내역입니다. 입력 내용은 유지됩니다.
             <button className={`${buttonClass} mt-2 block`} disabled={busy} onClick={reload}>입력을 버리고 최신 내역 사용</button></div>}
-          {error && <div role="alert" className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{error}<button className="ml-2 underline" disabled={busy} onClick={() => void onRefresh()}>최신 내역 불러오기</button></div>}
-          {notice && <p role="status" className="text-sm text-emerald-700">{notice}</p>}
-          {duplicate.isDuplicate && <p className="rounded-lg bg-amber-50 p-3 text-sm">중복 의심 영수증입니다. {duplicate.reason}</p>}
+          {error && <div role="alert" className="rounded-[15px] bg-[#FFF4F2] p-4 text-[13px] text-[#A34E45]">{error}<button className="ml-2 underline" disabled={busy} onClick={() => void onRefresh()}>최신 내역 불러오기</button></div>}
+          {notice && <p role="status" className="text-[13px] font-medium text-[#31598F]">{notice}</p>}
+          {duplicate.isDuplicate && <p className="rounded-[15px] bg-[#FFF9F1] p-4 text-sm">중복 의심 영수증입니다. {duplicate.reason}</p>}
           <p className="text-xs text-slate-500">{saved.ocrExtracted ? 'OCR 추출 결과가 있습니다. 원본과 대조해 수정하세요.' : 'OCR 확인 정보가 없습니다. 원본을 직접 확인하세요.'} 수정 저장과 승인은 별개입니다.</p>
           <fieldset disabled={busy} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="text-sm sm:col-span-2">상호<input className={inputClass} value={fields.merchant} maxLength={200} onChange={event => setFields({ ...fields, merchant: event.target.value })}/></label>
@@ -157,10 +157,10 @@ export default function HqReceiptReviewWorkspace({ expense, expenses, bookings, 
             <label className="text-sm sm:col-span-2">검수 의견<textarea className={inputClass} value={notes} maxLength={5000} onChange={event => setNotes(event.target.value)}/></label>
             <label className="flex min-h-11 items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={billable} onChange={event => setBillable(event.target.checked)}/>고객 정산에 반영</label>
           </fieldset>
-          <button className={`${buttonClass} w-full bg-slate-900 text-white`} disabled={busy || stale || !dirty} onClick={save}>수정 내용 저장</button>
+          <button className={`${buttonClass} w-full bg-[#F7F9FC] text-[#17233B]`} disabled={busy || stale || !dirty} onClick={save}>수정 내용 저장</button>
           {problem && <p className="text-sm text-amber-800">{problem}</p>}
           <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={checked} disabled={busy || !proofReady || dirty || stale} onChange={event => setChecked(event.target.checked)}/>원본과 저장된 항목을 대조했습니다</label>
-          <button ref={approveButton} className={`${buttonClass} flex w-full items-center justify-center gap-2 bg-blue-600 text-white`} disabled={!canApprove} onClick={() => void persist({ status: '승인 완료' }, true)}><Check size={18}/>승인 후 다음 영수증</button>
+          <button ref={approveButton} className={`${buttonClass} flex w-full items-center justify-center gap-2 bg-[#1E60F3] text-white hover:bg-[#1757DC]`} disabled={!canApprove} onClick={() => void persist({ status: '승인 완료' }, true)}><Check size={18}/>승인 후 다음 영수증</button>
           <p className="text-xs text-slate-500">저장되지 않은 수정이 있으면 승인할 수 없습니다. 입력 칸 밖에서 Ctrl/Cmd+Enter로 승인할 수 있습니다.</p>
           <div className="flex flex-wrap gap-2"><button className={buttonClass} disabled={busy || dirty || stale} onClick={() => void persist({ status: '금액 확인' })}>보완 요청</button><button className={buttonClass} disabled={busy || dirty || stale} onClick={() => void persist({ status: '반려' })}>반려</button></div>
         </section>
