@@ -1,6 +1,6 @@
 'use client';
 
-import { HqTextarea } from '@/components/hq/ui';
+import { HqTextarea, HqButton } from '@/components/hq/ui';
 import React, { useState } from 'react';
 import { X, Heart, FileText, Check, Loader2 } from 'lucide-react';
 import { HqCustomer } from '@/types/customerHq';
@@ -115,17 +115,17 @@ export const HqCustomerEditModal: React.FC<HqCustomerEditModalProps> = ({
           )}
 
           <div className="flex items-center justify-end gap-2 pt-3">
-            <button
+            <HqButton variant="subtle"
               type="button"
               onClick={onClose}
-              className="min-h-11 cursor-pointer rounded-[14px] bg-[#F7F9FC] px-4 text-[12px] font-semibold text-[#4D607C] transition-colors hover:bg-[#EDF1F6]"
+              
             >
               취소
-            </button>
-            <button
+            </HqButton>
+            <HqButton variant="primary"
               type="submit"
               disabled={isSaving}
-              className="flex min-h-11 cursor-pointer items-center gap-1.5 rounded-[14px] bg-[#1E60F3] px-5 text-[12px] font-semibold text-white shadow-[0_6px_16px_rgba(30,96,243,0.15)] transition-colors hover:bg-[#1757DC] disabled:cursor-not-allowed disabled:opacity-50"
+              
             >
               {isSaving ? (
                 <>
@@ -138,7 +138,7 @@ export const HqCustomerEditModal: React.FC<HqCustomerEditModalProps> = ({
                   <span>저장 완료</span>
                 </>
               )}
-            </button>
+            </HqButton>
           </div>
         </form>
       </div>
