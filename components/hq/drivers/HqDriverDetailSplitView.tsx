@@ -220,13 +220,13 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
   }
 
   return (
-    <div className="space-y-3">
+    <div className="hq-driver-detail-a space-y-4">
       {/* Top Back Navigation Bar */}
       <div className="flex items-center justify-between">
         <button
           type="button"
           onClick={onBackToTable}
-          className="px-3.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs group"
+          className="group inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-[14px] bg-white px-4 text-[12px] font-semibold text-[#4D607C] shadow-[0_4px_14px_rgba(35,49,78,0.05)] transition-colors hover:bg-[#F5F8FF]"
         >
           <ArrowLeft className="w-3.5 h-3.5 text-slate-500 group-hover:-translate-x-0.5 transition-transform" />
           <span>표 목록으로 보기</span>
@@ -241,9 +241,9 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
         {/* ========================================================= */}
         {/* Column 1 (Left): Compact Driver List (w-[250px])           */}
         {/* ========================================================= */}
-        <div className="w-full lg:w-[250px] shrink-0 bg-white rounded-2xl border border-slate-200/90 shadow-sm flex flex-col h-[750px]">
+        <div className="flex h-[750px] w-full shrink-0 flex-col rounded-[23px] bg-white shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] lg:w-[250px]">
           {/* Header */}
-          <div className="p-3.5 border-b border-slate-100 flex items-center gap-2 bg-white rounded-t-2xl">
+          <div className="flex items-center gap-2 rounded-t-[23px] bg-white px-4 py-4">
             <div className="relative group/drivers inline-flex items-center gap-2 cursor-pointer">
               <img
                 src="/images/icons/drivers/icon_driver.png"
@@ -251,26 +251,26 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                 className="w-12 h-12 object-contain shrink-0 transition-transform duration-150 group-hover/drivers:scale-110 drop-shadow-2xs select-none"
                 draggable={false}
               />
-              <h2 className="text-sm font-black text-slate-900">기사 목록</h2>
+              <h2 className="text-[15px] font-bold tracking-[-0.02em] text-[#17233B]">기사 목록</h2>
 
               {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 (최상단 레이어) */}
               <div className="absolute bottom-full left-0 mb-2 hidden group-hover/drivers:flex flex-col items-start pointer-events-none z-[100]">
-                <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+                <span className="whitespace-nowrap rounded-[12px] bg-white px-3 py-2 text-[11px] font-medium text-[#4D607C] shadow-[0_8px_22px_rgba(35,49,78,0.1)] animate-in fade-in-50 duration-150">
                   소속 및 프리랜서 기사님들의 프로필과 배차 자격을 관리해요
                 </span>
-                <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 ml-4 shadow-xs" />
+                <div className="-mt-1 ml-4 size-2 rotate-45 bg-white" />
               </div>
             </div>
           </div>
 
           {/* Filter Pills */}
-          <div className="p-2.5 border-b border-slate-100 bg-slate-50/50 flex items-center gap-1 text-[11px] font-bold">
+          <div className="flex items-center gap-1 bg-white px-3 pb-3 text-[11px] font-medium">
             <button
               type="button"
               onClick={() => setFilterAffiliation('all')}
               className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${filterAffiliation === 'all'
-                ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 font-extrabold shadow-2xs'
-                : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900'
+                ? 'bg-[#EEF3FF] text-[#1E60F3] font-semibold'
+                : 'bg-white text-[#73839D] shadow-[0_3px_10px_rgba(35,49,78,0.04)] hover:bg-[#F7F9FC]'
                 }`}
             >
               전체 {counts.total}
@@ -279,8 +279,8 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
               type="button"
               onClick={() => setFilterAffiliation('employed')}
               className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${filterAffiliation === 'employed'
-                ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 font-extrabold shadow-2xs'
-                : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900'
+                ? 'bg-[#EEF3FF] text-[#1E60F3] font-semibold'
+                : 'bg-white text-[#73839D] shadow-[0_3px_10px_rgba(35,49,78,0.04)] hover:bg-[#F7F9FC]'
                 }`}
             >
               소속 {counts.employed}
@@ -290,8 +290,8 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                 type="button"
                 onClick={() => setFilterAffiliation('freelance')}
                 className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${filterAffiliation === 'freelance'
-                  ? 'bg-blue-50 text-[#1E60F3] border border-blue-200 font-extrabold shadow-2xs'
-                  : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900'
+                  ? 'bg-[#EEF3FF] text-[#1E60F3] font-semibold'
+                  : 'bg-white text-[#73839D] shadow-[0_3px_10px_rgba(35,49,78,0.04)] hover:bg-[#F7F9FC]'
                   }`}
               >
                 프리랜서 {counts.freelance}
@@ -300,7 +300,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
           </div>
 
           {/* Driver List */}
-          <div className="divide-y divide-slate-100 overflow-y-auto flex-1 rounded-b-2xl">
+          <div className="flex-1 space-y-1 overflow-y-auto overscroll-contain rounded-b-[23px] px-2 pb-3">
             {filteredDrivers.map((driver) => {
               const isSelected = driver.id === activeDriver.id;
 
@@ -311,9 +311,9 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
                     haptics.lightTap();
                     onSelectDriver(driver.id);
                   }}
-                  className={`p-3 transition-all cursor-pointer relative ${isSelected
-                    ? 'bg-blue-50/80 border-l-4 border-l-[#1E60F3] shadow-2xs'
-                    : 'hover:bg-slate-50 border-l-4 border-l-transparent'
+                  className={`relative cursor-pointer rounded-[16px] p-3 transition-colors ${isSelected
+                    ? 'bg-[#F3F7FF] shadow-[0_3px_12px_rgba(35,49,78,0.05)]'
+                    : 'hover:bg-[#FAFBFD]'
                     }`}
                 >
                   <div className="flex items-center gap-2.5">
@@ -370,17 +370,17 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
         {/* Column 2 (Middle): 기본 정보 (Basic Info) (w-[320px])      */}
         {/* [Swapped position: placed in middle as requested]          */}
         {/* ========================================================= */}
-        <div className="w-full lg:w-[320px] shrink-0 bg-white rounded-2xl border border-slate-200/90 shadow-sm p-5 space-y-4 h-[750px] overflow-y-auto">
+        <div className="h-[750px] w-full shrink-0 space-y-4 overflow-y-auto overscroll-contain rounded-[23px] bg-white p-5 shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] lg:w-[320px]">
           {/* Section Header */}
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <h3 className="text-sm font-black text-slate-900">기본 정보</h3>
+            <h3 className="text-[15px] font-bold tracking-[-0.02em] text-[#17233B]">기본 정보</h3>
             <span className="text-[11px] font-semibold text-slate-400">
               드라이버 프로필
             </span>
           </div>
 
           {/* Driver Profile Header Card */}
-          <div className="relative p-3.5 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-3">
+          <div className="relative space-y-3 rounded-[18px] bg-[#FAFBFD] p-4">
             {/* 1행: 아바타 + 기사 풀네임 + 소속 뱃지 + 수정(연필) 버튼 */}
             <div className="flex items-center gap-3">
               {effectiveAvatarUrl && !avatarLoadError ? (
@@ -490,8 +490,8 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
 
                   {/* 전화 Hover Tooltip (아래로 향하는 말풍선) */}
                   <div className="absolute top-full right-1/2 translate-x-1/2 pt-2 hidden group-hover/phone:flex flex-col items-center pointer-events-none z-50">
-                    <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 shadow-xs" />
-                    <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+                    <div className="w-2 h-2 bg-white rotate-45 -mb-1 shadow-xs" />
+                    <span className="whitespace-nowrap rounded-[12px] bg-white px-3 py-2 text-[11px] font-medium text-[#4D607C] shadow-[0_8px_22px_rgba(35,49,78,0.1)] animate-in fade-in-50 duration-150">
                       {activeDriver.phone ? formatPhoneNumber(activeDriver.phone) : '연락처 미등록'}
                     </span>
                   </div>
@@ -518,8 +518,8 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
 
                   {/* VIP의전카드 Hover Tooltip (아래로 향하는 말풍선) */}
                   <div className="absolute top-full right-0 pt-2 hidden group-hover/profile:flex flex-col items-end pointer-events-none z-50">
-                    <div className="w-2 h-2 bg-slate-900 rotate-45 -mb-1 mr-4 shadow-xs" />
-                    <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+                    <div className="w-2 h-2 bg-white rotate-45 -mb-1 mr-4 shadow-xs" />
+                    <span className="whitespace-nowrap rounded-[12px] bg-white px-3 py-2 text-[11px] font-medium text-[#4D607C] shadow-[0_8px_22px_rgba(35,49,78,0.1)] animate-in fade-in-50 duration-150">
                       프로필 카드를 관리해요
                     </span>
                   </div>
@@ -644,7 +644,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
 
           {/* Card: 최근 운행일 */}
           <div className="space-y-1.5">
-            <h4 className="text-xs font-black text-slate-900">최근 운행일</h4>
+            <h4 className="text-[13px] font-semibold text-[#17233B]">최근 운행일</h4>
             {activeDriver.recentTripDate ? (
               <div className="p-3 bg-blue-50/40 rounded-xl border border-blue-100 flex items-center gap-2.5">
                 <div className="w-7 h-7 rounded-lg bg-blue-100 text-[#0050FF] flex items-center justify-center shrink-0">
@@ -669,7 +669,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
           {/* Card: 메모 (Editable and Persisted to DB) */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <h4 className="text-xs font-black text-slate-900">관리자 메모</h4>
+              <h4 className="text-[13px] font-semibold text-[#17233B]">관리자 메모</h4>
               {!isEditingMemo ? (
                 currentMemo ? (
                   <button
@@ -735,10 +735,10 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
         {/* Column 3 (Right): 주간 스케줄 달력표 (Weekly Timetable)     */}
         {/* [Swapped position: placed on right as requested]          */}
         {/* ========================================================= */}
-        <div className="flex-1 min-w-0 w-full bg-white rounded-2xl border border-slate-200/90 shadow-sm p-5 space-y-4 h-[750px] flex flex-col">
+        <div className="flex-1 min-w-0 w-full rounded-[23px] bg-white shadow-[0_6px_20px_rgba(35,49,78,0.055),0_2px_6px_rgba(35,49,78,0.025)] p-5 space-y-4 h-[750px] flex flex-col">
           {/* Header Bar: Title + Week Navigator */}
           <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100 shrink-0">
-            <h3 className="text-sm font-black text-slate-900">
+            <h3 className="text-[15px] font-bold tracking-[-0.02em] text-[#17233B]">
               {activeDriver.name} 기사님의 주간 일정
             </h3>
 
