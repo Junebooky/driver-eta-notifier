@@ -6,6 +6,7 @@ import { X, Search, Check, Loader2, Globe2, UserRound, Phone, ChevronLeft, Chevr
 import { haptics } from '@/utils/haptics';
 import { HqDriverSummary } from '@/types/driverHq';
 import { useHqDrivers } from '@/utils/useHqDrivers';
+import { DRIVERS_PER_PAGE, paginateDriverItems } from '@/utils/driverPickerPagination';
 
 export interface AvailableDriverItem {
   id: string;
@@ -49,9 +50,6 @@ export interface HqDriverSelectModalProps {
   excludedDriverIds?: string[];
 }
 
-// Each page is one swipeable part of the SAME filtered driver list.
-const DRIVERS_PER_PAGE = 4;
-
 export const HqDriverSelectModal: React.FC<HqDriverSelectModalProps> = ({
   isOpen, onClose, onSelectDriver, targetVehicleName = '차량 미지정',
   targetDate = '', targetTime = '', initialDriverId = '', requiredLanguage = 'any',
@@ -90,6 +88,22 @@ export const HqDriverSelectModal: React.FC<HqDriverSelectModalProps> = ({
     if (pagesRef.current) pagesRef.current.scrollLeft = 0;
   }, [isOpen, search, englishOnly, onlyAvailable]);
 
+  // Open on the page containing the current driver assignment, if present.
+  // Keep the current assignment visible, even when it is driver #5 or later.
+  useEffect(() => {
+    if (!isOpen || !mounted) return;
+    const matchingDrivers = driversList.filter(driver =>
+      driver.isAvailable && !excludedDriverIds.includes(driver.id) &&
+      (requiredLanguage !== 'english' || driverSupportsEnglish(driver))
+    ).sort((a, b) => Number(b.isAvailable) - Number(a.isAvailable) || a.name.localeCompare(b.name, 'ko'));
+    const selectedIndex = matchingDrivers.findIndex(driver => driver.id === initialDriverId);
+    const target = selectedIndex < 0 ? 0 : Math.floor(selectedIndex / DRIVERS_PER_PAGE);
+    setCurrentPage(target);
+    if (pagesRef.current) pagesRef.current.scrollLeft = target * pagesRef.current.clientWidth;
+  // Intentionally initialize for each opened booking. Active filters reset separately.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, mounted, initialDriverId, driversList.length]);
+
   useEffect(() => {
     if (!isOpen) return;
     const oldOverflow = document.body.style.overflow;
@@ -115,8 +129,7 @@ export const HqDriverSelectModal: React.FC<HqDriverSelectModalProps> = ({
       .some((word) => word.toLocaleLowerCase().includes(q))) return false;
     return true;
   }).sort((a,b) => Number(b.isAvailable) - Number(a.isAvailable) || a.name.localeCompare(b.name, 'ko'));
-  const driverPages = Array.from({ length: Math.ceil(filteredDrivers.length / DRIVERS_PER_PAGE) },
-    (_, index) => filteredDrivers.slice(index * DRIVERS_PER_PAGE, (index + 1) * DRIVERS_PER_PAGE));
+  const driverPages = paginateDriverItems(filteredDrivers);
   const pageCount = driverPages.length;
   const goToPage = (index: number) => {
     const next = Math.max(0, Math.min(index, pageCount - 1));
