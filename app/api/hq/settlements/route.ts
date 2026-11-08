@@ -48,17 +48,23 @@ export async function GET(req: NextRequest) {
     const [docs,schedules]=await Promise.all([
       supabaseAdmin.from('settlement_documents').select('*')
         .eq('organization_id',SETTLEMENT_ORG).order('updated_at',{ascending:false}).limit(150),
-      supabaseAdmin.from('schedules').select('id,date,customer_name,event_name,vehicle_model,vehicle_plate,driver_name,org_id')
+      supabaseAdmin.from('schedules').select('id,date,customer_name,event_name,vehicle_model,vehicle_plate,driver_name,org_id,schedule_meta')
         .or('org_id.eq.'+SETTLEMENT_ORG+',org_id.is.null')
         .order('date',{ascending:false}).limit(100),
     ]);
     if(docs.error || schedules.error) return fail('정산 DB 테이블을 조회할 수 없습니다.',503);
     return NextResponse.json({ok:true,documents:docs.data || [],
-      schedules:(schedules.data || []).map(s=>({
-        id:s.id,date:s.date,customerName:s.customer_name || '미등록 고객사',
-        eventName:s.event_name || '',vehicleModel:s.vehicle_model || '',
-        vehiclePlate:s.vehicle_plate || '',driverName:s.driver_name || '',
-      }))}, {headers:HEADERS});
+      schedules:(schedules.data || []).map(s=>{
+        const meta=(s.schedule_meta && typeof s.schedule_meta==='object' && !Array.isArray(s.schedule_meta)
+          ? s.schedule_meta:{}) as Record<string,unknown>;
+        const field=(value:unknown,other:unknown)=>typeof value==='string'&&value.trim()?value.trim():
+          typeof other==='string'&&other.trim()?other.trim():'';
+        return {
+          id:s.id,date:s.date,customerName:field(s.customer_name,meta.customerName)||'미등록 고객사',
+          eventName:field(s.event_name,meta.eventName),vehicleModel:field(s.vehicle_model,meta.vehicleModel),
+          vehiclePlate:field(s.vehicle_plate,meta.vehiclePlate),driverName:field(s.driver_name,meta.driverName),
+        };
+      })}, {headers:HEADERS});
   }catch{return fail('정산 서버에 연결하지 못했습니다.',503);}
 }
 
