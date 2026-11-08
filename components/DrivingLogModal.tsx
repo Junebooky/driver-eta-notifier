@@ -45,6 +45,7 @@ import Link from 'next/link';
 import { AddScheduleModal } from './AddScheduleModal';
 import { haptics } from '@/utils/haptics';
 import { submitDriverLogToHqDb } from '@/utils/drivingLogHqStorage';
+import { selectDrivingLogForHydration } from '@/utils/drivingLogContinuity';
 import { HqDrivingLog } from '@/types/drivingLogHq';
 import { findVipVehicle } from '@/utils/vehicleData';
 
@@ -316,7 +317,18 @@ const DrivingLogModalContent: React.FC<{
     const query = new URLSearchParams({ date: logData.rawDate }); if (bookingId) query.set('bookingId', bookingId);
     fetch(`/api/driving-logs?${query}`, { cache: 'no-store', credentials: 'include', signal: abort.signal })
       .then(async response => {
-        if (!response.ok) return; const data = await response.json(); const row = data.logs?.find((entry: HqDrivingLog) => (entry.bookingId || null) === (bookingId || null)); if (!row || abort.signal.aborted) return;
+        if (!response.ok) return;
+        const data = await response.json();
+        const row = selectDrivingLogForHydration(
+          Array.isArray(data.logs) ? data.logs as HqDrivingLog[] : [],
+          {
+            date: logData.rawDate,
+            submissionId: logData.submissionId,
+            bookingId: bookingId || logData.bookingId,
+            localStatus: logData.status,
+          },
+        );
+        if (!row || abort.signal.aborted) return;
         setLogData(previous => {
           const dbStops: RouteStopItem[] = Array.isArray(row.stops)
             ? row.stops.map((stop: any) => ({
@@ -365,6 +377,7 @@ const DrivingLogModalContent: React.FC<{
           const next: DrivingLogData = {
             ...previous,
             submissionId: row.id,
+            bookingId: row.bookingId || previous.bookingId,
             hqStatus: row.status,
             driverId: row.driverId || previous.driverId || driverProfile.driverId,
             clientName: previous.clientName || (row.customerName === '미지정 고객' || row.customerName === '고객사' ? '' : row.customerName),
@@ -594,6 +607,10 @@ const DrivingLogModalContent: React.FC<{
 
   // Temporary save to localStorage and DB (Strictly draft status)
   const handleTemporarySave = () => {
+    if (logData.status !== 'draft') {
+      showToast('이미 제출한 운행일지는 임시저장으로 바꿀 수 없습니다.');
+      return;
+    }
     haptics.success();
     const draftPayload: DrivingLogData = { ...logData, status: 'draft' };
     isInternalSaveRef.current = true;
@@ -1313,9 +1330,10 @@ const DrivingLogModalContent: React.FC<{
             <button
               type="button"
               onClick={handleTemporarySave}
+              disabled={logData.status !== 'draft'}
               className="w-[38%] h-12 sm:h-13 border border-slate-100/90 bg-white text-slate-800 text-sm font-extrabold rounded-2xl hover:bg-slate-50 active:scale-98 transition-all shadow-[0_4px_14px_rgba(15,23,42,0.05)] cursor-pointer"
             >
-              임시저장
+              {logData.status === 'draft' ? '임시저장' : '제출 완료'}
             </button>
             <button
               type="button"
