@@ -25,12 +25,8 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { FieldKnowledgeItem, FieldKnowledgeCategory } from '@/types/fieldKnowledge';
-import {
-  getStoredFieldKnowledge,
-  saveFieldKnowledgeItem,
-  deleteFieldKnowledgeItem,
-  FIELD_KNOWLEDGE_CHANGE_EVENT,
-} from '@/utils/fieldKnowledgeData';
+import { useSharedFieldKnowledge, mutateSharedFieldKnowledge } from '@/hooks/useSharedFieldKnowledge';
+import { getBrowserKnowledgeImportReview, type LegacyKnowledgeReview } from '@/utils/legacyFieldKnowledgeImport';
 import { haptics } from '@/utils/haptics';
 import { formatPhoneNumber } from '@/utils/formatters';
 import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
@@ -58,7 +54,11 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
   initialSearchQuery = '',
   onSelectPlaceForSchedule,
 }) => {
-  const [items, setItems] = useState<FieldKnowledgeItem[]>(() => getStoredFieldKnowledge());
+  const { items, loading: knowledgeLoading, error: knowledgeError, refresh: refreshKnowledge } = useSharedFieldKnowledge();
+  const [isMutating, setIsMutating] = useState(false);
+  const [legacyDialogOpen, setLegacyDialogOpen] = useState(false);
+  const [legacyReview, setLegacyReview] = useState<LegacyKnowledgeReview | null>(null);
+  const [selectedLegacyIds, setSelectedLegacyIds] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>(initialSearchQuery);
   const [selectedCategory, setSelectedCategory] = useState<FieldKnowledgeCategory>('전체');
 
@@ -74,15 +74,6 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
   const [photoDialogMode, setPhotoDialogMode] = useState<'cover' | 'photo' | null>(null);
   const [photoUrlDraft, setPhotoUrlDraft] = useState('');
   const [photoInputError, setPhotoInputError] = useState<string | null>(null);
-
-  // Sync listener for cross-tab or external changes
-  useEffect(() => {
-    const handleUpdate = () => {
-      setItems(getStoredFieldKnowledge());
-    };
-    window.addEventListener(FIELD_KNOWLEDGE_CHANGE_EVENT, handleUpdate);
-    return () => window.removeEventListener(FIELD_KNOWLEDGE_CHANGE_EVENT, handleUpdate);
-  }, []);
 
   const showToast = (msg: string, tone: 'info' | 'error' = 'info') => {
     setFeedbackTone(tone);
@@ -118,6 +109,7 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
   const handleOpenEdit = (item: FieldKnowledgeItem) => {
     haptics.lightTap();
     setEditingItem({ ...item });
+    setToastMessage(null);
     setEditTab('details');
     setCurrentView('edit');
   };
@@ -126,7 +118,7 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
   const handleOpenAddNew = () => {
     haptics.mediumTap();
     const newItem: FieldKnowledgeItem = {
-      id: `fk-${Date.now()}`,
+      id: `fk-${crypto.randomUUID()}`,
       title: '',
       subtitle: '',
       category: '호텔',
@@ -148,54 +140,100 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
       updatedBy: '본사 관리자',
     };
     setEditingItem(newItem);
+    setToastMessage(null);
     setEditTab('details');
     setCurrentView('edit');
   };
 
-  // Truthful persistence: these records are browser-local until a real server sync exists.
-  const handleSaveItem = () => {
-    if (!editingItem) return;
+  // Mutations require confirmed DB writes and the version opened by HQ.
+  const handleSaveItem = async () => {
+    if (!editingItem || isMutating) return;
     if (!editingItem.title.trim()) {
-      haptics.errorAlert();
       showToast('장소명을 입력해 주세요.', 'error');
       return;
     }
     if (!isValidFieldKnowledgeImageUrl(editingItem.imageUrl) ||
-        (editingItem.photos || []).some(url => !isValidFieldKnowledgeImageUrl(url))) {
-      showToast('이미지 주소는 유효한 HTTPS 주소 또는 앱 내부 이미지 경로여야 합니다.', 'error');
+      (editingItem.photos || []).some(url => !isValidFieldKnowledgeImageUrl(url))) {
+      showToast('이미지 주소는 유효한 HTTPS 또는 앱 이미지 경로여야 합니다.', 'error');
       return;
     }
-    if (!saveFieldKnowledgeItem(editingItem)) {
-      haptics.errorAlert();
-      showToast('이 기기에 저장하지 못했습니다. 브라우저 저장 공간 및 설정을 확인해 주세요.', 'error');
-      return;
+    setIsMutating(true);
+    try {
+      const existing = Number.isSafeInteger(editingItem.version) && Number(editingItem.version) > 0;
+      const response = await mutateSharedFieldKnowledge(existing ? 'PUT' : 'POST', {
+        item: editingItem, ...(existing ? { expectedVersion: editingItem.version } : {}),
+      });
+      if (!response.ok) {
+        haptics.errorAlert();
+        showToast(response.error || '현장 지식을 서버에 저장하지 못했습니다.', 'error');
+        return;
+      }
+      haptics.success();
+      showToast(`'${editingItem.title}' 현장 지식이 회사 공용 DB에 저장되었습니다.`);
+      setCurrentView('list');
+      setEditingItem(null);
+      await refreshKnowledge();
+    } finally {
+      setIsMutating(false);
     }
-    haptics.success();
-    setItems(getStoredFieldKnowledge());
-    showToast(`'${editingItem.title}' 현장 지식을 이 브라우저에 저장했습니다.`);
-    setCurrentView('list');
-    setEditingItem(null);
   };
 
   const handleDeleteItem = () => {
-    if (editingItem) setDeleteDialogOpen(true);
+    if (editingItem?.version) setDeleteDialogOpen(true);
   };
 
-  const confirmDeleteItem = () => {
-    if (!editingItem) return;
-    const title = editingItem.title;
-    if (!deleteFieldKnowledgeItem(editingItem.id)) {
-      haptics.errorAlert();
-      showToast('이 기기에서 현장 지식을 삭제하지 못했습니다.', 'error');
+  const confirmDeleteItem = async () => {
+    if (!editingItem?.version || isMutating) return;
+    setIsMutating(true);
+    try {
+      const response = await mutateSharedFieldKnowledge('DELETE', {
+        id: editingItem.id, expectedVersion: editingItem.version,
+      });
+      if (!response.ok) {
+        haptics.errorAlert();
+        showToast(response.error || '서버에서 삭제하지 못했습니다.', 'error');
+        setDeleteDialogOpen(false);
+        return;
+      }
+      haptics.mediumTap();
+      showToast(`'${editingItem.title}' 항목을 회사 공용 DB에서 삭제했습니다.`);
       setDeleteDialogOpen(false);
+      setCurrentView('list');
+      setEditingItem(null);
+      await refreshKnowledge();
+    } finally {
+      setIsMutating(false);
+    }
+  };
+
+  const openLegacyDialog = () => {
+    const review = getBrowserKnowledgeImportReview();
+    setLegacyReview(review);
+    setSelectedLegacyIds([]);
+    setLegacyDialogOpen(true);
+    setToastMessage(null);
+  };
+
+  const confirmLegacyImport = async () => {
+    if (isMutating || !legacyReview) return;
+    const selected = legacyReview.candidates.filter(item => selectedLegacyIds.includes(item.id));
+    if (!selected.length || selected.length > 50) {
+      showToast('한 번에 1~50개 항목을 선택해 주세요.', 'error');
       return;
     }
-    haptics.mediumTap();
-    setItems(getStoredFieldKnowledge());
-    showToast(`'${title}' 현장 지식을 이 브라우저에서 삭제했습니다.`);
-    setDeleteDialogOpen(false);
-    setCurrentView('list');
-    setEditingItem(null);
+    setIsMutating(true);
+    try {
+      const result = await mutateSharedFieldKnowledge('POST', { action: 'import', items: selected });
+      if (!result.ok) {
+        showToast(result.error || '브라우저 항목 가져오기에 실패했습니다.', 'error');
+        return;
+      }
+      setLegacyDialogOpen(false);
+      showToast(`회사 공용 DB에 ${result.imported || 0}건 등록했습니다. 이미 존재하는 ${result.skipped || 0}건은 덮어쓰지 않았습니다. 기존 브라우저 데이터는 보존됩니다.`);
+      await refreshKnowledge();
+    } finally {
+      setIsMutating(false);
+    }
   };
 
   const openPhotoDialog = (mode: 'cover' | 'photo') => {
@@ -238,7 +276,7 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
             <div>
               <h2 className="text-lg font-bold text-slate-900 tracking-tight">현장 지식 수정</h2>
               <p className="text-xs text-slate-500 font-medium">
-                이 브라우저에만 저장됩니다. 기사 앱이나 다른 기기에는 자동 공유되지 않습니다.
+                관리자 등록 내용은 회사 공용 DB에 저장되며 기사 앱에서 자동 갱신됩니다.
               </p>
             </div>
           </div>
@@ -247,6 +285,7 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
             {/* STRICT REQUIREMENT: Clean Neutral Gray Delete Button (NOT RED!) */}
             <button
               type="button"
+              disabled={!editingItem.version || isMutating}
               onClick={handleDeleteItem}
               className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-100/80 active:scale-95 text-slate-700 text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
               title="현장 지식 삭제"
@@ -597,11 +636,12 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
 
           <button
             type="button"
-            onClick={handleSaveItem}
+            disabled={isMutating}
+            onClick={() => void handleSaveItem()}
             className="px-6 py-2.5 rounded-xl bg-[#1E60F3] hover:bg-blue-600 text-white text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-[0_4px_14px_rgba(30,96,243,0.25)] flex items-center gap-1.5"
           >
             <CheckCircle2 className="w-4 h-4" />
-            <span>저장</span>
+            <span>{isMutating ? '서버 저장 중…' : '저장'}</span>
           </button>
         </div>
         <HqModal
@@ -613,13 +653,13 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
             <>
               <button type="button" onClick={() => setDeleteDialogOpen(false)}
                 className="min-h-10 rounded-[12px] bg-[#F5F7FB] px-4 text-[12px] font-semibold text-[#60728A]">취소</button>
-              <button type="button" onClick={confirmDeleteItem}
+              <button type="button" disabled={isMutating} onClick={() => void confirmDeleteItem()}
                 className="min-h-10 rounded-[12px] bg-[#60728A] px-4 text-[12px] font-semibold text-white">삭제</button>
             </>
           }
         >
           <p className="text-[12px] leading-relaxed text-[#65758B]">
-            이 기기의 브라우저에서 해당 현장 지식을 삭제합니다. 복구할 수 없으니 확인해 주세요.
+            모든 기사와 관리자 화면에서 해당 항목을 보관 처리합니다. 삭제 전에 확인해 주세요.
           </p>
         </HqModal>
         <HqModal
@@ -682,7 +722,7 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
               </span>
             </h1>
             <p className="text-xs text-slate-500 font-medium">
-              호텔·공항 등 현장 노하우 · 브라우저에만 보관 (초기 예시는 현장 재확인 필요)
+              회사 공용 현장 지식 · 기사 Cockpit 자동 동기화 (최대 약 30초)
             </p>
           </div>
         </div>
@@ -711,6 +751,16 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
 
           <button
             type="button"
+            onClick={openLegacyDialog}
+            className="min-h-10 shrink-0 rounded-[12px] bg-[#F4F6FA] px-3 text-[12px] font-semibold text-[#556A85] transition-colors hover:bg-[#EDF1F6]"
+            title="이 브라우저에 저장된 기존 현장 지식 검토 및 수동 이전"
+          >
+            기존 데이터 가져오기
+          </button>
+
+          <button
+            type="button"
+            disabled={knowledgeLoading || Boolean(knowledgeError)}
             onClick={handleOpenAddNew}
             className="px-3.5 py-2 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white text-xs font-bold flex items-center gap-1.5 shadow-[0_4px_12px_rgba(30,96,243,0.2)] transition-all cursor-pointer shrink-0"
           >
@@ -749,6 +799,20 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
           tone={feedbackTone}
           onDismiss={() => setToastMessage(null)}
         />
+
+      {knowledgeError && (
+        <HqInlineFeedback message={`회사 공용 현장 지식 서버 연결 실패: ${knowledgeError}. 이전에 표시된 내용은 최신 정보가 아닐 수 있습니다.`}
+          onDismiss={undefined} />
+      )}
+      {knowledgeError && (
+        <button type="button" onClick={() => void refreshKnowledge()}
+          className="rounded-[12px] bg-[#F2F5FA] px-3 py-2 text-[12px] font-semibold text-[#516783]">
+          다시 조회
+        </button>
+      )}
+      {knowledgeLoading && (
+        <p role="status" className="text-[12px] font-medium text-[#6F8098]">회사 공용 현장 지식 동기화 중…</p>
+      )}
 
       {/* 3-Column Card Grid (Reference 1) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -826,6 +890,55 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
           </div>
         )}
       </div>
+      <HqModal
+        isOpen={legacyDialogOpen}
+        title="기존 브라우저 데이터 가져오기"
+        subtitle="관리자 확인 후 선택한 정보만 회사 공용 DB에 등록합니다."
+        onClose={() => { if (!isMutating) setLegacyDialogOpen(false); }}
+        footer={
+          <>
+            <button type="button" disabled={isMutating}
+              onClick={() => setLegacyDialogOpen(false)}
+              className="min-h-10 rounded-[12px] bg-[#F4F6FA] px-4 text-[12px] font-semibold text-[#60728A]">
+              취소
+            </button>
+            <button type="button" disabled={isMutating || selectedLegacyIds.length === 0 || selectedLegacyIds.length > 50}
+              onClick={() => void confirmLegacyImport()}
+              className="min-h-10 rounded-[12px] bg-[#1E60F3] px-4 text-[12px] font-semibold text-white disabled:opacity-50">
+              {isMutating ? '등록 중…' : `선택한 ${selectedLegacyIds.length}건 등록`}
+            </button>
+          </>
+        }
+      >
+        <p className="mb-3 text-[12px] leading-relaxed text-[#5D6E85]">
+          이 기기의 기존 정보를 검토하는 기능입니다. 기본 예시 항목은 자동으로 제외하며, 기존 회사 데이터는 절대 덮어쓰지 않습니다.
+          등록된 항목은 모든 기사에게 표시되므로 정확성을 확인한 후 선택해 주세요.
+        </p>
+        {legacyReview && (
+          <p className="mb-3 text-[11px] font-medium text-[#8090A4]">
+            가져오기 후보 {legacyReview.candidates.length}건 · 변경 없는 예시 제외 {legacyReview.skippedSamples}건
+            {legacyReview.invalid > 0 ? ` · 형식 오류 제외 ${legacyReview.invalid}건` : ''}
+          </p>
+        )}
+        <div className="max-h-72 space-y-2 overflow-y-auto">
+          {legacyReview?.candidates.map(item => (
+            <label key={item.id} className="flex cursor-pointer items-start gap-3 rounded-[13px] bg-[#F7F9FC] px-3 py-3">
+              <input type="checkbox" checked={selectedLegacyIds.includes(item.id)}
+                onChange={event => setSelectedLegacyIds(previous => event.target.checked
+                  ? [...previous, item.id] : previous.filter(id => id !== item.id))}
+                className="mt-0.5 size-4 accent-[#1E60F3]" />
+              <span className="min-w-0">
+                <span className="block text-[12px] font-semibold text-[#293D55]">{item.title}</span>
+                <span className="block text-[11px] text-[#8593A7]">{item.category} · {item.address || '주소 미기입'}</span>
+              </span>
+            </label>
+          ))}
+          {legacyReview?.candidates.length === 0 && (
+            <p className="py-4 text-center text-[12px] text-[#8090A4]">이 기기에서 가져올 사용자 작성 정보가 없습니다.</p>
+          )}
+        </div>
+        <HqInlineFeedback message={feedbackTone === 'error' ? toastMessage : null} className="mt-3"/>
+      </HqModal>
     </div>
   );
 };

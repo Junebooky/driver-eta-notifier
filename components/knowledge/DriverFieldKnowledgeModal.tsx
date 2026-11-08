@@ -21,10 +21,7 @@ import {
   BookOpen,
 } from 'lucide-react';
 import { FieldKnowledgeItem, FieldKnowledgeCategory } from '@/types/fieldKnowledge';
-import {
-  getStoredFieldKnowledge,
-  FIELD_KNOWLEDGE_CHANGE_EVENT,
-} from '@/utils/fieldKnowledgeData';
+import { useSharedFieldKnowledge } from '@/hooks/useSharedFieldKnowledge';
 import { haptics } from '@/utils/haptics';
 
 export interface DriverFieldKnowledgeModalProps {
@@ -47,24 +44,19 @@ export const DriverFieldKnowledgeModal: React.FC<DriverFieldKnowledgeModalProps>
   onClose,
   initialPlaceName,
 }) => {
-  const [items, setItems] = useState<FieldKnowledgeItem[]>(() => getStoredFieldKnowledge());
+  const { items, loading: knowledgeLoading, error: knowledgeError, refresh: refreshKnowledge } = useSharedFieldKnowledge(isOpen);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<FieldKnowledgeCategory>('전체');
 
   // Active item in detail view (null = list view)
-  const [activeItem, setActiveItem] = useState<FieldKnowledgeItem | null>(null);
+  const [activeItemId, setActiveItemId] = useState<string | null>(null);
+  const activeItem = useMemo(
+    () => items.find(item => item.id === activeItemId) || null,
+    [items, activeItemId],
+  );
   const [activeTab, setActiveTab] = useState<'info' | 'photos'>('info');
   const [copiedAddress, setCopiedAddress] = useState(false);
   const overlayRef = useRef<HTMLDivElement | null>(null);
-
-  // Sync listener
-  useEffect(() => {
-    const handleUpdate = () => {
-      setItems(getStoredFieldKnowledge());
-    };
-    window.addEventListener(FIELD_KNOWLEDGE_CHANGE_EVENT, handleUpdate);
-    return () => window.removeEventListener(FIELD_KNOWLEDGE_CHANGE_EVENT, handleUpdate);
-  }, []);
 
   // Auto-select initial place if provided
   useEffect(() => {
@@ -74,11 +66,11 @@ export const DriverFieldKnowledgeModal: React.FC<DriverFieldKnowledgeModalProps>
         initialPlaceName.toLowerCase().includes(i.title.toLowerCase())
       );
       if (match) {
-        setActiveItem(match);
+        setActiveItemId(match.id);
         setActiveTab('info');
       }
     } else if (!isOpen) {
-      setActiveItem(null);
+      setActiveItemId(null);
       setSearchQuery('');
     }
   }, [isOpen, initialPlaceName, items]);
@@ -190,7 +182,7 @@ export const DriverFieldKnowledgeModal: React.FC<DriverFieldKnowledgeModalProps>
                   type="button"
                   onClick={() => {
                     haptics.lightTap();
-                    setActiveItem(null);
+                    setActiveItemId(null);
                   }}
                   className="w-9 h-9 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center backdrop-blur-xs active:scale-95 transition-all cursor-pointer"
                   aria-label="뒤로 가기"
@@ -547,6 +539,14 @@ export const DriverFieldKnowledgeModal: React.FC<DriverFieldKnowledgeModalProps>
 
             {/* 2-Column Card Grid */}
             <div data-modal-scroll="true" className="flex-1 px-5 pb-5 pt-0.5 overflow-y-auto overscroll-contain">
+              {knowledgeLoading && <p role="status" className="mb-3 text-[12px] text-[#73849C]">회사 공용 현장 지식을 갱신하고 있어요…</p>}
+              {knowledgeError && (
+                <div role="alert" className="mb-3 rounded-[13px] bg-[#FBF4F3] p-3 text-[12px] text-[#A85C54]">
+                  최신 정보를 불러오지 못했어요: {knowledgeError}
+                  <button type="button" onClick={() => void refreshKnowledge()}
+                    className="ml-2 underline">다시 시도</button>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3.5">
                 {filteredItems.map((item) => (
                   <div
@@ -555,13 +555,13 @@ export const DriverFieldKnowledgeModal: React.FC<DriverFieldKnowledgeModalProps>
                     tabIndex={0}
                     onClick={() => {
                       haptics.lightTap();
-                      setActiveItem(item);
+                      setActiveItemId(item.id);
                       setActiveTab('info');
                     }}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
-                        setActiveItem(item);
+                        setActiveItemId(item.id);
                         setActiveTab('info');
                       }
                     }}
