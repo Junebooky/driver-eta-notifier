@@ -74,6 +74,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
   const profileInputRef = useRef<HTMLInputElement>(null);
   const pcInputRef = useRef<HTMLInputElement>(null);
   const mobileInputRef = useRef<HTMLInputElement>(null);
+  const bundleRequestSequence = useRef(0);
 
   // Match caller selection, but never resurrect archived or browser-only cars.
   useEffect(() => {
@@ -145,16 +146,22 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
   }, [vehicleAssetSummary]);
 
   // Load bundle whenever driver or vehicle selection changes
-  const fetchBundle = async () => {
-    if (!activeDriver?.id) return;
+  const fetchBundle = async (preserveNotice = false) => {
+    if (!activeDriver?.id || !assetVehicleReady) {
+      setBundle(null);
+      return;
+    }
+    const requestId = ++bundleRequestSequence.current;
     setIsLoading(true);
-    setStatusMessage(null);
+    setBundle(null);
+    if (!preserveNotice) setStatusMessage(null);
     try {
       const vPlate = activeVehicle.plate;
       const res = await fetch(
         `/api/hq/drivers/assets?driverId=${encodeURIComponent(activeDriver.id)}&vehiclePlate=${encodeURIComponent(vPlate)}&type=bundle`
       );
       const json = await res.json();
+      if (requestId !== bundleRequestSequence.current) return;
       if (res.ok && json.ok) {
         setBundle(json.bundle);
         if (json.vehicleAssetSummary) {
@@ -171,17 +178,22 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
         setStatusMessage({ type: 'error', text: json.error || '자료 조회 실패' });
       }
     } catch (err: any) {
-      setStatusMessage({ type: 'error', text: err?.message || '네트워크 오류' });
+      if (requestId === bundleRequestSequence.current) {
+        setStatusMessage({ type: 'error', text: err?.message || '네트워크 오류' });
+      }
     } finally {
-      setIsLoading(false);
+      if (requestId === bundleRequestSequence.current) setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    if (isOpen && activeDriver?.id) {
-      fetchBundle();
+    if (isOpen && activeDriver?.id && assetVehicleReady) {
+      void fetchBundle();
+    } else {
+      ++bundleRequestSequence.current;
+      setBundle(null);
     }
-  }, [isOpen, activeDriver?.id, activeVehicle.plate]);
+  }, [isOpen, activeDriver?.id, activeVehicle.plate, assetVehicleReady]);
 
   if (!isOpen) return null;
 
@@ -192,6 +204,10 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
     variant?: 'pc' | 'mobile'
   ) => {
     if (!activeDriver?.id) return;
+    if (assetType === 'info' && !assetVehicleReady) {
+      setStatusMessage({ type: 'error', text: '차량 등록부에서 활성 차량을 선택한 뒤 안내 카드를 등록해 주세요.' });
+      return;
+    }
 
     if (!isDbReady) {
       setStatusMessage({
@@ -265,7 +281,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
         });
       }
 
-      await fetchBundle();
+      await fetchBundle(true);
       onAssetUpdated?.();
     } catch (err: any) {
       setStatusMessage({ type: 'error', text: err?.message || '네트워크 오류' });
@@ -279,7 +295,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
   // Capture the resource identity before asking, to avoid deleting another
   // driver's image if an operator changes the selection.
   const handleDeleteAsset = (type: 'profile' | 'info', variant?: 'pc' | 'mobile') => {
-    if (!activeDriver?.id || isDeleting) return;
+    if (!activeDriver?.id || isDeleting || (type === 'info' && !assetVehicleReady)) return;
     const label = type === 'profile' ? '프로필 사진' : `${variant === 'pc' ? 'PC' : '모바일'} 안내 카드`;
     setPendingDelete({
       type, variant, label, driverId: activeDriver.id,
@@ -309,7 +325,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
       haptics.success();
       setPendingDelete(null);
       setStatusMessage({ type: 'success', text: `${pendingDelete.label}이 삭제되었습니다.` });
-      await fetchBundle();
+      await fetchBundle(true);
       onAssetUpdated?.();
     } catch (error) {
       haptics.errorAlert();
@@ -415,7 +431,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
             </span>
             <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-50 text-[#1E60F3] border border-blue-200 flex items-center gap-1">
               <Car className="w-3 h-3" />
-              카드 {completedVehiclesCount}/{VIP_REAL_VEHICLES.length} 등록
+              카드 {completedVehiclesCount}/{fleet.vehicles.length} 등록
             </span>
           </div>
         </div>
@@ -439,7 +455,17 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
 
         {/* Modal Body */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
-          {/* Section 1: Driver Profile Photo (Independent 1-photo per driver) */}
+          {fleet.error && (
+            <div role="alert" className="rounded-[14px] bg-[#FFF5F3] p-3 text-[12px] text-[#A85950]">
+              차량 등록부 연결 실패: {fleet.error}. 차량 안내 카드 업로드를 차단했습니다.
+            </div>
+          )}
+          {!fleet.loading && !fleet.error && fleet.vehicles.length === 0 && (
+            <div role="status" className="rounded-[14px] bg-[#F7F9FC] p-3 text-[12px] text-[#6D7C90]">
+              등록된 활성 차량이 없습니다. 차량 관리에서 먼저 등록해 주세요.
+            </div>
+          )}
+          {needle}
           <div className="bg-slate-50/70 rounded-2xl border border-slate-200/90 p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div>
@@ -653,6 +679,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                     <button
                       key={v.uuid}
                       type="button"
+                      disabled={isUploading !== null || isDeleting}
                       onClick={() => {
                         haptics.selection();
                         setSelectedVehiclePlate(v.plate);
@@ -818,7 +845,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                   />
                   <button
                     type="button"
-                    disabled={!isDbReady || isUploading === 'pc'}
+                    disabled={!isDbReady || !assetVehicleReady || isUploading === 'pc' || isDeleting}
                     onClick={() => pcInputRef.current?.click()}
                     className="flex-1 py-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-colors cursor-pointer bg-blue-50 hover:bg-blue-100 text-[#1E60F3] disabled:opacity-50"
                   >
@@ -952,7 +979,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                   />
                   <button
                     type="button"
-                    disabled={!isDbReady || isUploading === 'mobile'}
+                    disabled={!isDbReady || !assetVehicleReady || isUploading === 'mobile' || isDeleting}
                     onClick={() => mobileInputRef.current?.click()}
                     className="flex-1 py-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-colors cursor-pointer bg-blue-50 hover:bg-blue-100 text-[#1E60F3] disabled:opacity-50"
                   >
