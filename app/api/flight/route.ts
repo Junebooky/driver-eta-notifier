@@ -153,7 +153,8 @@ async function fetchIncheonFlights(
       const airport = bestItem.airport || (type === 'arrival' ? '출발지' : '도착지');
       const airportCode = bestItem.airportCode || '';
       const terminalId = bestItem.terminalid || '';
-      const { terminal, isT2 } = resolveTerminal(terminalId, flightId);
+      const operatingFlightId = String(bestItem.flightId || flightId);
+      const { terminal, isT2 } = resolveTerminal(terminalId, operatingFlightId, flightDate, airline);
 
       const scheduleTimeFormatted = formatFlightTime(bestItem.scheduleDateTime);
       const estimatedTimeFormatted = formatFlightTime(bestItem.estimatedDateTime || bestItem.scheduleDateTime);
@@ -168,8 +169,9 @@ async function fetchIncheonFlights(
       const { departureLocationText, suggestedDoor } = resolveDepartureDoor(
         terminal,
         isT2,
-        flightId,
-        checkinRange
+        operatingFlightId,
+        checkinRange,
+        airline
       );
 
       const rawGate = bestItem.gatenumber ? String(bestItem.gatenumber).trim() : '';
