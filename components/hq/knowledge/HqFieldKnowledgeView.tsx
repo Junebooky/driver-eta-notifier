@@ -751,6 +751,16 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
 
           <button
             type="button"
+            onClick={openLegacyDialog}
+            className="min-h-10 shrink-0 rounded-[12px] bg-[#F4F6FA] px-3 text-[12px] font-semibold text-[#556A85] transition-colors hover:bg-[#EDF1F6]"
+            title="이 브라우저에 저장된 기존 현장 지식 검토 및 수동 이전"
+          >
+            기존 데이터 가져오기
+          </button>
+
+          <button
+            type="button"
+            disabled={knowledgeLoading || Boolean(knowledgeError)}
             onClick={handleOpenAddNew}
             className="px-3.5 py-2 rounded-xl bg-[#1E60F3] hover:bg-blue-600 active:scale-95 text-white text-xs font-bold flex items-center gap-1.5 shadow-[0_4px_12px_rgba(30,96,243,0.2)] transition-all cursor-pointer shrink-0"
           >
@@ -789,6 +799,20 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
           tone={feedbackTone}
           onDismiss={() => setToastMessage(null)}
         />
+
+      {knowledgeError && (
+        <HqInlineFeedback message={`회사 공용 현장 지식 서버 연결 실패: ${knowledgeError}. 이전에 표시된 내용은 최신 정보가 아닐 수 있습니다.`}
+          onDismiss={undefined} />
+      )}
+      {knowledgeError && (
+        <button type="button" onClick={() => void refreshKnowledge()}
+          className="rounded-[12px] bg-[#F2F5FA] px-3 py-2 text-[12px] font-semibold text-[#516783]">
+          다시 조회
+        </button>
+      )}
+      {knowledgeLoading && (
+        <p role="status" className="text-[12px] font-medium text-[#6F8098]">회사 공용 현장 지식 동기화 중…</p>
+      )}
 
       {/* 3-Column Card Grid (Reference 1) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -866,6 +890,55 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
           </div>
         )}
       </div>
+      <HqModal
+        isOpen={legacyDialogOpen}
+        title="기존 브라우저 데이터 가져오기"
+        subtitle="관리자 확인 후 선택한 정보만 회사 공용 DB에 등록합니다."
+        onClose={() => { if (!isMutating) setLegacyDialogOpen(false); }}
+        footer={
+          <>
+            <button type="button" disabled={isMutating}
+              onClick={() => setLegacyDialogOpen(false)}
+              className="min-h-10 rounded-[12px] bg-[#F4F6FA] px-4 text-[12px] font-semibold text-[#60728A]">
+              취소
+            </button>
+            <button type="button" disabled={isMutating || selectedLegacyIds.length === 0 || selectedLegacyIds.length > 50}
+              onClick={() => void confirmLegacyImport()}
+              className="min-h-10 rounded-[12px] bg-[#1E60F3] px-4 text-[12px] font-semibold text-white disabled:opacity-50">
+              {isMutating ? '등록 중…' : `선택한 ${selectedLegacyIds.length}건 등록`}
+            </button>
+          </>
+        }
+      >
+        <p className="mb-3 text-[12px] leading-relaxed text-[#5D6E85]">
+          이 기기의 기존 정보를 검토하는 기능입니다. 기본 예시 항목은 자동으로 제외하며, 기존 회사 데이터는 절대 덮어쓰지 않습니다.
+          등록된 항목은 모든 기사에게 표시되므로 정확성을 확인한 후 선택해 주세요.
+        </p>
+        {legacyReview && (
+          <p className="mb-3 text-[11px] font-medium text-[#8090A4]">
+            가져오기 후보 {legacyReview.candidates.length}건 · 변경 없는 예시 제외 {legacyReview.skippedSamples}건
+            {legacyReview.invalid > 0 ? ` · 형식 오류 제외 ${legacyReview.invalid}건` : ''}
+          </p>
+        )}
+        <div className="max-h-72 space-y-2 overflow-y-auto">
+          {legacyReview?.candidates.map(item => (
+            <label key={item.id} className="flex cursor-pointer items-start gap-3 rounded-[13px] bg-[#F7F9FC] px-3 py-3">
+              <input type="checkbox" checked={selectedLegacyIds.includes(item.id)}
+                onChange={event => setSelectedLegacyIds(previous => event.target.checked
+                  ? [...previous, item.id] : previous.filter(id => id !== item.id))}
+                className="mt-0.5 size-4 accent-[#1E60F3]" />
+              <span className="min-w-0">
+                <span className="block text-[12px] font-semibold text-[#293D55]">{item.title}</span>
+                <span className="block text-[11px] text-[#8593A7]">{item.category} · {item.address || '주소 미기입'}</span>
+              </span>
+            </label>
+          ))}
+          {legacyReview?.candidates.length === 0 && (
+            <p className="py-4 text-center text-[12px] text-[#8090A4]">이 기기에서 가져올 사용자 작성 정보가 없습니다.</p>
+          )}
+        </div>
+        <HqInlineFeedback message={feedbackTone === 'error' ? toastMessage : null} className="mt-3"/>
+      </HqModal>
     </div>
   );
 };
