@@ -86,11 +86,16 @@ export async function POST(req: NextRequest) {
     }
     const org = auth.session.org;
     const canonicalPlate = booking._meta.vehiclePlate || row.vehicle_plate || row.vehicle_no || '';
-    const effVehicle = await resolveRegisteredFleetVehicle(canonicalPlate);
-    if (driverId !== booking.driver_id || booking.vehicle_id !== effVehicle.uuid ||
-        vehiclePlate.replace(/\s+/g, '') !== effVehicle.plate.replace(/\s+/g, '') ||
+    // Reject stale/mismatched requests before touching the fleet registry.
+    // A changed schedule is always a version conflict (409), not a DB failure.
+    if (driverId !== booking.driver_id ||
+        vehiclePlate.replace(/\s+/g, '') !== canonicalPlate.replace(/\s+/g, '') ||
         (vehicleId && vehicleId !== booking.vehicle_id) || payload.expectedVersion !== booking.version) {
       return NextResponse.json({ ok: false, error: '배차가 변경되었습니다. 최신 기사·차량과 버전을 다시 확인해 주세요.' }, { status: 409 });
+    }
+    const effVehicle = await resolveRegisteredFleetVehicle(canonicalPlate);
+    if (booking.vehicle_id !== effVehicle.uuid) {
+      return NextResponse.json({ ok: false, error: '현재 배차의 차량 식별자가 등록부와 일치하지 않습니다.' }, { status: 409 });
     }
 
     // Verify Info asset existence for this (driver, vehicle) pair
