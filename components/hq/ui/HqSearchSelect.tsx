@@ -100,7 +100,7 @@ export function HqSearchSelect({
       </button>
       {open && (
         <div id={id} role="listbox" aria-label={label}
-          className="relative z-[80] mt-2 w-full min-w-[min(260px,calc(100vw-52px))] rounded-[17px] bg-white p-2 shadow-[0_12px_35px_rgba(35,49,78,0.12)] sm:absolute sm:left-0 sm:top-full sm:mt-1.5 sm:min-w-[300px]">
+          className="relative z-[80] mt-2 w-full min-w-0 max-w-[520px] rounded-[17px] bg-white p-2 shadow-[0_12px_35px_rgba(35,49,78,0.12)]">
           <div className="relative">
             <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9BA7B7]"/>
             <input ref={searchInput} type="search" aria-label={`${label} 검색`}
