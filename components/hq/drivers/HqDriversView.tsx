@@ -9,6 +9,7 @@ import { useHqDrivers } from '@/utils/useHqDrivers';
 import { HqAdminLoginModal } from '@/components/hq/auth/HqAdminLoginModal';
 import { haptics } from '@/utils/haptics';
 import { formatPhoneNumber } from '@/utils/formatters';
+import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
 
 export interface HqDriversViewProps {
   initialSearchQuery?: string;
@@ -319,14 +320,18 @@ export const HqDriversView: React.FC<HqDriversViewProps> = ({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-500 mb-1">소속 구분</label>
-                  <select
+                  <HqSearchSelect
+                    label="신규 기사 소속 구분"
+                    size="sm"
                     value={newAffiliation}
-                    onChange={(e) => setNewAffiliation(e.target.value as any)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:ring-2 focus:ring-[#1E60F3] transition-all cursor-pointer"
-                  >
-                    <option value="employed">본사 소속</option>
-                    <option value="freelance">프리랜서</option>
-                  </select>
+                    onChange={next => setNewAffiliation(next as 'employed' | 'freelance')}
+                    placeholder="소속 구분"
+                    disabled={isSubmitting}
+                    options={[
+                      { value: 'employed', label: '본사 소속' },
+                      { value: 'freelance', label: '프리랜서' },
+                    ]}
+                  />
                 </div>
 
                 <div>

@@ -5,7 +5,10 @@ import { ArrowRight, ChevronDown, FileClock, GitCompareArrows, Info, Plus, Minus
 import type { HqEmailExtractedDraft } from '@/types/emailHq';
 import type { HqDriverSummary } from '@/types/driverHq';
 import type { ExistingEmailBookingCandidate } from '@/services/emailBookingMatchService';
-import { VIP_REAL_VEHICLES } from '@/utils/vehicleData';
+import { getVehicleImage } from '@/utils/vehicleData';
+import { getDriverProfileImage } from '@/components/hq/HqQuickDispatch';
+import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
+import { useHqFleetRegistry } from '@/hooks/useHqFleetRegistry';
 import {
   emailBatchRows,
   type EmailBatchDecisions,
@@ -55,6 +58,7 @@ export function HqEmailBatchRevisionPanel({
   const unchanged = rows.filter(row => row.action === 'unchanged').length;
   const skipped = rows.filter(row => row.action === 'skip').length;
   const [cancelAcknowledged, setCancelAcknowledged] = useState(false);
+  const fleet = useHqFleetRegistry(showAssignments);
   const approvalSignature = [
     JSON.stringify(decisions), JSON.stringify(cancelIds), JSON.stringify(cancelReasons),
     JSON.stringify(assignments), JSON.stringify(draft.waypoints), slots.length,
@@ -127,29 +131,28 @@ export function HqEmailBatchRevisionPanel({
                 </span>
               </div>
 
-              <label className="block space-y-1.5">
+              <div className="block space-y-1.5">
                 <span className="text-[11px] font-medium text-[#8491A3]">연결할 기존 예약</span>
-                <div className="relative">
-                  <select
-                    value={row.selection}
-                    onChange={e => onSelect(row.key, e.target.value)}
-                    disabled={isSubmitting}
-                    aria-label={`${row.date} ${row.index + 1}호차 기존 예약`}
-                    className="h-12 w-full appearance-none rounded-2xl bg-[#FAFBFD] px-4 pr-9 text-[12px] font-medium text-[#253449] outline-none transition-shadow focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25 disabled:opacity-55"
-                  >
-                    <option value="">연결할 예약을 선택해 주세요</option>
-                    <option value="new">+ 신규 예약으로 추가</option>
-                    <option value="skip">— 이 날짜에는 차량 운행 없음</option>
-                    {candidates.map(item => (
-                      <option key={item.scheduleId} value={item.scheduleId} disabled={alreadyUsed.has(item.scheduleId)}>
-                        {item.pickupDate} · {item.groupVehicleIndex || 1}호차 · {item.vehiclePlate || '차량 미정'} · {item.driverName || item.customerName}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-3.5 top-4 h-4 w-4 text-[#94A1B2]"/>
-                </div>
+                <HqSearchSelect
+                  label={`${row.date} ${row.index + 1}호차 기존 예약`}
+                  value={row.selection}
+                  onChange={next => onSelect(row.key, next)}
+                  disabled={isSubmitting}
+                  placeholder="연결할 예약을 선택해 주세요"
+                  options={[
+                    { value: 'new', label: '신규 예약으로 추가', subtitle: '기존 예약을 수정하지 않음' },
+                    { value: 'skip', label: '이 날짜에는 차량 운행 없음', subtitle: '다른 날짜 일정은 유지' },
+                    ...candidates.map(item => ({
+                      value: item.scheduleId,
+                      label: `${item.pickupDate} · ${item.groupVehicleIndex || 1}호차`,
+                      subtitle: `${item.vehiclePlate || '차량 미정'} · ${item.driverName || item.customerName}`,
+                      disabled: alreadyUsed.has(item.scheduleId),
+                      status: alreadyUsed.has(item.scheduleId) ? '다른 행에 연결됨' : undefined,
+                    })),
+                  ]}
+                />
                 {previous && <span className="block text-[10px] text-[#95A1AF]">연결 근거: {previous.reasons.join(' · ') || '관리자 선택'} · 버전 v{previous.version}</span>}
-              </label>
+              </div>
 
               {previous && (
                 <details className="group rounded-2xl bg-[#FAFBFD] px-3.5 py-3">
@@ -176,41 +179,78 @@ export function HqEmailBatchRevisionPanel({
               )}
               {showAssignments && row.selection && row.selection !== 'skip' && (
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <label className="space-y-1">
+                  <div className="min-w-0 space-y-1">
                     <span className="text-[11px] text-[#8491A3]">이 날짜에 사용할 차량</span>
-                    <select
+                    <HqSearchSelect
+                      label={`${row.date} ${row.index + 1}호차 차량 배정`}
                       value={selectedPlate}
-                      onChange={e => onAssignment(row.key, { ...assignment, vehiclePlate: e.target.value })}
-                      disabled={isSubmitting}
-                      aria-label={`${row.date} ${row.index + 1}호차 차량 배정`}
-                      className="h-11 w-full rounded-xl bg-[#FAFBFD] px-3 text-[11px] font-medium text-[#334155] outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25"
-                    >
-                      <option value="">차량 선택</option>
-                      {VIP_REAL_VEHICLES.map(vehicle => (
-                        <option key={vehicle.id} value={vehicle.plate}>{vehicle.plate} · {vehicle.modelShort}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="space-y-1">
+                      onChange={next => onAssignment(row.key, { ...assignment, vehiclePlate: next })}
+                      disabled={isSubmitting || fleet.loading || !!fleet.error}
+                      placeholder={fleet.loading ? '차량 목록 조회 중…' : '차량 선택'}
+                      emptyLabel="차량 미배정"
+                      imageShape="vehicle"
+                      categoryOptions={[
+                        { value: 'sprinter', label: '스프린터' }, { value: 'staria', label: '스타리아' },
+                        { value: 'carnival', label: '카니발' }, { value: 'genesis', label: '제네시스' },
+                        { value: 's_class', label: 'S클래스' },
+                      ]}
+                      options={[
+                        ...(selectedPlate && !fleet.vehicles.some(vehicle => vehicle.plate === selectedPlate)
+                          ? [{ value: selectedPlate, label: selectedPlate, subtitle: '현재 등록부에 없는 기존 차량',
+                              disabled: true, status: '변경 필요' }] : []),
+                        ...fleet.vehicles.map(vehicle => ({
+                          value: vehicle.plate,
+                          label: vehicle.modelShort || vehicle.model,
+                          subtitle: vehicle.plate,
+                          imageSrc: getVehicleImage(vehicle),
+                          category: vehicle.category,
+                        })),
+                      ]}
+                    />
+                    {fleet.error && <p role="alert" className="text-[11px] text-[#AC6655]">차량 등록부 조회 실패: {fleet.error} · 배정 선택을 중단했습니다.</p>}
+                    {selectedPlate && !fleet.loading && !fleet.error &&
+                      !fleet.vehicles.some(vehicle => vehicle.plate === selectedPlate) &&
+                      <p role="alert" className="text-[11px] text-[#AC6655]">
+                        현재 등록된 차량이 아닙니다. 활성 차량으로 바꾼 후 승인해 주세요.
+                      </p>}
+                  </div>
+                  <div className="min-w-0 space-y-1">
                     <span className="text-[11px] text-[#8491A3]">이 날짜의 담당 기사</span>
-                    <select
+                    <HqSearchSelect
+                      label={`${row.date} ${row.index + 1}호차 기사 배정`}
                       value={selectedDriverId}
-                      onChange={e => {
-                        const chosen = drivers.find(driver => driver.id === e.target.value);
+                      onChange={next => {
+                        const chosen = drivers.find(driver => driver.id === next);
                         onAssignment(row.key, {
                           ...assignment,
-                          driver: chosen ? { id: chosen.id, name: chosen.name, phone: chosen.phone, languages: chosen.languages, englishAvailable: chosen.englishAvailable } : null,
+                          driver: chosen ? {
+                            id: chosen.id, name: chosen.name, phone: chosen.phone,
+                            languages: chosen.languages, englishAvailable: chosen.englishAvailable,
+                          } : null,
                         });
                       }}
                       disabled={isSubmitting}
-                      aria-label={`${row.date} ${row.index + 1}호차 기사 배정`}
-                      className="h-11 w-full rounded-xl bg-[#FAFBFD] px-3 text-[11px] font-medium text-[#334155] outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/25"
-                    >
-                      <option value="">기사 선택</option>
-                      {originalDriver && <option value={previous!.driverId}>{previous!.driverName} · 기존 담당자</option>}
-                      {drivers.map(driver => <option key={driver.id} value={driver.id}>{driver.name} · {driver.carNumber || '차량 미정'}</option>)}
-                    </select>
-                  </label>
+                      placeholder="담당 기사 선택"
+                      emptyLabel="기사 미배정"
+                      options={[
+                        ...(originalDriver && previous?.driverId
+                          ? [{
+                              value: previous.driverId,
+                              label: previous.driverName || '기존 기사',
+                              subtitle: '현재 명단에 없음', status: '변경 필요',
+                              imageSrc: getDriverProfileImage({ name: previous.driverName }),
+                              disabled: true,
+                            }] : []),
+                        ...drivers.map(driver => ({
+                          value: driver.id,
+                          label: driver.name,
+                          subtitle: `${driver.phone || '연락처 미등록'} · ${driver.carNumber || '차량 미정'}`,
+                          imageSrc: getDriverProfileImage(driver),
+                          status: driver.isAvailable ? '운행 가능' : '가용 여부 확인 필요',
+                        })),
+                      ]}
+                    />
+                  </div>
                 </div>
               )}
             </div>

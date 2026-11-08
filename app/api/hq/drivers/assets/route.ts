@@ -10,7 +10,7 @@ import {
   getDriverVehicleInfoAsset,
   getDriverVehicleAssetSummary,
 } from '@/lib/assets/driverAssetServerStore';
-import { resolveVehicleEntity } from '@/utils/vehicleData';
+import { resolveRegisteredFleetVehicle } from '@/lib/fleet/resolveRegisteredVehicle';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
     }
 
     const resolvedVehicle = vehicleIdParam || vehiclePlate
-      ? resolveVehicleEntity(vehicleIdParam || vehiclePlate!)
+      ? await resolveRegisteredFleetVehicle(vehicleIdParam || vehiclePlate!, { allowArchived: true })
       : null;
 
     if (type === 'info') {
@@ -120,7 +120,7 @@ export async function GET(req: NextRequest) {
     }
 
     const [bundle, vehicleAssetSummary] = await Promise.all([
-      getDriverVehicleBundle(driverId, resolvedVehicle.uuid, undefined, org),
+      getDriverVehicleBundle(driverId, resolvedVehicle.uuid, undefined, org, resolvedVehicle),
       getDriverVehicleAssetSummary(driverId, org),
     ]);
     return NextResponse.json({
@@ -186,7 +186,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     if (type === 'info') {
-      const effVehicle = resolveVehicleEntity(vehicleId || vehiclePlate);
+      const effVehicle = await resolveRegisteredFleetVehicle(vehicleId || vehiclePlate, { allowArchived: true });
       if (!variant || (variant !== 'pc' && variant !== 'mobile')) {
         return NextResponse.json(
           { ok: false, error: '삭제할 규격(variant: pc 또는 mobile)이 필요합니다.' },

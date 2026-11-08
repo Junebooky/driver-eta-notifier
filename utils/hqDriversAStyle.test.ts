@@ -38,7 +38,9 @@ test('driver profile details, schedule and table actions remain hooked up',()=>{
   assert.match(table,/setResidenceFilter/);
   assert.match(table,/setStatusFilter/);
   assert.match(table,/setEditingDriver\(driver\)/);
-  assert.match(table,/deleteDriver\(driver\.id\)/);
+  assert.match(table,/deleteDriver\(driverToRemove\.id\)/);
+  assert.match(table,/<HqModal/);
+  assert.match(table,/setDriverToRemove\(driver\)/);
   assert.match(detail,/onSelectDriver\(driver\.id\)/);
   assert.match(detail,/onBackToTable/);
   assert.match(detail,/activeDriver\.name/);

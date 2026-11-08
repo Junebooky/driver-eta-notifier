@@ -22,12 +22,12 @@ import {
   DriverVehicleAssetBundle,
 } from '@/types/driverVehicleAsset';
 import {
-  VIP_REAL_VEHICLES,
-  VipRealVehicle,
   resolveVehicleEntity,
   getVehicleImage,
 } from '@/utils/vehicleData';
 import { haptics } from '@/utils/haptics';
+import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
+import { useHqFleetRegistry } from '@/hooks/useHqFleetRegistry';
 
 export interface HqDriverAssetManagerModalProps {
   isOpen: boolean;
@@ -47,12 +47,8 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
   onAssetUpdated,
 }) => {
   const [selectedDriverId, setSelectedDriverId] = useState<string>(initialDriverId || '');
-  const [selectedVehiclePlate, setSelectedVehiclePlate] = useState<string>(() => {
-    if (initialVehiclePlate && VIP_REAL_VEHICLES.some((v) => v.plate === initialVehiclePlate)) {
-      return initialVehiclePlate;
-    }
-    return VIP_REAL_VEHICLES[0]?.plate || '125호 9982';
-  });
+  const fleet = useHqFleetRegistry(isOpen);
+  const [selectedVehiclePlate, setSelectedVehiclePlate] = useState<string>(initialVehiclePlate || '');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [vehicleSearchQuery, setVehicleSearchQuery] = useState<string>('');
 
@@ -65,6 +61,11 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
   const [isDraggingProfile, setIsDraggingProfile] = useState(false);
   const [isDraggingPc, setIsDraggingPc] = useState(false);
   const [isDraggingMobile, setIsDraggingMobile] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<{
+    type: 'profile' | 'info'; variant?: 'pc' | 'mobile';
+    driverId: string; vehiclePlate: string; label: string;
+  } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{
     type: 'success' | 'warning' | 'error';
     text: string;
@@ -73,38 +74,37 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
   const profileInputRef = useRef<HTMLInputElement>(null);
   const pcInputRef = useRef<HTMLInputElement>(null);
   const mobileInputRef = useRef<HTMLInputElement>(null);
+  const bundleRequestSequence = useRef(0);
 
-  // Sync initial props
+  // Match caller selection, but never resurrect archived or browser-only cars.
   useEffect(() => {
     if (initialDriverId) setSelectedDriverId(initialDriverId);
-    if (initialVehiclePlate && VIP_REAL_VEHICLES.some((v) => v.plate === initialVehiclePlate)) {
-      setSelectedVehiclePlate(initialVehiclePlate);
-    } else if (VIP_REAL_VEHICLES.length > 0) {
-      setSelectedVehiclePlate(VIP_REAL_VEHICLES[0].plate);
-    }
+    setSelectedVehiclePlate(initialVehiclePlate || '');
   }, [initialDriverId, initialVehiclePlate, isOpen]);
 
-  // Set default driver and vehicle if none selected
   useEffect(() => {
-    if (!selectedDriverId && drivers.length > 0) {
-      setSelectedDriverId(drivers[0].id);
-    }
-    if (!selectedVehiclePlate && VIP_REAL_VEHICLES.length > 0) {
-      setSelectedVehiclePlate(VIP_REAL_VEHICLES[0].plate);
-    }
-  }, [drivers, selectedDriverId, selectedVehiclePlate]);
-
-  const activeDriver = useMemo(() => {
-    return drivers.find((d) => d.id === selectedDriverId) || drivers[0] || null;
+    if (!selectedDriverId && drivers.length > 0) setSelectedDriverId(drivers[0].id);
   }, [drivers, selectedDriverId]);
 
-  const activeVehicle = useMemo(() => {
-    const targetPlate =
-      selectedVehiclePlate && VIP_REAL_VEHICLES.some((v) => v.plate === selectedVehiclePlate)
-        ? selectedVehiclePlate
-        : VIP_REAL_VEHICLES[0]?.plate || '125호 9982';
-    return resolveVehicleEntity(targetPlate);
-  }, [selectedVehiclePlate]);
+  useEffect(() => {
+    if (!isOpen || fleet.loading || fleet.error || !fleet.vehicles.length) return;
+    if (!fleet.vehicles.some(vehicle => vehicle.plate === selectedVehiclePlate)) {
+      setSelectedVehiclePlate(fleet.vehicles[0].plate);
+    }
+  }, [isOpen, fleet.loading, fleet.error, fleet.vehicles, selectedVehiclePlate]);
+
+  const activeDriver = useMemo(
+    () => drivers.find(driver => driver.id === selectedDriverId) || drivers[0] || null,
+    [drivers, selectedDriverId],
+  );
+  const activeVehicle = useMemo(() =>
+    fleet.vehicles.find(vehicle => vehicle.plate === selectedVehiclePlate) ||
+    fleet.vehicles[0] ||
+    resolveVehicleEntity('미배정'),
+    [fleet.vehicles, selectedVehiclePlate],
+  );
+  const assetVehicleReady = !fleet.loading && !fleet.error &&
+    fleet.vehicles.some(vehicle => vehicle.plate === selectedVehiclePlate);
 
   // Clean vehicle display name (eliminating double brand names like '벤츠 벤츠...')
   const displayVehicleName = useMemo(() => {
@@ -120,25 +120,25 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
     return `${brand} ${model}`.trim();
   }, [activeVehicle]);
 
-  // Category Tabs Configuration
-  const categoryTabs = useMemo(() => [
-    { key: 'all', label: '전체', count: VIP_REAL_VEHICLES.length, icon: Car },
-    { key: 'sprinter', label: '스프린터', count: 9, icon: Bus },
-    { key: 'staria', label: '스타리아', count: 4, icon: Truck },
-    { key: 'carnival', label: '카니발', count: 2, icon: Truck },
-    { key: 'genesis', label: '제네시스', count: 4, icon: Car },
-    { key: 's_class', label: 'S-클래스', count: 1, icon: Car },
-  ], []);
+  // Counts reflect registered active vehicles, not an obsolete fixed stock list.
+  const categoryTabs = useMemo(() => ([
+    { key: 'all', label: '전체', icon: Car },
+    { key: 'sprinter', label: '스프린터', icon: Bus },
+    { key: 'staria', label: '스타리아', icon: Truck },
+    { key: 'carnival', label: '카니발', icon: Truck },
+    { key: 'genesis', label: '제네시스', icon: Car },
+    { key: 's_class', label: 'S-클래스', icon: Car },
+  ]).map(tab => ({
+    ...tab, count: tab.key === 'all'
+      ? fleet.vehicles.length : fleet.vehicles.filter(vehicle => vehicle.category === tab.key).length,
+  })), [fleet.vehicles]);
 
-  // Filtered vehicles based on category and search
-  const filteredVehicles = useMemo(() => {
-    return VIP_REAL_VEHICLES.filter((v) => {
-      const matchesCategory = selectedCategory === 'all' || v.category === selectedCategory;
-      const q = vehicleSearchQuery.trim().toLowerCase();
-      const matchesSearch = !q || v.plate.toLowerCase().includes(q) || v.model.toLowerCase().includes(q);
-      return matchesCategory && matchesSearch;
-    });
-  }, [selectedCategory, vehicleSearchQuery]);
+  const filteredVehicles = useMemo(() => fleet.vehicles.filter(vehicle => {
+    const matchesCategory = selectedCategory === 'all' || vehicle.category === selectedCategory;
+    const query = vehicleSearchQuery.trim().toLowerCase();
+    return matchesCategory && (!query || vehicle.plate.toLowerCase().includes(query) ||
+      vehicle.model.toLowerCase().includes(query));
+  }), [fleet.vehicles, selectedCategory, vehicleSearchQuery]);
 
   // Count total completed vehicles for this driver
   const completedVehiclesCount = useMemo(() => {
@@ -146,16 +146,22 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
   }, [vehicleAssetSummary]);
 
   // Load bundle whenever driver or vehicle selection changes
-  const fetchBundle = async () => {
-    if (!activeDriver?.id) return;
+  const fetchBundle = async (preserveNotice = false) => {
+    if (!activeDriver?.id || !assetVehicleReady) {
+      setBundle(null);
+      return;
+    }
+    const requestId = ++bundleRequestSequence.current;
     setIsLoading(true);
-    setStatusMessage(null);
+    setBundle(null);
+    if (!preserveNotice) setStatusMessage(null);
     try {
       const vPlate = activeVehicle.plate;
       const res = await fetch(
         `/api/hq/drivers/assets?driverId=${encodeURIComponent(activeDriver.id)}&vehiclePlate=${encodeURIComponent(vPlate)}&type=bundle`
       );
       const json = await res.json();
+      if (requestId !== bundleRequestSequence.current) return;
       if (res.ok && json.ok) {
         setBundle(json.bundle);
         if (json.vehicleAssetSummary) {
@@ -172,17 +178,22 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
         setStatusMessage({ type: 'error', text: json.error || '자료 조회 실패' });
       }
     } catch (err: any) {
-      setStatusMessage({ type: 'error', text: err?.message || '네트워크 오류' });
+      if (requestId === bundleRequestSequence.current) {
+        setStatusMessage({ type: 'error', text: err?.message || '네트워크 오류' });
+      }
     } finally {
-      setIsLoading(false);
+      if (requestId === bundleRequestSequence.current) setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    if (isOpen && activeDriver?.id) {
-      fetchBundle();
+    if (isOpen && activeDriver?.id && assetVehicleReady) {
+      void fetchBundle();
+    } else {
+      ++bundleRequestSequence.current;
+      setBundle(null);
     }
-  }, [isOpen, activeDriver?.id, activeVehicle.plate]);
+  }, [isOpen, activeDriver?.id, activeVehicle.plate, assetVehicleReady]);
 
   if (!isOpen) return null;
 
@@ -193,6 +204,10 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
     variant?: 'pc' | 'mobile'
   ) => {
     if (!activeDriver?.id) return;
+    if (assetType === 'info' && !assetVehicleReady) {
+      setStatusMessage({ type: 'error', text: '차량 등록부에서 활성 차량을 선택한 뒤 안내 카드를 등록해 주세요.' });
+      return;
+    }
 
     if (!isDbReady) {
       setStatusMessage({
@@ -266,7 +281,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
         });
       }
 
-      await fetchBundle();
+      await fetchBundle(true);
       onAssetUpdated?.();
     } catch (err: any) {
       setStatusMessage({ type: 'error', text: err?.message || '네트워크 오류' });
@@ -276,36 +291,49 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
     }
   };
 
-  // Delete Handler
-  const handleDeleteAsset = async (type: 'profile' | 'info', variant?: 'pc' | 'mobile') => {
-    if (!activeDriver?.id) return;
-
+  // Open a branded confirmation instead of a native browser confirm().
+  // Capture the resource identity before asking, to avoid deleting another
+  // driver's image if an operator changes the selection.
+  const handleDeleteAsset = (type: 'profile' | 'info', variant?: 'pc' | 'mobile') => {
+    if (!activeDriver?.id || isDeleting || (type === 'info' && !assetVehicleReady)) return;
     const label = type === 'profile' ? '프로필 사진' : `${variant === 'pc' ? 'PC' : '모바일'} 안내 카드`;
-    if (!confirm(`${label}을 삭제하시겠습니까?`)) {
-      return;
-    }
+    setPendingDelete({
+      type, variant, label, driverId: activeDriver.id,
+      vehiclePlate: activeVehicle.plate,
+    });
+  };
 
+  const confirmDeleteAsset = async () => {
+    if (!pendingDelete || isDeleting) return;
+    setIsDeleting(true);
+    setStatusMessage(null);
     try {
       const res = await fetch('/api/hq/drivers/assets', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          type,
-          driverId: activeDriver.id,
-          vehiclePlate: activeVehicle.plate,
-          variant,
+          type: pendingDelete.type,
+          driverId: pendingDelete.driverId,
+          vehiclePlate: pendingDelete.vehiclePlate,
+          variant: pendingDelete.variant,
         }),
       });
-      const json = await res.json();
+      const json = await res.json().catch(() => ({}));
       if (!res.ok || !json.ok) {
-        alert(json.error || '삭제 실패');
-        return;
+        throw new Error(json.error || '삭제에 실패했습니다.');
       }
       haptics.success();
-      await fetchBundle();
+      setPendingDelete(null);
+      setStatusMessage({ type: 'success', text: `${pendingDelete.label}이 삭제되었습니다.` });
+      await fetchBundle(true);
       onAssetUpdated?.();
-    } catch (err: any) {
-      alert(err?.message || '네트워크 오류');
+    } catch (error) {
+      haptics.errorAlert();
+      setStatusMessage({
+        type: 'error', text: error instanceof Error ? error.message : '네트워크 연결을 확인해 주세요.',
+      });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -345,12 +373,12 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="w-full max-w-4xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[88vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#17233B]/25 animate-in fade-in duration-200">
+      <div className="w-full max-w-4xl bg-white rounded-[21px] shadow-[0_20px_52px_rgba(35,49,78,0.12)] overflow-hidden flex flex-col max-h-[88vh]">
         {/* Header */}
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#0050FF] flex items-center justify-center font-bold">
+            <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#1E60F3] flex items-center justify-center font-bold">
               <Sparkles className="w-4 h-4" />
             </div>
             <div>
@@ -369,23 +397,25 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
         </div>
 
         {/* Top Bar: Driver Select ONLY (Decoupled from vehicle) */}
-        <div className="p-4 bg-slate-50/80 border-b border-slate-200/80 shrink-0 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="p-4 bg-[#F9FAFD] shrink-0 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <div className="flex-1 min-w-0">
             <label className="block text-[11px] font-black text-slate-700 mb-1.5 flex items-center gap-1.5">
-              <User className="w-3.5 h-3.5 text-[#0050FF]" />
+              <User className="w-3.5 h-3.5 text-[#1E60F3]" />
               <span>기사 선택</span>
             </label>
-            <select
+            <HqSearchSelect
+              label="배차 카드 관리 기사 선택"
               value={selectedDriverId}
-              onChange={(e) => setSelectedDriverId(e.target.value)}
-              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs"
-            >
-              {drivers.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name} ({d.phone || '연락처 미등록'} · {d.affiliationLabel} · {d.carNumber || d.vehicleNo || '차량 미지정'})
-                </option>
-              ))}
-            </select>
+              onChange={next => setSelectedDriverId(next)}
+              placeholder="기사 선택"
+              disabled={isUploading !== null || isDeleting}
+              options={drivers.map(driver => ({
+                value: driver.id,
+                label: driver.name,
+                subtitle: `${driver.phone || '연락처 미등록'} · ${driver.affiliationLabel} · ${driver.carNumber || driver.vehicleNo || '차량 미지정'}`,
+                imageSrc: driver.avatarUrl || undefined,
+              }))}
+            />
           </div>
 
           {/* Quick Summary Chips for Driver */}
@@ -399,9 +429,9 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
               <User className="w-3 h-3" />
               {bundle?.profile ? '프로필 등록됨' : '프로필 미등록'}
             </span>
-            <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-50 text-[#0050FF] border border-blue-200 flex items-center gap-1">
+            <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-50 text-[#1E60F3] border border-blue-200 flex items-center gap-1">
               <Car className="w-3 h-3" />
-              카드 {completedVehiclesCount}/20 등록
+              카드 {completedVehiclesCount}/{fleet.vehicles.length} 등록
             </span>
           </div>
         </div>
@@ -425,12 +455,22 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
 
         {/* Modal Body */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+          {fleet.error && (
+            <div role="alert" className="rounded-[14px] bg-[#FFF5F3] p-3 text-[12px] text-[#A85950]">
+              차량 등록부 연결 실패: {fleet.error}. 차량 안내 카드 업로드를 차단했습니다.
+            </div>
+          )}
+          {!fleet.loading && !fleet.error && fleet.vehicles.length === 0 && (
+            <div role="status" className="rounded-[14px] bg-[#F7F9FC] p-3 text-[12px] text-[#6D7C90]">
+              등록된 활성 차량이 없습니다. 차량 관리에서 먼저 등록해 주세요.
+            </div>
+          )}
           {/* Section 1: Driver Profile Photo (Independent 1-photo per driver) */}
           <div className="bg-slate-50/70 rounded-2xl border border-slate-200/90 p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
-                  <User className="w-4 h-4 text-[#0050FF]" />
+                  <User className="w-4 h-4 text-[#1E60F3]" />
                   <span>기사 프로필</span>
                 </h3>
                 <p className="text-[11px] text-slate-500">
@@ -438,8 +478,8 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                 </p>
               </div>
               {bundle?.profile ? (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-[#0050FF] text-xs font-semibold">
-                  <span className="w-4 h-4 rounded-full bg-[#0050FF] text-white flex items-center justify-center shrink-0">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-[#1E60F3] text-xs font-semibold">
+                  <span className="w-4 h-4 rounded-full bg-[#1E60F3] text-white flex items-center justify-center shrink-0">
                     <Check className="w-2.5 h-2.5 stroke-[2.5]" />
                   </span>
                   <span>등록 완료</span>
@@ -469,7 +509,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
               }}
               onDrop={(e) => handleDropFile(e, 'profile')}
               className={`flex flex-col sm:flex-row items-center gap-4 bg-white p-3.5 rounded-xl border transition-all ${isDraggingProfile
-                ? 'border-2 border-dashed border-[#0050FF] bg-blue-50/60 ring-2 ring-blue-300'
+                ? 'border-2 border-dashed border-[#1E60F3] bg-blue-50/60 ring-2 ring-blue-300'
                 : 'border-slate-200 shadow-2xs'
                 }`}
             >
@@ -553,8 +593,8 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
               </div>
 
               {bundle?.isFullyComplete ? (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-[#0050FF] text-xs font-semibold self-start sm:self-auto">
-                  <span className="w-4 h-4 rounded-full bg-[#0050FF] text-white flex items-center justify-center shrink-0">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-[#1E60F3] text-xs font-semibold self-start sm:self-auto">
+                  <span className="w-4 h-4 rounded-full bg-[#1E60F3] text-white flex items-center justify-center shrink-0">
                     <Check className="w-2.5 h-2.5 stroke-[2.5]" />
                   </span>
                   <span>완비 (PC·모바일)</span>
@@ -587,7 +627,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                           setSelectedCategory(cat.key);
                         }}
                         className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${isSelected
-                          ? 'bg-[#0050FF] text-white shadow-2xs'
+                          ? 'bg-[#1E60F3] text-white shadow-2xs'
                           : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900'
                           }`}
                       >
@@ -612,7 +652,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                     value={vehicleSearchQuery}
                     onChange={(e) => setVehicleSearchQuery(e.target.value)}
                     placeholder="차량번호나 차종 검색"
-                    className="w-full pl-8 pr-7 py-1 text-xs border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:border-[#0050FF] placeholder:text-slate-400"
+                    className="w-full pl-8 pr-7 py-1 text-xs border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:outline-none focus:border-[#1E60F3] placeholder:text-slate-400"
                   />
                   {vehicleSearchQuery && (
                     <button
@@ -639,12 +679,13 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                     <button
                       key={v.uuid}
                       type="button"
+                      disabled={isUploading !== null || isDeleting}
                       onClick={() => {
                         haptics.selection();
                         setSelectedVehiclePlate(v.plate);
                       }}
                       className={`p-2 rounded-xl text-left transition-all border flex flex-col justify-between gap-1.5 cursor-pointer relative group ${isSelected
-                        ? 'ring-2 ring-[#0050FF] border-[#0050FF] bg-blue-50/30 shadow-xs'
+                        ? 'ring-2 ring-[#1E60F3] border-[#1E60F3] bg-blue-50/30 shadow-xs'
                         : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/80'
                         }`}
                     >
@@ -655,8 +696,8 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                           className="w-9 h-6 object-contain shrink-0 filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.18)]"
                         />
                         {isComplete ? (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-50 text-[#0050FF] text-[9.5px] font-semibold shrink-0">
-                            <span className="w-3.5 h-3.5 rounded-full bg-[#0050FF] text-white flex items-center justify-center shrink-0">
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-50 text-[#1E60F3] text-[9.5px] font-semibold shrink-0">
+                            <span className="w-3.5 h-3.5 rounded-full bg-[#1E60F3] text-white flex items-center justify-center shrink-0">
                               <Check className="w-2 h-2 stroke-[2.5]" />
                             </span>
                             <span>완비</span>
@@ -671,7 +712,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                       </div>
 
                       <div className="min-w-0">
-                        <div className={`text-[11px] font-black truncate ${isSelected ? 'text-[#0050FF]' : 'text-slate-800'}`}>
+                        <div className={`text-[11px] font-black truncate ${isSelected ? 'text-[#1E60F3]' : 'text-slate-800'}`}>
                           {v.plate}
                         </div>
                         <div className="text-[10px] text-slate-400 truncate">
@@ -686,7 +727,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
               {/* Active Vehicle Status Bar (Cleaned from duplicate brand name) */}
               <div className="px-3 py-2 bg-blue-50/50 rounded-lg border border-blue-100 flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-black text-[#0050FF] uppercase tracking-wider">
+                  <span className="text-[11px] font-black text-[#1E60F3] uppercase tracking-wider">
                     현재 선택 차량:
                   </span>
                   <span className="font-bold text-slate-800">
@@ -710,8 +751,8 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                       <span>PC용 가로 카드 (16:9)</span>
                     </span>
                     {bundle?.pcInfo ? (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-[#0050FF] text-xs font-semibold">
-                        <span className="w-4 h-4 rounded-full bg-[#0050FF] text-white flex items-center justify-center shrink-0">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-[#1E60F3] text-xs font-semibold">
+                        <span className="w-4 h-4 rounded-full bg-[#1E60F3] text-white flex items-center justify-center shrink-0">
                           <Check className="w-2.5 h-2.5 stroke-[2.5]" />
                         </span>
                         <span>등록 완료</span>
@@ -751,7 +792,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                     }}
                     onDrop={(e) => handleDropFile(e, 'info', 'pc')}
                     className={`w-full aspect-video rounded-xl overflow-hidden border transition-all flex items-center justify-center relative group cursor-pointer ${isDraggingPc
-                      ? 'border-2 border-dashed border-[#0050FF] bg-blue-50/60 ring-2 ring-blue-300'
+                      ? 'border-2 border-dashed border-[#1E60F3] bg-blue-50/60 ring-2 ring-blue-300'
                       : 'border-slate-200 bg-white hover:border-blue-400'
                       }`}
                   >
@@ -804,7 +845,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                   />
                   <button
                     type="button"
-                    disabled={!isDbReady || isUploading === 'pc'}
+                    disabled={!isDbReady || !assetVehicleReady || isUploading === 'pc' || isDeleting}
                     onClick={() => pcInputRef.current?.click()}
                     className="flex-1 py-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-colors cursor-pointer bg-blue-50 hover:bg-blue-100 text-[#1E60F3] disabled:opacity-50"
                   >
@@ -840,8 +881,8 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                       <span>모바일용 세로 카드 (9:16)</span>
                     </span>
                     {bundle?.mobileInfo ? (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-[#0050FF] text-xs font-semibold">
-                        <span className="w-4 h-4 rounded-full bg-[#0050FF] text-white flex items-center justify-center shrink-0">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-[#1E60F3] text-xs font-semibold">
+                        <span className="w-4 h-4 rounded-full bg-[#1E60F3] text-white flex items-center justify-center shrink-0">
                           <Check className="w-2.5 h-2.5 stroke-[2.5]" />
                         </span>
                         <span>등록 완료</span>
@@ -881,7 +922,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                     }}
                     onDrop={(e) => handleDropFile(e, 'info', 'mobile')}
                     className={`w-32 sm:w-36 aspect-[9/16] rounded-2xl border transition-all bg-white relative overflow-hidden flex flex-col group cursor-pointer ${isDraggingMobile
-                      ? 'border-2 border-dashed border-[#0050FF] bg-blue-50/60 ring-2 ring-blue-300'
+                      ? 'border-2 border-dashed border-[#1E60F3] bg-blue-50/60 ring-2 ring-blue-300'
                       : 'border-slate-200 shadow-2xs hover:border-blue-400'
                       }`}
                   >
@@ -938,7 +979,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
                   />
                   <button
                     type="button"
-                    disabled={!isDbReady || isUploading === 'mobile'}
+                    disabled={!isDbReady || !assetVehicleReady || isUploading === 'mobile' || isDeleting}
                     onClick={() => mobileInputRef.current?.click()}
                     className="flex-1 py-2 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-colors cursor-pointer bg-blue-50 hover:bg-blue-100 text-[#1E60F3] disabled:opacity-50"
                   >
@@ -981,6 +1022,30 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
           </button>
         </div>
       </div>
+      {pendingDelete && (
+        <div className="absolute inset-0 z-[90] flex items-center justify-center bg-[#17233B]/25 p-4"
+          role="presentation">
+          <div role="alertdialog" aria-modal="true" aria-label="에셋 삭제 확인"
+            className="w-full max-w-sm rounded-[19px] bg-white p-5 shadow-[0_20px_55px_rgba(35,49,78,0.16)]">
+            <h3 className="text-[15px] font-semibold text-[#243449]">{pendingDelete.label} 삭제</h3>
+            <p className="mt-2 text-[12px] leading-relaxed text-[#697A90]">
+              선택한 파일이 삭제되며 고객에게 표시되지 않을 수 있습니다. 계속하시겠습니까?
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" disabled={isDeleting}
+                onClick={() => setPendingDelete(null)}
+                className="min-h-10 rounded-[12px] bg-[#F4F6FA] px-4 text-[12px] font-semibold text-[#5A6E86] disabled:opacity-50">
+                취소
+              </button>
+              <button type="button" disabled={isDeleting}
+                onClick={() => void confirmDeleteAsset()}
+                className="min-h-10 rounded-[12px] bg-[#A85C54] px-4 text-[12px] font-semibold text-white disabled:opacity-50">
+                {isDeleting ? '삭제 중…' : '파일 삭제'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
