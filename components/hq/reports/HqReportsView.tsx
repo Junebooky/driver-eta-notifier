@@ -1412,6 +1412,10 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                     <tr
                       key={r.id}
                       onClick={() => {
+                        // A ledger row must open the exact report selected, even
+                        // if event-only status/search filters were active earlier.
+                        setStatusFilter("all");
+                        setSearchQuery("");
                         setSelectedReportId(r.id);
                         setActiveSubTab("events");
                       }}
