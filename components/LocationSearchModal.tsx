@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { LocationPreset } from '@/types';
+import type { DriverEventFavorite, DriverEventRoute, DriverEventStop } from '@/utils/driverEventFavorites';
+import { DriverEventFavoritesSection } from '@/components/driver/DriverEventFavoritesSection';
 import {
   sanitizeSearchQuery,
   getCachedTmapPoisClient,
@@ -38,6 +40,11 @@ interface LocationSearchModalProps {
   onClose: () => void;
   target: 'origin' | 'destination' | 'waypoint';
   presets: LocationPreset[];
+  eventFavorites?: DriverEventFavorite[];
+  eventFavoritesLoading?: boolean;
+  eventFavoritesError?: string | null;
+  onRefreshEventFavorites?: () => void;
+  onLoadEventRoute?: (route: DriverEventRoute) => void;
   homeLocation?: { name: string; address: string; lat: number; lng: number } | null;
   currentSelectedId?: string;
   onSelectLocation: (location: SelectedLocationData) => void;
@@ -64,6 +71,11 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
   onClose,
   target,
   presets,
+  eventFavorites = [],
+  eventFavoritesLoading,
+  eventFavoritesError,
+  onRefreshEventFavorites,
+  onLoadEventRoute,
   homeLocation,
   currentSelectedId,
   onSelectLocation,
@@ -88,6 +100,7 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
 
   // Carousel Pagination State
   const [currentPage, setCurrentPage] = useState(0);
+  const [favoriteTab, setFavoriteTab] = useState<'personal' | 'events'>('personal');
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -751,6 +764,22 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
           {/* [태스크 3] '자주 가는 거점 퀵 선택' 캐러셀 & 캡슐형 인디케이터 */}
           {/* ========================================================= */}
           <div className="space-y-2.5">
+            <div role="tablist" aria-label="즐겨찾기 분류" className="flex bg-white rounded-t-[12px]">
+              {([
+                { id: 'personal' as const, label: '내 즐겨찾기' },
+                { id: 'events' as const, label: '배정 행사' },
+              ]).map((tab) => (
+                <button key={tab.id} type="button" role="tab" aria-selected={favoriteTab === tab.id}
+                  onClick={() => { setFavoriteTab(tab.id); haptics.lightTap(); }}
+                  className={`flex-1 border-b-[2.5px] py-3 text-[13px] tracking-tight transition-colors ${favoriteTab === tab.id
+                    ? 'border-[#1E60F3] font-bold text-[#1E60F3]'
+                    : 'border-transparent font-semibold text-[#8290A5] hover:text-[#25344D]'}`}>
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            {favoriteTab === 'personal' ? (
+              <>
             <div className="flex items-center justify-between text-sm sm:text-[15px] font-extrabold text-slate-900 px-1">
               <span>자주 가는 거점 퀵 선택</span>
               {onOpenManagePresets && (
@@ -916,12 +945,38 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
                 />
               ))}
             </div>
+              </>
+            ) : onLoadEventRoute ? (
+              <div role="tabpanel" className="pt-1">
+                <DriverEventFavoritesSection
+                  events={eventFavorites}
+                  isLoading={eventFavoritesLoading}
+                  error={eventFavoritesError}
+                  onRefresh={onRefreshEventFavorites}
+                  onLoadRoute={onLoadEventRoute}
+                  onSelectStop={(stop: DriverEventStop) => {
+                    if (!stop.isPoiConfirmed || typeof stop.lat !== 'number' || typeof stop.lng !== 'number') return;
+                    onSelectLocation({
+                      id: 'event-stop-' + stop.id,
+                      name: stop.name,
+                      shortName: stop.name,
+                      address: stop.address,
+                      lat: stop.lat,
+                      lng: stop.lng,
+                      category: 'CUSTOM',
+                    });
+                    onClose();
+                  }}
+                  compact
+                />
+              </div>
+            ) : null}
           </div>
         </div>
 
         {/* Footer Guidance */}
         <div className="px-5 py-3 bg-[#F6F8FC] border-t border-slate-200/60 text-xs text-slate-400 flex items-center justify-between shrink-0">
-          <span className="font-medium">거점을 터치하면 {isOrigin ? '출발지' : '목적지'}로 즉시 설정됩니다.</span>
+          <span className="font-medium">{favoriteTab === 'events' ? '배정 변경 시 행사 주소도 자동 업데이트됩니다.' : `거점을 터치하면 ${isOrigin ? '출발지' : '목적지'}로 즉시 설정됩니다.`}</span>
           <span className="text-[#0055FF] font-bold">실시간 장소 검색</span>
         </div>
       </div>
