@@ -465,7 +465,7 @@ export const HqDriverAssetManagerModal: React.FC<HqDriverAssetManagerModalProps>
               등록된 활성 차량이 없습니다. 차량 관리에서 먼저 등록해 주세요.
             </div>
           )}
-          {needle}
+          {/* Section 1: Driver Profile Photo (Independent 1-photo per driver) */}
           <div className="bg-slate-50/70 rounded-2xl border border-slate-200/90 p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div>
