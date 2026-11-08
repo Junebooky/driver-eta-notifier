@@ -14,6 +14,8 @@ import { ENABLE_DEV_FLEET_SWITCHER, FLEET_PRESET_DRIVERS } from '@/utils/constan
 import { generateNameCandidates } from '@/utils/nameMatcher';
 import { parseVehicleDetails } from '@/components/ProfileModal';
 import { ensureClientAuth } from '@/utils/cockpitClientAuth';
+import type { DriverEventFavorite, DriverEventRoute } from '@/utils/driverEventFavorites';
+import { DriverEventFavoritesSection } from '@/components/driver/DriverEventFavoritesSection';
 
 const THINKING_STEPS = [
   '🔍 배차 데이터베이스 동선 대조 중...',
@@ -94,6 +96,11 @@ function parseAndValidate8DigitDate(raw: string) {
 
 interface ScheduleTabProps {
   profile: DriverProfile;
+  eventFavorites?: DriverEventFavorite[];
+  eventFavoritesLoading?: boolean;
+  eventFavoritesError?: string | null;
+  onRefreshEventFavorites?: () => void;
+  onLoadEventRoute?: (route: DriverEventRoute) => void;
   onOpenProfileModal: () => void;
   onSelectRouteForCockpit: (origin: LocationPreset, destination: LocationPreset, schedule?: ScheduleItem) => void;
   onOpenPredictionForSchedule: (schedule: ScheduleItem) => void;
@@ -105,6 +112,11 @@ interface ScheduleTabProps {
 
 export const ScheduleTab: React.FC<ScheduleTabProps> = ({
   profile,
+  eventFavorites = [],
+  eventFavoritesLoading,
+  eventFavoritesError,
+  onRefreshEventFavorites,
+  onLoadEventRoute,
   onOpenProfileModal,
   onSelectRouteForCockpit,
   onOpenPredictionForSchedule,
@@ -858,6 +870,19 @@ ${scheduleItemsFormatted}`.trim();
         multiple
         className="hidden"
       />
+
+      {/* Server-synced event itinerary by name and service day. Regular schedule cards remain below. */}
+      {onLoadEventRoute && (eventFavorites.length > 0 || eventFavoritesLoading || eventFavoritesError) && (
+        <div className="mb-4">
+          <DriverEventFavoritesSection
+            events={eventFavorites}
+            isLoading={eventFavoritesLoading}
+            error={eventFavoritesError}
+            onRefresh={onRefreshEventFavorites}
+            onLoadRoute={onLoadEventRoute}
+          />
+        </div>
+      )}
 
       {/* 1. Driver Profile Incomplete Guardrail Banner (Shown at top when profile is missing) */}
       {!hasProfile && (
