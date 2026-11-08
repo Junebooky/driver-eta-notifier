@@ -12,7 +12,7 @@ import {
   saveDriverVehicleInfoAsset,
   validateAssetUpload,
 } from '@/lib/assets/driverAssetServerStore';
-import { resolveVehicleEntity } from '@/utils/vehicleData';
+import { resolveRegisteredFleetVehicle } from '@/lib/fleet/resolveRegisteredVehicle';
 
 export const dynamic = 'force-dynamic';
 
@@ -181,7 +181,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const effVehicle = resolveVehicleEntity(vehicleIdParam || vehiclePlate || '', vehicleModel || undefined);
+      const effVehicle = await resolveRegisteredFleetVehicle(vehicleIdParam || vehiclePlate || '');
 
       let nextVersion = 1;
       try {
