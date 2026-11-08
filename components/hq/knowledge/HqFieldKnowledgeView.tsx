@@ -292,7 +292,7 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
                 <button
                   type="button"
                   onClick={() => openPhotoDialog('cover')}
-                  className="absolute bottom-2.5 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg bg-black/70 hover:bg-black/85 text-white text-[11px] font-bold flex items-center gap-1.5 backdrop-blur-xs transition-all cursor-pointer"
+                  className="absolute bottom-2.5 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg bg-white/95 hover:bg-white text-[#374B66] text-[11px] font-bold flex items-center gap-1.5 backdrop-blur-xs transition-all cursor-pointer"
                 >
                   <Camera className="w-3.5 h-3.5" />
                   <span>대표 이미지 변경</span>
@@ -566,7 +566,7 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
                         photos: (editingItem.photos || []).filter((_, i) => i !== idx),
                       });
                     }}
-                    className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                    className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-white/95 text-[#52647A] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -604,6 +604,48 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
             <span>저장</span>
           </button>
         </div>
+        <HqModal
+          isOpen={deleteDialogOpen}
+          title="현장 지식 삭제"
+          subtitle={editingItem.title}
+          onClose={() => setDeleteDialogOpen(false)}
+          footer={
+            <>
+              <button type="button" onClick={() => setDeleteDialogOpen(false)}
+                className="min-h-10 rounded-[12px] bg-[#F5F7FB] px-4 text-[12px] font-semibold text-[#60728A]">취소</button>
+              <button type="button" onClick={confirmDeleteItem}
+                className="min-h-10 rounded-[12px] bg-[#60728A] px-4 text-[12px] font-semibold text-white">삭제</button>
+            </>
+          }
+        >
+          <p className="text-[12px] leading-relaxed text-[#65758B]">
+            이 기기의 브라우저에서 해당 현장 지식을 삭제합니다. 복구할 수 없으니 확인해 주세요.
+          </p>
+        </HqModal>
+        <HqModal
+          isOpen={photoDialogMode !== null}
+          title={photoDialogMode === 'cover' ? '대표 이미지 변경' : '현장 사진 추가'}
+          subtitle="HTTPS 이미지 주소 또는 앱 이미지 경로를 입력해 주세요."
+          onClose={() => setPhotoDialogMode(null)}
+          footer={
+            <>
+              <button type="button" onClick={() => setPhotoDialogMode(null)}
+                className="min-h-10 rounded-[12px] bg-[#F5F7FB] px-4 text-[12px] font-semibold text-[#60728A]">취소</button>
+              <button type="button" onClick={savePhotoUrl}
+                className="min-h-10 rounded-[12px] bg-[#1E60F3] px-4 text-[12px] font-semibold text-white">적용</button>
+            </>
+          }
+        >
+          <label className="block space-y-1.5 text-[12px] font-semibold text-[#52647A]">
+            <span>이미지 URL</span>
+            <input type="text" value={photoUrlDraft} onChange={event => {
+              setPhotoUrlDraft(event.target.value);
+              setPhotoInputError(null);
+            }} placeholder="https://example.com/photo.jpg"
+              className="w-full rounded-[13px] bg-[#F7F9FC] px-3.5 py-3 text-[12px] text-[#26374E] outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20" />
+          </label>
+          <HqInlineFeedback message={photoInputError} className="mt-2" />
+        </HqModal>
       </div>
     );
   }
@@ -625,10 +667,10 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
 
             {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 (아이콘 근접 시에만 노출, 최상단 레이어) */}
             <div className="absolute bottom-full left-0 mb-2 hidden group-hover/knowledge:flex flex-col items-start pointer-events-none z-[100]">
-              <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+              <span className="whitespace-nowrap rounded-lg bg-white px-2.5 py-1 text-[11px] font-semibold text-[#52647A] shadow-[0_8px_22px_rgba(35,49,78,0.1)] animate-in fade-in-50 duration-150">
                 VIP 의전 현장의 주차장·동선·진입 노하우가 모여있어요
               </span>
-              <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 ml-5 shadow-xs" />
+              <div className="w-2 h-2 bg-white rotate-45 -mt-1 ml-5 shadow-xs" />
             </div>
           </div>
 
@@ -743,7 +785,7 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
                   />
                 )}
                 <div className="absolute top-2.5 left-2.5">
-                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-black/60 text-white backdrop-blur-xs">
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-white/95 text-[#52647A]">
                     {item.categoryBadge || item.category}
                   </span>
                 </div>
