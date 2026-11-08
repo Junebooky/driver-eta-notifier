@@ -32,8 +32,9 @@ async function main(){
     const org='vip_limousine_korea';
     const actor='14f24193-267f-4fe5-9635-392f644cfa04';
     await db.query('INSERT INTO cockpit.schedules(id,org_id,customer_name) VALUES($1,$2,$3)',[schedule,org,'Real Customer']);
-    await db.query("INSERT INTO cockpit.driving_logs(booking_id,organization_id,status,customer_service_start,customer_service_end) VALUES($1,$2,'승인 완료','09:00','21:50')",[schedule,org]);
+    const logInsert=await db.query("INSERT INTO cockpit.driving_logs(booking_id,organization_id,status,customer_service_start,customer_service_end) VALUES($1,$2,'승인 완료','09:00','21:50') RETURNING id",[schedule,org]);
     await db.query("INSERT INTO cockpit.expenses(booking_id,organization_id,status,amount) VALUES($1,$2,'승인 완료',18000)",[schedule,org]);
+    const logOnlyExpense=await db.query("INSERT INTO cockpit.expenses(driving_log_id,organization_id,status,amount) VALUES($1,$2,'승인 완료',5000) RETURNING id",[logInsert.rows[0].id,org]);
     const getHash=async()=> (await db.query('SELECT cockpit.settlement_live_source_hash($1,$2) AS hash',[schedule,org])).rows[0].hash as string;
     const commit=async(action:string,version:number,hash:string,source?:unknown,contract?:unknown,totals?:unknown)=>{
       const result=await db.query(
@@ -43,6 +44,10 @@ async function main(){
       return result.rows[0] as {id:string;version:number;status:string;source_hash:string};
     };
     const hash=await getHash();
+    await db.query('UPDATE cockpit.expenses SET amount=6000 WHERE id=$1',[logOnlyExpense.rows[0].id]);
+    assert.notEqual(await getHash(),hash,'driving-log-only expense must affect the live fingerprint');
+    await db.query('UPDATE cockpit.expenses SET amount=5000 WHERE id=$1',[logOnlyExpense.rows[0].id]);
+    assert.equal(await getHash(),hash);
     const source={serviceVerified:true,approvedLogCount:1,pendingExpenseCount:0};
     const contract={reference:'CONTRACT-123456',laborReference:'LABOR-123456',baseRate:800000};
     const totals={supplyAmount:998000,grandTotal:1097800};
