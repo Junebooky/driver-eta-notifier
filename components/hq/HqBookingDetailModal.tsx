@@ -23,7 +23,10 @@ import { useFleetAvailability } from '@/hooks/useFleetAvailability';
 import { validateDispatchInterval } from '@/utils/dispatchInterval';
 import { createRetryableJsonMutation } from '@/utils/retryableJsonMutation';
 import { haptics } from '@/utils/haptics';
-import { VIP_REAL_VEHICLES, stripManufacturerName } from '@/utils/vehicleData';
+import { getVehicleImage, stripManufacturerName } from '@/utils/vehicleData';
+import { HqDispatchTimeField } from './ui/HqDispatchTimeField';
+import { HqSearchSelect } from './ui/HqSearchSelect';
+import { parseFlexibleTimeInput, formatTimeKoreanAmPm, getDriverProfileImage } from './HqQuickDispatch';
 import { HqDriverVehicleInfoModal } from './bookings/HqDriverVehicleInfoModal';
 import { HqDriverAssetManagerModal } from './drivers/HqDriverAssetManagerModal';
 import { useHqDrivers } from '@/utils/useHqDrivers';
@@ -211,7 +214,7 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
     }
 
     const matchedDriver = fleet.data?.drivers.find(d => d.id === selectedDriverId);
-    const matchedVehicle = VIP_REAL_VEHICLES.find((v) => v.plate === selectedVehiclePlate);
+    const matchedVehicle = fleet.data?.vehicles.find((v) => v.plate === selectedVehiclePlate);
     const resolvedModel =
       matchedVehicle?.model ||
       matchedDriver?.model ||
@@ -496,26 +499,31 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                     onChange={(newDate) => setPickupDate(newDate)}
                     heightClass="h-11"
                   />
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      픽업 시간 <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="time"
-                      value={pickupTime}
-                      onChange={(e) => setPickupTime(e.target.value)}
-                      className="w-full h-11 px-3.5 bg-white border border-slate-200 hover:border-blue-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 rounded-xl text-sm font-bold text-slate-900 shadow-2xs transition-all outline-none cursor-pointer"
-                    />
-                  </div>
+                  <HqDispatchTimeField
+                    label="픽업 시간"
+                    value={pickupTime}
+                    onChange={(next) => { setPickupTime(next); setErrorMsg(null); }}
+                    parseInput={parseFlexibleTimeInput}
+                    formatValue={formatTimeKoreanAmPm}
+                    required
+                    compact
+                    disabled={isCancelled || isSaving}
+                  />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <label className="text-xs font-bold text-slate-700">종료 날짜
-                    <input type="date" aria-label="종료 날짜" value={endDate} onChange={e => setEndDate(e.target.value)} className="mt-1 h-11 w-full rounded-xl border border-slate-200 px-3" />
+                    <input type="date" aria-label="종료 날짜" value={endDate} min={pickupDate || undefined} onChange={e => setEndDate(e.target.value)} className="mt-1 min-h-11 w-full rounded-[13px] bg-[#F7F9FC] px-3 text-[13px] font-semibold text-[#253552] outline-none focus:ring-2 focus:ring-[#1E60F3]/20" />
                   </label>
-                  <label className="text-xs font-bold text-slate-700">실제 종료 시간
-                    <input type="time" aria-label="실제 종료 시간" value={endTime} onChange={e => setEndTime(e.target.value)} className="mt-1 h-11 w-full rounded-xl border border-slate-200 px-3" />
-                  </label>
+                  <HqDispatchTimeField
+                    label="실제 종료 시간"
+                    value={endTime}
+                    onChange={(next) => { setEndTime(next); setErrorMsg(null); }}
+                    parseInput={parseFlexibleTimeInput}
+                    formatValue={formatTimeKoreanAmPm}
+                    compact
+                    disabled={isCancelled || isSaving}
+                  />
                 </div>
                 {fleet.error && <p role="alert" className="text-xs text-red-600">{fleet.error}</p>}
 
@@ -666,48 +674,78 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                   )}
                 </div>
 
-                <div className="space-y-3 pt-1">
+                <div className="grid grid-cols-1 gap-3 pt-1 sm:grid-cols-2">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      담당 기사 선정 (대표님 확인)
-                    </label>
-                    <select
-                      aria-label="담당 기사 배정"
+                    <label className="mb-1.5 block text-[12px] font-semibold text-[#52647A]">담당 기사</label>
+                    <HqSearchSelect
+                      label="담당 기사 배정"
                       value={selectedDriverId}
-                      onChange={(e) => { setSelectedDriverId(e.target.value); setSelectedDriverName(fleet.data?.drivers.find(d => d.id === e.target.value)?.name || ''); }}
-                      disabled={isCancelled || !fleet.data}
-                      className="w-full h-11 px-3.5 rounded-xl border border-slate-200 hover:border-blue-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 bg-white text-sm font-bold text-slate-900 shadow-2xs cursor-pointer outline-none"
-                    >
-                      <option value="">-- 기사 미배정 (배차 대기함) --</option>
-                      {fleet.data?.drivers.map(driver => (
-                        <option key={driver.id} value={driver.id} disabled={!driver.isAvailable || (booking.requestedLanguage === 'en' && !driver.isEnglishVerified)}>
-                          {driver.name} · {driver.phone}{driver.isAvailable ? '' : ' (배차 불가)'}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      투입 차량 선정 (실제 보유 20대)
-                    </label>
-                    <select
-                      aria-label="배정 차량"
-                      value={selectedVehiclePlate}
-                      onChange={(e) => {
+                      onChange={(next) => {
+                        setSelectedDriverId(next);
+                        setSelectedDriverName(fleet.data?.drivers.find(driver => driver.id === next)?.name || '');
                         setErrorMsg(null);
-                        setSelectedVehiclePlate(e.target.value);
                       }}
-                      disabled={isCancelled || !fleet.data}
-                      className="w-full h-11 px-3.5 rounded-xl border border-slate-200 hover:border-blue-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 bg-white text-sm font-bold text-slate-900 shadow-2xs cursor-pointer outline-none"
-                    >
-                      <option value="">-- 차량 미배정 --</option>
-                      {fleet.data?.vehicles.map((v) => (
-                        <option key={v.id} value={v.plate} disabled={!v.isAvailable}>
-                          {v.plate} · {stripManufacturerName(v.model)} · {VEHICLE_STATUS_LABELS[v.currentStatus]}
-                        </option>
-                      ))}
-                    </select>
+                      options={[
+                        ...(selectedDriverId && !fleet.data?.drivers.some(driver => driver.id === selectedDriverId)
+                          ? [{
+                              value: selectedDriverId, label: selectedDriverName || booking.driverName || '기존 담당 기사',
+                              status: '현재 명단에 없음', disabled: true,
+                              imageSrc: getDriverProfileImage({ name: selectedDriverName || booking.driverName }),
+                            }] : []),
+                        ...(fleet.data?.drivers || []).map(driver => ({
+                          value: driver.id,
+                          label: driver.name,
+                          subtitle: driver.phone || '연락처 미등록',
+                          imageSrc: getDriverProfileImage({ name: driver.name }),
+                          status: !driver.isAvailable
+                            ? driver.unavailabilityReason || '배차 불가'
+                            : booking.requestedLanguage === 'en' && !driver.isEnglishVerified
+                              ? '영어 확인 필요' : '배차 가능',
+                          disabled: !driver.isAvailable ||
+                            (booking.requestedLanguage === 'en' && !driver.isEnglishVerified),
+                        })),
+                      ]}
+                      placeholder="담당 기사 선택"
+                      emptyLabel="기사 미배정"
+                      disabled={isCancelled || isSaving || !fleet.data}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-[12px] font-semibold text-[#52647A]">배정 차량</label>
+                    <HqSearchSelect
+                      label="배정 차량"
+                      value={selectedVehiclePlate}
+                      onChange={(next) => { setSelectedVehiclePlate(next); setErrorMsg(null); }}
+                      options={[
+                        ...(selectedVehiclePlate && !fleet.data?.vehicles.some(v => v.plate === selectedVehiclePlate)
+                          ? [{
+                              value: selectedVehiclePlate,
+                              label: booking.vehicleModel || '기존 배정 차량',
+                              subtitle: selectedVehiclePlate, status: '현재 등록부에 없음',
+                              imageSrc: getVehicleImage({ plate: selectedVehiclePlate, model: booking.vehicleModel }),
+                              disabled: true,
+                            }] : []),
+                        ...(fleet.data?.vehicles || []).map(v => ({
+                          value: v.plate,
+                          label: stripManufacturerName(v.model),
+                          subtitle: v.plate,
+                          imageSrc: getVehicleImage({ plate: v.plate, model: v.model }),
+                          status: v.isAvailable ? VEHICLE_STATUS_LABELS[v.currentStatus] : v.unavailabilityReason || '배차 불가',
+                          disabled: !v.isAvailable,
+                          category: v.uiCategory,
+                        })),
+                      ]}
+                      placeholder="배정 차량 선택"
+                      emptyLabel="차량 미배정"
+                      imageShape="vehicle"
+                      categoryOptions={[
+                        { value: 'sedan', label: '세단' },
+                        { value: 'suv', label: 'SUV' },
+                        { value: 'van', label: '밴' },
+                        { value: 'sprinter', label: '스프린터' },
+                      ]}
+                      disabled={isCancelled || isSaving || !fleet.data}
+                    />
                   </div>
                 </div>
 

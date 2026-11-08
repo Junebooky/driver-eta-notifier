@@ -1,18 +1,16 @@
 'use client';
 
 import React from 'react';
-import {
-  Calendar,
-  ChevronDown,
-  Search,
-  X,
-} from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import { HqDrivingLogStatus } from '@/types/drivingLogHq';
+import { HqDateRangePicker } from '@/components/hq/ui/HqDateRangePicker';
+import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
+import { type HqDateRange } from '@/utils/hqDateRange';
 import { haptics } from '@/utils/haptics';
 
 export interface HqDrivingLogsFilterBarProps {
-  dateRange: string;
-  onSelectDateRange?: () => void;
+  dateRange: HqDateRange;
+  onChangeDateRange: (range: HqDateRange) => void;
   driverOptions: string[];
   selectedDriver: string;
   onSelectDriver: (driver: string) => void;
@@ -29,176 +27,50 @@ export interface HqDrivingLogsFilterBarProps {
   onExportExcel: () => void;
 }
 
+/** The same A-plan date and searchable filter controls are shared with HQ booking views. */
 export const HqDrivingLogsFilterBar: React.FC<HqDrivingLogsFilterBarProps> = ({
-  dateRange,
-  onSelectDateRange,
-  driverOptions,
-  selectedDriver,
-  onSelectDriver,
-  vehicleOptions,
-  selectedVehicle,
-  onSelectVehicle,
-  customerOptions,
-  selectedCustomer,
-  onSelectCustomer,
-  selectedStatus,
-  onSelectStatus,
-  searchQuery,
-  onSearchChange,
-  onExportExcel,
+  dateRange, onChangeDateRange, driverOptions, selectedDriver, onSelectDriver,
+  vehicleOptions, selectedVehicle, onSelectVehicle,
+  customerOptions, selectedCustomer, onSelectCustomer,
+  selectedStatus, onSelectStatus, searchQuery, onSearchChange, onExportExcel,
 }) => {
   return (
-    <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        {/* Left Side: Filter Selectors */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/* 1. Date Range Picker Button */}
-          <button
-            type="button"
-            onClick={() => {
-              haptics.lightTap();
-              onSelectDateRange?.();
-            }}
-            className="flex items-center gap-2 px-3 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200/90 rounded-xl text-xs font-bold text-slate-700 transition-all cursor-pointer shadow-2xs"
-            title="날짜 범위 선택"
-          >
-            <Calendar className="w-3.5 h-3.5 text-[#1E60F3]" />
-            <span>{dateRange}</span>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-0.5" />
-          </button>
-
-          {/* 2. 기사명 Select */}
-          <div className="relative">
-            <select
-              value={selectedDriver}
-              onChange={(e) => {
-                haptics.selection();
-                onSelectDriver(e.target.value);
-              }}
-              className="appearance-none pl-3 pr-8 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200/90 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-[#1E60F3] cursor-pointer transition-all shadow-2xs"
-            >
-              <option value="전체">기사명 전체</option>
-              {driverOptions.map((driver) => (
-                <option key={driver} value={driver}>
-                  {driver}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
-
-          {/* 3. 차량 Select */}
-          <div className="relative">
-            <select
-              value={selectedVehicle}
-              onChange={(e) => {
-                haptics.selection();
-                onSelectVehicle(e.target.value);
-              }}
-              className="appearance-none pl-3 pr-8 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200/90 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-[#1E60F3] cursor-pointer transition-all shadow-2xs"
-            >
-              <option value="전체">차량 전체</option>
-              {vehicleOptions.map((v) => (
-                <option key={v} value={v}>
-                  {v}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
-
-          {/* 4. 고객사 Select */}
-          <div className="relative">
-            <select
-              value={selectedCustomer}
-              onChange={(e) => {
-                haptics.selection();
-                onSelectCustomer(e.target.value);
-              }}
-              className="appearance-none pl-3 pr-8 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200/90 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-[#1E60F3] cursor-pointer transition-all shadow-2xs"
-            >
-              <option value="전체">고객사 전체</option>
-              {customerOptions.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
-
-          {/* 5. 상태 Select */}
-          <div className="relative">
-            <select
-              value={selectedStatus}
-              onChange={(e) => {
-                haptics.selection();
-                onSelectStatus(e.target.value as HqDrivingLogStatus | '전체');
-              }}
-              className="appearance-none pl-3 pr-8 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200/90 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-[#1E60F3] cursor-pointer transition-all shadow-2xs"
-            >
-              <option value="전체">상태 전체</option>
-              <option value="draft">진행 중 (초안)</option>
-              <option value="검토 대기">검토 대기</option>
-              <option value="검토 중">검토 중</option>
-              <option value="승인 완료">승인 완료</option>
-              <option value="보완 필요">보완 필요</option>
-              <option value="반려">반려</option>
-            </select>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
+    <div className="space-y-3 rounded-[19px] bg-white p-4 shadow-[0_5px_18px_rgba(35,49,78,0.045)]">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <HqDateRangePicker value={dateRange} onChange={onChangeDateRange} label="운행일지" />
+          <HqSearchSelect label="기사 필터" size="sm" value={selectedDriver} onChange={value => { haptics.selection(); onSelectDriver(value); }}
+            placeholder="기사명 전체" options={[{ value: '전체', label: '기사명 전체' },
+              ...driverOptions.map(name => ({ value: name, label: name }))]} />
+          <HqSearchSelect label="차량 필터" size="sm" value={selectedVehicle} onChange={value => { haptics.selection(); onSelectVehicle(value); }}
+            placeholder="차량 전체" options={[{ value: '전체', label: '차량 전체' },
+              ...vehicleOptions.map(name => ({ value: name, label: name }))]} />
+          <HqSearchSelect label="고객사 필터" size="sm" value={selectedCustomer} onChange={value => { haptics.selection(); onSelectCustomer(value); }}
+            placeholder="고객사 전체" options={[{ value: '전체', label: '고객사 전체' },
+              ...customerOptions.map(name => ({ value: name, label: name }))]} />
+          <HqSearchSelect label="운행일지 상태 필터" size="sm" value={selectedStatus} onChange={value => { haptics.selection(); onSelectStatus(value as HqDrivingLogStatus | '전체'); }}
+            placeholder="상태 전체" options={[
+              { value: '전체', label: '상태 전체' }, { value: 'draft', label: '진행 중 (초안)' },
+              { value: '검토 대기', label: '검토 대기' }, { value: '검토 중', label: '검토 중' },
+              { value: '승인 완료', label: '승인 완료' }, { value: '보완 필요', label: '보완 필요' },
+              { value: '반려', label: '반려' },
+            ]} />
         </div>
-
-        {/* Right Side: Search Input & Excel Export */}
-        <div className="flex items-center gap-2.5 w-full sm:w-auto">
-          {/* Search Box */}
-          <div className="relative flex-1 sm:w-64">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="고객명, 기사명, 차량번호로 검색..."
-              className="w-full pl-8 pr-7 py-2 bg-slate-50 hover:bg-slate-100 focus:bg-white border border-slate-200/90 rounded-xl text-xs font-semibold text-slate-800 placeholder:text-slate-400 outline-none focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 transition-all shadow-2xs"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => onSearchChange('')}
-                className="w-4 h-4 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 flex items-center justify-center absolute right-2.5 top-1/2 -translate-y-1/2 cursor-pointer transition-colors"
-              >
-                <X className="w-2.5 h-2.5" />
-              </button>
-            )}
+        <div className="flex w-full items-center gap-2 sm:w-auto">
+          <div className="relative min-w-0 flex-1 sm:w-60">
+            <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#94A1B2]" />
+            <input type="search" value={searchQuery} onChange={event => onSearchChange(event.target.value)}
+              placeholder="고객명, 기사명, 차량번호 검색"
+              aria-label="운행일지 검색"
+              className="min-h-10 w-full rounded-[13px] bg-[#F7F9FC] py-2 pl-9 pr-8 text-[12px] font-medium text-[#253552] outline-none placeholder:text-[#A2AEBD] focus:bg-white focus:ring-2 focus:ring-[#1E60F3]/15" />
+            {searchQuery && <button type="button" aria-label="검색어 지우기" onClick={() => onSearchChange('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#94A1B2]"><X size={13}/></button>}
           </div>
-
-          {/* 엑셀 내보내기 Button & Tooltip */}
-          <div className="relative group/excel shrink-0 flex items-center">
-            <button
-              type="button"
-              onClick={() => {
-                haptics.success();
-                onExportExcel();
-              }}
-              className="p-1 rounded-xl hover:bg-slate-100/90 transition-all cursor-pointer active:scale-95 flex items-center justify-center"
-              aria-label="엑셀파일로 내보내기"
-            >
-              <img
-                src="/images/icons/icon_excel.png"
-                alt="엑셀"
-                className="w-8 h-8 object-contain shrink-0 transition-transform duration-150 group-hover/excel:scale-110 drop-shadow-2xs"
-              />
-            </button>
-
-            {/* 마우스 호버 말풍선 Tooltip: 위로 향하는 블랙 말풍선 규격 (최상단 레이어) */}
-            <div className="absolute right-0 bottom-full mb-2 hidden group-hover/excel:flex flex-col items-end pointer-events-none z-[100]">
-              <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
-                운행일지 목록을 엑셀로 내보내요
-              </span>
-              {/* 말풍선 꼬리표 화살표 */}
-              <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 mr-3.5 shadow-xs" />
-            </div>
-          </div>
+          <button type="button" onClick={onExportExcel}
+            aria-label="필터링된 운행일지 Excel 다운로드" title="화면에 표시된 필터 결과만 다운로드"
+            className="flex size-10 shrink-0 items-center justify-center rounded-[13px] bg-[#F7F9FC] transition-colors hover:bg-[#EEF2F8]">
+            <img src="/images/icons/icon_excel.png" alt="" className="size-7 object-contain"/>
+          </button>
         </div>
       </div>
     </div>
