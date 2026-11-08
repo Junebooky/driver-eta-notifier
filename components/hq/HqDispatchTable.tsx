@@ -989,7 +989,7 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
                           const isSelected = vehicleFilter === v.plate;
                           return (
                             <button
-                              key={v.id}
+                              key={v.plate}
                               type="button"
                               onClick={() => {
                                 haptics.lightTap();
