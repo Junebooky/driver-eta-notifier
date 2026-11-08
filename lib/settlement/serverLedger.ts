@@ -156,7 +156,7 @@ export async function loadSettlementSource(scheduleId: string): Promise<{ source
   const before = await readHash();
   const [s, l] = await Promise.all([
     supabaseAdmin.from('schedules')
-      .select('id,org_id,date,customer_name,event_name,vehicle_model,vehicle_plate,driver_name,driver_id')
+      .select('id,org_id,date,customer_name,event_name,vehicle_model,vehicle_plate,driver_name,driver_id,schedule_meta')
       .eq('id', scheduleId).maybeSingle(),
     supabaseAdmin.from('driving_logs')
       .select('id,booking_id,driver_id,status,customer_service_start,customer_service_end')
@@ -182,10 +182,18 @@ export async function loadSettlementSource(scheduleId: string): Promise<{ source
   const serviceVerified = Boolean(log && SETTLEMENT_APPROVED.has(log.status) &&
     serviceMinutes !== null && (!s.data.driver_id || !log.driver_id || s.data.driver_id === log.driver_id));
   const approved = expenses.filter(x => SETTLEMENT_APPROVED.has(x.status));
+  const metadata = (s.data.schedule_meta && typeof s.data.schedule_meta === 'object' &&
+    !Array.isArray(s.data.schedule_meta) ? s.data.schedule_meta : {}) as Record<string,unknown>;
+  const firstReal = (column:unknown, fallback:unknown) =>
+    typeof column==='string' && column.trim() ? column.trim() :
+      typeof fallback==='string' && fallback.trim() ? fallback.trim() : '';
   const source: SettlementSource = {
-    scheduleId, serviceDate: s.data.date || '', customerName: s.data.customer_name || '미등록 고객사',
-    eventName: s.data.event_name || '', vehicleModel: s.data.vehicle_model || '',
-    vehiclePlate: s.data.vehicle_plate || '', driverName: s.data.driver_name || '',
+    scheduleId, serviceDate: s.data.date || '',
+    customerName: firstReal(s.data.customer_name,metadata.customerName) || '미등록 고객사',
+    eventName: firstReal(s.data.event_name,metadata.eventName),
+    vehicleModel: firstReal(s.data.vehicle_model,metadata.vehicleModel),
+    vehiclePlate: firstReal(s.data.vehicle_plate,metadata.vehiclePlate),
+    driverName: firstReal(s.data.driver_name,metadata.driverName),
     startTime: start, endTime: end, serviceMinutes, serviceVerified,
     approvedLogCount: logs.filter(x => SETTLEMENT_APPROVED.has(x.status)).length,
     pendingExpenseCount: expenses.filter(x => !SETTLEMENT_APPROVED.has(x.status) && !SETTLEMENT_REJECTED.has(x.status)).length,
