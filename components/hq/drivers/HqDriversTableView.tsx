@@ -28,6 +28,7 @@ import { haptics } from '@/utils/haptics';
 import { formatPhoneNumber } from '@/utils/formatters';
 import { getKstTodayDateStr } from '@/utils/dispatchConflictDetector';
 import { HqDriverEditModal } from './HqDriverEditModal';
+import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
 
 export interface HqDriversTableViewProps {
   onSelectDriver: (driverId: string) => void;
@@ -293,41 +294,42 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
             )}
           </div>
 
-          {/* Status Dropdown */}
-          <div className="relative">
-            <select
+          {/* Searchable HQ-standard status & region filters */}
+          <div className="min-w-[155px]">
+            <HqSearchSelect
+              label="기사 운행 상태 필터"
+              size="sm"
               value={statusFilter}
-              onChange={(e) => {
-                setStatusFilter(e.target.value as any);
+              onChange={next => {
+                setStatusFilter(next as typeof statusFilter);
                 setCurrentPage(1);
               }}
-              className="h-11 cursor-pointer appearance-none rounded-[14px] bg-white px-3 pr-8 text-[12px] font-medium text-[#4D607C] shadow-[0_4px_14px_rgba(35,49,78,0.045)] outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20"
-            >
-              <option value="all">운행 상태 전체</option>
-              <option value="available">운행 가능</option>
-              <option value="driving">운행 중</option>
-              <option value="off">휴무</option>
-            </select>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+              placeholder="운행 상태 전체"
+              options={[
+                { value: 'all', label: '운행 상태 전체' },
+                { value: 'available', label: '운행 가능' },
+                { value: 'driving', label: '운행 중' },
+                { value: 'off', label: '휴무' },
+              ]}
+            />
           </div>
-
-          {/* Residence Filter Dropdown */}
-          <div className="relative flex items-center">
-            <MapPin className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
-            <select
+          <div className="min-w-[155px]">
+            <HqSearchSelect
+              label="기사 거주 지역 필터"
+              size="sm"
               value={residenceFilter}
-              onChange={(e) => {
-                setResidenceFilter(e.target.value);
+              onChange={next => {
+                setResidenceFilter(next);
                 setCurrentPage(1);
               }}
-              className="h-11 cursor-pointer appearance-none rounded-[14px] bg-white pl-8 pr-8 text-[12px] font-medium text-[#4D607C] shadow-[0_4px_14px_rgba(35,49,78,0.045)] outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20"
-            >
-              <option value="all">거주 지역 전체</option>
-              <option value="서울">서울 권역</option>
-              <option value="경기">경기 권역</option>
-              <option value="인천">인천 권역</option>
-            </select>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 pointer-events-none" />
+              placeholder="거주 지역 전체"
+              options={[
+                { value: 'all', label: '거주 지역 전체' },
+                { value: '서울', label: '서울 권역' },
+                { value: '경기', label: '경기 권역' },
+                { value: '인천', label: '인천 권역' },
+              ]}
+            />
           </div>
         </div>
 
