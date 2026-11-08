@@ -621,9 +621,10 @@ export async function getDriverVehicleBundle(
   driverId: string,
   vehiclePlateOrId: string,
   fallbackModel?: string,
-  org: string = DEFAULT_ORG
+  org: string = DEFAULT_ORG,
+  registeredVehicle?: ReturnType<typeof resolveVehicleEntity>,
 ): Promise<DriverVehicleAssetBundle> {
-  const veh = resolveVehicleEntity(vehiclePlateOrId, fallbackModel);
+  const veh = registeredVehicle || resolveVehicleEntity(vehiclePlateOrId, fallbackModel);
   const [profile, pcInfo, mobileInfo] = await Promise.all([
     getDriverProfileAsset(driverId, org),
     getDriverVehicleInfoAsset(driverId, veh.uuid, 'pc', org),
