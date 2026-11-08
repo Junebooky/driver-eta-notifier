@@ -21,6 +21,7 @@ import {
 import { getHqExpenses, importReconciledHipassTolls } from '@/utils/expenseHqStorage';
 import { getHqDrivingLogs } from '@/utils/drivingLogHqStorage';
 import { VIP_REAL_VEHICLES } from '@/utils/vehicleData';
+import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
 
 interface HqHipassImportModalProps {
   isOpen: boolean;
@@ -546,20 +547,20 @@ export default function HqHipassImportModal({
                                   <AlertTriangle className="h-3 w-3" />
                                   {item.matchStatusLabel}
                                 </span>
-                                <select
+                                <HqSearchSelect
+                                  label={`하이패스 거래 ${item.hipassTxKey} 예약 연결`}
+                                  size="sm"
                                   value={item.matchedScheduleId || ''}
-                                  onChange={(e) =>
-                                    handleSelectCandidateSchedule(item.hipassTxKey, e.target.value)
-                                  }
-                                  className="block w-full rounded border border-indigo-200 bg-indigo-50/50 px-2 py-1 text-[11px] font-bold text-slate-800"
-                                >
-                                  <option value="">연결할 배차 선택...</option>
-                                  {item.candidateSchedules.map((cand) => (
-                                    <option key={cand.scheduleId} value={cand.scheduleId}>
-                                      [{cand.pickupTime}] {cand.customerName} ({cand.route})
-                                    </option>
-                                  ))}
-                                </select>
+                                  onChange={(next) => handleSelectCandidateSchedule(item.hipassTxKey, next)}
+                                  placeholder="연결할 배차 선택"
+                                  emptyLabel="배차 미지정"
+                                  options={item.candidateSchedules.map(cand => ({
+                                    value: cand.scheduleId,
+                                    label: `[${cand.pickupTime}] ${cand.customerName}`,
+                                    subtitle: cand.route,
+                                  }))}
+                                  disabled={submitting}
+                                />
                               </div>
                             ) : (
                               <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
