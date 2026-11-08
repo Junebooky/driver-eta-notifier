@@ -19,7 +19,7 @@ async function main(){
       'CREATE TABLE cockpit.schedules(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), org_id text, customer_name text);',
       'CREATE TABLE cockpit.driving_logs(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), booking_id uuid,',
       ' organization_id text, status text, customer_service_start time, customer_service_end time);',
-      'CREATE TABLE cockpit.expenses(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), booking_id uuid,',
+      'CREATE TABLE cockpit.expenses(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), booking_id uuid, driving_log_id uuid,',
       ' organization_id text, status text, amount integer);',
     ].join('\n'));
     const migration=readFileSync('supabase/migrations/20261108163000_server_settlement_ledger.sql','utf8');
