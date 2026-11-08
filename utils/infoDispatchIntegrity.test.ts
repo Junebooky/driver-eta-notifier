@@ -24,6 +24,24 @@ test('Info records require the current server assignment, explicit manual eviden
   };
   let failUpdate = false, concurrentUpdate = false, writes = 0;
   supabaseAdmin.from = ((table: string) => {
+    if (table === 'vehicles') {
+      // New real-fleet resolver: this fixture must model the registered
+      // physical vehicle UUID, not allow static fallback in production code.
+      const physical = {
+        id: car.uuid, organization_id: org, plate: car.plate, plate_short: car.plateShort,
+        model: car.model, model_short: car.modelShort, brand: car.brand,
+        category: car.category, category_label: car.categoryLabel,
+        sub_type: car.subType, capacity: car.capacity, fuel_type: car.fuelType,
+        status: 'available', archived: false, profile: { id: car.id },
+      };
+      const query = {
+        select: () => query,
+        eq: (_name: string, value: unknown) => Promise.resolve({
+          data: value === org ? [physical] : [], error: null,
+        }),
+      };
+      return query;
+    }
     assert.equal(table, 'schedules');
     const filters: Array<[string, unknown]> = [];
     let patch: Record<string, unknown> | undefined;
