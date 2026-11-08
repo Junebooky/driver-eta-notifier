@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Users,
   ChevronLeft,
@@ -25,6 +25,8 @@ import { formatPhoneNumber } from '@/utils/formatters';
 import { HqDriverAssetManagerModal } from './HqDriverAssetManagerModal';
 import { HqDriverEditModal } from './HqDriverEditModal';
 import { getKstTodayDateStr } from '@/utils/dispatchConflictDetector';
+import { HqTextarea } from '@/components/hq/ui';
+import { HqInlineFeedback } from '@/components/hq/ui/HqInlineFeedback';
 
 interface HqDriverDetailSplitViewProps {
   selectedDriverId: string;
@@ -62,6 +64,8 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
   const [isEditingMemo, setIsEditingMemo] = useState(false);
   const [isSavingMemo, setIsSavingMemo] = useState(false);
   const [memoDraft, setMemoDraft] = useState('');
+  const [memoError, setMemoError] = useState<string | null>(null);
+  const currentDriverIdRef = useRef<string | null>(null);
   const [weekOffset, setWeekOffset] = useState<number>(0);
   const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -73,6 +77,14 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
   const activeDriver = useMemo(() => {
     return drivers.find((d) => d.id === selectedDriverId) || drivers[0] || null;
   }, [drivers, selectedDriverId]);
+
+  // Avoid saving an open memo draft against a different driver after switching.
+  useEffect(() => {
+    currentDriverIdRef.current = activeDriver?.id || null;
+    setIsEditingMemo(false);
+    setMemoDraft('');
+    setMemoError(null);
+  }, [activeDriver?.id]);
 
   // Synchronize and fetch profile photo whenever active driver changes
   useEffect(() => {
@@ -115,19 +127,29 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
 
   const handleStartEditMemo = () => {
     setMemoDraft(currentMemo);
+    setMemoError(null);
     setIsEditingMemo(true);
   };
 
   const handleSaveMemo = async () => {
-    if (!activeDriver) return;
+    if (!activeDriver || isSavingMemo) return;
+    const targetDriverId = activeDriver.id;
+    setMemoError(null);
     setIsSavingMemo(true);
     try {
-      const ok = await updateDriver(activeDriver.id, { memo: memoDraft });
-      if (ok) {
-        setIsEditingMemo(false);
-        haptics.success();
-      } else {
-        alert('메모 저장에 실패했습니다.');
+      const ok = await updateDriver(targetDriverId, { memo: memoDraft });
+      if (currentDriverIdRef.current !== targetDriverId) return;
+      if (!ok) {
+        haptics.errorAlert();
+        setMemoError('메모를 서버에 저장하지 못했습니다. 다시 시도해 주세요.');
+        return;
+      }
+      setIsEditingMemo(false);
+      haptics.success();
+    } catch (err) {
+      if (currentDriverIdRef.current === targetDriverId) {
+        haptics.errorAlert();
+        setMemoError(err instanceof Error ? err.message : '메모 저장 중 네트워크 오류가 발생했습니다.');
       }
     } finally {
       setIsSavingMemo(false);
@@ -694,18 +716,19 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
 
             {isEditingMemo ? (
               <div className="space-y-2">
-                <textarea
+                <HqInlineFeedback message={memoError} onDismiss={() => setMemoError(null)} />
+                <HqTextarea
                   value={memoDraft}
                   onChange={(e) => setMemoDraft(e.target.value)}
                   rows={3}
                   placeholder="기사 특이사항, 의전 스타일, 비고 등..."
-                  className="w-full p-2.5 text-xs font-medium text-slate-800 bg-white border border-blue-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs leading-relaxed"
+                  className="w-full min-h-24 text-xs font-medium leading-relaxed"
                 />
                 <button
                   type="button"
                   onClick={handleSaveMemo}
                   disabled={isSavingMemo}
-                  className="w-full py-1.5 rounded-lg bg-[#0050FF] text-white text-xs font-bold shadow-2xs hover:bg-blue-700 disabled:opacity-50 transition-colors cursor-pointer flex items-center justify-center gap-1"
+                  className="w-full min-h-10 rounded-[12px] bg-[#1E60F3] text-white text-xs font-semibold disabled:opacity-50 transition-colors cursor-pointer flex items-center justify-center gap-1"
                 >
                   {isSavingMemo ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -723,7 +746,7 @@ export const HqDriverDetailSplitView: React.FC<HqDriverDetailSplitViewProps> = (
               <button
                 type="button"
                 onClick={handleStartEditMemo}
-                className="text-xs text-[#0050FF] hover:underline font-semibold flex items-center gap-1 py-1 cursor-pointer"
+                className="text-xs text-[#1E60F3] hover:underline font-semibold flex items-center gap-1 py-1 cursor-pointer"
               >
                 + 메모 추가하기
               </button>
