@@ -1,4 +1,5 @@
 import type { ScheduleItem } from '@/data/ferrariSchedules';
+import type { LocationPreset } from '@/types';
 
 /** An immutable, server-derived snapshot. It is NOT a user-editable preset. */
 export interface DriverEventStop {
@@ -137,4 +138,22 @@ export function buildDriverEventFavorites(
     }))
     .sort((a, b) =>
       a.days[0].date.localeCompare(b.days[0].date) || a.name.localeCompare(b.name));
+}
+
+/** Return a full navigation package only if every stop has a verified POI. */
+export function eventRouteToPresets(
+  route: DriverEventRoute,
+): { origin: LocationPreset; destination: LocationPreset; waypoints: LocationPreset[] } | null {
+  if (!route.ready || !route.fullItinerary || route.stops.length < 2 ||
+      !route.stops.every(stop => stop.isPoiConfirmed && validCoordinate(stop.lat, stop.lng))) return null;
+  const items: LocationPreset[] = route.stops.map((stop, index) => ({
+    id: `event-${route.scheduleId}-${index}`,
+    name: stop.name,
+    shortName: stop.name,
+    address: stop.address,
+    lat: stop.lat!,
+    lng: stop.lng!,
+    category: 'CUSTOM',
+  }));
+  return { origin: items[0], destination: items[items.length - 1], waypoints: items.slice(1, -1) };
 }
