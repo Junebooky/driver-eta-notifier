@@ -33,6 +33,10 @@ import {
 } from '@/utils/fieldKnowledgeData';
 import { haptics } from '@/utils/haptics';
 import { formatPhoneNumber } from '@/utils/formatters';
+import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
+import { HqModal } from '@/components/hq/ui/HqModal';
+import { HqInlineFeedback } from '@/components/hq/ui/HqInlineFeedback';
+import { isValidFieldKnowledgeImageUrl } from '@/utils/hqKnowledgeImageUrl';
 
 export interface HqFieldKnowledgeViewProps {
   initialSearchQuery?: string;
@@ -65,6 +69,11 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
 
   // Toast feedback state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [feedbackTone, setFeedbackTone] = useState<'info' | 'error'>('info');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [photoDialogMode, setPhotoDialogMode] = useState<'cover' | 'photo' | null>(null);
+  const [photoUrlDraft, setPhotoUrlDraft] = useState('');
+  const [photoInputError, setPhotoInputError] = useState<string | null>(null);
 
   // Sync listener for cross-tab or external changes
   useEffect(() => {
@@ -75,11 +84,9 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
     return () => window.removeEventListener(FIELD_KNOWLEDGE_CHANGE_EVENT, handleUpdate);
   }, []);
 
-  const showToast = (msg: string) => {
+  const showToast = (msg: string, tone: 'info' | 'error' = 'info') => {
+    setFeedbackTone(tone);
     setToastMessage(msg);
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 2800);
   };
 
   // Filtered Items
@@ -125,7 +132,7 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
       category: '호텔',
       categoryBadge: '호텔',
       description: '',
-      imageUrl: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80',
+      imageUrl: '/images/icons/knowledge/icon_knowledge.png',
       photos: [],
       address: '',
       phone: '',
@@ -145,51 +152,73 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
     setCurrentView('edit');
   };
 
-  // Handle Save
+  // Truthful persistence: these records are browser-local until a real server sync exists.
   const handleSaveItem = () => {
     if (!editingItem) return;
     if (!editingItem.title.trim()) {
       haptics.errorAlert();
-      showToast('장소명은 필수 입력 항목입니다.');
+      showToast('장소명을 입력해 주세요.', 'error');
       return;
     }
-
-    haptics.success();
-    saveFieldKnowledgeItem(editingItem);
-    setItems(getStoredFieldKnowledge());
-    showToast(`'${editingItem.title}' 현장 지식이 성공적으로 저장되었습니다.`);
-    setCurrentView('list');
-    setEditingItem(null);
-  };
-
-  // Handle Delete (with strict neutral gray button per user instruction)
-  const handleDeleteItem = () => {
-    if (!editingItem) return;
-    const confirmDelete = window.confirm(`'${editingItem.title}' 현장 지식을 정말 삭제하시겠습니까?`);
-    if (!confirmDelete) return;
-
-    haptics.mediumTap();
-    deleteFieldKnowledgeItem(editingItem.id);
-    setItems(getStoredFieldKnowledge());
-    showToast(`'${editingItem.title}' 현장 지식이 삭제되었습니다.`);
-    setCurrentView('list');
-    setEditingItem(null);
-  };
-
-  // Handle Change Cover Image URL
-  const handleChangeImageUrl = () => {
-    if (!editingItem) return;
-    const newUrl = window.prompt(
-      '새 대표 이미지 URL을 입력해 주세요 (웹 주소):',
-      editingItem.imageUrl
-    );
-    if (newUrl && newUrl.trim()) {
-      setEditingItem({
-        ...editingItem,
-        imageUrl: newUrl.trim(),
-      });
-      showToast('대표 이미지가 변경되었습니다.');
+    if (!isValidFieldKnowledgeImageUrl(editingItem.imageUrl) ||
+        (editingItem.photos || []).some(url => !isValidFieldKnowledgeImageUrl(url))) {
+      showToast('이미지 주소는 유효한 HTTPS 주소 또는 앱 내부 이미지 경로여야 합니다.', 'error');
+      return;
     }
+    if (!saveFieldKnowledgeItem(editingItem)) {
+      haptics.errorAlert();
+      showToast('이 기기에 저장하지 못했습니다. 브라우저 저장 공간 및 설정을 확인해 주세요.', 'error');
+      return;
+    }
+    haptics.success();
+    setItems(getStoredFieldKnowledge());
+    showToast(`'${editingItem.title}' 현장 지식을 이 브라우저에 저장했습니다.`);
+    setCurrentView('list');
+    setEditingItem(null);
+  };
+
+  const handleDeleteItem = () => {
+    if (editingItem) setDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteItem = () => {
+    if (!editingItem) return;
+    const title = editingItem.title;
+    if (!deleteFieldKnowledgeItem(editingItem.id)) {
+      haptics.errorAlert();
+      showToast('이 기기에서 현장 지식을 삭제하지 못했습니다.', 'error');
+      setDeleteDialogOpen(false);
+      return;
+    }
+    haptics.mediumTap();
+    setItems(getStoredFieldKnowledge());
+    showToast(`'${title}' 현장 지식을 이 브라우저에서 삭제했습니다.`);
+    setDeleteDialogOpen(false);
+    setCurrentView('list');
+    setEditingItem(null);
+  };
+
+  const openPhotoDialog = (mode: 'cover' | 'photo') => {
+    if (!editingItem) return;
+    setPhotoDialogMode(mode);
+    setPhotoUrlDraft(mode === 'cover' ? editingItem.imageUrl : '');
+    setPhotoInputError(null);
+  };
+
+  const savePhotoUrl = () => {
+    if (!editingItem || !photoDialogMode) return;
+    if (!isValidFieldKnowledgeImageUrl(photoUrlDraft)) {
+      setPhotoInputError('유효한 HTTPS 이미지 주소 또는 /images/로 시작하는 경로를 입력해 주세요.');
+      return;
+    }
+    const url = photoUrlDraft.trim();
+    setEditingItem(previous => previous ? photoDialogMode === 'cover'
+      ? { ...previous, imageUrl: url }
+      : { ...previous, photos: [...(previous.photos || []), url] }
+      : previous);
+    setPhotoDialogMode(null);
+    setPhotoInputError(null);
+    showToast('이미지를 수정했습니다. 변경사항을 저장하려면 아래 저장 버튼을 눌러 주세요.');
   };
 
   // =========================================================================
@@ -209,7 +238,7 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
             <div>
               <h2 className="text-lg font-bold text-slate-900 tracking-tight">현장 지식 수정</h2>
               <p className="text-xs text-slate-500 font-medium">
-                기사 Cockpit 앱에 실시간 공유되는 거점 진입 동선 및 의전 가이드
+                이 브라우저에만 저장됩니다. 기사 앱이나 다른 기기에는 자동 공유되지 않습니다.
               </p>
             </div>
           </div>
@@ -243,12 +272,11 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
         </div>
 
         {/* Toast Feedback */}
-        {toastMessage && (
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-2 text-xs font-bold text-blue-800 animate-in fade-in duration-150">
-            <CheckCircle2 className="w-4 h-4 text-[#1E60F3] shrink-0" />
-            <span>{toastMessage}</span>
-          </div>
-        )}
+        <HqInlineFeedback
+          message={toastMessage}
+          tone={feedbackTone}
+          onDismiss={() => setToastMessage(null)}
+        />
 
         {/* Main Header Edit Card: Image + Title/Category/Description */}
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs">
@@ -263,8 +291,8 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
                 />
                 <button
                   type="button"
-                  onClick={handleChangeImageUrl}
-                  className="absolute bottom-2.5 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg bg-black/70 hover:bg-black/85 text-white text-[11px] font-bold flex items-center gap-1.5 backdrop-blur-xs transition-all cursor-pointer"
+                  onClick={() => openPhotoDialog('cover')}
+                  className="absolute bottom-2.5 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg bg-white/95 hover:bg-white text-[#374B66] text-[11px] font-bold flex items-center gap-1.5 backdrop-blur-xs transition-all cursor-pointer"
                 >
                   <Camera className="w-3.5 h-3.5" />
                   <span>대표 이미지 변경</span>
@@ -294,26 +322,16 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
                     <span>카테고리</span>
                     <span className="text-[#1E60F3]">*</span>
                   </label>
-                  <select
+                  <HqSearchSelect
+                    label="현장 지식 카테고리"
+                    size="sm"
                     value={editingItem.category}
-                    onChange={(e) => {
-                      const val = e.target.value as FieldKnowledgeItem['category'];
-                      setEditingItem({
-                        ...editingItem,
-                        category: val,
-                        categoryBadge: val,
-                      });
-                    }}
-                    className="w-full px-3 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:outline-hidden focus:border-[#1E60F3]"
-                  >
-                    <option value="호텔">호텔</option>
-                    <option value="공항">공항</option>
-                    <option value="식당">식당</option>
-                    <option value="쇼핑">쇼핑</option>
-                    <option value="교통">교통</option>
-                    <option value="긴급">긴급</option>
-                    <option value="기타">기타</option>
-                  </select>
+                    onChange={next => setEditingItem(previous => previous ? {
+                      ...previous, category: next as FieldKnowledgeItem['category'], categoryBadge: next,
+                    } : previous)}
+                    placeholder="카테고리 선택"
+                    options={CATEGORIES.filter(category => category !== '전체').map(category => ({ value: category, label: category }))}
+                  />
                 </div>
               </div>
 
@@ -525,15 +543,7 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
               <h3 className="text-xs font-bold text-slate-700">현장 참조 사진 목록</h3>
               <button
                 type="button"
-                onClick={() => {
-                  const url = window.prompt('추가할 사진 이미지 URL을 입력하세요:');
-                  if (url && url.trim()) {
-                    setEditingItem({
-                      ...editingItem,
-                      photos: [...(editingItem.photos || []), url.trim()],
-                    });
-                  }
-                }}
+                onClick={() => openPhotoDialog('photo')}
                 className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-1 cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -556,7 +566,7 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
                         photos: (editingItem.photos || []).filter((_, i) => i !== idx),
                       });
                     }}
-                    className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                    className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-white/95 text-[#52647A] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -594,6 +604,48 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
             <span>저장</span>
           </button>
         </div>
+        <HqModal
+          isOpen={deleteDialogOpen}
+          title="현장 지식 삭제"
+          subtitle={editingItem.title}
+          onClose={() => setDeleteDialogOpen(false)}
+          footer={
+            <>
+              <button type="button" onClick={() => setDeleteDialogOpen(false)}
+                className="min-h-10 rounded-[12px] bg-[#F5F7FB] px-4 text-[12px] font-semibold text-[#60728A]">취소</button>
+              <button type="button" onClick={confirmDeleteItem}
+                className="min-h-10 rounded-[12px] bg-[#60728A] px-4 text-[12px] font-semibold text-white">삭제</button>
+            </>
+          }
+        >
+          <p className="text-[12px] leading-relaxed text-[#65758B]">
+            이 기기의 브라우저에서 해당 현장 지식을 삭제합니다. 복구할 수 없으니 확인해 주세요.
+          </p>
+        </HqModal>
+        <HqModal
+          isOpen={photoDialogMode !== null}
+          title={photoDialogMode === 'cover' ? '대표 이미지 변경' : '현장 사진 추가'}
+          subtitle="HTTPS 이미지 주소 또는 앱 이미지 경로를 입력해 주세요."
+          onClose={() => setPhotoDialogMode(null)}
+          footer={
+            <>
+              <button type="button" onClick={() => setPhotoDialogMode(null)}
+                className="min-h-10 rounded-[12px] bg-[#F5F7FB] px-4 text-[12px] font-semibold text-[#60728A]">취소</button>
+              <button type="button" onClick={savePhotoUrl}
+                className="min-h-10 rounded-[12px] bg-[#1E60F3] px-4 text-[12px] font-semibold text-white">적용</button>
+            </>
+          }
+        >
+          <label className="block space-y-1.5 text-[12px] font-semibold text-[#52647A]">
+            <span>이미지 URL</span>
+            <input type="text" value={photoUrlDraft} onChange={event => {
+              setPhotoUrlDraft(event.target.value);
+              setPhotoInputError(null);
+            }} placeholder="https://example.com/photo.jpg"
+              className="w-full rounded-[13px] bg-[#F7F9FC] px-3.5 py-3 text-[12px] text-[#26374E] outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/20" />
+          </label>
+          <HqInlineFeedback message={photoInputError} className="mt-2" />
+        </HqModal>
       </div>
     );
   }
@@ -615,10 +667,10 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
 
             {/* Hover Tooltip: 위로 향하는 블랙 말풍선 규격 (아이콘 근접 시에만 노출, 최상단 레이어) */}
             <div className="absolute bottom-full left-0 mb-2 hidden group-hover/knowledge:flex flex-col items-start pointer-events-none z-[100]">
-              <span className="whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-lg animate-in fade-in-50 duration-150">
+              <span className="whitespace-nowrap rounded-lg bg-white px-2.5 py-1 text-[11px] font-semibold text-[#52647A] shadow-[0_8px_22px_rgba(35,49,78,0.1)] animate-in fade-in-50 duration-150">
                 VIP 의전 현장의 주차장·동선·진입 노하우가 모여있어요
               </span>
-              <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 ml-5 shadow-xs" />
+              <div className="w-2 h-2 bg-white rotate-45 -mt-1 ml-5 shadow-xs" />
             </div>
           </div>
 
@@ -630,7 +682,7 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
               </span>
             </h1>
             <p className="text-xs text-slate-500 font-medium">
-              호텔, 공항, 쇼핑, 미팅포인트 등 VIP 의전 현장 특이사항 및 주차·진입 가이드
+              호텔·공항 등 현장 노하우 · 브라우저에만 보관 (초기 예시는 현장 재확인 필요)
             </p>
           </div>
         </div>
@@ -692,12 +744,11 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
       </div>
 
       {/* Toast Feedback */}
-      {toastMessage && (
-        <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-2 text-xs font-bold text-blue-800 animate-in fade-in duration-150">
-          <CheckCircle2 className="w-4 h-4 text-[#1E60F3] shrink-0" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
+      <HqInlineFeedback
+          message={toastMessage}
+          tone={feedbackTone}
+          onDismiss={() => setToastMessage(null)}
+        />
 
       {/* 3-Column Card Grid (Reference 1) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -734,7 +785,7 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
                   />
                 )}
                 <div className="absolute top-2.5 left-2.5">
-                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-black/60 text-white backdrop-blur-xs">
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-white/95 text-[#52647A]">
                     {item.categoryBadge || item.category}
                   </span>
                 </div>

@@ -284,7 +284,7 @@ export function getStoredFieldKnowledge(): FieldKnowledgeItem[] {
       return INITIAL_FIELD_KNOWLEDGE_ITEMS;
     }
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length > 0) {
+    if (Array.isArray(parsed)) {
       return parsed;
     }
     return INITIAL_FIELD_KNOWLEDGE_ITEMS;
@@ -297,8 +297,8 @@ export function getStoredFieldKnowledge(): FieldKnowledgeItem[] {
 /**
  * Save / Update a single Field Knowledge item (Admin Only)
  */
-export function saveFieldKnowledgeItem(item: FieldKnowledgeItem): void {
-  if (typeof window === 'undefined') return;
+export function saveFieldKnowledgeItem(item: FieldKnowledgeItem): boolean {
+  if (typeof window === 'undefined') return false;
   try {
     const current = getStoredFieldKnowledge();
     const existingIndex = current.findIndex((i) => i.id === item.id);
@@ -324,22 +324,26 @@ export function saveFieldKnowledgeItem(item: FieldKnowledgeItem): void {
 
     localStorage.setItem(FIELD_KNOWLEDGE_STORAGE_KEY, JSON.stringify(updated));
     window.dispatchEvent(new CustomEvent(FIELD_KNOWLEDGE_CHANGE_EVENT, { detail: { item } }));
+    return true;
   } catch (err) {
     console.error('Failed to save field knowledge item:', err);
+    return false;
   }
 }
 
 /**
  * Delete a single Field Knowledge item (Admin Only)
  */
-export function deleteFieldKnowledgeItem(id: string): void {
-  if (typeof window === 'undefined') return;
+export function deleteFieldKnowledgeItem(id: string): boolean {
+  if (typeof window === 'undefined') return false;
   try {
     const current = getStoredFieldKnowledge();
     const filtered = current.filter((i) => i.id !== id);
     localStorage.setItem(FIELD_KNOWLEDGE_STORAGE_KEY, JSON.stringify(filtered));
     window.dispatchEvent(new CustomEvent(FIELD_KNOWLEDGE_CHANGE_EVENT, { detail: { id } }));
+    return true;
   } catch (err) {
     console.error('Failed to delete field knowledge item:', err);
+    return false;
   }
 }

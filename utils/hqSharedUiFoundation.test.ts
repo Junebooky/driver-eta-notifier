@@ -51,7 +51,8 @@ test('real HQ screens have been incrementally migrated; Settings keeps its origi
   assert.match(header,/onRefresh\(\)/);
   assert.match(header,/onOpenNotifications\?\.\(\)/);
   assert.match(register,/HqInput/);
-  assert.match(register,/HqSelect/);
+  assert.match(register,/HqSearchSelect/);
+  assert.match(register,/HqInlineFeedback/);
   assert.match(register,/HqTextarea/);
   assert.match(register,/HqButton variant="primary"/);
   assert.match(edit,/HqTextarea/);

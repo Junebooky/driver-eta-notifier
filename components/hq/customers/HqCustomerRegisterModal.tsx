@@ -1,11 +1,14 @@
 'use client';
 
-import { HqInput, HqSelect, HqTextarea, HqButton } from '@/components/hq/ui';
+import { HqInput, HqTextarea, HqButton } from '@/components/hq/ui';
 import React, { useState } from 'react';
 import { X, Building2, User, Plus, Loader2 } from 'lucide-react';
 import { HqCustomer, CustomerTier } from '@/types/customerHq';
 import { haptics } from '@/utils/haptics';
 import { formatPhoneNumber } from '@/utils/formatters';
+import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
+import { HqInlineFeedback } from '@/components/hq/ui/HqInlineFeedback';
+import { normalizeDateToIso } from '@/utils/dispatchConflictDetector';
 
 interface HqCustomerRegisterModalProps {
   isOpen: boolean;
@@ -26,20 +29,26 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
   const [contactPhone, setContactPhone] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [nextEventTitle, setNextEventTitle] = useState('');
-  const [nextEventDate, setNextEventDate] = useState('2024. 11. 30');
-  const [preferencesInput, setPreferencesInput] = useState('S클래스 선호, 영어 가능 기사, 정시 출발 필수');
-  const [notesInput, setNotesInput] = useState('VIP 동선 보안 민감\n행사 전담 차량 사전 점검 필수');
+  const [nextEventDate, setNextEventDate] = useState('');
+  const [preferencesInput, setPreferencesInput] = useState('');
+  const [notesInput, setNotesInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      alert('고객사명을 입력해주세요.');
+      setFormError('고객사명을 입력해 주세요.');
       return;
     }
 
+    if (nextEventTitle.trim() && !normalizeDateToIso(nextEventDate)) {
+      setFormError('행사명을 입력한 경우 행사 예정 날짜를 정확히 입력해 주세요.');
+      return;
+    }
+    setFormError(null);
     setIsSubmitting(true);
     try {
       const prefList = preferencesInput
@@ -61,7 +70,7 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
         primaryContactName: contactName.trim() || '담당자',
         contactCountExtra: 0,
         recentSnippet: nextEventTitle.trim() || '신규 고객사 등록',
-        nextEventDate: nextEventDate.trim() || undefined,
+        nextEventDate: nextEventTitle.trim() ? normalizeDateToIso(nextEventDate) : undefined,
         mainPhone: contactPhone.trim(),
         mainEmail: contactEmail.trim(),
         department: department.trim() || '의전예약',
@@ -71,12 +80,12 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
           ? {
               id: `ev-${Date.now()}`,
               title: nextEventTitle.trim(),
-              date: nextEventDate.trim(),
-              dDay: 'D-30',
-              location: '서울 시내 주요 호텔',
-              vehiclesRequired: 'S클래스 1대',
-              passengerCount: 2,
-              timeRange: '09:00 - 18:00',
+              date: normalizeDateToIso(nextEventDate),
+              dDay: '',
+              location: '미정',
+              vehiclesRequired: '미정',
+              passengerCount: 0,
+              timeRange: '미정',
               status: 'upcoming',
             }
           : undefined,
@@ -102,7 +111,11 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
       if (result !== false) {
         haptics.success();
         onClose();
+      } else {
+        setFormError('고객사 등록에 실패했습니다. 상세 오류를 고객사 목록에서 확인하고 다시 시도해 주세요.');
       }
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : '고객사 등록 중 네트워크 오류가 발생했습니다.');
     } finally {
       setIsSubmitting(false);
     }
@@ -155,15 +168,18 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
               <label className="block text-[11px] font-bold text-slate-800 mb-1">
                 고객사 등급 (Tier)
               </label>
-              <HqSelect
+              <HqSearchSelect
+                label="신규 고객사 등급"
+                size="sm"
                 value={tier}
-                onChange={(e) => setTier(e.target.value as CustomerTier)}
-                
-              >
-                <option value="VIP">VIP</option>
-                <option value="주요">주요 고객</option>
-                <option value="일반">일반 고객</option>
-              </HqSelect>
+                onChange={next => setTier(next as CustomerTier)}
+                placeholder="고객사 등급"
+                options={[
+                  { value: 'VIP', label: 'VIP' },
+                  { value: '주요', label: '주요 고객' },
+                  { value: '일반', label: '일반 고객' },
+                ]}
+              />
             </div>
           </div>
 
@@ -241,7 +257,7 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
                 type="text"
                 value={nextEventTitle}
                 onChange={(e) => setNextEventTitle(e.target.value)}
-                placeholder="예: 2024 Collection Preview"
+                placeholder="예: 신제품 런칭 행사"
                 
               />
             </div>
@@ -253,7 +269,7 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
                 type="text"
                 value={nextEventDate}
                 onChange={(e) => setNextEventDate(e.target.value)}
-                placeholder="예: 2024. 11. 30"
+                placeholder="예: 2026-11-30"
                 
               />
             </div>
@@ -287,6 +303,7 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
             />
           </div>
 
+          <HqInlineFeedback message={formError} onDismiss={() => setFormError(null)} />
           {/* Action buttons */}
           <div className="flex items-center justify-end gap-2 pt-3">
             <HqButton variant="subtle"
