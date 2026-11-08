@@ -42,8 +42,6 @@ import {
   getSettlementReportsServerSnapshot,
   getSettlementReportsSnapshot,
   getVehiclePresetsSnapshot,
-  resetDemoPipelineData,
-  runDemoPipelineScenario,
   saveDriverProfiles,
   saveVehiclePresets,
   subscribeSettlementReports,
@@ -52,6 +50,10 @@ import {
 } from "@/utils/settlementStorage";
 import { formatKRW } from "@/utils/expense";
 import { haptics } from "@/utils/haptics";
+import { HqDateRangePicker } from "@/components/hq/ui/HqDateRangePicker";
+import { HqSearchSelect } from "@/components/hq/ui/HqSearchSelect";
+import { ALL_HQ_DATES, matchesHqDateRange, formatHqDateRangeLabel, type HqDateRange } from "@/utils/hqDateRange";
+import { exportSettlementSummaryCsv } from "@/utils/settlementSummaryCsv";
 
 export interface HqReportsViewProps {
   initialSearchQuery?: string;
@@ -86,6 +88,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
   // Filters
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [statusFilter, setStatusFilter] = useState<"all" | SettlementReportStatus>("all");
+  const [dateRange, setDateRange] = useState<HqDateRange>(ALL_HQ_DATES);
   const [selectedReportId, setSelectedReportId] = useState<string>(() => {
     if (initialCustomerId) {
       const match = reports.find((r) => r.customerId === initialCustomerId);
@@ -112,9 +115,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
   // Modals
   const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
   const [isContractModalOpen, setIsContractModalOpen] = useState(false);
-  const [showDevConsole, setShowDevConsole] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
-  const [demoLogs, setDemoLogs] = useState<string[]>([]);
   const [confirmDirectCostsOnApprove, setConfirmDirectCostsOnApprove] = useState(false);
 
   // Contract Edit Form State
@@ -155,9 +156,14 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
     return dateStr.replace(/-/g, ". ");
   };
 
-  // Filtered reports
+  // Global period selection is shared by events, profitability and the ledger.
+  const periodReports = useMemo(() => reports.filter(r =>
+    matchesHqDateRange(r.rawDate || r.eventDate, dateRange)
+  ), [reports, dateRange]);
+
+  // Status/search refine only the event list; period is global.
   const filteredReports = useMemo(() => {
-    return reports.filter((r) => {
+    return periodReports.filter((r) => {
       if (statusFilter !== "all" && r.status !== statusFilter) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -176,31 +182,30 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
       }
       return true;
     });
-  }, [reports, statusFilter, searchQuery]);
+  }, [periodReports, statusFilter, searchQuery]);
 
   const selectedReport = useMemo(() => {
     return (
-      reports.find((r) => r.id === selectedReportId) ||
+      filteredReports.find((r) => r.id === selectedReportId) ||
       filteredReports[0] ||
-      reports[0] ||
       null
     );
-  }, [reports, filteredReports, selectedReportId]);
+  }, [filteredReports, selectedReportId]);
 
   // Dashboard Aggregate KPIs
   const dashboardKpis = useMemo(() => {
-    const totalRevenue = reports.reduce((s, r) => s + r.supplyAmount, 0);
-    const totalDriverLabor = reports.reduce((s, r) => s + r.totalDriverLaborCost, 0);
-    const totalApprovedExpenses = reports.reduce((s, r) => s + r.totalApprovedExpenses, 0);
-    const totalDirectProfit = reports.reduce((s, r) => s + r.totalDirectProfit, 0);
+    const totalRevenue = periodReports.reduce((s, r) => s + r.supplyAmount, 0);
+    const totalDriverLabor = periodReports.reduce((s, r) => s + r.totalDriverLaborCost, 0);
+    const totalApprovedExpenses = periodReports.reduce((s, r) => s + r.totalApprovedExpenses, 0);
+    const totalDirectProfit = periodReports.reduce((s, r) => s + r.totalDirectProfit, 0);
     const avgMargin =
       totalRevenue > 0 ? Number(((totalDirectProfit / totalRevenue) * 100).toFixed(1)) : 0;
-    const totalOvertimeMin = reports.reduce((s, r) => s + r.totalOvertimeMinutes, 0);
-    const totalOvertimeFare = reports.reduce((s, r) => s + r.totalOvertimeFare, 0);
-    const approvedCount = reports.filter(
+    const totalOvertimeMin = periodReports.reduce((s, r) => s + r.totalOvertimeMinutes, 0);
+    const totalOvertimeFare = periodReports.reduce((s, r) => s + r.totalOvertimeFare, 0);
+    const approvedCount = periodReports.filter(
       (r) => r.status === "approved" || r.status === "invoiced"
     ).length;
-    const pendingCount = reports.length - approvedCount;
+    const pendingCount = periodReports.length - approvedCount;
 
     return {
       totalRevenue,
@@ -213,7 +218,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
       approvedCount,
       pendingCount,
     };
-  }, [reports]);
+  }, [periodReports]);
 
   // Open contract editor for selected report
   const handleOpenContractModal = () => {
@@ -253,7 +258,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
   const handleDownloadClientCsv = () => {
     if (!selectedReport) return;
     if (selectedReport.status !== "approved" && selectedReport.status !== "invoiced") {
-      alert("관리자 검토·승인 완료 후 고객사 제출용 확정 정산서를 다운로드할 수 있습니다.");
+      showToast("관리자 검토·승인 완료 후 고객사 제출용 확정 정산서를 다운로드할 수 있습니다.");
       return;
     }
     haptics.selection();
@@ -283,6 +288,26 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
     showToast("본사 내부용 배차별 수익성 분석 Excel(CSV) 다운로드가 완료되었습니다.");
   };
 
+  // Comprehensive export includes every row in the selected period.
+  const handleDownloadAllSummaryCsv = () => {
+    if (!periodReports.length) {
+      showToast('선택한 기간에 내보낼 정산 리포트가 없습니다.');
+      return;
+    }
+    const csv = exportSettlementSummaryCsv(periodReports);
+    const blob = new Blob([String.fromCharCode(0xfeff) + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    try {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `[본사내부용]_행사정산총괄_${formatHqDateRangeLabel(dateRange).replace(/[^가-힣0-9.-]/g, '_')}.csv`;
+      a.click();
+      showToast(`선택 기간의 ${periodReports.length}건을 Excel(CSV)로 내보냈습니다.`);
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  };
+
   // Print / PDF Export
   const handlePrintPdf = () => {
     if (!selectedReport) return;
@@ -291,7 +316,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
       selectedReport.status !== "approved" &&
       selectedReport.status !== "invoiced"
     ) {
-      alert("관리자 검토·승인 완료 후 고객사 제출용 PDF/인쇄가 가능합니다.");
+      showToast("관리자 검토·승인 완료 후 고객사 제출용 PDF/인쇄가 가능합니다.");
       return;
     }
     haptics.selection();
@@ -407,17 +432,11 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={() => {
-              haptics.lightTap();
-              showToast("정산 기간 필터: 전체 기간이 선택되어 있습니다.");
-            }}
-            className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/80 cursor-pointer shadow-2xs transition-colors"
-            title="정산 기간 필터"
-          >
-            <Calendar className="w-4 h-4" />
-          </button>
+          <HqDateRangePicker
+            value={dateRange}
+            onChange={(next) => { setDateRange(next); setShowHeaderMenu(false); }}
+            label="행사 정산"
+          />
 
           <div className="relative">
             <button
@@ -448,17 +467,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                   <Settings2 className="w-3.5 h-3.5 text-[#0050FF]" />
                   <span>기본 요금 및 인건비 설정</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowHeaderMenu(false);
-                    setShowDevConsole(!showDevConsole);
-                  }}
-                  className="w-full text-left px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 border-t border-slate-100 mt-1 pt-1.5 cursor-pointer"
-                >
-                  <Settings2 className="w-3.5 h-3.5 text-slate-400" />
-                  <span>{showDevConsole ? "테스트 콘솔 닫기" : "테스트 콘솔 열기"}</span>
-                </button>
+
               </div>
             )}
           </div>
@@ -522,75 +531,6 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
         </div>
       </div>
 
-      {/* Dev Console (if enabled) */}
-      {showDevConsole && (
-        <div className="bg-slate-900 text-white rounded-2xl p-4 border border-slate-800 space-y-2.5 animate-in fade-in duration-150 print:hidden">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="px-2 py-0.5 rounded bg-blue-600 text-white text-[10px] font-black tracking-wide">
-                DEV TEST CONSOLE
-              </span>
-              <span className="text-xs font-black text-white">
-                E2E 업무·정산 파이프라인 시나리오 실행기
-              </span>
-            </div>
-
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {(
-                [
-                  { code: "A", label: "시나리오 A (단일차량)" },
-                  { code: "B", label: "시나리오 B (복수3대)" },
-                  { code: "C", label: "시나리오 C (수정·재계산)" },
-                  { code: "D", label: "시나리오 D (경계조건)" },
-                  { code: "ALL", label: "전체 A~D 실행" },
-                ] as const
-              ).map((btn) => (
-                <button
-                  key={btn.code}
-                  type="button"
-                  onClick={() => {
-                    haptics.selection();
-                    const res = runDemoPipelineScenario(btn.code);
-                    setDemoLogs(res.summaryLog);
-                    const firstDemo = res.reports.find((r) => r.isDemoScenario);
-                    if (firstDemo) setSelectedReportId(firstDemo.id);
-                    showToast(`시나리오 ${btn.code} E2E 데이터 생성 및 정산 검증 완료`);
-                  }}
-                  className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
-                    btn.code === "ALL"
-                      ? "bg-[#0050FF] hover:bg-blue-600 text-white shadow-xs"
-                      : "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
-                  }`}
-                >
-                  {btn.label}
-                </button>
-              ))}
-
-              <button
-                type="button"
-                onClick={() => {
-                  haptics.lightTap();
-                  resetDemoPipelineData();
-                  setDemoLogs([]);
-                  showToast("DEMO 시나리오 데이터가 초기화되었습니다.");
-                }}
-                className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-rose-950/80 hover:bg-rose-900 text-rose-200 border border-rose-800/70 cursor-pointer"
-              >
-                초기화
-              </button>
-            </div>
-          </div>
-
-          {demoLogs.length > 0 && (
-            <div className="p-2.5 rounded-xl bg-slate-950/90 border border-slate-800 text-[11px] text-emerald-300 font-mono space-y-1">
-              {demoLogs.map((logLine, i) => (
-                <div key={i}>✓ {logLine}</div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Sub-Tab Content 1: 행사별 정산 (Split Master-Detail View) */}
       {activeSubTab === "events" && (
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start">
@@ -613,17 +553,20 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                   className="w-full pl-8.5 pr-3 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
                 />
               </div>
-              <select
+              <HqSearchSelect
+                label="정산 상태 필터"
+                size="sm"
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as any)}
-                className="w-full px-3 py-2 bg-white border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-700 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500"
-              >
-                <option value="all">전체</option>
-                <option value="draft">청구 대기</option>
-                <option value="reviewing">검토 중</option>
-                <option value="approved">승인 완료</option>
-                <option value="invoiced">청구 완료</option>
-              </select>
+                onChange={(next) => setStatusFilter(next as "all" | SettlementReportStatus)}
+                placeholder="전체 상태"
+                options={[
+                  { value: "all", label: "전체 상태" },
+                  { value: "draft", label: "청구 대기" },
+                  { value: "reviewing", label: "검토 중" },
+                  { value: "approved", label: "승인 완료" },
+                  { value: "invoiced", label: "청구 완료" },
+                ]}
+              />
             </div>
 
             {/* Cards List */}
@@ -1277,7 +1220,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                 <CheckCircle2 className="w-4 h-4 text-[#3182F6]" />
               </div>
               <div className="text-lg sm:text-xl font-black text-slate-900 mt-2">
-                {dashboardKpis.approvedCount} / {reports.length}
+                {dashboardKpis.approvedCount} / {periodReports.length}
               </div>
               <div className="text-[11px] text-slate-400 font-medium mt-1">
                 승인완료 {dashboardKpis.approvedCount}건
@@ -1427,13 +1370,13 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
           <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-xs space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-bold text-slate-900">전체 행사 정산 총괄 명세서</h3>
-                <p className="text-xs text-slate-400 mt-0.5">승인 대기 및 승인 완료된 전체 리포트 현황</p>
+                <h3 className="text-sm font-bold text-slate-900">행사 정산 총괄 명세서 · {periodReports.length}건</h3>
+                <p className="text-xs text-slate-400 mt-0.5">선택한 기간의 리포트 현황 · {formatHqDateRangeLabel(dateRange)}</p>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={handleDownloadClientCsv}
+                  onClick={handleDownloadAllSummaryCsv}
                   className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-1.5 cursor-pointer"
                 >
                   <img src="/images/icons/icon_excel.png" alt="Excel" className="w-3.5 h-3.5 object-contain" />
@@ -1458,7 +1401,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {reports.map((r) => (
+                  {periodReports.map((r) => (
                     <tr
                       key={r.id}
                       onClick={() => {
