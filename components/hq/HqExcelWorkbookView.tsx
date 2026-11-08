@@ -1,9 +1,12 @@
 'use client';
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {ChevronDown,ChevronUp,ChevronLeft,ChevronRight,Expand,Minimize2,FileSpreadsheet,Pencil,Save,X,ArrowUpDown,ZoomIn,ZoomOut} from 'lucide-react';
+import {ChevronDown,ChevronUp,ChevronLeft,ChevronRight,Expand,Minimize2,FileSpreadsheet,Pencil,Save,X,ArrowUpDown,ZoomIn,ZoomOut,MessageSquareText} from 'lucide-react';
 export type ReportExcelFocus={year:number;sheet:string;row:number;requestId:number};
 type Row={row:number;cells:string[];locked:string[]};
-type Grid={version:string;year:number;filename:string;month:string;months:string[];total:number;offset:number;limit:number;rows:Row[];columns:string[]};
+type Grid={version:string;year:number;filename:string;month:string;months:string[];total:number;offset:number;limit:number;rows:Row[];columns:string[];linkedRows:number[]};
+type SourceLink={year:number;month:string;row:number;version:string};
+type OriginalSource={year:number;month:string;row:number;rawMessage:string;driver:string;customer:string;plate:string;submittedAt:string};
+const sourceLinkKey=(target:SourceLink)=>[target.year,target.version,target.month,target.row].join('/');
 const columnWidths=[120,112,165,210,125,145,475,165,190,130,130,135];
 const totalWidth=52+columnWidths.reduce((sum,width)=>sum+width,0);
 const headers=['날짜','차량번호','차종','거래처','운전자','타임','운행경로','셀프/의전','OT Hours','금액','결제방법','합계'];
@@ -14,6 +17,12 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
  const [highlightedRow,setHighlightedRow]=useState<number|null>(null);
  const [flashSequence,setFlashSequence]=useState(0);
  const scrollRef=useRef<HTMLDivElement>(null);
+ const [sourceLink,setSourceLink]=useState<SourceLink|null>(null);
+ const [sourceText,setSourceText]=useState<OriginalSource|null>(null);
+ const [sourceLoading,setSourceLoading]=useState(false);
+ const [sourceError,setSourceError]=useState('');
+ const sourceCache=useRef(new Map<string,OriginalSource>());
+ const hoverTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
  const [zoom,setZoom]=useState(false);
  const [tableScale,setTableScale]=useState(100);
  const [scrollEdges,setScrollEdges]=useState({left:true,right:true});
@@ -21,6 +30,51 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
  useEffect(()=>{syncScroll();const node=scrollRef.current;if(!node)return;const observer=new ResizeObserver(syncScroll);observer.observe(node);return()=>observer.disconnect();},[syncScroll,grid,zoom,tableScale]);
  useEffect(()=>{if(!zoom)return;const key=(event:KeyboardEvent)=>{if(event.key==='Escape'){setZoom(false);setEdit(null);setTableScale(100);}};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[zoom]);
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[edit,setEdit]=useState<{row:number;col:string;value:string}|null>(null);
+ const dismissSource=useCallback(()=>{
+  if(hoverTimer.current)clearTimeout(hoverTimer.current);
+  setSourceLink(null);
+ },[]);
+ const openSource=(row:number)=>{
+  if(!grid||!grid.linkedRows?.includes(row))return;
+  const candidate={year:grid.year,month:grid.month,row,version:grid.version};
+  setSourceLink(previous=>previous&&sourceLinkKey(previous)===sourceLinkKey(candidate)?previous:candidate);
+ };
+ const scheduleSource=(row:number)=>{
+  if(hoverTimer.current)clearTimeout(hoverTimer.current);
+  if(typeof window==='undefined'||!window.matchMedia('(hover: hover) and (pointer: fine)').matches)return;
+  hoverTimer.current=setTimeout(()=>openSource(row),180);
+ };
+ useEffect(()=>()=>{if(hoverTimer.current)clearTimeout(hoverTimer.current);},[]);
+ useEffect(()=>{
+  if(!sourceLink){setSourceLoading(false);setSourceError('');setSourceText(null);return;}
+  let cancelled=false;
+  const key=sourceLinkKey(sourceLink);
+  const cached=sourceCache.current.get(key);
+  setSourceText(cached||null);
+  setSourceError('');
+  if(cached){setSourceLoading(false);return;}
+  setSourceLoading(true);
+  const controller=new AbortController();
+  const params=new URLSearchParams({
+   year:String(sourceLink.year),month:sourceLink.month,row:String(sourceLink.row),version:sourceLink.version,
+  });
+  void fetch('/api/hq/report-row-source?'+params,{cache:'no-store',signal:controller.signal}).then(async r=>{
+   const data=await r.json().catch(()=>({}));
+   if(!r.ok||!data.ok)throw Error(data.error||'연결된 원문을 불러오지 못했습니다.');
+   if(cancelled)return;
+   const value=data as OriginalSource;
+   sourceCache.current.set(key,value);
+   setSourceText(value);
+  }).catch(e=>{if(!cancelled&&e?.name!=='AbortError')setSourceError((e as Error).message);})
+   .finally(()=>{if(!cancelled)setSourceLoading(false);});
+  return ()=>{cancelled=true;controller.abort();};
+ },[sourceLink]);
+ useEffect(()=>{
+  if(!sourceLink)return;
+  const onKey=(event:KeyboardEvent)=>{if(event.key==='Escape')dismissSource();};
+  window.addEventListener('keydown',onKey);
+  return ()=>window.removeEventListener('keydown',onKey);
+ },[sourceLink,dismissSource]);
  useEffect(()=>{
   if(!focus||focus.year!==year)return;
   queueMicrotask(()=>{
@@ -44,12 +98,12 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
   const r=await fetch('/api/hq/report-workbook?'+params,{cache:'no-store'});
   const data=await r.json();
   if(!r.ok)throw Error(data.error||'Excel을 불러올 수 없습니다.');
-  setGrid(data);setMonth(data.month);
+  dismissSource();setGrid(data);setMonth(data.month);
   if(focusRow!==undefined){
    setOffset(data.offset);setHighlightedRow(focusRow);setFlashSequence(count=>count+1);
    setNavigateTo(null);
   }
- },[year,offset]);
+ },[year,offset,dismissSource]);
  useEffect(()=>{
   if(!open)return;
   if(navigateTo&&navigateTo.sheet!==month)return;
@@ -83,7 +137,7 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
   }catch(e){setError((e as Error).message);}finally{setBusy(false);}
  }
  return <div className={zoom?'fixed inset-0 z-[150] flex min-w-0 flex-col bg-[#F4F7FC] p-2 sm:p-5':'min-w-0 space-y-3'}>
-  {!zoom&&<button type="button" aria-expanded={open} onClick={()=>{setOpen(v=>!v);setEdit(null);setError('');}}
+  {!zoom&&<button type="button" aria-expanded={open} onClick={()=>{dismissSource();setOpen(v=>!v);setEdit(null);setError('');}}
    className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[13px] font-semibold text-slate-700 shadow-2xs transition-all hover:bg-slate-50 hover:border-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/30">
    <Pencil size={14} className="text-slate-500"/>웹에서 편집 {open?'▴':'▾'}
   </button>}
@@ -226,8 +280,20 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
       <th className="sticky left-0 z-20 border-b border-r border-[#DCE5F1] bg-[#EDF2F8] px-2 py-2">행</th>
       {headers.map(h=><th key={h} className="overflow-hidden whitespace-nowrap border-b border-r border-[#DCE5F1] px-3 py-2 text-left">{h}</th>)}
      </tr></thead>
-     <tbody>{grid.rows.map(row=><tr key={row.row+(highlightedRow===row.row?'-'+flashSequence:'')} data-excel-row={row.row} className={highlightedRow===row.row?'hq-excel-target-row':'hover:bg-[#F8FAFD]'}>
-      <td className="sticky left-0 z-[1] border-b border-r border-[#E8EDF3] bg-[#F7F9FC] px-2 py-2 text-center font-medium text-[#8B9BB1]">{row.row}</td>
+     <tbody>{grid.rows.map(row=><tr key={row.row+(highlightedRow===row.row?'-'+flashSequence:'')}
+      data-excel-row={row.row}
+      onMouseEnter={()=>{if(grid.linkedRows?.includes(row.row))scheduleSource(row.row);}}
+      onMouseLeave={()=>{if(hoverTimer.current)clearTimeout(hoverTimer.current);}}
+      className={highlightedRow===row.row?'hq-excel-target-row':'hover:bg-[#F8FAFD]'}>
+      <td className="sticky left-0 z-[1] border-b border-r border-[#E8EDF3] bg-[#F7F9FC] px-1 py-1 text-center font-medium text-[#8B9BB1]">
+       {grid.linkedRows?.includes(row.row)
+        ?<button type="button" onClick={()=>openSource(row.row)} title="기사 운행보고 원문 보기"
+          aria-label={row.row+'행 기사 운행보고 원문 보기'}
+          className="flex min-h-9 w-full flex-col items-center justify-center gap-0.5 rounded-md text-[#1E60F3] hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1E60F3]/30">
+          <span>{row.row}</span><MessageSquareText size={12} strokeWidth={1.7}/>
+         </button>
+        :<span className="block px-1 py-2">{row.row}</span>}
+      </td>
       {row.cells.map((value,i)=>{
        const col=grid.columns[i],active=edit?.row===row.row&&edit.col===col,locked=row.locked.includes(col);
        return <td key={col} className="min-w-0 overflow-hidden border-b border-r border-[#E8EDF3] p-0 align-top">
@@ -252,5 +318,37 @@ export function HqExcelWorkbookView({year,onCommitted,focus}:{year:number;onComm
    {grid&&grid.total>grid.limit&&<div className="flex gap-3"><button type="button" disabled={offset===0||busy} onClick={()=>{setEdit(null);setOffset(Math.max(0,offset-grid.limit));}} className="min-h-11 px-3 text-sm text-[#1E60F3] disabled:opacity-40">이전 행</button><button type="button" disabled={offset+grid.limit>=grid.total||busy} onClick={()=>{setEdit(null);setOffset(offset+grid.limit);}} className="min-h-11 px-3 text-sm text-[#1E60F3] disabled:opacity-40">다음 행</button></div>}
    {busy&&<p className="text-xs text-[#1E60F3]">저장 중...</p>}
   </div>}
+  {sourceLink&&(
+   <aside role="dialog" aria-label="연결된 기사 운행보고 원문"
+    className="fixed inset-x-3 bottom-3 z-[210] flex max-h-[73dvh] flex-col overflow-hidden rounded-[19px] bg-white p-4 shadow-[0_16px_50px_rgba(25,42,76,0.19)] ring-1 ring-[#E7ECF4] sm:inset-x-auto sm:bottom-auto sm:right-5 sm:top-24 sm:w-[375px] sm:max-h-[min(74dvh,650px)] sm:p-5">
+    <div className="flex items-start justify-between gap-3">
+     <div className="min-w-0">
+      <p className="flex items-center gap-2 text-[13px] font-semibold text-[#17233B]">
+       <MessageSquareText size={16} className="text-[#8192AB]"/>기사 보고 원문
+      </p>
+      <p className="mt-1 text-[11px] font-medium text-[#8898AF]">{sourceLink.year}년 · {sourceLink.month} · {sourceLink.row}행</p>
+     </div>
+     <button type="button" onClick={dismissSource} aria-label="원문 미리보기 닫기"
+      className="flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-[#F5F7FA] text-[#657B95] hover:bg-[#EDF1F6]">
+      <X size={16}/>
+     </button>
+    </div>
+    {sourceLoading&&<p role="status" className="mt-4 rounded-[12px] bg-[#F6F8FC] p-3 text-[12px] text-[#7789A3]">원문을 불러오는 중…</p>}
+    {sourceError&&<div role="alert" className="mt-4 rounded-[12px] bg-[#FBF4F3] p-3 text-[12px] text-[#A85C54]">
+      {sourceError}
+      <button type="button" className="ml-2 underline" onClick={()=>{sourceCache.current.delete(sourceLinkKey(sourceLink));setSourceLink({...sourceLink});}}>다시 시도</button>
+    </div>}
+    {sourceText&&!sourceLoading&&!sourceError&&<>
+     <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 border-b border-[#EDF1F6] pb-3 text-[11px] text-[#7889A0]">
+      <span>기사 {sourceText.driver||'미확인'}</span><span>거래처 {sourceText.customer||'미확인'}</span>
+      {sourceText.plate&&<span>차량 {sourceText.plate}</span>}
+     </div>
+     <div className="mt-3 min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-[13px] bg-[#F8FAFC] px-3.5 py-3">
+      <p className="whitespace-pre-wrap break-words text-[12px] leading-[1.85] text-[#475C76]">{sourceText.rawMessage}</p>
+     </div>
+     <p className="mt-2 text-[10px] text-[#9AA7B8]">기사 제출 당시 원문 · Excel 수정 내용과 다를 수 있습니다.</p>
+    </>}
+   </aside>
+  )}
  </div>;
 }
