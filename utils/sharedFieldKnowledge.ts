@@ -34,9 +34,6 @@ export function normalizeKnowledgeItem(value: unknown):
     if (clean[key].length > limit) return { ok: false, error: `${key} 입력 길이를 확인해 주세요.` };
   }
   if (!clean.title) return { ok: false, error: '장소명을 입력해 주세요.' };
-  if (!clean.imageUrl) {
-    // imageUrl separately validated below, image may be missing in old imports
-  }
   const imageUrl = typeof row.imageUrl === 'string' ? row.imageUrl.trim() : '';
   if (!isValidFieldKnowledgeImageUrl(imageUrl)) {
     return { ok: false, error: '대표 이미지 주소는 HTTPS 또는 앱 이미지 경로여야 합니다.' };
