@@ -55,6 +55,7 @@ import { HqSearchSelect } from "@/components/hq/ui/HqSearchSelect";
 import { ALL_HQ_DATES, matchesHqDateRange, formatHqDateRangeLabel, type HqDateRange } from "@/utils/hqDateRange";
 import { exportSettlementSummaryCsv } from "@/utils/settlementSummaryCsv";
 import { buildHqSettlementProfitTrend } from "@/utils/hqSettlementProfitTrend";
+import { canPublishHqSettlementReport, isHqSettlementPreviewFixture, HQ_SETTLEMENT_UNVERIFIED_NOTICE } from "@/utils/hqSettlementTrustGuard";
 import { getKstTodayDateStr } from "@/utils/dispatchConflictDetector";
 import { resolveHqDateBounds } from "@/utils/hqDateRange";
 
@@ -72,6 +73,9 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
     getSettlementReportsSnapshot,
     getSettlementReportsServerSnapshot
   );
+
+  // Legacy fixtures are not company business records.
+  const workingReports = useMemo(() => reports.filter(r => !isHqSettlementPreviewFixture(r)), [reports]);
 
   const vehiclePresets = useSyncExternalStore(
     subscribeSettlementReports,
@@ -160,9 +164,9 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
   };
 
   // Global period selection is shared by events, profitability and the ledger.
-  const periodReports = useMemo(() => reports.filter(r =>
+  const periodReports = useMemo(() => workingReports.filter(r =>
     matchesHqDateRange(r.rawDate || r.eventDate, dateRange)
-  ), [reports, dateRange]);
+  ), [workingReports, dateRange]);
 
   // Status/search refine only the event list; period is global.
   const filteredReports = useMemo(() => {
@@ -267,6 +271,10 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
   // Download Client CSV (Strictly excludes driver labor & company profit!)
   const handleDownloadClientCsv = () => {
     if (!selectedReport) return;
+    if (!canPublishHqSettlementReport(selectedReport)) {
+      showToast("서버 정산 승인·발행 검증이 없어 고객사 제출용 Excel은 사용할 수 없습니다.");
+      return;
+    }
     if (selectedReport.status !== "approved" && selectedReport.status !== "invoiced") {
       showToast("관리자 검토·승인 완료 후 고객사 제출용 확정 정산서를 다운로드할 수 있습니다.");
       return;
@@ -292,7 +300,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `[대외비_본사내부용]_수익성분석_${selectedReport.customerName}_${selectedReport.reportNo}.csv`;
+    a.download = `[잠정_로컬작업본_대외비]_수익성분석_${selectedReport.customerName}_${selectedReport.reportNo}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     showToast("본사 내부용 배차별 수익성 분석 Excel(CSV) 다운로드가 완료되었습니다.");
@@ -310,7 +318,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
     try {
       const a = document.createElement('a');
       a.href = url;
-      a.download = `[본사내부용]_행사정산총괄_${formatHqDateRangeLabel(dateRange).replace(/[^가-힣0-9.-]/g, '_')}.csv`;
+      a.download = `[잠정_로컬작업본_본사내부용]_행사정산총괄_${formatHqDateRangeLabel(dateRange).replace(/[^가-힣0-9.-]/g, '_')}.csv`;
       a.click();
       showToast(`선택 기간의 ${periodReports.length}건을 Excel(CSV)로 내보냈습니다.`);
     } finally {
@@ -321,6 +329,10 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
   // Print / PDF Export
   const handlePrintPdf = () => {
     if (!selectedReport) return;
+    if (reportViewMode === "client_external" && !canPublishHqSettlementReport(selectedReport)) {
+      showToast("서버 정산 승인·발행 검증 전에는 고객사 제출용 인쇄가 제한됩니다.");
+      return;
+    }
     if (
       reportViewMode === "client_external" &&
       selectedReport.status !== "approved" &&
@@ -339,14 +351,14 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
         return (
           <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-[#F2F5FA] text-[#546984] border border-[#EEF1F6] inline-flex items-center gap-1">
             <CheckCircle2 className="w-3 h-3" />
-            <span>승인 완료</span>
+            <span>승인 표시 · 로컬 미검증</span>
           </span>
         );
       case "invoiced":
         return (
           <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-blue-50 text-[#1E60F3] border border-blue-200 inline-flex items-center gap-1">
             <Receipt className="w-3 h-3" />
-            <span>청구 완료</span>
+            <span>청구 표시 · 로컬 미검증</span>
           </span>
         );
       case "reviewing":
@@ -403,6 +415,16 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
 
   return (
     <div className="space-y-4 select-none">
+      <div role="status" className="rounded-2xl bg-white px-4 py-3.5 text-xs leading-5 text-[#52647A] shadow-[0_6px_24px_rgba(35,49,78,0.055)] print:border print:border-[#CFD6E0]">
+        <div className="flex items-start gap-2">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#1E60F3]" aria-hidden="true" />
+          <div>
+            <p className="font-bold text-[#17233B]">잠정 정산 · 서버 미검증</p>
+            <p className="mt-1">{HQ_SETTLEMENT_UNVERIFIED_NOTICE}</p>
+            <p className="mt-1">초기 예시 정산서는 목록·통계에서 제외되며, 고객사 제출용 출력과 청구 승인은 서버 승인 기능이 준비될 때까지 차단됩니다.</p>
+          </div>
+        </div>
+      </div>
       {/* 1. Header Bar: Title + Rounded Utility Controls (Card Box) */}
       <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:px-5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-20 print:hidden">
         <div className="flex items-center gap-3">
@@ -436,7 +458,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
               정산 · 수익성 · 종합 리포트
             </h2>
             <p className="text-xs text-slate-500 font-medium mt-0.5">
-              고객사 서비스 시간 기준 정산 · 기사 인건비 · 배차별 직접이익 분석 리포트
+              로컬 작업본 기준 예상 청구액 · 인건비 · 잠정 직접이익 분석
             </p>
           </div>
         </div>
@@ -573,8 +595,8 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                   { value: "all", label: "전체 상태" },
                   { value: "draft", label: "청구 대기" },
                   { value: "reviewing", label: "검토 중" },
-                  { value: "approved", label: "승인 완료" },
-                  { value: "invoiced", label: "청구 완료" },
+                  { value: "approved", label: "로컬 승인 표시(미검증)" },
+                  { value: "invoiced", label: "로컬 청구 표시(미검증)" },
                 ]}
               />
             </div>
@@ -619,7 +641,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
               })}
               {filteredReports.length === 0 && (
                 <div className="p-6 text-center text-xs text-slate-400">
-                  검색 조건에 맞는 정산 리포트가 없습니다.
+                  표시할 로컬 정산 작업본이 없습니다. 초기 예시 데이터는 제외됩니다.
                 </div>
               )}
             </div>
@@ -660,7 +682,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                       }`}
                     >
                       <Eye className="w-3.5 h-3.5 text-slate-700" />
-                      <span>고객사 제출용</span>
+                      <span>고객사 양식 미리보기</span>
                     </button>
                   </div>
 
@@ -713,10 +735,12 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                             setShowDetailMenu(false);
                             handleDownloadClientCsv();
                           }}
-                          className="w-full text-left px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
+                          disabled={!canPublishHqSettlementReport(selectedReport)}
+                          title="서버 승인 원장 연동 전까지 사용할 수 없습니다"
+                          className="w-full text-left px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           <img src="/images/icons/icon_excel.png" alt="Excel" className="w-3.5 h-3.5 object-contain" />
-                          <span>고객사 제출용 Excel</span>
+                          <span>고객사 제출용 Excel · 발행 대기</span>
                         </button>
                         <button
                           type="button"
@@ -724,7 +748,9 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                             setShowDetailMenu(false);
                             handlePrintPdf();
                           }}
-                          className="w-full text-left px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 border-t border-slate-100 mt-1 pt-1.5 cursor-pointer"
+                          disabled={reportViewMode === "client_external" && !canPublishHqSettlementReport(selectedReport)}
+                          title={reportViewMode === "client_external" ? "서버 승인 전 고객사 인쇄 제한" : "내부 잠정 작업본 인쇄"}
+                          className="w-full text-left px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 border-t border-slate-100 mt-1 pt-1.5 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           <Printer className="w-3.5 h-3.5 text-slate-600" />
                           <span>PDF / 인쇄</span>
@@ -752,7 +778,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                         : `${selectedReport.customerName} ${selectedReport.eventName}`}
                     </h3>
                     <div className="text-right shrink-0">
-                      <div className="text-[11px] text-slate-400 font-medium">최종 청구 금액</div>
+                      <div className="text-[11px] text-slate-400 font-medium">예상 청구 금액</div>
                       <div className="text-xl font-extrabold text-slate-900 mt-0.5 tracking-tight">
                         {selectedReport.supplyAmount > 0
                           ? formatKRW(selectedReport.grandTotal)
@@ -1056,7 +1082,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                           </span>
                         </div>
                         <div className="flex justify-between text-sm font-black text-[#1E60F3] pt-2 border-t border-slate-200">
-                          <span>최종 청구 합계</span>
+                          <span>잠정 청구 합계</span>
                           <span>{formatKRW(selectedReport.grandTotal)}</span>
                         </div>
                       </div>
@@ -1106,15 +1132,15 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                             </span>
                           </div>
                           <div className="flex justify-between text-sm font-black text-[#1E60F3] pt-2 border-t border-slate-200">
-                            <span>배차 직접이익</span>
+                            <span>잠정 배차 직접이익</span>
                             <span>
                               {formatKRW(selectedReport.totalDirectProfit)} ({selectedReport.averageDirectMarginPercent}%)
                             </span>
                           </div>
                           <div className="pt-2 text-[11px] text-slate-400 flex items-center justify-between">
-                            <span>이익 확정 상태</span>
+                            <span>이익 검증 상태</span>
                             <span className="font-bold text-slate-700">
-                              {selectedReport.profitConfirmStatus === "confirmed" ? "확정 직접이익" : "잠정 손익"}
+                              {"서버 미검증 · 잠정 손익"}
                             </span>
                           </div>
                         </div>
@@ -1139,6 +1165,10 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                   <button
                     type="button"
                     onClick={() => {
+                      if (!canPublishHqSettlementReport(selectedReport)) {
+                        showToast("서버 승인 원장이 없어 청구 승인을 진행할 수 없습니다.");
+                        return;
+                      }
                       haptics.successPulse();
                       updateSettlementReportStatus(
                         selectedReport.id,
@@ -1148,10 +1178,12 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                       );
                       showToast("정산 리포트 검토 및 승인이 완료되어 고객사 청구서 발행이 활성화되었습니다.");
                     }}
-                    className="px-5 py-2.5 rounded-xl bg-[#1E60F3] hover:bg-blue-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                    disabled={!canPublishHqSettlementReport(selectedReport)}
+                    title="서버 정산 원장과 승인 기능 연동 전까지 비활성화됩니다"
+                    className="px-5 py-2.5 rounded-xl bg-[#1E60F3] hover:bg-blue-600 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer disabled:cursor-not-allowed disabled:bg-[#E8ECF2] disabled:text-[#8A99AE] disabled:shadow-none"
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>검토 완료 및 청구 승인</span>
+                    <span>청구 승인 · 서버 연동 대기</span>
                   </button>
                 </div>
               </>
@@ -1167,7 +1199,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 print:hidden">
             <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-2xs flex flex-col justify-between">
               <div className="flex items-center justify-between text-xs text-slate-500 font-bold">
-                <span>총 매출 (공급가)</span>
+                <span>예상 매출 (로컬)</span>
                 <Building2 className="w-4 h-4 text-[#1E60F3]" />
               </div>
               <div className="text-lg sm:text-xl font-black text-slate-900 mt-2">
@@ -1202,7 +1234,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
 
             <div className="bg-white rounded-2xl border border-blue-100 p-4 shadow-2xs flex flex-col justify-between bg-blue-50/20">
               <div className="flex items-center justify-between text-xs text-[#1E60F3] font-bold">
-                <span>배차 직접이익</span>
+                <span>잠정 배차 직접이익</span>
                 <TrendingUp className="w-4 h-4 text-[#1E60F3]" />
               </div>
               <div className="text-lg sm:text-xl font-black text-[#1E60F3] mt-2">
@@ -1215,7 +1247,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
 
             <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-2xs flex flex-col justify-between">
               <div className="flex items-center justify-between text-xs text-slate-500 font-bold">
-                <span>평균 마진율</span>
+                <span>예상 평균 마진율</span>
                 <BarChart3 className="w-4 h-4 text-[#8294AC]" />
               </div>
               <div className="text-lg sm:text-xl font-black text-[#52647A] mt-2">
@@ -1233,7 +1265,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
                 {dashboardKpis.approvedCount} / {periodReports.length}
               </div>
               <div className="text-[11px] text-slate-400 font-medium mt-1">
-                승인완료 {dashboardKpis.approvedCount}건
+                로컬 승인 표시 {dashboardKpis.approvedCount}건 (미검증)
               </div>
             </div>
           </div>
@@ -1244,11 +1276,11 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
             <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-100 p-5 shadow-2xs space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-bold text-slate-900">수익성 추이</h3>
-                <span className="text-xs font-semibold text-slate-400">기간 내 최근 7일 · 실제 행사</span>
+                <span className="text-xs font-semibold text-slate-400">기간 내 최근 7일 · 로컬 입력 행사</span>
               </div>
 
               {trendHasActualData ? (
-                <div role="img" aria-label="기간별 실제 정산 직접이익, 행사 날짜 기준" className="grid min-h-48 grid-cols-7 gap-1.5 py-2">
+                <div role="img" aria-label="기간별 로컬 작업본 잠정 직접이익, 행사 날짜 기준" className="grid min-h-48 grid-cols-7 gap-1.5 py-2">
                   {profitTrend.map(day => (
                     <div key={day.date} className="flex min-w-0 flex-col items-center justify-end gap-1.5">
                       <div className="flex h-28 w-full flex-col">
@@ -1364,7 +1396,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
               </div>
 
               <div className="text-[11px] text-slate-400 text-center pt-1 border-t border-slate-100">
-                총 공급가액 기준 정산 집계
+                로컬 공급가액 기준 잠정 집계
               </div>
             </div>
           </div>
