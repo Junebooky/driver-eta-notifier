@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { LocationPreset } from '@/types';
-import type { DriverEventFavorite, DriverEventRoute, DriverEventStop } from '@/utils/driverEventFavorites';
+import type { DriverEventFavorite, DriverEventLeg, DriverEventStop } from '@/utils/driverEventFavorites';
 import { DriverEventFavoritesSection } from '@/components/driver/DriverEventFavoritesSection';
 import { generateSmartDisplayName } from '@/utils/nameFormatter';
 import {
@@ -31,7 +31,7 @@ interface CustomPresetModalProps {
   eventFavoritesLoading?: boolean;
   eventFavoritesError?: string | null;
   onRefreshEventFavorites?: () => void;
-  onLoadEventRoute?: (route: DriverEventRoute) => void;
+  onLoadEventLeg?: (route: DriverEventLeg) => void;
   onSelectEventStop?: (stop: DriverEventStop) => void;
   onReorderPresets?: (reordered: LocationPreset[]) => void;
   onDeletePreset?: (id: string) => void;
@@ -66,7 +66,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
   eventFavoritesLoading,
   eventFavoritesError,
   onRefreshEventFavorites,
-  onLoadEventRoute,
+  onLoadEventLeg,
   onSelectEventStop,
   onReorderPresets,
   onDeletePreset,
@@ -1487,14 +1487,14 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
           )}
             </>
           )}
-          {!isHomeMode && favoriteTab === 'events' && onLoadEventRoute && (
+          {!isHomeMode && favoriteTab === 'events' && onLoadEventLeg && (
             <div role="tabpanel" className="pt-2">
               <DriverEventFavoritesSection
                 events={eventFavorites}
                 isLoading={eventFavoritesLoading}
                 error={eventFavoritesError}
                 onRefresh={onRefreshEventFavorites}
-                onLoadRoute={onLoadEventRoute}
+                onLoadLeg={onLoadEventLeg}
                 onSelectStop={onSelectEventStop}
                 compact
               />

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { ScheduleItem } from '@/data/ferrariSchedules';
-import { buildDriverEventFavorites, eventRouteToPresets } from './driverEventFavorites';
+import { buildDriverEventFavorites, getEventRouteLegs, eventLegToPresets, scheduleToEventRoute } from './driverEventFavorites';
 
 const DRIVER_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const DRIVER_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
@@ -41,11 +41,15 @@ test('two-day email dispatch becomes one event with two ordered days, every stop
   ]);
   const route = events[0].days[0].routes[0];
   assert.equal(route.ready, true);
-  const nav = eventRouteToPresets(route);
-  assert.equal(nav?.origin.address, '서울 강남구 테헤란로 231');
-  assert.equal(nav?.destination.name, '그랜드하얏트');
-  assert.equal(nav?.waypoints.length, 1);
-  assert.equal(nav?.waypoints[0].name, '성수 행사장');
+  const legs = getEventRouteLegs(route);
+  assert.equal(legs.length, 2, 'three stops must become two separate journeys');
+  const first = eventLegToPresets(legs[0]);
+  const second = eventLegToPresets(legs[1]);
+  assert.equal(first?.origin.address, '서울 강남구 테헤란로 231');
+  assert.equal(first?.destination.name, '성수 행사장');
+  assert.equal(second?.origin.name, '성수 행사장');
+  assert.equal(second?.destination.name, '그랜드하얏트');
+  assert.deepEqual(Object.keys(first || {}).sort(), ['destination', 'origin'], 'never pass intermediate waypoints');
 });
 
 test('same-name events from different emails never get merged', () => {
@@ -92,7 +96,7 @@ test('legacy incomplete route and unverified coordinates are display-only', () =
   const legacyRoute = buildDriverEventFavorites([legacy], DRIVER_A)[0].days[0].routes[0];
   assert.equal(legacyRoute.fullItinerary, false);
   assert.equal(legacyRoute.ready, false);
-  assert.equal(eventRouteToPresets(legacyRoute), null);
+  assert.equal(getEventRouteLegs(legacyRoute).length, 0, 'no fabricated itinerary legs');
 
   const invalid = schedule('invalid', '2026-11-13', {
     routeWaypoints: schedule('temp', '2026-11-13').routeWaypoints!.map((s, i) =>
@@ -100,7 +104,8 @@ test('legacy incomplete route and unverified coordinates are display-only', () =
   });
   const invalidRoute = buildDriverEventFavorites([invalid], DRIVER_A)[0].days[0].routes[0];
   assert.equal(invalidRoute.ready, false);
-  assert.equal(eventRouteToPresets(invalidRoute), null);
+  assert.ok(getEventRouteLegs(invalidRoute).every(leg => !leg.ready));
+  assert.equal(eventLegToPresets(getEventRouteLegs(invalidRoute)[0]), null);
 });
 
 test('two schedules same day keep separate route cards, ordered by pickup', () => {
@@ -111,4 +116,52 @@ test('two schedules same day keep separate route cards, ordered by pickup', () =
   const events = buildDriverEventFavorites(items, DRIVER_A);
   assert.equal(events.length, 1);
   assert.deepEqual(events[0].days[0].routes.map(r => r.scheduleId), ['early', 'late']);
+});
+
+test('09:00 airport -> 10:00 hotel, 13:00 COEX produces two independent drives, never one all-day route', () => {
+  const date = '2026-11-12';
+  const base = schedule('hotel-wait', date);
+  const trip = schedule('hotel-wait', date, {
+    routeWaypoints: base.routeWaypoints!.map((point, i) => ({
+      ...point,
+      location: ['인천공항', '조선팰리스', '코엑스'][i],
+      time: ['09:00', '10:00', '13:00'][i],
+    })),
+  });
+  const legs = getEventRouteLegs(scheduleToEventRoute(trip));
+  assert.equal(legs.length, 2);
+  assert.deepEqual(legs.map(l => [l.origin.name, l.destination.name]), [
+    ['인천공항', '조선팰리스'],
+    ['조선팰리스', '코엑스'],
+  ]);
+  assert.equal(legs[0].destination.time, '10:00');
+  assert.equal(legs[1].destination.time, '13:00');
+  assert.equal(legs[1].origin.time, '10:00', 'retain original itinerary time without inventing next departure');
+  assert.equal(eventLegToPresets(legs[1])?.origin.name, '조선팰리스');
+  assert.equal(eventLegToPresets(legs[1])?.destination.name, '코엑스');
+  assert.equal('waypoints' in (eventLegToPresets(legs[1]) || {}), false);
+});
+
+test('unverified stop prevents only its adjacent drives; same-place visit never launches navigation', () => {
+  const date = '2026-11-12';
+  const base = schedule('four-stop', date);
+  const more = [...base.routeWaypoints!, {
+    id: 'four-stop-4', date, order: 4, location: '마지막 호텔', address: '서울 중구',
+    lat: 37.565, lng: 126.99, time: '20:00', isPoiConfirmed: true,
+  }];
+  const withBadMiddle = schedule('four-stop', date, { routeWaypoints: more.map((p, i) =>
+    i === 1 ? { ...p, isPoiConfirmed: false } : p),
+  });
+  const legs = getEventRouteLegs(scheduleToEventRoute(withBadMiddle));
+  assert.deepEqual(legs.map(l => l.ready), [false, false, true]);
+  assert.equal(eventLegToPresets(legs[0]), null);
+  assert.equal(eventLegToPresets(legs[2])?.destination.name, '마지막 호텔');
+
+  const samePlace = schedule('same-place', date, { routeWaypoints: base.routeWaypoints!.map((stop, i) =>
+    i === 1 ? { ...stop, lat: base.routeWaypoints![0].lat, lng: base.routeWaypoints![0].lng } : stop),
+  });
+  const duplicates = getEventRouteLegs(scheduleToEventRoute(samePlace));
+  assert.equal(duplicates[0].samePlace, true);
+  assert.equal(duplicates[0].ready, false);
+  assert.equal(eventLegToPresets(duplicates[0]), null);
 });

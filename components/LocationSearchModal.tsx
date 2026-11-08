@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { LocationPreset } from '@/types';
-import type { DriverEventFavorite, DriverEventRoute, DriverEventStop } from '@/utils/driverEventFavorites';
+import type { DriverEventFavorite, DriverEventLeg, DriverEventStop } from '@/utils/driverEventFavorites';
 import { DriverEventFavoritesSection } from '@/components/driver/DriverEventFavoritesSection';
 import {
   sanitizeSearchQuery,
@@ -44,7 +44,7 @@ interface LocationSearchModalProps {
   eventFavoritesLoading?: boolean;
   eventFavoritesError?: string | null;
   onRefreshEventFavorites?: () => void;
-  onLoadEventRoute?: (route: DriverEventRoute) => void;
+  onLoadEventLeg?: (route: DriverEventLeg) => void;
   homeLocation?: { name: string; address: string; lat: number; lng: number } | null;
   currentSelectedId?: string;
   onSelectLocation: (location: SelectedLocationData) => void;
@@ -75,7 +75,7 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
   eventFavoritesLoading,
   eventFavoritesError,
   onRefreshEventFavorites,
-  onLoadEventRoute,
+  onLoadEventLeg,
   homeLocation,
   currentSelectedId,
   onSelectLocation,
@@ -946,14 +946,14 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
               ))}
             </div>
               </>
-            ) : onLoadEventRoute ? (
+            ) : onLoadEventLeg ? (
               <div role="tabpanel" className="pt-1">
                 <DriverEventFavoritesSection
                   events={eventFavorites}
                   isLoading={eventFavoritesLoading}
                   error={eventFavoritesError}
                   onRefresh={onRefreshEventFavorites}
-                  onLoadRoute={onLoadEventRoute}
+                  onLoadLeg={onLoadEventLeg}
                   onSelectStop={(stop: DriverEventStop) => {
                     if (!stop.isPoiConfirmed || typeof stop.lat !== 'number' || typeof stop.lng !== 'number') return;
                     onSelectLocation({

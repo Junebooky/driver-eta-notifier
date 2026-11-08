@@ -33,7 +33,7 @@ import { PredictionResult } from '@/app/api/route/prediction/route';
 import { LocationPreset, ReportMode, RouteEstimate, HomeLocation, GasStation, FlightType } from '@/types';
 import { DEFAULT_PRESET_LOCATIONS, DEFAULT_ORIGIN } from '@/utils/presets';
 import { ensureClientAuth } from '@/utils/cockpitClientAuth';
-import { eventRouteToPresets, type DriverEventFavorite, type DriverEventRoute, type DriverEventStop } from '@/utils/driverEventFavorites';
+import { eventLegToPresets, type DriverEventFavorite, type DriverEventLeg, type DriverEventStop } from '@/utils/driverEventFavorites';
 import { getPresetPassengerName } from '@/utils/constants';
 import { generateReportText } from '@/utils/reportGenerator';
 import { calculateHaversineEstimate, getEtaString, launchNavigationApp } from '@/utils/navigation';
@@ -1328,21 +1328,21 @@ export default function DriverCockpit() {
     haptics.success();
   };
 
-  /** Load all verified itinerary stops, never dropping intermediate locations. */
-  const handleLoadEventRoute = (route: DriverEventRoute) => {
-    const packageData = eventRouteToPresets(route);
-    if (!packageData) return;
-    setOrigin(packageData.origin);
-    setDestination(packageData.destination);
-    setAdminWaypoints(packageData.waypoints);
+  /** Each journey is just one origin → destination: never load the day's stops as via points. */
+  const handleLoadEventLeg = (leg: DriverEventLeg) => {
+    const pair = eventLegToPresets(leg);
+    if (!pair) return;
+    setOrigin(pair.origin);
+    setDestination(pair.destination);
+    setAdminWaypoints([]);
     setWaypoints([]);
-    setIsAdminRoute(packageData.waypoints.length > 0);
-    setActiveBookingId(route.scheduleId);
+    setIsAdminRoute(false);
+    setActiveBookingId(leg.scheduleId);
     setIsAddModalOpen(false);
     setIsLocationSearchOpen(false);
     setSelectionTarget('destination');
     setActiveTab('drive');
-    fetchRouteEstimate(packageData.origin, packageData.destination, packageData.waypoints);
+    fetchRouteEstimate(pair.origin, pair.destination, []);
     haptics.success();
   };
 
@@ -1364,15 +1364,16 @@ export default function DriverCockpit() {
   // Schedule Tab Action Handlers
   const handleSelectRouteFromSchedule = useCallback(
     (originPreset: LocationPreset, destinationPreset: LocationPreset, schedule?: ScheduleItem) => {
+      // Multi-stop schedule cards must use the segment picker, not silently route across the entire day.
+      if (schedule && ((schedule.routeWaypoints?.length || 0) > 2 ||
+        (schedule.adminWaypoints?.length || 0) > 0 || (schedule.waypoints?.length || 0) > 0)) return;
       setOrigin(originPreset);
       setDestination(destinationPreset);
       if (schedule?.id) setActiveBookingId(String(schedule.id));
-      const isSchedAdmin = Boolean(schedule?.isAdminRoute);
-      const schedAdminWps = schedule?.adminWaypoints || schedule?.waypoints || [];
-      setIsAdminRoute(isSchedAdmin);
-      setAdminWaypoints(schedAdminWps);
+      setIsAdminRoute(false);
+      setAdminWaypoints([]);
       setWaypoints([]);
-      fetchRouteEstimate(originPreset, destinationPreset, isSchedAdmin ? schedAdminWps : []);
+      fetchRouteEstimate(originPreset, destinationPreset, []);
       setActiveTab('drive');
       haptics.success();
     },
@@ -1380,17 +1381,22 @@ export default function DriverCockpit() {
   );
 
   const handleNavigateForSchedule = useCallback(
-    async (schedule: ScheduleItem) => {
+    async (schedule: ScheduleItem, leg?: DriverEventLeg) => {
+      // Never send every stop to the navigator as a single continuous drive.
+      if (!leg && ((schedule.routeWaypoints?.length || 0) > 2 ||
+        (schedule.adminWaypoints?.length || 0) > 0 || (schedule.waypoints?.length || 0) > 0)) return;
+      const pair = leg ? eventLegToPresets(leg) : scheduleToPresets(schedule);
+      if (!pair) return;
+      const { origin: originPreset, destination: destinationPreset } = leg
+        ? pair as { origin: LocationPreset; destination: LocationPreset }
+        : { origin: (pair as ReturnType<typeof scheduleToPresets>).originPreset, destination: (pair as ReturnType<typeof scheduleToPresets>).destinationPreset };
       if (schedule?.id) setActiveBookingId(String(schedule.id));
-      const { originPreset, destinationPreset, adminWaypoints: rawAdminWps, isAdminRoute: rawIsAdmin } = scheduleToPresets(schedule);
-      const isSchedAdmin = Boolean(rawIsAdmin);
-      const schedAdminWps: LocationPreset[] = rawAdminWps || [];
       setOrigin(originPreset);
       setDestination(destinationPreset);
-      setIsAdminRoute(isSchedAdmin);
-      setAdminWaypoints(schedAdminWps);
+      setIsAdminRoute(false);
+      setAdminWaypoints([]);
       setWaypoints([]);
-      fetchRouteEstimate(originPreset, destinationPreset, isSchedAdmin ? schedAdminWps : []);
+      fetchRouteEstimate(originPreset, destinationPreset, []);
 
       // Switch to Drive tab and open unified navigation confirm flow with fresh ETA recalculation
       setActiveTab('drive');
@@ -1401,8 +1407,8 @@ export default function DriverCockpit() {
         origin: originPreset,
         destination: destinationPreset,
         waypoints: [],
-        adminWaypoints: schedAdminWps,
-        isAdminRoute: isSchedAdmin,
+        adminWaypoints: [],
+        isAdminRoute: false,
         defaultNavi: profile.defaultNavi,
         reportMode: 'DEPARTURE',
         language: activeLanguage,
@@ -1472,19 +1478,32 @@ export default function DriverCockpit() {
   };
 
   const handleOpenPredictionForSchedule = useCallback(
-    (schedule: ScheduleItem) => {
+    (schedule: ScheduleItem, leg?: DriverEventLeg) => {
+      if (!leg && ((schedule.routeWaypoints?.length || 0) > 2 ||
+        (schedule.adminWaypoints?.length || 0) > 0 || (schedule.waypoints?.length || 0) > 0)) return;
+      const pair = leg ? eventLegToPresets(leg) : null;
+      if (leg && !pair) return;
+      const { originPreset, destinationPreset } = pair
+        ? { originPreset: pair.origin, destinationPreset: pair.destination }
+        : scheduleToPresets(schedule);
       if (schedule?.id) setActiveBookingId(String(schedule.id));
-      const { originPreset, destinationPreset, adminWaypoints: schedWps } = scheduleToPresets(schedule);
       setOrigin(originPreset);
       setDestination(destinationPreset);
-      fetchRouteEstimate(originPreset, destinationPreset, schedWps || []);
+      setWaypoints([]);
+      setAdminWaypoints([]);
+      setIsAdminRoute(false);
+      fetchRouteEstimate(originPreset, destinationPreset, []);
 
       const [year, month, day] = schedule.date.split('-').map(Number);
       const [hour, minute] = schedule.pickup_time.split(':').map(Number);
       const schedDate = new Date();
-      if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
-        schedDate.setFullYear(year, month - 1, day);
-        schedDate.setHours(hour || 9, minute || 0, 0, 0);
+      // Later stops have appointment/arrival times, not confirmed departure times.
+      // For those legs start the ETA picker from "now", never reuse day-one pickup time.
+      if (!leg || leg.index === 0) {
+        if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+          schedDate.setFullYear(year, month - 1, day);
+          schedDate.setHours(hour || 9, minute || 0, 0, 0);
+        }
       }
       // If the schedule's date/time has already passed, project same pickup hour:minute onto today/tomorrow for valid TMAP prediction
       if (schedDate.getTime() < Date.now() + 60 * 1000) {
@@ -1496,7 +1515,7 @@ export default function DriverCockpit() {
       }
       setSimulationDepartureDate(schedDate);
       setIsPredictionSheetOpen(true);
-      fetchPrediction(schedDate, originPreset, destinationPreset, schedWps || []);
+      fetchPrediction(schedDate, originPreset, destinationPreset, []);
       haptics.mediumTap();
     },
     [setOrigin, setDestination, fetchRouteEstimate, fetchPrediction]
@@ -1727,7 +1746,7 @@ export default function DriverCockpit() {
               eventFavoritesLoading={eventFavoritesLoading}
               eventFavoritesError={eventFavoritesError}
               onRefreshEventFavorites={() => void refreshDriverEvents()}
-              onLoadEventRoute={handleLoadEventRoute}
+              onLoadEventLeg={handleLoadEventLeg}
               onOpenProfileModal={() => setIsProfileModalOpen(true)}
               onSelectRouteForCockpit={handleSelectRouteFromSchedule}
               onOpenPredictionForSchedule={handleOpenPredictionForSchedule}
@@ -1803,7 +1822,7 @@ export default function DriverCockpit() {
         eventFavoritesLoading={eventFavoritesLoading}
         eventFavoritesError={eventFavoritesError}
         onRefreshEventFavorites={() => void refreshDriverEvents()}
-        onLoadEventRoute={handleLoadEventRoute}
+        onLoadEventLeg={handleLoadEventLeg}
         onSelectEventStop={handleSelectEventStop}
         onReorderPresets={handleReorderPresets}
         onDeletePreset={handleDeleteCustomPreset}
@@ -1906,7 +1925,7 @@ export default function DriverCockpit() {
         eventFavoritesLoading={eventFavoritesLoading}
         eventFavoritesError={eventFavoritesError}
         onRefreshEventFavorites={() => void refreshDriverEvents()}
-        onLoadEventRoute={handleLoadEventRoute}
+        onLoadEventLeg={handleLoadEventLeg}
         homeLocation={profile.homeLocation}
         currentSelectedId={
           selectionTarget === 'origin'
