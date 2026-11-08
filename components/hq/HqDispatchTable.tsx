@@ -32,7 +32,8 @@ import { getCustomerDotColor } from '@/utils/customerDotColor';
 import { getDriverProfileImage } from './HqQuickDispatch';
 import { HqBooking } from '@/types/hq';
 import { haptics } from '@/utils/haptics';
-import { VIP_REAL_VEHICLES, VipRealVehicle, stripManufacturerName } from '@/utils/vehicleData';
+import { stripManufacturerName } from '@/utils/vehicleData';
+import type { FleetRegistryRecord } from '@/utils/fleetVehicleRegistry';
 import { isBookingInPast, cleanVehicleIdentity } from '@/utils/dispatchConflictDetector';
 import { useHqDrivers } from '@/utils/useHqDrivers';
 import {
@@ -149,45 +150,67 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
     };
   }, []);
 
-  // 3. Live Fleet Vehicles (synchronized with 차량 관리 custom & deleted vehicles)
-  const [customVehicles, setCustomVehicles] = useState<VipRealVehicle[]>([]);
-  const [deletedVehicleIds, setDeletedVehicleIds] = useState<string[]>([]);
+  // 3. HQ fleet filter follows the same server-owned cockpit.vehicles catalog
+  // as Vehicle Management and Quick Dispatch. Historical bookings remain
+  // searchable even if their vehicle has since been archived.
+  const [registryVehicles, setRegistryVehicles] = useState<FleetRegistryRecord[]>([]);
+  const [fleetFilterError, setFleetFilterError] = useState<string | null>(null);
+  const fleetRequestSequence = useRef(0);
 
   useEffect(() => {
-    try {
-      const storedCustom = localStorage.getItem('vip_hq_custom_vehicles');
-      if (storedCustom) {
-        const parsed = JSON.parse(storedCustom);
-        if (Array.isArray(parsed)) setCustomVehicles(parsed);
+    let mounted = true;
+    const loadVehicles = async () => {
+      const seq = ++fleetRequestSequence.current;
+      try {
+        const response = await fetch('/api/fleet/registry', { cache: 'no-store' });
+        const json = await response.json().catch(() => ({}));
+        if (!response.ok || !json.ok || !Array.isArray(json.records)) {
+          throw new Error(json.error || '차량 목록을 조회하지 못했습니다.');
+        }
+        if (mounted && seq === fleetRequestSequence.current) {
+          setRegistryVehicles(json.records);
+          setFleetFilterError(null);
+        }
+      } catch (error) {
+        if (mounted && seq === fleetRequestSequence.current) {
+          setRegistryVehicles([]);
+          setFleetFilterError(error instanceof Error ? error.message : '차량 서버 조회 실패');
+        }
       }
-      const storedDeleted = localStorage.getItem('vip_hq_deleted_vehicle_ids');
-      if (storedDeleted) {
-        const parsedDeleted = JSON.parse(storedDeleted);
-        if (Array.isArray(parsedDeleted)) setDeletedVehicleIds(parsedDeleted);
-      }
-    } catch {
-      // ignore storage errors
-    }
+    };
+    void loadVehicles();
+    const refresh = () => { if (document.visibilityState === 'visible') void loadVehicles(); };
+    window.addEventListener('vip_hq_fleet_updated', refresh);
+    window.addEventListener('focus', refresh);
+    return () => {
+      mounted = false;
+      window.removeEventListener('vip_hq_fleet_updated', refresh);
+      window.removeEventListener('focus', refresh);
+    };
   }, []);
 
   const vehicleOptions = useMemo(() => {
-    const customPlates = new Set(customVehicles.map((v) => v.plate.trim().replace(/\s+/g, '')));
-    const activeDeletedSet = new Set(
-      deletedVehicleIds
-        .map((id) => String(id).trim().replace(/\s+/g, ''))
-        .filter((cleanId) => !customPlates.has(cleanId))
-    );
-    const isNotDeleted = (v: VipRealVehicle) => {
-      const cleanPlate = v.plate.trim().replace(/\s+/g, '');
-      const cleanId = v.id.trim().replace(/\s+/g, '');
-      return !activeDeletedSet.has(cleanPlate) && !activeDeletedSet.has(cleanId);
-    };
-    const validCustom = customVehicles.filter(isNotDeleted);
-    const validDefault = VIP_REAL_VEHICLES.filter(
-      (v) => isNotDeleted(v) && !customPlates.has(v.plate.trim().replace(/\s+/g, ''))
-    );
-    return [...validCustom, ...validDefault];
-  }, [customVehicles, deletedVehicleIds]);
+    const unique = new Map<string, { plate: string; model: string; modelShort: string }>();
+    for (const row of registryVehicles) {
+      if (row.archived || !row.profile?.plate) continue;
+      unique.set(cleanVehicleIdentity(row.plate), {
+        plate: row.plate,
+        model: row.profile.model,
+        modelShort: row.profile.modelShort || stripManufacturerName(row.profile.model),
+      });
+    }
+    for (const b of allBookingsForCounts || bookings) {
+      const plate = (b.vehiclePlate || '').trim();
+      if (!plate || plate === '미배정') continue;
+      const key = cleanVehicleIdentity(plate);
+      if (!unique.has(key)) unique.set(key, {
+        plate,
+        model: b.vehicleModel || '',
+        modelShort: stripManufacturerName(b.vehicleModel || ''),
+      });
+    }
+    return [...unique.values()].sort((x, y) => x.plate.localeCompare(y.plate, 'ko'));
+  }, [registryVehicles, bookings, allBookingsForCounts]);
 
   const handleClockClick = async (e: React.MouseEvent, b: HqBooking) => {
     e.stopPropagation();
