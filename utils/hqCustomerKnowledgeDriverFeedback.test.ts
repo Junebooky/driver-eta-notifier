@@ -63,7 +63,7 @@ test('customer operations show in-page failures, not fake success alerts', () =>
   assert.match(view, /<HqInlineFeedback/);
   assert.doesNotMatch(view, /\balert\(/);
   assert.match(view, /setOperationMessage\(/);
-  assert.match(view, /return true;[\s\S]*?\/\/.*server/); // checked below with the refresh branch.
+  assert.match(view, /retrying the POST here could create a duplicate customer/);
   assert.match(view, /The server confirmed the new customer/);
   assert.match(register, /<HqSearchSelect/);
   assert.match(register, /<HqInlineFeedback/);
