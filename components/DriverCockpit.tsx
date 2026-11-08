@@ -32,6 +32,8 @@ import { ScheduleItem, scheduleToPresets } from '@/data/ferrariSchedules';
 import { PredictionResult } from '@/app/api/route/prediction/route';
 import { LocationPreset, ReportMode, RouteEstimate, HomeLocation, GasStation, FlightType } from '@/types';
 import { DEFAULT_PRESET_LOCATIONS, DEFAULT_ORIGIN } from '@/utils/presets';
+import { ensureClientAuth } from '@/utils/cockpitClientAuth';
+import { eventRouteToPresets, type DriverEventFavorite, type DriverEventRoute, type DriverEventStop } from '@/utils/driverEventFavorites';
 import { getPresetPassengerName } from '@/utils/constants';
 import { generateReportText } from '@/utils/reportGenerator';
 import { calculateHaversineEstimate, getEtaString, launchNavigationApp } from '@/utils/navigation';
@@ -726,6 +728,45 @@ export default function DriverCockpit() {
   const isRouteRestoredRef = useRef(false);
 
   const [activeTab, setActiveTab] = useState<DriverTab>('drive');
+  const [eventFavorites, setEventFavorites] = useState<DriverEventFavorite[]>([]);
+  const [eventFavoritesLoading, setEventFavoritesLoading] = useState(false);
+  const [eventFavoritesError, setEventFavoritesError] = useState<string | null>(null);
+
+  const refreshDriverEvents = useCallback(async () => {
+    setEventFavoritesLoading(true);
+    try {
+      const session = await ensureClientAuth('driver', { driverName: profile.driverName, vehicleNo: profile.vehicleNo });
+      if (!session.authenticated || session.role !== 'driver' || !session.driverId) {
+        setEventFavorites([]);
+        setEventFavoritesError(session.authenticated ? '기사 계정으로 로그인하면 배정 행사가 표시됩니다.' : '로그인 후 배정 행사를 확인할 수 있습니다.');
+        return;
+      }
+      const response = await fetch('/api/driver/event-favorites', { cache: 'no-store', credentials: 'include' });
+      const data = await response.json();
+      if (!response.ok || !Array.isArray(data.events)) throw new Error(data.error || '행사 정보를 확인할 수 없습니다.');
+      setEventFavorites(data.events);
+      setEventFavoritesError(null);
+    } catch (err) {
+      setEventFavorites([]); // Fail closed. Never show another driver's stale event data.
+      setEventFavoritesError(err instanceof Error ? err.message : '행사 정보를 불러오지 못했습니다.');
+    } finally {
+      setEventFavoritesLoading(false);
+    }
+  }, [profile.driverName, profile.vehicleNo]);
+
+  useEffect(() => {
+    if (!isLoaded || (activeTab !== 'schedule' && !isAddModalOpen && !isLocationSearchOpen)) return;
+    void refreshDriverEvents();
+    const onFocus = () => { if (document.visibilityState !== 'hidden') void refreshDriverEvents(); };
+    const timer = window.setInterval(onFocus, 15000);
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('vip_hq_schedules_updated', onFocus);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('vip_hq_schedules_updated', onFocus);
+    };
+  }, [isLoaded, activeTab, isAddModalOpen, isLocationSearchOpen, refreshDriverEvents]);
   const selectDriverTab = (tab: DriverTab) => {
     haptics.lightTap();
     if (tab === 'log') {
@@ -1287,6 +1328,39 @@ export default function DriverCockpit() {
     haptics.success();
   };
 
+  /** Load all verified itinerary stops, never dropping intermediate locations. */
+  const handleLoadEventRoute = (route: DriverEventRoute) => {
+    const packageData = eventRouteToPresets(route);
+    if (!packageData) return;
+    setOrigin(packageData.origin);
+    setDestination(packageData.destination);
+    setAdminWaypoints(packageData.waypoints);
+    setWaypoints([]);
+    setIsAdminRoute(packageData.waypoints.length > 0);
+    setActiveBookingId(route.scheduleId);
+    setIsAddModalOpen(false);
+    setIsLocationSearchOpen(false);
+    setSelectionTarget('destination');
+    setActiveTab('drive');
+    fetchRouteEstimate(packageData.origin, packageData.destination, packageData.waypoints);
+    haptics.success();
+  };
+
+  /** Pick just one stop in the active origin/destination/waypoint selection mode. */
+  const handleSelectEventStop = (stop: DriverEventStop) => {
+    if (!stop.isPoiConfirmed || typeof stop.lat !== 'number' || typeof stop.lng !== 'number') return;
+    handleSelectLocationFromSearch({
+      id: 'event-stop-' + stop.id,
+      name: stop.name,
+      shortName: stop.name,
+      address: stop.address,
+      lat: stop.lat,
+      lng: stop.lng,
+      category: 'CUSTOM',
+    });
+    setIsAddModalOpen(false);
+  };
+
   // Schedule Tab Action Handlers
   const handleSelectRouteFromSchedule = useCallback(
     (originPreset: LocationPreset, destinationPreset: LocationPreset, schedule?: ScheduleItem) => {
@@ -1649,6 +1723,11 @@ export default function DriverCockpit() {
             <ScheduleTab
               profile={profile}
               presets={presets}
+              eventFavorites={eventFavorites}
+              eventFavoritesLoading={eventFavoritesLoading}
+              eventFavoritesError={eventFavoritesError}
+              onRefreshEventFavorites={() => void refreshDriverEvents()}
+              onLoadEventRoute={handleLoadEventRoute}
               onOpenProfileModal={() => setIsProfileModalOpen(true)}
               onSelectRouteForCockpit={handleSelectRouteFromSchedule}
               onOpenPredictionForSchedule={handleOpenPredictionForSchedule}
@@ -1720,6 +1799,12 @@ export default function DriverCockpit() {
           setEditingPreset(null);
         }}
         presets={presets}
+        eventFavorites={eventFavorites}
+        eventFavoritesLoading={eventFavoritesLoading}
+        eventFavoritesError={eventFavoritesError}
+        onRefreshEventFavorites={() => void refreshDriverEvents()}
+        onLoadEventRoute={handleLoadEventRoute}
+        onSelectEventStop={handleSelectEventStop}
         onReorderPresets={handleReorderPresets}
         onDeletePreset={handleDeleteCustomPreset}
         onAddPreset={handleAddCustomPreset}
@@ -1817,6 +1902,11 @@ export default function DriverCockpit() {
         }}
         target={selectionTarget}
         presets={presets}
+        eventFavorites={eventFavorites}
+        eventFavoritesLoading={eventFavoritesLoading}
+        eventFavoritesError={eventFavoritesError}
+        onRefreshEventFavorites={() => void refreshDriverEvents()}
+        onLoadEventRoute={handleLoadEventRoute}
         homeLocation={profile.homeLocation}
         currentSelectedId={
           selectionTarget === 'origin'
