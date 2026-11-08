@@ -820,7 +820,7 @@ export const HqDriversTableView: React.FC<HqDriversTableViewProps> = ({
         )}
       </HqModal>
 
-      {anchor}
+      {/* Driver Edit Modal */}
       {editingDriver && (
         <HqDriverEditModal
           isOpen={Boolean(editingDriver)}
