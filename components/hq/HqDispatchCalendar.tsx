@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight, Inbox, MapPin } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { CalendarDays, ChevronLeft, ChevronRight, Inbox, MapPin, X } from 'lucide-react';
 import type { HqBooking } from '@/types/hq';
 import { getCustomerDotColor } from '@/utils/customerDotColor';
 import { getKstTodayDateStr, normalizeDateToIso } from '@/utils/dispatchConflictDetector';
@@ -10,6 +11,7 @@ import {
   isHqBookingScheduledOn,
   shiftHqCalendarMonth,
   sortHqCalendarBookings,
+  getHqCalendarContinuity,
 } from '@/utils/hqDispatchCalendar';
 
 interface Props {
@@ -122,6 +124,42 @@ export function HqDispatchCalendar({ bookings, onViewBooking, onOpenNewBooking }
   const today = getKstTodayDateStr();
   const [monthKey, setMonthKey] = useState(() => today.slice(0, 7));
   const [selectedDate, setSelectedDate] = useState(today);
+  const [peek, setPeek] = useState<{date:string;top:number;left:number} | null>(null);
+
+  const showDayPeek = (iso: string, element: HTMLElement, fromHover = false) => {
+    if (fromHover && !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+    const bounds = element.getBoundingClientRect();
+    const width = Math.min(352, window.innerWidth - 24);
+    setPeek({
+      date: iso,
+      left: Math.max(12, Math.min(bounds.left, window.innerWidth - width - 12)),
+      top: Math.max(12, Math.min(bounds.bottom + 8, window.innerHeight - 345)),
+    });
+  };
+  useEffect(() => {
+    if (!peek) return;
+    const dismiss = (event: PointerEvent) => {
+      const element = event.target as Element | null;
+      if (!element?.closest('[data-calendar-peek-trigger], [data-calendar-peek-panel]')) {
+        setPeek(null);
+      }
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPeek(null);
+    };
+    const close = () => setPeek(null);
+    document.addEventListener('pointerdown', dismiss);
+    window.addEventListener('keydown', escape);
+    window.addEventListener('resize', close);
+    window.addEventListener('scroll', close, true);
+    return () => {
+      document.removeEventListener('pointerdown', dismiss);
+      window.removeEventListener('keydown', escape);
+      window.removeEventListener('resize', close);
+      window.removeEventListener('scroll', close, true);
+    };
+  }, [peek?.date]);
+
 
   const days = useMemo(() => getHqCalendarDays(monthKey), [monthKey]);
   const dayBookings = useMemo(() => {
@@ -134,6 +172,10 @@ export function HqDispatchCalendar({ bookings, onViewBooking, onOpenNewBooking }
   }, [days, bookings]);
 
   const selectedBookings = dayBookings.get(selectedDate) || [];
+  const peekBookings = peek ? dayBookings.get(peek.date) || [] : [];
+  const continuityByDate = useMemo(() => new Map(days.map(day =>
+    [day.iso, getHqCalendarContinuity(bookings, day.iso)]
+  )), [days, bookings]);
   const monthlyBookings = bookings.filter((booking) =>
     days.some((day) => day.inMonth && isHqBookingScheduledOn(booking, day.iso))
   );
@@ -142,11 +184,13 @@ export function HqDispatchCalendar({ bookings, onViewBooking, onOpenNewBooking }
     if (iso.slice(0, 7) !== monthKey) setMonthKey(iso.slice(0, 7));
   };
   const moveMonth = (delta: number) => {
+    setPeek(null);
     const next = shiftHqCalendarMonth(monthKey, delta);
     setMonthKey(next);
     setSelectedDate(`${next}-01`);
   };
   const backToToday = () => {
+    setPeek(null);
     const next = getKstTodayDateStr();
     setMonthKey(next.slice(0, 7));
     setSelectedDate(next);
@@ -201,6 +245,7 @@ export function HqDispatchCalendar({ bookings, onViewBooking, onOpenNewBooking }
             const rows = dayBookings.get(day.iso) || [];
             const selected = day.iso === selectedDate;
             const isToday = day.iso === today;
+            const continuation = continuityByDate.get(day.iso);
             return (
               <div
                 key={day.iso}
@@ -208,8 +253,12 @@ export function HqDispatchCalendar({ bookings, onViewBooking, onOpenNewBooking }
               >
                 <button
                   type="button"
-                  onClick={() => openDay(day.iso)}
-                  aria-label={`${day.iso} 배차 ${rows.length}건 확인`}
+                  data-calendar-peek-trigger
+                  onClick={(event) => { openDay(day.iso); showDayPeek(day.iso, event.currentTarget); }}
+                  onMouseEnter={(event) => { if (rows.length) showDayPeek(day.iso, event.currentTarget, true); }}
+                  aria-haspopup={rows.length ? 'dialog' : undefined}
+                  aria-expanded={peek?.date === day.iso}
+                  aria-label={`${day.iso} 배차 ${rows.length}건 미리보기`}
                   aria-pressed={selected}
                   aria-current={isToday ? 'date' : undefined}
                   className={`flex h-[66px] w-full flex-col items-center justify-start gap-1 rounded-lg pt-1.5 text-left transition-colors hover:bg-[#F7F9FC] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#1E60F3] sm:h-auto sm:min-h-8 sm:flex-row sm:justify-between sm:pt-0 sm:px-1.5 ${selected ? 'bg-[#EEF3FF]' : ''}`}
@@ -229,6 +278,14 @@ export function HqDispatchCalendar({ bookings, onViewBooking, onOpenNewBooking }
                     </>
                   )}
                 </button>
+                {continuation && (
+                  <div
+                    title={`같은 차량의 연속 일정 ${continuation.days}일`}
+                    aria-label={`연결된 배차 ${continuation.days}일, ${continuation.previous ? '이전 날짜에서 계속' : '첫 날짜'}`}
+                    className={`mt-1 h-[3px] sm:mt-2 ${continuation.previous ? '-ml-1.5 sm:-ml-2.5' : 'ml-1.5 rounded-l-full'} ${continuation.next ? '-mr-1.5 sm:-mr-2.5' : 'mr-1.5 rounded-r-full'}`}
+                    style={{ backgroundColor: getCustomerDotColor(continuation.colorBooking.customerId, continuation.colorBooking.customerName) }}
+                  />
+                )}
                 <div className="hidden space-y-1.5 pt-1.5 sm:block">
                   {rows.slice(0, 2).map((booking) => (
                     <DesktopEvent
@@ -279,6 +336,50 @@ export function HqDispatchCalendar({ bookings, onViewBooking, onOpenNewBooking }
           </div>
         )}
       </section>
+      {peek && peekBookings.length > 0 && typeof document !== 'undefined' && createPortal(
+        <div
+          data-calendar-peek-panel
+          role="dialog"
+          aria-label={`${selectedTitle(peek.date)} 배차 미리보기`}
+          className="fixed inset-x-3 bottom-3 z-[160] max-h-[min(72dvh,420px)] overflow-hidden rounded-[20px] bg-white p-3.5 shadow-[0_16px_48px_rgba(26,41,69,0.16)] ring-1 ring-[#E9EEF5] sm:inset-auto sm:w-[352px] sm:max-h-[min(440px,70dvh)] sm:p-4"
+          style={{ ...(window.matchMedia('(min-width: 640px)').matches ? { top: peek.top, left: peek.left, bottom: 'auto' } : {}) }}
+        >
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[13px] font-semibold text-[#17233B]">{selectedTitle(peek.date)}</p>
+              <p className="mt-0.5 text-[11px] text-[#8998AD]">배차 {peekBookings.length}건 · 일정을 누르면 상세 화면으로 이동</p>
+            </div>
+            <button type="button" onClick={() => setPeek(null)}
+              aria-label="배차 미리보기 닫기"
+              className="flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-[#F5F7FA] text-[#687C96] hover:bg-[#EDF1F6]">
+              <X className="size-4" />
+            </button>
+          </div>
+          <div className="max-h-[min(56dvh,340px)] space-y-2 overflow-y-auto overscroll-contain">
+            {peekBookings.map(booking => {
+              const run = getHqCalendarContinuity(bookings, peek.date);
+              const sameRun = run && run.colorBooking.id === booking.id ? run : null;
+              return (
+                <button key={booking.id} type="button" onClick={() => { setPeek(null); onViewBooking(booking); }}
+                  className="block w-full rounded-[14px] bg-[#F7F9FC] px-3 py-2.5 text-left transition-colors hover:bg-[#EFF3F8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#1E60F3]">
+                  <div className="flex items-center gap-2">
+                    <span aria-hidden="true" className="size-2 shrink-0 rounded-full"
+                      style={{ backgroundColor: getCustomerDotColor(booking.customerId, booking.customerName) }} />
+                    <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-[#17233B]">{booking.customerName}</span>
+                    {sameRun && <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[10px] text-[#72849B]">연속 {sameRun.days}일</span>}
+                  </div>
+                  <p className="mt-1.5 pl-4 text-[11px] font-medium text-[#586D89]">
+                    {booking.vehicleModel ? booking.vehicleModel + ' · ' : ''}{vehiclePlate(booking)} · {chauffeur(booking)}
+                  </p>
+                  <p className="mt-0.5 pl-4 text-[11px] text-[#8A9AB0]">
+                    {normalizeDateToIso(booking.pickupDate) === peek.date ? booking.pickupTime : '연속 운행'} · {status(booking) || '배차 일정'}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        </div>, document.body
+      )}
       {monthlyBookings.length === 0 && (
         <p className="flex items-center justify-center gap-2 pb-2 text-xs text-[#95A3B9]">
           <Inbox className="h-4 w-4" strokeWidth={1.5} /> 이 달에는 등록된 배차가 없습니다.
