@@ -915,6 +915,11 @@ export const HqDispatchTable: React.FC<HqDispatchTableProps> = ({
               {/* 3-3. 전체 차량 드롭다운 (차량 관리 1:1 연동 + 검색) */}
               <div className="relative">
                 <label className="block text-[11px] font-bold text-slate-500 mb-1">배정 차량</label>
+                {fleetFilterError && (
+                  <p role="status" className="mb-2 text-[11px] font-medium text-[#A86452]">
+                    차량 DB 조회 실패 · 기존 예약에 등록된 차량만 검색할 수 있습니다.
+                  </p>
+                )}
                 <button
                   type="button"
                   onClick={() => toggleDropdown('vehicle')}
