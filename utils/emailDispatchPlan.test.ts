@@ -79,3 +79,13 @@ test('English-language VIP assignment is saved and validated for every vehicle s
  const manuallyOverridden=buildEmailDispatchPlan({...english,requestedLanguage:'ko'},slots(),'published');
  assert.ok(manuallyOverridden.every(item=>item.requestedLanguage==='ko'));
 });
+
+
+test('confirmed email event name survives all dates and cars without being replaced by the client name', () => {
+  const draftWithEvent = { ...draft(), companyName: 'FRED', eventName: '90th Anniversary' };
+  const rows = buildEmailDispatchPlan(draftWithEvent, slots(), 'published');
+  assert.equal(rows.length, 4);
+  assert.ok(rows.every(row => row.eventName === '90th Anniversary' && row.customerName === 'FRED'));
+  assert.equal(new Set(rows.map(row => row.eventId)).size, 1, 'all event days must share one event ID');
+  assert.equal(new Set(rows.map(row => row.groupId)).size, 2, 'different dates stay independent');
+});

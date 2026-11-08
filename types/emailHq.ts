@@ -96,6 +96,8 @@ export interface HqEmailExtractedDraft {
 
   // Client Organization & Reservation Coordinator (Contact Entity)
   companyName?: string;
+  /** Separate event title; never confuse customer company with the event name. */
+  eventName?: string;
   contactName?: string;
   contactPhone?: string; // Strictly phone number or empty, NEVER email
   contactEmail?: string;

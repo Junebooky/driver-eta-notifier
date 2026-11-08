@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { LocationPreset } from '@/types';
+import type { DriverEventFavorite, DriverEventRoute, DriverEventStop } from '@/utils/driverEventFavorites';
+import { DriverEventFavoritesSection } from '@/components/driver/DriverEventFavoritesSection';
 import { generateSmartDisplayName } from '@/utils/nameFormatter';
 import {
   X,
@@ -25,6 +27,12 @@ interface CustomPresetModalProps {
   isOpen: boolean;
   onClose: () => void;
   presets?: LocationPreset[];
+  eventFavorites?: DriverEventFavorite[];
+  eventFavoritesLoading?: boolean;
+  eventFavoritesError?: string | null;
+  onRefreshEventFavorites?: () => void;
+  onLoadEventRoute?: (route: DriverEventRoute) => void;
+  onSelectEventStop?: (stop: DriverEventStop) => void;
   onReorderPresets?: (reordered: LocationPreset[]) => void;
   onDeletePreset?: (id: string) => void;
   onAddPreset: (preset: LocationPreset) => void;
@@ -54,6 +62,12 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
   isOpen,
   onClose,
   presets,
+  eventFavorites = [],
+  eventFavoritesLoading,
+  eventFavoritesError,
+  onRefreshEventFavorites,
+  onLoadEventRoute,
+  onSelectEventStop,
   onReorderPresets,
   onDeletePreset,
   onAddPreset,
@@ -78,6 +92,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
 
   // Local Presets State for Dynamic Position Swapping (Excluding Home slot)
   const [items, setItems] = useState<LocationPreset[]>(presets || []);
+  const [favoriteTab, setFavoriteTab] = useState<'personal' | 'events'>('personal');
   const itemsRef = useRef<LocationPreset[]>(items);
   itemsRef.current = items;
 
@@ -962,7 +977,7 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
             <h2 className="text-[18px] font-black text-slate-900 tracking-tight leading-snug">
               {isHomeMode
                 ? (isHomeEditMode ? '자택 주소 수정' : '자택 주소 등록')
-                : '거점 · 자주 가는 장소'}
+                : '즐겨찾기'}
             </h2>
           </div>
           <button
@@ -976,6 +991,24 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
           </button>
         </div>
 
+        {!isHomeMode && (
+          <div role="tablist" aria-label="즐겨찾기 분류"
+            className="flex shrink-0 items-stretch bg-white px-5 shadow-[0_2px_7px_rgba(35,49,78,0.015)]">
+            {([
+              { id: 'personal' as const, label: '내 즐겨찾기' },
+              { id: 'events' as const, label: '배정 행사' },
+            ]).map((tab) => (
+              <button key={tab.id} type="button" role="tab" aria-selected={favoriteTab === tab.id}
+                onClick={() => { setFavoriteTab(tab.id); haptics.lightTap(); }}
+                className={`relative flex-1 border-b-[2.5px] px-2 py-3.5 text-[14px] tracking-tight transition-colors ${favoriteTab === tab.id
+                  ? 'border-[#1E60F3] font-bold text-[#1E60F3]'
+                  : 'border-transparent font-semibold text-[#8290A5] hover:text-[#25344D]'}`}>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* ========================================================= */}
         {/* Modal Scrollable Body                                     */}
         {/* ========================================================= */}
@@ -984,6 +1017,8 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
           style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
         >
           {/* ========================================================= */}
+          {(isHomeMode || favoriteTab === 'personal') && (
+            <>
           {/* [태스크 1 & 2] 상단: '장소 등록' 볼륨 카드 폼 상시 노출 */}
           {/* ========================================================= */}
           {!isHomeMode ? (
@@ -1448,6 +1483,21 @@ export const CustomPresetModal: React.FC<CustomPresetModalProps> = ({
                   );
                 })}
               </div>
+            </div>
+          )}
+            </>
+          )}
+          {!isHomeMode && favoriteTab === 'events' && onLoadEventRoute && (
+            <div role="tabpanel" className="pt-2">
+              <DriverEventFavoritesSection
+                events={eventFavorites}
+                isLoading={eventFavoritesLoading}
+                error={eventFavoritesError}
+                onRefresh={onRefreshEventFavorites}
+                onLoadRoute={onLoadEventRoute}
+                onSelectStop={onSelectEventStop}
+                compact
+              />
             </div>
           )}
         </div>

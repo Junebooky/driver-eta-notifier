@@ -500,6 +500,16 @@ export const HqStep2BookingDetailView: React.FC<HqStep2BookingDetailViewProps> =
                 <span className="text-slate-400 font-medium">고객사</span>
                 <span className="font-bold text-slate-900">{companyName}</span>
               </div>
+              <div className="flex items-center justify-between gap-2">
+                <label htmlFor="hq-booking-event-title" className="shrink-0 font-medium text-slate-400">행사명</label>
+                <input id="hq-booking-event-title" type="text" maxLength={160}
+                  aria-label="행사명 수정"
+                  value={extractedDraft?.eventName || ''}
+                  onChange={(e) => extractedDraft && onUpdateDraft?.({ ...extractedDraft, eventName: e.target.value })}
+                  placeholder="행사명 입력 (미입력 시 고객사명 사용)"
+                  className="h-9 w-[68%] rounded-[12px] bg-[#F6F7FA] px-3 text-right text-[12px] font-semibold text-[#17233B] outline-none placeholder:text-[#9BA9BA] focus:bg-white focus:ring-1 focus:ring-[#1E60F3]/35"
+                />
+              </div>
               <div className="flex items-start justify-between">
                 <span className="text-slate-400 font-medium pt-0.5">예약 담당자</span>
                 <div className="text-right">
