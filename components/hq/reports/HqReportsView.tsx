@@ -52,6 +52,7 @@ import { formatKRW } from "@/utils/expense";
 import { haptics } from "@/utils/haptics";
 import { HqDateRangePicker } from "@/components/hq/ui/HqDateRangePicker";
 import { HqSearchSelect } from "@/components/hq/ui/HqSearchSelect";
+import { HqServerSettlementPanel } from "@/components/hq/reports/HqServerSettlementPanel";
 import { ALL_HQ_DATES, matchesHqDateRange, formatHqDateRangeLabel, type HqDateRange } from "@/utils/hqDateRange";
 import { exportSettlementSummaryCsv } from "@/utils/settlementSummaryCsv";
 import { buildHqSettlementProfitTrend } from "@/utils/hqSettlementProfitTrend";
@@ -415,6 +416,7 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
 
   return (
     <div className="space-y-4 select-none">
+      <HqServerSettlementPanel />
       <div role="status" className="rounded-2xl bg-white px-4 py-3.5 text-xs leading-5 text-[#52647A] shadow-[0_6px_24px_rgba(35,49,78,0.055)] print:border print:border-[#CFD6E0]">
         <div className="flex items-start gap-2">
           <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#1E60F3]" aria-hidden="true" />
