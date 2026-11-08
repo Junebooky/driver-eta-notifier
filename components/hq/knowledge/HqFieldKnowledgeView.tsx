@@ -132,7 +132,7 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
       category: '호텔',
       categoryBadge: '호텔',
       description: '',
-      imageUrl: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80',
+      imageUrl: '/images/icons/knowledge/icon_knowledge.png',
       photos: [],
       address: '',
       phone: '',
