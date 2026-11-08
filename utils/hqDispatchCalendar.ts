@@ -54,3 +54,52 @@ export function sortHqCalendarBookings<T extends Pick<HqBooking, 'pickupTime' | 
     a.id.localeCompare(b.id)
   );
 }
+
+/** Only explicit persisted event/group identities or an actual multi-day booking
+ * can connect adjacent dates. Same customer text alone is never sufficient.
+ */
+export function hqBookingSeriesKey(booking: Pick<HqBooking,
+  'id' | 'eventId' | 'groupId' | 'customerId' | 'customerName' | 'vehicleId' | 'vehiclePlate' | 'vehicleNoKey'
+>): string {
+  const event = booking.eventId?.trim() || booking.groupId?.trim();
+  if (!event) return 'booking:' + booking.id;
+  const customer = booking.customerId?.trim() || booking.customerName.trim();
+  // A multi-vehicle event gets one continuity indicator per actual vehicle.
+  // Missing vehicle assignments cannot be conflated with a real assignment.
+  const vehicle = booking.vehicleId?.trim() || booking.vehiclePlate?.trim() || booking.vehicleNoKey?.trim();
+  return event && vehicle
+    ? 'event:' + JSON.stringify([event, customer, vehicle])
+    : 'booking:' + booking.id;
+}
+
+export function getHqCalendarContinuity(
+  bookings: HqBooking[],
+  date: string,
+): { previous: boolean; next: boolean; days: number; colorBooking: HqBooking } | null {
+  const today = bookings.filter(item => isHqBookingScheduledOn(item, date));
+  if (!today.length) return null;
+  const neighbor = (step: number): string => {
+    const next = new Date(date + 'T00:00:00Z');
+    next.setUTCDate(next.getUTCDate() + step);
+    return next.toISOString().slice(0, 10);
+  };
+  for (const candidate of today) {
+    const key = hqBookingSeriesKey(candidate);
+    const includes = (day: string) => bookings.some(other =>
+      hqBookingSeriesKey(other) === key && isHqBookingScheduledOn(other, day)
+    );
+    const previous = includes(neighbor(-1));
+    const next = includes(neighbor(1));
+    if (!previous && !next) continue;
+    let days = 1;
+    // Read only a bounded 60-day contiguous series, not unrelated distant events.
+    for (const direction of [-1, 1]) {
+      for (let distance = 1; distance < 61; distance++) {
+        if (!includes(neighbor(distance * direction))) break;
+        days++;
+      }
+    }
+    return { previous, next, days, colorBooking: candidate };
+  }
+  return null;
+}
