@@ -6,7 +6,7 @@ import {
   getLatestDispatchLogForBooking,
   recordInfoDispatchLog,
 } from '@/lib/assets/driverAssetServerStore';
-import { resolveVehicleEntity } from '@/utils/vehicleData';
+import { resolveRegisteredFleetVehicle } from '@/lib/fleet/resolveRegisteredVehicle';
 import { hydrateRawScheduleRow, encodeScheduleMeta } from '@/lib/dispatch/scheduleServerStore';
 import type { CockpitAuthSession } from '@/lib/auth/serverAuth';
 
@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
     }
     const org = auth.session.org;
     const canonicalPlate = booking._meta.vehiclePlate || row.vehicle_plate || row.vehicle_no || '';
-    const effVehicle = resolveVehicleEntity(canonicalPlate, booking._meta.vehicleModel || vehicleModel);
+    const effVehicle = await resolveRegisteredFleetVehicle(canonicalPlate);
     if (driverId !== booking.driver_id || booking.vehicle_id !== effVehicle.uuid ||
         vehiclePlate.replace(/\s+/g, '') !== effVehicle.plate.replace(/\s+/g, '') ||
         (vehicleId && vehicleId !== booking.vehicle_id) || payload.expectedVersion !== booking.version) {
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Verify Info asset existence for this (driver, vehicle) pair
-    const bundle = await getDriverVehicleBundle(driverId, effVehicle.uuid, effVehicle.model, org);
+    const bundle = await getDriverVehicleBundle(driverId, effVehicle.uuid, effVehicle.model, org, effVehicle);
 
     if (!bundle.isReadyForCustomerDispatch) {
       return NextResponse.json(
