@@ -45,7 +45,7 @@ test('CSV guards customer spreadsheet formulas and keeps negative numeric profit
     report('y', '2026-11-03', 0, '+SUM(1,1)'),
   ]);
   assert.match(csv, /"'=HYPERLINK/);
-  assert.match(csv, /"'+SUM\(1,1\)/); // A leading formula marker is neutralized as text.
+  assert.ok(csv.includes('"\'+SUM(1,1)'), 'A leading plus formula is neutralized as text.');
   assert.match(csv, /"-5000"/);
 });
 
