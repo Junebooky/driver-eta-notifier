@@ -11,7 +11,7 @@ export interface HqFleetRegistryState {
 }
 
 /** The server-owned cockpit.vehicles inventory, shared by email revisions and HQ.
- * No static/localStorage fallback: archived or deleted plates must not reappear.
+ * No browser-cache or hardcoded fallback: archived plates stay archived.
  */
 export function useHqFleetRegistry(enabled = true): HqFleetRegistryState {
   const [state, setState] = useState<HqFleetRegistryState>({
