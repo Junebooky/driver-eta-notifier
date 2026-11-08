@@ -14,7 +14,7 @@ import { ENABLE_DEV_FLEET_SWITCHER, FLEET_PRESET_DRIVERS } from '@/utils/constan
 import { generateNameCandidates } from '@/utils/nameMatcher';
 import { parseVehicleDetails } from '@/components/ProfileModal';
 import { ensureClientAuth } from '@/utils/cockpitClientAuth';
-import type { DriverEventFavorite, DriverEventRoute } from '@/utils/driverEventFavorites';
+import type { DriverEventFavorite, DriverEventLeg } from '@/utils/driverEventFavorites';
 import { DriverEventFavoritesSection } from '@/components/driver/DriverEventFavoritesSection';
 
 const THINKING_STEPS = [
@@ -100,7 +100,7 @@ interface ScheduleTabProps {
   eventFavoritesLoading?: boolean;
   eventFavoritesError?: string | null;
   onRefreshEventFavorites?: () => void;
-  onLoadEventRoute?: (route: DriverEventRoute) => void;
+  onLoadEventLeg?: (route: DriverEventLeg) => void;
   onOpenProfileModal: () => void;
   onSelectRouteForCockpit: (origin: LocationPreset, destination: LocationPreset, schedule?: ScheduleItem) => void;
   onOpenPredictionForSchedule: (schedule: ScheduleItem) => void;
@@ -116,7 +116,7 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
   eventFavoritesLoading,
   eventFavoritesError,
   onRefreshEventFavorites,
-  onLoadEventRoute,
+  onLoadEventLeg,
   onOpenProfileModal,
   onSelectRouteForCockpit,
   onOpenPredictionForSchedule,
@@ -872,14 +872,14 @@ ${scheduleItemsFormatted}`.trim();
       />
 
       {/* Server-synced event itinerary by name and service day. Regular schedule cards remain below. */}
-      {onLoadEventRoute && (eventFavorites.length > 0 || eventFavoritesLoading || eventFavoritesError) && (
+      {onLoadEventLeg && (eventFavorites.length > 0 || eventFavoritesLoading || eventFavoritesError) && (
         <div className="mb-4">
           <DriverEventFavoritesSection
             events={eventFavorites}
             isLoading={eventFavoritesLoading}
             error={eventFavoritesError}
             onRefresh={onRefreshEventFavorites}
-            onLoadRoute={onLoadEventRoute}
+            onLoadLeg={onLoadEventLeg}
           />
         </div>
       )}
