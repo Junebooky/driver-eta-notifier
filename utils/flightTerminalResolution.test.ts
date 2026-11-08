@@ -1,3 +1,4 @@
+process.env.DEV_AUTH_ENABLED = 'true';
 import assert from 'node:assert/strict';
 import {
   resolveTerminal,
