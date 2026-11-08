@@ -54,6 +54,9 @@ import { HqDateRangePicker } from "@/components/hq/ui/HqDateRangePicker";
 import { HqSearchSelect } from "@/components/hq/ui/HqSearchSelect";
 import { ALL_HQ_DATES, matchesHqDateRange, formatHqDateRangeLabel, type HqDateRange } from "@/utils/hqDateRange";
 import { exportSettlementSummaryCsv } from "@/utils/settlementSummaryCsv";
+import { buildHqSettlementProfitTrend } from "@/utils/hqSettlementProfitTrend";
+import { getKstTodayDateStr } from "@/utils/dispatchConflictDetector";
+import { resolveHqDateBounds } from "@/utils/hqDateRange";
 
 export interface HqReportsViewProps {
   initialSearchQuery?: string;
@@ -219,6 +222,13 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
       pendingCount,
     };
   }, [periodReports]);
+
+  const profitTrend = useMemo(() => {
+    const periodEnd = resolveHqDateBounds(dateRange)?.to || getKstTodayDateStr();
+    return buildHqSettlementProfitTrend(periodReports, periodEnd);
+  }, [periodReports, dateRange]);
+  const trendHasActualData = profitTrend.some(day => day.reportCount > 0);
+  const trendMaxAbsolute = Math.max(1, ...profitTrend.map(day => Math.abs(day.directProfit)));
 
   // Open contract editor for selected report
   const handleOpenContractModal = () => {
@@ -1234,49 +1244,46 @@ export const HqReportsView: React.FC<HqReportsViewProps> = ({
             <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-100 p-5 shadow-2xs space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-bold text-slate-900">수익성 추이</h3>
-                <span className="text-xs font-semibold text-slate-400">최근 7일 정산</span>
+                <span className="text-xs font-semibold text-slate-400">기간 내 최근 7일 · 실제 행사</span>
               </div>
 
-              <div className="h-44 w-full flex flex-col justify-end relative pt-6">
-                <div className="absolute right-4 top-2 bg-[#3182F6] text-white text-[11px] font-bold px-2.5 py-1 rounded-full shadow-md shadow-blue-500/25 flex items-center gap-1">
-                  <span>{formatKRW(dashboardKpis.totalDirectProfit)}</span>
+              {trendHasActualData ? (
+                <div role="img" aria-label="기간별 실제 정산 직접이익, 행사 날짜 기준" className="grid min-h-48 grid-cols-7 gap-1.5 py-2">
+                  {profitTrend.map(day => (
+                    <div key={day.date} className="flex min-w-0 flex-col items-center justify-end gap-1.5">
+                      <div className="flex h-28 w-full flex-col">
+                        <div className="flex h-14 items-end justify-center">
+                          {day.directProfit > 0 && (
+                            <div title={`${day.date} · 행사 ${day.reportCount}건 · 직접이익 ${formatKRW(day.directProfit)}`}
+                              style={{ height: `${Math.max(5, Math.abs(day.directProfit) / trendMaxAbsolute * 100)}%` }}
+                              className="w-[min(22px,70%)] rounded-t-[6px] bg-[#1E60F3]/85" />
+                          )}
+                        </div>
+                        <div className="h-px w-full shrink-0 bg-[#E7ECF4]" />
+                        <div className="flex h-14 items-start justify-center">
+                          {day.directProfit < 0 && (
+                            <div title={`${day.date} · 행사 ${day.reportCount}건 · 손실 ${formatKRW(day.directProfit)}`}
+                              style={{ height: `${Math.max(5, Math.abs(day.directProfit) / trendMaxAbsolute * 100)}%` }}
+                              className="w-[min(22px,70%)] rounded-b-[6px] bg-[#C88980]/85" />
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-semibold text-[#8290A4] tabular-nums">{day.label}</span>
+                      <span title={`${day.date}: ${day.reportCount}건`}
+                        className="max-w-full truncate text-[10px] font-medium tabular-nums text-[#61728D]">
+                        {day.reportCount ? formatKRW(day.directProfit) : '—'}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-
-                <svg className="w-full h-32 overflow-visible" viewBox="0 0 500 120" preserveAspectRatio="none">
-                  <defs>
-                    <linearGradient id="profitGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#3182F6" stopOpacity="0.18" />
-                      <stop offset="100%" stopColor="#3182F6" stopOpacity="0.0" />
-                    </linearGradient>
-                  </defs>
-                  <line x1="0" y1="20" x2="500" y2="20" stroke="#F1F5F9" strokeWidth="1" strokeDasharray="3 3" />
-                  <line x1="0" y1="60" x2="500" y2="60" stroke="#F1F5F9" strokeWidth="1" strokeDasharray="3 3" />
-                  <line x1="0" y1="100" x2="500" y2="100" stroke="#F1F5F9" strokeWidth="1" strokeDasharray="3 3" />
-
-                  <path
-                    d="M 15 105 C 80 100, 140 70, 200 90 C 260 110, 320 60, 380 75 C 430 85, 460 30, 485 28 L 485 118 L 15 118 Z"
-                    fill="url(#profitGrad)"
-                  />
-                  <path
-                    d="M 15 105 C 80 100, 140 70, 200 90 C 260 110, 320 60, 380 75 C 430 85, 460 30, 485 28"
-                    fill="none"
-                    stroke="#3182F6"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                  />
-                  <circle cx="485" cy="28" r="4.5" fill="#FFFFFF" stroke="#3182F6" strokeWidth="2.5" />
-                </svg>
-
-                <div className="flex justify-between text-[11px] font-semibold text-slate-400 pt-2 border-t border-slate-100">
-                  <span>10/29</span>
-                  <span>10/30</span>
-                  <span>10/31</span>
-                  <span>11/01</span>
-                  <span>11/02</span>
-                  <span>11/03</span>
-                  <span className="font-bold text-[#3182F6]">11/04</span>
+              ) : (
+                <div className="flex min-h-48 flex-col items-center justify-center gap-2 text-center">
+                  <BarChart3 className="size-7 text-[#BBC7D7]" />
+                  <p className="text-[12px] font-medium text-[#73839D]">
+                    최근 7일 동안 정산된 행사 데이터가 없습니다.
+                  </p>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* 비용 구성 (5 cols) */}
