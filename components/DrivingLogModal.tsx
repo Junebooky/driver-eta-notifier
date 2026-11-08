@@ -665,7 +665,7 @@ const DrivingLogModalContent: React.FC<{
       }
 
       haptics.success();
-      const saved = { ...logData, submissionId: res.log?.id || logData.submissionId, hqStatus: res.log?.status, carNumber: res.log?.vehiclePlate || logData.carNumber, vehicleId: res.log?.vehicleId || logData.vehicleId, status: 'submitted' as const };
+      const saved = { ...logData, submissionId: res.log?.id || logData.submissionId, bookingId: res.log?.bookingId || logData.bookingId || bookingId, hqStatus: res.log?.status, carNumber: res.log?.vehiclePlate || logData.carNumber, vehicleId: res.log?.vehicleId || logData.vehicleId, status: 'submitted' as const };
       setLogData(saved); saveDrivingLogDraft(saved);
       setIsPreviewSubmitModalOpen(true);
     } catch (err: any) {
