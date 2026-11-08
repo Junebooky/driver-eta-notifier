@@ -33,6 +33,10 @@ import {
 } from '@/utils/fieldKnowledgeData';
 import { haptics } from '@/utils/haptics';
 import { formatPhoneNumber } from '@/utils/formatters';
+import { HqSearchSelect } from '@/components/hq/ui/HqSearchSelect';
+import { HqModal } from '@/components/hq/ui/HqModal';
+import { HqInlineFeedback } from '@/components/hq/ui/HqInlineFeedback';
+import { isValidFieldKnowledgeImageUrl } from '@/utils/hqKnowledgeImageUrl';
 
 export interface HqFieldKnowledgeViewProps {
   initialSearchQuery?: string;
@@ -65,6 +69,11 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
 
   // Toast feedback state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [feedbackTone, setFeedbackTone] = useState<'info' | 'error'>('info');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [photoDialogMode, setPhotoDialogMode] = useState<'cover' | 'photo' | null>(null);
+  const [photoUrlDraft, setPhotoUrlDraft] = useState('');
+  const [photoInputError, setPhotoInputError] = useState<string | null>(null);
 
   // Sync listener for cross-tab or external changes
   useEffect(() => {
@@ -75,11 +84,9 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
     return () => window.removeEventListener(FIELD_KNOWLEDGE_CHANGE_EVENT, handleUpdate);
   }, []);
 
-  const showToast = (msg: string) => {
+  const showToast = (msg: string, tone: 'info' | 'error' = 'info') => {
+    setFeedbackTone(tone);
     setToastMessage(msg);
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 2800);
   };
 
   // Filtered Items
@@ -145,51 +152,73 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
     setCurrentView('edit');
   };
 
-  // Handle Save
+  // Truthful persistence: these records are browser-local until a real server sync exists.
   const handleSaveItem = () => {
     if (!editingItem) return;
     if (!editingItem.title.trim()) {
       haptics.errorAlert();
-      showToast('장소명은 필수 입력 항목입니다.');
+      showToast('장소명을 입력해 주세요.', 'error');
       return;
     }
-
-    haptics.success();
-    saveFieldKnowledgeItem(editingItem);
-    setItems(getStoredFieldKnowledge());
-    showToast(`'${editingItem.title}' 현장 지식이 성공적으로 저장되었습니다.`);
-    setCurrentView('list');
-    setEditingItem(null);
-  };
-
-  // Handle Delete (with strict neutral gray button per user instruction)
-  const handleDeleteItem = () => {
-    if (!editingItem) return;
-    const confirmDelete = window.confirm(`'${editingItem.title}' 현장 지식을 정말 삭제하시겠습니까?`);
-    if (!confirmDelete) return;
-
-    haptics.mediumTap();
-    deleteFieldKnowledgeItem(editingItem.id);
-    setItems(getStoredFieldKnowledge());
-    showToast(`'${editingItem.title}' 현장 지식이 삭제되었습니다.`);
-    setCurrentView('list');
-    setEditingItem(null);
-  };
-
-  // Handle Change Cover Image URL
-  const handleChangeImageUrl = () => {
-    if (!editingItem) return;
-    const newUrl = window.prompt(
-      '새 대표 이미지 URL을 입력해 주세요 (웹 주소):',
-      editingItem.imageUrl
-    );
-    if (newUrl && newUrl.trim()) {
-      setEditingItem({
-        ...editingItem,
-        imageUrl: newUrl.trim(),
-      });
-      showToast('대표 이미지가 변경되었습니다.');
+    if (!isValidFieldKnowledgeImageUrl(editingItem.imageUrl) ||
+        (editingItem.photos || []).some(url => !isValidFieldKnowledgeImageUrl(url))) {
+      showToast('이미지 주소는 유효한 HTTPS 주소 또는 앱 내부 이미지 경로여야 합니다.', 'error');
+      return;
     }
+    if (!saveFieldKnowledgeItem(editingItem)) {
+      haptics.errorAlert();
+      showToast('이 기기에 저장하지 못했습니다. 브라우저 저장 공간 및 설정을 확인해 주세요.', 'error');
+      return;
+    }
+    haptics.success();
+    setItems(getStoredFieldKnowledge());
+    showToast(`'${editingItem.title}' 현장 지식을 이 브라우저에 저장했습니다.`);
+    setCurrentView('list');
+    setEditingItem(null);
+  };
+
+  const handleDeleteItem = () => {
+    if (editingItem) setDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteItem = () => {
+    if (!editingItem) return;
+    const title = editingItem.title;
+    if (!deleteFieldKnowledgeItem(editingItem.id)) {
+      haptics.errorAlert();
+      showToast('이 기기에서 현장 지식을 삭제하지 못했습니다.', 'error');
+      setDeleteDialogOpen(false);
+      return;
+    }
+    haptics.mediumTap();
+    setItems(getStoredFieldKnowledge());
+    showToast(`'${title}' 현장 지식을 이 브라우저에서 삭제했습니다.`);
+    setDeleteDialogOpen(false);
+    setCurrentView('list');
+    setEditingItem(null);
+  };
+
+  const openPhotoDialog = (mode: 'cover' | 'photo') => {
+    if (!editingItem) return;
+    setPhotoDialogMode(mode);
+    setPhotoUrlDraft(mode === 'cover' ? editingItem.imageUrl : '');
+    setPhotoInputError(null);
+  };
+
+  const savePhotoUrl = () => {
+    if (!editingItem || !photoDialogMode) return;
+    if (!isValidFieldKnowledgeImageUrl(photoUrlDraft)) {
+      setPhotoInputError('유효한 HTTPS 이미지 주소 또는 /images/로 시작하는 경로를 입력해 주세요.');
+      return;
+    }
+    const url = photoUrlDraft.trim();
+    setEditingItem(previous => previous ? photoDialogMode === 'cover'
+      ? { ...previous, imageUrl: url }
+      : { ...previous, photos: [...(previous.photos || []), url] }
+      : previous);
+    setPhotoDialogMode(null);
+    setPhotoInputError(null);
+    showToast('이미지를 수정했습니다. 변경사항을 저장하려면 아래 저장 버튼을 눌러 주세요.');
   };
 
   // =========================================================================
@@ -209,7 +238,7 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
             <div>
               <h2 className="text-lg font-bold text-slate-900 tracking-tight">현장 지식 수정</h2>
               <p className="text-xs text-slate-500 font-medium">
-                기사 Cockpit 앱에 실시간 공유되는 거점 진입 동선 및 의전 가이드
+                이 브라우저에만 저장됩니다. 기사 앱이나 다른 기기에는 자동 공유되지 않습니다.
               </p>
             </div>
           </div>
@@ -243,12 +272,11 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
         </div>
 
         {/* Toast Feedback */}
-        {toastMessage && (
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-2 text-xs font-bold text-blue-800 animate-in fade-in duration-150">
-            <CheckCircle2 className="w-4 h-4 text-[#1E60F3] shrink-0" />
-            <span>{toastMessage}</span>
-          </div>
-        )}
+        <HqInlineFeedback
+          message={toastMessage}
+          tone={feedbackTone}
+          onDismiss={() => setToastMessage(null)}
+        />
 
         {/* Main Header Edit Card: Image + Title/Category/Description */}
         <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-2xs">
@@ -263,7 +291,7 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
                 />
                 <button
                   type="button"
-                  onClick={handleChangeImageUrl}
+                  onClick={() => openPhotoDialog('cover')}
                   className="absolute bottom-2.5 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg bg-black/70 hover:bg-black/85 text-white text-[11px] font-bold flex items-center gap-1.5 backdrop-blur-xs transition-all cursor-pointer"
                 >
                   <Camera className="w-3.5 h-3.5" />
@@ -294,26 +322,16 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
                     <span>카테고리</span>
                     <span className="text-[#1E60F3]">*</span>
                   </label>
-                  <select
+                  <HqSearchSelect
+                    label="현장 지식 카테고리"
+                    size="sm"
                     value={editingItem.category}
-                    onChange={(e) => {
-                      const val = e.target.value as FieldKnowledgeItem['category'];
-                      setEditingItem({
-                        ...editingItem,
-                        category: val,
-                        categoryBadge: val,
-                      });
-                    }}
-                    className="w-full px-3 py-2 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:outline-hidden focus:border-[#1E60F3]"
-                  >
-                    <option value="호텔">호텔</option>
-                    <option value="공항">공항</option>
-                    <option value="식당">식당</option>
-                    <option value="쇼핑">쇼핑</option>
-                    <option value="교통">교통</option>
-                    <option value="긴급">긴급</option>
-                    <option value="기타">기타</option>
-                  </select>
+                    onChange={next => setEditingItem(previous => previous ? {
+                      ...previous, category: next as FieldKnowledgeItem['category'], categoryBadge: next,
+                    } : previous)}
+                    placeholder="카테고리 선택"
+                    options={CATEGORIES.filter(category => category !== '전체').map(category => ({ value: category, label: category }))}
+                  />
                 </div>
               </div>
 
@@ -525,15 +543,7 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
               <h3 className="text-xs font-bold text-slate-700">현장 참조 사진 목록</h3>
               <button
                 type="button"
-                onClick={() => {
-                  const url = window.prompt('추가할 사진 이미지 URL을 입력하세요:');
-                  if (url && url.trim()) {
-                    setEditingItem({
-                      ...editingItem,
-                      photos: [...(editingItem.photos || []), url.trim()],
-                    });
-                  }
-                }}
+                onClick={() => openPhotoDialog('photo')}
                 className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-1 cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -630,7 +640,7 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
               </span>
             </h1>
             <p className="text-xs text-slate-500 font-medium">
-              호텔, 공항, 쇼핑, 미팅포인트 등 VIP 의전 현장 특이사항 및 주차·진입 가이드
+              호텔·공항 등 현장 노하우 · 브라우저에만 보관 (초기 예시는 현장 재확인 필요)
             </p>
           </div>
         </div>
@@ -692,12 +702,11 @@ export const HqFieldKnowledgeView: React.FC<HqFieldKnowledgeViewProps> = ({
       </div>
 
       {/* Toast Feedback */}
-      {toastMessage && (
-        <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-2 text-xs font-bold text-blue-800 animate-in fade-in duration-150">
-          <CheckCircle2 className="w-4 h-4 text-[#1E60F3] shrink-0" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
+      <HqInlineFeedback
+          message={toastMessage}
+          tone={feedbackTone}
+          onDismiss={() => setToastMessage(null)}
+        />
 
       {/* 3-Column Card Grid (Reference 1) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
