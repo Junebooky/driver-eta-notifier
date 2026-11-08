@@ -36,9 +36,9 @@ export function formatFlightTime(dtStr?: string | null): string {
  */
 function isAsianaOperatingFlight(flightId?: string, operatingAirline?: string | null): boolean {
   const airline = (operatingAirline || '').trim();
-  if (/아시아나|ASIANA|^OZ(?:\\d|\\s|$)|^AAR(?:\\d|\\s|$)/i.test(airline)) return true;
+  if (/아시아나|ASIANA|^OZ(?:\d|\s|$)|^AAR(?:\d|\s|$)/i.test(airline)) return true;
   if (airline && airline !== '항공사' && airline.toLowerCase() !== 'unknown') return false;
-  return /^OZ(?:\\d|\\s)/i.test((flightId || '').trim());
+  return /^OZ(?:\d|\s)/i.test((flightId || '').trim());
 }
 
 /**
