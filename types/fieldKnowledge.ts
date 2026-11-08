@@ -14,6 +14,7 @@ export type FieldKnowledgeCategory =
 
 export interface FieldKnowledgeItem {
   id: string;
+  version?: number; // Server optimistic-lock version, absent for new/browser-only items
   title: string; // 장소명 (e.g. '조선팰리스 강남', '인천공항 T2')
   subtitle?: string; // 서브 카피 (e.g. '차량 진입 안내', '미팅포인트 안내')
   category: '공항' | '호텔' | '식당' | '쇼핑' | '교통' | '긴급' | '기타';
