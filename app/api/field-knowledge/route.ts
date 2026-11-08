@@ -53,12 +53,14 @@ export async function POST(req: NextRequest) {
       if (invalid && !invalid.ok) return jsonError(invalid.error, 400);
       const ids = parsed.map(v => v.ok ? v.item.id : '');
       if (new Set(ids).size !== ids.length) return jsonError('중복된 항목 ID는 가져올 수 없습니다.', 400);
-      const values = parsed.filter((v): v is { ok: true; item: NonNullable<typeof v extends {ok:true;item:infer T} ? T : never> } => v.ok);
-      const rows = values.map(({ item }) => ({
-        organization_id: FIELD_KNOWLEDGE_ORG, id: item.id,
-        content: item, version: 1, archived: false,
-        updated_at: now, updated_by: author,
-      }));
+      const rows = parsed.map(value => {
+        if (!value.ok) throw new Error(value.error);
+        return {
+          organization_id: FIELD_KNOWLEDGE_ORG, id: value.item.id,
+          content: value.item, version: 1, archived: false,
+          updated_at: now, updated_by: author,
+        };
+      });
       const { data, error } = await supabaseAdmin.from(TABLE)
         .upsert(rows, { onConflict: 'organization_id,id', ignoreDuplicates: true })
         .select('id');
