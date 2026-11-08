@@ -1399,6 +1399,8 @@ export default function DriverCockpit() {
       fetchRouteEstimate(originPreset, destinationPreset, []);
 
       // Switch to Drive tab and open unified navigation confirm flow with fresh ETA recalculation
+      // Never show an ETA calculated for a previous selected leg if the next request fails.
+      setScheduleNaviFreshResult(null);
       setActiveTab('drive');
       setIsScheduleNaviConfirmOpen(true);
       setIsScheduleNaviLoading(true);
