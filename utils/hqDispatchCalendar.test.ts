@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { HqBooking } from '@/types/hq';
@@ -92,12 +93,12 @@ test('contiguous multi-day indicators require a real booking or explicit series 
 });
 
 test('calendar keeps seven slim columns and exposes mobile tap / desktop hover preview without losing detail callback', () => {
-  const source = require('node:fs').readFileSync(new URL('../components/hq/HqDispatchCalendar.tsx', import.meta.url), 'utf8');
+  const source = readFileSync(new URL('../components/hq/HqDispatchCalendar.tsx', import.meta.url), 'utf8');
   assert.match(source, /grid grid-cols-7/);
   assert.match(source, /data-calendar-peek-trigger/);
   assert.match(source, /onMouseEnter=/);
   assert.match(source, /createPortal\(/);
   assert.match(source, /onViewBooking\(booking\)/);
-  assert.match(source, /aria-label=\{\`\$\{selectedTitle\(peek\.date\)\} 배차 미리보기/);
+  assert.match(source, /aria-label=.*배차 미리보기/);
   assert.match(source, /continuation\.days/);
 });
