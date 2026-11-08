@@ -30,24 +30,47 @@ export function formatFlightTime(dtStr?: string | null): string {
 }
 
 /**
- * Resolves Terminal name from Incheon Airport terminal ID or flight prefix
+ * Resolve the *operating* airline, not just the marketing flight prefix.
+ * Codeshares must use the operating airline's terminal; the airport's explicit
+ * terminal ID remains authoritative for other airlines.
  */
-export function resolveTerminal(terminalId?: string | null, flightId?: string): { terminal: string; isT2: boolean } {
-  const prefix = (flightId || '').slice(0, 2).toUpperCase();
-  const tId = (terminalId || '').toUpperCase();
+function isAsianaOperatingFlight(flightId?: string, operatingAirline?: string | null): boolean {
+  const airline = (operatingAirline || '').trim();
+  if (/아시아나|ASIANA|^OZ(?:\\d|\\s|$)|^AAR(?:\\d|\\s|$)/i.test(airline)) return true;
+  if (airline && airline !== '항공사' && airline.toLowerCase() !== 'unknown') return false;
+  return /^OZ(?:\\d|\\s)/i.test((flightId || '').trim());
+}
 
-  // Rule 1: Asiana Airlines (OZ) or P01/P02 is strictly Terminal 1
-  // (Incheon Airport API mistakenly returns P03 for Asiana flights like OZ741)
-  if (prefix === 'OZ' || tId === 'P01' || tId === 'P02') {
-    return { terminal: '제1여객터미널', isT2: false };
+/**
+ * Asiana moved ALL Incheon departures/arrivals from T1 to T2 at
+ * 2026-01-14 00:00 KST (source: flyasiana.com, notice CM202509300002526502).
+ * An old/stale P01 or P02 API value must not override this published change.
+ * flightDate is the airport flight's KST calendar date (YYYY-MM-DD).
+ */
+export function resolveTerminal(
+  terminalId?: string | null,
+  flightId?: string,
+  flightDate?: string | null,
+  operatingAirline?: string | null
+): { terminal: string; isT2: boolean } {
+  const prefix = (flightId || '').trim().slice(0, 2).toUpperCase();
+  const tId = (terminalId || '').trim().toUpperCase();
+  const ymd = (flightDate || '').replace(/[^0-9]/g, '').slice(0, 8);
+
+  if (isAsianaOperatingFlight(flightId, operatingAirline)) {
+    // Missing date means a current/live search. Do not revive the obsolete T1 rule.
+    const isT2 = !ymd || ymd >= '20260114';
+    return { terminal: isT2 ? '제2여객터미널' : '제1여객터미널', isT2 };
   }
 
-  // Rule 2: T2 airlines or explicitly P03
+  // For codeshares and other carriers, trust the airport's explicit terminal.
+  if (tId === 'P03' || tId === 'T2') return { terminal: '제2여객터미널', isT2: true };
+  if (tId === 'P01' || tId === 'P02' || tId === 'T1') return { terminal: '제1여객터미널', isT2: false };
+
   const t2Airlines = ['KE', 'DL', 'AF', 'KL', 'AM', 'GA', 'ME', 'RO', 'SV', 'UX', 'VN', 'MF', 'LJ'];
-  if (t2Airlines.includes(prefix) || tId === 'P03') {
-    return { terminal: '제2여객터미널', isT2: true };
-  }
+  if (t2Airlines.includes(prefix)) return { terminal: '제2여객터미널', isT2: true };
 
+  // Unknown airline + missing terminal: preserve existing T1 fallback.
   return { terminal: '제1여객터미널', isT2: false };
 }
 
@@ -108,12 +131,21 @@ export function resolveDepartureDoor(
   terminal: string,
   isT2: boolean,
   flightId: string,
-  checkinRange?: string | null
+  checkinRange?: string | null,
+  operatingAirline?: string | null
 ): { departureLocationText: string; suggestedDoor: string } {
   const cleanCounter = (checkinRange || '').trim();
+  const asianaT2 = isT2 && isAsianaOperatingFlight(flightId, operatingAirline);
 
   // If check-in counter is confirmed by airport API
   if (cleanCounter) {
+    // Asiana now checks in at T2 G–J counters. Do not invent a drop-off door.
+    if (asianaT2) {
+      return {
+        departureLocationText: `${terminal} 3층 (카운터 ${cleanCounter} / 하차 도어 현장 확인)`,
+        suggestedDoor: '현장 확인',
+      };
+    }
     const firstLetter = cleanCounter.replace(/[^A-Za-z]/g, '').charAt(0).toUpperCase();
 
     if (isT2) {
@@ -160,7 +192,15 @@ export function resolveDepartureDoor(
     };
   }
 
-  if (prefix === 'OZ') {
+  if (asianaT2) {
+    return {
+      departureLocationText: `${terminal} 3층 G~J열 체크인 카운터 (하차 도어 현장 확인)`,
+      suggestedDoor: '현장 확인',
+    };
+  }
+
+  if (prefix === 'OZ' && !isT2) {
+    // Pre-2026-01-14 historical T1 guidance only.
     return {
       departureLocationText: `${terminal} 3층 1번 도어 (프리미엄 체크인 존 카운터 A)`,
       suggestedDoor: '1번 도어',
@@ -648,6 +688,7 @@ export function formatFlightReportEnglish(
 
   const isGmp = flight.airportKind === 'GMP' || flight.terminal.includes('김포') || flight.terminal.includes('국내');
   const isT2 = flight.terminal.includes('2') || flight.terminalId === 'P03';
+  const asianaT2 = isT2 && isAsianaOperatingFlight(flight.flightId, flight.airline);
   const terminalEn = isGmp
     ? flight.isDomestic || flight.terminal.includes('국내')
       ? 'Gimpo Domestic'
@@ -675,10 +716,11 @@ export function formatFlightReportEnglish(
   } else {
     const cleanCounter = (flight.checkinRange || '').trim();
     const doorMatch = (flight.suggestedDoor || flight.departureLocationText || '').match(/(\d+(?:~\d+)?)\s*번\s*도어/);
-    const doorEn = doorMatch ? `Door ${doorMatch[1]}` : isT2 ? 'Door 4~5' : 'Door 7~8';
+    const doorEn = doorMatch ? `Door ${doorMatch[1]}` : asianaT2 ? 'Door TBD' : isT2 ? 'Door 4~5' : 'Door 7~8';
     const floorEn = isGmp ? '2F' : '3F';
-    const depLocEn = cleanCounter
-      ? `${terminalEn} ${floorEn} (Counter ${cleanCounter} / ${doorEn})`
+    const effectiveCounter = cleanCounter || (asianaT2 ? 'G–J' : '');
+    const depLocEn = effectiveCounter
+      ? `${terminalEn} ${floorEn} (Counter ${effectiveCounter} / ${doorEn})`
       : `${terminalEn} ${floorEn} (${doorEn})`;
 
     lines.push(`• Flight: ${flight.flightId} (${airportCode} ➔ ${airportEn})`);
