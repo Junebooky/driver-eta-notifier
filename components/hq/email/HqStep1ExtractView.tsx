@@ -89,6 +89,7 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
 
   // Field values with safe fallbacks
   const companyName = extractedDraft?.companyName || '';
+  const eventName = extractedDraft?.eventName || '';
   const contactName = extractedDraft?.contactName || '';
   const contactPhone = extractedDraft?.contactPhone || '';
   const contactEmail = extractedDraft?.contactEmail || fromAddress;
@@ -685,6 +686,18 @@ export const HqStep1ExtractView: React.FC<HqStep1ExtractViewProps> = ({
                         : '고객 관리에 저장'}
                   </span>
                 </button>
+              </div>
+
+              {/* Event title is edited independently of the customer's CRM company. */}
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <label htmlFor="hq-extracted-event-name" className="flex shrink-0 items-center gap-2 text-xs font-semibold text-[#6E809B]">
+                  <Calendar className="h-4 w-4 text-[#94A3B8]" /> 행사명
+                </label>
+                <input id="hq-extracted-event-name" type="text" value={eventName}
+                  onChange={(e) => extractedDraft && onUpdateDraft?.({ ...extractedDraft, eventName: e.target.value })}
+                  maxLength={160} placeholder={companyName ? `행사명 입력 (고객사: ${companyName})` : '고객사 이메일의 행사명 입력'}
+                  className="h-10 w-full rounded-[12px] bg-[#F6F7FA] px-3.5 text-[13px] font-semibold text-[#17233B] outline-none placeholder:text-[#A8B5C8] focus:bg-white focus:ring-1 focus:ring-[#1E60F3]/35 sm:max-w-[65%]"
+                />
               </div>
 
               {/* 예약 담당자 */}
