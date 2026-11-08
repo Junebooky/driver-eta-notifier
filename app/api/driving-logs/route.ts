@@ -325,7 +325,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: false, error: '운행일자와 예약 기간이 다릅니다.' }, { status: 409 });
       }
       if (scheduleRow.driver_id && scheduleRow.driver_id !== effectiveDriverId) {
-        return NextResponse.json({ ok: false, error: '예약 담당 기사와 운행일지 작성자가 다릅니다.' }, { status: 409 });
+        return NextResponse.json({ ok: false, error: '예약 담당 기사와 운행일지 작성자가 다릅니다.' }, { status: 403 });
       }
       if(scheduleRow.schedule_meta?.serviceMode==='vehicle_only' || ['draft','unassigned','cancelled'].includes(scheduleRow.dispatch_status))return NextResponse.json({ok:false,error:'현재 기사 운행으로 배정된 예약만 연결할 수 있습니다.'},{status:403});
       verifiedSchedule=scheduleRow;
@@ -460,8 +460,7 @@ export async function POST(req: NextRequest) {
         .select('id, org_id, driver_id, date, end_date, vehicle_plate, dispatch_status, schedule_meta')
         .eq('org_id', auth.session.org)
         .eq('driver_id', effectiveDriverId)
-        .eq('dispatch_status', 'published')
-        .lte('date', drivingDate);
+        .eq('dispatch_status', 'published');
 
       if (candidateQuery.error) {
         bookingLink = { status: 'review_required', reason: 'schedule_lookup_failed' };
