@@ -16,11 +16,11 @@ async function main(){
       'END $$;',
       'CREATE SCHEMA cockpit;',
       'GRANT USAGE ON SCHEMA cockpit TO service_role;',
-      'CREATE TABLE cockpit.schedules(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), org_id text, customer_name text);',
+      'CREATE TABLE cockpit.schedules(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), org_id text, customer_name text, date date, end_date date, driver_id uuid, vehicle_plate text);',
       'CREATE TABLE cockpit.driving_logs(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), booking_id uuid,',
-      ' organization_id text, status text, customer_service_start time, customer_service_end time);',
+      ' organization_id text, status text, customer_service_start time, customer_service_end time, driving_date date, driver_id uuid, vehicle_plate text, updated_at timestamptz);',
       'CREATE TABLE cockpit.expenses(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), booking_id uuid, driving_log_id uuid,',
-      ' organization_id text, status text, amount integer);',
+      ' organization_id text, status text, amount integer, updated_at timestamptz);',
     ].join('\n'));
     const migration=readFileSync('supabase/migrations/20261108163000_server_settlement_ledger.sql','utf8');
     await db.query(migration);await db.query(migration);
@@ -70,7 +70,34 @@ async function main(){
     assert.deepEqual(audit.rows.map(r=>r.action),['prepare','price','approve','issue']);
     assert.deepEqual(audit.rows.map(r=>r.version),[1,2,3,4]);
     assert.ok(audit.rows.every(r=>r.actor_id===actor));
-    process.stdout.write('Settlement migration, RLS, CAS, stale source, approvals and audit passed\n');
+    const linkMigration=readFileSync('supabase/migrations/20261108181500_booking_driving_log_links.sql','utf8');
+    await db.query(linkMigration);
+    await db.query(linkMigration);
+    const linkPerms=await db.query("SELECT has_function_privilege('anon','cockpit.link_driving_log_to_booking(text,uuid,uuid,text)','EXECUTE') AS anon_link, has_function_privilege('service_role','cockpit.link_driving_log_to_booking(text,uuid,uuid,text)','EXECUTE') AS service_link");
+    assert.equal(linkPerms.rows[0].anon_link,false);
+    assert.equal(linkPerms.rows[0].service_link,true);
+    const secondSchedule='1cde9d0a-64d9-4a06-8857-9a84271c8403';
+    const thirdSchedule='7bfef8d0-bb35-4945-84b8-282f08cfcf30';
+    await db.query("INSERT INTO cockpit.schedules(id,org_id,date,customer_name,vehicle_plate) VALUES($1,$2,'2026-11-08','Real Client','12가3456'),($3,$2,'2026-11-09','Real Client','12가3456')",
+      [secondSchedule,org,thirdSchedule]);
+    const orphan=(await db.query("INSERT INTO cockpit.driving_logs(organization_id,driving_date,vehicle_plate,status) VALUES($1,'2026-11-08','12가3456','승인 완료') RETURNING id",[org])).rows[0].id as string;
+    const orphanExpense=(await db.query("INSERT INTO cockpit.expenses(organization_id,driving_log_id,status,amount) VALUES($1,$2,'승인 완료',12000) RETURNING id",[org,orphan])).rows[0].id as string;
+    const link=async(logId:string,bookingId:string)=>(await db.query(
+      'SELECT cockpit.link_driving_log_to_booking($1,$2::uuid,$3::uuid,$4) AS result',
+      [org,logId,bookingId,actor])).rows[0].result;
+    await assert.rejects(link(orphan,thirdSchedule),/DATE_MISMATCH/);
+    const linked=await link(orphan,secondSchedule);
+    assert.equal(linked.ok,true);
+    assert.equal(linked.expenseCount,1);
+    assert.equal((await db.query('SELECT booking_id FROM cockpit.driving_logs WHERE id=$1',[orphan])).rows[0].booking_id,secondSchedule);
+    assert.equal((await db.query('SELECT booking_id FROM cockpit.expenses WHERE id=$1',[orphanExpense])).rows[0].booking_id,secondSchedule);
+    assert.equal((await link(orphan,secondSchedule)).alreadyLinked,true);
+    assert.equal((await db.query('SELECT count(*)::int as n FROM cockpit.driving_log_booking_link_audit WHERE driving_log_id=$1',[orphan])).rows[0].n,1);
+    const orphan2=(await db.query("INSERT INTO cockpit.driving_logs(organization_id,driving_date) VALUES($1,'2026-11-08') RETURNING id",[org])).rows[0].id as string;
+    await assert.rejects(link(orphan2,secondSchedule),/BOOKING_HAS_LOG/);
+    await assert.rejects(link(orphan2,schedule),/DATE_MISMATCH|SETTLEMENT_LOCKED/);
+    assert.equal((await db.query('SELECT booking_id FROM cockpit.driving_logs WHERE id=$1',[orphan2])).rows[0].booking_id,null);
+    process.stdout.write('Settlement and reviewed booking link migrations, RLS, conflict and expense propagation passed\n');
   }finally{await db.end();}
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});
