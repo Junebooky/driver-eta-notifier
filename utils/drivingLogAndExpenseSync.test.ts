@@ -98,6 +98,11 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
   const mockSchedules = [
     {
       id: BOOKING_CHANEL_UUID,
+      org_id: 'vip_limousine_korea',
+      driver_id: DRIVER_A_UUID,
+      date: '2026-11-09',
+      end_date: '2026-11-09',
+      dispatch_status: 'published',
       customer_name: '샤넬코리아',
       driver_name: '윤태준',
       vehicle_plate: '116허 1514',
@@ -106,6 +111,11 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
     },
     {
       id: BOOKING_MORNING_UUID,
+      org_id: 'vip_limousine_korea',
+      driver_id: DRIVER_A_UUID,
+      date: '2026-11-09',
+      end_date: '2026-11-09',
+      dispatch_status: 'published',
       customer_name: '오전 고객사',
       driver_name: '윤태준',
       vehicle_plate: '116허 1514',
@@ -114,6 +124,11 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
     },
     {
       id: BOOKING_AFTERNOON_UUID,
+      org_id: 'vip_limousine_korea',
+      driver_id: DRIVER_A_UUID,
+      date: '2026-11-09',
+      end_date: '2026-11-09',
+      dispatch_status: 'published',
       customer_name: '오후 고객사',
       driver_name: '윤태준',
       vehicle_plate: '116허 1514',
@@ -122,6 +137,11 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
     },
     {
       id: BOOKING_FAIL_UUID,
+      org_id: 'vip_limousine_korea',
+      driver_id: DRIVER_A_UUID,
+      date: '2026-11-09',
+      end_date: '2026-11-09',
+      dispatch_status: 'published',
       customer_name: '오류 테스트 고객사',
       driver_name: '윤태준',
       vehicle_plate: '116허 1514',
@@ -130,6 +150,11 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
     },
     {
       id: BOOKING_DRIVER_B_ONLY_UUID,
+      org_id: 'vip_limousine_korea',
+      driver_id: DRIVER_B_UUID,
+      date: '2026-11-09',
+      end_date: '2026-11-09',
+      dispatch_status: 'published',
       customer_name: '민성호 전용 고객사',
       driver_name: '민성호',
       vehicle_plate: '142호 7815',
@@ -138,6 +163,11 @@ test('Driver & HQ Driving Log / Expense Sync & Security Test Suite', async () =>
     },
     {
       id: BOOKING_SPOOFED_NAME_UUID,
+      org_id: 'vip_limousine_korea',
+      driver_id: DRIVER_B_UUID,
+      date: '2026-11-09',
+      end_date: '2026-11-09',
+      dispatch_status: 'published',
       customer_name: '이름만 일치하는 타인 예약 (Loose Match Bypass Attack)',
       driver_name: '윤태준', // Same driver name
       vehicle_plate: '116허 1514', // Same vehicle plate

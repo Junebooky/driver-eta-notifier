@@ -6,6 +6,7 @@ import { custodyOdometerForLog } from '@/utils/vehicleCustody';
 import type { VehicleCustody } from '@/types/vehicleCustody';
 import { HqDrivingLog, HqDrivingLogStatus } from '@/types/drivingLogHq';
 import { passengerSummaryFromProfile } from '@/utils/drivingLogPassenger';
+import { findUnambiguousDrivingLogBooking } from '@/utils/drivingLogBookingMatch';
 
 export const dynamic = 'force-dynamic';
 
@@ -317,6 +318,15 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      if (scheduleRow.org_id !== auth.session.org) {
+        return NextResponse.json({ ok: false, error: '다른 조직의 예약을 연결할 수 없습니다.' }, { status: 403 });
+      }
+      if (scheduleRow.date > drivingDate || (scheduleRow.end_date || scheduleRow.date) < drivingDate) {
+        return NextResponse.json({ ok: false, error: '운행일자와 예약 기간이 다릅니다.' }, { status: 409 });
+      }
+      if (scheduleRow.driver_id && scheduleRow.driver_id !== effectiveDriverId) {
+        return NextResponse.json({ ok: false, error: '예약 담당 기사와 운행일지 작성자가 다릅니다.' }, { status: 403 });
+      }
       if(scheduleRow.schedule_meta?.serviceMode==='vehicle_only' || ['draft','unassigned','cancelled'].includes(scheduleRow.dispatch_status))return NextResponse.json({ok:false,error:'현재 기사 운행으로 배정된 예약만 연결할 수 있습니다.'},{status:403});
       verifiedSchedule=scheduleRow;
       // If requester is a driver, verify that this booking is strictly assigned to their driver_id
@@ -438,9 +448,63 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Real HQ submission only. KakaoTalk copy/paste report previews never use this endpoint.
+    // Do not guess when the driver has two bookings on the same day.
+    // Reuse the PR #77 atomic RPC so matching expenses and audit records remain consistent.
+    let confirmedRow = savedRow;
+    let bookingLink: { status: 'not_applicable' | 'auto_linked' | 'review_required'; reason?: string } =
+      { status: 'not_applicable' };
+    if (isSubmitting && !bookingId && !savedRow.booking_id) {
+      const candidateQuery = await supabaseAdmin
+        .from('schedules')
+        .select('id, org_id, driver_id, date, end_date, vehicle_plate, dispatch_status, schedule_meta')
+        .eq('org_id', auth.session.org)
+        .eq('driver_id', effectiveDriverId)
+        .eq('dispatch_status', 'published');
+
+      if (candidateQuery.error) {
+        bookingLink = { status: 'review_required', reason: 'schedule_lookup_failed' };
+      } else {
+        const match = findUnambiguousDrivingLogBooking(candidateQuery.data || [], {
+          orgId: auth.session.org,
+          driverId: effectiveDriverId,
+          drivingDate,
+          vehiclePlate: vehiclePlate || auth.session.carNumber || '',
+        });
+        if (!match.bookingId) {
+          bookingLink = { status: 'review_required', reason: match.reason };
+        } else {
+          const { data: linked, error: linkError } = await supabaseAdmin
+            .rpc('link_driving_log_to_booking', {
+              p_org: auth.session.org,
+              p_log: savedRow.id,
+              p_booking: match.bookingId,
+              p_actor: 'auto_driver_submit:' + effectiveDriverId,
+            });
+          if (linkError || !linked?.ok) {
+            // The submitted log is retained. HQ can safely review and link it manually.
+            bookingLink = { status: 'review_required', reason: 'atomic_link_rejected' };
+          } else {
+            const refreshed = await supabaseAdmin.from('driving_logs')
+              .select('*')
+              .eq('id', savedRow.id)
+              .eq('organization_id', auth.session.org)
+              .maybeSingle();
+            if (!refreshed.error && refreshed.data?.booking_id === match.bookingId) {
+              confirmedRow = refreshed.data;
+              bookingLink = { status: 'auto_linked' };
+            } else {
+              bookingLink = { status: 'review_required', reason: 'link_verification_failed' };
+            }
+          }
+        }
+      }
+    }
+
     return NextResponse.json({
       ok: true,
-      log: mapDbRowToDrivingLog(savedRow),
+      log: mapDbRowToDrivingLog(confirmedRow),
+      bookingLink,
       message: isSubmitting ? '운행일지가 성공적으로 제출되었습니다.' : '임시 저장되었습니다.',
     });
   } catch (err: any) {
