@@ -23,7 +23,10 @@ import { useFleetAvailability } from '@/hooks/useFleetAvailability';
 import { validateDispatchInterval } from '@/utils/dispatchInterval';
 import { createRetryableJsonMutation } from '@/utils/retryableJsonMutation';
 import { haptics } from '@/utils/haptics';
-import { VIP_REAL_VEHICLES, stripManufacturerName } from '@/utils/vehicleData';
+import { getVehicleImage, stripManufacturerName } from '@/utils/vehicleData';
+import { HqDispatchTimeField } from './ui/HqDispatchTimeField';
+import { HqSearchSelect } from './ui/HqSearchSelect';
+import { parseFlexibleTimeInput, formatTimeKoreanAmPm, getDriverProfileImage } from './HqQuickDispatch';
 import { HqDriverVehicleInfoModal } from './bookings/HqDriverVehicleInfoModal';
 import { HqDriverAssetManagerModal } from './drivers/HqDriverAssetManagerModal';
 import { useHqDrivers } from '@/utils/useHqDrivers';
@@ -211,7 +214,7 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
     }
 
     const matchedDriver = fleet.data?.drivers.find(d => d.id === selectedDriverId);
-    const matchedVehicle = VIP_REAL_VEHICLES.find((v) => v.plate === selectedVehiclePlate);
+    const matchedVehicle = fleet.data?.vehicles.find((v) => v.plate === selectedVehiclePlate);
     const resolvedModel =
       matchedVehicle?.model ||
       matchedDriver?.model ||
@@ -496,26 +499,31 @@ export const HqBookingDetailModal: React.FC<HqBookingDetailModalProps> = ({
                     onChange={(newDate) => setPickupDate(newDate)}
                     heightClass="h-11"
                   />
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      픽업 시간 <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="time"
-                      value={pickupTime}
-                      onChange={(e) => setPickupTime(e.target.value)}
-                      className="w-full h-11 px-3.5 bg-white border border-slate-200 hover:border-blue-400 focus:border-[#1E60F3] focus:ring-2 focus:ring-blue-100 rounded-xl text-sm font-bold text-slate-900 shadow-2xs transition-all outline-none cursor-pointer"
-                    />
-                  </div>
+                  <HqDispatchTimeField
+                    label="픽업 시간"
+                    value={pickupTime}
+                    onChange={(next) => { setPickupTime(next); setErrorMsg(null); }}
+                    parseInput={parseFlexibleTimeInput}
+                    formatValue={formatTimeKoreanAmPm}
+                    required
+                    compact
+                    disabled={isCancelled || isSaving}
+                  />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <label className="text-xs font-bold text-slate-700">종료 날짜
-                    <input type="date" aria-label="종료 날짜" value={endDate} onChange={e => setEndDate(e.target.value)} className="mt-1 h-11 w-full rounded-xl border border-slate-200 px-3" />
+                    <input type="date" aria-label="종료 날짜" value={endDate} min={pickupDate || undefined} onChange={e => setEndDate(e.target.value)} className="mt-1 min-h-11 w-full rounded-[13px] bg-[#F7F9FC] px-3 text-[13px] font-semibold text-[#253552] outline-none focus:ring-2 focus:ring-[#1E60F3]/20" />
                   </label>
-                  <label className="text-xs font-bold text-slate-700">실제 종료 시간
-                    <input type="time" aria-label="실제 종료 시간" value={endTime} onChange={e => setEndTime(e.target.value)} className="mt-1 h-11 w-full rounded-xl border border-slate-200 px-3" />
-                  </label>
+                  <HqDispatchTimeField
+                    label="실제 종료 시간"
+                    value={endTime}
+                    onChange={(next) => { setEndTime(next); setErrorMsg(null); }}
+                    parseInput={parseFlexibleTimeInput}
+                    formatValue={formatTimeKoreanAmPm}
+                    compact
+                    disabled={isCancelled || isSaving}
+                  />
                 </div>
                 {fleet.error && <p role="alert" className="text-xs text-red-600">{fleet.error}</p>}
 
