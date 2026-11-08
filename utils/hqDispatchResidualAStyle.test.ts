@@ -22,8 +22,11 @@ test('booking detail keeps conflict guard and safe dispatch publishing',()=>{
   assert.match(detail,/handleSaveOrPublish\('published'\)/);
   assert.match(detail,/modalConflicts\.length > 0/);
   assert.match(detail,/revisionChanged/);
-  assert.match(detail,/fleet\.data\?\.drivers\.map/);
-  assert.match(detail,/fleet\.data\?\.vehicles\.map/);
+  assert.match(detail,/\(fleet\.data\?\.drivers \|\| \[\]\)\.map/);
+  assert.match(detail,/\(fleet\.data\?\.vehicles \|\| \[\]\)\.map/);
+  assert.match(detail,/<HqSearchSelect/);
+  assert.match(detail,/disabled: !driver\.isAvailable/);
+  assert.match(detail,/disabled: !v\.isAvailable/);
   assert.doesNotMatch(detail,/shadow-2xl|bg-slate-900 border border-slate-700/);
   assert.match(css,/HQ booking detail A-plan/);
 });
