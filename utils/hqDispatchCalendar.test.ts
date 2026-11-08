@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import type { HqBooking } from '@/types/hq';
 import { HqDispatchCalendar } from '../components/hq/HqDispatchCalendar';
 import { getKstTodayDateStr } from './dispatchConflictDetector';
-import { getHqCalendarDays, isHqBookingScheduledOn, shiftHqCalendarMonth, sortHqCalendarBookings } from './hqDispatchCalendar';
+import { getHqCalendarDays, isHqBookingScheduledOn, shiftHqCalendarMonth, sortHqCalendarBookings, hqBookingSeriesKey, getHqCalendarContinuity } from './hqDispatchCalendar';
 
 test('November 2026 grid begins on Sunday and covers all 30 days in five full weeks', () => {
   const days = getHqCalendarDays('2026-11');
@@ -69,4 +69,35 @@ test('calendar renders actual HQ booking values, not demonstration fixtures or f
   }));
   assert.ok(empty.includes('이 날짜에 등록된 배차가 없어요.'));
   assert.equal(empty.includes('실제데이터 연결 검증'), false);
+});
+
+test('contiguous multi-day indicators require a real booking or explicit series and matching vehicle', () => {
+  const base = {
+    id: 'multi', customerName: '연속 실제 운행', customerId: 'org-a',
+    pickupDate: '2026-11-10', endDate: '2026-11-12', pickupTime: '09:00',
+    vehicleId: 'vehicle-a', vehiclePlate: '193호 5336',
+  } as HqBooking;
+  const within = getHqCalendarContinuity([base], '2026-11-11');
+  assert.deepEqual({ previous: within?.previous, next: within?.next, days: within?.days },
+    { previous: true, next: true, days: 3 });
+  assert.equal(getHqCalendarContinuity([base], '2026-11-09'), null);
+  const first = { ...base, id: 'day-1', endDate: undefined, groupId: 'real-group-a' };
+  const second = { ...base, id: 'day-2', pickupDate: '2026-11-11', endDate: undefined, groupId: 'real-group-a' };
+  assert.equal(getHqCalendarContinuity([first, second], '2026-11-10')?.next, true);
+  assert.equal(getHqCalendarContinuity([first, second], '2026-11-11')?.previous, true);
+  assert.equal(getHqCalendarContinuity([first, { ...second, vehicleId: 'vehicle-b' }], '2026-11-10'), null);
+  assert.equal(getHqCalendarContinuity([first, { ...second, groupId: 'group-b' }], '2026-11-10'), null);
+  assert.equal(getHqCalendarContinuity([{ ...first, groupId: undefined }, { ...second, groupId: undefined }], '2026-11-10'), null);
+  assert.notEqual(hqBookingSeriesKey(first), hqBookingSeriesKey({ ...second, vehicleId: 'vehicle-b' }));
+});
+
+test('calendar keeps seven slim columns and exposes mobile tap / desktop hover preview without losing detail callback', () => {
+  const source = require('node:fs').readFileSync(new URL('../components/hq/HqDispatchCalendar.tsx', import.meta.url), 'utf8');
+  assert.match(source, /grid grid-cols-7/);
+  assert.match(source, /data-calendar-peek-trigger/);
+  assert.match(source, /onMouseEnter=/);
+  assert.match(source, /createPortal\(/);
+  assert.match(source, /onViewBooking\(booking\)/);
+  assert.match(source, /aria-label=\{\`\$\{selectedTitle\(peek\.date\)\} 배차 미리보기/);
+  assert.match(source, /continuation\.days/);
 });
