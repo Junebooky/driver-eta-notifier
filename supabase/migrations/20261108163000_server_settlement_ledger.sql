@@ -64,7 +64,13 @@ AS $$
     'expenses', COALESCE((
       SELECT jsonb_agg(to_jsonb(e) ORDER BY e.id)
       FROM cockpit.expenses e
-      WHERE e.booking_id = s.id AND e.organization_id = p_org
+      WHERE e.organization_id = p_org AND (
+        e.booking_id = s.id OR EXISTS (
+          SELECT 1 FROM cockpit.driving_logs linked
+          WHERE linked.id = e.driving_log_id
+            AND linked.booking_id = s.id AND linked.organization_id = p_org
+        )
+      )
     ), '[]'::jsonb)
   )::text)
   FROM cockpit.schedules s
@@ -100,12 +106,12 @@ BEGIN
     OR p_expected_version < 0 THEN
     RAISE EXCEPTION 'INVALID_SETTLEMENT_REQUEST';
   END IF;
+  SELECT * INTO v_row FROM cockpit.settlement_documents
+   WHERE organization_id = p_org AND schedule_id = p_schedule FOR UPDATE;
+  -- Evaluate the live source after obtaining the document lock.
   v_live := cockpit.settlement_live_source_hash(p_schedule, p_org);
   IF v_live IS NULL THEN RAISE EXCEPTION 'SCHEDULE_NOT_FOUND'; END IF;
   IF v_live IS DISTINCT FROM p_source_hash THEN RAISE EXCEPTION 'SOURCE_CHANGED'; END IF;
-
-  SELECT * INTO v_row FROM cockpit.settlement_documents
-   WHERE organization_id = p_org AND schedule_id = p_schedule FOR UPDATE;
 
   IF NOT FOUND THEN
     IF p_action <> 'prepare' OR p_expected_version <> 0
@@ -156,9 +162,13 @@ BEGIN
         EXISTS(SELECT 1 FROM cockpit.driving_logs
           WHERE booking_id=p_schedule AND organization_id=p_org
           AND status NOT IN ('승인 완료','approved')) OR
-        EXISTS(SELECT 1 FROM cockpit.expenses
-          WHERE booking_id=p_schedule AND organization_id=p_org
-          AND status NOT IN ('승인 완료','approved','반려','rejected')) THEN
+        EXISTS(SELECT 1 FROM cockpit.expenses e
+          WHERE e.organization_id=p_org
+          AND (e.booking_id=p_schedule OR EXISTS (
+            SELECT 1 FROM cockpit.driving_logs l
+             WHERE l.id=e.driving_log_id AND l.booking_id=p_schedule AND l.organization_id=p_org
+          ))
+          AND e.status NOT IN ('승인 완료','approved','반려','rejected')) THEN
         RAISE EXCEPTION 'UNVERIFIED_OPERATING_RECORDS';
       END IF;
       UPDATE cockpit.settlement_documents SET
