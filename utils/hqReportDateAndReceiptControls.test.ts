@@ -14,7 +14,7 @@ const report = (id: string, day: string, profit: number, name = '테스트 고�
   totalDriverLaborCost: 250000, totalVehicleDirectCost: 110000, totalOtherDirectCost: 40000,
   totalDirectProfit: profit, averageDirectMarginPercent: profit / 10000,
   status: 'approved', profitConfirmStatus: 'pending',
-} as EventSettlementReport);
+} as unknown as EventSettlementReport);
 
 test('selected calendar range is inclusive and filters dates in dotted Korean settlement records', () => {
   const rows = [
