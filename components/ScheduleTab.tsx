@@ -16,6 +16,7 @@ import { parseVehicleDetails } from '@/components/ProfileModal';
 import { ensureClientAuth } from '@/utils/cockpitClientAuth';
 import type { DriverEventFavorite, DriverEventLeg } from '@/utils/driverEventFavorites';
 import { DriverEventFavoritesSection } from '@/components/driver/DriverEventFavoritesSection';
+import { DriverLegPickerModal, type DriverLegAction } from '@/components/driver/DriverLegPickerModal';
 
 const THINKING_STEPS = [
   '🔍 배차 데이터베이스 동선 대조 중...',
@@ -103,8 +104,8 @@ interface ScheduleTabProps {
   onLoadEventLeg?: (route: DriverEventLeg) => void;
   onOpenProfileModal: () => void;
   onSelectRouteForCockpit: (origin: LocationPreset, destination: LocationPreset, schedule?: ScheduleItem) => void;
-  onOpenPredictionForSchedule: (schedule: ScheduleItem) => void;
-  onNavigateForSchedule: (schedule: ScheduleItem) => void;
+  onOpenPredictionForSchedule: (schedule: ScheduleItem, leg?: DriverEventLeg) => void;
+  onNavigateForSchedule: (schedule: ScheduleItem, leg?: DriverEventLeg) => void;
   onOpenFlightModal?: (flightId: string, type: 'arrival' | 'departure') => void;
   onSwitchVehicle?: (vehicleNo: string) => void;
   presets?: LocationPreset[];
@@ -127,6 +128,11 @@ export const ScheduleTab: React.FC<ScheduleTabProps> = ({
 }) => {
   // Schedules state (starts with empty state by default, populated dynamically per vehicle)
   const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
+  const [legSelection, setLegSelection] = useState<{ schedule: ScheduleItem; action: DriverLegAction } | null>(null);
+  const needsLegSelection = (item: ScheduleItem) =>
+    (item.routeWaypoints?.length || 0) > 2 ||
+    (item.adminWaypoints?.length || 0) > 0 ||
+    (item.waypoints?.length || 0) > 0;
   const [scheduleSaveError,setScheduleSaveError]=useState('');
   const [scheduleTitle, setScheduleTitle] = useState<string>('페라리 VIP 의전 배차표');
   const [inputText, setInputText] = useState('');
@@ -861,6 +867,21 @@ ${scheduleItemsFormatted}`.trim();
     <div className="w-full min-h-[calc(100dvh-130px)] flex flex-col justify-between relative pb-6 select-none">
       {scheduleSaveError && <p role="alert" className="p-3 text-sm text-rose-600">{scheduleSaveError}</p>}
       {scheduleMutation.hasPending && <button type="button" className="rounded-xl border p-3 text-sm text-blue-700" onClick={async()=>{try{const response=await scheduleMutation.retry();const data=await response.json();if(!response.ok)throw new Error(data.error || '저장 결과를 확인하지 못했습니다.');window.location.reload();}catch(error){setScheduleSaveError(error instanceof Error?error.message:'저장 결과를 확인하지 못했습니다.');}}}>이전 일정 저장 결과 확인</button>}
+      {/* For multi-stop VIP services the driver must select the actual journey first. */}
+      {legSelection && (
+        <DriverLegPickerModal
+          schedule={legSelection.schedule}
+          action={legSelection.action}
+          onClose={() => setLegSelection(null)}
+          onSelect={(leg) => {
+            const { schedule, action } = legSelection;
+            setLegSelection(null);
+            if (action === 'load') onLoadEventLeg?.(leg);
+            else if (action === 'navigate') onNavigateForSchedule(schedule, leg);
+            else onOpenPredictionForSchedule(schedule, leg);
+          }}
+        />
+      )}
       {/* Hidden File Input for Image/PDF Upload (multiple enabled) */}
       <input
         type="file"
@@ -1163,11 +1184,21 @@ ${scheduleItemsFormatted}`.trim();
               <ScheduleCard
                 key={`${item.id}-${itemIdx}`}
                 item={item}
-                onNavigate={(sch) => onNavigateForSchedule(sch)}
-                onPredict={(sch) => onOpenPredictionForSchedule(sch)}
+                onNavigate={(sch) => {
+                  if (needsLegSelection(sch)) setLegSelection({ schedule: sch, action: 'navigate' });
+                  else onNavigateForSchedule(sch);
+                }}
+                onPredict={(sch) => {
+                  if (needsLegSelection(sch)) setLegSelection({ schedule: sch, action: 'predict' });
+                  else onOpenPredictionForSchedule(sch);
+                }}
                 onSelectForCockpit={(sch) => {
-                  const { originPreset, destinationPreset } = scheduleToPresets(sch);
-                  onSelectRouteForCockpit(originPreset, destinationPreset, sch);
+                  if (needsLegSelection(sch)) {
+                    setLegSelection({ schedule: sch, action: 'load' });
+                  } else {
+                    const { originPreset, destinationPreset } = scheduleToPresets(sch);
+                    onSelectRouteForCockpit(originPreset, destinationPreset, sch);
+                  }
                 }}
                 onOpenFlight={onOpenFlightModal}
                 onEdit={(sch) => {
