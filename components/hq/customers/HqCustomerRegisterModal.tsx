@@ -304,7 +304,7 @@ export const HqCustomerRegisterModal: React.FC<HqCustomerRegisterModalProps> = (
           </div>
 
           <HqInlineFeedback message={formError} onDismiss={() => setFormError(null)} />
-          {actionHead}
+          {/* Action buttons */}
           <div className="flex items-center justify-end gap-2 pt-3">
             <HqButton variant="subtle"
               type="button"
