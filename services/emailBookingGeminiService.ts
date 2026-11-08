@@ -87,6 +87,7 @@ const BOOKING_RESPONSE_SCHEMA = {
   type: Type.OBJECT,
   properties: {
     companyName: { type: Type.STRING },
+    eventName: { type: Type.STRING },
     contactName: { type: Type.STRING },
     contactPhone: { type: Type.STRING },
     contactEmail: { type: Type.STRING },
@@ -163,6 +164,7 @@ export function createEmptyDraft(params: ExtractBookingParams): HqEmailExtracted
     senderEmail: params.sender,
     replyTo: params.replyTo || undefined,
     companyName: '',
+    eventName: '',
     contactName: '',
     contactPhone: '',
     contactEmail: '',
@@ -300,6 +302,7 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
 1. ZERO HALLUCINATION: If a field is not explicitly mentioned or clearly inferred, return empty string "".
 2. DISAMBIGUATE ENTITIES:
    - "companyName": Requesting client/company (e.g. Ferrari Korea, Simmtech, Chanel, Global Events). If not mentioned, return "".
+   - "eventName": The actual event or project title (e.g. FRED 90th Anniversary, Fashion Week, Brand Press Tour). Do not use the companyName as a made-up event title. If no explicit title, return "".
    - "contactName": Person coordinating/booking the trip (from body, signature, or sign-off).
    - "contactPhone": Coordinator's phone only. MUST NEVER CONTAIN AN EMAIL ADDRESS!
    - "contactEmail": Coordinator's email address.
@@ -415,6 +418,7 @@ ${pdfFiles.length ? 'Read each attached PDF in order, including scanned tables, 
       senderEmail: sender,
       replyTo: replyTo || undefined,
       companyName: String(parsed.companyName || ''),
+      eventName: String(parsed.eventName || '').trim(),
       contactName: String(parsed.contactName || ''),
       contactPhone: cleanPhone(parsed.contactPhone),
       contactEmail: String(parsed.contactEmail || ''),
