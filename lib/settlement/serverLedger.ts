@@ -154,20 +154,27 @@ export async function loadSettlementSource(scheduleId: string): Promise<{ source
     return data;
   };
   const before = await readHash();
-  const [s, l, e] = await Promise.all([
+  const [s, l] = await Promise.all([
     supabaseAdmin.from('schedules')
       .select('id,org_id,date,customer_name,event_name,vehicle_model,vehicle_plate,driver_name,driver_id')
       .eq('id', scheduleId).maybeSingle(),
     supabaseAdmin.from('driving_logs')
       .select('id,booking_id,driver_id,status,customer_service_start,customer_service_end')
       .eq('organization_id', SETTLEMENT_ORG).eq('booking_id',scheduleId).order('id'),
-    supabaseAdmin.from('expenses')
-      .select('id,booking_id,expense_date,category,amount,merchant,billable_to_customer,status')
-      .eq('organization_id', SETTLEMENT_ORG).eq('booking_id',scheduleId).order('id'),
   ]);
-  if (s.error || !s.data || (s.data.org_id && s.data.org_id !== SETTLEMENT_ORG) || l.error || e.error)
-    throw new Error('예약·운행일지·경비 원본을 조회하지 못했습니다.');
-  const logs = l.data || [], expenses = e.data || [];
+  if (s.error || !s.data || (s.data.org_id && s.data.org_id !== SETTLEMENT_ORG) || l.error)
+    throw new Error('예약·운행일지 원본을 조회하지 못했습니다.');
+  const logs = l.data || [];
+  const expenseLinkIds = logs.map(log => log.id).filter(validScheduleId);
+  // A receipt may be linked directly to the booking OR only to its driving log.
+  // Include both, without matching by loose customer name or license plate.
+  const expenseFilter = ['booking_id.eq.'+scheduleId];
+  if (expenseLinkIds.length) expenseFilter.push('driving_log_id.in.('+expenseLinkIds.join(',')+')');
+  const e = await supabaseAdmin.from('expenses')
+    .select('id,booking_id,driving_log_id,expense_date,category,amount,merchant,billable_to_customer,status')
+    .eq('organization_id', SETTLEMENT_ORG).or(expenseFilter.join(',')).order('id');
+  if (e.error) throw new Error('승인 경비 원본을 조회하지 못했습니다.');
+  const expenses = e.data || [];
   const log = logs.length === 1 ? logs[0] : null;
   const start = log?.customer_service_start || null;
   const end = log?.customer_service_end || null;
